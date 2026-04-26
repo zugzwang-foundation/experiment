@@ -1,0 +1,29 @@
+# Lefthook config for Zugzwang experiment.
+# Hooks run locally before commit/push to catch issues early.
+# Per Playbook §1: verify with biome check + tsc --noEmit before commits land.
+# CI is the canonical enforcement layer; these hooks are developer convenience.
+
+pre-commit:
+  parallel: true
+  jobs:
+    - name: biome-check-staged
+      glob: "*.{js,jsx,ts,tsx,json,jsonc,css}"
+      run: pnpm exec biome check --write --no-errors-on-unmatched --files-ignore-unknown=true --colors=off {staged_files}
+      stage_fixed: true
+      skip:
+        - merge
+        - rebase
+
+pre-push:
+  parallel: true
+  jobs:
+    - name: typecheck
+      run: pnpm tsc --noEmit
+      skip:
+        - merge
+        - rebase
+    - name: biome-check-all
+      run: pnpm exec biome check .
+      skip:
+        - merge
+        - rebase
