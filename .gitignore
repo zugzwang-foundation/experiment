@@ -1,0 +1,53 @@
+# === Dependencies ===
+node_modules/
+.pnpm-store/
+
+# === Build outputs ===
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# === Caches ===
+.turbo/
+.cache/
+.eslintcache
+.parcel-cache/
+
+# === Environment files (NEVER commit secrets) ===
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+.env.test
+!.env.example
+
+# === IDE / editor ===
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# === OS detritus ===
+.DS_Store
+Thumbs.db
+*.log
+
+# === Test / coverage ===
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# === Claude Code local overrides ===
+CLAUDE.local.md
+.claude/settings.local.json
+
+# === Misc ===
+*.pem
+.vercel
