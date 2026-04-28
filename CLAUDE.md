@@ -314,7 +314,7 @@ Every default below has either an ADR backing it or a `DECIDE` marker pointing t
 | Tool versions | **mise** | `mise.toml` pins Node 22, pnpm 10 |
 | Task runner | **just** | `justfile` for human-facing commands |
 | Commits | **Conventional Commits + commitlint** | Predictable changelog |
-| License | **AGPL-3.0** | Per ADR-0001; matches Manifold |
+| License | **AGPL-3.0-or-later** | Per ADR-0001; AGPL §13 forecloses closed-source SaaS forks |
 | **Claude Code model** | **Opus 4.7** (`claude-opus-4-7`) | Hrishikesh's preference for all coding tasks |
 | **Claude Code effort (repo baseline)** | **`effortLevel: xhigh`** in `.claude/settings.json` | Strongest setting that *persists* via settings.json |
 | **Claude Code effort (per-machine)** | **`CLAUDE_CODE_EFFORT_LEVEL=max`** in shell rc | Hrishikesh-preferred override; `max` does not persist via settings.json |
