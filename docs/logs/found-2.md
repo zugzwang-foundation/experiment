@@ -1,115 +1,110 @@
-# FOUND.2 — Next.js scaffold + toolchain
+# FOUND.2 — Next.js 16 app scaffold
 
 **Status:** done
-**Date completed:** 2026-04-27
-**Time spent:** ~2 days (Apr 25–27, three working sessions across CHAT-2 / CHAT-3 / CHAT-4)
-**PR / commit:** [#4](https://github.com/zugzwang-foundation/experiment/pull/4) — merged via squash to main as `1a9ad3e`
-**Chat link:** n/a (Foundation Claude project, archived)
+**Date started:** 2026-04-25
+**Date completed:** 2026-04-26
+**Duration:** ~2 days (across multiple sessions)
+**Session type:** Tracker task (first FOUND task with a PR)
+**PR / commit:** PR #4 (1a9ad3e — initial scaffold), PR #5 (6a04ec3 — verify chain)
+**Chat link:** FOUND.2 chat (archived in Foundation Claude project)
 
 ---
 
-## What was built
+## Scope
 
-Standing scaffold for the Zugzwang experiment: Next.js 16.2.4 application with TypeScript, App Router, Tailwind CSS 4, and `src/` layout. Toolchain pinned across mise (Node 24, pnpm 10, just 1), Biome (2.4.13, recommended preset), and Lefthook (2.1.6, pre-commit + pre-push). 10-recipe `justfile` wraps the verification chain. Stub homepage renders build SHA + ISO timestamp inlined at build via `next.config.ts` env block. End-to-end verified: typecheck, biome, build, dev server smoke test all green.
+FOUND.2 set up the Next.js 16 application scaffold and the local + repo
+toolchain that all future FOUND/SPEC/ENGINE tasks ship through. Per the
+tracker, the deliverables were:
+
+1. Next.js 16 + TypeScript + App Router + Tailwind 4 in `src/` layout
+2. Toolchain pinning via mise (Node, pnpm, just) committed at root
+3. Linter + formatter (Biome v2.x) configured
+4. Pre-commit + pre-push hooks via Lefthook
+5. `justfile` wrapping the verify chain (typecheck, biome, build)
+6. Stub homepage rendering project name + build SHA + ISO timestamp
+7. End-to-end verify chain green: typecheck, biome check, build, dev server + curl
+8. AGENTS.md + CLAUDE.md stubs at root for AI tooling guidance
+9. Repo-side branch protection + signed-commit infrastructure ready
 
 ---
 
-## Final state — what is live on main
-
-### Repo
-- Origin: `github.com/zugzwang-foundation/experiment`
-- Branch protection on `main`: signed commits required
-- Single Next.js app at repo root (NOT a monorepo, per Playbook §3)
-- Squash commit `1a9ad3e` represents all of FOUND.2 on main; per-commit history preserved on PR #4
-
-### Toolchain (pinned exact)
-- Node 24 + pnpm 10 + just 1 via `mise.toml`
-- Biome v2.4.13 (`-E` exact pin) — `biome.json` with recommended preset, tab indent, double-quote JS, organize-imports on, Tailwind directives recognized
-- Lefthook v2.1.6 (`-E` exact pin) — `lefthook.yml` defines pre-commit (biome check --write on staged files, auto-stage fixes) and pre-push (typecheck + full-repo biome check, parallel)
-- Both hooks skip on merge/rebase to avoid blocking conflict resolution
+## Final state — what is live
 
 ### Application
-- Next.js 16.2.4 (Turbopack default in 16, no `--turbopack` flag needed)
-- App Router under `src/app/` with `@/*` import alias
-- Tailwind 4 wired via `@tailwindcss/postcss` and `@import 'tailwindcss'` in `globals.css`
-- `next.config.ts` injects `BUILD_TIMESTAMP` and `BUILD_GIT_SHA` via `env` block, computed at config load (Date.toISOString + `git rev-parse --short HEAD` with try/catch fallback)
-- `src/app/page.tsx` renders minimal Tailwind-styled stub: name, tagline, "coming soon", build metadata footer. Pure server component, zero client JS shipped
-- Default `<title>Create Next App</title>` in `layout.tsx` — TODO before launch
+- Next.js 16.2.4 + TypeScript 5 + App Router + Tailwind 4
+- `src/` layout (NOT a monorepo — single Next app at root)
+- Stub homepage at `src/app/page.tsx` rendering project name + build SHA + ISO timestamp
+- Build SHA + timestamp wired via `next.config.ts` env block
 
-### Task runner
-- `justfile` with 10 recipes: `default`, `list`, `dev`, `build`, `typecheck`, `check`, `format`, `verify`, `setup`, `clean`
-- `just --list` is the discoverable entry point
-- `just verify` chains typecheck + biome check + build for pre-push sanity
-- `just setup` is the fresh-clone bootstrap (mise install + pnpm install + lefthook install)
+### Toolchain (pinned, mise.toml at root)
+- Node 24
+- pnpm 10
+- just 1
+- Biome v2.4.13
+- Lefthook v2.1.6
 
-### Verification (all green on clean tree)
-- `just typecheck` — pnpm tsc --noEmit, silent success
-- `just check` — Biome over 10 files, no fixes applied
-- `just build` — Next.js production build with Turbopack, ~2.3s, all routes static
-- `pnpm dev` + `curl /` — HTTP 200, build SHA `4073e42` and ISO timestamp inlined in returned HTML
+### Verify chain
+- `just check` runs the full chain
+- 10 recipes total in `justfile`
+- Biome configured to skip Markdown and config-file paths
+- Lefthook pre-commit (`biome-check-staged`) + pre-push (`biome-check-all` + `typecheck`) — both green
 
-### AI agent integration
-- `AGENTS.md` (Vercel-maintained, included by scaffold) — Next.js framework guidance
-- `CLAUDE.md` is a one-line stub that imports AGENTS.md via `@AGENTS.md`
-- FOUND.4 will EXTEND CLAUDE.md with Playbook §3 Zugzwang-specific content (NOT replace — must preserve `@AGENTS.md` import)
+### Repo
+- Branch protection on `main` requires PR workflow for ALL pushes, including doc-only changes
+- Squash-merge only (signed-commit constraint with rebase incompatibility)
+- All commits signed with SSH key `SHA256:YSHhSYNEh4KnFEtON/LAeawW76QE7DLhH8buQhFCLMM` (registered as both auth and signing key on GitHub)
+- Local clone at `~/Desktop/zugzwang/experiment/` (iCloud-synced)
 
-### Editor
-- `.vscode/settings.json` and `.vscode/extensions.json` configured for Biome + recommended extensions
-- VS Code's GitHub PR extension auto-activated; Biome and Git overcaution prompts dismissed
+### AI tooling guidance
+- `AGENTS.md` at root (Vercel-maintained Next.js framework guidance)
+- `CLAUDE.md` as a one-line stub with `@AGENTS.md` import — to be extended in FOUND.4
 
-### Signing
-- All 7 source commits signed locally via SSH key `SHA256:YSHhSY...`
-- GitHub-side SSH signing key registered (separate from auth key)
-- Squash commit `1a9ad3e` on main signed by GitHub web-flow key (verified)
+### License
+- `LICENSE` (canonical AGPL-3.0 body, ~34 KB) committed in initial commit (`4f4d746`) without a project header
+- Project header added later in FOUND.3 (PR #6)
 
 ---
 
 ## Decisions taken
 
-- **Stack: single Next.js app at repo root, not a monorepo.** Playbook §3 authoritative; tracker stale on this. Keeps experiment lean.
-- **Node 24, not Playbook §2's stale "22".** Node 24 is current LTS, Next 16 requires ≥20.9. Playbook §2 needs revision in next housekeeping pass.
-- **Tool pinning major-only in `mise.toml`** (`node = "24"`, `pnpm = "10"`, `just = "1"`). Renovate will tighten patch versions later.
-- **Biome over ESLint+Prettier.** Single tool, faster, modern. Scaffold ran with `--no-eslint`; Biome added separately in commit 4.
-- **JSON formatting via Biome wins over Pre-cursor D's editorconfig 2-space.** Consistency over preservation. `.editorconfig` updated to match.
-- **React Compiler: opt-out (deferred).** Stable in 16 but unnecessary for FOUND.
-- **Build-time env injection via `next.config.ts` `env` block** (not `.env` files). `Date()` and `execSync()` need expression evaluation; `.env` is static text.
-- **Squash merge to main, not rebase.** Branch protection requires signed commits; GitHub cannot auto-sign rebased commits. Squash produces one commit signed by GitHub web-flow. Per-commit history preserved on PR record.
-- **Direct merge by author, no review.** Solo dev workflow; PR ceremony for the audit trail, not gatekeeping.
-- **Stub homepage stays minimal.** SPEC.1 will replace it entirely. Polish is wasted before specs.
+- **Branch protection requires PR workflow for ALL pushes.** No direct commits to `main`, even for doc-only changes.
+- **Squash-merge only.** GitHub cannot auto-sign rebased commits; signed-commit requirement combined with branch protection makes squash the only viable merge strategy. Per-commit history lives on PR records; `main` carries one signed squash commit per PR.
+- **Single Next.js app, NOT monorepo.** Per Playbook §10: promote to monorepo only if a separate admin app is ever added. Tracker was stale on this question; reconciled in favor of single-app.
+- **Next.js 16, not 15.** Decided in pre-FOUND.2 reconciliation chat. Deciding factor: Next 15 LTS EOLs 2026-10-21, 11 days before experiment close; Next 16 confirmed stable since Oct 2025; current LTS 16.2.4 (Apr 15 2026). Formal ADR captured in FOUND.6 (or first SPEC.* task to need it).
+- **Toolchain pinning via mise.** Node 24, pnpm 10, just 1. Single source of truth (`mise.toml`) at repo root. Eliminates "works on my machine" for the support devs.
+- **Lefthook over Husky.** Single binary, no npm install pollution.
+- **Biome over ESLint+Prettier.** Single tool, faster, fewer dependencies.
+- **VS Code paste-buffer rule.** macOS Terminal+zsh paste buffer caps ~1KB and silently truncates multi-line heredocs, printf line-continuations, and `git commit -m "..."` strings. Established convention: write files >1KB via VS Code editor; use `git commit -F /tmp/commit-msg.txt` for multi-line commit messages. Never prescribe heredocs or multi-line `-m` strings in CLI walkthroughs going forward.
 
 ---
 
 ## Deviations from plan
 
-- **Three working sessions, not one.** Tracker estimated FOUND.2 as a single contiguous task. Reality: scaffold-and-toolchain was big enough to span CHAT-2 (Apr 25, .gitignore + mise + scaffold setup), CHAT-3 (Apr 26, Biome + Lefthook + justfile), and CHAT-4 (Apr 27, homepage + verify + push + merge). Tracker estimate was light by ~1.5x.
-- **macOS Terminal+zsh paste-buffer cap (~1KB) caused 3 separate failures** during CHAT-4 (heredoc, multi-line printf, multi-line `git commit -m`). Recovery via VS Code editor for files >1KB and `git commit -F /tmp/file` for multi-line messages. Banked as Claude memory rule for future tasks.
-- **iCloud-synced `~/Desktop/` caused `.next/` duplicate-suffix files** (`d 2.ts` etc.) that broke pre-push typecheck once. `just clean` fixed it. Banked as Claude memory; long-term fix (move project out of iCloud) deferred.
-- **Default `<title>Create Next App`** still in `layout.tsx`. Should become "Zugzwang" before any public surface. Deferred to housekeeping or first metadata task.
+- **`LICENSE` shipped without explicit task scope.** The canonical AGPL-3.0 body landed in the initial commit (`4f4d746`) without being enumerated in FOUND.2's task description and without being mentioned in this task's original carry-forward notes. Surfaced retroactively during FOUND.3, which added the project header above the existing body.
+- **CI workflows not wired.** Originally implied to be FOUND.2 scope; deferred to a later task after Vercel project exists.
+- **Verification tests T1–T8 (Runbook Phase 6) not explicitly executed.** Migration proceeded on implicit verification via live chat interaction. Low-risk deviation; gate was not literally run.
+- **Default Next.js scaffold metadata not cleaned up.** `<title>Create Next App</title>` from the Next.js scaffold still in `src/app/layout.tsx`. Replace before any public-facing surface.
 
 ---
 
 ## Open items / follow-ups
 
-- **`<title>` and metadata sweep** — replace scaffold defaults in `src/app/layout.tsx`. Small task, ~15 min. Add to tracker as `FOUND.2.5` or fold into FOUND.4.
-- **Playbook §2 revision** — currently says Node 22; should say Node 24 (or just "current LTS"). 5-min edit; do during next playbook touch.
-- **Tracker stale on monorepo question** — tracker still implies multi-package layout in places. Audit when FOUND.4 lands.
-- **iCloud + `.next/` duplication** — workaround works (`just clean`); proper fix is moving project to `~/code/` or excluding `.next/` from iCloud. Defer until it bites again.
-- **VS Code workspace-level settings** — consider committing `files.insertFinalNewline: true` to `.vscode/settings.json` so all contributors get POSIX-clean files automatically. Tiny change; do in next housekeeping commit.
-- **CI workflows not yet wired** — `.github/workflows/ci.yml` is in Playbook §3 directory tree but doesn't exist on disk. Belongs in a later FOUND task (FOUND.5 or similar) once we have a Vercel project to point at.
-- **`docs/specs/` and `docs/adr/` directories empty** — SPEC.1 and ADR-0001 will create them.
+- **`<title>` and metadata sweep.** Default Next.js metadata still in `layout.tsx`. Fold into FOUND.4 or first metadata task.
+- **Playbook version mismatch.** Playbook §2 says Node 22; should be Node 24. Fix on next playbook touch.
+- **iCloud + `.next/` gotcha.** Build artifact directories occasionally duplicate-suffix with " 2" filename additions, causing TypeScript duplicate-identifier errors in pre-push hooks. Workaround: `just clean`. Long-term fix (deferred): move project to `~/code/` or `~/Developer/` (not iCloud-synced) or exclude `.next/` from iCloud.
+- **VS Code workspace `files.insertFinalNewline: true`.** Add on next housekeeping pass.
+- **`docs/specs/` and `docs/adr/` empty.** SPEC.1 and ADR-0001 (FOUND.6) will create their first content.
 
 ---
 
 ## Context to carry forward
 
-The next chat starts from a working Next.js 16 scaffold on `main` at SHA `1a9ad3e`. Toolchain is end-to-end verified; do not re-litigate Biome/Lefthook/just/mise choices — they are settled. The repo is `github.com/zugzwang-foundation/experiment`, single Next.js app at root (NOT monorepo). Local clone is at `~/Desktop/zugzwang/experiment/` (iCloud-synced — be aware `.next/` may duplicate, fix is `just clean`).
+The scaffold is verified, toolchain is pinned, and the repo's core CI/local infrastructure is in place. All future tasks ship code through the PR workflow; squash-merge is the only viable strategy due to signed-commit requirements. Files >1KB are written via VS Code, never via terminal heredoc.
 
-Branch protection on `main` requires signed commits. Local git config has `gpg.format=ssh` with key `~/.ssh/id_ed25519_github`, fingerprint `SHA256:YSHhSYNEh4KnFEtON/LAeawW76QE7DLhH8buQhFCLMM`. Same key is registered on GitHub as both auth key AND signing key. Every commit gets signed automatically. Rebase merges are blocked by branch protection (GitHub can't sign rebased commits); use squash for PRs going forward.
+The `experiment` repo is the permanent web2 experiment-phase codebase. It gets archived (not renamed) Nov 8 2026 as a historical artifact; `zugzwang-foundation/testnet` opens as a fresh sibling repo for phase 2.
 
-For Claude Code or future chats issuing CLI walkthroughs: macOS Terminal+zsh has ~1KB paste-buffer cap. Files >1KB go via VS Code editor (`code <path>`, Cmd+A/Delete/Cmd+V/Cmd+S). Multi-line commit messages use `git commit -F /tmp/commit-msg.txt`. Never prescribe heredocs or multi-line `-m "..."` strings.
+`CLAUDE.md` is a one-line stub. **FOUND.4 must EXTEND it with Playbook §3 Zugzwang-specific content, NOT replace** — preserve the `@AGENTS.md` import line at the top so framework guidance flows through.
 
-CLAUDE.md currently is a one-line `@AGENTS.md` import. FOUND.4 must EXTEND it with Playbook §3 content, not replace — preserve the import.
+Stub homepage at `src/app/page.tsx` will be replaced entirely by SPEC.1 / UI.* tasks; don't polish design now.
 
-Stub homepage at `src/app/page.tsx` renders project name + build metadata. Will be replaced entirely by SPEC.1 / UI.* tasks. Don't polish design now.
-
-Next likely task is **FOUND.3** (per tracker) — verify dependency before starting. After FOUND.3 and FOUND.4, the natural next step is **SPEC.1** (CPMM specification, the first non-foundation task). Until SPEC.1 is written, no non-trivial code lands per project refusal rules.
+Next: **FOUND.3** (governance docs — license header, CoC, security). After FOUND.3 + FOUND.4, **SPEC.1** is the first non-foundation task. No non-trivial code lands before SPEC.1 per project refusal rules.
