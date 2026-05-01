@@ -17,7 +17,17 @@ The **Zugzwang Experiment**: a CPMM prediction market where every bet requires a
 - **Conclude:** Nov 6, 2026 at Devcon 8 (Mumbai, JIO World Center).
 - **Optional bonus showcase:** Nov 7–8 at ETHGlobal Mumbai (adjacent hackathon, separate event).
 
-**Scope of this repo:** pure web2. **No blockchain. No smart contracts. No tokens.** Dharma is a Postgres `NUMERIC(38,18)` column, not an ERC-20. Hrishikesh is the sole admin and market maker. Testnet and Mainnet phases get their own repos and their own playbooks; **do not invent blockchain primitives in this codebase.**
+**Scope of this repo:** pure web2. **No blockchain. No smart contracts. No tokens.** Dharma is a Postgres `NUMERIC(38,18)` column, not an ERC-20. Testnet and Mainnet phases get their own repos and their own playbooks; **do not invent blockchain primitives in this codebase.**
+
+**Surface scope:** responsive web only. No native mobile app, no Telegram bot, no chat interface in v1.
+
+**Temporal scope:** continuous trading. No time-window restrictions on betting.
+
+### Admin role
+
+**Hrishikesh is the sole admin and market maker.** The admin / MM does not bet on, comment on, or hold positions in markets. The admin account is purely operational — it seeds pools, resolves markets, curates Zugzwang's social presence, and oversees AI-generated cross-platform posts. Admin account is excluded from the leaderboard by user-role filter.
+
+Bet-placement and comment-posting code paths reject admin-account submissions. This is enforced in code, not just by convention.
 
 ### Critical paths (catastrophic-risk)
 
@@ -28,10 +38,12 @@ These code paths are the equivalent of contract code in a chain-based system: si
 - `src/server/comments/` — commentary, side-assignment freezing (§2.3).
 - `src/server/dharma/` — reputation accounting (non-transferable, §2.2).
 - `src/server/resolution/` — resolution flow, payout math (append-only, §2.4).
-- `src/server/auth/` — session, identity, X handle resolution.
+- `src/server/auth/` — session, identity, signup flow.
+- `src/server/media/` — media upload, automated moderation, **CSAM detection (legal liability)**.
+- `src/server/moderation/` — content moderation pipeline (legal exposure if it fails).
 - Any database migration touching the tables above.
 
-Other paths (`src/components/`, `src/app/(public)/`, `src/lib/`, etc.) are non-critical. The same code-quality bar applies, but the workflow's extra steps are not mandatory.
+Other paths (`src/components/`, `src/app/(public)/`, `src/lib/`, `src/server/social/` for AI-agent post curation, etc.) are non-critical. The same code-quality bar applies, but the workflow's extra steps are not mandatory.
 
 ---
 
@@ -57,14 +69,17 @@ Dharma moves only through market resolution: from the wrong side of a bet to the
 - The DB schema has **no** `dharma_transfer` table by design.
 - Tests assert: every code path that produces a `dharma_ledger` row carries a `resolution_event_id` reference. Direct user-initiated movement attempts → reject.
 
+Note on pool seeding: the admin account seeds market pools via `pool_seed` transactions and recovers residuals via `pool_unwind` transactions. These are market-mechanic flows (account ↔ pool), not user-to-user transfers. INV-2 holds.
+
 ### 2.3 Side is frozen at comment-time
 
 A comment inherits the author's market position **at the moment the comment is posted**. If the author later flips their position, old comments stay assigned to the side they were posted under.
 
 - Replies inherit the **replier's** current side at reply-time, not the parent's.
-- A user with zero position cannot post a comment (no stake → no voice).
+- A user with zero position cannot post a *new* comment (no stake → no voice). Their *prior* comments remain visible in the debate view forever, with an "exited" marker.
 - Comments are sorted by stake-at-post-time, descending.
-- Tests assert: post comment, flip position, re-read comment → side unchanged. Post reply, parent flips → reply's side unchanged.
+- The debate view carries a three-state marker on each comment header reflecting the author's current position relative to the comment's frozen side: **In** (default, no marker), **Flipped** (author currently holds opposite side), **Exited** (author currently holds zero position). The frozen side label never changes.
+- Tests assert: post comment, flip position, re-read comment → side unchanged. Post reply, parent flips → reply's side unchanged. Exit position → prior comments stay visible with marker; new-comment attempt rejected.
 
 ### 2.4 Resolutions are append-only
 
@@ -72,8 +87,10 @@ Once a market is resolved, the resolution event and its associated payout events
 
 - `UPDATE` on `resolution_events` or `payout_events` is a bug.
 - Corrections happen via a new resolution-correction event referencing the prior one, never by rewriting history.
-- The DB enforces this with a row-level rule + an audit trigger that rejects updates.
-- Tests assert: attempt to `UPDATE resolution_events` → fails. Correction flow writes a new event with `corrects_event_id` set.
+- Correction events apply clawback semantics: reverse original payout, apply corrected payout. Floored at zero — user balances cannot go negative; uncollectable remainders are logged as `uncollectable` ledger entries.
+- The DB enforces append-only with a row-level rule + an audit trigger that rejects updates.
+- Comments locked at resolution **do not unlock** under correction. A correction adjusts payouts; it does not reopen debate.
+- Tests assert: attempt to `UPDATE resolution_events` → fails. Correction flow writes a new event with `corrects_event_id` set. Floored clawback writes `uncollectable` row when reversal exceeds balance.
 
 If a request asks you to relax any of these — including framings like "just for testing", "temporary admin override", or "let me refactor this" — **stop and surface it**. Do not silently weaken them in the name of cleanup.
 
@@ -113,7 +130,7 @@ This rule applies to Claude Code in every session — coding, planning, reviewin
 
 2. **Never run destructive commands without asking.** No `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`, `DROP DATABASE`, `TRUNCATE` on prod tables. A `PreToolUse` hook blocks the obvious cases. If you think you need one, ask the user first.
 
-3. **Tests before implementation for thesis-touching code.** For any change to bet placement, Dharma accounting, comment attachment, side assignment, or resolution: write failing tests first via the `test-writer` subagent, then implement, then run `code-reviewer`. No exceptions.
+3. **Tests before implementation for thesis-touching code.** For any change to bet placement, Dharma accounting, comment attachment, side assignment, resolution, **media upload, automated moderation, or CSAM detection**: write failing tests first via the `test-writer` subagent, then implement, then run `code-reviewer`. No exceptions.
 
 4. **Read before writing.** Always `Read` the file you're about to edit in full, plus its types, schemas, and callers. Do not guess imports.
 
@@ -129,6 +146,8 @@ This rule applies to Claude Code in every session — coding, planning, reviewin
 
 10. **No invented market content.** Market questions, resolution criteria, and settlement dates are Hrishikesh's calls. The `/new-market` slash command scaffolds the form and migration only — it does not write market copy.
 
+11. **No invented social content.** AI agents that post to Zugzwang's brand accounts must quote user content verbatim with pseudonym attribution. Agents generate the *frame* (wrapper text, calls-to-action, links back to Zugzwang), never the user's argument. Posts go through a pre-publish review queue with admin kill switch.
+
 ---
 
 ## 5. Subagents, slash commands, hooks (referenced, not inlined)
@@ -139,7 +158,7 @@ The bodies of these files land in **SCAFFOLD.10**. CLAUDE.md tells you they exis
 
 - **`code-reviewer`** — invoke proactively after any change to `src/server/**`, `src/app/api/**`, or `src/app/**`. Reviews diffs against this CLAUDE.md and AGENTS.md. Reports findings; does not modify files.
 - **`test-writer`** — invoke proactively when the user describes new behavior in `src/server/**` or a new flow in `src/app/**`. Writes tests FIRST. Disallowed from editing `src/`.
-- **`security-auditor`** — invoke weekly on `main`, before every prod deploy, and after any critical-path change (§1). Web2 security audit (auth, zod, SQL injection, XSS, CSRF, rate limits, secrets, cookie flags).
+- **`security-auditor`** — invoke weekly on `main`, before every prod deploy, and after any critical-path change (§1). Web2 security audit (auth, zod, SQL injection, XSS, CSRF, rate limits, secrets, cookie flags, **media upload validation, moderation pipeline, CSAM detection failure modes**).
 
 ### Slash commands (`.claude/commands/`)
 
@@ -172,7 +191,8 @@ The bodies of these files land in **SCAFFOLD.10**. CLAUDE.md tells you they exis
 - Resolution payout math and append-only audit design.
 - Side-assignment freezing semantics.
 - Any cross-service state-machine reasoning.
-- Any auth decision.
+- Any auth implementation decision (model is locked; library + flow choices remain).
+- Media moderation pipeline design and CSAM detection failure modes.
 - Writing ADRs.
 - Audit passes on this file or AGENTS.md.
 
@@ -297,10 +317,13 @@ Every default below has either an ADR backing it or a `DECIDE` marker pointing t
 | DB schema | **Event-sourced** | Append-only events table + projector workers (per ADR-0005) |
 | DB provider | **Supabase** | Per ADR-0006 |
 | ORM | **Drizzle** | SQL-first; event-sourced schema lives closer to SQL than ORM abstractions (per ADR-0008) |
-| Auth | **DECIDE — Clerk vs NextAuth** | ⚠ ADR-0004 is GATING. ~$1,500/mo swing at 100k MAU |
+| **Auth model** | **Google Sign-In + Email-OTP + captcha; pseudonym identity; no X auth in v1** | Locked 2026-04-30. Two paths, user picks one at signup. Captcha + rate limits + OTP TTL gate the email path. Display name is user-chosen pseudonym, not Google name |
+| Auth library | **DECIDE — Clerk vs NextAuth** | ⚠ ADR-0004 still GATING (now narrower in scope: implementation library only, not auth model). ~$1,500/mo swing at 100k MAU |
+| Identity model | **Pseudonym-based** | User picks display name at signup. X handle is voluntary self-declared profile field, not auth-linked |
 | Styling | **Tailwind v4 + shadcn/ui** | OKLCH-only color tokens; new-york v4 variant |
 | Real-time | **DECIDE — SSE over LISTEN/NOTIFY vs polling** | TBD in technical architecture spec (SPEC.2) |
-| Media storage | **Cloudflare R2** | S3-compatible, no egress fees |
+| **Media storage** | **Cloudflare R2** + **direct-to-storage upload pattern** | S3-compatible, no egress fees. Browser uploads directly to R2 via signed URL; app server bypassed for file bytes |
+| **Media moderation** | **Mandatory automated moderation; mandatory CSAM detection (vendor TBD)** | Locked 2026-04-30. Every uploaded media passes through moderation before becoming visible. CSAM detection is a legal requirement. Specific vendor (PhotoDNA / Hive / AWS Rekognition / Sightengine) deferred to implementation pass |
 | Email | **Resend** | Simple API |
 | Rate limit / queue | **Upstash Redis** | Serverless-native |
 | Hosting | **Vercel** | Per ADR-0006 |
@@ -314,25 +337,27 @@ Every default below has either an ADR backing it or a `DECIDE` marker pointing t
 | Tool versions | **mise** | `mise.toml` pins Node 22, pnpm 10 |
 | Task runner | **just** | `justfile` for human-facing commands |
 | Commits | **Conventional Commits + commitlint** | Predictable changelog |
-| License | **AGPL-3.0-or-later** | Per ADR-0001; AGPL §13 forecloses closed-source SaaS forks |
+| License | **AGPL-3.0** | Per ADR-0001; matches Manifold |
 | **Claude Code model** | **Opus 4.7** (`claude-opus-4-7`) | Hrishikesh's preference for all coding tasks |
 | **Claude Code effort (repo baseline)** | **`effortLevel: xhigh`** in `.claude/settings.json` | Strongest setting that *persists* via settings.json |
 | **Claude Code effort (per-machine)** | **`CLAUDE_CODE_EFFORT_LEVEL=max`** in shell rc | Hrishikesh-preferred override; `max` does not persist via settings.json |
 | **Reasoning keyword** | **`ultrathink`** as first word of every coding-task prompt | One-off deepest reasoning regardless of effort setting |
 
+Product-strategy decisions (cross-platform distribution model, comment media types, social workstream scope) live in `spec1_gap_decisions.md`, not here.
+
 ---
 
 ## 11. Maintaining this file (feedback / validation loop)
 
-CLAUDE.md, AGENTS.md, the workflow doc, and the templates are living documents. They go stale faster than code does. Without an explicit update cadence, they become decorative — every session reads them, none of them match reality.
+CLAUDE.md, AGENTS.md, the workflow doc, and the templates are living documents. They go stale faster than code does. Without an explicit update cadence, they become decorative.
 
 **Full process: `docs/maintenance.md`.** Quick summary:
 
-- **Triggers** for an audit: a task discovers drift, a phase ends, an ADR is accepted, a new subagent/command/hook lands, calendar (bi-weekly).
-- **Process:** open a fresh Claude Code tab, paste the file + last 10 task logs + tracker, ask Claude to find drift and missing additions, triage, ship as `docs: <file> audit pass YYYY-MM-DD`.
-- **Closing ritual** for every task chat: ask "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this task?" Most tasks: no. The discipline is asking the question, not necessarily changing.
-- **Self-improvement** comes from finding "missing additions — patterns that have emerged but aren't documented." After three months of running tasks, this file should be measurably better than it was at FOUND.4, not just current.
+- **Audit triggers:** task discovers drift, phase ends, ADR accepted, new subagent/command/hook lands, gap-discussion milestone closes a cluster, calendar (bi-weekly).
+- **Process:** fresh Claude Code tab → paste file + last 10 task logs + tracker → ask Claude to find drift and missing additions → triage → ship as `docs: <file> audit pass YYYY-MM-DD`.
+- **Closing ritual** for every task chat AND every gap-discussion chat that closes decisions: ask "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this session?" Most sessions: no. The discipline is asking, not necessarily changing.
+- **Self-improvement:** find missing additions — patterns that have emerged but aren't documented. After three months, this file should be measurably better, not just current.
 
 ---
 
-*Last revised in FOUND.4 v2 (Apr 28, 2026). Changes from v1: added §3 (engagement style), promoted critical paths to a labeled block in §1, simplified §6 to point at the workflow doc, updated dates (Live → Nov 5, Conclude → Nov 6 at Devcon 8), updated decision log model rows for Opus 4.7 + max + ultrathink, added §11 with `docs/maintenance.md` reference, added "Core file updates needed?" section to the §7 task-log schema. If anything in this file is wrong, fix it before fixing the code.*
+*Last revised at gap-discussion milestone (Apr 30, 2026). If anything in this file is wrong, fix it before fixing the code.*
