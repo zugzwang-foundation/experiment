@@ -1,363 +1,139 @@
 # CLAUDE.md
 
-> **Read this file in full at the start of every session.** This is the contract between Claude Code and Zugzwang. If anything below conflicts with what you think you know, this file wins.
->
-> Framework-level patterns (Next.js, Drizzle, Tailwind, Postgres, testing, deployment) live in `AGENTS.md` and flow through via the import below. This file holds **Zugzwang-specific rules**: what cannot bend, what to never do, and how to work.
+> **Read in full at the start of every session.** This is the contract between Claude Code and Zugzwang. If anything here conflicts with what you think you know, this file wins. Stack and framework patterns flow through the import below.
 
 @AGENTS.md
 
 ---
 
-## 1. What this codebase is
+## 1. Project frame
 
-The **Zugzwang Experiment**: a CPMM prediction market where every bet requires attached commentary, and a non-transferable reputation score (Dharma) is conserved per market.
+The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Single deployment, single domain, sole operator. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8 Mumbai (JIO World Center). Optional showcase Nov 7–8 at ETHGlobal Mumbai.
 
-- **Build:** Apr 24 → Sep 14, 2026.
-- **Live:** Sep 15 → Nov 5, 2026.
-- **Conclude:** Nov 6, 2026 at Devcon 8 (Mumbai, JIO World Center).
-- **Optional bonus showcase:** Nov 7–8 at ETHGlobal Mumbai (adjacent hackathon, separate event).
+- **Repo scope:** pure web2. **No blockchain. No smart contracts. No tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet and Mainnet phases get their own repos and their own playbooks — do not invent blockchain primitives in this codebase.
+- **Source of truth.** Spec hierarchy: `docs/specs/SPEC.1.md` (product), `docs/specs/SPEC.2.md` (technical architecture), `docs/adr/0003–0016.md` (decisions of record), `AGENTS.md` (stack patterns). When this file disagrees with code, this file wins until updated by an ADR.
+- **License.** AGPL-3.0-or-later. Source-link footer required on every page (SPEC.1 §16.5). Rationale: AGPL §13 forecloses closed-source SaaS forks.
 
-**Scope of this repo:** pure web2. **No blockchain. No smart contracts. No tokens.** Dharma is a Postgres `NUMERIC(38,18)` column, not an ERC-20. Testnet and Mainnet phases get their own repos and their own playbooks; **do not invent blockchain primitives in this codebase.**
+### Critical paths
 
-**Surface scope:** responsive web only. No native mobile app, no Telegram bot, no chat interface in v1.
+Silent corruption is catastrophic. Tasks touching any of these qualify as critical-path tasks and trigger the writer/reviewer ritual (`docs/workflows/plan-then-execute.md`) + the invariant test gate + a same-commit ADR scan:
 
-**Temporal scope:** continuous trading. No time-window restrictions on betting.
-
-### Admin role
-
-**Hrishikesh is the sole admin and market maker.** The admin / MM does not bet on, comment on, or hold positions in markets. The admin account is purely operational — it seeds pools, resolves markets, curates Zugzwang's social presence, and oversees AI-generated cross-platform posts. Admin account is excluded from the leaderboard by user-role filter.
-
-Bet-placement and comment-posting code paths reject admin-account submissions. This is enforced in code, not just by convention.
-
-### Critical paths (catastrophic-risk)
-
-These code paths are the equivalent of contract code in a chain-based system: silent corruption is catastrophic, hard to detect, and harder to recover from. **Tasks touching any of these qualify as critical-path tasks** and trigger the workflow's extra rigor (§6 + `docs/workflows/plan-then-execute.md`):
-
-- `src/server/markets/` — CPMM engine, market lifecycle, price calculation.
-- `src/server/bets/` — bet placement (atomic with comment, see §2.1).
-- `src/server/comments/` — commentary, side-assignment freezing (§2.3).
-- `src/server/dharma/` — reputation accounting (non-transferable, §2.2).
-- `src/server/resolution/` — resolution flow, payout math (append-only, §2.4).
-- `src/server/auth/` — session, identity, signup flow.
-- `src/server/media/` — media upload, automated moderation, **CSAM detection (legal liability)**.
-- `src/server/moderation/` — content moderation pipeline (legal exposure if it fails).
-- Any database migration touching the tables above.
-
-Other paths (`src/components/`, `src/app/(public)/`, `src/lib/`, `src/server/social/` for AI-agent post curation, etc.) are non-critical. The same code-quality bar applies, but the workflow's extra steps are not mandatory.
+- `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`
+- `src/server/auth/`, `src/server/identity/`, `src/server/moderation/`
+- `src/db/schema/`, `drizzle/migrations/`, `supabase/migrations/`
 
 ---
 
-## 2. Thesis invariants (these cannot bend)
+## 2. The four hard-locked invariants
 
-Four invariants encode the thesis. Violating any of them ships something that is not Zugzwang. Tests must enforce them. Subagents must check them. Reviewers must reject any diff that weakens them.
+Encoded in SPEC.1 §5. Canonical tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. Triggers at `drizzle/migrations/<NNNN>_append_only_triggers.sql` (storage-layer ground truth — not application advisory).
 
-### 2.1 Bet ↔ comment atomicity
-
-A bet without a comment is impossible. The bet row and the comment row commit in a single Postgres transaction or both fail. Enforced server-side, not just in the UI.
-
-- `POST /api/bets` (or the corresponding Server Action) without a `commentId` returns 400.
-- The DB schema makes `bets.comment_id` `NOT NULL` with a foreign key.
-- Tests assert: attempt to insert a bet with `comment_id = NULL` → fails. Attempt to insert a bet whose comment fails validation → both rolled back.
-
-### 2.2 Dharma is non-transferable
-
-Dharma moves only through market resolution: from the wrong side of a bet to the right side. There is no user-initiated transfer.
-
-- No "send Dharma" UI, ever.
-- No admin override that moves Dharma between accounts except via a resolution event.
-- No API surface that does user-to-user Dharma movement.
-- The DB schema has **no** `dharma_transfer` table by design.
-- Tests assert: every code path that produces a `dharma_ledger` row carries a `resolution_event_id` reference. Direct user-initiated movement attempts → reject.
-
-Note on pool seeding: the admin account seeds market pools via `pool_seed` transactions and recovers residuals via `pool_unwind` transactions. These are market-mechanic flows (account ↔ pool), not user-to-user transfers. INV-2 holds.
-
-### 2.3 Side is frozen at comment-time
-
-A comment inherits the author's market position **at the moment the comment is posted**. If the author later flips their position, old comments stay assigned to the side they were posted under.
-
-- Replies inherit the **replier's** current side at reply-time, not the parent's.
-- A user with zero position cannot post a *new* comment (no stake → no voice). Their *prior* comments remain visible in the debate view forever, with an "exited" marker.
-- Comments are sorted by stake-at-post-time, descending.
-- The debate view carries a three-state marker on each comment header reflecting the author's current position relative to the comment's frozen side: **In** (default, no marker), **Flipped** (author currently holds opposite side), **Exited** (author currently holds zero position). The frozen side label never changes.
-- Tests assert: post comment, flip position, re-read comment → side unchanged. Post reply, parent flips → reply's side unchanged. Exit position → prior comments stay visible with marker; new-comment attempt rejected.
-
-### 2.4 Resolutions are append-only
-
-Once a market is resolved, the resolution event and its associated payout events are immutable.
-
-- `UPDATE` on `resolution_events` or `payout_events` is a bug.
-- Corrections happen via a new resolution-correction event referencing the prior one, never by rewriting history.
-- Correction events apply clawback semantics: reverse original payout, apply corrected payout. Floored at zero — user balances cannot go negative; uncollectable remainders are logged as `uncollectable` ledger entries.
-- The DB enforces append-only with a row-level rule + an audit trigger that rejects updates.
-- Comments locked at resolution **do not unlock** under correction. A correction adjusts payouts; it does not reopen debate.
-- Tests assert: attempt to `UPDATE resolution_events` → fails. Correction flow writes a new event with `corrects_event_id` set. Floored clawback writes `uncollectable` row when reversal exceeds balance.
-
-If a request asks you to relax any of these — including framings like "just for testing", "temporary admin override", or "let me refactor this" — **stop and surface it**. Do not silently weaken them in the name of cleanup.
-
----
-
-## 3. Engagement style — push back, don't just agree
-
-The dominant failure mode of LLM coding assistants is sycophancy. The pattern: human gives a task, model agrees, model executes, model produces code with a problem the human would have caught if asked, but wasn't asked because the model didn't push back. Multiplied across hundreds of tasks, this compounds into a codebase that's subtly wrong in ways the human can't see.
-
-**The rule:** agree when Hrishikesh is right. Push back when he's wrong. Flag tradeoffs when both have merit.
-
-Concretely, push back when:
-
-- A task description references something stale (a removed file, an old subagent name, a tracker entry that's been rewritten).
-- A stated dependency isn't actually a dependency.
-- The human asks for X but Y would clearly solve their actual problem — propose Y and defend why.
-- A planned approach violates a thesis invariant (§2). State the invariant, state the violation, propose an alternative.
-- The human's framing is wrong (wrong file path, wrong assumption about how a system works) — correct it before agreeing.
-- You don't know whether the human is right. Say so. Guessing is worse than admitting uncertainty.
-
-Pushback is **not**:
-
-- Disagreement for its own sake.
-- Refusing to execute a valid approach because you'd prefer a different valid approach.
-- Lecturing on first principles when they're already understood.
-- Holding up obvious tasks with theoretical objections.
-
-**The pushback test:** before saying "Got it" or "Sure" to any task, check whether the framing is actually right. If yes, proceed. If no or unsure, push back first.
-
-This rule applies to Claude Code in every session — coding, planning, reviewing, auditing — not only within the workflow's "push back" prompts.
-
----
-
-## 4. Golden rules (YOU MUST)
-
-1. **Never commit directly to `main`.** Work on `feat/*`, `fix/*`, `chore/*`, or `refactor/*` branches. A `PreToolUse` hook enforces this.
-
-2. **Never run destructive commands without asking.** No `rm -rf`, `git push --force`, `git reset --hard`, `DROP TABLE`, `DROP DATABASE`, `TRUNCATE` on prod tables. A `PreToolUse` hook blocks the obvious cases. If you think you need one, ask the user first.
-
-3. **Tests before implementation for thesis-touching code.** For any change to bet placement, Dharma accounting, comment attachment, side assignment, resolution, **media upload, automated moderation, or CSAM detection**: write failing tests first via the `test-writer` subagent, then implement, then run `code-reviewer`. No exceptions.
-
-4. **Read before writing.** Always `Read` the file you're about to edit in full, plus its types, schemas, and callers. Do not guess imports.
-
-5. **Stay in scope.** If the task is about `src/server/markets/`, do not touch `src/server/comments/`. Open a separate task. "While we're here" is how solo-dev codebases die and how reviews become impossible.
-
-6. **Verify everything.** After edits, run the verification path (§8). Report pass/fail. Do not claim "done" without verification.
-
-7. **Use the todo list.** For any multi-step task, emit a TodoList up front and update it as you go.
-
-8. **Plan before you write.** For any non-trivial task, follow `docs/workflows/plan-then-execute.md`. Two phases (Plan + Execute), two fresh Claude Code tabs. Critical-path tasks (§1) add `@security-auditor` invocation, integration tests, and 24-hour PR soak before merge.
-
-9. **One task per session.** When a task is done (PR open or merged), `/clear` before starting the next one. `/compact` only mid-task, with an explicit directive about what to preserve.
-
-10. **No invented market content.** Market questions, resolution criteria, and settlement dates are Hrishikesh's calls. The `/new-market` slash command scaffolds the form and migration only — it does not write market copy.
-
-11. **No invented social content.** AI agents that post to Zugzwang's brand accounts must quote user content verbatim with pseudonym attribution. Agents generate the *frame* (wrapper text, calls-to-action, links back to Zugzwang), never the user's argument. Posts go through a pre-publish review queue with admin kill switch.
-
----
-
-## 5. Subagents, slash commands, hooks (referenced, not inlined)
-
-The bodies of these files land in **SCAFFOLD.10**. CLAUDE.md tells you they exist and when to invoke them; the bodies are in their own files so they can evolve without rewriting CLAUDE.md.
-
-### Subagents (`.claude/agents/`)
-
-- **`code-reviewer`** — invoke proactively after any change to `src/server/**`, `src/app/api/**`, or `src/app/**`. Reviews diffs against this CLAUDE.md and AGENTS.md. Reports findings; does not modify files.
-- **`test-writer`** — invoke proactively when the user describes new behavior in `src/server/**` or a new flow in `src/app/**`. Writes tests FIRST. Disallowed from editing `src/`.
-- **`security-auditor`** — invoke weekly on `main`, before every prod deploy, and after any critical-path change (§1). Web2 security audit (auth, zod, SQL injection, XSS, CSRF, rate limits, secrets, cookie flags, **media upload validation, moderation pipeline, CSAM detection failure modes**).
-
-### Slash commands (`.claude/commands/`)
-
-- **`/plan <TASK.ID>`** — bootstraps Phase 1 of the workflow with the prompt scaffold pre-filled.
-- **`/new-market <slug>`** — scaffold the admin-side form + DB migration for a new market. Does NOT invent market content.
-- **`/resolve <market-id>`** — scaffold the resolution flow with required resolution note.
-- **`/audit-prep`** — pre-deploy checklist: tests pass, no `console.log` in server code, no `any` casts, zod present on every Server Action, no missing rate limits.
-- **`/audit-core <file>`** — bootstraps an audit pass on CLAUDE.md, AGENTS.md, the workflow, or a template. See §11 + `docs/maintenance.md`.
-- **`/pr`** — open a PR with conventional commit title and the standard checklist.
-
-### Hooks (`.claude/hooks/`)
-
-- **`block-dangerous-bash.sh`** (PreToolUse on Bash) — blocks `rm -rf`, `git push --force`, etc.
-- **`block-main-commits.sh`** (PreToolUse on Edit/Write) — blocks edits when `HEAD` is on `main`.
-- **`post-edit-format.sh`** (PostToolUse on Edit/Write) — runs Biome formatter on touched files.
-- **`session-start.sh`** (SessionStart) — prints `git log -5 --oneline`, `claude-progress.md` if present, and pending PRs.
-
-### When to use planning mode (mandatory)
-
-- Any task over 30 lines of diff.
-- Any task touching more than 3 files.
-- Any task touching a critical path (§1).
-- Any architectural decision (writing or modifying an ADR).
-- Any database migration.
-
-### When to use `ultrathink` (mandatory)
-
-- CPMM pricing function, liquidity curve, fee model.
-- Dharma accounting and minting/decay rules.
-- Resolution payout math and append-only audit design.
-- Side-assignment freezing semantics.
-- Any cross-service state-machine reasoning.
-- Any auth implementation decision (model is locked; library + flow choices remain).
-- Media moderation pipeline design and CSAM detection failure modes.
-- Writing ADRs.
-- Audit passes on this file or AGENTS.md.
-
-In practice, with `CLAUDE_CODE_EFFORT_LEVEL=max` set in the shell (§10), `ultrathink` is the keyword that engages the deepest reasoning available regardless of the underlying setting. Habit: drop it as the first word in every coding-task prompt.
-
-### When to `/clear`
-
-- Between unrelated tasks (always).
-- After 2 failed attempts at the same fix (always).
-- When Claude starts repeating itself or making the same mistake twice.
-- Before a security review — fresh eyes only.
-- Before an audit pass on a core file (§11).
-
----
-
-## 6. Writer/reviewer ritual (see workflow doc)
-
-The full ritual lives at `docs/workflows/plan-then-execute.md`. Key principles:
-
-- **Non-trivial tasks:** 2 fresh Claude Code tabs (Plan + Execute). Plan tab = plan mode + ultrathink. Execute tab = normal mode + ultrathink. Each in a fresh tab, not just `/clear`.
-- **Critical-path tasks (§1):** add `@security-auditor` after `@code-reviewer`, run `pnpm vitest run tests/integration/` in addition to the standard verification path, and wait 24 hours before merging the PR.
-- **Trivial tasks (typos, single-line tweaks, doc-only):** skip the ritual.
-
-If the workflow doc says one thing and this section says another, **the workflow doc wins**. This section is a pointer.
-
----
-
-## 7. Task-log discipline
-
-Every task chat ends with a log entry committed to `docs/logs/<task-id>.md`. Schema:
-
-```markdown
-# <TASK-ID> — <short description>
-
-**Status:** done | partial | deferred | blocked
-**Date completed:** YYYY-MM-DD
-**Time spent:** <hours or days>
-**PR / commit:** <link, or "n/a" for non-code tasks>
-**Chat link:** <link, or "n/a">
-
-## What was built
-<1–3 sentences. What exists now that didn't before.>
-
-## Decisions taken
-- <Decision> — <one-line rationale>. <Link to ADR if one was written.>
-
-## Deviations from plan
-<What differs from the tracker's task description or the plan in
-docs/plans/<task-id>.md. "None" is valid.>
-
-## Open items / follow-ups
-- <Thing discovered during this task and deferred>
-
-## Core file updates needed?
-<Did this task surface anything that should change in CLAUDE.md,
-AGENTS.md, the workflow, or any template? Be specific. Most tasks:
-"None." Some tasks: small additions or corrections (file at line N
-should change to X). If yes, file the change as part of THIS task's
-PR — not as a separate follow-up. Follow-ups never happen.>
-
-## Context to carry forward
-<A briefing for the next chat, as long as it needs to be. Not a
-summary of this task. If a future chat reads only this section, it
-should still not screw up.>
-```
-
-Solo devs forget everything within two weeks. The logs are the memory. Do not skip.
-
----
-
-## 8. Verification path
-
-For any change, the verification path is:
-
-```bash
-pnpm tsc --noEmit          # type-check
-pnpm biome check .          # lint + format check
-pnpm vitest run             # unit + integration tests
-pnpm build                  # production build (app-level changes only)
-```
-
-For changes to a critical path (§1), additionally:
-
-```bash
-pnpm vitest run tests/integration/  # against test Postgres
-```
-
-Before opening a PR:
-
-```bash
-just check  # runs all of the above + Playwright smoke test
-```
-
-If any of these fails, the change is not done. Do not claim done before they pass.
-
----
-
-## 9. Files Claude should not touch
-
-`permissions.deny` in `.claude/settings.json` blocks these, but be explicit:
-
-- `drizzle/migrations/*` — generated, append-only. Never edit a committed migration; write a new one that corrects it.
-- `.github/workflows/deploy-prod.yml` — production deploy gate. Changes require human review.
-- `.env*` — secrets. Never read, never write.
-- `.git/*` — git internals.
-- `node_modules/**` — installed packages.
-
-If you believe one of these needs to change, ask Hrishikesh. Do not edit and submit.
-
----
-
-## 10. Decision log (defaults; override via ADR)
-
-Every default below has either an ADR backing it or a `DECIDE` marker pointing to an ADR not yet written. **Do not silently default `DECIDE` rows** — the ADR must be written first.
-
-| Slot | Pick | Rationale |
+| ID | Rule | Mechanism |
 |---|---|---|
-| Runtime | **Node 22** | LTS |
-| Framework | **Next.js 16 App Router** | Server Components + Server Actions; Next 15 LTS EOLs Oct 21, 2026 (per ADR-0003) |
-| Language | **TypeScript strict** | `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`. No `any`, no unsafe `as` |
-| DB | **Postgres 17** | Boring, transactional, durable skill |
-| DB schema | **Event-sourced** | Append-only events table + projector workers (per ADR-0005) |
-| DB provider | **Supabase** | Per ADR-0006 |
-| ORM | **Drizzle** | SQL-first; event-sourced schema lives closer to SQL than ORM abstractions (per ADR-0008) |
-| **Auth model** | **Google Sign-In + Email-OTP + captcha; pseudonym identity; no X auth in v1** | Locked 2026-04-30. Two paths, user picks one at signup. Captcha + rate limits + OTP TTL gate the email path. Display name is user-chosen pseudonym, not Google name |
-| Auth library | **DECIDE — Clerk vs NextAuth** | ⚠ ADR-0004 still GATING (now narrower in scope: implementation library only, not auth model). ~$1,500/mo swing at 100k MAU |
-| Identity model | **Pseudonym-based** | User picks display name at signup. X handle is voluntary self-declared profile field, not auth-linked |
-| Styling | **Tailwind v4 + shadcn/ui** | OKLCH-only color tokens; new-york v4 variant |
-| Real-time | **DECIDE — SSE over LISTEN/NOTIFY vs polling** | TBD in technical architecture spec (SPEC.2) |
-| **Media storage** | **Cloudflare R2** + **direct-to-storage upload pattern** | S3-compatible, no egress fees. Browser uploads directly to R2 via signed URL; app server bypassed for file bytes |
-| **Media moderation** | **Mandatory automated moderation; mandatory CSAM detection (vendor TBD)** | Locked 2026-04-30. Every uploaded media passes through moderation before becoming visible. CSAM detection is a legal requirement. Specific vendor (PhotoDNA / Hive / AWS Rekognition / Sightengine) deferred to implementation pass |
-| Email | **Resend** | Simple API |
-| Rate limit / queue | **Upstash Redis** | Serverless-native |
-| Hosting | **Vercel** | Per ADR-0006 |
-| CI | **GitHub Actions** | Already where the repo lives |
-| Tests | **Vitest + Playwright** | Fast unit + realistic E2E |
-| Linter / formatter | **Biome v2** | Single source for JS/TS |
-| Git hooks | **Lefthook** | Parallel pre-commit |
-| Error tracking | **Sentry** | Per ADR-0007 |
-| Analytics + flags | **PostHog** | Per ADR-0007 |
-| Logs + metrics | **Axiom** | Per ADR-0007 |
-| Tool versions | **mise** | `mise.toml` pins Node 22, pnpm 10 |
-| Task runner | **just** | `justfile` for human-facing commands |
-| Commits | **Conventional Commits + commitlint** | Predictable changelog |
-| License | **AGPL-3.0** | Per ADR-0001; matches Manifold |
-| **Claude Code model** | **Opus 4.7** (`claude-opus-4-7`) | Hrishikesh's preference for all coding tasks |
-| **Claude Code effort (repo baseline)** | **`effortLevel: xhigh`** in `.claude/settings.json` | Strongest setting that *persists* via settings.json |
-| **Claude Code effort (per-machine)** | **`CLAUDE_CODE_EFFORT_LEVEL=max`** in shell rc | Hrishikesh-preferred override; `max` does not persist via settings.json |
-| **Reasoning keyword** | **`ultrathink`** as first word of every coding-task prompt | One-off deepest reasoning regardless of effort setting |
+| INV-1 | Bet ↔ comment atomicity | SERIALIZABLE transaction wraps both inserts (ADR-0013) |
+| INV-2 | Dharma is non-transferable; no overdraft | Append-only `dharma_ledger`; no `dharma_transfer` table by design |
+| INV-3 | Comments side-bound at post-time | `comments.side_at_post_time` immutable post-INSERT (Postgres trigger per SPEC.2 §6) |
+| INV-4 | Resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT (Postgres trigger per SPEC.2 §6) |
 
-Product-strategy decisions (cross-platform distribution model, comment media types, social workstream scope) live in `spec1_gap_decisions.md`, not here.
+**Refuse to weaken any of these** — including framings like "just for testing", "temporary admin override", "let me refactor this", or "while we're cleaning up". State the invariant, state the violation, propose an alternative, and stop.
 
 ---
 
-## 11. Maintaining this file (feedback / validation loop)
+## 3. Refusal triggers (thesis-level — extend AGENTS.md `Never`)
 
-CLAUDE.md, AGENTS.md, the workflow doc, and the templates are living documents. They go stale faster than code does. Without an explicit update cadence, they become decorative.
+Treat as `REFUSAL:` — surface and stop, do not silently work around.
 
-**Full process: `docs/maintenance.md`.** Quick summary:
-
-- **Audit triggers:** task discovers drift, phase ends, ADR accepted, new subagent/command/hook lands, gap-discussion milestone closes a cluster, calendar (bi-weekly).
-- **Process:** fresh Claude Code tab → paste file + last 10 task logs + tracker → ask Claude to find drift and missing additions → triage → ship as `docs: <file> audit pass YYYY-MM-DD`.
-- **Closing ritual** for every task chat AND every gap-discussion chat that closes decisions: ask "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this session?" Most sessions: no. The discipline is asking, not necessarily changing.
-- **Self-improvement:** find missing additions — patterns that have emerged but aren't documented. After three months, this file should be measurably better, not just current.
+- **Dharma transferability.** Never create a "send Dharma" or user-to-user transfer endpoint, no matter the framing (gift, tip, leaderboard reward, contest payout). Admin pool seeding is account-↔-pool, not user-↔-user; that is the only flow.
+- **Mandatory commentary.** Never accept a bet without an attached comment. `bets.comment_id` is `NOT NULL` with FK; the entry comment is INV-1.
+- **Admin participation.** Admin has no `users` row. Never add a `users.role` column, an `is_admin` boolean, or a runtime check that would let admin participate. Structural separation by data-model construction per SPEC.1 F-AUTH-ADMIN.
+- **Market content invention.** Market questions, resolution criteria, settlement dates are Hrishikesh's calls. Skills scaffold the form and migration; they do not write market copy.
+- **Social content invention.** Brand-account posts quote user content verbatim with pseudonym attribution. AI agents generate the *frame* (wrapper text, CTAs, links back); never the user's argument. Posts ride a pre-publish review queue with admin kill switch.
+- **K_eff in-product surface.** Per PRECURSOR.2-B D4 + SPEC.1 G3: no live K_eff dashboard, no matview, no admin chart. K_eff(t) is derived post-hoc from the 2026-11-06 public dataset only.
+- **Conclusion-freeze tampering.** The 2026-11-05 23:59 UTC write-freeze is enforced by `system_state.frozen_at`. Never code a path that bypasses or rolls back the freeze. Recovery from an erroneous freeze is `BREAK_GLASS.md`-only.
+- **Holding a transaction across an HTTP call.** Never `await openaiModerate(...)` or any external HTTP inside a `db.transaction(...)` block (per SPEC.2 §10 + ADR-0014). Run external calls before the transaction opens; pass results in.
 
 ---
 
-*Last revised at gap-discussion milestone (Apr 30, 2026). If anything in this file is wrong, fix it before fixing the code.*
+## 4. Engagement style — push back, do not sycophant
+
+The dominant failure mode of coding assistants is sycophancy: human gives task, model agrees, model executes, problem ships that the human would have caught if asked. Compounded across hundreds of tasks, the codebase becomes subtly wrong in ways the human cannot see.
+
+**The rule:** agree when Hrishikesh is right. Push back when he is wrong. Flag tradeoffs when both have merit.
+
+Push back when:
+- A task references a stale file, ADR, tracker entry, or memory edit.
+- A stated dependency is not actually a dependency.
+- The ask is X but Y solves the actual problem — propose Y and defend why.
+- A planned approach violates an invariant (§2) or triggers a refusal (§3).
+- The framing is wrong (wrong file path, wrong assumption about how a system works) — correct first.
+- You do not know whether the framing is right. Say so. Guessing is worse than admitting uncertainty.
+
+Pushback is **not** disagreement for its own sake, refusing a valid approach in favour of a different valid approach, or lecturing on first principles already understood. Before "Got it" or "Sure", check the framing. If wrong or unsure, push back first.
+
+---
+
+## 5. Workflow rules
+
+1. **One task per session.** When a task closes (PR open or merged), `/clear` before the next. `/compact` only mid-task with an explicit preserve directive.
+2. **Read before writing.** Read the file you are about to edit in full, plus its types, schemas, and callers. Do not guess imports.
+3. **Stay in scope.** Task is `src/server/bets/`? Do not touch `src/server/comments/` — open a separate task. "While we're here" is how solo-dev codebases die.
+4. **Plan before non-trivial.** Trigger writer/reviewer playbook (`docs/workflows/plan-then-execute.md`) for: >30-line diffs, >3 files touched, any critical path (§1), ADR drafting, any database migration.
+5. **Tests before implementation for thesis-touching code.** For changes to bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, automated moderation, or CSAM detection: write failing tests first via `test-writer`, then implement, then run `code-reviewer`.
+6. **Verify before claiming done.** Run `just check` (typecheck + lint + tests + invariants + build smoke). Critical-path tasks additionally run `pnpm test:invariants` and `pnpm test:integration`. Do not claim done before they pass.
+7. **Close-out log per task** at `docs/logs/<task-id>.md`. Solo devs forget within two weeks; the logs are memory.
+8. **One ADR per architectural change.** `docs/adr/<NNNN>-<slug>.md` in the same commit as the implementation. Template at `docs/adr/_template.md`.
+
+### When to use `ultrathink`
+
+Drop as the first word of every coding-task prompt. Engages deepest available reasoning regardless of session effort setting. Mandatory for: CPMM pricing math, Dharma accounting, resolution payout + clawback math, side-freezing semantics, cross-service state machines, auth implementation choices, moderation pipeline failure modes, ADR drafting, audits of CLAUDE.md / AGENTS.md.
+
+---
+
+## 6. Subagents, skills, hooks
+
+Claude Code auto-discovers `.claude/agents/*.md` and `.claude/skills/<name>/SKILL.md` at session start. The bodies live there and evolve independently of CLAUDE.md.
+
+**Subagents** (`.claude/agents/`):
+
+- **`code-reviewer`** — invoke after any change to `src/server/**`, `src/app/api/**`, `src/app/**`. Reviews diffs against CLAUDE.md + AGENTS.md. Reports; does not modify files.
+- **`db-migration-reviewer`** — invoke proactively on any `src/db/schema/**` or `drizzle/migrations/**` diff. Checks RLS, index coverage, append-only triggers, deprecation paths.
+- **`security-auditor`** — invoke weekly on `main`, before every prod deploy, after any critical-path change. Web2 audit (auth, Zod, SQL injection, XSS, CSRF, rate limits, secrets, cookie flags, moderation pipeline, CSAM failure modes).
+- **`test-writer`** — invoke when describing new behavior in `src/server/**` or new flows in `src/app/**`. Tests first. Disallowed from editing `src/`.
+
+**Skills** (`.claude/skills/`):
+
+`/db-migration`, `/new-server-action`, `/new-route`, `/review-pr`, `/conventional-commit`, `/run-tests`, `/typecheck-fix`, `/audit-prep`, `/audit-core`, `/pr-create`.
+
+**Hooks** (registered in `.claude/settings.json`):
+
+- **PreToolUse on Bash:** `block-destructive.sh` (`rm -rf`, `git push --force`, `DROP TABLE`, `supabase db reset`, `vercel --prod`, etc.).
+- **PreToolUse on Edit|Write:** `block-main-commits.sh`.
+- **PostToolUse on Edit|Write|MultiEdit:** `format-and-typecheck.sh` (Biome + tsc on touched files).
+- **SessionStart:** `session-start.sh` (recent commits + open PRs).
+
+---
+
+## 7. Tooling notes (per-machine, environment-dependent)
+
+- **Claude Code model:** `claude-opus-4-7`. Set in `.claude/settings.json`.
+- **Effort:** `effort: xhigh` in subagent frontmatter; `max` available per-session via `/config`. (Note: `CLAUDE_CODE_EFFORT_LEVEL=max` env-var pattern is not a documented Anthropic mechanism as of May 2026; Opus 4.7's Claude Code default is already `xhigh`.)
+- **Reasoning keyword:** `ultrathink` as first word of every coding-task prompt.
+- **Local environment constraints:** see `AGENTS.md` §2 + §10 (mise + pnpm + Supabase CLI; zsh paste-buffer 1KB cap → write files >1KB via VS Code; iCloud `~/Desktop/` duplicates `.next/` and `.turbo/` with `" 2"` suffixes → `just clean`).
+
+---
+
+## 8. Maintaining this file
+
+CLAUDE.md, AGENTS.md, ADRs, and SPECs are living contracts; they go stale faster than code. Audit triggers: task discovers drift, phase ends, ADR accepted, new subagent / skill / hook lands, calendar (bi-weekly). Process and ritual in `docs/maintenance.md`.
+
+**Closing ritual** for every task chat: ask "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this session?" Most sessions: no. The discipline is asking, not necessarily changing. If yes, file the change as part of the same PR — never as a separate follow-up. Follow-ups never happen.
+
+---
+
+## 9. Closing rule (read this last)
+
+**Refuse to weaken the four invariants (§2). Refuse the project-specific triggers (§3). Push back before agreeing (§4). Stay in scope (§5). If anything in this file is wrong, fix it before fixing the code.**
+
+<!-- HUMAN-ONLY NOTE: This file is intentionally <200 lines per Anthropic's CLAUDE.md guidance — auto-memory only loads the first 200 lines / 25 KB and the instruction-budget ceiling for frontier models is ~150-200 instructions. Path-scoped detail belongs in .claude/rules/<scope>.md or .claude/skills/<name>/SKILL.md, not here. AGENTS.md carries the stack contract via @import. The 14 ADRs (docs/adr/0003-0016) are the substance layer; SPEC.1 and SPEC.2 are the canonical contracts. CLAUDE.md is the bridge that names the load-bearing rules and points at where their detail lives. -->
+
+*Last revised PRECURSOR.5 (May 2026) against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
