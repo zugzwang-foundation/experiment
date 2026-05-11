@@ -1,4 +1,10 @@
-// Re-export aggregator for per-domain schema files. SCAFFOLD.2 stratum 3.B
-// fills this with `export * from './<domain>'` lines once the 11 schema
-// files land. Per AGENTS.md §6 + ADR-0008 §4.
-export {};
+export * from "./audit";
+export * from "./auth";
+export * from "./bets";
+export * from "./comments";
+export * from "./dharma";
+export * from "./events";
+export * from "./identity";
+export * from "./image-uploads";
+export * from "./markets";
+export * from "./system";

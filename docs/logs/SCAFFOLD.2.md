@@ -76,3 +76,64 @@ None blocking 3.B. Carry-forward items:
 - supabase CLI invoked via `mise exec -- supabase ...` (shell activation not configured on this machine)
 - `just verify` is DB-free (typecheck + biome + build only). DB-touching verification is `just test-db` and requires `supabase start` running
 - Lefthook hooks installed (`approve-builds` triggered `lefthook postinstall: sync hooks: ✔️ (pre-commit, pre-push)`); pre-push runs typecheck + biome
+
+---
+
+## Stratum 3.B — Drizzle schemas (21 tables, 10 domains)
+
+**Date:** 2026-05-11
+**Branch:** `feat/scaffold-2-stratum-b`
+**PR:** TBD (draft)
+**Session length:** ~1 chat (plan + execute split across two tabs)
+
+### What landed
+
+- 10 new per-domain schema files at `src/db/schema/<domain>.ts`: `auth.ts` (5 tables), `markets.ts` (2), `bets.ts` (2), `comments.ts` (2), `dharma.ts` (1), `events.ts` (3), `identity.ts` (1), `image-uploads.ts` (1), `audit.ts` (3), `system.ts` (1) — 21 tables, 9 Bucket A + 4 Bucket B + 8 Bucket C per SPEC.2 §5.2
+- `src/db/schema/index.ts`: `export {};` placeholder replaced with 10 alphabetical re-export lines
+- 9 pgEnums: `marketStatusEnum`, `marketOutcomeEnum`, `sideEnum`, `ffDirectionEnum`, `dharmaEntryTypeEnum`, `resolutionEventKindEnum`, `payoutTypeEnum`, `imageTerminalStateEnum`, `modVerdictEnum`
+- `events.event_type` / `aggregate_type` / `admin_events.event_type` / `user_events.event_type` remain `text` (open-extensible per SPEC.2 §7.1 line 686)
+- `bets.comment_id` NOT NULL lambda FK to `comments.id` — INV-1 schema half
+- `dharma_ledger` lone in-scope CHECK `balance_after >= 0` — INV-2 storage-layer enforcement
+- `friendly_fire_events`: two independent Bucket-B whitelisted columns (`cleared_at` + `frozen_at`)
+- All FKs indexed per AGENTS.md §6; `relations()` per table for typed query builder
+- `docs/specs/SPEC.2.md` §5.1 row 10 + Appendix B.8 — `cleared_at` ratification (same commit as schemas)
+- Commit: `e903c72` (`feat(scaffold-2): b — drizzle schemas (21 tables, 10 domains, 11 files)`)
+
+### Decisions made
+
+**Plan-faithful (no scope variances).** All confirmed-framing items honored: ADR substrate dormant (cited SPEC.1/SPEC.2 by section, never `per ADR-N`); `cleared_at` SPEC.2 amendment same-commit; `system_state.id` text-`'system'` carve-out documented in source (SPEC ratification text deferred to 3.C); §5.6 tests-before-implementation dormant for 3.B.
+
+**Better Auth 1.6.x users 4-column gap.** `users` is 17 columns — SPEC.2 B.1's 13 plus Better Auth core `name`, `email_verified`, `image`, `updated_at`. `email` also flips to NOT NULL to match Better Auth's contract. SPEC.2 B.1 flagged for PRECURSOR.5 drift sweep alongside `markets.status` 3-vs-7 (B.2), `identity_pool.number` 1-9-vs-0-999 (B.15), `bet_settle`-vs-`bet_payout` enum (B.7).
+
+**Biome auto-fixes applied** during verify: import-sort on `auth.ts` (Biome merged the third-party + relative import blocks under its single-block organize-imports rule) and one-line `uniqueIndex().on()` formatting in `comments.ts`. No semantic changes.
+
+### Open questions
+
+None blocking 3.C. Carry-forward (PRECURSOR.5 drift sweep): SPEC.2 B.1 4-col gap, B.2 markets.status 3-vs-7, B.15 identity_pool.number 1-9-vs-0-999, B.7 `bet_settle`/`bet_payout`.
+
+### Next session starts at
+
+**Stratum 3.C — Migrations + triggers.**
+
+- Branch `feat/scaffold-2-stratum-c` from `main` (after PR merges + `/clear`)
+- 4 migrations: `0001_initial_schema.sql` (drizzle-kit generated), `0002_events_partitioning.sql` (hand-written `PARTITION BY RANGE` per SPEC.2 §7 + ADR-0005), `0003_append_only_triggers.sql` (Bucket A strict + Bucket B whitelisted per SPEC.2 §6), `0004_seed_system_state.sql` (single `id='system'` row)
+- Verification: `pnpm drizzle-kit generate`; grep generated SQL for `CREATE TABLE.*events` must return 0; CREATE TABLE count must be 20 (events excluded)
+- Same-commit SPEC ratification: `system_state.id` text-PK SPEC text (deferred from 3.B per plan §"Confirmed framing" item 3)
+
+### Context to preserve (non-obvious)
+
+- Circular FK pair `bets.comment_id ↔ comments.bet_id`: both use `references((): AnyPgColumn => …, { onDelete: 'restrict' })` lambda form. ESM lazy evaluation handles the import cycle
+- Self-ref lambdas: `comments.parent_comment_id`, `resolution_events.corrects_event_id` (both `onDelete: 'restrict'`)
+- `events.event_id` (NOT `id`) per SPEC.2 §7.1 line 685 — code defaulting to `<table>.id` must explicitly target `events.event_id`
+- `events` pgTable is type-only in 3.B; `drizzle.config.ts tablesFilter: ["!events"]` excludes it from DDL gen; 3.C's `0002_events_partitioning.sql` is hand-written
+- `system_state.id` text-PK carve-out documented in `src/db/schema/system.ts` source comment; SPEC.2 ratification text deferred to 3.C
+- `actor_id` columns in `mod_actions` / `admin_events` are `text NOT NULL` (not FKs) — admin has no `users` row (§8.7 pillar 1)
+- Relation disambiguation: `relationName: "comment_thread"` on `comments` self-ref; `"resolution_corrections"` on `resolution_events` self-ref
+- `dharma_ledger CHECK (balance_after >= 0)` is the only in-scope CHECK in 3.B; all others deferred to HARDEN.*
+- `comments.image_uploads_id` keeps plural-target → `_id` naming per SPEC.2 B.6 line 2480 — intentional, do not singularize
+- `pnpm drizzle-kit generate` NOT run yet (3.C scope); `just test-db` NOT run (no migrations yet)
+- Biome's organize-imports merged the third-party + relative import blocks in `auth.ts` — adopting separate blocks back would force a re-fix on every save
+
+### Time
+
+~1 chat (plan-then-execute via two-tab handoff)
