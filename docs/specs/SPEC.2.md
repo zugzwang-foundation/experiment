@@ -473,7 +473,7 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 
 | # | Table | Domain | Owner ADRs | Whitelisted transition | Notes |
 |---|---|---|---|---|---|
-| 10 | `friendly_fire_events` | `comments` | ADR-0005 | `frozen_at` NULL → timestamp | Up/down votes on comments; frozen at market resolution per §3.6; `cleared_at` schema decided by SCAFFOLD.2 per ADR-0009 |
+| 10 | `friendly_fire_events` | `comments` | ADR-0005 | `frozen_at` NULL → timestamp | Up/down votes on comments; frozen at market resolution per §3.6; `cleared_at` nullable timestamptz, second independent Bucket-B whitelisted transition (NULL → timestamp once), independent from `frozen_at` (ratified by SCAFFOLD.2 stratum 3.B; per-table trigger function in 3.C permits either column transitioning alone, rejects both transitioning together) |
 | 11 | `identity_pool` | `identity` | ADR-0005 + ADR-0011 | `assigned_at` NULL → timestamp | 50,000-row pseudonym pool; consumed via `SELECT ... FOR UPDATE SKIP LOCKED` in F-AUTH-3 per §3.5; synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` per ADR-0016 D5 |
 | 12 | `image_uploads` | `image-uploads` | ADR-0006 + ADR-0014 + 3-B §12-R1 | `terminal_state` + `terminal_at` set together once | Image upload lifecycle; two-column atomic transition (committed / orphan / blocked); orphan sweep per §3.5 Pattern A-2 + §12.6 |
 | 13 | `system_state` | `system` | 3-E §20-1 | `frozen_at` NULL → timestamp | Single-row keyed by `id = 'system'`; conclusion-event freeze trigger per §20.2; reversibility-none enforced at DB level |
@@ -2505,7 +2505,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `voter_id` | uuid | PSEUDO | Rewritten to `voter_pseudonym` per §19.5 |
 | `comment_id` | uuid | SHIP | FK to `comments.id` |
 | `direction` | text | SHIP | `up` / `down` |
-| `cleared_at` | timestamptz \| null | SHIP | F-COMMENT-7 clear timestamp; NULL for active votes (schema decided by SCAFFOLD.2 per ADR-0009) |
+| `cleared_at` | timestamptz \| null | SHIP | F-COMMENT-7 clear timestamp; NULL for active votes (second independent Bucket-B whitelisted transition; SCAFFOLD.2 stratum 3.B ratified) |
 | `frozen_at` | timestamptz \| null | SHIP | Bucket-B whitelisted transition; NULL until market resolution; the freeze instant per §3.6 |
 | `created_at` | timestamptz | SHIP | |
 
