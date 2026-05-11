@@ -14,7 +14,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 - **Source of truth.** Hierarchy: `docs/specs/SPEC.1.md` (product), `docs/specs/SPEC.2.md` (technical), `docs/adr/0003–0016.md` (decisions), `AGENTS.md` (stack patterns). When this file disagrees with code, this file wins until updated by an ADR.
 - **License.** AGPL-3.0-or-later. AGPL §13 forecloses closed-source SaaS forks.
 
-### Critical paths (trigger writer/reviewer ritual + invariant test gate + same-commit ADR scan)
+### Critical paths (trigger writer/reviewer ritual + invariant test gate + same-commit ADR scan + pre-PR self-audit + task-appropriate subagent review)
 
 - `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`
 - `src/server/auth/`, `src/server/identity/`, `src/server/moderation/`
@@ -29,7 +29,7 @@ Encoded in SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. 
 | ID | Rule | Mechanism |
 |---|---|---|
 | INV-1 | Bet ↔ comment atomicity | SERIALIZABLE transaction wraps both inserts (ADR-0013) |
-| INV-2 | Dharma non-transferable; no overdraft | Append-only `dharma_ledger`; no `dharma_transfer` table by design |
+| INV-2 | Dharma non-transferable; no overdraft | Append-only `dharma_ledger`; no `dharma_transfer` table by design; `CHECK (balance_after >= 0)` at storage layer |
 | INV-3 | Comments side-bound at post-time | `comments.side_at_post_time` immutable post-INSERT (SPEC.2 §6) |
 | INV-4 | Resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT (SPEC.2 §6) |
 
@@ -83,6 +83,8 @@ Use `/plan` for any task touching critical paths (§1), any task without an exis
 
 In `/plan`: read, draft plan, surface uncertainties as questions, **no edits**. Plan reviewed in Claude Code (Hrishikesh confirms), then pasted to web Claude chat for sign-off. Only then exit and execute.
 
+Plan file lives at `docs/plans/<TASK-ID>.md` inside the repo, **not** at `.claude/plans/<scratch>.md`. The plan file is the contract Phase 2 references via `@docs/plans/...` It must be committed before Phase 1 ends.
+
 Trivial work skips: file moves, dep bumps, doc-only edits, hot-fixes already agreed.
 
 If about to write code without an approved plan, **stop and surface**.
@@ -117,11 +119,13 @@ Read the file you're about to edit in full, plus its types, schemas, and callers
 
 ### 5.6 Tests before implementation (thesis-touching code)
 
-For bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, moderation, CSAM detection: failing tests first via `test-writer`, then implement, then `code-reviewer`.
+For bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, moderation, CSAM detection: failing tests first via `@test-writer`, then implement, then `@code-reviewer`.
+
+§5.6 applies to **business logic**. Type-only declarations (schema files, type aliases, interfaces) and configuration changes are exempt — the type-check is the gate.
 
 ### 5.7 Verify before claiming done
 
-Run `just check`. Critical-path tasks additionally run `pnpm test:invariants` and `pnpm test:integration`. Don't claim done before they pass.
+Run `just verify`. Critical-path tasks additionally run `pnpm test:invariants` and `pnpm test:integration`. Don't claim done before they pass.
 
 ### 5.8 Session boundaries
 
@@ -146,17 +150,55 @@ Log ships in its own commit on the branch BEFORE the PR opens. Convention: `chor
 
 If a session ends without a log, the next session starts blind. **Most expensive failure mode.**
 
-### 5.10 Handoff ritual: web Claude ↔ Claude Code
+### 5.10 Pre-PR self-audit
 
-Every new web Claude chat = new Claude Code session. One chat, one session, one task scope (or one stratum).
+Critical-path PRs (per §1) run a self-audit inside the execute session **BEFORE** `gh pr create`. The author surface verifies its own work against the plan, item by item, while context is still loaded.
 
-Session start sequence: web Claude reads project knowledge + latest log entry → confirms state with Hrishikesh → drafts kickoff prompt → Hrishikesh pastes into fresh Claude Code session (after `/clear`) → Claude Code reads CLAUDE.md, AGENTS.md, plan doc, log → executes.
+The audit walks the plan's per-table / per-component inventory and verifies actual code matches the plan. Format:
 
-Mid-execution, Claude Code surfaces questions; Hrishikesh either answers or pastes to web Claude for triage. At session end, log → commit → PR → web Claude reviews → merge → both surfaces close.
+- **PASS** — item present, correct, matches plan
+- **FAIL** — item wrong or missing; fix in-session before continuing
+- **SURPRISE** — unexpected finding not predicted by plan; surface to Hrishikesh
 
-Never close a pair with a stranded session (PR open, no log) or mid-uncommitted-edit.
+What to verify (task-dependent — kickoff prompts list specifics):
 
-### 5.11 ADRs
+- **Schema work:** every column name, type, nullability; every FK + index; every enum value set; every bucket classification; every same-commit spec amendment (grep verification)
+- **Server work:** every handler against the plan's API surface; every invariant the plan flags + the assertion that proves it holds
+- **Migration work:** ordering, idempotency, trigger SQL correctness, partition DDL, singleton constraints
+
+The audit is run by the Phase 2 execute surface (same Claude Code session that wrote the code). It is NOT a subagent step — §5.11 covers subagent review separately.
+
+PR opens only after audit reports clean. FAIL items fix in-session, re-verify, then PR. SURPRISE items surface for Hrishikesh's decision.
+
+Non-critical-path PRs skip the audit (still run `just verify`).
+
+Verification is left-shifted into write-time, where context is loaded and fixes are cheap. There is no post-PR soak — audit at write-time is stronger.
+
+### 5.11 Subagent invocation
+
+Subagents declared in `.claude/agents/` (see §6) are invoked **explicitly** from kickoff prompts. Auto-invocation via description matching is also enabled (every agent file uses "MUST BE USED" language) but explicit invocation is the reliable path. Belt-and-suspenders.
+
+**Critical-path invocation policy** (after pre-PR self-audit passes, before `gh pr create`):
+
+| Work type | Subagent | Phase | Tool scope |
+|---|---|---|---|
+| `src/db/schema/` or `drizzle/migrations/` | `@db-migration-reviewer` | Phase 2 post-audit | Read-only |
+| `src/server/` changes | `@code-reviewer` | Phase 2 post-audit | Read-only |
+| Critical-path business logic | `@security-auditor` | After code-reviewer | Read-only |
+| New business-logic behavior | `@test-writer` | Phase 2 start (tests-first per §5.6) | Read + Write tests only |
+
+**Always pass plan context.** Subagents start from zero context. Every invocation includes the plan path: `@docs/plans/<TASK-ID>.md`. Without it, the subagent re-explores the codebase from scratch — expensive and noisy.
+
+**Subagent findings:**
+- FAIL findings within scope → fix in-session before PR
+- SURPRISE findings outside scope → write to `claude-progress.md` and STOP (do not silently expand scope)
+
+**When NOT to invoke subagents:**
+- Tightly coupled work spanning schema + server + UI + tests in one pass (subagents lose shared intent; stay in main session)
+- Non-critical-path work (file moves, dep bumps, doc edits)
+- Type-only declarations (the type-check is the gate)
+
+### 5.12 ADRs
 
 One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md` in the same commit as the implementation. Template at `docs/adr/_template.md`.
 
@@ -170,7 +212,15 @@ First word of every coding-task prompt. Mandatory for: CPMM pricing math, Dharma
 
 Auto-discovered from `.claude/agents/*.md`, `.claude/skills/<name>/SKILL.md`, `.claude/settings.json` at session start.
 
-**Subagents:** `code-reviewer` (after src/server changes), `db-migration-reviewer` (proactive on schema/migrations), `security-auditor` (weekly + pre-deploy + post-critical-path), `test-writer` (new behavior; tests first; disallowed from editing `src/`).
+**Subagents** (descriptions are routing rules — "MUST BE USED" enables reliable auto-invocation; explicit invocation per §5.11 is the primary path):
+
+- **`code-reviewer`** — MUST BE USED after any new file written under `src/server/`. Reviews the diff for invariant violations (§2), missing error handling, and refusal triggers (§3). Returns findings as CRITICAL / HIGH / MEDIUM / LOW with file:line references. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+
+- **`db-migration-reviewer`** — MUST BE USED after any change in `src/db/schema/` or `drizzle/migrations/`. Reviews schema declarations against SPEC.2 §5 inventory, verifies FK lambdas, indexes per AGENTS.md §6, Bucket A/B/C classifications, and append-only trigger SQL. Returns PASS/FAIL/SURPRISE per table. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+
+- **`security-auditor`** — MUST BE USED after critical-path work lands (per §1), before PR opens. Reviews auth flows, transaction handlers, moderation paths, and admin surfaces for INV-1/INV-2/INV-3/INV-4 enforcement gaps. Returns findings ranked by exploitability. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+
+- **`test-writer`** — MUST BE USED for new business-logic behavior per §5.6. Writes failing tests FIRST against the plan's test plan section. Forbidden from editing `src/`. Returns test files + a list of which scenarios are covered. Tools: Read, Write, Edit, Bash, Grep, Glob. Model: opus. Effort: xhigh.
 
 **Hooks:** `block-destructive.sh` (rm -rf, force-push, DROP TABLE), `block-main-commits.sh`, `format-and-typecheck.sh` (Biome + tsc post-edit), `session-start.sh` (recent commits + open PRs).
 
@@ -186,6 +236,6 @@ CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: dri
 
 ## 8. Closing rule
 
-**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session (§5). If anything in this file is wrong, fix it before fixing the code.**
+**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything in this file is wrong, fix it before fixing the code.**
 
-*Last revised PRECURSOR.5 (May 2026) against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
+*Last revised SCAFFOLD.2 stratum 3.B post-merge (May 11, 2026) — soak rule removed; pre-PR self-audit (§5.10) and subagent invocation policy (§5.11) added; §6 subagent descriptions sharpened to "MUST BE USED" routing rules. Against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
