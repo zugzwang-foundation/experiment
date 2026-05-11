@@ -46,3 +46,19 @@ setup:
 clean:
     rm -rf .next/ .turbo/ tsconfig.tsbuildinfo
     @echo "Cleaned build artifacts."
+
+# Generate a Drizzle migration from schema diff.
+db-generate name:
+    pnpm drizzle-kit generate --name {{name}}
+
+# Apply pending migrations to the configured DATABASE_URL.
+db-migrate:
+    pnpm drizzle-kit migrate
+
+# Reset local Supabase DB. Destroys local data.
+db-reset:
+    supabase db reset
+
+# Run trigger + invariant tests against local Postgres.
+test-db:
+    pnpm vitest run tests/db/ tests/invariants/
