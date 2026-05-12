@@ -3,7 +3,6 @@ import {
 	type AnyPgColumn,
 	index,
 	numeric,
-	pgEnum,
 	pgTable,
 	text,
 	timestamp,
@@ -12,14 +11,14 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
+import { sideEnum } from "./_enums";
 import { users } from "./auth";
 import { comments } from "./comments";
 import { markets } from "./markets";
 
-// Shared enum: bets.side + positions.side + comments.side_at_post_time.
-// Declared here per plan §"Common patterns" #4 ("sideEnum in bets.ts;
-// positions + comments import").
-export const sideEnum = pgEnum("side", ["YES", "NO"]);
+// sideEnum (bets.side + positions.side + comments.side_at_post_time) lives in
+// _enums.ts to break the bets↔comments runtime eval cycle — 3.B erratum
+// absorbed by 3.C per docs/plans/SCAFFOLD.2-3C.md §"3.B erratum absorbed".
 
 // Bucket A. comment_id NOT NULL FK to comments.id — the schema-level half
 // of INV-1 (bet ↔ comment atomicity). Lambda form per the circular pair

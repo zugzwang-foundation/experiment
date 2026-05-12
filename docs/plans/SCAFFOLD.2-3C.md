@@ -104,6 +104,105 @@ grep -nE "NULL → timestamp" docs/specs/SPEC.2.md
 
 **`system_state.id` text carve-out:** No same-commit amendment needed. SPEC.2 §20.2 already documents the literal-`'system'` sentinel and the no-UUIDv7 reason. The `src/db/schema/system.ts` source comment from 3.B already documents the carve-out. The master plan's "ADR-0016 amendment" instruction is obsolete (the ADR doesn't exist, and the carve-out is already documented in spec).
 
+### 3.B erratum absorbed (same-commit, per session ratification 2026-05-12)
+
+drizzle-kit's CJS module evaluation hits a TDZ error on the first `pnpm drizzle-kit generate` against 3.B's schemas:
+
+```
+ReferenceError: Cannot access 'sideEnum' before initialization
+    at Object.sideEnum (src/db/schema/bets.ts:1:1)
+    at Object.<anonymous> (src/db/schema/comments.ts:53:19)
+```
+
+**Root cause.** `bets.ts` imports `comments` (lambda-FK to `comments.id`) and declares `sideEnum` at line 22. `comments.ts` imports `bets, sideEnum` from `./bets` and *eagerly* calls `sideEnum("side_at_post_time")` at line 53 (non-lambda). Barrel `index.ts` re-exports `bets` first → bets.ts pauses at its `import { comments }` line → comments.ts evaluates → reaches `sideEnum(...)` call before bets.ts's line 22 declaration → TDZ. 3.B's `just verify` (tsc + biome + Next.js build) is static and never executes the schema files; drizzle-kit is the first runtime evaluator (which 3.C scope owns).
+
+**Fix.** Extract `sideEnum` to `src/db/schema/_enums.ts` (new file, `sideEnum` only — per session condition (a), other co-located pgEnums stay put unless proven part of a separate cycle). Update `bets.ts` and `comments.ts` to import `sideEnum` from `./_enums` instead of from each other. Add `export * from "./_enums";` to the barrel index for forward consumer compat. Lambda-FK pattern between `bets`↔`comments` preserved (lambdas are lazy; only the eager `sideEnum(...)` call needed breaking).
+
+**Files touched (4):**
+- `src/db/schema/_enums.ts` — new (sideEnum declaration + rationale comment)
+- `src/db/schema/bets.ts` — remove `pgEnum` from `drizzle-orm/pg-core` import + `sideEnum` declaration; add `import { sideEnum } from "./_enums";`
+- `src/db/schema/comments.ts` — split `import { bets, sideEnum } from "./bets"` into separate imports from `./_enums` and `./bets`
+- `src/db/schema/index.ts` — add `export * from "./_enums";` as first re-export line
+
+**Why bundled into 3.C, not a separate erratum PR.** One-shot blocker for 3.C's first generate. ~3-line touch across 4 files. Separate-PR round-trip overhead (open PR, merge, rebase 3.C) is not justified per session ratification.
+
+**Verification.** Post-extraction, `pnpm drizzle-kit generate --custom --name uuidv7_function` succeeded — minted the stub and updated `drizzle/migrations/meta/_journal.json` without TDZ error. Cycle broken. Confirmed 2026-05-12.
+
+**Inherited drift list update (PR body):** The 3.B sideEnum TDZ moves from "open drift" to "RESOLVED in 3.C (this PR)" so the PRECURSOR.5 backlog stays clean.
+
+### 3.A drift discovered (NOT fixed in 3.C — flagged for PR body)
+
+`just db-migrate` recipe calls `pnpm drizzle-kit migrate` directly without sourcing `.env.local`. drizzle-kit reports `url: undefined` and fails. Workaround in 3.C session: `set -a && source .env.local && set +a && just db-migrate` (or run `pnpm drizzle-kit migrate` directly after sourcing). Not a 3.C scope item — modifying the justfile would expand the surface beyond migrations + triggers + seed. Flagged in PR body's "Inherited drift" as a separate 3.A erratum awaiting a future fix (likely adding `set dotenv-load := true` with `dotenv-filename := ".env.local"` to the justfile).
+
+### 3.B events PK + partition contradiction absorbed (same-commit, per session ratification 2026-05-12)
+
+SPEC.2 §7 carries a physical-constraint contradiction that surfaces only at apply-time:
+- §7.1: `event_id` is `PRIMARY KEY` (single column)
+- §7.2: `PARTITION BY RANGE (created_at)`
+- §7.3: storage idempotency via `INSERT ... ON CONFLICT (event_id) DO NOTHING`
+
+Postgres requires every UNIQUE/PK constraint on a partitioned table to include the partition column (PG error: *"unique constraint on partitioned table must include all partitioning columns; PRIMARY KEY constraint on table 'events' lacks column 'created_at' which is part of the partition key"*). A single-column PK on `event_id` is incompatible with `PARTITION BY RANGE (created_at)`. This is a PG design rule, not a bug.
+
+**Resolution: composite PK `(event_id, created_at)`.** Standard pattern for time-partitioned event tables. Three changes ship same-commit:
+
+1. **0002 DDL.** `CREATE TABLE events (...)` declares `event_id uuid NOT NULL DEFAULT uuidv7()` (no `PRIMARY KEY` annotation on the column) and adds `PRIMARY KEY (event_id, created_at)` as a table-level constraint at the bottom.
+2. **SPEC.2 §7.1 amendment.** `event_id` row's type annotation changes from `uuid PRIMARY KEY` to `uuid NOT NULL (composite PK with created_at per §7.2 partition constraint)`. A trailing paragraph names the partition-constraint rationale and the `insertEvent` deterministic-created_at discipline.
+3. **SPEC.2 §7.3 amendment.** "ON CONFLICT (event_id)" becomes "ON CONFLICT (event_id, created_at)"; storage idempotency text reads on the composite pair. A new sentence names the `insertEvent` helper (ENGINE.6) and its responsibility to derive `created_at` deterministically from the UUIDv7 millisecond prefix (first 48 bits, big-endian unix-ms) so retries reuse the same `(event_id, created_at)` pair.
+4. **SPEC.2 §3.7 + §5.1 row 1 + §7.7 spec-consistency sweep.** The same `ON CONFLICT (event_id) DO NOTHING` phrase appears in three other locations (§3.7 events-insertion helper paragraph, §5.1 row 1 events-table note, §7.7 sql template). Leaving them single-column while §7.3 reads composite would internally contradict the spec. Three additional one-line replacements bring all SPEC.2 references to the composite form. Verified: `grep -c "ON CONFLICT (event_id) DO NOTHING" docs/specs/SPEC.2.md` returns 0; `grep -c "ON CONFLICT (event_id, created_at) DO NOTHING"` returns 4 (§3.7 + §5.1 + §7.3 + §7.7).
+
+**Downstream ENGINE.6 implication.** `insertEvent(tx, eventInput)` per SPEC.2 §7.7 must compute `created_at` from `event_id`'s UUIDv7 time prefix (not call `now()`, not let DB default fire). Without this, retries with the same `event_id` would land different `created_at` values and bypass the composite PK dedupe.
+
+**`src/db/schema/events.ts` declaration unchanged.** Still declares `eventId: uuid("event_id").primaryKey()` at the type-inference layer. This is a cosmetic mismatch with the DDL's composite PK — drizzle-zod infers `event_id` as THE PK. Runtime correctness is unaffected (reads still work; the only place this matters is `insertEvent`'s `ON CONFLICT` clause, which ENGINE.6 writes as raw SQL per SPEC.2 §7.7). 3.B-erratum to align the schema declaration is deferred per §5.4 surgical scope; not blocking 3.C. The plan's PR body names this as inherited drift for PRECURSOR.5.
+
+**ADR-0005 §5 amendment NOT shipped.** ADR-0005 file does not exist on disk (it's a ghost reference, same drift 3.B encountered). The SPEC.2 §7.1 + §7.3 amendments absorb what an ADR-0005 §5 ratification would have said. PR body's "Spec drift absorbed" section flags this.
+
+**Verification (deterministic):**
+```bash
+# 0002 DDL has composite PK and no single-column event_id PRIMARY KEY
+grep -nE "PRIMARY KEY \(event_id, created_at\)" drizzle/migrations/0002_events_partitioning.sql
+# Expect: 1 hit (the composite PK declaration)
+
+grep -nE "event_id uuid PRIMARY KEY" drizzle/migrations/0002_events_partitioning.sql
+# Expect: 0 hits (the single-column PK is gone)
+
+# SPEC.2 §7.1 + §7.3 amendments land
+grep -c "composite PK with .created_at." docs/specs/SPEC.2.md
+# Expect: ≥1 (the §7.1 row + paragraph mention this)
+
+grep -c "ON CONFLICT (event_id, created_at)" docs/specs/SPEC.2.md
+# Expect: ≥1 (the §7.3 amendment)
+
+grep -c "ON CONFLICT (event_id) DO NOTHING" docs/specs/SPEC.2.md
+# Expect: 0 (old single-column ON CONFLICT removed)
+
+# Apply-time verification (post db-reset + db-migrate up through 0002)
+psql "$DATABASE_URL" -c "SELECT count(*) FROM pg_inherits WHERE inhparent = 'events'::regclass;"
+# Expect: 13 (12 monthly + 1 default — confirms 0002 applied cleanly with composite PK)
+```
+
+### 3.A drift absorbed (same-commit, per session ratification 2026-05-12)
+
+`tablesFilter: ["!events"]` in `drizzle.config.ts` does **not** exclude `events` from `drizzle-kit generate`. Per Drizzle docs at orm.drizzle.team/kit-docs/config-reference, `tablesFilter` is listed under the `db push` command surface — it filters introspection (`pull`) and push behavior, but `generate` reads exported tables from the schema TS files and emits DDL for all of them regardless. 3.A's drizzle.config.ts comment + master plan + predecessor log line 148 all asserted `tablesFilter` would exclude `events` from generate output. That assertion is incorrect.
+
+**Observation.** `pnpm drizzle-kit generate --name initial_schema` emitted 21 `CREATE TABLE` statements including a regular (non-partitioned) `CREATE TABLE "events" (...)` block plus its `CREATE INDEX events_aggregate_idx`. Leaving them in would have caused 0002's `CREATE TABLE events ... PARTITION BY RANGE (created_at)` to fail with "relation already exists" (you cannot retrofit partitioning via `ALTER TABLE`).
+
+**Fix (hand-edit, per session ratification 2026-05-12).** Two targeted Edits to `drizzle/migrations/0001_initial_schema.sql`:
+1. Delete the entire `CREATE TABLE "events" (...)` block (lines 160–169 of the generated file) plus its trailing `--> statement-breakpoint` (line 170) — 11 lines.
+2. Delete the `CREATE INDEX "events_aggregate_idx" ON "events" ...` line (line 308 of the generated file) — 1 line.
+
+Total surgery: ~12 lines removed. No FK constraints reference `events` (it has no FKs in the schema, verified by `grep`), so the surgery is clean with no ripple effects.
+
+**Post-surgery verification (deterministic):**
+- `grep -c "^CREATE TABLE" drizzle/migrations/0001_initial_schema.sql` → **20** (was 21)
+- `grep -ic "events_aggregate" drizzle/migrations/0001_initial_schema.sql` → **0**
+- `grep -c "friendly_fire_events" drizzle/migrations/0001_initial_schema.sql` → **6** (table def + FK constraints + indexes; sanity check that we deleted only the bare `events` table, NOT `friendly_fire_events`)
+
+**Why hand-edit and not regenerate.** drizzle-kit-generated files aren't normally hand-edited, but 0001 is *emitted once at the start*. Subsequent `drizzle-kit generate` invocations produce diffs against the journal snapshot, not re-emits — so the hand-edit isn't fragile across the project lifecycle. The events table remains in `src/db/schema/events.ts` (for type inference + drizzle-zod schemas), but its DDL ships exclusively in 0002.
+
+**Why not fix `tablesFilter` in drizzle.config.ts.** Per §5.4 surgical scope, modifying drizzle.config.ts is 3.A territory. The functional outcome (events excluded from 0001) is achieved by the hand-edit. The cosmetic concern (the `tablesFilter` line in drizzle.config.ts implies an effect it doesn't have) is flagged for PRECURSOR.5 as RESOLVED with note: "tablesFilter is a no-op for drizzle-kit generate; consider removing it from drizzle.config.ts (no functional impact, but the comment in drizzle.config.ts implies an effect it doesn't have)."
+
+**Inherited drift list update (PR body):** The 3.A tablesFilter no-op moves from "open drift" to "RESOLVED in 3.C (this PR) via hand-edit; backlog item flagged for cosmetic cleanup."
+
 ## 3. API surface
 
 **None — schema/DDL stratum only.** 3.C ships zero TypeScript handler code. The events insert helper at `src/server/events/insert.ts`, the bet transaction wrapper at `src/server/bets/transaction.ts`, the moderation helper, and every Server Action / Route Handler are explicitly out-of-scope (ENGINE.6, ENGINE.7+, etc.).
