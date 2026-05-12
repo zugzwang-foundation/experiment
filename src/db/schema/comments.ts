@@ -12,8 +12,9 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
+import { sideEnum } from "./_enums";
 import { users } from "./auth";
-import { bets, sideEnum } from "./bets";
+import { bets } from "./bets";
 import { imageUploads } from "./image-uploads";
 import { markets } from "./markets";
 

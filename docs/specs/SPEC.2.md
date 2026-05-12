@@ -309,7 +309,7 @@ Every state-mutating data flow MUST emit at least one `events` row in the same t
 | `ip` | text | `proxy.ts` | Client IP; included in dataset release per SPEC.1 §16.3 |
 | `user_agent` | text | `proxy.ts` | Client UA; included in dataset release per SPEC.1 §16.3 |
 
-**Events insertion helper.** `src/server/events/insert.ts` exposes a single `insertEvent(tx, eventInput)` function that runs `INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id) DO NOTHING` against the bound transaction. The `event_id` is generated client-side via UUIDv7 (per ADR-0016) at handler-entry — used as the storage-layer dedupe primitive per ADR-0005 §5. The `payload` is Zod-validated against the per-`event_type` schema at `src/server/events/schemas.ts` before insertion; schema mismatches are runtime errors, not silent inserts.
+**Events insertion helper.** `src/server/events/insert.ts` exposes a single `insertEvent(tx, eventInput)` function that runs `INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id, created_at) DO NOTHING` against the bound transaction (composite key per §7.1 + §7.3 partition-constraint reconciliation). The `event_id` is generated client-side via UUIDv7 (per ADR-0016) at handler-entry — used as the storage-layer dedupe primitive per ADR-0005 §5; `created_at` is derived deterministically from the UUIDv7 millisecond prefix. The `payload` is Zod-validated against the per-`event_type` schema at `src/server/events/schemas.ts` before insertion; schema mismatches are runtime errors, not silent inserts.
 
 **CI lint enforcement (HARDEN.\* task).** Every state-mutating handler — defined as any file under `src/server/{bets,comments,dharma,resolution,auth,identity,moderation}/` that opens a `db.transaction(...)` — MUST contain at least one `insertEvent(...)` call inside the transaction body. The lint rule scans for the pattern and fails the build on a missing call. Acceptable false-positive (rare): a transaction that legitimately reads but does not write — these mark the handler with a `// no-event` comment, audited at code review.
 
@@ -459,7 +459,7 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 
 | # | Table | Domain | Owner ADRs | Notes |
 |---|---|---|---|---|
-| 1 | `events` | `events` | ADR-0005 + ADR-0007 + ADR-0016 | Canonical events log per §3.7 + §7; monthly partitioned with twelve pre-created partitions + DEFAULT; storage idempotency via `INSERT ... ON CONFLICT (event_id) DO NOTHING` |
+| 1 | `events` | `events` | ADR-0005 + ADR-0007 + ADR-0016 | Canonical events log per §3.7 + §7; monthly partitioned with twelve pre-created partitions + DEFAULT; composite PK `(event_id, created_at)` per §7.1 partition-constraint reconciliation; storage idempotency via `INSERT ... ON CONFLICT (event_id, created_at) DO NOTHING` |
 | 2 | `dharma_ledger` | `dharma` | ADR-0005 | Append-only Dharma balance ledger; every balance change flows here; INV-2 (no-overdraft) enforced via §6 + ledger discipline |
 | 3 | `bets` | `bets` | ADR-0005 + ADR-0013 | Per-bet record; locked second in §9 W-1 lock-order chain; INV-1 atomic with comment write |
 | 4 | `comments` | `comments` | ADR-0005 + ADR-0009 | Per-comment record; INV-3 (side-bound at post time) carries `stake_at_post_time NUMERIC(38,18)` ranking-function input frozen on insert |
@@ -596,9 +596,9 @@ Two functions, eighteen trigger declarations (nine tables × two triggers). The 
 
 Per-table function comparing OLD and NEW row images. Four protected tables, each with its specific whitelisted transition.
 
-**`friendly_fire_events.frozen_at` NULL → timestamp** (per ADR-0005). The trigger function rejects any UPDATE where `OLD.frozen_at IS NOT NULL` (re-firing) OR `NEW.frozen_at IS NULL` (un-freezing) OR any non-`frozen_at` column changes between OLD and NEW. Permitted: a single transition from NULL to a non-NULL timestamp on the `frozen_at` column with all other columns unchanged.
+**`friendly_fire_events.frozen_at` + `cleared_at` two independent NULL → timestamp transitions** (per ADR-0005 + 3-B ratification absorbed at §5.1 row 10 + Appendix B.8). The trigger function permits exactly one whitelisted-column transition per UPDATE: either `frozen_at` flipping NULL → non-NULL timestamp (with `cleared_at` unchanged) or `cleared_at` flipping NULL → non-NULL timestamp (with `frozen_at` unchanged). Rejects: both whitelisted columns transitioning in the same UPDATE; either column changing once already non-NULL (one-shot, via `OLD IS NOT NULL AND NEW IS DISTINCT FROM OLD`); any non-whitelisted column change. A no-op UPDATE (no column changes) is permitted — the trigger enforces non-mutation, not action. The two columns are independent: `frozen_at` flips at market resolution per §3.6; `cleared_at` flips when the voter clears their vote per F-COMMENT-7.
 
-**`identity_pool.assigned_at` NULL → timestamp** (per ADR-0011). Identical shape to `friendly_fire_events` — single-column NULL-to-non-NULL transition once, all other columns unchanged.
+**`identity_pool.assigned_at` NULL → timestamp** (per ADR-0011). Single whitelisted column shape — NULL-to-non-NULL transition once via `OLD IS NOT NULL AND NEW IS DISTINCT FROM OLD`, all other columns unchanged. Permits no-op UPDATEs (3-rule uniform across all Bucket B per SCAFFOLD.2 stratum 3.C ratification — see closing paragraph of this section).
 
 **`image_uploads.terminal_state` + `image_uploads.terminal_at` set together atomically** (per 3-B §12-R1). Two-column atomic transition: the trigger function rejects any UPDATE where one column transitions but the other does not, OR where either column is already non-NULL in OLD (re-firing), OR where any non-whitelisted column changes. Permitted: a single UPDATE that moves both columns from NULL to non-NULL together. This is the only Bucket B table with a multi-column transition shape; the per-table function carries an explicit conjunction.
 
@@ -606,27 +606,33 @@ Per-table function comparing OLD and NEW row images. Four protected tables, each
 CREATE OR REPLACE FUNCTION enforce_image_uploads_terminal_atomic()
 RETURNS TRIGGER AS $$
 BEGIN
-  -- Reject re-firing
-  IF OLD.terminal_state IS NOT NULL OR OLD.terminal_at IS NOT NULL THEN
-    RAISE EXCEPTION 'image_uploads terminal transition is one-shot';
+  -- One-shot on terminal_state (immutable once set; permits no-op on terminal rows)
+  IF OLD.terminal_state IS NOT NULL AND NEW.terminal_state IS DISTINCT FROM OLD.terminal_state THEN
+    RAISE EXCEPTION 'image_uploads: terminal_state is one-shot (immutable once set)';
   END IF;
-  -- Reject partial transition
+  -- One-shot on terminal_at (immutable once set; permits no-op on terminal rows)
+  IF OLD.terminal_at IS NOT NULL AND NEW.terminal_at IS DISTINCT FROM OLD.terminal_at THEN
+    RAISE EXCEPTION 'image_uploads: terminal_at is one-shot (immutable once set)';
+  END IF;
+  -- Reject partial transition (XOR; one column NULL while other set)
   IF (NEW.terminal_state IS NULL) <> (NEW.terminal_at IS NULL) THEN
-    RAISE EXCEPTION 'image_uploads terminal_state and terminal_at must transition together';
+    RAISE EXCEPTION 'image_uploads: terminal_state and terminal_at must transition together';
   END IF;
-  -- Reject changes to any other column
-  IF NEW.id <> OLD.id OR NEW.user_id <> OLD.user_id
-     OR NEW.r2_object_key <> OLD.r2_object_key OR NEW.created_at <> OLD.created_at
-     -- ... other columns enumerated
-  THEN
-    RAISE EXCEPTION 'image_uploads append-only violation: only terminal_state + terminal_at may transition';
+  -- Reject any non-whitelisted column change
+  IF NEW.id IS DISTINCT FROM OLD.id
+     OR NEW.user_id IS DISTINCT FROM OLD.user_id
+     OR NEW.r2_object_key IS DISTINCT FROM OLD.r2_object_key
+     OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'image_uploads: only terminal_state + terminal_at may transition together';
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 ```
 
-**`system_state.frozen_at` NULL → timestamp** (per 3-E §20-1). Single-column shape identical to `friendly_fire_events` and `identity_pool`. The conclusion-event freeze trigger flips this column once at 2026-11-05 23:59 UTC; the trigger ensures it can never flip back. Recovery from an erroneous freeze requires `BREAK_GLASS.md` direct-database surgery via `ALTER TABLE ... DISABLE TRIGGER` followed by manual UPDATE — this breaks the experiment deliverable per SPEC.1 §12.4 and is acceptable only as catastrophic-failure recovery.
+**`system_state.frozen_at` NULL → timestamp** (per 3-E §20-1). Single whitelisted column shape — same per-column DISTINCT-FROM one-shot semantics as `identity_pool`. The conclusion-event freeze trigger flips this column once at 2026-11-05 23:59 UTC; the trigger ensures it can never flip back. Recovery from an erroneous freeze requires `BREAK_GLASS.md` direct-database surgery via `ALTER TABLE ... DISABLE TRIGGER` followed by manual UPDATE — this breaks the experiment deliverable per SPEC.1 §12.4 and is acceptable only as catastrophic-failure recovery.
+
+All four Bucket B trigger functions use the 3-rule (DISTINCT-FROM) pattern uniformly per SCAFFOLD.2 stratum 3.C ratification — permit no-op UPDATEs (the trigger enforces non-mutation, not action), reject re-fires on whitelisted columns via DISTINCT-FROM, reject partial transitions on multi-column-atomic Bucket B (image_uploads only), reject any non-whitelisted column change. Asymmetry across Bucket B trigger functions would be a permanent cognitive tax.
 
 Total Bucket B trigger declarations: four per-table functions + eight trigger statements (four tables × two triggers — one BEFORE UPDATE calling the per-table function, one BEFORE DELETE that `RAISE EXCEPTION` unconditionally).
 
@@ -682,7 +688,7 @@ Eight columns per ADR-0005 §5:
 
 | Column | Type | Notes |
 |---|---|---|
-| `event_id` | `uuid` PRIMARY KEY | UUIDv7 per ADR-0016 D1; client-side-generated at handler entry; storage-layer dedupe primitive (see §7.3) |
+| `event_id` | `uuid` NOT NULL (composite PK with `created_at` per §7.2 partition constraint) | UUIDv7 per ADR-0016 D1; client-side-generated at handler entry; storage-layer dedupe primitive (see §7.3) |
 | `event_type` | `text` NOT NULL | Discriminator; closed enum at the application layer; one Zod schema per value at `src/server/events/schemas.ts` |
 | `aggregate_type` | `text` NOT NULL | Domain object the event concerns (`market`, `bet`, `comment`, `user`, `dharma_account`, `system`) |
 | `aggregate_id` | `uuid` NOT NULL | The primary key of the aggregate row this event belongs to |
@@ -692,6 +698,8 @@ Eight columns per ADR-0005 §5:
 | `created_at` | `timestamptz` NOT NULL DEFAULT `now()` | Canonical chronological-sort column per ADR-0016 monotonicity caveat |
 
 Drizzle declaration lives in `src/db/schema/events.ts` per ADR-0008 §4. The full DDL substance is owned by ADR-0005; §7.1 is the at-a-glance shape.
+
+Postgres requires the partition column be part of any PK/UNIQUE constraint on a partitioned table. Per §7.2's `PARTITION BY RANGE (created_at)`, the storage-layer PRIMARY KEY is composite `(event_id, created_at)`. `event_id` remains the storage-idempotency dedupe primitive; `created_at` is supplied deterministically by the `insertEvent` helper per §7.3 (extracted from the UUIDv7 millisecond prefix so retries that reuse the same `event_id` also reuse the same `created_at`). This composite-PK shape is locked at SCAFFOLD.2 stratum 3.C apply-time; SPEC.2 v0.3-draft's earlier "PRIMARY KEY (event_id)" assertion in §7.1 + §7.3 is reconciled here.
 
 ### §7.2 Partitioning
 
@@ -705,11 +713,11 @@ Partition creation SQL ships as a hand-written raw migration: `drizzle/migration
 
 Two structurally distinct idempotency surfaces. Both consume the request's `idempotency_key` value but operate at different layers and on disjoint storage substrates.
 
-**Storage-layer idempotency.** `event_id` is the primary key; insert uses `INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id) DO NOTHING`. Re-inserting an event with the same `event_id` (e.g., a transaction retry that re-runs the events.insert) is a no-op — exactly-once event-row creation guaranteed by the PK constraint. The `event_id` is generated client-side via UUIDv7 at handler entry (per ADR-0016) and reused across retries within the same logical request.
+**Storage-layer idempotency.** `(event_id, created_at)` is the composite primary key (per §7.1's partition-constraint note); insert uses `INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id, created_at) DO NOTHING`. Re-inserting an event with the same `(event_id, created_at)` pair (e.g., a transaction retry that re-runs the events.insert) is a no-op — exactly-once event-row creation guaranteed by the composite PK constraint. The `event_id` is generated client-side via UUIDv7 at handler entry (per ADR-0016) and reused across retries within the same logical request. The `insertEvent` helper at `src/server/events/insert.ts` (ENGINE.6) supplies `created_at` deterministically from UUIDv7's millisecond prefix (the first 48 bits of the UUID, big-endian unix-ms) so retries that reuse the same `event_id` also reuse the same `created_at` — storage idempotency stands across retries.
 
 **API-boundary idempotency.** §11 / ADR-0015's `Idempotency-Key` HTTP header (Route Handlers) and Server Action argument surface, with cache lookup against Upstash Redis on `idem:{key}` keys, body-fingerprint match, and 24-hour completed-response replay. Sits at handler entry, before any database work.
 
-The two are orthogonal: a request that survives the API-boundary idempotency cache MAY still be retried at the database layer (e.g., the bet transaction wrapper retrying on SQLSTATE 40001 per ADR-0013); the storage-layer idempotency on `event_id` ensures the events row writes exactly once even across those retries. A reader who needs the API-boundary contract goes to §11; a reader who needs the storage-layer contract stays here.
+The two are orthogonal: a request that survives the API-boundary idempotency cache MAY still be retried at the database layer (e.g., the bet transaction wrapper retrying on SQLSTATE 40001 per ADR-0013); the storage-layer idempotency on `(event_id, created_at)` ensures the events row writes exactly once even across those retries. A reader who needs the API-boundary contract goes to §11; a reader who needs the storage-layer contract stays here.
 
 ### §7.4 Synchronous vs asynchronous read-model classification rule
 
@@ -757,7 +765,7 @@ Three locked properties per ADR-0008 §6.2:
 
 1. **Bound-transaction-only.** The function takes a `Transaction` (not the top-level `db` client) and runs INSERT against it. Calling `insertEvent(db, ...)` is a TypeScript compile error. This guarantees the events write is inside the originating transaction by construction.
 2. **Zod-validates payload.** The function looks up the per-event-type schema (per §7.6), validates `eventInput.payload`, and throws on mismatch before issuing SQL. Validation runs synchronously and adds microsecond-scale overhead; mismatches are application bugs, not data hazards.
-3. **`sql\`...\`` template.** The actual INSERT uses Drizzle's `sql\`INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id) DO NOTHING\`` template per the events-insert pattern locked in ADR-0008 §6.2. Hand-written SQL beats query-builder composition here because the storage-idempotency `ON CONFLICT (event_id) DO NOTHING` clause is the load-bearing primitive — a Drizzle-builder version would obscure it.
+3. **`sql\`...\`` template.** The actual INSERT uses Drizzle's `sql\`INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id, created_at) DO NOTHING\`` template per the events-insert pattern locked in ADR-0008 §6.2. Hand-written SQL beats query-builder composition here because the storage-idempotency `ON CONFLICT (event_id, created_at) DO NOTHING` clause (composite per §7.1 partition-constraint reconciliation) is the load-bearing primitive — a Drizzle-builder version would obscure it.
 
 The `event_id` is supplied by the caller (handler entry generates it via `uuidv7()` from the npm `uuid` package per ADR-0016). The helper does not generate UUIDs internally — keeps the call site authoritative for retry-correlation.
 
