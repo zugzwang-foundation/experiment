@@ -1,9 +1,8 @@
 # SCAFFOLD.2 — close-out
 
 > Task-level close-out per CLAUDE.md §5.9. Supersedes the per-session in-flight
-> checkpoint that previously sat at this path. Per-stratum logs preserved at
-> `docs/logs/SCAFFOLD.2-3B.md`, `…-3C.md`, `…-3D.md`. Stratum 3.A's per-session
-> log lives in this file's git history (pre-rewrite commit on `chore/scaffold-2-close`).
+> checkpoint that previously sat at this path. Per-stratum logs at
+> `docs/logs/SCAFFOLD.2-3A.md`, `…-3B.md`, `…-3C.md`, `…-3D.md`.
 
 - **Task:** SCAFFOLD.2 — Postgres + Drizzle + event-sourced schema foundation
 - **Closed:** 2026-05-12
@@ -117,7 +116,7 @@ The two master-plan imprecisions are captured as PRECURSOR.5 backlog items below
 | `docs/specs/SPEC.2.md` | amended in 3.B + 3.C (§5.1 row 10, B.8, §3.7, §5.1, §6.3, §7.1, §7.3, §7.7) | Verify currency in web Claude context | SPEC.2 absorbs ADR-0009 + ADR-0016 substance per 3.C precedent |
 | `docs/plans/SCAFFOLD.2.md` | new (master plan, all 5 strata) | Add | task plan, archival reference |
 | `docs/logs/SCAFFOLD.2.md` (this file) | rewritten as task-level close-out | Add | task close-out (Tier 2 rolling) |
-| `docs/logs/SCAFFOLD.2-3B.md`, `…-3C.md`, `…-3D.md` | per-stratum logs | Keep | per-session log series per CLAUDE.md §5.9 |
+| `docs/logs/SCAFFOLD.2-3A.md`, `…-3B.md`, `…-3C.md`, `…-3D.md` | per-stratum logs | Keep | per-session log series per CLAUDE.md §5.9; 3.A extracted from in-flight `SCAFFOLD.2.md` in the same commit as this close-out |
 | `docs/adr/0003-0016` | still ghost references (not present in repo) | Verify approach with Hrishikesh | substance absorbed into SPEC.2 (3.C precedent); decide whether to land the files or trim the references — see PRECURSOR.5 backlog |
 | `zugzwang_experiment_tracker_v6.html` | tracker | Keep (stale) | Hrishikesh updates separately |
 
