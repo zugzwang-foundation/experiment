@@ -238,7 +238,7 @@ CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: dri
 
 ### Decision log
 
-- **2026-05-14:** VISUAL phase minted (8 DESIGN.* tasks, runs parallel to ENGINE). Tracker v7 absorbs the phase. SPEC.13 retained as pointer to DESIGN.8 producer. See `docs/logs/chat_close_2026-05-14_visual-phase-mint_v7-tracker.md`.
+- **2026-05-14:** VISUAL phase minted (8 DESIGN.* tasks, runs parallel to ENGINE). Tracker v7 absorbs the phase. SPEC.13 retained as pointer to DESIGN.8 producer. See project-knowledge close-out log (chat_close_2026-05-14_visual-phase-mint_v7-tracker).
 
 ### Cleanup absorption rule
 
