@@ -14,7 +14,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 - **Source of truth.** Hierarchy: `docs/specs/SPEC.1.md` (product), `docs/specs/SPEC.2.md` (technical), `docs/adr/0003–0016.md` (decisions), `AGENTS.md` (stack patterns). When this file disagrees with code, this file wins until updated by an ADR.
 - **License.** AGPL-3.0-or-later. AGPL §13 forecloses closed-source SaaS forks.
 
-### Critical paths (trigger writer/reviewer ritual + invariant test gate + same-commit ADR scan + pre-PR self-audit + task-appropriate subagent review)
+### Critical paths (trigger writer/reviewer ritual + invariant test gate + same-commit ADR scan + pre-PR self-audit + task-appropriate reviewer call)
 
 - `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`
 - `src/server/auth/`, `src/server/identity/`, `src/server/moderation/`
@@ -119,7 +119,7 @@ Read the file you're about to edit in full, plus its types, schemas, and callers
 
 ### 5.6 Tests before implementation (thesis-touching code)
 
-For bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, moderation, CSAM detection: failing tests first via `@test-writer`, then implement, then `@code-reviewer`.
+For bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, moderation, CSAM detection: failing tests first via a `test-writer` reviewer call (per §5.11), then implement, then a `code-reviewer` reviewer call.
 
 §5.6 applies to **business logic**. Type-only declarations (schema files, type aliases, interfaces) and configuration changes are exempt — the type-check is the gate.
 
@@ -166,7 +166,7 @@ What to verify (task-dependent — kickoff prompts list specifics):
 - **Server work:** every handler against the plan's API surface; every invariant the plan flags + the assertion that proves it holds
 - **Migration work:** ordering, idempotency, trigger SQL correctness, partition DDL, singleton constraints
 
-The audit is run by the Phase 2 execute surface (same Claude Code session that wrote the code). It is NOT a subagent step — §5.11 covers subagent review separately.
+The audit is run by the Phase 2 execute surface (same Claude Code session that wrote the code). It is NOT a reviewer-call step — §5.11 covers reviewer-call review separately.
 
 PR opens only after audit reports clean. FAIL items fix in-session, re-verify, then PR. SURPRISE items surface for Hrishikesh's decision.
 
@@ -174,27 +174,31 @@ Non-critical-path PRs skip the audit (still run `just verify`).
 
 Verification is left-shifted into write-time, where context is loaded and fixes are cheap. There is no post-PR soak — audit at write-time is stronger.
 
-### 5.11 Subagent invocation
+### 5.11 Reviewer-call invocation
 
-Subagents declared in `.claude/agents/` (see §6) are invoked **explicitly** from kickoff prompts. Auto-invocation via description matching is also enabled (every agent file uses "MUST BE USED" language) but explicit invocation is the reliable path. Belt-and-suspenders.
+The Claude Code `Agent` tool exposes only built-in agent types (`general-purpose`, `Explore`, etc.) — the named project review roles (`code-reviewer`, `db-migration-reviewer`, `security-auditor`, `test-writer`) are NOT auto-discoverable. Project roles live as **role briefings** at `.claude/agents/*.md`. A "reviewer call" is a fresh-context `general-purpose` Agent invocation with the role briefing baked into the prompt, plus the plan path, plus tool-scope constraints. The §6 catalogue names which briefing routes to which work type.
 
 **Critical-path invocation policy** (after pre-PR self-audit passes, before `gh pr create`):
 
-| Work type | Subagent | Phase | Tool scope |
+| Work type | Role briefing | Phase | Tool scope (enforce via prompt) |
 |---|---|---|---|
-| `src/db/schema/` or `drizzle/migrations/` | `@db-migration-reviewer` | Phase 2 post-audit | Read-only |
-| `src/server/` changes | `@code-reviewer` | Phase 2 post-audit | Read-only |
-| Critical-path business logic | `@security-auditor` | After code-reviewer | Read-only |
-| New business-logic behavior | `@test-writer` | Phase 2 start (tests-first per §5.6) | Read + Write tests only |
+| `src/db/schema/` or `drizzle/migrations/` | `db-migration-reviewer` | Phase 2 post-audit | Read-only |
+| `src/server/` changes | `code-reviewer` | Phase 2 post-audit | Read-only |
+| Critical-path business logic | `security-auditor` | After code-reviewer | Read-only |
+| New business-logic behavior | `test-writer` | Phase 2 start (tests-first per §5.6) | Read + Write tests only (no `src/` edits) |
 
-**Always pass plan context.** Subagents start from zero context. Every invocation includes the plan path: `@docs/plans/<TASK-ID>.md`. Without it, the subagent re-explores the codebase from scratch — expensive and noisy.
+**Three required prompt elements** for every reviewer call:
 
-**Subagent findings:**
+1. **Explicit role briefing** — name the role and point at `.claude/agents/<role>.md`; instruct the agent to load it and follow it verbatim.
+2. **Plan path** — `@docs/plans/<TASK-ID>.md`. Without it, the call re-explores the codebase from scratch — expensive and noisy.
+3. **Tool-scope constraints** — the briefing's tool scope enforced in the prompt body (e.g., "Read, Grep, Glob, Bash only — do not Edit or Write"). The `general-purpose` agent has full tool access by default; the prompt must constrain it.
+
+**Findings:**
 - FAIL findings within scope → fix in-session before PR
 - SURPRISE findings outside scope → write to `claude-progress.md` and STOP (do not silently expand scope)
 
-**When NOT to invoke subagents:**
-- Tightly coupled work spanning schema + server + UI + tests in one pass (subagents lose shared intent; stay in main session)
+**When NOT to invoke a reviewer call:**
+- Tightly coupled work spanning schema + server + UI + tests in one pass (separate calls lose shared intent; stay in main session)
 - Non-critical-path work (file moves, dep bumps, doc edits)
 - Type-only declarations (the type-check is the gate)
 
@@ -208,19 +212,19 @@ First word of every coding-task prompt. Mandatory for: CPMM pricing math, Dharma
 
 ---
 
-## 6. Subagents, skills, hooks
+## 6. Review roles, skills, hooks
 
-Auto-discovered from `.claude/agents/*.md`, `.claude/skills/<name>/SKILL.md`, `.claude/settings.json` at session start.
+**Review roles** are role briefings at `.claude/agents/*.md`, invoked per §5.11 as fresh-context `general-purpose` Agent calls. They are NOT auto-discovered runtime subagents — the Claude Code runtime exposes only built-in agent types. Each briefing names its checklist, output format, and tool-scope expectations; §5.11's invocation policy table names which work types route to which briefing.
 
-**Subagents** (descriptions are routing rules — "MUST BE USED" enables reliable auto-invocation; explicit invocation per §5.11 is the primary path):
+- **`code-reviewer`** — reviews diffs under `src/server/` for invariant violations (§2), missing error handling, and refusal triggers (§3). Returns findings as CRITICAL / HIGH / MEDIUM / LOW with `file:line` references. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/code-reviewer.md`.
 
-- **`code-reviewer`** — MUST BE USED after any new file written under `src/server/`. Reviews the diff for invariant violations (§2), missing error handling, and refusal triggers (§3). Returns findings as CRITICAL / HIGH / MEDIUM / LOW with file:line references. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+- **`db-migration-reviewer`** — reviews changes under `src/db/schema/` or `drizzle/migrations/` against SPEC.2 §5 inventory; verifies FK lambdas, indexes per AGENTS.md §6, Bucket A/B/C classifications, and append-only trigger SQL. Returns PASS / FAIL / SURPRISE per table. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/db-migration-reviewer.md`.
 
-- **`db-migration-reviewer`** — MUST BE USED after any change in `src/db/schema/` or `drizzle/migrations/`. Reviews schema declarations against SPEC.2 §5 inventory, verifies FK lambdas, indexes per AGENTS.md §6, Bucket A/B/C classifications, and append-only trigger SQL. Returns PASS/FAIL/SURPRISE per table. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+- **`security-auditor`** — reviews critical-path work (per §1) for INV-1 / INV-2 / INV-3 / INV-4 enforcement gaps, auth bypasses, moderation pipeline exploitability, and admin-surface separation. Returns findings ranked by exploitability with concrete attack scenarios. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/security-auditor.md`.
 
-- **`security-auditor`** — MUST BE USED after critical-path work lands (per §1), before PR opens. Reviews auth flows, transaction handlers, moderation paths, and admin surfaces for INV-1/INV-2/INV-3/INV-4 enforcement gaps. Returns findings ranked by exploitability. Tools: Read, Grep, Glob, Bash. Model: opus. Effort: xhigh.
+- **`test-writer`** — writes FAILING tests FIRST for new business-logic behavior per §5.6 against the plan's test plan section. Briefing forbids edits to `src/`. Returns test files + coverage map. Briefing tool scope: Read, Write, Edit (tests only), Bash, Grep, Glob. Briefing file: `.claude/agents/test-writer.md`.
 
-- **`test-writer`** — MUST BE USED for new business-logic behavior per §5.6. Writes failing tests FIRST against the plan's test plan section. Forbidden from editing `src/`. Returns test files + a list of which scenarios are covered. Tools: Read, Write, Edit, Bash, Grep, Glob. Model: opus. Effort: xhigh.
+**Skills:** auto-discovered from `.claude/skills/<name>/SKILL.md` at session start.
 
 **Hooks:** `block-destructive.sh` (rm -rf, force-push, DROP TABLE), `block-main-commits.sh`, `format-and-typecheck.sh` (Biome + tsc post-edit), `session-start.sh` (recent commits + open PRs).
 
@@ -228,9 +232,31 @@ Auto-discovered from `.claude/agents/*.md`, `.claude/skills/<name>/SKILL.md`, `.
 
 ## 7. Maintaining this file
 
-CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: drift discovered, phase ends, ADR accepted, new subagent/skill/hook, bi-weekly. Process at `docs/maintenance.md`.
+CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: drift discovered, phase ends, ADR accepted, new role briefing / skill / hook, bi-weekly. Process at `docs/maintenance.md`.
 
 **Closing ritual** for every task: "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this session?" Most: no. The discipline is asking. If yes, file in the same PR — never as a follow-up. Follow-ups never happen.
+
+### Decision log
+
+- **2026-05-14:** VISUAL phase minted (8 DESIGN.* tasks, runs parallel to ENGINE). Tracker v7 absorbs the phase. SPEC.13 retained as pointer to DESIGN.8 producer. See project-knowledge close-out log (chat_close_2026-05-14_visual-phase-mint_v7-tracker).
+
+### Cleanup absorption rule
+
+Drift fixes — config tweaks, doc updates, stale-reference replacements, convention codifications, naming inconsistencies — are absorbed by the stratum that surfaces them, in the same PR, before merge.
+
+Forbidden:
+
+- Deferring drift to a future "PRECURSOR-N" or "cleanup sweep" task.
+- Accumulating backlogs across multiple strata for batch resolution.
+- Treating per-stratum cleanup as overhead rather than as part of the stratum's close-out ritual.
+
+Permitted:
+
+- In-stratum absorption of drift items that take <2 hours per item.
+- For drift items that genuinely require >2 hours (architectural decisions, multi-file coordinated edits), mint a real task with its own kickoff. Not a backlog row.
+- Parking items genuinely out-of-scope for any current task (e.g., "engage lawyer mid-July 2026 HARDEN.7") in `docs/parked.md`.
+
+PRECURSOR.5 (this PR) is the last PRECURSOR-N task. Future drift rolls into the stratum that surfaced it.
 
 ---
 
@@ -238,4 +264,4 @@ CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: dri
 
 **Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything in this file is wrong, fix it before fixing the code.**
 
-*Last revised SCAFFOLD.2 stratum 3.B post-merge (May 11, 2026) — soak rule removed; pre-PR self-audit (§5.10) and subagent invocation policy (§5.11) added; §6 subagent descriptions sharpened to "MUST BE USED" routing rules. Against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
+*Last revised PRECURSOR.5 (May 14, 2026) — subagent → reviewer-call reframe per §5.11 + §6 (`.claude/agents/*.md` role briefings invoked via fresh-context `general-purpose` Agent calls, not auto-discovered); decision log + cleanup absorption rule added at §7. Against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
