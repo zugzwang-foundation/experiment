@@ -47,6 +47,7 @@ test-results/
 # === Claude Code local overrides ===
 CLAUDE.local.md
 .claude/settings.local.json
+.claude/scheduled_tasks.lock
 claude-progress.md
 
 # === Supabase CLI runtime ===

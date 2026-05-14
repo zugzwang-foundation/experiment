@@ -10,8 +10,8 @@
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Runtime | Node.js 22 LTS via `mise` | `.tool-versions` pins exact patch |
-| Package manager | pnpm 10 | `pnpm-workspace.yaml` not used (single package) |
+| Runtime | Node.js 24 via `mise` | `mise.toml` pins major; `.nvmrc` mirrors for non-mise users |
+| Package manager | pnpm 10 | `pnpm-workspace.yaml` declares `allowBuilds` for build-script approval |
 | Framework | Next.js 16 (App Router) | Turbopack default; React Server Components first; `cacheComponents: true` |
 | Language | TypeScript 5.x strict | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` all `true` |
 | ORM | Drizzle 0.45+ | event-sourced schema; one table per file |
@@ -23,7 +23,7 @@
 | CAPTCHA | Cloudflare Turnstile | invisible by default, fail-closed at OTP issuance |
 | Hosting | Vercel | Server Actions + Route Handlers + Vercel Cron (HTTP-fanout) + pg_cron (DB-internal) |
 | Observability | Sentry + PostHog + Vercel runtime logs | Sentry for errors/alarms; PostHog for **feature flags only** (no product analytics in v1); Vercel logs for the structured request log |
-| Styling | Tailwind v4 (CSS-first via `@theme`) + shadcn/ui new-york v4 | OKLCH colors only |
+| Styling | Tailwind v4 (CSS-first via `@theme`) + shadcn/ui radix-nova preset | OKLCH colors only |
 | Linter / formatter | Biome v2 | one tool both jobs; 80-char line width; trailing newlines required |
 | Testing | Vitest (unit + integration) + Playwright (E2E) | invariant tests gated separately via `pnpm test:invariants` |
 | Tooling | `mise`, `just`, `lefthook`, `drizzle-kit`, `gh` | |
@@ -288,14 +288,17 @@ No `tailwind.config.ts`. All design tokens go in `src/app/globals.css`:
 ```css
 @import "tailwindcss";
 
+/* Plain @theme: adds utilities for tokens that don't have a Tailwind name. */
 @theme {
-  --color-yes:   oklch(0.65 0.18 145);
-  --color-no:    oklch(0.65 0.18 25);
-  --color-brand: oklch(0.55 0.20 270);
-  --font-sans:   "Inter", system-ui, sans-serif;
-  --font-mono:   "JetBrains Mono", ui-monospace, monospace;
+  --color-yes:   oklch(0.65 0.18 145);  /* placeholder — DESIGN.1 mints */
+  --color-no:    oklch(0.65 0.18 25);   /* placeholder — DESIGN.1 mints */
+  --color-brand: oklch(0.55 0.20 270);  /* placeholder — DESIGN.1 mints */
+  --font-sans:   var(--font-geist-sans); /* placeholder — DESIGN.7 swaps */
+  --font-mono:   var(--font-geist-mono); /* placeholder — DESIGN.7 swaps */
 }
 ```
+
+The `--color-yes` / `--color-no` / `--color-brand` color values AND the `--font-sans` / `--font-mono` mappings shown above are **SCAFFOLD.1 placeholders**. The real brand palette is produced by DESIGN.1 (brand + tokens) and back-applied to `globals.css` by DESIGN.7; the font choice is similarly DESIGN.7's call. This is the operational realization of SPEC.2 §22.2's design-independence carve-out: the codebase scaffolds without `docs/specs/design.md`, then the design system layers on once ADR-0012 lands. Token NAMES (`--color-yes`, `--font-sans`, etc.) are stable; only VALUES are placeholder.
 
 Defining `--color-yes` automatically generates `bg-yes`, `text-yes`, `border-yes`, etc.
 
@@ -303,10 +306,10 @@ Defining `--color-yes` automatically generates `bg-yes`, `text-yes`, `border-yes
 
 Next.js 16 needs `postcss.config.mjs` with `@tailwindcss/postcss`.
 
-### shadcn/ui — new-york v4
+### shadcn/ui — radix-nova preset
 
 - Primitives use `data-slot` attributes for styling.
-- new-york v4 styles only. Don't mix in v3-style components.
+- radix-nova preset only (per SCAFFOLD.1 init; `components.json` `style` field). Don't mix in older shadcn styles.
 - `Sonner` for toasts (deprecated `Toast` component).
 - `pnpm dlx shadcn@latest add <component>` to add. Review the generated code; commit it. Don't import from `@/components/ui` in `src/server/`.
 
