@@ -47,6 +47,12 @@ test-results/
 # === Claude Code local overrides ===
 CLAUDE.local.md
 .claude/settings.local.json
+claude-progress.md
+
+# === Supabase CLI runtime ===
+# Local Supabase state (.branches, .temp, snippets). When `supabase/migrations/`
+# is minted for RLS policies (per AGENTS.md §3), add `!supabase/migrations/` here.
+supabase/
 
 # === Misc ===
 *.pem

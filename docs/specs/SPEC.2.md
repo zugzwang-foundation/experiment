@@ -57,7 +57,7 @@ This split is the **Option B distribution**: SPEC.2 is the load-bearing frame; t
 
 ### §1.2 Audience and primary reader
 
-The primary reader of SPEC.2 + ADRs is **Claude Code** generating the experiment codebase under the writer/reviewer ritual. The secondary readers are Hrishikesh (product owner / sole engineer) and the SPEC.8 fresh-session reviewer instance. SPEC.2 MUST therefore optimise for *agent experience* — scannable structure, RFC-2119 keyword discipline, named source-of-truth files, named test paths for every invariant — over narrative readability.
+The primary reader of SPEC.2 + ADRs is **Claude Code** generating the experiment codebase under the writer/reviewer ritual. The secondary readers are Hrishikesh (product owner / sole engineer) and the PRECURSOR.4 fresh-session reviewer instance. SPEC.2 MUST therefore optimise for *agent experience* — scannable structure, RFC-2119 keyword discipline, named source-of-truth files, named test paths for every invariant — over narrative readability.
 
 ### §1.3 Scope (what SPEC.2 covers)
 
@@ -83,7 +83,7 @@ SPEC.2 owns, as a **frame document**:
 - The operational runbook *slots* — cron schedule, deployment, rollback, dataset release (§21, substance lives in `HARDEN.*` task outputs).
 - The open-blockers register (§2 + §21 mirror).
 - The ADR index (§22).
-- The tracker-task gating map — which SPEC.2 section unblocks which tracker task and which `F-*` flow (§23). This makes the SPEC.8 review objective.
+- The tracker-task gating map — which SPEC.2 section unblocks which tracker task and which `F-*` flow (§23). This makes the PRECURSOR.4 review objective.
 
 ### §1.4 Non-goals (what SPEC.2 explicitly does NOT cover)
 
@@ -111,7 +111,7 @@ SPEC.2 MUST NOT contain:
 
 ### §1.5 What "perfect" means for SPEC.2
 
-A "perfect" SPEC.2 + ADR bundle has the following properties, jointly verified by SPEC.8:
+A "perfect" SPEC.2 + ADR bundle has the following properties, jointly verified by PRECURSOR.4:
 
 1. **Coverage.** Every flow named in SPEC.1 (`F-*`) has a technical contract in `docs/specs/flows/F-*.md`. Every invariant in SPEC.1 §5 (`INV-1` through `INV-4`) has a named technical mechanism in SPEC.2 §14 + a named test file path. Every constant slot in SPEC.1 Appendix B has an owning ADR or section. Every error case in any `F-*` flow maps to a stable error code in `docs/specs/error-codes.md`.
 2. **No drift.** Every claim "X is the single source of truth for concern Y" in SPEC.2 has a corresponding `docs/specs/...` or `src/server/...` file path; the file exists; CI greps SPEC.2 for these claims and fails if any path is missing.
@@ -145,7 +145,7 @@ The current SPEC.2 outline contains zero open architectural blockers. All ten ar
 
 ### §2.2 Resolved blockers (historical record)
 
-Closed blockers remain in this register as historical context. They MUST NOT be silently deleted; closure is recorded with a `RESOLVED:` block linking to the ratifying ADR. This preserves the audit trail that SPEC.8 review depends on.
+Closed blockers remain in this register as historical context. They MUST NOT be silently deleted; closure is recorded with a `RESOLVED:` block linking to the ratifying ADR. This preserves the audit trail that PRECURSOR.4 review depends on.
 
 ```
 RESOLVED: D2 — Single-writer actor vs Postgres SELECT FOR UPDATE
@@ -176,13 +176,13 @@ A new blocker is opened when:
 
 1. A SPEC.2 section needs a value that isn't yet ratified, OR
 2. A dependent ADR exposes a question SPEC.2 cannot answer alone, OR
-3. SPEC.8 review surfaces an inconsistency requiring a fresh decision.
+3. PRECURSOR.4 review surfaces an inconsistency requiring a fresh decision.
 
 The opener writes the `BLOCKER:` block, commits SPEC.2, and creates the ADR file referenced in `resolves-in` with status `provisional`. Code generation in affected flows pauses until ratification. On ratification, the `BLOCKER:` block is rewritten as `RESOLVED:` and moved to §2.2; the ADR status flips to `accepted`.
 
 ### §2.4 Why §2 is at the top of the doc
 
-`BLOCKER:` markers buried mid-document are easy to skip during the SPEC.8 fresh-session review and trivial for Claude Code to elide under context-window pressure. Placing the register at §2 — immediately after Purpose — guarantees the register sits in the first 200 lines of any context window the document is loaded into. Per `CLAUDE.md`, this is one of three "non-negotiable scan zones" alongside §1 Purpose and §3 Reading Guide.
+`BLOCKER:` markers buried mid-document are easy to skip during the PRECURSOR.4 fresh-session review and trivial for Claude Code to elide under context-window pressure. Placing the register at §2 — immediately after Purpose — guarantees the register sits in the first 200 lines of any context window the document is loaded into. Per `CLAUDE.md`, this is one of three "non-negotiable scan zones" alongside §1 Purpose and §3 Reading Guide.
 
 ---
 
@@ -2113,7 +2113,7 @@ Three properties locked at the ADR file shape:
 
 ## §23 Tracker Task Gating Map
 
-§23 owns the *bidirectional gating trace* between tracker tasks and SPEC.2 sections + ADRs + F-* flow files for the experiment-phase build — Direction A maps each tracker phase to the SPEC.2 sections + ADRs + F-* files that gate its tasks; Direction B maps each SPEC.2 section to the tracker tasks that unblock when the section locks. The trace is the load-bearing PRECURSOR.4 review surface — coverage gaps surface here before they land as blocked downstream tasks. SPEC.1 owns the *product-level* tracker cadence; the tracker HTML at `zugzwang_experiment_tracker_v6.html` is the *operational* Kanban surface; this §23 sits at the *gating-relationship contract* layer, naming what blocks what and what unblocks what.
+§23 owns the *bidirectional gating trace* between tracker tasks and SPEC.2 sections + ADRs + F-* flow files for the experiment-phase build — Direction A maps each tracker phase to the SPEC.2 sections + ADRs + F-* files that gate its tasks; Direction B maps each SPEC.2 section to the tracker tasks that unblock when the section locks. The trace is the load-bearing PRECURSOR.4 review surface — coverage gaps surface here before they land as blocked downstream tasks. SPEC.1 owns the *product-level* tracker cadence; the tracker HTML at `zugzwang_experiment_tracker_v7.html` is the *operational* Kanban surface; this §23 sits at the *gating-relationship contract* layer, naming what blocks what and what unblocks what.
 
 The discipline is strict: §23 names the gating relationships at phase grain (Direction A) and section grain (Direction B); it does NOT enumerate every task's status (the tracker HTML owns), it does NOT decide implementation priority within a phase (the tracker's per-phase ordering owns), and it does NOT track day-to-day progress (the tracker's status field owns).
 
@@ -2192,7 +2192,7 @@ Each SPEC.2 section row names which tracker tasks unblock when the section reach
 | Phase-bucketed Direction A trace | §23.1 (this section) |
 | Per-section Direction B trace | §23.2 (this section) |
 | Tracker description drift surfaced for PRECURSOR.5 | §23.3 |
-| Per-task status (not_started / in_progress / blocked / done) | `zugzwang_experiment_tracker_v6.html` |
+| Per-task status (not_started / in_progress / blocked / done) | `zugzwang_experiment_tracker_v7.html` |
 | Per-task ordering within phase | tracker HTML |
 | Per-flow contract files (consumed by Direction A's "F-* files gated" column) | `docs/specs/flows/F-*.md` (per §13) |
 | Per-section "ADRs consumed by §N" footers (consumed by Direction A's "ADRs consumed" column) | each SPEC.2 section's closing footer |

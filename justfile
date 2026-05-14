@@ -2,6 +2,10 @@
 # Run `just` (no args) or `just list` to see all recipes.
 # Per Playbook §1: dev/build/typecheck/check are the canonical verification chain.
 
+# Source .env.local automatically for every recipe — DATABASE_URL et al.
+# Removes the manual `DATABASE_URL=... <cmd>` workaround used through SCAFFOLD.2.
+set dotenv-load := true
+
 # Default recipe: list all available tasks.
 default:
     @just --list
