@@ -14,7 +14,9 @@ import { redis } from "@/server/upstash/redis";
  * Body-fingerprint uses RFC 8785 (JSON Canonicalization Scheme) via the
  * `canonicalize` npm package. Hand-rolling RFC 8785 gets number-formatting
  * (ECMA-262 §7.1.12.1) and UTF-8 escape edge cases wrong; the library is
- * 49 LOC, MIT-licensed, RFC 8785 §3.2.2.3 compliant. Per ADR-0015 D5.
+ * 49 LOC, Apache-2.0-licensed, RFC 8785 §3.2.2.3 compliant. Per ADR-0015
+ * D5. Apache-2.0 is GPL-compatible per FSF, so no AGPL-3.0 clearance
+ * issue with the project's outer license.
  *
  * Pipeline: `canonicalize(body) → SHA-256 over UTF-8 bytes → lowercase
  * hex`. The fingerprint is the disambiguator between a legitimate cache
