@@ -48,8 +48,10 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 
 // Indefinite-session sentinel per SPEC.2 §8.2 line 818 ("Indefinite cookie
 // lifetime"). Large `expiresIn` (100y) makes Better Auth's
-// internalAdapter.createSession write a far-future Date; combined with
-// `updateAge: expiresIn` it suppresses the sliding-window refresh.
+// internalAdapter.createSession write a far-future Date for `expires_at`;
+// `disableSessionRefresh: true` is the canonical Better Auth 1.6.11 option
+// (verified at init-options.d.mts, surfaced during step-10 check-in) that
+// overrides any updateAge sliding-window refresh.
 const ONE_HUNDRED_YEARS_SEC = 60 * 60 * 24 * 365 * 100;
 
 // === Custom plugin: Turnstile + rate-limit on email-OTP send ================
@@ -186,14 +188,23 @@ export const auth = betterAuth({
 	baseURL: process.env.BETTER_AUTH_URL,
 	session: {
 		expiresIn: ONE_HUNDRED_YEARS_SEC,
-		updateAge: ONE_HUNDRED_YEARS_SEC,
+		disableSessionRefresh: true,
 	},
 	advanced: {
 		database: {
 			generateId: () => uuidv7(),
 		},
+		// SPEC.2 §8.5 cookie table mandates participant cookie name
+		// `zugzwang_session` (no dot/_token suffix). Better Auth defaults to
+		// `${cookiePrefix}.${cookieName}` = `zugzwang.session_token`; the
+		// `advanced.cookies.session_token.name` override at cookies/index.mjs:27
+		// replaces that with our SPEC-mandated name verbatim. The
+		// `cookiePrefix` is preserved for Better Auth's internal cookies
+		// (session_data, dont_remember, account_data) — not in SPEC, so
+		// `zugzwang.session_data` etc. are fine.
 		cookies: {
 			session_token: {
+				name: "zugzwang_session",
 				attributes: {
 					httpOnly: true,
 					secure: true,
