@@ -58,14 +58,11 @@ describe("Better Auth APIError body serialization probe", () => {
 
 		// Diagnostic log so the actual response shape is visible in the test
 		// run (CI + local). The assertions below are the regression guard.
-		// biome-ignore lint/suspicious/noConsole: load-bearing diagnostic for
-		// the Item #4 verification; intentional console output.
 		console.log(
 			"[apierror-body-probe] status=%d headers.content-type=%s",
 			response.status,
 			response.headers.get("content-type"),
 		);
-		// biome-ignore lint/suspicious/noConsole: see above.
 		console.log("[apierror-body-probe] body=%s", bodyText);
 
 		// HTTP 403 (FORBIDDEN → 403 per better-call's statusCodes map).
