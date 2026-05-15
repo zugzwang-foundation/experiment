@@ -852,13 +852,12 @@ The hook is the construction-layer protection of B5 (admin not a participant), I
 
 ### §8.4 Admin auth path
 
-Hand-rolled per ADR-0010. Five-step Server Action sequence at `src/server/auth/admin/login.ts`:
+Hand-rolled per ADR-0010. Four-step Server Action sequence at `src/server/auth/admin/login.ts` (SCAFFOLD.3 Q1 amendment: Turnstile dropped per SPEC.1 §13 line 609 — "No CAPTCHA on F-AUTH-ADMIN (per-IP rate limit … is the brute-force guard for a single-user admin path)". Per-IP rate limit + identical-401 + transactional replace + indefinite cookie remain sufficient brute-force protection for a single-user admin path):
 
-1. **Cloudflare Turnstile siteverify** (same `hooks.before` shape as F-AUTH-2, applied to the admin login Server Action).
-2. **`crypto.timingSafeEqual` comparison** of `input.password` to `process.env.ADMIN_PASSWORD`.
-3. **Run-and-discard timing parity** — on password mismatch, the action still issues a dummy database round-trip + a constant-time delay before returning. This prevents an information-leak side-channel where wrong-password responses are systematically faster than rate-limit-exceeded responses.
-4. **Transactional `DELETE FROM admin_sessions; INSERT INTO admin_sessions (...) RETURNING session_id;`** in a single Postgres transaction. Maintains the single-row-at-any-moment invariant without a UNIQUE constraint — no concurrent admin login can produce two rows because the DELETE precedes the INSERT in the same transaction; wraparound is impossible.
-5. **Issue cookie** with name `zugzwang_admin_session`, attributes `HttpOnly + Secure + SameSite=Lax + Path=/admin + indefinite Max-Age` per ADR-0010 + §8.5.
+1. **HMAC-SHA256 digest comparison** via `crypto.timingSafeEqual` over equal-length 32-byte buffers. `createHmac(BETTER_AUTH_SECRET).update(input).digest()` on both submitted and env values so the comparison never throws `RangeError` on different-length inputs (which would itself leak password length).
+2. **Run-and-discard timing parity** — on password mismatch, the action still issues a dummy database round-trip + a constant-time delay before returning. This prevents an information-leak side-channel where wrong-password responses are systematically faster than rate-limit-exceeded responses.
+3. **Transactional `DELETE FROM admin_sessions; INSERT INTO admin_sessions (...) RETURNING session_id;`** in a single Postgres transaction. Maintains the single-row-at-any-moment invariant without a UNIQUE constraint — no concurrent admin login can produce two rows because the DELETE precedes the INSERT in the same transaction; wraparound is impossible.
+4. **Issue cookie** with name `zugzwang_admin_session`, attributes `HttpOnly + Secure + SameSite=Lax + Path=/admin + indefinite Max-Age` per ADR-0010 + §8.5.
 
 **Two-layer middleware-plus-validator pattern.** Admin trust is checked at TWO places per CVE-2025-29927 defense-in-depth + AGENTS.md §5:
 

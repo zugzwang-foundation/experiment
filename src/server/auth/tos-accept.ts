@@ -90,6 +90,15 @@ export async function acceptTosAction(
 	const ua = getUserAgent(headerStore);
 
 	await db.transaction(async (tx) => {
+		// Per plan §5 failure mode #11 + SPEC.1 line 703: `SELECT … FOR
+		// UPDATE` acquires a row-level lock so concurrent tabs serialize
+		// through this point. The second tab BLOCKS on this SELECT until
+		// the first tab's tx commits; on unblock it re-reads via
+		// findFirst() below and sees `tos_accepted_at IS NOT NULL`, taking
+		// the no-op branch. Issued as raw SQL (Drizzle RQB findFirst has
+		// no `.for("update")` equivalent).
+		await tx.execute(sql`SELECT 1 FROM users WHERE id = ${userId} FOR UPDATE`);
+
 		const row = await tx.query.users.findFirst({
 			where: eq(users.id, userId),
 			columns: { id: true, pseudonym: true, tosAcceptedAt: true },

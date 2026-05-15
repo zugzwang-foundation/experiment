@@ -208,11 +208,14 @@ describe("ToS gate + acceptance Server Action (F-AUTH-4)", () => {
 			// Server Action redirect throw — expected on success.
 		}
 
-		// No UPDATE issued — the implementation saw tos_accepted_at set
-		// and short-circuited. Plan §6: "second call see tos_accepted_at
-		// IS NOT NULL, take no-op branch."
+		// No UPDATE-users-SET issued — the implementation saw
+		// tos_accepted_at set and short-circuited. Plan §6: "second call
+		// see tos_accepted_at IS NOT NULL, take no-op branch." Regex is
+		// `/UPDATE\s+users\s+SET/i` (not just `/UPDATE/i`) so the
+		// step-24-audit-added `SELECT … FOR UPDATE` row lock isn't counted
+		// as an UPDATE — only the SET-five-columns statement is.
 		const updateCalls = mockDb._tx.execute.mock.calls.filter((c) =>
-			JSON.stringify(c[0]).match(/UPDATE/i),
+			JSON.stringify(c[0]).match(/UPDATE\s+users\s+SET/i),
 		);
 		expect(updateCalls.length).toBe(0);
 	});

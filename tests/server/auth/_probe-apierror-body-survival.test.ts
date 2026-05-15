@@ -1,3 +1,6 @@
+// REGRESSION GUARD — Better Auth serialization preserves arbitrary
+// APIError body fields (plan §5 failure mode #8 + Q4 / item #4 resolution).
+
 import { describe, expect, it } from "vitest";
 
 // Empirical probe per kickoff Item #4: when a Better Auth hook throws an
