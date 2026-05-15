@@ -292,13 +292,13 @@ describe("identity_pool FIFO consumer", () => {
 		// invokes the callback; if the callback returns without throwing,
 		// the tx is considered committed (mockDb._txCommitted = true).
 		let txCommitted = false;
-		mockDb.transaction.mockImplementationOnce(async (cb: typeof mockDb._tx) => {
-			const result = await (cb as unknown as (t: typeof mockDb._tx) => unknown)(
-				mockDb._tx,
-			);
-			txCommitted = true;
-			return result;
-		});
+		mockDb.transaction.mockImplementationOnce(
+			async (cb: (t: typeof mockDb._tx) => unknown) => {
+				const result = await cb(mockDb._tx);
+				txCommitted = true;
+				return result;
+			},
+		);
 
 		mockDb._tx.execute.mockResolvedValueOnce([row]); // SELECT
 		mockDb._tx.execute.mockResolvedValueOnce([

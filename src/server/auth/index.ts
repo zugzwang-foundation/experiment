@@ -1,0 +1,285 @@
+import { betterAuth } from "better-auth";
+import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { APIError } from "better-auth/api";
+import { emailOTP } from "better-auth/plugins/email-otp";
+import { v7 as uuidv7 } from "uuid";
+import { db } from "@/db";
+import * as schema from "@/db/schema";
+import { sendVerificationOTP } from "@/server/auth/email-otp";
+import { createSessionGate } from "@/server/auth/session-gate";
+import { consumeIdentityPoolTuple } from "@/server/identity-pool/consume";
+import {
+	checkRateLimit,
+	ipIdentifier,
+	otpEmailIdentifier,
+} from "@/server/middleware/rate-limit";
+
+// Better Auth instance + plugins + databaseHooks + cookie config + UUIDv7
+// generateId override per SPEC.2 §8.10 single source of truth. Wires:
+//
+//   - drizzleAdapter with usePlural:true (Q11) + transaction:true (Q6)
+//   - socialProviders.google with email_verified enforcement (SPEC.2 §8.2)
+//   - emailOTP plugin with Resend-backed sendVerificationOTP
+//   - zugzwang-otp-gate plugin: Turnstile siteverify + rate-limit MATCHED
+//     ONLY to /email-otp/send-verification-otp (plan §5 failure-mode #2)
+//   - databaseHooks.user.create.before: atomic identity_pool consumption +
+//     pseudonym/pfpFilename injection (Q10)
+//   - databaseHooks.session.create.before: INV-3 construction-layer
+//     protection via createSessionGate(db) (SPEC.2 §8.3 + plan §1)
+//   - advanced.database.generateId: () => uuidv7() across all 4 Better Auth
+//     tables (SPEC.2 §8.2)
+//
+// The OTP-gate plugin's hooks.before array is also attached to
+// `auth.options.hooks.before` post-hoc for test introspection per
+// `tests/server/auth/otp.test.ts`. Better Auth's runtime aggregation has
+// already completed by then (init reads options.hooks.before as a single
+// AuthMiddleware at construction); the post-hoc mutation is purely a
+// surface-for-tests convenience.
+
+if (!process.env.BETTER_AUTH_SECRET) {
+	throw new Error("BETTER_AUTH_SECRET not set");
+}
+if (!process.env.BETTER_AUTH_URL) {
+	throw new Error("BETTER_AUTH_URL not set");
+}
+if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+	throw new Error("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set");
+}
+
+// Indefinite-session sentinel per SPEC.2 §8.2 line 818 ("Indefinite cookie
+// lifetime"). Large `expiresIn` (100y) makes Better Auth's
+// internalAdapter.createSession write a far-future Date; combined with
+// `updateAge: expiresIn` it suppresses the sliding-window refresh.
+const ONE_HUNDRED_YEARS_SEC = 60 * 60 * 24 * 365 * 100;
+
+// === Custom plugin: Turnstile + rate-limit on email-OTP send ================
+//
+// Plugin form because: (a) Better Auth's top-level `hooks.before` is a single
+// AuthMiddleware (no built-in path matching), and (b) the runtime
+// aggregator (`to-auth-endpoints.mjs`) merges plugin hooks (array form
+// `{matcher, handler}[]`) into the before-chain. Plain async handler — when
+// Better Auth runs the hook, it calls `await handler(ctx)`; createAuth
+// Middleware wrapping is not required for our use case.
+
+type HookCtx = {
+	path?: string;
+	body?: { email?: string; turnstileToken?: string } | unknown;
+	request?: { headers?: Headers };
+	headers?: Headers;
+};
+
+const TURNSTILE_SITEVERIFY_URL =
+	"https://challenges.cloudflare.com/turnstile/v0/siteverify";
+
+async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+	const secret = process.env.TURNSTILE_SECRET_KEY;
+	if (!secret) {
+		// Fail-CLOSED: missing secret is a configuration error, refuse send.
+		console.error("turnstile_unavailable", "TURNSTILE_SECRET_KEY not set");
+		return false;
+	}
+	try {
+		const resp = await fetch(TURNSTILE_SITEVERIFY_URL, {
+			method: "POST",
+			body: new URLSearchParams({
+				secret,
+				response: token,
+				remoteip: ip,
+			}),
+		});
+		if (!resp.ok) {
+			console.error("turnstile_unavailable", `HTTP ${resp.status}`);
+			return false;
+		}
+		const data = (await resp.json()) as { success?: boolean };
+		return data.success === true;
+	} catch (err) {
+		console.error("turnstile_unavailable", err);
+		return false;
+	}
+}
+
+function ipFromCtx(ctx: HookCtx): string {
+	const headers = ctx.request?.headers ?? ctx.headers;
+	if (!headers) return "unknown";
+	const fwd = headers.get("x-forwarded-for");
+	if (fwd) return fwd.split(",")[0]?.trim() ?? "unknown";
+	return "unknown";
+}
+
+const otpGateBeforeHooks = [
+	{
+		matcher: (ctx: HookCtx) => ctx.path === "/email-otp/send-verification-otp",
+		handler: async (ctx: HookCtx): Promise<Record<string, unknown>> => {
+			const body = (ctx.body ?? {}) as {
+				email?: string;
+				turnstileToken?: string;
+			};
+			const ip = ipFromCtx(ctx);
+
+			// Turnstile siteverify (fail-CLOSED per SPEC.2 §18.2 + plan §5
+			// failure-mode #2). Matched to this path only — Google callback
+			// path explicitly excluded so a Cloudflare outage doesn't take
+			// both auth paths down.
+			if (!body.turnstileToken) {
+				throw new APIError("BAD_REQUEST", { message: "turnstile_required" });
+			}
+			const ok = await verifyTurnstile(body.turnstileToken, ip);
+			if (!ok) {
+				throw new APIError("BAD_REQUEST", { message: "turnstile_failed" });
+			}
+
+			// Rate-limit gates (fail-OPEN within checkRateLimit itself per
+			// SCAFFOLD.4). Per-email check fires before per-IP burst per
+			// SPEC.2 §11 ordering. Either denial blocks the send.
+			if (body.email) {
+				const r = await checkRateLimit(
+					"otpRequestPerEmail",
+					otpEmailIdentifier(body.email),
+				);
+				if (!r.allowed) {
+					throw new APIError("TOO_MANY_REQUESTS", {
+						message: "otp_rate_limited",
+					});
+				}
+			}
+			const ipRate = await checkRateLimit(
+				"otpRequestPerIpBurst",
+				ipIdentifier(ip),
+			);
+			if (!ipRate.allowed) {
+				throw new APIError("TOO_MANY_REQUESTS", {
+					message: "otp_rate_limited",
+				});
+			}
+
+			// Return empty context object — Better Auth's runtime ignores the
+			// return value of before-hooks at the aggregator boundary, but
+			// having a defined return value lets unit tests assert "resolved
+			// without throw" via `resolves.toBeDefined()`.
+			return {};
+		},
+	},
+];
+
+// biome-ignore lint/suspicious/noExplicitAny: BetterAuthPlugin's `hooks` type
+// expects AuthMiddleware-typed handlers built via createAuthMiddleware; our
+// plain async handlers satisfy the runtime contract but not the type. Cast
+// at the plugin boundary per plan §3 (file outside §8.10 map, justified).
+const zugzwangOtpGate = {
+	id: "zugzwang-otp-gate",
+	hooks: { before: otpGateBeforeHooks },
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+} as any;
+
+export const auth = betterAuth({
+	database: drizzleAdapter(db, {
+		provider: "pg",
+		schema,
+		usePlural: true,
+		transaction: true,
+	}),
+	secret: process.env.BETTER_AUTH_SECRET,
+	baseURL: process.env.BETTER_AUTH_URL,
+	session: {
+		expiresIn: ONE_HUNDRED_YEARS_SEC,
+		updateAge: ONE_HUNDRED_YEARS_SEC,
+	},
+	advanced: {
+		database: {
+			generateId: () => uuidv7(),
+		},
+		cookies: {
+			session_token: {
+				attributes: {
+					httpOnly: true,
+					secure: true,
+					sameSite: "lax",
+				},
+			},
+		},
+		cookiePrefix: "zugzwang",
+	},
+	socialProviders: {
+		google: {
+			clientId: process.env.GOOGLE_CLIENT_ID,
+			clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+			scope: ["openid", "email", "profile"],
+			// SPEC.2 §8.2 line 814 + plan §5 failure-mode #3: enforce
+			// email_verified === true at the profile-mapper boundary. Throwing
+			// here rejects the OAuth callback with `oauth_email_not_verified`;
+			// no user row is written.
+			mapProfileToUser: async (profile: {
+				email: string;
+				email_verified: boolean;
+				name?: string;
+				picture?: string;
+				sub: string;
+			}) => {
+				if (!profile.email_verified) {
+					throw new APIError("BAD_REQUEST", {
+						message: "oauth_email_not_verified",
+					});
+				}
+				return {
+					email: profile.email,
+					name: profile.name ?? profile.email,
+					image: profile.picture,
+					emailVerified: true,
+					googleId: profile.sub,
+				};
+			},
+		},
+	},
+	plugins: [emailOTP({ sendVerificationOTP }), zugzwangOtpGate],
+	databaseHooks: {
+		user: {
+			create: {
+				// Q10 verified: returning `{ data }` lets us inject pseudonym +
+				// pfpFilename. Use camelCase TS-identifier keys (not SQL
+				// aliases) — Drizzle adapter resolves by table-key.
+				// Q6 verified: pool consumption commits in its own
+				// db.transaction; stranded-tuple recovery via stale-30d sweep.
+				before: async (user: Record<string, unknown>) => {
+					const tuple = await consumeIdentityPoolTuple(db);
+					if (!tuple) {
+						throw new APIError("SERVICE_UNAVAILABLE", {
+							message: "identity_pool_exhausted",
+						});
+					}
+					return {
+						data: {
+							...user,
+							pseudonym: tuple.pseudonym,
+							pfpFilename: tuple.pfpFilename,
+						},
+					};
+				},
+			},
+		},
+		session: {
+			create: {
+				// SPEC.2 §8.3 + plan §1 — DIRECT INV-3 construction-layer
+				// protection. The hook's APIError("FORBIDDEN",
+				// "ONBOARDING_REQUIRED") shape is the byte-exact contract the
+				// catch-all route at src/app/api/auth/[...all]/route.ts matches
+				// on to emit the signed onboarding_ref cookie + redirect.
+				before: createSessionGate(db),
+			},
+		},
+	},
+});
+
+// Test introspection: expose the OTP-gate before-hook array on
+// `auth.options.hooks.before`. Better Auth's runtime aggregation read
+// `options.hooks.before` at init (it was undefined then, since we didn't
+// configure top-level hooks); mutating it now is purely for unit tests that
+// probe the array shape per `tests/server/auth/otp.test.ts`. Runtime
+// dispatch happens via the zugzwang-otp-gate plugin's hooks.before per
+// `to-auth-endpoints.mjs` plugin-hook aggregation.
+(
+	auth as { options: { hooks?: { before?: typeof otpGateBeforeHooks } } }
+).options.hooks = {
+	...((auth as { options: { hooks?: object } }).options.hooks ?? {}),
+	before: otpGateBeforeHooks,
+};
