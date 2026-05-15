@@ -5,7 +5,8 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
-		"start": "next start"
+		"start": "next start",
+		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts"
 	},
 	"dependencies": {
 		"@upstash/ratelimit": "2.0.8",
@@ -39,6 +40,7 @@
 		"drizzle-kit": "^0.30.0",
 		"lefthook": "2.1.6",
 		"tailwindcss": "^4",
+		"tsx": "4.22.0",
 		"typescript": "^5",
 		"vite-tsconfig-paths": "^6.1.1",
 		"vitest": "^3.0.0"

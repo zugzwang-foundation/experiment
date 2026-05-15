@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  PFP placeholder per SCAFFOLD.3 plan Q2. Used by the onboarding page
+  + any other component that renders identity_pool.pfp_filename until
+  SCAFFOLD.15 wires the R2 URL builder. Plain gray circle on neutral
+  background; DESIGN.1 + DESIGN.7 may replace once brand lands.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" aria-hidden="true">
+  <rect width="256" height="256" fill="#e5e7eb" />
+  <circle cx="128" cy="128" r="80" fill="#9ca3af" />
+  <text
+    x="128"
+    y="240"
+    font-family="ui-monospace, monospace"
+    font-size="14"
+    text-anchor="middle"
+    fill="#6b7280"
+  >PFP placeholder</text>
+</svg>

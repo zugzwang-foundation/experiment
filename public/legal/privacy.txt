@@ -1,0 +1,22 @@
+Zugzwang Experiment — Privacy Policy (PLACEHOLDER v0)
+
+This is placeholder Lorem ipsum copy used during SCAFFOLD.3 development.
+The real Privacy Policy text is produced by HARDEN.7 (legal review,
+mid-July 2026 per project tracker). The placeholder hash
+`placeholder-privacy-v0` is recorded as acceptance evidence in users.
+privacy_version_hash; the real hash replaces this when HARDEN.7 lands.
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod
+tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim
+veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea
+commodo consequat.
+
+Data we collect: pseudonym, email, Google account ID (if OAuth), profile
+picture filename, timestamps of acceptance + activity. Data we do not
+collect: real names, government identifiers, payment information,
+geolocation beyond IP-derived country. Retention: indefinite for the
+experiment phase (ends 2026-11-05); public dataset published 2026-11-06
+contains pseudonymised activity. Erasure: H2-scrub per SPEC.1 §13
+replaces pseudonym with a placeholder; the tuple is permanently retired.
+
+(Real text: HARDEN.7.)
