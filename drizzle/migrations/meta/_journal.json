@@ -36,6 +36,13 @@
       "when": 1778575500864,
       "tag": "0004_seed_system_state",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1778851244860,
+      "tag": "0005_auth_schema_corrections",
+      "breakpoints": true
     }
   ]
 }

@@ -62,12 +62,17 @@ export const users = pgTable(
 		index("users_banned_at_idx")
 			.on(table.bannedAt)
 			.where(sql`${table.bannedAt} IS NOT NULL`),
-		index("users_email_idx").on(table.email),
+		// UNIQUE per SCAFFOLD.3 Q5 drift fix — Better Auth's signup flow needs
+		// email uniqueness to prevent concurrent signups producing two rows.
+		uniqueIndex("users_email_idx").on(table.email),
 	],
 );
 
-// Better Auth 1.6.x core session shape. expires_at NULL because
-// disableSessionRefresh=true per SPEC.2 §8.2 line 809.
+// Better Auth 1.6.x core session shape. expires_at NOT NULL per SCAFFOLD.3
+// step-3 reviewer finding: Better Auth's internalAdapter.createSession always
+// populates a Date (sessionExpiration default 7d, overridden via large
+// `expiresIn` sentinel per SPEC.2 §8.2). disableSessionRefresh suppresses the
+// sliding-window UPDATE, not the INSERT.
 export const sessions = pgTable(
 	"sessions",
 	{
@@ -76,7 +81,7 @@ export const sessions = pgTable(
 			.notNull()
 			.references(() => users.id, { onDelete: "cascade" }),
 		token: text("token").notNull().unique(),
-		expiresAt: timestamp("expires_at", { withTimezone: true }),
+		expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
 		ipAddress: text("ip_address"),
 		userAgent: text("user_agent"),
 		createdAt: timestamp("created_at", { withTimezone: true })
