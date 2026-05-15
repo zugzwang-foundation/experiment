@@ -29,19 +29,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // each instance keyed by its `prefix` so per-test scripts can address them
 // (e.g., otpRequestPerIpBurst's instance has prefix 'otp-ip').
 
-const ratelimitInstances: Record<
-	string,
-	{ prefix: string; limit: ReturnType<typeof vi.fn> }
-> = {};
+// vi.mock() is hoisted; factory variables MUST come from vi.hoisted() too.
+// Per vitest docs: https://vitest.dev/api/vi.html#vi-hoisted
+const { ratelimitInstances } = vi.hoisted(() => ({
+	ratelimitInstances: {} as Record<
+		string,
+		{ prefix: string; limit: ReturnType<typeof import("vitest").vi.fn> }
+	>,
+}));
 
-vi.mock("@upstash/ratelimit", () => {
+vi.mock("@upstash/ratelimit", async () => {
+	const { vi: viInner } = await import("vitest");
 	class Ratelimit {
 		prefix: string;
-		limit: ReturnType<typeof vi.fn>;
+		limit: ReturnType<typeof viInner.fn>;
 
 		constructor(opts: { prefix?: string; redis: unknown; limiter: unknown }) {
 			this.prefix = opts.prefix ?? "default";
-			this.limit = vi.fn();
+			this.limit = viInner.fn();
 			ratelimitInstances[this.prefix] = {
 				prefix: this.prefix,
 				limit: this.limit,
@@ -97,7 +102,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.restoreAllMocks();
+	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would detach the
+	// module-level `consoleErrorSpy` after the first test, breaking the
+	// fails-open assertion in row 5 which depends on the spy still being
+	// attached to console.error.
+	vi.clearAllMocks();
 });
 
 describe("rate-limit middleware", () => {

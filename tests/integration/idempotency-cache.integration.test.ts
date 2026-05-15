@@ -36,11 +36,17 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // or similar to script the SET-NX win/loss + GET hit/miss + Upstash-throw
 // state-machine arms.
 
-const mockRedis = {
-	set: vi.fn(),
-	get: vi.fn(),
-	del: vi.fn(),
-};
+// vi.mock() is hoisted to the top of the file. Variables referenced inside
+// the factory MUST come from vi.hoisted() (also hoisted) — top-level `const`
+// is not yet initialized when the factory runs. Per vitest docs:
+// https://vitest.dev/api/vi.html#vi-hoisted
+const { mockRedis } = vi.hoisted(() => ({
+	mockRedis: {
+		set: vi.fn(),
+		get: vi.fn(),
+		del: vi.fn(),
+	},
+}));
 
 vi.mock("@/server/upstash/redis", () => ({
 	redis: mockRedis,
@@ -71,7 +77,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-	vi.restoreAllMocks();
+	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would detach the
+	// module-level `consoleErrorSpy` after the first test, breaking the
+	// fails-closed assertion in row 9 which runs later in the file. clearAll
+	// keeps the spy attached and just resets call history.
+	vi.clearAllMocks();
 });
 
 describe("idempotency cache state machine", () => {

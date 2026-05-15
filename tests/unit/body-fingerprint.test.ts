@@ -1,4 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `computeBodyFingerprint` is pure (no Redis), but its containing module
+// imports the singleton Redis client at top-level — which calls
+// `Redis.fromEnv()` and prints stderr warnings if Upstash env vars are
+// unset. Mock the wrapper to suppress noise; the real client isn't used
+// by any test in this file.
+vi.mock("@/server/upstash/redis", () => ({
+	redis: { set: vi.fn(), get: vi.fn(), del: vi.fn() },
+}));
 
 import { computeBodyFingerprint } from "@/server/idempotency/cache";
 
