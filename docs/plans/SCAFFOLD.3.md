@@ -239,7 +239,13 @@ Stand up Better Auth 1.6.x against the already-minted Drizzle schema with four b
 
 - **Q5: Email uniqueness drift.** *Resolved.* Same-commit drizzle migration `drizzle/migrations/0005_users_email_unique.sql` converts `users_email_idx` from `index()` to `uniqueIndex()`. Triggers `db-migration-reviewer` reviewer call. Adds an item to §5.10 self-audit. Per CLAUDE.md §7 cleanup-absorption rule.
 
-- **Q6: Better Auth two-hook transaction wrapping semantics.** **Open at plan time** — resolved at Phase 2 step 2 once `pnpm install better-auth` lands and `node_modules/better-auth/dist/api/...` is readable. The plan's "atomic pool + ToS" + "ROLLBACK restores assigned_at NULL" claims depend on a single Postgres transaction wrapping `user.create.before` + user INSERT + `session.create.before` + session INSERT. If Better Auth uses two transactions: the pool tuple "strands" on session-create throw. Captured failure mode #8 above. **Fallback locked: accept stale-30d sweep recovery (HARDEN-era).** Do NOT write a tuple-release sweep in SCAFFOLD.3 — Cancel-from-onboarding (the operational instance) is already bounded by the 30-day sweep per SPEC.1 line 704; adding release-sweep logic mid-stratum expands scope for a bounded edge case. **Resolve path:** Phase 2 step 2 reads library source, documents the actual semantics in plan §5 + this Q, and adjusts failure-mode #8 wording if needed. No code action in either branch.
+- **Q6: Better Auth two-hook transaction wrapping semantics.** **VERIFIED at Phase 2 step 2 (2026-05-15, Better Auth 1.6.11).** Findings:
+  - `node_modules/better-auth/dist/api/routes/sign-up.mjs:141` wraps the entire sign-up handler in `runWithTransaction(ctx.context.adapter, async () => {...})`; both `internalAdapter.createUser` (line 218) and `internalAdapter.createSession` (line 253) execute inside this single transaction.
+  - With our `drizzleAdapter({ transaction: true })` config, this maps to one `db.transaction(tx => ...)` in Drizzle (see `@better-auth/drizzle-adapter` `dist/index.mjs:465`).
+  - **Caveat — pool consumption runs in a SEPARATE transaction:** the `databaseHooks.user.create.before` hook fires inside Better Auth's tx but the hook is called with `(user, context)` only; Better Auth does NOT expose the inner Drizzle tx handle (its `context` parameter is `GenericEndpointContext`, not a Drizzle tx). Our pool consumption uses its OWN `db.transaction(...)` for `SELECT … FOR UPDATE SKIP LOCKED` + `UPDATE assigned_at`. That separate tx COMMITS immediately after the hook returns the injected `data`.
+  - **Consequence:** if session-create throws (ToS not set), Better Auth rolls back the user-row INSERT, but our pool tuple's `assigned_at` UPDATE has already committed → **stranded tuple**. Same outcome if user-INSERT fails (e.g., email-unique race).
+  - **Fallback locked (per plan-review feedback):** accept stale-30d sweep recovery per SPEC.1 line 704. Do NOT write a tuple-release sweep in SCAFFOLD.3 — Cancel-from-onboarding (the operational instance) and email-race are both bounded by the 30-day sweep. Release-sweep is HARDEN-era if it ever surfaces as needed.
+  - **Implementation note:** set `transaction: true` in the drizzleAdapter config anyway — it guarantees user+session atomicity on Better Auth's side (no half-written participant identity).
 
 - **Q7: Events-row writes for auth flows.** *Resolved.* Defer to ENGINE.6. Stub call sites with `// TODO(ENGINE.6): writeUserEvent(...)`. Match SCAFFOLD.2 precedent.
 
@@ -247,9 +253,28 @@ Stand up Better Auth 1.6.x against the already-minted Drizzle schema with four b
 
 - **Q9: `proxy.ts` vs `middleware.ts`.** *Resolved.* Next.js 16.2.4's `node_modules/next/dist/lib/constants.js` defines BOTH `MIDDLEWARE_FILENAME='middleware'` and `PROXY_FILENAME='proxy'` as valid filenames at repo root (with optional `src/` prefix). Use `proxy.ts` per SPEC.2 §8.10. No compatibility risk; both supported.
 
-- **Q10: Better Auth `databaseHooks.user.create.before` data injection contract.** **Open at plan time** — resolved at Phase 2 start once Better Auth source is readable. Plan's "inject pseudonym + pfp_filename into user data" needs the hook to support returning a mutated user object. Better Auth 1.6.x docs imply `return { data: user }` is supported in `before` hooks. Verify; fallback is `additionalFields` config if `before` injection is rejected.
+- **Q10: Better Auth `databaseHooks.user.create.before` data injection contract.** **VERIFIED at Phase 2 step 2.** `@better-auth/core/types/init-options.d.mts` declares the hook return as `Promise<boolean | void | { data: Optional<User> & Record<string, any> }>`. The `Record<string, any>` permits arbitrary additional fields in the returned `data`. The adapter's `create({ model, data: values })` at `@better-auth/drizzle-adapter/dist/index.mjs:257` passes `values` straight through to Drizzle, so injected `pseudonym` + `pfp_filename` will be written by the user-INSERT. **No fallback needed.** Pattern:
+  ```ts
+  before: async (user) => {
+    const tuple = await consumeIdentityPoolTuple(db); // separate tx, see Q6 caveat
+    if (!tuple) throw new APIError("SERVICE_UNAVAILABLE", { message: "identity_pool_exhausted" });
+    return { data: { ...user, pseudonym: tuple.pseudonym, pfp_filename: tuple.pfpFilename } };
+  }
+  ```
 
-- **Q11: Better Auth Drizzle adapter table-name mapping.** **Verdict locked:** Better Auth 1.6.x's Drizzle adapter expects SINGULAR table names (`user`, `session`, `account`, `verification`); SCAFFOLD.2 minted plural (`users`, `sessions`, `accounts`, `verifications`). Use Better Auth's `schema` (or `tablesMap` — exact option name confirmed at Phase 2 step 1) config in `betterAuth({ database: drizzleAdapter(db, { schema, ... }) })` to alias plural Drizzle exports to Better Auth's singular expectations at runtime. **No schema rename, no migration.** Same pattern is used for the column-name renames Better Auth needs (e.g., `googleId` → `google_id` is already handled at the schema-level via `text("google_id")` declarations).
+- **Q11: Better Auth Drizzle adapter table-name mapping.** **VERIFIED at Phase 2 step 1.** Better Auth 1.6.11's `@better-auth/drizzle-adapter` exposes a `DrizzleAdapterConfig.usePlural: boolean` option (NOT a `tablesMap` — that hypothesis was wrong). Setting `usePlural: true` makes the adapter accept plural table names like `users`/`sessions`/`accounts`/`verifications`. See `@better-auth/drizzle-adapter/dist/index.d.mts:22`. **No schema rename, no migration, no per-table aliasing.** Config:
+  ```ts
+  betterAuth({
+    database: drizzleAdapter(db, {
+      schema,             // namespace import from '@/db/schema'
+      provider: 'pg',
+      usePlural: true,    // Q11 resolution
+      transaction: true,  // Q6 — wraps user+session create in one tx
+    }),
+    // ...
+  })
+  ```
+  Column-name snake_case is already handled at the schema declaration layer (`text("google_id")` etc.).
 
 ---
 
