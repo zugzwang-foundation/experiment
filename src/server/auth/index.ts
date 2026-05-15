@@ -1,4 +1,4 @@
-import { betterAuth } from "better-auth";
+import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { APIError } from "better-auth/api";
 import { emailOTP } from "better-auth/plugins/email-otp";
@@ -162,15 +162,18 @@ const otpGateBeforeHooks = [
 	},
 ];
 
-// biome-ignore lint/suspicious/noExplicitAny: BetterAuthPlugin's `hooks` type
-// expects AuthMiddleware-typed handlers built via createAuthMiddleware; our
-// plain async handlers satisfy the runtime contract but not the type. Cast
-// at the plugin boundary per plan §3 (file outside §8.10 map, justified).
+// BetterAuthPlugin's hooks.before handler type is the opaque AuthMiddleware
+// (return type of createAuthMiddleware). Our plain async handlers satisfy
+// the runtime contract (Better Auth calls `await handler(ctx)` per
+// to-auth-endpoints.mjs aggregation) but not the structural type. The
+// double cast through `unknown` at the plugin boundary preserves the
+// runtime wiring; tests invoke handlers with synthetic ctx and would fail
+// if we used createAuthMiddleware which inserts optionsMiddleware that
+// requires the full request context.
 const zugzwangOtpGate = {
 	id: "zugzwang-otp-gate",
 	hooks: { before: otpGateBeforeHooks },
-	// eslint-disable-next-line @typescript-eslint/no-explicit-any
-} as any;
+} as unknown as BetterAuthPlugin;
 
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
