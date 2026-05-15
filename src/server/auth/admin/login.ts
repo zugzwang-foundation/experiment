@@ -64,7 +64,7 @@ function hmacDigestEqual(
 
 export async function adminLoginAction(
 	formData: FormData,
-): Promise<AdminLoginResult | void> {
+): Promise<AdminLoginResult> {
 	const headerStore = await headers();
 	const cookieStore = await cookies();
 	const ip = getClientIp(headerStore);
