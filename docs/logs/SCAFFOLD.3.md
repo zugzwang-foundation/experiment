@@ -211,6 +211,18 @@ Step-26 security-auditor LOW: `src/server/auth/admin/validate.ts:34-36` and `adm
 
 Step-26 security-auditor LOW: `src/app/(auth)/sign-in/page.tsx:18,31` use raw HTML `<form>` POSTs (default `application/x-www-form-urlencoded`); Better Auth's `/api/auth/sign-in/social` + `/api/auth/email-otp/send-verification-otp` expect JSON bodies. Form submissions functionally fail in dev. **NOT a security issue** — UX/wiring stub only. **Deferred reasoning**: DESIGN.* rewrites the whole sign-in page with the Better Auth client wrapper (which posts JSON), proper Turnstile widget mount, and brand styling. Fixing the placeholder now is throw-away work. The hardcoded `turnstileToken=placeholder-token` would be Turnstile-rejected (fail-CLOSED, correct behavior).
 
+### MAINT-10: DATABASE_URL absent in Vercel until SCAFFOLD.3 build surfaced it; UPSTASH undocumented; CLI all-preview-branches papercut
+
+SCAFFOLD.3's PR #38 first Preview build (2026-05-16) failed at "Collecting page data using 1 worker" with `Error: DATABASE_URL is not set` from `src/db/index.ts` module-load — `src/server/auth/index.ts` is the first PR to import `@/db` (the SCAFFOLD.14 placeholder landing page didn't), so this is the first Vercel build that hits the missing-env check. Triage + audit:
+
+**(a) DATABASE_URL absent at SCAFFOLD.3 time; interim Supabase Session pooler wired pending SCAFFOLD.13.** `.env.example:3` notes "Production / staging URLs land via SCAFFOLD.13 (Vercel env vars + Doppler)." SCAFFOLD.13 is unscheduled in tracker v8 at SCAFFOLD.3 close. Interim resolution: Hrishikesh provisioned a Supabase free-tier project (Session pooler, port 5432 — chosen over Direct because Vercel free-tier is IPv4-only and Supabase Direct is IPv6-only; auth requests would otherwise fail at runtime) and wired DATABASE_URL to Production (via CLI from this clone) + Preview/all-branches (via Vercel dashboard — see CLI papercut below). SCAFFOLD.13 swaps for the Doppler-wired permanent URL when scheduled.
+
+**(b) `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` present in Vercel Preview + Production at 23h-ago timestamp.** Wired via undocumented operator action between SCAFFOLD.14 close (2026-05-14) and SCAFFOLD.3 build (2026-05-16) — neither SCAFFOLD.4 (substrate code only) nor SCAFFOLD.14 (auth vendor 9-key paste-block) recorded the Upstash Vercel wiring in their close-out logs. **Gap in SCAFFOLD.4 close-out log.** SCAFFOLD.13 should audit + fold Upstash keys into the Doppler-wired env so the operator-side patching isn't replicated.
+
+**(c) `NEXT_PUBLIC_BASE_URL` was mental-model carry-over from a different stack pattern.** Not in `.env.example`, not referenced by SCAFFOLD.3 code, confirmed absent in Vercel. Not a real gap. `BETTER_AUTH_URL` serves the auth-callback-base-URL purpose for our stack.
+
+**Tooling note (Vercel CLI papercut).** `vercel env add DATABASE_URL preview --value <v> --yes [--force]` was rejected by both `vercel@54.1.0` and `vercel@53.3.2` with `{"status":"action_required","reason":"git_branch_required"}` despite the CLI's own `next[]` hint suggesting that exact form for the "all preview branches" scope. Branch-specific add works non-interactively; the all-branches scope via CLI does not in agent-mode non-interactive. Dashboard side-wiring was required. **Flag for SCAFFOLD.13 to handle via Doppler integration** (auto-syncs to all preview branches by design) rather than relying on CLI for the operator path. Worth filing as a GitHub issue against `vercel/vercel` if operator chooses.
+
 ---
 
 ## Single source of truth — files touched
