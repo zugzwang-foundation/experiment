@@ -35,7 +35,19 @@ const TIMING_PARITY_DELAY_MS = 100;
 
 const INVALID = { ok: false, code: "admin_login_invalid" } as const;
 
-type AdminLoginResult = typeof INVALID;
+// Transient-failure envelope per kickoff Option A-prime (step-25 review
+// MEDIUM fix): when the SERIALIZABLE DELETE+INSERT below hits SQLSTATE
+// 40001 twice, the loser receives this code (HTTP 503 semantic — service
+// temporarily unavailable, retry). Distinct from `admin_login_invalid`
+// (HTTP 401, no info-leak shape) because this is a transient
+// concurrency outcome, not a credential failure. Route / page layer
+// maps to 503 in a future iteration; current page wrapper discards.
+const SERIALIZATION_CONFLICT = {
+	ok: false,
+	code: "admin_login_serialization_conflict",
+} as const;
+
+type AdminLoginResult = typeof INVALID | typeof SERIALIZATION_CONFLICT;
 
 function getClientIp(headerStore: {
 	get: (name: string) => string | null;
@@ -60,6 +72,33 @@ function hmacDigestEqual(
 	const inputDigest = createHmac("sha256", secret).update(input).digest();
 	const expectedDigest = createHmac("sha256", secret).update(expected).digest();
 	return timingSafeEqual(inputDigest, expectedDigest);
+}
+
+// Postgres SQLSTATE 40001 — `serialization_failure`. SERIALIZABLE
+// transactions abort with this code when Postgres detects a serialization
+// anomaly with another concurrent SERIALIZABLE transaction. Surfaces here
+// via the postgres.js driver as an Error with `code: "40001"`.
+function isSerializationFailure(err: unknown): boolean {
+	if (err === null || typeof err !== "object") return false;
+	return (err as { code?: unknown }).code === "40001";
+}
+
+// Single SERIALIZABLE attempt at the DELETE+INSERT replace. Hoisted so the
+// retry-once wrapper below can invoke it twice without duplicating the
+// transaction body.
+async function attemptAdminSessionReplace(): Promise<string | null> {
+	return db.transaction(
+		async (tx) => {
+			await tx.execute(sql`DELETE FROM admin_sessions`);
+			const inserted = (await tx.execute(
+				sql`INSERT INTO admin_sessions (session_id, issued_at, last_seen_at)
+				    VALUES (${uuidv7()}, now(), now())
+				    RETURNING session_id`,
+			)) as unknown as Array<{ session_id: string }>;
+			return inserted[0]?.session_id ?? null;
+		},
+		{ isolationLevel: "serializable" },
+	);
 }
 
 export async function adminLoginAction(
@@ -93,19 +132,37 @@ export async function adminLoginAction(
 		return INVALID;
 	}
 
-	// Step 4: SERIALIZABLE DELETE+INSERT single transaction. DELETE first
-	// so concurrent admin logins (rare, but per SPEC.1 line 736) revoke
-	// the prior session row atomically — single-row-at-any-moment invariant
-	// without a UNIQUE constraint.
-	const newSessionId = await db.transaction(async (tx) => {
-		await tx.execute(sql`DELETE FROM admin_sessions`);
-		const inserted = (await tx.execute(
-			sql`INSERT INTO admin_sessions (session_id, issued_at, last_seen_at)
-			    VALUES (${uuidv7()}, now(), now())
-			    RETURNING session_id`,
-		)) as unknown as Array<{ session_id: string }>;
-		return inserted[0]?.session_id ?? null;
-	});
+	// Step 4: SERIALIZABLE DELETE+INSERT single transaction per plan §4
+	// step 6.4 + SPEC.2 §8.4 (the DELETE+INSERT step; pre-Q1-amendment
+	// step 4, post-amendment step 3). DELETE first so concurrent admin
+	// logins (rare, but per SPEC.1 line 736) revoke the prior session row
+	// atomically — single-row-at-any-moment invariant without a UNIQUE
+	// constraint.
+	//
+	// **SERIALIZABLE is load-bearing — do NOT downgrade without a plan
+	// amendment.** Under READ COMMITTED, two concurrent admin logins can
+	// interleave as: T1.DELETE removes R0 → T2.DELETE (pre-T1-commit)
+	// finds nothing → both INSERTs commit distinct UUIDs → two rows in a
+	// singleton-by-construction table. SERIALIZABLE makes Postgres detect
+	// the anomaly on the second commit and abort with SQLSTATE 40001.
+	//
+	// Retry-once-on-40001 per kickoff Option A-prime: first 40001 → retry
+	// immediately; second 40001 → return the
+	// `admin_login_serialization_conflict` envelope (HTTP 503 semantic,
+	// distinct from the `admin_login_invalid` 401 — surfaces as transient
+	// rather than as credential failure, no info-leak concern).
+	let newSessionId: string | null;
+	try {
+		newSessionId = await attemptAdminSessionReplace();
+	} catch (err) {
+		if (!isSerializationFailure(err)) throw err;
+		try {
+			newSessionId = await attemptAdminSessionReplace();
+		} catch (retryErr) {
+			if (isSerializationFailure(retryErr)) return SERIALIZATION_CONFLICT;
+			throw retryErr;
+		}
+	}
 
 	if (!newSessionId) {
 		return INVALID;
