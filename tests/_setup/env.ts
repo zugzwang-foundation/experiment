@@ -1,0 +1,23 @@
+// Default env vars for unit tests under tests/server/* + tests/integration/*.
+// Production reads real values from .env.local + Vercel; tests just need
+// non-empty values so module-load env validation in src/server/auth/index.ts +
+// src/server/upstash/redis.ts doesn't throw before vi.mock replaces the
+// IO surfaces. Conditional assignment (`??=`) so a real .env.local or a
+// per-test override still wins.
+
+process.env.BETTER_AUTH_SECRET ??=
+	"test-better-auth-secret-64char-hex-placeholder-do-not-use-prod-x";
+process.env.BETTER_AUTH_URL ??= "http://localhost:3000";
+process.env.GOOGLE_CLIENT_ID ??=
+	"test-google-client-id.apps.googleusercontent.com";
+process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
+process.env.RESEND_API_KEY ??= "re_test_resend_api_key_placeholder";
+process.env.RESEND_FROM_EMAIL ??= "onboarding@resend.dev";
+process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??= "1x00000000000000000000AA";
+process.env.TURNSTILE_SECRET_KEY ??= "1x0000000000000000000000000000000AA";
+process.env.ADMIN_PASSWORD ??=
+	"test-admin-password-64char-hex-placeholder-do-not-use-prod-xxxx";
+process.env.DATABASE_URL ??=
+	"postgresql://postgres:postgres@localhost:54322/postgres";
+process.env.UPSTASH_REDIS_REST_URL ??= "https://test.upstash.io";
+process.env.UPSTASH_REDIS_REST_TOKEN ??= "test-upstash-token-placeholder";

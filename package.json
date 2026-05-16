@@ -5,11 +5,13 @@
 	"scripts": {
 		"dev": "next dev",
 		"build": "next build",
-		"start": "next start"
+		"start": "next start",
+		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts"
 	},
 	"dependencies": {
 		"@upstash/ratelimit": "2.0.8",
 		"@upstash/redis": "1.38.0",
+		"better-auth": "1.6.11",
 		"canonicalize": "3.0.0",
 		"class-variance-authority": "^0.7.1",
 		"clsx": "^2.1.1",
@@ -21,6 +23,7 @@
 		"radix-ui": "^1.4.3",
 		"react": "19.2.4",
 		"react-dom": "19.2.4",
+		"resend": "6.12.3",
 		"server-only": "^0.0.1",
 		"shadcn": "^4.7.0",
 		"tailwind-merge": "^3.6.0",
@@ -37,6 +40,7 @@
 		"drizzle-kit": "^0.30.0",
 		"lefthook": "2.1.6",
 		"tailwindcss": "^4",
+		"tsx": "4.22.0",
 		"typescript": "^5",
 		"vite-tsconfig-paths": "^6.1.1",
 		"vitest": "^3.0.0"

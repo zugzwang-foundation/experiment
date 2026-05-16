@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig } from "vitest/config";
 
@@ -6,9 +7,25 @@ import { defineConfig } from "vitest/config";
 // forks pool for process-isolation between test files (matches integration-
 // test orthodoxy; one DB connection per file under the testClient { max: 1 }
 // setting in tests/db/_fixtures/db.ts).
+//
+// SCAFFOLD.3 additions:
+//   - setupFiles: tests/_setup/env.ts seeds non-empty values for the
+//     module-load env validation in src/server/auth/index.ts +
+//     src/server/upstash/redis.ts (vi.mock replaces the IO surfaces, but the
+//     env reads happen at module-load before the mocks attach).
+//   - resolve.alias: "server-only" → noop shim. The real npm package throws
+//     when a server module is bundled into a client component (Next.js
+//     build-time guard); tests run in Node without that split.
 
 export default defineConfig({
 	plugins: [tsconfigPaths()], // resolves @/db/schema → ./src/db/schema
+	resolve: {
+		alias: {
+			"server-only": fileURLToPath(
+				new URL("./tests/_setup/server-only-shim.ts", import.meta.url),
+			),
+		},
+	},
 	test: {
 		globals: false,
 		testTimeout: 10_000,
@@ -23,6 +40,7 @@ export default defineConfig({
 		// sequentially by default. Plan CAT 5 missed this; documented as a
 		// deviation in the @test-writer return.
 		fileParallelism: false,
+		setupFiles: ["./tests/_setup/env.ts"],
 		coverage: {
 			enabled: false,
 		},
