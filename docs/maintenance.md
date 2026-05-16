@@ -17,7 +17,7 @@ This doc encodes the feedback loop. The audit is light, repeatable, and triggere
 | `docs/workflows/plan-then-execute.md` | Workflow misfires reported in task logs, new failure modes discovered |
 | `docs/plans/_template.md` | Plans repeatedly miss something the template should prompt for |
 | `docs/logs/_template.md` | Log entries repeatedly fail to capture what was needed |
-| `zugzwang_experiment_tracker_v7.html` | Task completion (continuous); occasional reorgs |
+| `zugzwang_experiment_tracker_v9.html` | Task completion (continuous); occasional reorgs |
 | `.claude/agents/*`, `.claude/commands/*`, `.claude/hooks/*` | When the subagent/command/hook itself changes |
 
 ---
@@ -128,7 +128,7 @@ The discipline is *asking the question*, not necessarily changing anything.
 | `docs/workflows/plan-then-execute.md` | Workflow misfires reported in task logs | Phase boundaries |
 | `docs/plans/_template.md` | Plans repeatedly missing something | Quarterly |
 | `docs/logs/_template.md` | Log entries failing to capture what's needed | Quarterly |
-| `zugzwang_experiment_tracker_v7.html` | Task completion (continuous); reorgs (rare) | Continuous (per task close) |
+| `zugzwang_experiment_tracker_v9.html` | Task completion (continuous); reorgs (rare) | Continuous (per task close) |
 | `.claude/agents/*`, `.claude/commands/*`, `.claude/hooks/*` | When the underlying file changes | As needed |
 | This file (`docs/maintenance.md`) | Audit process itself misfires | Quarterly |
 
