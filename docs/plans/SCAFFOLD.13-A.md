@@ -620,20 +620,30 @@ Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a f
 - Reviewer-call invocation summary (A5 db-migration-reviewer reframed scope → retroactive state review; A8 security-auditor expanded scope → 4 surfaces including credential-leak incident)
 - §0 amendment log: three successive amendment states same day (initial → first counter-amendment Sensitive-var retraction → second counter-amendment post-A10 ground-truth + findings 4/5/6)
 
-## Surprises caught + fixed in-session (§5.10 — 6 entries)
+## Surprises caught + fixed in-session (§5.10 — 8 entries)
 1. **PROD pre-existed (§0 finding 1).** Project + migrations applied 2026-05-15 (before session). A2 became URL-capture; A3 became no-op verification. State correct.
 2. **Interim schemaless (§0 finding 2).** Interim Tokyo project never received `drizzle-kit migrate`; plan §6 parity-vs-interim framework structurally invalid; reframed to PROD-only schema-correctness vs canonical migration files.
 3. **Sensitive-var CLI artifact (§0 finding 3 retraction).** `vercel env pull` returned `DATABASE_URL=""` — mistaken initially for "Vercel env is empty"; root cause: Vercel marks `DATABASE_URL` Sensitive (CLI returns empty for Sensitive vars by deliberate platform-security design). Retracted same day; later resolved via A10 first-smoke 415 evidence.
-4. **Credential-leak incident (caught + rotated).** PROD + INTERIM DATABASE_URL credentials leaked into Claude Code chat during A4 q0 protocol; Claude Code refused execution + recommended immediate rotation; both passwords rotated mid-session; new URLs re-captured via `read -rs` discipline. A8 security-auditor scope expanded to audit incident.
+4. **Credential-leak incident (caught + rotated, with residual historical-record exposure).** PROD + INTERIM DATABASE_URL credentials leaked into Claude Code chat during A4 q0 protocol; Claude Code refused execution + recommended immediate rotation; both passwords rotated mid-session; new URLs re-captured via `read -rs` discipline. A8 security-auditor scope expanded to audit incident. **Augmented per A8 audit (Surface 1 / MEDIUM finding 3):** post-rotation Claude Code transcripts (`~/.claude/projects/.../*.jsonl` + `~/.claude/history.jsonl`) retain historical PROD + INTERIM URLs with **burned** passwords; new post-rotation passwords confirmed absent (auditor verified `read -rs` discipline worked). Persistence as historical record is expected; mitigated by rotation. Out-of-repo (operator-side ~/.claude/); not eligible for in-PR scrub.
 5. **Procedural divergence A6/A7 (§0 finding 4).** Operator applied PROD URL via Vercel dashboard mid-session, out of plan sequence (before A4 close + A5 reviewer call + A11 anchor). State landed correct; procedure broke. Captured for future-discipline: plan templates should instrument a "dashboard-side actions log" to keep operator dashboard work in sync with Claude Code-orchestrated sequence.
 6. **A11 procedure infeasible, substituted by scheduled-backup-by-coincidence (§0 finding 6).** Web-Claude plan-review prescribed mandatory on-demand snapshot via Supabase dashboard; infeasible because on-demand snapshots require PITR add-on (deferred to HARDEN). The 2026-05-16 23:30:19 UTC scheduled daily backup (Pro tier default, included; predates A6/A7) substitutes incidentally as the de facto rollback anchor. Plan-review-template miss: future templates should verify dashboard procedures are available on the chosen plan tier before prescribing them. Capture for `docs/maintenance.md`.
+7. **`.claude/settings.local.json:129` literal credential persistence (caught + scrubbed via A8 HIGH #1).** A8 security-auditor surfaced that the rotated INTERIM `DATABASE_URL` (with burned password `Surprise1-Said0-Deluxe3-Stoppage7-Tablet5` + INTERIM project ref) was baked verbatim into a permission-allowlist entry on line 129 of `.claude/settings.local.json`. File is gitignored (verified: `git log -p --all -S "Surprise1-Said0"` returns empty), so never propagated to git history. Local-disk persistence only. Scrubbed in-session before plan commit; verified `grep -n "Surprise1-Said0" .claude/settings.local.json` returns empty. Wildcard `Bash(vercel env *)` on line 127 covers future invocations. **Maintenance candidate per `docs/maintenance.md`:** future allowlist entries should match `Bash(<tool> <subcommand> *)` wildcards, NOT literal commands with values; literal-command allowlist entries are a leakage channel.
+8. **Live SCAFFOLD.14 vendor credentials in `/tmp/scaffold14-env.txt` — operator-deferred (caught + acknowledged + handed off to SCAFFOLD.13-B, not blocked here).** A8 security-auditor surfaced that `/tmp/scaffold14-env.txt` + `/private/tmp/scaffold14-env.txt` (1035 bytes, world-readable `-rw-r--r--`, 3+ day disk presence) carries **live (un-rotated)** vendor credentials from the 2026-05-14 SCAFFOLD.14 session: `BETTER_AUTH_SECRET`, `ADMIN_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Out-of-scope for SCAFFOLD.13-A per CLAUDE.md §5.11 (does not block this PR). **Operator (Hrishikesh) acknowledged risk 2026-05-17 ~14:50 IST and deferred both file removal and credential rotation to SCAFFOLD.13-B kickoff as the stratum's first action.** Web Claude flagged but did not block; operator's call as project owner. **Honest record:** the credentials remained on disk at PR-open time. See "Next session starts at" below for the deferred-action chain.
 
 ## Open questions (§5.9 field 3)
-- (Expected) none at close — all 6 surprises resolved in-session
+- (Expected) none at close — all 8 surprises resolved or operator-deferred in-session
 
 ## Next session starts at (§5.9 field 4)
-- SCAFFOLD.13-B kickoff (Doppler integration + Upstash/R2/Resend env audit) OR ENGINE.6 (events helper at src/server/events/insert.ts) per Hrishikesh's queue ordering
-- New tracker entry: SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5)
+- **SCAFFOLD.13-B kickoff** (Doppler integration + Upstash/R2/Resend env audit) — **first action of the stratum, before any Doppler work:**
+  1. `rm /tmp/scaffold14-env.txt /private/tmp/scaffold14-env.txt` (closes SURPRISE 8 file-persistence)
+  2. Rotate `BETTER_AUTH_SECRET` + `ADMIN_PASSWORD` (highest blast radius — `ADMIN_PASSWORD` is the admin Control Centre password per ADR-0010; `BETTER_AUTH_SECRET` is the session-cookie HMAC key)
+  3. Rotate `GOOGLE_CLIENT_SECRET` + `RESEND_API_KEY` + `TURNSTILE_SECRET_KEY`
+  4. Update Vercel env vars with new values (dashboard, Sensitive flag on, same scope grouping per A6/A7 single-entry pattern)
+  5. **THEN** proceed to Doppler scope (the original SCAFFOLD.13-B purpose)
+  
+  SCAFFOLD.13-B's stratum description must be amended at its own kickoff to include this credential-rotation work as the load-bearing first step. SECURITY-1 tracker entry **NOT minted** per tracker-sweep cadence rule agreed 2026-05-17 — folded into 13-B scope instead.
+- **OR** ENGINE.6 (events helper at `src/server/events/insert.ts`) per Hrishikesh's queue ordering. If ENGINE.6 runs before SCAFFOLD.13-B, the deferred /tmp credential hygiene MUST be the first action of whichever stratum kicks off next (not delayed past two stratum boundaries).
+- **New tracker entry:** SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5)
 
 ## Context to preserve (§5.9 field 5)
 - PROD Supabase Pro project (name: `zugzwang-experiment-prod`, ref `zbvprdcyxhlguxbostdj`, ap-south-1, Session pooler URL) — operator-side password manager; **passwords rotated 2026-05-17 post-leak** (new credentials in password manager only)
@@ -648,6 +658,32 @@ Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a f
 ## Time (§5.9 field 6 — optional)
 <rough estimate>
 ```
+
+### §14 appendix — `vercel env ls production` capture (per A8 LOW finding 5 backstop)
+
+Executed 2026-05-17 in-session against `zugzwang-worlds-projects/experiment`. Sensitive-redacted output (Vercel CLI masks all values per Sensitive flag — confirms the §0 finding 3 root cause + A8 SAFE finding "Vercel Sensitive flag works as documented"). Captures key inventory + scope grouping + added-ago timing as audit-trail backstop for the §0 finding 4 procedural divergence:
+
+```
+ name                               value               environments                created
+ DATABASE_URL                       Encrypted           Production, Preview         23h ago
+ UPSTASH_REDIS_REST_URL             Encrypted           Preview, Production         2d ago
+ UPSTASH_REDIS_REST_TOKEN           Encrypted           Preview, Production         2d ago
+ GOOGLE_CLIENT_ID                   Encrypted           Production, Preview         3d ago
+ GOOGLE_CLIENT_SECRET               Encrypted           Production, Preview         3d ago
+ RESEND_API_KEY                     Encrypted           Production, Preview         3d ago
+ RESEND_FROM_EMAIL                  Encrypted           Production, Preview         3d ago
+ NEXT_PUBLIC_TURNSTILE_SITE_KEY     Encrypted           Production, Preview         3d ago
+ TURNSTILE_SECRET_KEY               Encrypted           Production, Preview         3d ago
+ BETTER_AUTH_SECRET                 Encrypted           Production, Preview         3d ago
+ BETTER_AUTH_URL                    Encrypted           Production, Preview         3d ago
+ ADMIN_PASSWORD                     Encrypted           Production, Preview         3d ago
+```
+
+**Verifications confirmed:**
+- `DATABASE_URL` exists with scope `Production, Preview` (single grouped entry per §0 finding 4 + §5 A7 amended Status)
+- All 12 env vars carry the `Encrypted` (Sensitive) flag — A8 Surface 2 "Vercel Sensitive-flag posture" operator-attestation surface is now file-evidence-verified
+- `DATABASE_URL` added "23h ago" (relative to 2026-05-17 capture time) — consistent with §0 finding 4 chronology ("operator applied PROD URL via Vercel web dashboard mid-session 2026-05-17, ~23h before A8 audit")
+- 12-entry inventory matches the SCAFFOLD.3 + SCAFFOLD.4 substrate work (auth + Upstash + Resend + Turnstile + Better Auth + admin password) — no unexpected keys
 
 ---
 
