@@ -545,7 +545,7 @@ Per kickoff: "Self-audit per §5.10 before `gh pr create`." Run at A12, after A1
 | ✓ `DATABASE_URL` set in Vercel (single grouped entry) | Kickoff exit-4 (amended) | A6/A7 ✓ completed out-of-sequence via dashboard (§0 finding 4); Sensitive flag on; scope Production + Preview single entry; auto-redeployed build `3QvGjQ32M` from commit `82bee48`. Stored value unreadable post-set; A10 415 evidence is the wiring confirmation |
 | ⏳ pnpm tsc --noEmit exit 0 | Kickoff exit-5 | Run at A12; capture output |
 | ⏳ pnpm biome check . zero fixes | Kickoff exit-6 | Run at A12; capture output |
-| ⏳ pnpm vitest run green | Kickoff exit-7 (interpreted per Q6) | Run at A12; matches SCAFFOLD.3 baseline (58 pass, 5 todo) |
+| ✓ pnpm vitest run green | Kickoff exit-7 (interpreted per Q6) | Ran at A12 2026-05-17: 133 passed + 5 todo (138 total) across 26 test files, exit 0. Current baseline (+75 since SCAFFOLD.3 era 58/5 figure — SCAFFOLD.4 + subsequent work); no regressions; all 5 todo carry forward. Plan-text accuracy SURPRISE amended in this row. |
 | ✓ Vercel Production deploy green | Kickoff exit-8 | Build `3QvGjQ32M` from commit `82bee48` deployed successfully; A10 first-smoke confirms HTTP 200 at `/sign-in` |
 | ✓ Vercel Preview deploy green | Kickoff exit-8 | Same build per single-entry env grouping (§0 finding 4); A10 first-smoke ran against Production URL |
 | ✓ Backup configuration verified | Kickoff exit-9 (reframed per §0 finding 6) | 2026-05-16 23:30:19 UTC scheduled daily backup confirmed in dashboard (post-migration, pre-traffic) = de facto rollback anchor; PITR + on-demand snapshots HARDEN-scoped |
@@ -628,21 +628,14 @@ Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a f
 5. **Procedural divergence A6/A7 (§0 finding 4).** Operator applied PROD URL via Vercel dashboard mid-session, out of plan sequence (before A4 close + A5 reviewer call + A11 anchor). State landed correct; procedure broke. Captured for future-discipline: plan templates should instrument a "dashboard-side actions log" to keep operator dashboard work in sync with Claude Code-orchestrated sequence.
 6. **A11 procedure infeasible, substituted by scheduled-backup-by-coincidence (§0 finding 6).** Web-Claude plan-review prescribed mandatory on-demand snapshot via Supabase dashboard; infeasible because on-demand snapshots require PITR add-on (deferred to HARDEN). The 2026-05-16 23:30:19 UTC scheduled daily backup (Pro tier default, included; predates A6/A7) substitutes incidentally as the de facto rollback anchor. Plan-review-template miss: future templates should verify dashboard procedures are available on the chosen plan tier before prescribing them. Capture for `docs/maintenance.md`.
 7. **`.claude/settings.local.json:129` literal credential persistence (caught + scrubbed via A8 HIGH #1).** A8 security-auditor surfaced that the rotated INTERIM `DATABASE_URL` (with burned password `Surprise1-Said0-Deluxe3-Stoppage7-Tablet5` + INTERIM project ref) was baked verbatim into a permission-allowlist entry on line 129 of `.claude/settings.local.json`. File is gitignored (verified: `git log -p --all -S "Surprise1-Said0"` returns empty), so never propagated to git history. Local-disk persistence only. Scrubbed in-session before plan commit; verified `grep -n "Surprise1-Said0" .claude/settings.local.json` returns empty. Wildcard `Bash(vercel env *)` on line 127 covers future invocations. **Maintenance candidate per `docs/maintenance.md`:** future allowlist entries should match `Bash(<tool> <subcommand> *)` wildcards, NOT literal commands with values; literal-command allowlist entries are a leakage channel.
-8. **Live SCAFFOLD.14 vendor credentials in `/tmp/scaffold14-env.txt` — operator-deferred (caught + acknowledged + handed off to SCAFFOLD.13-B, not blocked here).** A8 security-auditor surfaced that `/tmp/scaffold14-env.txt` + `/private/tmp/scaffold14-env.txt` (1035 bytes, world-readable `-rw-r--r--`, 3+ day disk presence) carries **live (un-rotated)** vendor credentials from the 2026-05-14 SCAFFOLD.14 session: `BETTER_AUTH_SECRET`, `ADMIN_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Out-of-scope for SCAFFOLD.13-A per CLAUDE.md §5.11 (does not block this PR). **Operator (Hrishikesh) acknowledged risk 2026-05-17 ~14:50 IST and deferred both file removal and credential rotation to SCAFFOLD.13-B kickoff as the stratum's first action.** Web Claude flagged but did not block; operator's call as project owner. **Honest record:** the credentials remained on disk at PR-open time. See "Next session starts at" below for the deferred-action chain.
+8. **Live SCAFFOLD.14 vendor credentials in `/tmp/scaffold14-env.txt` — operator-deferred (caught + acknowledged + handed off to SCAFFOLD.13-B, not blocked here).** A8 security-auditor surfaced that `/tmp/scaffold14-env.txt` + `/private/tmp/scaffold14-env.txt` (1035 bytes, world-readable `-rw-r--r--`, 3+ day disk presence) carries **live (un-rotated)** vendor credentials from the 2026-05-14 SCAFFOLD.14 session: `BETTER_AUTH_SECRET`, `ADMIN_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `RESEND_API_KEY`, `TURNSTILE_SECRET_KEY`. Out-of-scope for SCAFFOLD.13-A per CLAUDE.md §5.11 (does not block this PR). **Operator (Hrishikesh) acknowledged risk 2026-05-17 ~14:50 IST and deferred both file removal and credential rotation to SCAFFOLD.13-B kickoff as the stratum's first action.** Web Claude flagged but did not block; operator's call as project owner. **Honest record:** the credentials remained on disk at PR-open time. **Action chain canonicalized in the named "Handoff to SCAFFOLD.13-B" section below — that section is the load-bearing first action for the 13-B stratum.**
 
 ## Open questions (§5.9 field 3)
 - (Expected) none at close — all 8 surprises resolved or operator-deferred in-session
 
 ## Next session starts at (§5.9 field 4)
-- **SCAFFOLD.13-B kickoff** (Doppler integration + Upstash/R2/Resend env audit) — **first action of the stratum, before any Doppler work:**
-  1. `rm /tmp/scaffold14-env.txt /private/tmp/scaffold14-env.txt` (closes SURPRISE 8 file-persistence)
-  2. Rotate `BETTER_AUTH_SECRET` + `ADMIN_PASSWORD` (highest blast radius — `ADMIN_PASSWORD` is the admin Control Centre password per ADR-0010; `BETTER_AUTH_SECRET` is the session-cookie HMAC key)
-  3. Rotate `GOOGLE_CLIENT_SECRET` + `RESEND_API_KEY` + `TURNSTILE_SECRET_KEY`
-  4. Update Vercel env vars with new values (dashboard, Sensitive flag on, same scope grouping per A6/A7 single-entry pattern)
-  5. **THEN** proceed to Doppler scope (the original SCAFFOLD.13-B purpose)
-  
-  SCAFFOLD.13-B's stratum description must be amended at its own kickoff to include this credential-rotation work as the load-bearing first step. SECURITY-1 tracker entry **NOT minted** per tracker-sweep cadence rule agreed 2026-05-17 — folded into 13-B scope instead.
-- **OR** ENGINE.6 (events helper at `src/server/events/insert.ts`) per Hrishikesh's queue ordering. If ENGINE.6 runs before SCAFFOLD.13-B, the deferred /tmp credential hygiene MUST be the first action of whichever stratum kicks off next (not delayed past two stratum boundaries).
+- **SCAFFOLD.13-B kickoff** (Doppler integration + Upstash/R2/Resend env audit). **The 6-step credential-rotation handoff is canonicalized in the "Handoff to SCAFFOLD.13-B" section below — that is the load-bearing first action of the 13-B stratum, before any Doppler work.** SCAFFOLD.13-B's stratum description must be amended at its own kickoff to include the credential rotation as its load-bearing first step. SECURITY-1 tracker entry **NOT minted** per tracker-sweep cadence rule agreed 2026-05-17 — folded into 13-B scope instead.
+- **OR** ENGINE.6 (events helper at `src/server/events/insert.ts`) per Hrishikesh's queue ordering. If ENGINE.6 runs before SCAFFOLD.13-B, the deferred /tmp credential hygiene per the Handoff section below MUST be the first action of whichever stratum kicks off next (not delayed past two stratum boundaries).
 - **New tracker entry:** SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5)
 
 ## Context to preserve (§5.9 field 5)
@@ -657,7 +650,24 @@ Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a f
 
 ## Time (§5.9 field 6 — optional)
 <rough estimate>
+
+## Handoff to SCAFFOLD.13-B (load-bearing first action — credential rotation + Doppler scope) — §5.9 field 7 (project-specific extension)
+
+**Per A8 HIGH finding 2 + LOW finding 4 + operator decision 2026-05-17:** SCAFFOLD.13-B's first action, before any Doppler integration work, is the 6-step credential-hygiene sequence below. This is the canonical action chain — SURPRISE 4 + SURPRISE 7 + SURPRISE 8 are the findings; this section is the action. Future operator (Hrishikesh in a fresh 13-B chat) reads this section as the first thing 13-B does.
+
+1. `rm /tmp/scaffold14-env.txt /private/tmp/scaffold14-env.txt` — closes SURPRISE 8 file-persistence (live SCAFFOLD.14 vendor credentials, world-readable, 3+ day disk presence as of 2026-05-17)
+2. `chmod 600 .env.local` — closes A8 LOW finding 4 (operator-deferred to 13-B per amendment)
+3. **Rotate** `BETTER_AUTH_SECRET` + `ADMIN_PASSWORD` — highest blast radius. `ADMIN_PASSWORD` is the admin Control Centre password per ADR-0010; `BETTER_AUTH_SECRET` is the session-cookie HMAC key (compromise lets attacker forge any participant session). Generate fresh per `.env.example` comments (`openssl rand -hex 32` for each)
+4. **Rotate** `GOOGLE_CLIENT_SECRET` + `RESEND_API_KEY` + `TURNSTILE_SECRET_KEY` — vendor-side primary keys. Operator regenerates from each vendor's dashboard (Google Cloud Console, Resend, Cloudflare Turnstile) per `.env.example` URLs
+5. **Update corresponding Vercel env vars with new values** — dashboard, Sensitive flag on, same Production + Preview single-entry grouping per A6/A7 pattern. Verify post-set via `vercel env ls production` (key inventory + scope grouping; values remain Sensitive-redacted)
+6. **THEN** proceed to Doppler scope — the original SCAFFOLD.13-B purpose per tracker-sweep-v9 log §"Path A — SCAFFOLD.13 kickoff first": full env audit across all four vendors (Supabase DATABASE_URL, Upstash, R2, Resend) PLUS Doppler-wiring
+
+**Why this order:** steps 1-2 close immediate file-persistence risk; steps 3-4 burn compromised credentials before Doppler-wire propagates them anywhere new; step 5 syncs Vercel runtime to the new credentials so production still works post-rotation; step 6 then proceeds to the planned Doppler integration with clean credential state.
+
+**Not blocking THIS PR (SCAFFOLD.13-A).** Operator decision 2026-05-17 ~14:50 IST: handed off to 13-B kickoff. Honest record in SURPRISE 8.
 ```
+
+---
 
 ### §14 appendix — `vercel env ls production` capture (per A8 LOW finding 5 backstop)
 
