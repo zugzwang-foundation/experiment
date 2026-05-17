@@ -2,7 +2,7 @@
 
 **Status:** Closed 2026-05-17
 **Branch:** `feat/scaffold-13-a` (3 plan commits + 1 .env.example commit + 1 log commit at log-write time; final PR# update commit pending)
-**PR:** #<TBD — fills on `gh pr create`>
+**PR:** [#40](https://github.com/zugzwang-foundation/experiment/pull/40)
 **Predecessor:** tracker-sweep-v9 (`docs/logs/tracker-sweep-v9.md`, `main` at `82bee48`)
 **Unblocks:** SCAFFOLD.13-B (credential rotation per Handoff section below, then Doppler + Upstash/R2/Resend env audit); HARDEN.* connection-pool tuning; HARDEN.* PITR add-on + backup-runbook + restore-drill; SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5 in plan)
 
