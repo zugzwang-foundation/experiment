@@ -9,30 +9,101 @@
 
 ---
 
-## §1 Context
+## §0 Amendment log — 2026-05-17 (three successive amendment states same day)
 
-The repo currently points `DATABASE_URL` (Vercel Production + Preview) at an interim **Supabase free-tier project** wired during SCAFFOLD.3's PR-#38 build (per SCAFFOLD.3 log §"MAINT-10"). The interim project carries two well-known liabilities:
+Plan amended through three states on 2026-05-17:
 
-1. **7-day auto-pause** — free-tier projects pause when unused; if the project pauses, any deploy that hits it errors at runtime. Mitigated pre-SCAFFOLD.13 by a daily `pg_dump` cron + R2-age-encrypted off-site bridge (per tracker-sweep-v9 log).
-2. **No SLA / no PITR / no native daily backups** — free-tier carries best-effort uptime only.
+1. **Initial amendment** (post-A4 q0): three candidate findings recorded.
+2. **First counter-amendment** (same day, post-Sensitive-var realization): finding 3 demoted from "established" to "RETRACTED — CLI artifact". HOLD on §5 A5+ pending Vercel ground-truth check.
+3. **Second counter-amendment** (same day, post-A10 first-smoke ground-truth + post-A11-infeasibility realization): finding 3 RESOLVED via runtime evidence; findings 4, 5, and 6 added; HOLD released; A5-A15 retroactive amendments applied.
 
-The infrastructure-subscription strategy locked at tracker-sweep-v9 (`$25/mo Supabase Pro at SCAFFOLD.13 cutover; $20/mo Vercel Pro mid-August 2026; $45/mo at 2026-09-15 launch`) sets the budget envelope. SCAFFOLD.13-A spends the Supabase Pro $25/mo line — it is the SLA + native-backup + PITR substrate swap.
+### Findings (final state)
 
-The cutover is **structurally a substrate swap with zero feature delta**:
+1. **PROD provisioning predates session.** Supabase Pro project `zugzwang-experiment-prod` (ap-south-1) was provisioned + 6 drizzle migrations applied on **2026-05-15 13:20:44 UTC**, before this Phase 2 session opened. A2 today was URL capture + PITR/backup verification on an existing project, not net-new provisioning. A3's `pnpm drizzle-kit migrate` was an idempotent no-op (journal cursor already at 0005). PITR add-on (~$100/mo separate billing) deferred to HARDEN per A2 operator decision; daily backups confirmed active. **STANDS.**
+2. **Interim is schemaless.** Interim Tokyo-region (`ap-northeast-1`) free-tier project `niihrpqgzxpczyignxnn` carries no Zugzwang schema. `drizzle.__drizzle_migrations` and `public.__drizzle_migrations` both return "relation does not exist"; public schema is empty; only Supabase-internal schemas (auth/extensions/graphql/pgbouncer/realtime/storage/vault) present. Interim is a stale placeholder, never received `drizzle-kit migrate`. **STANDS.**
+3. ~~**Vercel `DATABASE_URL` is literally empty.**~~ **RETRACTED then RESOLVED 2026-05-17.** Initial reading: `vercel env pull` returned `DATABASE_URL=""`. Retracted same day after recognizing Vercel marks the variable Sensitive (CLI returns empty for Sensitive vars by deliberate platform-security design — write-once-read-never from outside runtime). **Resolved later same day via A10 first-smoke ground-truth:** Email-OTP POST to `/api/auth/email-otp/send-verification-otp` returned HTTP 415 with Better Auth domain error (`Content-Type "application/x-www-form-urlencoded" is not allowed`), NOT a 500 with Postgres/connection error. The 415 is end-to-end runtime evidence that `DATABASE_URL` is correctly wired to PROD and the request path reaches Better Auth past the auth-handler boundary. Stronger signal than deploy-log inspection because it tests the runtime end-to-end. **The stored URL value remains unreadable** (still Sensitive); operational verification supersedes inspection.
+4. **Procedural divergence at A6/A7 (NEW per second counter-amendment).** Operator applied PROD Session pooler URL via Vercel web dashboard mid-session, **out of plan's procedural sequence** — before A4 close, before A5 reviewer call, before A11 snapshot. State landed correct: scope Production + Preview, Sensitive flag on; auto-redeploy triggered to build `3QvGjQ32M` from commit `82bee48`. **State correct; procedure broke.** Captured as load-bearing §14 SURPRISE for future procedural discipline (operator dashboard work can outrun the Claude Code-orchestrated sequence; instrumenting a "dashboard-side actions log" in plan templates is a candidate maintenance item).
+5. **Downstream SCAFFOLD.3 sign-in form bug — separate tracker entry (NEW per second counter-amendment).** Sign-in form posts `application/x-www-form-urlencoded`; Better Auth `/api/auth/email-otp/send-verification-otp` route expects `application/json`. 415 surfaced by A10 first-smoke (the very fact this bug was never previously caught is because SCAFFOLD.3 deploys never reached a working DATABASE_URL until A6/A7 wired one). **Not SCAFFOLD.13-A scope.** Mint as new tracker entry post-merge (suggested ID: SCAFFOLD.3-FOLLOWUP-1 or BUG-1; operator's call). **Documented here for traceability, not for in-PR action.**
+6. **A11 procedure infeasible — substituted by scheduled-backup-by-coincidence (NEW per second counter-amendment).** Web-Claude plan-review originally specified A11 as "trigger on-demand snapshot via Supabase dashboard → Reports → Backups (Pro tier feature)". **Infeasible from the start:** on-demand snapshots on Supabase Pro require the PITR add-on (~$100/mo), which was explicitly skipped at A2 per HARDEN scoping. The prescribed A11 procedure could not run. **Functional substitution:** the 2026-05-16 23:30:19 UTC scheduled daily backup (Pro tier default, included) predates today's A6/A7 cutover and captures the post-migration / pre-traffic state (6 migrations applied, zero application rows). This is the de facto rollback anchor — **A11 is satisfied incidentally**. No operator action needed in Supabase. Plan-review-time miss to capture for `docs/maintenance.md` (future plan-review templates should verify dashboard procedures are available on the chosen plan tier before prescribing them).
 
-- The schema is **already version-controlled** in `drizzle/migrations/` (six migrations, `0000..0005`) covering uuidv7 function + 21-table inventory + 12+1 monthly events partitions + 26 append-only trigger declarations + system_state singleton seed + auth schema corrections.
-- The interim project carries **no production data** — the experiment launches 2026-09-15; the interim's only writes are SCAFFOLD.3-era dev fixtures (Better Auth onboarding, identity_pool dev-seed). There is **nothing to migrate over the wire**; the new project rebuilds from migrations.
-- The application code is **unchanged**. `src/db/index.ts` reads `DATABASE_URL` from env. The swap is one env-var value flip, zero source-tree diff in `src/`.
+### Consequence (second counter-amendment)
 
-Per kickoff explicit constraint: **if Claude Code finds itself touching `src/` files for behavioral changes, stop and surface — that signals scope drift.**
+The "cutover" framing is substantively "substrate setup with zero feature delta" — PROD is the live wired substrate (confirmed via A10 415 evidence); interim has no role. §6 parity-vs-interim is structurally invalid (per finding 2); reframed to PROD-only schema-correctness against canonical migration files. §8 recovery is rewritten — **the 2026-05-16 23:30 UTC scheduled daily backup is the de facto rollback anchor** (per finding 6 substitution); PITR + on-demand snapshots are both HARDEN-scoped; interim is schemaless and not a fallback. §5 sub-parts A6/A7/A9 land as retrospective status; A10 lands as PARTIAL (one smoke step ran); A11 satisfied incidentally; A5/A8/A12-A15 retain pending status with refined scope.
 
-### §1.1 Why a NEW Pro project (not an upgrade-in-place)
+### Sections actually amended below (full post-second-counter-amendment scope)
 
-Per kickoff exit criterion line 1 ("New Supabase Pro project provisioned (ap-south-1, Session pooler port 5432, daily backups enabled, PITR available)") — a fresh project, not an upgrade of the interim. Rationale:
+| § | Change |
+|---|---|
+| §1, §1.1 | Rewritten to reflect PROD-wired-via-415-ground-truth + procedural-divergence; downstream 415 bug pointer added |
+| §2.1 | Rows updated to reflect ✓ statuses for items already complete + first-traffic-anchor reframing of A11 |
+| §3 | Reviewer-call routing notes mention §0 findings 1-5 |
+| §5 intro | A11 reframed as first-traffic anchor (still pending; sequence preserved A1→…→A15) |
+| §5 A1-A3 | Status notes retained (factual) |
+| §5 A4 | Retroactive PARTIAL CLOSE (q0 done; §6 canonical-reference suite still pending) |
+| §5 A5 | Reframed: retroactive state review, not procedural gate |
+| §5 A6/A7 | Retroactive ✓ status notes (operator-applied via Vercel dashboard mid-session, out-of-sequence); capture `vercel env ls` post-hoc |
+| §5 A8 | Scope expanded: credential-leak audit + post-cutover env hygiene + procedural-divergence review |
+| §5 A9 | Retroactive ✓ status (implicit redeploy to build `3QvGjQ32M` from commit `82bee48`) |
+| §5 A10 | Retroactive PARTIAL ✓: sign-in render + 415 OTP-POST captured; remaining §7 steps pending |
+| §5 A11 | ✓ Satisfied incidentally by scheduled-backup-by-coincidence (per §0 finding 6): on-demand snapshot procedure infeasible without PITR add-on (skipped to HARDEN); 2026-05-16 23:30:19 UTC scheduled backup is the de facto rollback anchor (post-migration, pre-traffic). No operator action required. |
+| §5 A15 | Interim deletion 24h grace held as soft window per §10 Q9 (data-drain role reduced; interim is schemaless); separate tracker entry for downstream 415 bug noted |
+| §6 | Schema-correctness reframe (PROD-only against canonical) — kept from first counter-amendment |
+| §7 | Updated: steps 1-2 ✓ (sign-in renders); step 5 returned 415 (separate-tracker bug); remaining steps still pending |
+| §8 | Recovery procedure rewritten — 2026-05-16 23:30 UTC scheduled daily backup is the de facto rollback anchor (per §0 finding 6); PITR + on-demand snapshots are HARDEN-scoped; interim is schemaless and not a fallback |
+| §9 R3/R12/R13/R14 | Reframed — interim-load-bearing risks dissolve (interim is schemaless) |
+| §10 Q5/Q8 | Q5 resolved (interim region = `ap-northeast-1` Tokyo); Q8 resolved (cron bridge irrelevant; PROD is wired) |
+| §11 | Audit checklist items updated to reflect retroactive completion of A6/A7/A9/A10-partial |
+| §12 | A5/A8 scope rows refined per amendment |
+| §13 | Items 4, 8 retroactively complete; item 1 PROD-pre-existed noted; item 7 (`pnpm vitest run`) still pending |
+| §14 | 6 SURPRISE entries pre-drafted (PROD pre-existed, interim schemaless, Sensitive-var CLI artifact, credential-leak rotation, procedural-divergence A6/A7, A11 procedure-infeasibility-substituted-by-scheduled-backup) |
 
-- The interim project was provisioned with whatever free-tier default region was offered at SCAFFOLD.3 build time (region NOT recorded in SCAFFOLD.3 log MAINT-10 — flagged as Open Question Q5 below). Per SPEC.2 §22.1 ADR-0006 row: `Mumbai single-region`. AWS region for Mumbai = **ap-south-1**. If the interim is in a non-Mumbai region, an in-place region transfer is heavyweight; provisioning fresh in ap-south-1 is mechanically simpler.
-- Fresh provisioning gives a clean rollback window: interim stays alive during 24h grace, swap is reversible at the Vercel env-var layer alone.
-- Pre-launch state has zero data-loss exposure on rebuild.
+### A1-A10 outcomes (operator-confirmed in session)
+
+- A1 ✓ committed 2026-05-16 as `912c3d3` on `feat/scaffold-13-a` (plan promotion)
+- A2 ✓ URL capture + diagnostics; PROD pre-existed (2026-05-15); PITR deferred to HARDEN
+- A3 ✓ migrate no-op (cursor was already at 0005)
+- A4 ✓ PARTIAL: q0 done; §6 canonical-reference suite still pending (PROD-only against migration files)
+- A5 ⏳ pending; reframed scope (retroactive state review of completed A6/A7 + standing findings)
+- A6 ✓ COMPLETED out-of-sequence via Vercel web dashboard; documented retroactively in §5 A6
+- A7 ✓ COMPLETED in same A6 dashboard action (Vercel groups Production + Preview on single entry; Sensitive flag on)
+- A8 ⏳ pending; scope expanded (credential-leak audit + post-cutover env hygiene + procedural-divergence review)
+- A9 ✓ implicit redeploy to build `3QvGjQ32M` from commit `82bee48`
+- A10 ✓ PARTIAL first-smoke: sign-in renders cleanly at `experiment-zugzwang-worlds-projects.vercel.app/sign-in`; Email-OTP POST returned 415 (Better Auth domain error → DB reachable; downstream bug per finding 5)
+- A11 ✓ satisfied incidentally per §0 finding 6: on-demand snapshot procedure was infeasible (requires PITR add-on, skipped to HARDEN); 2026-05-16 23:30:19 UTC scheduled daily backup is the de facto rollback anchor (post-migration, pre-traffic). No operator action required.
+- A12 ⏳ pending (self-audit per CLAUDE.md §5.10)
+- A13 ⏳ pending (close-out log with 5 SURPRISE entries pre-drafted per §14)
+- A14 ⏳ pending (PR open)
+- A15 ⏳ pending (interim deletion 24h grace + downstream-bug tracker entry to mint)
+- **Mid-session security incident (caught + fixed):** PROD + INTERIM DATABASE_URL credentials leaked into Claude Code chat during A4 q0 protocol; Claude Code refused execution + recommended immediate rotation; both passwords rotated mid-session; new URLs re-captured to operator-side password manager via `read -rs` discipline. Documented as SURPRISE entry per §14.
+
+---
+
+## §1 Context (amended 2026-05-17, second counter-amendment same day)
+
+The repo's Vercel `DATABASE_URL` env var (Production + Preview, single grouped entry, Sensitive flag on) is wired to PROD as of 2026-05-17 mid-session, applied by the operator via Vercel web dashboard. Ground-truth confirmation came via A10 first-smoke executed in browser: `experiment-zugzwang-worlds-projects.vercel.app/sign-in` renders cleanly; Email-OTP POST to `/api/auth/email-otp/send-verification-otp` returned HTTP 415 with Better Auth domain error (`Content-Type "application/x-www-form-urlencoded" is not allowed`), NOT a 500 with a Postgres/connection error. The 415 is stronger evidence than build-log inspection: the request reached Better Auth, was processed past the auth-handler boundary, and rejected at Content-Type validation — meaning `DATABASE_URL` is correctly wired and the runtime is reaching the DB.
+
+The actual operational state at end of A10 PARTIAL first-smoke (2026-05-17):
+
+- **PROD project** (`zugzwang-experiment-prod`, ap-south-1 Mumbai): provisioned + all 6 drizzle migrations applied on 2026-05-15. Cursor at 0005 (`__drizzle_migrations.last_id=6, last_hash=0e9e617f...242edf4e`). PITR add-on (~$100/mo) deferred to HARDEN per A2 operator decision; daily backups (Pro tier default, included) confirmed active — the 2026-05-16 23:30:19 UTC scheduled backup predates today's A6/A7 cutover and captures the post-migration / pre-traffic state, acting as the de facto rollback anchor (per §0 finding 6 — A11 satisfied incidentally). Live first traffic: 1 request (the 415 smoke).
+- **Vercel `DATABASE_URL`** (Production + Preview, single grouped entry, Sensitive flag on): PROD Session pooler URL, applied via dashboard mid-session out of plan procedural sequence (§0 finding 4); auto-redeployed to build `3QvGjQ32M` from commit `82bee48`. Stored value remains unreadable post-creation (Sensitive); operational verification via A10 415 is authoritative.
+- **Interim project** (ap-northeast-1 Tokyo, free-tier `niihrpqgzxpczyignxnn`): schemaless. Never received `drizzle-kit migrate`. Confirmed via A4 q0 + post-415 inference to be unrelated to deployed-app `DATABASE_URL`; deletion in 24h grace per §10 Q9 / A15.
+- **Downstream bug (separate tracker entry post-merge):** SCAFFOLD.3 sign-in form posts urlencoded; Better Auth route expects JSON — surfaced by A10 first-smoke 415 (§0 finding 5). Not SCAFFOLD.13-A scope.
+
+SCAFFOLD.13-A's "substrate setup with zero feature delta" framing is correct: PROD is the live wired substrate; interim has no role. A6/A7 procedural sequence was inverted (§0 finding 4) — operator did the env work mid-session via dashboard before A4 close + A5 reviewer call + A11 snapshot; state landed correct, procedure broke. Captured as §14 SURPRISE.
+
+The infrastructure-subscription strategy locked at tracker-sweep-v9 (`$25/mo Supabase Pro at SCAFFOLD.13 cutover; $20/mo Vercel Pro mid-August 2026; $45/mo at 2026-09-15 launch`) is honored by the pre-existing PROD project.
+
+- The schema is **already version-controlled** in `drizzle/migrations/` (six migrations, `0000..0005`) covering uuidv7 function + 21-table inventory + 12+1 monthly events partitions + 26 append-only trigger declarations + system_state singleton seed + auth schema corrections. PROD is at the latest cursor as of 2026-05-15.
+- There is **negligible production data at risk** — pre-launch state, only first-traffic so far is the 415 smoke (which failed at Content-Type validation, before any DB write). PROD's data tables remain empty.
+- The application code is **unchanged**. `src/db/index.ts` reads `DATABASE_URL` from env. The wire was one env-var value set + redeploy, zero source-tree diff in `src/`.
+
+Per kickoff explicit constraint: **if Claude Code finds itself touching `src/` files for behavioral changes, stop and surface — that signals scope drift.** (The 415 downstream bug is in `src/` but is a separate task per the new tracker entry; not SCAFFOLD.13-A scope.)
+
+### §1.1 Why a pre-existing Pro project (not an in-session provision)
+
+Original plan §1.1 prescribed creating a new Pro project during A2 ("fresh provisioning gives a clean rollback window; interim stays alive during 24h grace"). Reality (per §0 finding 1): the project was provisioned on 2026-05-15, predating this session. A2 today was URL capture + PITR/backup verification on the existing project. Functional outcome unchanged — PROD is in `ap-south-1` (Mumbai per SPEC.2 §22.1 ADR-0006), Session pooler port 5432, daily backups active. PITR add-on (~$100/mo separate billing) deferred to HARDEN.
+
+The original "fresh provisioning rollback" rationale is reframed: there is no interim schema to roll back to (interim is schemaless per §0 finding 2). The §8 recovery procedure now reads: **the 2026-05-16 23:30 UTC scheduled daily backup is the de facto rollback anchor** (per §0 finding 6 — PITR and on-demand snapshot are both HARDEN-scoped); recovery via Supabase dashboard → Settings → Database → Backups → Restore. Acceptable pre-launch posture — no production data; A10 first-smoke landed at 415-before-DB-write, so PROD's data tables remain empty.
 
 ---
 
@@ -42,18 +113,19 @@ Per kickoff exit criterion line 1 ("New Supabase Pro project provisioned (ap-sou
 
 | Item | Substance |
 |---|---|
-| New Supabase Pro project | ap-south-1 / Mumbai, Session pooler port 5432, daily backups enabled, PITR available |
-| Drizzle migration apply | `pnpm drizzle-kit migrate` against new project; all six migrations apply clean in journal order |
-| Schema parity verification | SQL suite per §6 comparing new project to interim (or to the canonical schema artifact); ten-query diff yielding zero drift |
-| `DATABASE_URL` swap | Vercel Production via CLI; Vercel Preview via dashboard (CLI papercut per SCAFFOLD.3 MAINT-10 absorbed by operator-path workaround, not Doppler) |
-| Trigger redeploy | Doc-only commit on `feat/scaffold-13-a` triggers Preview build against new URL; merge to `main` triggers Production deploy |
-| Smoke-test pass | Per §7 — Better Auth catch-all reachable + admin login Server Action submits + auth-flow round-trip writes `verifications` row |
-| Backup configuration verified | Daily snapshot exists in dashboard after first 24h; PITR window visible in dashboard |
-| `pg_dump` cron bridge retirement | Operator cron disabled after cutover smoke-passes (interim's free-tier risk profile is no longer load-bearing) |
-| Interim project deletion scheduled | 24h grace from cutover-smoke-pass timestamp; deletion is operator-side dashboard action, NOT this PR |
+| ✓ Pre-existing Pro project verified | `zugzwang-experiment-prod`, ap-south-1 / Mumbai, Session pooler port 5432, daily backups active. PITR add-on deferred to HARDEN per §0 + A2 amendment |
+| ✓ Drizzle migration cursor verified | `pnpm drizzle-kit migrate` against PROD = idempotent no-op (cursor at 0005 from 2026-05-15 apply); A4 q0 confirms `last_id=6, last_hash=0e9e617f...242edf4e` |
+| ⏳ Schema-correctness verification | §6 SQL suite against PROD-only; outputs validated against canonical migration files (`drizzle/migrations/0000-0005.sql`) + SPEC.2 §5 inventory; interim parity diff structurally invalid (interim schemaless per §0) |
+| ✓ `DATABASE_URL` wired to PROD | Operator-applied via Vercel web dashboard mid-session (out-of-sequence per §0 finding 4); scope Production + Preview, single grouped entry, Sensitive flag on |
+| ✓ Trigger redeploy | Auto-redeployed at A6/A7 dashboard action; build `3QvGjQ32M` from commit `82bee48` |
+| ✓ PARTIAL smoke-test | Per §7 — sign-in renders cleanly; OTP POST returned 415 (Better Auth Content-Type validation → DB reachable; downstream bug per §0 finding 5); remaining §7 steps blocked by downstream bug (separate tracker entry) |
+| ✓ A11 rollback anchor satisfied incidentally | On-demand snapshot procedure infeasible (PITR add-on required, deferred to HARDEN per A2). 2026-05-16 23:30:19 UTC scheduled backup (Pro tier default, included) is the de facto post-migration / pre-traffic rollback anchor. No operator action required (per §0 finding 6) |
+| ✓ Backup configuration verified | Daily snapshot active (Pro tier default); 2026-05-16 23:30:19 UTC backup confirmed in dashboard. PITR + on-demand snapshots deferred to HARDEN per §0 |
+| `pg_dump` cron bridge retirement | Operator cron disabled at any convenient time post-A6/A7; bridge wasn't on the PROD path (interim is schemaless per §0 finding 2; bridge ran against interim and is now orphaned) |
+| ⏳ Interim project deletion scheduled | 24h grace post-PR-merge; operator-side dashboard action, NOT this PR. Interim is schemaless per §0, so grace's data-drain role is reduced; 24h matches kickoff and is retained as soft window |
 | `.env.example` housekeeping | Replace stale "interim Supabase / Doppler" notes (line 3 + comment in SCAFFOLD.4 block) with current-state guidance; <2h drift fix per CLAUDE.md §7 cleanup absorption |
-| `docs/plans/SCAFFOLD.13-A.md` | This file, promoted from scratch on Phase 2 execute branch |
-| `docs/logs/SCAFFOLD.13-A.md` | Six-field log per CLAUDE.md §5.9, written before `gh pr create` |
+| `docs/plans/SCAFFOLD.13-A.md` | This file, promoted at A1; amended per §0 mid-session (three amendment states; second counter-amendment current) |
+| `docs/logs/SCAFFOLD.13-A.md` | Six-field log per CLAUDE.md §5.9, written before `gh pr create`; includes 5 SURPRISE entries per §14 (PROD pre-existed, interim schemaless, Sensitive-var CLI artifact, credential-leak rotation, procedural-divergence A6/A7 out-of-sequence) |
 
 ### §2.2 Out of scope (deferred — separate stratum / future task)
 
@@ -89,12 +161,12 @@ docs/logs/SCAFFOLD.13-A.md       (NEW — six-field per-session log)
 
 ## §3 Critical-path posture
 
-§1 of CLAUDE.md names `drizzle/migrations/` as a critical path. This PR **reads** the migration set without modifying it (the migration apply is a runtime action against a new substrate). Two consequences for the workflow:
+§1 of CLAUDE.md names `drizzle/migrations/` as a critical path. This PR **reads** the migration set without modifying it (the migration apply was a pre-session operator action against PROD per §0 finding 1). Two consequences for the workflow:
 
-1. **Pre-PR self-audit per CLAUDE.md §5.10 is REQUIRED.** Even though no migration file changes, the parity verification at §6 IS the self-audit's load-bearing artifact. The audit walks the kickoff exit criterion line-by-line and produces PASS / FAIL / SURPRISE per item.
+1. **Pre-PR self-audit per CLAUDE.md §5.10 is REQUIRED.** Even though no migration file changes, the §6 schema-correctness verification IS the self-audit's load-bearing artifact. The audit walks the kickoff exit criterion line-by-line and produces PASS / FAIL / SURPRISE per item. Per §0 amendments, the audit's SURPRISE section is pre-loaded with the two standing findings (PROD pre-existed, interim schemaless), the retracted finding 3 (Vercel-empty was a CLI artifact, not ground truth), and the mid-session credential-leak incident.
 2. **Reviewer-call routing per CLAUDE.md §5.11 fires at two points:**
-   - `db-migration-reviewer` after §6 parity verification completes (mandatory; schema-touching surface)
-   - `security-auditor` after §8 cutover-rollback procedure documented (mandatory; secrets-handling surface)
+   - `db-migration-reviewer` after §6 schema-correctness verification completes (mandatory; reframed scope per §0 — review schema-empty interim finding + PROD-pre-existed cursor verification, not parity-vs-interim)
+   - `security-auditor` after §8 cutover-rollback procedure documented (mandatory; load-bearing surface now includes the credential-leak incident audit alongside the original secrets-handling-during-swap framing)
 
 `code-reviewer` is NOT invoked (no `src/server/` changes). Per kickoff: "If you find yourself wanting to call it, that's the scope-drift signal."
 
@@ -138,12 +210,16 @@ The kickoff exit criterion line `pnpm test green` doesn't match `package.json` �
 
 Per kickoff: "After plan-review approval, execute one sub-part per reply, wait for Hrishikesh confirmation, never bundle." Sub-parts sequenced for blast-radius minimization: dashboard provisioning before schema apply; schema apply before env swap; env swap before redeploy; redeploy before smoke; smoke before reviewer calls; reviewer calls before PR.
 
+**Execution sequence: A1 → A2 → A3 → A4 → A5 → A6 → A7 → A8 → A9 → A10 → A11 → A12 → A13 → A14 → A15** (original ordering — the proposed A11-before-A6 reorder was withdrawn alongside §0 finding 3 retraction; A11 timing may be reconsidered after the Vercel ground-truth check).
+
 ### A1 — Branch + plan promote
+**Status.** ✓ COMPLETED 2026-05-16 as `912c3d3` on `feat/scaffold-13-a`. Local main fast-forwarded from `62cd299` → `82bee48` during step 2; gate-failure caught and benign (local main was one commit behind origin/main pre-pull); plan committed as new file (531 insertions, byte-identical to scratchpad per A1 diff).
 **Substance.** From `main` at the post-tracker-sweep-v9 merge SHA, create `feat/scaffold-13-a`. Copy this plan from `~/.claude/plans/moonlit-brewing-sundae.md` to `docs/plans/SCAFFOLD.13-A.md`. Commit as `docs(scaffold-13-a): land approved implementation plan`.
 **Output.** Branch ready; plan committed; ready for A2 operator action.
 **Touch surface.** `docs/plans/SCAFFOLD.13-A.md` (NEW). Single commit.
 
-### A2 — Operator: provision new Supabase Pro project (DASHBOARD; Hrishikesh)
+### A2 — Operator: verify pre-existing Supabase Pro project + capture URLs (DASHBOARD; Hrishikesh)
+**Status.** ✓ COMPLETED 2026-05-17. **Deviation from prescribed substance:** PROD project was pre-provisioned on 2026-05-15 (per `__drizzle_migrations.created_at`); steps 1-3 below execute as URL-capture + PITR/backup verification rather than net-new provisioning. PITR add-on (~$100/mo separate billing) deferred to HARDEN per operator decision; daily backups confirmed active (snapshot from 2026-05-16 23:30 UTC already exists). Step 4 captures interim diagnostics: region resolved as `ap-northeast-1` (Tokyo); INTERIM URL captured per amended step 4b. **Mid-session security incident:** both URLs subsequently leaked into Claude Code chat at A4 q0 protocol; both passwords rotated immediately; re-capture via `read -rs` discipline completed before resuming A4.
 **Substance.** Hrishikesh in Supabase dashboard:
 1. **Create new project**
    - Project name: zugzwang-experiment-prod (mirrors Upstash project name for cross-vendor consistency)
@@ -168,7 +244,8 @@ Per kickoff: "After plan-review approval, execute one sub-part per reply, wait f
 **Touch surface.** None (operator dashboard work). No commit.
 **Refusal trigger check.** No "Dharma transfer", no "send Dharma" endpoint involved. PASS.
 
-### A3 — Apply schema migrations to new project
+### A3 — Apply (or verify already-applied) schema migrations to PROD project
+**Status.** ✓ COMPLETED 2026-05-17. Drizzle-kit reported `[✓] migrations applied successfully!`. **Outcome detail per A4 q0:** the apply was an idempotent no-op — the journal cursor was already at 0005 from the 2026-05-15 13:20:44 UTC pre-session apply. No new rows in `__drizzle_migrations` from this session. drizzle-kit's "applied successfully" message covers both fresh-apply and journal-already-current cases; A4 q0 distinguishes them via `last_applied_utc`.
 **Substance.** From the Phase 2 execute terminal:
 ```bash
 # One-shot env override (does NOT write to .env.local — per CLAUDE.md "Never read or write .env* files")
@@ -181,13 +258,18 @@ DATABASE_URL='postgres://postgres.<PROJECT-REF>:<PASSWORD>@aws-0-ap-south-1.pool
 **Touch surface.** None in the repo. Postgres-side DDL applied.
 **Refusal trigger check.** `pnpm drizzle-kit push` is forbidden per AGENTS.md §11 against staging/prod; `pnpm drizzle-kit migrate` (used here) is the safe append-only command. PASS.
 
-### A4 — Schema-parity verification — run §6 SQL suite
-**Substance.** Run the ten-query SQL suite from §6 against both endpoints (new Pro project + interim project) and `diff` outputs. Output captured to a session-local scratch file (NOT committed). Each query's results MUST match line-for-line OR have an explainable interim-only state (e.g., interim's `identity_pool.assigned_at` is non-NULL for dev-seed-consumed rows; new project's identity_pool is empty).
-**Acceptance.** All ten queries pass per §6 "Pass criterion" column. Drift = FAIL, fix-in-session.
-**Output.** Parity-verification artifact (paste into close-out log §"Decisions made"); zero drift confirmed.
+### A4 — Schema-correctness verification — run §6 SQL suite against PROD-only
+**Status.** ⏳ q0 cursor verification ran 2026-05-17 (PROD at cursor 0005 confirmed via `total=6, last_id=6, last_hash=0e9e617f...242edf4e`; interim schemaless surfaced as plan-invalidating finding per §0 finding 2). Full §6 schema-correctness suite (PROD-only against canonical) is independent of Vercel state and can technically proceed; further plan amendments past A4 HOLD pending the Vercel ground-truth check per §0 finding 3 retraction.
+**Substance (amended per §0).** Run the §6 SQL suite against PROD only; validate outputs against canonical migration files (`drizzle/migrations/0000-0005.sql`) and SPEC.2 §5 inventory. Interim parity is structurally invalid (interim schemaless per §0 finding 2); the original "diff PROD vs interim" target is replaced with "verify PROD matches canonical schema-of-record."
+
+The §6 queries return concrete counts and shapes — 21 base tables + 13 events partitions + drizzle migrations table; 26 trigger declarations; 7 functions (uuidv7 + 6 enforcers); 9 enums; 1 `system_state` row with `frozen_at IS NULL`; 3 distinct `uuidv7()` outputs. The pass criterion is: PROD's query outputs match SPEC.2 §5 + migration-file canonical expectations within the explanatory bounds noted in §6.
+
+**Acceptance.** Every §6 query's PROD output matches canonical expectations OR has an explainable variance (e.g., `__drizzle_migrations` schema location — `drizzle` vs `public`). Variances surface as SURPRISE per CLAUDE.md §5.10 and land in §14 close-out log.
+**Output.** Schema-correctness verification artifact (paste into close-out log §"Decisions made"); PROD confirmed at SPEC.2 §5 inventory.
 **Touch surface.** None in repo.
 
 ### A5 — Reviewer call: `db-migration-reviewer`
+**Status.** ⏳ PENDING. Scope reframed per §0 second counter-amendment: **retroactive state review, not procedural gate** — A6/A7 already complete via dashboard (§0 finding 4 procedural divergence); A11 satisfied incidentally (§0 finding 6); A10 PARTIAL first-smoke confirms PROD-wired. Reviewer's job: verify PROD schema at cursor 0005 matches SPEC.2 §5 inventory + canonical migration files, and flag whether the standing state (cursor 0005 + Sensitive Vercel env wired to PROD + 16 May scheduled backup as rollback anchor + 415 downstream bug noted) is reviewer-PASS for proceeding to A12 self-audit.
 **Substance.** Fresh-context `general-purpose` Agent invocation per CLAUDE.md §5.11 with role briefing baked into prompt. Prompt template:
 
 > Load `.claude/agents/db-migration-reviewer.md` and follow it verbatim.
@@ -205,7 +287,8 @@ DATABASE_URL='postgres://postgres.<PROJECT-REF>:<PASSWORD>@aws-0-ap-south-1.pool
 
 **Output.** Reviewer report; expected GREEN. Any FAIL fixes in-session before A6. Any SURPRISE writes to `claude-progress.md` and STOPS per CLAUDE.md §5.11.
 
-### A6 — Operator: Vercel env swap — Production (CLI)
+### A6 — Operator: Vercel env wire — Production
+**Status.** ✓ COMPLETED out-of-sequence 2026-05-17 via **Vercel web dashboard** (not CLI). Per §0 finding 4 procedural divergence: operator applied PROD Session pooler URL via dashboard before A4 close + A5 reviewer call + A11 anchor. Scope = Production + Preview (single grouped Vercel entry); Sensitive flag on; auto-redeployed to build `3QvGjQ32M` from commit `82bee48`. The original CLI-based procedure below stands as reference but was not executed; the belt-and-suspenders `vercel env ls` backup file was not created (dashboard procedure doesn't surface prior value via CLI; Sensitive flag prevents post-set read anyway per §0 finding 3 root cause). Retroactive `vercel env ls production` capture available pending operator (for §14 close-out audit trail; will return Sensitive-redacted but at least confirm key present + scope).
 **Substance.** Per SCAFFOLD.3 MAINT-10 — Vercel CLI works non-interactively for SINGLE-environment scope (production OR per-preview-branch); the all-preview-branches scope is the broken path. Production is single-environment, so CLI is clean:
 ```bash
 # Belt-and-suspenders: capture current Production value before removing
@@ -225,7 +308,8 @@ printf 'postgres://postgres.<PROJECT-REF>:<PASSWORD>@aws-0-ap-south-1.pooler.sup
 ```
 **Output.** Production env carries new URL. NOTE: Vercel does NOT auto-redeploy on env change; A8 commit triggers the redeploy.
 
-### A7 — Operator: Vercel env swap — Preview (DASHBOARD; CLI papercut workaround)
+### A7 — Operator: Vercel env wire — Preview
+**Status.** ✓ COMPLETED in same A6 dashboard action. Per finding made at A4 q0 protocol: Vercel groups Production + Preview on a single grouped entry for `DATABASE_URL` (Sensitive flag on); the A6 dashboard set covered both scopes simultaneously. No separate Preview dashboard action required. Original prescribed procedure below (separate Preview dashboard edit) stands as reference but was unnecessary given the single-entry grouping.
 **Substance.** Per SCAFFOLD.3 MAINT-10 — CLI rejects `--yes` non-interactive add for the all-preview-branches scope (`{"status":"action_required","reason":"git_branch_required"}`). Dashboard side-wires:
 1. `https://vercel.com/<team>/<project>/settings/environment-variables`
 2. Locate `DATABASE_URL` row scoped `Preview` (all branches)
@@ -233,22 +317,33 @@ printf 'postgres://postgres.<PROJECT-REF>:<PASSWORD>@aws-0-ap-south-1.pooler.sup
 **Output.** Preview env carries new URL. Same no-auto-redeploy caveat as A6.
 
 ### A8 — Reviewer call: `security-auditor`
+**Status.** ⏳ PENDING. Scope expanded per §0 second counter-amendment to include four review surfaces (was: secrets-handling during swap only):
+1. **Original** — `DATABASE_URL` swap procedure leak surfaces (§5 A6 + A7); INV-1/INV-2/INV-3/INV-4 preservation
+2. **NEW — credential-leak incident audit** (load-bearing): PROD + INTERIM URLs leaked into Claude Code chat at A4 q0 protocol; both passwords rotated mid-session; re-capture via `read -rs` discipline. Audit: residual exposure in chat transcripts, conversation logs, ScheduleWakeup contexts, etc.; sufficiency of rotation; future hardening
+3. **NEW — post-cutover env hygiene**: Sensitive flag confirmed on; scope grouping (Production + Preview single entry) reviewed; A6/A7 unifying surface verified
+4. **NEW — procedural-divergence review** (§0 finding 4): A6/A7 happened out-of-sequence via dashboard before A4 close + A5 reviewer call + A11 anchor. State landed correct, procedure broke. Audit: is the resulting state reviewable? what hardening prevents future divergence?
+
+Rollback procedure note for the auditor: §8 reframed to scheduled-backup-by-coincidence (per §0 finding 6) — recovery anchor is 2026-05-16 23:30 UTC daily backup; PITR + on-demand snapshots are HARDEN-scoped.
+
 **Substance.** Fresh-context `general-purpose` Agent invocation per CLAUDE.md §5.11 with role briefing baked into prompt. Prompt template:
 
 > Load `.claude/agents/security-auditor.md` and follow it verbatim.
 > Plan path: `@docs/plans/SCAFFOLD.13-A.md`.
 > Tool scope: Read, Grep, Glob, Bash — do NOT Edit or Write.
-> Scope: review the cutover procedure for secrets-handling exposure and structural-separation invariants. Specifically:
-> - `DATABASE_URL` swap procedure (§5 A6 + A7) — does the procedure expose the new password in shell history, logs, or chat? Identify any leak path.
-> - Rollback procedure (§8) — is the rollback window adequate (target: <5 min)? Does it preserve the four invariants (CLAUDE.md §2) during the rollback?
-> - 24h grace period adequacy — is 24h enough to detect a regression, or should the grace extend?
-> - Interim project deletion — does any non-Hrishikesh actor retain credentials? Audit + flag.
-> - INV-1 / INV-2 / INV-3 / INV-4 — verify the substrate swap does not enable a path where atomicity, append-only, or side-binding is bypassed during the cutover window.
+> Scope: per A8 Status amendment above (four surfaces: original swap leak + NEW credential-leak incident + NEW env hygiene + NEW procedural-divergence). Specifically:
+> - `DATABASE_URL` set procedure (§5 A6 + A7 amended Status) — does the dashboard procedure expose the password? Identify any residual leak path.
+> - Credential-leak incident audit — see §0 finding 3 retraction + A4 q0 timeline; verify rotation sufficiency + flag any residual conversation-log exposure
+> - Recovery procedure (§8 reframed per §0 finding 6) — is the scheduled-backup-by-coincidence anchor adequate pre-launch? Identify gaps
+> - 24h grace period adequacy — is 24h enough to detect a regression?
+> - Interim project deletion — does any non-Hrishikesh actor retain credentials? Both URLs were leaked and rotated; verify
+> - INV-1 / INV-2 / INV-3 / INV-4 — verify the substrate setup does not enable a path where atomicity, append-only, or side-binding is bypassed
+> - Procedural-divergence review (§0 finding 4) — is the resulting state reviewable? What hardening prevents future operator-dashboard work running ahead of Claude Code-orchestrated sequence?
 > Return findings ranked by exploitability with concrete attack scenarios.
 
-**Output.** Reviewer report; expected GREEN. CRITICAL/HIGH findings fix in-session.
+**Output.** Reviewer report; expected GREEN with conditional findings on credential-leak rotation sufficiency. CRITICAL/HIGH findings fix in-session.
 
 ### A9 — Trigger Preview redeploy
+**Status.** ✓ IMPLICIT. Vercel auto-redeployed at A6/A7 dashboard env-var set; new build = `3QvGjQ32M` from commit `82bee48`. Doc-only commit procedure below stands as reference but is redundant given the dashboard-induced redeploy. Operator may still push a `.env.example` drift-fix commit at A9's original step (covers the §2.1 housekeeping row); that commit triggers another Preview build, this time as a no-op env-wise.
 **Substance.** Push a doc-only commit on `feat/scaffold-13-a`:
 ```bash
 # .env.example drift fix (per §2.1 line "stale Doppler / SCAFFOLD.13 notes") is the natural carrier
@@ -258,21 +353,35 @@ git push origin feat/scaffold-13-a
 ```
 **Output.** Vercel auto-deploys Preview against new Supabase Pro URL. Watch Vercel dashboard for build status; expected: "Collecting page data using 1 worker" passes without the `Error: DATABASE_URL is not set` failure observed at SCAFFOLD.3 build time.
 
-### A10 — Smoke tests against Preview deploy (operator-driven, live Internet)
-**Substance.** Per §7 endpoint list — operator visits Preview URL and exercises:
+### A10 — First-smoke tests against Production deploy (operator-driven, live Internet)
+**Status.** ✓ PARTIAL. Live first-smoke executed 2026-05-17 in browser against `https://experiment-zugzwang-worlds-projects.vercel.app`:
+- ✓ Step 1 (sign-in page render): renders cleanly, HTTP 200
+- ✗ Step 3 (Email-OTP POST to `/api/auth/email-otp/send-verification-otp`): returned HTTP 415 with Better Auth domain error (`Content-Type "application/x-www-form-urlencoded" is not allowed. Allowed types: application/json`)
+- Steps 2/4 (admin login flow, full OTP verify) blocked by downstream Better Auth content-type bug (§0 finding 5; separate tracker entry post-merge)
+
+**Interpretation:** The 415 is end-to-end runtime evidence that `DATABASE_URL` is correctly wired (request reached Better Auth past the auth-handler boundary; rejected at Content-Type validation). A 500 with Postgres/connection error would have indicated a wiring failure. Stronger signal than build-log inspection (per §0 finding 3 resolution). Rollback NOT triggered — 415 is a downstream domain bug, not a connection failure.
+
+**Substance.** Per §7 endpoint list — operator visits Preview/Production URL and exercises:
 1. Landing page renders without 500
 2. `/(auth)/sign-in` page renders (server-rendered; no DB module-load error)
 3. Email-OTP flow submission — type a test email + valid Turnstile token → verify Resend OTP arrives → verify `verifications` table row exists in new Pro project (via `supabase studio` SQL editor)
 4. Admin login at `/(admin)/admin/login` — submit `ADMIN_PASSWORD` → verify redirect to `/admin` works → verify `admin_sessions` table has a row in new Pro project
-**Acceptance.** All four checks pass. If any fails: rollback procedure §8 fires immediately; investigate offline.
-**Output.** Smoke-pass timestamp captured for close-out log + 24h grace clock start.
+**Acceptance.** All four checks pass OR (per §0 finding 5) Step 3+4 blocked by downstream bug + Step 1+2 pass + 415 surfaces the bug as the load-bearing wiring-confirmation. Rollback only on connection-failure shape (5xx with Postgres error), not on 4xx domain errors.
+**Output.** Smoke-pass timestamp 2026-05-17 captured; first-traffic clock starts; downstream bug minted as separate tracker entry per A15.
 
-### A11 — Operator: backup configuration verification (DASHBOARD)
-**Substance.** Hrishikesh in Supabase dashboard:
-1. `Settings` → `Database` → `Backups` → trigger on-demand snapshot via `Reports` → `Backups` (Pro tier feature). Verifies the backup mechanism works at cutover time — does NOT wait for the +24h first-daily-snapshot window. Capture snapshot completion timestamp.
-2. `Settings` → `Database` → `Backups` → confirm daily-snapshot schedule is enabled (the +24h first-snapshot is a soft confirmation post-PR; A15 tracker-row covers verification).
-3. `Settings` → `Database` → `Point in Time Recovery` → confirm 7-day window is visible (Pro tier default).
-**Output.** On-demand snapshot completion timestamp + daily-schedule status + PITR window confirmed; pasted into close-out log §"Decisions made".
+### A11 — Rollback anchor verification (no operator action required per §0 finding 6)
+**Status.** ✓ SATISFIED INCIDENTALLY. Original A11 prescribed on-demand snapshot trigger via Supabase dashboard `Reports` → `Backups`. **Procedure infeasible:** on-demand snapshots require the PITR add-on (~$100/mo), explicitly deferred to HARDEN per A2 operator decision. The prescribed A11 procedure could not run.
+
+**Functional substitution:** the 2026-05-16 23:30:19 UTC scheduled daily backup (Pro tier default, included; predates A6/A7) captures the post-migration / pre-traffic state (6 migrations applied, zero application rows). This is the de facto rollback anchor. **No operator action in Supabase needed.**
+
+**Substance (retained as historical reference; not for execution).** Original Part-4-amended A11:
+1. ~~`Settings` → `Database` → `Backups` → trigger on-demand snapshot via `Reports` → `Backups` (Pro tier feature). Verifies the backup mechanism works at cutover time.~~ INFEASIBLE — requires PITR add-on, deferred to HARDEN.
+2. ~~`Settings` → `Database` → `Backups` → confirm daily-snapshot schedule is enabled.~~ ✓ Confirmed at A2; 2026-05-16 23:30:19 UTC backup exists.
+3. ~~`Settings` → `Database` → `Point in Time Recovery` → confirm 7-day window is visible.~~ INFEASIBLE — PITR add-on not active.
+
+**Output.** 2026-05-16 23:30:19 UTC scheduled-backup timestamp documented as rollback anchor in close-out log §"Decisions made" + §14 SURPRISE entry 6 (procedure-infeasibility-substituted-by-scheduled-backup).
+**Touch surface.** None.
+**Maintenance flag.** Plan-review templates should verify dashboard procedures are available on the chosen plan tier before prescribing them. Capture for `docs/maintenance.md`.
 
 ### A12 — Pre-PR self-audit (CLAUDE.md §5.10)
 **Substance.** Walk every kickoff exit criterion line, mark PASS / FAIL / SURPRISE with `file:line` or evidence reference. Format per §11 below. FAIL items fix in-session before A14. SURPRISE items per §5.10 (audit catches what plan missed) write into close-out log §"Surprises caught + fixed in-session" with full chain.
@@ -297,11 +406,11 @@ git push origin feat/scaffold-13-a
 
 ---
 
-## §6 Schema-parity verification SQL suite
+## §6 Schema-correctness verification SQL suite (reframed per §0 finding 2)
 
-Ten queries cross-walk the new Pro project's schema against the canonical migration set + the interim project. Run via `psql` direct connection to each project, capture output to scratch files, `diff` line-for-line. Discrepancies that aren't explainable by interim-dev-fixture state = FAIL.
+Ten queries verify PROD's schema matches the canonical migration set. **Original framing was parity-vs-interim; reframed to PROD-only against canonical per §0 finding 2 (interim is schemaless — parity diff is structurally invalid).** Run via `psql` direct connection to PROD, capture output to scratch files, compare against canonical expectations from `drizzle/migrations/0000-0005.sql` + SPEC.2 §5 inventory.
 
-Run on both endpoints unless noted otherwise. The interim endpoint is the live-reference comparison; the new endpoint is the validate target.
+Run on PROD endpoint only. The validate target is "PROD matches canonical" — variance from expected counts/shapes is FAIL (or SURPRISE if explainable by drizzle-kit version specifics — e.g., `__drizzle_migrations` schema location is `drizzle.` not `public.`).
 
 | # | Query | Pass criterion |
 |---|---|---|
@@ -316,9 +425,9 @@ Run on both endpoints unless noted otherwise. The interim endpoint is the live-r
 | 9 | **system_state seed** — `SELECT id, frozen_at IS NULL AS frozen_at_is_null FROM system_state;` | **1 row**: `('system', true)` — singleton per `0004_seed_system_state.sql`; frozen_at NULL until 2026-11-05 23:59 UTC conclusion freeze per SPEC.2 §20.2. |
 | 10 | **uuidv7() function smoke** — `SELECT uuidv7();` then `SELECT uuidv7();` then `SELECT uuidv7();` (three times in sequence) | Returns three distinct UUIDs. Per ADR-0016 §1 + `0000_uuidv7_function.sql` lines 11-14: `LANGUAGE sql VOLATILE` + `clock_timestamp()` not `now()` — back-to-back calls inside one transaction MUST return monotonically-increasing UUIDs (millisecond prefix advances per `clock_timestamp()`). If returns identical UUIDs, the function definition is wrong. |
 
-**Capture format.** For each query, run on both endpoints, save to `/tmp/scaffold-13a-q<N>-new.txt` and `/tmp/scaffold-13a-q<N>-interim.txt`. Run `diff -u` and inspect. Discrepancies that aren't dev-fixture state (e.g., consumed identity_pool rows, Better Auth seed users) are FAIL.
+**Capture format (reframed per §0 finding 2).** For each query, run against PROD, save to `/tmp/scaffold-13a-q<N>-prod.txt`. Compare row counts + content shapes against the canonical expectations in the "Pass criterion" column. **No interim diff — interim is schemaless.** Variances surface as SURPRISE per CLAUDE.md §5.10.
 
-**Higher-level alternative** (faster, lossier): `pg_dump --schema-only --no-owner --no-privileges <NEW>` vs `pg_dump --schema-only --no-owner --no-privileges <INTERIM>` and `diff -u`. Captures everything in queries 1-9 plus default privileges + RLS policies (currently none) in one shot. Run this AS WELL as the targeted queries — targeted queries give precise counts; pg_dump diff catches surprises the targeted queries miss.
+**Higher-level alternative** (faster, lossier): `pg_dump --schema-only --no-owner --no-privileges <PROD>` produces a deterministic schema dump that can be eyeballed against the migration files (`cat drizzle/migrations/0000*.sql drizzle/migrations/0001*.sql ...`). Catches surprises the targeted queries miss (default privileges, RLS policies — currently none — comment text, etc.).
 
 ---
 
@@ -326,53 +435,57 @@ Run on both endpoints unless noted otherwise. The interim endpoint is the live-r
 
 Per Open Question Q7 — `/api/health` does not exist (currently nothing in `src/app/api/` except `auth/[...all]/route.ts`). Smoke surface rides existing endpoints:
 
-| Step | Endpoint | What it confirms | Green criterion |
-|---|---|---|---|
-| 1 | Landing page (`/`) | Server renders without `Error: DATABASE_URL is not set` | HTTP 200, no module-load DB error in Vercel runtime logs |
-| 2 | `/(auth)/sign-in` | Sign-in page server-renders (DESIGN.* placeholder per SCAFFOLD.3 MAINT-9; doesn't yet make DB call at SSR time) | HTTP 200 |
-| 3 | `/(admin)/admin/login` GET | Admin login form server-renders | HTTP 200 |
-| 4 | Admin login Server Action (POST submit with correct `ADMIN_PASSWORD`) | Writes a row to `admin_sessions` table via SERIALIZABLE DELETE+INSERT per SPEC.2 §8.4 | Redirect to `/admin` + verify `SELECT COUNT(*) FROM admin_sessions;` returns 1 in new Pro project |
-| 5 | Better Auth Email-OTP request (`/api/auth/email-otp/send-verification-otp` POST with valid email + Turnstile token) | Cloudflare Turnstile validates + Resend invokes (out-of-process) + Better Auth writes a `verifications` row in DB | Resend email arrives at test inbox; `SELECT COUNT(*) FROM verifications;` returns 1 in new Pro project |
-| 6 | Better Auth Email-OTP verify (submit OTP from Resend email) | Better Auth reads `verifications`, validates code, runs `databaseHooks.user.create.before` (consumes `identity_pool`), writes `users` row | New row in `users`; `assigned_at` set on first available `identity_pool` row |
+| Step | Endpoint | What it confirms | Green criterion | A10 result (2026-05-17) |
+|---|---|---|---|---|
+| 1 | Landing page (`/`) | Server renders without `Error: DATABASE_URL is not set` | HTTP 200, no module-load DB error in Vercel runtime logs | not exercised in A10 (operator went directly to sign-in) |
+| 2 | `/(auth)/sign-in` | Sign-in page server-renders (DESIGN.* placeholder per SCAFFOLD.3 MAINT-9; doesn't yet make DB call at SSR time) | HTTP 200 | **✓ PASS** — renders cleanly |
+| 3 | `/(admin)/admin/login` GET | Admin login form server-renders | HTTP 200 | not exercised in A10 |
+| 4 | Admin login Server Action (POST submit with correct `ADMIN_PASSWORD`) | Writes a row to `admin_sessions` table via SERIALIZABLE DELETE+INSERT per SPEC.2 §8.4 | Redirect to `/admin` + verify `SELECT COUNT(*) FROM admin_sessions;` returns 1 in PROD | blocked by §0 finding 5 |
+| 5 | Better Auth Email-OTP request (`/api/auth/email-otp/send-verification-otp` POST with valid email + Turnstile token) | Cloudflare Turnstile validates + Resend invokes (out-of-process) + Better Auth writes a `verifications` row in DB | Resend email arrives at test inbox; `SELECT COUNT(*) FROM verifications;` returns 1 in PROD | **✗ 415** — Better Auth Content-Type validation rejects urlencoded body (downstream bug per §0 finding 5); 415 itself is ground-truth evidence that DATABASE_URL is correctly wired (request reached Better Auth) |
+| 6 | Better Auth Email-OTP verify (submit OTP from Resend email) | Better Auth reads `verifications`, validates code, runs `databaseHooks.user.create.before` (consumes `identity_pool`), writes `users` row | New row in `users`; `assigned_at` set on first available `identity_pool` row | blocked by §0 finding 5 (step 5 prerequisite) |
 
-**Failure modes mapped to rollback:**
-- Step 1 fails with `DATABASE_URL is not set` → env not yet swapped or value wrong; check Vercel env settings.
-- Step 1 fails with `connection refused` / `ECONNREFUSED` → Session pooler URL has wrong port (must be 5432) OR project paused (Pro shouldn't pause, but verify status in Supabase dashboard).
-- Step 4 fails with `admin_login_invalid` → `ADMIN_PASSWORD` env mismatch (unrelated to cutover); not a rollback trigger.
-- Step 5 fails with timeout → Cloudflare Turnstile network issue OR Resend outage — verify against status pages before rolling back.
-- Step 6 fails on identity_pool consumption → `identity_pool` not seeded in new project. Run `pnpm seed:identity-pool:dev` against the new DATABASE_URL (per SCAFFOLD.3 dev-seed script).
+**Failure modes mapped to recovery (reframed per §0 finding 6):**
+- Step 1 fails with `DATABASE_URL is not set` → Vercel env not set or value wrong; verify in Vercel dashboard (Sensitive value can't be inspected, but Vercel dashboard surfaces whether the key exists)
+- Step 1 fails with `connection refused` / `ECONNREFUSED` → Session pooler URL has wrong port (must be 5432) OR PROD project paused (Pro shouldn't pause). Restore from 2026-05-16 23:30 scheduled backup if data corrupted; otherwise re-set env-var
+- Step 4 fails with `admin_login_invalid` → `ADMIN_PASSWORD` env mismatch (unrelated to cutover); not a recovery trigger
+- Step 5 returns **HTTP 415 (per A10 PARTIAL)** → downstream Better Auth Content-Type bug (separate tracker entry per §0 finding 5). NOT a recovery trigger — DB reachability confirmed by the 415 itself (request landed at Better Auth past handler boundary)
+- Step 5 fails with timeout → Cloudflare Turnstile network issue OR Resend outage — verify against status pages before recovery
+- Step 6 fails on identity_pool consumption → `identity_pool` not seeded in PROD. Run `pnpm seed:identity-pool:dev` against PROD (per SCAFFOLD.3 dev-seed script)
 
 ---
 
-## §8 Cutover rollback procedure
+## §8 Recovery procedure (reframed per §0 findings 2 + 6)
 
-**Target rollback window:** <5 minutes from smoke-fail decision to interim URL serving traffic.
+**Original framing was "rollback to interim DATABASE_URL".** Reality (§0 finding 2): interim is schemaless — there is nothing to roll back to. **Reframed: recovery via 2026-05-16 23:30 UTC scheduled daily backup of PROD** (de facto rollback anchor per §0 finding 6; on-demand snapshot + PITR both HARDEN-scoped).
 
-**Trigger.** Any smoke step 1-6 fails AND the failure is deterministically attributable to the new Pro project (NOT to upstream vendor outage — Turnstile / Resend / Vercel control plane).
+**Pre-A10 state:** Vercel `DATABASE_URL` was unset/empty; no recovery needed (no traffic).
 
-**Rollback sequence:**
+**Post-A6/A7 state (current):** Vercel `DATABASE_URL` wired to PROD; A10 PARTIAL first-smoke landed (sign-in render + 415 OTP-POST). PROD's data tables remain empty (415 short-circuited before any DB write). Recovery if needed:
 
-1. **Re-swap Production DATABASE_URL** (CLI; operator-driven from terminal):
-   ```bash
-   vercel env rm DATABASE_URL production --yes
-   printf '<INTERIM-DATABASE-URL>' | vercel env add DATABASE_URL production
-   ```
-   The interim DATABASE_URL is captured to operator-side password manager at A2 step 4b (primary) AND to `/tmp/scaffold-13a-prod-database-url.bak.txt` at A6 (secondary). Either source is sufficient for rollback; use 4b first.
+### Recovery substrates (in order of preference)
 
-2. **Re-swap Preview DATABASE_URL** (dashboard; CLI papercut):
-   - `https://vercel.com/<team>/<project>/settings/environment-variables` → DATABASE_URL Preview → `Edit` → paste interim URL → `Save`
+1. **Most-recent scheduled daily backup restore** — Supabase dashboard → Settings → Database → Backups → select 2026-05-16 23:30:19 UTC backup (or later daily) → Restore. Restores PROD to post-migration / pre-traffic state. **RTO ~5-15 min.** Pre-launch acceptable; max 24h data loss between backups (negligible pre-launch — no real user data yet).
+2. **Re-migrate from scratch** — drop public schema, re-run `pnpm drizzle-kit migrate` against PROD. **RTO ~2 min.** Last resort; loses any legitimate data writes between last backup and now (none expected pre-launch).
+3. **PITR restore + on-demand snapshot recovery** — **not available** until HARDEN PITR add-on lands. **On Supabase Pro, PITR and on-demand snapshots are coupled into a single procurement** (on-demand snapshots require the PITR add-on; both together cost ~$100/mo as one decision per §0 finding 6). HARDEN scoping addresses both simultaneously. Out of scope for SCAFFOLD.13-A.
 
-3. **Re-deploy** to pick up reverted env:
-   - `vercel redeploy <preview-deploy-url>` for Preview (uses last commit's build with new env)
-   - For Production: `git revert` the doc-only commit from A9 + push → triggers Vercel auto-deploy
+### No interim fallback
 
-4. **Verify rollback** — re-run §7 smoke steps 1-6 against the re-deployed Preview + Production. All should pass against interim (since interim was green for SCAFFOLD.3 + SCAFFOLD.4).
+The original plan §8's "re-swap to interim URL" is invalid (interim is schemaless per §0 finding 2; re-swapping to it would make every server action fail with relation-does-not-exist errors). The 24h grace on interim deletion (per A15) is a soft window for unrelated regression discovery, not an operational rollback target.
 
-5. **Operator post-rollback** — open `docs/logs/SCAFFOLD.13-A.md` rollback section + capture failure mode for re-attempt diagnosis.
+### When recovery fires
 
-**Within how many minutes.** Steps 1+2 take <2 minutes via dashboard. Step 3 redeploy is ~60-90 seconds. Step 4 verification is ~2 minutes manual. **Total target: <5 minutes per kickoff Risk register.**
+- DATABASE_URL set to wrong value (typo, wrong project ref) → re-run A6/A7 with correct value. No data recovery needed.
+- A10 step 5/6 fail with HTTP 5xx + Postgres/connection error → DB unreachable. Verify Supabase project status; if PROD compromised, restore from scheduled backup
+- A10 step 5/6 surface data-corruption (e.g., constraint violations from app bugs) → restore from scheduled backup, fix app bug separately, redeploy
+- **A10 415 result is NOT a recovery trigger** — domain-level Better Auth bug, not a wiring or data issue
 
-**No data loss.** Pre-launch state — interim still carries dev fixtures from SCAFFOLD.3 era; rollback is non-destructive.
+### Target recovery window
+
+**<15 minutes** (dashboard backup restore + redeploy + smoke re-verify). Acceptable pre-launch posture.
+
+### Operator post-recovery
+
+Open `docs/logs/SCAFFOLD.13-A.md` recovery section + capture failure mode for re-attempt diagnosis. Mint a tracker entry if root cause warrants a follow-up.
 
 ---
 
@@ -382,18 +495,18 @@ Per Open Question Q7 — `/api/health` does not exist (currently nothing in `src
 |---|---|---|---|
 | R1 | **Connection pooling — Session vs Transaction** — Drizzle uses prepared statements. Transaction pooler (port 6543) drops prepared statement state between transactions, breaking Drizzle. Session pooler (port 5432) preserves session state — correct choice. | Medium (operator might copy wrong URL) | A2 step 3 explicitly verifies port is 5432; A5 db-migration-reviewer cross-checks |
 | R2 | **IPv4 vs IPv6 reachability** — Vercel runtime is IPv4-only on free + Pro tiers. Supabase Direct connection is IPv6-only. Session pooler routes via IPv4. Per SCAFFOLD.3 MAINT-10 (a). | Medium (default Supabase connection-string display sometimes shows Direct first) | A2 step 3 selects "Session pooler" tab explicitly — NOT "Direct connection" or "Transaction pooler" |
-| R3 | **Region mismatch latency during cutover window** | Low (cutover is atomic at env-swap; no traffic-straddle; pre-launch = no real users) | Risk is theoretical — no data migration over wire; new project is built from migrations applied via `pnpm drizzle-kit migrate`. Interim region noted at A2 step 4 for risk-register completeness only. |
+| R3 | **Region mismatch latency during cutover window** | Low → **RETROACTIVELY MOOT** (interim was never live per §0 finding 2 + A10 first-smoke 415 evidence; no traffic-straddle ever occurred) | A2 step 4a recorded interim region as `ap-northeast-1` (Tokyo). PROD is in `ap-south-1` (Mumbai). Region mismatch is irrelevant because interim never carried production traffic. |
 | R4 | **Migration apply ordering** — six migrations must apply in journal order; out-of-order = broken state | Low (drizzle-kit reads `_journal.json` and applies in order; manual operator intervention is the only way to break this) | A3 invokes `pnpm drizzle-kit migrate` (the safe append-only command, NOT `pnpm drizzle-kit push`); A5 db-migration-reviewer verifies all 6 migrations applied |
 | R5 | **Partition initial-month creation** — events_2026_05 must exist on day-of-cutover for current writes to route correctly (today is 2026-05-16; partition range FROM '2026-05-01' TO '2026-06-01' covers it) | Low | A4 query 8 verifies all 13 partitions exist with correct bounds |
 | R6 | **Append-only trigger preservation** — 26 triggers + 6 functions must apply via 0003 migration. A trigger that fails to install = INV-2 / INV-3 / INV-4 enforcement gap | Low (drizzle-kit migrate applies SQL atomically; partial install = error + rollback) | A4 query 5 + query 6 verify trigger + function counts match SPEC.2 §6.1 contract; A5 db-migration-reviewer cross-checks per-table |
 | R7 | **NUMERIC(38,18) precision parity** — Dharma + bet stake columns must preserve full 38-digit precision. Postgres NUMERIC is precise; both projects are PG 17. | Very Low | A4 query 2 confirms types match |
 | R8 | **`uuidv7()` function presence** — every PK depends on this user-space function | Low (0000 migration runs first per journal) | A4 query 6 + query 10 verify presence + functional behavior |
-| R9 | **CLI papercut for Preview env all-branches scope** | High (per SCAFFOLD.3 MAINT-10 evidence) | A7 prescribes dashboard workaround explicitly |
-| R10 | **Trigger redeploy** — Vercel does NOT auto-redeploy on env change | High (default Vercel behavior) | A9 pushes a doc-only commit on `feat/scaffold-13-a` to trigger Preview auto-deploy. Merge to main triggers Production. |
-| R11 | **Secret exposure during swap** — `--value <secret>` flag risks shell-history leak | Medium | A6 uses `printf '...' \| vercel env add` via stdin pattern to keep secret out of shell history. Operator follows same pattern at A7 (dashboard handles secret-display masking natively). |
-| R12 | **Interim auto-pause during cutover** — free-tier paused interim makes rollback impossible (cannot re-target a paused project without first unpausing) | Medium (7-day auto-pause clock from last interim activity) | Operator ensures interim is touched within 24h before A6 (e.g., visit Supabase dashboard) to keep its activity clock fresh; alternatively, capture interim URL + auth credentials to operator-side password manager in advance |
-| R13 | **24h grace period inadequate** — regression discovered >24h after cutover = interim already deleted, no fast rollback | Low (smoke tests are deterministic; regressions surface within minutes) | If A10 smoke passes, regressions in the 24h window have <24h to surface; if discovered post-deletion, restore from Pro project's PITR (the substitute durability mechanism) |
-| R14 | **Interim auto-pause during multi-session Phase 2 execution** — Phase 2 executes one sub-part per reply with operator-confirmation gates. Sub-parts may straddle multiple sessions over hours or days. Interim's 7-day auto-pause clock advances independently. If interim pauses between A2 and A10, three operations break: A4 parity diff (needs interim queryable), A6 belt-and-suspenders sanity ping (needs interim reachable), §8 rollback (needs interim unpaused). | Medium (depends on Phase 2 calendar) | Operator touches interim Supabase dashboard at the START of each Phase 2 session — visit dashboard URL, confirm project is not paused, refresh activity clock. Ritual continues until A10 smoke-passes (after which interim is no longer load-bearing and the 24h grace clock takes over). |
+| R9 | **CLI papercut for Preview env all-branches scope** | High → **OBSOLETE** (Vercel `DATABASE_URL` is grouped as a single Production + Preview entry with Sensitive flag; A6 dashboard set covered both scopes simultaneously per A7 status — no separate Preview action needed) | Original mitigation (A7 dashboard workaround) not exercised because no separate Preview action was required |
+| R10 | **Trigger redeploy** — original framing: Vercel does NOT auto-redeploy on env change | High → **WRONG FRAMING** (Vercel DOES auto-redeploy on dashboard env-var set — empirically confirmed at A6/A7: build `3QvGjQ32M` from commit `82bee48` triggered on save) | A9 doc-only-commit was therefore redundant; original R10 framing was inverted. Reframe: "operator-applied dashboard env changes auto-trigger redeploy in Vercel; no separate trigger required." |
+| R11 | **Secret exposure during swap** — `--value <secret>` flag risks shell-history leak | Medium → **MATERIALIZED + MITIGATED** | Risk materialized in a different form at A4 q0 protocol: both PROD + INTERIM URLs leaked into Claude Code chat (not shell history). Mitigated by mid-session password rotation on both projects + re-capture via `read -rs`. A8 security-auditor scope expanded to include incident audit (per §5 A8 amended status). |
+| R12 | **Interim auto-pause during cutover** — free-tier paused interim makes rollback impossible | Medium → **MOOT** (interim was never the live substrate per §0 findings 2 + 3 + A10 415 evidence; auto-pause has no operational impact since no rollback target ever existed) | No mitigation required. Interim deletion 24h grace (per A15) is now a soft window for unrelated regression discovery, not a load-bearing rollback path. |
+| R13 | **24h grace period inadequate** — regression discovered >24h after cutover = interim already deleted, no fast rollback | Low → **PARTIALLY MOOT** (interim path is moot per R12; PITR substitution mentioned in original mitigation is HARDEN-scoped per §0 finding 6) | Reframed recovery is **scheduled-backup-based** per §8 (2026-05-16 23:30 UTC scheduled daily backup is the de facto rollback anchor; max 24h data loss between backups is acceptable pre-launch since no real user data exists yet). |
+| R14 | **Interim auto-pause during multi-session Phase 2 execution** — sub-parts straddle sessions; interim 7-day auto-pause clock advances independently | Medium → **MOOT** (interim was never load-bearing per §0 finding 2 + R12; A4 parity diff was structurally invalid regardless of pause status; A6 belt-and-suspenders sanity ping was reframed to dashboard procedure per A6 status) | Original mitigation ritual (operator touches interim dashboard at session start) was not needed; ritual logged in close-out for procedural-discipline reference only. |
 
 ---
 
@@ -407,10 +520,10 @@ Resolution paths annotated. Plan proceeds with the **proposed resolution**; web 
 | Q2 | Kickoff cites `SPEC.2 §8.* (DB architecture)`. §8 is Authentication & Sessions (§4.2). | Read SPEC.2 §5 + §6 + §7 in lieu. Document kickoff-text typo as MAINT-row in tracker v9 (operator surface; not this PR). |
 | Q3 | Kickoff cites `SPEC.5` for partitioning. No SPEC.5 doc exists (§4.3). | Treat as shorthand for `ADR-0005` ratification (which lives in SPEC.2 §22.1 ADR row) + the partition DDL at `drizzle/migrations/0002_events_partitioning.sql` + the partition contract at SPEC.2 §7.2. |
 | Q4 | Doppler integration scope — tracker-sweep-v9 log §"Path A — SCAFFOLD.13 kickoff first" includes "Doppler-wired staging + production DATABASE_URL". Kickoff for SCAFFOLD.13-A omits Doppler. | Defer Doppler integration to SCAFFOLD.13-B. SCAFFOLD.13-A uses direct Vercel env management. Stratum B scope per tracker-sweep-v9 covers full env audit across all four vendors (Supabase DATABASE_URL, Upstash, R2, Resend) PLUS Doppler-wiring — not Doppler-alone. The SCAFFOLD.13-B kickoff template must reflect this broader scope when written. |
-| Q5 | Interim Supabase project region. SCAFFOLD.3 MAINT-10 (a) does not record it. | A2 step 4 captures interim region for risk-register completeness. Plan does not block on resolution — A2 work proceeds with operator dashboard inspection. |
+| Q5 | Interim Supabase project region. SCAFFOLD.3 MAINT-10 (a) does not record it. | ✓ **RESOLVED 2026-05-17:** interim region is `ap-northeast-1` (Tokyo), revealed at A2 step 4a dashboard inspection + the URL pasted at A4 q0 protocol (`aws-1-ap-northeast-1.pooler.supabase.com:5432`). Combined with §0 finding 2 (interim is schemaless) + R3 retroactive moot, the region is now historical context only — interim is operationally irrelevant. |
 | Q6 | Kickoff exit criterion `pnpm test green` — script not defined (§4.4). | Interpret as `pnpm vitest run` returning SCAFFOLD.3 baseline (58 pass, 5 todo). The test suite is independent of the cutover (uses module-load shims, not cloud DB). |
 | Q7 | Smoke-test endpoint list — kickoff implies `/api/health` exists. It does not (only `/api/auth/[...all]/route.ts` in `src/app/api/`). | Use §7 ride-existing-endpoints approach (Better Auth + admin login + Email-OTP). Document `/api/health` as HARDEN.* deliverable. Note: §7 smoke coverage exercises auth-path code only; non-auth schema (markets, pools, bets, events partitions, etc.) is verified by §6 parity SQL suite at A4, NOT by A10 smoke. Pre-launch this is adequate — non-auth code is not yet wired. Post-launch, `/api/health` with non-auth probes is HARDEN.* scope. |
-| Q8 | `pg_dump` cron bridge retirement timing — tracker-sweep-v9 says "retire when SCAFFOLD.13 swaps to Pro with native PITR". After A10 smoke-pass or after A11 backup-verify? | After A10 smoke-pass — at the cutover-smoke-pass moment, native PITR is live (Pro tier default; A11 verifies the dashboard surface). A11's verification is a confirmation step, not a gate. |
+| Q8 | `pg_dump` cron bridge retirement timing — tracker-sweep-v9 says "retire when SCAFFOLD.13 swaps to Pro with native PITR". After A10 smoke-pass or after A11 backup-verify? | ✓ **RESOLVED 2026-05-17 (reframed):** Question presumed PITR would be active post-cutover. Per §0 finding 6, PITR is HARDEN-scoped (~$100/mo add-on deferred). The bridge was running against interim (which is schemaless per §0 finding 2 — bridge output was empty dumps anyway). **Bridge retirement is unrelated to PROD wiring; operator can retire at any convenient time post-PR-merge.** Recovery substrate for PROD is the 2026-05-16 23:30 UTC scheduled daily backup per §8, not PITR. |
 | Q9 | 24h interim deletion grace — kickoff prescribes 24h, not 7d. Confirm. | 24h matches kickoff. Clock origin: A10 cutover-smoke-pass timestamp (operational-proof moment, not PR-merge). Guard: deletion proceeds only if PR has merged AND smoke-pass timestamp is >24h old. If PR still open at +24h, deletion waits. |
 | Q10 | Vercel Preview env all-branches scope — confirms ALL preview branches use the new URL (not just `feat/scaffold-13-a`)? | Yes — Preview scope in Vercel is "all preview branches" unless per-branch overrides exist. Per SCAFFOLD.3 history, no per-branch overrides are configured. A7 dashboard action sets the all-branches Preview value. |
 
@@ -422,27 +535,26 @@ Per kickoff: "Self-audit per §5.10 before `gh pr create`." Run at A12, after A1
 
 | Audit item | Source criterion | Verification method |
 |---|---|---|
-| Plan committed before code | CLAUDE.md §5.1 "Plan file must be committed before Phase 1 ends" | `git ls-files docs/plans/SCAFFOLD.13-A.md` returns path |
-| New Supabase Pro project in ap-south-1 | Kickoff exit-1 + SPEC.2 §22.1 ADR-0006 | A2 step 1 confirmed |
-| Session pooler port 5432 | Kickoff exit-1 + SCAFFOLD.3 MAINT-10 (a) | A2 step 3 confirmed |
-| Daily backups enabled | Kickoff exit-1 | A11 step 1 confirmed |
-| PITR available | Kickoff exit-1 | A11 step 2 confirmed |
-| All 6 drizzle migrations applied | Kickoff exit-2 | `pnpm drizzle-kit migrate` output at A3; SQL query against `__drizzle_migrations` table shows 6 entries |
-| Schema parity (zero drift) | Kickoff exit-3 | §6 queries 1-10 run at A4; diff empty per query; A5 db-migration-reviewer reports GREEN |
-| DATABASE_URL swapped Vercel Prod | Kickoff exit-4 | `vercel env ls production` shows new Pro project URL |
-| DATABASE_URL swapped Vercel Preview | Kickoff exit-4 | Vercel dashboard `Settings → Environment Variables` shows Preview scope = new URL |
-| pnpm tsc --noEmit exit 0 | Kickoff exit-5 | Run at A12; capture output |
-| pnpm biome check . zero fixes | Kickoff exit-6 | Run at A12; capture output |
-| pnpm vitest run green | Kickoff exit-7 (interpreted per Q6) | Run at A12; matches SCAFFOLD.3 baseline (58 pass, 5 todo) |
-| Vercel Production deploy green | Kickoff exit-8 | Vercel dashboard shows merge-to-main deploy succeeded |
-| Vercel Preview deploy green | Kickoff exit-8 | Vercel dashboard shows feat/scaffold-13-a Preview deploy succeeded |
-| Backup configuration verified | Kickoff exit-9 | On-demand snapshot completion timestamp captured at A11 step 1 (mandatory cutover-time verification per Part 4 amendment); PITR 7-day window confirmed at A11 step 3. Daily-snapshot schedule enabled (A11 step 2) is a soft confirmation — first scheduled snapshot lands +24h post-create, verified at A15 tracker-row. |
-| Interim deletion scheduled (24h grace) | Kickoff exit-10 | Tracker v9 MAINT-row added; operator calendar reminder set |
-| Close-out log written before PR | Kickoff exit-11 + CLAUDE.md §5.9 | `git log --oneline` shows log commit precedes `gh pr create` |
-| db-migration-reviewer invoked + GREEN | Kickoff §"Subagent invocations" | A5 output appended to close-out log §"Reviewer-call invocation summary" |
-| security-auditor invoked + GREEN | Kickoff §"Subagent invocations" | A8 output appended to close-out log §"Reviewer-call invocation summary" |
+| ✓ Plan committed before code | CLAUDE.md §5.1 | `git ls-files docs/plans/SCAFFOLD.13-A.md` returns path; A1 committed `912c3d3` 2026-05-16 |
+| ✓ Supabase Pro project in ap-south-1 (pre-existed) | Kickoff exit-1 + SPEC.2 §22.1 ADR-0006 | A2 confirmed: PROD = `zugzwang-experiment-prod`, pre-provisioned 2026-05-15 per §0 finding 1 |
+| ✓ Session pooler port 5432 | Kickoff exit-1 + SCAFFOLD.3 MAINT-10 (a) | A2 step 3 confirmed: URL ends in `:5432/postgres` |
+| ✓ Daily backups enabled | Kickoff exit-1 | A2 confirmed: scheduled daily backup active; 2026-05-16 23:30:19 UTC backup is the de facto rollback anchor per §0 finding 6 |
+| **PITR deferred to HARDEN per §0** | Kickoff exit-1 (amended) | A2 operator decision: PITR add-on (~$100/mo) skipped; A11 on-demand-snapshot procedure infeasible per §0 finding 6, substituted incidentally by scheduled backup |
+| ✓ All 6 drizzle migrations applied | Kickoff exit-2 | A4 q0 confirms PROD cursor at 0005 (`__drizzle_migrations.last_id=6, last_hash=0e9e617f...242edf4e`); A3 migrate was idempotent no-op per §0 finding 1 |
+| ⏳ Schema-correctness vs canonical (reframed per §0 finding 2) | Kickoff exit-3 (amended) | §6 queries 1-10 run against PROD-only at A4; validated against canonical migration files + SPEC.2 §5; A5 db-migration-reviewer reports PASS/FAIL/SURPRISE per query. **Parity-vs-interim is structurally invalid (interim schemaless).** |
+| ✓ `DATABASE_URL` set in Vercel (single grouped entry) | Kickoff exit-4 (amended) | A6/A7 ✓ completed out-of-sequence via dashboard (§0 finding 4); Sensitive flag on; scope Production + Preview single entry; auto-redeployed build `3QvGjQ32M` from commit `82bee48`. Stored value unreadable post-set; A10 415 evidence is the wiring confirmation |
+| ⏳ pnpm tsc --noEmit exit 0 | Kickoff exit-5 | Run at A12; capture output |
+| ⏳ pnpm biome check . zero fixes | Kickoff exit-6 | Run at A12; capture output |
+| ⏳ pnpm vitest run green | Kickoff exit-7 (interpreted per Q6) | Run at A12; matches SCAFFOLD.3 baseline (58 pass, 5 todo) |
+| ✓ Vercel Production deploy green | Kickoff exit-8 | Build `3QvGjQ32M` from commit `82bee48` deployed successfully; A10 first-smoke confirms HTTP 200 at `/sign-in` |
+| ✓ Vercel Preview deploy green | Kickoff exit-8 | Same build per single-entry env grouping (§0 finding 4); A10 first-smoke ran against Production URL |
+| ✓ Backup configuration verified | Kickoff exit-9 (reframed per §0 finding 6) | 2026-05-16 23:30:19 UTC scheduled daily backup confirmed in dashboard (post-migration, pre-traffic) = de facto rollback anchor; PITR + on-demand snapshots HARDEN-scoped |
+| ⏳ Interim deletion scheduled (24h grace) | Kickoff exit-10 | Tracker v9 MAINT-row added (per A15); operator calendar reminder set; interim is schemaless so grace is soft window |
+| ⏳ Close-out log written before PR | Kickoff exit-11 + CLAUDE.md §5.9 | `git log --oneline` shows log commit precedes `gh pr create`; includes 6 SURPRISE entries per §14 |
+| ⏳ db-migration-reviewer invoked (retroactive state review) | Kickoff §"Subagent invocations" | A5 output appended to close-out log §"Reviewer-call invocation summary"; scope reframed per A5 amended status |
+| ⏳ security-auditor invoked (expanded scope) | Kickoff §"Subagent invocations" | A8 output appended to close-out log §"Reviewer-call invocation summary"; scope expanded per A8 amended status (4 surfaces) |
 | code-reviewer NOT invoked | Kickoff §"Subagent invocations" | Absence-of-invocation is the audit item; confirmed by walking close-out log |
-| No `src/` changes | Kickoff scope-drift gate | `git diff main -- src/` returns empty |
+| No `src/` changes | Kickoff scope-drift gate | `git diff main -- src/` returns empty (downstream 415 bug per §0 finding 5 is separate tracker entry, not in this PR) |
 | No `drizzle/migrations/` changes | Kickoff scope-drift gate | `git diff main -- drizzle/migrations/` returns empty |
 | `.env.example` drift fix | §2.1 housekeeping | `git diff main -- .env.example` shows <2h drift fix |
 
@@ -452,12 +564,12 @@ Per kickoff: "Self-audit per §5.10 before `gh pr create`." Run at A12, after A1
 
 Per §5.11's invocation policy table:
 
-| Reviewer | Phase | When | Tool scope | Briefing | Plan path |
-|---|---|---|---|---|---|
-| `db-migration-reviewer` | A5 (post-A4 parity verification) | After §6 SQL suite captures parity artifact | Read, Grep, Glob, Bash (no Edit, no Write) | `.claude/agents/db-migration-reviewer.md` | `@docs/plans/SCAFFOLD.13-A.md` |
-| `security-auditor` | A8 (post-A6/A7 env swap) | After Production + Preview env-swap procedures completed | Read, Grep, Glob, Bash (no Edit, no Write) | `.claude/agents/security-auditor.md` | `@docs/plans/SCAFFOLD.13-A.md` |
-| `code-reviewer` | — | NOT invoked | — | — | — |
-| `test-writer` | — | NOT invoked (no new business-logic behavior) | — | — | — |
+| Reviewer | Phase | When | Tool scope | Briefing | Plan path | Scope (per §0 second counter-amendment) |
+|---|---|---|---|---|---|---|
+| `db-migration-reviewer` | A5 (retroactive state review per A5 amended status) | After §6 schema-correctness suite captures PROD-vs-canonical artifact | Read, Grep, Glob, Bash (no Edit, no Write) | `.claude/agents/db-migration-reviewer.md` | `@docs/plans/SCAFFOLD.13-A.md` | Verify PROD schema at cursor 0005 matches SPEC.2 §5 inventory + canonical migration files; flag whether standing state (cursor 0005 + Sensitive Vercel env wired to PROD + 16 May scheduled backup as rollback anchor + 415 downstream bug noted) is reviewer-PASS for proceeding to A12 |
+| `security-auditor` | A8 (post-cutover; A6/A7 already completed out-of-sequence per §0 finding 4) | After PROD wired + A10 first-smoke landed | Read, Grep, Glob, Bash (no Edit, no Write) | `.claude/agents/security-auditor.md` | `@docs/plans/SCAFFOLD.13-A.md` | Four surfaces per A8 amended status: (1) original swap leak surfaces; (2) NEW credential-leak incident audit (load-bearing); (3) NEW post-cutover env hygiene; (4) NEW procedural-divergence review |
+| `code-reviewer` | — | NOT invoked | — | — | — | No `src/server/` changes in this PR (downstream 415 bug per §0 finding 5 is a separate tracker entry) |
+| `test-writer` | — | NOT invoked (no new business-logic behavior) | — | — | — | — |
 
 Three required prompt elements per CLAUDE.md §5.11 enforced in A5 + A8 prompt templates above. FAIL findings within scope → fix in-session; SURPRISE findings outside scope → `claude-progress.md` + STOP.
 
@@ -465,25 +577,25 @@ Three required prompt elements per CLAUDE.md §5.11 enforced in A5 + A8 prompt t
 
 ## §13 Exit criterion (mirrors kickoff verbatim; PR opens only after all green)
 
-| # | Criterion | Audit reference |
-|---|---|---|
-| 1 | New Supabase Pro project provisioned (ap-south-1, Session pooler port 5432, daily backups enabled, PITR available) | §11 items 2-5 |
-| 2 | All drizzle migrations applied to new project | §11 item 6 |
-| 3 | Schema parity vs interim verified (zero drift on table list, column types, constraints, indexes, triggers, functions) | §11 item 7 + §6 |
-| 4 | DATABASE_URL swapped across Vercel Prod + Preview | §11 items 8-9 |
-| 5 | pnpm tsc --noEmit exit 0 | §11 item 10 |
-| 6 | pnpm biome check . zero fixes | §11 item 11 |
-| 7 | pnpm test green (interpreted: `pnpm vitest run` per Q6) | §11 item 12 |
-| 8 | Vercel Production + Preview deploys both green against new Supabase Pro | §11 items 13-14 |
-| 9 | Backup configuration verified (snapshot test + PITR window check) | §11 item 15 |
-| 10 | Interim project deletion scheduled (24h grace, not immediate) | §11 item 16 |
-| 11 | docs/logs/SCAFFOLD.13-A.md written before gh pr create | §11 item 17 |
+| # | Criterion | Audit reference | Status |
+|---|---|---|---|
+| 1 | Supabase Pro project provisioned (ap-south-1, Session pooler port 5432, daily backups enabled; **PITR deferred to HARDEN per §0**) | §11 items 2-5 | ✓ (project pre-existed 2026-05-15 per §0 finding 1; PITR amendment) |
+| 2 | All drizzle migrations applied to PROD | §11 item 6 | ✓ (cursor 0005 per A4 q0) |
+| 3 | Schema-correctness vs canonical verified (PROD-only against migration files + SPEC.2 §5; **parity-vs-interim invalid per §0 finding 2**) | §11 item 7 + §6 | ⏳ pending full §6 suite + A5 reviewer call |
+| 4 | DATABASE_URL set in Vercel (single grouped entry covers Production + Preview per A4 finding) | §11 item 8 | ✓ A6/A7 completed out-of-sequence per §0 finding 4 |
+| 5 | pnpm tsc --noEmit exit 0 | §11 item 10 | ⏳ pending A12 |
+| 6 | pnpm biome check . zero fixes | §11 item 11 | ⏳ pending A12 |
+| 7 | pnpm test green (interpreted: `pnpm vitest run` per Q6) | §11 item 12 | ⏳ pending A12 |
+| 8 | Vercel deploy green against PROD (build `3QvGjQ32M` from commit `82bee48`; A10 first-smoke landed) | §11 items 13-14 | ✓ confirmed by HTTP 200 on `/sign-in` + 415 on OTP POST (DB reachable per §0 finding 3 resolution) |
+| 9 | Backup configuration verified (2026-05-16 23:30 UTC scheduled backup as rollback anchor per §0 finding 6; on-demand snapshot + PITR HARDEN-scoped) | §11 item 15 | ✓ |
+| 10 | Interim project deletion scheduled (24h grace, not immediate; soft window per §10 Q9 amendment) | §11 item 16 | ⏳ pending A15 |
+| 11 | docs/logs/SCAFFOLD.13-A.md written before gh pr create (includes 6 SURPRISE entries per §14) | §11 item 17 | ⏳ pending A13 |
 
 ---
 
 ## §14 Close-out log shape preview (CLAUDE.md §5.9 — written at A13)
 
-Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a fast-fill template:
+Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a fast-fill template. Includes pre-drafted 6 SURPRISE entries per §0 second counter-amendment.
 
 ```markdown
 # SCAFFOLD.13-A — Postgres cutover to Supabase Pro
@@ -491,34 +603,47 @@ Six fields per CLAUDE.md §5.9; sections drafted in advance below so A13 has a f
 **Status:** Closed <YYYY-MM-DD>
 **Branch:** feat/scaffold-13-a (N commits; head <SHA>); pre-merge at log-write time
 **PR:** to fill on open
-**Predecessor:** tracker-sweep-v9 (`docs/logs/tracker-sweep-v9.md`, `main` at <merged-SHA>)
-**Unblocks:** SCAFFOLD.13-B (Doppler + Upstash/R2/Resend env audit); HARDEN.* connection-pool tuning; HARDEN.* backup-runbook + restore-drill
+**Predecessor:** tracker-sweep-v9 (`docs/logs/tracker-sweep-v9.md`, `main` at `82bee48`)
+**Unblocks:** SCAFFOLD.13-B (Doppler + Upstash/R2/Resend env audit); HARDEN.* connection-pool tuning; HARDEN.* PITR add-on + backup-runbook + restore-drill; SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5)
 
 ## What landed (§5.9 field 1)
-- New Supabase Pro project provisioned in ap-south-1 with Session pooler @ 5432, daily backups, PITR
-- 6 drizzle migrations applied to new project
-- DATABASE_URL swapped Vercel Production (CLI) + Preview (dashboard)
-- Vercel Preview + Production both green against new project
+- PROD Supabase Pro project (`zugzwang-experiment-prod`, ap-south-1, Session pooler @ 5432, daily backups) verified pre-existing (provisioned 2026-05-15 per §0 finding 1); PITR add-on deferred to HARDEN
+- 6 drizzle migrations confirmed applied to PROD via A4 q0 (cursor 0005, hash `0e9e617f...242edf4e`); A3 migrate was idempotent no-op
+- DATABASE_URL wired to PROD via Vercel web dashboard (operator-applied out-of-sequence per §0 finding 4); scope Production + Preview single grouped entry; Sensitive flag on
+- Auto-redeploy to build `3QvGjQ32M` from commit `82bee48`; A10 PARTIAL first-smoke landed (sign-in renders; OTP POST returned 415 → DB reachable, downstream bug per §0 finding 5)
+- A11 rollback anchor satisfied incidentally per §0 finding 6: 2026-05-16 23:30:19 UTC scheduled daily backup captures post-migration / pre-traffic state
 - .env.example drift fix (line 3 + SCAFFOLD.4-block comment)
-- Plan + log committed; interim deletion scheduled +24h
+- Plan + log committed; interim (Tokyo, schemaless) deletion scheduled +24h soft window
 
 ## Decisions made (§5.9 field 2)
-- Q1-Q10 resolutions (per plan §10)
-- Reviewer-call invocation summary (A5 db-migration-reviewer GREEN; A8 security-auditor GREEN)
-- Surprises caught + fixed in-session (CLAUDE.md §5.10 working-as-designed; full chain per audit)
+- Q1-Q10 resolutions (per plan §10; Q5 resolved → interim region `ap-northeast-1`; Q8 resolved → cron bridge retirement decoupled from PITR per §0 finding 6)
+- Reviewer-call invocation summary (A5 db-migration-reviewer reframed scope → retroactive state review; A8 security-auditor expanded scope → 4 surfaces including credential-leak incident)
+- §0 amendment log: three successive amendment states same day (initial → first counter-amendment Sensitive-var retraction → second counter-amendment post-A10 ground-truth + findings 4/5/6)
+
+## Surprises caught + fixed in-session (§5.10 — 6 entries)
+1. **PROD pre-existed (§0 finding 1).** Project + migrations applied 2026-05-15 (before session). A2 became URL-capture; A3 became no-op verification. State correct.
+2. **Interim schemaless (§0 finding 2).** Interim Tokyo project never received `drizzle-kit migrate`; plan §6 parity-vs-interim framework structurally invalid; reframed to PROD-only schema-correctness vs canonical migration files.
+3. **Sensitive-var CLI artifact (§0 finding 3 retraction).** `vercel env pull` returned `DATABASE_URL=""` — mistaken initially for "Vercel env is empty"; root cause: Vercel marks `DATABASE_URL` Sensitive (CLI returns empty for Sensitive vars by deliberate platform-security design). Retracted same day; later resolved via A10 first-smoke 415 evidence.
+4. **Credential-leak incident (caught + rotated).** PROD + INTERIM DATABASE_URL credentials leaked into Claude Code chat during A4 q0 protocol; Claude Code refused execution + recommended immediate rotation; both passwords rotated mid-session; new URLs re-captured via `read -rs` discipline. A8 security-auditor scope expanded to audit incident.
+5. **Procedural divergence A6/A7 (§0 finding 4).** Operator applied PROD URL via Vercel dashboard mid-session, out of plan sequence (before A4 close + A5 reviewer call + A11 anchor). State landed correct; procedure broke. Captured for future-discipline: plan templates should instrument a "dashboard-side actions log" to keep operator dashboard work in sync with Claude Code-orchestrated sequence.
+6. **A11 procedure infeasible, substituted by scheduled-backup-by-coincidence (§0 finding 6).** Web-Claude plan-review prescribed mandatory on-demand snapshot via Supabase dashboard; infeasible because on-demand snapshots require PITR add-on (deferred to HARDEN). The 2026-05-16 23:30:19 UTC scheduled daily backup (Pro tier default, included; predates A6/A7) substitutes incidentally as the de facto rollback anchor. Plan-review-template miss: future templates should verify dashboard procedures are available on the chosen plan tier before prescribing them. Capture for `docs/maintenance.md`.
 
 ## Open questions (§5.9 field 3)
-- (Expected) none at close
+- (Expected) none at close — all 6 surprises resolved in-session
 
 ## Next session starts at (§5.9 field 4)
 - SCAFFOLD.13-B kickoff (Doppler integration + Upstash/R2/Resend env audit) OR ENGINE.6 (events helper at src/server/events/insert.ts) per Hrishikesh's queue ordering
+- New tracker entry: SCAFFOLD.3-FOLLOWUP-1 (Better Auth Content-Type bug per §0 finding 5)
 
 ## Context to preserve (§5.9 field 5)
-- New Supabase Pro project (name: zugzwang-experiment-prod) ref + Session pooler URL — operator-side password manager, NOT in log
-- Interim project region (captured A2 step 4) — for risk-register history
-- 24h grace deletion clock — origin = A10 smoke-pass timestamp; guard = PR-merged-into-main; deletion proceeds only when both conditions satisfied. Operator calendar reminder + tracker v9 MAINT-row.
+- PROD Supabase Pro project (name: `zugzwang-experiment-prod`, ref `zbvprdcyxhlguxbostdj`, ap-south-1, Session pooler URL) — operator-side password manager; **passwords rotated 2026-05-17 post-leak** (new credentials in password manager only)
+- Interim project (name: `niihrpqgzxpczyignxnn`, ap-northeast-1 Tokyo, schemaless) — deletion +24h soft window per §10 Q9 amendment
+- 24h grace deletion clock — origin = A10 first-smoke timestamp (2026-05-17); guard = PR-merged-into-main; deletion proceeds only when both conditions satisfied. Operator calendar reminder + tracker v9 MAINT-row.
 - Session pooler port 5432 rationale (IPv4 + prepared-statement support) — repeat in SCAFFOLD.13-B for Doppler-wired URL discipline
-- `pg_dump` cron bridge retired (per Q8 — at cutover-smoke-pass moment)
+- `pg_dump` cron bridge retired at operator's convenience post-merge — bridge was orphaned anyway (interim was schemaless)
+- 2026-05-16 23:30:19 UTC scheduled daily backup is the de facto rollback anchor; restore via Supabase dashboard if needed
+- Procedural-discipline maintenance item: instrument "dashboard-side actions log" in plan templates (per §0 finding 4 surprise 5)
+- Plan-review template maintenance item: verify dashboard procedures available on chosen plan tier before prescribing (per §0 finding 6 surprise 6)
 
 ## Time (§5.9 field 6 — optional)
 <rough estimate>
