@@ -3,7 +3,9 @@ import { Resend } from "resend";
 // Resend `sendVerificationOTP` callback body for the Better Auth email-OTP
 // plugin per SCAFFOLD.3 plan §3 + SPEC.2 §8.2. Sandbox-mode caveat per
 // SCAFFOLD.14 close-out: `onboarding@resend.dev` only delivers to
-// `zugzwangworld@proton.me` until SCAFFOLD.12 verifies the production domain.
+// `zugzwangworld@proton.me` until Resend domain verification ships
+// (tracked in docs/parked.md under the Resend `RESEND_FROM_EMAIL` flip
+// follow-up).
 
 export type SendVerificationOTPArgs = {
 	email: string;
