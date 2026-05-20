@@ -1,8 +1,8 @@
 # SCAFFOLD.13-B — Credential rotation + Doppler-canonical secrets store cutover
 
 **Status:** Closed 2026-05-20
-**Branch:** `feat/scaffold-13-b-execute-closeout` (from `main` at `c8e8e7e`; PR# update commit pending at log-write time)
-**PR:** [#TBD](https://github.com/zugzwang-foundation/experiment/pull/TBD)
+**Branch:** `feat/scaffold-13-b-execute-closeout` (from `main` at `c8e8e7e`; 3 commits: `e3c8f33` close-out core + `b814dcf` auditor absorption + PR# update commit)
+**PR:** [#43](https://github.com/zugzwang-foundation/experiment/pull/43)
 **Predecessor:** SCAFFOLD.13-A (#40, post-merge SHA `7167397`); plan promoted at PR #41; Round 5 amend15 PR #42 merged 2026-05-18 (`main` at `c8e8e7e`)
 **Unblocks:** Future credential-rotation strata inheriting the `docs/maintenance.md` §5.11 routing extension; testnet phase secrets handoff; SCAFFOLD.12 (custom domain attachment per SURPRISE 3); SCAFFOLD.3-FOLLOWUP-2 candidate (Better Auth session endpoint route mounting per SURPRISE 7)
 
