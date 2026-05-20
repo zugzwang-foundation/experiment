@@ -103,6 +103,27 @@ If the audit only ever finds currency issues and never improvements, the loop is
 
 ---
 
+## Routing extensions to CLAUDE.md §5.11
+
+`CLAUDE.md §5.11`'s reviewer-call invocation policy is a per-class
+routing table (schema → `db-migration-reviewer`, server → `code-reviewer`,
+critical-path business logic → `security-auditor`, new business-logic →
+`test-writer`). This sub-section enumerates ADDITIONAL recognized classes
+that route to a reviewer regardless of literal §1 critical-path file
+touch. The classes accumulate as the project encounters them; each entry
+names the class, the reviewer, when it fires, and a one-line
+justification.
+
+| Class | Reviewer | Phases fired | Justification |
+|---|---|---|---|
+| Credential rotation / secrets-store cutover | `security-auditor` | Plan-review + execute close-out | Rotation surfaces affect production auth substrate even without `src/` file changes; cutover changes the secrets-store substrate. First recognized at SCAFFOLD.13-B (2026-05-17). |
+
+Future strata that meet a listed class inherit the routing automatically.
+New classes are added to the table at the stratum that first surfaces
+them — same PR, not as a follow-up.
+
+---
+
 ## Closing ritual for every task chat
 
 Every task chat — including this one — ends with one question:
@@ -136,4 +157,4 @@ Yes, this file gets audited too. The loop checks itself.
 
 ---
 
-*Last revised in FOUND.4 (Apr 28, 2026).*
+*Last revised in SCAFFOLD.13-B (May 20, 2026) — §5.11 routing extension added.*
