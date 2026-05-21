@@ -2,7 +2,7 @@
 
 **Status:** Closed 2026-05-21
 **Branch:** `feat/scaffold-12-domain-cutover` (from `main` at `2fb9091`; 5 commits — plan promote + email-otp.ts comment fix + 2 plan amendments + this close-out)
-**PR:** [#TODO — populated post-PR-open per §9.2]
+**PR:** [#44](https://github.com/zugzwang-foundation/experiment/pull/44)
 **Predecessor:** SCAFFOLD.13-B (#43, post-merge SHA `2fb9091`)
 **Unblocks:** SCAFFOLD.3-FOLLOWUP-1 (production auth functionality is now blocked solely on FOLLOWUP-1 since cutover is verified — `BETTER_AUTH_URL`/OAuth-client wiring all correct at `https://zugzwangworld.com`); any future task requiring a stable production origin instead of the Vercel-default deploy alias
 
