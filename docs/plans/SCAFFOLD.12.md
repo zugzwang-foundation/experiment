@@ -29,9 +29,14 @@ re-verification (do not improvise).
 - **Q1 — Preview `BETTER_AUTH_URL`:** **Split.** Production scope
   flips to `https://zugzwangworld.com`; Preview scope unbundles from
   the current grouped value and stays at
-  `https://experiment-zugzwang-worlds-projects.vercel.app`. §10
-  (old Google OAuth redirect URI cleanup) defers indefinitely until
-  Preview is later flipped.
+  `https://experiment-zugzwang-worlds-projects.vercel.app`.
+  **Revised reasoning post-§0.3 (execute-time SURPRISE 3):**
+  preview-deploy OAuth has never worked at the vercel-default URL
+  either — the corresponding callback URI is absent from the Google
+  OAuth client list per §0.3 baseline. Split preserves the
+  never-worked-anyway state; enabling Preview OAuth at any
+  preview-alias URL is out-of-scope for SCAFFOLD.12 (tracked at
+  §10.c + §10.d).
 - **Q2 — Env-var actor for §6:** **Operator via Vercel Dashboard.**
   Matches 13-B precedent across all credential mutations. CC issues
   the prescription, operator executes, CC verifies via `vercel env ls`.
@@ -57,17 +62,83 @@ hard-code the old URL.
 2. **§6 transient window.** Between §4 (TLS cert valid → new domain
    live + serving) and end-of-§6 (redeploy completes with new
    `BETTER_AUTH_URL`), any OAuth attempt at `https://zugzwangworld.com`
-   will fail: Better Auth still constructs the callback URL from the
-   old `BETTER_AUTH_URL`, Google redirects to the old origin, the
-   state cookie set on the new origin does not transfer. Plan §6
-   below pins explicit operator instruction: do NOT test OAuth at
-   the new domain during this window.
+   will fail. The original plan-time framing (cross-origin cookie
+   transfer failure on the callback) was superseded at execute-time
+   SURPRISE 3: per §0.3 baseline the vercel-default callback URI is
+   not in the Google OAuth client list, so the real failure mode is
+   Google `redirect_uri_mismatch` at the consent screen. Better
+   Auth constructs `redirect_uri = {BETTER_AUTH_URL}/api/auth/callback/google`
+   from the still-old `BETTER_AUTH_URL`, Google sees that URI is
+   absent from the authorized list, rejects. Net user-facing
+   behaviour is "Google sign-in fails during the window" either
+   way. Plan §4 below pins the final framing + explicit operator
+   instruction: do NOT test OAuth at the new domain during this
+   window.
 3. **ADRs 0004 / 0006 / 0010 do not exist yet** (only ADR-0001 in
    `docs/adr/`). The kickoff and CLAUDE.md treat these as
    load-bearing references — decisions documented in `docs/plans/
    SCAFFOLD.1.md` / SCAFFOLD.3.md / SCAFFOLD.13-B.md and SPEC.1 §13.
    Not blocking this task. ADR backfill is a separate maintenance
    line.
+
+## Execute-time amendments
+
+Logged here as the plan amendments made post-promote (per execute
+operator/CC discovery + web-Claude adjudication). Full per-amendment
+provenance lives in commits + `claude-progress.md` + the eventual
+`docs/logs/SCAFFOLD.12.md`. Plan-section edits made in place to keep
+the live plan internally consistent at all times.
+
+1. **Execute-time SURPRISE 1 (2026-05-20).** Plan-time SURPRISE 1's
+   "remain tracked" claim was wrong (`.vercel/repo.json` is
+   gitignored and has never been tracked). Plan-time SURPRISE 1
+   wording rewritten pre-promote; §0.4 verification mechanic
+   rewritten pre-promote (`test -f` + content match + `git
+   check-ignore -v` instead of `git ls-files`). Substance of §0.4
+   PASSES (project linkage present + correct).
+
+2. **Execute-time SURPRISE 2 (2026-05-20).** Stale forward-reference
+   in `src/server/auth/email-otp.ts:5-6` ("until SCAFFOLD.12
+   verifies the production domain" — but SCAFFOLD.12 does not, per
+   Q3). Comment corrected via in-stratum absorption commit
+   `chore(scaffold-12): correct stale forward-reference in
+   email-otp.ts`. No plan-file edit.
+
+3. **Execute-time SURPRISE 3 (2026-05-21).** Google OAuth client
+   Authorized redirect URIs baseline diverges from plan assumption.
+   Actual list = [`http://localhost:3000/api/auth/callback/google`,
+   `https://zugzwangworld.com/api/auth/callback/google`]; the
+   vercel-default callback URI was never present (operator added
+   `zugzwangworld.com` callback manually at some earlier point
+   during initial OAuth client configuration; production OAuth
+   never tested at vercel-default URL). Plan amendments (this
+   commit):
+   - **§1 reworded** — verification of URI presence + exact-string
+     match, not addition. §1 reduces to a CC-side string-match check
+     against §0.3 baseline; no operator vendor-UI click in §1.
+   - **§4 transient-window framing reframed** — failure mode is
+     Google `redirect_uri_mismatch` (vercel-default URI absent from
+     OAuth client list), not cross-origin cookie transfer failure
+     on callback. Original framing assumed vercel-default URI was
+     authorized; SURPRISE 3 established it never was. Net user
+     behaviour unchanged.
+   - **§7.2 annotated** — first-time-ever production Google OAuth
+     test, not a regression test against a previously-working state.
+     Failure modes at §7.2 = setup discovery, not regression.
+   - **§8 audit scope** — "dual-active old+new" removed; "old
+     redirect URI still in Google OAuth client" removed (never was).
+   - **§9.1 walk list** — §1 framing updated to verify-not-add.
+   - **§10.a removed** — vercel-default URI cleanup is moot. The
+     URI was never in the OAuth client; nothing to clean up; no
+     `docs/parked.md` row.
+   - **§10.d added** — Preview-alias callback URI add to Google
+     OAuth client (conditional follow-up, fires only if §10.c
+     fires).
+   - **§11 exit-criteria checklist** — §1 row updated.
+   - **Q1 revised reasoning** recorded under "Open questions
+     resolved at plan-review".
+   - **Plan-time SURPRISE 2** transient-window framing updated to
+     match §4 reframing.
 
 ## Surface separation (do not violate)
 
@@ -212,17 +283,26 @@ independent.
 Gate: §0 PASS = §0.1 read + §0.2/§0.3/§0.5 operator reports + §0.4
 file present and correct.
 
-### §1 — Google OAuth Client: additive redirect URI
+### §1 — Google OAuth Client: verify redirect URI present
 
-- Operator-side: Google Cloud Console → OAuth 2.0 Client → Authorized
-  redirect URIs → Add `https://zugzwangworld.com/api/auth/callback/google`.
-- Save. Old URI stays. Result list = old + new (dual-active).
-- No env var change. No deploy. No git op.
-- Operator confirms via redacted screenshot or copy-pasted updated
-  URI list. CC verifies new entry present, old entry retained.
+Per execute-time SURPRISE 3 (operator-reported baseline at §0.3,
+web-Claude adjudicated): the production callback URI
+`https://zugzwangworld.com/api/auth/callback/google` is already
+present in the Google OAuth client's Authorized redirect URIs list
+(operator added it manually at some earlier point during initial
+OAuth client configuration; the vercel-default callback URI was
+never present). §1 reduces to verification, not addition.
 
-Gate: §1 PASS = updated URI list contains exactly the old URI plus
-the new URI. No other changes.
+- Operator-side: no action — URI presence already established at
+  §0.3 baseline report.
+- CC verifies the §0.3 report contains an EXACT-string match for
+  `https://zugzwangworld.com/api/auth/callback/google` (case-sensitive,
+  no trailing slash, no path-component drift).
+- No env var change. No save, no edit, no deploy, no git op in §1.
+
+Gate: §1 PASS = exact-string match verified against the §0.3 URI
+list:
+`https://zugzwangworld.com/api/auth/callback/google`
 
 ### §2 — Vercel custom domain add
 
@@ -275,18 +355,24 @@ Gate: §4 PASS = both `dig` queries resolve to expected values AND
 both Vercel domain cards show Valid + TLS Issued.
 
 **⚠ Transient OAuth-break window opens here.** New domain is live
-and serving, but `BETTER_AUTH_URL` still references the old origin.
-OAuth at `https://zugzwangworld.com` will fail for ANY visitor — not
-just the operator — because Better Auth constructs the callback URL
-from `BETTER_AUTH_URL` (still pointing at the old origin), Google
-redirects there, and the state cookie set on the new apex does not
-transfer cross-origin. **Mitigation:** zero pre-publication state.
-The new domain is not yet linked from anywhere, no users are aware
-of it, and ingress in this window is bounded to deliberate operator
-visits. The user-impact dimension is acknowledged but functionally
-absent given the pre-publication posture. **Operator: do NOT test
-OAuth at `https://zugzwangworld.com` between §4 and end-of-§6.**
-Window closes after §6 redeploy completes.
+and serving, but `BETTER_AUTH_URL` still holds the vercel-default
+value (Doppler `prd` config, pre-§6 edit). Failure mode (per
+execute-time SURPRISE 3 reframing): Better Auth constructs
+`redirect_uri = {BETTER_AUTH_URL}/api/auth/callback/google` from the
+still-old value =
+`https://experiment-zugzwang-worlds-projects.vercel.app/api/auth/callback/google`,
+which is NOT in the Google OAuth client's authorized list (per §0.3
+baseline). Google rejects at the consent screen with
+`redirect_uri_mismatch`. The original plan-time framing
+(cross-origin cookie transfer failure on callback) was superseded —
+it assumed the vercel-default URI was authorized; SURPRISE 3
+established it never was. Net user-facing behaviour is identical:
+"Google sign-in fails during the window." **Mitigation:** zero
+pre-publication state — the new domain is not yet linked from
+anywhere; ingress in this window is bounded to deliberate operator
+visits. **Operator: do NOT test OAuth at `https://zugzwangworld.com`
+between §4 and end-of-§6.** Window closes after §6 redeploy
+completes.
 
 ### §5 — Vercel: configure `www` → apex 308 redirect
 
@@ -355,7 +441,12 @@ proceed to §8 until all 5 subtests PASS.
 - **§7.2** Test Google OAuth: click "Sign in with Google" → consent
   screen → returns to `https://zugzwangworld.com` with established
   session. No `redirect_uri_mismatch` from Google. Confirms §1 +
-  §6 wired correctly.
+  §6 wired correctly. **Annotation per execute-time SURPRISE 3:**
+  this is a first-time-ever production Google OAuth test, not a
+  regression test against a previously-working state. Failure at
+  §7.2 = setup discovery (e.g., missed URI exact-string match at §1,
+  callback path typo, `BETTER_AUTH_URL` value typo applied at §6
+  Doppler edit, etc.), not regression diagnosis.
 - **§7.3** Test Email-OTP: enter `zugzwangworld@proton.me`,
   receive OTP from `onboarding@resend.dev` (sandbox sender per Q3),
   enter code, session established. Confirms `BETTER_AUTH_URL` flip
@@ -388,15 +479,20 @@ Scope of audit:
 
 - Env var changes (Production-scope split for `BETTER_AUTH_URL`;
   rest of env inventory unchanged).
-- Google OAuth client redirect URI list (dual-active old+new).
+- Google OAuth client redirect URI list — final state per §0.3
+  baseline + §1 verify-not-add (`localhost` + `zugzwangworld.com`
+  callbacks; vercel-default callback URI never present per
+  execute-time SURPRISE 3).
 - DNS configuration at Namecheap (A + CNAME additions; existing
   Proton records untouched; CAA if added).
 - TLS posture (Let's Encrypt cert valid on apex + www).
 - Secret material handling during cutover (no creds in repo, no
   creds in logs, screenshots redacted per no-screenshot-with-reveal
   rule).
-- Dual-active credential window posture (old redirect URI still in
-  Google OAuth client; Preview env still at old default URL).
+- Preview-env posture (Preview-scope `BETTER_AUTH_URL` stays at the
+  vercel-default value per Q1 Split; Preview OAuth was never wired
+  at that URL — corresponding callback URI never in Google OAuth
+  client; out-of-scope follow-up tracked at §10.c + §10.d).
 - INV-1/INV-2/INV-3/INV-4 enforcement gaps — expect "no diff in
   src/server/ — invariants not touched in this task" verdict.
 
@@ -417,7 +513,8 @@ FAIL/HIGH findings closed with audit trail.
 - **§9.1 Pre-PR self-audit (CLAUDE.md §5.10):** CC walks this plan
   item by item, reporting PASS / FAIL / SURPRISE for:
   - §0.1–§0.5 (predecessor read + operator reports + file checks)
-  - §1 (Google OAuth URI additive add)
+  - §1 (Google OAuth URI verify-not-add per execute-time SURPRISE 3
+    reframing)
   - §2 (Vercel domain add, DNS values captured)
   - §3 (Namecheap A + CNAME + optional CAA)
   - §4 (DNS propagation + TLS cert validation)
@@ -448,30 +545,39 @@ operator approval, squash-merge to main.
 
 ### §10 — (Deferred) Follow-ups tracked at PR close
 
-Per Q1 (Split) + Q3 (Follow-up):
+Per Q1 (Split) + Q3 (Follow-up) + execute-time SURPRISE 3:
 
-- **§10.a Old Vercel-default URI cleanup** from Google OAuth client.
-  Per Q1: deferred indefinitely until Preview env is later flipped
-  to a new value. Add row to `docs/parked.md` referencing
-  SCAFFOLD.12 §10.a.
+- ~~**§10.a Old Vercel-default URI cleanup**~~ — REMOVED per
+  execute-time SURPRISE 3. The vercel-default callback URI was never
+  in the Google OAuth client (per §0.3 baseline), so there is
+  nothing to clean up. No `docs/parked.md` row.
 - **§10.b Resend domain verification + `RESEND_FROM_EMAIL` flip.**
   Per Q3: deferred to a later task (likely SCAFFOLD.14). Add row
   to `docs/parked.md` referencing SCAFFOLD.12 §10.b. The candidate
   flip target (`noreply@zugzwangworld.com` vs alias of
   `foundation@…`) is that task's call, not this one's.
-- **§10.c Preview-env `BETTER_AUTH_URL` posture.** If a later task
-  requires preview OAuth to work at canonical preview alias URLs,
-  the Google OAuth client may need additional redirect URIs added.
-  Add row to `docs/parked.md`.
+- **§10.c Preview-env `BETTER_AUTH_URL` value flip.** Per Q1 Split,
+  Preview-scope `BETTER_AUTH_URL` stays at the vercel-default value
+  in this PR. If a later task wants Preview OAuth to work at a
+  canonical preview-alias URL, that task flips this env var.
+  Add row to `docs/parked.md` referencing SCAFFOLD.12 §10.c.
+- **§10.d Preview-alias callback URI add to Google OAuth client.**
+  Coupled with §10.c — if §10.c flips Preview `BETTER_AUTH_URL` to
+  a preview-alias URL, the Google OAuth client also needs the
+  corresponding `/api/auth/callback/google` URI added to the
+  Authorized redirect URIs list. Add row to `docs/parked.md`
+  referencing SCAFFOLD.12 §10.d. Conditional — fires only if
+  §10.c fires.
 
-These rows in `docs/parked.md` ship in this PR (per CLAUDE.md §7
-cleanup absorption rule — these are not stratum-scope absorbable
-under 2h, so they become real follow-up tasks tracked in `parked.md`,
-not embedded backlog).
+These rows (b / c / d) in `docs/parked.md` ship in this PR (per
+CLAUDE.md §7 cleanup absorption rule — these are not stratum-scope
+absorbable under 2h, so they become real follow-up tasks tracked in
+`parked.md`, not embedded backlog).
 
 ### §11 — Exit criteria checklist (all must be green for PR merge)
 
-- [ ] §1: New Google OAuth redirect URI added; old retained
+- [ ] §1: Google OAuth redirect URI for `zugzwangworld.com` verified
+      present (verify-not-add per execute-time SURPRISE 3)
 - [ ] §2: Both `zugzwangworld.com` + `www.zugzwangworld.com` added
       in Vercel; DNS values captured
 - [ ] §3: A + CNAME records added at Namecheap (+CAA if §0.5
@@ -552,7 +658,8 @@ Created in this task:
 ## Verification (re-stated end-to-end)
 
 - §0 read + report gates pass
-- §1 OAuth URI additive add verified by operator screenshot
+- §1 OAuth URI presence verified by exact-string match against §0.3
+  baseline (verify-not-add per execute-time SURPRISE 3)
 - §2 domains added + DNS values captured
 - §3 Namecheap records added per §2 values
 - §4 `dig` + Vercel card validation
