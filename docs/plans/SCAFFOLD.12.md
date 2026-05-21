@@ -1,0 +1,765 @@
+# SCAFFOLD.12 — Domain + DNS setup (`zugzwangworld.com` → Vercel)
+
+> Plan-mode scratch. After approval, promote to `docs/plans/SCAFFOLD.12.md` and commit on the SCAFFOLD.12 branch before any vendor-UI step (CLAUDE.md §5.1).
+
+## Context
+
+The experiment app currently serves out of the Vercel-default URL
+`https://experiment-zugzwang-worlds-projects.vercel.app` (canonical
+`BETTER_AUTH_URL` after the SCAFFOLD.13-B SURPRISE 3 surgical fix).
+That URL is a deploy alias, not a brand identity, and is unsuitable
+as the production origin for Devcon 8 (15 Sep – 5 Nov 2026).
+
+This task attaches `zugzwangworld.com` (owned, Namecheap PremiumDNS,
+DNSSEC on, Proton-Mail-MX wired) as the custom apex domain on the
+Vercel project `experiment`, retires the Vercel default URL as the
+canonical origin, and updates the Google OAuth client redirect URI
+list to match. Apex-only for the experiment phase (`www` → apex 308
+via Vercel edge); subdomain architecture is testnet-phase scope.
+
+Critical-path (auth + domain cutover): CLAUDE.md §5.10 pre-PR
+self-audit + §5.11 security-auditor reviewer call apply. Symmetric
+pre-verification rule from SCAFFOLD.13-B carries forward — every
+vendor-UI prescription below was pre-verified by web Claude in the
+kickoff; failure of any prescription in practice → STOP + request
+re-verification (do not improvise).
+
+## Open questions resolved at plan-review
+
+- **Q1 — Preview `BETTER_AUTH_URL`:** **Both scopes flip to new URL.**
+  Production and Preview both get `https://zugzwangworld.com` via a
+  single Doppler `prd` edit; the Doppler→Vercel sync propagates to
+  both scopes. Q1 reversed Split → both at execute-time SURPRISE 5.
+  **Reasoning:** SURPRISE 3 established preview-deploy OAuth never
+  worked at the vercel-default URL (callback URI absent from the
+  Google OAuth client list per §0.3 baseline). SURPRISE 5 (operator's
+  out-of-sequence Doppler edit + recovery) confirmed there is no
+  working preview OAuth state to protect via Split. Q1 = both removes
+  the M1/M2/M3 mechanic dependency that POTENTIAL SURPRISE 4 flagged
+  — single Doppler edit, both scopes flip together, no Vercel-direct
+  override needed. Preview OAuth still will not work at preview-alias
+  URLs post-Q1 = both, but for a different reason (Better Auth
+  constructs `redirect_uri` from `BETTER_AUTH_URL` = apex; cookie
+  set at preview origin doesn't transfer cross-origin to apex on
+  callback). Enabling Preview OAuth at preview-alias URLs is
+  out-of-scope for SCAFFOLD.12 (tracked at §10.c + §10.d).
+- **Q2 — Env-var actor for §6:** **Operator via Vercel Dashboard.**
+  Matches 13-B precedent across all credential mutations. CC issues
+  the prescription, operator executes, CC verifies via `vercel env ls`.
+- **Q3 — Resend `RESEND_FROM_EMAIL` flip:** **Follow-up, not in this
+  task.** `RESEND_FROM_EMAIL = onboarding@resend.dev` (sandbox)
+  stays for §7 Email-OTP verification (sandbox delivers to
+  `zugzwangworld@proton.me`). Resend domain verification + flip
+  belongs to a later task (likely SCAFFOLD.14). Tracked at §10.
+
+Hard-coded URL check (kickoff open question 2) confirmed via Phase 1
+Explore: zero matches for `experiment-zugzwang-worlds-projects`
+outside `docs/logs/` and `.claude/scratch-*.md`. No source code paths
+hard-code the old URL.
+
+## SURPRISES caught at plan-time
+
+1. **Kickoff §0.4 referenced `.vercel/project.json`; the actual file
+   in this repo is `.vercel/repo.json`** (local-only by Vercel
+   design, gitignored per `.gitignore` line 60). §0.4 below verifies
+   presence + content, not git-tracking. Carries forward 13-B
+   SURPRISE 5 (`vercel` CLI resolves the project via directory-name +
+   user-context inference, not via committed repo metadata).
+2. **§6 transient window.** Between §4 (TLS cert valid → new domain
+   live + serving) and end-of-§6 (redeploy completes with new
+   `BETTER_AUTH_URL`), any OAuth attempt at `https://zugzwangworld.com`
+   will fail. The original plan-time framing (cross-origin cookie
+   transfer failure on the callback) was superseded at execute-time
+   SURPRISE 3: per §0.3 baseline the vercel-default callback URI is
+   not in the Google OAuth client list, so the real failure mode is
+   Google `redirect_uri_mismatch` at the consent screen. Better
+   Auth constructs `redirect_uri = {BETTER_AUTH_URL}/api/auth/callback/google`
+   from the still-old `BETTER_AUTH_URL`, Google sees that URI is
+   absent from the authorized list, rejects. Net user-facing
+   behaviour is "Google sign-in fails during the window" either
+   way. Plan §4 below pins the final framing + explicit operator
+   instruction: do NOT test OAuth at the new domain during this
+   window.
+3. **ADRs 0004 / 0006 / 0010 do not exist yet** (only ADR-0001 in
+   `docs/adr/`). The kickoff and CLAUDE.md treat these as
+   load-bearing references — decisions documented in `docs/plans/
+   SCAFFOLD.1.md` / SCAFFOLD.3.md / SCAFFOLD.13-B.md and SPEC.1 §13.
+   Not blocking this task. ADR backfill is a separate maintenance
+   line.
+
+## Execute-time amendments
+
+Logged here as the plan amendments made post-promote (per execute
+operator/CC discovery + web-Claude adjudication). Full per-amendment
+provenance lives in commits + `claude-progress.md` + the eventual
+`docs/logs/SCAFFOLD.12.md`. Plan-section edits made in place to keep
+the live plan internally consistent at all times.
+
+1. **Execute-time SURPRISE 1 (2026-05-20).** Plan-time SURPRISE 1's
+   "remain tracked" claim was wrong (`.vercel/repo.json` is
+   gitignored and has never been tracked). Plan-time SURPRISE 1
+   wording rewritten pre-promote; §0.4 verification mechanic
+   rewritten pre-promote (`test -f` + content match + `git
+   check-ignore -v` instead of `git ls-files`). Substance of §0.4
+   PASSES (project linkage present + correct).
+
+2. **Execute-time SURPRISE 2 (2026-05-20).** Stale forward-reference
+   in `src/server/auth/email-otp.ts:5-6` ("until SCAFFOLD.12
+   verifies the production domain" — but SCAFFOLD.12 does not, per
+   Q3). Comment corrected via in-stratum absorption commit
+   `chore(scaffold-12): correct stale forward-reference in
+   email-otp.ts`. No plan-file edit.
+
+3. **Execute-time SURPRISE 3 (2026-05-21).** Google OAuth client
+   Authorized redirect URIs baseline diverges from plan assumption.
+   Actual list = [`http://localhost:3000/api/auth/callback/google`,
+   `https://zugzwangworld.com/api/auth/callback/google`]; the
+   vercel-default callback URI was never present (operator added
+   `zugzwangworld.com` callback manually at some earlier point
+   during initial OAuth client configuration; production OAuth
+   never tested at vercel-default URL). Plan amendments (this
+   commit):
+   - **§1 reworded** — verification of URI presence + exact-string
+     match, not addition. §1 reduces to a CC-side string-match check
+     against §0.3 baseline; no operator vendor-UI click in §1.
+   - **§4 transient-window framing reframed** — failure mode is
+     Google `redirect_uri_mismatch` (vercel-default URI absent from
+     OAuth client list), not cross-origin cookie transfer failure
+     on callback. Original framing assumed vercel-default URI was
+     authorized; SURPRISE 3 established it never was. Net user
+     behaviour unchanged.
+   - **§7.2 annotated** — first-time-ever production Google OAuth
+     test, not a regression test against a previously-working state.
+     Failure modes at §7.2 = setup discovery, not regression.
+   - **§8 audit scope** — "dual-active old+new" removed; "old
+     redirect URI still in Google OAuth client" removed (never was).
+   - **§9.1 walk list** — §1 framing updated to verify-not-add.
+   - **§10.a removed** — vercel-default URI cleanup is moot. The
+     URI was never in the OAuth client; nothing to clean up; no
+     `docs/parked.md` row.
+   - **§10.d added** — Preview-alias callback URI add to Google
+     OAuth client (conditional follow-up, fires only if §10.c
+     fires).
+   - **§11 exit-criteria checklist** — §1 row updated.
+   - **Q1 revised reasoning** recorded under "Open questions
+     resolved at plan-review".
+   - **Plan-time SURPRISE 2** transient-window framing updated to
+     match §4 reframing.
+
+4. **POTENTIAL SURPRISE 4 (CC-flagged 2026-05-21, MOOT
+   post-SURPRISE-5).** CC flagged §6's substantive flow as needing
+   thought given Doppler-managed source-of-truth + Q1 Split
+   mechanic. Three candidate mechanics (M1 Vercel-direct override
+   on Preview, M2 Doppler config split, M3 integration-sync key
+   exclusion) were captured in `claude-progress.md` for
+   operator/web-Claude adjudication. SURPRISE 5's Q1 reversal
+   (Split → Both) eliminated the mechanic dependency entirely; the
+   candidate-mechanic exploration is now historical-only.
+
+5. **Execute-time SURPRISE 5 (2026-05-21).** Operator edited Doppler
+   `prd` `BETTER_AUTH_URL` to new URL out-of-sequence (before §1-§5
+   ran, before any mechanic-pre-verification). Doppler→Vercel sync
+   fired; both Production and Preview scopes briefly reflected new
+   URL. Operator reverted Doppler `BETTER_AUTH_URL` to the old URL
+   (`https://experiment-zugzwang-worlds-projects.vercel.app`) and
+   manually redeployed; production restored to pre-§6 state. **Q1
+   reversal: Split → Both.** No working preview OAuth state to
+   protect via Split (per SURPRISE 3: preview-deploy OAuth never
+   worked at the vercel-default URL; SURPRISE 5's out-of-sequence
+   edit + recovery confirmed); Q1 = Both removes the M1/M2/M3
+   mechanic dependency entirely. Plan amendments (this commit):
+   - **Q1** rewritten to "Both scopes flip to new URL" with full
+     reasoning chain (SURPRISE 3 + SURPRISE 5).
+   - **§6 substantive rewrite** — single Doppler `prd` edit (no
+     per-scope unbundle, no Vercel-direct override); both scopes
+     propagate via Doppler→Vercel sync; manual Vercel redeploy
+     required (13-B SURPRISE 11 carry-forward); start point pinned
+     as Doppler Dashboard (not Vercel Dashboard).
+   - **§8 audit scope** — env-var change description updated to
+     single-Doppler-edit framing; Preview-env posture clarified.
+   - **§9.1 walk list** — §6 framing updated.
+   - **§10 header** — Q1 attribution updated.
+   - **§10.c** — Preview-env posture reframed under Q1 Both
+     (Preview flips to apex in §6; future preview-alias flip would
+     come from this row).
+   - **§11 exit criteria** — §6 line updated.
+   - **§12 log schema** — Q1 attribution updated; SURPRISE 5 added
+     to vendor-UI delta list.
+   - **Verification (end-to-end)** — §6 line updated.
+   - **POTENTIAL SURPRISE 4** marked MOOT (entry 4 above).
+
+## Surface separation (do not violate)
+
+- **Operator (Hrishikesh):** runs all vendor-UI clicks — Namecheap
+  PremiumDNS, Vercel Domain Settings, Vercel Environment Variables,
+  Google Cloud Console OAuth client, Proton Mail. Pastes redacted
+  screenshots or copy-pasted text to CC at each gate.
+- **Claude Code:** issues prescriptions, runs read-only verifications
+  (`dig`, `vercel domains inspect`, `vercel env ls`, `git ls-files`),
+  invokes security-auditor reviewer call, writes logs + PR. NEVER
+  fires vendor-UI clicks.
+- **Web Claude:** pre-verification reference (already captured in
+  kickoff), SURPRISE adjudication during execute, close-out support.
+  NOT firing tool calls during this task.
+
+When a step requires operator action, CC outputs the prescription
+and STOPs. CC waits for explicit operator confirmation (redacted
+screenshot or copy-pasted text) before proceeding to the next
+step-group.
+
+## Pre-verified vendor mechanics (do not re-derive)
+
+### Vercel custom-domain configuration
+
+- **Apex A record value:** read from Vercel Domain Settings card OR
+  `vercel domains inspect zugzwangworld.com`. Default for Hobby/Pro
+  is `76.76.21.21` but project-specific IPs occur — do NOT hard-code,
+  read from Vercel.
+- **`www` CNAME target:** read project-specific value from Vercel
+  Domain Settings card OR `vercel domains inspect`. Format:
+  `<hash>.vercel-dns-NNN.com`. The older generic `cname.vercel-dns.com`
+  is outdated.
+- **`www` → apex redirect:** Vercel Domain Settings → www card →
+  Edit → "Redirect to" = `zugzwangworld.com`. Edge-side 308; no app
+  code.
+- **TLS:** Vercel auto-provisions Let's Encrypt on DNS validation.
+
+### Better Auth Google OAuth callback URL
+
+- **New production redirect URI:**
+  `https://zugzwangworld.com/api/auth/callback/google` (path fixed
+  by Better Auth; do not alter `/api/auth/callback/{provider}`).
+- **`BETTER_AUTH_URL`** is read by Better Auth at init
+  (`src/server/auth/index.ts:42–44`, passed as `baseURL` at line
+  188). No hard-coded fallback. Updating it requires redeploy.
+
+### Google Cloud Console OAuth client behavior
+
+- **Adding a redirect URI is purely additive.** Does NOT rotate
+  `GOOGLE_CLIENT_SECRET`. Old + new can coexist (dual-active).
+- **Secret rotation is a separate, explicit operator action.** Do
+  not invoke it during this task.
+
+### Namecheap PremiumDNS posture
+
+- Domain registered, PremiumDNS active, DNSSEC enabled, auto-renew
+  through 2 Mar 2031.
+- Existing records (read-only inventory): 3 Proton DKIM CNAMEs, 1
+  Proton verification TXT, 1 SPF TXT, 2 Proton MX records. None
+  conflict with the A + CNAME this task adds.
+- **Do NOT change nameservers** (DNSSEC).
+
+### Email — `foundation@zugzwangworld.com`
+
+Already provisioned as Proton Mail alias. No DNS changes for email
+in this task. Verification = external→inbox test email at §7.5.
+
+## Standing refusals (operator-set; non-negotiable)
+
+- Refuse non-trivial code without a spec.
+- Refuse to skip subagent review on critical-path PRs (THIS task is
+  critical-path; security-auditor is required at §8).
+- Refuse to silently absorb scope creep — surface scope deltas at
+  step-group boundaries.
+- Refuse to make domain decisions affecting production posture
+  without operator sign-off.
+- Refuse to commit operator-supplied secret material (DNS API tokens,
+  email provider creds, OAuth client secrets) to the repo.
+- "Confirm" / "Continue" / "Trust me" at a gate → explicit
+  verification request, not silent accept.
+- No-screenshot-with-reveal: operator confirmations may be redacted
+  screenshots or copy-pasted text; NEVER request screenshots showing
+  secret material.
+- Operator-authority HIGH-finding closure (§8) requires explicit
+  audit trail in PR description or `docs/logs/SCAFFOLD.12.md`. Not
+  closed by verbal assertion.
+
+## Plan
+
+### §0 — Pre-flight
+
+- **§0.1** CC reads predecessor context: `docs/logs/SCAFFOLD.13-A.md`,
+  `docs/logs/SCAFFOLD.13-B.md`, `docs/logs/FOUND.2.md` (if present),
+  ADR 0004 / 0006 / 0010 backfills (if present), tracker v9 row for
+  SCAFFOLD.12. (Phase 1 Explore findings stand in for this if CC
+  has them in-session.)
+- **§0.2** Operator reads Vercel Dashboard → Project `experiment` →
+  Settings → Environment Variables → `BETTER_AUTH_URL`. Confirms
+  current Production value is
+  `https://experiment-zugzwang-worlds-projects.vercel.app`. Also
+  confirms the source-of-truth for this env var: is it managed via
+  the Doppler→Vercel integration (visible in Vercel as
+  integration-linked, value greyed-out) or set directly in Vercel
+  (manually editable in the dashboard)? This determines whether §6
+  edits happen in Doppler (with Vercel sync) or directly in Vercel.
+  The user-facing instruction in §6 (edit value, then trigger manual
+  redeploy) is unchanged either way; only the §6 reason-for-manual
+  framing differs. Reports via redacted screenshot or copy-pasted
+  env var inventory (value-only, not the cluster of all 12 keys).
+- **§0.3** Operator reads Google Cloud Console → OAuth 2.0 Client
+  IDs → the experiment client → Authorized redirect URIs. Reports
+  the current URI list (copy-pasted text).
+- **§0.4** CC verifies `.vercel/repo.json` exists locally and carries
+  the expected project linkage. File is local-only by Vercel design
+  (`.vercel/README.txt`: "you should not share the '.vercel' folder
+  with anyone"); gitignored per `.gitignore` line 60. Verification
+  mechanic:
+  - `test -f .vercel/repo.json` — confirms presence on disk
+  - `cat .vercel/repo.json` — content must include:
+    - `id: prj_5krm0VEQQ9TleA2rjUBIL3oLJpiI`
+    - `orgId: team_m0d8TiC9xuPrm9qI8ob6byBM`
+    - `name: experiment` (Vercel CLI uses `name`, not `projectName`)
+    - `directory: "."`
+  - `git check-ignore -v .vercel/repo.json` — confirms the file is
+    matched by `.gitignore` line 60 (`.vercel`); expected output
+    references that rule
+  Linkage is via `vercel` CLI directory + user-context inference, not
+  via committed repo metadata (per 13-B SURPRISE 5 forward-relevance).
+- **§0.5** Operator reads Namecheap → `zugzwangworld.com` →
+  Advanced DNS → record list. Confirms baseline (3 Proton DKIM
+  CNAMEs, 1 Proton verification TXT, 1 SPF TXT, 2 MX). Reports
+  whether any CAA records exist. If yes → CC adds `0 issue
+  "letsencrypt.org"` requirement to §3. If no → CAA omitted (default
+  behaviour allows any CA).
+
+**Batching (nice-to-have):** §0.2 / §0.3 / §0.5 may be reported by
+the operator in a single consolidated reply if convenient. CC issues
+all three prescriptions together at session start and waits for one
+response (rather than gating sequentially). §0.4 is CC-side and
+independent.
+
+Gate: §0 PASS = §0.1 read + §0.2/§0.3/§0.5 operator reports + §0.4
+file present and correct.
+
+### §1 — Google OAuth Client: verify redirect URI present
+
+Per execute-time SURPRISE 3 (operator-reported baseline at §0.3,
+web-Claude adjudicated): the production callback URI
+`https://zugzwangworld.com/api/auth/callback/google` is already
+present in the Google OAuth client's Authorized redirect URIs list
+(operator added it manually at some earlier point during initial
+OAuth client configuration; the vercel-default callback URI was
+never present). §1 reduces to verification, not addition.
+
+- Operator-side: no action — URI presence already established at
+  §0.3 baseline report.
+- CC verifies the §0.3 report contains an EXACT-string match for
+  `https://zugzwangworld.com/api/auth/callback/google` (case-sensitive,
+  no trailing slash, no path-component drift).
+- No env var change. No save, no edit, no deploy, no git op in §1.
+
+Gate: §1 PASS = exact-string match verified against the §0.3 URI
+list:
+`https://zugzwangworld.com/api/auth/callback/google`
+
+### §2 — Vercel custom domain add
+
+- Operator-side: Vercel Dashboard → Project `experiment` → Settings
+  → Domains → Add Domain. Add `zugzwangworld.com` and (separately)
+  `www.zugzwangworld.com`.
+- Vercel displays "Invalid Configuration" with required DNS values
+  (A IP for apex; CNAME target for www).
+- Operator captures exact DNS values (screenshot or copy-pasted)
+  and pastes to CC. Alternatively: operator runs `vercel domains
+  inspect zugzwangworld.com` locally and pastes output.
+
+Gate: §2 PASS = both domains added in Vercel, exact DNS A value and
+CNAME target captured.
+
+### §3 — Namecheap PremiumDNS: A + CNAME records (+ CAA if §0.5)
+
+- Operator-side: Namecheap → `zugzwangworld.com` → Advanced DNS →
+  Add New Record:
+  - Type `A`, Host `@`, Value `<from §2>`, TTL Automatic
+  - Type `CNAME`, Host `www`, Value `<from §2>` (project-specific
+    hash), TTL Automatic
+- If §0.5 reported existing CAA records: also add Type `CAA`,
+  Host `@`, Tag `issue`, Value `letsencrypt.org`, TTL Automatic.
+- Save records. Operator confirms via redacted screenshot of record
+  table.
+
+Gate: §3 PASS = A + CNAME records visible in Namecheap with the
+exact values from §2.
+
+### §4 — DNS propagation + TLS cert verification
+
+- CC-side: `dig @8.8.8.8 zugzwangworld.com A +short` (explicit
+  Google public resolver) → should resolve to the A value from §2
+  within ~minutes (Namecheap PremiumDNS propagation is typically
+  <5 min globally). Also run `dig zugzwangworld.com A +short`
+  (default resolver — likely the operator's ISP or local
+  forwarder) for comparison; both should agree.
+- CC-side: `dig @8.8.8.8 www.zugzwangworld.com CNAME +short` →
+  should resolve to the CNAME target from §2. Also run with default
+  resolver for comparison.
+- Operator-side: Vercel Domain Settings card for both domains shows
+  "Valid Configuration" and TLS cert "Issued" (Let's Encrypt
+  auto-issued on DNS validation).
+- **Stop condition:** if validation has not succeeded after 15 min,
+  STOP. Re-read DNS records at Namecheap, re-verify they match §2
+  values exactly. Do not proceed until both domains valid.
+
+Gate: §4 PASS = both `dig` queries resolve to expected values AND
+both Vercel domain cards show Valid + TLS Issued.
+
+**⚠ Transient OAuth-break window opens here.** New domain is live
+and serving, but `BETTER_AUTH_URL` still holds the vercel-default
+value (Doppler `prd` config, pre-§6 edit). Failure mode (per
+execute-time SURPRISE 3 reframing): Better Auth constructs
+`redirect_uri = {BETTER_AUTH_URL}/api/auth/callback/google` from the
+still-old value =
+`https://experiment-zugzwang-worlds-projects.vercel.app/api/auth/callback/google`,
+which is NOT in the Google OAuth client's authorized list (per §0.3
+baseline). Google rejects at the consent screen with
+`redirect_uri_mismatch`. The original plan-time framing
+(cross-origin cookie transfer failure on callback) was superseded —
+it assumed the vercel-default URI was authorized; SURPRISE 3
+established it never was. Net user-facing behaviour is identical:
+"Google sign-in fails during the window." **Mitigation:** zero
+pre-publication state — the new domain is not yet linked from
+anywhere; ingress in this window is bounded to deliberate operator
+visits. **Operator: do NOT test OAuth at `https://zugzwangworld.com`
+between §4 and end-of-§6.** Window closes after §6 redeploy
+completes.
+
+### §5 — Vercel: configure `www` → apex 308 redirect
+
+- Operator-side: Vercel Dashboard → Domain Settings →
+  `www.zugzwangworld.com` card → Edit → "Redirect to" field →
+  `zugzwangworld.com`. Default 308 status, edge-side.
+- Operator confirms via redacted screenshot showing `www` card with
+  redirect target visible.
+
+Gate: §5 PASS = www card shows redirect to apex; no app-code edit
+required.
+
+### §6 — Doppler edit: `BETTER_AUTH_URL` → new URL (both scopes)
+
+Per Q1 (Both, post-SURPRISE-5 reversal) + Q2 (Operator via Dashboard)
++ §0.2 (source-of-truth = Doppler-managed):
+
+- Operator-side: Doppler Dashboard → Project `zugzwang-experiment`
+  → Config `prd` → `BETTER_AUTH_URL`.
+- Current value (post-SURPRISE-5 revert):
+  `https://experiment-zugzwang-worlds-projects.vercel.app`.
+- Edit value to: `https://zugzwangworld.com`. Save in Doppler.
+- Doppler→Vercel integration syncs BOTH the Vercel Production and
+  Vercel Preview env-var entries to the new value (single `prd`
+  config × 2 sync targets per 13-B topology). No Vercel-direct
+  override; no per-scope unbundle.
+- CC verifies via `vercel env ls production` that the
+  `BETTER_AUTH_URL` entry exists with the modified-at timestamp
+  updated post-§6 start; same check for Preview via
+  `vercel env ls preview`. **Vercel env values are write-only
+  post-set** — `vercel env ls` surfaces metadata (name, scopes,
+  modified-at) but NOT the value itself; neither does
+  `vercel inspect` read env values. Functional correctness of the
+  env value is proven at §7.2 (Google OAuth completes end-to-end
+  at the new domain), not by value read-back.
+- Operator triggers a manual Vercel production redeploy: Vercel
+  Dashboard → Deployments → most recent Production deploy →
+  "Redeploy" (with or without build cache; env-only change is fine
+  either way). Per 13-B SURPRISE 11 carry-forward: Doppler→Vercel
+  auto-redeploy was never observed firing in operator's environment
+  — treat manual redeploy as required regardless of any
+  auto-redeploy expectation. SURPRISE 5's recovery redeploy is
+  NOT a §6 redeploy; this step's redeploy is the canonical §6
+  trigger.
+- Operator confirms redeploy completed via Vercel Dashboard
+  Deployments listing. CC verifies by checking that a new Production
+  deployment with "Ready" status exists with a timestamp post-§6
+  env-edit.
+
+Gate: §6 PASS = `vercel env ls production` shows the `BETTER_AUTH_URL`
+entry with modified-at timestamp post-§6 start; same check passes
+for Preview; a new Production deployment is "Ready" post-env-edit;
+AND `https://zugzwangworld.com` returns a 200 for `/sign-in`.
+Functional correctness of the env value itself is proven at §7.2,
+not here. Transient OAuth-break window closes at this gate.
+
+### §7 — End-to-end verification
+
+Operator-side, from a clean incognito browser session. CC does not
+proceed to §8 until all 5 subtests PASS.
+
+- **§7.1** Navigate to `https://zugzwangworld.com/sign-in`. Page
+  loads with valid TLS (no cert errors), renders SCAFFOLD.3 sign-in
+  surface (Google + Email-OTP options).
+- **§7.2** Test Google OAuth: click "Sign in with Google" → consent
+  screen → returns to `https://zugzwangworld.com` with established
+  session. No `redirect_uri_mismatch` from Google. Confirms §1 +
+  §6 wired correctly. **Annotation per execute-time SURPRISE 3:**
+  this is a first-time-ever production Google OAuth test, not a
+  regression test against a previously-working state. Failure at
+  §7.2 = setup discovery (e.g., missed URI exact-string match at §1,
+  callback path typo, `BETTER_AUTH_URL` value typo applied at §6
+  Doppler edit, etc.), not regression diagnosis.
+- **§7.3** Test Email-OTP: enter `zugzwangworld@proton.me`,
+  receive OTP from `onboarding@resend.dev` (sandbox sender per Q3),
+  enter code, session established. Confirms `BETTER_AUTH_URL` flip
+  did not break the email-OTP flow.
+- **§7.4** Navigate to `https://www.zugzwangworld.com/sign-in`.
+  Browser shows 308 redirect to `https://zugzwangworld.com/sign-in`
+  in the network tab; final page loads correctly. Confirms §5
+  wired correctly.
+- **§7.5** From an external email account (any non-Proton), send a
+  short test email to `foundation@zugzwangworld.com`. Confirm
+  receipt in the Proton Mail inbox routed for that alias. Confirms
+  the existing Proton MX records still route correctly (no
+  disruption from the A + CNAME additions in §3).
+
+Operator reports PASS/FAIL for each subtest. Any FAIL → STOP, do
+NOT proceed to §8. Diagnose root cause: most likely §3 DNS, §5
+redirect config, or §6 env var/redeploy.
+
+Gate: §7 PASS = 5/5 subtests pass.
+
+### §8 — security-auditor reviewer call
+
+CC invokes per CLAUDE.md §5.11 — a fresh-context `general-purpose`
+Agent invocation with the `.claude/agents/security-auditor.md` role
+briefing baked into the prompt + this plan path
+(`@docs/plans/SCAFFOLD.12.md` once promoted) + tool-scope constraints
+(Read, Grep, Glob, Bash only; no Edit/Write).
+
+Scope of audit:
+
+- Env var changes (single Doppler `prd` edit for `BETTER_AUTH_URL`
+  → apex URL, propagating to both Vercel Production + Preview via
+  integration sync per Q1 Both; rest of env inventory unchanged).
+- Google OAuth client redirect URI list — final state per §0.3
+  baseline + §1 verify-not-add (`localhost` + `zugzwangworld.com`
+  callbacks; vercel-default callback URI never present per
+  execute-time SURPRISE 3).
+- DNS configuration at Namecheap (A + CNAME additions; existing
+  Proton records untouched; CAA if added).
+- TLS posture (Let's Encrypt cert valid on apex + www).
+- Secret material handling during cutover (no creds in repo, no
+  creds in logs, screenshots redacted per no-screenshot-with-reveal
+  rule).
+- Preview-env posture (Preview-scope `BETTER_AUTH_URL` flips to apex
+  in §6 per Q1 Both, same value as Production; preview OAuth still
+  will not work cleanly at preview-alias URLs because callback
+  redirects to apex and cookie set at preview origin does not
+  transfer cross-origin; out-of-scope follow-up tracked at §10.c +
+  §10.d).
+- INV-1/INV-2/INV-3/INV-4 enforcement gaps — expect "no diff in
+  src/server/ — invariants not touched in this task" verdict.
+
+Output format per CLAUDE.md §5.10:
+
+- **PASS** items: itemize with brief justification.
+- **FAIL** items (CRITICAL / HIGH): fix in-session before PR open.
+  If fix requires operator-side action, surface to operator,
+  capture audit trail in PR description / `docs/logs/SCAFFOLD.12.md`.
+- **SURPRISE** items: write to `claude-progress.md` and STOP — do
+  not silently expand scope.
+
+Gate: §8 PASS = security-auditor returns PASS verdict OR all
+FAIL/HIGH findings closed with audit trail.
+
+### §9 — Pre-PR self-audit + PR open + merge
+
+- **§9.1 Pre-PR self-audit (CLAUDE.md §5.10):** CC walks this plan
+  item by item, reporting PASS / FAIL / SURPRISE for:
+  - §0.1–§0.5 (predecessor read + operator reports + file checks)
+  - §1 (Google OAuth URI verify-not-add per execute-time SURPRISE 3
+    reframing)
+  - §2 (Vercel domain add, DNS values captured)
+  - §3 (Namecheap A + CNAME + optional CAA)
+  - §4 (DNS propagation + TLS cert validation)
+  - §5 (www → apex redirect)
+  - §6 (Doppler edit `BETTER_AUTH_URL` → apex, both scopes via sync,
+    + manual Vercel redeploy)
+  - §7 (5 verification subtests)
+  - §8 (security-auditor verdict)
+  FAIL items fix in-session before PR open. SURPRISE items surface
+  for operator decision.
+- **§9.2** CC opens PR against `main`:
+  - Title: `chore(scaffold-12): zugzwangworld.com domain cutover`
+  - Description includes:
+    - Summary (env vars + Vercel Dashboard + Namecheap + Google OAuth;
+      no source code changes expected)
+    - §8 security-auditor verdict (and audit trail for any
+      HIGH-finding closures)
+    - Operator-confirmation log of all vendor-UI steps
+    - §7 verification artifacts (redacted; PASS confirmations)
+    - §9.1 self-audit walk: PASS/FAIL/SURPRISE per plan item
+    - Link to `docs/logs/SCAFFOLD.12.md`
+  - Files in this PR: `docs/plans/SCAFFOLD.12.md`,
+    `docs/logs/SCAFFOLD.12.md`, possibly `docs/parked.md` (§10 row).
+    Likely zero changes under `src/`.
+- **§9.3** Operator reviews PR, approves, squash-merges to `main`.
+
+Gate: §9 PASS = PR open with green checks, self-audit clean,
+operator approval, squash-merge to main.
+
+### §10 — (Deferred) Follow-ups tracked at PR close
+
+Per Q1 (Both, post-SURPRISE-5 reversal) + Q3 (Follow-up) +
+execute-time SURPRISE 3:
+
+- ~~**§10.a Old Vercel-default URI cleanup**~~ — REMOVED per
+  execute-time SURPRISE 3. The vercel-default callback URI was never
+  in the Google OAuth client (per §0.3 baseline), so there is
+  nothing to clean up. No `docs/parked.md` row.
+- **§10.b Resend domain verification + `RESEND_FROM_EMAIL` flip.**
+  Per Q3: deferred to a later task (likely SCAFFOLD.14). Add row
+  to `docs/parked.md` referencing SCAFFOLD.12 §10.b. The candidate
+  flip target (`noreply@zugzwangworld.com` vs alias of
+  `foundation@…`) is that task's call, not this one's.
+- **§10.c Preview-env `BETTER_AUTH_URL` value flip.** Per Q1 (Both,
+  post-SURPRISE-5 reversal), Preview-scope `BETTER_AUTH_URL` flips
+  to the apex URL `https://zugzwangworld.com` in §6 (same value as
+  Production, via the single Doppler `prd` config + Vercel
+  integration sync). Preview OAuth at preview-alias URLs is still
+  broken post-§6 (callback redirects to apex; cookie set at preview
+  origin doesn't transfer cross-origin). If a later task wants
+  Preview OAuth to work cleanly at canonical preview-alias URLs,
+  that task flips Preview-scope `BETTER_AUTH_URL` to one of those
+  aliases — either via Doppler config split (M2 mechanic) or a
+  Vercel-direct override (M1 mechanic). Add row to `docs/parked.md`
+  referencing SCAFFOLD.12 §10.c.
+- **§10.d Preview-alias callback URI add to Google OAuth client.**
+  Coupled with §10.c — if §10.c flips Preview `BETTER_AUTH_URL` to
+  a preview-alias URL, the Google OAuth client also needs the
+  corresponding `/api/auth/callback/google` URI added to the
+  Authorized redirect URIs list. Add row to `docs/parked.md`
+  referencing SCAFFOLD.12 §10.d. Conditional — fires only if
+  §10.c fires.
+
+These rows (b / c / d) in `docs/parked.md` ship in this PR (per
+CLAUDE.md §7 cleanup absorption rule — these are not stratum-scope
+absorbable under 2h, so they become real follow-up tasks tracked in
+`parked.md`, not embedded backlog).
+
+### §11 — Exit criteria checklist (all must be green for PR merge)
+
+- [ ] §1: Google OAuth redirect URI for `zugzwangworld.com` verified
+      present (verify-not-add per execute-time SURPRISE 3)
+- [ ] §2: Both `zugzwangworld.com` + `www.zugzwangworld.com` added
+      in Vercel; DNS values captured
+- [ ] §3: A + CNAME records added at Namecheap (+CAA if §0.5
+      flagged it)
+- [ ] §4: `dig` confirms propagation; Vercel cards show Valid + TLS
+      Issued for both domains
+- [ ] §5: `www` → apex 308 redirect configured in Vercel
+- [ ] §6: `BETTER_AUTH_URL` Doppler `prd` edit → apex (both scopes
+      via Doppler→Vercel sync per Q1 Both) + manual Vercel redeploy
+      completed
+- [ ] §7.1: `https://zugzwangworld.com/sign-in` loads, no cert errors
+- [ ] §7.2: Google OAuth completes end-to-end at new domain
+- [ ] §7.3: Email-OTP completes end-to-end at new domain (sandbox
+      sender + Proton inbox)
+- [ ] §7.4: `https://www.zugzwangworld.com` 308-redirects to apex
+- [ ] §7.5: External email → `foundation@zugzwangworld.com` received
+      in Proton
+- [ ] §8: security-auditor PASS or HIGH findings closed with audit
+      trail
+- [ ] §9.1: Pre-PR self-audit clean
+- [ ] §9.2: PR open with required content
+- [ ] `docs/logs/SCAFFOLD.12.md` committed
+- [ ] `docs/parked.md` rows for §10 added
+- [ ] §9.3: PR squash-merged to `main`
+
+### §12 — Session log (`docs/logs/SCAFFOLD.12.md`)
+
+CC writes the log BEFORE PR open per CLAUDE.md §5.9. Schema:
+
+- **What landed** — files changed (likely doc-only:
+  `docs/plans/SCAFFOLD.12.md`, `docs/logs/SCAFFOLD.12.md`,
+  `docs/parked.md`; plus `src/server/auth/email-otp.ts` comment fix
+  per SURPRISE 2), PR #, vendor-UI deltas (Google OAuth URI
+  verify-not-add per SURPRISE 3, Vercel domains added, Namecheap
+  records added, www→apex redirect, `BETTER_AUTH_URL` Doppler edit
+  to apex both scopes per Q1 Both post-SURPRISE-5).
+- **Decisions made** — Q1 Both (reversed Split → both per SURPRISE
+  5) / Q2 Operator-Dashboard / Q3
+  Follow-up, plus any in-flight choices.
+- **Open questions** — none expected, but any SURPRISE adjudication
+  outcomes land here.
+- **Next session starts at** — likely either SCAFFOLD.13-A or the
+  next tracker-v9 SCAFFOLD row depending on operator routing.
+- **Context to preserve** — old default URL still serves; old
+  Google OAuth redirect URI still active; Preview env still on old
+  default URL; Resend sandbox sender still in use.
+- **Surprises caught + fixed in-session** subsection per memory
+  `feedback_audit_surprises.md` — at minimum the plan-time
+  SURPRISES (`.vercel/repo.json` filename, §6 transient window).
+
+Convention: commit message
+`chore(scaffold-12): log session — domain cutover complete`.
+
+## Critical files
+
+Read-only verification (no edits expected unless SURPRISE forces a
+code touch):
+
+- `/Users/hrishikesh/code/zugzwang/experiment/.vercel/repo.json`
+  (§0.4 — verify present + correct linkage)
+- `/Users/hrishikesh/code/zugzwang/experiment/src/server/auth/index.ts`
+  (§0.1 reference — confirms Better Auth reads `BETTER_AUTH_URL`
+  with no fallback; lines 42–44, 188)
+- `/Users/hrishikesh/code/zugzwang/experiment/src/app/api/auth/[...all]/route.ts`
+  (§0.1 reference — confirms callback handler path
+  `/api/auth/callback/google` derived from Better Auth catch-all)
+- `/Users/hrishikesh/code/zugzwang/experiment/src/server/auth/email-otp.ts`
+  (§7.3 reference — confirms `RESEND_FROM_EMAIL` env var read at
+  line 22)
+- `/Users/hrishikesh/code/zugzwang/experiment/.env.example` (§0.1
+  reference — confirms env var inventory)
+
+Created in this task:
+
+- `/Users/hrishikesh/code/zugzwang/experiment/docs/plans/SCAFFOLD.12.md`
+  (promoted from this scratch plan after operator approval)
+- `/Users/hrishikesh/code/zugzwang/experiment/docs/logs/SCAFFOLD.12.md`
+  (§12 session log)
+- `/Users/hrishikesh/code/zugzwang/experiment/docs/parked.md`
+  appended with §10 follow-up rows
+
+## Verification (re-stated end-to-end)
+
+- §0 read + report gates pass
+- §1 OAuth URI presence verified by exact-string match against §0.3
+  baseline (verify-not-add per execute-time SURPRISE 3)
+- §2 domains added + DNS values captured
+- §3 Namecheap records added per §2 values
+- §4 `dig` + Vercel card validation
+- §5 redirect screenshot
+- §6 Doppler `prd` edit `BETTER_AUTH_URL` → apex (both scopes via
+  sync per Q1 Both) + manual Vercel redeploy completion
+- §7 five-subtest live verification at new domain
+- §8 security-auditor PASS
+- §9.1 pre-PR self-audit clean
+- §9.2 PR with required content
+- §9.3 squash-merge to main
+- §11 exit criteria checklist green
+
+## What CC is NOT doing in this task
+
+- NOT running Namecheap UI clicks
+- NOT running Vercel Domain Settings UI clicks
+- NOT running Vercel Environment Variables UI clicks
+- NOT running Google Cloud Console UI clicks
+- NOT registering domains, transferring, or changing nameservers
+- NOT modifying DNSSEC settings
+- NOT touching Proton Mail configuration
+- NOT generating, rotating, or moving any OAuth client secret
+- NOT making subdomain decisions (apex-only confirmed for experiment
+  phase)
+- NOT flipping `RESEND_FROM_EMAIL` in this PR (Q3 → follow-up)
+- NOT cleaning up the old Google OAuth redirect URI in this PR (Q1
+  → §10.a follow-up)
+- NOT closing security-auditor HIGH findings by verbal assertion
+
+## First action when execute mode begins
+
+1. Operator confirms plan approval (via ExitPlanMode → accept).
+2. CC creates branch `feat/scaffold-12-domain-cutover` (or similar
+   per conventional commits / kickoff scope).
+3. CC promotes this scratch plan to
+   `docs/plans/SCAFFOLD.12.md` and commits — convention
+   `plan(scaffold-12): promote plan` — per CLAUDE.md §5.1.
+4. CC begins §0.1 (re-read predecessor context if cleared), then
+   prompts operator for §0.2 / §0.3 / §0.5 reports.
