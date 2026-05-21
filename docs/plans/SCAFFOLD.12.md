@@ -26,17 +26,23 @@ re-verification (do not improvise).
 
 ## Open questions resolved at plan-review
 
-- **Q1 — Preview `BETTER_AUTH_URL`:** **Split.** Production scope
-  flips to `https://zugzwangworld.com`; Preview scope unbundles from
-  the current grouped value and stays at
-  `https://experiment-zugzwang-worlds-projects.vercel.app`.
-  **Revised reasoning post-§0.3 (execute-time SURPRISE 3):**
-  preview-deploy OAuth has never worked at the vercel-default URL
-  either — the corresponding callback URI is absent from the Google
-  OAuth client list per §0.3 baseline. Split preserves the
-  never-worked-anyway state; enabling Preview OAuth at any
-  preview-alias URL is out-of-scope for SCAFFOLD.12 (tracked at
-  §10.c + §10.d).
+- **Q1 — Preview `BETTER_AUTH_URL`:** **Both scopes flip to new URL.**
+  Production and Preview both get `https://zugzwangworld.com` via a
+  single Doppler `prd` edit; the Doppler→Vercel sync propagates to
+  both scopes. Q1 reversed Split → both at execute-time SURPRISE 5.
+  **Reasoning:** SURPRISE 3 established preview-deploy OAuth never
+  worked at the vercel-default URL (callback URI absent from the
+  Google OAuth client list per §0.3 baseline). SURPRISE 5 (operator's
+  out-of-sequence Doppler edit + recovery) confirmed there is no
+  working preview OAuth state to protect via Split. Q1 = both removes
+  the M1/M2/M3 mechanic dependency that POTENTIAL SURPRISE 4 flagged
+  — single Doppler edit, both scopes flip together, no Vercel-direct
+  override needed. Preview OAuth still will not work at preview-alias
+  URLs post-Q1 = both, but for a different reason (Better Auth
+  constructs `redirect_uri` from `BETTER_AUTH_URL` = apex; cookie
+  set at preview origin doesn't transfer cross-origin to apex on
+  callback). Enabling Preview OAuth at preview-alias URLs is
+  out-of-scope for SCAFFOLD.12 (tracked at §10.c + §10.d).
 - **Q2 — Env-var actor for §6:** **Operator via Vercel Dashboard.**
   Matches 13-B precedent across all credential mutations. CC issues
   the prescription, operator executes, CC verifies via `vercel env ls`.
@@ -139,6 +145,48 @@ the live plan internally consistent at all times.
      resolved at plan-review".
    - **Plan-time SURPRISE 2** transient-window framing updated to
      match §4 reframing.
+
+4. **POTENTIAL SURPRISE 4 (CC-flagged 2026-05-21, MOOT
+   post-SURPRISE-5).** CC flagged §6's substantive flow as needing
+   thought given Doppler-managed source-of-truth + Q1 Split
+   mechanic. Three candidate mechanics (M1 Vercel-direct override
+   on Preview, M2 Doppler config split, M3 integration-sync key
+   exclusion) were captured in `claude-progress.md` for
+   operator/web-Claude adjudication. SURPRISE 5's Q1 reversal
+   (Split → Both) eliminated the mechanic dependency entirely; the
+   candidate-mechanic exploration is now historical-only.
+
+5. **Execute-time SURPRISE 5 (2026-05-21).** Operator edited Doppler
+   `prd` `BETTER_AUTH_URL` to new URL out-of-sequence (before §1-§5
+   ran, before any mechanic-pre-verification). Doppler→Vercel sync
+   fired; both Production and Preview scopes briefly reflected new
+   URL. Operator reverted Doppler `BETTER_AUTH_URL` to the old URL
+   (`https://experiment-zugzwang-worlds-projects.vercel.app`) and
+   manually redeployed; production restored to pre-§6 state. **Q1
+   reversal: Split → Both.** No working preview OAuth state to
+   protect via Split (per SURPRISE 3: preview-deploy OAuth never
+   worked at the vercel-default URL; SURPRISE 5's out-of-sequence
+   edit + recovery confirmed); Q1 = Both removes the M1/M2/M3
+   mechanic dependency entirely. Plan amendments (this commit):
+   - **Q1** rewritten to "Both scopes flip to new URL" with full
+     reasoning chain (SURPRISE 3 + SURPRISE 5).
+   - **§6 substantive rewrite** — single Doppler `prd` edit (no
+     per-scope unbundle, no Vercel-direct override); both scopes
+     propagate via Doppler→Vercel sync; manual Vercel redeploy
+     required (13-B SURPRISE 11 carry-forward); start point pinned
+     as Doppler Dashboard (not Vercel Dashboard).
+   - **§8 audit scope** — env-var change description updated to
+     single-Doppler-edit framing; Preview-env posture clarified.
+   - **§9.1 walk list** — §6 framing updated.
+   - **§10 header** — Q1 attribution updated.
+   - **§10.c** — Preview-env posture reframed under Q1 Both
+     (Preview flips to apex in §6; future preview-alias flip would
+     come from this row).
+   - **§11 exit criteria** — §6 line updated.
+   - **§12 log schema** — Q1 attribution updated; SURPRISE 5 added
+     to vendor-UI delta list.
+   - **Verification (end-to-end)** — §6 line updated.
+   - **POTENTIAL SURPRISE 4** marked MOOT (entry 4 above).
 
 ## Surface separation (do not violate)
 
@@ -385,50 +433,49 @@ completes.
 Gate: §5 PASS = www card shows redirect to apex; no app-code edit
 required.
 
-### §6 — Vercel env var update: `BETTER_AUTH_URL` Production-only
+### §6 — Doppler edit: `BETTER_AUTH_URL` → new URL (both scopes)
 
-Per Q1 (Split) + Q2 (Operator via Dashboard):
+Per Q1 (Both, post-SURPRISE-5 reversal) + Q2 (Operator via Dashboard)
++ §0.2 (source-of-truth = Doppler-managed):
 
-- Operator-side: Vercel Dashboard → Settings → Environment Variables
-  → `BETTER_AUTH_URL`.
-- The current entry is grouped across Production + Preview with
-  value `https://experiment-zugzwang-worlds-projects.vercel.app`.
-- Unbundle into two scopes:
-  - **Production:** value = `https://zugzwangworld.com`
-  - **Preview:** value = `https://experiment-zugzwang-worlds-projects.vercel.app`
-    (unchanged from current)
-- Save. Operator confirms via redacted screenshot showing both
-  scopes with their values.
-- CC verifies via `vercel env ls` that two `BETTER_AUTH_URL` entries
-  exist with scopes split as Production + Preview, and that the
-  modified-at timestamp on the Production entry has just updated.
-  **Vercel env values are write-only post-set** — `vercel env ls`
-  surfaces metadata (name, scopes, modified-at) but NOT the value
-  itself; neither does `vercel inspect` read env values. The actual
-  value being correct is proven functionally at §7.2 (Google OAuth
-  completes end-to-end at the new domain), not by value read-back.
-- Operator triggers production redeploy: Vercel Dashboard →
-  Deployments → most recent Production deploy → "Redeploy" (without
-  build cache OK; with cache also fine for env-only change). Env-var
-  changes in Vercel do not propagate to running deployments without
-  a redeploy — this is standard Vercel behaviour regardless of the
-  source-of-truth determined at §0.2 (Doppler-managed: edit in
-  Doppler, sync to Vercel, then redeploy; Vercel-direct: edit in
-  Vercel, then redeploy). The 13-B carry-forward (Doppler→Vercel
-  auto-redeploy did not fire that session) reinforces the contract:
-  this task treats manual redeploy as required, never assuming
-  auto-redeploy.
+- Operator-side: Doppler Dashboard → Project `zugzwang-experiment`
+  → Config `prd` → `BETTER_AUTH_URL`.
+- Current value (post-SURPRISE-5 revert):
+  `https://experiment-zugzwang-worlds-projects.vercel.app`.
+- Edit value to: `https://zugzwangworld.com`. Save in Doppler.
+- Doppler→Vercel integration syncs BOTH the Vercel Production and
+  Vercel Preview env-var entries to the new value (single `prd`
+  config × 2 sync targets per 13-B topology). No Vercel-direct
+  override; no per-scope unbundle.
+- CC verifies via `vercel env ls production` that the
+  `BETTER_AUTH_URL` entry exists with the modified-at timestamp
+  updated post-§6 start; same check for Preview via
+  `vercel env ls preview`. **Vercel env values are write-only
+  post-set** — `vercel env ls` surfaces metadata (name, scopes,
+  modified-at) but NOT the value itself; neither does
+  `vercel inspect` read env values. Functional correctness of the
+  env value is proven at §7.2 (Google OAuth completes end-to-end
+  at the new domain), not by value read-back.
+- Operator triggers a manual Vercel production redeploy: Vercel
+  Dashboard → Deployments → most recent Production deploy →
+  "Redeploy" (with or without build cache; env-only change is fine
+  either way). Per 13-B SURPRISE 11 carry-forward: Doppler→Vercel
+  auto-redeploy was never observed firing in operator's environment
+  — treat manual redeploy as required regardless of any
+  auto-redeploy expectation. SURPRISE 5's recovery redeploy is
+  NOT a §6 redeploy; this step's redeploy is the canonical §6
+  trigger.
 - Operator confirms redeploy completed via Vercel Dashboard
   Deployments listing. CC verifies by checking that a new Production
   deployment with "Ready" status exists with a timestamp post-§6
   env-edit.
 
-Gate: §6 PASS = `vercel env ls` shows split entries (Prod + Preview)
-with the Production entry modified-at timestamp post-§6 start, AND
-a new Production deployment is "Ready" post-env-edit, AND
-`https://zugzwangworld.com` returns a 200 for `/sign-in`. Functional
-correctness of the env value itself is proven at §7.2, not here.
-Transient OAuth-break window closes at this gate.
+Gate: §6 PASS = `vercel env ls production` shows the `BETTER_AUTH_URL`
+entry with modified-at timestamp post-§6 start; same check passes
+for Preview; a new Production deployment is "Ready" post-env-edit;
+AND `https://zugzwangworld.com` returns a 200 for `/sign-in`.
+Functional correctness of the env value itself is proven at §7.2,
+not here. Transient OAuth-break window closes at this gate.
 
 ### §7 — End-to-end verification
 
@@ -477,8 +524,9 @@ briefing baked into the prompt + this plan path
 
 Scope of audit:
 
-- Env var changes (Production-scope split for `BETTER_AUTH_URL`;
-  rest of env inventory unchanged).
+- Env var changes (single Doppler `prd` edit for `BETTER_AUTH_URL`
+  → apex URL, propagating to both Vercel Production + Preview via
+  integration sync per Q1 Both; rest of env inventory unchanged).
 - Google OAuth client redirect URI list — final state per §0.3
   baseline + §1 verify-not-add (`localhost` + `zugzwangworld.com`
   callbacks; vercel-default callback URI never present per
@@ -489,10 +537,12 @@ Scope of audit:
 - Secret material handling during cutover (no creds in repo, no
   creds in logs, screenshots redacted per no-screenshot-with-reveal
   rule).
-- Preview-env posture (Preview-scope `BETTER_AUTH_URL` stays at the
-  vercel-default value per Q1 Split; Preview OAuth was never wired
-  at that URL — corresponding callback URI never in Google OAuth
-  client; out-of-scope follow-up tracked at §10.c + §10.d).
+- Preview-env posture (Preview-scope `BETTER_AUTH_URL` flips to apex
+  in §6 per Q1 Both, same value as Production; preview OAuth still
+  will not work cleanly at preview-alias URLs because callback
+  redirects to apex and cookie set at preview origin does not
+  transfer cross-origin; out-of-scope follow-up tracked at §10.c +
+  §10.d).
 - INV-1/INV-2/INV-3/INV-4 enforcement gaps — expect "no diff in
   src/server/ — invariants not touched in this task" verdict.
 
@@ -519,7 +569,8 @@ FAIL/HIGH findings closed with audit trail.
   - §3 (Namecheap A + CNAME + optional CAA)
   - §4 (DNS propagation + TLS cert validation)
   - §5 (www → apex redirect)
-  - §6 (env var split + redeploy)
+  - §6 (Doppler edit `BETTER_AUTH_URL` → apex, both scopes via sync,
+    + manual Vercel redeploy)
   - §7 (5 verification subtests)
   - §8 (security-auditor verdict)
   FAIL items fix in-session before PR open. SURPRISE items surface
@@ -545,7 +596,8 @@ operator approval, squash-merge to main.
 
 ### §10 — (Deferred) Follow-ups tracked at PR close
 
-Per Q1 (Split) + Q3 (Follow-up) + execute-time SURPRISE 3:
+Per Q1 (Both, post-SURPRISE-5 reversal) + Q3 (Follow-up) +
+execute-time SURPRISE 3:
 
 - ~~**§10.a Old Vercel-default URI cleanup**~~ — REMOVED per
   execute-time SURPRISE 3. The vercel-default callback URI was never
@@ -556,11 +608,18 @@ Per Q1 (Split) + Q3 (Follow-up) + execute-time SURPRISE 3:
   to `docs/parked.md` referencing SCAFFOLD.12 §10.b. The candidate
   flip target (`noreply@zugzwangworld.com` vs alias of
   `foundation@…`) is that task's call, not this one's.
-- **§10.c Preview-env `BETTER_AUTH_URL` value flip.** Per Q1 Split,
-  Preview-scope `BETTER_AUTH_URL` stays at the vercel-default value
-  in this PR. If a later task wants Preview OAuth to work at a
-  canonical preview-alias URL, that task flips this env var.
-  Add row to `docs/parked.md` referencing SCAFFOLD.12 §10.c.
+- **§10.c Preview-env `BETTER_AUTH_URL` value flip.** Per Q1 (Both,
+  post-SURPRISE-5 reversal), Preview-scope `BETTER_AUTH_URL` flips
+  to the apex URL `https://zugzwangworld.com` in §6 (same value as
+  Production, via the single Doppler `prd` config + Vercel
+  integration sync). Preview OAuth at preview-alias URLs is still
+  broken post-§6 (callback redirects to apex; cookie set at preview
+  origin doesn't transfer cross-origin). If a later task wants
+  Preview OAuth to work cleanly at canonical preview-alias URLs,
+  that task flips Preview-scope `BETTER_AUTH_URL` to one of those
+  aliases — either via Doppler config split (M2 mechanic) or a
+  Vercel-direct override (M1 mechanic). Add row to `docs/parked.md`
+  referencing SCAFFOLD.12 §10.c.
 - **§10.d Preview-alias callback URI add to Google OAuth client.**
   Coupled with §10.c — if §10.c flips Preview `BETTER_AUTH_URL` to
   a preview-alias URL, the Google OAuth client also needs the
@@ -585,8 +644,9 @@ absorbable under 2h, so they become real follow-up tasks tracked in
 - [ ] §4: `dig` confirms propagation; Vercel cards show Valid + TLS
       Issued for both domains
 - [ ] §5: `www` → apex 308 redirect configured in Vercel
-- [ ] §6: `BETTER_AUTH_URL` split (Prod=new, Preview=old) + manual
-      redeploy completed
+- [ ] §6: `BETTER_AUTH_URL` Doppler `prd` edit → apex (both scopes
+      via Doppler→Vercel sync per Q1 Both) + manual Vercel redeploy
+      completed
 - [ ] §7.1: `https://zugzwangworld.com/sign-in` loads, no cert errors
 - [ ] §7.2: Google OAuth completes end-to-end at new domain
 - [ ] §7.3: Email-OTP completes end-to-end at new domain (sandbox
@@ -608,10 +668,13 @@ CC writes the log BEFORE PR open per CLAUDE.md §5.9. Schema:
 
 - **What landed** — files changed (likely doc-only:
   `docs/plans/SCAFFOLD.12.md`, `docs/logs/SCAFFOLD.12.md`,
-  `docs/parked.md`), PR #, vendor-UI deltas (Google OAuth URI add,
-  Vercel domains added, Namecheap records added, www→apex redirect,
-  `BETTER_AUTH_URL` Production split).
-- **Decisions made** — Q1 Split / Q2 Operator-Dashboard / Q3
+  `docs/parked.md`; plus `src/server/auth/email-otp.ts` comment fix
+  per SURPRISE 2), PR #, vendor-UI deltas (Google OAuth URI
+  verify-not-add per SURPRISE 3, Vercel domains added, Namecheap
+  records added, www→apex redirect, `BETTER_AUTH_URL` Doppler edit
+  to apex both scopes per Q1 Both post-SURPRISE-5).
+- **Decisions made** — Q1 Both (reversed Split → both per SURPRISE
+  5) / Q2 Operator-Dashboard / Q3
   Follow-up, plus any in-flight choices.
 - **Open questions** — none expected, but any SURPRISE adjudication
   outcomes land here.
@@ -664,7 +727,8 @@ Created in this task:
 - §3 Namecheap records added per §2 values
 - §4 `dig` + Vercel card validation
 - §5 redirect screenshot
-- §6 split env var + redeploy completion
+- §6 Doppler `prd` edit `BETTER_AUTH_URL` → apex (both scopes via
+  sync per Q1 Both) + manual Vercel redeploy completion
 - §7 five-subtest live verification at new domain
 - §8 security-auditor PASS
 - §9.1 pre-PR self-audit clean
