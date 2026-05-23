@@ -53,13 +53,45 @@ async function handleAuth(request: Request): Promise<Response> {
 		`Max-Age=${ONBOARDING_REF_MAX_AGE_SEC}`,
 	].join("; ");
 
-	return new Response(null, {
-		status: 302,
-		headers: {
-			location: "/onboarding",
-			"set-cookie": setCookie,
+	// §18 Amendment 1.6 path discriminator: the OAuth callback path is
+	// a browser-navigation consumer (Google redirects the user-agent
+	// here post-consent); the SDK email-OTP-verify path is a
+	// programmatic JSON consumer. Two response shapes, one per
+	// consumer-type. The token rides only in the HttpOnly cookie either
+	// way; the 302 branch has a null body so the HMAC onboardingRef is
+	// never visible in the response (screenshot-leak surface closed).
+	const url = new URL(request.url);
+	const isOAuthCallback = url.pathname.startsWith("/api/auth/callback/");
+
+	if (isOAuthCallback) {
+		return new Response(null, {
+			status: 302,
+			headers: {
+				location: "/onboarding",
+				"set-cookie": setCookie,
+			},
+		});
+	}
+
+	// SDK consumer path. FLAT JSON body matches better-fetch's
+	// error-spread at @better-fetch/fetch/dist/index.js:676-680 + Better
+	// Auth's APIError serialization convention per
+	// tests/server/auth/_probe-apierror-body-survival.test.ts. Detection
+	// at src/app/(auth)/sign-in/otp/page.tsx via
+	// `sdkError?.message === "ONBOARDING_REQUIRED"`.
+	return new Response(
+		JSON.stringify({
+			message: parsed.message,
+			onboardingRef: parsed.onboardingRef,
+		}),
+		{
+			status: 403,
+			headers: {
+				"content-type": "application/json",
+				"set-cookie": setCookie,
+			},
 		},
-	});
+	);
 }
 
 export const GET = handleAuth;

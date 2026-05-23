@@ -21,3 +21,15 @@ process.env.DATABASE_URL ??=
 	"postgresql://postgres:postgres@localhost:54322/postgres";
 process.env.UPSTASH_REDIS_REST_URL ??= "https://test.upstash.io";
 process.env.UPSTASH_REDIS_REST_TOKEN ??= "test-upstash-token-placeholder";
+
+// Node test environment shim: better-fetch (under better-auth's client)
+// synchronously throws when constructing URLs from relative paths if
+// `window.location` is undefined. Per SCAFFOLD.3-FOLLOWUP-1 §15 Amendment
+// 1.3 SURPRISE 2 resolution: provide a stable `window.location.origin` so
+// the SDK can build absolute URLs against this base in the Node runtime.
+if (typeof globalThis.window === "undefined") {
+	Object.defineProperty(globalThis, "window", {
+		value: { location: { origin: "http://localhost:3000" } },
+		writable: true,
+	});
+}

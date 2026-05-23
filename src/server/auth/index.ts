@@ -28,13 +28,6 @@ import {
 //     protection via createSessionGate(db) (SPEC.2 §8.3 + plan §1)
 //   - advanced.database.generateId: () => uuidv7() across all 4 Better Auth
 //     tables (SPEC.2 §8.2)
-//
-// The OTP-gate plugin's hooks.before array is also attached to
-// `auth.options.hooks.before` post-hoc for test introspection per
-// `tests/server/auth/otp.test.ts`. Better Auth's runtime aggregation has
-// already completed by then (init reads options.hooks.before as a single
-// AuthMiddleware at construction); the post-hoc mutation is purely a
-// surface-for-tests convenience.
 
 if (!process.env.BETTER_AUTH_SECRET) {
 	throw new Error("BETTER_AUTH_SECRET not set");
@@ -65,7 +58,7 @@ const ONE_HUNDRED_YEARS_SEC = 60 * 60 * 24 * 365 * 100;
 
 type HookCtx = {
 	path?: string;
-	body?: { email?: string; turnstileToken?: string } | unknown;
+	body?: { email?: string } | unknown;
 	request?: { headers?: Headers };
 	headers?: Headers;
 };
@@ -113,20 +106,25 @@ const otpGateBeforeHooks = [
 	{
 		matcher: (ctx: HookCtx) => ctx.path === "/email-otp/send-verification-otp",
 		handler: async (ctx: HookCtx): Promise<Record<string, unknown>> => {
-			const body = (ctx.body ?? {}) as {
-				email?: string;
-				turnstileToken?: string;
-			};
+			const body = (ctx.body ?? {}) as { email?: string };
 			const ip = ipFromCtx(ctx);
+			// Q6 (per §15 Amendment 1.3): read Turnstile token from the
+			// `x-turnstile-token` header instead of the body. The Better Auth
+			// email-OTP send-verification-otp Zod schema is default-`.strip()`
+			// (verified at execute-time pre-check §14.5.1) — passing the token
+			// in the body would have it silently dropped before the hook
+			// observes it. Header transport sidesteps the schema strip.
+			const headers = ctx.request?.headers ?? ctx.headers;
+			const turnstileToken = headers?.get("x-turnstile-token") ?? "";
 
 			// Turnstile siteverify (fail-CLOSED per SPEC.2 §18.2 + plan §5
 			// failure-mode #2). Matched to this path only — Google callback
 			// path explicitly excluded so a Cloudflare outage doesn't take
 			// both auth paths down.
-			if (!body.turnstileToken) {
+			if (!turnstileToken) {
 				throw new APIError("BAD_REQUEST", { message: "turnstile_required" });
 			}
-			const ok = await verifyTurnstile(body.turnstileToken, ip);
+			const ok = await verifyTurnstile(turnstileToken, ip);
 			if (!ok) {
 				throw new APIError("BAD_REQUEST", { message: "turnstile_failed" });
 			}
@@ -283,17 +281,3 @@ export const auth = betterAuth({
 		},
 	},
 });
-
-// Test introspection: expose the OTP-gate before-hook array on
-// `auth.options.hooks.before`. Better Auth's runtime aggregation read
-// `options.hooks.before` at init (it was undefined then, since we didn't
-// configure top-level hooks); mutating it now is purely for unit tests that
-// probe the array shape per `tests/server/auth/otp.test.ts`. Runtime
-// dispatch happens via the zugzwang-otp-gate plugin's hooks.before per
-// `to-auth-endpoints.mjs` plugin-hook aggregation.
-(
-	auth as { options: { hooks?: { before?: typeof otpGateBeforeHooks } } }
-).options.hooks = {
-	...((auth as { options: { hooks?: object } }).options.hooks ?? {}),
-	before: otpGateBeforeHooks,
-};
