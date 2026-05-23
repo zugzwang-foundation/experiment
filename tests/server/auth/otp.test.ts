@@ -118,20 +118,29 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 		//
 		// Verifier: walk the registered hooks.before entries, find the
 		// Turnstile-handler entry, run its matcher against both paths.
+		// §15 Amendment 1.3: walk plugin registration directly instead of
+		// the (removed) post-hoc `auth.options.hooks.before` mutation.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: unknown;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: unknown;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		expect(otpGatePlugin).toBeDefined();
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		expect(beforeHooks.length).toBeGreaterThan(0);
 
 		// At least one before-hook entry must match the OTP send path AND
@@ -160,20 +169,27 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 			reset: 0,
 		});
 
+		// §15 Amendment 1.3: walk plugin registration directly.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: (ctx: unknown) => Promise<unknown>;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		const otpHook = beforeHooks.find((h) =>
 			h.matcher({ path: "/email-otp/send-verification-otp" }),
 		);
@@ -188,9 +204,13 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 				path: "/email-otp/send-verification-otp",
 				body: {
 					email: "user@example.com",
-					turnstileToken: "test-token-passing",
 				},
-				request: { headers: new Headers({ "x-forwarded-for": "1.2.3.4" }) },
+				request: {
+					headers: new Headers({
+						"x-forwarded-for": "1.2.3.4",
+						"x-turnstile-token": "test-token-passing",
+					}),
+				},
 			}),
 		).resolves.toBeDefined();
 
@@ -214,20 +234,27 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 			new Response(JSON.stringify({ success: false }), { status: 200 }),
 		);
 
+		// §15 Amendment 1.3: walk plugin registration directly.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: (ctx: unknown) => Promise<unknown>;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		const otpHook = beforeHooks.find((h) =>
 			h.matcher({ path: "/email-otp/send-verification-otp" }),
 		);
@@ -238,9 +265,13 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 				path: "/email-otp/send-verification-otp",
 				body: {
 					email: "user@example.com",
-					turnstileToken: "test-token-failing",
 				},
-				request: { headers: new Headers({ "x-forwarded-for": "1.2.3.4" }) },
+				request: {
+					headers: new Headers({
+						"x-forwarded-for": "1.2.3.4",
+						"x-turnstile-token": "test-token-failing",
+					}),
+				},
 			}),
 		).rejects.toBeDefined();
 
@@ -257,20 +288,27 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 			new Response("server error", { status: 503 }),
 		);
 
+		// §15 Amendment 1.3: walk plugin registration directly.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: (ctx: unknown) => Promise<unknown>;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		const otpHook = beforeHooks.find((h) =>
 			h.matcher({ path: "/email-otp/send-verification-otp" }),
 		);
@@ -281,9 +319,13 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 				path: "/email-otp/send-verification-otp",
 				body: {
 					email: "user@example.com",
-					turnstileToken: "anything",
 				},
-				request: { headers: new Headers({ "x-forwarded-for": "1.2.3.4" }) },
+				request: {
+					headers: new Headers({
+						"x-forwarded-for": "1.2.3.4",
+						"x-turnstile-token": "anything",
+					}),
+				},
 			}),
 		).rejects.toBeDefined();
 	});
@@ -304,20 +346,27 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 			retryAfter: 3600,
 		});
 
+		// §15 Amendment 1.3: walk plugin registration directly.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: (ctx: unknown) => Promise<unknown>;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		const otpHook = beforeHooks.find((h) =>
 			h.matcher({ path: "/email-otp/send-verification-otp" }),
 		);
@@ -328,9 +377,13 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 				path: "/email-otp/send-verification-otp",
 				body: {
 					email: "user@example.com",
-					turnstileToken: "test-token-passing",
 				},
-				request: { headers: new Headers({ "x-forwarded-for": "1.2.3.4" }) },
+				request: {
+					headers: new Headers({
+						"x-forwarded-for": "1.2.3.4",
+						"x-turnstile-token": "test-token-passing",
+					}),
+				},
 			}),
 		).rejects.toBeDefined();
 
@@ -359,20 +412,27 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 			retryAfter: 60,
 		});
 
+		// §15 Amendment 1.3: walk plugin registration directly.
 		const opts = (
 			auth as {
 				options?: {
-					hooks?: {
-						before?: Array<{
-							matcher: (ctx: { path?: string }) => boolean;
-							handler: (ctx: unknown) => Promise<unknown>;
-						}>;
-					};
+					plugins?: Array<{
+						id?: string;
+						hooks?: {
+							before?: Array<{
+								matcher: (ctx: { path?: string }) => boolean;
+								handler: (ctx: unknown) => Promise<unknown>;
+							}>;
+						};
+					}>;
 				};
 			}
 		).options;
 
-		const beforeHooks = opts?.hooks?.before ?? [];
+		const otpGatePlugin = opts?.plugins?.find(
+			(p) => p.id === "zugzwang-otp-gate",
+		);
+		const beforeHooks = otpGatePlugin?.hooks?.before ?? [];
 		const otpHook = beforeHooks.find((h) =>
 			h.matcher({ path: "/email-otp/send-verification-otp" }),
 		);
@@ -383,9 +443,13 @@ describe("Email-OTP send + verify (F-AUTH-2)", () => {
 				path: "/email-otp/send-verification-otp",
 				body: {
 					email: "user@example.com",
-					turnstileToken: "test-token-passing",
 				},
-				request: { headers: new Headers({ "x-forwarded-for": "1.2.3.4" }) },
+				request: {
+					headers: new Headers({
+						"x-forwarded-for": "1.2.3.4",
+						"x-turnstile-token": "test-token-passing",
+					}),
+				},
 			}),
 		).rejects.toBeDefined();
 

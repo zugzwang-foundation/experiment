@@ -122,3 +122,81 @@ aliases are per-deploy by default; the OAuth client URI list may
 need to be a wildcard pattern OR the preview alias may need to be
 pinned to a known stable subdomain. That is §10.d's design call,
 not this PR's.
+
+---
+
+## SCAFFOLD.3-FOLLOWUP-1 §0.2 S3 — ADR backfill (0002 through 0017 missing from disk)
+
+**Originating task:** SCAFFOLD.3-FOLLOWUP-1 §0 step-1 audit;
+re-confirmed at execute-phase Phase 0.2 `find` (empty output for
+`0004-better-auth*`).
+
+**Deferred work.** Backfill ADRs referenced by SPEC.1 / SPEC.2 /
+CLAUDE.md / AGENTS.md but missing from `docs/adr/`. Empirical
+inventory at execute time:
+
+- On disk: `0001-license-choice.md` only.
+- Referenced (per `grep -ohE "ADR-00[0-9]{2}" docs/specs/SPEC.{1,2}.md CLAUDE.md AGENTS.md | sort -u`):
+  ADR-0001 through ADR-0017.
+- **Missing (16):** ADR-0002, ADR-0003, ADR-0004 (Better Auth),
+  ADR-0005, ADR-0006, ADR-0007, ADR-0008, ADR-0009, ADR-0010 (admin
+  auth), ADR-0011, ADR-0012, ADR-0013 (bet transaction), ADR-0014 (no
+  HTTP-in-transaction), ADR-0015 (rate-limit / idempotency), ADR-0016
+  (UUIDv7 IDs), ADR-0017.
+
+**Why deferred:** scope creep. FOLLOWUP-1 is a code fix (Better Auth
+Content-Type 415 + captcha coverage), not an ADR backfill task.
+
+**Conditional trigger:** next task that touches a domain governed by
+a missing ADR.
+
+**Expected next task:** dedicated ADR-BACKFILL stratum, or absorption
+by HARDEN.* pre-launch consolidation.
+
+---
+
+## SCAFFOLD.3-FOLLOWUP-1 security-auditor v3 SURPRISE-1 — IP-extraction trust chain (`X-Forwarded-For` leftmost-element issue)
+
+**Originating task:** SCAFFOLD.3-FOLLOWUP-1 security-auditor pass
+(Amendment 1.2 transition).
+
+**Deferred work.** `src/server/auth/index.ts:104-110` (`ipFromCtx`)
+takes `X-Forwarded-For.split(",")[0]` which is the LEFTMOST element —
+attacker-controlled when chained. Defeats per-IP rate-limit
+`otpRequestPerIpBurst` AND pollutes Cloudflare siteverify `remoteip`
+field. Switch to Vercel-canonical `x-real-ip` or `request.ip` per
+Next.js runtime; rightmost `X-Forwarded-For` element is the
+trustworthy one in Vercel's edge.
+
+**Why deferred:** pre-existing surface, not touched by FOLLOWUP-1's
+Q6 change. Symmetric to the change so the SDK migration does not
+amplify the risk.
+
+**Conditional trigger:** HARDEN.* pre-launch security pass, OR first
+observed abuse pattern hitting the per-IP rate-limit.
+
+---
+
+## SCAFFOLD.3-FOLLOWUP-1 security-auditor v3 SURPRISE-2 — First-request CSRF gap on `/sign-in/social` + `/sign-in/email-otp` + `/email-otp/send-verification-otp`
+
+**Originating task:** SCAFFOLD.3-FOLLOWUP-1 security-auditor pass
+(Amendment 1.2 transition).
+
+**Deferred work.** Better Auth's `originCheckMiddleware` only
+validates origin when cookies are present. First-time (cookie-less)
+requests to `/sign-in/social`, `/sign-in/email-otp`, and
+`/email-otp/send-verification-otp` are reachable cross-origin without
+Sec-Fetch CSRF protection. Threat-model fit: low — initiating a
+Google OAuth flow cross-origin still requires victim consent at
+Google's UI; can't auto-complete sign-in. Email-OTP cross-origin send
+is rate-limited per-IP/per-email.
+
+**Why deferred:** pre-existing Better Auth design choice, not
+introduced by FOLLOWUP-1. Threat-model fit is low.
+
+**Mitigation candidates:** (a) ask Better Auth maintainers for
+`formCsrfMiddleware` on social + email-otp paths, OR (b) implement
+repo-side `Sec-Fetch-Site` check at the catch-all wrapper
+(`src/app/api/auth/[...all]/route.ts:21-66` is the right hook point).
+
+**Conditional trigger:** HARDEN.* pre-launch security pass.
