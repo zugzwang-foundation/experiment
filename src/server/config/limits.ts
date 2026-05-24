@@ -9,6 +9,12 @@
 // each constant's intended HARDEN.6 source in its JSDoc so a future reader
 // who finds a 5 looks up §16.1 / §19 Q4/Q16 / ADR-0010 / ADR-0015 for the
 // real cap rather than treating these as production numbers.
+//
+// SCAFFOLD.15 additions follow the rate-limit block: R2 storage TTLs +
+// MIME whitelist + ext mapping + byte cap, orphan-sweep tuning, OpenAI
+// moderation constants. These are SPEC-ratified (not placeholder) per
+// SCAFFOLD.15 Q2/Q3/Q5/Q6/Q7 + SPEC.2 §10.10 + §12.3 + §12.6 amendments.
+// JSDoc per-constant cites the ratification source for greppability.
 
 /** Per-email OTP request cap (anti-spam / anti-bot). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + §19 Q4/Q16. */
 export const OTP_REQUESTS_PER_EMAIL_PER_HOUR = 5;
@@ -30,3 +36,66 @@ export const BET_ATTEMPTS_PER_IP_PER_MIN = 30;
 
 /** Per-IP anti-abuse burst cap on R2 signed-PUT URL mint. PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0015 D7. */
 export const IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN = 10;
+
+// === SCAFFOLD.15: R2 storage substrate + moderation pipeline constants ====
+
+/** Signed-PUT URL TTL. Ratified at SCAFFOLD.15 Q2 + SPEC.2 §12.3 — long enough for `pick file → review → submit` (~30s typical), short enough to bound exfiltrated-URL exposure. NOT a HARDEN.6-tuned placeholder. */
+export const PUT_URL_TTL_SECONDS = 60;
+
+/** Signed-READ URL TTL for moderation hop. Per SCAFFOLD.15 Q3 + SPEC.2 §10.10 — 60s spans OpenAI's 3s call + 1 retry + slack. Discarded after the call returns; never flows to client. */
+export const READ_URL_TTL_SECONDS_MODERATION = 60;
+
+// READ_URL_TTL_SECONDS_RENDER (3600s render-side TTL per SCAFFOLD.15 Q3) is
+// documented but NOT exported — SCAFFOLD.15 doesn't ship a render-side
+// caller; DEBATE.4 adds the constant + caller together when the render path
+// lands. Pre-declaring an unused constant would invite drift.
+
+/** Image upload byte cap (8 MiB). Ratified at SCAFFOLD.15 Q6 + SPEC.2 §12.3 + 0006 CHECK constraint. Mirrored in `image_uploads.byte_size <= 8388608` SQL CHECK. */
+export const IMAGE_UPLOADS_MAX_BYTES = 8 * 1024 * 1024;
+
+/** Allowed image MIME whitelist. Per SCAFFOLD.15 Q5 — SVG excluded (XSS surface); HEIC/HEIF excluded (vendor moderation coverage gap). Whitelist (not blacklist) is the load-bearing pattern. */
+export const IMAGE_UPLOADS_ALLOWED_MIME = [
+	"image/jpeg",
+	"image/png",
+	"image/webp",
+	"image/gif",
+	"image/avif",
+] as const;
+
+/** Canonical lowercase ext per MIME for the `u/{user_id}/{image_uploads_id}.{ext}` object-key shape per SCAFFOLD.15 Q9 + SPEC.2 §12.9. JPEG canonicalises to `jpg` (not `jpeg`) to match common CDN convention + Cloudflare R2 cache-key normalisation. */
+export const IMAGE_UPLOADS_EXT_BY_MIME: Readonly<
+	Record<(typeof IMAGE_UPLOADS_ALLOWED_MIME)[number], string>
+> = {
+	"image/jpeg": "jpg",
+	"image/png": "png",
+	"image/webp": "webp",
+	"image/gif": "gif",
+	"image/avif": "avif",
+};
+
+/** Orphan-sweep candidate window — only image_uploads rows older than 120 minutes with `terminal_state IS NULL` are eligible. Ratified at SCAFFOLD.15 + SPEC.2 §12.6 — 2h spans typical F-COMMENT-3 client orchestration latency + slack. */
+export const ORPHAN_WINDOW_MINUTES = 120;
+
+/** Distributed-lock TTL for the orphan-sweep cron. 10 min = 600s — enough for a single sweep run even with R2 retry backoff; expires automatically if the handler crashes without releasing. */
+export const ORPHAN_SWEEP_LOCK_TTL_SECONDS = 600;
+
+/** Circuit breaker threshold — N consecutive R2 deleteObject failures aborts the sweep cleanly. Per SCAFFOLD.15 plan §5.6 — prevents a universal R2 outage from burning Vercel function execution budget + Sentry noise. */
+export const ORPHAN_SWEEP_CIRCUIT_BREAKER_THRESHOLD = 5;
+
+/** Orphan-sweep per-batch SELECT limit. Per SCAFFOLD.15 plan §5.6 — caps the working set per sweep iteration; loop continues until an empty batch returns. Lifted to limits.ts (rather than a route-handler module constant) for SCAFFOLD.5 sweep greppability. */
+export const ORPHAN_SWEEP_BATCH_SIZE = 100;
+
+/** OpenAI moderation model snapshot pin. Per SPEC.2 §10.10 + ADR-0014 — pinning the snapshot guarantees verdict-mapping stability across OpenAI model retunes. SCAFFOLD.16 adds PhotoDNA / Safer in parallel. */
+export const OPENAI_MODERATION_MODEL_SNAPSHOT = "omni-moderation-2024-09-26";
+
+/** OpenAI moderation call timeout (ms). Per SPEC.2 §10.10 — 3s budget for the moderation hop; 1 retry on transient failure makes the effective ceiling ~6s + reservation slack. */
+export const OPENAI_TIMEOUT_MS = 3000;
+
+/** OpenAI moderation retry budget. Per SPEC.2 §10.10 — 1 retry on transient (network / timeout / 5xx / 429). 4xx auth failures (401/403) throw without retry. */
+export const OPENAI_MAX_RETRIES = 1;
+
+/** Reservation key prefix for `mod:reserve:${userId}:${marketId}:${idempotencyKey}` per SPEC.2 §10.10. Disjoint from `idem:*` (idempotency-cache) and rate-limit prefixes per the disjointness invariant. */
+export const RESERVATION_KEY_PREFIX = "mod:reserve:";
+
+/** Reservation TTL (s). Per SPEC.2 §10.10 — 10s spans the moderation call's worst case + slack. Auto-expires if `precommitModerate` crashes between SET-NX and DEL-in-finally; a retry from the same idempotency key then proceeds cleanly. */
+export const RESERVATION_TTL_SECONDS = 10;

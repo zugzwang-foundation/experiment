@@ -43,6 +43,13 @@
       "when": 1778851244860,
       "tag": "0005_auth_schema_corrections",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779614793533,
+      "tag": "0006_image_uploads_extension",
+      "breakpoints": true
     }
   ]
 }
