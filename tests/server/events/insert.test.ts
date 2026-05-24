@@ -223,7 +223,12 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 					eventType: c.eventType,
 					aggregateType: c.aggregateType,
 					aggregateId,
-					payload,
+					// `as never` — Case.buildPayload returns the generic
+					// `Record<string, unknown>` because TypeScript can't
+					// narrow per-row through the loop over CASES. Runtime
+					// correctness ensured by the per-row eventType+payload
+					// pairing in the CASES table itself.
+					payload: payload as never,
 					metadata,
 				});
 			});

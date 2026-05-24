@@ -128,7 +128,12 @@ describe("insertEvent — probes (ENGINE.6 §F + §B)", () => {
 		// then INSERT. Asserts the row's created_at is the past ms (with
 		// tolerance for clock skew but well below the sleep delta).
 		const { userId } = await seedUser("now-vs-prefix");
-		const pastMs = Date.UTC(2026, 5, 1, 0, 0, 0); // 2026-06-01T00:00:00Z
+		// 365 days before execution time — relative-to-now to stay robust
+		// across CI runs on any date. Lands in `events_default` (outside
+		// 2026-05..2027-04 named partitions), which is fine: this probe
+		// doesn't assert partition routing (see the dedicated partition
+		// probes below).
+		const pastMs = Date.now() - 1000 * 60 * 60 * 24 * 365;
 		const eventId = uuidv7AtMs(pastMs);
 
 		// 50ms is enough to confirm derived-ms != now() on any non-broken clock.
@@ -149,8 +154,10 @@ describe("insertEvent — probes (ENGINE.6 §F + §B)", () => {
 			{ created_at: Date }[]
 		>`SELECT created_at FROM events WHERE event_id = ${eventId}`;
 		expect(rows[0]?.created_at.getTime()).toBe(pastMs);
-		// Hard floor: ~50ms minimum delta vs. now() — if helper used now()
-		// the value would be much closer to current wall-clock.
+		// Hard floor: > 30 days delta vs. now() — if helper used now()
+		// the value would be within ~50ms of Date.now(). Pinning a 365-day
+		// past pastMs makes this assertion robust regardless of execution
+		// date.
 		expect(
 			Math.abs(Date.now() - (rows[0]?.created_at.getTime() ?? 0)),
 		).toBeGreaterThan(
