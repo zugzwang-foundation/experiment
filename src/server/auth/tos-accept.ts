@@ -3,6 +3,7 @@
 import { eq, sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { v7 as uuidv7 } from "uuid";
 import { db } from "@/db";
 import { users } from "@/db/schema/auth";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
@@ -10,6 +11,7 @@ import {
 	PRIVACY_VERSION_HASH,
 	TOS_VERSION_HASH,
 } from "@/server/auth/tos-versions";
+import { insertEvent } from "@/server/events/insert";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
 // 281 + plan §4 step 3. Verifies the signed `onboarding_ref` cookie, opens
@@ -89,6 +91,23 @@ export async function acceptTosAction(
 	const ip = getIp(headerStore);
 	const ua = getUserAgent(headerStore);
 
+	// eventId generated at handler entry per ADR-0016 D1 + ENGINE.6 plan
+	// V6; reused across any SERIALIZABLE retry so the composite-PK
+	// ON CONFLICT dedupes the events row on retry (LD-8 + LD-9).
+	// metadata 7-field set per SPEC.2 §3.7; request_id 'unknown' is the
+	// S-C deferral placeholder until HARDEN.* request-context middleware
+	// populates at handler entry.
+	const eventId = uuidv7();
+	const metadata = {
+		request_id: "unknown",
+		flow_id: "F-AUTH-4",
+		user_id: userId,
+		actor_id: userId,
+		idempotency_key: null,
+		ip,
+		user_agent: ua,
+	};
+
 	await db.transaction(async (tx) => {
 		// Per plan §5 failure mode #11 + SPEC.1 line 703: `SELECT … FOR
 		// UPDATE` acquires a row-level lock so concurrent tabs serialize
@@ -118,6 +137,25 @@ export async function acceptTosAction(
 			    tos_acceptance_user_agent = ${ua}
 			WHERE id = ${userId}
 		`);
+
+		// ENGINE.6 §D.2: emission INSIDE the existing tx. Commits atomic
+		// with the UPDATE — either both rows persist or neither (V3 sync
+		// emission). Early-return branches above (missing user / tab-race
+		// no-op) skip this emission as intended.
+		await insertEvent(tx, {
+			eventId,
+			eventType: "user.tos_accepted",
+			aggregateType: "user",
+			aggregateId: userId,
+			payload: {
+				userId,
+				tosVersionHash: TOS_VERSION_HASH,
+				privacyVersionHash: PRIVACY_VERSION_HASH,
+				ip,
+				userAgent: ua,
+			},
+			metadata,
+		});
 	});
 
 	// Clear the onboarding_ref cookie — ToS is now accepted; subsequent
@@ -125,8 +163,6 @@ export async function acceptTosAction(
 	// emission Path so the browser actually clears it.
 	cookieStore.delete({ name: ONBOARDING_REF_COOKIE, path: "/onboarding" });
 
-	// TODO(ENGINE.6): writeUserEvent('user.tos_accepted', { userId, ip })
-	//
 	// Next.js redirect — user is currently anonymous (no participant
 	// cookie yet). Hitting `/` triggers middleware-or-page-level
 	// redirect to `/sign-in` where the user re-authenticates; session-
