@@ -6,9 +6,13 @@
 		"dev": "next dev",
 		"build": "next build",
 		"start": "next start",
-		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts"
+		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts",
+		"test:invariants": "vitest run tests/invariants/",
+		"test:integration": "vitest run tests/integration/"
 	},
 	"dependencies": {
+		"@aws-sdk/client-s3": "3.1045.0",
+		"@aws-sdk/s3-request-presigner": "3.1045.0",
 		"@upstash/ratelimit": "2.0.8",
 		"@upstash/redis": "1.38.0",
 		"better-auth": "1.6.11",
@@ -19,6 +23,7 @@
 		"drizzle-zod": "^0.7.0",
 		"lucide-react": "^1.14.0",
 		"next": "16.2.4",
+		"openai": "6.39.0",
 		"postgres": "^3.4.5",
 		"radix-ui": "^1.4.3",
 		"react": "19.2.4",

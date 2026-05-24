@@ -266,7 +266,7 @@ Two engines per ADR-0006. Most scheduled work runs inside Postgres via `pg_cron`
 
 **Pattern A-1 — `pg_cron`-driven (Postgres-internal cadence).** Three jobs in v1: (i) `events`-table partition-overrun monitor (alarms on any DEFAULT-partition insert per ADR-0005); (ii) `identity_pool` low-watermark check (5%-of-pool threshold — alarm 5 per ADR-0007); (iii) `markets`-state drift detection (asserts no `Open` markets past `resolution_deadline` and no `Resolved` markets without a corresponding `resolution_events` row). All three run inside the Supabase Postgres instance; no HTTP fanout; no Vercel function invocation. Failure surfaces via `cron.job_run_details` (Sentry alarm 6 per ADR-0007 §4 entry 6).
 
-**Pattern A-2 — Vercel Cron HTTP-fanout (the single carve-out).** One job in v1: R2 orphan sweep — deletes uploaded image objects whose corresponding `image_uploads` row is more than N hours old without a referencing `comments.image_url`. Cadence deferred to ADR-0006 / §21. Trigger surface: `POST /api/cron/r2-orphan-sweep` Route Handler under Bearer-auth via `CRON_SECRET` env var. Carved out because the operation reaches into R2 — Postgres can't do that natively. No other Vercel Cron jobs in v1.
+**Pattern A-2 — Vercel Cron HTTP-fanout (the single carve-out).** One job in v1: R2 orphan sweep — deletes uploaded image objects whose corresponding `image_uploads` row is more than N hours old without a referencing `comments.image_url`. Cadence `0 */6 * * *` per SCAFFOLD.15 Q7 ratification (every 6 hours; Vercel Pro tier required for sub-daily cadences). Trigger surface: `GET /api/cron/r2-orphan-sweep` Route Handler under Bearer-auth via `Authorization: Bearer ${CRON_SECRET}` header (Vercel Cron contract supports GET only). Carved out because the operation reaches into R2 — Postgres can't do that natively. No other Vercel Cron jobs in v1.
 
 The cron-engine split is itself a §3-level data-flow decision: every async background process is either (a) a Postgres-internal job that mutates Postgres state, or (b) an HTTP-fanout job that mutates state outside Postgres. Adding a third engine (a worker daemon, Inngest, BullMQ) is a future-architecture decision — explicitly out of scope for v1 per ADR-0006.
 
@@ -345,6 +345,8 @@ Six surface families. Every endpoint in §4.2 / §4.3 belongs to exactly one.
 
 The taxonomy is a §4-internal organising aid. The per-endpoint catalogue rows in §4.2 / §4.3 reference family by code (F1–F6) so a reader can scan by family.
 
+**Cross-cutting Origin-allowlist middleware (per ADR-0003 §D3 CSRF defense).** Every state-mutating Route Handler validates the `Origin` request header at handler entry against an allowlist derived from the `BETTER_AUTH_URL` env var (with http→https variant for production). Mismatched-Origin requests return HTTP 403 `error_origin_rejected` with no state changes. Missing-Origin requests (typical server-to-server callers without a browser context) are admitted — the threat model is browser-originated CSRF, which always presents an `Origin` header. Single source of truth: `src/server/middleware/origin-allowlist.ts` (bootstrapped at SCAFFOLD.15 alongside `POST /api/uploads/sign`; future bet and admin handlers reuse the same helper). The Vercel Cron Route Handler `GET /api/cron/r2-orphan-sweep` is **exempt** — Vercel-internal cron fires from a server-to-server context without an `Origin` header, and bearer-auth via `CRON_SECRET` pre-empts CSRF threats on that surface. This middleware is the cross-cutting CSRF defense that compensates for Server Actions' built-in origin check being absent on Route Handlers; per-endpoint Origin-check helpers (e.g., `src/server/bets/origin-check.ts` named in §4.3) are deprecated in favour of the cross-cutting helper as bet endpoints land.
+
 ### §4.2 Server Actions catalogue
 
 Sixteen Server Actions in v1. Every row's file path is the single source of truth for that action's implementation.
@@ -383,7 +385,7 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 | `POST /api/uploads/sign` | F6 | `src/app/api/uploads/sign/route.ts` | Participant | Optional | F-COMMENT-3 prep |
 | `POST /api/admin/uploads/sign` | F5 | `src/app/api/admin/uploads/sign/route.ts` | Admin | Optional | F-ADMIN-4 image affordance prep |
 | `GET/POST /api/auth/[...all]` | F6 | (Better Auth mounted) `src/app/api/auth/[...all]/route.ts` | Pre-auth | N/A | F-AUTH-1 OAuth callback, OTP request, session validation |
-| `POST /api/cron/r2-orphan-sweep` | F6 | `src/app/api/cron/r2-orphan-sweep/route.ts` | Bearer `CRON_SECRET` | N/A | A-2 cron pattern |
+| `GET /api/cron/r2-orphan-sweep` | F6 | `src/app/api/cron/r2-orphan-sweep/route.ts` | Bearer `CRON_SECRET` | N/A | A-2 cron pattern (Vercel Cron contract supports GET only) |
 | `GET /api/health` | F6 | `src/app/api/health/route.ts` | None | N/A | Liveness probe |
 | `GET /api/dataset/manifest` | F6 | `src/app/api/dataset/manifest/route.ts` | None (post-2026-11-06) | N/A | SPEC.1 §12.2 dataset metadata |
 
@@ -619,10 +621,13 @@ BEGIN
   IF (NEW.terminal_state IS NULL) <> (NEW.terminal_at IS NULL) THEN
     RAISE EXCEPTION 'image_uploads: terminal_state and terminal_at must transition together';
   END IF;
-  -- Reject any non-whitelisted column change
+  -- Reject any non-whitelisted column change (immutable list extended at
+  -- SCAFFOLD.15 to include content_type + byte_size per 0006 migration)
   IF NEW.id IS DISTINCT FROM OLD.id
      OR NEW.user_id IS DISTINCT FROM OLD.user_id
      OR NEW.r2_object_key IS DISTINCT FROM OLD.r2_object_key
+     OR NEW.content_type IS DISTINCT FROM OLD.content_type
+     OR NEW.byte_size IS DISTINCT FROM OLD.byte_size
      OR NEW.created_at IS DISTINCT FROM OLD.created_at THEN
     RAISE EXCEPTION 'image_uploads: only terminal_state + terminal_at may transition together';
   END IF;
@@ -630,6 +635,8 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 ```
+
+The immutable list for `image_uploads` is `id`, `user_id`, `r2_object_key`, `content_type`, `byte_size`, `created_at`. The two-column atomic transition (`terminal_state` + `terminal_at`) is the only permitted UPDATE; the trigger function lives in `drizzle/migrations/0003_append_only_triggers.sql` with the `content_type` + `byte_size` extension re-created via `CREATE OR REPLACE` in `drizzle/migrations/0006_image_uploads_extension.sql` per SCAFFOLD.15.
 
 **`system_state.frozen_at` NULL → timestamp** (per 3-E §20-1). Single whitelisted column shape — same per-column DISTINCT-FROM one-shot semantics as `identity_pool`. The conclusion-event freeze trigger flips this column once at 2026-11-05 23:59 UTC; the trigger ensures it can never flip back. Recovery from an erroneous freeze requires `BREAK_GLASS.md` direct-database surgery via `ALTER TABLE ... DISABLE TRIGGER` followed by manual UPDATE — this breaks the experiment deliverable per SPEC.1 §12.4 and is acceptable only as catastrophic-failure recovery.
 
@@ -653,7 +660,7 @@ This means a future "I just need to fix this one row" production hotfix is struc
 
 ### §6.6 Test contract floor
 
-Test contract floor at SPEC.2 v1.0 lock: **33+ cases minimum across the thirteen protected tables.** The floor is sized at the per-table baseline ratified at 3-A: each Bucket A table requires at least UPDATE-rejected + DELETE-rejected coverage; each Bucket B table requires whitelisted-transition-accepted + non-whitelisted-column-rejected + re-firing-rejected + DELETE-rejected coverage; `image_uploads` additionally requires partial-transition-rejected coverage for both column orderings. The exact case count at implementation time may exceed 33 — 33 is the minimum below which the contract is under-tested.
+Test contract floor at SPEC.2 v1.0 lock: **38+ cases minimum across the thirteen protected tables** (bumped from 33+ at SCAFFOLD.15 to absorb the five `image_uploads` 0006 extension cases — content_type/byte_size immutability under the extended trigger + CHECK constraint bound enforcement at INSERT). The floor is sized at the per-table baseline ratified at 3-A: each Bucket A table requires at least UPDATE-rejected + DELETE-rejected coverage; each Bucket B table requires whitelisted-transition-accepted + non-whitelisted-column-rejected + re-firing-rejected + DELETE-rejected coverage; `image_uploads` additionally requires partial-transition-rejected coverage for both column orderings AND content_type / byte_size immutability + CHECK-bound coverage per SCAFFOLD.15 0006. The exact case count at implementation time may exceed 38 — 38 is the minimum below which the contract is under-tested.
 
 Test path naming: `tests/db/triggers/<table>-append-only.spec.ts`, one file per protected table. SCAFFOLD.2 implements the full suite as a same-commit deliverable with the trigger SQL migration. Test fixtures bypass any application-layer protection (going straight to the Drizzle client) so the trigger is the only enforcement under test.
 
@@ -1033,7 +1040,7 @@ Every state-mutating endpoint runs through a five-step shared contract: auth gat
 
 The shared comment + friendly-fire budget is enforced by **two parallel `Ratelimit.limit()` calls** per write attempt (the per-market 24h cap *and* the user-wide 1m burst cap); both must succeed for the write to proceed. Bet placement and image-PUT-URL surfaces use **per-IP** identifiers because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface. Numeric values for every constant are deferred to HARDEN.6 number-tuning pass per the project-wide deferral rule.
 
-**Idempotency contract — header, key shape, storage.** Header: `Idempotency-Key: <opaque-string>` matching `^[A-Za-z0-9_-]{1,255}$`. Server validates format and rejects malformed with HTTP 400 `error_idempotency_key_invalid`. Required on bet endpoints (`place`, `sell`); optional on comment / friendly-fire endpoints (where natural-key uniqueness already protects against most duplicate-write hazards but idempotency-aware retries are still safer for clients on flaky networks). Scoping: **global** — matched on the key value alone, regardless of HTTP method or path; cross-endpoint reuse with mismatched body triggers the body-fingerprint mismatch path. Body fingerprint: SHA-256 of canonical-JSON-serialised request body (RFC 8785 — sorted keys, no insignificant whitespace, UTF-8), hex-encoded. Storage substrate: Redis SETNX-with-pending-sentinel on Upstash, two-tier TTL — 30-second pending sentinel for in-flight requests (sized for §10 / ADR-0014's 10-second moderation reservation worst case + §9 / ADR-0013's bet-transaction worst case ~600ms upper + slack); 24-hour completed-response cache replay (matches Stripe's published contract).
+**Idempotency contract — header, key shape, storage.** Header: `Idempotency-Key: <opaque-string>` matching `^[A-Za-z0-9_-]{1,255}$`. Server validates format and rejects malformed with HTTP 400 `error_idempotency_key_invalid`. Required on bet endpoints (`place`, `sell`); optional on comment / friendly-fire endpoints (where natural-key uniqueness already protects against most duplicate-write hazards but idempotency-aware retries are still safer for clients on flaky networks); **exempt** on file-storage PUT-URL mint (`POST /api/uploads/sign`) per SCAFFOLD.15 Q2 ratification — orphan-sweep handles duplicate-mint cleanup within `ORPHAN_WINDOW_MINUTES` per §12.6 (double-mint risk accepted; cleanup cost is one stale R2 object pruned within ≤2h). Scoping: **global** — matched on the key value alone, regardless of HTTP method or path; cross-endpoint reuse with mismatched body triggers the body-fingerprint mismatch path. Body fingerprint: SHA-256 of canonical-JSON-serialised request body (RFC 8785 — sorted keys, no insignificant whitespace, UTF-8), hex-encoded. Storage substrate: Redis SETNX-with-pending-sentinel on Upstash, two-tier TTL — 30-second pending sentinel for in-flight requests (sized for §10 / ADR-0014's 10-second moderation reservation worst case + §9 / ADR-0013's bet-transaction worst case ~600ms upper + slack); 24-hour completed-response cache replay (matches Stripe's published contract).
 
 **Single-key-encoding-both-states pattern.** One Redis key per idempotency-key encodes both lifecycle states. On cache miss, the handler executes `SET idem:{key} <pending-sentinel> NX EX 30`; the `NX` flag means "only set if key does not exist." If `NX` returns `0`, another in-flight request holds the sentinel and we return HTTP 409 `error_idempotency_in_flight` with `Retry-After: 2`. The pending-sentinel value is the constant string `"PENDING"` plus the body fingerprint (so the in-flight collision check can already detect body mismatch on a still-pending key). A body-fingerprint mismatch against a still-pending sentinel returns the in-flight collision shape (HTTP 409 `error_idempotency_in_flight + Retry-After: 2`), NOT the completed-mismatch shape (`error_idempotency_key_reused`) — surfacing two different errors mid-flight would confuse client retry policy, and the still-pending request may yet complete with a body that matches the eventual retry. On handler completion (success or terminal error), the handler executes `SET idem:{key} <completed-payload> EX 86400` where `<completed-payload>` is JSON-encoded `{ status, body, body_fingerprint }`. The atomic transition pending → completed is just a `SET` without `NX`, which Redis guarantees as atomic.
 
@@ -1103,9 +1110,9 @@ Server-mediated. Endpoint: `POST /api/uploads/sign` per §4.3 (F6 family — int
 
 **Per-IP rate limit.** `image-put-ip:{ip}` 1m sliding window per §11's per-surface rate-limit table + ADR-0015. The threat model is credential-stuffed bot traffic minting throwaway PUT URLs to fill the bucket; per-user limits don't fire until a successful login and are the wrong defense surface.
 
-**Scoped per upload.** The signed URL is bound to (i) the exact R2 object key minted at §12.2 step 2, (ii) the declared `Content-Type`, (iii) a `Content-Length-Range` constraint. A client that PUTs a different content type or oversized body to the URL is rejected by R2 directly — the server doesn't need to validate at step 4.
+**Scoped per upload.** The signed URL is bound to (i) the exact R2 object key minted at §12.2 step 2, (ii) the declared `Content-Type`, (iii) a `Content-Length-Range` constraint. A client that PUTs a different content type or oversized body to the URL is rejected by R2 directly — the server doesn't need to validate at step 4. R2 does not enforce `Content-Length-Range` at signing time per its S3-compat contract; the byte-size cap is enforced post-PUT via `HeadObject` + R2 native lifecycle rule (90-day prefix `u/` expire per SCAFFOLD.15 operator substrate, bumped from 30d to span the experiment's 51-day live window + archive headroom — see SCAFFOLD.15 SURPRISE-7) as the backstop layer.
 
-**TTL.** Deferred to SCAFFOLD.15. The TTL must be long enough for the typical "user picks file from picker → review → submit" flow (~30 seconds is plausible) and short enough that an exfiltrated URL is useless if observed (~5 minutes is plausible upper bound).
+**TTL.** 60 seconds per SCAFFOLD.15 Q2 ratification — long enough for `pick file → review → submit` (~30s typical), short enough to bound exfiltrated-URL exposure. Constant lives at `src/server/config/limits.ts` `PUT_URL_TTL_SECONDS`.
 
 ### §12.4 Signed-READ URL for OpenAI multimodal moderation
 
@@ -1129,11 +1136,11 @@ The §6.3 per-table trigger function for `image_uploads` is the only Bucket-B tr
 
 Restated from §3.5 Pattern A-2 for the §12 reader. The single Vercel Cron HTTP-fanout job in v1 per ADR-0006:
 
-- **Endpoint:** `POST /api/cron/r2-orphan-sweep` Route Handler at `src/app/api/cron/r2-orphan-sweep/route.ts`.
-- **Auth:** Bearer `CRON_SECRET` env var; Vercel Cron is the only legitimate caller.
-- **Cadence:** Deferred to ADR-0006 / §21 (the §21 cron schedule register names the slot; HARDEN.* tunes the literal cadence value).
-- **Logic:** Query `image_uploads` rows where `terminal_state IS NULL` AND `created_at < now() - <orphan_window>`; for each row, DELETE the R2 object via the R2 client; UPDATE the row SET `terminal_state = 'orphan'`, `terminal_at = now()` (the whitelisted Bucket-B transition).
-- **Failure mode:** Operational-only per ADR-0006 §"Failure-mode profile". A failed sweep does not affect any user-facing flow; storage cost grows; Sentry alarm 6e per §17.2 alarm-6 sub-table fires on Vercel Cron handler 5xx.
+- **Endpoint:** `GET /api/cron/r2-orphan-sweep` Route Handler at `src/app/api/cron/r2-orphan-sweep/route.ts` (Vercel Cron contract supports GET only — see SCAFFOLD.15 SURPRISE-1).
+- **Auth:** `Authorization: Bearer ${CRON_SECRET}` header; Vercel Cron is the only legitimate caller. Constant-time compare per `crypto.timingSafeEqual`.
+- **Cadence:** `0 */6 * * *` per SCAFFOLD.15 Q7 ratification (every 6 hours; Vercel Pro tier required for sub-daily cadences).
+- **Logic:** Query `image_uploads` rows where `terminal_state IS NULL` AND `created_at < now() - ORPHAN_WINDOW_MINUTES`; for each row, DELETE the R2 object via the R2 client; UPDATE the row SET `terminal_state = 'orphan'`, `terminal_at = now()` (the whitelisted Bucket-B transition). The cron sweep is the **Layer 2** early-orphan reconciliation surface — it sweeps `terminal_state IS NULL` rows only. Bucket-B `'blocked'` rows are deleted from R2 by the **Layer 1** R2 native lifecycle rule (90-day prefix `u/` expire — bumped from 30d at SCAFFOLD.15 per SURPRISE-7); their DB rows stay in terminal `'blocked'` state for audit. The two layers are deliberately asymmetric — Layer 2 is precision (Vercel Cron deterministic cadence), Layer 1 is safety net (R2-native, 24-hour-fuzzy).
+- **Failure mode:** Operational-only per ADR-0006 §"Failure-mode profile". A failed sweep does not affect any user-facing flow; storage cost grows (bounded by Layer 1 lifecycle); Sentry alarm 6e per §17.2 alarm-6 sub-table fires on Vercel Cron handler 5xx. Circuit breaker at 5 consecutive R2 failures aborts the sweep cleanly with `{status: 'r2_unavailable'}` HTTP 200 (NOT 5xx — Vercel cron should not treat a universal R2 outage as a cron failure; the next 6-hour fire retries).
 - **Reconciliation invariant:** `image_uploads` rows with `terminal_state IS NULL` represent in-flight uploads (the user is still completing the F-COMMENT-3 client orchestration). Rows with `terminal_state = 'committed'` have a corresponding `comments.image_uploads_id` FK; rows with `'blocked'` have a `mod_actions.image_r2_key` linkage; rows with `'orphan'` have neither and the R2 object is deleted.
 
 ### §12.7 Identity-pool PFP bucket (`zugzwang-pfp`) static lifecycle
@@ -1144,6 +1151,7 @@ Per ADR-0011 + the asset pipeline at `experiment/asset-pipeline/`. 50,000 pseudo
 - **Object metadata.** `Content-Type: image/webp` + `Cache-Control: public, max-age=31536000, immutable`. The 1-year max-age + immutable flag tells Cloudflare's edge to cache aggressively forever; the `v1/` prefix is the version sentinel — a future re-bake bumps to `v2/` and the asset pipeline re-uploads.
 - **Public-read on `v1/*`.** Bucket policy allows anonymous GET on `v1/*` only; no anonymous list, no anonymous write per ADR-0011 §"R2 storage" requirements (specific JSON owned by SCAFFOLD.15).
 - **F-AUTH-3 does NOT mint signed PUT URLs into this bucket.** PFP selection happens via `identity_pool` Bucket-B `assigned_at` whitelisted transition (per §3.5 + ADR-0011) and writes `users.pfp_filename` to the slug. The frontend composes the public CDN URL at render time via a deterministic `${R2_PFP_BASE_URL}/v1/${pfp_filename}` template.
+- **`R2_PFP_BASE_URL` substrate (experiment phase).** SCAFFOLD.15 sets `R2_PFP_BASE_URL` to the R2 public dev URL on `zugzwang-pfp` (e.g. `https://pub-<account-hash>.r2.dev`). The originally-planned custom domain `cdn.zugzwangworld.com` bind is **deferred to post-experiment** per SCAFFOLD.15 SURPRISE-8 — `zugzwangworld.com` DNS is hosted at Namecheap (not Cloudflare), and the partial-CNAME / nameserver-migration paths both carry unacceptable cost (Cloudflare Business plan ≥$200/mo) or risk (founder email continuity on `zugzwangworld@proton.me`) at experiment scale. Architectural impact: PFP reads have **no edge cache** during the experiment phase — every PFP fetch hits R2 directly (~50–100ms latency; R2 Class B Operations cost ≤$2 over the experiment window, well within the free tier). The custom-domain bind + DNS migration is a post-experiment tracker entry (testnet-phase scope).
 - **H2 erasure** scrubs `users.pfp_filename` to NULL and PII columns, but does NOT delete the R2 object. The freed pseudonym tuple in `identity_pool` remains permanently retired (the `identity_pool.assigned_at` Bucket-B transition is one-shot per ADR-0011) — the R2 object becomes unreferenced but is preserved for any future audit need.
 
 ### §12.8 Failure-mode profile (R2 outage)
@@ -1169,7 +1177,7 @@ Fourteen-row partition of concerns. §12 owns the structural and flow-contract s
 | `image_uploads` Bucket-B classification (Option B) | §12.5 + §6.3 |
 | Per-IP rate-limit class on PUT-URL mint | §11 + ADR-0015 |
 | Multimodal signed-READ TTL (60s) | §12.4 + ADR-0014 |
-| Object-key literal pattern (e.g., `comments/{user_id}/{yyyy}/{mm}/{uuid}.{ext}` or other) | SCAFFOLD.15 |
+| Object-key literal pattern — `u/{user_id}/{image_uploads_id}.{ext}` where `ext ∈ {jpg, png, webp, gif, avif}` lowercase canonical per MIME (locked at SCAFFOLD.15 Q9) | SCAFFOLD.15 ✓ |
 | CORS policy on `zugzwang-uploads` | SCAFFOLD.15 |
 | Bucket-policy JSON (anonymous-read `v1/*` rules, etc.) | SCAFFOLD.15 |
 | Read-side signed URL TTL for committed images | SCAFFOLD.15 |
