@@ -698,7 +698,7 @@ Eight columns per ADR-0005 §5:
 |---|---|---|
 | `event_id` | `uuid` NOT NULL (composite PK with `created_at` per §7.2 partition constraint) | UUIDv7 per ADR-0016 D1; client-side-generated at handler entry; storage-layer dedupe primitive (see §7.3) |
 | `event_type` | `text` NOT NULL | Discriminator; closed enum at the application layer; one Zod schema per value at `src/server/events/schemas.ts` |
-| `aggregate_type` | `text` NOT NULL | Domain object the event concerns (`market`, `bet`, `comment`, `user`, `dharma_account`, `system`) |
+| `aggregate_type` | `text` NOT NULL | Domain object the event concerns (`market`, `bet`, `comment`, `user`, `dharma_account`, `system`, `admin_session`) |
 | `aggregate_id` | `uuid` NOT NULL | The primary key of the aggregate row this event belongs to |
 | `payload` | `jsonb` NOT NULL | Per-event-type body; Zod-validated at insertion per §7.6 |
 | `payload_version` | `smallint` NOT NULL | Migration cursor for payload-shape evolution within a stable `event_type` |
@@ -752,6 +752,14 @@ When a state-mutating transaction touches more than one synchronous target, all 
 - **F-MOD-* moderation actions** write `mod_actions` + (optionally) `comments`, `bets`, `users` (Track A side effects) + `events`.
 
 The events row is always terminal in the lock-order chain per ADR-0005 convention. The CI-lint rule named in §3.7 (every state-mutating handler MUST contain at least one `insertEvent(...)` call inside its `db.transaction(...)` body) enforces the discipline at the codebase level.
+
+### §7.5.1 V3 carve-out for `user.signed_out`
+
+V3 (synchronous emission in the originating transaction) holds across all in-house mutation paths. One carve-out: when an upstream library (Better Auth `signOut`) owns the originating mutation and does not expose an after-hook for events emission, the events row may be emitted in a separate post-commit transaction. Audit-trail gap between the mutation and the emission (process-crash window) is accepted iff the upstream mutation is idempotent.
+
+`user.signed_out` emits post-Better-Auth-mutation in a new transaction. Atomicity guarantee weaker than other event_types: a process crash between Better Auth's `signOut` and our `insertEvent` call leaves a session-deleted-with-no-event-row state. The orphan is undetectable. Operational tradeoff accepted because (a) session deletion is itself idempotent — the user can log in again — and (b) the audit-trail gap for a single crashed logout has no consequence beyond a missing log entry.
+
+Currently applied only at `src/server/auth/logout.ts`. Adding another V3 carve-out is a same-commit amendment to this subsection plus a corresponding code-level justification in the relevant handler docstring.
 
 ### §7.6 drizzle-zod vs hand-written per-event-type Zod boundary
 
@@ -922,7 +930,7 @@ Auth-flow events emit to specific audit tables per SPEC.1 §16.4 lock. The encod
 
 **Participant auth flows (F-AUTH-1, F-AUTH-2, F-AUTH-3, F-AUTH-4, F-AUTH-5).** Events rows emit to `user_events` (Bucket A) with `metadata.user_id = users.id` and `metadata.actor_id = users.id` (self-actor). Event types: `user.oauth_signed_in`, `user.otp_signed_in`, `user.pseudonym_assigned`, `user.tos_accepted`, `user.signed_out`. The actor IS the user; participant flows never write to `admin_events`.
 
-**Admin auth flow (F-AUTH-ADMIN).** Events row emits to `admin_events` (Bucket A) with `metadata.user_id = NULL` and `metadata.actor_id = 'admin-singleton'`. Event type: `admin.signed_in`. Admin flows never write to `user_events`. The encoding signals to downstream consumers (dataset-export pipeline at §19, audit search at F-ADMIN-5, observability tag set at §17) that the row is admin-actor — there is no pseudonym to map for the public dataset; admin rows pass through without pseudonymization per §3.6.
+**Admin auth flow (F-AUTH-ADMIN + F-AUTH-5-ADMIN).** Events row emits to `admin_events` (Bucket A) with `metadata.user_id = NULL` and `metadata.actor_id = 'admin-singleton'`. Event types: `admin.signed_in`, `admin.signed_out`. Both carry `aggregate_type = 'admin_session'` with `aggregate_id = admin_sessions.session_id` (the row created at login, deleted at logout — captured via `RETURNING session_id` at login and via the cookie value at logout). Admin flows never write to `user_events`. The encoding signals to downstream consumers (dataset-export pipeline at §19, audit search at F-ADMIN-5, observability tag set at §17) that the row is admin-actor — there is no pseudonym to map for the public dataset; admin rows pass through without pseudonymization per §3.6.
 
 **The session tables themselves are NOT append-only.** `sessions` and `admin_sessions` are Bucket C — they update (`last_seen_at`) and delete (logout) routinely. Only the auth-flow *outcomes* are events; the session-row lifecycle is mutable state.
 
@@ -2607,7 +2615,7 @@ The events table is the most heavily-consumed surface for K_eff(t) trajectory de
 |---|---|---|---|
 | `event_id` | uuid | SHIP | Storage-layer dedupe primitive per §7.3 |
 | `event_type` | text | SHIP | Closed enum at application layer; one Zod schema per value at `src/server/events/schemas.ts` |
-| `aggregate_type` | text | SHIP | `market` / `bet` / `comment` / `user` / `dharma_account` / `system` |
+| `aggregate_type` | text | SHIP | `market` / `bet` / `comment` / `user` / `dharma_account` / `system` / `admin_session` |
 | `aggregate_id` | uuid | SHIP_OR_PSEUDO | Per-aggregate-type: `users` aggregate_id rewrites to pseudonym; other aggregate types preserve raw UUID |
 | `payload` | jsonb | SHIP (with per-event-type variations) | `bet.placed` carries stake / side / price; `comment.placed` carries body / side_at_post_time; etc. |
 | `payload_version` | smallint | SHIP | Migration cursor |
