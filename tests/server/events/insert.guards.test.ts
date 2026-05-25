@@ -21,7 +21,7 @@ import { v4 as uuidv4, v7 as uuidv7 } from "uuid";
 
 import { events, users } from "@/db/schema";
 import { InvalidEventIdError, InvalidEventPayloadError } from "@/lib/errors";
-import { insertEvent } from "@/server/events/insert";
+import { type AggregateType, insertEvent } from "@/server/events/insert";
 import type { EventType } from "@/server/events/schemas";
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -74,7 +74,7 @@ async function eventsCount(): Promise<number> {
  */
 type BadCase = {
 	eventType: EventType;
-	aggregateType: string;
+	aggregateType: AggregateType;
 	buildBadPayload: () => Record<string, unknown>;
 };
 

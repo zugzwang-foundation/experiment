@@ -23,7 +23,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { v7 as uuidv7 } from "uuid";
 
 import { imageUploads, users } from "@/db/schema";
-import { insertEvent } from "@/server/events/insert";
+import { type AggregateType, insertEvent } from "@/server/events/insert";
 import type { EventType } from "@/server/events/schemas";
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -67,7 +67,7 @@ function baseMetadata(userId: string | null, actorId: string) {
  */
 type Case = {
 	eventType: EventType;
-	aggregateType: string;
+	aggregateType: AggregateType;
 	buildPayload: (ctx: {
 		userId: string;
 		aggregateId: string;
