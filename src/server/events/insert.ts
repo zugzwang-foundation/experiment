@@ -61,10 +61,31 @@ function uuidv7ToCreatedAt(eventId: string): Date {
 	return new Date(Number.parseInt(hex, 16));
 }
 
+/**
+ * Closed enum of valid `aggregate_type` values per SPEC.2 §7.1 line 701
+ * + Appendix B.14. 8 values total — adding a new aggregate_type is a
+ * same-commit amendment to this union, SPEC.2 §7.1 + B.14, and any
+ * affected per-event-type payload schemas in `schemas.ts`.
+ *
+ * Narrowed from the prior `string` shape (Checkpoint 4 absorption) to
+ * close the defense-in-depth gap surfaced by security-auditor MEDIUM —
+ * a future caller passing `'admin'` instead of `'admin_session'` or
+ * `'users'` instead of `'user'` now fails at tsc time.
+ */
+export type AggregateType =
+	| "market"
+	| "bet"
+	| "comment"
+	| "user"
+	| "dharma_account"
+	| "system"
+	| "admin_session"
+	| "image_upload";
+
 export interface EventInsertInput<T extends EventType> {
 	eventId: string;
 	eventType: T;
-	aggregateType: string;
+	aggregateType: AggregateType;
 	aggregateId: string;
 	payload: z.infer<(typeof eventPayloadSchemas)[T]>;
 	metadata: z.infer<typeof eventMetadataSchema>;
