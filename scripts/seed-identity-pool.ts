@@ -20,6 +20,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 import { sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db";
@@ -208,6 +209,10 @@ async function main(): Promise<never> {
 }
 
 // Only execute main() when invoked as CLI (not when imported by tests).
-if (import.meta.url === `file://${process.argv[1]}`) {
+// Use pathToFileURL for correct URL encoding of the argv path.
+if (
+	process.argv[1] &&
+	import.meta.url === pathToFileURL(process.argv[1]).href
+) {
 	void main();
 }
