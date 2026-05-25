@@ -106,6 +106,7 @@ describe("sweepOrphans emits image_upload.orphaned (ENGINE.6 §D.6)", () => {
 		>`SELECT event_type, aggregate_type, aggregate_id, payload, metadata
 		    FROM events WHERE aggregate_id = ${id}::uuid`;
 		expect(evRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const ev = evRows[0]!;
 		expect(ev.event_type).toBe("image_upload.orphaned");
 		expect(ev.aggregate_type).toBe("image_upload");

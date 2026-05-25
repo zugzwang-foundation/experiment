@@ -248,6 +248,7 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 			          payload_version, metadata, created_at
 			    FROM events WHERE event_id = ${eventId}`;
 			expect(rows.length).toBe(1);
+			// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 			const row = rows[0]!;
 			expect(row.event_id).toBe(eventId);
 			expect(row.event_type).toBe(c.eventType);

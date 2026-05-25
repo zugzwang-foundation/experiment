@@ -105,6 +105,7 @@ describe("signOutAction emits user.signed_out (ENGINE.6 §D.5 V3 carve-out)", ()
 		>`SELECT event_type, aggregate_type, aggregate_id, payload, metadata
 		    FROM events WHERE event_type = 'user.signed_out'`;
 		expect(evRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const ev = evRows[0]!;
 		expect(ev.aggregate_type).toBe("user");
 		expect(ev.aggregate_id).toBe(userId);

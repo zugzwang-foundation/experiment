@@ -104,6 +104,7 @@ describe("adminLoginAction emits admin.signed_in (ENGINE.6 §D.3 S-F)", () => {
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
 		expect(sessionRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const sessionId = sessionRows[0]!.session_id;
 
 		// One events row.
@@ -118,6 +119,7 @@ describe("adminLoginAction emits admin.signed_in (ENGINE.6 §D.3 S-F)", () => {
 		>`SELECT event_type, aggregate_type, aggregate_id, payload, metadata
 		    FROM events WHERE event_type = 'admin.signed_in'`;
 		expect(evRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const ev = evRows[0]!;
 		expect(ev.aggregate_type).toBe("admin_session");
 		expect(ev.aggregate_id).toBe(sessionId);
@@ -211,6 +213,7 @@ describe("adminLoginAction emits admin.signed_in (ENGINE.6 §D.3 S-F)", () => {
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
 		expect(priorRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const priorSessionId = priorRows[0]!.session_id;
 
 		mockCheckRateLimit.mockResolvedValueOnce({
@@ -227,6 +230,7 @@ describe("adminLoginAction emits admin.signed_in (ENGINE.6 §D.3 S-F)", () => {
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
 		expect(newRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const newSessionId = newRows[0]!.session_id;
 		expect(newSessionId).not.toBe(priorSessionId);
 

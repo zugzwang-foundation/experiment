@@ -26,7 +26,7 @@ vi.mock("@/server/storage/r2", () => ({
 
 import { v7 as uuidv7 } from "uuid";
 
-import { imageUploads, users } from "@/db/schema";
+import { users } from "@/db/schema";
 import { signUploadAndInsert } from "@/server/storage/sign-upload";
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -115,6 +115,7 @@ describe("sign-upload emits image_upload.sign_requested (ENGINE.6 §D.1)", () =>
 		>`SELECT event_id, event_type, aggregate_type, aggregate_id, payload, metadata
 		    FROM events WHERE event_id = ${eventId}`;
 		expect(eventRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const ev = eventRows[0]!;
 		expect(ev.event_type).toBe("image_upload.sign_requested");
 		expect(ev.aggregate_type).toBe("image_upload");

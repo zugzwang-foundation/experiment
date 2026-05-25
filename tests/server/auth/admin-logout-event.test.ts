@@ -64,6 +64,7 @@ describe("adminLogoutAction emits admin.signed_out (ENGINE.6 §D.4)", () => {
 		const sessionRows = await testClient<
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
+		// biome-ignore lint/style/noNonNullAssertion: seeded above; row is guaranteed present
 		const sessionId = sessionRows[0]!.session_id;
 		mockCookiesGet.mockReturnValue({
 			name: "zugzwang_admin_session",
@@ -94,6 +95,7 @@ describe("adminLogoutAction emits admin.signed_out (ENGINE.6 §D.4)", () => {
 		>`SELECT event_type, aggregate_type, aggregate_id, payload, metadata
 		    FROM events WHERE event_type = 'admin.signed_out'`;
 		expect(evRows.length).toBe(1);
+		// biome-ignore lint/style/noNonNullAssertion: length pre-asserted by expect above
 		const ev = evRows[0]!;
 		expect(ev.aggregate_type).toBe("admin_session");
 		expect(ev.aggregate_id).toBe(sessionId);
@@ -118,6 +120,7 @@ describe("adminLogoutAction emits admin.signed_out (ENGINE.6 §D.4)", () => {
 		const sessionRows = await testClient<
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
+		// biome-ignore lint/style/noNonNullAssertion: seeded above; row is guaranteed present
 		const sessionId = sessionRows[0]!.session_id;
 		mockCookiesGet.mockReturnValue({
 			name: "zugzwang_admin_session",
@@ -179,6 +182,7 @@ describe("adminLogoutAction emits admin.signed_out (ENGINE.6 §D.4)", () => {
 		const sessionRows = await testClient<
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
+		// biome-ignore lint/style/noNonNullAssertion: seeded above; row is guaranteed present
 		const sessionId = sessionRows[0]!.session_id;
 		mockCookiesGet.mockReturnValue({
 			name: "zugzwang_admin_session",
@@ -209,6 +213,7 @@ describe("adminLogoutAction emits admin.signed_out (ENGINE.6 §D.4)", () => {
 		const sessionRows = await testClient<
 			{ session_id: string }[]
 		>`SELECT session_id FROM admin_sessions`;
+		// biome-ignore lint/style/noNonNullAssertion: seeded above; row is guaranteed present
 		const sessionId = sessionRows[0]!.session_id;
 		mockCookiesGet.mockReturnValue({
 			name: "zugzwang_admin_session",
