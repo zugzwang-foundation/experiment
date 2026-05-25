@@ -50,6 +50,13 @@
       "when": 1779614793533,
       "tag": "0006_image_uploads_extension",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779832800000,
+      "tag": "0007_pg_cron_jobs",
+      "breakpoints": true
     }
   ]
 }
