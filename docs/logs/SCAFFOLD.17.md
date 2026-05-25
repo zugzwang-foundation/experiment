@@ -169,3 +169,136 @@ Flag-absorption iteration: ~20 min wall-clock from web Claude review return thro
 
 *End of SCAFFOLD.17 plan-mode flag-absorption entry. Operator next action: confirm absorption reads correctly + `/clear` this chat + open execute chat against `plan/scaffold-17` head at the post-log commit.*
 
+---
+
+# SCAFFOLD.17 — execute close-out
+
+> Third log entry; appended 2026-05-25 at execute-chat close, before `/clear`, before operator PR review. Six fields per CLAUDE.md §5.9.
+
+## What landed (third entry)
+
+- **Branch:** `feat/scaffold-17` cut from `main` at `42baa8b` (post-ENGINE.6 merge); NOT from `plan/scaffold-17`. Plan branch carries planning artifacts as separate history; execute PR brings only the implementation.
+- **PR:** [#50](https://github.com/zugzwang-foundation/experiment/pull/50) — `feat(scaffold-17): identity-pool seed + pg_cron low-watermark + verification` against `main`.
+- **Commits on `feat/scaffold-17`:**
+  - `8700d8e` — Phase 1 scaffold (empty files + fixtures + package.json scripts).
+  - `c1d2ba4` — Phase 2 START tests-first (test-writer reviewer-call output): 10 fail-first tests + 3 regression-guards.
+  - `9fca58b` — Phase 2 §B pg_cron migration (`0007_pg_cron_jobs.sql`) + drizzle meta journal + 0007 snapshot (duplicates 0006 shape; new tables are raw-SQL-only per Flag 3 absorption).
+  - `cad1d99` — Phase 2 §A `scripts/seed-identity-pool.ts` (chunked bulk-INSERT; `runSeed` exported; CLI exit codes 0/1/2/3; dynamic `import("@/db")` keeps prod pool out of test runtime).
+  - `4ff971b` — Phase 2 §C `scripts/verify-identity-pool.ts` (4 checks; SHA-256-seeded 20-sample HEAD spot-check via `headObject`).
+  - `fbf3ba7` — Phase 2 §F 5 SPEC.2 same-commit amendments (B.15 line 2665+2666 + §5.1 Bucket C rows 22+23 + §5 prose 21→23 + §5.2 summary table 8→10).
+  - `ac06b55` — Post-audit MEDIUM fix: ESM main-gate `import.meta.url === \`file://${process.argv[1]}\`` → `pathToFileURL(process.argv[1]).href` per code-reviewer reviewer-call.
+- **Files:** 14 changed; 4669 insertions; 5 deletions.
+  - Net-new code: `scripts/seed-identity-pool.ts` (218 LOC), `scripts/verify-identity-pool.ts` (130 LOC), `drizzle/migrations/0007_pg_cron_jobs.sql` (82 LOC), `tests/db/identity-pool/seed.test.ts` (158 LOC) + `watermark.test.ts` (240 LOC).
+  - Net-new fixtures: `_fixtures/manifest-100.csv` (101 lines) + `_fixtures/manifest-malformed.csv` (4 lines).
+  - Extended: `tests/server/auth/pseudonym.test.ts` (+223 LOC = 3 new tests + import-line edit; existing 6 active tests + 1 it.todo unmodified).
+  - Modified: `docs/specs/SPEC.2.md` (5 hunks per §F).
+  - Plan + log copied from `plan/scaffold-17` into the feat branch so reviewers have execute context in-tree.
+
+## Decisions made (third entry)
+
+### Pre-PR self-audit (§6 + CLAUDE.md §5.10) — PASS
+
+Walked §A–§F inventory item-by-item with grep verification:
+- **§A**: CSV parser anchors, `ManifestParseError` export, `CHUNK_SIZE=1_000`, `onConflictDoNothing({ target: [colour, animal, number] })`, exit codes 0/1/2/3 all present + correctly discriminated; `pathToFileURL` main-gate post-MEDIUM-fix. `package.json` `seed:identity-pool:prod` entry present.
+- **§B**: `CREATE EXTENSION`, `CREATE TABLE watermark_state` + `cron_alarms`, `CREATE OR REPLACE FUNCTION check_identity_pool_watermark`, `unassigned * 20 < total` threshold (line 13 doc + line 46 SQL), 5 `--> statement-breakpoint` separators, `cron.schedule('identity-pool-watermark', '*/5 * * * *', ...)` all present. Local DB verified post-migrate: `cron.job` has the row (active=t), `watermark_state` seeded to `'above'`, `cron_alarms` empty.
+- **§C**: 4 PASS/FAIL/INFO checks, `EXPECTED_TOTAL=50_000`, `SAMPLE_N=20`, `headObject` consumed via dynamic import from `@/server/storage/r2`. `package.json` `verify:identity-pool` entry present.
+- **§D**: 4 + 6 sub-tests with names matching plan §D; afterEach/beforeEach TRUNCATE CASCADE; fixtures present and well-formed.
+- **§E**: 3 new tests appended at lines 366, 434, 512 (after existing it.todo at line 361); `expectTypeOf` imported at line 6 + used at line 534; `vi.spyOn(globalThis, "fetch")` at line 545; existing 6 active tests bodies UNCHANGED (git diff shows only additions).
+- **§F**: 5 SPEC.2 amendments grep-verified — old text 0 matches, new text 1 match each.
+
+Test budget: ~620 LOC net-new (158 + 240 + 220), well under plan §9 ceiling of 660–910 LOC. No LOC-overage SURPRISE.
+
+### Reviewer-call subagents (Phase 2 post-audit per CLAUDE.md §5.11) — 3 invocations
+
+1. **db-migration-reviewer**: PASS on all schema + function + 5 SPEC.2 amendments + meta journal + snapshot. 3 SURPRISEs surfaced (all cosmetic; see "Surprises caught + fixed in-session" below).
+2. **code-reviewer**: 1 MEDIUM **fixed in-session** + 7 LOW deferred. Details below.
+3. **security-auditor**: 0 CRITICAL / 0 HIGH / 0 MEDIUM. 1 LOW (header doc nit — `cron_alarms` accumulation bound not quantified in migration header; bound IS quantified in plan §B; not exploitable at `bigserial` × ~576 rows/day worst case vs 9e18 capacity).
+
+### Surprises caught + fixed in-session
+
+Per CLAUDE.md §5.10 self-audit ritual + user memory pattern (close-out subsection, not buried footnote):
+
+1. **code-reviewer MEDIUM — ESM main-gate path-symlink-fragile.** `import.meta.url === \`file://${process.argv[1]}\`` returns false when the script is invoked via a symlinked path (macOS Darwin `/tmp` → `/private/tmp`) because Node's `import.meta.url` resolves symlinks while `process.argv[1]` preserves un-resolved paths. Production invocation path (`pnpm seed:identity-pool:prod` → `tsx scripts/seed-identity-pool.ts`) is safe in this repo (working tree NOT under a Darwin-symlinked root), but the failure mode would be silent (script imports cleanly, exits 0 without doing anything). Test path unaffected (tests import `runSeed` directly, not `main`). **Fix in-session per CLAUDE.md §7 in-stratum drift absorption (< 2 hours):** commit `ac06b55` replaces with canonical `pathToFileURL(process.argv[1]).href` idiom + adds `process.argv[1] &&` guard. Pattern matches existing `node:url` consumption in `tests/db/identity-pool/seed.test.ts:13`.
+
+2. **db-migration-reviewer SURPRISE — SPEC.2 line numbers shifted by +2 from plan citations.** Plan §F cites lines 2663 (`number` row) + 2664 (`pseudonym` row). Actual landed at lines 2665 + 2666 — a +2 shift likely from a prior PRECURSOR-era additive edit pushing the B.15 section down. Content is verbatim-correct in both rows (grep-verified: old `1-9 per ADR-0011` = 0 matches, new `0-999 per ADR-0011` = 1 match; old `Composed slug` = 0 matches, new `PascalCase concatenation` = 1 match). No correctness issue; cosmetic plan-citation drift only. **Resolution:** absorbed (no plan amendment); future strata referencing B.15 line numbers should grep instead of hard-coding.
+
+3. **db-migration-reviewer SURPRISE — local Supabase preinstalls pg_cron in `pg_catalog`, prod-aligned environments use `extensions`.** `CREATE EXTENSION IF NOT EXISTS pg_cron WITH SCHEMA extensions` succeeds idempotently locally because IF NOT EXISTS short-circuits before the schema specification matters. On Supabase production the extension lives in `extensions` per `cron.schema_name`, so the statement remains correct for the deploy target. **Resolution:** plan §B note already acknowledges "succeeded locally"; no action.
+
+4. **db-migration-reviewer SURPRISE — SQL tab indentation vs plan markdown rendering.** Plan §B prints the file with space indentation; shipped file uses tab indentation per Biome convention + existing `0003_append_only_triggers.sql` + `0006_image_uploads_extension.sql` precedent. Semantically identical. **Resolution:** absorbed; cosmetic.
+
+5. **code-reviewer LOW — `noUncheckedIndexedAccess` missing from `tsconfig.json` despite AGENTS.md §1 claim.** AGENTS.md §1 declares `noUncheckedIndexedAccess: true`; actual `tsconfig.json` does NOT set it. Pre-existing global drift, NOT SCAFFOLD.17 scope (the seed-script's `lines[i] as string` cast is forced by this gap). **Resolution:** Carry-forward CF-9 — flag for next tsconfig sweep; AGENTS.md is the source of truth; tsconfig should align.
+
+### LOW findings deferred per CLAUDE.md §7 cleanup absorption rule (carry-forward)
+
+- code-reviewer LOW: `as unknown as Array<{...}>` casts in scripts match repo convention (verified at `scripts/seed-identity-pool-dev.ts:87`, `tests/db/identity-pool/seed.test.ts:86-88`, `watermark.test.ts:97-100`). Letter-of-AGENTS.md-§4 gap could be closed with one-line comments. **CF-8** (HARDEN.\* docs sweep).
+- code-reviewer LOW: docstring "Re-runs are safe" is precisely "Re-runs of the SAME manifest are safe" — `pseudonym` UNIQUE constraint would raise 23505 (caught at exit-2) for a pseudonym collision against a DIFFERENT manifest. **CF-10** (one-line tightening; non-blocking).
+- code-reviewer LOW: `noUncheckedIndexedAccess` global gap (see #5 above). **CF-9**.
+- code-reviewer LOW: sequential OFFSET queries × 20 in verify-script — plan §C explicitly accepted "20 short queries; acceptable at this N". **CF-11** (HARDEN.\* if 50K grows).
+- code-reviewer LOW: hard-coded `image/webp` content-type check — plan §C explicitly specified. Tripwire if pipeline ever ships AVIF/JPEG/PNG fallbacks.
+- code-reviewer LOW: `Promise<never>` return type on `main()` — technically correct; matches `process.exit(...)` discipline.
+- security-auditor LOW: migration header could quantify `cron_alarms` accumulation bound until SCAFFOLD.5 drain ships (~576 rows/day worst case vs `bigserial` 9e18 capacity). **CF-12** (one-line migration header addition; non-blocking).
+
+### Test-writer regression-guard discipline (plan §E Tests 7-9)
+
+Tests 7-9 pass on the current commit by design — they are **regression guards**, NOT fail-first per CLAUDE.md §5.6 strict interpretation. The kickoff prompt explicitly authorised this: *"Do NOT contrive a way to make Test 9 fail-first if the contract is 'regression guard only'."* Plan §E acknowledges this — Flag 2 absorption rationale states the new shape *"catches any future drift…"*. Test-writer subagent documented the design choice + coverage map; no judgment call required at execute time.
+
+## Open questions (third entry)
+
+- **None blocking PR review.** All in-scope items resolved; out-of-scope LOW findings + reviewer SURPRISEs documented above as CF-8 through CF-12.
+- **Awaiting operator review.** PR #50 is open against `main`; CI not yet run at log-write time. Operator confirms merge readiness after CI green.
+
+## Next session starts at
+
+**SCAFFOLD.16 brief-drafting chat** per the plan-mode close-out's stratum sequencing (ENGINE.6 → SCAFFOLD.17 → SCAFFOLD.16). SCAFFOLD.16 substance per `docs/logs/SCAFFOLD.15.md` line 130: PhotoDNA + Safer parallel moderation.
+
+After SCAFFOLD.17 merges, operator runs the post-merge runbook per plan §6 (operator-side; not blocking for downstream strata).
+
+## Context to preserve (third entry; supplements first + second)
+
+### Operator-side post-merge runbook (per plan §6)
+
+The seed + verify scripts ship NOW; operator runs them post-merge AFTER the external-dev image pipeline (B1) delivers the 50K `.webp` files + CSV manifest. The plan does NOT block on B1.
+
+1. **External-dev pipeline (B1).** Operator-side parallel work — 50K `.webp` files uploaded to `zugzwang-pfp/v1/` + CSV manifest produced (Q1 5-column shape: `colour, animal, number, pseudonym, pfp_filename`). NOT in SCAFFOLD.17 scope.
+2. **`pnpm seed:identity-pool:prod <manifest-path>`.** Operator runs against production DB. Wall-clock ~30 s (50 chunks × 1,000 rows × ~0.5 s/chunk per research brief R2).
+3. **`pnpm verify:identity-pool`.** Runs the 4 checks; exit 0 means all pass.
+4. **`SELECT jobname FROM cron.job WHERE jobname = 'identity-pool-watermark'`.** Operator confirms 1 row post-deploy.
+5. **`SELECT * FROM watermark_state WHERE metric = 'identity_pool_unassigned'`.** Operator confirms `state = 'above'`.
+6. **`SELECT count(*) FROM cron_alarms`.** Operator confirms 0 rows (no false-positive alarms at deploy time).
+
+### Carry-forwards minted in execute
+
+- **CF-8** — Code-reviewer LOW: `as unknown as Array<...>` casts in seed/verify scripts. One-line repo-convention comments would close the letter-of-AGENTS.md-§4 gap. HARDEN.\* docs sweep.
+- **CF-9** — Code-reviewer LOW: `noUncheckedIndexedAccess` missing from `tsconfig.json` despite AGENTS.md §1 claim. Pre-existing global drift; tsconfig should align with AGENTS.md. HARDEN.\* tsconfig sweep.
+- **CF-10** — Code-reviewer LOW: docstring "Re-runs are safe" → "Re-runs of the SAME manifest are safe" (pseudonym UNIQUE would raise 23505 on cross-manifest collision). One-line tightening.
+- **CF-11** — Code-reviewer LOW: verify-script's 20 sequential OFFSET queries — acceptable at N=50K per plan §C; revisit if N grows.
+- **CF-12** — Security-auditor LOW: migration header could quantify `cron_alarms` accumulation bound. Non-blocking; one-line addition.
+- All carry-forwards land in the operator's task tracker rather than in code today (per CLAUDE.md §7 cleanup absorption rule — drift items <2h absorb in-stratum, OR mint a real task; these are documentation-only nits without immediate consequence).
+
+### Reviewer-call invocation pattern (load-bearing for future execute chats)
+
+All 3 post-audit reviewer subagents (db-migration-reviewer, code-reviewer, security-auditor) invoked **in parallel** in a single message via 3 `Agent` tool calls with `subagent_type: "general-purpose"` + role briefing baked into the prompt + plan path + tool-scope constraint. Parallel invocation cut wall-clock by ~3× vs sequential.
+
+### Specific implementation choices ratified at execute time (non-obvious; preserve for future strata)
+
+- **Drizzle 0007 snapshot is a pure shape-duplicate of 0006** (only `id` + `prevId` change). Per Flag 3 absorption + plan §B note: `watermark_state` + `cron_alarms` ship as raw SQL only (no Drizzle declaration in SCAFFOLD.17). SCAFFOLD.5 MAY add Drizzle declarations at `src/db/schema/system.ts` when it ships the drain handler — at that point the snapshot diff will land naturally.
+- **Drizzle meta `_journal.json` `when` timestamp** for idx 7 set to `1779832800000` (~2026-05-25 06:00:00 UTC). Chosen as a small monotonic increment over 0006's `1779614793533` to preserve journal ordering; the exact value is not load-bearing.
+- **Seed-script's `import.meta.url === pathToFileURL(...).href`** prevents `main()` from running when tests import `runSeed` directly. Without this gate, the test process would call `process.exit(...)` and crash the runner. Pattern minted at SCAFFOLD.17; reusable for future tsx-invocable scripts.
+- **Test-writer reviewer-call's pseudonym.test.ts extension** added 3 new tests AFTER the existing `it.todo` (now at line 361 post-import-line-shift, previously at 352 per plan). The shift is from the import-line edit adding `expectTypeOf` to the named imports; existing 6 active test bodies UNCHANGED.
+
+## Time (third entry)
+
+Execute session: ~70-90 min wall-clock from operator kickoff to PR #50 + this log entry + push. Breakdown:
+- Phase 0–1 (baseline + scaffold): ~10 min.
+- Phase 2 START (test-writer reviewer-call): ~8 min wall-clock for subagent; ~5 min for verification + commit.
+- Phase 2 implementation (§B + §A + §C + §F): ~15 min.
+- Phase 2 post-audit (3 reviewer subagents in parallel): ~8 min wall-clock (parallel invocation); ~5 min for review + MEDIUM fix.
+- Phase 2 pre-PR self-audit: ~5 min.
+- Phase 3 (push + PR open): ~3 min.
+- Phase 4 (this log entry): ~10-15 min.
+
+Cogitation: dominated by reviewer-subagent prompt drafting (tool-scope constraints, target file enumeration, briefing references) — ~10 min cumulative across the 4 invocations (1 test-writer + 3 post-audit). Plan + brief reading at chat opening: ~5 min.
+
+---
+
+*End of SCAFFOLD.17 execute close-out. Operator next action: review PR #50 + CI green + merge against `main`. Post-merge runbook per "Context to preserve" → Operator-side runbook above. Next stratum: SCAFFOLD.16 brief-drafting.*
