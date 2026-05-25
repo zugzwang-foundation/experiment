@@ -452,7 +452,7 @@ ADRs consumed by §4: ADR-0003 (Server Actions vs Route Handlers default + runti
 
 §5 owns the *complete table inventory* for the experiment-phase build — every Postgres table the v1 codebase reads or writes, with append-only-vs-mutable classification per ADR-0005's Bucket A / B / C scheme, the per-domain schema home per ADR-0008 §4, and the load-bearing ADR(s) that mint the table's substance. SPEC.2 §5 is the single inventory; per-table DDL substance lives in ADR-0005 (table shape + classification rationale) + ADR-0008 (Drizzle declaration + migration discipline) + ADR-0016 (universal UUIDv7 PK). A reader who needs the column-by-column DDL goes to the schema file at `src/db/schema/<domain>.ts`; a reader who needs the inventory shape stays here.
 
-Twenty-one tables in v1 across nine domains. Nine strictly append-only (Bucket A); four append-only with one whitelisted column transition (Bucket B); eight mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: thirteen.
+Twenty-three tables in v1 across nine domains. Nine strictly append-only (Bucket A); four append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: thirteen.
 
 ### §5.1 Inventory table
 
@@ -493,6 +493,8 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 19 | `markets` | `markets` | ADR-0005 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6 |
 | 20 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
 | 21 | `positions` | `bets` | ADR-0005 + ADR-0009 | Per-user-per-market position cache; updated synchronously inside bet transaction per §3.7; ranking-function input via `comments.stake_at_post_time` derivation |
+| 22 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
+| 23 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
 
 ### §5.2 Bucket-classification summary
 
@@ -502,7 +504,7 @@ The bucket classification is the load-bearing operational distinction: it determ
 |---|---|---|---|
 | **A** — strictly append-only | 9 | `BEFORE UPDATE` + `BEFORE DELETE` both `RAISE EXCEPTION` | `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events` |
 | **B** — whitelisted transition | 4 | Per-table function comparing OLD/NEW row images, permitting only the named whitelisted column-set transition once | `friendly_fire_events`, `identity_pool`, `image_uploads`, `system_state` |
-| **C** — mutable | 8 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions` |
+| **C** — mutable | 10 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`, `watermark_state`, `cron_alarms` |
 
 Total protected (Bucket A + Bucket B): **thirteen tables**. The §6 test contract floor of 33+ cases in v0.3-draft is sized for this thirteen-table protected set per the per-table baseline ratified at 3-A.
 
@@ -2660,8 +2662,8 @@ The events table is the most heavily-consumed surface for K_eff(t) trajectory de
 | `id` | uuid | SHIP | Synthetic UUIDv7 PK per ADR-0016 D5 |
 | `colour` | text | SHIP | One of the canonical colour set per ADR-0011 |
 | `animal` | text | SHIP | One of the canonical animal set per ADR-0011 |
-| `number` | smallint | SHIP | 1-9 per ADR-0011 |
-| `pseudonym` | text | SHIP | Composed slug `<colour>-<animal>-<number>` |
+| `number` | smallint | SHIP | 0-999 per ADR-0011 |
+| `pseudonym` | text | SHIP | Materialised PascalCase concatenation `<Colour><Animal><NNN>` (e.g. `RedFox001`) per shipped `src/server/identity-pool/consume.ts:51`. NOT hyphen-kebab — that shape applies to `pfp_filename` only. |
 | `pfp_filename` | text | SHIP | Slug for `zugzwang-pfp/v1/<slug>` (deterministic per ADR-0011) |
 | `assigned_at` | timestamptz \| null | SHIP | Bucket-B whitelisted transition; NULL for unassigned tuples; populated at F-AUTH-3 |
 | `created_at` | timestamptz | SHIP | |

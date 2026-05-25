@@ -7,6 +7,8 @@
 		"build": "next build",
 		"start": "next start",
 		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts",
+		"seed:identity-pool:prod": "tsx scripts/seed-identity-pool.ts",
+		"verify:identity-pool": "tsx scripts/verify-identity-pool.ts",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/"
 	},
