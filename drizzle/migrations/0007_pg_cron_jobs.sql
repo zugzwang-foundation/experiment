@@ -1,0 +1,2 @@
+-- 0007_pg_cron_jobs.sql — SCAFFOLD.17
+-- TODO(SCAFFOLD.17): implement per plan §B.
