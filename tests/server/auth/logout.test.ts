@@ -14,14 +14,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Admin Server Actions validate admin_sessions only; participant Server
 // Actions validate `sessions` only.
 
-const { mockAuthApiSignOut } = vi.hoisted(() => ({
+const { mockAuthApiSignOut, mockAuthApiGetSession } = vi.hoisted(() => ({
 	mockAuthApiSignOut: vi.fn(),
+	// Per ENGINE.6 §D.5 V3 carve-out: signOutAction calls `auth.api.getSession`
+	// BEFORE `auth.api.signOut` to capture `userId` for the post-commit emit
+	// micro-tx (the session is deleted by signOut; userId unrecoverable
+	// afterwards). Default to null so existing tests (which only assert
+	// signOut wiring) get the no-op-emission branch; the ENGINE.6 emission
+	// tests live in tests/server/auth/logout-event.test.ts.
+	mockAuthApiGetSession: vi.fn().mockResolvedValue(null),
 }));
 
 vi.mock("@/server/auth/index", () => ({
 	auth: {
 		api: {
 			signOut: mockAuthApiSignOut,
+			getSession: mockAuthApiGetSession,
 		},
 	},
 }));
@@ -69,6 +77,8 @@ import { signOutAction } from "@/server/auth/logout";
 
 beforeEach(() => {
 	mockAuthApiSignOut.mockReset();
+	mockAuthApiGetSession.mockReset();
+	mockAuthApiGetSession.mockResolvedValue(null);
 	mockDb.transaction.mockReset();
 	mockDb.execute.mockReset();
 	mockDb._tx.execute.mockReset();

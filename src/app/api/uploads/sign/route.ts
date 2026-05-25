@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { v7 as uuidv7 } from "uuid";
 
 import { db } from "@/db";
 import { users } from "@/db/schema";
@@ -8,11 +9,15 @@ import {
 	StorageUnavailableError,
 } from "@/lib/errors";
 import { auth } from "@/server/auth";
+import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
+import { mintPutUrl } from "@/server/storage/r2";
 import { signUploadAndInsert } from "@/server/storage/sign-upload";
 
-// POST /api/uploads/sign — SCAFFOLD.15 plan §5.6.
+// POST /api/uploads/sign — SCAFFOLD.15 plan §5.6 + ENGINE.6 §D.1
+// (SURPRISE-A absorption: separates the tx-bound INSERT+emit from the
+// R2 HTTP hop per CLAUDE.md §3 + ADR-0014).
 //
 // Seven-step handler stack per AGENTS.md §7 / SPEC.2 §3.1, with one
 // documented exemption (Idempotency-Key per SCAFFOLD.15 Q2 + SPEC.2 §11
@@ -23,8 +28,17 @@ import { signUploadAndInsert } from "@/server/storage/sign-upload";
 //   3. Idempotency lookup: EXEMPT
 //   4. Rate-limit         (imagePutUrlPerIp per IP, 1m sliding window)
 //   5. Body validate      (hand-rolled shape; semantic via signUploadAndInsert)
-//   6. Handler body       (signUploadAndInsert — DB INSERT + R2 PUT-URL mint)
-//   7. Events row + cache: STUB (ENGINE.6 fills via insertEvent helper)
+//   6. Handler body       (db.transaction wraps signUploadAndInsert;
+//                          image_uploads INSERT + image_upload.sign_requested
+//                          events row commit atomically inside the tx)
+//   7. Events row         (folded into step 6 — emitted inside the helper
+//                          tx; the tx commit IS the surface)
+//
+// `mintPutUrl` runs AFTER the tx commits — HTTP-outside-tx per CLAUDE.md §3.
+// `eventId` is generated at handler entry per ADR-0016 D1; a retry with the
+// same body would re-enter with a fresh eventId (idempotency exempt here),
+// while a retry within the same handler invocation would reuse the captured
+// id and the composite-PK ON CONFLICT dedupes on retry.
 //
 // Returns `{ uploadId, putUrl, key }` JSON HTTP 200 on the happy path.
 
@@ -112,16 +126,46 @@ export async function POST(request: Request): Promise<Response> {
 		);
 	}
 
-	// 6. Handler body
+	// 6. Handler body — tx wraps signUploadAndInsert (INSERT + sync emit).
+	// `eventId` generated here at handler entry per ADR-0016 D1 + ENGINE.6
+	// plan V6. `metadata` carries the 7-field set per SPEC.2 §3.7;
+	// `request_id`/`user_agent` placeholders 'unknown' pending HARDEN.*
+	// request-context middleware (S-C deferral).
+	const eventId = uuidv7();
+	const metadata = {
+		request_id: "unknown",
+		flow_id: "F-COMMENT-3",
+		user_id: session.user.id,
+		actor_id: session.user.id,
+		idempotency_key: null,
+		ip,
+		user_agent: request.headers.get("user-agent") ?? "unknown",
+	};
+
 	try {
-		const result = await signUploadAndInsert({
-			db,
-			userId: session.user.id,
-			contentType: parsed.contentType,
-			byteSize: parsed.byteSize,
-		});
-		// 7. TODO(ENGINE.6): insertEvent(tx, { eventType: "image_upload.sign_requested", ... })
-		return jsonResponse(result, { status: 200 });
+		const result = await db.transaction(async (tx) =>
+			signUploadAndInsert(tx, {
+				userId: session.user.id,
+				contentType: parsed.contentType,
+				byteSize: parsed.byteSize,
+				eventId,
+				metadata,
+			}),
+		);
+		// mintPutUrl AFTER tx commits — HTTP outside the DB transaction per
+		// CLAUDE.md §3 + ADR-0014. A failure here returns 503 to the client
+		// but leaves the image_uploads row + events row committed; the
+		// orphan-sweep cron (SCAFFOLD.15) cleans the unused row within ≤2h.
+		const putUrl = await mintPutUrl(
+			"uploads",
+			result.key,
+			parsed.contentType,
+			PUT_URL_TTL_SECONDS,
+		);
+		return jsonResponse(
+			{ uploadId: result.uploadId, putUrl, key: result.key },
+			{ status: 200 },
+		);
 	} catch (err) {
 		if (err instanceof ImageMimeRejectedError) {
 			return jsonResponse(err.toEnvelope(), { status: 400 });

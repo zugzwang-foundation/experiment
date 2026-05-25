@@ -5,7 +5,10 @@ import { sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { v7 as uuidv7 } from "uuid";
+import type { z } from "zod";
 import { db } from "@/db";
+import { insertEvent } from "@/server/events/insert";
+import type { eventMetadataSchema } from "@/server/events/schemas";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
 
 // F-AUTH-ADMIN login Server Action per SPEC.1 §13 + SPEC.2 §8.4 + plan §4
@@ -86,7 +89,20 @@ function isSerializationFailure(err: unknown): boolean {
 // Single SERIALIZABLE attempt at the DELETE+INSERT replace. Hoisted so the
 // retry-once wrapper below can invoke it twice without duplicating the
 // transaction body.
-async function attemptAdminSessionReplace(): Promise<string | null> {
+//
+// ENGINE.6 §D.3 + S-F: threads eventId + metadata through so the
+// admin.signed_in events row commits inside this SERIALIZABLE tx,
+// aggregate_id = the inserted admin_sessions.session_id (UUIDv7 PK).
+// aggregate_type = 'admin_session' (the 7th SPEC.2 §7.1 aggregate_type
+// entry — same-commit amendment lands at Phase 5).
+// metadata.user_id = NULL, metadata.actor_id = 'admin-singleton' per
+// SPEC.2 §3.6. NOT an ADMIN_SINGLETON_UUID synthesized constant — the
+// JSONB `metadata.actor_id` is the admin-actor surface.
+async function attemptAdminSessionReplace(
+	eventId: string,
+	metadata: z.infer<typeof eventMetadataSchema>,
+	ip: string,
+): Promise<string | null> {
 	return db.transaction(
 		async (tx) => {
 			await tx.execute(sql`DELETE FROM admin_sessions`);
@@ -95,7 +111,19 @@ async function attemptAdminSessionReplace(): Promise<string | null> {
 				    VALUES (${uuidv7()}, now(), now())
 				    RETURNING session_id`,
 			)) as unknown as Array<{ session_id: string }>;
-			return inserted[0]?.session_id ?? null;
+			const sessionId = inserted[0]?.session_id;
+			if (!sessionId) return null;
+
+			await insertEvent(tx, {
+				eventId,
+				eventType: "admin.signed_in",
+				aggregateType: "admin_session",
+				aggregateId: sessionId,
+				payload: { sessionId, ip },
+				metadata,
+			});
+
+			return sessionId;
 		},
 		{ isolationLevel: "serializable" },
 	);
@@ -151,13 +179,32 @@ export async function adminLoginAction(
 	// `admin_login_serialization_conflict` envelope (HTTP 503 semantic,
 	// distinct from the `admin_login_invalid` 401 — surfaces as transient
 	// rather than as credential failure, no info-leak concern).
+	//
+	// ENGINE.6 §D.3: eventId + metadata generated at handler entry per
+	// ADR-0016 D1 + plan V6, threaded through both attempts. If attempt 1
+	// aborts on 40001, its events row rolls back atomically with the
+	// admin_sessions INSERT; attempt 2 inserts the events row fresh with
+	// the SAME eventId but a NEW admin_sessions.session_id (the inner
+	// uuidv7() call generates per-attempt). Final state: 1 admin_sessions
+	// row + 1 events row, aggregate_id matching the committed session_id.
+	const eventId = uuidv7();
+	const metadata = {
+		request_id: "unknown",
+		flow_id: "F-AUTH-ADMIN",
+		user_id: null,
+		actor_id: "admin-singleton",
+		idempotency_key: null,
+		ip,
+		user_agent: headerStore.get("user-agent") ?? "unknown",
+	};
+
 	let newSessionId: string | null;
 	try {
-		newSessionId = await attemptAdminSessionReplace();
+		newSessionId = await attemptAdminSessionReplace(eventId, metadata, ip);
 	} catch (err) {
 		if (!isSerializationFailure(err)) throw err;
 		try {
-			newSessionId = await attemptAdminSessionReplace();
+			newSessionId = await attemptAdminSessionReplace(eventId, metadata, ip);
 		} catch (retryErr) {
 			if (isSerializationFailure(retryErr)) return SERIALIZATION_CONFLICT;
 			throw retryErr;
@@ -177,6 +224,5 @@ export async function adminLoginAction(
 		path: "/admin",
 	});
 
-	// TODO(ENGINE.6): writeAdminEvent('admin.signed_in', { sessionId: newSessionId, ip })
 	redirect("/admin");
 }

@@ -698,7 +698,7 @@ Eight columns per ADR-0005 §5:
 |---|---|---|
 | `event_id` | `uuid` NOT NULL (composite PK with `created_at` per §7.2 partition constraint) | UUIDv7 per ADR-0016 D1; client-side-generated at handler entry; storage-layer dedupe primitive (see §7.3) |
 | `event_type` | `text` NOT NULL | Discriminator; closed enum at the application layer; one Zod schema per value at `src/server/events/schemas.ts` |
-| `aggregate_type` | `text` NOT NULL | Domain object the event concerns (`market`, `bet`, `comment`, `user`, `dharma_account`, `system`) |
+| `aggregate_type` | `text` NOT NULL | Domain object the event concerns (`market`, `bet`, `comment`, `user`, `dharma_account`, `system`, `admin_session`, `image_upload`) |
 | `aggregate_id` | `uuid` NOT NULL | The primary key of the aggregate row this event belongs to |
 | `payload` | `jsonb` NOT NULL | Per-event-type body; Zod-validated at insertion per §7.6 |
 | `payload_version` | `smallint` NOT NULL | Migration cursor for payload-shape evolution within a stable `event_type` |
@@ -752,6 +752,14 @@ When a state-mutating transaction touches more than one synchronous target, all 
 - **F-MOD-* moderation actions** write `mod_actions` + (optionally) `comments`, `bets`, `users` (Track A side effects) + `events`.
 
 The events row is always terminal in the lock-order chain per ADR-0005 convention. The CI-lint rule named in §3.7 (every state-mutating handler MUST contain at least one `insertEvent(...)` call inside its `db.transaction(...)` body) enforces the discipline at the codebase level.
+
+### §7.5.1 V3 carve-out for `user.signed_out`
+
+V3 (synchronous emission in the originating transaction) holds across all in-house mutation paths. One carve-out: when an upstream library (Better Auth `signOut`) owns the originating mutation and does not expose an after-hook for events emission, the events row may be emitted in a separate post-commit transaction. Audit-trail gap between the mutation and the emission (process-crash window) is accepted iff the upstream mutation is idempotent.
+
+`user.signed_out` emits post-Better-Auth-mutation in a new transaction. Atomicity guarantee weaker than other event_types: a process crash between Better Auth's `signOut` and our `insertEvent` call leaves a session-deleted-with-no-event-row state. The orphan is undetectable. Operational tradeoff accepted because (a) session deletion is itself idempotent — the user can log in again — and (b) the audit-trail gap for a single crashed logout has no consequence beyond a missing log entry.
+
+Currently applied only at `src/server/auth/logout.ts`. Adding another V3 carve-out is a same-commit amendment to this subsection plus a corresponding code-level justification in the relevant handler docstring.
 
 ### §7.6 drizzle-zod vs hand-written per-event-type Zod boundary
 
@@ -920,9 +928,11 @@ The seven pillars are the construction-layer protection of B5. §18.4 promotes t
 
 Auth-flow events emit to specific audit tables per SPEC.1 §16.4 lock. The encoding distinguishes participant-actor flows from admin-actor flows at the events-metadata level:
 
-**Participant auth flows (F-AUTH-1, F-AUTH-2, F-AUTH-3, F-AUTH-4, F-AUTH-5).** Events rows emit to `user_events` (Bucket A) with `metadata.user_id = users.id` and `metadata.actor_id = users.id` (self-actor). Event types: `user.oauth_signed_in`, `user.otp_signed_in`, `user.pseudonym_assigned`, `user.tos_accepted`, `user.signed_out`. The actor IS the user; participant flows never write to `admin_events`.
+All auth-flow event_types route to the unified `events` table per ADR-0005 §4 + §7. The legacy `user_events` + `admin_events` Drizzle tables in `src/db/schema/audit.ts` are retained for future stratum use (mod-action audit subdivision per F-MOD-*, dedicated admin audit search per F-ADMIN-5) but are NOT written by ENGINE.6's auth-flow emit sites. Participant vs admin distinction is preserved entirely at the metadata level (`metadata.user_id` + `metadata.actor_id`) per §3.6 — the unified-table choice doesn't dilute the actor encoding.
 
-**Admin auth flow (F-AUTH-ADMIN).** Events row emits to `admin_events` (Bucket A) with `metadata.user_id = NULL` and `metadata.actor_id = 'admin-singleton'`. Event type: `admin.signed_in`. Admin flows never write to `user_events`. The encoding signals to downstream consumers (dataset-export pipeline at §19, audit search at F-ADMIN-5, observability tag set at §17) that the row is admin-actor — there is no pseudonym to map for the public dataset; admin rows pass through without pseudonymization per §3.6.
+**Participant auth flows (F-AUTH-1, F-AUTH-2, F-AUTH-3, F-AUTH-4, F-AUTH-5).** Events rows emit to `events` (Bucket A) with `metadata.user_id = users.id` and `metadata.actor_id = users.id` (self-actor). Event types: `user.oauth_signed_in`, `user.otp_signed_in`, `user.pseudonym_assigned`, `user.tos_accepted`, `user.signed_out`. The actor IS the user; the metadata encoding makes participant rows filterable at dataset-export time.
+
+**Admin auth flow (F-AUTH-ADMIN + F-AUTH-5-ADMIN).** Events row emits to `events` (Bucket A) with `metadata.user_id = NULL` and `metadata.actor_id = 'admin-singleton'`. Event types: `admin.signed_in`, `admin.signed_out`. Both carry `aggregate_type = 'admin_session'` with `aggregate_id = admin_sessions.session_id` (the row created at login, deleted at logout — captured via `RETURNING session_id` at login and via the cookie value at logout). The metadata encoding signals to downstream consumers (dataset-export pipeline at §19, audit search at F-ADMIN-5, observability tag set at §17) that the row is admin-actor — there is no pseudonym to map for the public dataset; admin rows pass through without pseudonymization per §3.6.
 
 **The session tables themselves are NOT append-only.** `sessions` and `admin_sessions` are Bucket C — they update (`last_seen_at`) and delete (logout) routinely. Only the auth-flow *outcomes* are events; the session-row lifecycle is mutable state.
 
@@ -1835,6 +1845,28 @@ The remaining five `metadata` fields (`request_id`, `flow_id`, `user_id`, `actor
 
 **H2 erasure interaction.** Per SPEC.1 §16.6 + §12.7, H2 erasure scrubs `users` PII columns + null-s `pfp_filename` while preserving the `users` row (audit-trail integrity per Bucket-C convention). At dataset-export time, H2-erased rows ship in the same shape as not-erased rows — both have NULL email, NULL google_id, etc. The dataset consumer cannot distinguish "user erased pre-freeze" from "user never had data": this is the privacy-by-design property; not a bug.
 
+### §19.4.1 Per-payload-key STRIP rules for `events.payload`
+
+The `events.payload` JSONB column SHIPs verbatim per §19.3 row 1 + Appendix B.14, but the per-event-type payload shapes carry PII or sensitive substrate identifiers in some keys. The export pipeline applies per-event-type STRIP rules at the JSONB-key level (analogous to `metadata.ip` / `metadata.user_agent` STRIP_KEY per §19.4 table above).
+
+Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR-0005 sync-target rule); export-time strip handles the privacy boundary. Two separate concerns, two separate layers. Runtime emission MUST NOT pre-strip — full payload fidelity is required for in-database forensics + admin replay.
+
+| event_type | STRIP_KEY targets | Rationale |
+|---|---|---|
+| `user.tos_accepted` | `payload.ip`, `payload.user_agent` | PII per §19.4 row 3-4; redundant with `users.tos_acceptance_ip` + `users.tos_acceptance_user_agent` (already STRIP) |
+| `user.oauth_signed_in` | `payload.googleId` | PII per §19.4 row 2 (mirrors `users.google_id` STRIP) |
+| `user.otp_signed_in` | `payload.email` | PII per §19.4 row 1 (mirrors `users.email` STRIP) |
+| `user.pseudonym_assigned` | `payload.userId` | Defense-in-depth — `aggregate_id` already PSEUDO per §19.5; explicit payload strip prevents re-identification via cross-join |
+| `user.signed_out` | `payload.userId` | Same rationale as above |
+| `image_upload.sign_requested` | `payload.userId`, `payload.key` | `userId` PSEUDO defense-in-depth; R2 key embeds userId per SCAFFOLD.15 §Q9 (`u/<userId>/<uploadId>.<ext>`) |
+| `image_upload.committed` | `payload.userId`, `payload.key` | Same rationale (DEBATE.2 future emit site) |
+| `image_upload.blocked` | `payload.userId`, `payload.key` | Same rationale (DEBATE.2 future emit site) |
+| `image_upload.orphaned` | `payload.key` | R2 key strip; `uploadId` is the row id (SHIP — not PII) |
+| `admin.signed_in` | `payload.sessionId`, `payload.ip` | Cookie value + admin IP defense-in-depth (mitigation layer beyond `BREAK_GLASS.md` rotation pre-freeze) |
+| `admin.signed_out` | `payload.sessionId` | Cookie value defense-in-depth |
+
+**Adding a new event_type or modifying a payload shape** is a same-commit amendment to this table plus the schema declaration at `src/server/events/schemas.ts` plus the per-site emit call. The export pipeline reads this table to derive its per-payload-key strip lambdas (implementation deferred to HARDEN.* / DATASET.* stratum; runtime emission codifies the strip-key contract at the spec layer NOW so future emit sites cannot accidentally bypass).
+
 ### §19.5 Export-time JOIN pseudonymization
 
 **Cross-table joins in the released archive use pseudonym slugs as join keys, not raw `users.id` UUIDs.** The build pipeline performs export-time JOINs that rewrite every FK reference from `users.id` (UUIDv7) to the corresponding `users.pseudonym` (the colour-animal-number slug per ADR-0011 + §3.5):
@@ -2607,9 +2639,9 @@ The events table is the most heavily-consumed surface for K_eff(t) trajectory de
 |---|---|---|---|
 | `event_id` | uuid | SHIP | Storage-layer dedupe primitive per §7.3 |
 | `event_type` | text | SHIP | Closed enum at application layer; one Zod schema per value at `src/server/events/schemas.ts` |
-| `aggregate_type` | text | SHIP | `market` / `bet` / `comment` / `user` / `dharma_account` / `system` |
-| `aggregate_id` | uuid | SHIP_OR_PSEUDO | Per-aggregate-type: `users` aggregate_id rewrites to pseudonym; other aggregate types preserve raw UUID |
-| `payload` | jsonb | SHIP (with per-event-type variations) | `bet.placed` carries stake / side / price; `comment.placed` carries body / side_at_post_time; etc. |
+| `aggregate_type` | text | SHIP | `market` / `bet` / `comment` / `user` / `dharma_account` / `system` / `admin_session` / `image_upload` |
+| `aggregate_id` | uuid | SHIP_OR_PSEUDO | Per-aggregate-type: `users` aggregate_id rewrites to pseudonym; other aggregate types preserve raw UUID. `admin_session` aggregate_id (the admin cookie value) SHIPs raw — defense-in-depth covered by `BREAK_GLASS.md` rotation + payload STRIP rules per §19.4.1 |
+| `payload` | jsonb | SHIP with per-event-type STRIP_KEY rules per §19.4.1 | `bet.placed` carries stake / side / price; `comment.placed` carries body / side_at_post_time; etc. Per-event-type PII keys (`ip`, `user_agent`, `email`, `googleId`, `userId`, `key`, `sessionId`) STRIP at export per §19.4.1 table |
 | `payload_version` | smallint | SHIP | Migration cursor |
 | `metadata` | jsonb | SHIP (with PII strip per below) | |
 | `metadata.request_id` | text | SHIP_KEY | |

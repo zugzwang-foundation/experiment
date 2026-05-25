@@ -41,7 +41,11 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE image_uploads, users CASCADE`);
+	// Per ENGINE.6 §D.6 rebaseline: sweepOrphans now emits one
+	// `image_upload.orphaned` event per CAS-success, so the events table
+	// accumulates rows alongside image_uploads. TRUNCATE both to keep tests
+	// isolated.
+	await testClient.unsafe(`TRUNCATE events, image_uploads, users CASCADE`);
 	vi.clearAllMocks();
 });
 

@@ -4,10 +4,16 @@
 // is the carrier so `throw new ImageMimeRejectedError(...)` is the call
 // site, and `if (err instanceof ImageMimeRejectedError)` is the catch
 // site for type-narrowing. The `kind` field maps 1:1 to the HTTP error
-// envelope code (`error_<kind>`) per SPEC.2 §11 + §15 conventions.
+// envelope code (`error_<kind>`) per SPEC.2 §11 + §15 conventions —
+// except for programming-error classes (the two ENGINE.6 entries below),
+// which override `toEnvelope()` to return `{ error: 'error_internal' }`
+// because they're caller-bug surfaces, not user-facing failure modes.
 //
 // SCAFFOLD.15 bootstraps the registry with the 7 errors named in plan
-// §5.3. Future strata extend by adding new classes here.
+// §5.3. ENGINE.6 adds 2 (invalid_event_payload + invalid_event_id) per
+// plan §C. Future strata extend by adding new classes here.
+
+import type { ZodIssue } from "zod";
 
 export type DomainErrorKind =
 	| "storage_unavailable"
@@ -16,9 +22,11 @@ export type DomainErrorKind =
 	| "moderation_in_flight"
 	| "image_mime_rejected"
 	| "image_oversize"
-	| "orphan_sweep_lock_contention";
+	| "orphan_sweep_lock_contention"
+	| "invalid_event_payload"
+	| "invalid_event_id";
 
-interface ErrorEnvelope {
+export interface ErrorEnvelope {
 	error: string;
 }
 
@@ -104,5 +112,46 @@ export class OrphanSweepLockContentionError extends DomainError {
 	constructor() {
 		super("orphan_sweep_lock_contention");
 		this.name = "OrphanSweepLockContentionError";
+	}
+}
+
+/**
+ * ENGINE.6 §C: payload or metadata failed Zod validation in `insertEvent`.
+ * Programming error — caller passed a payload shape mismatched to the
+ * `event_type`'s schema, or omitted a required `metadata` field.
+ * `toEnvelope()` returns `error_internal` (NOT `error_invalid_event_payload`)
+ * because this is a bug surface, not a user-visible failure mode. Carries
+ * `eventType` + `issues` for diagnosability in Sentry/log capture.
+ */
+export class InvalidEventPayloadError extends DomainError {
+	readonly kind = "invalid_event_payload" as const;
+	constructor(
+		public readonly eventType: string,
+		public readonly issues: ZodIssue[],
+	) {
+		super(`invalid_event_payload: event_type="${eventType}"`);
+		this.name = "InvalidEventPayloadError";
+	}
+	override toEnvelope(): ErrorEnvelope {
+		return { error: "error_internal" };
+	}
+}
+
+/**
+ * ENGINE.6 §C: caller-supplied `event_id` is not a UUIDv7 (13th hex char
+ * != '7'). Programming error — caller passed a UUIDv4, a non-UUID string,
+ * or otherwise broke the ADR-0016 D1 handler-entry-generation contract.
+ * `toEnvelope()` returns `error_internal` per the same bug-surface
+ * reasoning as `InvalidEventPayloadError`. Carries `eventId` for
+ * diagnosability.
+ */
+export class InvalidEventIdError extends DomainError {
+	readonly kind = "invalid_event_id" as const;
+	constructor(public readonly eventId: string) {
+		super(`invalid_event_id: received="${eventId}"`);
+		this.name = "InvalidEventIdError";
+	}
+	override toEnvelope(): ErrorEnvelope {
+		return { error: "error_internal" };
 	}
 }
