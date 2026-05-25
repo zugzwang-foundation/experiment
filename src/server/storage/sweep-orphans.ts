@@ -124,11 +124,16 @@ export async function sweepOrphans(args: SweepArgs): Promise<SweepResult> {
 			// CAS-loss so the post-commit branch skips (no delete, no
 			// counter touch).
 			//
-			// eventId is generated per-row INSIDE the tx — cron has no
-			// handler-entry analog to ADR-0016 D1; per-row generation is
-			// the cron variant + V2 retry-safety still holds since each
-			// per-row tx is independent (no retry across rows; intra-tx
-			// throws rollback that row only).
+			// eventId hoisted ABOVE the db.transaction call for symmetry with
+			// the other 5 emit sites (sign-upload route, tos-accept,
+			// admin/login attempt, admin/logout, logout — all generate
+			// eventId before opening the tx). Cron has no handler-entry to
+			// match ADR-0016 D1 literally; per-row generation is the cron
+			// variant. V2 retry-safety still holds because each per-row tx
+			// is independent (no retry across rows; intra-tx throws roll
+			// back that row only) — placement before vs inside the tx
+			// callback is behaviorally equivalent here.
+			const eventId = uuidv7();
 			const r2KeyOrNull = await db.transaction(async (tx) => {
 				const updated = await tx.execute<UpdateReturningRow>(sql`
 					UPDATE image_uploads
@@ -147,7 +152,6 @@ export async function sweepOrphans(args: SweepArgs): Promise<SweepResult> {
 				const r2ObjectKey = updated[0]?.r2_object_key;
 				if (!r2ObjectKey) return null;
 
-				const eventId = uuidv7();
 				await insertEvent(tx, {
 					eventId,
 					eventType: "image_upload.orphaned",
