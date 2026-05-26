@@ -1,0 +1,63 @@
+# .github/workflows/ci.yml
+# Zugzwang CI gate — runs on every PR to main.
+# Scope: install -> lint/format check -> typecheck -> tests.
+# Out of scope (HARDEN.* / post-experiment): e2e, build, secret scan,
+# dependency audit, coverage, bundle/perf budgets, matrix testing.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel stale runs when a PR is force-pushed or has new commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimum GITHUB_TOKEN scope. No PR comments, no deploys, no releases.
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    # Default is 360 min. Real pipeline runs in 3-5 min; 15 is 3x
+    # safety margin and bounds a hung Vitest worker.
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # MUST run before setup-node so pnpm is on PATH when setup-node
+      # locates the store directory for caching.
+      # Omitting the version input reads the pin from package.json
+      # packageManager (single source of truth; matches Lefthook
+      # locally).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --reporter=github emits ::error annotations inline on the PR
+      # diff. If you see ANSI escape codes corrupting the output
+      # (biome #9189), append: --colors=off
+      - name: Lint and format check (Biome)
+        run: pnpm biome check . --reporter=github
+
+      - name: Typecheck
+        run: pnpm tsc --noEmit
+
+      # Vitest auto-detects GITHUB_ACTIONS=true and adds the
+      # github-actions reporter alongside default. run = non-watch.
+      - name: Unit and integration tests
+        run: pnpm vitest run
