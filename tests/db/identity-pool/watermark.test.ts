@@ -230,7 +230,23 @@ describe("check_identity_pool_watermark — pg_cron alarm transition", () => {
 
 	// === Plan §D Test 6 — schedule registration ============================
 
-	it("registers the 'identity-pool-watermark' cron job exactly once", async () => {
+	it("registers the 'identity-pool-watermark' cron job exactly once", async ({
+		skip,
+	}) => {
+		// Runtime pg_cron probe — Path B CI substrate (vanilla postgres:17
+		// per SPEC.2 §0.1 ADR-0016 erratum) does not ship pg_cron; skip
+		// gracefully when the extension is absent. HARDEN-phase covers via
+		// local supabase start. ctx.skip() chosen over it.skipIf() because
+		// vitest evaluates skipIf at collection time, before any DB probe
+		// can run; the runtime probe needs to be inside the test body.
+		const probe = (await testDb.execute(
+			sql`SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') AS has_pg_cron`,
+		)) as unknown as Array<{ has_pg_cron: boolean }>;
+		if (!probe[0]?.has_pg_cron) {
+			skip();
+			return;
+		}
+
 		const rows = (await testDb.execute(
 			sql`SELECT jobname FROM cron.job WHERE jobname = 'identity-pool-watermark'`,
 		)) as unknown as Array<{ jobname: string }>;
