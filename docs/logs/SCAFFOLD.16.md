@@ -25,7 +25,7 @@
 
 - `<this commit>` — `chore(scaffold-16): execute-phase close-out log` (commit-4).
 
-**PR**: opened post-commit-4 push (URL recorded inline below once `gh pr create` returns).
+**PR**: [#52 — feat(scaffold-16): LD-3 text/image Track A carve-out + F-γ-thin §15 F-ADMIN-4 extension + 17 §F SPEC amendments](https://github.com/zugzwang-foundation/experiment/pull/52) — opened 2026-05-26 against `main`.
 
 **Phase summary**:
 
