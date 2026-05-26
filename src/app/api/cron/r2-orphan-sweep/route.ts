@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 
+import { captureException } from "@sentry/nextjs";
+
 import { db } from "@/db";
 import {
 	ORPHAN_SWEEP_BATCH_SIZE,
@@ -96,9 +98,10 @@ export async function GET(request: Request): Promise<Response> {
 			});
 			return jsonResponse(result, { status: 200 });
 		} catch (err) {
-			// TODO(SCAFFOLD.5): Sentry captureException + tag
-			// `orphan_sweep_handler_failure` per §17 alarm-6 sub-table.
-			console.error("orphan_sweep_handler_failure", err);
+			// Tag `orphan_sweep_handler_failure` per §17 alarm-6 sub-table.
+			captureException(err, {
+				tags: { kind: "orphan_sweep_handler_failure" },
+			});
 			return jsonResponse({ status: "error", swept: 0 }, { status: 200 });
 		}
 	} finally {

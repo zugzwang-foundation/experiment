@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { captureException } from "@sentry/nextjs";
 import canonicalize from "canonicalize";
 
 import {
@@ -59,9 +60,9 @@ export async function computeBodyFingerprint(body: unknown): Promise<string> {
  *
  * Failure-mode posture: fail-CLOSED on Upstash unreachable per ADR-0006
  * §"Failure-mode profile" + SPEC.2 §11. Any exception in the try block
- * is mapped to `{ kind: 'unavailable' }` and emits the stub Sentry tag
- * `upstash_unavailable_idempotency` (verbatim per SPEC.2 §17.3 alarm-6b).
- * SCAFFOLD.5 swaps the `console.error` for a real Sentry capture.
+ * is mapped to `{ kind: 'unavailable' }` and invokes Sentry's
+ * `captureException` with tag `upstash_unavailable_idempotency` (verbatim
+ * per SPEC.2 §17.3 alarm-6b).
  */
 export async function idempotencyLookupOrReserve(
 	key: string,
@@ -71,11 +72,10 @@ export async function idempotencyLookupOrReserve(
 	try {
 		return await tryReserveOrLookup(redisKey, bodyFingerprint, true);
 	} catch (err) {
-		// TODO(SCAFFOLD.5): replace console.error with Sentry captureException
-		// + tag `upstash_unavailable_idempotency` per SPEC.2 §17.3 alarm-6b.
-		// Tag string MUST stay byte-identical so the text-search-and-replace
-		// at SCAFFOLD.5 lands cleanly.
-		console.error("upstash_unavailable_idempotency", err);
+		// Tag `upstash_unavailable_idempotency` per SPEC.2 §17.3 alarm-6b.
+		captureException(err, {
+			tags: { kind: "upstash_unavailable_idempotency" },
+		});
 		return { kind: "unavailable", error: err };
 	}
 }

@@ -15,12 +15,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 // Per plan §7.1 row 5 + §F3 fail-OPEN posture: any Ratelimit.limit()
 // rejection causes `checkRateLimit` to RETURN { allowed: true, remaining: -1,
-// reset: 0 } and emit `console.error('upstash_unavailable_rate_limit', err)`.
+// reset: 0 } and emit
+// `captureException(err, { tags: { kind: 'upstash_unavailable_rate_limit' } })`.
 // Asymmetric to cache.ts's fail-CLOSED — the inversion is the load-bearing
 // posture decision (per ADR-0006 §"Failure-mode profile").
 //
 // Tag string `upstash_unavailable_rate_limit` matches SPEC.2 §17.3 col 4
-// byte-for-byte so SCAFFOLD.5's text-search-and-replace lands cleanly.
+// byte-for-byte (Sentry alarm-6a discriminator).
 
 // --- @upstash/ratelimit mock ----------------------------------------------
 //
@@ -67,6 +68,21 @@ vi.mock("@/server/upstash/redis", () => ({
 	redis: { set: vi.fn(), get: vi.fn(), del: vi.fn() },
 }));
 
+// --- @sentry/nextjs mock --------------------------------------------------
+//
+// SCAFFOLD.5 routed the fail-open observability emission to Sentry's
+// `captureException` with a tag. Mock the SDK at the wrapper boundary so the
+// test asserts on the captured (err, options) tuple without touching the real
+// Sentry transport.
+
+const { mockCaptureException } = vi.hoisted(() => ({
+	mockCaptureException: vi.fn(),
+}));
+
+vi.mock("@sentry/nextjs", () => ({
+	captureException: mockCaptureException,
+}));
+
 // Live imports — limits.ts constants are read at runtime so HARDEN.6 retunes
 // don't silently break the assertions (plan §6 edge-case enumeration).
 import {
@@ -92,20 +108,18 @@ import {
 	writeBurstPerUser,
 } from "@/server/middleware/rate-limit";
 
-const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
 beforeEach(() => {
 	for (const inst of Object.values(ratelimitInstances)) {
 		inst.limit.mockReset();
 	}
-	consoleErrorSpy.mockClear();
+	mockCaptureException.mockClear();
 });
 
 afterEach(() => {
-	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would detach the
-	// module-level `consoleErrorSpy` after the first test, breaking the
-	// fails-open assertion in row 5 which depends on the spy still being
-	// attached to console.error.
+	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would tear down
+	// the @upstash/ratelimit + @sentry/nextjs vi.mock factories that other
+	// tests in this file rely on. clearAll keeps the factories attached and
+	// just resets call history.
 	vi.clearAllMocks();
 });
 
@@ -235,8 +249,8 @@ describe("rate-limit middleware", () => {
 		// Library throws (network error); checkRateLimit catches + returns
 		// { allowed: true, remaining: -1, reset: 0 }. Per ADR-0006 §
 		// "Failure-mode profile": rate-limit fails OPEN. Asymmetric to
-		// cache.ts (fails closed). Console.error tag is the SPEC.2 §17.3
-		// alarm-6a sentinel that SCAFFOLD.5 swaps in for Sentry.
+		// cache.ts (fails closed). Tag is the SPEC.2 §17.3 alarm-6a
+		// discriminator routed through Sentry.captureException.
 		const networkError = new Error("ECONNREFUSED");
 		ratelimitInstances["bet-ip"]?.limit.mockRejectedValueOnce(networkError);
 
@@ -247,10 +261,9 @@ describe("rate-limit middleware", () => {
 			expect(result.remaining).toBe(-1);
 			expect(result.reset).toBe(0);
 		}
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			"upstash_unavailable_rate_limit",
-			networkError,
-		);
+		expect(mockCaptureException).toHaveBeenCalledWith(networkError, {
+			tags: { kind: "upstash_unavailable_rate_limit" },
+		});
 	});
 
 	// === §7.3 row 6 (extension) =============================================

@@ -1,4 +1,5 @@
 import "server-only";
+import { captureException } from "@sentry/nextjs";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 
@@ -35,9 +36,10 @@ import { insertEvent } from "@/server/events/insert";
 //     3. After the tx commits, try deleteObject(r2_object_key) OUTSIDE
 //        the tx (HTTP must NEVER run inside a DB transaction per
 //        CLAUDE.md §3 + ADR-0014). On success: reset failure counter.
-//        On failure: log via console.error (SCAFFOLD.5 routes to Sentry
-//        later); counter++. If counter >= circuitBreakerThreshold,
-//        return { status: 'r2_unavailable', swept } — clean exit.
+//        On failure: Sentry captureException with tag
+//        `orphan_sweep_per_row_failure`; counter++. If counter >=
+//        circuitBreakerThreshold, return { status: 'r2_unavailable',
+//        swept } — clean exit.
 //
 // Semantic note: `swept` counts CAS-successful orphan terminalizations
 // (= per-row tx commits). R2 cleanup is best-effort downstream — Layer 1
@@ -179,19 +181,16 @@ export async function sweepOrphans(args: SweepArgs): Promise<SweepResult> {
 				await deleteObject("uploads", r2KeyOrNull);
 				consecutiveR2Failures = 0;
 			} catch (err) {
-				// TODO(SCAFFOLD.5): replace console.error with Sentry captureException
-				// + tag `orphan_sweep_per_row_failure` for the §17 alarm-6 sub-table.
-				// Tag string MUST stay byte-identical so the text-search-and-replace
-				// lands cleanly (matches the convention at
-				// src/server/middleware/rate-limit.ts:174-178).
-				//
+				// Tag `orphan_sweep_per_row_failure` for the §17 alarm-6 sub-table.
 				// Row is already DB-orphan-terminalized AND the events row is
 				// already committed (the per-row tx flushed before this catch
 				// branch could run). R2 object lingers until the Layer 1 90-day
 				// native lifecycle cleans it. Operationally acceptable per
 				// SPEC.2 §12.6 layer asymmetry — the audit trail records the
 				// orphan-sweep intent regardless of R2 outcome.
-				console.error("orphan_sweep_per_row_failure", err);
+				captureException(err, {
+					tags: { kind: "orphan_sweep_per_row_failure" },
+				});
 				consecutiveR2Failures++;
 				if (consecutiveR2Failures >= circuitBreakerThreshold) {
 					earlyAbort = true;
