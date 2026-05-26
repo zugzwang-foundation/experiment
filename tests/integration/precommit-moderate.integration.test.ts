@@ -123,14 +123,24 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 		expect(mockOpenAiModerate).toHaveBeenCalledTimes(1);
 	});
 
-	it("precommit-moderate::track-a-csam-mapping", async () => {
-		// REFUSAL-2 (CSAM legal floor): 'sexual/minors' true → track_a,
-		// REGARDLESS of other flagged categories also being true.
-		// Verifies the 'sexual/minors' branch wins ordering even when
-		// sexual is also true.
-		const { a } = args({ text: "blocked content", idempotencyKey: "idem-a" });
+	it("precommit-moderate::track-a-csam-mapping-with-image", async () => {
+		// REFUSAL-2 (CSAM legal floor): 'sexual/minors' true + image attached
+		// → track_a per SCAFFOLD.16 LD-3 carve-out. Text-only `sexual/minors:
+		// true` routes to Track B; image-attached routes to Track A. This test
+		// covers the image-attached positive branch;
+		// `precommit-moderate::text-only-sexual-minors-routes-track-b` covers
+		// the text-only counterexample. Verifies the 'sexual/minors' branch
+		// wins ordering even when sexual is also true.
+		const { a } = args({
+			text: "blocked content",
+			imageR2Key: "u/user-1/csam-test.jpg",
+			idempotencyKey: "idem-a",
+		});
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
+		mockSignRead.mockResolvedValueOnce(
+			"https://r2.example/u/user-1/csam-test.jpg?X-Amz-Signature=mod",
+		);
 		mockOpenAiModerate.mockResolvedValueOnce(
 			modResult({ "sexual/minors": true, sexual: true }),
 		);
@@ -139,6 +149,33 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 
 		expect(result.outcome).toBe("track_a");
 		expect(result.categories).toContain("sexual/minors");
+	});
+
+	it("precommit-moderate::text-only-sexual-minors-routes-track-b", async () => {
+		// SCAFFOLD.16 LD-3 carve-out: text-only `sexual/minors: true` routes to
+		// Track B (admin review), NOT Track A (auto-ban). Image-attached path
+		// tested at `precommit-moderate::track-a-csam-mapping-with-image`. The
+		// carve-out mitigates text-classifier false-positive risk for the CSAM
+		// category in line with industry practice (Bluesky, Roblox, Reddit all
+		// route text-only CSAM-adjacent signals to specialized human review).
+		// Research-brief finding: `sexual/minors` is text-only on
+		// omni-moderation-2024-09-26 at the model level — image input always
+		// returns score 0 for this category.
+		const { a } = args({
+			text: "blocked content",
+			idempotencyKey: "idem-text-only-csam",
+		});
+		mockRedis.set.mockResolvedValueOnce("OK");
+		mockRedis.del.mockResolvedValueOnce(1);
+		mockOpenAiModerate.mockResolvedValueOnce(
+			modResult({ "sexual/minors": true, sexual: true }),
+		);
+
+		const result = await precommitModerate(a);
+
+		expect(result.outcome).toBe("track_b");
+		expect(result.categories).toContain("sexual/minors");
+		expect(mockSignRead).not.toHaveBeenCalled(); // text-only — no R2 fetch
 	});
 
 	it("precommit-moderate::track-b-sexual-not-minors", async () => {

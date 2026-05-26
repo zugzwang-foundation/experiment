@@ -85,7 +85,7 @@ export const ORPHAN_SWEEP_CIRCUIT_BREAKER_THRESHOLD = 5;
 /** Orphan-sweep per-batch SELECT limit. Per SCAFFOLD.15 plan §5.6 — caps the working set per sweep iteration; loop continues until an empty batch returns. Lifted to limits.ts (rather than a route-handler module constant) for SCAFFOLD.5 sweep greppability. */
 export const ORPHAN_SWEEP_BATCH_SIZE = 100;
 
-/** OpenAI moderation model snapshot pin. Per SPEC.2 §10.10 + ADR-0014 — pinning the snapshot guarantees verdict-mapping stability across OpenAI model retunes. SCAFFOLD.16 adds PhotoDNA / Safer in parallel. */
+/** OpenAI moderation model snapshot pin. Per SPEC.2 §10 + ADR-0014 — pinning the snapshot guarantees verdict-mapping stability across OpenAI model retunes. OpenAI omni-moderation is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1; second-vendor deferred per docs/parked.md. */
 export const OPENAI_MODERATION_MODEL_SNAPSHOT = "omni-moderation-2024-09-26";
 
 /** OpenAI moderation call timeout (ms). Per SPEC.2 §10.10 — 3s budget for the moderation hop; 1 retry on transient failure makes the effective ceiling ~6s + reservation slack. */

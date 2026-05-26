@@ -18,11 +18,17 @@ import { redis } from "@/server/upstash/redis";
 //   2. SET NX EX 10. Null → ModerationInFlightError (caller → HTTP 409).
 //   3. try { ... } finally { redis.del(reservationKey) }
 //   4. Inside try: if imageR2Key → mint 60s read URL; openai.moderate(...)
-//   5. Map verdict: 'sexual/minors' → track_a (REFUSAL-2 CSAM legal floor);
-//      any other flagged → track_b; none → pass.
+//   5. Map verdict per SCAFFOLD.16 LD-3:
+//      - 'sexual/minors' true + imageR2Key → track_a (REFUSAL-2 CSAM legal
+//        floor, image-attached path);
+//      - 'sexual/minors' true + no imageR2Key → track_b (text-only carve-out;
+//        admin review mitigates text-classifier false-positive risk);
+//      - any other flagged → track_b;
+//      - none → pass.
 //
-// SCAFFOLD.16 adds PhotoDNA + Safer in parallel via `Promise.all`; the
-// caller-facing return shape (`{ outcome, categories }`) stays unchanged.
+// OpenAI omni-moderation is the SOLE moderation vendor in experiment phase.
+// Second-vendor (PhotoDNA / Safer / Hive) deferred — see docs/parked.md
+// "SCAFFOLD.16 §6 — Second moderation vendor deferred" for resolution path.
 
 const TRACK_A_CATEGORY = "sexual/minors" as const;
 
@@ -93,12 +99,13 @@ export async function precommitModerate(
 			result = await moderate({ text, imageUrl });
 		} catch (err) {
 			// Wrap any throw from the moderate hop (openai.ts already wraps
-			// terminal failures into ModerationUnavailableError, but a mock /
-			// future PhotoDNA addition might throw a raw error — the contract
-			// surface here is: precommit always fails CLOSED as
-			// ModerationUnavailableError, regardless of source. Idempotent
-			// double-wrap: if `err` is already a ModerationUnavailableError,
-			// the cause-chain is preserved via the new wrapper).
+			// terminal failures into ModerationUnavailableError, but a mock or
+			// a future second-vendor addition (per docs/parked.md) might throw
+			// a raw error — the contract surface here is: precommit always
+			// fails CLOSED as ModerationUnavailableError, regardless of source.
+			// Idempotent double-wrap: if `err` is already a
+			// ModerationUnavailableError, the cause-chain is preserved via the
+			// new wrapper).
 			throw new ModerationUnavailableError(err);
 		}
 
@@ -111,7 +118,7 @@ export async function precommitModerate(
 
 		let outcome: PrecommitResult["outcome"] = "pass";
 		if (result.categories[TRACK_A_CATEGORY] === true) {
-			outcome = "track_a";
+			outcome = imageR2Key ? "track_a" : "track_b";
 		} else if (flaggedCategories.length > 0) {
 			outcome = "track_b";
 		}
