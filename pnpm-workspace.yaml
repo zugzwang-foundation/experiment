@@ -1,6 +1,8 @@
 allowBuilds:
   '@sentry/cli': true
+  core-js: false
   esbuild: true
   lefthook: true
   msw: false
+  protobufjs: true
   sharp: true
