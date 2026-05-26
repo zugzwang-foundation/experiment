@@ -756,11 +756,12 @@ Applies to both participant sessions and admin sessions. Each session type has i
 
 Per `cluster_e_decisions.md` and `spec1_section_moderation.md`. **Pattern locked; thresholds, vendor selection, and edge-case behaviour finalised after Aug 15–31 sample-content testing. Final close target: 2026-09-01.**
 
-Three tracks at submission. Two AI services run in parallel: text (OpenAI moderation API) and image (CSAM hash via PhotoDNA-or-equivalent + general adult/violence/weapons classifier, vendor TBD).
+Three tracks at submission. OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26` per ADR-0014) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per OpenAI's `omni-moderation-2024-09-26` capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality (Hive / PhotoDNA / Safer) and NCMEC CyberTipline reporting both deferred to post-experiment per `docs/parked.md`.
 
 | Track | AI flag categories | Action | Admin in loop? |
 |---|---|---|---|
-| **A** | CSAM, sexual minors | Block + auto-report (legal) + auto-ban user | No |
+| **A** | `sexual/minors` (image-attached) | Block + auto-ban user. Per SCAFFOLD.16 LD-3 image-attached path. | No |
+| **B** | `sexual/minors` (text-only) | Hide from public; admin review queue at `/admin/moderation`. Per SCAFFOLD.16 LD-3 text-only carve-out (text-classifier false-positive mitigation; industry practice per research brief). | Yes |
 | **A** | NSFW / sexual content; adult imagery | Block + auto-ban user | No |
 | **B** | Graphic violence; threats; hate speech; harassment | Hide from public; queue for admin: **Approve user** or **Block user** | Yes |
 | **C** | Below threshold | Posts normally | No |
@@ -769,7 +770,7 @@ Admin-in-the-loop is **Experiment-phase only**. Testnet and mainnet replace it w
 
 ### F-MOD-1 — Track A auto-ban
 
-- **System.** Comment never reaches public view. User account flagged `banned` (per `E2`). Append-only `mod_actions` row written. Existing positions ride to resolution. Existing comments preserved with B1 markers frozen at ban-time. No daily allowance from ban-time forward. No appeal in v1. CSAM specifically: legal report filed automatically.
+- **System.** Comment never reaches public view. User account flagged `banned` (per `E2`). Append-only `mod_actions` row written. Existing positions ride to resolution. Existing comments preserved with B1 markers frozen at ban-time. No daily allowance from ban-time forward. No appeal in v1. NCMEC CyberTipline auto-report deferred to post-experiment per SCAFFOLD.16 LD-7 + attorney consultation 2026-05; see `docs/parked.md` "SCAFFOLD.16 §6 — NCMEC CyberTipline reporting deferred".
 - **Acceptance.** `tests/server/moderation/track-a.test.ts::auto-ban-and-positions-preserved`.
 
 ### F-MOD-2 — Track B admin review
@@ -777,10 +778,10 @@ Admin-in-the-loop is **Experiment-phase only**. Testnet and mainnet replace it w
 - **System.** Comment hidden from all public surfaces. Author sees `Comment under review` on their own profile only. Admin queue at `/admin/moderation` sorted oldest-first. Each row shows comment, AI flag categories with confidence scores, user pseudonym, user Dharma, user prior-flag count.
 - **Acceptance.** `tests/server/moderation/track-b.test.ts::queue-and-visibility`.
 
-### F-MOD-3 — Admin Approve / Block decision
+### F-MOD-3 — Admin Approve / Block / Remove pass-verdict decision
 
-- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. Two surfaces, same backend: the hub queue at `/admin/moderation` (two buttons per row) and the inline affordance on debate views (per F-ADMIN-4 in §15). Both paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
-- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`.
+- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. **Remove pass-verdict (per SCAFFOLD.16 F-γ-thin)**: comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery). No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. All three actions land at the same surfaces: the hub queue at `/admin/moderation` (three buttons per row for pending/applicable comments) and the inline affordance on debate views (per F-ADMIN-4 in §15). All paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
+- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`, `tests/server/admin/moderation/act.test.ts::pass-verdict-removal` (per SCAFFOLD.16 F-γ-thin).
 
 ### F-MOD-4 — Bet+comment atomicity on flag (entry case)
 
@@ -800,7 +801,7 @@ No misinformation moderation. No community / user-side moderation in v1 (per `C9
 ### Provisional gates
 
 - Aug 15–31 sample-content testing (vendor + thresholds + admin queue throughput).
-- PhotoDNA / equivalent CSAM service onboarded and verified.
+- Second-vendor (PhotoDNA / equivalent CSAM hash service) optionality deferred to post-experiment per SCAFFOLD.16 LD-1; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred".
 - Lawyer review of ToS + content policy.
 
 ---
@@ -881,15 +882,17 @@ Analytics is folded into the Home dashboard. There is no separate Analytics tab.
 
 ### F-ADMIN-4 — Moderation actions (Hub: Moderation tab; Inline: market pages)
 
-- **Pre.** Track B comment exists with `review_status = pending`.
-- **System.** Admin reviews comment context (text, image, AI flag categories with confidence, user pseudonym, user Dharma, user prior-flag count). Two actions available:
+- **Pre (Approve/Block path).** Track B comment exists with `review_status = pending`.
+- **Pre (Remove pass-verdict path; per SCAFFOLD.16 F-γ-thin).** Any comment with `outcome === 'pass'` exists on a market the admin is viewing.
+- **System.** Admin reviews comment context (text, image, AI flag categories with confidence, user pseudonym, user Dharma, user prior-flag count). Three actions available:
   - **Approve user** — comment restored to public view, user untouched, flag closed and logged in `mod_actions`.
   - **Block user** — comment stays hidden, user banned (Track A mechanics per `E2`), flag closed and logged.
-- **Response.** Comment state updated; `mod_actions` row written; if Block, `users.banned_at` set.
-- **Surface — hub.** `/admin/moderation` shows the global queue, sorted oldest-first. Approve / Block buttons per row. Used for systematic queue work.
-- **Surface — inline.** When an authenticated admin views `/markets/<id>` or any debate view, Track B pending comments render inline (visible to admin only, with a yellow `pending review` badge) alongside Approve / Remove buttons. Approving from inline restores the comment to public view; Remove keeps it hidden and bans the author. Same backend endpoints as the hub. **Server independently verifies a valid `admin_sessions` row on every request — the inline affordance is a UI convenience, not a privilege path.**
-- **Inline scope explicitly:** approve a Track B pending comment, remove a Track A or Track B comment. Nothing else. No "ban user" button on the comment author's pseudonym (banning is hub-only — accessed via the moderation queue or a user-record action). No "trigger resolution" button on the market header. No bulk-select.
-- **Acceptance.** `tests/server/admin/moderation.test.ts::hub-queue-approve-block`, `tests/server/admin/moderation.test.ts::inline-remove-pending-comment`, `tests/server/admin/moderation.test.ts::inline-affordance-admin-only-server-verified`, `tests/server/admin/moderation.test.ts::inline-scope-comment-only-no-user-ban-no-resolve`.
+  - **Remove pass-verdict comment (per SCAFFOLD.16 F-γ-thin)** — comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery).
+- **Response.** Comment state updated; `mod_actions` row written; if Block, `users.banned_at` set; Remove pass-verdict path leaves `users.banned_at` unchanged.
+- **Surface — hub.** `/admin/moderation` shows the global queue, sorted oldest-first. Approve / Block buttons per row for Track B pending comments. Used for systematic queue work.
+- **Surface — inline.** When an authenticated admin views `/markets/<id>` or any debate view, Track B pending comments render inline (visible to admin only, with a yellow `pending review` badge) alongside Approve / Remove buttons. Approving from inline restores the comment to public view; Remove keeps it hidden and bans the author. Same backend endpoints as the hub. Pass-verdict comments also render with admin-only Remove button (no badge — comment appears normally to admin same as to public, with Remove button visible only to admin). Removal mechanic identical to Track A/B inline removal; gated on admin role. **Server independently verifies a valid `admin_sessions` row on every request — the inline affordance is a UI convenience, not a privilege path.**
+- **Inline scope explicitly:** approve a Track B pending comment, remove a Track A or Track B comment, remove a pass-verdict comment (per SCAFFOLD.16 F-γ-thin). Nothing else. No "ban user" button on the comment author's pseudonym (banning is hub-only — accessed via the moderation queue or a user-record action). No "trigger resolution" button on the market header. No bulk-select.
+- **Acceptance.** `tests/server/admin/moderation.test.ts::hub-queue-approve-block`, `tests/server/admin/moderation.test.ts::inline-remove-pending-comment`, `tests/server/admin/moderation.test.ts::inline-affordance-admin-only-server-verified`, `tests/server/admin/moderation.test.ts::inline-scope-comment-only-no-user-ban-no-resolve`, `tests/server/admin/moderation/act.test.ts::pass-verdict-removal` (per SCAFFOLD.16 F-γ-thin).
 
 ### F-ADMIN-5 — Audit log search (Hub: Moderation tab)
 
@@ -1007,7 +1010,7 @@ Append-only enforcement on `mod_actions`, `admin_events`, and `friendly_fire_eve
 - **Terms of Service.** Drafted; lawyer-finalised wording. Includes transparency-by-design statement, pseudonym-scrub model, re-identification warning, content policy referencing §14, ToS-implicit consent for K2 brand-account quoting.
 - **Privacy Policy.** Drafted; lawyer-finalised. Cross-references §16.3.
 - **DPDPA grievance contact.** Email + named officer (per Indian Digital Personal Data Protection Act). Surfaced in footer and Privacy Policy.
-- **PhotoDNA + reporting compliance.** CSAM hash service onboarded pre-launch. Auto-report to NCMEC (or jurisdictional equivalent) on Track A CSAM detection.
+- **CSAM detection + reporting compliance.** Experiment-phase posture: OpenAI `sexual/minors` classifier (text-only per `omni-moderation-2024-09-26`) routes text-only flags to Track B (admin review) and image-attached flags to Track A (auto-ban) per SCAFFOLD.16 LD-3. Dedicated CSAM-hash vendor and NCMEC auto-report deferred to post-experiment per attorney consultation 2026-05; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred" and "SCAFFOLD.16 §6 — NCMEC CyberTipline reporting deferred". Pre-launch resolution gated on incorporation + attorney sign-off.
 - **DSA notice-and-action.** Small-platform exposure noted. ToS includes notice-and-action contact + procedure.
 
 Lawyer engagement target: mid-July 2026. ToS / Privacy Policy drafts ready four weeks before launch.
@@ -1136,7 +1139,8 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `moderation::redis-reservation-collision-409` | ADR-0014 §3 | — |
 | `moderation::openai-transient-failure-retry-succeeds` | ADR-0014 §4 | — |
 | `moderation::openai-terminal-failure-fails-closed` | ADR-0014 §4 | INV-1 |
-| `moderation::photodna-csam-match-shortcircuits-openai` | ADR-0014 §3 | — |
+| `precommit-moderate::text-only-sexual-minors-routes-track-b` | SCAFFOLD.16 LD-3 (text/image Track A carve-out) | — |
+| `f-admin-4::pass-verdict-removal` | §15 F-ADMIN-4 (per SCAFFOLD.16 F-γ-thin) | — |
 | `admin::market-deadline-form-validation` | §15 F-ADMIN-1 | — |
 | `admin::pool-seed-flow` | §15 F-ADMIN-2 | INV-2 |
 | `admin::resolution-trigger` | §15 F-ADMIN-3 | INV-4 |
@@ -1232,8 +1236,8 @@ Numbered. Each: question, default behaviour shipped now, decider, resolve-by dat
 | # | Question | Default | Decider | Resolve by |
 |---|---|---|---|---|
 | Q1 | AI flag thresholds (per category, per track) | Conservative starting values; sample-content tested. | Hrishikesh + sample-content test | 2026-09-01 |
-| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | TBD; selected via implementation pass. | Engineering implementation pass | Before launch |
-| Q3 | PhotoDNA / equivalent CSAM hash service onboarded | In progress; weeks-long onboarding initiated. | Hrishikesh | Before launch |
+| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | Resolved per SCAFFOLD.16 LD-1: OpenAI omni-moderation is the SOLE moderation vendor in experiment phase; image-classifier gap (6 text-only categories per `omni-moderation-2024-09-26` capability table) is an accepted v1 gap. Operational mitigation: SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin); empirical measurement: HARDEN.5. Second-vendor optionality deferred per `docs/parked.md`. | Hrishikesh (resolved at SCAFFOLD.16) | Resolved 2026-05-26 |
+| Q3 | PhotoDNA / equivalent CSAM hash service onboarded | Deferred to post-experiment per SCAFFOLD.16 LD-1; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred". | Hrishikesh (post-experiment) | Post-experiment |
 | Q4 | Specific rate-limit values, slippage threshold, allowance, seed magnitude, comment length, OTP TTL, poll interval, in-flight timeout | All deferred; symbolic constants only in §16.1. | Number-tuning pass | 2026-09-01 |
 | Q5 | ToS final wording | Drafted; lawyer-review pending. | Lawyer | Mid-July 2026 |
 | Q6 | First market content | TBD; refusal rule — Claude does not invent market content. | Hrishikesh alone (per `J1`) | Before launch |
@@ -1273,22 +1277,21 @@ Claude does not try to resolve these; it implements the default and flags the qu
 
 ## Appendix A — AI moderation category-to-track mapping
 
-Source vendors: OpenAI moderation API (text), PhotoDNA-or-equivalent (image hash for CSAM), general image classifier TBD (adult / violence / weapons).
+Source vendor: OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26`) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per `omni-moderation-2024-09-26`'s capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality deferred per `docs/parked.md`.
 
 | AI category | Source layer | Track | Notes |
 |---|---|---|---|
-| `csam` (hash match) | Image — PhotoDNA | A | Auto-block + auto-report + auto-ban. Legal floor. |
-| `sexual/minors` | Text — OpenAI | A | Auto-block + auto-report + auto-ban. |
+| `sexual/minors` | Text — OpenAI | A (image-attached) / B (text-only) | Image-attached: auto-block + Track A auto-ban contract (caller-side per SCAFFOLD.16 LD-6). Text-only: Track B (admin review via `/admin/moderation`) per SCAFFOLD.16 LD-3 — text-classifier false-positive mitigation. Per research-brief finding, `sexual/minors` is text-only on `omni-moderation-2024-09-26` at the model level (image input returns score 0 for this category); the carve-out aligns with what the classifier can actually attribute. |
 | `sexual` | Text — OpenAI | A | Auto-block + auto-ban. No product fit. |
-| `nsfw` / adult imagery | Image — classifier | A | Auto-block + auto-ban. No product fit. |
+| `nsfw` / adult imagery | Image — OpenAI (`sexual` category, image inputs supported per `omni-moderation-2024-09-26`) | A | Auto-block + auto-ban. No product fit. |
 | `violence/graphic` | Text — OpenAI | B | Admin review. Edges: war markets, journalistic context. |
-| `violence` (image) | Image — classifier | B | Admin review. |
+| `violence` (image) | Image — OpenAI (`violence` category, image inputs supported per `omni-moderation-2024-09-26`) | B | Admin review. |
 | `harassment` | Text — OpenAI | B | Admin review. |
 | `harassment/threatening` | Text — OpenAI | B | Admin review. Threats specifically. |
 | `hate` | Text — OpenAI | B | Admin review. Edges: quoting slurs to criticise. |
 | `hate/threatening` | Text — OpenAI | B | Admin review. |
 | `self-harm` | Text — OpenAI | B | Admin review. |
-| `weapons` | Image — classifier | B | Admin review. Edges: weapon-policy markets. |
+| `weapons` | Image — N/A (`weapons` is not an OpenAI moderation category; SPEC.1 §15 F-ADMIN-4 extended scope per SCAFFOLD.16 F-γ-thin mitigates) | B | Admin review. Edges: weapon-policy markets. |
 | (below threshold) | — | C | Posts normally. |
 
 Specific confidence thresholds per category per track → number-tuning pass after Aug 15–31 sample-content testing.
