@@ -1,4 +1,5 @@
 import "server-only";
+import { captureException } from "@sentry/nextjs";
 import { sql } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 
@@ -179,19 +180,16 @@ export async function sweepOrphans(args: SweepArgs): Promise<SweepResult> {
 				await deleteObject("uploads", r2KeyOrNull);
 				consecutiveR2Failures = 0;
 			} catch (err) {
-				// TODO(SCAFFOLD.5): replace console.error with Sentry captureException
-				// + tag `orphan_sweep_per_row_failure` for the §17 alarm-6 sub-table.
-				// Tag string MUST stay byte-identical so the text-search-and-replace
-				// lands cleanly (matches the convention at
-				// src/server/middleware/rate-limit.ts:174-178).
-				//
+				// Tag `orphan_sweep_per_row_failure` for the §17 alarm-6 sub-table.
 				// Row is already DB-orphan-terminalized AND the events row is
 				// already committed (the per-row tx flushed before this catch
 				// branch could run). R2 object lingers until the Layer 1 90-day
 				// native lifecycle cleans it. Operationally acceptable per
 				// SPEC.2 §12.6 layer asymmetry — the audit trail records the
 				// orphan-sweep intent regardless of R2 outcome.
-				console.error("orphan_sweep_per_row_failure", err);
+				captureException(err, {
+					tags: { kind: "orphan_sweep_per_row_failure" },
+				});
 				consecutiveR2Failures++;
 				if (consecutiveR2Failures >= circuitBreakerThreshold) {
 					earlyAbort = true;

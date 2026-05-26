@@ -22,7 +22,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //                                ADR-0006 §"Failure-mode profile")
 //
 // Tag string `upstash_unavailable_idempotency` matches SPEC.2 §17.3 col 4
-// byte-for-byte so SCAFFOLD.5's text-search-and-replace lands cleanly.
+// byte-for-byte (Sentry alarm-6b discriminator routed through
+// `captureException(err, { tags: { kind: 'upstash_unavailable_idempotency' } })`).
 
 // --- Upstash Redis mock ----------------------------------------------------
 //
@@ -52,6 +53,21 @@ vi.mock("@/server/upstash/redis", () => ({
 	redis: mockRedis,
 }));
 
+// --- @sentry/nextjs mock --------------------------------------------------
+//
+// SCAFFOLD.5 routed the fail-closed observability emission to Sentry's
+// `captureException` with a tag. Mock the SDK at the wrapper boundary so the
+// test asserts on the captured (err, options) tuple without touching the real
+// Sentry transport.
+
+const { mockCaptureException } = vi.hoisted(() => ({
+	mockCaptureException: vi.fn(),
+}));
+
+vi.mock("@sentry/nextjs", () => ({
+	captureException: mockCaptureException,
+}));
+
 // `types.ts` constants are NOT mocked — tests read them at runtime so a
 // HARDEN.6 retune (e.g. PENDING_TTL_SECONDS bump) doesn't silently break
 // the assertion. Plan §6 edge-case enumeration explicitly calls this out.
@@ -67,20 +83,18 @@ import {
 	PENDING_TTL_SECONDS,
 } from "@/server/idempotency/types";
 
-const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
 beforeEach(() => {
 	mockRedis.set.mockReset();
 	mockRedis.get.mockReset();
 	mockRedis.del.mockReset();
-	consoleErrorSpy.mockClear();
+	mockCaptureException.mockClear();
 });
 
 afterEach(() => {
-	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would detach the
-	// module-level `consoleErrorSpy` after the first test, breaking the
-	// fails-closed assertion in row 9 which runs later in the file. clearAll
-	// keeps the spy attached and just resets call history.
+	// clearAllMocks (NOT restoreAllMocks) — restoreAllMocks would tear down
+	// the @/server/upstash/redis + @sentry/nextjs vi.mock factories that
+	// other tests in this file rely on. clearAll keeps the factories
+	// attached and just resets call history.
 	vi.clearAllMocks();
 });
 
@@ -351,9 +365,8 @@ describe("idempotency cache state machine", () => {
 		// returns kind:'unavailable'. Caller maps to HTTP 503
 		// error_idempotency_unavailable + Retry-After: 5 (per ADR-0015).
 		// Per ADR-0006 §"Failure-mode profile": idempotency fails CLOSED.
-		// Sentry-stub tag string `upstash_unavailable_idempotency` matches
-		// SPEC.2 §17.3 column 4 byte-for-byte so SCAFFOLD.5's text-search-
-		// and-replace lands cleanly.
+		// Tag `upstash_unavailable_idempotency` is the SPEC.2 §17.3 alarm-6b
+		// discriminator routed through Sentry.captureException.
 		const key = "test-key-9";
 		const fingerprint = "fp-unavailable";
 		const networkError = new Error("ECONNREFUSED");
@@ -366,10 +379,9 @@ describe("idempotency cache state machine", () => {
 		if (result.kind === "unavailable") {
 			expect(result.error).toBe(networkError);
 		}
-		expect(consoleErrorSpy).toHaveBeenCalledWith(
-			"upstash_unavailable_idempotency",
-			networkError,
-		);
+		expect(mockCaptureException).toHaveBeenCalledWith(networkError, {
+			tags: { kind: "upstash_unavailable_idempotency" },
+		});
 		// Constant assertion — the catalogued error code consumers map to.
 		expect(IDEMPOTENCY_ERROR_CODES.UNAVAILABLE).toBe(
 			"error_idempotency_unavailable",

@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
 
 import {
@@ -171,11 +172,10 @@ export async function checkRateLimit(
 		);
 		return { allowed: false, retryAfter };
 	} catch (err) {
-		// TODO(SCAFFOLD.5): replace console.error with Sentry captureException
-		// + tag `upstash_unavailable_rate_limit` per SPEC.2 §17.3 alarm-6a.
-		// Tag string MUST stay byte-identical so SCAFFOLD.5's text-search-
-		// and-replace lands cleanly.
-		console.error("upstash_unavailable_rate_limit", err);
+		// Tag `upstash_unavailable_rate_limit` per SPEC.2 §17.3 alarm-6a.
+		captureException(err, {
+			tags: { kind: "upstash_unavailable_rate_limit" },
+		});
 		return { allowed: true, remaining: -1, reset: 0 };
 	}
 }
