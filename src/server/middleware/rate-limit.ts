@@ -31,10 +31,9 @@ import { redis } from "@/server/upstash/redis";
  *
  * Failure-mode posture: fail-OPEN per ADR-0006 §"Failure-mode profile" +
  * SPEC.2 §11. Any exception in `checkRateLimit` is caught, the request is
- * admitted (`{ allowed: true, remaining: -1, reset: 0 }`), and the stub
- * Sentry tag `upstash_unavailable_rate_limit` (verbatim per SPEC.2 §17.3
- * alarm-6a) is emitted via console.error. SCAFFOLD.5 swaps the stub for
- * a real Sentry capture.
+ * admitted (`{ allowed: true, remaining: -1, reset: 0 }`), and Sentry's
+ * `captureException` is invoked with tag `upstash_unavailable_rate_limit`
+ * (verbatim per SPEC.2 §17.3 alarm-6a).
  */
 
 export const otpRequestPerEmail = new Ratelimit({

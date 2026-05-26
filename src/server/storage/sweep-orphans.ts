@@ -36,9 +36,10 @@ import { insertEvent } from "@/server/events/insert";
 //     3. After the tx commits, try deleteObject(r2_object_key) OUTSIDE
 //        the tx (HTTP must NEVER run inside a DB transaction per
 //        CLAUDE.md §3 + ADR-0014). On success: reset failure counter.
-//        On failure: log via console.error (SCAFFOLD.5 routes to Sentry
-//        later); counter++. If counter >= circuitBreakerThreshold,
-//        return { status: 'r2_unavailable', swept } — clean exit.
+//        On failure: Sentry captureException with tag
+//        `orphan_sweep_per_row_failure`; counter++. If counter >=
+//        circuitBreakerThreshold, return { status: 'r2_unavailable',
+//        swept } — clean exit.
 //
 // Semantic note: `swept` counts CAS-successful orphan terminalizations
 // (= per-row tx commits). R2 cleanup is best-effort downstream — Layer 1
