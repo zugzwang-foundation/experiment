@@ -64,6 +64,28 @@ The first five surfaced during /plan opening + Phase-1 Q-verdict ratification; t
 
 ---
 
+## §3.7 — Execute-phase Phase 1 verify-don't-trust SURPRISE (1 event, ceiling 2/6)
+
+Per CLAUDE.md §5 + SCAFFOLD.3-FOLLOWUP-1 lesson 3.1, execute-phase honors the same hard-ceiling-at-6 SURPRISES rule as plan-mode. SURPRISE 7 was absorbed at execute-phase Phase 1 (verify-don't-trust re-grep against current `main` HEAD `6a6b04b` at chat opening 2026-05-26). Three-way split (7a / 7b / 7c) per operator's Q3 refinement: same SURPRISE event, three distinct failure modes worth distinguishing for process learning.
+
+**SURPRISE 7 (one event) — Execute-phase Phase 1 verify-don't-trust find ratification 2026-05-26.**
+
+- **7a — 5 SPEC.1 brief-drift items (Items A–E).** Phase 1 verify-don't-trust re-grep against current `main` HEAD `6a6b04b` surfaced 5 non-NCMEC, non-PhotoDNA brief-drift items in SPEC.1 not enumerated by plan §F. Drift rooted in LD-1 (OpenAI sole vendor) + LD-3 (text/image Track A carve-out): Item A SPEC.1 §14 main moderation matrix row 763 (LD-3 + LD-7); Item B SPEC.1 §14 prose line 759 (LD-1); Item C SPEC.1 §16 Q-table line 1235 Q2 (LD-1); Item D SPEC.1 §20-Appendix preamble line 1276 (LD-1); Item E SPEC.1 §20-Appendix image-classifier rows 1283/1285/1291 (LD-1). All 5 ratified individually by operator 2026-05-26 with verification gates (Item A structural verification of §14 Track labels A/A/B/C; Item B + D + E re-narrowing per authoritative OpenAI `omni-moderation-2024-09-26` capability table; Item C Q-table column-shape verification). Process learning: brief-time scope estimate was off by ~90% on §F amendment count (5 in brief → 9 ratified at /plan → 17 ratified at execute-phase Phase 1). Per §F edits 10–14 above.
+
+- **7b — Plan body §F Edit 4a "After" text factual error (Option 6α correction).** Item E verification (authoritative OpenAI `omni-moderation-2024-09-26` capability table fetched 2026-05-26 from `developers.openai.com/api/docs/guides/moderation`) revealed plan body §F Edit 4a "After" text contained a factual error: claimed "three image categories `omni-moderation` does NOT classify (`hate`, `harassment`, `weapons` on image inputs)" but authoritative table shows 7 text-only categories (`harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, `sexual/minors`) and `weapons` is not an OpenAI moderation category at all. Error originated in research brief v1 §1 line 33 (claimed `hate` is image-supported; authoritative source contradicts) and propagated into plan body Edit 4a during /plan opening drafting 2026-05-26. **Option 6α resolution:** correct plan body Edit 4a "After" text in-place per authoritative table; tracked as amendment-note within existing Edit 4 entry, not as separate locus. Research brief frozen at v1; dated errata note appended per Option II as a third commit-2 file change (`docs/briefs/SCAFFOLD.16-technical-research-brief.md`). Process learning: research brief factual claims should be verified against primary docs at /plan opening, not assumed correct.
+
+- **7c — F-ADMIN-4 citation chain structural break (Option F-γ-thin resolution).** Phase 1 Q4 defensive sweep #2 (SPEC.1 §15 F-ADMIN-4 contract review) surfaced that plan body §F Edit 4a "After" text + the re-narrowed Items B/C/D/E + Item E weapons row Notes column all cite "SPEC.1 §15 F-ADMIN-4 reactive removal" as the v1 image-input gap mitigation. F-ADMIN-4's actual contract (lines 882–892) requires upstream Track A/B classification (`Pre: Track B comment exists with review_status = pending`; inline scope is approve Track B / remove Track A/B) — it cannot act on `pass`-verdict content. The cited mitigation mechanism does not exist in §15 today; citation chain structurally broken. **Option F-γ-thin resolution:** extend F-ADMIN-4 with one narrow capability (inline admin removal of pass-verdict comments) per sub-edits 15a–15e + cascade via G2 (extend §14 F-MOD-3 to preserve §14 ↔ §15 moderation-pair internal consistency) + Item G (SPEC.2 §4 Server Action map line 371 description column update). Rationale: image-borne harm content during the 15 Sep – 1 Nov experiment window + ETHGlobal Mumbai public launch is a thesis-violation surface (mandatory-commentary integrity + K_eff demonstration optics) that outweighs the ~1-2 hour scope expansion; documentation honesty + operational adequacy both achieved. F-γ-thin uses H-γ encoding-agnostic phrasing for the `mod_actions` row shape (deferring verdict-enum vs action column vs metadata-field encoding choice to DEBATE.2 caller-side per LD-5) to avoid propagating Item H-1 (long-standing SPEC vs shipped-code drift on `mod_actions` schema; SPEC.1 §1 documents `mod_actions.action` enum but shipped audit.ts has `verdict: modVerdictEnum` only). Item H-1 itself is out-of-scope per LD-5; flagged for DEBATE.2 caller-side reconciliation. Per §F edits 15 + 16 + 17 above + plan body Edit 4a "After" text re-narrowing. Process learning: plan-mode cited-mitigation contracts should be grep'd against their target prose at /plan opening; cited mechanism may not match cited contract's actual scope.
+
+**Ceiling bookkeeping:** SURPRISE 7 (7a + 7b + 7c lumped as one event per Q3 operator refinement) = 1 of 6 execute-phase ceiling. Plan-mode used 6 of 6 (SURPRISES 1–6 absorbed at /plan opening 2026-05-26). Total Phase 0 + execute-phase ceiling consumption: 1 of 6 events; 5 budget remaining for Phases 2–6.
+
+**Defensive sweeps run pre-commit-2** (no Items I+ surfaced, all clean):
+- Sweep #3: SPEC.1 §17 acceptance-test catalogue cascade under F-γ-thin → existing rows hold; new sub-edit 15e row slots in without conflict.
+- Sweep #4: SPEC.1 §14 F-MOD-1 through F-MOD-5 prose → clean modulo NCMEC ceiling-exempt strike at F-MOD-1 line 772 (already in Phase 4 NCMEC inventory).
+- Sweep #5: F-COMMENT-3 cascade SPEC.2 → 15+ hits analyzed; no F-ADMIN-4 coupling found; orthogonal participant-side vs admin-side surfaces.
+- Sweep #6: `mod_actions` SPEC inventory → 42 operational references catalogued (18 SPEC.1 + 24 SPEC.2); Item H-1 drift isolated to SPEC.1 lines 62–63; rest aligned with shipped schema.
+
+---
+
 ## §A — Scope (6 items per brief §1.1 — Phase-2 execute deliverable)
 
 > Brief §1.1 enumerated 6 items (the kickoff §A summary "5 items" was a count-error; the brief is authoritative). All 6 reproduced verbatim with plan-mode amendments where Q-verdicts or §3 SURPRISES adjusted shape.
@@ -320,9 +342,9 @@ After Edit 1-3 land + Test 1-2 land + §F amendments land + pre-PR self-audit pe
 
 ---
 
-## §F — Same-commit doc amendments (9 SPEC amendment locations)
+## §F — Same-commit doc amendments (17 SPEC amendment locations)
 
-Per Position B (LD-10 reopen) + 6th-find γ-strike + NCMEC default-strike. Locked at 9 per operator at /plan opening 2026-05-26.
+Per Position B (LD-10 reopen) + 6th-find γ-strike + NCMEC default-strike. Originally locked at 9 per operator at /plan opening 2026-05-26; expanded to 17 per Phase-1 verify-don't-trust find ratification 2026-05-26 (Items A–E SPEC.1 brief-drift items + F-γ-thin SPEC.1 §15 F-ADMIN-4 amendment with sub-edits a–e + G2 SPEC.1 §14 F-MOD-3 cascade extension + Item G SPEC.2 line 371 Server Action map description column update). Edit 4a "After" text additionally corrected per Option 6α (image-input gap category enumeration) + re-narrowed per F-γ-thin citation chain in-place (tracked as amendment-note within the existing Edit 4 entry, not as a separate locus). See §3 SURPRISE 7 (7a/7b/7c) and §I provenance subsection "Brief drift caught at execute-phase Phase 1 verify-don't-trust".
 
 ### Edit 1 — `docs/specs/SPEC.1.md` §16.5 bullet 5 (line 1010)
 
@@ -391,7 +413,7 @@ Per §3 SURPRISE 2 + Position B (strike, no deferred markers).
 
 Five paragraph-level edits across SPEC.2 §10 (lines 1005, 1017, 1021, 1023, 1029).
 
-**Edit 4a — Vendor selection paragraph (line 1005):** strike "PhotoDNA-or-equivalent for CSAM hash matching, called in parallel on every image-attached submit." entirely. Rewrite the surrounding clause to "OpenAI `omni-moderation-latest` (snapshot-pinned `omni-moderation-2024-09-26`) for text and multimodal classification — the SOLE moderation vendor for the experiment phase. **No second image-classifier vendor in experiment phase** — `omni-moderation-latest` covers the violence, self-harm, and sexual (non-minors) image categories natively, and is free of charge per OpenAI Help Center as of May 2026. The three image categories `omni-moderation` does NOT classify (`hate`, `harassment`, `weapons` on image inputs) are an accepted v1 gap mitigated by SPEC.1 §15 F-ADMIN-4 reactive removal and measured empirically by HARDEN.5. **Second-vendor (PhotoDNA / Safer / Hive) optionality deferred per SCAFFOLD.16 LD-1 → `docs/parked.md`.**"
+**Edit 4a — Vendor selection paragraph (line 1005):** strike "PhotoDNA-or-equivalent for CSAM hash matching, called in parallel on every image-attached submit." entirely. Rewrite the surrounding clause to (combined Option 6α image-input gap category correction + F-γ-thin H-γ encoding-agnostic citation re-narrowing per Phase-1 verify-don't-trust find ratification 2026-05-26): "OpenAI `omni-moderation-latest` (snapshot-pinned `omni-moderation-2024-09-26`) for text and multimodal classification — the SOLE moderation vendor for the experiment phase. **No second image-classifier vendor in experiment phase** — `omni-moderation-latest` covers the violence (including `violence/graphic`), self-harm (including `self-harm/intent` and `self-harm/instructions`), and `sexual` (non-minors) image categories natively, and is free of charge per OpenAI Help Center as of May 2026. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per OpenAI's `omni-moderation-2024-09-26` capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. **Second-vendor (PhotoDNA / Safer / Hive) optionality deferred per SCAFFOLD.16 LD-1 → `docs/parked.md`.**"
 
 **Edit 4b — Track A carve-out paragraph (NEW, insert after Vendor selection paragraph):** add a paragraph documenting LD-3:
 
@@ -509,6 +531,152 @@ Two amendments per Position B (LD-10 reopen + §3 SURPRISE 4).
 
 Per LD-10 reopen Position B: no soft-defer marker, no path-name preservation. `docs/parked.md` Item 1 (§G) is the sole record.
 
+---
+
+### Edits 10–17 — Phase-1 verify-don't-trust amendments (operator-ratified 2026-05-26)
+
+The following 8 edits surfaced during execute-phase Phase 1 verify-don't-trust re-grep against current `main` HEAD `6a6b04b`. All ratified individually by operator per the same discipline as plan-mode §3 SURPRISE absorption. See §3 SURPRISE 7 (7a/7b/7c) and §I provenance "Brief drift caught at execute-phase Phase 1 verify-don't-trust" subsection.
+
+### Edit 10 — `docs/specs/SPEC.1.md` §14 main moderation matrix row 763 (Item A) — LD-3 carve-out + NCMEC strike
+
+Split single Track A row into image-attached Track A + text-only Track B per LD-3; strike "auto-report (legal)" NCMEC reference per LD-7.
+
+```markdown
+// Before (line 763, single Track A row)
+| **A** | CSAM, sexual minors | Block + auto-report (legal) + auto-ban user | No |
+
+// After (two rows replacing the single row; existing rows 764-766 shift down by 1)
+| **A** | `sexual/minors` (image-attached) | Block + auto-ban user. Per SCAFFOLD.16 LD-3 image-attached path. | No |
+| **B** | `sexual/minors` (text-only) | Hide from public; admin review queue at `/admin/moderation`. Per SCAFFOLD.16 LD-3 text-only carve-out (text-classifier false-positive mitigation; industry practice per research brief). | Yes |
+```
+
+NCMEC auto-report sentence struck per Position B / LD-7. CSAM-hash row reframed away from PhotoDNA dependency.
+
+### Edit 11 — `docs/specs/SPEC.1.md` §14 prose line 759 (Item B) — LD-1 vendor + image-input gap framing
+
+Strike PhotoDNA + "general adult/violence/weapons classifier, vendor TBD" framing per LD-1; cite authoritative `omni-moderation-2024-09-26` capability table; cite F-γ-thin operational mitigation.
+
+```markdown
+// Before (line 759)
+Three tracks at submission. Two AI services run in parallel: text (OpenAI moderation API) and image (CSAM hash via PhotoDNA-or-equivalent + general adult/violence/weapons classifier, vendor TBD).
+
+// After
+Three tracks at submission. OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26` per ADR-0014) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per OpenAI's `omni-moderation-2024-09-26` capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality (Hive / PhotoDNA / Safer) and NCMEC CyberTipline reporting both deferred to post-experiment per `docs/parked.md`.
+```
+
+### Edit 12 — `docs/specs/SPEC.1.md` §16 Q-table line 1235 (Item C) — Q2 resolution per LD-1
+
+Mark Q2 resolved per LD-1; Default column carries resolution text (Q-table has 5 cols, no Status column).
+
+```markdown
+// Before (line 1235)
+| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | TBD; selected via implementation pass. | Engineering implementation pass | Before launch |
+
+// After
+| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | Resolved per SCAFFOLD.16 LD-1: OpenAI omni-moderation is the SOLE moderation vendor in experiment phase; image-classifier gap (6 text-only categories per `omni-moderation-2024-09-26` capability table) is an accepted v1 gap. Operational mitigation: SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin); empirical measurement: HARDEN.5. Second-vendor optionality deferred per `docs/parked.md`. | Hrishikesh (resolved at SCAFFOLD.16) | Resolved 2026-05-26 |
+```
+
+### Edit 13 — `docs/specs/SPEC.1.md` §20-Appendix preamble line 1276 (Item D) — LD-1 vendor framing rewrite
+
+Strike PhotoDNA + general image classifier TBD framing per LD-1; parallel phrasing to Edit 11.
+
+```markdown
+// Before (line 1276)
+Source vendors: OpenAI moderation API (text), PhotoDNA-or-equivalent (image hash for CSAM), general image classifier TBD (adult / violence / weapons).
+
+// After
+Source vendor: OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26`) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per `omni-moderation-2024-09-26`'s capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality deferred per `docs/parked.md`.
+```
+
+### Edit 14 — `docs/specs/SPEC.1.md` §20-Appendix image-classifier rows (Item E) — Source-layer rewrite per LD-1
+
+Three rows in moderation-category table at lines 1283, 1285, 1291. Rewrite Source-layer column to reflect authoritative `omni-moderation-2024-09-26` capability table (verified at execute-phase Item E verification via OpenAI docs 2026-05-26).
+
+```markdown
+// Before (lines 1283, 1285, 1291)
+| `nsfw` / adult imagery | Image — classifier | A | Auto-block + auto-ban. No product fit. |
+| `violence` (image) | Image — classifier | B | Admin review. |
+| `weapons` | Image — classifier | B | Admin review. Edges: weapon-policy markets. |
+
+// After
+| `nsfw` / adult imagery | Image — OpenAI (`sexual` category, image inputs supported per `omni-moderation-2024-09-26`) | A | Auto-block + auto-ban. No product fit. |
+| `violence` (image) | Image — OpenAI (`violence` category, image inputs supported per `omni-moderation-2024-09-26`) | B | Admin review. |
+| `weapons` | Image — N/A (`weapons` is not an OpenAI moderation category; SPEC.1 §15 F-ADMIN-4 extended scope per SCAFFOLD.16 F-γ-thin mitigates) | B | Admin review. Edges: weapon-policy markets. |
+```
+
+### Edit 15 — `docs/specs/SPEC.1.md` §15 F-ADMIN-4 contract extension (F-γ-thin) — five sub-edits a–e
+
+Per Phase-1 verify-don't-trust Item F operator ratification 2026-05-26: F-γ-thin extends F-ADMIN-4 with one narrow capability — inline admin removal of pass-verdict comments — to mitigate the v1 image-input gap (image-borne harm content omni-moderation cannot classify) during the 15 Sep – 1 Nov experiment window + ETHGlobal Mumbai public launch. Documentation honesty + operational adequacy both achieved without expanding F-ADMIN-4's user-ban semantics.
+
+**Sub-edit 15a — extend "System" bullet action list (lines 885–887 area).** Current reads "Two actions available: Approve user / Block user". After F-γ-thin:
+
+```markdown
+// After (System bullet)
+- **System.** Admin reviews comment context (text, image, AI flag categories with confidence, user pseudonym, user Dharma, user prior-flag count). Three actions available:
+  - **Approve user** — comment restored to public view, user untouched, flag closed and logged in `mod_actions`.
+  - **Block user** — comment stays hidden, user banned (Track A mechanics per `E2`), flag closed and logged.
+  - **Remove pass-verdict comment** — comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery).
+```
+
+**Sub-edit 15b — extend "Surface — inline" bullet** to cover pass-verdict removal. Append to existing sentence:
+
+```markdown
+Pass-verdict comments also render with admin-only Remove button (no badge — comment appears normally to admin same as to public, with Remove button visible only to admin). Removal mechanic identical to Track A/B inline removal; gated on admin role.
+```
+
+**Sub-edit 15c — extend "Inline scope explicitly" bullet** to cover pass-verdict removal:
+
+```markdown
+// After
+- **Inline scope explicitly:** approve a Track B pending comment, remove a Track A or Track B comment, remove a pass-verdict comment (per SCAFFOLD.16 F-γ-thin). Nothing else. No "ban user" button on the comment author's pseudonym (banning is hub-only — accessed via the moderation queue or a user-record action). No "trigger resolution" button on the market header. No bulk-select.
+```
+
+**Sub-edit 15d — split "Pre" bullet** into two pre-conditions:
+
+```markdown
+// After
+- **Pre (Approve/Block path).** Track B comment exists with `review_status = pending`.
+- **Pre (Remove pass-verdict path).** Any comment with `outcome === 'pass'` exists on a market the admin is viewing.
+```
+
+**Sub-edit 15e — add new §17 acceptance-test row**:
+
+```markdown
+| `f-admin-4::pass-verdict-removal` | §15 F-ADMIN-4 (per SCAFFOLD.16 F-γ-thin) | — |
+```
+
+Insertion point: after existing F-ADMIN-4 rows at SPEC.1 §17 lines 1144–1147.
+
+### Edit 16 — `docs/specs/SPEC.1.md` §14 F-MOD-3 cascade extension (G2)
+
+Per operator Q3 G2 disposition: extend F-MOD-3 to acknowledge the new Remove pass-verdict action, maintaining §14 ↔ §15 moderation-pair internal consistency (F-MOD-3 documents the decision contract; F-ADMIN-4 surfaces the operational mechanic).
+
+```markdown
+// Before (lines 780–783)
+### F-MOD-3 — Admin Approve / Block decision
+
+- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. Two surfaces, same backend: the hub queue at `/admin/moderation` (two buttons per row) and the inline affordance on debate views (per F-ADMIN-4 in §15). Both paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
+- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`.
+
+// After (per SCAFFOLD.16 F-γ-thin + G2 cascade extension)
+### F-MOD-3 — Admin Approve / Block / Remove pass-verdict decision
+
+- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. **Remove pass-verdict (per SCAFFOLD.16 F-γ-thin)**: comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery). No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. All three actions land at the same surfaces: the hub queue at `/admin/moderation` (three buttons per row for pending/applicable comments) and the inline affordance on debate views (per F-ADMIN-4 in §15). All paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
+- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`, `f-admin-4::pass-verdict-removal` (per SCAFFOLD.16 F-γ-thin sub-edit 15e).
+```
+
+### Edit 17 — `docs/specs/SPEC.2.md` §4 Server Action map line 371 (Item G) — F-γ-thin cascade
+
+Update description column to acknowledge third action (Remove pass-verdict) per F-γ-thin cascade.
+
+```markdown
+// Before (line 371)
+| `moderateComment(input)` | F5 | `src/server/admin/moderation/act.ts` | Approve / Block buttons on hub queue + inline market view | F-ADMIN-4 |
+
+// After
+| `moderateComment(input)` | F5 | `src/server/admin/moderation/act.ts` | Approve / Block / Remove pass-verdict buttons on hub queue + inline market view (per SCAFFOLD.16 F-γ-thin) | F-ADMIN-4 |
+```
+
 ### Same-commit amendment count summary
 
 | # | File | Section / line | Edit type |
@@ -522,8 +690,16 @@ Per LD-10 reopen Position B: no soft-defer marker, no path-name preservation. `d
 | 7 | `docs/specs/SPEC.2.md` | §17.2 row 4 (line 1592) | No-op (explicit no-edit decision per Q4) |
 | 8 | `docs/specs/SPEC.2.md` | §22.2 line 2175 | Stratum-description drift correction |
 | 9 | `docs/specs/SPEC.2.md` | Appendix A file map (lines 2316 + 2318) | Description strike + row strike (Position B) |
+| 10 | `docs/specs/SPEC.1.md` | §14 main moderation matrix row 763 | Split into image-attached A + text-only B per LD-3; strike NCMEC auto-report (Item A) |
+| 11 | `docs/specs/SPEC.1.md` | §14 prose line 759 | Vendor framing rewrite per LD-1 + F-γ-thin H-γ citation (Item B) |
+| 12 | `docs/specs/SPEC.1.md` | §16 Q-table line 1235 (Q2) | Mark Q2 resolved per LD-1 (Item C) |
+| 13 | `docs/specs/SPEC.1.md` | §20-Appendix preamble line 1276 | Vendor framing rewrite per LD-1 + F-γ-thin H-γ citation (Item D) |
+| 14 | `docs/specs/SPEC.1.md` | §20-Appendix image-classifier rows (lines 1283, 1285, 1291) | Source-layer column rewrite per LD-1 + authoritative OpenAI table (Item E) |
+| 15 | `docs/specs/SPEC.1.md` | §15 F-ADMIN-4 prose (lines 882–892) + §17 acceptance-test row insert | F-γ-thin contract extension; sub-edits a–e (inline admin removal of pass-verdict comments + new §17 row `f-admin-4::pass-verdict-removal`) |
+| 16 | `docs/specs/SPEC.1.md` | §14 F-MOD-3 prose (lines 780–783) | G2 cascade extension: add Remove pass-verdict to decision contract (§14 ↔ §15 internal consistency) |
+| 17 | `docs/specs/SPEC.2.md` | §4 Server Action map line 371 | Description column update: 2 buttons → 3 buttons (Item G, F-γ-thin cascade) |
 
-**Total: 9 SPEC amendment locations across 2 SPEC files.**
+**Total: 17 SPEC amendment locations across 2 SPEC files.** (Originally 9 plan-ratified at /plan opening 2026-05-26; expanded to 17 per Phase-1 verify-don't-trust find ratification 2026-05-26 — Items A–E SPEC.1 brief-drift items + F-γ-thin SPEC.1 §15 F-ADMIN-4 amendment + G2 SPEC.1 §14 F-MOD-3 cascade extension + Item G SPEC.2 line 371 description column update. Edit 4a "After" text additionally corrected per Option 6α + re-narrowed per F-γ-thin citation chain in-place, tracked as amendment-note within existing Edit 4 entry not as separate locus.)
 
 ---
 
@@ -689,6 +865,26 @@ Each row follows the existing `docs/parked.md` convention (H2 header: `## <STRAT
 - Brief §4 same-commit amendment scope enumerated 5 SPEC locations. /plan opening greps surfaced 3 additional load-bearing SPEC amendment targets (SPEC.1 §20-Appendix + SPEC.2 §12.2 line 1112 + SPEC.2 Appendix A file map). Locked at 9 per operator + LD-10 Position B.
 - Brief LD-10 originally locked Position A (keep `photodna.ts` row in SPEC.2 §10 file map, mark deferred). Operator reopened at /plan opening 2026-05-26 → Position B (complete removal of all PhotoDNA references in SPEC.1 + SPEC.2). Rationale: experiment-phase scope discipline; `docs/parked.md` Item 1 sole record.
 - NCMEC operational references in SPEC framing: brief did not enumerate. NCMEC default-strike applies during §F drafting per operator ratification 2026-05-26 (ceiling-exempt; same root cause as 6th-find).
+
+### Brief drift caught at execute-phase Phase 1 verify-don't-trust
+
+Sibling subsection added per Phase-1 verify-don't-trust find ratification 2026-05-26 (SURPRISE 7a/7b/7c — see §3.7). Three failure-mode root causes worth distinguishing for process learning.
+
+**7a failure-mode root cause — brief-time scope estimate dramatically underestimated SPEC.1 amendment fan-out.** Brief §4 enumerated 5 SPEC amendment locations; /plan opening greps surfaced 4 more → 9 ratified at /plan opening 2026-05-26; execute-phase Phase 1 verify-don't-trust re-grep surfaced 5 more → 17 ratified 2026-05-26. Cumulative scope expansion: brief → /plan ratification: +80%; /plan → execute-phase ratification: +89%; brief → execute-phase: +240%. Each expansion ratified individually with operator verification gates. **Process learning:** brief-time scope estimates on cross-document amendment fan-out (e.g., LD-1 "OpenAI sole vendor" + LD-3 "text/image carve-out" implications) should not be treated as upper bounds; /plan opening greps + execute-phase verify-don't-trust greps are both necessary scope-discovery passes.
+
+**7b failure-mode root cause — research brief factual claim propagated into plan body without primary-source verification.** Research brief v1 §1 line 33 stated "image inputs are supported only for `violence`, `violence/graphic`, `sexual`, `self-harm` (including `intent`/`instructions`), and `hate`". Authoritative source (OpenAI Moderation Guide at `developers.openai.com/api/docs/guides/moderation`, fetched at execute-phase Item E verification 2026-05-26) lists 7 text-only categories including `hate`. Brief was wrong about `hate`. Plan body §F Edit 4a inherited the brief's category enumeration and propagated it as "three image categories `omni-moderation` does NOT classify (`hate`, `harassment`, `weapons` on image inputs)" — three errors compounded into one: (i) wrong count (7 text-only, not 3); (ii) wrong list (missing illicit, illicit/violent, sexual/minors); (iii) wrong taxonomy claim (`weapons` is not an OpenAI moderation category at all). Caught at execute-phase Item E verification when operator gated Item E on authoritative citation; cascaded to Item B + Item D + Item E + plan body Edit 4a "After" text correction per Option 6α. **Process learning:** research brief factual claims (especially per-category capability tables for external vendors) should be verified against primary docs at /plan opening, not assumed correct. Plan-mode CC's verify-before-claiming-done discipline (CLAUDE.md §5.7) should extend to all empirical claims absorbed from briefs into plan bodies.
+
+**7c failure-mode root cause — plan-mode cited-mitigation contract not grep'd against target prose.** Plan body §F Edit 4a "After" text cited "SPEC.1 §15 F-ADMIN-4 reactive removal" as the v1 image-input gap mitigation. Items B/C/D/E inherited the citation. F-ADMIN-4's actual contract at SPEC.1 §15 lines 882–892 requires upstream Track A/B classification (`Pre: Track B comment exists with review_status = pending`; inline scope is approve Track B / remove Track A/B). The cited mitigation mechanism does not exist in §15 today; citation chain structurally broken. Caught at execute-phase Phase 1 Q4 defensive sweep #2 (F-ADMIN-4 contract review). Operator chose Option F-γ-thin: extend F-ADMIN-4 with narrow new capability (inline admin removal of pass-verdict comments) to align cited mechanism with actual mitigation. Cascade: G2 (§14 F-MOD-3 extension) + Item G (SPEC.2 §4 Server Action map description column). **Process learning:** plan-mode CC's cited-mitigation references (e.g., "mitigated by F-ADMIN-X reactive removal") should be grep'd against the cited contract's actual prose at /plan opening; cited mechanism's scope may not match the citing context's claim. Particularly important for §14 ↔ §15 ↔ §20-Appendix moderation-domain cross-references where decision-contracts (§14 F-MOD-*) and operational-surfaces (§15 F-ADMIN-*) live in different sections and drift independently.
+
+**Item H-1 close-out documentation (long-standing SPEC vs shipped-code drift on `mod_actions` schema; predates SCAFFOLD.16).** Discovered during Phase 1 Item H bundled sweep 2026-05-26. SPEC.1 §1 glossary lines 62–63 documents `mod_actions.action ∈ {csam_blocked, nsfw_auto_banned}` (Track A) and `∈ {flagged, approved, blocked}` (Track B); shipped `src/db/schema/audit.ts` has NO `action` column — has `verdict: modVerdictEnum("verdict", ["pass", "track_a", "track_b"])` instead. Long-standing SPEC vs code drift. Out-of-scope for SCAFFOLD.16 per LD-5 (`mod_actions` INSERT is caller-side; DEBATE.2 caller-side stratum owns the schema reconciliation at INSERT-site shipping time). F-γ-thin uses H-γ encoding-agnostic phrasing to avoid propagating Item H-1 into new SPEC.1 §15 / §14 prose. Flagged for DEBATE.2 caller-side reconciliation.
+
+**42-locus `mod_actions` SPEC inventory (close-out reference for DEBATE.2 future-reader; from Phase 1 Sweep #6).**
+
+SPEC.1 (18 operational hits, excluding historical change-log line 1268): lines 62, 63 (Item H-1 drift source — glossary `mod_actions.action ∈ {...}` framing); 64, 68 (glossary Track C absence + Mod-action log → table); 136, 181, 189, 1002 (§5 + §16.4 append-only discipline); 772, 782 (§14 F-MOD-1 + F-MOD-3 mod_actions writes); 816, 886, 888 (§15 admin centre + F-ADMIN-4 prose); 897, 994, 1204 (§15 F-ADMIN-5 + §16 catalogue + §17 deferred public-log); 911, 914 (§15 Control Centre boundary statements).
+
+SPEC.2 (24 operational hits, excluding historical change-log lines 40 + 43): line 373 (§4 F-ADMIN-5 audit-log search); 471 (§5 mod_actions Bucket A row); 505, 1801 (Bucket A list + §19 Bucket-A table row 7); 548, 685, 1217 (ADR-0014 consumption); 595, 738, 754 (§5 / §7 SQL + current-state writes lists); 1015, 1023, 1027, 1115 (§10 / §12 Track A/B mod_actions writes); 1141 (§12 audit-trail integrity rationale); 1156 (§12 reconciliation invariant); 1247 (§13 four pure-read flows); 1698 (§18 insider-threat residual mitigations); 1739 (§18 admin-actor no-FK encoding); 1843 (§20 metadata.ip strip); 1880 (§20 mod_actions.user_id pseudonym scrub); 2269 (Appendix file map `src/db/schema/audit.ts`); 2587 (Appendix B.11 mod_actions Bucket A appendix); 2688 (Appendix JSONB sub-key handling).
+
+DEBATE.2 future-reader scope: when wiring caller-side `mod_actions` INSERT semantics, this 42-locus inventory is the reference material. Reconciliation decision (extend verdict enum vs add action column vs use metadata field) ripples through SPEC.1 §1 + SPEC.2 §5/§6/§B.11 at minimum.
 
 ### Sequencing authority
 
