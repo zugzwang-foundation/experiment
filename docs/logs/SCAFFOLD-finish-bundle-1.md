@@ -19,7 +19,7 @@
 | 4 | `feat(scaffold-7): structured request-log helper per SPEC.1 §16.3 (Vercel runtime logs, Axiom dropped)` | Phase 3 | 4 files (`@vercel/functions` dep, new logging.ts + test) |
 | 5 | `chore(scaffold-finish-bundle-1): absorb Phase 4 audit SURPRISE — refresh stale "SCAFFOLD.5 swaps console.error" docblocks` | Phase 4 absorption | 3 files (docblock prose refresh) |
 
-PR #: pending (recorded in follow-up commit after `gh pr create`).
+PR #: [#53](https://github.com/zugzwang-foundation/experiment/pull/53).
 
 Net diff (vs `origin/main`):
 - 21 files changed, ~2456 insertions, 99 deletions.
