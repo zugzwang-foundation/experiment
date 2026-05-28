@@ -1,0 +1,11 @@
+SCAFFOLD.8 J3 throwaway preview marker — close at C11, do not merge.
+
+This file exists solely to trigger a Vercel preview deployment so the
+J3 smoke runner (item #6) can hit a *.vercel.app preview URL with the
+/api/health route in place. The PR carrying this file is closed without
+merging at the C11 step of SCAFFOLD.8; the file is never merged to main
+or to feat/scaffold-8-staging-env.
+
+If you found this file outside the SCAFFOLD.8 J-phase window, the
+throwaway PR was probably not closed cleanly — see
+docs/plans/SCAFFOLD.8-staging-plan.md §3 C11.
