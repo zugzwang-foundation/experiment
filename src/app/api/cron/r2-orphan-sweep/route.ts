@@ -11,6 +11,7 @@ import {
 } from "@/server/config/limits";
 import { deleteObject } from "@/server/storage/r2";
 import { sweepOrphans } from "@/server/storage/sweep-orphans";
+import { getRedisKey } from "@/server/upstash/keys";
 import { acquireLock, releaseLock } from "@/server/upstash/lock";
 
 // GET /api/cron/r2-orphan-sweep — SCAFFOLD.15 plan §5.6 + SPEC.2 §3.3 + §12.6.
@@ -64,7 +65,7 @@ export async function GET(request: Request): Promise<Response> {
 	}
 
 	// 2. Lock — at-most-one-runner across Vercel cron fanout
-	const lockKey = "cron-lock:r2-orphan-sweep";
+	const lockKey = getRedisKey("cron-lock", "r2-orphan-sweep");
 	let lock: { token: string } | null;
 	try {
 		lock = await acquireLock(lockKey, ORPHAN_SWEEP_LOCK_TTL_SECONDS);

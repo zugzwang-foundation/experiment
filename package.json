@@ -10,6 +10,11 @@
 		"seed:identity-pool:dev": "tsx scripts/seed-identity-pool-dev.ts",
 		"seed:identity-pool:prod": "tsx scripts/seed-identity-pool.ts",
 		"verify:identity-pool": "tsx scripts/verify-identity-pool.ts",
+		"vercel-env-audit": "tsx scripts/vercel-env-audit.ts",
+		"db:migrate:staging": "tsx scripts/migrate-staging.ts",
+		"db:seed:staging": "tsx scripts/seed-staging.ts",
+		"verify:r2-scope": "tsx scripts/verify-r2-scope.ts",
+		"smoke:staging": "tsx scripts/smoke-staging.ts",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/"
 	},

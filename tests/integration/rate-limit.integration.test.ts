@@ -26,9 +26,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // --- @upstash/ratelimit mock ----------------------------------------------
 //
 // Each Ratelimit instance is constructed ONCE at rate-limit.ts module load.
-// The mock returns a distinct `.limit` vi.fn() per construction; we record
-// each instance keyed by its `prefix` so per-test scripts can address them
-// (e.g., otpRequestPerIpBurst's instance has prefix 'otp-ip').
+// Post-SCAFFOLD.8 LD-10, the captured `prefix` carries the env prefix
+// (e.g., `prod:ratelimit:otp-email`). The test keys `ratelimitInstances`
+// by the BARE surface name (last `:`-delimited segment) so per-test
+// scripts remain readable (`ratelimitInstances["otp-email"]` rather than
+// the full env-prefixed string). The mock retains the full captured
+// prefix on each instance for the disjointness + shape assertions
+// below.
 
 // vi.mock() is hoisted; factory variables MUST come from vi.hoisted() too.
 // Per vitest docs: https://vitest.dev/api/vi.html#vi-hoisted
@@ -48,7 +52,12 @@ vi.mock("@upstash/ratelimit", async () => {
 		constructor(opts: { prefix?: string; redis: unknown; limiter: unknown }) {
 			this.prefix = opts.prefix ?? "default";
 			this.limit = viInner.fn();
-			ratelimitInstances[this.prefix] = {
+			// Key by the bare surface name (post-SCAFFOLD.8 LD-10 the full
+			// prefix is `{env}:ratelimit:{surface}` — the last segment is the
+			// surface). Falls back to the full string if no `:` is present.
+			const segments = this.prefix.split(":");
+			const surface = segments[segments.length - 1] ?? this.prefix;
+			ratelimitInstances[surface] = {
 				prefix: this.prefix,
 				limit: this.limit,
 			};
@@ -107,6 +116,7 @@ import {
 	writeBurstIdentifier,
 	writeBurstPerUser,
 } from "@/server/middleware/rate-limit";
+import { getRedisKey } from "@/server/upstash/keys";
 
 beforeEach(() => {
 	for (const inst of Object.values(ratelimitInstances)) {
@@ -271,9 +281,10 @@ describe("rate-limit middleware", () => {
 	it("rate-limit::otp-email-vs-otp-ip-disjoint-keys", async () => {
 		// Same email used across two IPs. Identifier helpers produce
 		// distinct bare-values; library config carries distinct PREFIXES
-		// ('otp-email' vs 'otp-ip'). The combined Redis key shape is
+		// (post-SCAFFOLD.8 LD-10: `{env}:ratelimit:otp-email` vs
+		// `{env}:ratelimit:otp-ip`). The combined Redis key shape is
 		// `<prefix>:<identifier>` so the two surfaces accumulate
-		// independently.
+		// independently and remain env-scoped.
 		const email = "abuse@example.com";
 		const ip1 = "1.1.1.1";
 		const ip2 = "2.2.2.2";
@@ -284,9 +295,14 @@ describe("rate-limit middleware", () => {
 		expect(ipIdentifier(ip1)).toBe(ip1);
 		expect(ipIdentifier(ip2)).toBe(ip2);
 
-		// The 7 constructions populated distinct prefixes.
-		expect(ratelimitInstances["otp-email"]?.prefix).toBe("otp-email");
-		expect(ratelimitInstances["otp-ip"]?.prefix).toBe("otp-ip");
+		// The 7 constructions populated distinct env-prefixed prefixes
+		// per the C4 getRedisKey contract.
+		expect(ratelimitInstances["otp-email"]?.prefix).toBe(
+			getRedisKey("ratelimit", "otp-email"),
+		);
+		expect(ratelimitInstances["otp-ip"]?.prefix).toBe(
+			getRedisKey("ratelimit", "otp-ip"),
+		);
 		expect(ratelimitInstances["otp-email"]?.prefix).not.toBe(
 			ratelimitInstances["otp-ip"]?.prefix,
 		);
@@ -398,14 +414,22 @@ describe("rate-limit middleware", () => {
 	// === §7.3 row 8 (extension) =============================================
 
 	it("rate-limit::idempotency-and-rate-limit-key-prefixes-disjoint", async () => {
-		// Per SPEC.2 §11 ¶"Distinction from §10" — `idem:*` cache keys
+		// Per SPEC.2 §11 ¶"Distinction from §10" — idempotency-cache keys
 		// MUST NOT overlap with any rate-limit surface prefix. INV-1
 		// indirect: a prefix collision would let a rate-limit GET / SET
 		// stomp on an idempotency cache entry, surfacing as a corrupted
 		// cache hit (false 'hit' arm fires for a request that should have
 		// been a fresh execution).
-		const idemPrefix = "idem"; // hard-coded in cache.ts (`idem:${key}`)
-		const ratelimitPrefixes = [
+		//
+		// Post-SCAFFOLD.8 LD-10, the disjointness invariant lives at the
+		// SECOND segment of each key: `{env}:ratelimit:*` is disjoint
+		// from `{env}:idem:*`, `{env}:mod-reserve:*`, and
+		// `{env}:cron-lock:*`. The leftmost segment (env) is shared.
+		const idemPrefix = getRedisKey("idem", "_probe")
+			.split(":")
+			.slice(0, 2)
+			.join(":");
+		const ratelimitSurfaces = [
 			"otp-email",
 			"otp-ip",
 			"admin-login-ip",
@@ -415,20 +439,17 @@ describe("rate-limit middleware", () => {
 			"image-put-ip",
 		];
 
-		// Every ratelimit prefix observed in the mock-recorded constructions.
-		for (const prefix of ratelimitPrefixes) {
-			expect(ratelimitInstances[prefix]).toBeDefined();
-			expect(ratelimitInstances[prefix]?.prefix).toBe(prefix);
-			// Disjoint test: no rate-limit prefix equals 'idem'; no
-			// rate-limit prefix starts with 'idem:' or contains the
-			// character sequence 'idem' as the leading prefix segment.
-			expect(prefix).not.toBe(idemPrefix);
-			expect(prefix.startsWith(`${idemPrefix}:`)).toBe(false);
-		}
-		// And reverse: 'idem' is not equal to / prefix-of any rate-limit
-		// prefix (sanity floor).
-		for (const prefix of ratelimitPrefixes) {
-			expect(`${idemPrefix}:`.startsWith(`${prefix}:`)).toBe(false);
+		// Every rate-limit surface registered with the env-prefixed shape.
+		for (const surface of ratelimitSurfaces) {
+			expect(ratelimitInstances[surface]).toBeDefined();
+			expect(ratelimitInstances[surface]?.prefix).toBe(
+				getRedisKey("ratelimit", surface),
+			);
+			// Disjoint at the second segment: each rate-limit prefix
+			// begins with `{env}:ratelimit:`, never with `{env}:idem`.
+			expect(
+				ratelimitInstances[surface]?.prefix.startsWith(`${idemPrefix}`),
+			).toBe(false);
 		}
 
 		// Surface-instance exports are wired (sanity that the mock

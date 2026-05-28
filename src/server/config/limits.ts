@@ -94,8 +94,8 @@ export const OPENAI_TIMEOUT_MS = 3000;
 /** OpenAI moderation retry budget. Per SPEC.2 §10.10 — 1 retry on transient (network / timeout / 5xx / 429). 4xx auth failures (401/403) throw without retry. */
 export const OPENAI_MAX_RETRIES = 1;
 
-/** Reservation key prefix for `mod:reserve:${userId}:${marketId}:${idempotencyKey}` per SPEC.2 §10.10. Disjoint from `idem:*` (idempotency-cache) and rate-limit prefixes per the disjointness invariant. */
-export const RESERVATION_KEY_PREFIX = "mod:reserve:";
+/** Reservation key base segment per SPEC.2 §10.10. Consumed by `getRedisKey(RESERVATION_KEY_BASE, userId, marketId, idempotencyKey)` per SCAFFOLD.8 LD-10 → keys land at `{env}:mod-reserve:{userId}:{marketId}:{idempotencyKey}`. Disjoint from `idem:*` (idempotency-cache), `ratelimit:*`, and `cron-lock:*` segments per the disjointness invariant. */
+export const RESERVATION_KEY_BASE = "mod-reserve";
 
 /** Reservation TTL (s). Per SPEC.2 §10.10 — 10s spans the moderation call's worst case + slack. Auto-expires if `precommitModerate` crashes between SET-NX and DEL-in-finally; a retry from the same idempotency key then proceeds cleanly. */
 export const RESERVATION_TTL_SECONDS = 10;

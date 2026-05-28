@@ -42,32 +42,24 @@ function resolveBucketEnv(bucket: R2Bucket): R2BucketEnv {
 		const endpoint = process.env.R2_ENDPOINT_UPLOADS;
 		const accessKeyId = process.env.R2_ACCESS_KEY_ID_UPLOADS;
 		const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_UPLOADS;
-		if (!endpoint || !accessKeyId || !secretAccessKey) {
+		const bucketName = process.env.R2_BUCKET_UPLOADS;
+		if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
 			throw new Error(
-				"R2 uploads env not configured: set R2_ENDPOINT_UPLOADS, R2_ACCESS_KEY_ID_UPLOADS, R2_SECRET_ACCESS_KEY_UPLOADS (see .env.example).",
+				"R2 uploads env not configured: set R2_ENDPOINT_UPLOADS, R2_ACCESS_KEY_ID_UPLOADS, R2_SECRET_ACCESS_KEY_UPLOADS, R2_BUCKET_UPLOADS (see .env.example).",
 			);
 		}
-		return {
-			endpoint,
-			accessKeyId,
-			secretAccessKey,
-			bucketName: "zugzwang-uploads",
-		};
+		return { endpoint, accessKeyId, secretAccessKey, bucketName };
 	}
 	const endpoint = process.env.R2_ENDPOINT_PFP;
 	const accessKeyId = process.env.R2_ACCESS_KEY_ID_PFP;
 	const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_PFP;
-	if (!endpoint || !accessKeyId || !secretAccessKey) {
+	const bucketName = process.env.R2_BUCKET_PFP;
+	if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
 		throw new Error(
-			"R2 pfp env not configured: set R2_ENDPOINT_PFP, R2_ACCESS_KEY_ID_PFP, R2_SECRET_ACCESS_KEY_PFP (see .env.example).",
+			"R2 pfp env not configured: set R2_ENDPOINT_PFP, R2_ACCESS_KEY_ID_PFP, R2_SECRET_ACCESS_KEY_PFP, R2_BUCKET_PFP (see .env.example).",
 		);
 	}
-	return {
-		endpoint,
-		accessKeyId,
-		secretAccessKey,
-		bucketName: "zugzwang-pfp",
-	};
+	return { endpoint, accessKeyId, secretAccessKey, bucketName };
 }
 
 const clients: Partial<

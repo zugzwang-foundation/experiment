@@ -9,6 +9,7 @@ import posthog from "posthog-js";
 
 Sentry.init({
 	dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+	environment: process.env.ZUGZWANG_ENV,
 	tracesSampleRate: 1.0,
 	sendDefaultPii: false,
 	debug: false,
