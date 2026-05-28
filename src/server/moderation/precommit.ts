@@ -5,16 +5,19 @@ import {
 } from "@/lib/errors";
 import {
 	READ_URL_TTL_SECONDS_MODERATION,
-	RESERVATION_KEY_PREFIX,
+	RESERVATION_KEY_BASE,
 	RESERVATION_TTL_SECONDS,
 } from "@/server/config/limits";
 import { moderate } from "@/server/moderation/openai";
 import { signRead } from "@/server/storage/sign-read";
+import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
 
 // Pre-commit moderation per SPEC.2 §10.10 + ADR-0014. Owns the
-// 10-second `mod:reserve:*` Redis reservation lifecycle:
-//   1. Compute reservation key `mod:reserve:${userId}:${marketId}:${idempotencyKey}`
+// 10-second `{env}:mod-reserve:*` Redis reservation lifecycle
+// (env-prefixed via getRedisKey per SCAFFOLD.8 LD-10):
+//   1. Compute reservation key `{env}:mod-reserve:{userId}:{marketId}:{idempotencyKey}`
+//      via getRedisKey(RESERVATION_KEY_BASE, userId, marketId, idempotencyKey)
 //   2. SET NX EX 10. Null → ModerationInFlightError (caller → HTTP 409).
 //   3. try { ... } finally { redis.del(reservationKey) }
 //   4. Inside try: if imageR2Key → mint 60s read URL; openai.moderate(...)
@@ -59,7 +62,12 @@ export async function precommitModerate(
 	args: PrecommitArgs,
 ): Promise<PrecommitResult> {
 	const { text, imageR2Key, idempotencyKey, userId, marketId } = args;
-	const reservationKey = `${RESERVATION_KEY_PREFIX}${userId}:${marketId}:${idempotencyKey}`;
+	const reservationKey = getRedisKey(
+		RESERVATION_KEY_BASE,
+		userId,
+		marketId,
+		idempotencyKey,
+	);
 
 	const reservation = await redis.set(reservationKey, "1", {
 		nx: true,

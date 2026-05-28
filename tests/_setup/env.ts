@@ -21,6 +21,18 @@ process.env.DATABASE_URL ??=
 	"postgresql://postgres:postgres@localhost:54322/postgres";
 process.env.UPSTASH_REDIS_REST_URL ??= "https://test.upstash.io";
 process.env.UPSTASH_REDIS_REST_TOKEN ??= "test-upstash-token-placeholder";
+// SCAFFOLD.8 LD-10: getRedisKey() reads ZUGZWANG_ENV at module-load
+// (rate-limit.ts constructs 7 Ratelimit instances at top-level after
+// C4 refactor). Tests use "prod" as the default; tests that need to
+// observe other-env behaviour override locally per Test 2 / unit-test
+// pattern at tests/unit/upstash-keys.test.ts.
+process.env.ZUGZWANG_ENV ??= "prod";
+// SCAFFOLD.8 C4b: r2.ts resolveBucketEnv() now reads R2_BUCKET_*
+// alongside the credential pair. Tests that go through that resolver
+// (storage / sweep-orphans / sign-upload) need non-empty defaults.
+// Mirrors the prod bucket names per .env.example.
+process.env.R2_BUCKET_UPLOADS ??= "zugzwang-uploads";
+process.env.R2_BUCKET_PFP ??= "zugzwang-pfp";
 
 // Node test environment shim: better-fetch (under better-auth's client)
 // synchronously throws when constructing URLs from relative paths if

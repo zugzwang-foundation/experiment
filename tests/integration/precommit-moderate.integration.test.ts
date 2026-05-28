@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Per SCAFFOLD.15 plan §5.2 — precommitModerate state-machine tests.
 // Covers:
-//   - Reservation lifecycle (`mod:reserve:${userId}:${marketId}:${idempotencyKey}`
-//     via redis.set NX EX 10; del in finally; throw on collision)
+//   - Reservation lifecycle (`{env}:mod-reserve:{userId}:{marketId}:{idempotencyKey}`
+//     post-SCAFFOLD.8 LD-10 via getRedisKey; redis.set NX EX 10; del in
+//     finally; throw on collision)
 //   - Verdict mapping table per §5.2 step 6 (pass / track_a / track_b)
 //   - imageR2Key path mints a 60s signed READ URL and passes imageUrl into
 //     openai.moderate
@@ -51,10 +52,11 @@ import {
 } from "@/lib/errors";
 import {
 	READ_URL_TTL_SECONDS_MODERATION,
-	RESERVATION_KEY_PREFIX,
+	RESERVATION_KEY_BASE,
 	RESERVATION_TTL_SECONDS,
 } from "@/server/config/limits";
 import { precommitModerate } from "@/server/moderation/precommit";
+import { getRedisKey } from "@/server/upstash/keys";
 
 beforeEach(() => {
 	mockRedis.set.mockReset();
@@ -99,7 +101,12 @@ function args(over?: {
 		userId,
 		marketId,
 	};
-	const reservationKey = `${RESERVATION_KEY_PREFIX}${userId}:${marketId}:${idempotencyKey}`;
+	const reservationKey = getRedisKey(
+		RESERVATION_KEY_BASE,
+		userId,
+		marketId,
+		idempotencyKey,
+	);
 	return { a, reservationKey };
 }
 
@@ -280,10 +287,11 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 	});
 
 	it("precommit-moderate::reservation-key-shape-with-namespacing", async () => {
-		// Key shape per §5.2 step 1: `mod:reserve:${userId}:${marketId}:${idempotencyKey}`.
+		// Key shape post-SCAFFOLD.8 LD-10: `{env}:mod-reserve:${userId}:${marketId}:${idempotencyKey}`
+		// (the env-prefixed form produced by getRedisKey at runtime).
 		// Verifies the three identifiers are colon-joined in canonical order
-		// after the prefix (collisions across users/markets/idems are
-		// impossible by construction).
+		// after the env + namespace segments (collisions across users/markets/
+		// idems are impossible by construction).
 		const { a, reservationKey } = args({
 			userId: "user-xyz",
 			marketId: "market-abc",
@@ -301,10 +309,10 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 			expect.objectContaining({ nx: true, ex: RESERVATION_TTL_SECONDS }),
 		);
 		expect(reservationKey).toBe(
-			"mod:reserve:user-xyz:market-abc:idem-namespacing",
+			"prod:mod-reserve:user-xyz:market-abc:idem-namespacing",
 		);
 		// Sanity floors on the constants.
-		expect(RESERVATION_KEY_PREFIX).toBe("mod:reserve:");
+		expect(RESERVATION_KEY_BASE).toBe("mod-reserve");
 		expect(RESERVATION_TTL_SECONDS).toBe(10);
 	});
 
@@ -407,7 +415,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 		// Sanity floors on the SPEC.2 §10.10 ratified constants. If a future
 		// PR moves any of these off-spec, this surfaces loud.
 		expect(RESERVATION_TTL_SECONDS).toBe(10);
-		expect(RESERVATION_KEY_PREFIX).toBe("mod:reserve:");
+		expect(RESERVATION_KEY_BASE).toBe("mod-reserve");
 		expect(READ_URL_TTL_SECONDS_MODERATION).toBe(60);
 	});
 });

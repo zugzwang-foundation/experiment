@@ -15,6 +15,18 @@ const nextConfig: NextConfig = {
 	env: {
 		BUILD_TIMESTAMP: buildTimestamp,
 		BUILD_GIT_SHA: buildGitSha,
+		// SCAFFOLD.8 C6 amendment: surface ZUGZWANG_ENV into the browser
+		// bundle so `instrumentation-client.ts`'s Sentry.init() reads a
+		// non-undefined `environment` tag. Without this entry the var
+		// isn't NEXT_PUBLIC_-prefixed and would inline as undefined on
+		// the client (server-runtime reads from Doppler-synced env are
+		// unaffected — same source on Vercel Custom Env). Fallback to
+		// "unknown" matches the BUILD_GIT_SHA discipline; in any
+		// deployment scenario where the server boots successfully,
+		// instrumentation.ts::register() has already validated the live
+		// value against VALID_ENVS so the inlined value is one of
+		// prod / staging / preview.
+		ZUGZWANG_ENV: process.env.ZUGZWANG_ENV ?? "unknown",
 	},
 };
 

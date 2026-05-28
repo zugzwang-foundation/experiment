@@ -7,8 +7,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // cache against a hermetic Redis or per-test-prefixed Upstash endpoint —
 // out of scope here.
 //
-// State machine (per plan §F2 cache.ts pseudocode + Q4 resolution):
-//   redisKey = `idem:${key}`
+// State machine (per plan §F2 cache.ts pseudocode + Q4 resolution +
+// SCAFFOLD.8 LD-10 env-prefix):
+//   redisKey = getRedisKey("idem", key)  // e.g. `prod:idem:${key}`
 //   SET NX EX 30 → if 'OK' → kind:'miss' + release callback
 //                  else GET existing
 //                       if null → race-retry (recurse once)
@@ -82,6 +83,7 @@ import {
 	PENDING_SENTINEL_PREFIX,
 	PENDING_TTL_SECONDS,
 } from "@/server/idempotency/types";
+import { getRedisKey } from "@/server/upstash/keys";
 
 beforeEach(() => {
 	mockRedis.set.mockReset();
@@ -125,7 +127,7 @@ describe("idempotency cache state machine", () => {
 		}
 		// SET NX was the only write attempt; no further set fires on a hit.
 		expect(mockRedis.set).toHaveBeenCalledTimes(1);
-		expect(mockRedis.get).toHaveBeenCalledWith(`idem:${key}`);
+		expect(mockRedis.get).toHaveBeenCalledWith(getRedisKey("idem", key));
 		expect(mockRedis.del).not.toHaveBeenCalled();
 	});
 
@@ -155,7 +157,7 @@ describe("idempotency cache state machine", () => {
 		// SET NX was issued with the pending sentinel + 30s TTL.
 		expect(mockRedis.set).toHaveBeenNthCalledWith(
 			1,
-			`idem:${key}`,
+			getRedisKey("idem", key),
 			`${PENDING_SENTINEL_PREFIX}${fingerprint}`,
 			{ nx: true, ex: PENDING_TTL_SECONDS },
 		);
@@ -164,7 +166,7 @@ describe("idempotency cache state machine", () => {
 		await result.release(completed);
 		expect(mockRedis.set).toHaveBeenNthCalledWith(
 			2,
-			`idem:${key}`,
+			getRedisKey("idem", key),
 			JSON.stringify(completed),
 			{ ex: COMPLETED_TTL_SECONDS },
 		);
@@ -269,7 +271,7 @@ describe("idempotency cache state machine", () => {
 		await idempotencyLookupOrReserve(key, fingerprint);
 
 		expect(mockRedis.set).toHaveBeenCalledWith(
-			`idem:${key}`,
+			getRedisKey("idem", key),
 			`${PENDING_SENTINEL_PREFIX}${fingerprint}`,
 			expect.objectContaining({ ex: PENDING_TTL_SECONDS }),
 		);
@@ -304,7 +306,7 @@ describe("idempotency cache state machine", () => {
 
 		expect(mockRedis.set).toHaveBeenNthCalledWith(
 			2,
-			`idem:${key}`,
+			getRedisKey("idem", key),
 			JSON.stringify(completed),
 			expect.objectContaining({ ex: COMPLETED_TTL_SECONDS }),
 		);
@@ -341,7 +343,7 @@ describe("idempotency cache state machine", () => {
 		// status !== 2xx). Body is JSON.stringify(errorResponse) verbatim.
 		expect(mockRedis.set).toHaveBeenNthCalledWith(
 			2,
-			`idem:${key}`,
+			getRedisKey("idem", key),
 			JSON.stringify(errorResponse),
 			expect.objectContaining({ ex: COMPLETED_TTL_SECONDS }),
 		);
@@ -408,7 +410,7 @@ describe("idempotency cache state machine", () => {
 		await result.release(null);
 
 		// DEL was issued on the pending sentinel; no second SET fired.
-		expect(mockRedis.del).toHaveBeenCalledWith(`idem:${key}`);
+		expect(mockRedis.del).toHaveBeenCalledWith(getRedisKey("idem", key));
 		expect(mockRedis.set).toHaveBeenCalledTimes(1); // only the SET NX
 	});
 

@@ -34,6 +34,28 @@ interface EnvRow {
 	isDopplerManaged: boolean;
 }
 
+// SCAFFOLD.8 Phase-1 amendment (2026-05-27): Sentry env vars are
+// intentionally entered into Vercel directly, NOT routed through
+// Doppler. The Sentry Marketplace integration auto-provisions
+// NEXT_PUBLIC_SENTRY_DSN + SENTRY_AUTH_TOKEN + SENTRY_ORG +
+// SENTRY_PROJECT at build time, and the operator pastes the
+// staging-project values manually into Vercel's staging Custom Env
+// (per ASK 1 / plan §3.A row "NEXT_PUBLIC_SENTRY_DSN" + LD-9 split-
+// project posture). Flagging them as "manual" would generate noise
+// and risk the operator deleting them on autopilot. Explicit Set
+// (not regex prefix) per security-auditor L5 absorption — exact
+// membership avoids over-matching future SENTRY_*-prefixed non-Sentry
+// vars an operator might add. The 5 entries below are the complete
+// Sentry env-var inventory; extend only when a new Sentry-managed key
+// joins the project.
+const INTENTIONAL_MANUAL: ReadonlySet<string> = new Set([
+	"NEXT_PUBLIC_SENTRY_DSN",
+	"SENTRY_ORG",
+	"SENTRY_PROJECT",
+	"SENTRY_AUTH_TOKEN",
+	"SENTRY_API_TOKEN",
+]);
+
 function runVercel(args: string[]): {
 	status: number | null;
 	stdout: string;
@@ -130,36 +152,51 @@ function main(): void {
 
 	console.log("# Vercel env-var audit (SCAFFOLD.8 O3.5)\n");
 
-	let totalManual = 0;
+	let totalActionable = 0;
 	for (const env of envs) {
 		const rows = auditEnv(env);
-		const manual = rows.filter((row) => !row.isDopplerManaged);
 		const managed = rows.filter((row) => row.isDopplerManaged);
-		totalManual += manual.length;
+		const nonManaged = rows.filter((row) => !row.isDopplerManaged);
+		const intentional = nonManaged.filter((row) =>
+			INTENTIONAL_MANUAL.has(row.key),
+		);
+		const actionable = nonManaged.filter(
+			(row) => !INTENTIONAL_MANUAL.has(row.key),
+		);
+		totalActionable += actionable.length;
 
 		console.log(`## ${env}`);
 		console.log(
-			`Total: ${rows.length} | Doppler-managed: ${managed.length} | Manual: ${manual.length}\n`,
+			`Total: ${rows.length} | Doppler-managed: ${managed.length} | Intentional-manual (Sentry): ${intentional.length} | Actionable manual: ${actionable.length}\n`,
 		);
-		if (manual.length > 0) {
+		if (intentional.length > 0) {
 			console.log(
-				"Manual env vars (operator decision — DELETE if obsolete, MIGRATE to Doppler if load-bearing):",
+				"Intentional-manual env vars (Sentry — Vercel-direct by design; do NOT migrate):",
 			);
-			for (const row of manual) {
+			for (const row of intentional) {
+				console.log(`  - ${row.key}   [source: ${row.source || "(unknown)"}]`);
+			}
+			console.log();
+		}
+		if (actionable.length > 0) {
+			console.log(
+				"Actionable manual env vars (operator decision — DELETE if obsolete, MIGRATE to Doppler if load-bearing):",
+			);
+			for (const row of actionable) {
 				console.log(`  - ${row.key}   [source: ${row.source || "(unknown)"}]`);
 			}
 			console.log();
 		}
 	}
 
-	if (totalManual > 0) {
+	if (totalActionable > 0) {
 		console.log(
-			`[NEXT] Resolve ${totalManual} manual var(s) above before O5 (Doppler sync setup).`,
+			`[NEXT] Resolve ${totalActionable} actionable manual var(s) above before O5 (Doppler sync setup).`,
 		);
 		process.exit(2);
 	}
 	console.log(
-		"[OK] All Vercel env vars listed are Doppler-managed. Proceed to O5.",
+		"[OK] All non-Sentry Vercel env vars are Doppler-managed. Proceed to O5.",
 	);
 }
 

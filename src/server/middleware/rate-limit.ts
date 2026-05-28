@@ -10,6 +10,7 @@ import {
 	RATE_LIMIT_BURST_PER_MIN,
 	RATE_LIMIT_PER_MARKET_PER_DAY,
 } from "@/server/config/limits";
+import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
 
 /*
@@ -39,42 +40,42 @@ import { redis } from "@/server/upstash/redis";
 export const otpRequestPerEmail = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(OTP_REQUESTS_PER_EMAIL_PER_HOUR, "1 h"),
-	prefix: "otp-email",
+	prefix: getRedisKey("ratelimit", "otp-email"),
 	analytics: false,
 });
 
 export const otpRequestPerIpBurst = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(OTP_REQUESTS_PER_IP_BURST_PER_MIN, "1 m"),
-	prefix: "otp-ip",
+	prefix: getRedisKey("ratelimit", "otp-ip"),
 	analytics: false,
 });
 
 export const adminLoginPerIp = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR, "1 h"),
-	prefix: "admin-login-ip",
+	prefix: getRedisKey("ratelimit", "admin-login-ip"),
 	analytics: false,
 });
 
 export const writeBudgetPerMarket = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(RATE_LIMIT_PER_MARKET_PER_DAY, "24 h"),
-	prefix: "write-budget",
+	prefix: getRedisKey("ratelimit", "write-budget"),
 	analytics: false,
 });
 
 export const writeBurstPerUser = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(RATE_LIMIT_BURST_PER_MIN, "1 m"),
-	prefix: "write-burst",
+	prefix: getRedisKey("ratelimit", "write-burst"),
 	analytics: false,
 });
 
 export const betPerIp = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(BET_ATTEMPTS_PER_IP_PER_MIN, "1 m"),
-	prefix: "bet-ip",
+	prefix: getRedisKey("ratelimit", "bet-ip"),
 	analytics: false,
 });
 
@@ -84,7 +85,7 @@ export const imagePutUrlPerIp = new Ratelimit({
 		IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
 		"1 m",
 	),
-	prefix: "image-put-ip",
+	prefix: getRedisKey("ratelimit", "image-put-ip"),
 	analytics: false,
 });
 

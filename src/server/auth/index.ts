@@ -175,6 +175,18 @@ const zugzwangOtpGate = {
 	hooks: { before: otpGateBeforeHooks },
 } as unknown as BetterAuthPlugin;
 
+// SCAFFOLD.8 LD-11(c) — per-environment trustedOrigins, comma-separated
+// in BETTER_AUTH_TRUSTED_ORIGINS. prod: `https://zugzwangworld.com`;
+// staging: `https://staging.zugzwangworld.com`; preview: unset (falls
+// back to baseURL-only matching — preview auth is known-broken per
+// docs/parked.md M1/M2 and out of SCAFFOLD.8 scope). Wildcard
+// `*.vercel.app` rejected at plan review on attack-surface + Better
+// Auth #3154 protocol-wildcard reliability grounds.
+const trustedOrigins =
+	process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",")
+		.map((s) => s.trim())
+		.filter((s) => s.length > 0) ?? [];
+
 export const auth = betterAuth({
 	database: drizzleAdapter(db, {
 		provider: "pg",
@@ -184,6 +196,7 @@ export const auth = betterAuth({
 	}),
 	secret: process.env.BETTER_AUTH_SECRET,
 	baseURL: process.env.BETTER_AUTH_URL,
+	trustedOrigins,
 	session: {
 		expiresIn: ONE_HUNDRED_YEARS_SEC,
 		disableSessionRefresh: true,

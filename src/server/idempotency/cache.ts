@@ -9,6 +9,7 @@ import {
 	PENDING_SENTINEL_PREFIX,
 	PENDING_TTL_SECONDS,
 } from "@/server/idempotency/types";
+import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
 
 /*
@@ -68,7 +69,7 @@ export async function idempotencyLookupOrReserve(
 	key: string,
 	bodyFingerprint: string,
 ): Promise<IdempotencyResult> {
-	const redisKey = `idem:${key}`;
+	const redisKey = getRedisKey("idem", key);
 	try {
 		return await tryReserveOrLookup(redisKey, bodyFingerprint, true);
 	} catch (err) {
