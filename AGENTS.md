@@ -1,424 +1,258 @@
 # AGENTS.md
 
-> Stack and framework patterns for the `zugzwang-foundation/experiment` codebase. Follows the [agents.md](https://agents.md) open standard so any coding agent (Claude Code, Codex, Cursor, Copilot, Aider, Gemini CLI) reads the same guidance.
+> Stack / framework patterns for the **Zugzwang Experiment** codebase. Follows the [agents.md](https://agents.md) open standard — a README for coding agents.
 >
-> Project-specific rules — thesis invariants, golden rules, refusal triggers, decision log — live in `CLAUDE.md`. This file is the *how* of writing code in this stack; CLAUDE.md is the *what cannot bend*.
+> **Claude Code reads this via the `@AGENTS.md` import at the top of `CLAUDE.md`** (Claude Code does not read `AGENTS.md` natively). This file is the *how* of writing code in this stack; `CLAUDE.md` is the *what cannot bend*.
+>
+> **Descriptive, not aspirational.** It documents the repo as it actually is at the current commit. Where it and a SPEC disagree, the SPEC is the *target* and this file is the *present reality* — see "Specs-ahead-of-code" below. Keep it accurate and lean; it loads in full every session alongside `CLAUDE.md`.
+
+**Specs-ahead-of-code (read once).** The built schema still carries pre-fold artifacts the specs have removed: `comments.bet_id` is **nullable** (target `NOT NULL`, ADR-0017), and `friendly_fire_events` + `stake_at_post_time` still exist. Code catch-up is DEBATE.8/9. This file describes what is *on disk now*; don't "correct" the schema to the spec outside that task.
 
 ---
 
-## 1. Stack (locked — do not propose alternatives)
+## 1. Stack (live versions — from `package.json`)
 
-| Layer | Choice | Notes |
-|---|---|---|
-| Runtime | Node.js 24 via `mise` | `mise.toml` pins major; `.nvmrc` mirrors for non-mise users |
-| Package manager | pnpm 10 | `pnpm-workspace.yaml` declares `allowBuilds` for build-script approval |
-| Framework | Next.js 16 (App Router) | Turbopack default; React Server Components first; `cacheComponents: true` |
-| Language | TypeScript 5.x strict | `strict`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes` all `true` |
-| ORM | Drizzle 0.45+ | event-sourced schema; one table per file |
-| Database | Postgres 17.6 (Supabase) | UUIDv7 PKs via userspace `public.uuidv7()` per ADR-0016 |
-| Cache / KV | Upstash Redis | rate-limit + Stripe-style idempotency |
-| Object storage | Cloudflare R2 | image uploads via signed PUT URLs |
-| Auth | Better Auth | participant: Google OAuth + Email-OTP; admin: hand-rolled static-password (per ADR-0004 + ADR-0010) |
-| Email | Resend | OTP delivery |
-| CAPTCHA | Cloudflare Turnstile | invisible by default, fail-closed at OTP issuance |
-| Hosting | Vercel | Server Actions + Route Handlers + Vercel Cron (HTTP-fanout) + pg_cron (DB-internal) |
-| Observability | Sentry + PostHog + Vercel runtime logs | Sentry for errors/alarms; PostHog for **feature flags only** (no product analytics in v1); Vercel logs for the structured request log |
-| Styling | Tailwind v4 (CSS-first via `@theme`) + shadcn/ui radix-nova preset | OKLCH colors only |
-| Linter / formatter | Biome v2 | one tool both jobs; 80-char line width; trailing newlines required |
-| Testing | Vitest (unit + integration) + Playwright (E2E) | invariant tests gated separately via `pnpm test:invariants` |
-| Tooling | `mise`, `just`, `lefthook`, `drizzle-kit`, `gh` | |
-
-If a task requires a layer not listed here, stop and surface it. Do not introduce a new vendor or library without an ADR.
+- **Runtime:** Node 24 (`mise.toml`). CI pins via `.nvmrc` (pinned to 24).
+- **Framework:** Next.js `16.2.4`, App Router, React `19.2.4`, TypeScript strict.
+- **DB:** Postgres 17 on Supabase (ap-south-1, session pooler). Drizzle ORM `0.45`, `drizzle-kit 0.30`, `drizzle-zod 0.7`.
+- **Auth:** Better Auth `1.6.11` (Google OAuth + email-OTP via Resend + Cloudflare Turnstile). See §H/§7.
+- **Styling:** Tailwind v4 (CSS-first via `@theme`) + shadcn (`shadcn 4.7`, `radix-ui 1.4`, `tw-animate-css`).
+- **Storage:** Cloudflare R2 via `@aws-sdk/client-s3 3.1045` + `s3-request-presigner`.
+- **Cache / limits:** Upstash Redis (`@upstash/redis 1.38`, `@upstash/ratelimit 2.0.8`).
+- **Moderation:** OpenAI omni-moderation (`openai 6.39`).
+- **Email:** Resend `6.12`. **Canonical JSON:** `canonicalize 3.0`. **IDs:** `uuid 11`. **Validation:** `zod 3.25`.
+- **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
+- **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`.
+- **Build-script approval:** `package.json` → `pnpm.onlyBuiltDependencies` (`esbuild`, `lefthook`, `sharp`). *(Not a `pnpm-workspace.yaml` allow-list.)*
+- **Not installed yet:** Playwright / any E2E runner; a decimal math library (`decimal.js`/`big.js`); `commitlint`.
 
 ---
 
-## 2. Setup and commands
+## 2. Setup & commands (the real `justfile`)
+
+`just` is the task entry point; `set dotenv-load := true` sources `.env.local` for every recipe.
 
 ```bash
-# First-time setup
-mise install                          # pulls Node + pnpm versions
-pnpm install                          # install deps
-cp .env.example .env.local            # fill in Supabase, Upstash, Better Auth, Resend, Turnstile, Sentry, PostHog secrets
-just db:up                            # local Supabase via supabase CLI
-pnpm drizzle-kit push                 # local schema push (dev only)
-
-# Daily commands
-pnpm dev                              # Next.js dev server (Turbopack)
-pnpm tsc --noEmit                     # type-check
-pnpm biome check .                    # lint + format check
-pnpm biome check --write .            # auto-fix lint + format
-pnpm vitest run                       # unit + integration tests
-pnpm vitest run tests/invariants/     # the four hard-locked invariants only
-pnpm playwright test                  # E2E
-pnpm drizzle-kit generate             # generate migration from schema diff
-pnpm drizzle-kit push                 # apply (dev) — never against staging or prod
-just check                            # full pre-PR check (typecheck + lint + tests + build)
-just clean                            # clear .next, .turbo (fixes iCloud dup-suffix bug)
+just setup            # mise install; pnpm install; lefthook install
+just dev              # next dev
+just build            # next build
+just typecheck        # pnpm tsc --noEmit
+just check            # biome check .          (LINT/FORMAT ONLY — not the full gate)
+just format           # biome check --write .
+just verify           # typecheck → check → build   (the pre-claim gate; DOES build; runs NO tests)
+just clean            # rm -rf .next/ .turbo/ tsconfig.tsbuildinfo
+just db-generate name # drizzle-kit generate --name <name>
+just db-migrate       # drizzle-kit migrate
+just db-reset         # supabase db reset
+just test-db          # vitest run tests/db/ tests/invariants/
 ```
 
-**`just check` before opening a PR.** It fails fast on type errors, lint, missing tests, or broken builds.
+Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/invariants/`), `pnpm test:integration` (`vitest run tests/integration/`), plus identity-pool seed/verify and staging migrate/seed/smoke scripts. There is **no `just db:up`** and **no all-in-one test recipe** — run `just test-db` and the `pnpm test:*` scripts as needed.
 
-**Do not run `pnpm build` during agent sessions.** Production builds run from CI on PR merge. Use `pnpm dev` and `pnpm test` for verification.
-
-If `pnpm dev` fails with `TypeScript "duplicate identifier"` errors, run `just clean` and retry — iCloud occasionally duplicates `.next/` and `.turbo/` directories with `" 2"` suffixes. The long-term fix is moving the project off iCloud-synced paths (deferred).
+**Before claiming a change is done:** `just verify`. Critical-path work additionally runs the test suites above (CLAUDE.md §5.7).
 
 ---
 
-## 3. Project structure
+## 3. Project structure (the real tree)
 
 ```
 experiment/
-├── CLAUDE.md, AGENTS.md              # contract + stack patterns
-├── .claude/                          # subagents, skills, hooks, MCP
+├── CLAUDE.md, AGENTS.md            # contract + stack patterns (CLAUDE.md imports @AGENTS.md)
+├── .claude/agents/                 # 4 subagent briefings (tracked); settings.local.json is gitignored
+├── .github/workflows/ci.yml        # the ONLY workflow
 ├── src/
-│   ├── app/                          # Next.js App Router
-│   │   ├── (public)/                 # market list, market detail, debate view
-│   │   ├── (auth)/                   # sign-in flows
-│   │   ├── (admin)/                  # admin Control Centre (admin-only, route-gated)
-│   │   └── api/                      # Route Handlers (bet endpoints, OAuth callbacks, public-read JSON)
-│   ├── server/                       # CRITICAL — see CLAUDE.md
-│   │   ├── bets/, comments/, dharma/, resolution/
-│   │   ├── auth/, identity/, moderation/
-│   │   ├── events/                   # event-row insertion helper (every state-mutation calls this)
-│   │   └── db/                       # Drizzle client + schema
-│   ├── components/                   # shared UI
-│   ├── lib/                          # pure utilities, no IO
-│   └── styles/                       # globals.css with @theme
-├── tests/{unit,integration,e2e,invariants}/
-├── docs/{specs,adr,runbooks,workflows,maintenance.md}
-├── drizzle/migrations/               # generated, append-only — DO NOT EDIT
-├── supabase/migrations/              # RLS policies (paired with drizzle migrations on schema-affecting changes)
-├── scripts/                          # one-off ops scripts (data migrations with --dry-run)
-├── next.config.ts, drizzle.config.ts, biome.json, lefthook.yml,
-├── mise.toml, justfile, vitest.config.ts, playwright.config.ts
-└── postcss.config.mjs                # Tailwind v4 needs this for Next.js
+│   ├── app/                        # Next.js App Router
+│   │   ├── (admin)/admin/login/    # admin login (separate from Better Auth)
+│   │   ├── (auth)/                 # onboarding, sign-in, sign-in/otp
+│   │   ├── (dev)/                  # scaffold smoke page
+│   │   ├── api/                    # _smoke-error, auth/[...all], cron/r2-orphan-sweep, health, uploads/sign
+│   │   ├── globals.css, layout.tsx, page.tsx
+│   ├── components/ui/              # shadcn primitives (button.tsx …)
+│   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
+│   │   ├── index.ts                #   the drizzle client
+│   │   └── schema/                 #   12 files: _enums, audit, auth, bets, comments, dharma,
+│   │                               #   events, identity, image-uploads, index, markets, system
+│   ├── lib/                        # auth-client, errors, utils, posthog/
+│   └── server/                     # server-side business logic
+│       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
+│       │   └── admin/              # login, logout, validate (admin path)
+│       ├── config/ events/ idempotency/ identity-pool/ middleware/ moderation/ storage/ upstash/
+├── tests/                          # dedicated dir (NOT colocated) — see §9
+├── docs/{adr,specs,logs,plans,…}
+├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
+├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
+├── supabase/                       # branch/snippet scratch only — NO migrations dir (RLS out of scope, ADR-0019)
+├── biome.json, drizzle.config.ts, lefthook.yml, mise.toml, justfile,
+├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vercel.json
+└── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-Server-side business logic lives under `src/server/`. Don't import from `src/server/` into client components — that's a server/client boundary violation Next.js catches at build, but better to catch in review.
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases.
+
+Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
 ---
 
 ## 4. TypeScript conventions
 
-- `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true` in `tsconfig.json`. Non-negotiable.
-- **No `any`.** Reach for `unknown` plus a type guard.
-- **No `as` casts** except at trust boundaries (parsed form input, third-party API responses). Every cast paired with a Zod validation or an explicit comment.
-- **Named exports only.** No default exports, except where Next.js requires them (`page.tsx`, `layout.tsx`, `error.tsx`, `loading.tsx`, `not-found.tsx`, `route.ts`).
-- **Explicit return types on exported functions.** Inference is fine internally; the exported boundary is contractual.
-- **`type` for unions and shapes; `interface` for extensible object types** consumed across modules.
-- **String literal unions over enums.** `type Side = 'yes' | 'no'`, not `enum Side`.
-- **Errors:** custom error classes in `src/lib/errors.ts` with discriminated `kind`. Never throw plain strings.
-- **Imports:** absolute via TS path aliases (`@/server/bets`), not deep relative paths.
+- `tsconfig.json` sets `"strict": true`. `target` ES2017, `moduleResolution: "bundler"`, path alias `@/* → ./src/*`. **Note:** `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` are **not currently set** — do not rely on them; enabling them is a candidate hardening (raise before assuming).
+- **No `any`.** Reach for `unknown` + a type guard instead.
+- **No `as` casts** except at trust boundaries (parsed form input, third-party responses); pair each with a zod validation or an explicit comment.
+- **Named exports** except where Next.js requires default (`page/layout/error/loading/not-found.tsx`, route handlers). *(Not Biome-enforced today — convention.)*
+- **`type`** for unions/shapes; **`interface`** for extensible cross-module objects. **String-literal unions over enums** in TS (`type Side = "YES" | "NO"`).
+- **Errors:** custom classes in `src/lib/errors.ts` with a discriminated `kind`. Never throw plain strings.
+- **Imports:** absolute via `@/...`, not deep relative paths.
 
-### Naming
-
-- Files: `kebab-case.ts` for utilities, server modules, route folders. `PascalCase.tsx` for components.
-- Functions: `camelCase`. Types: `PascalCase`. Constants: `UPPER_SNAKE_CASE` for true global constants only (env keys, magic strings).
-- Tests: `<subject>.test.ts` (unit), `<subject>.integration.test.ts` (integration), `<flow>.spec.ts` (Playwright), `I-<AREA>-<NNN>.<short-name>.spec.ts` (invariant).
+**Naming.** Files: `kebab-case.ts` for utilities/server modules/route folders; `PascalCase.tsx` for components. Functions `camelCase`, types `PascalCase`, true global constants `UPPER_SNAKE_CASE`. Tests: see §9. **Formatting is Biome:** tab indent, double quotes, default line width 80 (not pinned — see §10).
 
 ---
 
 ## 5. Next.js 16 patterns
 
-<!-- BEGIN:nextjs-agent-rules -->
-**ALWAYS read Next.js docs before writing Next.js code.** Your training data is older than Next.js 16.2. The bundled docs at `node_modules/next/dist/docs/` are the source of truth. Find and read the relevant doc before writing any Next.js API.
-<!-- END:nextjs-agent-rules -->
+**Server vs client.** Server Components by default. Add `"use client"` only for hooks, event handlers, browser APIs, or client-only libraries. Pass server-fetched data down as props; keep the client boundary near the leaf.
 
-### Server vs client components
-
-Server Components by default. Add `'use client'` **only** when the component needs:
-- React hooks (`useState`, `useEffect`, `useActionState`, etc.)
-- Event listeners (`onClick`, `onChange`, etc.)
-- Browser APIs (`window`, `localStorage`, `IntersectionObserver`)
-- Third-party client-only libraries (most charts, rich editors)
-
-Pass server-fetched data down to client components as props. Keep the client boundary as close to the leaf as possible. Never add `'use client'` to a page or layout file unless the entire route is interactive.
-
-### Server Actions are the default mutation contract
-
-Three carve-outs ride as Route Handlers per ADR-0003 + SPEC.2 §4:
-
-1. **Bet endpoints** (F-BET-1 / F-BET-2 / F-BET-3) — need the `Idempotency-Key` HTTP header that Server Actions cannot currently read from the client. Each implements an explicit Origin allowlist at handler entry as the CSRF defense.
-2. **OAuth callbacks** — external surface, must accept HTTP.
-3. **Public-read JSON** (`/api/health`, `/api/dataset/manifest`) — cacheless GETs.
-
-Every Server Action validates input with Zod. No naked form data into the DB.
-
-### `cacheComponents` + `'use cache'`
-
-`next.config.ts` ships with `cacheComponents: true`. Data fetching is **uncached by default**. Mark scopes explicitly with `'use cache'`:
+**Server Actions (mutations).** Every action validates input with zod — no naked form data into the DB. Every multi-write action runs inside `db.transaction(...)` (§6). Example shape:
 
 ```ts
-async function getOpenMarkets() {
-  'use cache';
-  cacheTag('markets:open');
-  return db.select().from(markets).where(eq(markets.status, 'Open'));
-}
+"use server";
+import { z } from "zod";
+import { db } from "@/db";
+
+const placeBetSchema = z.object({
+  marketId: z.string().uuid(),
+  side: z.enum(["YES", "NO"]),
+  stake: z.coerce.number().positive(),
+});
+// validate → run externals (e.g. moderation) → db.transaction(bet + comment) → revalidate
 ```
 
-Invalidate via `revalidateTag('markets:open')`, not time-based revalidation.
+**Route handlers** (`app/api/*/route.ts`) — external-facing endpoints (auth callback, uploads, health, cron). Same zod + auth rules.
 
-To use cookies or headers, read them **outside** cached scopes and pass values as arguments.
+**Caching.** `next.config.ts` is currently a Sentry wrapper + env injection only — **`cacheComponents` is NOT enabled** and no Turbopack flags are set. If `cacheComponents` is turned on later, fetches become uncached by default and you mark scopes with `'use cache'`, reading cookies/headers *outside* cached scopes. Until then, standard Next 16 caching applies.
 
-### `params` and `searchParams` are Promises
-
-Pages and route handlers receive these as Promises (Next.js 15+ contract):
-
-```ts
-export default async function MarketPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-}
-```
-
-### Don't / do
-
-| Don't | Do |
-|---|---|
-| Don't use `next/dynamic` with `ssr: false` in a Server Component. | Move the dynamic import into a client component. |
-| Don't pass server-only objects (DB rows, `request`) into `'use client'` components. | Map to plain DTOs in the server layer. |
-| Don't `revalidatePath()` from inside a transaction. | Call after the transaction commits. |
+**`params` / `searchParams` are Promises** (Next 15+). `const { id } = await params;`.
 
 ---
 
 ## 6. Database — Drizzle + Postgres
 
-Read this section in full before touching `src/db/schema/`, `drizzle/migrations/`, or `src/server/<domain>/`.
-
 ### Schema conventions
 
-- **One table per file** in `src/db/schema/<table>.ts`. Re-export from `src/db/schema/index.ts`.
-- **Primary keys are UUIDv7** per ADR-0016. Fixed declaration:
-  ```ts
-  id: uuid().primaryKey().default(sql`uuidv7()`)
-  ```
-  Userspace `public.uuidv7()` is a hand-written PL/pgSQL function shipped in `drizzle/migrations/0001_uuidv7.sql`. Do NOT use `crypto.randomUUID()`, `gen_random_uuid()`, `uuid_generate_v4()`, or `serial`/`bigserial` for primary keys.
-- **Better Auth tables are uniform with the rest of the schema** — `user`, `session`, `account`, `verification` carry `uuid` PKs via the Better Auth `advanced.database.generateId` override (per ADR-0016 §4).
-- Timestamps with timezone: `timestamp('created_at', { withTimezone: true })` everywhere.
-- Money / Dharma: `numeric('balance', { precision: 38, scale: 18 })`.
-- Enums: `pgEnum`, defined alongside the table.
-- Indexes inline with the schema in the second arg to `pgTable`. Index every foreign key on the referencing side — Postgres does NOT auto-index FK columns.
-- Foreign keys: always declared, always indexed.
+- **PKs:** UUIDv7 — `uuid("id").primaryKey().default(sql\`uuidv7()\`)`. The userspace `public.uuidv7()` function ships in **`drizzle/migrations/0000_uuidv7_function.sql`**.
+- **Timestamps:** `timestamp("…", { withTimezone: true })` everywhere.
+- **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
+- **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 9 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable`.
+- **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
+- **One file may hold several related tables.** 21 tables live across 11 files — e.g. `bets.ts` (bets + positions), `comments.ts` (comments + `friendly_fire_events`), `events.ts` (events + resolution_events + payout_events).
 
-### Append-only triggers — the storage-layer ground truth
+### Reply-as-bet schema reality (specs-ahead)
 
-The 13 protected tables (9 Bucket A + 4 Bucket B per SPEC.2 §5) carry `BEFORE UPDATE` and `BEFORE DELETE` triggers in `drizzle/migrations/<NNNN>_append_only_triggers.sql`. Application code cannot bypass these — they fire on every credentialed connection.
+- `bets.comment_id` — **`NOT NULL`**, FK to `comments.id` (the built half of INV-1). Indexed.
+- `comments.bet_id` — **EXISTS but NULLABLE**; target is `NOT NULL` per ADR-0017 (catch-up DEBATE.8/9). Indexed (`comments_bet_id_idx`, migration 0008).
+- `friendly_fire_events` (in `comments.ts`) and `comments.stake_at_post_time` (an ADR-0009 ranking input) are **vestigial** — superseded by ADR-0017 ranking, removed in DEBATE.8/9. Don't build new logic on them.
 
-- **Bucket A** (strictly append-only): `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events`. No UPDATE, no DELETE.
-- **Bucket B** (append-only with one whitelisted column transition): `friendly_fire_events`, `identity_pool`, `image_uploads`, `system_state`. Exactly one column flips from NULL to a timestamp once.
-- **Bucket C** (mutable): `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`. Regular FK / UNIQUE / CHECK constraints only.
+### Append-only buckets
 
-Adding a new protected table is a same-commit edit to: schema file, triggers migration, SPEC.2 §5.1 row, SPEC.2 §6 test case. No exceptions.
+- **Bucket A — fully append-only** (9 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events). Protected by `0003_append_only_triggers.sql`; reject UPDATE/DELETE at the storage layer.
+- **Bucket B — append-only with whitelisted column transition(s).** `friendly_fire_events` has **two** independent `NULL→timestamp` transitions (`frozen_at`, `cleared_at`), each fires once, never together. Others: identity-pool, image-uploads, system-state.
+- **Bucket C — mutable** (e.g. `positions`).
 
-### Migrations
+### Migrations (`drizzle/migrations/`)
 
-- Generated via `pnpm drizzle-kit generate`. Verify the generated SQL before committing.
-- **Append-only at the file level.** Never edit a committed migration; write a new one that references the prior.
-- **Destructive operations** (`DROP COLUMN`, `DROP TABLE`, type narrowing) need a deprecation path: ship the deprecation in one migration, the destructive change in a later one, with at least one deploy between.
-- **Supabase RLS policies** live in `supabase/migrations/`. A schema change that affects RLS is a same-commit edit to both directories.
-- Postgres partitioning is not first-class in Drizzle — for the events table partitioning per SPEC.2 §7, write the `CREATE TABLE ... PARTITION BY RANGE` as raw SQL in a custom migration.
+- Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
+- The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
+- `0007_pg_cron_jobs.sql` is the pg_cron Path-A substrate; CI strips the `CREATE EXTENSION pg_cron` + `cron.schedule()` statements before applying (the CI runner has no pg_cron).
+- Current head: `0008_comments_bet_id_idx.sql`.
 
-### Bet transaction contract (`src/server/bets/transaction.ts`)
+### Transactions, queries, validation
 
-Per SPEC.2 §9 + ADR-0013. Read both before changing anything in `src/server/bets/`.
+- **Any multi-write user action runs in `db.transaction(...)`.** Bet placement is `SERIALIZABLE` + `SELECT … FOR NO KEY UPDATE` on the pool row with full-jitter retry on `40001/40P01` (ADR-0013) — *forward spec; the `bets/` handler is greenfield.*
+- Drizzle query builder for typed reads; raw `sql<T>` only for hot paths. Avoid N+1 (`db.query.<t>.findMany({ with })`). Don't `SELECT *` in hot paths. Don't expose Drizzle row types in API responses — map to DTOs in the server layer.
+- **`drizzle-zod`** (`createInsertSchema` / `createSelectSchema`) derives zod schemas from tables — one source of truth for shape.
 
-- **Isolation:** `SERIALIZABLE`. Set per-transaction.
-- **Pool row lock:** `SELECT … FOR NO KEY UPDATE` (NOT `FOR UPDATE`). `FOR UPDATE` conflicts with the `FOR KEY SHARE` lock concurrent FK-validating INSERTs take, blocking every other bet on the market.
-- **Canonical lock order:** `pools → positions → dharma_ledger → friendly_fire_events → events`. Acquire locks in this order, every transaction, every code path.
-- **Retry policy:** up to 3 attempts on `SQLSTATE 40001` (serialization failure) OR `40P01` (deadlock). Full-jitter backoff on bases `[50, 100, 200]` ms. Exhaustion fires §17 alarm 3 and returns `error_bet_serialization_exhausted` (HTTP 503, `Retry-After: 1`).
-- **Moderation runs OUTSIDE the transaction** (per CLAUDE.md golden rule, ADR-0014, SPEC.2 §10). Holding a transaction open across a 200–2000 ms HTTP call would block every other bet on the same market. The bet wrapper opens its transaction only on a `pass` verdict.
+### Events
 
-### Read patterns
-
-- **Drizzle query builder** for typed reads. Raw SQL only for performance-critical paths (price curves, leaderboards, the debate-view ranking function), kept in `src/server/<domain>/queries.sql.ts` with explicit `sql<T>` types.
-- **Avoid N+1.** Use `db.query.<table>.findMany({ with: { ... } })` for relational reads, not loops with `where` clauses.
-- **Don't `SELECT *` in hot paths.** Name the columns.
-- **Don't expose Drizzle row types in API responses.** Map to API DTOs in the server layer; the DB schema is internal.
-
-### Validation — `drizzle-zod`
-
-Use `createInsertSchema` / `createSelectSchema` to derive Zod schemas from Drizzle tables. One source of truth for shape.
-
-```ts
-import { createInsertSchema } from 'drizzle-zod';
-export const insertBetSchema = createInsertSchema(bets, {
-  stake: (s) => s.positive(),
-});
-```
+`events.event_type` is **`text`** (open-extensibility, SPEC.2 §7.1), **not** a `pgEnum`. The closed value set is the TS const `EVENT_TYPES` in `src/server/events/schemas.ts` (currently 11 values: 4 `image_upload.*`, 5 `user.*`, 2 `admin.*`), compile-guarded by `as const satisfies Record<EventType, …>`. When a new event type is added, extend `EVENT_TYPES` **and** its Zod payload schema in the **same commit** (enum-hygiene).
 
 ---
 
-## 7. Handler stack — every state-mutating endpoint
+## 7. Server stack — `server-only`, middleware, handlers
 
-Per SPEC.2 §3.1. Seven steps in fixed order. The bet wrapper (`src/server/bets/transaction.ts`), the comment write transaction (`src/server/comments/write.ts`), and the resolution flow (`src/server/resolution/`) all reduce to this stack.
-
-1. **Auth gate** — middleware redirect (Layer 1, UX) + Server Action / Route Handler validator (Layer 2, security boundary). Two layers per CVE-2025-29927 defense-in-depth.
-2. **Idempotency-Key validation** — RFC 8785 canonical-JSON SHA-256 fingerprint over the request body. Per ADR-0015.
-3. **Idempotency cache lookup** — return cached `(status, body)` on hit (including cached 429s and 4xxs); skip moderation and DB transaction. Per Stripe contract.
-4. **Rate-limit check** — `@upstash/ratelimit` sliding window per surface.
-5. **Pre-commit moderation** — OpenAI moderation + PhotoDNA, OUTSIDE the DB transaction. Per ADR-0014.
-6. **Handler body** — the SERIALIZABLE transaction or read query.
-7. **Events row + response cache write** — every state-mutating transaction writes its `events` row in-transaction with the seven-field metadata block (`request_id`, `flow_id`, `user_id`, `actor_id`, `idempotency_key`, `ip`, `user_agent`). Per SPEC.2 §3.7.
-
-### Failure-mode posture (asymmetric, deliberate)
-
-| Concern | Substrate | Failure mode | Reason |
-|---|---|---|---|
-| Rate-limit | Upstash Redis | **Fail open** — admit, alarm 6a | Brief abuse-cap gap < global outage |
-| Idempotency | Upstash Redis | **Fail closed** — HTTP 503, alarm 6b | Duplicate bet would corrupt the ledger |
-| Moderation | OpenAI + PhotoDNA | **Fail closed** — HTTP 503, alarm 4 | Legal-floor breach for CSAM categories |
-| Sentry | Sentry | Fail open silently | Observability is downstream of correctness |
-| PostHog flags | PostHog | Return `defaultValue` per call site | Never expose unfinished UI on outage |
-
-### `useFlag` runtime contract
-
-```ts
-useFlag(name: string, defaultValue: boolean): boolean
-```
-
-Local evaluation only (no server round-trip per render). Safe `defaultValue` per call site (never expose unfinished UI on a PostHog outage — that would be a `REFUSAL:`). Returns `defaultValue` on outage. Every call site MUST pass an explicit `defaultValue`.
+- Files under `src/server/**` that touch the DB or secrets import `server-only`. **Scripts run under `tsx` must not delegate into the `@/db` → `server-only` chain** — inline their own `postgres()` client (the staging-seed/smoke pattern).
+- **Structured logging** via the `src/server/middleware/logging.ts` logger — no `console.log` in server code (a convention today, *not* a Biome rule; `console.error` does appear in auth). No request bodies in logs.
+- Middleware: `logging`, `origin-allowlist`, `rate-limit`. Idempotency store + lock in `idempotency/` + `upstash/`. Moderation is `moderation/precommit.ts` (OpenAI **before** the bet tx, guarded by a Redis SETNX reservation; fail-closed on terminal — ADR-0014). Rate-limit fails **open**; idempotency fails **closed** (ADR-0015).
 
 ---
 
-## 8. Frontend — Tailwind v4 + shadcn/ui
+## 8. Frontend — Tailwind v4 + shadcn
 
-### Tailwind v4 — CSS-first config
-
-No `tailwind.config.ts`. All design tokens go in `src/app/globals.css`:
-
-```css
-@import "tailwindcss";
-
-/* Plain @theme: adds utilities for tokens that don't have a Tailwind name. */
-@theme {
-  --color-yes:   oklch(0.65 0.18 145);  /* placeholder — DESIGN.1 mints */
-  --color-no:    oklch(0.65 0.18 25);   /* placeholder — DESIGN.1 mints */
-  --color-brand: oklch(0.55 0.20 270);  /* placeholder — DESIGN.1 mints */
-  --font-sans:   var(--font-geist-sans); /* placeholder — DESIGN.7 swaps */
-  --font-mono:   var(--font-geist-mono); /* placeholder — DESIGN.7 swaps */
-}
-```
-
-The `--color-yes` / `--color-no` / `--color-brand` color values AND the `--font-sans` / `--font-mono` mappings shown above are **SCAFFOLD.1 placeholders**. The real brand palette is produced by DESIGN.1 (brand + tokens) and back-applied to `globals.css` by DESIGN.7; the font choice is similarly DESIGN.7's call. This is the operational realization of SPEC.2 §22.2's design-independence carve-out: the codebase scaffolds without `docs/specs/design.md`, then the design system layers on once ADR-0012 lands. Token NAMES (`--color-yes`, `--font-sans`, etc.) are stable; only VALUES are placeholder.
-
-Defining `--color-yes` automatically generates `bg-yes`, `text-yes`, `border-yes`, etc.
-
-**OKLCH only** for colors. No hex, no HSL, no RGB in `@theme`. OKLCH gives perceptually uniform color and predictable opacity (`bg-yes/50` works correctly).
-
-Next.js 16 needs `postcss.config.mjs` with `@tailwindcss/postcss`.
-
-### shadcn/ui — radix-nova preset
-
-- Primitives use `data-slot` attributes for styling.
-- radix-nova preset only (per SCAFFOLD.1 init; `components.json` `style` field). Don't mix in older shadcn styles.
-- `Sonner` for toasts (deprecated `Toast` component).
-- `pnpm dlx shadcn@latest add <component>` to add. Review the generated code; commit it. Don't import from `@/components/ui` in `src/server/`.
-
-### Class-string formatting
-
-When a `className` exceeds ~80 chars, pre-wrap across multiple lines. Biome auto-formats on save, but writing source pre-wrapped avoids round-trips:
-
-```tsx
-<div
-  className={cn(
-    'flex items-center justify-between gap-3',
-    'rounded-md border border-border bg-card p-4',
-    'hover:bg-accent transition-colors',
-    isActive && 'ring-2 ring-ring',
-  )}
->
-```
-
-### Accessibility
-
-- `aria-label` on icon-only buttons and on YES/NO toggles.
-- All interactive elements reachable via Tab.
-- Modal/dialog focus-trap via shadcn `Dialog`.
-- Live regions (`aria-live="polite"`) for order status and price updates.
-- Pair color with icon or text for state — never color-only.
-- `pnpm playwright test --project=accessibility` (axe-core) on every PR touching `src/app/**`.
+- **CSS-first config** in `src/app/globals.css`: `@import "tailwindcss"`, `tw-animate-css`, `shadcn/tailwind.css`, then `@custom-variant dark`. **`postcss.config.mjs`** loads `@tailwindcss/postcss` (Next.js needs it).
+- **OKLCH only** in `@theme` — no hex/HSL/RGB (perceptually uniform; opacity like `bg-yes/50` behaves). Defining `--color-yes` auto-generates `bg-yes`, `text-yes`, etc.
+- **Tokens are PLACEHOLDER.** The `@theme` block (`--color-yes/no/brand`, `--font-sans/mono` → Geist) is a SCAFFOLD.1 placeholder per SPEC.2 §22.2; DESIGN.1 mints real values and DESIGN.7 back-applies. **Do not consume brand tokens in business logic until DESIGN.7 lands.**
+- shadcn primitives carry `data-slot`; use the current variant, don't mix older styles; `Sonner` for toasts.
+- **Accessibility:** `aria-label` on icon-only buttons and YES/NO toggles; Tab-reachable; focus-trap via shadcn `Dialog`; `aria-live="polite"` for price/status; pair colour with icon/text. *(No axe/Playwright accessibility project is installed yet — manual review for now.)*
 
 ---
 
-## 9. Testing
+## 9. Testing — Vitest (no Playwright yet)
 
-### Unit (Vitest, `tests/unit/`)
+**Vitest is the only runner installed.** No Playwright, no `tests/e2e/`. Real layout under a dedicated `tests/` dir (not colocated):
 
-Pure functions in `src/lib/` and `src/server/<domain>/{pricing,dharma,side}.ts` MUST have unit tests covering happy path + at least two edge cases + the relevant invariant. No IO.
+```
+tests/
+├── _setup/        env.ts, server-only-shim.ts
+├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
+├── integration/   7 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock)
+├── invariants/    I-APPEND-ONLY-001.<slug>.spec.ts   (only this one exists so far)
+├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys
+```
 
-### Integration (Vitest + test Postgres, `tests/integration/`)
-
-Required for any service-layer function that writes to the DB. Each test runs in a transaction that rolls back at the end (no test pollution).
-
-### Invariant (`tests/invariants/`)
-
-The four hard-locked invariants from SPEC.1 §5 each have a canonical integration test at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`:
-
-- `I-ATOMICITY-001.bet-comment-atomic.spec.ts`
-- `I-NO-OVERDRAFT-001.dharma-ledger-monotone.spec.ts`
-- `I-SIDE-BIND-001.comment-side-frozen.spec.ts`
-- `I-APPEND-ONLY-001.resolutions-append-only.spec.ts`
-
-Run via `pnpm test:invariants`. CI fails if any invariant test fails or is skipped.
-
-### E2E (Playwright, `tests/e2e/`)
-
-Full user flows: sign-in → market detail → place bet with comment → debate view. Run against staging on every PR; against `docker compose` Postgres locally.
+- **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
+- **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. Only `I-APPEND-ONLY-001` exists; INV-1/2/3 canonical tests are written as their modules land (enforcement currently lives in `tests/db/triggers/` + the schema + the session-gate).
+- **`_probe-*.test.ts`** = vendor-contract **regression guards** (e.g. `_probe-openai-omni-shape`, auth probes) — they assert a third-party/library shape, distinct from TDD drivers (CLAUDE.md §5.6).
+- **Naming:** `<subject>.test.ts` (unit), `<subject>.integration.test.ts` (integration), `<area>.spec.ts` (db/invariant specs). One subject per file.
 
 ---
 
-## 10. Git workflow + macOS / zsh constraints
+## 10. Git workflow + macOS/zsh
 
-- **Git identity** for this repo: `Zugzwang/world <zugzwangworld@proton.me>`. Set per-repo: `git config user.email zugzwangworld@proton.me`.
-- **Branches:** `feat/*`, `fix/*`, `chore/*`, `refactor/*`. Never commit to `main` (Lefthook enforces).
-- **Conventional Commits**, enforced by commitlint via Lefthook:
-  - `feat(bets): add comment-id requirement to place-bet action`
-  - `fix(dharma): prevent double-credit on resolution-correction event`
-  - `chore(deps): bump drizzle-orm to 0.45.2`
-- **Multi-line commit messages:** write to `/tmp/commit-msg.txt` via VS Code, then `git commit -F /tmp/commit-msg.txt`. The macOS Terminal+zsh paste buffer caps ~1 KB and silently truncates `git commit -m "..."`.
-- **Files >1 KB:** open in VS Code (`code <path>`), paste the full file, save. Do not use heredocs, `printf` line-continuations, or `cat > <file> <<EOF` — they truncate at the same paste-buffer limit.
-- **Trailing newline at end of file** — POSIX convention; Biome enforces.
-- **PRs:** open via the `/pr` skill at `.claude/skills/pr-create/SKILL.md` (per current Claude Code conventions; legacy `.claude/commands/pr.md` superseded) or `gh pr create --fill`. Title follows Conventional Commits format.
-- **CI** runs Biome, tsc, Vitest, Playwright, `pnpm test:invariants`, build, gitleaks, CodeQL on every PR. All required passing before merge.
-- **One ADR per architectural change.** Add `docs/adr/<NNNN>-<slug>.md` in the same commit as the implementation. Template lives at `docs/adr/_template.md`.
+- **Branches:** `feat/*`, `fix/*`, `chore/*`, `refactor/*`. **Squash-merge only. PRs required. Signed commits (SSH, ED25519).** These are enforced by **GitHub branch protection (server-side)** — **not** by a local hook. Locally, Lefthook runs only: `pre-commit` → Biome on staged files (auto-fix, re-stage); `pre-push` → `tsc --noEmit` + `biome check .`. There is **no** commit-msg/commitlint job and **no** block-main hook.
+- **Conventional Commits** by convention (e.g. `feat(bets): …`, `fix(dharma): …`, `chore(deps): …`) — a style rule, not machine-enforced.
+- **Multi-line commit messages:** write to `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt`. Never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB — split multi-command pastes into single commands; files >1KB via the editor).
+- **Canonical SHA** for landed work is the **squash-merge SHA on `main`**; feature-branch SHAs are ephemeral.
+- **Commit identity:** `Zugzwang/world <zugzwangworld@proton.me>`, git username `Chrollo`.
+- **No `Co-authored-by` trailer.** Foundation commits are single-author — the operational identity above; never append a `Co-authored-by` line. When cherry-picking or replaying a commit that already carries one, strip it at commit time (`git commit --amend` to drop the trailer) before pushing — the squash-merge dialog is a backstop, not the primary control (see `docs/logs/SYNC.10.md`, where a trailer leaked into a squash body).
 
 ---
 
 ## 11. Boundaries — always / ask first / never
 
 ### Always
-
-- Run `pnpm tsc --noEmit && pnpm biome check . && pnpm vitest run` (or `just check`) before claiming a change is done.
-- Wrap any multi-write user action in `db.transaction(...)` at SERIALIZABLE isolation.
-- Validate Server Action / Route Handler input with Zod.
-- Use Server Components by default; add `'use client'` only when needed.
-- Read `node_modules/next/dist/docs/` before writing Next.js APIs.
-- Reference ADRs and SPEC sections by number in code comments where the implementation is load-bearing (e.g., `// per SPEC.2 §9 / ADR-0013`).
+- Run `just verify` (and the test suites on critical paths) before claiming a change is done.
+- Wrap any multi-write user action in `db.transaction(...)`.
+- Validate Server Action / route-handler input with zod.
+- Server Components by default; `"use client"` only when needed.
 
 ### Ask first
-
-- Adding a new dependency. Justify why an existing one cannot do the job.
-- Editing a committed migration. The answer is almost always "write a new migration instead."
-- Disabling a Biome rule. Discuss why before silencing.
-- Touching `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`, `src/server/auth/`, `src/server/identity/`, or `src/server/moderation/` — these are CLAUDE.md critical paths and follow the workflow's extra steps.
-- Changing the canonical lock order, retry policy, or isolation level in `src/server/bets/transaction.ts`.
+- Adding a dependency (justify why an existing one can't do it).
+- Editing a committed migration (almost always: write a new one).
+- Disabling a Biome rule.
+- Touching `src/server/{bets,comments,dharma,resolution}/` or `src/server/auth/` — the CLAUDE.md §1 critical paths, which carry the full ritual.
 
 ### Never
-
-- Edit `drizzle/migrations/*` after commit (append-only at the file level).
-- Edit `.github/workflows/deploy-prod.yml` without human review.
+- Edit `drizzle/migrations/*` after commit (append-only).
 - Read or write `.env*` files.
-- Use `any` or unsafe `as` casts to silence type errors.
-- Use `console.log` in `src/server/**` (Biome rule). Use the structured logger.
-- Import from `src/server/**` into client components (`'use client'` files).
+- Use `any` or unsafe `as` to silence type errors.
+- Import from `src/server/**` into client components.
 - Expose Drizzle row types directly in API responses.
-- Use `gen_random_uuid()`, `crypto.randomUUID()`, or `uuid_generate_v4()` for primary keys. Use `uuid().primaryKey().default(sql`uuidv7()`)` per ADR-0016.
-- Hold a database transaction across an HTTP call (OpenAI, R2, Resend, anything). Run external calls before the transaction opens; pass results in. Per ADR-0014.
-- Use `FOR UPDATE` on the pool row in `src/server/bets/`. Use `FOR NO KEY UPDATE` per ADR-0013.
-- Run `pnpm build` or `vercel --prod` during agent sessions.
-- Run `supabase db reset --linked`, `drizzle-kit drop`, or any `DROP TABLE` against staging or production.
-- Create a "send Dharma" or user-to-user Dharma transfer endpoint. There is no `dharma_transfer` table by design.
-- `UPDATE` rows in `resolution_events` or `payout_events`. Append-only enforced by Postgres trigger; the trigger is the ground truth, not the application code.
+- Create a "send Dharma" / user-to-user transfer endpoint (CLAUDE.md §3).
+- `UPDATE` rows in `resolution_events` or `payout_events` (append-only, INV-4).
+- Commit directly to `main` (PR-only — and server-side protection will reject it).
+
+**What is actually enforced vs. discipline.** Mechanically enforced today: PR-required + squash + signed-commit (GitHub branch protection); Biome + `tsc` (Lefthook pre-push + CI); append-only on Bucket-A tables (DB triggers); `bets.comment_id NOT NULL` (schema). Everything else in this section is **discipline** — no hook blocks it. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → migrate → `vitest run` against a Postgres-17 service.)
 
 ---
 
-*AGENTS.md follows the [agents.md](https://agents.md) open standard. Update via the maintenance loop (`docs/maintenance.md`) when stack conventions evolve. Last revised PRECURSOR.5 (May 2026) against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0019. Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*

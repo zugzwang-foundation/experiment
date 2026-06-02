@@ -1,6 +1,10 @@
 # CLAUDE.md
 
-> **Read in full at the start of every session.** This is the contract between Claude Code and Zugzwang. If anything here conflicts with what you think you know, this file wins. Stack and framework patterns flow through the import below.
+> **Read in full at the start of every session.** The contract between Claude Code and Zugzwang — the part that *cannot bend*. This file is the *what*; `AGENTS.md` (imported below) is the *how*.
+>
+> **Advisory, not a control plane.** Claude reads and tries to follow this; it does **not** enforce. Hard guarantees belong in hooks / `permissions.deny` / CI (§6) — most are not installed yet, so treat every rule here as discipline, not a safety net.
+>
+> **Keep it lean** — it loads in full every session alongside `@AGENTS.md`. Add a rule only after Claude repeats a mistake; prune the moment a decision supersedes it.
 
 @AGENTS.md
 
@@ -8,260 +12,214 @@
 
 ## 1. Project frame
 
-The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8 Mumbai.
+The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
-- **Repo scope:** pure web2. **No blockchain. No smart contracts. No tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet and Mainnet phases get their own repos.
-- **Source of truth.** Hierarchy: `docs/specs/SPEC.1.md` (product), `docs/specs/SPEC.2.md` (technical), `docs/adr/0003–0016.md` (decisions), `AGENTS.md` (stack patterns). When this file disagrees with code, this file wins until updated by an ADR.
-- **License.** AGPL-3.0-or-later. AGPL §13 forecloses closed-source SaaS forks.
+- **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
+- **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0019` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
+- **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
+- **Specs-ahead-of-code:** the built schema still carries pre-fold artifacts the spec removed (detail in AGENTS.md §6). **Do not reconcile the schema to the spec outside the DEBATE.8/9 task.**
 
-### Critical paths (trigger writer/reviewer ritual + invariant test gate + same-commit ADR scan + pre-PR self-audit + task-appropriate reviewer call)
+**Operating model.** Claude Code executes; web Claude reviews and gates decisions; Hrishikesh relays and operates the dashboards. One task per chat; a fresh session for each major phase transition (§5.8).
 
-- `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`
-- `src/server/auth/`, `src/server/identity/`, `src/server/moderation/`
-- `src/db/schema/`, `drizzle/migrations/`, `supabase/migrations/`
+**Critical paths** — touching any triggers the full ritual (writer/reviewer §5.6 · invariant gate §5.7 · same-commit ADR §5.12 · pre-PR self-audit §5.10 · subagent review §5.11):
+
+- Greenfield (not built): `src/server/{bets,comments,dharma,resolution}/`
+- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`
+- Schema / migrations: `src/db/schema/`, `drizzle/migrations/`
+
+*(RLS / `supabase/migrations/` out of scope — ADR-0019.)*
+
+**Vocabulary** — use these exact terms in code, comments, and commits:
+
+- **Market** — a binary YES/NO question with a CPMM pool (`markets` + `pools`).
+- **CPMM** — constant-product market maker (lifted from Manifold, attributed; fee-less, single-MM). Pure TS in `src/server/cpmm/` (greenfield).
+- **Market states** — `Draft → Open → Closed → Resolving → Resolved` / `Voided` / `Frozen`; pure transition functions, illegal transitions are negative tests (ENGINE.4).
+- **Side** — `YES` | `NO` (pgEnum `side`); a bet and its comment share one side.
+- **Pool** — the CPMM reserve row backing a market (`pools`); seeded/unwound admin-side only.
+- **Support / Counter** — a reply-bet's stance toward its parent; not a separate vote — derived from side at read time.
+- **Bet** — a stake on a side (`bets` + `positions`); carries `comment_id`, its argument.
+- **Comment** — argued commentary; rides a bet via `comments.bet_id` (reply-as-bet).
+- **Reply-bet** — a reply *is* a Support/Counter bet on the parent (depth 1, flat).
+- **Dharma** — soulbound reputation; append-only `dharma_ledger`; never transferable.
+- **Daily Credit** — the daily Dharma allowance (DB: `daily_allowance`, `last_allowance_accrued_at`); two stake floors `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY` (ADR-0018).
+- **Artha** — the transferable asset; arrives at **testnet** and is *out of scope* for this web2 repo (named only so it's never reached for here).
+- **Position** — a user's net holding in a market (Bucket C, mutable).
+- **Resolution** — settlement of a market; append-only `resolution_events` → `payout_events`.
+- **Void / Freeze** — a cancelled market (`void_refund` refunds) / the conclusion write-freeze (`system_state.frozen_at`, read-only after).
+- **Identity** — pseudonym + PFP assigned from `identity_pool` at signup; the user's public face.
 
 ---
 
 ## 2. The four hard-locked invariants
 
-Encoded in SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. Triggers at `drizzle/migrations/<NNNN>_append_only_triggers.sql` — storage-layer ground truth, not application advisory.
+SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`; the triggers in `drizzle/migrations/0003_append_only_triggers.sql` are storage-layer ground truth. *(Today only `I-APPEND-ONLY-001` exists; INV-1/2/3 are currently held by `tests/db/triggers/` + the schema + the auth session-gate. Their canonical tests land with the ENGINE modules.)*
 
 | ID | Rule | Mechanism |
 |---|---|---|
-| INV-1 | Bet ↔ comment atomicity | SERIALIZABLE transaction wraps both inserts (ADR-0013) |
-| INV-2 | Dharma non-transferable; no overdraft | Append-only `dharma_ledger`; no `dharma_transfer` table by design; `CHECK (balance_after >= 0)` at storage layer |
-| INV-3 | Comments side-bound at post-time | `comments.side_at_post_time` immutable post-INSERT (SPEC.2 §6) |
-| INV-4 | Resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT (SPEC.2 §6) |
+| **INV-1** | Bet ↔ comment atomicity (reply-as-bet) | One SERIALIZABLE tx wraps both inserts (ADR-0013). `bets.comment_id NOT NULL` (built); `comments.bet_id` → target `NOT NULL` per ADR-0017 (now nullable; DEBATE.8/9). |
+| **INV-2** | Dharma non-transferable; no overdraft | Append-only `dharma_ledger`; **no** transfer table, by design; `CHECK (balance_after >= 0)`. |
+| **INV-3** | Comments side-bound at post-time | `comments.side_at_post_time` immutable post-INSERT. Flipping sides never moves prior comments. |
+| **INV-4** | Resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT. |
 
-**Refuse to weaken any of these** — including "just for testing", "temporary admin override", "while we're cleaning up". State the invariant, the violation, propose an alternative, stop.
+**Mandatory commentary, in schema:** no bet without a comment, **and no comment without a bet** — every comment rides a Support/Counter reply-bet (ADR-0017, `REPLY_DEPTH_MAX = 1`). No standalone friendly-fire vote; Support/Counter are read-time aggregates over reply-bets.
+
+**Refuse to weaken any invariant** — "just for testing" / "temporary admin override" / "while we clean up" included. State it, name the violation, propose an alternative, stop.
+
+**Architecture & money (correctness landmines).** The system is **event-sourced**: every state change is an append to `events`, projected into read models, idempotent by `event_id`, replayable (ADR-0005). **Never mutate state in place.** All monetary/Dharma math is `NUMERIC(38,18)` — **never JS floats** for balances, prices, or shares; there is no decimal library yet, so keep arithmetic exact and server-side. Handler failure posture: rate-limit fails **open**, idempotency fails **closed**, moderation fails **closed** on a terminal error (ADR-0014/0015).
 
 ---
 
 ## 3. Refusal triggers
 
-Treat as `REFUSAL:` — surface and stop, do not silently work around.
+Each is a `REFUSAL:` — surface and stop; never silently work around.
 
-- **Dharma transferability.** No "send Dharma" or user-↔-user transfer endpoint, ever. Admin pool seeding is account-↔-pool only.
-- **Mandatory commentary.** No bet without a comment. `bets.comment_id NOT NULL` with FK; the entry comment is INV-1.
-- **Admin participation.** Admin has no `users` row. No `users.role` column, no `is_admin` boolean, no runtime check. Structural separation by data-model.
-- **Market content invention.** Market questions, resolution criteria, settlement dates are Hrishikesh's calls. Skills scaffold the form; they do not write market copy.
-- **Social content invention.** Brand posts quote user content verbatim with pseudonym attribution. AI generates the frame; never the user's argument.
-- **K_eff in-product surface.** No live dashboard, no matview, no admin chart. K_eff(t) is derived post-hoc from the 2026-11-06 public dataset only.
-- **Conclusion-freeze tampering.** The 2026-11-05 23:59 UTC write-freeze is `system_state.frozen_at`. No bypass path. Recovery is `BREAK_GLASS.md`-only.
-- **HTTP inside a DB transaction.** Never `await openaiModerate(...)` or any external HTTP inside `db.transaction(...)`. Run externals first, pass results in (SPEC.2 §10 + ADR-0014).
+- **Dharma transfer.** No user-↔-user "send Dharma" endpoint, ever. Pool seeding is account-↔-pool only.
+- **Mandatory commentary.** No bet without a comment; no comment without a bet (§2, INV-1).
+- **Admin participation.** Admin has no `users` row — no `role`, no `is_admin`, no runtime check. Admin auth is a separate path (`src/server/auth/admin/`).
+- **Market-content invention.** Questions, resolution criteria, settlement dates are Hrishikesh's. Scaffold the form, never the copy.
+- **Social-content invention.** Brand posts quote users verbatim with pseudonym attribution. Generate the frame, never the argument.
+- **K_eff in-product surface.** No live dashboard / matview / chart. K_eff(t) is derived post-hoc from the 2026-11-06 dataset only.
+- **Conclusion-freeze tampering.** The 2026-11-05 23:59 UTC freeze is `system_state.frozen_at`. No bypass; recovery is `BREAK_GLASS.md`-only.
+- **HTTP inside a DB transaction.** Never run moderation or any external HTTP inside `db.transaction(...)` — run externals first, pass results in (ADR-0014).
 
 ---
 
 ## 4. Engagement style — push back, don't sycophant
 
-The dominant failure mode of coding assistants is sycophancy: human asks, model agrees, model executes, problem ships that the human would have caught if asked. Compounded across tasks, the codebase becomes subtly wrong in ways the human cannot see.
+The dominant failure of a coding assistant is agreeing with a flawed ask and shipping a problem the human would have caught. Compounded across tasks, the codebase goes subtly wrong in ways the human can't see.
 
-**Before agreeing:**
+**Before agreeing:** state assumptions (ask if uncertain); surface multiple interpretations rather than picking silently; correct wrong framing first; say so when you don't know — guessing is worse than admitting it.
 
-- State assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them — don't pick silently.
-- If the framing is wrong (wrong file, wrong assumption about how a system works), correct first.
-- If you don't know whether the framing is right, say so. Guessing is worse than admitting uncertainty.
+**Push back when:** a task cites a stale file / ADR / tracker / memory (e.g. "this references tracker_v8, but v11 supersedes it"); a stated dependency isn't one; the ask is X but Y solves the real problem (propose Y, defend it); an approach violates §2 or trips §3; a simpler approach exists.
 
-**Push back when:**
-
-- A task references a stale file, ADR, tracker entry, or memory edit.
-- A stated dependency is not actually a dependency.
-- The ask is X but Y solves the actual problem — propose Y and defend.
-- A planned approach violates an invariant (§2) or triggers a refusal (§3).
-- A simpler approach exists. Say so.
-
-Pushback is **not** disagreement for its own sake, refusing a valid approach for a different valid approach, or lecturing on first principles already understood.
+Pushback is **not** disagreement for its own sake, swapping one valid approach for another, or lecturing on basics already understood.
 
 ---
 
 ## 5. Workflow rules
 
 ### 5.1 Plan mode
-
-Use `/plan` for any task touching critical paths (§1), any task without an existing approved `docs/plans/<TASK-ID>.md`, or any work >30 lines / >3 files.
-
-In `/plan`: read, draft plan, surface uncertainties as questions, **no edits**. Plan reviewed in Claude Code (Hrishikesh confirms), then pasted to web Claude chat for sign-off. Only then exit and execute.
-
-Plan file lives at `docs/plans/<TASK-ID>.md` inside the repo, **not** at `.claude/plans/<scratch>.md`. The plan file is the contract Phase 2 references via `@docs/plans/...` It must be committed before Phase 1 ends.
-
-Trivial work skips: file moves, dep bumps, doc-only edits, hot-fixes already agreed.
-
-If about to write code without an approved plan, **stop and surface**.
+`/plan` for any critical-path task (§1), any task without an approved `docs/plans/<TASK-ID>.md`, or any work > 30 lines / > 3 files. In plan mode: read, draft the plan, surface uncertainties as questions, **make no edits**. The plan is confirmed in CC, then pasted to the web Claude chat for sign-off; only then exit and execute. The plan file lives in-repo at `docs/plans/<TASK-ID>.md` (not `.claude/`) and is committed before Phase 1 ends — Phase 2 references it via `@docs/plans/...`. About to write code with no approved plan → stop and surface. Trivial work skips planning: file moves, dep bumps, doc-only edits, agreed hot-fixes.
 
 ### 5.2 Simplicity first
-
-- Minimum code that solves the problem. Nothing speculative.
-- No features beyond what was asked.
-- No abstractions for single-use code.
-- No error handling for impossible scenarios.
-- If you write 200 lines and it could be 50, rewrite.
-
-Test: would a senior engineer call this overcomplicated? If yes, simplify.
+The minimum code that solves the problem — nothing speculative, no abstractions for single-use code, no error handling for impossible scenarios. If you write 200 lines and it could be 50, rewrite. Test: would a senior engineer call this overcomplicated? If yes, simplify.
 
 ### 5.3 Surgical changes
+Touch only what the task requires. Don't "improve" adjacent code, comments, or formatting; don't refactor what isn't broken; match the existing style even if you'd do it differently. Clean up orphans *your* change created; leave pre-existing dead code unless asked. Every changed line traces directly to the request.
 
-- Touch only what the task requires.
-- Don't "improve" adjacent code, comments, or formatting.
-- Don't refactor things that aren't broken.
-- Match existing style, even if you'd do it differently.
-- Clean up orphans YOUR changes created. Don't delete pre-existing dead code unless asked.
-
-Every changed line traces directly to the user's request.
-
-### 5.4 Stay in scope (task-level)
-
-Task is `src/server/bets/`? Do not touch `src/server/comments/`. Open a separate task. "While we're here" is how solo-dev codebases die.
+### 5.4 Stay in scope
+Task is `src/server/bets/`? Don't touch `src/server/comments/` — open a separate task. "While we're here" is how a solo-dev codebase dies. New issues surfaced mid-task → write to `claude-progress.md` and raise them; never absorb silently.
 
 ### 5.5 Read before writing
+Read the file you're about to edit in full, plus its types, schemas, and callers. Don't guess imports.
 
-Read the file you're about to edit in full, plus its types, schemas, and callers. Do not guess imports.
+### 5.6 Tests first (thesis-touching logic)
+Failing tests via `@test-writer` first → implement → `@code-reviewer`, for business logic in the surfaces below. Type-only declarations (schema, type aliases) and config are exempt — the type-check is the gate; distinguish TDD drivers from `_probe-*` regression guards (AGENTS.md §9).
 
-### 5.6 Tests before implementation (thesis-touching code)
+- bet placement · Dharma accounting · payout math
+- comment attachment · side assignment · resolution
+- media upload · moderation · CSAM detection
 
-For bet placement, Dharma accounting, comment attachment, side assignment, resolution, media upload, moderation, CSAM detection: failing tests first via a `test-writer` reviewer call (per §5.11), then implement, then a `code-reviewer` reviewer call.
-
-§5.6 applies to **business logic**. Type-only declarations (schema files, type aliases, interfaces) and configuration changes are exempt — the type-check is the gate.
-
-### 5.7 Verify before claiming done
-
-Run `just verify`. Critical-path tasks additionally run `pnpm test:invariants` and `pnpm test:integration`. Don't claim done before they pass.
+### 5.7 Verify before "done"
+Run `just verify` (= typecheck → `biome check` → `next build`). Critical-path tasks additionally run `pnpm test:invariants` + `pnpm test:integration` (or `just test-db`). Don't claim done before they pass. *(`just check` is Biome-only — not the full gate.)* Bet-handler concurrency — `SERIALIZABLE` + `SELECT … FOR NO KEY UPDATE` on the pool row + full-jitter retry on `40001/40P01` — is ADR-0013 (detail in AGENTS.md §6).
 
 ### 5.8 Session boundaries
-
-Use `/clear` (not `/compact`) between distinct units of work:
-
-- Between strata of a multi-stratum task
-- After a PR is merged before the next task begins
-- When context drifts
-- At the start of every new Claude Code session paired with a new web Claude chat
-
-Do NOT `/clear` mid-task. Finish to a clean PR boundary first.
+Use `/clear` (not `/compact`) between strata of a multi-stratum task, after a PR merges before the next task, when context drifts, and at the start of every new session paired with a new web chat. Never `/clear` mid-task — finish to a clean PR boundary first.
 
 ### 5.9 Per-session logs
-
-Every session ends with a log entry at `docs/logs/<TASK-ID>.md`. No exceptions.
-
-Write BEFORE `/clear`, BEFORE disconnecting Remote Control, BEFORE walking away. Not at task close only — every session.
-
-Six fields: **What landed** (files + PR#), **Decisions made** (variances, amendments, carve-outs), **Open questions**, **Next session starts at** (exact next action), **Context to preserve** (non-obvious state), **Time** (optional).
-
-Log ships in its own commit on the branch BEFORE the PR opens. Convention: `chore(<scope>): log session — <stratum> <state>`.
-
-If a session ends without a log, the next session starts blind. **Most expensive failure mode.**
+Every session ends with a log at `docs/logs/<TASK-ID>.md` — written *before* `/clear`, before disconnecting, before walking away; every session, not only at task close. Six fields: What landed (files + PR#) · Decisions made · Open questions · Next session starts at (exact next action) · Context to preserve · Time. The log ships in its own commit before the PR: `chore(<scope>): log session — <stratum> <state>`. Canonical reference SHA = the **squash-merge SHA on `main`** (branch SHAs are ephemeral). A session that ends without a log makes the next one start blind — the most expensive failure mode.
 
 ### 5.10 Pre-PR self-audit
+Critical-path PRs self-audit **before** `gh pr create`, in-session, against the plan item by item: **PASS** (correct, matches plan) / **FAIL** (fix in-session before continuing) / **SURPRISE** (surface to Hrishikesh). What to verify:
 
-Critical-path PRs (per §1) run a self-audit inside the execute session **BEFORE** `gh pr create`. The author surface verifies its own work against the plan, item by item, while context is still loaded.
+- **Schema:** every column / type / nullability, FK, index, enum value set, bucket classification, same-commit spec amendment (grep-verified).
+- **Server:** every handler against the plan's API surface + the assertion that proves each flagged invariant holds.
+- **Migration:** ordering, idempotency, trigger SQL, partition DDL, singleton constraints.
 
-The audit walks the plan's per-table / per-component inventory and verifies actual code matches the plan. Format:
+PR opens only when the audit is clean. This is the execute surface's own pass — **not** a subagent step (§5.11 is separate). Verification is left-shifted to write-time, where fixes are cheap; there is no post-PR soak. Non-critical PRs skip it (still run `just verify`).
 
-- **PASS** — item present, correct, matches plan
-- **FAIL** — item wrong or missing; fix in-session before continuing
-- **SURPRISE** — unexpected finding not predicted by plan; surface to Hrishikesh
+### 5.11 Subagent invocation
+Subagents (§6) are invoked **explicitly** from kickoff prompts (auto-match is on via "MUST BE USED", but explicit is the reliable path). **Always pass `@docs/plans/<TASK-ID>.md`** — they start from zero context, and without it they re-explore the codebase from scratch. FAIL in scope → fix before PR; SURPRISE out of scope → `claude-progress.md` + STOP. Don't invoke for tightly-coupled schema + server + UI + tests in one pass (they lose shared intent), non-critical work, or type-only changes.
 
-What to verify (task-dependent — kickoff prompts list specifics):
-
-- **Schema work:** every column name, type, nullability; every FK + index; every enum value set; every bucket classification; every same-commit spec amendment (grep verification)
-- **Server work:** every handler against the plan's API surface; every invariant the plan flags + the assertion that proves it holds
-- **Migration work:** ordering, idempotency, trigger SQL correctness, partition DDL, singleton constraints
-
-The audit is run by the Phase 2 execute surface (same Claude Code session that wrote the code). It is NOT a reviewer-call step — §5.11 covers reviewer-call review separately.
-
-PR opens only after audit reports clean. FAIL items fix in-session, re-verify, then PR. SURPRISE items surface for Hrishikesh's decision.
-
-Non-critical-path PRs skip the audit (still run `just verify`).
-
-Verification is left-shifted into write-time, where context is loaded and fixes are cheap. There is no post-PR soak — audit at write-time is stronger.
-
-### 5.11 Reviewer-call invocation
-
-The Claude Code `Agent` tool exposes only built-in agent types (`general-purpose`, `Explore`, etc.) — the named project review roles (`code-reviewer`, `db-migration-reviewer`, `security-auditor`, `test-writer`) are NOT auto-discoverable. Project roles live as **role briefings** at `.claude/agents/*.md`. A "reviewer call" is a fresh-context `general-purpose` Agent invocation with the role briefing baked into the prompt, plus the plan path, plus tool-scope constraints. The §6 catalogue names which briefing routes to which work type.
-
-**Critical-path invocation policy** (after pre-PR self-audit passes, before `gh pr create`):
-
-| Work type | Role briefing | Phase | Tool scope (enforce via prompt) |
-|---|---|---|---|
-| `src/db/schema/` or `drizzle/migrations/` | `db-migration-reviewer` | Phase 2 post-audit | Read-only |
-| `src/server/` changes | `code-reviewer` | Phase 2 post-audit | Read-only |
-| Critical-path business logic | `security-auditor` | After code-reviewer | Read-only |
-| New business-logic behavior | `test-writer` | Phase 2 start (tests-first per §5.6) | Read + Write tests only (no `src/` edits) |
-
-**Three required prompt elements** for every reviewer call:
-
-1. **Explicit role briefing** — name the role and point at `.claude/agents/<role>.md`; instruct the agent to load it and follow it verbatim.
-2. **Plan path** — `@docs/plans/<TASK-ID>.md`. Without it, the call re-explores the codebase from scratch — expensive and noisy.
-3. **Tool-scope constraints** — the briefing's tool scope enforced in the prompt body (e.g., "Read, Grep, Glob, Bash only — do not Edit or Write"). The `general-purpose` agent has full tool access by default; the prompt must constrain it.
-
-**Findings:**
-- FAIL findings within scope → fix in-session before PR
-- SURPRISE findings outside scope → write to `claude-progress.md` and STOP (do not silently expand scope)
-
-**When NOT to invoke a reviewer call:**
-- Tightly coupled work spanning schema + server + UI + tests in one pass (separate calls lose shared intent; stay in main session)
-- Non-critical-path work (file moves, dep bumps, doc edits)
-- Type-only declarations (the type-check is the gate)
+| Work | Subagent | Phase |
+|---|---|---|
+| `src/db/schema/` or `drizzle/migrations/` | `@db-migration-reviewer` | post-audit |
+| `src/server/` changes | `@code-reviewer` | post-audit |
+| Critical-path business logic | `@security-auditor` | after `@code-reviewer` |
+| New business-logic behavior | `@test-writer` | Phase 2 start (tests-first) |
 
 ### 5.12 ADRs
+One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md`, in the **same commit** as the code (template `docs/adr/_template.md`). Decision unchanged but consumer surface needs scoping → in-place *Patch record*, not a formal supersession.
 
-One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md` in the same commit as the implementation. Template at `docs/adr/_template.md`.
+### 5.13 Commit & git hygiene
+Branches `feat/` · `fix/` · `chore/` · `refactor/`. **Squash-merge only; PRs required; signed commits (SSH, ED25519)** — enforced by GitHub branch protection (server-side), *not* a local hook. Multi-line commit messages: write `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt` — never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB; split multi-command pastes into single commands). Commit identity: `Zugzwang/world <zugzwangworld@proton.me>` (git username `Chrollo`).
 
-### When to use `ultrathink`
+### Gotchas
+- `events.event_type` is `text`, not a pgEnum — extend the `EVENT_TYPES` const **and** its Zod payload schema in the **same commit**.
+- The `events` table is hand-partitioned (`PARTITION BY RANGE`) and **excluded from drizzle-kit** (`tablesFilter: ["!events"]`) — write its DDL as raw SQL in a migration.
+- Scripts run under `tsx` must **not** import the `@/db` → `server-only` chain — inline their own `postgres()` client (the staging-seed/smoke pattern).
+- `0000_uuidv7_function.sql` ships the userspace `uuidv7()`; CI strips `pg_cron` from `0007` before applying.
+- Doppler config names are `stg` / `prd` — **never** `staging` / `production`.
+- Supabase direct host (`db.<ref>.supabase.co`) is IPv6-only; local scripts and migrations use the **session pooler** (`...pooler.supabase.com:5432`).
+- `BETTER_AUTH_URL` fails at **build time**, not request time — the custom domain must be attached and the URL set *before* deploy.
 
-First word of every coding-task prompt. Mandatory for: CPMM pricing math, Dharma accounting, resolution payout math, side-freezing semantics, cross-service state machines, auth choices, moderation failure modes, ADR drafting, CLAUDE.md / AGENTS.md audits.
+### `ultrathink`
+First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, payout math, side-freeze semantics, cross-service state machines, auth, moderation failure modes, ADR drafting, and CLAUDE.md / AGENTS.md audits.
 
 ---
 
-## 6. Review roles, skills, hooks
+## 6. Subagents, hooks, model
 
-**Review roles** are role briefings at `.claude/agents/*.md`, invoked per §5.11 as fresh-context `general-purpose` Agent calls. They are NOT auto-discovered runtime subagents — the Claude Code runtime exposes only built-in agent types. Each briefing names its checklist, output format, and tool-scope expectations; §5.11's invocation policy table names which work types route to which briefing.
+**Claude Code runs on Opus 4.8** — no `model` pin, so the account default carries (the 4.7 → 4.8 move per SYNC `D-CC-MODEL` holds). Max effort (`CLAUDE_CODE_EFFORT_LEVEL=max` in the shell rc) + `ultrathink` in every coding prompt.
 
-- **`code-reviewer`** — reviews diffs under `src/server/` for invariant violations (§2), missing error handling, and refusal triggers (§3). Returns findings as CRITICAL / HIGH / MEDIUM / LOW with `file:line` references. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/code-reviewer.md`.
+**Subagents** — auto-discovered from `.claude/agents/*.md`; all four are tracked, each `model: opus` / `effort: xhigh` with a "MUST BE USED" routing description. Full briefings live in those files; invocation policy is §5.11.
 
-- **`db-migration-reviewer`** — reviews changes under `src/db/schema/` or `drizzle/migrations/` against SPEC.2 §5 inventory; verifies FK lambdas, indexes per AGENTS.md §6, Bucket A/B/C classifications, and append-only trigger SQL. Returns PASS / FAIL / SURPRISE per table. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/db-migration-reviewer.md`.
+- `code-reviewer` — diff under `src/server/` vs §2/§3 + stack patterns; returns CRITICAL/HIGH/MEDIUM/LOW with `file:line`.
+- `db-migration-reviewer` — schema vs SPEC.2 §5 inventory, FK lambdas, indexes, Bucket A/B/C, trigger SQL; returns PASS/FAIL/SURPRISE per table.
+- `security-auditor` — auth, transaction handlers, moderation, admin surfaces for INV-1/2/3/4 gaps + exploitability.
+- `test-writer` — failing tests first against the plan; **never edits `src/`**.
 
-- **`security-auditor`** — reviews critical-path work (per §1) for INV-1 / INV-2 / INV-3 / INV-4 enforcement gaps, auth bypasses, moderation pipeline exploitability, and admin-surface separation. Returns findings ranked by exploitability with concrete attack scenarios. Briefing tool scope: Read, Grep, Glob, Bash. Briefing file: `.claude/agents/security-auditor.md`.
+**Hooks / skills — NOT installed.** No committed `.claude/settings.json`, no `.claude/hooks/`, no `.claude/skills/`. The only local config is a gitignored `.claude/settings.local.json` (a tool allow-list — **no `permissions.deny`, no hooks**). So "blocked main commits / blocked destructive commands / commit linting" are **enforced nowhere** — discipline only until installed. The prioritized set to install (hooks at `.claude/hooks/`, registered via a committed `.claude/settings.json`; hard blocks in `permissions.deny`):
 
-- **`test-writer`** — writes FAILING tests FIRST for new business-logic behavior per §5.6 against the plan's test plan section. Briefing forbids edits to `src/`. Returns test files + coverage map. Briefing tool scope: Read, Write, Edit (tests only), Bash, Grep, Glob. Briefing file: `.claude/agents/test-writer.md`.
-
-**Skills:** auto-discovered from `.claude/skills/<name>/SKILL.md` at session start.
-
-**Hooks:** `block-destructive.sh` (rm -rf, force-push, DROP TABLE), `block-main-commits.sh`, `format-and-typecheck.sh` (Biome + tsc post-edit), `session-start.sh` (recent commits + open PRs).
+- **`block-main-commits`** (PreToolUse) — reject any `git commit`/`push` targeting `main` directly.
+- **`block-destructive`** (PreToolUse) — reject `rm -rf`, `db reset`, `migrate down`, force-push outside an explicit allow.
+- **`format-and-typecheck`** (post-edit) — `biome` + `tsc` on touched files.
+- **`permissions.deny`** — `.env*` writes, `supabase db reset`, raw `psql` against prod.
+- *(optional)* commitlint for the `type(scope): subject` convention.
 
 ---
 
 ## 7. Maintaining this file
 
-CLAUDE.md, AGENTS.md, ADRs, SPECs go stale faster than code. Audit triggers: drift discovered, phase ends, ADR accepted, new role briefing / skill / hook, bi-weekly. Process at `docs/maintenance.md`.
+Stale docs are worse than none — the ongoing burden is **pruning**, not adding (process: `docs/maintenance.md`).
 
-**Closing ritual** for every task: "Should CLAUDE.md, AGENTS.md, the workflow, or the tracker change as a result of this session?" Most: no. The discipline is asking. If yes, file in the same PR — never as a follow-up. Follow-ups never happen.
+- **Add** a rule only on trigger: Claude repeated a mistake / a review caught something it should have known / you retyped last session's correction / a new teammate would need it.
+- **Prune** on supersession (ADR-0009 ranking → removed, not stacked beside ADR-0017).
+- **Auto memory is a separate layer** — Claude's machine-local notes (`~/.claude/projects/<repo>/memory/`) are *not* in the repo and *not* shared with the devs. Team-shared knowledge belongs here, in the committed file.
+- **Reconcile periodically** (a SYNC sweep + version bump), not per-task. Routine tasks touch only the logs.
 
-### Decision log
+**Decision log** (`DECIDE` = a settled call this file encodes; newest first):
 
-- **2026-05-14:** VISUAL phase minted (8 DESIGN.* tasks, runs parallel to ENGINE). Tracker v7 absorbs the phase. SPEC.13 retained as pointer to DESIGN.8 producer. See project-knowledge close-out log (chat_close_2026-05-14_visual-phase-mint_v7-tracker).
+- Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v11` is planning/sequencing only.
+- Doc authorship: AGENTS.md is descriptive (CC-authored from the live repo); CLAUDE.md is the contract (web-drafted invariants + CC-verified file-map refs).
+- Ranking = ADR-0017 multi-mode; supersedes ADR-0009. `RANKING.md` stale until DEBATE.8.
+- Reply-as-bet (ADR-0017): a reply **is** a Support/Counter bet; `REPLY_DEPTH_MAX = 1`; no standalone friendly-fire vote.
+- Issuance + two bet floors (ADR-0018): `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY`; DB identifiers `daily_allowance` / `last_allowance_accrued_at` retained.
+- IDs are UUIDv7 (ADR-0016); no raw UUIDs in participant-facing URLs.
+- Two-instrument architecture: Dharma is soulbound (this repo); Artha is transferable and arrives at testnet — not in the web2 experiment.
+- Conclusion freeze is 2026-11-05 23:59 UTC; the public dataset (the only place K_eff is derived) is dated 2026-11-06.
+- Moderation runs **outside** the bet transaction and fails closed on terminal errors (ADR-0014); CSAM via PhotoDNA + image classifier.
+- RLS out of scope for the experiment (ADR-0019).
+- Same-commit doctrine: fixes to guardrail mechanisms are absorbed in-session, never deferred.
+- CC on Opus 4.8 (`D-CC-MODEL`); subagents stay `model: opus` / `effort: xhigh`.
+- Enforcement hooks / `permissions.deny` not yet installed — this file is advisory until they are (§6).
 
-### Cleanup absorption rule
-
-Drift fixes — config tweaks, doc updates, stale-reference replacements, convention codifications, naming inconsistencies — are absorbed by the stratum that surfaces them, in the same PR, before merge.
-
-Forbidden:
-
-- Deferring drift to a future "PRECURSOR-N" or "cleanup sweep" task.
-- Accumulating backlogs across multiple strata for batch resolution.
-- Treating per-stratum cleanup as overhead rather than as part of the stratum's close-out ritual.
-
-Permitted:
-
-- In-stratum absorption of drift items that take <2 hours per item.
-- For drift items that genuinely require >2 hours (architectural decisions, multi-file coordinated edits), mint a real task with its own kickoff. Not a backlog row.
-- Parking items genuinely out-of-scope for any current task (e.g., "engage lawyer mid-July 2026 HARDEN.7") in `docs/parked.md`.
-
-PRECURSOR.5 (this PR) is the last PRECURSOR-N task. Future drift rolls into the stratum that surfaced it.
+**Closing ritual**, every task: "Should CLAUDE.md / AGENTS.md / the workflow / the tracker change as a result of this session?" Usually no — the discipline is asking. If yes, same PR, never a follow-up (follow-ups never happen).
 
 ---
 
 ## 8. Closing rule
 
-**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything in this file is wrong, fix it before fixing the code.**
+**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything here is wrong, fix it before fixing the code.**
 
-*Last revised PRECURSOR.5 (May 14, 2026) — subagent → reviewer-call reframe per §5.11 + §6 (`.claude/agents/*.md` role briefings invoked via fresh-context `general-purpose` Agent calls, not auto-discovered); decision log + cleanup absorption rule added at §7. Against SPEC.1 v1.8.0 + SPEC.2 v0.3-draft + ADRs 0003–0016. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0019. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*

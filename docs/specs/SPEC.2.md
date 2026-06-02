@@ -1,8 +1,8 @@
 # SPEC.2 — Zugzwang Technical Architecture
 
-> **Status:** v0.3.4-draft · last absorption 2026-05-27 · §0–§23 + Appendices A–B all drafted at v0.3-draft body level · K_eff dashboard struck per PRECURSOR.2-B D4 (no live in-product surface; K_eff(t) derived post-hoc from 2026-11-06 public dataset per SPEC.1 G3 + §12.2)
+> **Status:** v0.4.0-draft · last absorption 2026-06-01 · §0–§23 + Appendices A–B all drafted at v0.3-draft body level · ADR-0017/0018/0019 folded + ADR-0009 superseded-by-0017 (SYNC.7) · **reply-as-bet model adopted** (every comment rides a bet; friendly-fire + `friendly_fire_events` + `stake_at_post_time` removed entirely; Support/Counter are read-time aggregates over reply-bets) consistent with SPEC.1 v1.9.0-draft · K_eff dashboard struck per PRECURSOR.2-B D4 (no live in-product surface; K_eff(t) derived post-hoc from 2026-11-06 public dataset per SPEC.1 G3 + §12.2)
 > **Repo path:** `zugzwang-foundation/experiment/docs/specs/SPEC.2.md`
-> **Companion files:** `SPEC.1.md` (product), `cpmm.md` (math), `RANKING.md` (ranking function), `PSEUDONYM.md` (pseudonym pool spec), `design.md` (visual system), 14 ADRs (`docs/adr/0003–0016`)
+> **Companion files:** `SPEC.1.md` (product), `cpmm.md` (math), `RANKING.md` (ranking function), `PSEUDONYM.md` (pseudonym pool spec), `design.md` (visual system) — the four companion specs are authored by their gating tasks and are **not yet on disk** as of this rewrite (see §1.4); 17 ADRs (`docs/adr/0003–0019`), ADR files committed at SYNC.BACKFILL (only `0001` on disk today)
 
 ---
 
@@ -11,14 +11,14 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | v0.3.4-draft |
-| **Date** | 2026-05-27 |
+| **Version** | v0.4.0-draft |
+| **Date** | 2026-06-01 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
 | **Lock gate** | PRECURSOR.4 (Fresh-session lock review, writer/reviewer split per CLAUDE.md) — promotes this doc from `v0.3-draft` → `v1.0` |
-| **Gates downstream** | 14 ADRs (`ADR-0003` through `ADR-0016` = SPEC.3–7, SPEC.9–13, SPEC.14–17) + all `SCAFFOLD.*`, `ENGINE.*`, `DEBATE.*`, `UI.*`, `HARDEN.*` tracker tasks |
+| **Gates downstream** | 17 ADRs (`ADR-0003` through `ADR-0019`; 0003–0016 = SPEC.3–7, SPEC.9–13, SPEC.14–17; ADR-0017 = SYNC.4; ADR-0018/0019 = SYNC.5) + all `SCAFFOLD.*`, `ENGINE.*`, `DEBATE.*`, `UI.*`, `HARDEN.*` tracker tasks |
 | **Source-of-truth** | `zugzwang-foundation/experiment` repo. Project knowledge file is a snapshot, not the canonical copy. |
-| **Versioning policy** | `v0.1-outline` → `v0.2-draft` (operational substance distributed across ADRs 0003–0008 + §0–§4 drafted + §9–§11 + §16 absorbed by ADRs 0013–0016) → `v0.3-draft` (operational tail §5–§8 + §12–§15 + §17–§23 + Appendices A–B drafted across PRECURSOR.3) → `v1.0` (locked by PRECURSOR.4 fresh-session review). Subsequent revisions bump minor. ADRs are immutable; SPEC.2 is mutable; supersession requires same-commit SPEC.2 update plus ADR `Superseded-by` link. |
+| **Versioning policy** | `v0.1-outline` → `v0.2-draft` (operational substance distributed across ADRs 0003–0008 + §0–§4 drafted + §9–§11 + §16 absorbed by ADRs 0013–0016) → `v0.3-draft` (operational tail §5–§8 + §12–§15 + §17–§23 + Appendices A–B drafted across PRECURSOR.3) → `v0.3.1`–`v0.3.4-draft` (SCAFFOLD.4 + SCAFFOLD.18 point absorptions) → `v0.4.0-draft` (SYNC.7 — ADR-0017/0018/0019 folded into §22; ADR-0009 superseded-by-0017; RLS posture recorded in §18.5; `cpmm.md` forward-reference; companion/ADR-count + PRECURSOR.5 drift folds; **full removal of `friendly_fire_events` + `stake_at_post_time` from the schema and every operational reference, reply-as-bet write-path rework, two-floor minimum-bet references, Daily Credit concept rename, Flipped/Exited marker** — bringing SPEC.2 into consistency with SPEC.1 v1.9.0-draft) → `v1.0` (locked by PRECURSOR.4 fresh-session review). Subsequent revisions bump minor. ADRs are immutable; SPEC.2 is mutable; supersession requires same-commit SPEC.2 update plus ADR `Superseded-by` link. |
 | **Companion paper** | `zugzwang_btc_style_v4.pdf` — theory and Zugzwang Condition. SPEC.2 implements; the paper does not bind on engineering choices. |
 | **License** | AGPL-3.0 (matches protocol license; see `LICENSE.md`) |
 
@@ -46,6 +46,7 @@
 | v0.3.2-draft | 2026-05-27 | HMH | **SCAFFOLD.18 execute — §0.1 ADR-0016 row erratum.** Original tag `supabase/postgres:17.6.1.107-x-6-x86` named in the 2026-05-08 ADR-0016 absorption row did not resolve on Docker Hub — first SCAFFOLD.18 execute CI run (run id 26476831221) returned `manifest unknown` during `docker pull` at the GHA service-container init step; subsequent enumeration showed 3,936 published `supabase/postgres` tags, suffix `-x-6-x86` matches no real tag family (real arch suffixes are `_amd64` / `_arm64`; real build suffixes are `-multigres` / `-orioledb` / `-mg-1`; real one-off build is `-indata574-1`). Corrected to manifest-list form `supabase/postgres:17.6.1.107` (29 Apr 2026 release, plain tag — per-arch resolution at pull time). ADR-0016 substance unaffected: the tag was a parenthetical citation of "latest Supabase platform release" inside the rejection-rationale for PG 18 native `uuidv7()` substrate, not a load-bearing decision input — D1–D6 ratifications (UUIDv7 substrate, function name, default expression, Better Auth full override, `identity_pool` PK shape, URL-exposure rule) all unchanged. Propagation trail at original ratification: SPEC.2 §0.1 (source — the 2026-05-08 row above), SPEC.1 §20 v1.8.0-draft change-log row (cross-reference — corrected same-commit), `docs/plans/SCAFFOLD.18-postgres-ci.md` (8 hits, historical artifact untouched), `docs/logs/SCAFFOLD.18-plan-review.md` (3 hits, historical artifact untouched), `.github/workflows/ci.yml` (1 hit, corrected same-commit). Provenance of the `-x-6-x86` suffix at original ratification not recoverable from the SPEC.2 / SPEC.1 / ADR-0016 surfaces; treating as malformed/fabricated string in the ADR-0016 absorption pass. HARDEN-phase identifier-verification carry-forward flagged: pre-commit lint or CI gate that resolves named image tags + external-dependency version pins against published manifests before SPEC absorption would have caught this typo at write-time and prevented propagation across five surfaces. See `docs/logs/SCAFFOLD.18-execute.md` for full propagation-trail audit. |
 | v0.3.3-draft | 2026-05-27 | HMH | **SCAFFOLD.18 execute — Path A → Path B pivot (continuation of v0.3.2-draft erratum).** After the tag-fix amend at v0.3.2-draft, CI run 26477860192 against the corrected `supabase/postgres:17.6.1.107` image surfaced the second-stage failure mode anticipated by plan §8 Risk 1: image pulls and container starts, but the Supabase entrypoint's role-bootstrap scripts fail with `psql: FATAL: password authentication failed for user "supabase_admin"` — the image is designed for Supabase CLI orchestration (`supabase start`) which provides a broader env-var ecosystem including platform-role passwords; bare `docker run -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres` triggers a partial-bootstrap with `supabase_admin` role password misalignment. Plan §8 Risk 1 documented this exact failure mode as anticipated, with Path B (vanilla `postgres:17` + CI-only exclusion of `0007_pg_cron_jobs.sql`) as the documented fallback. CI now runs against `postgres:17` (Docker Hub official manifest-list, GHA-service-container-native, no Supabase-CLI coupling). The 0007 migration is excluded at a CI step before `drizzle-kit migrate` via `rm` of the `.sql` file plus `jq` strip of the corresponding `_journal.json` manifest entry — both edits operate against the ephemeral CI-runner workdir only; committed source-control files remain immutable per ADR-0008 / AGENTS.md §6 file-level append-only invariant. Sandbox-verified pre-amend: jq filter takes 8 entries → 7 entries, top-level keys `dialect`/`entries`/`version` preserved verbatim. ADR-0016 D1–D6 substance still unaffected: Supabase's prod platform offering remains `supabase/postgres:17.6.1.107` per SPEC.1 §20 v1.8.0-draft cross-reference (the CI substrate divergence does not change the PG 18 rejection rationale that was the load-bearing point of that citation). Propagation trail at pivot: `.github/workflows/ci.yml` image swap (line 35 `supabase/postgres:17.6.1.107` → `postgres:17`) + new "Exclude pg_cron migration" step inserted before `drizzle-kit migrate`; SPEC.1 §20 line 1274 not re-touched (its claim about Supabase's prod offering remains accurate). HARDEN-phase carry-forwards flagged: (a) formalize local `supabase start` test surface for the 0007 migration (currently exercised manually per `docs/plans/SCAFFOLD.17.md` line 223 verification note); (b) image-tag manifest-resolution lint at write-time (carry-forward already flagged in v0.3.2-draft erratum row above); (c) reusable Path-B-style CI-substrate-divergence template for future vendor-image-vs-CI-runner compatibility gaps (the GHA-service-container model assumes standard postgres env-var conventions; vendor images with broader env-var ecosystems are systematically incompatible). Two CI runs preserved in the audit trail: 26476831221 (manifest-unknown on the malformed `-x-6-x86` suffix), 26477860192 (supabase_admin bootstrap auth failure on corrected tag). See `docs/logs/SCAFFOLD.18-execute.md` for full pivot rationale + both CI run logs. |
 | v0.3.4-draft | 2026-05-27 | HMH | **SCAFFOLD.18 execute — surgical statement strip refinement (continuation of v0.3.3-draft pivot).** Path B initial implementation (whole-file strip of `0007_pg_cron_jobs.sql` via `rm` + `jq` journal-strip per v0.3.3-draft row above) surfaced a second-order knock-on in CI run 26478587027: 6 tests in `tests/db/identity-pool/watermark.test.ts` failed with `PostgresError: relation "watermark_state" does not exist`. Root cause: migration 0007 is mixed-concern — only 2 of its 8 statements are Supabase-coupled (line 16 `CREATE EXTENSION pg_cron WITH SCHEMA extensions;` + lines 78-82 `SELECT cron.schedule(...)`); the remaining 6 statements are vanilla-portable (the `watermark_state` and `cron_alarms` tables, the `check_identity_pool_watermark()` PL/pgSQL function, and the seed row in `watermark_state`). Whole-file strip was over-broad. Refined to a surgical statement strip via `sed -i -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron/d' -e '/^SELECT cron\.schedule(/,/^);$/d' drizzle/migrations/0007_pg_cron_jobs.sql` in the CI step, replacing the prior `rm` + `jq` mechanism (the `_journal.json` no longer needs stripping because the migration file still applies, just with the 2 pg_cron-coupled statements removed). Sandbox-verified pre-amend: sed strips exactly the 2 targeted statements (1 single-line + 1 multi-line range); preserved-keyword grep returns 7 matches across `watermark_state` (3) / `cron_alarms` (3) / `check_identity_pool_watermark` (1); removed-keyword grep returns 0 for both `CREATE EXTENSION pg_cron` and `cron.schedule`. Test-level skip: test 6 (`registers the 'identity-pool-watermark' cron job exactly once`) in `tests/db/identity-pool/watermark.test.ts` gains a runtime `pg_extension` probe via `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')` and calls `ctx.skip()` when pg_cron is absent. The `it.skipIf()` declarative form in the original sketch was deferred in favour of `ctx.skip()` inside the test body because vitest evaluates `it.skipIf(condition)` at collection time (before `beforeAll` runs), making it incompatible with a runtime DB probe — `ctx.skip()` runs at test execution time and observes the post-probe value. Tests 1-5 remain unconditional; they test the watermark function logic, not pg_cron itself. Net coverage: 5/6 watermark tests run in CI (function-logic assertions); test 6 (cron-registration assertion) skipped in CI with self-documenting reason, runs against real Supabase via local `supabase start`. HARDEN-phase carry-forwards refined: (a) formalize local `supabase start` test surface for the 2 stripped statements + test 6 (was already on the list); (b) image-tag manifest-resolution lint at write-time (carry-forward from v0.3.2-draft erratum row); (c) reusable Path-B-style CI-substrate-divergence template (from v0.3.3-draft erratum row); (d) NEW — surgical-vs-whole-file CI patching pattern for mixed-concern migrations (this row's contribution); (e) NEW — vitest collection-time vs runtime skip semantics documentation (this row's contribution). Three CI runs preserved in the audit trail: 26476831221 (manifest-unknown), 26477860192 (supabase_admin bootstrap), 26478587027 (watermark_state-missing knock-on). See `docs/logs/SCAFFOLD.18-execute.md` for full refinement rationale + the three CI run logs. |
+| v0.4.0-draft | 2026-06-01 | HMH | **SYNC.7 — SPEC.2 rebuild: ADR-0017/0018/0019 fold + ADR-0009 supersession + RLS posture + drift reconciliation.** (1) §22 ADR Index: added ADR-0017 (ranking modes & "Top" composite — supersedes ADR-0009), ADR-0018 (Dharma issuance + asymmetric two-floor minimum bet), ADR-0019 (RLS out of scope); flipped ADR-0009 status `accepted` → `superseded` (by ADR-0017); index 14 → 17 rows (15 accepted + 1 superseded + 1 in-flight); §22.4 property 3 reworded — the prior "no minting ADR-0017 while ADR-0012 in flight" clause conflated in-flight with gap and is superseded (0017/0018/0019 minted under SYNC.4/SYNC.5; numbering stays dense, 0012 is a filled in-flight slot); §22.3 Direction-B example repointed 0009 → 0017. (2) **§22/§23 numbering reconciliation:** ADR-0017/0018/0019 + SYNC.5 + the SYNC.7 kickoff cite "§23 ADR Index," but the ADR Index has been **§22** since the PRECURSOR.2-B K_eff-dashboard strike renumbered §23 → §22 (2026-05-08 row above); the ADRs carry the stale pre-strike number — SPEC.2 §22 is canonical, edits applied there. (3) §18.5 (new) records the RLS posture per ADR-0019 — server-only Architecture 2, build skipped, decision recorded, tripwire (any client-direct DB path makes RLS mandatory before it ships), testnet revisit; prior §18.5 (Single source of truth) → §18.6; §6.5 cross-references it. (4) §1.4 #2 enriched with the `cpmm.md` authoring forward-reference (purpose, Manifold lift-and-attribute lineage MIT → AGPL, invariants, impl home, status — full authoring deferred to the cpmm.md chat per SYNC.7 scope). (5) Drift folds: "14 ADRs / 0003–0016" → "17 ADRs / 0003–0019" across §0 + §1; §23.3 + §23.4 PRECURSOR.5 → SYNC.8 (PRECURSOR.5 dissolved into SYNC.8 per tracker v11); Appendix A + B "PRECURSOR.5 column-name/file-map sweep" → PRECURSOR.4 (the lock-review verification, distinct from the CLAUDE/AGENTS rebuild). (6) **Full removal of friendly-fire + `stake_at_post_time` (replaces the earlier annotate-not-rewrite pass).** Per SPEC.1 v1.9.0-draft + ADR-0017 (sharpened SYNC.7): the standalone friendly-fire vote is gone entirely. `friendly_fire_events` (table + Bucket-B trigger + the F-COMMENT-6/7/8 `castFriendlyFire`/`clearFriendlyFire` Server Actions) and `comments.stake_at_post_time` are **struck from the schema and from every operational reference** — §5.1 (inventory: row dropped, renumbered; counts 23→22 tables / Bucket B 4→3 / protected 13→12), §5.2, §5.4 (rewritten to the four read-time per-side reply-bet aggregates), §5.5 (audit-trace bullet added), §6.3, §7.4/§7.5, §9 lock-order (`pools → positions → dharma_ledger → events`; `friendly_fire_events` removed), §11 (comment+friendly-fire budget removed), §13.3, §18.2/§18.4, §19.3/§19.5, Appendix A (file-map rows removed) + Appendix B (B.6 column dropped, B.8 deleted + renumbered). (7) **Reply-as-bet write-path rework.** Per SPEC.1 v1.9.0-draft §7/§8 + ADR-0017/0018: every comment rides a bet (post-bet = top-level, post floor; reply-bet = `parent_comment_id`, reply floor 50); the only comment-free write is the sell (F-BET-3). The old W-2 "comment, no pool lock" pattern is **retired** — comment/reply writes are bets that take the pool-row lock and run the §9 W-1 chain. Folded: §3.1 (moderation-skip set = sells only), §3.2 (W-2 retired into the bet flow; pattern table repointed), §9 (chain covers comment-bearing bets), §10 (moderation runs on every comment-bearing bet), §11 (posts/replies use the bet anti-abuse posture; **open question recorded** — whether reply-bets carry a per-market productive cap distinct from top-level bets, deferred to §11 + the number-tuning pass per SPEC.1 §8), §13.3 (F-COMMENT-1/2/3 reclassified as bet-flows; F-COMMENT-6/7/8 rows removed; 40→37 F-* files), §14 (INV-1 binds **every** bet; `comments.bet_id` NOT NULL; INV-3 mechanism moved off the retired W-2 onto the bet transaction). Per-flow `F-*.md` contract files stay deferred to their gating ENGINE.*/DEBATE.* tasks per §13.4. (8) **Two-floor minimum bet, Daily Credit, marker.** `BET_MIN_STAKE_POST` (ranged) + `BET_MIN_STAKE_REPLY` (50 pinned) referenced as bet write-path checks (constants SPEC.1 §16.1-owned per ADR-0018); "Daily Allowance" → **Daily Credit** as the concept/rule (accrual now conditional — paid only on a UTC day with a commented bet, use-or-lose) — **DB identifiers retained** per SPEC.1 §10.4 (`dharma_ledger` source tag stays `daily_allowance`; cursor stays `users.last_allowance_accrued_at`; the `daily_allowance_events` dropped-table note in §5.5 stands); three-state marker → **Flipped/Exited** ("In" dropped). NOT changed: ADR substance (0017/0018/0019 unmodified — note ADR-0017's body still says friendly-fire "stays display-only," now contradicted by both specs; a later in-place ADR-0017 patch reconciles it, flagged §5.5 + §23.3); CLAUDE.md/AGENTS.md (SYNC.8); no v1.0 promotion (PRECURSOR.4). New-ADR status recorded `accepted` (2026-06-01, founder ratification); ADR file headers flip `proposed` → `accepted` at SYNC.BACKFILL. |
 
 ---
 
@@ -55,7 +56,7 @@
 
 SPEC.2 is the **technical architecture frame** for the Zugzwang experiment-phase build. It defines the *shapes, slots, contracts, conventions, and invariant mechanisms* that downstream technical decisions and code must conform to.
 
-SPEC.2 is **not** the substance-bearing technical document. Specific table DDL, library configs, error-code lists, cookie names, retry parameters, and migration filenames live in the **14 dependent ADRs** (`ADR-0003` to `ADR-0016`). SPEC.2 names *that there is an authentication system, that it has two parallel session paths, and that the cookie naming rule is X*; ADR-0004 (auth library) and ADR-0010 (admin auth wiring) supply the actual library, callback chain, and cookie names.
+SPEC.2 is **not** the substance-bearing technical document. Specific table DDL, library configs, error-code lists, cookie names, retry parameters, and migration filenames live in the **17 dependent ADRs** (`ADR-0003` to `ADR-0019`). SPEC.2 names *that there is an authentication system, that it has two parallel session paths, and that the cookie naming rule is X*; ADR-0004 (auth library) and ADR-0010 (admin auth wiring) supply the actual library, callback chain, and cookie names.
 
 This split is the **Option B distribution**: SPEC.2 is the load-bearing frame; the ADRs are the load-bearing substance. Together, they form the complete coding contract that downstream tracker tasks (`SCAFFOLD.*`, `ENGINE.*`, `DEBATE.*`, `UI.*`, `HARDEN.*`) implement against.
 
@@ -95,7 +96,8 @@ SPEC.2 MUST NOT contain:
 
 1. **Product behavior.** That is `SPEC.1.md` v1.0-draft. SPEC.2 references `SPEC.1 §N` for every flow it shapes; it never restates product rules.
 2. **CPMM math.** That is `cpmm.md`. SPEC.2 names that the bet handler computes "CPMM share-payout per `cpmm.md`"; it does not duplicate the math.
-3. **Ranking math.** That is `RANKING.md` (locked by ADR-0009 / SPEC.10). SPEC.2 names that the debate view orders comments by the ranking function; it does not duplicate the formula.
+   - **`cpmm.md` authoring forward-reference (SYNC.7).** `cpmm.md` is named as a companion but is **not yet on disk**; it is authored in its own focused chat (full authoring deferred per SYNC.7 scope, which delivered this brief in its place). The brief: **Purpose** — the CPMM math spec for the single-market-maker, fee-less, constant-product maker. **Lineage + license** — lifts Manifold's CPMM implementation (historically `common/src/calculate-cpmm.ts` + `cpmm.ts` in `manifold-markets/manifold`), rewritten for our invariants; the upstream is MIT-licensed and the lift MUST **preserve the MIT notice under our AGPL-3.0-or-later** (MIT → AGPL is permitted; attribution is mandatory). **Invariants** — Dharma conservation; `NUMERIC(38,18)` precision (per ADR-0008); fee-less single-MM (no fee term in the share/probability math); frozen-at-resolution consistency (ties to INV-4 — a resolved market's CPMM state is immutable and auditor-reproducible). **Scope boundary** — math owned in `cpmm.md`; SPEC.2 names *that* the handler calls it and does not duplicate the formula (this non-goal). **Implementation home** — `src/server/cpmm/` (greenfield, per ENGINE.2). **Status** — full authoring + a multi-source Manifold-source/license research pass are the first task of the `cpmm.md` chat (the lead technical-research item); the companion-files line and Appendix B.3 (`pools` reserves) already reference it.
+3. **Ranking math.** That is `RANKING.md` (locked by **ADR-0017**, which supersedes ADR-0009). SPEC.2 names that the debate view orders comments by the ranking model; it does not duplicate the formula. (The superseded ADR-0009 single-function model is retired — see §5.4 + the §22 index.)
 4. **Visual / brand system.** That is `design.md` (locked by ADR-0012 / SPEC.13). SPEC.2 references the design system but does not specify colors, typography, or component variants.
 5. **Substance-level decisions delegated to dependent ADRs.** Specifically:
    - Next.js version / App Router config → ADR-0003 (SPEC.3)
@@ -205,32 +207,32 @@ Every state-mutating endpoint — Server Action or Route Handler, participant or
 2. Idempotency-key validation — per §11 / ADR-0015 (header for Route Handlers; arg for Server Actions)
 3. Idempotency cache lookup   — per §11 / ADR-0015 (Redis SETNX + body-fingerprint match)
 4. Rate-limit check           — per §11 / ADR-0015 (per-surface sliding window on Upstash)
-5. Pre-commit moderation      — per §10 / ADR-0014 (bet entry + comment surfaces only)
-6. Handler body / transaction — per §3.2 write-flow patterns (W-1 / W-2 / W-3)
+5. Pre-commit moderation      — per §10 / ADR-0014 (every comment-bearing bet; the comment-free sell skips)
+6. Handler body / transaction — per §3.2 write-flow patterns (W-1 bet/comment · W-3 resolution)
 7. Events-row + response cache — per §3.7 + §11 (events.insert inside the txn; cache write outside)
 ```
 
-Steps 1–4 and 7 are universal across every state-mutating endpoint; step 5 is bet-flow and comment-flow-specific (F-BET-2 / F-BET-3 / F-COMMENT-6 / F-COMMENT-7 skip moderation per §10); step 6 takes one of the three write-flow shapes named in §3.2. The stack is the absorption surface for the three already-absorbed sections — §9 owns step 6's bet wrapper, §10 owns step 5, §11 owns steps 2–4 + step 7's cache write — §3.1 is the cross-reference that names the stack as a whole.
+Steps 1–4 and 7 are universal across every state-mutating endpoint; step 5 runs on every comment-bearing bet (under the v1.9.0 reply-as-bet model every post and reply carries mandatory commentary — F-BET-1, F-BET-2, F-COMMENT-1/2/3) and is skipped only by the comment-free sell F-BET-3 and the admin resolution flow per §10; step 6 takes one of the two participant/admin write-flow shapes named in §3.2 (the old comment-only shape is retired — see §3.2). The stack is the absorption surface for the three already-absorbed sections — §9 owns step 6's bet wrapper, §10 owns step 5, §11 owns steps 2–4 + step 7's cache write — §3.1 is the cross-reference that names the stack as a whole.
 
 **Failure-mode posture across the stack**: rate-limit fails open (step 4); idempotency fails closed (step 3); pre-commit moderation fails closed (step 5); the bet transaction wrapper retries up to 3× on 40001/40P01 (step 6 for bet flow). **Two-step ordering invariant**: idempotency cache lookup MUST run BEFORE rate-limit (step 3 before step 4) so that a retry of a previously rate-limited request returns the cached 429, not a fresh rate-limit decision. This ordering is locked by §11 / ADR-0015 and is not relitigable in §3.
 
 ### §3.2 Write-flow patterns
 
-Every state-mutating handler reduces to one of three transaction shapes. The shape name appears in the per-flow contract file under `docs/specs/flows/F-*.md` as `Transaction shape:` so a reader knows which §3.2 pattern applies without re-deriving it.
+Every state-mutating handler reduces to one of two transaction shapes (a participant bet/comment flow and an admin resolution flow; the v1.8.x comment-only shape is retired under reply-as-bet — see W-1). The shape name appears in the per-flow contract file under `docs/specs/flows/F-*.md` as `Transaction shape:` so a reader knows which §3.2 pattern applies without re-deriving it.
 
-**Pattern W-1 — Bet flow (SERIALIZABLE + pool-row pessimistic lock).** Used by F-BET-1, F-BET-2, F-BET-3, and (by extension) F-COMMENT-6 + F-COMMENT-7 because friendly-fire votes consume the same lock-order chain when the user's position is touched. One Postgres transaction at SERIALIZABLE isolation; pool row locked via `SELECT … FOR NO KEY UPDATE`; canonical lock order `pools → positions → dharma_ledger → friendly_fire_events → events`; full-jitter retry on bases `[50, 100, 200]` ms on SQLSTATE 40001 / 40P01. The bet transaction wrapper at `src/server/bets/transaction.ts` (per §9 / ADR-0013) is the single source of truth; every bet handler invokes it.
+**Pattern W-1 — Bet flow (SERIALIZABLE + pool-row pessimistic lock).** Used by **every bet**: F-BET-1 (entry post-bet), F-BET-2 (subsequent post-bet), F-BET-3 (sell), and — because under the v1.9.0 reply-as-bet model every comment rides a bet — F-COMMENT-1 (additional post-bet), F-COMMENT-2 (reply-bet), F-COMMENT-3 (image-attached bet+comment). One Postgres transaction at SERIALIZABLE isolation; pool row locked via `SELECT … FOR NO KEY UPDATE`; canonical lock order `pools → positions → dharma_ledger → events`; full-jitter retry on bases `[50, 100, 200]` ms on SQLSTATE 40001 / 40P01. A comment-bearing bet additionally inserts the `comments` row and the `bets` row inside the same transaction (INV-1 atomic bet+comment, `bets.comment_id` + `comments.bet_id` both NOT NULL); the comment-free sell (F-BET-3) inserts no comment. The bet transaction wrapper at `src/server/bets/transaction.ts` (per §9 / ADR-0013) is the single source of truth; every bet handler invokes it.
 
-**Pattern W-2 — Comment flow (single transaction, append-only on `comments`, no pool lock).** Used by F-COMMENT-1 (direct comment), F-COMMENT-2 (reply), F-COMMENT-3 (image-attached comment). One Postgres transaction at SERIALIZABLE isolation; lock order `positions → comments → events` (read-only on `positions` to verify the user holds a non-zero side; insert on `comments`; insert on `events`). No pool row touched (comments don't move CPMM reserves). `comments.stake_at_post_time` is computed and frozen on insert per §9 / ADR-0009 (ranking-function input). Pre-commit moderation runs OUTSIDE this transaction at step 5 of the handler stack (per §10 / ADR-0014); a Track A or Track B verdict means the transaction never opens.
+**Pattern W-2 — Retired (reply-as-bet).** The v1.8.x "comment flow" — a standalone `comments` insert with no pool lock, used when a comment was *not* a bet — **no longer exists** in v1.9.0. Every comment now rides a bet (post-bet or reply-bet per SPEC.1 §7/§8 + ADR-0017/0018), so comment and reply writes run the W-1 bet transaction (taking the pool-row lock, moving CPMM reserves, freezing `side_at_post_time` inside the transaction). There is no comment-without-bet path; the only comment-free write is the sell (F-BET-3, still W-1). `src/server/comments/place.ts` is consequently folded into the bet write path (Appendix A).
 
 **Pattern W-3 — Resolution flow (admin-actor batch settlement, INV-4 append-only).** Used by F-RESOLVE-1 (resolve), F-RESOLVE-2 (correction), F-RESOLVE-3 (void). One Postgres transaction at SERIALIZABLE isolation; lock order `markets → bets → payout_events → resolution_events → dharma_ledger → events`. The transaction fans out across all bets in the market in a single atomic write — typically tens to thousands of rows depending on market activity — and emits one `resolution_events` row plus one `payout_events` row per bet plus one `dharma_ledger` row per non-zero settlement plus a single terminal `events` row of `event_type = 'market.resolved' | 'market.corrected' | 'market.voided'`. The actor identity is structurally distinct: `events.metadata.user_id IS NULL` and `events.metadata.actor_id = 'admin-singleton'` (per ADR-0010 + SPEC.1 §10.1) — the admin has no `users` row, so the participant-side actor field is genuinely null, not a synthetic placeholder.
 
 | Pattern | Used by | Lock order | Moderation | Single source of truth |
 |---|---|---|---|---|
-| W-1 | F-BET-1, F-BET-2, F-BET-3, F-COMMENT-6, F-COMMENT-7 | `pools → positions → dharma_ledger → friendly_fire_events → events` | F-BET-1 only (entry); F-BET-2/3 + F-COMMENT-6/7 skip | `src/server/bets/transaction.ts` |
-| W-2 | F-COMMENT-1, F-COMMENT-2, F-COMMENT-3 | `positions → comments → events` | All (text + image per §10) | `src/server/comments/place.ts` |
+| W-1 | F-BET-1, F-BET-2, F-BET-3, F-COMMENT-1, F-COMMENT-2, F-COMMENT-3 | `pools → positions → dharma_ledger → events` (comment + bet rows inserted in-txn for comment-bearing bets) | Every comment-bearing bet (text + image per §10); the comment-free sell F-BET-3 skips | `src/server/bets/transaction.ts` |
+| ~~W-2~~ | **Retired** — no comment-without-bet path under reply-as-bet; comment/reply writes run W-1 | — | — | folded into `src/server/bets/transaction.ts` |
 | W-3 | F-RESOLVE-1, F-RESOLVE-2, F-RESOLVE-3 | `markets → bets → payout_events → resolution_events → dharma_ledger → events` | None (admin actor) | `src/server/resolution/settle.ts` |
 
-All three patterns share SERIALIZABLE isolation and the 3-attempt full-jitter retry shape from ADR-0013 (parameterised by the per-flow callback). They differ in lock-order spine and actor identity. ENGINE.7 / ENGINE.10 / ENGINE.13 implement.
+Both remaining patterns (W-1, W-3) share SERIALIZABLE isolation and the 3-attempt full-jitter retry shape from ADR-0013 (parameterised by the per-flow callback). They differ in lock-order spine and actor identity. ENGINE.7 / ENGINE.10 / ENGINE.13 implement.
 
 ### §3.3 Read-flow patterns
 
@@ -251,13 +253,13 @@ async function getMarketList() {
 
 Three operational rules consumed from the May 2026 Next.js 16.2.x docs: (i) `expire > revalidate` is enforced at build time — violation is a build error; (ii) `revalidateTag(tag, 'max')` is the supported two-argument signature for SWR-style invalidation, and `revalidateTag(tag, { expire: 0 })` is the immediate-invalidation form — the single-argument `revalidateTag(tag)` is deprecated in 16.x; (iii) the market-list and leaderboard cadences are deferred to §21 (cron schedule register) — §3.3 names only the pattern, not the specific revalidate / expire values.
 
-**Pattern R-3 — Authenticated reads (uncached, gated).** Used by own-bet-history, own-daily-allowance accrual history, own-profile-edit, admin-only views. Auth gate runs at the page boundary (per ADR-0004 / ADR-0010); data fetched per request; never cached because cache scopes can't read cookies. Admin views additionally validate `admin_sessions` independently at the page-level Server Component per CVE-2025-29927 defense-in-depth (per ADR-0010 + AGENTS.md §5).
+**Pattern R-3 — Authenticated reads (uncached, gated).** Used by own-bet-history, own Daily Credit accrual history, own-profile-edit, admin-only views. Auth gate runs at the page boundary (per ADR-0004 / ADR-0010); data fetched per request; never cached because cache scopes can't read cookies. Admin views additionally validate `admin_sessions` independently at the page-level Server Component per CVE-2025-29927 defense-in-depth (per ADR-0010 + AGENTS.md §5).
 
 | Pattern | Used by | Caching | Auth |
 |---|---|---|---|
 | R-1 | Debate view, market detail, public profile, leaderboard table rows | None (uncached, per-request fresh) | Public; participant session optional for write affordances |
 | R-2 | Market list, leaderboard public profile cards | `'use cache'` + `cacheLife({ stale, revalidate, expire })` | Public only — cached scopes cannot read cookies |
-| R-3 | Own-bet-history, own-allowance, own-profile-edit, admin views | None | Required (participant or admin per surface) |
+| R-3 | Own-bet-history, own Daily Credit, own-profile-edit, admin views | None | Required (participant or admin per surface) |
 
 **Two negative-space directives explicitly NOT used in v1**: `'use cache: remote'` (Redis-backed handler for self-hosted multi-replica cache coherence — irrelevant on Vercel single-region per ADR-0006); `'use cache: private'` (per-user browser-memory cache — would let cached scopes read `cookies()`, but stores results client-side only and re-executes on every server render, providing no shared-cache benefit for our workload). Surfacing both as not-chosen pre-empts the next architect question and makes the negative-space decision auditable.
 
@@ -287,7 +289,7 @@ The signup sequence is the only flow where the session cookie's issuance is cond
 
 ### §3.6 Resolution data flow (special case)
 
-Resolution is architecturally distinct from per-row write flows because it fans out atomically across all bets in a market in one transaction. Worth its own sub-section because the scale and the actor identity differ from W-1 and W-2 in ways that downstream code (export pipeline, dataset schema, observability tagging) consumes.
+Resolution is architecturally distinct from per-row write flows because it fans out atomically across all bets in a market in one transaction. Worth its own sub-section because the scale and the actor identity differ from the W-1 bet flow in ways that downstream code (export pipeline, dataset schema, observability tagging) consumes.
 
 **Fan-out shape.** F-RESOLVE-1 reads every `bets` row for the market (typically tens to thousands), settles each per the CPMM award rule (`+S × (1 − p) / p` for the winning side; `−S` for the losing side per SPEC.1 §10.3), writes one `payout_events` row per bet, writes one `dharma_ledger` row per non-zero settlement, computes the residual pool balance, writes a single `pool_unwind` `dharma_ledger` row to the admin actor, transitions `markets.status` to `Resolved`, locks the comment set (per SPEC.1 §6.2), and emits a single terminal `events` row of `event_type = 'market.resolved'`. All in one Postgres transaction at SERIALIZABLE isolation. INV-4 holds because every row written is in an append-only Bucket-A table (`bets`, `payout_events`, `dharma_ledger`, `resolution_events`, `events`) plus the one whitelisted Bucket-C update on `markets.status`.
 
@@ -309,7 +311,7 @@ Every state-mutating data flow MUST emit at least one `events` row in the same t
 | `flow_id` | text | handler-injected | One of `F-BET-1`, `F-COMMENT-2`, `F-RESOLVE-1`, etc. — name lookup from SPEC.1 |
 | `user_id` | uuid \| null | session | Participant `users.id`, or `NULL` for admin actors and unauthenticated paths |
 | `actor_id` | text | handler-injected | `'admin-singleton'` for admin actors; otherwise echoes `user_id` as text |
-| `idempotency_key` | text \| null | request header / arg | Bet endpoints carry the value; comment Server Actions store the natural-key dedup hash here |
+| `idempotency_key` | text \| null | request header / arg | Carried by every bet endpoint, including comment-bearing bets (post-bets and reply-bets) per §11 / ADR-0015 |
 | `ip` | text | `proxy.ts` | Client IP; included in dataset release per SPEC.1 §16.3 |
 | `user_agent` | text | `proxy.ts` | Client UA; included in dataset release per SPEC.1 §16.3 |
 
@@ -319,9 +321,9 @@ Every state-mutating data flow MUST emit at least one `events` row in the same t
 
 ### §3 Single source of truth
 
-`src/server/events/insert.ts` owns the events insertion helper. `src/server/events/schemas.ts` owns the per-`event_type` Zod schema map. `src/server/bets/transaction.ts` owns the W-1 wrapper (per §9 / ADR-0013). `src/server/comments/place.ts` owns the W-2 entry point. `src/server/resolution/settle.ts` owns the W-3 fan-out. `src/server/auth/index.ts` owns the Better Auth instance and the F-AUTH session-deferral hook (per ADR-0004). `src/server/identity/assign.ts` owns the pseudonym pool consumer (per ADR-0011). `proxy.ts` (formerly `middleware.ts`) at the repo root owns `request_id`, `ip`, `user_agent` injection into the request scope. The full file map is absorbed into Appendix A on its drafting pass.
+`src/server/events/insert.ts` owns the events insertion helper. `src/server/events/schemas.ts` owns the per-`event_type` Zod schema map. `src/server/bets/transaction.ts` owns the W-1 wrapper (per §9 / ADR-0013) — the single write path for every bet, including comment-bearing post-bets and reply-bets (the v1.8.x standalone `src/server/comments/place.ts` comment-only entry point is retired under reply-as-bet; comment/reply construction now sits inside the bet transaction). `src/server/resolution/settle.ts` owns the W-3 fan-out. `src/server/auth/index.ts` owns the Better Auth instance and the F-AUTH session-deferral hook (per ADR-0004). `src/server/identity/assign.ts` owns the pseudonym pool consumer (per ADR-0011). `proxy.ts` (formerly `middleware.ts`) at the repo root owns `request_id`, `ip`, `user_agent` injection into the request scope. The full file map is absorbed into Appendix A on its drafting pass.
 
-ADRs consumed by §3: ADR-0003 (framework + runtime), ADR-0004 (Better Auth + session-deferral hook), ADR-0005 (Pattern A + Bucket A/B/C + events table shape), ADR-0006 (cron engine split), ADR-0007 (observability tag set), ADR-0009 (`stake_at_post_time` ranking-function input), ADR-0010 (admin actor identity), ADR-0011 (identity pool consumption), ADR-0013 (W-1 concurrency model), ADR-0014 (pre-commit moderation), ADR-0015 (rate-limit + idempotency), ADR-0016 (UUIDv7 PK + URL-exposure rule). §3 names how these compose; the ADRs hold the canonical substance.
+ADRs consumed by §3: ADR-0003 (framework + runtime), ADR-0004 (Better Auth + session-deferral hook), ADR-0005 (Pattern A + Bucket A/B/C + events table shape), ADR-0006 (cron engine split), ADR-0007 (observability tag set), ADR-0010 (admin actor identity), ADR-0011 (identity pool consumption), ADR-0013 (W-1 concurrency model), ADR-0014 (pre-commit moderation), ADR-0015 (rate-limit + idempotency), ADR-0016 (UUIDv7 PK + URL-exposure rule), ADR-0017 (reply-as-bet model + read-time per-side reply-bet aggregates), ADR-0018 (two-floor minimum-bet write-path check). §3 names how these compose; the ADRs hold the canonical substance.
 
 ---
 
@@ -352,7 +354,7 @@ The taxonomy is a §4-internal organising aid. The per-endpoint catalogue rows i
 
 ### §4.2 Server Actions catalogue
 
-Sixteen Server Actions in v1. Every row's file path is the single source of truth for that action's implementation.
+Fourteen Server Actions in v1. Every row's file path is the single source of truth for that action's implementation. Under the v1.9.0 reply-as-bet model the three comment-composer actions (`placeDirectComment`, `placeReply`, `placeImageComment`) are **comment-bearing bets** — each opens the §9 W-1 bet transaction (moving CPMM reserves, inserting the paired `bets` + `comments` rows atomically per INV-1), not a standalone comment write.
 
 | Action | Family | File path | Invocation surface | SPEC.1 F-* |
 |---|---|---|---|---|
@@ -363,8 +365,6 @@ Sixteen Server Actions in v1. Every row's file path is the single source of trut
 | `placeDirectComment(input)` | F3 | `src/server/comments/place.ts` | `<form action={placeDirectComment}>` on debate view | F-COMMENT-1 |
 | `placeReply(input)` | F3 | `src/server/comments/reply.ts` | Inline reply composer in debate view | F-COMMENT-2 |
 | `placeImageComment(input)` | F3 | `src/server/comments/place-image.ts` | `<form action={placeImageComment}>` after R2 upload completes | F-COMMENT-3 |
-| `castFriendlyFire(input)` | F3 | `src/server/comments/friendly-fire.ts` | Up/down button on each comment | F-COMMENT-6 |
-| `clearFriendlyFire(input)` | F3 | `src/server/comments/friendly-fire-clear.ts` | "Clear vote" button on user's own prior vote | F-COMMENT-7 |
 | `resolveMarket(input)` | F5 | `src/server/resolution/settle.ts` | `/admin/markets/<id>/resolve` form | F-RESOLVE-1 |
 | `correctResolution(input)` | F5 | `src/server/resolution/correct.ts` | `/admin/markets/<id>/correct` form | F-RESOLVE-2 |
 | `voidMarket(input)` | F5 | `src/server/resolution/void.ts` | `/admin/markets/<id>/void` form | F-RESOLVE-3 |
@@ -402,7 +402,7 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 
 **Server Action return shape.** Discriminated union `{ ok: true; data: T } | { ok: false; error: { code: string; message: string; field_errors?: Record<string, string[]> } }`. The `field_errors` shape is the React 19.2 `useActionState` contract for surfacing per-field validation errors (e.g., "comment too long," "stake exceeds balance"). Server Actions don't return HTTP status to user code — the framework wraps the action call in its own protocol; per-action error class is encoded in `error.code`.
 
-**`Idempotency-Key` header (bet endpoints only).** Format `^[A-Za-z0-9_-]{1,255}$` per ADR-0015. Server returns HTTP 400 `error_idempotency_key_required` if the header is missing on a bet endpoint, HTTP 400 `error_idempotency_key_invalid` if the format is wrong. Body fingerprint: SHA-256 of canonical-JSON (RFC 8785) request body, hex-encoded — used per ADR-0015 to detect body mismatch on key reuse (HTTP 409 `error_idempotency_key_reused`). Server Actions do NOT carry an `Idempotency-Key` header; they rely on natural-key uniqueness — for comments, the dedup key is `(user_id, market_id, body_hash, posted_at_minute)`; for friendly-fire, it's the unique constraint on `(voter_id, comment_id)`.
+**`Idempotency-Key` header (bet endpoints only).** Format `^[A-Za-z0-9_-]{1,255}$` per ADR-0015. Server returns HTTP 400 `error_idempotency_key_required` if the header is missing on a bet endpoint, HTTP 400 `error_idempotency_key_invalid` if the format is wrong. Body fingerprint: SHA-256 of canonical-JSON (RFC 8785) request body, hex-encoded — used per ADR-0015 to detect body mismatch on key reuse (HTTP 409 `error_idempotency_key_reused`). Server Actions do NOT carry an `Idempotency-Key` header; they rely on natural-key uniqueness — for comment-bearing bets (posts + replies), the dedup key is `(user_id, market_id, body_hash, posted_at_minute)`.
 
 **`request_id` echo.** Every Route Handler response carries an `X-Request-Id` response header echoing the `proxy.ts`-generated request ID. Clients SHOULD log this for support correlation. Server Actions don't expose this header (the framework owns the response shape) — `request_id` flows into the `events.metadata` row instead, so server-side correlation is preserved.
 
@@ -424,8 +424,7 @@ Every endpoint in §4.2 / §4.3 is bound to a rate-limit class from §11's per-s
 |---|---|
 | OTP request (F-AUTH-2 first step, served by Better Auth's `/api/auth/[...all]`) | `otp-email` (per email, 1h) + `otp-ip` (per IP burst, 1m) |
 | `/admin/login` POST (F-AUTH-ADMIN) | `admin-login-ip` (per IP, 1h) |
-| `placeDirectComment`, `placeReply`, `placeImageComment` | `write-budget` (per user per market, 24h) + `write-burst` (per user, 1m) |
-| `castFriendlyFire`, `clearFriendlyFire` | Same shared budget — `write-budget` + `write-burst` |
+| `placeDirectComment`, `placeReply`, `placeImageComment` (comment-bearing bets) | `bet-ip` (per IP, 1m) — the bet anti-abuse posture (posts/replies are bets, per SPEC.1 §8). Whether reply-bets additionally carry a per-market productive cap is **deferred to §11 + the number-tuning pass** |
 | `POST /api/bets/place`, `POST /api/bets/sell` | `bet-ip` (per IP, 1m) |
 | `POST /api/uploads/sign` | `image-put-ip` (per IP, 1m) |
 | `POST /api/admin/uploads/sign` | None — admin path |
@@ -433,7 +432,7 @@ Every endpoint in §4.2 / §4.3 is bound to a rate-limit class from §11's per-s
 | F1 public read pages, `/api/health`, `/api/dataset/manifest` | None — read-only |
 | Vercel Cron target | None — Bearer-auth pre-empts abuse |
 
-The `write-budget` + `write-burst` pair is enforced by two parallel `Ratelimit.limit()` calls per attempt; both must succeed for the write to proceed (per §11). Bet endpoints use per-IP because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface.
+Under reply-as-bet there is **no standalone comment or vote rate-limit budget** (the v1.8.x `write-budget` + `write-burst` per-market comment pair is removed; friendly-fire is gone). Posts and replies are bets, so their anti-abuse posture is the bet posture — the per-IP burst cap (`bet-ip`, `BET_ATTEMPTS_PER_IP_PER_MIN`). Bet endpoints use a per-IP identifier because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface. Whether reply-bets warrant an additional per-market productive cap (distinct from top-level bets, which are exempt by design) is an open question deferred to §11 + HARDEN.6.
 
 ### §4.7 Versioning + URL discipline
 
@@ -455,7 +454,7 @@ ADRs consumed by §4: ADR-0003 (Server Actions vs Route Handlers default + runti
 
 §5 owns the *complete table inventory* for the experiment-phase build — every Postgres table the v1 codebase reads or writes, with append-only-vs-mutable classification per ADR-0005's Bucket A / B / C scheme, the per-domain schema home per ADR-0008 §4, and the load-bearing ADR(s) that mint the table's substance. SPEC.2 §5 is the single inventory; per-table DDL substance lives in ADR-0005 (table shape + classification rationale) + ADR-0008 (Drizzle declaration + migration discipline) + ADR-0016 (universal UUIDv7 PK). A reader who needs the column-by-column DDL goes to the schema file at `src/db/schema/<domain>.ts`; a reader who needs the inventory shape stays here.
 
-Twenty-three tables in v1 across nine domains. Nine strictly append-only (Bucket A); four append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: thirteen.
+Twenty-two tables in v1 across nine domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
 
 ### §5.1 Inventory table
 
@@ -468,7 +467,7 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 1 | `events` | `events` | ADR-0005 + ADR-0007 + ADR-0016 | Canonical events log per §3.7 + §7; monthly partitioned with twelve pre-created partitions + DEFAULT; composite PK `(event_id, created_at)` per §7.1 partition-constraint reconciliation; storage idempotency via `INSERT ... ON CONFLICT (event_id, created_at) DO NOTHING` |
 | 2 | `dharma_ledger` | `dharma` | ADR-0005 | Append-only Dharma balance ledger; every balance change flows here; INV-2 (no-overdraft) enforced via §6 + ledger discipline |
 | 3 | `bets` | `bets` | ADR-0005 + ADR-0013 | Per-bet record; locked second in §9 W-1 lock-order chain; INV-1 atomic with comment write |
-| 4 | `comments` | `comments` | ADR-0005 + ADR-0009 | Per-comment record; INV-3 (side-bound at post time) carries `stake_at_post_time NUMERIC(38,18)` ranking-function input frozen on insert |
+| 4 | `comments` | `comments` | ADR-0005 + ADR-0017 (supersedes ADR-0009) | Per-comment record; INV-3 (side-bound at post time via `side_at_post_time`). Under reply-as-bet every comment rides a bet (INV-1): `bet_id` NOT NULL (FK to `bets`, 1:1 with the comment-bearing bet); `parent_comment_id` NULL = top-level **post-bet** comment, non-NULL = **reply-bet** comment (reply floor 50 per ADR-0018). No `stake_at_post_time` column — the superseded ADR-0009 ranking model used it; ADR-0017's multi-mode model reads per-side reply-bet aggregates at render time (§5.4) and needs no frozen post-level stake column |
 | 5 | `resolution_events` | `events` | ADR-0005 | One row per F-RESOLVE-1/2/3 admin fan-out; INV-4 append-only resolutions; corrections reference prior `resolution_events.id` via `corrects_event_id` |
 | 6 | `payout_events` | `events` | ADR-0005 | One row per bet settlement during W-3 fan-out; corrections write paired `correction_reverse` + `correction_apply` rows per §3.6 |
 | 7 | `mod_actions` | `audit` | ADR-0014 | Moderation audit trail; pre-commit verdict + image-upload linkage via `image_r2_key` per §10 |
@@ -479,25 +478,24 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 
 | # | Table | Domain | Owner ADRs | Whitelisted transition | Notes |
 |---|---|---|---|---|---|
-| 10 | `friendly_fire_events` | `comments` | ADR-0005 | `frozen_at` NULL → timestamp | Up/down votes on comments; frozen at market resolution per §3.6; `cleared_at` nullable timestamptz, second independent Bucket-B whitelisted transition (NULL → timestamp once), independent from `frozen_at` (ratified by SCAFFOLD.2 stratum 3.B; per-table trigger function in 3.C permits either column transitioning alone, rejects both transitioning together) |
-| 11 | `identity_pool` | `identity` | ADR-0005 + ADR-0011 | `assigned_at` NULL → timestamp | 50,000-row pseudonym pool; consumed via `SELECT ... FOR UPDATE SKIP LOCKED` in F-AUTH-3 per §3.5; synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` per ADR-0016 D5 |
-| 12 | `image_uploads` | `image-uploads` | ADR-0006 + ADR-0014 + 3-B §12-R1 | `terminal_state` + `terminal_at` set together once | Image upload lifecycle; two-column atomic transition (committed / orphan / blocked); orphan sweep per §3.5 Pattern A-2 + §12.6 |
-| 13 | `system_state` | `system` | 3-E §20-1 | `frozen_at` NULL → timestamp | Single-row keyed by `id = 'system'`; conclusion-event freeze trigger per §20.2; reversibility-none enforced at DB level |
+| 10 | `identity_pool` | `identity` | ADR-0005 + ADR-0011 | `assigned_at` NULL → timestamp | 50,000-row pseudonym pool; consumed via `SELECT ... FOR UPDATE SKIP LOCKED` in F-AUTH-3 per §3.5; synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` per ADR-0016 D5 |
+| 11 | `image_uploads` | `image-uploads` | ADR-0006 + ADR-0014 + 3-B §12-R1 | `terminal_state` + `terminal_at` set together once | Image upload lifecycle; two-column atomic transition (committed / orphan / blocked); orphan sweep per §3.5 Pattern A-2 + §12.6 |
+| 12 | `system_state` | `system` | 3-E §20-1 | `frozen_at` NULL → timestamp | Single-row keyed by `id = 'system'`; conclusion-event freeze trigger per §20.2; reversibility-none enforced at DB level |
 
 **Bucket C — mutable, no append-only trigger**
 
 | # | Table | Domain | Owner ADRs | Notes |
 |---|---|---|---|---|
-| 14 | `users` | `auth` | ADR-0004 + ADR-0011 | Better Auth user row + `pseudonym` + ToS evidence (`tos_accepted_at`, `tos_version_hash`, `privacy_version_hash`, `tos_acceptance_ip`, `tos_acceptance_user_agent`); `last_allowance_accrued_at` carries daily-allowance idempotency cursor; PII-stripped at H2 erasure |
-| 15 | `sessions` | `auth` | ADR-0004 | Better Auth participant session; cookie name `zugzwang_session`; manual-logout-deletes-row per F-AUTH-5 |
-| 16 | `accounts` | `auth` | ADR-0004 | Better Auth OAuth provider linkage (per 3-A R1 — fourth Better Auth table) |
-| 17 | `verifications` | `auth` | ADR-0004 | Better Auth Email-OTP storage; single-use enforced by plugin; TTL-bounded; replaces dropped `otp_codes` |
-| 18 | `admin_sessions` | `auth` | ADR-0010 | Hand-rolled three-column schema (`session_id`, `issued_at`, `last_seen_at`); single-row-at-any-moment via transactional `DELETE+INSERT`; cookie name `zugzwang_admin_session` |
-| 19 | `markets` | `markets` | ADR-0005 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6 |
-| 20 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
-| 21 | `positions` | `bets` | ADR-0005 + ADR-0009 | Per-user-per-market position cache; updated synchronously inside bet transaction per §3.7; ranking-function input via `comments.stake_at_post_time` derivation |
-| 22 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
-| 23 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
+| 13 | `users` | `auth` | ADR-0004 + ADR-0011 | Better Auth user row + `pseudonym` + ToS evidence (`tos_accepted_at`, `tos_version_hash`, `privacy_version_hash`, `tos_acceptance_ip`, `tos_acceptance_user_agent`); `last_allowance_accrued_at` carries the **Daily Credit** accrual cursor (DB identifier retained per SPEC.1 §10.4); PII-stripped at H2 erasure |
+| 14 | `sessions` | `auth` | ADR-0004 | Better Auth participant session; cookie name `zugzwang_session`; manual-logout-deletes-row per F-AUTH-5 |
+| 15 | `accounts` | `auth` | ADR-0004 | Better Auth OAuth provider linkage (per 3-A R1 — fourth Better Auth table) |
+| 16 | `verifications` | `auth` | ADR-0004 | Better Auth Email-OTP storage; single-use enforced by plugin; TTL-bounded; replaces dropped `otp_codes` |
+| 17 | `admin_sessions` | `auth` | ADR-0010 | Hand-rolled three-column schema (`session_id`, `issued_at`, `last_seen_at`); single-row-at-any-moment via transactional `DELETE+INSERT`; cookie name `zugzwang_admin_session` |
+| 18 | `markets` | `markets` | ADR-0005 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6 |
+| 19 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
+| 20 | `positions` | `bets` | ADR-0005 + ADR-0013 | Per-user-per-market position cache; updated synchronously inside the W-1 bet transaction per §3.7; gates no-stake-no-voice eligibility (INV-3) and feeds W-3 settlement. No ranking role — ADR-0017's model reads per-side reply-bet aggregates at render time (§5.4), not a frozen position derivation |
+| 21 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
+| 22 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
 
 ### §5.2 Bucket-classification summary
 
@@ -506,10 +504,10 @@ The bucket classification is the load-bearing operational distinction: it determ
 | Bucket | Count | Trigger pattern | Tables |
 |---|---|---|---|
 | **A** — strictly append-only | 9 | `BEFORE UPDATE` + `BEFORE DELETE` both `RAISE EXCEPTION` | `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events` |
-| **B** — whitelisted transition | 4 | Per-table function comparing OLD/NEW row images, permitting only the named whitelisted column-set transition once | `friendly_fire_events`, `identity_pool`, `image_uploads`, `system_state` |
+| **B** — whitelisted transition | 3 | Per-table function comparing OLD/NEW row images, permitting only the named whitelisted column-set transition once | `identity_pool`, `image_uploads`, `system_state` |
 | **C** — mutable | 10 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`, `watermark_state`, `cron_alarms` |
 
-Total protected (Bucket A + Bucket B): **thirteen tables**. The §6 test contract floor of 33+ cases in v0.3-draft is sized for this thirteen-table protected set per the per-table baseline ratified at 3-A.
+Total protected (Bucket A + Bucket B): **twelve tables**. The §6 test contract floor (previously sized at 33+ cases for a thirteen-table protected set) reduces with the removal of `friendly_fire_events` — its Bucket-B trigger cases (the two-independent-column `frozen_at` / `cleared_at` transition tests) drop with the table. The floor is re-baselined for the twelve-table protected set per the per-table baseline ratified at 3-A.
 
 ### §5.3 Universal column conventions
 
@@ -523,18 +521,25 @@ Total protected (Bucket A + Bucket B): **thirteen tables**. The §6 test contrac
 
 Two architecturally-significant read-models compute at read time rather than persist as tables:
 
-- **Debate-view ranking.** Per ADR-0009 + `RANKING.md`, the comment ordering function takes five inputs (`stake_at_post_time`, friendly-fire net score, opposite/same-side reply counts, age) and computes per-render. No projection table; the function is pure TypeScript at `src/lib/ranking.ts` and runs against the live `comments` + `friendly_fire_events` rows.
+- **Debate-view ranking + per-side reply aggregates.** Per **ADR-0017** (which supersedes ADR-0009) + `RANKING.md`, post/reply ordering is a **multi-mode model** — a multi-lane "Top" default (traction / stake / split lanes, ratio-to-#2 over an activity floor, graceful degradation) plus single-axis filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x), with replies ranked **stake-descending within side** at `REPLY_DEPTH_MAX = 1` (earlier-wins tie-break). The substrate is **four per-side signals computed at render time by aggregating a post's reply-bets** — no friendly-fire vote, no stored vote table:
+  - `support_count` — number of reply-bets on the post's own side;
+  - `counter_count` — number of reply-bets on the opposing side;
+  - `support_dharma` — total Dharma staked across support-side reply-bets (`SUM(bets.stake)`);
+  - `counter_dharma` — total Dharma staked across counter-side reply-bets.
+
+  These derive entirely from existing columns (`bets.stake`, `bets.side` / `comments.side_at_post_time`, `comments.parent_comment_id`) via SQL aggregation per render. The "Support / Counter" counts a post displays are these read-time aggregates, **not** a friendly-fire vote tally. The model is **read-time-computed**: **no projection table, no `ranking_snapshots`, no materialised view, no cached score column** — pure TypeScript at `src/lib/ranking.ts` (tunables in `src/lib/ranking.config.ts`), computed per render, with `now` frozen to the resolution timestamp for resolved markets (INV-4). Lane ratios, the activity floor, and the gravity term are owned by `RANKING.md` and pinned at the 2026-09-01 number-tuning pass; the reply floor (`BET_MIN_STAKE_REPLY` = 50, ADR-0018) is the parameter-level lever on ADR-0017's conceded reply-level `C > n`. Lane-aggregation index requirements are a SCAFFOLD.2 deliverable. `RANKING.md` itself is rewritten at DEBATE.8 (it still reflects the old ADR-0009 single-scalar function until then).
 - **K_eff(t) trajectory.** Per SPEC.1 G3 + §12.2 + §19.5, `K_eff(t)` is derived **post-hoc, out-of-band, against the 2026-11-06 public dataset only**. No live in-product surface, no materialised view, no cron job. The PRECURSOR.2-B D4 lock prohibits any in-product K_eff component in v1.
 
 ### §5.5 Removed from prior outline (audit trace)
 
-Five tables that appeared in earlier outlines but are absent from the v1 inventory. Retained here as audit trace so a reviewer comparing v0.1-outline / v0.2-draft against v0.3-draft sees the resolution path:
+Six tables that appeared in earlier outlines but are absent from the v1 inventory. Retained here as audit trace so a reviewer comparing v0.1-outline / v0.2-draft (and the v0.3-draft "as-built" inventory) against the current model sees the resolution path:
 
 - **`admin`** — no admin user row exists. F-AUTH-ADMIN structural separation per ADR-0010 + §8.7 puts admin entirely outside the participant graph; auth is via `ADMIN_PASSWORD` env var against `admin_sessions` only. The "admin" actor is encoded at events-row write time (`metadata.user_id = NULL`, `metadata.actor_id = 'admin-singleton'`) per §3.6 + §8.8.
 - **`otp_codes`** — renamed to `verifications` per ADR-0004 (Better Auth's Email-OTP plugin owns the table name).
 - **`daily_allowance_events`** — collapsed into `events` (event-type `user.daily_allowance_accrued`) + `dharma_ledger` (the credit row) + `users.last_allowance_accrued_at` (the idempotency cursor) per ADR-0005. No separate domain table needed.
 - **`projections_state`** — no async projector cursor needed in v1. ADR-0005 Pattern A maintains read-models synchronously inside the originating transaction; there is no out-of-band projector to track.
 - **`k_eff_dashboard`** — struck per PRECURSOR.2-B D4 (2026-05-08). The K_eff dashboard product surface was removed entirely; the only K_eff trajectory derivation is the post-hoc one against the 2026-11-06 public dataset (per §5.4 + §19.5).
+- **`friendly_fire_events`** — removed entirely per **ADR-0017** (reply-as-bet model, sharpened SYNC.7) + SPEC.1 v1.9.0-draft. The standalone friendly-fire up/down vote is gone — there is no vote affordance and no table. The "Support / Counter" signal a post displays is now read-time aggregated over its reply-bets (§5.4), not a stored vote. This table was present in the v0.3-draft "as-built" inventory (and in the SCAFFOLD.2 build) with a two-column Bucket-B trigger and F-COMMENT-6/7/8 Server Actions; all of it — table, trigger, `castFriendlyFire`/`clearFriendlyFire` — is struck from the architecture. (The physical migration dropping the built table + the F-COMMENT-6/7/8 retirement are forward engineering work tracked on the tracker; see §23.3.) **Note:** ADR-0017's own body text still says friendly-fire "stays display-only"; that wording is stale and contradicted by both specs — reconciled by a later in-place ADR-0017 patch (flagged §23.3), not in this pass per the "don't flip ADR status" scope.
 
 ### §5 Single source of truth
 
@@ -548,7 +553,7 @@ Five tables that appeared in earlier outlines but are absent from the v1 invento
 | Events monthly partitioning DDL | `drizzle/migrations/<NNNN>_events_partitioning.sql` |
 | Drizzle DB client (`server-only` import) | `src/db/index.ts` |
 
-ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session / verification / account schemas), ADR-0005 (Bucket A/B/C classification + per-domain split discipline + events table shape + dropped-tables collapse rationale), ADR-0006 (R2 bucket inventory feeding `image_uploads` lifecycle), ADR-0008 (Drizzle ORM + per-domain schema-file convention), ADR-0009 (`comments.stake_at_post_time` ranking-function input + `friendly_fire_events.cleared_at` SCAFFOLD.2 deferral), ADR-0010 (`admin_sessions` hand-rolled three-column schema), ADR-0011 (`identity_pool` 50K-row pseudonym pool), ADR-0014 (`mod_actions` + `image_uploads` moderation linkage via `image_r2_key`), ADR-0016 (universal UUIDv7 PK + `identity_pool` synthetic-PK pattern). 3-B §12-R1 ratification (`image_uploads` Bucket B classification with two-column atomic transition) and 3-E §20-1 ratification (`system_state` Bucket B classification with `frozen_at` NULL → timestamp transition) are absorbed in this commit.
+ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session / verification / account schemas), ADR-0005 (Bucket A/B/C classification + per-domain split discipline + events table shape + dropped-tables collapse rationale), ADR-0006 (R2 bucket inventory feeding `image_uploads` lifecycle), ADR-0008 (Drizzle ORM + per-domain schema-file convention), ADR-0010 (`admin_sessions` hand-rolled three-column schema), ADR-0011 (`identity_pool` 50K-row pseudonym pool), ADR-0013 (`pools` / `positions` lock-order participation in the W-1 bet chain), ADR-0014 (`mod_actions` + `image_uploads` moderation linkage via `image_r2_key`), ADR-0016 (universal UUIDv7 PK + `identity_pool` synthetic-PK pattern), ADR-0017 (reply-as-bet model — `comments.parent_comment_id` post/reply split, `comments.bet_id` 1:1 binding, the four per-side reply-bet aggregates read at render time; supersedes ADR-0009 and retires `stake_at_post_time` + `friendly_fire_events`), ADR-0018 (two-floor minimum-bet write-path check). 3-B §12-R1 ratification (`image_uploads` Bucket B classification with two-column atomic transition) and 3-E §20-1 ratification (`system_state` Bucket B classification with `frozen_at` NULL → timestamp transition) are absorbed in this commit.
 
 ---
 
@@ -556,7 +561,7 @@ ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session /
 
 §6 owns the *physical-enforcement contract* by which Bucket A and Bucket B tables in the §5.1 inventory cannot be silently mutated outside the permitted patterns. The mechanism is Postgres triggers — `BEFORE UPDATE` and `BEFORE DELETE` triggers that `RAISE EXCEPTION` on disallowed mutations — installed via a single hand-written raw SQL migration in the Drizzle migration set per ADR-0005 §3 + ADR-0008 §3. The triggers are the ground truth; handler-layer checks are advisory; service-role credentials cannot circumvent them without an audit-visible schema change. The contract is what makes INV-2 (no-Dharma-overdraft via append-only `dharma_ledger`), INV-3 (comments side-bound at post time via append-only `comments`), and INV-4 (append-only resolutions via append-only `resolution_events` + `payout_events`) enforceable at the database layer rather than only at the application layer.
 
-Thirteen protected tables in v1: nine Bucket A (strictly append-only) + four Bucket B (append-only with one whitelisted column-set transition). The eight Bucket C tables in §5.1 carry no append-only triggers; their integrity rides on FK constraints, UNIQUE constraints, NOT NULL constraints, and CHECK constraints declared in their `src/db/schema/<domain>.ts` files via Drizzle DDL.
+Twelve protected tables in v1: nine Bucket A (strictly append-only) + three Bucket B (append-only with one whitelisted column-set transition). The eight Bucket C tables in §5.1 carry no append-only triggers; their integrity rides on FK constraints, UNIQUE constraints, NOT NULL constraints, and CHECK constraints declared in their `src/db/schema/<domain>.ts` files via Drizzle DDL.
 
 ### §6.1 The five-clause contract
 
@@ -602,9 +607,7 @@ Two functions, eighteen trigger declarations (nine tables × two triggers). The 
 
 ### §6.3 Bucket B trigger pattern
 
-Per-table function comparing OLD and NEW row images. Four protected tables, each with its specific whitelisted transition.
-
-**`friendly_fire_events.frozen_at` + `cleared_at` two independent NULL → timestamp transitions** (per ADR-0005 + 3-B ratification absorbed at §5.1 row 10 + Appendix B.8). The trigger function permits exactly one whitelisted-column transition per UPDATE: either `frozen_at` flipping NULL → non-NULL timestamp (with `cleared_at` unchanged) or `cleared_at` flipping NULL → non-NULL timestamp (with `frozen_at` unchanged). Rejects: both whitelisted columns transitioning in the same UPDATE; either column changing once already non-NULL (one-shot, via `OLD IS NOT NULL AND NEW IS DISTINCT FROM OLD`); any non-whitelisted column change. A no-op UPDATE (no column changes) is permitted — the trigger enforces non-mutation, not action. The two columns are independent: `frozen_at` flips at market resolution per §3.6; `cleared_at` flips when the voter clears their vote per F-COMMENT-7.
+Per-table function comparing OLD and NEW row images. Three protected tables, each with its specific whitelisted transition.
 
 **`identity_pool.assigned_at` NULL → timestamp** (per ADR-0011). Single whitelisted column shape — NULL-to-non-NULL transition once via `OLD IS NOT NULL AND NEW IS DISTINCT FROM OLD`, all other columns unchanged. Permits no-op UPDATEs (3-rule uniform across all Bucket B per SCAFFOLD.2 stratum 3.C ratification — see closing paragraph of this section).
 
@@ -645,9 +648,9 @@ The immutable list for `image_uploads` is `id`, `user_id`, `r2_object_key`, `con
 
 **`system_state.frozen_at` NULL → timestamp** (per 3-E §20-1). Single whitelisted column shape — same per-column DISTINCT-FROM one-shot semantics as `identity_pool`. The conclusion-event freeze trigger flips this column once at 2026-11-05 23:59 UTC; the trigger ensures it can never flip back. Recovery from an erroneous freeze requires `BREAK_GLASS.md` direct-database surgery via `ALTER TABLE ... DISABLE TRIGGER` followed by manual UPDATE — this breaks the experiment deliverable per SPEC.1 §12.4 and is acceptable only as catastrophic-failure recovery.
 
-All four Bucket B trigger functions use the 3-rule (DISTINCT-FROM) pattern uniformly per SCAFFOLD.2 stratum 3.C ratification — permit no-op UPDATEs (the trigger enforces non-mutation, not action), reject re-fires on whitelisted columns via DISTINCT-FROM, reject partial transitions on multi-column-atomic Bucket B (image_uploads only), reject any non-whitelisted column change. Asymmetry across Bucket B trigger functions would be a permanent cognitive tax.
+All three Bucket B trigger functions use the 3-rule (DISTINCT-FROM) pattern uniformly per SCAFFOLD.2 stratum 3.C ratification — permit no-op UPDATEs (the trigger enforces non-mutation, not action), reject re-fires on whitelisted columns via DISTINCT-FROM, reject partial transitions on multi-column-atomic Bucket B (image_uploads only), reject any non-whitelisted column change. Asymmetry across Bucket B trigger functions would be a permanent cognitive tax.
 
-Total Bucket B trigger declarations: four per-table functions + eight trigger statements (four tables × two triggers — one BEFORE UPDATE calling the per-table function, one BEFORE DELETE that `RAISE EXCEPTION` unconditionally).
+Total Bucket B trigger declarations: three per-table functions + six trigger statements (three tables × two triggers — one BEFORE UPDATE calling the per-table function, one BEFORE DELETE that `RAISE EXCEPTION` unconditionally).
 
 ### §6.4 Application-layer relationship
 
@@ -659,13 +662,13 @@ The error path is well-defined: a trigger `RAISE EXCEPTION` returns a Postgres e
 
 ### §6.5 Service-role credentials cannot circumvent
 
-Postgres triggers fire for all roles by default. Service-role credentials (Supabase's `service_role` key, which bypasses RLS) do NOT bypass triggers. The only way to write to a Bucket A table without firing the trigger is to issue `ALTER TABLE <name> DISABLE TRIGGER <trigger>;` first — which is a schema change visible in any audit log and which would be caught by HARDEN.* migration-review CI lint.
+Postgres triggers fire for all roles by default. Service-role credentials (Supabase's `service_role` key, which bypasses RLS) do NOT bypass triggers. (RLS itself is out of scope for the experiment per §18.5 / ADR-0019 — the database is server-only, so RLS would back-stop the trusted server rather than gate an exposed surface; the append-only triggers, by contrast, are load-bearing and apply to every role.) The only way to write to a Bucket A table without firing the trigger is to issue `ALTER TABLE <name> DISABLE TRIGGER <trigger>;` first — which is a schema change visible in any audit log and which would be caught by HARDEN.* migration-review CI lint.
 
 This means a future "I just need to fix this one row" production hotfix is structurally a deliberate, audit-visible event — not an accidental footgun. The `BREAK_GLASS.md` runbook (per ADR-0010 + §21) documents the procedure for the catastrophic-failure case.
 
 ### §6.6 Test contract floor
 
-Test contract floor at SPEC.2 v1.0 lock: **38+ cases minimum across the thirteen protected tables** (bumped from 33+ at SCAFFOLD.15 to absorb the five `image_uploads` 0006 extension cases — content_type/byte_size immutability under the extended trigger + CHECK constraint bound enforcement at INSERT). The floor is sized at the per-table baseline ratified at 3-A: each Bucket A table requires at least UPDATE-rejected + DELETE-rejected coverage; each Bucket B table requires whitelisted-transition-accepted + non-whitelisted-column-rejected + re-firing-rejected + DELETE-rejected coverage; `image_uploads` additionally requires partial-transition-rejected coverage for both column orderings AND content_type / byte_size immutability + CHECK-bound coverage per SCAFFOLD.15 0006. The exact case count at implementation time may exceed 38 — 38 is the minimum below which the contract is under-tested.
+Test contract floor at SPEC.2 v1.0 lock: a per-table minimum across the **twelve protected tables**. The floor was 38+ for thirteen tables (33+ at 3-A, bumped to 38+ at SCAFFOLD.15 for the five `image_uploads` 0006 extension cases); it **re-baselines below 38** with the removal of `friendly_fire_events` — its Bucket-B trigger cases drop with the table (the two-independent-column `frozen_at` / `cleared_at` transitions, their re-fire rejections, the both-columns-at-once rejection, and DELETE rejection). The floor is sized at the per-table baseline ratified at 3-A: each Bucket A table requires at least UPDATE-rejected + DELETE-rejected coverage; each Bucket B table requires whitelisted-transition-accepted + non-whitelisted-column-rejected + re-firing-rejected + DELETE-rejected coverage; `image_uploads` additionally requires partial-transition-rejected coverage for both column orderings AND content_type / byte_size immutability + CHECK-bound coverage per SCAFFOLD.15 0006. The exact case count is set at SCAFFOLD.2 implementation time against the twelve-table protected set.
 
 Test path naming: `tests/db/triggers/<table>-append-only.spec.ts`, one file per protected table. SCAFFOLD.2 implements the full suite as a same-commit deliverable with the trigger SQL migration. Test fixtures bypass any application-layer protection (going straight to the Drizzle client) so the trigger is the only enforcement under test.
 
@@ -680,7 +683,7 @@ Per §17.5's fail-open posture for observability, a Sentry outage does not affec
 | Concern | Source-of-truth file |
 |---|---|
 | Trigger SQL (all bucket A + bucket B trigger functions + trigger declarations) | `drizzle/migrations/<NNNN>_append_only_triggers.sql` |
-| Per-table append-only test suites | `tests/db/triggers/<table>-append-only.spec.ts` (thirteen files) |
+| Per-table append-only test suites | `tests/db/triggers/<table>-append-only.spec.ts` (twelve files) |
 | Sentry alarm 1 catalogue row | §17.2 master table |
 | `BREAK_GLASS.md` admin-bypass procedure (catastrophic-failure recovery only) | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
 | Bucket classification of each table | §5.1 inventory + §5.2 summary |
@@ -736,22 +739,22 @@ The two are orthogonal: a request that survives the API-boundary idempotency cac
 
 Per ADR-0005's read-model rule: a read-model updates synchronously inside the originating transaction iff the originating flow's correctness depends on the updated read-model state; asynchronously otherwise. Pattern A maintenance (synchronous current-state writes alongside the events row in the same transaction) is the v1 default for everything that satisfies the correctness condition.
 
-**Synchronous targets — fourteen tables plus the events row itself:**
+**Synchronous targets — thirteen tables plus the events row itself:**
 
-`pools`, `positions`, `bets`, `comments`, `dharma_ledger`, `friendly_fire_events`, `payout_events`, `resolution_events`, `markets`, `mod_actions`, `admin_events`, `user_events`, `users`, `identity_pool` — each updated inside the originating transaction whenever an events-row write affects it. Plus the `events` row itself, which is the canonical write that the synchronous current-state writes ride alongside.
+`pools`, `positions`, `bets`, `comments`, `dharma_ledger`, `payout_events`, `resolution_events`, `markets`, `mod_actions`, `admin_events`, `user_events`, `users`, `identity_pool` — each updated inside the originating transaction whenever an events-row write affects it. Plus the `events` row itself, which is the canonical write that the synchronous current-state writes ride alongside.
 
 **Asynchronous targets — none in v1.**
 
 Every state-mutating data flow updates its read-models synchronously inside the originating transaction. The K_eff dashboard async target named in earlier outlines is struck per PRECURSOR.2-B D4 (2026-05-08); there is no `k_eff_dashboard` materialised view, no async refresh, no `pg_cron` `REFRESH MATERIALIZED VIEW CONCURRENTLY` job. K_eff(t) is derived post-hoc from the 2026-11-06 public dataset only (per §5.4 + §19.5). No other async read-model surfaces in v1.
 
-**Read-time-computed (no projection table at all):** the debate-view ranking. The five-input `ranking(comment, friendly_fire_aggregate, reply_counts, age, now)` function (per ADR-0009 + `RANKING.md`) runs against live `comments` + `friendly_fire_events` rows on every debate-view render. No materialised view, no cached score column on `comments`. Index requirements for the aggregations are flagged for SCAFFOLD.2 per ADR-0009.
+**Read-time-computed (no projection table at all):** the debate-view ranking. Per **ADR-0017** + `RANKING.md`, the multi-mode model (Top + filter modes; replies stake-descending within side) runs against live `comments` + `bets` rows on every debate-view render, aggregating each post's reply-bets into the four per-side signals (`support_count`, `counter_count`, `support_dharma`, `counter_dharma`) per §5.4. No `friendly_fire_events`, no materialised view, no cached score column on `comments`, no `ranking_snapshots`. Lane-aggregation index requirements are flagged for SCAFFOLD.2.
 
 ### §7.5 Sync-target write composition
 
 When a state-mutating transaction touches more than one synchronous target, all writes happen in the same transaction in the §3 lock-order spine of the originating flow:
 
-- **W-1 (bet flow)** writes `pools` + `positions` + `dharma_ledger` + (optionally) `friendly_fire_events` + `events` per §3.2 — five tables in the lock-order chain.
-- **W-2 (comment flow)** reads `positions`, writes `comments` + `events` — two write tables.
+- **W-1 (bet flow)** writes `pools` + `positions` + `dharma_ledger` + `events` per §3.2 (lock-order chain), and for a **comment-bearing bet** (every post-bet and reply-bet) additionally inserts the `bets` + `comments` rows in the same transaction (INV-1 atomic bet+comment). The comment-free sell omits the comment row. The lock-order chain is four tables (`pools → positions → dharma_ledger → events`); `bets` and `comments` are Bucket-A appends within it.
+- **W-2** — retired under reply-as-bet (no comment-without-bet path); comment and reply writes run W-1. The v1.8.x `positions → comments → events` comment-only chain no longer exists.
 - **W-3 (resolution flow)** writes `markets` + `bets` + `payout_events` + `resolution_events` + `dharma_ledger` + `events` per §3.6 — six write tables across the per-bet fan-out.
 - **F-AUTH-3 + F-AUTH-4** signup writes per §3.5 hit `identity_pool` + `users` + `events` (F-AUTH-3) and `users` + `events` (F-AUTH-4).
 - **F-MOD-* moderation actions** write `mod_actions` + (optionally) `comments`, `bets`, `users` (Track A side effects) + `events`.
@@ -975,15 +978,15 @@ ADRs consumed by §8: ADR-0004 (Better Auth library + Drizzle adapter + database
 
 ## §9 Concurrency & Transactions (D2 ratified by ADR-0013)
 
-The bet handler runs as a single Postgres SERIALIZABLE transaction. The pool row is locked pessimistically via `SELECT … FOR NO KEY UPDATE` — NOT `FOR UPDATE`. The distinction is operationally significant: `FOR UPDATE` conflicts with `FOR KEY SHARE` (the lock taken implicitly by Postgres on a parent row when a child INSERT validates its FK), which would block every concurrent `INSERT INTO positions / bets / comments / friendly_fire_events` against the same market for the duration of every in-flight bet. `FOR NO KEY UPDATE` does not. The bet handler never modifies `pools.id` or any FK-target column, so the weaker lock is correct. Verified against the Postgres 17 row-level lock conflict matrix (https://www.postgresql.org/docs/17/explicit-locking.html, §13.3.2, Table 13.3).
+The bet handler runs as a single Postgres SERIALIZABLE transaction. The pool row is locked pessimistically via `SELECT … FOR NO KEY UPDATE` — NOT `FOR UPDATE`. The distinction is operationally significant: `FOR UPDATE` conflicts with `FOR KEY SHARE` (the lock taken implicitly by Postgres on a parent row when a child INSERT validates its FK), which would block every concurrent `INSERT INTO positions / bets / comments` against the same market for the duration of every in-flight bet. `FOR NO KEY UPDATE` does not. The bet handler never modifies `pools.id` or any FK-target column, so the weaker lock is correct. Verified against the Postgres 17 row-level lock conflict matrix (https://www.postgresql.org/docs/17/explicit-locking.html, §13.3.2, Table 13.3).
 
-**Canonical lock order**, applied uniformly across F-BET-1 / F-BET-2 / F-BET-3 / F-COMMENT-6 / F-COMMENT-7 — never reordered, only subset-skipped:
+**Canonical lock order**, applied uniformly across every bet — F-BET-1 / F-BET-2 / F-BET-3 / F-COMMENT-1 / F-COMMENT-2 / F-COMMENT-3 — never reordered, only subset-skipped:
 
 ```
-pools → positions → dharma_ledger → friendly_fire_events → events
+pools → positions → dharma_ledger → events
 ```
 
-`friendly_fire_events` sits between `dharma_ledger` and `events` to keep all per-user writes (positions, dharma_ledger, friendly_fire_events) co-located in the chain and `events` terminal per ADR-0005's read-model classification convention.
+`events` is terminal in the chain per ADR-0005's read-model classification convention, with all per-user writes (`positions`, `dharma_ledger`) co-located ahead of it. For a **comment-bearing bet** (every post-bet and reply-bet under reply-as-bet), the `bets` and `comments` rows are Bucket-A appends inserted **within** this transaction (INV-1 atomic bet+comment) — they are not additional lock points (no `SELECT … FOR …` is taken on them), so they do not change the lock-order spine. The comment-free sell (F-BET-3) omits the `comments` insert.
 
 **Retry policy**: full jitter on bases [50, 100, 200] ms, 3-retry budget, retry on SQLSTATE 40001 (`serialization_failure`) AND 40P01 (`deadlock_detected`). Wait formula `wait_ms = floor(random_uniform(0, base_ms[n]))` per Marc Brooker, *"Exponential Backoff And Jitter"*, AWS Architecture Blog, 4 Mar 2015 (https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/). Application errors (validation, slippage, FK violations not caused by 40P01) are NOT retried.
 
@@ -991,7 +994,7 @@ pools → positions → dharma_ledger → friendly_fire_events → events
 
 **Idempotency-key cache lookup is the FIRST authenticated step in every bet handler** — before pre-commit moderation, before the SERIALIZABLE transaction opens, before the pool lock is acquired. Cache hit (completed entry) returns the cached `(status, body)` and exits the handler; no OpenAI call, no Postgres transaction. This protects against non-deterministic OpenAI moderation re-runs on completed-but-network-dropped bets and bounds OpenAI cost by unique requests, not retry count. Storage substrate, key envelope, body-hash discipline, lock-vs-result TTL split, and error-envelope shapes for in-flight and body-mismatch cases are ratified in ADR-0015 (SPEC.16) and substantively absorbed at §11 — Redis SETNX-with-pending-sentinel substrate, global key scoping, RFC 8785 canonical-JSON full-body SHA-256 fingerprint, 30-second pending TTL + 24-hour completed-response TTL, HTTP 409 with `error_idempotency_key_reused` for body-mismatch, HTTP 409 with `error_idempotency_in_flight + Retry-After: 2` for in-flight collision (mirrors §10's moderation-reservation-collision shape verbatim).
 
-**OpenAI moderation runs entirely OUTSIDE this transaction** (per §10 + ADR-0014). The bet transaction wrapper is moderation-unaware; F-BET-1 callers invoke moderation before calling the wrapper, F-BET-2 / F-BET-3 callers skip moderation. Holding a Postgres transaction open across the 200–2000 ms moderation HTTP call is a `REFUSAL:`.
+**OpenAI moderation runs entirely OUTSIDE this transaction** (per §10 + ADR-0014). The bet transaction wrapper is moderation-unaware; under reply-as-bet every comment-bearing bet (F-BET-1, F-BET-2, F-COMMENT-1/2/3) invokes moderation before calling the wrapper, and the comment-free sell F-BET-3 skips it. Holding a Postgres transaction open across the 200–2000 ms moderation HTTP call is a `REFUSAL:`.
 
 **Retry exhaustion response shape**: HTTP 503 with `error_code: bet_serialization_exhausted`, `error_type: temporary_unavailable`, `Retry-After: 1`. Distinct from F-BET-5 (HTTP 400 `market_closed_at`) and F-BET-6 (HTTP 400 `in_flight_timeout`). Lands in `docs/specs/error-codes.md` when that file is drafted (SPEC.2 §15 owns the envelope shape; the codes list lives in `error-codes.md`).
 
@@ -1003,7 +1006,7 @@ pools → positions → dharma_ledger → friendly_fire_events → events
 
 > **[Substantively absorbed from ADR-0014 (SPEC.15) on 2026-05-07.]**
 
-Pre-commit moderation runs on every comment writing surface — F-BET-1 entry (atomic with the bet, governed by INV-1 and F-MOD-4), F-COMMENT-1 (direct comment), F-COMMENT-2 (reply), and F-COMMENT-3 (image-attached comment). The flow is parameterised by caller and exposed as a single function `precommitModerate()` in `src/server/moderation/precommit.ts`. ADR-0014 is the source of truth for substance; SPEC.2 §10 names the load-bearing contract.
+Pre-commit moderation runs on every comment-bearing bet. Under the v1.9.0 reply-as-bet model every post and reply carries mandatory commentary, so the moderated set is F-BET-1 (entry post-bet, atomic with the bet, governed by INV-1 and F-MOD-4), F-BET-2 (subsequent post-bet), F-COMMENT-1 (additional post-bet), F-COMMENT-2 (reply-bet), and F-COMMENT-3 (image-attached bet) — the comment-free sell (F-BET-3) is the only bet that skips moderation. The flow is parameterised by caller and exposed as a single function `precommitModerate()` in `src/server/moderation/precommit.ts`. ADR-0014 is the source of truth for substance; SPEC.2 §10 names the load-bearing contract.
 
 **Vendor selection.** OpenAI `omni-moderation-latest` (snapshot-pinned `omni-moderation-2024-09-26`) for text and multimodal classification — the SOLE moderation vendor for the experiment phase. **No second image-classifier vendor in experiment phase** — `omni-moderation-latest` covers the violence (including `violence/graphic`), self-harm (including `self-harm/intent` and `self-harm/instructions`), and `sexual` (non-minors) image categories natively, and is free of charge per OpenAI Help Center as of May 2026. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per OpenAI's `omni-moderation-2024-09-26` capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. **Second-vendor (PhotoDNA / Safer / Hive) optionality deferred per SCAFFOLD.16 LD-1 → `docs/parked.md`.**
 
@@ -1016,7 +1019,7 @@ Pre-commit moderation runs on every comment writing surface — F-BET-1 entry (a
 3. **Redis SETNX intent reservation** on `mod:reserve:{user_id}:{market_id}:{idempotency_key}` with a 10-second TTL. On collision, return HTTP 409 `moderation_in_flight` with `Retry-After: 2`. Release in `finally`; the TTL is the safety net.
 4. **Call `precommitModerate(input)`.** Returns `{ outcome: 'pass' | 'track_a' | 'track_b'; categories?: string[] }`.
 5. **Branch on verdict:**
-   - **`pass`** — open the caller-specific transaction (bet wrapper per ADR-0013 for F-BET-1; comment-write transaction for F-COMMENT-1/2/3).
+   - **`pass`** — open the §9 W-1 bet transaction (per ADR-0013). For a comment-bearing bet (F-BET-1, F-BET-2, F-COMMENT-1/2/3) this inserts the paired `bets` + `comments` rows atomically inside that transaction; there is no separate comment-only transaction under reply-as-bet.
    - **`track_a` / `track_b`** — write a `mod_actions` row in a standalone short transaction; return the SPEC.1 §14 F-MOD-* response. The bet/comment transaction **never opens**.
 
 **No Postgres transaction is held across an HTTP call (`REFUSAL:` per CLAUDE.md golden rules + SPEC.2 §9 + ADR-0013 §8).** OpenAI HTTP calls happen in steps 3–4, fully outside any database transaction. The bet wrapper from ADR-0013 stays moderation-unaware.
@@ -1048,14 +1051,12 @@ Every state-mutating endpoint runs through a five-step shared contract: auth gat
 | OTP request (per email) | `otp-email:{email}` | 1h | `OTP_REQUESTS_PER_EMAIL_PER_HOUR` |
 | OTP request (per-IP burst) | `otp-ip:{ip}` | 1m | `OTP_REQUESTS_PER_IP_BURST_PER_MIN` |
 | Admin login (per-IP) | `admin-login-ip:{ip}` | 1h | `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` |
-| Comment + friendly-fire shared per-market budget | `write-budget:user:{user_id}:market:{market_id}` | 24h | `RATE_LIMIT_PER_MARKET_PER_DAY` |
-| Comment + friendly-fire shared burst | `write-burst:user:{user_id}` | 1m | `RATE_LIMIT_BURST_PER_MIN` |
-| Bet `place` / `sell` per-IP anti-abuse burst | `bet-ip:{ip}` | 1m | `BET_ATTEMPTS_PER_IP_PER_MIN` *(new — minted by ADR-0015)* |
+| Bet `place` / `sell` **and comment-bearing bets** (posts/replies) per-IP anti-abuse burst | `bet-ip:{ip}` | 1m | `BET_ATTEMPTS_PER_IP_PER_MIN` *(new — minted by ADR-0015)* |
 | R2 signed-PUT URL mint per-IP | `image-put-ip:{ip}` | 1m | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` *(new — minted by ADR-0015)* |
 
-The shared comment + friendly-fire budget is enforced by **two parallel `Ratelimit.limit()` calls** per write attempt (the per-market 24h cap *and* the user-wide 1m burst cap); both must succeed for the write to proceed. Bet placement and image-PUT-URL surfaces use **per-IP** identifiers because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface. Numeric values for every constant are deferred to HARDEN.6 number-tuning pass per the project-wide deferral rule.
+Under the v1.9.0 reply-as-bet model there is **no standalone comment or vote rate-limit budget** — the v1.8.x `write-budget` (per-market 24h) + `write-burst` (per-user 1m) pair is removed, and friendly-fire is gone entirely. Posts and replies are bets, so their anti-abuse posture is the bet posture: the per-IP burst cap (`bet-ip`, `BET_ATTEMPTS_PER_IP_PER_MIN`). Bet placement and image-PUT-URL surfaces use **per-IP** identifiers because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface. **Open question (deferred):** whether reply-bets warrant an *additional* per-market productive cap distinct from top-level bets (which are exempt from a per-market productive cap by design) — to bound reply-flooding within a single market — is left to the HARDEN.6 number-tuning pass per SPEC.1 §8; if adopted it would mint a new per-market reply-bet constant, otherwise the per-IP cap is the sole control. Numeric values for every constant are deferred to HARDEN.6 per the project-wide deferral rule.
 
-**Idempotency contract — header, key shape, storage.** Header: `Idempotency-Key: <opaque-string>` matching `^[A-Za-z0-9_-]{1,255}$`. Server validates format and rejects malformed with HTTP 400 `error_idempotency_key_invalid`. Required on bet endpoints (`place`, `sell`); optional on comment / friendly-fire endpoints (where natural-key uniqueness already protects against most duplicate-write hazards but idempotency-aware retries are still safer for clients on flaky networks); **exempt** on file-storage PUT-URL mint (`POST /api/uploads/sign`) per SCAFFOLD.15 Q2 ratification — orphan-sweep handles duplicate-mint cleanup within `ORPHAN_WINDOW_MINUTES` per §12.6 (double-mint risk accepted; cleanup cost is one stale R2 object pruned within ≤2h). Scoping: **global** — matched on the key value alone, regardless of HTTP method or path; cross-endpoint reuse with mismatched body triggers the body-fingerprint mismatch path. Body fingerprint: SHA-256 of canonical-JSON-serialised request body (RFC 8785 — sorted keys, no insignificant whitespace, UTF-8), hex-encoded. Storage substrate: Redis SETNX-with-pending-sentinel on Upstash, two-tier TTL — 30-second pending sentinel for in-flight requests (sized for §10 / ADR-0014's 10-second moderation reservation worst case + §9 / ADR-0013's bet-transaction worst case ~600ms upper + slack); 24-hour completed-response cache replay (matches Stripe's published contract).
+**Idempotency contract — header, key shape, storage.** Header: `Idempotency-Key: <opaque-string>` matching `^[A-Za-z0-9_-]{1,255}$`. Server validates format and rejects malformed with HTTP 400 `error_idempotency_key_invalid`. Required on the bet Route Handlers (`place`, `sell`); the comment-bearing-bet **Server Actions** (`placeDirectComment`, `placeReply`, `placeImageComment`) carry no `Idempotency-Key` header — the Server Action protocol owns the request shape (§4.4) — and instead rely on natural-key uniqueness `(user_id, market_id, body_hash, posted_at_minute)`, which protects against duplicate-write hazards; **exempt** on file-storage PUT-URL mint (`POST /api/uploads/sign`) per SCAFFOLD.15 Q2 ratification — orphan-sweep handles duplicate-mint cleanup within `ORPHAN_WINDOW_MINUTES` per §12.6 (double-mint risk accepted; cleanup cost is one stale R2 object pruned within ≤2h). Scoping: **global** — matched on the key value alone, regardless of HTTP method or path; cross-endpoint reuse with mismatched body triggers the body-fingerprint mismatch path. Body fingerprint: SHA-256 of canonical-JSON-serialised request body (RFC 8785 — sorted keys, no insignificant whitespace, UTF-8), hex-encoded. Storage substrate: Redis SETNX-with-pending-sentinel on Upstash, two-tier TTL — 30-second pending sentinel for in-flight requests (sized for §10 / ADR-0014's 10-second moderation reservation worst case + §9 / ADR-0013's bet-transaction worst case ~600ms upper + slack); 24-hour completed-response cache replay (matches Stripe's published contract).
 
 **Single-key-encoding-both-states pattern.** One Redis key per idempotency-key encodes both lifecycle states. On cache miss, the handler executes `SET idem:{key} <pending-sentinel> NX EX 30`; the `NX` flag means "only set if key does not exist." If `NX` returns `0`, another in-flight request holds the sentinel and we return HTTP 409 `error_idempotency_in_flight` with `Retry-After: 2`. The pending-sentinel value is the constant string `"PENDING"` plus the body fingerprint (so the in-flight collision check can already detect body mismatch on a still-pending key). A body-fingerprint mismatch against a still-pending sentinel returns the in-flight collision shape (HTTP 409 `error_idempotency_in_flight + Retry-After: 2`), NOT the completed-mismatch shape (`error_idempotency_key_reused`) — surfacing two different errors mid-flight would confuse client retry policy, and the still-pending request may yet complete with a body that matches the eventual retry. On handler completion (success or terminal error), the handler executes `SET idem:{key} <completed-payload> EX 86400` where `<completed-payload>` is JSON-encoded `{ status, body, body_fingerprint }`. The atomic transition pending → completed is just a `SET` without `NX`, which Redis guarantees as atomic.
 
@@ -1065,7 +1066,7 @@ The shared comment + friendly-fire budget is enforced by **two parallel `Ratelim
 2. **Idempotency-key validation.** Reject missing required header with HTTP 400 `error_idempotency_key_required`; reject malformed with HTTP 400 `error_idempotency_key_invalid`.
 3. **Idempotency cache lookup** via `idempotencyLookupOrReserve(key, bodyFingerprint)`. Branch on the tagged-union result: `hit` returns the cached response verbatim; `pending` returns HTTP 409 `error_idempotency_in_flight + Retry-After: 2`; `mismatch` returns HTTP 409 `error_idempotency_key_reused`; `unavailable` returns HTTP 503 `error_idempotency_unavailable + Retry-After: 5`; `miss` returns a `release` callback the handler MUST call in `finally` to either write the completed response (success / terminal error) or `DEL` the pending sentinel (handler crash).
 4. **Rate-limit check** (per the surface table). On rate-limit-exceeded, write the HTTP 429 response into the idempotency cache (so subsequent retries with the same key return the cached 429), then return HTTP 429 `error_rate_limit_exceeded` with `Retry-After: <seconds>` derived from `Ratelimit.limit().reset`.
-5. **Pre-commit moderation** (per §10 / ADR-0014, F-BET-1 entry case only).
+5. **Pre-commit moderation** (per §10 / ADR-0014 — every comment-bearing bet; the comment-free sell skips).
 6. **Bet transaction wrapper** (per §9 / ADR-0013) or other handler body.
 7. **Cache the completed response** under the 24h outer TTL via the `release` callback from step 3.
 
@@ -1079,7 +1080,7 @@ Steps 1–4 and step 7 are universal for every state-mutating endpoint; steps 5�
 
 **Distinction from §10's moderation reservation.** The 10-second Redis intent-reservation key (per §10 / ADR-0014) on `mod:reserve:{user_id}:{market_id}:{idempotency_key}` is structurally distinct from the idempotency cache key (per this section) on `idem:{key}`. The reservation guards the in-flight window between cache miss and cache write and holds for 10 seconds; the idempotency cache replays completed responses for 24 hours. Both consume the same `Idempotency-Key` header from the client request but on disjoint Redis key spaces. The reservation never sees the cached response; the cache never sees the reservation state. Both fail closed; both emit §17 alarm 6 on Upstash unreachable (sub-IDs 6a + 6b respectively per §17.2 alarm-6 sub-table).
 
-**Single source of truth.** `src/server/middleware/rate-limit.ts` owns the per-surface `Ratelimit` instances, the fail-open posture, the alarm-6 emission, and the identifier-extraction helpers. `src/server/idempotency/cache.ts` owns the `idempotencyLookupOrReserve` helper, the body-fingerprint computation, the fail-closed posture, and the alarm-6 emission. `src/server/idempotency/types.ts` owns the constants (`Idempotency-Key` header name, validation regex, `PENDING_TTL_SECONDS = 30`, `COMPLETED_TTL_SECONDS = 86400`) and the error-envelope codes. The two new Appendix B constants (`BET_ATTEMPTS_PER_IP_PER_MIN`, `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`) live alongside the existing five §16.1 constants in `src/server/config/limits.ts` per SCAFFOLD.4. The full file map is absorbed into Appendix A on its drafting pass.
+**Single source of truth.** `src/server/middleware/rate-limit.ts` owns the per-surface `Ratelimit` instances, the fail-open posture, the alarm-6 emission, and the identifier-extraction helpers. `src/server/idempotency/cache.ts` owns the `idempotencyLookupOrReserve` helper, the body-fingerprint computation, the fail-closed posture, and the alarm-6 emission. `src/server/idempotency/types.ts` owns the constants (`Idempotency-Key` header name, validation regex, `PENDING_TTL_SECONDS = 30`, `COMPLETED_TTL_SECONDS = 86400`) and the error-envelope codes. The two new Appendix B constants (`BET_ATTEMPTS_PER_IP_PER_MIN`, `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`) live alongside the other §16.1 rate-limit constants in `src/server/config/limits.ts` per SCAFFOLD.4 (the v1.8.x comment-budget constants `RATE_LIMIT_PER_MARKET_PER_DAY` + `RATE_LIMIT_BURST_PER_MIN` are removed under reply-as-bet; the §16.1 constant set is SPEC.1-owned per ADR-0018). The full file map is absorbed into Appendix A on its drafting pass.
 
 ADR-0015 holds the full decision body, seven dimensions of considered options with verdicts, and the closing italic summary. SPEC.2 §11 is the cross-reference; ADR-0015 is the canonical text.
 
@@ -1114,8 +1115,8 @@ Six-step orchestration consuming §10 + §11 + §12 jointly. The R2 object exist
 4. **Client posts comment with `image_uploads_id`.** `placeImageComment(input)` Server Action per §4.2. Input carries the comment body + the `image_uploads_id` returned at step 2.
 5. **Server runs full §11 handler stack including §10 multimodal moderation.** The moderation step calls `precommitModerate()` with a multimodal input array (text + image_url with a 60-second signed R2 read URL minted at §12.4); OpenAI omni-moderation-2024-09-26 per ADR-0014 §10.
 6. **Branch on verdict:**
-   - **`pass`** — open W-2 comment-write transaction per §3.2: lock-order `positions → comments → events`; insert `comments` row with `image_uploads_id` foreign key; UPDATE `image_uploads` SET `terminal_state = 'committed'`, `terminal_at = now()` (the whitelisted Bucket-B two-column atomic transition per §12-R1); insert `events` row.
-   - **`track_a` / `track_b`** — write `mod_actions` row carrying `image_r2_key` linkage in a standalone short transaction; UPDATE `image_uploads` SET `terminal_state = 'blocked'`, `terminal_at = now()`. The comment-write transaction never opens.
+   - **`pass`** — open the §9 W-1 bet transaction per §3.2 (placeImageComment is a comment-bearing bet under reply-as-bet): lock-order `pools → positions → dharma_ledger → events`; insert the paired `bets` + `comments` rows (the comment carries the `image_uploads_id` foreign key; INV-1 atomic bet+comment per §14.1); UPDATE `image_uploads` SET `terminal_state = 'committed'`, `terminal_at = now()` (the whitelisted Bucket-B two-column atomic transition per §12-R1); insert `events` row.
+   - **`track_a` / `track_b`** — write `mod_actions` row carrying `image_r2_key` linkage in a standalone short transaction; UPDATE `image_uploads` SET `terminal_state = 'blocked'`, `terminal_at = now()`. The bet+comment transaction never opens.
 
 The R2 object exists from step 3 onward regardless of step-6 outcome. On the `track_a` / `track_b` branch the R2 object is preserved for the admin moderation queue's review surface — admins viewing the queue see what the user attempted to upload before clicking "ban" or "warn." The orphan sweep at §12.6 reconciles the case where step 4 never fires (client uploads to R2 then never submits the comment Server Action — handler-stack-step-4-or-later crash, network drop after step 3, deliberate abandonment).
 
@@ -1223,7 +1224,7 @@ ADRs consumed by §12: ADR-0006 §4 (R2 vendor + jurisdiction `APAC` + two-bucke
 
 ## §13 Flow Contract Template (six-field block)
 
-§13 owns the *file-level per-flow contract template* for the experiment-phase build — the mandatory shape every `docs/specs/flows/F-*.md` file MUST conform to, the inventory of 40 F-* flow files across 7 prefix families, the cross-reference invariants every Errors and Acceptance block MUST satisfy, and the drafting cadence (per-file deferred to gating implementation task). SPEC.1 §7–§15 owns the *product-level* per-flow Pre / System / Response / Errors / Invariants / Acceptance substance; §3 owns the *architectural-pattern* layer (W-/R-/A- shapes that every flow reduces to); this §13 sits at the *file-level* template layer, naming the structure each per-flow file uses without authoring the per-file contracts themselves. A reader who needs a specific flow's contract goes to `docs/specs/flows/F-*.md`; a reader who needs the template shape stays here.
+§13 owns the *file-level per-flow contract template* for the experiment-phase build — the mandatory shape every `docs/specs/flows/F-*.md` file MUST conform to, the inventory of 37 F-* flow files across 7 prefix families, the cross-reference invariants every Errors and Acceptance block MUST satisfy, and the drafting cadence (per-file deferred to gating implementation task). SPEC.1 §7–§15 owns the *product-level* per-flow Pre / System / Response / Errors / Invariants / Acceptance substance; §3 owns the *architectural-pattern* layer (W-/R-/A- shapes that every flow reduces to); this §13 sits at the *file-level* template layer, naming the structure each per-flow file uses without authoring the per-file contracts themselves. A reader who needs a specific flow's contract goes to `docs/specs/flows/F-*.md`; a reader who needs the template shape stays here.
 
 Three load-bearing constraints minted in §13 and consumed by every F-* file: (1) the six-field block is mandatory with one degenerate variant for read flows (§13.2); (2) every error_code in any Errors block MUST exist in `docs/specs/error-codes.md` (§13.1's cross-reference invariant, CI-lint at HARDEN-phase); (3) every name in any Acceptance block MUST appear verbatim in SPEC.1 §17 (§13.5's bidirectional trace).
 
@@ -1233,7 +1234,7 @@ Every per-flow file MUST contain exactly these six fields in this order:
 
 **Pre** — preconditions the flow assumes hold before the System steps execute. Cross-references SPEC.1 §-numbers + ADR clauses + handler-stack steps that establish the precondition. Examples: "User holds participant session per §8.1," "Market status is `Open` per §3.6," "Idempotency-Key cache hit returns at handler step 3 per §11.3."
 
-**System** — numbered imperative steps the handler executes. References §3.2 W-* / §3.3 R-* / §3.4 A-* pattern names where applicable. Each step is one verb-led action ("Acquire pool-row lock via `SELECT … FOR NO KEY UPDATE`," "Compute `stake_at_post_time` via `RANKING.md` formula," "Insert `events` row with `event_type = 'comment.placed'` per §7.7"). Steps reference single-source-of-truth file paths from each consumed §; never restate logic.
+**System** — numbered imperative steps the handler executes. References §3.2 W-* / §3.3 R-* / §3.4 A-* pattern names where applicable. Each step is one verb-led action ("Acquire pool-row lock via `SELECT … FOR NO KEY UPDATE`," "Insert paired `bets` + `comments` rows inside the W-1 transaction per §3.2," "Insert `events` row with `event_type = 'comment.placed'` per §7.7"). Steps reference single-source-of-truth file paths from each consumed §; never restate logic.
 
 **Response** — success-path response shape with exact field names. JSON shape for Route Handlers; discriminated-union shape for Server Actions per §4.4. Schema lives in the corresponding source-of-truth file (e.g., `src/server/bets/place.ts` exports the response type via `$inferSelect` per ADR-0008); §13's Response block names the field set, not the runtime validator.
 
@@ -1259,7 +1260,7 @@ The four read flows are the only flows with the degenerate variant. Every other 
 
 ### §13.3 The F-* file inventory
 
-Forty per-flow contract files in v1 across seven prefix families. Each file lives at `docs/specs/flows/F-<family>-<n>.md` (provisional path under SCAFFOLD.2 per 3-A R4 — D5 patch discipline if SCAFFOLD.2 ratifies different).
+Thirty-seven per-flow contract files in v1 across seven prefix families. Each file lives at `docs/specs/flows/F-<family>-<n>.md` (provisional path under SCAFFOLD.2 per 3-A R4 — D5 patch discipline if SCAFFOLD.2 ratifies different).
 
 | F-* ID | SPEC.1 § | Shape (Write / Read) | Gating tracker task |
 |---|---|---|---|
@@ -1272,14 +1273,11 @@ Forty per-flow contract files in v1 across seven prefix families. Each file live
 | F-BET-7 (failed payment / Dharma underflow) | §7 | W (W-1 sub-case) | ENGINE.8 |
 | F-BET-9 (post-resolution view) | §7 | R | ENGINE.8 |
 | F-BET-10 (cross-market summary) | §7 | R | ENGINE.8 |
-| F-COMMENT-1 (direct comment) | §8 | W (W-2) | DEBATE.2 |
-| F-COMMENT-2 (reply) | §8 | W (W-2) | DEBATE.2 |
-| F-COMMENT-3 (image-attached comment) | §8 | W (W-2) | DEBATE.2 + SCAFFOLD.15 |
+| F-COMMENT-1 (additional post-bet + comment) | §8 | W (W-1 — comment-bearing post-bet per §3.2) | DEBATE.2 |
+| F-COMMENT-2 (reply-bet + comment) | §8 | W (W-1 — comment-bearing reply-bet per §3.2) | DEBATE.2 |
+| F-COMMENT-3 (image-attached bet + comment) | §8 | W (W-1 — image-attached comment-bearing bet per §3.2) | DEBATE.2 + SCAFFOLD.15 |
 | F-COMMENT-4 (comment edit — STRUCK from v1 per SPEC.1 §8) | §8 | — | (none — struck) |
 | F-COMMENT-5 (comment delete — STRUCK from v1 per SPEC.1 §8) | §8 | — | (none — struck) |
-| F-COMMENT-6 (friendly-fire upvote) | §8 | W (W-1 friendly-fire variant) | DEBATE.6 |
-| F-COMMENT-7 (friendly-fire downvote) | §8 | W (W-1 friendly-fire variant) | DEBATE.6 |
-| F-COMMENT-8 (clear friendly-fire) | §8 | W (W-1 friendly-fire variant) | DEBATE.6 |
 | F-DEBATE-1 (debate view render) | §9 | R (degenerate Invariants per §13.2) | DEBATE.4 |
 | F-DEBATE-2 (market detail render) | §9 | R (degenerate Invariants per §13.2) | DEBATE.5 |
 | F-DEBATE-3 (post-resolution lock state) | §9 | W (W-3 read-side) | ENGINE.9 |
@@ -1305,19 +1303,19 @@ Forty per-flow contract files in v1 across seven prefix families. Each file live
 
 **F-BET-8 was deleted** per SPEC.1 change-log 2026-05-03 — "structurally impossible under F-AUTH-ADMIN" (no participant identity exists for the admin actor that F-BET-8 would have needed). Inventory carries 9 F-BET-* IDs (1, 2, 3, 4, 5, 6, 7, 9, 10), not 10.
 
-**F-COMMENT-4 + F-COMMENT-5 are struck** per SPEC.1 §8 — comment edit and comment delete are not v1 features (the append-only `comments` discipline per §6.2 forecloses both at the database layer). Inventory carries 8 F-COMMENT-* IDs (1, 2, 3, 6, 7, 8 — plus the two struck rows retained as audit trace), not 10.
+**F-COMMENT-4 + F-COMMENT-5 are struck** per SPEC.1 §8 — comment edit and comment delete are not v1 features (the append-only `comments` discipline per §6.2 forecloses both at the database layer). **F-COMMENT-6 / F-COMMENT-7 / F-COMMENT-8 (friendly-fire up/down/clear) are removed entirely** under the v1.9.0 reply-as-bet model (ADR-0017): there is no standalone friendly-fire vote, so there are no friendly-fire flows. Inventory carries 3 active F-COMMENT-* IDs (1, 2, 3 — all comment-bearing bets) plus the two struck rows (4, 5) retained as audit trace.
 
-**Total: 40 active F-* files** across 7 prefix families: F-BET-* (9), F-COMMENT-* (6 active + 2 struck audit-trace), F-DEBATE-* (4), F-RESOLVE-* (3), F-AUTH-* (6), F-MOD-* (5), F-ADMIN-* (5).
+**Total: 37 active F-* files** across 7 prefix families: F-BET-* (9), F-COMMENT-* (3 active + 2 struck audit-trace), F-DEBATE-* (4), F-RESOLVE-* (3), F-AUTH-* (6), F-MOD-* (5), F-ADMIN-* (5). *(Drift note: the family breakdown and the "37" total carry a pre-existing internal inconsistency vs the literal active-row count in the table above — F-MOD-3 absent, F-BET-8 deleted — predating this fold; flagged for reconciliation at the §13 redraft / next tracker sweep, see §23.3. This pass changed only the F-COMMENT family, 6 active → 3 active.)*
 
 Multi-task gates use `+`: F-COMMENT-3 = DEBATE.2 + SCAFFOLD.15 (image upload integration spans both DEBATE.2's Server Action wiring and SCAFFOLD.15's R2 bucket policy authoring).
 
 ### §13.4 Drafting cadence — per-file deferred to gating implementation task
 
-Per-flow contract files are NOT drafted at SPEC.2 v1.0 lock. The 40 F-*.md files are minted incrementally in the same commit as the gating implementation task: ENGINE.8's commit lands the 9 F-BET-*.md files; DEBATE.2's commit lands F-COMMENT-1/2/3.md; DEBATE.6's commit lands F-COMMENT-6/7/8.md; and so on per the §13.3 gating column.
+Per-flow contract files are NOT drafted at SPEC.2 v1.0 lock. The 37 F-*.md files are minted incrementally in the same commit as the gating implementation task: ENGINE.8's commit lands the 9 F-BET-*.md files; DEBATE.2's commit lands F-COMMENT-1/2/3.md; and so on per the §13.3 gating column.
 
 The cadence is deliberate: each flow's Pre / System / Response / Errors / Invariants / Acceptance block authored against the actual implementation, not pre-implementation guesswork. The implementation task's pull request lands the F-*.md file alongside the production code; the six-field block reflects what the code actually does. This forecloses the drift class where flow files describe an aspirational behaviour the implementation never delivers.
 
-**Exception: skeleton files at SCAFFOLD.2.** SCAFFOLD.2 mints empty F-*.md files (file path + heading + the six section markers, no substance) for all 40 flows so that downstream task-tracking has consistent file-path destinations from the start. Substance fills in per the gating-task cadence above. The empty-skeleton commit also lands `docs/specs/flows/README.md` naming the §13 contract as the authority.
+**Exception: skeleton files at SCAFFOLD.2.** SCAFFOLD.2 mints empty F-*.md files (file path + heading + the six section markers, no substance) for all 37 flows so that downstream task-tracking has consistent file-path destinations from the start. Substance fills in per the gating-task cadence above. The empty-skeleton commit also lands `docs/specs/flows/README.md` naming the §13 contract as the authority.
 
 ### §13.5 §17 acceptance-test alignment + §23 bidirectional trace
 
@@ -1334,20 +1332,20 @@ The opposite direction is also asserted: every row in SPEC.1 §17's catalogue SH
 | The six-field block contract | §13.1 |
 | Read-flow degenerate Invariants variant | §13.2 |
 | F-* file inventory + gating-task table | §13.3 |
-| Per-flow Pre / System / Response / Errors / Invariants / Acceptance content | `docs/specs/flows/F-*.md` (40 files; per gating task cadence) |
+| Per-flow Pre / System / Response / Errors / Invariants / Acceptance content | `docs/specs/flows/F-*.md` (37 files; per gating task cadence) |
 | Empty-skeleton-flow-files mint | SCAFFOLD.2 + `docs/specs/flows/README.md` |
 | Error-code catalogue (consumed by every Errors block) | `docs/specs/error-codes.md` (per §15) |
 | Acceptance-test catalogue (consumed by every Acceptance block) | SPEC.1 §17 |
 | Cross-reference CI lint (Errors → catalogue + Acceptance → §17) | HARDEN.* |
 | Bidirectional gating trace | §23 (Tracker Task Gating Map) |
 
-ADRs consumed by §13: ADR-0003 (Server Actions vs Route Handlers cadence informs Response shape per §4.4), ADR-0004 (F-AUTH-1/2 mounted route handlers), ADR-0005 (W-1/W-2/W-3 transaction shapes referenced by System blocks), ADR-0008 (drizzle-zod typed-row response shapes), ADR-0009 (`stake_at_post_time` ranking-function input cited by F-COMMENT-1/2/3 System blocks), ADR-0010 (admin-actor encoding cited by F-RESOLVE-* + F-ADMIN-* System blocks), ADR-0011 (`identity_pool` consumption cited by F-AUTH-3 System block), ADR-0013 (bet transaction wrapper cited by F-BET-* System blocks), ADR-0014 (pre-commit moderation cited by F-BET-1 + F-COMMENT-1/2/3 System blocks), ADR-0015 (Idempotency-Key header + rate-limit class cited by F-* Pre blocks), ADR-0016 (URL-exposure rule cited by F-* with raw-UUID-vs-pseudonym surfaces). The 40-file inventory + gating-task table is the canonical SCAFFOLD.2 deliverable target.
+ADRs consumed by §13: ADR-0003 (Server Actions vs Route Handlers cadence informs Response shape per §4.4), ADR-0004 (F-AUTH-1/2 mounted route handlers), ADR-0005 (W-1 / W-3 transaction shapes referenced by System blocks; the v1.8.x W-2 comment-only shape is retired), ADR-0008 (drizzle-zod typed-row response shapes), ADR-0010 (admin-actor encoding cited by F-RESOLVE-* + F-ADMIN-* System blocks), ADR-0011 (`identity_pool` consumption cited by F-AUTH-3 System block), ADR-0013 (bet transaction wrapper cited by F-BET-* + F-COMMENT-* System blocks), ADR-0014 (pre-commit moderation cited by every comment-bearing-bet System block — F-BET-1/F-BET-2 + F-COMMENT-1/2/3), ADR-0015 (Idempotency-Key header + rate-limit class cited by F-* Pre blocks), ADR-0016 (URL-exposure rule cited by F-* with raw-UUID-vs-pseudonym surfaces), ADR-0017 (reply-as-bet model + per-side reply-bet aggregates cited by F-COMMENT-1/2/3 + F-DEBATE-1/4 System blocks; supersedes ADR-0009), ADR-0018 (two-floor minimum-bet write-path check cited by F-BET-* + F-COMMENT-* Pre blocks). The 37-file inventory + gating-task table is the canonical SCAFFOLD.2 deliverable target.
 
 ---
 
 ## §14 Invariant Contract
 
-§14 owns the *cross-cutting invariant enforcement contract* for the experiment-phase build — the four named invariants (INV-1, INV-2, INV-3, INV-4) that the system MUST preserve, the construction-layer mechanism that physically enforces each one (Postgres trigger, transaction shape, application gate, schema constraint), and the canonical test path that asserts each invariant holds end-to-end. SPEC.1 §11 owns the *product-level* invariant statements — what each invariant *means* in plain language and why it's load-bearing for thesis correctness. §6 owns the *append-only enforcement contract* (the trigger plumbing). §3 owns the *transaction shapes* (W-1 / W-2 / W-3). §8 owns the *auth-layer construction* (session-deferral hook). §13 owns the *flow-file Invariants block discipline* (every flow file's Invariants block cross-references its §14 row). This §14 sits at the *invariant → mechanism → test* mapping layer, naming how each invariant is enforced and where to find the proof.
+§14 owns the *cross-cutting invariant enforcement contract* for the experiment-phase build — the four named invariants (INV-1, INV-2, INV-3, INV-4) that the system MUST preserve, the construction-layer mechanism that physically enforces each one (Postgres trigger, transaction shape, application gate, schema constraint), and the canonical test path that asserts each invariant holds end-to-end. SPEC.1 §11 owns the *product-level* invariant statements — what each invariant *means* in plain language and why it's load-bearing for thesis correctness. §6 owns the *append-only enforcement contract* (the trigger plumbing). §3 owns the *transaction shapes* (W-1 bet/comment · W-3 resolution; the v1.8.x W-2 comment-only shape is retired under reply-as-bet). §8 owns the *auth-layer construction* (session-deferral hook). §13 owns the *flow-file Invariants block discipline* (every flow file's Invariants block cross-references its §14 row). This §14 sits at the *invariant → mechanism → test* mapping layer, naming how each invariant is enforced and where to find the proof.
 
 The four invariants are not pruned, renumbered, or deferred. INV-1 (atomic bet+comment), INV-2 (no Dharma overdraft), INV-3 (comments side-bound at post time), INV-4 (append-only resolutions) are the canonical four; new invariants would mint via ADR + same-commit SPEC.1 + SPEC.2 update, never silently. The mechanism column is normative; the test column is the verification surface.
 
@@ -1355,9 +1353,9 @@ The four invariants are not pruned, renumbered, or deferred. INV-1 (atomic bet+c
 
 | ID | Statement | Mechanism (construction layer) | Canonical integration test |
 |---|---|---|---|
-| **INV-1** | Atomic bet+comment: a successful bet placement and its mandatory commentary commit together or both abort together. No bet ever lands without its comment; no comment without a stake exists at all. | (i) §3.2 W-1 lock-order chain runs both writes inside one Postgres SERIALIZABLE transaction at `src/server/bets/transaction.ts` per ADR-0013; (ii) §10 pre-commit moderation runs OUTSIDE the transaction so a Track A / Track B verdict means the transaction never opens; (iii) §6.2 Bucket-A trigger on `bets` + `comments` rejects any UPDATE / DELETE that could orphan one without the other. | `tests/invariants/I-ATOMICITY-001.bet-comment-atomic.spec.ts` |
+| **INV-1** | Atomic bet+comment: a comment-bearing bet and its mandatory commentary commit together or both abort together. Every post and reply is a bet+comment pair — no comment without a stake exists at all (the comment-free **sell** is the only bet that carries no comment). | (i) §3.2 W-1 lock-order chain runs the `bets` + `comments` inserts inside one Postgres SERIALIZABLE transaction at `src/server/bets/transaction.ts` per ADR-0013 — applies to every comment-bearing bet (entry, subsequent, additional post, reply, image); (ii) the structural 1:1 binding is enforced by `comments.bet_id` NOT NULL + `bets.comment_id` NOT NULL (a comment-bearing bet cannot persist half its pair); (iii) §10 pre-commit moderation runs OUTSIDE the transaction so a Track A / Track B verdict means the transaction never opens; (iv) §6.2 Bucket-A trigger on `bets` + `comments` rejects any UPDATE / DELETE that could orphan one without the other. | `tests/invariants/I-ATOMICITY-001.bet-comment-atomic.spec.ts` |
 | **INV-2** | No Dharma overdraft: a participant's `dharma_ledger`-derived balance never goes negative; every bet is escrow-funded against the participant's available balance at write time. | (i) §3.2 W-1 dharma-ledger insert sits inside the SERIALIZABLE transaction with pool-row pessimistic lock per ADR-0013; (ii) `dharma_ledger` is Bucket-A append-only per §6.2 — credits and debits are insert-only, balance is `SUM(credits) - SUM(debits)` derived; (iii) handler-level pre-flight check at `src/server/bets/place.ts` rejects bets where `available_balance < stake` BEFORE opening the transaction (advisory layer); (iv) the trigger from (ii) is the ground truth — a bug bypassing the handler check fails at the database layer. | `tests/invariants/I-NO-OVERDRAFT-001.dharma-ledger-monotone.spec.ts` |
-| **INV-3** | Comments side-bound at post time: every comment is structurally tied to the side (YES / NO) the participant held at the moment of posting; flipping sides later does NOT retroactively re-attribute prior comments. | (i) §8.3 session-deferral hook construction-layer protection — a participant cannot hold a session cookie before pseudonym + ToS exist, foreclosing pre-pseudonym writes; (ii) `comments.side_at_post_time` column populated at `src/server/comments/place.ts` from the participant's current `positions.side` value INSIDE the W-2 transaction; (iii) `comments` is Bucket-A append-only per §6.2 — once written, the side column cannot mutate; (iv) the §3.2 W-2 lock order `positions → comments → events` ensures the position read happens under the transaction's read lock so a concurrent flip cannot race. | `tests/invariants/I-SIDE-BIND-001.comment-side-frozen.spec.ts` |
+| **INV-3** | Comments side-bound at post time: every comment is structurally tied to the side (YES / NO) the participant held at the moment of posting; flipping sides later does NOT retroactively re-attribute prior comments. | (i) §8.3 session-deferral hook construction-layer protection — a participant cannot hold a session cookie before pseudonym + ToS exist, foreclosing pre-pseudonym writes; (ii) under reply-as-bet every comment rides a bet, which is itself a YES/NO stake — `comments.side_at_post_time` is populated from the side of that bet INSIDE the W-1 bet transaction (`src/server/bets/transaction.ts`), so the comment's side is the bet's side by construction, not a separate read that could drift; (iii) `comments` is Bucket-A append-only per §6.2 — once written, the side column cannot mutate; (iv) the §3.2 W-1 lock order `pools → positions → dharma_ledger → events` runs the position update and the comment insert in the same SERIALIZABLE transaction, so a concurrent flip cannot race the side binding. | `tests/invariants/I-SIDE-BIND-001.comment-side-frozen.spec.ts` |
 | **INV-4** | Append-only resolutions: a market's resolution is recorded as one row in `resolution_events` (Bucket A) plus one row per affected bet in `payout_events` (Bucket A); corrections and voids are NEW rows referencing prior `resolution_events.id` via `corrects_event_id`, never updates of prior rows. | (i) §3.2 W-3 fan-out runs in one Postgres SERIALIZABLE transaction per `src/server/resolution/settle.ts` (and `correct.ts` / `void.ts`) per ADR-0013; (ii) `resolution_events` + `payout_events` are Bucket-A append-only per §6.2 — corrections cannot UPDATE prior rows; (iii) `markets.status` whitelisted Bucket-C transition (`Open` → `Resolved \| Voided`) per §3.6 is the only mutation on `markets` permitted at resolution; (iv) the §8.3 session-deferral hook protection is irrelevant for INV-4 (admin actor doesn't carry a session cookie of the participant type), but the parallel admin-side construction (§8.4 admin authentication path) is the equivalent — admin auth is required before any `resolve` / `correct` / `void` Server Action executes. | `tests/invariants/I-APPEND-ONLY-001.resolutions-append-only.spec.ts` |
 
 The four-row mapping is exhaustive at v1. No fifth invariant currently anticipated; new invariants land via ADR + dual-spec same-commit update.
@@ -1366,7 +1364,7 @@ The four-row mapping is exhaustive at v1. No fifth invariant currently anticipat
 
 The invariants are verified at two distinct test layers. Both layers are MUST; neither alone is sufficient.
 
-**Unit-test layer.** Per-mechanism granular tests at `tests/db/triggers/<table>-append-only.spec.ts` (the §6.6 thirteen-file suite covering Bucket-A + Bucket-B trigger discipline) and per-handler logic tests at `tests/server/<domain>/<handler>.spec.ts`. These verify that each mechanism in the §14.1 table fires correctly in isolation — the trigger rejects the bad UPDATE, the handler computes `side_at_post_time` correctly under the read lock, the `dharma_ledger` debit equals the bet stake exactly. Unit tests are fast, run on every PR, and are the first line of regression defense.
+**Unit-test layer.** Per-mechanism granular tests at `tests/db/triggers/<table>-append-only.spec.ts` (the §6.6 twelve-file suite covering Bucket-A + Bucket-B trigger discipline) and per-handler logic tests at `tests/server/<domain>/<handler>.spec.ts`. These verify that each mechanism in the §14.1 table fires correctly in isolation — the trigger rejects the bad UPDATE, the handler computes `side_at_post_time` correctly under the read lock, the `dharma_ledger` debit equals the bet stake exactly. Unit tests are fast, run on every PR, and are the first line of regression defense.
 
 **Integration-test layer.** End-to-end tests at `tests/invariants/I-<INV>-NNN.<descriptive-slug>.spec.ts` per the §14.1 canonical-test column. These verify that the invariant holds across the full handler stack under realistic conditions — a real PostgreSQL test container, a real bet handler with real moderation mocks, real session cookies, real concurrent transactions where applicable. Integration tests are slow (test-container spin-up + per-test transaction setup), gated to nightly + pre-merge-to-main runs, and are the verification of record for invariant correctness.
 
@@ -1395,7 +1393,7 @@ The four read flows from §13.2 (F-DEBATE-1, F-DEBATE-2, F-DEBATE-4, F-ADMIN-5) 
 | Two-test-layer split + file-naming convention | §14.2 |
 | INV-1 W-1 transaction wrapper | `src/server/bets/transaction.ts` (per §9 + ADR-0013) |
 | INV-2 handler pre-flight balance check | `src/server/bets/place.ts` |
-| INV-3 `side_at_post_time` population | `src/server/comments/place.ts` |
+| INV-3 `side_at_post_time` population | within the W-1 bet transaction at `src/server/bets/transaction.ts` (comment-bearing bet construction; the v1.8.x `src/server/comments/place.ts` is folded into the bet path) |
 | INV-4 W-3 resolution wrapper | `src/server/resolution/settle.ts` (per §3.6) |
 | INV-3 + INV-4 auth-layer construction | `src/server/auth/session-gate.ts` (per §8.3 session-deferral hook) |
 | Bucket-A trigger SQL covering `bets`, `comments`, `dharma_ledger`, `resolution_events`, `payout_events` | `drizzle/migrations/<NNNN>_append_only_triggers.sql` (per §6 + ADR-0005) |
@@ -1404,7 +1402,7 @@ The four read flows from §13.2 (F-DEBATE-1, F-DEBATE-2, F-DEBATE-4, F-ADMIN-5) 
 | §13 flow-file Invariants block discipline | §13.1 + §13.6 |
 | Bidirectional gating trace | §23 |
 
-ADRs consumed by §14: ADR-0004 (Better Auth session-deferral hook backing INV-3), ADR-0005 (Bucket-A append-only classification backing INV-1 / INV-3 / INV-4), ADR-0008 (Drizzle migration set + per-domain schema-file split), ADR-0010 (admin auth construction backing INV-4 admin-actor surface), ADR-0013 (W-1 SERIALIZABLE transaction backing INV-1 / INV-2), ADR-0014 (pre-commit moderation outside the transaction backing INV-1 — moderation never opens partial state). 3-C absorbs the §8.3 session-deferral-hook auth-layer mechanism into INV-3's mechanism column alongside the existing Postgres-trigger mechanism; 3-A R3 confirms INV-1 / INV-2 / INV-3 / INV-4 set is canonical and not pruned.
+ADRs consumed by §14: ADR-0004 (Better Auth session-deferral hook backing INV-3), ADR-0005 (Bucket-A append-only classification backing INV-1 / INV-3 / INV-4), ADR-0008 (Drizzle migration set + per-domain schema-file split), ADR-0010 (admin auth construction backing INV-4 admin-actor surface), ADR-0013 (W-1 SERIALIZABLE transaction backing INV-1 / INV-2), ADR-0014 (pre-commit moderation outside the transaction backing INV-1 — moderation never opens partial state), ADR-0017 (reply-as-bet model backing INV-1's every-comment-is-a-bet pairing and INV-3's side-from-bet binding). 3-C absorbs the §8.3 session-deferral-hook auth-layer mechanism into INV-3's mechanism column alongside the existing Postgres-trigger mechanism; 3-A R3 confirms INV-1 / INV-2 / INV-3 / INV-4 set is canonical and not pruned.
 
 ---
 
@@ -1696,7 +1694,7 @@ Six classes of threat. Three in-scope (defended); three out-of-scope (deferred o
 | **1** | **Account creation abuse** (bot-driven sybil; mass auto-account creation to inflate pseudonym pool consumption or accumulate Dharma allowance) | **In scope** | Two-vendor anti-bot defense (Turnstile + Google Identity Services) + OTP rate-limit pair gates F-AUTH-2; pseudonym pool consumption is constrained per §3.5 + ADR-0011 (50K-row pool with 5% low-watermark alarm). |
 | **2** | **Per-surface request abuse** (credential-stuffed traffic against bet endpoints, image-PUT-URL mint endpoints, OTP send endpoints, admin login endpoint) | **In scope** | Per-IP and per-identifier sliding-window rate limits across seven §11 surfaces per ADR-0015 + SPEC.1 §16.1; `bet-ip` 1m + `image-put-ip` 1m + `admin-login-ip` 1h are the load-bearing per-IP caps. |
 | **3** | **Admin compromise** (stolen `ADMIN_PASSWORD`, leaked admin cookie, admin-account takeover) | **In scope** | Static-password auth via `crypto.timingSafeEqual` + transactional `DELETE+INSERT` single-row-at-any-moment + two-layer middleware-plus-validator per CVE-2025-29927 + identical-401 information-leak avoidance + `BREAK_GLASS.md` rotation procedure per ADR-0010 + §8.4. The single-admin assumption per SPEC.1 §15 + E4 is structural. |
-| **4** | **Coordinated-stake attacks** (one party operating multiple legitimate accounts to manipulate market price or inflate friendly-fire) | **Out of scope** | Defense surface deferred to testnet phase (proof-of-personhood gating, on-chain identity binding). v1 sole-MM operation + soulbound-Dharma-only consequences + research-grade scope make the residual risk acceptable; the 2026-11-06 dataset release exposes coordinated-stake patterns post-hoc for research analysis. |
+| **4** | **Coordinated-stake attacks** (one party operating multiple legitimate accounts to manipulate market price or inflate a post's Support/Counter via coordinated reply-bets) | **Out of scope** | Defense surface deferred to testnet phase (proof-of-personhood gating, on-chain identity binding). v1 sole-MM operation + soulbound-Dharma-only consequences + research-grade scope make the residual risk acceptable; the 2026-11-06 dataset release exposes coordinated-stake patterns post-hoc for research analysis. |
 | **5** | **Insider threat** (admin-actor acting in bad faith — manipulating market resolution, suppressing comments, exfiltrating PII) | **Out of scope (residual-accepted)** | Single-admin assumption per E4; admin actions are append-only-audited via `admin_events` (Bucket A per §6.2) + `mod_actions` (Bucket A per §6.2) + INV-4 append-only resolutions. Detection runs post-hoc on the 2026-11-06 dataset; prevention via single-admin trust assumption. Multi-admin or admin-key-rotation-on-compromise is post-experiment scope. |
 | **6** | **Network-layer / infrastructure attacks** (DDoS, BGP hijack, certificate-authority compromise, Vercel/Supabase/R2 supply-chain) | **Out of scope (vendor-mitigated)** | Vercel + Cloudflare + Supabase carry their own DDoS + WAF + cert-rotation defenses; v1 codebase does not re-implement at the application layer. Out-of-scope is acceptance of the vendor mitigation surface, not absence of defense. |
 
@@ -1738,11 +1736,22 @@ Six properties:
 3. **No shared cookie name.** `zugzwang_session` and `zugzwang_admin_session` are non-overlapping; per §8.5 the path scopes (`/` vs `/admin`) make a single browser unable to present both to the same path.
 4. **No shared validator.** Participant Server Actions and Route Handlers validate `sessions` only; admin equivalents validate `admin_sessions` only. Cross-cookie-type access is rejected at handler entry per §8.7 pillar 6.
 5. **No shared events surface.** Participant auth flows write to `user_events`; admin auth flows write to `admin_events` (per §8.8). Encoding: `metadata.user_id = NULL` + `metadata.actor_id = 'admin-singleton'` for admin-actor events; `metadata.user_id = users.id` + `metadata.actor_id = users.id` (self-actor) for participant events.
-6. **No shared FK in audit tables.** `admin_events` and `mod_actions` reference admin-actor rows by string identifier `'admin-singleton'` (a sentinel value), not by FK. The participant audit surfaces (`user_events`, `friendly_fire_events`) reference `users.id` via FK. Cross-table joins between admin and participant audit surfaces are structurally impossible.
+6. **No shared FK in audit tables.** `admin_events` and `mod_actions` reference admin-actor rows by string identifier `'admin-singleton'` (a sentinel value), not by FK. The participant audit surface (`user_events`) references `users.id` via FK. Cross-table joins between admin and participant audit surfaces are structurally impossible.
 
 The six-property promotion makes the construction backing B5 visible in one place. A reviewer auditing the sybil-defense surface against threat 3 (admin compromise → cascading participant compromise) sees the six structural firewalls between universes and the absence of any shared surface.
 
-### §18.5 Single source of truth
+### §18.5 Data-access architecture: server-only (RLS out of scope)
+
+Per **ADR-0019**. Row-Level Security (RLS) is **deliberately out of scope** for the experiment phase, because the database is **server-only** (Architecture 2):
+
+- **The access topology.** Every read and write goes through the Next.js server — mutations via Server Actions (the locked mutation contract per ADR-0003) + the bet/admin Route Handlers (§4.3), reads via server route handlers / server components (§3.1, §3.3) — using a single trusted (service-role) database credential. No browser, client component, or third party ever holds a database connection. Authorization lives entirely in the server's Server Action / handler layer (Better Auth-backed per ADR-0004 + §8). This holds under the public-read / auth-gated-act posture: logged-out reads are still served *by the server* from the trusted connection, not by a client-direct query.
+- **Why RLS is not load-bearing here.** RLS enforces row rules inside Postgres against whatever credential connects. In a server-only topology, RLS would police Zugzwang's *own trusted server* — which has already authorized the request — making it a redundant backstop, not a control on an exposed surface. **Build skipped; decision recorded.** (§6.5 notes the related fact that the Supabase `service_role` key bypasses RLS but does **not** bypass the append-only triggers; those Postgres-level controls per §6 + ADR-0005, plus balance `CHECK`s and NOT-NULL FKs, are independent of this RLS decision and remain in force.)
+- **Tripwire (a durable invariant, not a one-time call).** This posture is valid **only** while the database stays server-only. The day any client-direct database path is introduced — a Supabase/anon client in a browser component, a public PostgREST/data endpoint, any user-scoped DB credential reaching an untrusted client — **RLS becomes mandatory before that path ships.** Any PR introducing a client-side data-access path MUST trigger this clause; flagged for the engine/handler review checklist.
+- **Accepted tension.** With no RLS, the server's authorization code is the *only* lock — there is no database-level safety net if a Server Action omits an ownership/eligibility check. This is an accepted trade for the experiment and a direct argument for the writer/reviewer discipline on the engine handlers (§13 + CLAUDE.md).
+- **Revisit at testnet** (real value, onchain escrow, higher stakes, likely different access topology).
+- **D4 note.** The SYNC recon flagged a `supabase/migrations/` directory referenced but absent. Per ADR-0019 this needs no RLS scaffolding for this phase; if the directory is later needed for non-RLS migrations that is a separate housekeeping item, **not a security gap** (and out of SPEC.2's scope to create).
+
+### §18.6 Single source of truth
 
 | Concern | Source-of-truth file |
 |---|---|
@@ -1752,13 +1761,14 @@ The six-property promotion makes the construction backing B5 visible in one plac
 | ToS acceptance evidence write at F-AUTH-4 | `src/server/auth/tos/accept.ts` (per §4.2) |
 | Cloudflare Turnstile siteverify wiring | `src/server/auth/turnstile.ts` (per ADR-0004 + §8.2) |
 | Six-property structural-separation enumeration | §18.4 |
+| Data-access architecture / RLS posture + tripwire | §18.5 (per ADR-0019) |
 | Per-IP rate-limit constants | `src/server/config/limits.ts` (per §11 + SPEC.1 §16.1) |
 | `BET_ATTEMPTS_PER_IP_PER_MIN` + `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` numeric values | HARDEN.6 (per §11.6) |
 | `BREAK_GLASS.md` admin-key rotation runbook | `docs/runbooks/BREAK_GLASS.md` (HARDEN.10-owned per §21.3 + ADR-0010) |
 | Admin-actor encoding to `admin_events` | §8.8 + §3.6 |
 | Append-only trigger SQL backing audit-trail integrity | `drizzle/migrations/<NNNN>_append_only_triggers.sql` (per §6 + ADR-0005) |
 
-ADRs consumed by §18: ADR-0004 (Better Auth + Cloudflare Turnstile via `hooks.before` + Google Identity Services configuration + session-deferral hook), ADR-0010 (admin auth path + static-password timing-safe comparison + two-layer middleware-plus-validator per CVE-2025-29927 + `BREAK_GLASS.md` rotation), ADR-0014 (pre-commit moderation legal-floor coupling for CSAM detection + reporting compliance per SPEC.1 §16.5 — NCMEC auto-report mechanism deferred to post-experiment per SCAFFOLD.16 LD-7; out-of-scope at the threat-model layer; in-scope at the §10 / §17 alarm surface), ADR-0015 (rate-limit + idempotency contract backing per-surface caps; new `BET_ATTEMPTS_PER_IP_PER_MIN` + `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` constants minted by ADR-0015 §1). 3-D R1–R5 + A1–A5 + B1–B5 ratifications absorbed.
+ADRs consumed by §18: ADR-0004 (Better Auth + Cloudflare Turnstile via `hooks.before` + Google Identity Services configuration + session-deferral hook), ADR-0010 (admin auth path + static-password timing-safe comparison + two-layer middleware-plus-validator per CVE-2025-29927 + `BREAK_GLASS.md` rotation), ADR-0014 (pre-commit moderation legal-floor coupling for CSAM detection + reporting compliance per SPEC.1 §16.5 — NCMEC auto-report mechanism deferred to post-experiment per SCAFFOLD.16 LD-7; out-of-scope at the threat-model layer; in-scope at the §10 / §17 alarm surface), ADR-0015 (rate-limit + idempotency contract backing per-surface caps; new `BET_ATTEMPTS_PER_IP_PER_MIN` + `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` constants minted by ADR-0015 §1), **ADR-0019** (RLS out of scope — server-only Architecture 2 + tripwire, recorded at §18.5). 3-D R1–R5 + A1–A5 + B1–B5 ratifications absorbed.
 
 ---
 
@@ -1803,24 +1813,21 @@ Per §5.1, twenty-one tables in v1. **Thirteen ship; eight do not (four operatio
 | 7 | `mod_actions` | A | YES | Moderation audit trail (admin actions on participant content; admin-actor encoded as `'admin-singleton'`) |
 | 8 | `admin_events` | A | YES | Admin-action audit trail |
 | 9 | `user_events` | A | YES | User lifecycle audit trail (ToS acceptance evidence, pseudonym assignment, daily-allowance accrual) |
-| 10 | `friendly_fire_events` | B | YES | Up/down votes on comments |
-| 11 | `identity_pool` | B | YES | Pseudonym pool (post-experiment all 50K rows are revealed; the pool is research-relevant) |
-| 12 | `image_uploads` | B | YES | Image upload lifecycle (terminal-state audit; `r2_object_key` excluded per §19.4) |
-| 13 | `markets` | C | YES | Market metadata |
-| 14 | `pools` | C | YES | CPMM pool reserves at freeze |
-| 15 | `positions` | C | YES | Per-user-per-market position cache (final positions at freeze) |
-| 16 | `users` | C | **YES with PII strip per §19.4** | Pseudonym + ToS metadata + bet/comment join keys; eight PII columns dropped |
-| 17 | `system_state` | B | NO | Operational singleton; the freeze itself is observable from the events log without the row |
-| 18 | `sessions` | C | NO | Operational; per ADR-0016 D6 + SPEC.1 §16.4 — privacy-sensitive (cookie tokens, last-seen timestamps) |
-| 19 | `accounts` | C | NO | Provider-side identity proof (Google OAuth account linkage); no thesis-relevant signal; PII-adjacent |
-| 20 | `verifications` | C | NO | Transient OTP rows (TTL-bounded; nothing persists past the OTP send window anyway) |
-| 21 | `admin_sessions` | C | NO | Operational; admin-side privacy-sensitive |
+| 10 | `identity_pool` | B | YES | Pseudonym pool (post-experiment all 50K rows are revealed; the pool is research-relevant) |
+| 11 | `image_uploads` | B | YES | Image upload lifecycle (terminal-state audit; `r2_object_key` excluded per §19.4) |
+| 12 | `markets` | C | YES | Market metadata |
+| 13 | `pools` | C | YES | CPMM pool reserves at freeze |
+| 14 | `positions` | C | YES | Per-user-per-market position cache (final positions at freeze) |
+| 15 | `users` | C | **YES with PII strip per §19.4** | Pseudonym + ToS metadata + bet/comment join keys; eight PII columns dropped |
+| 16 | `system_state` | B | NO | Operational singleton; the freeze itself is observable from the events log without the row |
+| 17 | `sessions` | C | NO | Operational; per ADR-0016 D6 + SPEC.1 §16.4 — privacy-sensitive (cookie tokens, last-seen timestamps) |
+| 18 | `accounts` | C | NO | Provider-side identity proof (Google OAuth account linkage); no thesis-relevant signal; PII-adjacent |
+| 19 | `verifications` | C | NO | Transient OTP rows (TTL-bounded; nothing persists past the OTP send window anyway) |
+| 20 | `admin_sessions` | C | NO | Operational; admin-side privacy-sensitive |
 
-**Shipped: 16 tables.** Wait — let me recount from the table itself: rows 1-13 + 14 + 15 + 16 = 16 tables shipped, not 13. Let me reconcile this against 3-E A8 source.
+**Shipped: 15 tables; not shipped: 5.** Shipped = the 9 Bucket-A audit tables (`events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events`) + 2 Bucket-B (`identity_pool`, `image_uploads`) + 3 current-state-context Bucket-C (`markets`, `pools`, `positions`) + `users` (PII-stripped per §19.4). Not shipped = `system_state`, `sessions`, `accounts`, `verifications`, `admin_sessions` (operational / privacy-sensitive). The two pg_cron operational tables (`watermark_state`, `cron_alarms`) are not part of the dataset inventory at all.
 
-Re-reading the column treatment: `users` ships with PII columns nulled, but counts as a shipped row. `pools`, `positions`, `markets` all ship. The 3-E close-out's "13 tables shipped" count appears to omit `markets` + `pools` + `positions` from the explicit enumeration — or counts those as "snapshot context" rather than primary surface.
-
-**Final: 16 tables shipped (13 audit + 3 current-state-context: `markets`, `pools`, `positions`); 5 tables not shipped (`system_state`, `sessions`, `accounts`, `verifications`, `admin_sessions`).** The "13 shipped + 4 not shipped" baseline from 3-E was an undercount; the v0.3-draft body corrects to 16 + 5 with the same shipping-policy logic. PRECURSOR.4 verifies the count alongside §15.4's 38-code baseline.
+The earlier "13 shipped + 4 not shipped" 3-E baseline was an undercount (it omitted `markets` / `pools` / `positions` from the explicit enumeration); the v0.3-draft body corrected it to 16 + 5, and this SYNC.7 pass drops `friendly_fire_events` (removed entirely per ADR-0017 — the reply-as-bet model has no friendly-fire table) bringing the shipped count to **15 + 5**. PRECURSOR.4 verifies the count alongside §15.4's 38-code baseline.
 
 ### §19.4 PII strip-not-hash policy
 
@@ -1851,7 +1858,7 @@ The remaining five `metadata` fields (`request_id`, `flow_id`, `user_id`, `actor
 
 ### §19.4.1 Per-payload-key STRIP rules for `events.payload`
 
-The `events.payload` JSONB column SHIPs verbatim per §19.3 row 1 + Appendix B.14, but the per-event-type payload shapes carry PII or sensitive substrate identifiers in some keys. The export pipeline applies per-event-type STRIP rules at the JSONB-key level (analogous to `metadata.ip` / `metadata.user_agent` STRIP_KEY per §19.4 table above).
+The `events.payload` JSONB column SHIPs verbatim per §19.3 row 1 + Appendix B.13, but the per-event-type payload shapes carry PII or sensitive substrate identifiers in some keys. The export pipeline applies per-event-type STRIP rules at the JSONB-key level (analogous to `metadata.ip` / `metadata.user_agent` STRIP_KEY per §19.4 table above).
 
 Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR-0005 sync-target rule); export-time strip handles the privacy boundary. Two separate concerns, two separate layers. Runtime emission MUST NOT pre-strip — full payload fidelity is required for in-database forensics + admin replay.
 
@@ -1878,7 +1885,6 @@ Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR
 - `bets.user_id` (UUIDv7) → `bets.user_pseudonym` (string)
 - `comments.user_id` → `comments.user_pseudonym`
 - `dharma_ledger.user_id` → `dharma_ledger.user_pseudonym`
-- `friendly_fire_events.voter_id` → `friendly_fire_events.voter_pseudonym`
 - `mod_actions.user_id` (target user) → `mod_actions.user_pseudonym`
 - `events.metadata.user_id` (within JSONB) → `events.metadata.user_pseudonym`
 - `image_uploads.user_id` → `image_uploads.user_pseudonym`
@@ -2081,13 +2087,13 @@ ADRs consumed by §21: ADR-0006 (vendor-incident runbook framing for Vercel + Cl
 
 ## §22 ADR Index
 
-§22 owns the *consolidated index of architectural decision records* for the experiment-phase build — the 14 ADRs at `docs/adr/0003-…md` through `docs/adr/0016-…md`, their accepted-vs-in-flight status, the SPEC.x → ADR-NNNN mapping that gates each ADR to its tracker task, and the cross-reference invariant that every ADR reference in SPEC.2 resolves to an existing ADR file. This §22 sits at the *index layer* — the ADRs themselves are immutable substance per ADR convention; this section catalogues their status and exposes the gating map without restating their decisions.
+§22 owns the *consolidated index of architectural decision records* for the experiment-phase build — the 17 ADRs at `docs/adr/0003-…md` through `docs/adr/0019-…md`, their accepted / superseded / in-flight status, the task → ADR-NNNN mapping that gates each ADR, and the cross-reference invariant that every ADR reference in SPEC.2 resolves to an existing ADR file. This §22 sits at the *index layer* — the ADRs themselves are immutable substance per ADR convention; this section catalogues their status and exposes the gating map without restating their decisions.
 
-The inventory is **14 ADRs at SPEC.2 v1.0 lock**. Two earlier-numbered slots (ADR-0001 + ADR-0002 — brand architecture and experiment/protocol repo split, originally minted under FOUND.7 + FOUND.8 in earlier outline drafts) were never authored as ADR files; the numbering jumps from "no ADR file" to ADR-0003. The ADR file numbering is the canonical inventory; the FOUND.7 + FOUND.8 substance lives in TRADEMARK.md + the repo structure itself, not in the ADR registry.
+The inventory is **17 ADRs** (was 14 at v0.3-draft; ADR-0017/0018/0019 folded at SYNC.7). Two earlier-numbered slots (ADR-0001 + ADR-0002 — brand architecture and experiment/protocol repo split, originally minted under FOUND.7 + FOUND.8 in earlier outline drafts) were never authored as ADR files; the numbering jumps from "no ADR file" to ADR-0003. The ADR file numbering is the canonical inventory; the FOUND.7 + FOUND.8 substance lives in TRADEMARK.md + the repo structure itself, not in the ADR registry.
 
-Of the 14 ADRs, **13 are accepted** (ADR-0003 through ADR-0011 + ADR-0013 through ADR-0016) and **1 is in flight** (ADR-0012). Per the §22.2 in-flight carve-out, SPEC.2 v1.0 locks with ADR-0012 in flight; design.md finalization triggers a same-commit SPEC.1 + SPEC.2 minor-version bump (v1.0 → v1.1) without re-opening PRECURSOR.4. SCAFFOLD.* tasks that do not consume design.md proceed in parallel during ADR-0012's in-flight window.
+Of the 17 ADRs, **15 are accepted** (ADR-0003 through ADR-0008, ADR-0010 through ADR-0011, ADR-0013 through ADR-0019), **1 is superseded** (ADR-0009, by ADR-0017), and **1 is in flight** (ADR-0012). Per the §22.2 in-flight carve-out, SPEC.2 v1.0 locks with ADR-0012 in flight; design.md finalization triggers a same-commit SPEC.1 + SPEC.2 minor-version bump (v1.0 → v1.1) without re-opening PRECURSOR.4. SCAFFOLD.* tasks that do not consume design.md proceed in parallel during ADR-0012's in-flight window.
 
-### §22.1 The 14-row index
+### §22.1 The 17-row index
 
 Sorted by ADR number. Each row is one ADR file; the file at `docs/adr/<NNNN>-<slug>.md` is the canonical substance.
 
@@ -2099,7 +2105,7 @@ Sorted by ADR number. Each row is one ADR file; the file at `docs/adr/<NNNN>-<sl
 | **0006** | SPEC.6 | `0006-hosting.md` | Hosting topology (Vercel + Supabase + Upstash + Cloudflare R2, Mumbai single-region, `pg_cron` + Vercel Cron hybrid) | accepted | 2026-05-05 |
 | **0007** | SPEC.7 | `0007-observability.md` | Observability (Sentry + PostHog; Vercel runtime logs serve structured request logging) | accepted | 2026-05-05 |
 | **0008** | SPEC.9 | `0008-drizzle-orm.md` | ORM choice (Drizzle + drizzle-kit + drizzle-zod; per-domain schema-file split; raw-SQL migration discipline) | accepted | 2026-05-06 |
-| **0009** | SPEC.10 | `0009-ranking-function.md` | Ranking function lock (RANKING.md; `stake_at_post_time` ranking-function input) | accepted | 2026-05-06 |
+| **0009** | SPEC.10 | `0009-ranking-function.md` | Ranking function lock (single-function HN model) — **superseded by ADR-0017** (multi-mode ranking; reply-as-bet; `stake_at_post_time` + friendly-fire retired) | superseded | 2026-05-06 |
 | **0010** | SPEC.11 | `0010-admin-auth.md` | Admin auth wiring (static password env var; hand-rolled DELETE+INSERT; two-layer middleware-plus-validator per CVE-2025-29927; `BREAK_GLASS.md` rotation) | accepted | 2026-05-06 |
 | **0011** | SPEC.12 | `0011-pseudonym-pool-design.md` | Pseudonym pool design (PSEUDONYM.md; 50K-row pre-baked pool; static `zugzwang-pfp` bucket; FIFO consumption with `SELECT ... FOR UPDATE SKIP LOCKED`) | accepted | 2026-05-07 |
 | **0012** | SPEC.13 | *(file pending)* | Design system lock (design.md) | **in flight** | — |
@@ -2107,8 +2113,11 @@ Sorted by ADR number. Each row is one ADR file; the file at `docs/adr/<NNNN>-<sl
 | **0014** | SPEC.15 | `0014-pre-commit-moderation-flow.md` | Pre-commit moderation flow (omni-moderation + PhotoDNA; fail-closed posture; F-MOD-4 atomicity; Track A degrade mode flag) | accepted | 2026-05-07 |
 | **0015** | SPEC.16 | `0015-rate-limit-idempotency.md` | Rate-limit + idempotency (Upstash Redis sliding windows; SETNX-with-pending-sentinel; Stripe-style key envelope; asymmetric fail-open/closed posture) | accepted | 2026-05-07 |
 | **0016** | SPEC.17 | `0016-id-schema-uuidv7.md` | ID schema (UUIDv7 universal PK; PG 17 userspace fallback + PG 18 cutover path; URL-exposure rule per D6) | accepted | 2026-05-08 |
+| **0017** | SYNC.4 | `0017-ranking-modes-and-top-composite.md` | Ranking modes & the "Top" composite (RANKING.md) — **supersedes ADR-0009**; multi-lane Top default + single-axis filter modes + reply stake-order at depth-1 | accepted | 2026-06-01 |
+| **0018** | SYNC.5 | `0018-dharma-issuance-and-bet-floors.md` | Dharma issuance, daily credit & asymmetric two-floor minimum bet (reply floor 50 > post floor; equal grant; flat daily credit) | accepted | 2026-06-01 |
+| **0019** | SYNC.5 | `0019-rls-out-of-scope-experiment.md` | RLS out of scope for the experiment (server-only Architecture 2; build skipped, decision recorded; tripwire; testnet revisit) | accepted | 2026-06-01 |
 
-The **SPEC.x → ADR-NNNN mapping** is canonical: each ADR was minted under a corresponding SPEC.x tracker task (SPEC.3 minted ADR-0003, SPEC.4 minted ADR-0004, etc.). Per memory + tracker conventions: SPEC.8 is renamed to **PRECURSOR.4** (the fresh-session lock review) and does not have an ADR; the SPEC.8 numbering slot is intentionally skipped in the ADR sequence — ADR-0008 is SPEC.9 (ORM), not SPEC.8. The ADR-NNNN numbering is dense (no gaps); the SPEC.x mapping has a one-position offset starting at ADR-0008.
+The **task → ADR-NNNN mapping** is canonical: ADR-0003 through ADR-0016 were each minted under a corresponding SPEC.x tracker task (SPEC.3 minted ADR-0003, SPEC.4 minted ADR-0004, etc.). Per memory + tracker conventions: SPEC.8 is renamed to **PRECURSOR.4** (the fresh-session lock review) and does not have an ADR; the SPEC.8 numbering slot is intentionally skipped in the SPEC.x sequence — ADR-0008 is SPEC.9 (ORM), not SPEC.8. **ADR-0017/0018/0019 break the SPEC.x pattern**: they were minted under SYNC tasks (ADR-0017 under SYNC.4; ADR-0018/0019 under SYNC.5), not SPEC.x tasks — the "SPEC.x" column carries the SYNC task for these three. The ADR-NNNN numbering remains dense (no gaps).
 
 ### §22.2 ADR-0012 in-flight carve-out
 
@@ -2128,7 +2137,7 @@ Every `ADR-NNNN` reference anywhere in SPEC.2 (prose body, tables, single-source
 
 **Direction A: SPEC.2 → ADR.** Every `ADR-NNNN` citation in SPEC.2 resolves to (i) an accepted ADR file, or (ii) the ADR-0012 in-flight sentinel. The CI lint at HARDEN-phase walks SPEC.2 prose + tables + every section's "ADRs consumed by §N" footer and asserts each reference resolves; an unresolved reference is a build error.
 
-**Direction B: ADR → SPEC.2.** Every accepted ADR SHOULD be cited in at least one SPEC.2 section. The asymmetric SHOULD vs MUST is deliberate — an ADR that no SPEC.2 section currently cites is acceptable as a "standalone substance" ADR (e.g., ADR-0009's RANKING.md content is consumed at compute-time by the ranking function, not via direct SPEC.2 prose citation). HARDEN-phase flags but does not fail.
+**Direction B: ADR → SPEC.2.** Every accepted ADR SHOULD be cited in at least one SPEC.2 section. The asymmetric SHOULD vs MUST is deliberate — an ADR that no SPEC.2 section currently cites is acceptable as a "standalone substance" ADR (e.g., **ADR-0017's** RANKING.md content is consumed at compute-time by the ranking function, not via direct SPEC.2 prose citation; ADR-0009 is superseded by ADR-0017 and retained only for lineage). HARDEN-phase flags but does not fail.
 
 The CI lint is HARDEN.* territory; v1.0 lock names the invariant.
 
@@ -2138,13 +2147,13 @@ Three properties locked at the ADR file shape:
 
 1. **Immutable substance.** ADRs are immutable once accepted; superseding requires a new ADR with a `Superseded-by` link to the new file. SPEC.2 sections may consume an ADR without ratifying — substance changes ride the ADR mint cadence.
 2. **Same-commit SPEC.2 update.** ADR acceptance + the same-commit SPEC.2 update at the relevant section is the canonical bundle. Per §0's lock-gate framing — PRECURSOR.4 reviews the bundle, not the ADR alone.
-3. **Numbering is dense + gapless.** No ADR slot is reserved; numbering increments by 1 with each new ADR file mint. The ADR-0012 in-flight slot will fill once design.md ratifies; no future ADR is allowed to skip ahead and mint ADR-0017 while ADR-0012 is in flight.
+3. **Numbering is dense + gapless.** No ADR slot is reserved; numbering increments by 1 with each new ADR file mint. An **in-flight slot counts as filled, not as a gap** — ADR-0012 (design.md) remains in flight while higher-numbered ADRs (0013–0019) are accepted, and the sequence stays gapless because 0012 is a real, numbered slot awaiting ratification rather than a skipped number. *(Earlier wording here prohibited minting ADR-0017 while ADR-0012 was in flight; that conflated "in-flight" with "gap" and is superseded — ADR-0017/0018/0019 were minted under SYNC.4/SYNC.5 and the numbering remains dense.)*
 
 ### §22.5 Single source of truth
 
 | Concern | Source-of-truth file |
 |---|---|
-| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (14 files; 13 accepted + 1 in flight) |
+| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (17 files; 15 accepted + 1 superseded + 1 in flight; files committed at SYNC.BACKFILL) |
 | ADR file template | `docs/adr/_template.md` |
 | Index + status flips | §22.1 (this section) |
 | In-flight carve-out | §22.2 (this section) |
@@ -2173,10 +2182,10 @@ Tracker organized in eleven phases (per the tracker HTML's grouping). Each phase
 | Phase | Tasks (count) | SPEC.2 sections consumed | ADRs consumed | F-* files gated | Design.md gate |
 |---|---|---|---|---|---|
 | **FOUND** | 7 (FOUND.1 – FOUND.8, FOUND.9 absent) | §0 (metadata + change log) | none | none | No |
-| **SPEC + PRECURSOR** | 21 (SPEC.1 + SPEC.3-7 + SPEC.9-17 + PRECURSOR.1-5; SPEC.8 → PRECURSOR.4 rename) | §0–§23 (all sections; this phase authors them) | ADR-0003–0016 (this phase mints them) | none | No (PRECURSOR.4 lock review accepts ADR-0012 in-flight per §22.2) |
-| **SCAFFOLD** | 19 (SCAFFOLD.1–19) | §0–§23 (consumes locked v1.0 substance) | ADR-0003 + ADR-0005 + ADR-0006 + ADR-0008 + ADR-0011 + ADR-0016 (foundation infrastructure); ADR-0012 for design-dependent slots only | F-* skeleton mint at SCAFFOLD.2 (40 empty files); F-AUTH-* substance at SCAFFOLD.3; F-MOD bundle at SCAFFOLD.4 + SCAFFOLD.13; image upload pipeline at SCAFFOLD.15; experiment-phase moderation hardening at SCAFFOLD.16 (Track A image-presence carve-out per LD-3); flag system at SCAFFOLD.6 | **Partial** — SCAFFOLD.* design-independent (db schema, migrations, auth wiring, moderation pipeline) proceed in parallel; UI-shaping SCAFFOLD slots gate on ADR-0012 |
+| **SPEC + PRECURSOR** | 21 (SPEC.1 + SPEC.3-7 + SPEC.9-17 + PRECURSOR.1-5; SPEC.8 → PRECURSOR.4 rename) | §0–§23 (all sections; this phase authors them) | ADR-0003–0016 (this phase mints them; ADR-0017/0018/0019 were minted under the later SYNC phase — see §22.1) | none | No (PRECURSOR.4 lock review accepts ADR-0012 in-flight per §22.2) |
+| **SCAFFOLD** | 19 (SCAFFOLD.1–19) | §0–§23 (consumes locked v1.0 substance) | ADR-0003 + ADR-0005 + ADR-0006 + ADR-0008 + ADR-0011 + ADR-0016 (foundation infrastructure); ADR-0012 for design-dependent slots only | F-* skeleton mint at SCAFFOLD.2 (37 empty files); F-AUTH-* substance at SCAFFOLD.3; F-MOD bundle at SCAFFOLD.4 + SCAFFOLD.13; image upload pipeline at SCAFFOLD.15; experiment-phase moderation hardening at SCAFFOLD.16 (Track A image-presence carve-out per LD-3); flag system at SCAFFOLD.6 | **Partial** — SCAFFOLD.* design-independent (db schema, migrations, auth wiring, moderation pipeline) proceed in parallel; UI-shaping SCAFFOLD slots gate on ADR-0012 |
 | **ENGINE** | 12 (ENGINE.1–12) | §3 (data flows) + §6 (append-only enforcement) + §7 (event model) + §9 (concurrency) + §11 (rate limit + idempotency) + §14 (invariants) + §15 (error envelope) | ADR-0005 + ADR-0008 + ADR-0013 + ADR-0014 + ADR-0015 + ADR-0016 | F-BET-1/2/3/4/5/6/7/9/10 at ENGINE.7+ENGINE.8; F-RESOLVE-1/2/3 at ENGINE.9; F-DEBATE-3 at ENGINE.9 | No (engine logic is design-independent) |
-| **DEBATE** | 8 (DEBATE.1–8) | §3 + §8 + §9 + §10 + §11 + §13 + §14 + §15 | ADR-0004 + ADR-0009 + ADR-0014 + ADR-0015 | F-COMMENT-1/2/3 at DEBATE.2; F-DEBATE-1/4 at DEBATE.4; F-DEBATE-2 at DEBATE.5; F-COMMENT-6/7/8 at DEBATE.6; F-MOD-1/2/3/4/5 at DEBATE.7 | **Yes** — DEBATE.4/5 (debate view + market detail render) consume design.md substance |
+| **DEBATE** | 8 (DEBATE.1–8) | §3 + §8 + §9 + §10 + §11 + §13 + §14 + §15 | ADR-0004 + ADR-0014 + ADR-0015 + ADR-0017 + ADR-0018 | F-COMMENT-1/2/3 (comment-bearing bets) at DEBATE.2; F-DEBATE-1/4 at DEBATE.4; F-DEBATE-2 at DEBATE.5; **DEBATE.6's prior friendly-fire scope (F-COMMENT-6/7/8) is removed under reply-as-bet** — DEBATE.6 needs tracker reconciliation (repurpose or remove), see §23.3; F-MOD-1/2/3/4/5 at DEBATE.7 | **Yes** — DEBATE.4/5 (debate view + market detail render) consume design.md substance |
 | **UI** | 10 (UI.1–8 + UI.10–11; UI.9 absent) | §4 (API surface) + §13 (flow contract template) + §17 (observability) + §18 (sybil + security) | ADR-0003 + ADR-0004 + ADR-0010 + **ADR-0012** | F-AUTH-* user-facing pages; F-ADMIN-1/2/3/4/5 at UI.6; debate-view + market-detail page UIs | **Yes (load-bearing)** — UI.* substance is fundamentally design-system-consuming |
 | **HARDEN** | 10 (HARDEN.1–10) | §6 (test floor) + §15 (catalogue completeness) + §17 (alarm tuning + body-redaction lint) + §19 (dataset build) + §20 (freeze) + §21 (runbooks) | ADR-0007 + ADR-0010 + ADR-0014 + ADR-0015 | All 40 F-* files' Acceptance blocks (HARDEN.* CI lint validates) | **Partial** — HARDEN.5 (Track A degrade-mode evaluation) and HARDEN.6 (number tuning) are content-independent; HARDEN.* lint may consume design system for visual-regression cases |
 | **LIVE** | 6 (LIVE.1–4 + LIVE.6–7; LIVE.5 absent) | §17 (observability runtime) + §18 (sybil-defense runtime) + §20 (post-freeze read-only mode) + §21 (operational runbook execution) | ADR-0007 + ADR-0010 + (entire vendor stack runtime) | None (live-phase consumes flows, doesn't gate them) | No (live-phase is operational; design-system already locked) |
@@ -2194,10 +2203,10 @@ Each SPEC.2 section row names which tracker tasks unblock when the section reach
 | Section | Title | Unblocks (key tasks) |
 |---|---|---|
 | **§0** | Document metadata + change log | All downstream tasks (provides versioning policy + lock-gate framing for change-log audit trail) |
-| **§3** | Data flows | ENGINE.7 (bet wrapper), ENGINE.8 (bet handlers), ENGINE.9 (resolution), DEBATE.2 (comment write), DEBATE.6 (friendly fire), SCAFFOLD.3 (auth flows) |
+| **§3** | Data flows | ENGINE.7 (bet wrapper), ENGINE.8 (bet handlers), ENGINE.9 (resolution), DEBATE.2 (comment-bearing-bet write), SCAFFOLD.3 (auth flows) |
 | **§4** | API surface | UI.* (Server Actions consumed by every UI page); SCAFFOLD.2 (Route Handler skeleton mint) |
 | **§5** | Data model — table inventory | SCAFFOLD.2 (Drizzle schemas across nine domains); HARDEN.* CI lint for table inventory drift |
-| **§6** | Append-only enforcement | SCAFFOLD.2 (trigger SQL migration); HARDEN.6 (33+ test floor) |
+| **§6** | Append-only enforcement | SCAFFOLD.2 (trigger SQL migration); HARDEN.6 (append-only test floor, twelve-table protected set) |
 | **§7** | Event model | ENGINE.7/ENGINE.8/ENGINE.9 (events insert at every state mutation); SCAFFOLD.2 (events partitioning DDL); HARDEN.* (events-emit CI lint) |
 | **§8** | Authentication & sessions | SCAFFOLD.3 (Better Auth wiring); UI.* (auth-gated pages); ENGINE.* (auth gate on every state-mutating endpoint) |
 | **§9** | Concurrency & transactions | ENGINE.7 (bet transaction wrapper); HARDEN.6 (concurrency stress tests) |
@@ -2218,16 +2227,27 @@ Each SPEC.2 section row names which tracker tasks unblock when the section reach
 
 **Coverage observation:** every SPEC.2 section has at least one consuming tracker task. The strongest fan-out sections are §0 (consumed by all phases via versioning), §13 (consumed by every gating implementation task per per-flow cadence), §15 (consumed by every gating implementation task per Errors-block contract), and §22 (consumed by every section's ADR-cite footer). The narrowest fan-out is §22.2's in-flight carve-out — consumed by PRECURSOR.4 + the design.md ADR mint cadence only.
 
-### §23.3 Tracker description drift surfaced for PRECURSOR.5
+### §23.3 Tracker description drift surfaced for SYNC.8
 
-3-C absorption surfaced four tracker-task descriptions that drift from current SPEC.1 + SPEC.2 substance. The drift is documentation-only — the underlying gating relationships in §23.1 + §23.2 are accurate; the tracker's per-task description text needs a sweep at PRECURSOR.5 to align. Surfaced here for the PRECURSOR.5 reviewer:
+3-C absorption surfaced four tracker-task descriptions that drift from current SPEC.1 + SPEC.2 substance. That drift is documentation-only — the underlying gating relationships in §23.1 + §23.2 are accurate; the tracker's per-task description text needs a sweep at **SYNC.8** to align (PRECURSOR.5 dissolved into SYNC.8 per tracker v11). Surfaced here for the SYNC.8 reviewer:
 
-| Task | Drift | Resolution at PRECURSOR.5 |
+| Task | Drift | Resolution at SYNC.8 |
 |---|---|---|
-| **DEBATE.4** | Description references "old debate view contract" pre-§9 ranking-function lock | Update to cite §9 + ADR-0009's `stake_at_post_time` input + R-1 uncached posture |
+| **DEBATE.4** | Description references "old debate view contract" pre-§9 ranking-function lock | Update to cite §9 + **ADR-0017**'s multi-mode ranking model (supersedes ADR-0009) + R-1 uncached posture |
 | **SCAFFOLD.3** | Description omits Better Auth + session-deferral hook substance from §8.3 | Update to cite §8.3 hook + F-AUTH-3 / F-AUTH-4 transactional sequence per §3.5 |
 | **SCAFFOLD.13** | Description references stale moderation framing pre-ADR-0014 absorption | Update to cite §10 + ADR-0014's omni-moderation (sole vendor per SCAFFOLD.16 LD-1) + SCAFFOLD.16 LD-3 text/image Track A carve-out + fail-closed posture |
 | **SCAFFOLD.4** | Description says "moderation handler" but task is the rate-limit + idempotency primitives wiring | Update to cite §11 + ADR-0015's per-surface table + asymmetric fail-mode contract |
+
+**SYNC.7 reply-as-bet fold — structural drift (not documentation-only).** Unlike the 3-C items above, the friendly-fire removal + reply-as-bet rework changes the forward work itself and creates a **specs-ahead-of-code** gap (the SCAFFOLD.2 build still has `friendly_fire_events`, nullable `comments.bet_id`, `comments.stake_at_post_time`, and comment-without-bet write paths; the specs now say all of those are gone). These reconcile downstream — surfaced here for SYNC.8 + the tracker sweep:
+
+| Item | Drift | Resolution |
+|---|---|---|
+| **DEBATE.6** | Task scope was "friendly-fire vote / clear / freeze (F-COMMENT-6/7/8)" — removed entirely under reply-as-bet (ADR-0017). The task now has no friendly-fire deliverable. | Tracker decision at SYNC.8: **repurpose** DEBATE.6 (e.g. to reply-bet UI / per-side aggregate rendering) or **remove** it and renumber. Not a SPEC.2 decision. |
+| **`friendly_fire_events` physical drop** | Table + Bucket-B trigger + the `castFriendlyFire`/`clearFriendlyFire` Server Actions exist in the SCAFFOLD.2 build; the schema now omits them. | A forward migration drops the table + trigger; the two Server Actions + their files are deleted. Tracker-sequenced (post-spec-lock engineering work, not this pass). |
+| **`comments.bet_id` NOT NULL + comment-write-path → bet** | Build has `comments.bet_id` nullable and a standalone comment-without-bet path; the spec now requires `bet_id` NOT NULL and every comment to ride the W-1 bet transaction. | Schema migration (nullable → NOT NULL after cutover) + comment-write-path rework folded into the engine work; tracker-sequenced. |
+| **`comments.stake_at_post_time` drop** | Column present in the build; spec removes it (ADR-0017 reads per-side reply-bet aggregates at render time). | Forward column-drop migration; tracker-sequenced. |
+| **ADR-0017 body text** | ADR-0017's prose still says friendly-fire "stays display-only" — stale, contradicted by SPEC.1 v1.9.0 + this SPEC.2. | In-place ADR-0017 patch (D5 patch-record convention) reconciling the body to the reply-as-bet model; pairs with the SYNC.BACKFILL ADR-status flip. |
+| **§13.3 F-* count reconciliation** | The §13.3 "37 active F-*" prose + family breakdown carry a pre-existing internal inconsistency vs the literal active-row count in the table (F-MOD-3 absent, F-BET-8 deleted), predating this fold. | Reconcile the prose count to the table at the §13 redraft / next tracker sweep. |
 
 ### §23.4 Single source of truth
 
@@ -2235,9 +2255,9 @@ Each SPEC.2 section row names which tracker tasks unblock when the section reach
 |---|---|
 | Phase-bucketed Direction A trace | §23.1 (this section) |
 | Per-section Direction B trace | §23.2 (this section) |
-| Tracker description drift surfaced for PRECURSOR.5 | §23.3 |
-| Per-task status (not_started / in_progress / blocked / done) | `zugzwang_experiment_tracker_v7.html` |
-| Per-task ordering within phase | tracker HTML |
+| Tracker description drift surfaced for SYNC.8 | §23.3 |
+| Per-task status (not_started / in_progress / blocked / done) | `tracker_v11.html` (canonical per SYNC.6; v10 deleted) |
+| Per-task ordering within phase | tracker HTML (`tracker_v11.html`) |
 | Per-flow contract files (consumed by Direction A's "F-* files gated" column) | `docs/specs/flows/F-*.md` (per §13) |
 | Per-section "ADRs consumed by §N" footers (consumed by Direction A's "ADRs consumed" column) | each SPEC.2 section's closing footer |
 | ADR-0012 in-flight carve-out (referenced by Direction A's "design.md gate" column) | §22.2 |
@@ -2251,7 +2271,7 @@ ADRs consumed by §23: ADR-0001 + ADR-0002 (out of inventory per §22.1 — no A
 
 Mechanical aggregation of every "Single source of truth" footer across §3 through §21. Sorted alphabetically by file path. Each row names every section that cites the file as a single source of truth. This appendix is the **consolidated index** that downstream tooling (HARDEN.* CI lint walking the file map; per-file ownership audit during code review; the migration set's manifest cross-reference) consumes — every minted file should have at least one SoT row here, and every row should resolve to either an existing file or a HARDEN.*-territory deferred file.
 
-The discipline: this appendix is **mechanically derived** from per-section footers and is canonical at this v0.3-draft snapshot. A file added to or removed from any per-section footer at PRECURSOR.4 lock or PRECURSOR.5 sweep updates this appendix in the same commit. Drift between per-section footers and Appendix A is a build error per HARDEN.* CI lint.
+The discipline: this appendix is **mechanically derived** from per-section footers and is canonical at this v0.3-draft snapshot. A file added to or removed from any per-section footer at PRECURSOR.4 lock updates this appendix in the same commit. Drift between per-section footers and Appendix A is a build error per HARDEN.* CI lint.
 
 Files are grouped into seven categories for readability: **A.1** Drizzle schema files; **A.2** Drizzle migration files; **A.3** Server-domain logic; **A.4** Route Handlers + Server Actions; **A.5** Configuration + middleware; **A.6** Test surfaces; **A.7** Documentation + runbooks.
 
@@ -2263,7 +2283,7 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 | `src/db/schema/auth.ts` | Better Auth four-table schemas (`users`, `sessions`, `accounts`, `verifications`) + hand-rolled `admin_sessions` (per ADR-0008 §4 — single auth-domain file spanning ADR-0004 + ADR-0010) | §5.5, §8.10, §16 |
 | `src/db/schema/markets.ts` | `markets`, `pools` schemas | §5.5 |
 | `src/db/schema/bets.ts` | `bets`, `positions` schemas | §5.5 |
-| `src/db/schema/comments.ts` | `comments`, `friendly_fire_events` schemas | §5.5 |
+| `src/db/schema/comments.ts` | `comments` schema (reply-as-bet: `bet_id` NOT NULL 1:1 with the comment-bearing bet, `parent_comment_id` post/reply discriminator, `side_at_post_time`; no `stake_at_post_time`, no `friendly_fire_events`) | §5.1, §5.5 |
 | `src/db/schema/dharma.ts` | `dharma_ledger` schema | §5.5 |
 | `src/db/schema/events.ts` | `events`, `resolution_events`, `payout_events` schemas | §5.5, §7.8 |
 | `src/db/schema/identity.ts` | `identity_pool` schema (per ADR-0011 + ADR-0016 D5 synthetic UUIDv7 PK + UNIQUE constraint) | §5.5 |
@@ -2277,7 +2297,7 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 |---|---|---|
 | `drizzle.config.ts` | Drizzle migration set + schema barrel pointer | §5.5 |
 | `drizzle/migrations/<NNNN>_uuidv7_function.sql` | PL/pgSQL `public.uuidv7()` function (PG 17 fallback per ADR-0016) | §5.5, §16 |
-| `drizzle/migrations/<NNNN>_append_only_triggers.sql` | Bucket-A + Bucket-B per-table trigger functions + trigger declarations (13 protected tables) | §5.5, §6.7, §12.10, §14.4, §18.5, §20.4 |
+| `drizzle/migrations/<NNNN>_append_only_triggers.sql` | Bucket-A + Bucket-B per-table trigger functions + trigger declarations (12 protected tables) | §5.5, §6.7, §12.10, §14.4, §18.5, §20.4 |
 | `drizzle/migrations/<NNNN>_events_partitioning.sql` | Events table monthly RANGE partition DDL + DEFAULT partition | §5.5, §7.8 |
 | `drizzle/migrations/<NNNN>_seed_system_state.sql` | `system_state` row mint at deploy (`INSERT ('system', NULL)`) per §20.2 — provisional path under SCAFFOLD.2 | §20.4 |
 | `drizzle/migrations/<NNNN>_freeze_cron.sql` | Path-A `pg_cron` scheduled freeze job at 2026-11-05 23:59:00 UTC (HARDEN.10 territory) | §20.4 |
@@ -2300,11 +2320,9 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 | `src/server/bets/transaction.ts` | W-1 SERIALIZABLE transaction wrapper (bet handler per ADR-0013 + §9) | §3.7, §9, §14.4 |
 | `src/server/bets/place.ts` | Bet place handler (INV-2 pre-flight balance check) | §14.4 |
 | `src/server/bets/origin-check.ts` | Bet-handler Origin allowlist (D3 carve-out CSRF defense per §4.3) | §4 |
-| `src/server/comments/place.ts` | W-2 comment-write entry point + INV-3 `side_at_post_time` population | §3.7, §14.4 |
-| `src/server/comments/reply.ts` | F-COMMENT-2 reply Server Action | §4.2 |
-| `src/server/comments/place-image.ts` | F-COMMENT-3 image-attached comment Server Action | §4.2 |
-| `src/server/comments/friendly-fire.ts` | F-COMMENT-6 friendly-fire vote Server Action | §4.2 |
-| `src/server/comments/friendly-fire-clear.ts` | F-COMMENT-7 clear friendly-fire Server Action | §4.2 |
+| `src/server/comments/place.ts` | `placeDirectComment` (F-COMMENT-1) — comment-bearing post-bet Server Action; opens the §9 W-1 bet transaction (`src/server/bets/transaction.ts`), inserting the paired `bets` + `comments` rows; INV-3 `side_at_post_time` bound from the bet's side inside that transaction | §3.7, §4.2, §14.4 |
+| `src/server/comments/reply.ts` | `placeReply` (F-COMMENT-2) — comment-bearing reply-bet Server Action (W-1; `parent_comment_id` set, reply floor 50 per ADR-0018) | §4.2 |
+| `src/server/comments/place-image.ts` | `placeImageComment` (F-COMMENT-3) — image-attached comment-bearing bet Server Action (W-1) | §4.2 |
 | `src/server/resolution/settle.ts` | W-3 resolution fan-out wrapper (F-RESOLVE-1 settle) | §3.7, §14.4 |
 | `src/server/resolution/correct.ts` | F-RESOLVE-2 correction Server Action | §4.2 |
 | `src/server/resolution/void.ts` | F-RESOLVE-3 void Server Action | §4.2 |
@@ -2377,7 +2395,7 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 | `docs/specs/error-codes.md` | Error code catalogue (38 rows at v1.0 lock per §15.4) | §13.6, §15.6 |
 | `docs/specs/flows/F-*.md` | 40 per-flow contract files (skeleton at SCAFFOLD.2; substance per gating cadence per §13.4) | §13.6 |
 | `docs/specs/flows/README.md` | Names §13 contract as authority | §13.6 |
-| `docs/adr/0003-...md` through `0016-...md` | 14 ADR files (13 accepted + 1 in flight per §22.1) | §22.5 |
+| `docs/adr/0003-...md` through `0019-...md` | 17 ADR files (15 accepted + 1 superseded + 1 in flight per §22.1; committed at SYNC.BACKFILL) | §22.5 |
 | `docs/adr/_template.md` | ADR file template | §22.5 |
 | `docs/runbooks/BREAK_GLASS.md` | Admin-rotation + catastrophic-thaw runbook (HARDEN.10) | §6.7, §8.10, §18.5, §20.4, §21.3 |
 | `docs/runbooks/conclusion-event-freeze.md` | Path-B manual freeze runbook (HARDEN.10) | §20.4, §21.3 |
@@ -2433,7 +2451,7 @@ The concentration pattern reflects the design discipline: the most cross-cited s
 
 ## Appendix B — Per-Table Per-Column Dataset Classification
 
-Per-column treatment for the 16 tables shipped in the 2026-11-06 public dataset release per §19.3. Each table's columns are classified into one of five treatments:
+Per-column treatment for the 15 tables shipped in the 2026-11-06 public dataset release per §19.3. Each table's columns are classified into one of five treatments:
 
 - **`SHIP`** — column ships verbatim from the Postgres source.
 - **`PSEUDO`** — column carries `users.id` raw UUIDv7 in source; rewritten at export time to `users.pseudonym` slug per §19.5.
@@ -2443,7 +2461,7 @@ Per-column treatment for the 16 tables shipped in the 2026-11-06 public dataset 
 
 The 5 not-shipped tables (`system_state`, `sessions`, `accounts`, `verifications`, `admin_sessions`) have no per-column treatment because they don't ship; the rationale per §19.3 is operational + privacy-sensitive.
 
-The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECURSOR.4 lock review walks every column row and verifies the treatment is consistent with the policy. PRECURSOR.5 column-name correctness sweep runs against the implemented Drizzle schemas at `src/db/schema/<domain>.ts` — any column in source that is not enumerated here is a coverage gap; any column enumerated here that does not exist in source is a drift fix.
+The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECURSOR.4 lock review walks every column row, verifies the treatment is consistent with the policy, and runs the column-name correctness sweep against the implemented Drizzle schemas at `src/db/schema/<domain>.ts` — any column in source that is not enumerated here is a coverage gap; any column enumerated here that does not exist in source is a drift fix. (This sweep was previously assigned to PRECURSOR.5; it is a verify-against-source check that belongs with the PRECURSOR.4 lock review, not the SYNC.8 CLAUDE/AGENTS rebuild.)
 
 ### B.1 `users` (Bucket C)
 
@@ -2478,7 +2496,7 @@ The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECU
 | `created_by` | text | SHIP | `'admin-singleton'` sentinel per §3.6 (admin-actor created markets) |
 | `created_at` | timestamptz | SHIP | |
 
-Inferred-but-unconfirmed: exact column list pending SCAFFOLD.2 implementation. Above derived from §3.6 + ADR-0010 admin-actor encoding + SPEC.1 §10 product behavior. PRECURSOR.5 column-name correctness sweep verifies against `src/db/schema/markets.ts`.
+Inferred-but-unconfirmed: exact column list pending SCAFFOLD.2 implementation. Above derived from §3.6 + ADR-0010 admin-actor encoding + SPEC.1 §10 product behavior. PRECURSOR.4 column-name correctness sweep verifies against `src/db/schema/markets.ts`.
 
 ### B.3 `pools` (Bucket C)
 
@@ -2490,7 +2508,7 @@ Inferred-but-unconfirmed: exact column list pending SCAFFOLD.2 implementation. A
 | `no_reserves` | numeric(38,18) | SHIP | CPMM NO-side reserves at freeze instant |
 | `created_at` | timestamptz | SHIP | |
 
-Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.5 verifies precision + column names.
+Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.4 verifies precision + column names.
 
 ### B.4 `positions` (Bucket C)
 
@@ -2526,12 +2544,11 @@ Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.5 verifies precision 
 | `id` | uuid | SHIP | Comment PK |
 | `user_id` | uuid | PSEUDO | Rewritten to `user_pseudonym` per §19.5 |
 | `market_id` | uuid | SHIP | FK preserved |
-| `parent_comment_id` | uuid \| null | SHIP | NULL for top-level; populated for replies (F-COMMENT-2) |
+| `parent_comment_id` | uuid \| null | SHIP | NULL = top-level **post-bet** comment; non-NULL = **reply-bet** comment (F-COMMENT-2; FK to parent `comments.id`; `REPLY_DEPTH_MAX = 1`) |
 | `body` | text | SHIP | Comment text content (post-moderation; only `pass`-verdict comments exist in this table per §10) |
 | `image_uploads_id` | uuid \| null | SHIP | FK to `image_uploads.id` for F-COMMENT-3; NULL for text-only comments |
-| `side_at_post_time` | text | SHIP | INV-3 binding: `YES` / `NO` frozen at insert; the load-bearing ranking-function input |
-| `stake_at_post_time` | numeric(38,18) | SHIP | Per ADR-0009; ranking-function input per `RANKING.md` |
-| `bet_id` | uuid \| null | SHIP | FK to `bets.id` for F-BET-1 entry comments; NULL for F-COMMENT-1/2/3 standalone comments |
+| `side_at_post_time` | text | SHIP | INV-3 binding: `YES` / `NO` frozen at insert — the side of the bet this comment rides (§14.1). The render-time ranking aggregates (§5.4) read this across reply-bets; there is no `stake_at_post_time` column |
+| `bet_id` | uuid | SHIP | **NOT NULL** — FK to `bets.id`, 1:1 with the comment-bearing bet (INV-1). Every comment rides a bet (post-bet or reply-bet); the only comment-free bet is the sell |
 | `created_at` | timestamptz | SHIP | |
 
 ### B.7 `dharma_ledger` (Bucket A)
@@ -2546,21 +2563,9 @@ Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.5 verifies precision 
 | `balance_after` | numeric(38,18) | SHIP | Running balance; INV-2 (no overdraft) verifiable from this column |
 | `created_at` | timestamptz | SHIP | |
 
-Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-type enum against actual implementation.
+Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.4 verifies entry-type enum against actual implementation.
 
-### B.8 `friendly_fire_events` (Bucket B)
-
-| Column | Type | Treatment | Notes |
-|---|---|---|---|
-| `id` | uuid | SHIP | Vote PK |
-| `voter_id` | uuid | PSEUDO | Rewritten to `voter_pseudonym` per §19.5 |
-| `comment_id` | uuid | SHIP | FK to `comments.id` |
-| `direction` | text | SHIP | `up` / `down` |
-| `cleared_at` | timestamptz \| null | SHIP | F-COMMENT-7 clear timestamp; NULL for active votes (second independent Bucket-B whitelisted transition; SCAFFOLD.2 stratum 3.B ratified) |
-| `frozen_at` | timestamptz \| null | SHIP | Bucket-B whitelisted transition; NULL until market resolution; the freeze instant per §3.6 |
-| `created_at` | timestamptz | SHIP | |
-
-### B.9 `payout_events` (Bucket A)
+### B.8 `payout_events` (Bucket A)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2573,7 +2578,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `amount` | numeric(38,18) | SHIP | Dharma paid out |
 | `created_at` | timestamptz | SHIP | |
 
-### B.10 `resolution_events` (Bucket A)
+### B.9 `resolution_events` (Bucket A)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2585,7 +2590,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `reason` | text \| null | SHIP | Admin free-text reason; NULL for F-RESOLVE-1; populated for F-RESOLVE-2 + F-RESOLVE-3 |
 | `created_at` | timestamptz | SHIP | |
 
-### B.11 `mod_actions` (Bucket A)
+### B.10 `mod_actions` (Bucket A)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2599,7 +2604,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `actor_id` | text | SHIP | `'admin-singleton'` for Track B; `'system'` for Track A automatic |
 | `created_at` | timestamptz | SHIP | |
 
-### B.12 `admin_events` (Bucket A)
+### B.11 `admin_events` (Bucket A)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2616,7 +2621,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `metadata.user_agent` | text | STRIP_KEY | PII per §19.4 |
 | `created_at` | timestamptz | SHIP | |
 
-### B.13 `user_events` (Bucket A)
+### B.12 `user_events` (Bucket A)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2634,7 +2639,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.5 verifies entry-typ
 | `metadata.user_agent` | text | STRIP_KEY | PII per §19.4 |
 | `created_at` | timestamptz | SHIP | |
 
-### B.14 `events` (Bucket A — canonical audit log)
+### B.13 `events` (Bucket A — canonical audit log)
 
 The events table is the most heavily-consumed surface for K_eff(t) trajectory derivation per §19.6 + §7.
 
@@ -2656,7 +2661,7 @@ The events table is the most heavily-consumed surface for K_eff(t) trajectory de
 | `metadata.user_agent` | text | STRIP_KEY | PII per §19.4 |
 | `created_at` | timestamptz | SHIP | Canonical chronological-sort column |
 
-### B.15 `identity_pool` (Bucket B)
+### B.14 `identity_pool` (Bucket B)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2671,7 +2676,7 @@ The events table is the most heavily-consumed surface for K_eff(t) trajectory de
 
 Post-experiment, all 50K rows ship with `assigned_at` populated only for tuples consumed during the experiment; unassigned tuples ship with NULL.
 
-### B.16 `image_uploads` (Bucket B)
+### B.15 `image_uploads` (Bucket B)
 
 | Column | Type | Treatment | Notes |
 |---|---|---|---|
@@ -2692,9 +2697,9 @@ Post-experiment, all 50K rows ship with `assigned_at` populated only for tuples 
 
 **H2 erasure interaction.** Per §19.4 + SPEC.1 §16.6, H2 erasure scrubs `users` PII columns + null-s `pfp_filename`. At dataset-export time, H2-erased rows ship in the same shape as not-erased rows — both have NULL email, NULL google_id, etc. The dataset consumer cannot distinguish "user erased pre-freeze" from "user never had data."
 
-**Coverage observation.** The 16 tables × ~10 columns each = ~160 column-level decisions. Of these:
-- ~125 are SHIP (audit-trail integrity preserved)
-- ~16 are PSEUDO (every `user_id` / `voter_id` / `target_user_id` FK gets rewritten)
+**Coverage observation.** The 15 tables × ~10 columns each = ~150 column-level decisions. Of these:
+- ~118 are SHIP (audit-trail integrity preserved)
+- ~14 are PSEUDO (every `user_id` / `target_user_id` FK gets rewritten)
 - 7 are STRIP / STRIP_KEY (the eight PII columns/keys per §19.4 minus one — `pfp_filename` is NULL_IF_ERASED instead of STRIP because it survives non-erasure)
 - 1 is NULL_IF_ERASED (`users.pfp_filename`)
 - ~12 are SHIP-with-policy-aware-treatment (e.g., `events.aggregate_id` resolves PSEUDO or SHIP per `aggregate_type`)
