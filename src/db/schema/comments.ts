@@ -73,6 +73,7 @@ export const comments = pgTable(
 			table.sideAtPostTime,
 		),
 		index("comments_image_uploads_idx").on(table.imageUploadsId),
+		index("comments_bet_id_idx").on(table.betId),
 	],
 );
 

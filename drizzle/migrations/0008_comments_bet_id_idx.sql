@@ -1,0 +1,1 @@
+CREATE INDEX "comments_bet_id_idx" ON "comments" USING btree ("bet_id");
