@@ -12,14 +12,15 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.8.0-draft (semver; bump major on invariant changes)
-- **Last updated:** 2026-05-08
+- **Version:** 1.9.0-draft (semver; bump major on invariant changes)
+- **Last updated:** 2026-06-01
 - **Authors:** The Zugzwang Authors
-- **Status:** Draft (promotes to Approved on v1.0.0 lock)
-- **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture, forthcoming), `docs/adr/`
+- **Status:** Working draft — folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor. Promotes to Approved on v1.0.0 lock at PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md).
+- **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
 - **Reader:** Claude Code (primary), human reviewers (secondary)
 - **Source decisions absorbed:** `spec1_gap_decisions.md` (75 rows resolved 2026-04-30); `cluster_a_ratify.md` (19 defaults); `cluster_b_decisions.md` (privacy/identity, 5 rows); `cluster_c_decisions.md` (visibility/brand/conclusion, 6 rows); `cluster_d_decisions.md` (operational edges, 4 rows); `cluster_e_decisions.md` (E1+E2 moderation, provisional); `cluster_launch_surfaces.md` (I1/I4/I5/I6); `Cluster_B` (A2 award formula, B1 lifecycle, B5 admin role); `Meta-rule__Prior-art_reference_policy`.
 - **Parked outside SPEC.1 scope:** A6 → `FOUND.1` (pre-registered hypothesis); J1 → Hrishikesh sole owner (refusal: spec does not invent market content); J9 → number-tuning pass.
+- **Anchor lock:** v1.8.0 was locked as canonical anchor on 2026-05-08 in PRECURSOR.2. This v1.9.0-draft is the SYNC.7 rewrite that folds ADR-0017 / ADR-0018 / ADR-0019 and resolves drift signal D11 (stale last-updated date). Supersedes prior working copies. Promotes to `v1.0` at PRECURSOR.4 fresh-session lock review (paired with the SPEC.2 v1.0 promotion).
 
 ---
 
@@ -46,23 +47,23 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 | Term | Definition | Code identifier |
 |---|---|---|
 | **Market** | A binary YES/NO question with a deadline and a resolution criterion. | `markets` table, `Market` type |
-| **Bet** | An atomic stake on a side of a market, accompanied by a comment. | `bets` table, `Bet` type |
-| **Comment** | The textual / image argument attached to a bet, or a reply to one. | `comments` table, `Comment` type |
-| **Reply** | A comment whose `parent_comment_id` is non-null. Inherits the *replier's* current side at reply-time. | `comments.parent_comment_id` |
+| **Bet** | An atomic stake on a side of a market, accompanied by a mandatory comment (INV-1). A bet with no parent comment is a **post** (clears the post floor); a bet whose comment has a parent is a **reply** (clears the reply floor). | `bets` table, `Bet` type |
+| **Comment** | The textual / image argument carried by a bet, or by a reply-bet. Every comment is bound to a bet — there is no comment without a stake (INV-1). | `comments` table, `Comment` type |
+| **Reply** | A bet whose comment has a non-null `parent_comment_id` — a **Support / Counter reply-bet** placed under a parent post. Carries its own stake (≥ reply floor) on the replier's held side, frozen at post-time. Flat: depth capped at 1 (a reply cannot itself be replied to). | `comments.parent_comment_id`, `bets` |
 | **Side** | YES or NO. The market's two share types. | `comments.side_at_post_time`, `bets.side` |
 | **Position** | A user's net share holding in a market. Computed from the bet ledger. | derived; not a column |
 | **Pool** | The CPMM share reserves for a market. Counterparty to every user trade. | `pools` table |
 | **Pool seed** | A `pool_seed` Dharma flow from the admin account into the market pool at market creation. | `dharma_ledger.tag = 'pool_seed'` |
 | **Pool unwind** | A `pool_unwind` Dharma flow from the pool back to the admin account at resolution or void. | `dharma_ledger.tag = 'pool_unwind'` |
 | **Dharma** | Non-transferable reputation score. Single fluid unit; same instrument is staked, won, and lost. | `NUMERIC(38,18)` column on user rows; flows in `dharma_ledger` |
-| **Daily Allowance** | A per-user, use-or-lose Dharma credit accruing once per UTC day. | `daily_allowance_events` table |
+| **Daily Credit** | A small, **flat** (never escalating) per-user Dharma credit, paid once per UTC day **only when the user places a commented bet that day** (per ADR-0018). Use-or-lose; does not accumulate. | `dharma_ledger.tag = 'daily_allowance'` + `users.last_allowance_accrued_at` cursor |
 | **Pseudonym** | The user's auto-assigned public display name of the form `<Colour><Animal><Number>` where `<Number>` is three-digit zero-padded (e.g., `RedFox001`, `BlueWolf472`). Permanent. Not user-chosen, not user-editable. Not an alias for a real-world identity. | `users.pseudonym` |
 | **PFP** | Profile picture: a pre-generated illustration of the user's `(colour, animal, number)` tuple, served from CDN. Coherent with the pseudonym. Permanent. | `users.pfp_filename` |
 | **Identity Pool** | The pre-generated bank of `(colour, animal, number)` tuples and matching PFP images consumed by signup. Filled pre-launch via the asset pipeline (§13 F-AUTH-3); FIFO-consumed at signup; never replenished except by re-running the pipeline operationally. | `identity_pool` table |
 | **Track A** | Moderation track: auto-ban category (CSAM, sexual minors, NSFW, adult imagery). No admin in loop. | `mod_actions.action ∈ {csam_blocked, nsfw_auto_banned}` |
 | **Track B** | Moderation track: admin-review category (graphic violence, threats, hate, harassment). Admin in loop. | `mod_actions.action ∈ {flagged, approved, blocked}` |
 | **Track C** | Moderation track: below threshold. Posts normally. | absence of `mod_actions` flag row |
-| **In / Flipped / Exited** | The three-state marker on every comment, reflecting the *author's current position* relative to the comment's *frozen post-time side*. | derived from `bets` + `comments.side_at_post_time` |
+| **Flipped / Exited marker** | The marker surfaced on a comment when the *author's current position* diverges from the comment's *frozen post-time side*: **Flipped** (author now holds the opposite side) or **Exited** (author holds no position). An author still holding the comment's side renders **no marker** — that is the default, unnamed state. | derived from `bets` + `comments.side_at_post_time` |
 | **Open / Closed / Resolving / Resolved / Voided / Frozen** | The six market lifecycle states. See §6. | `markets.state` |
 | **Banned** | A user-account state. Existing positions ride to resolution; no new bets, comments, allowance accrual, or appeal. | `users.banned_at` (non-null = banned) |
 | **Mod-action log** | Append-only log of every Track A and Track B action. | `mod_actions` table |
@@ -76,9 +77,11 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 | **CPMM** | Constant-product market maker. The pricing rule for share trades. Standard form: `x · y = k`. | `src/server/markets/cpmm.ts` |
 | **Stake** | The Dharma amount committed to a bet. Bought back on sell; settled on resolution. | `bets.stake` |
 | **Slippage** | The price impact of a single trade against thin liquidity. | computed pre-confirm |
-| **Friendly-fire** | Asymmetric upvote/downvote mechanic: a user upvotes only opposite-side comments and downvotes only same-side comments. Display-only — never a Dharma flow, never affects state, but does enter the §9 ranking function as one input among others. | `friendly_fire_events` table |
-| **Ranking function** | Open-source, deterministic, universal function that orders both top-level comments and replies in the debate view. Lives in `RANKING.md`. Inputs: `stake_at_post_time` (frozen on row), friendly-fire net score, opposite-side direct-reply count, same-side direct-reply count, comment age. Auditable from public dataset; not an audit event itself. Locked by ADR-0009. | `RANKING.md`, `src/lib/ranking.ts` |
-| **Single-side rule** | Per-market constraint: a user holds a position on at most one side at a time. Enforced at the `(user_id, market_id)` position layer. To switch sides, exit fully then re-enter via a fresh F-BET-1 with new comment. | enforced in `src/server/bets/place.ts` |
+| **Ranking model** | Open-source, deterministic, universal model ordering posts and replies in the debate view. Posts: the **Top** multi-lane composite (default) or a single-axis filter mode (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x). Replies: stake-descending within side. Reads four per-side reply-bet aggregates (`support_count`, `counter_count`, `support_dharma`, `counter_dharma`) plus author stake and age — every input requires committing Dharma to generate. Read-time-computed; auditable from the public dataset; not an audit event. Locked by **ADR-0017** (supersedes ADR-0009); math lives in `RANKING.md`. | `RANKING.md`, `src/lib/ranking.ts`, `src/lib/ranking.config.ts` |
+| **Single-side rule** | Per-market constraint: a user holds a position on at most one side at a time. Enforced at the `(user_id, market_id)` position layer. To switch sides, exit fully then re-enter via a fresh commented bet. | enforced in `src/server/bets/place.ts` |
+| **Post floor / Reply floor** | The two asymmetric minimum-bet floors (ADR-0018). **Post floor** (low, ranged) is the minimum stake on a top-level bet; **reply floor** (pinned at 50 Dharma) is the higher minimum stake on a reply-bet. Reply floor > post floor by design — it is the lever on ADR-0017's conceded reply-level C > n. | `BET_MIN_STAKE_POST`, `BET_MIN_STAKE_REPLY` (§16.1) |
+| **Support / Counter** | The two sides of a reply-bet relative to its parent post: **Support** = a reply-bet on the *same* side as the parent's frozen side; **Counter** = a reply-bet on the *opposite* side. Surfaced per post as read-time aggregate counts and Dharma totals (`support_count : Đ support_dharma` / `counter_count : Đ counter_dharma`). Not a vote — there is no standalone Support/Counter affordance; the counts aggregate over reply-bets. | derived from `bets.side` + `comments.parent_comment_id` + parent `side_at_post_time` |
+| **Top / ranking mode** | **Top** is the fixed default post ordering — a multi-lane composite that surfaces a post which decisively dominates any one lane (traction, stake, or split) by a relative margin. The **ranking modes** are the opt-in single-axis lenses (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x). Per ADR-0017. | `RANKING.md`, `src/lib/ranking.ts` |
 
 Drift between this glossary and code identifiers is a bug — a column rename, a type alias, or a route name change must update this section in the same PR.
 
@@ -94,7 +97,7 @@ Drift between this glossary and code identifiers is a bug — a column rename, a
 - **G2.** Release the full archive — markets, bets, comments, Dharma ledger — as a public dataset on November 6, 2026. *(Per `H1`. Maps to `archive-bundle-released-on-time`.)*
 - **G3.** Make the public dataset sufficient for *post hoc* derivation of K_eff(t) and its components — by including the events log, Dharma ledger, bets, and comments already captured by §16.4, and bundling a derived K_eff trajectory series in the dataset release per §12.2. No live, snapshot, or in-product K_eff surface ships in v1; conclusion-event analytics are generated out-of-band against the dataset. *(Maps to acceptance test `dataset-k-eff-derivable`.)*
 - **G4.** Enforce bet+comment atomicity at the database transaction layer such that no observable state contains a bet without its comment, or vice versa. *(Per `INV-1`. Maps to `bet-comment-atomicity` test family.)*
-- **G5.** Make commentary mandatory at every market entry: the entry comment is the user's first stake-attached argument, side-frozen to the entry position. *(Per `INV-1` + `INV-3`. Maps to `entry-bet-requires-comment`.)*
+- **G5.** Make commentary mandatory at **every bet** — entry, subsequent buy, and reply-bet alike: each carries a stake-attached argument, side-frozen at post-time. There is no comment-free buy and no comment without a stake (the reply-as-bet model per ADR-0017 / ADR-0018). *(Per `INV-1` + `INV-3`. Maps to `bet-requires-comment`.)*
 - **G6.** Preserve pseudonym-stable reputation: a user's Dharma trajectory and comment record persist across the experiment window under a pseudonym chosen at signup. Pseudonym scrub on right-to-erasure replaces the display name with a permanent placeholder; the ledger and content remain. *(Per `H2`, `D8`. Maps to `pseudonym-scrub-preserves-ledger`.)*
 - **G7.** Bound the admin role: the admin authenticates separately, creates markets, seeds pools, resolves, and moderates Track B. Admin cannot place bets, post comments, or hold positions — enforced structurally, not by runtime check: admin has no `users` row (per `B5`, F-AUTH-ADMIN). *(Maps to `admin-not-participant` test family.)*
 - **G8.** Make the public dataset sufficient for *post hoc* analysis of propagation dynamics — including the rate at which informed participation grows (dn/dt) and how that growth relates to stake-backed correctness — by including timestamps on every bet, comment, and admin-events row already captured by §16.4. No live propagation dashboard ships; the goal is satisfied by the data being analysable downstream by anyone with the archive. *(No new flows, no new tables. Maps to `dataset-propagation-derivable`.)*
@@ -137,8 +140,8 @@ This section mirrors `CLAUDE.md` §2.1–§2.4 verbatim in semantics. It exists 
 
 ### INV-1 — Bet ↔ comment atomicity
 
-- **Statement.** A bet row and its associated comment row are either both persisted or neither is. There is no observable state in which a bet exists without its comment, or vice versa.
-- **Rationale.** Mandatory commentary is the product's thesis. Allowing silent bets re-creates a generic prediction market.
+- **Statement.** A bet row and its associated comment row are either both persisted or neither is. There is no observable state in which a bet exists without its comment, or vice versa. **This binds *every* bet — entry, subsequent buy, and reply-bet alike** (the v1.9.0 reply-as-bet model per ADR-0017/ADR-0018: there is no comment-free buy and no comment without a stake). A post is a top-level bet+comment; a reply is a bet+comment with a `parent_comment_id`.
+- **Rationale.** Mandatory commentary is the product's thesis. Allowing silent bets re-creates a generic prediction market. Binding it to every bet (not only entry) is the structural form of "no stake, no voice" sharpened to *influence must cost* (SYNC.4): every unit of visible argument is backed by committed Dharma.
 - **Enforcement.** Single Postgres transaction wrapping both inserts. `bets.comment_id` is `NOT NULL` with foreign key. `POST /api/bets` (or the corresponding Server Action) without a `commentId` returns 400.
 - **Test assertions.** `tests/server/bets/atomicity.test.ts`:
   - `it("rolls back the bet when the comment insert fails")`
@@ -164,12 +167,12 @@ This section mirrors `CLAUDE.md` §2.1–§2.4 verbatim in semantics. It exists 
 
 - **Statement.** A comment inherits the author's market position at the moment the comment is posted. If the author later flips, exits, or re-enters, the comment's side label does not change. Replies inherit the *replier's* current side at reply-time, not the parent's.
 - **Rationale.** Comments are stake-backed arguments; their meaning is bound to the side the author was on when they spoke. Allowing post-hoc reassignment converts the debate view into a self-rewriting record.
-- **Enforcement.** `comments.side_at_post_time` is non-null and never updated after insert. A row-level rule rejects updates to that column. The author's *current* position is computed live on read and surfaces as the **In / Flipped / Exited** marker per `B1`. A user with zero current position cannot post a new comment (`A1`); their prior comments remain visible with the **Exited** marker.
+- **Enforcement.** `comments.side_at_post_time` is non-null and never updated after insert. A row-level rule rejects updates to that column. The author's *current* position is computed live on read and surfaces as the **Flipped / Exited** marker per `B1` (default: no marker when the author still holds the comment's side). Because every comment rides a bet (INV-1), a comment-bearing action by a user with zero current position is necessarily an *entry* bet that establishes the position atomically — there is no comment without a stake (`A1`). A user's prior comments remain visible with the **Exited** marker after they sell to zero.
 - **Test assertions.** `tests/server/comments/side-frozen.test.ts`:
   - `it("preserves comment side after author flips position")`
   - `it("preserves comment side after author exits position")`
-  - `it("inherits replier's side on reply, not parent's")`
-  - `it("rejects new comment from user with zero position")`
+  - `it("inherits replier's side on reply-bet, not parent's")`
+  - `it("rejects a comment-bearing write that carries no bet")`
   - `it("preserves prior comments visible with Exited marker after exit")`
 - **Failure mode.** Strategic record-laundering. Users post under one side, flip, and the debate view reorganises around their new position — the audit record dissolves.
 - **Code paths.** `src/server/comments/*`, `src/server/debate-view/*`, `drizzle/migrations/*` for any change to `comments.side_at_post_time`.
@@ -244,7 +247,7 @@ stateDiagram-v2
     Flagged --> Locked: market resolves or voids
 ```
 
-Three-state In / Flipped / Exited marker is **derived live** on read from the author's current position vs `comments.side_at_post_time`. It is not a state in this machine — it is a render-time property. At market resolution, the marker freezes alongside the comment.
+The **Flipped / Exited marker** is **derived live** on read from the author's current position vs `comments.side_at_post_time` (default: no marker when the author still holds the comment's side). It is not a state in this machine — it is a render-time property. At market resolution, the marker freezes alongside the comment.
 
 ### 6.3 User lifecycle
 
@@ -266,30 +269,32 @@ stateDiagram-v2
 
 Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance.
 
-**Single-side rule.** A user holds a position on at most one side of a market at any moment. The entry bet (F-BET-1) commits the user to that side for the duration of their participation in that market. Subsequent buys must be on the same side (F-BET-2). The opposite side cannot be bought while a position is held; to switch sides, the user must first sell their entire position to zero (F-BET-3) and then re-enter via F-BET-1 with a fresh comment. This is a spec-level rule, not an invariant — enforced via the `(user_id, market_id)` position constraint and pre-condition checks on F-BET-1 and F-BET-2. Rationale: a stake is an argument, and a user cannot meaningfully argue both sides of a contested question simultaneously.
+**Single-side rule.** A user holds a position on at most one side of a market at any moment. The entry bet (F-BET-1) commits the user to that side for the duration of their participation in that market. Subsequent buys must be on the same side (F-BET-2). The opposite side cannot be bought while a position is held; to switch sides, the user must first sell their entire position to zero (F-BET-3) and then re-enter with a fresh commented bet. This is a spec-level rule, not an invariant — enforced via the `(user_id, market_id)` position constraint and pre-condition checks on F-BET-1 and F-BET-2. Rationale: a stake is an argument, and a user cannot meaningfully argue both sides of a contested question simultaneously.
+
+**Every buy is a commented bet (v1.9.0 reply-as-bet model, per ADR-0017 / ADR-0018).** There is no comment-free buy and no comment without a stake (INV-1). A buy whose comment has no `parent_comment_id` is a **post** (top-level argument; clears the **post floor**, `BET_MIN_STAKE_POST`). A buy whose comment carries a `parent_comment_id` is a **reply** (a Support/Counter reply-bet under a parent; clears the higher **reply floor**, `BET_MIN_STAKE_REPLY` = 50). Both are bets: both move the CPMM price, buy shares on the user's held side, and append to the ledger. The post/reply distinction governs only the floor and the `parent_comment_id`. Selling (F-BET-3) is the sole exception — it is a position unwind, not an argument, and carries no comment.
 
 ### F-BET-1 — Entry bet+comment (atomic)
 
-- **Pre.** `market.state = Open` ∧ `S > BET_MIN_STAKE` ∧ `C.length ∈ [1, COMMENT_MAX_LENGTH]` ∧ user `Active` ∧ user not admin ∧ user has no current position in this market (i.e., zero shares on both sides) ∧ user balance ≥ S.
-- **System.** Open one Postgres transaction. Read market state and pool reserves. Compute CPMM share quantity for stake `S` at current price `p` for the chosen side. Run text and image moderation on `C`; if Track A or Track B, abort transaction (see §14 F-MOD-4). Insert comment row with `side_at_post_time` = chosen side. Insert bet row with `comment_id` set and `side` = chosen side. Decrement user balance by `S`; increment pool reserves; write `dharma_ledger` row tagged `bet_stake`. Commit. The user is now committed to this side for the lifetime of this position.
+- **Pre.** `market.state = Open` ∧ stake `S` clears the applicable floor (`S ≥ BET_MIN_STAKE_POST` for a top-level post; `S ≥ BET_MIN_STAKE_REPLY` if the entry is placed as a reply, i.e. `parent_comment_id` is set) ∧ `C.length ∈ [1, COMMENT_MAX_LENGTH]` ∧ user `Active` ∧ user not admin ∧ user has no current position in this market (i.e., zero shares on both sides) ∧ user balance ≥ S.
+- **System.** Open one Postgres transaction. Read market state and pool reserves. Compute CPMM share quantity for stake `S` at current price `p` for the chosen side. Run text and image moderation on `C`; if Track A or Track B, abort transaction (see §14 F-MOD-4). Insert comment row with `side_at_post_time` = chosen side and `parent_comment_id` (NULL for a post, set for a reply). Insert bet row with `comment_id` set and `side` = chosen side. Decrement user balance by `S`; increment pool reserves; write `dharma_ledger` row tagged `bet_stake`. Commit. The user is now committed to this side for the lifetime of this position.
 - **Response.** `{ betId, commentId, side, sharesBought, newPrice }`.
 - **Errors.** 400 `insufficient_dharma`, 400 `market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 409 `market_resolving`, 403 `banned_user`.
 - **Invariants.** INV-1, INV-3.
 - **Acceptance.** `tests/server/bets/atomicity.test.ts::happy-path-entry`.
 
-### F-BET-2 — Subsequent buy (existing position, same side)
+### F-BET-2 — Subsequent bet+comment (existing position, same side)
 
-- **Pre.** Same as F-BET-1, but user has a current non-zero position in this market **on the side being bought**. (If the user holds a position on the opposite side, F-BET-2 is rejected — see F-BET-10.) Comment is *not* mandatory — INV-1 binds the *entry* bet only.
-- **System.** Single transaction. Read market and pool. Verify the user's existing position is on the chosen side; if not, reject before any state changes. Compute shares. Decrement balance, increment pool, write `dharma_ledger` row.
-- **Response.** `{ betId, sharesBought, newPrice }`.
-- **Errors.** Same as F-BET-1 (minus comment-related codes), plus 400 `opposite_side_held`.
-- **Invariants.** INV-2 (every flow tagged on the ledger).
-- **Acceptance.** `tests/server/bets/subsequent-buy.test.ts::happy-path`.
+- **Pre.** Same as F-BET-1, but the user has a current non-zero position in this market **on the side being bought**. (If the user holds a position on the opposite side, this is rejected — see F-BET-10.) **A comment is mandatory** — every buy carries one (INV-1, v1.9.0 reply-as-bet model). Stake clears the post floor (top-level) or the reply floor (if `parent_comment_id` is set).
+- **System.** Single transaction. Read market and pool. Verify the user's existing position is on the chosen side; if not, reject before any state changes. Run text/image moderation on `C`; if Track A or Track B, abort (see §14 F-MOD-4). Insert comment row (`side_at_post_time` = held side; `parent_comment_id` NULL for a post, set for a reply). Insert bet row with `comment_id` set. Compute shares; decrement balance; increment pool; write `dharma_ledger` row tagged `bet_stake`.
+- **Response.** `{ betId, commentId, sharesBought, newPrice }`.
+- **Errors.** Same as F-BET-1, plus 400 `opposite_side_held`.
+- **Invariants.** INV-1, INV-2, INV-3.
+- **Acceptance.** `tests/server/bets/subsequent-buy.test.ts::happy-path-requires-comment`.
 
 ### F-BET-3 — Sell (in-stream exit)
 
 - **Pre.** User holds a non-zero position in this market on the side being sold. `market.state = Open`.
-- **System.** Single transaction. Compute Dharma return at current price. Increment user balance; decrement pool reserves; write `dharma_ledger` row tagged `bet_stake` with negative direction (or equivalently `bet_unwind` — schema decides). Position adjusts; comment record unaffected (per `B1`); In/Flipped/Exited marker recomputes on next read.
+- **System.** Single transaction. **A sell carries no comment** — it is a position unwind, not an argument, and is neither a post nor a reply. Compute Dharma return at current price. Increment user balance; decrement pool reserves; write `dharma_ledger` row tagged `bet_stake` with negative direction (or equivalently `bet_unwind` — schema decides). Position adjusts; comment and reply records are unaffected (per `B1`, INV-3) and remain in the debate as permanent record; the **Flipped / Exited marker** recomputes on next read (Exited once the position reaches zero).
 - **Response.** `{ sharesSold, dharmaReturned, newPrice }`.
 - **Errors.** 400 `position_not_held`, 400 `market_closed_at`.
 - **Invariants.** INV-2, INV-3 (selling does *not* delete or alter prior comments).
@@ -350,112 +355,85 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 
 *Thesis relevance: (a) directly testing K × n > C.*
 
-**Shared write-rate budget.** Direct comments (F-COMMENT-1), replies (F-COMMENT-2), image-attached comments (F-COMMENT-3), and friendly-fire votes (F-COMMENT-6) share a single per-user, per-market rate-limit budget governed by `RATE_LIMIT_PER_MARKET_PER_DAY` and `RATE_LIMIT_BURST_PER_MIN`. The cooldown applies identically to all four — replies are not exempt, friendly-fire votes are not exempt. Numeric values per the number-tuning pass.
+**Every comment rides a bet.** Under the v1.9.0 reply-as-bet model (ADR-0017 / ADR-0018), a comment is never a standalone write — it is the argument carried by a bet (§7). A top-level comment is a **post-bet** (F-BET-1 entry or F-BET-2 subsequent, post floor); a comment with a `parent_comment_id` is a **reply-bet** (F-COMMENT-2, reply floor 50). This section specifies the comment- and reply-facing behaviour of those bets — side-freezing, parent linkage, image attachment, length, and the no-stake-no-voice consequence — while the bet mechanics (price impact, ledger, single-side) live in §7. The two are one atomic action (INV-1). Because a comment is a bet, it can only be written while `market.state = Open`; once a market closes there are no new comments or replies (the debate window is the market-open window).
 
-### F-COMMENT-1 — Direct comment (post-entry, additional argument)
+**Rate-limit posture.** Posts and replies are bets, so their anti-abuse posture is the bet posture (per-IP burst caps via `BET_ATTEMPTS_PER_IP_PER_MIN`, §16.1), not a separate per-market comment/vote budget. Whether reply-bets additionally carry a per-market productive cap distinct from top-level bets is deferred to SPEC.2 §11 + the number-tuning pass; the R2 signed-PUT-URL mint endpoint keeps its own per-IP cap (`IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`). There is no standalone comment or vote rate-limit budget in v1.9.0.
 
-- **Pre.** User has a current non-zero position in the market on the side they're commenting from. `market.state ∈ {Open, Closed, Resolving}`. Comment passes moderation Track C. Rate-limit budget not exhausted.
-- **System.** Insert comment row with `side_at_post_time` derived from current position.
-- **Response.** `{ commentId, side }`.
-- **Errors.** 403 `no_position_no_voice`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 423 `comment_track_b_under_review`, 429 `rate_limit_exhausted`.
-- **Invariants.** INV-3.
-- **Acceptance.** `tests/server/comments/direct.test.ts::position-required`.
+### F-COMMENT-1 — Additional top-level argument (= a post-bet)
 
-### F-COMMENT-2 — Reply
+- **Pre.** User has a current non-zero position in the market on the side they are arguing from. `market.state = Open`. Stake clears the post floor (`BET_MIN_STAKE_POST`). Comment passes moderation Track C. (An additional argument is a new post-bet — it buys shares on the held side per F-BET-2; it is not a free comment.)
+- **System.** Per F-BET-2 (subsequent bet+comment): single transaction; moderation; insert comment row (`side_at_post_time` = held side, `parent_comment_id` NULL); insert bet row; `dharma_ledger` row; price moves.
+- **Response.** `{ betId, commentId, side }`.
+- **Errors.** 400 `insufficient_dharma`, 400 `below_post_floor`, 400 `market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 423 `comment_track_b_under_review`, 400 `opposite_side_held`.
+- **Invariants.** INV-1, INV-3.
+- **Acceptance.** `tests/server/comments/direct.test.ts::additional-argument-is-a-post-bet`.
 
-- **Pre.** Same as F-COMMENT-1; additionally `parent_comment_id` references an existing comment in the same market.
-- **System.** Reply inherits the *replier's* current side, not the parent's. Depth limit `REPLY_DEPTH_MAX` = 1 enforced (replies cannot themselves be replied to in v1; flat replies only per ADR-0009). The reply is scored by the same ranking function as top-level comments per §9.
-- **Response.** `{ commentId, side, depth }`.
-- **Errors.** Same as F-COMMENT-1, plus 400 `reply_depth_exceeded`.
-- **Invariants.** INV-3.
-- **Acceptance.** `tests/server/comments/reply.test.ts::replier-side-not-parent`.
+### F-COMMENT-2 — Reply (= a Support/Counter reply-bet)
 
-### F-COMMENT-3 — Comment with image attachment
+- **Pre.** User holds a current non-zero position on their side (or is entering — the reply is then their entry bet). `market.state = Open`. `parent_comment_id` references an existing comment in the same market. Stake clears the **reply floor** (`BET_MIN_STAKE_REPLY` = 50, higher than the post floor per ADR-0018). Comment passes moderation Track C.
+- **System.** A reply is a bet (per §7): single transaction; moderation; insert comment row with `parent_comment_id` set and `side_at_post_time` = the replier's held side (frozen at post-time, **not** the parent's); insert bet row; `dharma_ledger` row; price moves. The reply's side relative to the parent's frozen side classifies it at read-time as **Support** (same side as parent) or **Counter** (opposite) — a derived classification, never a stored verdict. Depth limit `REPLY_DEPTH_MAX = 1` enforced (a reply cannot itself be replied to; flat replies per ADR-0017). Replies are ordered by stake within side per §9.
+- **Response.** `{ betId, commentId, side, parentCommentId }`.
+- **Errors.** As F-COMMENT-1 but `below_reply_floor` in place of `below_post_floor`; plus 400 `reply_depth_exceeded`, 404 `parent_comment_not_found`.
+- **Invariants.** INV-1, INV-3.
+- **Acceptance.** `tests/server/comments/reply.test.ts::reply-is-a-bet-replier-side-not-parent`, `tests/server/comments/reply.test.ts::reply-floor-enforced`.
 
-- **Pre.** Same as F-COMMENT-1. Image upload occurs out of band: browser uploads directly to R2 via signed URL; server bypassed for file bytes (per `K3`). Image then runs through CSAM hash + general classifier before comment row commits.
-- **System.** Image moderation result routes to Track A / B / C the same way text moderation does; if Track A on either layer, both fail.
-- **Response.** Comment response on success; F-MOD-4-shaped error on failure.
-- **Errors.** Same as F-COMMENT-1, plus image-specific moderation codes.
-- **Invariants.** INV-1 (entry case), INV-3.
+### F-COMMENT-3 — Bet+comment with image attachment
+
+- **Pre.** Same as the underlying bet (F-BET-1 / F-BET-2 / F-COMMENT-2). Image upload occurs out of band: browser uploads directly to R2 via signed URL; server bypassed for file bytes (per `K3`). Image then runs through CSAM hash + general classifier before the bet+comment transaction commits.
+- **System.** Image moderation result routes to Track A / B / C the same way text moderation does; if Track A on either layer, the whole bet+comment transaction fails (INV-1).
+- **Response.** Bet+comment response on success; F-MOD-4-shaped error on failure.
+- **Errors.** Same as the underlying bet, plus image-specific moderation codes.
+- **Invariants.** INV-1, INV-3.
 - **Acceptance.** `tests/server/comments/media.test.ts::image-moderation-routes`.
 
 ### F-COMMENT-4 — Comment exceeds length limit
 
 - **Pre.** Submitted comment text length > `COMMENT_MAX_LENGTH`.
-- **System.** Live counter on input, submit disabled past limit (per `G4`). If bypassed, 400.
+- **System.** Live counter on input, submit disabled past limit (per `G4`). If bypassed, the bet+comment transaction rejects with 400 before any state change.
 - **Response.** 400 `comment_too_long`.
 - **Acceptance.** `tests/server/comments/validation.test.ts::length-limit`.
 
-### F-COMMENT-5 — Comment by user with no current position
+### F-COMMENT-5 — No stake, no voice
 
-- **Pre.** User has zero current position in the market.
-- **System.** Reject *new* comment submission with 403 `no_position_no_voice`. Their prior comments in this market remain visible with the **Exited** marker (per `B1`, `INV-3`).
-- **Response.** 403 `no_position_no_voice`.
-- **Invariants.** INV-3.
-- **Acceptance.** `tests/server/comments/no-position.test.ts::reject-new-allow-existing`.
+- **Pre.** A comment-bearing write arrives with no accompanying bet, or from a user attempting to argue without committing a stake.
+- **System.** Rejected — there is no comment without a stake (INV-1, `A1`). To post or reply, the user places a bet (an entry if they hold no position, a subsequent bet if they do); bet and comment commit atomically. A user who has sold to zero holds no position; their prior comments remain visible with the **Exited** marker (per `B1`, INV-3), but they cannot post or reply again without a fresh entry bet.
+- **Response.** 400 `comment_requires_bet` (no bet attached) / 403 `no_position_no_voice` (legacy alias for the zero-position case).
+- **Invariants.** INV-1, INV-3.
+- **Acceptance.** `tests/server/comments/no-position.test.ts::comment-requires-bet`, `tests/server/comments/no-position.test.ts::exited-user-prior-comments-remain`.
 
-### F-COMMENT-6 — Friendly-fire vote (cast)
-
-- **Description.** "Friendly-fire" is the asymmetric upvote/downvote mechanic: a user **upvotes only comments on the opposite side of theirs** and **downvotes only comments on their own side**. The mechanic surfaces cross-aisle acknowledgement (where the other side reluctantly validates an argument) and same-side accountability (where a user calls out their own side). It is display-only — never a Dharma flow, never an INV affecting state, never a sort-order primary signal (it is *one input* among others to the open-source ranking function in §9).
-- **Pre.** User has a current non-zero position in the market on side X. `market.state ∈ {Open, Closed, Resolving}`. Target comment exists in the same market with frozen `side_at_post_time` = Y. Voting rule keys on the comment's frozen side, not the author's current side. Eligibility:
-  - Direction **upvote** allowed only if Y = ¬X (cross-aisle).
-  - Direction **downvote** allowed only if Y = X (same-side).
-  - User cannot vote on their own comments.
-  - One vote per `(user, comment)` — second vote in the same direction returns 409 `already_voted`. To change a vote, the user clears it first via F-COMMENT-7, then casts the new direction.
-  - Rate-limit budget not exhausted.
-- **System.** Insert `friendly_fire_events` row: `voter_id, comment_id, market_id, comment_side, direction (up | down), voter_side_at_cast_time, timestamp, frozen_at = NULL`.
-- **Response.** `{ commentId, direction, newDisplayedCount }` where `newDisplayedCount` is the live `(up, down)` after the cast.
-- **Errors.** 403 `no_position_no_voice`, 403 `friendly_fire_ineligible_direction`, 403 `friendly_fire_self_vote`, 409 `already_voted`, 429 `rate_limit_exhausted`.
-- **Invariants.** None (display-only mechanic; not an invariant).
-- **Acceptance.** `tests/server/friendly-fire/eligibility.test.ts::cross-aisle-up-same-side-down`.
-
-### F-COMMENT-7 — Friendly-fire vote (clear)
-
-- **Pre.** User has a previously cast friendly-fire vote on the target comment. `frozen_at IS NULL` (vote not yet frozen by exit-event).
-- **System.** Mark the existing `friendly_fire_events` row as cleared via a compensating row tagged `cleared`, OR delete it (schema decides; cleared semantics preserves the audit trail more cleanly — recommended). Display count recomputes.
-- **Response.** `{ commentId, newDisplayedCount }`.
-- **Errors.** 404 `vote_not_found`, 410 `vote_already_frozen`.
-- **Invariants.** None.
-- **Acceptance.** `tests/server/friendly-fire/clear.test.ts::clear-recomputes-display`.
-
-### F-COMMENT-8 — Friendly-fire freeze on exit-to-zero
-
-- **Trigger.** Not a user-initiated flow. Fires automatically as a side-effect of F-BET-3 (Sell — in-stream exit) when a user's position in a market goes to zero.
-- **System.** Within the F-BET-3 transaction (so it commits atomically with the exit), find all the user's `friendly_fire_events` rows in this market where `frozen_at IS NULL` and set `frozen_at = now()`. Frozen rows remain in the audit log permanently (released in the public dataset per §16.4 + §12.2). Frozen rows **do not appear in the live displayed counts** on comments (counts show only votes from current eligible voters — those with `frozen_at IS NULL` and a current non-zero position on the legitimate voting side). This is the "remove from display, keep in record" rule.
-- **Re-entry behaviour.** A user who exits and re-enters the same side does *not* automatically thaw their old votes. Old votes stay frozen; new votes are fresh casts via F-COMMENT-6. A user who exits and re-enters the opposite side (a flip) similarly cannot reuse old votes — the old votes were cast from the prior side and remain frozen with their original `voter_side_at_cast_time`.
-- **Audit row.** Existing `friendly_fire_events` row updated with `frozen_at` only; nothing else changes. Append-only discipline preserved (the freeze is a single-field update on the existing row, not a mutation of historical content).
-- **Invariants.** None — this is a display-eligibility rule, not an INV.
-- **Acceptance.** `tests/server/friendly-fire/freeze-on-exit.test.ts::frozen-votes-removed-from-display-kept-in-log`.
+*(F-COMMENT-6, F-COMMENT-7, and F-COMMENT-8 — the friendly-fire vote cast / clear / freeze-on-exit flows — are **removed in v1.9.0**. Friendly-fire is gone entirely: there is no standalone up/down vote affordance and no `friendly_fire_events` table. The Support/Counter counts shown on a post are read-time aggregates over its reply-bets, not votes — see §9. This removal is per ADR-0017's reply-as-bet model as sharpened in SYNC.7, consistent with SPEC.2 §5.4.)*
 
 ---
 
-## §9 Debate View + Three-State Marker
+## §9 Debate View, Ranking & Markers
 
-*Thesis relevance: (a) directly testing K × n > C — sort order is a propagation mechanism on the dn/dt half of the thesis.*
+*Thesis relevance: (a) directly testing K × n > C — ranking is a propagation mechanism on the dn/dt half of the thesis.*
 
-**Ranking function (open-source).** Comments in the debate view — both top-level and replies — are ordered by a published, deterministic, universal ranking function. Inputs: `stake_at_post_time` (the Dharma-valued size of the author's position on the comment's side at the moment of post, frozen on the comment row at write-time), friendly-fire net score (`up − down`, computed over `friendly_fire_events` rows where `frozen_at IS NULL` and `cleared_at IS NULL`), opposite-side direct-reply count (replies to this comment whose `side_at_post_time` differs from the parent's), same-side direct-reply count (replies whose `side_at_post_time` matches the parent's), and comment age. The function is open-source (AGPL-3.0, same license as the protocol), versioned, and lives in `RANKING.md` at the repo root — referenced from this section, not embedded. The function is auditable: the inputs at any moment are reconstructible from the public dataset, so any reader can re-run the function over the inputs and verify the order they saw was honest. The function is *not* personalised — every reader sees the same order for the same market at the same moment. The function is **not** an audit event — ranking is a pure display operation; no `ranking_snapshots` table; no per-poll history; researchers compute rank on demand from the inputs already in the audit log. Changes to the function ship via ADR + a code commit. The function shape and design-intent weight ordering for v1 are locked by **ADR-0009**; specific weight values pin in `RANKING.md` via the number-tuning pass (target 2026-09-01) before public launch. At market resolution the function freezes — its `now` parameter is set to the resolution timestamp, and the rendered order at that moment becomes permanent.
+**Ranking model (open-source).** Posts and replies in the debate view are ordered by a published, deterministic, universal **model** — not a single scalar function. Per **ADR-0017** (which supersedes ADR-0009), there is no "quality" verdict on a post: a Support reply-bet and a Counter reply-bet are *both* contributions, so contestation is signal, not noise. Each post exposes **four per-side base signals** — `support_count`, `counter_count`, `support_dharma`, `counter_dharma` — plus its age and the author's own stake `a` (read from the post's entry bet). From these the model derives volume `n = support_count + counter_count`, value `D = support_dharma + counter_dharma`, and balance `b = min(support_count, counter_count) / max(support_count, counter_count)`. **Every input requires committing Dharma to generate** (a reply is itself a bet); there are no free-vote or passive-engagement inputs. The model is open-source (AGPL-3.0, same license as the protocol), versioned, and lives in `RANKING.md` at the repo root — referenced from this section, not embedded. It is auditable (inputs reconstructible from the public dataset, so any reader can re-run the model and verify the order), *not* personalised (same order for every reader at the same moment), and **not** an audit event (read-time-computed; no `ranking_snapshots` table, no per-poll history; researchers compute any historical order on demand from the inputs). Changes ship via ADR + a code commit. **The model carries no anti-capital logic** — K · n > C is upheld by the mandatory-commentary floor operating in the open, not by suppressing capital at the ranking layer (ADR-0017 Driver 2); all lanes compete on equal terms, stake included. Specific lane ratios, floors, and decay constants pin in `RANKING.md` via the number-tuning pass (target 2026-09-01) before launch. At market resolution the model freezes — its `now` parameter is set to the resolution timestamp, and the rendered order at that moment becomes permanent (INV-4).
 
-**Replies** under any parent comment are scored by the same ranking function, then rendered via a **two-slot rule**: by default each parent surfaces its **best opposite-side reply** (highest-scoring reply whose `side_at_post_time` differs from the parent's) and its **best same-side reply** (highest-scoring reply whose `side_at_post_time` matches the parent's). A "show all replies" affordance expands the full reply set, ordered by ranking-function score descending. Replies are flat — depth is capped at 1 per ADR-0009 (a reply cannot itself be replied to). Edge cases: when no opposite-side reply exists, render the two best same-side; when no same-side reply exists, render the two best opposite-side; when only one reply exists, render it without an expansion affordance; when zero replies exist, no reply widget is rendered.
+**Post ordering — Top (default) + filter modes.** The fixed default order is **Top**, a multi-lane composite: a post qualifies for Top by **decisively dominating any one lane** — being ahead of the *second-place* post in that lane by more than a tunable ratio `k_lane`, above a small absolute activity floor `floor_lane`. Top is *not* an average; different *kinds* of heavyweight surface simultaneously, each through its own lane. The lanes (all equal, none suppressed): **traction-dominance** (`n`), **stake-dominance** (`D`), and **dominance-split** (`lop = 1 − b`, gated by `n` so a 2-vs-0 post cannot read as maximal lopsidedness). When no post crosses a lane's ratio (early or sleepy market), Top falls back to **closest-to-landslide ordering** so it never renders empty. The opt-in single-axis filter **modes** are the lenses Top composes from, exposed individually: **Most Debated** (`n`), **Highest Stakes** (`D`), **Contested** (`n ^ b`), and **Newest** (chronological); **Surging** is deferred to v1.x. Most Debated / Highest Stakes / Contested carry an HN-style gravity decay (`raw / (age + c)^g`) so a post must keep attracting activity to hold position; Newest is pure recency. There is no "Best" mode (no ground truth pre-resolution; a "vindicated" lens is a post-mortem feature, out of scope). The default is **fixed, not shuffled** — legibility and dataset interpretability outweigh shuffle's only benefit (rich-get-richer breaking), which gravity already delivers. Author stake `a` is **not** a mode: it is the cold-start seed (a brand-new post with no replies orders by `a` until reply-bets arrive) and the mode tiebreaker (higher `a` wins, then recency).
 
-**Friendly-fire display.** Every comment renders an up/down split: `↑ N ↓ M`, where N and M are the **live counts** — votes from current eligible voters only (those whose `frozen_at IS NULL` and who currently hold a non-zero position on the legitimate voting side). Frozen votes (cast by users who have since exited their position) are excluded from the display but retained in the audit log per F-COMMENT-8 and §16.4. The comment's frozen side label tells the reader who is allowed to vote in each direction; no per-comment voter-side breakdown is rendered.
+**Reply ordering (depth = 1).** A reply is a bet, and with flat replies (`REPLY_DEPTH_MAX = 1`) stake is the only signal a reply emits — so reply ranking is not a choice, it is the only rankable number. Replies are **partitioned by side** (Support pool / Counter pool relative to the parent) and **sorted by reply stake descending within each side**; ties break **earlier-wins** (first-posted ranks higher; UUIDv7 reply IDs make this a free natural sort per ADR-0016). The debate-view **two-slot default** surfaces each parent's **best Support reply** and **best Counter reply**; a "show all replies" affordance expands each side's full stake-sorted list. Edge cases: when one side has no replies, render the two best from the other side; when only one reply exists, render it without an expansion affordance; when zero replies exist, no reply widget is rendered. *(Recorded, accepted, per ADR-0017: reply ranking is purely the C-axis — a high-Đ reply outranks many small informed replies on the same side. This is the conceded reply-level `C > n` inside a `K · n > C` system; it is narrow, lives only at the reply level, and the reply floor of 50 — ADR-0018 — is the parameter that compresses it. The post-level model carries the thesis.)*
+
+**Support / Counter display (not a vote).** Each post renders a per-side activity footer — **Support (`support_count`) : Đ `support_dharma`** and **Counter (`counter_count`) : Đ `counter_dharma`** — and the author's own stake `a` at the post header. These are **read-time aggregates over the post's reply-bets**, not votes: there is no standalone up/down affordance, no `friendly_fire_events` table, nothing to cast or clear. A reader expresses Support or Counter by *placing a reply-bet*, which is itself an argument under mandatory commentary. (This replaces the v1.8 friendly-fire `↑ N ↓ M` display entirely, per ADR-0017 + SYNC.7 + SPEC.2 §5.4.) The aggregates persist after an author sells or flips — the **Flipped / Exited marker** is the reader's live signal that the author no longer holds that side (a stake-to-rank-then-sell vector is accepted: selling still pays the CPMM price move and forgoes the conclusion payout, and the marker flags it; per ADR-0017 stake is append-only and the ranking weight a reply contributed is not retracted on exit).
 
 ### F-DEBATE-1 — Render debate view
 
 - **Pre.** User (anonymous or authenticated) requests market detail page.
-- **System.** Two columns: YES side (left), NO side (right). Top-level comments ordered by the ranking function in `RANKING.md`. Under each top-level comment, the two-slot reply rule renders the best opposite-side reply and the best same-side reply (per the §9 preamble); a "show all replies" affordance expands the full reply set, ranked by the same function. Replies are flat (depth = 1 per ADR-0009). Empty side renders `Be the first to argue [YES/NO]` CTA until at least one comment exists (per `C8`). Each comment renders the friendly-fire `↑ N ↓ M` live count next to the stake badge. Track B hidden comments invisible to anonymous and authenticated non-admin users (visible to author on their own profile only).
-- **Response.** Two-column rendered list.
-- **Acceptance.** `tests/server/debate-view/sort.test.ts::ranking-function-order`, `tests/server/debate-view/replies.test.ts::two-slot-best-opposite-and-same`, `tests/server/debate-view/replies.test.ts::expansion-ranked-by-function`.
+- **System.** Two columns: YES side (left), NO side (right). Posts ordered by **Top** by default, with a mode selector exposing Most Debated / Highest Stakes / Contested / Newest (per the §9 ranking model). Under each post, the two-slot reply rule renders the best Support reply and the best Counter reply (stake-descending within side, earlier-wins on ties); a "show all replies" affordance expands each side's full stake-sorted list. Replies are flat (depth = 1 per ADR-0017). Each post renders the author's stake `a` at its header and the **Support (count) : Đ / Counter (count) : Đ** aggregate footer (read-time over reply-bets — there is no `↑ N ↓ M` vote control). Empty side renders `Be the first to argue [YES/NO]` CTA until at least one post exists (per `C8`). Track B hidden comments invisible to anonymous and authenticated non-admin users (visible to author on their own profile only).
+- **Response.** Two-column rendered list with the active mode echoed.
+- **Acceptance.** `tests/server/debate-view/sort.test.ts::top-default-order`, `tests/server/debate-view/sort.test.ts::mode-selector-switches-order`, `tests/server/debate-view/replies.test.ts::two-slot-best-support-and-counter`, `tests/server/debate-view/replies.test.ts::expansion-stake-sorted-within-side`.
 
-### F-DEBATE-2 — Three-state marker computation
+### F-DEBATE-2 — Marker computation (Flipped / Exited)
 
 - **Pre.** Comment exists with `side_at_post_time = X`. Author currently holds position `Y`.
 - **System.** Compute on read:
-  - If `Y = X` (same side as comment): no marker (**In**, default).
-  - If `Y = ¬X` (opposite side): **Flipped** marker rendered alongside comment header.
-  - If `Y = 0` (no position): **Exited** marker rendered alongside comment header.
+  - If `Y = X` (still on the comment's side): **no marker** — the default, unnamed state.
+  - If `Y = ¬X` (opposite side): **Flipped** marker rendered alongside the comment header.
+  - If `Y = 0` (no position): **Exited** marker rendered alongside the comment header.
   - The frozen side label (YES/NO badge) on the comment never changes (`INV-3`).
-- **Response.** Marker enum `{In, Flipped, Exited}` per comment in the rendered list.
-- **Acceptance.** `tests/server/debate-view/marker.test.ts::three-state-from-current-position`.
+- **Response.** Marker enum `{Flipped, Exited, none}` per comment in the rendered list (`none` = default; no badge rendered).
+- **Acceptance.** `tests/server/debate-view/marker.test.ts::flipped-exited-from-current-position`, `tests/server/debate-view/marker.test.ts::same-side-renders-no-marker`.
 
 ### F-DEBATE-3 — Resolution-time marker freeze
 
@@ -466,7 +444,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 ### F-DEBATE-4 — Polled-on-view refresh
 
 - **Pre.** User has the debate view open in browser.
-- **System.** Per `C7`: debate view polls the read endpoint at interval `POLL_INTERVAL_MS_DEBATE_VIEW`. New comments and changed markers appear on next poll. No SSE / WebSockets in v1.
+- **System.** Per `C7`: debate view polls the read endpoint at interval `POLL_INTERVAL_MS_DEBATE_VIEW`. New posts, new reply-bets, changed markers, and re-ranking under the active mode appear on the next poll. No SSE / WebSockets in v1.
 - **Tradeoff (named).** Stale stake counts and missed replies between polls. Acceptable at experiment scale; SSE deferred to SPEC.2.
 - **Acceptance.** `tests/server/debate-view/poll.test.ts::interval-respected`.
 
@@ -476,21 +454,23 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 
 *Thesis relevance: (a) directly testing K × n > C — this is the K side.*
 
-Per `Cluster_B` (A2, B1, B5, F5/F6) and `cluster_a_ratify.md` (B6, B7, B8). No specific numeric values in this section — symbolic constants only. Numbers belong in §16.1 and the number-tuning pass.
+Per `Cluster_B` (A2, B1, B5, F5/F6), `cluster_a_ratify.md` (B6, B7, B8), and **ADR-0018** (Dharma issuance model + two-floor minimum bet). No specific numeric values in this section — symbolic constants only. Numbers (issuance amounts, floors, decay) belong in §16.1 and the number-tuning pass.
 
 ### 10.1 Account types
 
 Three logical account roles, all on the same single Dharma ledger (Path A):
 
-- **User accounts.** Receive an initial seed at signup. Accrue a daily allowance per UTC day. Can stake on bets, hold positions, post comments, sell, and collect resolution payouts. Subject to leaderboard, profile pages, and the in/flipped/exited marker.
-- **Admin account** (singular, ledger-only). Operational. Seeds pools at market creation. Receives `pool_unwind` flows at resolution and void. **Not a `users` row** — admin authenticates via F-AUTH-ADMIN and exists only as an actor identifier in the Dharma ledger (per `B5`, `J3`). Cannot bet, post comments, or hold positions because the data model offers no participant identity to act under. No daily allowance. Naturally absent from the leaderboard, which queries `users`.
+- **User accounts.** Receive an **equal initial grant** at signup (a single flat amount, identical for every user — magnitude ranged, ~1,000 Dharma, pinned at number-tuning; per ADR-0018). Earn a **Daily Credit** on each UTC day they place a commented bet (§10.4). Can stake on bets, hold positions, post and reply (every comment is a bet), sell, and collect resolution payouts. Subject to leaderboard, profile pages, and the **Flipped / Exited marker**.
+- **Admin account** (singular, ledger-only). Operational. Seeds pools at market creation. Receives `pool_unwind` flows at resolution and void. **Not a `users` row** — admin authenticates via F-AUTH-ADMIN and exists only as an actor identifier in the Dharma ledger (per `B5`, `J3`). Cannot bet, post, reply, or hold positions because the data model offers no participant identity to act under. No Daily Credit. Naturally absent from the leaderboard, which queries `users`.
 - **Pool accounts.** One per market. Hold pool reserves denominated in shares. Counterparty to every user trade. Created at market `Draft → Open` transition, dissolved at `Resolved → Frozen` or `Voided → Frozen`.
 
 ### 10.2 Conservation
 
-Dharma is conserved across the system: total Dharma equals admin seed + sum of user seeds + sum of daily allowances accrued. **Conservation is not strictly bettor-zero-sum** — the pool is a real counterparty, and the admin's expected aggregate PnL across the experiment is negative when informed traders systematically extract value from it (per `B5`). This is the K × n > C signal showing up as MM PnL — *correct* behaviour, not a bug.
+Dharma is conserved across the system: total Dharma equals admin seed + sum of equal initial grants + sum of Daily Credits paid. **Conservation is not strictly bettor-zero-sum** — the pool is a real counterparty, and the admin's expected aggregate PnL across the experiment is negative when informed traders systematically extract value from it (per `B5`). This is the K × n > C signal showing up as MM PnL — *correct* behaviour, not a bug.
 
 Every CPMM trade is a Dharma flow between user and pool. There are no synthetic mints. There is no separate liquidity ledger. INV-2 (non-transferability) holds because account ↔ pool flows are market-mechanic flows, not user-to-user transfers.
+
+**Over-issuance is the central economic risk of the experiment (per ADR-0018).** With an equal grant at signup, a Daily Credit on every active day, and **no balance decay and no mandatory in-window sink** (B2), total user-held Dharma only grows over the seven-week window. This is accepted for the experiment — the Dharma supply is dummy, dispensable at close, and the thesis cares about *relative* informedness, not absolute balances — but it is recorded as the known risk and is why an optional in-window sink is reserved (§10.10).
 
 ### 10.3 Award rule (CPMM share-payout)
 
@@ -503,9 +483,15 @@ Convexity-in-confidence and time-weighting are *emergent* properties of CPMM sha
 
 Per-bet `dharma_delta` is computed independently. A user holding multiple bets in one market sees their total movement as the sum of per-bet `dharma_delta` values.
 
-### 10.4 Daily Allowance
+### 10.4 Daily Credit
 
-Every user account accrues a fresh Dharma allowance once per UTC day. Use-or-lose: the allowance does not accumulate. Per `B2`, no decay on the rest of the user's balance — the daily allowance + use-or-lose handles the stale-Dharma concern across the seven-week window. Admin account does not accrue an allowance.
+Per ADR-0018, the daily issuance is a **Daily Credit**, not an unconditional allowance:
+
+- **Flat and non-escalating.** A single small amount (ranged, ~10 Dharma; pinned at number-tuning), identical every day. It never grows with streaks, tenure, or activity (escalating credit is explicitly rejected — §18).
+- **Conditional on a commented bet.** Paid **only on a UTC day on which the user places at least one commented bet** (a post or a reply — both are bets). A user who does not bet that day earns nothing that day. This is the behavioural change from the v1.8 unconditional allowance: issuance rewards participation in the debate, not mere presence.
+- **Use-or-lose.** Does not accumulate; an unspent credit does not roll into the next day. Per `B2`, there is no decay on the rest of the user's balance — the conditional, use-or-lose Daily Credit is the only issuance lever across the seven-week window.
+
+The admin account earns no Daily Credit. Ledger rows are tagged `daily_allowance` (identifier retained for schema continuity; the *rule* is the Daily Credit above). The accrual cursor is `users.last_allowance_accrued_at`.
 
 ### 10.5 Pool seeding rule
 
@@ -524,14 +510,27 @@ Per `B6`: pool seed is fixed at market creation. Mid-market injections re-price 
 
 - **Resolution correction (per `B4`).** Reverse original payout, apply corrected payout. Floored at zero — uncollectable remainder logged. INV-4 holds.
 - **Market void (per `B3`).** Stakes refunded, Dharma effects reversed via compensating ledger entries. Pool unwinds back to admin. Comments lock with `voided` marker.
-- **Banned user (per `E2`).** Existing positions ride to resolution. Resolution payouts apply normally. No daily allowance from ban-time forward. No forced liquidation.
+- **Banned user (per `E2`).** Existing positions ride to resolution. Resolution payouts apply normally. No Daily Credit from ban-time forward. No forced liquidation.
 - **Erasure scrub (per `H2`).** Pseudonym replaced; ledger rows persist under placeholder. Balance unaffected.
 
 ### 10.8 Display rules
 
 - Per-user current Dharma balance visible on profile, in debate view next to comments, on leaderboard (per `J3`, `D8`).
-- Daily-allowance usage history visible on user's own profile only (per `D8`).
+- Daily Credit history visible on user's own profile only (per `D8`).
 - Admin is structurally absent from the leaderboard — no `users` row, nothing to query (per F-AUTH-ADMIN).
+
+### 10.9 Minimum bet floors (post / reply)
+
+Per ADR-0018, two **asymmetric** minimum-stake floors gate every bet:
+
+- **Post floor** (`BET_MIN_STAKE_POST`) — the minimum stake on a **top-level** bet (a post). Low (ranged, ~10–25 Dharma; pinned at number-tuning). Keeps entry accessible.
+- **Reply floor** (`BET_MIN_STAKE_REPLY`) — the minimum stake on a **reply-bet**. **Pinned at 50 Dharma**, higher than the post floor by design.
+
+The reply floor sits **above** the post floor deliberately: it is the lever on ADR-0017's conceded reply-level `C > n` (a high-Đ reply can outrank many small same-side replies). Raising the cost of a reply compresses how cheaply a single well-funded reply dominates a side, without touching the post-level model that carries the thesis. This post/reply asymmetry is the only structural difference between the two bet shapes (§7). Both floors are symbolic here; values pin at number-tuning.
+
+### 10.10 Optional in-window sink (principle reserved, mechanism deferred)
+
+The over-issuance pressure of §10.2 (grant + Daily Credit, no decay, no forced sink) is accepted for the experiment. ADR-0018 **reserves the principle** that an *optional* in-window Dharma sink may later be introduced to drain supply if over-issuance distorts price discovery — but the **mechanism is deferred**: no sink ships in v1.9.0, no specific sink design (fees, burns, paid actions) is decided here, and any sink later added must not become a user-to-user transfer (INV-2) or a pay-to-win lever. This subsection records the reserved lever so its later introduction is a scoped decision, not scope creep.
 
 ---
 
@@ -583,7 +582,7 @@ On 2026-11-06, the full archive is released as a public dataset. Includes:
 - All markets — creation, deadline, resolution event, void status.
 - All bets — pseudonym, side, stake, timestamp, market state at bet.
 - Full Dharma ledger — every flow, every event, every tag.
-- All comments — including frozen In/Flipped/Exited markers — *excluding* Track A hard-removed content.
+- All comments — including frozen Flipped/Exited markers — *excluding* Track A hard-removed content.
 - Aggregated event timeline + the K_eff trajectory series.
 
 Format: CSV / JSON. Distribution: GitHub release at `zugzwang-foundation/experiment` plus a long-lived static URL. Removed media (Track A images) explicitly *not* released.
@@ -608,7 +607,7 @@ Per `K1` and `I4`. Auth surface is intentionally minimal in v1.
 
 **Vendor stack (pre-launch lock).** Google OAuth via Google Identity Services for participant Google sign-in (F-AUTH-1) only; no third-party identity provider in the admin trust path. Admin sign-in (F-AUTH-ADMIN) is a static-password path: `/admin/login` renders a single password field, the server compares the submitted value against env var `ADMIN_PASSWORD` using a constant-time comparison primitive, and on match issues a `zugzwang_admin_session` cookie keyed to a row in `admin_sessions`. No CAPTCHA on F-AUTH-1 (Google's own abuse signals replace it). No CAPTCHA on F-AUTH-ADMIN (per-IP rate limit `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` at the route handler is the brute-force guard for a single-user admin path). CAPTCHA on the email-OTP path: **Cloudflare Turnstile** (free unlimited, invisible by default, GDPR / DPDPA-friendly, no vendor lock-in). OTP delivery: **Resend** (free tier 3K/month; Pro $20/month for 50K covers any realistic launch spike). OTP code: 6-digit numeric, generated server-side, stored in a short-lived OTP table, validated on submission, single-use.
 
-**Trade-off accepted (dataset cleanliness).** Indefinite participant sessions mean that compromised cookies — via shared / stolen devices, browser sync, or malware — give the attacker the legitimate user's authority indefinitely. Bets, comments, and friendly-fire votes cast under a hijacked session are permanent under the user's pseudonym (INV-3, INV-4) and corrupt the dataset. At experiment scale and given the experiment's stakes (no real money, reputation-only), this is acceptable. Researchers analysing the public dataset should be aware of the noise floor; the trade-off is documented here and in the dataset README at conclusion. Admin sessions inherit the same indefinite-cookie property; admin-cookie compromise is operationally more serious (admin can remove arbitrary content, ban arbitrary users, trigger arbitrary resolutions) and is mitigated by `ADMIN_PASSWORD` being a long random secret stored only in the hosting environment-variable store and a personal password manager (no Google account, no email inbox in the admin trust path) plus the F-AUTH-ADMIN `DELETE+INSERT` pattern that ensures any new admin login replaces the prior session row. Suspected-compromise rotation procedure (manual `DELETE FROM admin_sessions` + `ADMIN_PASSWORD` rotation + redeploy) is documented in `BREAK_GLASS.md`.
+**Trade-off accepted (dataset cleanliness).** Indefinite participant sessions mean that compromised cookies — via shared / stolen devices, browser sync, or malware — give the attacker the legitimate user's authority indefinitely. Bets and comments (including reply-bets) cast under a hijacked session are permanent under the user's pseudonym (INV-3, INV-4) and corrupt the dataset. At experiment scale and given the experiment's stakes (no real money, reputation-only), this is acceptable. Researchers analysing the public dataset should be aware of the noise floor; the trade-off is documented here and in the dataset README at conclusion. Admin sessions inherit the same indefinite-cookie property; admin-cookie compromise is operationally more serious (admin can remove arbitrary content, ban arbitrary users, trigger arbitrary resolutions) and is mitigated by `ADMIN_PASSWORD` being a long random secret stored only in the hosting environment-variable store and a personal password manager (no Google account, no email inbox in the admin trust path) plus the F-AUTH-ADMIN `DELETE+INSERT` pattern that ensures any new admin login replaces the prior session row. Suspected-compromise rotation procedure (manual `DELETE FROM admin_sessions` + `ADMIN_PASSWORD` rotation + redeploy) is documented in `BREAK_GLASS.md`.
 
 ### F-AUTH-1 — Google sign-in
 
@@ -728,7 +727,7 @@ The auth method is a static password held in env var `ADMIN_PASSWORD`. There is 
 - **Errors.** 401 `admin_login_invalid` (single error code for wrong password and rate-limit-exceeded; no information leak); 500 `admin_session_persistence_failed` (DB transaction failed).
 - **Auth-flow boundaries** (unchanged from prior version — structural-separation rule is auth-method-agnostic):
   - Admin sign-in does **not** create or touch a `users` row. The admin cannot accidentally end up with a participant identity.
-  - Admin session does **not** grant participant powers. The participant write paths (F-BET-1, F-COMMENT-1, F-COMMENT-6, etc.) require a participant session and a `user_id` — admin has neither.
+  - Admin session does **not** grant participant powers. The participant write paths (F-BET-1, F-COMMENT-1, F-COMMENT-2, etc.) require a participant session and a `user_id` — admin has neither.
   - Participant session does **not** grant admin powers. The Control Centre routes (`/admin/*`) and the inline admin affordances on public pages check for a valid `admin_sessions` row server-side at the Server Action / route-handler boundary (per CVE-2025-29927 defense-in-depth, AGENTS.md §5); participant-session cookies are ignored at admin endpoints.
   - The two cookie types have different names and are issued / validated independently. A user who is also the admin (i.e., the same human) can hold both cookies in the same browser session — they would log in twice, once via F-AUTH-1 / F-AUTH-2 if they wanted to participate (which `B5` forbids; this is hypothetical and surfaces a constraint), once via F-AUTH-ADMIN to operate. In practice, the admin does not hold a participant session at all.
 - **Backup-admin / loss-of-access / suspected compromise.** Three operational scenarios with a shared procedure family:
@@ -756,12 +755,11 @@ Applies to both participant sessions and admin sessions. Each session type has i
 
 Per `cluster_e_decisions.md` and `spec1_section_moderation.md`. **Pattern locked; thresholds, vendor selection, and edge-case behaviour finalised after Aug 15–31 sample-content testing. Final close target: 2026-09-01.**
 
-Three tracks at submission. OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26` per ADR-0014) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per OpenAI's `omni-moderation-2024-09-26` capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality (Hive / PhotoDNA / Safer) and NCMEC CyberTipline reporting both deferred to post-experiment per `docs/parked.md`.
+Three tracks at submission. Two AI services run in parallel: text (OpenAI moderation API) and image (CSAM hash via PhotoDNA-or-equivalent + general adult/violence/weapons classifier, vendor TBD).
 
 | Track | AI flag categories | Action | Admin in loop? |
 |---|---|---|---|
-| **A** | `sexual/minors` (image-attached) | Block + auto-ban user. Per SCAFFOLD.16 LD-3 image-attached path. | No |
-| **B** | `sexual/minors` (text-only) | Hide from public; admin review queue at `/admin/moderation`. Per SCAFFOLD.16 LD-3 text-only carve-out (text-classifier false-positive mitigation; industry practice per research brief). | Yes |
+| **A** | CSAM, sexual minors | Block + auto-report (legal) + auto-ban user | No |
 | **A** | NSFW / sexual content; adult imagery | Block + auto-ban user | No |
 | **B** | Graphic violence; threats; hate speech; harassment | Hide from public; queue for admin: **Approve user** or **Block user** | Yes |
 | **C** | Below threshold | Posts normally | No |
@@ -770,7 +768,7 @@ Admin-in-the-loop is **Experiment-phase only**. Testnet and mainnet replace it w
 
 ### F-MOD-1 — Track A auto-ban
 
-- **System.** Comment never reaches public view. User account flagged `banned` (per `E2`). Append-only `mod_actions` row written. Existing positions ride to resolution. Existing comments preserved with B1 markers frozen at ban-time. No daily allowance from ban-time forward. No appeal in v1. NCMEC CyberTipline auto-report deferred to post-experiment per SCAFFOLD.16 LD-7 + attorney consultation 2026-05; see `docs/parked.md` "SCAFFOLD.16 §6 — NCMEC CyberTipline reporting deferred".
+- **System.** Comment never reaches public view. User account flagged `banned` (per `E2`). Append-only `mod_actions` row written. Existing positions ride to resolution. Existing comments preserved with B1 markers frozen at ban-time. No Daily Credit from ban-time forward. No appeal in v1. CSAM specifically: legal report filed automatically.
 - **Acceptance.** `tests/server/moderation/track-a.test.ts::auto-ban-and-positions-preserved`.
 
 ### F-MOD-2 — Track B admin review
@@ -778,10 +776,10 @@ Admin-in-the-loop is **Experiment-phase only**. Testnet and mainnet replace it w
 - **System.** Comment hidden from all public surfaces. Author sees `Comment under review` on their own profile only. Admin queue at `/admin/moderation` sorted oldest-first. Each row shows comment, AI flag categories with confidence scores, user pseudonym, user Dharma, user prior-flag count.
 - **Acceptance.** `tests/server/moderation/track-b.test.ts::queue-and-visibility`.
 
-### F-MOD-3 — Admin Approve / Block / Remove pass-verdict decision
+### F-MOD-3 — Admin Approve / Block decision
 
-- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. **Remove pass-verdict (per SCAFFOLD.16 F-γ-thin)**: comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery). No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. All three actions land at the same surfaces: the hub queue at `/admin/moderation` (three buttons per row for pending/applicable comments) and the inline affordance on debate views (per F-ADMIN-4 in §15). All paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
-- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`, `tests/server/admin/moderation/act.test.ts::pass-verdict-removal` (per SCAFFOLD.16 F-γ-thin).
+- **System.** **Approve user**: comment restored to public view, user untouched, flag closed and logged. **Block user**: comment stays hidden, user banned (Track A mechanics), flag closed and logged. No appeal. No middle option (no warn-and-restore, no edit-and-resubmit) in v1. Two surfaces, same backend: the hub queue at `/admin/moderation` (two buttons per row) and the inline affordance on debate views (per F-ADMIN-4 in §15). Both paths call the same endpoint, write the same `mod_actions` row, and apply the same audit discipline.
+- **Acceptance.** `tests/server/moderation/track-b.test.ts::approve-and-block-paths`.
 
 ### F-MOD-4 — Bet+comment atomicity on flag (entry case)
 
@@ -801,7 +799,7 @@ No misinformation moderation. No community / user-side moderation in v1 (per `C9
 ### Provisional gates
 
 - Aug 15–31 sample-content testing (vendor + thresholds + admin queue throughput).
-- Second-vendor (PhotoDNA / equivalent CSAM hash service) optionality deferred to post-experiment per SCAFFOLD.16 LD-1; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred".
+- PhotoDNA / equivalent CSAM service onboarded and verified.
 - Lawyer review of ToS + content policy.
 
 ---
@@ -882,17 +880,15 @@ Analytics is folded into the Home dashboard. There is no separate Analytics tab.
 
 ### F-ADMIN-4 — Moderation actions (Hub: Moderation tab; Inline: market pages)
 
-- **Pre (Approve/Block path).** Track B comment exists with `review_status = pending`.
-- **Pre (Remove pass-verdict path; per SCAFFOLD.16 F-γ-thin).** Any comment with `outcome === 'pass'` exists on a market the admin is viewing.
-- **System.** Admin reviews comment context (text, image, AI flag categories with confidence, user pseudonym, user Dharma, user prior-flag count). Three actions available:
+- **Pre.** Track B comment exists with `review_status = pending`.
+- **System.** Admin reviews comment context (text, image, AI flag categories with confidence, user pseudonym, user Dharma, user prior-flag count). Two actions available:
   - **Approve user** — comment restored to public view, user untouched, flag closed and logged in `mod_actions`.
   - **Block user** — comment stays hidden, user banned (Track A mechanics per `E2`), flag closed and logged.
-  - **Remove pass-verdict comment (per SCAFFOLD.16 F-γ-thin)** — comment hidden from public view; an append-only audit row is written recording the removal (exact `mod_actions` row shape — verdict-enum value, action column, or metadata field — determined by caller-side stratum per LD-5; DEBATE.2 owns INSERT semantics). `users.banned_at` NOT set (admin escalates via separate Block user action if user-level enforcement needed). Covers image-borne harm content omni-moderation-2024-09-26 cannot classify (text-only categories on image inputs; weapons-imagery).
-- **Response.** Comment state updated; `mod_actions` row written; if Block, `users.banned_at` set; Remove pass-verdict path leaves `users.banned_at` unchanged.
-- **Surface — hub.** `/admin/moderation` shows the global queue, sorted oldest-first. Approve / Block buttons per row for Track B pending comments. Used for systematic queue work.
-- **Surface — inline.** When an authenticated admin views `/markets/<id>` or any debate view, Track B pending comments render inline (visible to admin only, with a yellow `pending review` badge) alongside Approve / Remove buttons. Approving from inline restores the comment to public view; Remove keeps it hidden and bans the author. Same backend endpoints as the hub. Pass-verdict comments also render with admin-only Remove button (no badge — comment appears normally to admin same as to public, with Remove button visible only to admin). Removal mechanic identical to Track A/B inline removal; gated on admin role. **Server independently verifies a valid `admin_sessions` row on every request — the inline affordance is a UI convenience, not a privilege path.**
-- **Inline scope explicitly:** approve a Track B pending comment, remove a Track A or Track B comment, remove a pass-verdict comment (per SCAFFOLD.16 F-γ-thin). Nothing else. No "ban user" button on the comment author's pseudonym (banning is hub-only — accessed via the moderation queue or a user-record action). No "trigger resolution" button on the market header. No bulk-select.
-- **Acceptance.** `tests/server/admin/moderation.test.ts::hub-queue-approve-block`, `tests/server/admin/moderation.test.ts::inline-remove-pending-comment`, `tests/server/admin/moderation.test.ts::inline-affordance-admin-only-server-verified`, `tests/server/admin/moderation.test.ts::inline-scope-comment-only-no-user-ban-no-resolve`, `tests/server/admin/moderation/act.test.ts::pass-verdict-removal` (per SCAFFOLD.16 F-γ-thin).
+- **Response.** Comment state updated; `mod_actions` row written; if Block, `users.banned_at` set.
+- **Surface — hub.** `/admin/moderation` shows the global queue, sorted oldest-first. Approve / Block buttons per row. Used for systematic queue work.
+- **Surface — inline.** When an authenticated admin views `/markets/<id>` or any debate view, Track B pending comments render inline (visible to admin only, with a yellow `pending review` badge) alongside Approve / Remove buttons. Approving from inline restores the comment to public view; Remove keeps it hidden and bans the author. Same backend endpoints as the hub. **Server independently verifies a valid `admin_sessions` row on every request — the inline affordance is a UI convenience, not a privilege path.**
+- **Inline scope explicitly:** approve a Track B pending comment, remove a Track A or Track B comment. Nothing else. No "ban user" button on the comment author's pseudonym (banning is hub-only — accessed via the moderation queue or a user-record action). No "trigger resolution" button on the market header. No bulk-select.
+- **Acceptance.** `tests/server/admin/moderation.test.ts::hub-queue-approve-block`, `tests/server/admin/moderation.test.ts::inline-remove-pending-comment`, `tests/server/admin/moderation.test.ts::inline-affordance-admin-only-server-verified`, `tests/server/admin/moderation.test.ts::inline-scope-comment-only-no-user-ban-no-resolve`.
 
 ### F-ADMIN-5 — Audit log search (Hub: Moderation tab)
 
@@ -931,13 +927,14 @@ Symbolic only. Specific values → number-tuning pass (target: 2026-09-01).
 
 | Constant | Why |
 |---|---|
-| `INITIAL_USER_DHARMA` | Signup balance for every user account. |
+| `INITIAL_USER_DHARMA` | Equal initial grant at signup — a single flat amount, identical for every user account (ADR-0018). |
 | `ADMIN_INITIAL_DHARMA` | Operational seed for admin account, abundantly sized. |
-| `DAILY_ALLOWANCE_DHARMA` | Daily fresh-allowance accrual per UTC day. |
+| `DAILY_CREDIT_DHARMA` | Flat (non-escalating) Daily Credit, paid once per UTC day **only on a day the user places a commented bet** (ADR-0018). Use-or-lose. |
 | `POOL_SEED_PER_MARKET` | Default pool seed; criterion: typical trade → small price impact, cumulative activity → meaningful drift. |
-| `BET_MIN_STAKE` | Minimum stake per bet. |
+| `BET_MIN_STAKE_POST` | Minimum stake on a top-level bet (a post). Low; keeps entry accessible (ADR-0018). |
+| `BET_MIN_STAKE_REPLY` | Minimum stake on a reply-bet. **Pinned at 50** (higher than the post floor; the lever on ADR-0017's reply-level C > n, per ADR-0018). |
 | `COMMENT_MAX_LENGTH` | Maximum comment text length. |
-| `REPLY_DEPTH_MAX` | Maximum reply nesting depth. Pinned to 1 by ADR-0009 (flat replies — a reply cannot itself be replied to). Not deferred to number-tuning pass. |
+| `REPLY_DEPTH_MAX` | Maximum reply nesting depth. Pinned to 1 by ADR-0017 (flat replies — a reply cannot itself be replied to). Not deferred to number-tuning pass. |
 | `SLIPPAGE_WARNING_PCT_THRESHOLD` | Threshold above which slippage modal triggers (per `G1`). |
 | `IN_FLIGHT_BET_TIMEOUT_SEC` | Window during which `Resolving`-state in-flight bets may commit (per `G6`). |
 | `POLL_INTERVAL_MS_DEBATE_VIEW` | Debate-view poll interval (per `C7`). |
@@ -945,10 +942,10 @@ Symbolic only. Specific values → number-tuning pass (target: 2026-09-01).
 | `OTP_REQUESTS_PER_EMAIL_PER_HOUR` | Per-email OTP request cap (anti-spam / anti-bot). |
 | `OTP_REQUESTS_PER_IP_BURST_PER_MIN` | Per-IP OTP request burst cap. |
 | `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` | Per-IP rate limit on `/admin/login` POST attempts. Brute-force guard for the static-password admin path (per `K1`, F-AUTH-ADMIN). |
-| `RATE_LIMIT_PER_MARKET_PER_DAY` | Per-user, per-market write cap covering direct comments, replies, image-comments, and friendly-fire votes (shared budget per §8). Bets are not bound by this cap. |
-| `RATE_LIMIT_BURST_PER_MIN` | Per-user burst cap covering the same shared comment / friendly-fire write surface. |
-| `BET_ATTEMPTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on bet `place` / `sell` endpoints. Bets are exempt from the per-day per-market productive cap by §16.1's design (bets are the productive surface), but per-IP anti-abuse defense is a separate concern: a credential-stuffed bot account can hammer the bet endpoint at network speed without this cap. Per ADR-0015 / SPEC.16. |
-| `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on the R2 signed-PUT URL mint endpoint. The URL-mint endpoint can be hit independently of comment posting and is not bound by the shared comment / friendly-fire write budget; an abusive client can request thousands of signed URLs without ever committing a comment. Per ADR-0015 / SPEC.16. |
+| `RATE_LIMIT_PER_MARKET_PER_DAY` | Per-user, per-market productive write cap. In v1.9.0 posts and replies are bets; whether reply-bets carry this per-market productive cap in addition to the per-IP bet burst cap is **deferred to SPEC.2 §11 + number-tuning**. No friendly-fire surface exists. Top-level bets remain unbound by a per-day productive cap. |
+| `RATE_LIMIT_BURST_PER_MIN` | Per-user burst cap on the reply-bet write surface (the v1.9.0 successor to the v1.8 comment write surface); exact applicability per SPEC.2 §11. |
+| `BET_ATTEMPTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on bet `place` / `sell` endpoints — the primary anti-abuse posture for posts and replies (both bets). A credential-stuffed bot can hammer the bet endpoint at network speed without this cap. Per ADR-0015 / SPEC.16. |
+| `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` | Per-IP anti-abuse burst cap on the R2 signed-PUT URL mint endpoint. The URL-mint endpoint can be hit independently of bet posting and is not bound by any per-market comment cap; an abusive client can request thousands of signed URLs without ever committing a bet. Per ADR-0015 / SPEC.16. |
 | `AI_FLAG_THRESHOLD_TRACK_A_*` | Per-category Track A confidence thresholds (`E1`). |
 | `AI_FLAG_THRESHOLD_TRACK_B_*` | Per-category Track B confidence thresholds (`E1`). |
 
@@ -975,11 +972,12 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 Operating principle (per `Cluster_B`): **transparency-by-design.** Public visibility is the default; the legal floor reconciles via pseudonym-scrub.
 
 - **Public-by-default surface (`D7`).** Full debate view, pseudonyms, bets, stakes, Dharma values, comments, leaderboard — all visible to unauthenticated users. Bet placement, comment posting, profile editing, erasure requests are gated to authenticated users.
-- **Profile pages (`D8`).** Pseudonym, complete bet history, complete comment history with markers preserved, current Dharma balance, daily-allowance usage history (private to user), join date, optional self-declared X handle, win/loss aggregate stats. Banned users: profile shows `Banned` label visible to all; bet/comment history remains visible.
+- **Profile pages (`D8`).** Pseudonym, complete bet history, complete comment history with markers preserved, current Dharma balance, Daily Credit history (private to user), join date, optional self-declared X handle, win/loss aggregate stats. Banned users: profile shows `Banned` label visible to all; bet/comment history remains visible.
 - **Right-to-erasure (`H2`).** Pseudonym-scrub model: on valid request, pseudonym replaced with permanent placeholder (e.g., `[removed_user_4721]`); PII fields wiped (email, Google ID, IP, user-agent, self-declared X handle); bets, comments, mod-actions, ledger rows persist under placeholder. 30-day verification window. Banned users may request scrub.
 - **Re-identification warning (`H4`).** Re-id risk is transparency-by-design, not a bug to mitigate. ToS warning at signup quoted in F-AUTH-4.
 - **Session-level logging (`H3`).** Structured request log per request: timestamp, user_id (or anon marker), route, status_code, IP, user_agent, latency_ms. **No request body. No response body.**
 - **Public dataset (`H1`, `E5`).** Released 2026-11-06 — see §12.2.
+- **Data-access posture (ADR-0019).** Row-level security (RLS) is **out of scope** for the experiment. All data access is mediated by server-only code paths (Server Actions / route handlers); the database is never reached directly from the client. The public-by-default read surface and the auth-gated write surface are both enforced in the application layer, not by Postgres RLS policies. SPEC.1 inherits this posture from SPEC.2 §18.5 (the `server-only` import boundary). RLS is reconsidered at testnet, when Dharma becomes a real asset.
 
 Lawyer-review batch (Hrishikesh-owned action item, pre-launch): ToS wording for transparency-by-design, pseudonym-scrub, re-id warning; erasure-request flow + jurisdictional SLAs (DPDPA 30d / GDPR 1mo / CCPA 45d); cross-border data residency (R2 buckets, Supabase regions); content policy section (E1 tracks); grievance officer / compliance contact (DPDPA basics).
 
@@ -996,13 +994,12 @@ Append-only ledgers underpinning the public dataset. Enforcement is at row-level
 | `payout_events` | Per-bet settlement entries. | Public via profile. | Full at 2026-11-06. |
 | `mod_actions` | Every Track A and Track B action with reason, AI category, confidence, override history. | Admin-only during experiment (per `E5`). | Full at 2026-11-06. |
 | `admin_events` | Every admin-initiated state change (market creation, resolution trigger, void, mod action). `actor_id` references the admin allowlist identity (constant `'admin-singleton'` in v1 per E4) — not `users.id`. The admin is structurally outside the `users` table per F-AUTH-ADMIN. | Admin-only during experiment (per `E5`). | Full at 2026-11-06. |
-| `user_events` | Signup, ban, scrub, daily-allowance accrual. | Per-user views on profile. | Full at 2026-11-06. |
-| `friendly_fire_events` | Every friendly-fire vote with `voter_id, comment_id, market_id, comment_side, direction, voter_side_at_cast_time, timestamp, frozen_at` (NULL until exit-to-zero, then set; never deleted). Live display counts exclude frozen votes (per §8 F-COMMENT-8); audit log retains all. | Public counts visible per §9; full row not visible during experiment. | Full at 2026-11-06. |
+| `user_events` | Signup, ban, scrub, Daily Credit accrual. | Per-user views on profile. | Full at 2026-11-06. |
 | `sessions` | Server-side participant session rows backing the indefinite session cookie. Row written on F-AUTH-1 / F-AUTH-2 success. Row deleted on F-AUTH-5 (manual logout); no other deletion path. Stores: `session_id, user_id, issued_at, last_seen_at`. Not append-only — `last_seen_at` updates on every authenticated request. | Not visible to users or to the Audience. Admin-only diagnostic view via direct DB query. | Not released — sessions table excluded from public dataset (no thesis-relevant signal; user-correlatable session activity is privacy-sensitive). |
 | `admin_sessions` | Server-side admin session rows backing the admin-session cookie. Row written on F-AUTH-ADMIN success via a transactional `DELETE+INSERT` that maintains the single-row-at-any-moment invariant. Row deleted on F-AUTH-5 admin logout; no other automatic deletion path. Stores: `session_id, issued_at, last_seen_at`. (The `admin_email` column from prior versions is dropped — auth via `ADMIN_PASSWORD` env var per F-AUTH-ADMIN, ADR-0010, makes the column purposeless. Only the operator's contact email at `foundation@zugzwangworld.com` is retained, and that lives in static spec text and frontend code, not in this table.) Single row at any moment in v1 (single admin per `E4`); maintained by the `DELETE+INSERT` pattern in F-AUTH-ADMIN System step 4. Validation reads the cookie's `session_id`, looks up the row, and updates `last_seen_at`; no env-var re-check on session validation. For suspected-compromise rotation, operators MUST manually `DELETE FROM admin_sessions` before deploying a new `ADMIN_PASSWORD` (per F-AUTH-ADMIN backup-admin clause + `BREAK_GLASS.md`). | Not visible to users, to the Audience, or to the admin via product surface. Admin-only diagnostic view via direct DB query. | Not released — admin session activity is operational, not thesis-relevant. |
 | `identity_pool` | Pre-generated `(colour, animal, number, pfp_filename, assigned_at)` tuples backing F-AUTH-3 pseudonym + PFP assignment. Inserted in bulk pre-launch via the asset pipeline (see §13 F-AUTH-3). `assigned_at` updated from NULL to a timestamp when a tuple is consumed by signup. Not append-only — `assigned_at` is the single permitted update per row. | Not visible to users. Admin-only operational view (pool depth, exhaustion alerting). | Not released — operational table; the assignment of pseudonym to user is implicitly visible via the `users` row, which IS released. |
 
-Append-only enforcement on `mod_actions`, `admin_events`, and `friendly_fire_events` parallels INV-4 mechanics — these are not §5 invariants, but the same row-level rules and tests apply. The single permitted update on `friendly_fire_events` is setting `frozen_at` from NULL to a timestamp on exit-to-zero (per F-COMMENT-8); content fields are immutable.
+Append-only enforcement on `mod_actions` and `admin_events` parallels INV-4 mechanics — these are not §5 invariants, but the same row-level rules and tests apply. (The v1.8 `friendly_fire_events` table is removed in v1.9.0 — see §8 and §9; Support/Counter are read-time aggregates over reply-bets, not vote rows.)
 
 ### 16.5 Compliance
 
@@ -1010,7 +1007,7 @@ Append-only enforcement on `mod_actions`, `admin_events`, and `friendly_fire_eve
 - **Terms of Service.** Drafted; lawyer-finalised wording. Includes transparency-by-design statement, pseudonym-scrub model, re-identification warning, content policy referencing §14, ToS-implicit consent for K2 brand-account quoting.
 - **Privacy Policy.** Drafted; lawyer-finalised. Cross-references §16.3.
 - **DPDPA grievance contact.** Email + named officer (per Indian Digital Personal Data Protection Act). Surfaced in footer and Privacy Policy.
-- **CSAM detection + reporting compliance.** Experiment-phase posture: OpenAI `sexual/minors` classifier (text-only per `omni-moderation-2024-09-26`) routes text-only flags to Track B (admin review) and image-attached flags to Track A (auto-ban) per SCAFFOLD.16 LD-3. Dedicated CSAM-hash vendor and NCMEC auto-report deferred to post-experiment per attorney consultation 2026-05; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred" and "SCAFFOLD.16 §6 — NCMEC CyberTipline reporting deferred". Pre-launch resolution gated on incorporation + attorney sign-off.
+- **PhotoDNA + reporting compliance.** CSAM hash service onboarded pre-launch. Auto-report to NCMEC (or jurisdictional equivalent) on Track A CSAM detection.
 - **DSA notice-and-action.** Small-platform exposure noted. ToS includes notice-and-action contact + procedure.
 
 Lawyer engagement target: mid-July 2026. ToS / Privacy Policy drafts ready four weeks before launch.
@@ -1055,26 +1052,39 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `bets::concurrency-retry-on-40P01` | ADR-0013 §4 | INV-1 |
 | `bets::concurrency-retry-budget-exhausted-emits-alarm-3` | ADR-0013 §4, §5 | ADR-0013 |
 | `bets::concurrency-idempotency-replay-skips-moderation-and-txn` | ADR-0013 §3 | INV-1 |
-| `bets::concurrency-friendly-fire-freeze-atomic-with-sell` | §7 F-BET-3, §8 F-COMMENT-8, ADR-0013 §6 | ADR-0013 |
 | `bets::concurrency-moderation-outside-transaction` | ADR-0013 §8 | INV-1 |
-| `comment-direct::position-required` | §8 F-COMMENT-1 | INV-3 |
-| `comment-reply::replier-side` | §8 F-COMMENT-2 | INV-3 |
+| `comment-direct::additional-argument-is-a-post-bet` | §8 F-COMMENT-1, §7 F-BET-2 | INV-1, INV-3 |
+| `comment-reply::reply-is-a-bet-replier-side-not-parent` | §8 F-COMMENT-2 | INV-1, INV-3 |
+| `comment-reply::reply-floor-enforced` | §8 F-COMMENT-2, §10.9 | ADR-0018 |
+| `comment-no-position::comment-requires-bet` | §8 F-COMMENT-5 | INV-1, INV-3 |
+| `comment-no-position::exited-user-prior-comments-remain` | §8 F-COMMENT-5 | INV-3 |
 | `comment-media::moderation-routes` | §8 F-COMMENT-3 | INV-1, INV-3 |
 | `comment-validation::length-limit` | §8 F-COMMENT-4 | — |
-| `debate-view::ranking-function-order` | §9 F-DEBATE-1 | — |
-| `debate-view::replies-two-slot-best-opposite-and-same` | §9 F-DEBATE-1 | — |
-| `debate-view::replies-expansion-ranked-by-function` | §9 F-DEBATE-1 | — |
-| `ranking::deterministic-and-universal` | §9 + RANKING.md | — |
+| `debate-view::top-default-order` | §9 F-DEBATE-1, RANKING.md | ADR-0017 |
+| `debate-view::mode-selector-switches-order` | §9 F-DEBATE-1, RANKING.md | ADR-0017 |
+| `debate-view::replies-two-slot-best-support-and-counter` | §9 F-DEBATE-1 | ADR-0017 |
+| `debate-view::replies-expansion-stake-sorted-within-side` | §9 F-DEBATE-1 | ADR-0017 |
+| `debate-view::support-counter-aggregate-display` | §9 (preamble) | ADR-0017 |
+| `ranking::deterministic-per-mode` | §9 + RANKING.md | ADR-0017 |
 | `ranking::frozen-at-resolution` | §9 + RANKING.md | INV-4 |
-| `ranking::tie-break-by-comment-id` | §9 + RANKING.md | — |
-| `ranking::excludes-frozen-and-cleared-friendly-fire` | §9 + RANKING.md | — |
-| `debate-view::friendly-fire-live-count` | §9 (preamble), §8 F-COMMENT-8 | — |
-| `friendly-fire::cross-aisle-up-same-side-down` | §8 F-COMMENT-6 | — |
-| `friendly-fire::self-vote-rejected` | §8 F-COMMENT-6 | — |
-| `friendly-fire::already-voted-rejected` | §8 F-COMMENT-6 | — |
-| `friendly-fire::clear-recomputes-display` | §8 F-COMMENT-7 | — |
-| `friendly-fire::freeze-on-exit` | §8 F-COMMENT-8 | — |
-| `rate-limit::shared-budget-comments-and-friendly-fire` | §8 (preamble), §16.1 | — |
+| `ranking::default-fixed-not-shuffled` | §9 + RANKING.md | ADR-0017 |
+| `ranking::top-multi-lane-dominance` | §9 + RANKING.md | ADR-0017 |
+| `ranking::top-margin-and-activity-floor` | §9 + RANKING.md | ADR-0017 |
+| `ranking::top-graceful-degradation-closest-to-landslide` | §9 + RANKING.md | ADR-0017 |
+| `ranking::mode-most-debated` | §9 + RANKING.md | ADR-0017 |
+| `ranking::mode-highest-stakes` | §9 + RANKING.md | ADR-0017 |
+| `ranking::mode-contested` | §9 + RANKING.md | ADR-0017 |
+| `ranking::mode-newest` | §9 + RANKING.md | ADR-0017 |
+| `ranking::gravity-decay-on-accumulating-modes` | §9 + RANKING.md | ADR-0017 |
+| `ranking::author-stake-cold-start-seed` | §9 + RANKING.md | ADR-0017 |
+| `ranking::mode-tiebreak-author-stake-then-recency` | §9 + RANKING.md | ADR-0017 |
+| `ranking::replies-stake-descending-within-side` | §9 + RANKING.md | ADR-0017 |
+| `ranking::replies-tie-break-earlier-wins` | §9 + RANKING.md, ADR-0016 | ADR-0017 |
+| `economy::equal-initial-grant` | §10.1, §16.1 | ADR-0018 |
+| `economy::daily-credit-only-on-commented-bet-day` | §10.4 | ADR-0018 |
+| `economy::daily-credit-flat-non-escalating` | §10.4 | ADR-0018 |
+| `economy::post-floor-enforced` | §10.9, §7 F-BET-1 | ADR-0018 |
+| `economy::reply-floor-50-enforced` | §10.9, §8 F-COMMENT-2 | ADR-0018 |
 | `idempotency::cache-hit-returns-cached-response` | ADR-0015 §2 | — |
 | `idempotency::cache-miss-executes-fresh` | ADR-0015 §2 | — |
 | `idempotency::body-mismatch-returns-409` | ADR-0015 §2 | — |
@@ -1139,8 +1149,7 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `moderation::redis-reservation-collision-409` | ADR-0014 §3 | — |
 | `moderation::openai-transient-failure-retry-succeeds` | ADR-0014 §4 | — |
 | `moderation::openai-terminal-failure-fails-closed` | ADR-0014 §4 | INV-1 |
-| `precommit-moderate::text-only-sexual-minors-routes-track-b` | SCAFFOLD.16 LD-3 (text/image Track A carve-out) | — |
-| `f-admin-4::pass-verdict-removal` | §15 F-ADMIN-4 (per SCAFFOLD.16 F-γ-thin) | — |
+| `moderation::photodna-csam-match-shortcircuits-openai` | ADR-0014 §3 | — |
 | `admin::market-deadline-form-validation` | §15 F-ADMIN-1 | — |
 | `admin::pool-seed-flow` | §15 F-ADMIN-2 | INV-2 |
 | `admin::resolution-trigger` | §15 F-ADMIN-3 | INV-4 |
@@ -1181,7 +1190,7 @@ Explicit. Every item has a one-line "why not now" so Claude does not re-litigate
 - **Federation.** Single deployment, single domain.
 - **Per-user posting integrations to external platforms.** Brand-account propagation is admin-curated only (per `K2`).
 - **Notifications (email or in-app).** Deferred to a separate workstream (per `I1`). Users discover resolutions and replies by visiting pages. Risk acknowledged; retention impact accepted.
-- **About / FAQ / help page.** Deferred (per `I5`); whitepaper link in footer is the v1 explainer surface. Brand looks bare; tradeoff against ship-speed accepted.
+- **Standalone About / FAQ / help page (as a separate deferral).** Superseded by the **feature-guide page** (§21.6) — the canonical "how it works" content surface with per-feature "i" deep-links, in scope for v1.9.0. The prior `I5` deferral (whitepaper-link-only) no longer holds; the whitepaper link remains in the footer alongside the feature guide.
 - **Search.** Markets accessed via hand-curated list and brand-account links (per `I2`).
 - **Following users / markets.** Cascade into notifications (per `I3`); not v1.
 - **User-side moderation (block / hide / report).** No user-side report button in v1 (per `C9`); community moderation moves to testnet+.
@@ -1206,13 +1215,18 @@ Explicit. Every item has a one-line "why not now" so Claude does not re-litigate
 - **Forgotten-password / account-recovery flows for participants.** No participant passwords exist (participants use Google OAuth or email-OTP only). If a participant loses access to both their email and Google account simultaneously, recovery is via admin email contact (`foundation@zugzwangworld.com`); no automated recovery in v1. **Admin auth uses a static password** in env var `ADMIN_PASSWORD` per F-AUTH-ADMIN (ADR-0010); admin recovery is by env-var rotation + redeploy, not a forgotten-password flow.
 - **Admin role flag on participant accounts.** Admin is structurally separate per F-AUTH-ADMIN — no `users.role` column, no participant account with elevated permissions. The choice is deliberate (B5 enforced by data-model construction, not runtime check); reverting to a role-flag pattern would weaken B5's structural enforcement and is rejected.
 - **Public mod log surface during the experiment.** No live or hub-tab log surface. `admin_events` and `mod_actions` are admin-only audit tables during the experiment; full release at conclusion per `E5`.
-- **Personalised ranking.** The ranking function is universal — same inputs, same output, same rendered order for every reader at every moment (§9). No per-reader reordering, no recommender-style personalisation, no A/B variants in production.
-- **Passive-engagement ranking inputs.** View counts, dwell time, scroll depth, click-through, "users like you also voted X." Not v1 inputs. Discriminating rule per ADR-0009: admissible signals must require committing Dharma to generate (e.g., direct replies, friendly-fire votes — both stake-attached). Passive-consumption metrics fail this test. If introduced later, must be added via ADR + made auditable from the public dataset (§9 transparency requirement).
-- **Author Dharma at post time as a ranking input.** Considered and explicitly excluded for v1 by ADR-0009. The 45-day experiment window is too short for Dharma balances to spread meaningfully across users (log-scaled spread ≈ 0.7 across the population), so the signal would contribute near-uniformly across comments — dead weight. Reintroducible at testnet phase via a new ADR when track records compound over months/years.
-- **Subtree reply count.** Considered and rejected for v1 by ADR-0009. Counting full reply subtrees opens a reply-bombing attack surface (coordinated nested back-and-forth boosts a comment without the author acting). Direct-reply count only, capped at depth 1 per the flat-replies rule.
-- **Online-learned ranking weights.** Weights are hand-set in `RANKING.md`, locked at launch via ADR-0009 (§19 Q13), changed only via ADR. No silent online tuning, no ML-learned weights.
-- **User-toggleable sort variants.** Not v1. Single ranking function, single rendered order. Toggleable views (e.g., "newest first") deferred to a UI/UX ADR.
-- **Filters on the debate view.** Not v1. The implicit YES / NO column split is the only built-in filter.
+- **Personalised ranking.** The ranking model is universal — same inputs, same output, same rendered order for every reader at every moment (§9). No per-reader reordering, no recommender-style personalisation, no A/B variants in production.
+- **Passive-engagement ranking inputs.** View counts, dwell time, scroll depth, click-through, "users like you also viewed X." Not v1 inputs. Discriminating rule per ADR-0017: admissible signals must require committing Dharma to generate (a reply is itself a bet). Passive-consumption metrics fail this test. If introduced later, must be added via ADR + made auditable from the public dataset (§9 transparency requirement).
+- **Free / no-stake reactions (the v1.8 friendly-fire vote).** Removed in v1.9.0 (§8, §9). There is no up/down vote and no `friendly_fire_events` table. Support and Counter are read-time aggregates over reply-bets — every expression of agreement or dissent costs Dharma, by the same discriminating rule above. A no-stake reaction affordance is explicitly rejected.
+- **"Vindicated" / track-record ranking lens ("Best" mode).** Rejected for v1 by ADR-0017. Pre-resolution there is no ground truth, so a "best / correct" ordering cannot be computed honestly; a post-resolution "who was right" lens is a post-mortem analytics feature against the conclusion dataset (parallel to `G8`), not a live ranking mode.
+- **Shuffled / randomised default order.** Rejected by ADR-0017. The default (Top) is fixed and deterministic; legibility and dataset interpretability outweigh shuffle's only benefit (breaking rich-get-richer), which gravity decay already delivers on the accumulating modes.
+- **Weighted-average ranking composite.** Top is a *dominance* composite (lead the second-place post in any one lane past a ratio + activity floor), **not** a weighted average of lanes. A tunable weighted blend across traction / stake / split is explicitly not the model (ADR-0017) — it would let a high-stake post buy rank by dragging one term, the thing the dominance gate prevents.
+- **Author Dharma at post time as a ranking input.** Considered and explicitly excluded for v1 by ADR-0017 (carried from ADR-0009). The 45-day window is too short for Dharma balances to spread meaningfully across users, so the signal would contribute near-uniformly — dead weight. The post's *own author stake* `a` is used only as cold-start seed + mode tiebreaker (§9), never as a ranking term. Reintroducible at testnet via a new ADR when track records compound over months/years.
+- **Subtree reply count.** Considered and rejected for v1 by ADR-0017 (carried from ADR-0009). Counting full reply subtrees opens a reply-bombing attack surface. Replies are flat (depth = 1); reply ranking is stake-within-side.
+- **Online-learned ranking weights.** Lane ratios, floors, and decay constants are hand-set in `RANKING.md`, locked at launch via ADR-0017 (§19 Q13), changed only via ADR. No silent online tuning, no ML-learned weights.
+- **Surging ranking mode.** Deferred to v1.x by ADR-0017 — a velocity / acceleration lens needs time-series history the experiment does not retain in-product. The shipped modes are Most Debated, Highest Stakes, Contested, Newest (all in scope, §9).
+- **Arbitrary user-defined sort variants.** Beyond the published mode set (Top + the four filter modes, which **are** in scope per ADR-0017), no user-defined or saved custom sorts in v1.
+- **Arbitrary content filters on the debate view.** The YES / NO column split and the ADR-0017 ranking modes are the only built-in views; tag / keyword / author filters are not v1.
 - **Live or snapshot K_eff dashboard in-product.** Per `G3` and §12.3: K_eff(t) is computed from the public dataset post-hoc only. No live `/k-eff` page, no daily-snapshot variant, no admin-only K_eff dashboard. Conclusion-event analytics are generated out-of-band against the dataset, parallel to `G8`'s propagation-dynamics treatment.
 - **In-product analytics export tooling (chart PNG / CSV / slide-deck export).** No admin "highlight tool", no public dashboard download buttons, no admin-curated chart export. K_eff is computed from the public dataset post-hoc and not surfaced in-product (per `G3`, §12.3). If admin needs static analytics for external presentation, generation happens out-of-band against the public dataset. Decision: keep the product surface minimal; internal analytics are not a product feature.
 - **Multi-admin readiness / backup admin.** Single admin in v1 (per `E4`); `BREAK_GLASS.md` runbook is the mitigation.
@@ -1221,6 +1235,8 @@ Explicit. Every item has a one-line "why not now" so Claude does not re-litigate
 - **Pinned messages / featured comments.** Not v1.
 - **Synthetic Dharma / separate liquidity ledger.** Path A only (per `F5`/`F6`, `B5`).
 - **Brier overlay / time-weighted bonus on Dharma award.** CPMM-native only (per `A2`).
+- **Escalating / streak-based Daily Credit.** Rejected by ADR-0018. The Daily Credit is flat and never grows with tenure, streaks, or activity (§10.4) — escalating issuance compounds the over-issuance risk and rewards presence over informed participation.
+- **Large referral / invite grants.** Rejected by ADR-0018. No sign-up bonus beyond the single equal initial grant; large referral payouts are a Sybil and over-issuance vector inside a dummy-Dharma window.
 - **Forced position liquidation on user ban.** Positions ride to resolution (per `E2`).
 - **Public mod actions in real time.** Admin-only during experiment; full release at conclusion (per `E5`).
 - **Open-submission market curation.** Hrishikesh-curates in Experiment phase (per `J2`); revisits at testnet.
@@ -1236,23 +1252,24 @@ Numbered. Each: question, default behaviour shipped now, decider, resolve-by dat
 | # | Question | Default | Decider | Resolve by |
 |---|---|---|---|---|
 | Q1 | AI flag thresholds (per category, per track) | Conservative starting values; sample-content tested. | Hrishikesh + sample-content test | 2026-09-01 |
-| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | Resolved per SCAFFOLD.16 LD-1: OpenAI omni-moderation is the SOLE moderation vendor in experiment phase; image-classifier gap (6 text-only categories per `omni-moderation-2024-09-26` capability table) is an accepted v1 gap. Operational mitigation: SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin); empirical measurement: HARDEN.5. Second-vendor optionality deferred per `docs/parked.md`. | Hrishikesh (resolved at SCAFFOLD.16) | Resolved 2026-05-26 |
-| Q3 | PhotoDNA / equivalent CSAM hash service onboarded | Deferred to post-experiment per SCAFFOLD.16 LD-1; see `docs/parked.md` "SCAFFOLD.16 §6 — Second moderation vendor deferred". | Hrishikesh (post-experiment) | Post-experiment |
-| Q4 | Specific rate-limit values, slippage threshold, allowance, seed magnitude, comment length, OTP TTL, poll interval, in-flight timeout | All deferred; symbolic constants only in §16.1. | Number-tuning pass | 2026-09-01 |
+| Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | TBD; selected via implementation pass. | Engineering implementation pass | Before launch |
+| Q3 | PhotoDNA / equivalent CSAM hash service onboarded | In progress; weeks-long onboarding initiated. | Hrishikesh | Before launch |
+| Q4 | Specific rate-limit values, slippage threshold, equal initial grant + Daily Credit amounts, post floor (`BET_MIN_STAKE_POST`), seed magnitude, comment length, OTP TTL, poll interval, in-flight timeout, Top lane ratios + activity floors + gravity decay constants (ADR-0017) | All deferred; symbolic constants only in §16.1. **Reply floor `BET_MIN_STAKE_REPLY` (50) and `REPLY_DEPTH_MAX` (1) are pinned, not deferred** (ADR-0018 / ADR-0017). | Number-tuning pass | 2026-09-01 |
 | Q5 | ToS final wording | Drafted; lawyer-review pending. | Lawyer | Mid-July 2026 |
 | Q6 | First market content | TBD; refusal rule — Claude does not invent market content. | Hrishikesh alone (per `J1`) | Before launch |
 | Q7 | Notifications design | No v1 surface; users discover by visiting pages. | Separate notifications workstream | Mid-experiment |
-| Q8 | About / FAQ surface | No v1; whitepaper link in footer. | Hrishikesh, post-launch | Mid-experiment |
+| Q8 | About / FAQ surface | **SUPERSEDED 2026-06-01 (SYNC.7).** Replaced by the in-scope feature-guide page (§21.6) — a canonical "how it works" page with per-feature "i" deep-links. Page shell + anchor mechanism build now; per-feature explainer copy lands as each feature's spec locks. | Hrishikesh | Shell pre-launch; copy per-feature |
 | Q9 | Auth library implementation (NextAuth / Auth.js, Clerk, or hand-rolled) | DECIDE; ADR-0004 gating. Stack must support: Google OAuth, email-OTP with Cloudflare Turnstile siteverify integration, server-side session table, indefinite cookies, manual logout-only session-end. | Engineering | Before launch |
 | Q10 | Bet+comment atomicity behaviour on Track B flag (entry case) | Provisional: atomic — both fail. | Sample-content testing | 2026-09-01 |
 | Q11 | Three-state marker icons (Flipped / Exited visual) | TBD; design pass. | UI/UX design pass | Pre-launch |
 | Q12 | Cross-platform brand-account specifics (platform list, post copy, curation algorithm, AI-misfire response) | Deferred to Social workstream. | Social workstream | Pre-launch or mid-experiment |
-| Q13 | Comment ranking function (`RANKING.md`) — input set, weight ordering, decay shape, friendly-fire term | **CLOSED 2026-05-06 by ADR-0009.** Function shape locked: HN-style time decay over log-scaled additive numerator. Inputs: `stake_at_post_time`, friendly-fire net score, opposite-side direct-reply count, same-side direct-reply count, comment age. Design-intent weight ordering: `w_reply_opp > w_ff > w_reply_same > w_stake`. Specific weight values pin via number-tuning pass (target 2026-09-01). Author Dharma at post time excluded from v1 input set (45-day window argument — see §18). | Hrishikesh + engineering | ✅ Closed 2026-05-06 |
-| Q14 | Friendly-fire fine details — cool-down post side-flip; clear-vote vs replace-vote semantics; rate-limit weight relative to comments | No cool-down in v1; one vote per (user, comment), changeable via clear-then-recast; equal weight in shared rate-limit budget | Number-tuning pass + post-launch ADR if needed | 2026-09-01 |
+| Q13 | Comment ranking model (`RANKING.md`) — lane set, dominance ratios, decay shape | **SUPERSEDED 2026-06-01 by ADR-0017** (which supersedes the ADR-0009 closure). The single-scalar function with a friendly-fire term and `stake_at_post_time` is replaced by the multi-lane **Top** composite + filter modes over four per-side reply-bet aggregates (§9). Specific lane ratios, activity floors, and decay constants pin via the number-tuning pass (target 2026-09-01). | Hrishikesh + engineering | ✅ Superseded by ADR-0017, 2026-06-01 |
+| Q14 | Friendly-fire fine details | **OBSOLETE 2026-06-01 (SYNC.7).** Friendly-fire is removed entirely (§8, §9, ADR-0017) — there is no vote to cool down, clear, or rate-limit. Support / Counter are read-time aggregates over reply-bets. | — | Closed (obsolete) |
 | Q15 | Pseudonym + PFP asset pipeline (ADR-0011): word lists, Flux prompt template, sampler / seed strategy, number-compositing pipeline, R2 upload procedure | **CLOSED 2026-05-07 by ADR-0011.** Namespace locked at 50 colours × 100 animals × 10 deterministically-selected number variants per pair = 50,000 with three-digit zero-padded numbers in the range 000–999. Word lists ship as `experiment/asset-pipeline/colours.txt` and `animals.txt` under AGPL-3.0 with PascalCase single-token entries, light-touch brand-collision sweep, recognisability + Flux-render-legibility bias for animals, visual-distinguishability bias for colours. Number selection per pair derived deterministically from `hash(colour + ":" + animal + ":" + version_tag + ":" + model_checkpoint_hash)` — collision-free pool extension by widening per-pair count, no overlap with already-assigned numbers. Flux base + Pillow deterministic compositing; numbers never generated by the diffusion model. ComfyUI workflow committed at `experiment/asset-pipeline/comfyui-workflow.json`. R2 storage at `zugzwang-pfp/v1/<slug>` with explicit `Content-Type: image/webp` + `Cache-Control: public, max-age=31536000, immutable`. Pre-flight 100-image gate before production run; cheap doubling-via-numbers path preserved for pool extension. Three operational tunes (compositing font, contrast rule, locked Flux prompt + sampler params) deferred to SCAFFOLD.17 and the UI/UX design pass — tracked in `PSEUDONYM.md` §13 as v1.x.0-draft change-log targets, not §19 open questions. | Hrishikesh + engineering | ✅ Closed 2026-05-07 |
 | Q16 | OTP rate-limit specific values — `OTP_REQUESTS_PER_EMAIL_PER_HOUR`, `OTP_REQUESTS_PER_IP_BURST_PER_MIN`, `OTP_TTL_MIN` | Symbolic only in spec; specific values via number-tuning pass | Number-tuning pass | 2026-09-01 |
 | Q17 | Mid-experiment ToS / Privacy Policy revision policy (ADR-TOS-UPDATE) — whether existing users must re-accept on version change, what counts as continued-use acceptance, communication mechanism | No automatic re-prompt in v1; assumes one ToS version ships at launch and holds. ADR mechanism exists for exception cases. | Hrishikesh + lawyer | If/when needed |
 | Q18 | Admin auth implementation specifics (ADR-0010): library / hand-rolled choice; `admin_sessions` table schema; admin session middleware shape; auth-method choice on the locked `/admin/*` route surface | **CLOSED 2026-05-06 by ADR-0010.** Auth method changed from Google OAuth to **static password** in env var `ADMIN_PASSWORD`. Implementation: hand-rolled (~50 LOC across `src/server/auth/admin/{login,validate,logout}.ts` + `src/db/schema/admin-auth.ts`), no Better Auth admin instance, no third-party identity provider. `admin_sessions` schema simplified to three columns (`session_id, issued_at, last_seen_at`); the prior `admin_email` column was dropped because static-password auth makes it purposeless. Two-layer auth check (Next.js middleware redirect at `/admin/*` for UX; Server Action validator as security boundary per CVE-2025-29927 defense-in-depth, AGENTS.md §5). New constant `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` per §16.1 (number-tuning deferred). Specific value of `ADMIN_PASSWORD` set out-of-band by operator; never committed to repo. | Hrishikesh + engineering | ✅ Closed 2026-05-06 |
+| Q19 | In-window Dharma sink (ADR-0018) — whether to drain over-issued supply during the live window, and by what mechanism (fee, burn, paid action) | **Principle reserved, mechanism deferred (§10.10).** No sink ships in v1.9.0; over-issuance is accepted for the dummy-Dharma experiment (§10.2). If over-issuance distorts price discovery, a sink may be introduced via ADR — must not become a user-to-user transfer (INV-2) or a pay-to-win lever. | Hrishikesh + engineering | If/when over-issuance bites |
 
 Claude does not try to resolve these; it implements the default and flags the question in PR descriptions.
 
@@ -1271,27 +1288,95 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-05-07 | 1.5.0-draft | §0, §17, §20 | Bet transaction concurrency model implementation specifics locked by ADR-0013. §0 version bumped to 1.5.0-draft. §17 acceptance-test catalogue adds ten new `bets::concurrency-*` rows covering SERIALIZABLE-isolation enforcement (`serializable-isolation-enforced`), pool-row `FOR NO KEY UPDATE` lock acquisition (`pool-row-lock-acquired`), `FOR KEY SHARE` compatibility under FK validation (`no-key-update-allows-fk-share`), canonical lock order `pools → positions → dharma_ledger → friendly_fire_events → events` (`canonical-lock-order`), retry on SQLSTATE 40001 and 40P01 (`retry-on-40001`, `retry-on-40P01`), retry-budget exhaustion firing Sentry alarm 3 per ADR-0007 §4 entry 3 (`retry-budget-exhausted-emits-alarm-3`), idempotency-replay short-circuiting both moderation and transaction per ADR-0015 contract (`idempotency-replay-skips-moderation-and-txn`), F-BET-3 + F-COMMENT-8 friendly-fire-freeze atomicity (`friendly-fire-freeze-atomic-with-sell`), and OpenAI moderation outside the transaction per ADR-0014 (`moderation-outside-transaction`). No §5 / §7 / §8 amendments — ADR-0013 mints implementation specifics, not new product behaviour; INV-1 mechanism is concentrated at `src/server/bets/transaction.ts` per the ADR's file map. SPEC.2 back-pressure absorbed in same commit: §0.1 change-log row + §2.2 RESOLVED block tightened to point at ADR-0013 + §9 substantive stub absorption + §15 new `bet_serialization_exhausted` error code (HTTP 503, `Retry-After: 1`) + §23 ADR Index status flip. | ADR-0013 ratifies the bet transaction concurrency model implementation specifics: Postgres SERIALIZABLE isolation, pool-row pessimistic lock via `SELECT … FOR NO KEY UPDATE` (refining the SPEC.2 §9 stub `FOR UPDATE` wording — `FOR UPDATE` conflicts with `FOR KEY SHARE` per Postgres 17 §13.3.2 and would block every concurrent FK-validating INSERT against the pool, while `FOR NO KEY UPDATE` does not), canonical lock order extended with `friendly_fire_events` between `dharma_ledger` and `events` to keep per-user writes co-located with `events` terminal per ADR-0005, full-jitter retry on bases [50, 100, 200] ms (citing AWS Brooker 2015 — full jitter wins over equal jitter, decorrelated jitter is overkill for bounded ladders), retry on both 40001 and 40P01 with same ladder (40P01 expected to be vanishing under canonical lock order; retry-and-tag preferable to crash), Sentry breadcrumb per attempt + custom event on exhaustion (alarm 3), idempotency check first in handler before moderation and transaction (Stripe contract — protects against non-deterministic OpenAI re-runs on completed-but-network-dropped bets). ENGINE.7 is the implementation task carrying `Ultrathink mandatory`. | ADR-0013 |
 | 2026-05-07 | 1.6.0-draft | §0, §17, §20 | Pre-commit moderation flow locked by ADR-0014. §0 version bumped to 1.6.0-draft. §17 acceptance-test catalogue adds six new `moderation::*` rows covering: (1) `moderation::no-postgres-tx-across-openai-call` — bet wrapper holds no Postgres connection / transaction during the OpenAI HTTP call (verified by mocking OpenAI to a 2-second delay and asserting active connection count remains baseline); (2) `moderation::idempotency-cache-hit-skips-moderation` — duplicate request with cache hit returns cached response without invoking `precommitModerate()`; (3) `moderation::redis-reservation-collision-409` — two concurrent submits on same `(user, market, idempotency_key)` triple: first acquires reservation, second receives 409 `moderation_in_flight` with `Retry-After: 2`; (4) `moderation::openai-transient-failure-retry-succeeds` — request where OpenAI returns 5xx on first attempt and 200 on retry succeeds end-to-end without leaking failure to user; (5) `moderation::openai-terminal-failure-fails-closed` — request where OpenAI fails on both attempts returns 503 `moderation_unavailable`, writes no `mod_actions` row, no bet+comment row, releases Redis reservation; (6) `moderation::photodna-csam-match-shortcircuits-openai` — image-attached request where PhotoDNA returns `csam_match` returns Track A regardless of OpenAI verdict. The five existing `moderation::*` rows (`track-a-auto-ban`, `track-b-queue`, `track-b-approve-block`, `entry-flag-fails-both`, `banned-mid-session`) remain unchanged. No §5 / §7 / §8 / §14 amendments — ADR-0014 mints implementation specifics for the SPEC.1 §14 contract; the F-MOD-1 / F-MOD-2 / F-MOD-3 / F-MOD-4 / F-MOD-5 product behaviour is unchanged. F-MOD-4 atomicity preserved structurally: on Track A or Track B verdict, the bet+comment transaction never opens (no shared-transaction rollback required between moderation and the bet wrapper, consistent with ADR-0013 §8 moderation-unaware-wrapper discipline). Track A degrade mode named (HARDEN.5 trigger): if sample-content testing surfaces unacceptably high false-positive rates, Track A degrades to flag-only with manual admin ban via F-ADMIN-4; CSAM auto-report unaffected. SPEC.2 back-pressure absorbed in same commit: §0.1 change-log row + §10 substantive stub absorption + §11 fail-closed posture clarification + §23 ADR Index status flip for ADR-0014. | ADR-0014 ratifies the pre-commit moderation flow on the ADR-0013 §3 idempotency-first ordering / §8 moderation-outside-transaction discipline. Eight implementation primitives ratified: vendor selection (OpenAI `omni-moderation-latest` snapshot-pinned `omni-moderation-2024-09-26` for text and multimodal; PhotoDNA-or-equivalent for CSAM hash; no third image-classifier vendor in v1); parameterised Server Action sequence consumed by F-BET-1 / F-COMMENT-1 / F-COMMENT-2 / F-COMMENT-3; 10-second Redis SETNX intent-reservation key on `mod:reserve:{user_id}:{market_id}:{idempotency_key}` (the kickoff's 60-second value rejected as 10× over-sized against the 5–10 second submit budget); OpenAI HTTP call shape (3-second timeout per attempt, one retry on transient failure, fail-closed on terminal failure); PhotoDNA parallel call with same posture; F-MOD-4 atomicity preserved structurally; Sentry observability under ADR-0007 §4 alarm 4 with three event tags; Track A degrade mode named (HARDEN.5 trigger). | ADR-0014 |
 | 2026-05-07 | 1.7.0-draft | §0, §16.1, §17, §20, Appendix B | Rate-limit and idempotency contract locked by ADR-0015. §0 version bumped to 1.7.0-draft. §16.1 adds two new constants: `BET_ATTEMPTS_PER_IP_PER_MIN` (per-IP anti-abuse burst cap on bet `place` / `sell` endpoints — bets are exempt from the per-day per-market productive cap by §16.1's design, but per-IP anti-abuse defense is a separate concern) and `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` (per-IP anti-abuse burst cap on the R2 signed-PUT URL mint endpoint — the URL-mint endpoint can be hit independently of comment posting and is not bound by the shared comment / friendly-fire write budget). §17 acceptance-test catalogue adds twelve new rows covering: (1) `idempotency::cache-hit-returns-cached-response` — duplicate request with completed cache entry returns cached `(status, body)` verbatim without re-executing handler; (2) `idempotency::cache-miss-executes-fresh` — request with no cache entry proceeds through full handler and writes completed response under 24h TTL; (3) `idempotency::body-mismatch-returns-409` — same idempotency-key with different canonical-JSON body returns HTTP 409 `error_idempotency_key_reused`; (4) `idempotency::in-flight-collision-returns-409-retry-after-2` — same idempotency-key with pending sentinel held by another in-flight request returns HTTP 409 `error_idempotency_in_flight + Retry-After: 2`; (5) `idempotency::pending-sentinel-ttl-30s` — pending sentinel expires after 30 seconds (sized for ADR-0014's 10-second moderation reservation worst case + ADR-0013's bet-transaction worst case + slack); (6) `idempotency::completed-response-ttl-24h` — completed response cache entry expires after 24 hours (Stripe contract); (7) `idempotency::cached-response-includes-error-envelopes` — HTTP 429 / 4xx / 5xx responses are cached and replayed on retry just like 200s (clients SHOULD generate fresh idempotency-keys after rate-limit recovery); (8) `idempotency::fails-closed-on-upstash-unreachable-503` — idempotency cache helper returns HTTP 503 `error_idempotency_unavailable + Retry-After: 5` on Upstash Redis unreachable, no handler execution, Sentry alarm 6 emitted; (9) `rate-limit::otp-per-ip-burst-throttles` — OTP request endpoint enforces per-IP burst limit (filling existing gap in §17 coverage of the F-AUTH-2 surface); (10) `rate-limit::bet-per-ip-burst-throttles` — bet `place` / `sell` endpoints enforce the new per-IP anti-abuse burst limit; (11) `rate-limit::image-put-url-per-ip-burst-throttles` — R2 signed-PUT URL mint endpoint enforces the new per-IP anti-abuse burst limit; (12) `rate-limit::fails-open-on-upstash-unreachable` — rate-limit middleware admits the request on Upstash Redis unreachable, Sentry alarm 6 emitted, no user-facing latency penalty. The existing `rate-limit::shared-budget-comments-and-friendly-fire` row remains unchanged. No §5 / §7 / §8 / §14 amendments — ADR-0015 mints implementation specifics for the SPEC.1 §16.1 + §16.2 + §8 preamble contract; product behaviour at the per-flow level is unchanged. Appendix B adds two new TBD entries matching the §16.1 additions. SPEC.2 back-pressure absorbed in same commit: §0.1 change-log row + §2.2 RESOLVED block errata correction (60-second → 10-second on the moderation reservation TTL, missed in the ADR-0014 absorption pass) + §9 idempotency-cache forward-reference paragraph tightened (substance moved to §11) + §11 substantive stub absorption (per-surface rate-limit table + idempotency contract + single-key-encoding-both-states pattern + five-step in-handler call sequence + three-postures failure-mode contract + cached-error-responses-include-429s rule + no-server-side-retry rule + distinction from §10's moderation reservation + single-source-of-truth file map) + §23 ADR Index status flip for ADR-0015. Tracker (zugzwang_experiment_tracker_v5.html) corrections flagged for application: SPEC.16 description amended to reflect global key scoping, RFC 8785 fingerprint discipline, and HTTP 409 (not 400) for body-mismatch; ADR-0006 §3 stale 60-second moderation-reservation reference flagged as a separate cleanup pass (errata-only, ADR-0006's substrate decision unaffected). | ADR-0015 ratifies the rate-limit and idempotency contract: sliding-window per-surface rate limits via `@upstash/ratelimit` v2.0.8 on Upstash Redis (fail-open on Upstash unreachable, alarm 6 on emission); Stripe-style idempotency keys with global scoping, RFC 8785 canonical-JSON full-body SHA-256 fingerprint, two-tier TTL (30-second pending sentinel + 24-hour completed-response replay), HTTP 409 with `error_idempotency_key_reused` for body-mismatch and HTTP 409 with `error_idempotency_in_flight + Retry-After: 2` for in-flight collision (mirrors ADR-0014 verbatim); fail-closed on Upstash unreachable (503 `error_idempotency_unavailable + Retry-After: 5`, alarm 6 on emission); two new Appendix B constants for bet anti-abuse and image-PUT-URL anti-abuse, values deferred to HARDEN.6. Postgres-native option (Brandur Leach `INSERT … ON CONFLICT DO NOTHING`) considered and rejected for v1, flagged as future-consideration for testnet+ when Dharma becomes a real economic asset. SCAFFOLD.4, ENGINE.7, ENGINE.8, DEBATE.2, DEBATE.6 unblocked from the SPEC.16 gating dependency. | ADR-0015 |
-| 2026-05-08 | 1.8.0-draft | §0, §17, §20 | ID schema (UUIDv7) locked by ADR-0016. §0 version bumped to 1.8.0-draft; last-updated bumped to 2026-05-08. §17 acceptance-test catalogue adds five new `id::*` rows covering: (1) `id::uuidv7-monotonic-within-millisecond` — two PK insertions in the same millisecond from the **same backend session** produce monotonically-increasing UUIDs (the rand_a counter increments). The test verifies *within-backend* monotonicity only; cross-backend ordering across the Supavisor connection pool is explicitly NOT tested per ADR-0016 §Consequences/Negative — application code MUST NOT assume `id(N+1) > id(N)` across requests; (2) `id::uuidv7-time-prefix-extractable` — the 48-bit Unix-millisecond timestamp prefix is extractable via Postgres 18's `uuid_extract_timestamp()` (or the userspace equivalent on PG 17) and matches the row's `created_at` to within milliseconds for typical inserts; (3) `id::uuidv7-rfc9562-compliant` — version field = `0b0111`, variant field = `0b10`, layout matches RFC 9562 §5.7; (4) `id::uuidv7-no-collision-under-load` — 100K UUIDs generated in a tight loop produce zero collisions; (5) `id::raw-uuid-not-in-participant-urls` — every URL exposed by a participant-facing route handler is checked against a UUID regex and asserted-not-matching (per ADR-0016 §6 URL-exposure rule consuming ADR-0011's pseudonym contract — pseudonyms are the URL-exposed identifier on every user-routed page; raw UUIDs allowed only on `/admin/*` routes per F-AUTH-ADMIN structural separation per ADR-0010 and in the 2026-11-06 dataset release per §12.2). No §5 / §7 / §8 / §13 / §14 amendments — ADR-0016 mints implementation specifics for the universal PK type, not new product behaviour; INV-1 / INV-2 / INV-3 / INV-4 mechanisms are unchanged. SPEC.2 back-pressure absorbed in same commit: §0 status line + §0.1 change-log row + §5 stub one-line addition (ADR-0016 added to "Drizzle DDL substance lives in" tail naming the universal `uuid().primaryKey().default(sql\`uuidv7()\`)` declaration discipline + the four Better Auth column-type overrides + `identity_pool` synthetic-PK + UNIQUE-natural-triple) + §17 substantive stub absorption (full rewrite covering substrate, Drizzle column declaration, Better Auth full override, `identity_pool` PK shape, URL-exposure rule, per-backend monotonicity caveat, single-source-of-truth file map) + §23 ADR Index status flip for ADR-0016. SPEC.17 is the last ADR before SPEC.8 fresh-session review. | ADR-0016 ratifies the ID-schema contract for the Zugzwang experiment phase: UUIDv7 (RFC 9562) as the universal primary-key type across the SPEC.2 §5 inventory; userspace `public.uuidv7()` PL/pgSQL function shipped as a hand-written raw SQL migration in the Drizzle migration set (forward-compatible with PG 18's native `pg_catalog.uuidv7()` via one-statement function drop at cutover — function-name choice locks the cheap-migration path); Drizzle column declaration `uuid().primaryKey().default(sql\`uuidv7()\`)` schema-wide (DB-side default emits in DDL so raw-SQL inserts get a correct PK without app-layer participation; Drizzle's `$defaultFn` rejected as invisible to drizzle-kit-emitted DDL); full override of Better Auth's `generateId` to UUIDv7 across all four Better Auth tables (`user`, `session`, `account`, `verification`) for schema uniformity (partial and full carve-out alternatives rejected on FK-uniformity grounds); synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` for `identity_pool` (composite natural-triple PK rejected for negligible 800 kB storage saving at schema-uniformity cost); raw UUIDs forbidden on participant-facing URLs (pseudonyms only per ADR-0011), allowed on admin-only routes (per F-AUTH-ADMIN structural separation per ADR-0010), allowed in the 2026-11-06 dataset release (per §12.2). Per-backend monotonicity caveat documented but not relied on across the Supavisor connection pool. PG 18 native `uuidv7()` rejected as v1 substrate because Supabase has not shipped PG 18 (latest `supabase/postgres:17.6.1.107`, 29 Apr 2026; original Q1 2026 target slipped per discussion #42681); `pg_uuidv7` C extension rejected because not on Supabase's allowlist on any plan tier (three open requests since March 2024 unactioned); kjmph gist's pure-SQL variant adopted because endorsed by Supabase staff in discussion #9500 as the recommended PL/pgSQL workaround on PG 17. SCAFFOLD.2 (Postgres + Drizzle + event-sourced schema) is the implementation task that consumes ADR-0016. | ADR-0016 |
+| 2026-05-08 | 1.8.0-draft | §0, §17, §20 | ID schema (UUIDv7) locked by ADR-0016. §0 version bumped to 1.8.0-draft; last-updated bumped to 2026-05-08. §17 acceptance-test catalogue adds five new `id::*` rows covering: (1) `id::uuidv7-monotonic-within-millisecond` — two PK insertions in the same millisecond from the **same backend session** produce monotonically-increasing UUIDs (the rand_a counter increments). The test verifies *within-backend* monotonicity only; cross-backend ordering across the Supavisor connection pool is explicitly NOT tested per ADR-0016 §Consequences/Negative — application code MUST NOT assume `id(N+1) > id(N)` across requests; (2) `id::uuidv7-time-prefix-extractable` — the 48-bit Unix-millisecond timestamp prefix is extractable via Postgres 18's `uuid_extract_timestamp()` (or the userspace equivalent on PG 17) and matches the row's `created_at` to within milliseconds for typical inserts; (3) `id::uuidv7-rfc9562-compliant` — version field = `0b0111`, variant field = `0b10`, layout matches RFC 9562 §5.7; (4) `id::uuidv7-no-collision-under-load` — 100K UUIDs generated in a tight loop produce zero collisions; (5) `id::raw-uuid-not-in-participant-urls` — every URL exposed by a participant-facing route handler is checked against a UUID regex and asserted-not-matching (per ADR-0016 §6 URL-exposure rule consuming ADR-0011's pseudonym contract — pseudonyms are the URL-exposed identifier on every user-routed page; raw UUIDs allowed only on `/admin/*` routes per F-AUTH-ADMIN structural separation per ADR-0010 and in the 2026-11-06 dataset release per §12.2). No §5 / §7 / §8 / §13 / §14 amendments — ADR-0016 mints implementation specifics for the universal PK type, not new product behaviour; INV-1 / INV-2 / INV-3 / INV-4 mechanisms are unchanged. SPEC.2 back-pressure absorbed in same commit: §0 status line + §0.1 change-log row + §5 stub one-line addition (ADR-0016 added to "Drizzle DDL substance lives in" tail naming the universal `uuid().primaryKey().default(sql\`uuidv7()\`)` declaration discipline + the four Better Auth column-type overrides + `identity_pool` synthetic-PK + UNIQUE-natural-triple) + §17 substantive stub absorption (full rewrite covering substrate, Drizzle column declaration, Better Auth full override, `identity_pool` PK shape, URL-exposure rule, per-backend monotonicity caveat, single-source-of-truth file map) + §23 ADR Index status flip for ADR-0016. SPEC.17 is the last ADR before SPEC.8 fresh-session review. | ADR-0016 ratifies the ID-schema contract for the Zugzwang experiment phase: UUIDv7 (RFC 9562) as the universal primary-key type across the SPEC.2 §5 inventory; userspace `public.uuidv7()` PL/pgSQL function shipped as a hand-written raw SQL migration in the Drizzle migration set (forward-compatible with PG 18's native `pg_catalog.uuidv7()` via one-statement function drop at cutover — function-name choice locks the cheap-migration path); Drizzle column declaration `uuid().primaryKey().default(sql\`uuidv7()\`)` schema-wide (DB-side default emits in DDL so raw-SQL inserts get a correct PK without app-layer participation; Drizzle's `$defaultFn` rejected as invisible to drizzle-kit-emitted DDL); full override of Better Auth's `generateId` to UUIDv7 across all four Better Auth tables (`user`, `session`, `account`, `verification`) for schema uniformity (partial and full carve-out alternatives rejected on FK-uniformity grounds); synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` for `identity_pool` (composite natural-triple PK rejected for negligible 800 kB storage saving at schema-uniformity cost); raw UUIDs forbidden on participant-facing URLs (pseudonyms only per ADR-0011), allowed on admin-only routes (per F-AUTH-ADMIN structural separation per ADR-0010), allowed in the 2026-11-06 dataset release (per §12.2). Per-backend monotonicity caveat documented but not relied on across the Supavisor connection pool. PG 18 native `uuidv7()` rejected as v1 substrate because Supabase has not shipped PG 18 (latest `supabase/postgres:17.6.1.107-x-6-x86`, 29 Apr 2026; original Q1 2026 target slipped per discussion #42681); `pg_uuidv7` C extension rejected because not on Supabase's allowlist on any plan tier (three open requests since March 2024 unactioned); kjmph gist's pure-SQL variant adopted because endorsed by Supabase staff in discussion #9500 as the recommended PL/pgSQL workaround on PG 17. SCAFFOLD.2 (Postgres + Drizzle + event-sourced schema) is the implementation task that consumes ADR-0016. | ADR-0016 |
+| 2026-05-08 | 1.8.0 | §0, §20 | Anchor lock in PRECURSOR.2. Version field bumped `1.8.0-draft` → `1.8.0` (drop `-draft` suffix; this minor is now the locked anchor). Status field updated to **Locked anchor** with PRECURSOR.4 promotion path named (writer/reviewer fresh-session review per CLAUDE.md). New §0 `Anchor lock:` metadata line declares: anchor effective 2026-05-08; supersedes prior working copies; planned revision post-SPEC.13 (`design.md`) finalization (next bump: `1.9.0-draft`); v1.0 promotion at PRECURSOR.4. No substantive content change. | Establish a single named anchor for downstream chats (PRECURSOR.2/3/4/5 and β-phase SCAFFOLD.*) so chats no longer ambiguate between v1.5.0-draft mounts and v1.8.0-draft uploads, and so the v1.0 promotion path through PRECURSOR.4 stays unambiguous. | — |
+| 2026-06-01 | 1.9.0-draft | §0, §2, §3, §5, §6, §7, §8, §9, §10, §12.2, §13, §14, §16.1, §16.3, §16.4, §17, §18, §19, §21 (new), Appendix B | **SYNC.7 ADR-fold + scope-update pass.** Folds ADR-0017 (ranking model), ADR-0018 (Dharma issuance + two-floor minimum bet), ADR-0019 (RLS out of scope); resolves drift signal D11; folds six TYPE-2 product surfaces. **§0** version → 1.9.0-draft, last-updated → 2026-06-01 (D11), status + related-contracts updated. **§2** glossary: Bet/Comment/Reply reframed as reply-as-bet; Daily Allowance → Daily Credit; In/Flipped/Exited → Flipped/Exited marker (the "In" state dropped — same-side default renders no marker); Friendly-fire entry removed; Ranking function → Ranking model (ADR-0017); added Post/Reply floor, Support/Counter, Top/ranking-mode. **§3** G5 generalised: commentary mandatory at every bet. **§5** INV-1 generalised to bind every bet (post + reply); INV-3 marker rename. **§6.2** marker rename. **§7** every buy is a commented bet — F-BET-1 (post/reply floors, `parent_comment_id`), F-BET-2 now requires a comment, F-BET-3 sell stays comment-free. **§8** every comment rides a bet; F-COMMENT-1 = post-bet, F-COMMENT-2 = Support/Counter reply-bet (reply floor 50), F-COMMENT-5 = no-stake-no-voice; **F-COMMENT-6/7/8 (friendly-fire cast/clear/freeze) removed entirely**; rate-limit posture = bet posture, reply-bet class deferred to SPEC.2 §11. **§9** rewritten as the ADR-0017 ranking model: **Top** multi-lane dominance default (traction / stake / split lanes, ratio-to-#2 + activity floor, graceful degradation) + filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred); reply ordering stake-descending within side, earlier-wins tiebreak, two-slot Support/Counter render; Support/Counter as read-time aggregates (no `↑N↓M` vote); marker enum `{Flipped, Exited, none}`; no anti-capital logic; `stake_at_post_time` dropped. **§10** ADR-0018: equal initial grant; **Daily Credit** (flat, non-escalating, paid only on a commented-bet day); over-issuance recorded as central risk; new §10.9 two-floor minimum bet (post floor ranged, reply floor 50 pinned); new §10.10 reserved-but-deferred in-window sink. **§12.2** frozen Flipped/Exited markers; `friendly_fire_events` dropped from release. **§13** hijacked-session list drops friendly-fire votes. **§14** ban: Daily Credit rename. **§16.1** constants: `DAILY_CREDIT_DHARMA`, split `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY` (50), `REPLY_DEPTH_MAX` → ADR-0017, rate-limit constants reshaped (friendly-fire removed). **§16.3** new ADR-0019 server-only / RLS-out-of-scope posture bullet. **§16.4** `friendly_fire_events` audit row removed; append-only note updated. **§17** removed all friendly-fire + friendly-fire-freeze rows; repointed comment/reply rows; added ~24 ADR-0017 ranking + ADR-0018 economy rows. **§18** ranking out-of-scope reworded (modes IN scope; filters / Best / shuffle / weighted-average / free-vote / Surging OUT); ADR-0018 rejects (escalating credit, large referral grants); About/FAQ deferral superseded by §21.6 feature-guide. **§19** Q13 superseded by ADR-0017, Q14 obsolete (friendly-fire gone), Q8 superseded by §21.6, Q4 folds issuance + ranking constants + pinned reply floor, new Q19 (deferred sink). **§21 (new)** Ancillary Product Surfaces: visitor counter, download-post-JPEG, download-debate-`.md`, historical-debate showcase, radio/music widget, feature-guide page — all read-only / render-only TYPE-2 surfaces, zero engine/ledger/`n` contact, with editorial + lawyer flags carried from SYNC.3.5 refinement logs 01/03/04/06/07/08. **Appendix B** constant renames mirror §16.1. **Section structure:** §21 appended after §20 to avoid renumbering §0–§20 (which would corrupt point-in-time §-citations in historical change-log rows + the few forward refs to §18/§19); change-log rows dated before 2026-06-01 retain the section numbering in effect at the time. | SYNC.7: bring SPEC.1 into consistency with ADR-0017 / ADR-0018 / ADR-0019, SPEC.2 v0.4.0-draft (read-models §5.4, server-only §18.5, ADR Index §22), and the six confirmed TYPE-2 product surfaces; resolve D11. v1.0 promotion deferred to PRECURSOR.4 fresh-session review. | ADR-0017, ADR-0018, ADR-0019 |
+
+---
+
+## §21 Ancillary Product Surfaces
+
+*Thesis relevance: (c) peripheral. None of these touches the engine, the ledger, `n`, K_eff, ranking, or resolution.*
+
+This section homes six **TYPE-2** product surfaces confirmed in SYNC.3.5 (refinement logs 01, 03, 04, 06, 07, 08) and folded here at SYNC.7. Every surface in this section is **read-only or render-only**: it reads existing state (or curated static seed) and writes nothing back to the engine. None is load-bearing — none touches INV-1/2/3/4, the load-bearing ADRs (0005 / 0013 / 0014 / 0017), or the thesis rules (soulbound Dharma, mandatory commentary, no-stake-no-voice). They are placed at the document tail (after the change log, before the appendices) to keep §0–§20 numbering — and the point-in-time §-citations in the historical change-log — stable.
+
+Two cross-cutting disciplines apply throughout:
+
+- **Anti-conflation.** Any surface that displays a count or a debate must never let a non-thesis number read as a thesis number. The visitor counter is never co-located with `n` / stake / Dharma (§21.1); the historical showcase is visibly demarcated as illustrative so a reader cannot mistake it for a live market (§21.4). This is the same discipline as the visitor-vs-`n` rule and the K_eff-is-dataset-only rule.
+- **Editorial / legal flags ride along.** Content-sourcing constraints (§21.4, §21.5) are recorded as hard lines + a mid-July lawyer flag; they do not change the TYPE-2 engineering classification, which is set by the (nil) engine contact.
+
+### 21.1 Visitor counter
+
+A vanity / traction counter of page loads (or unique visitors) displayed on the product. It is **explicitly not `n`** — not a participant count, not staked, not in K_eff. It reads nothing from the ledger and feeds nothing into the engine.
+
+- **Anti-conflation (hard).** Labelled plainly as **"visitors"** and **never co-located** with any participant / stake / Dharma count. The risk is narrative, not technical: a visitor number shown as if it were participation muddies the K × n > C story.
+- **Implementation floor.** For a ~45-day gimmick, take the cheapest path: reuse an existing signal (Vercel Analytics or Sentry) before introducing any new table or server-side counter state.
+
+### 21.2 Download post → JPEG
+
+Every post carries a **download button** that produces a **JPEG of the post card** — its stake, Support count, Counter count, embedded market mini-chart, and timestamp.
+
+- **Client-side render.** The card is already a rendered component; the button hands its DOM node to a client-side image library (e.g. `html-to-image`) which repaints it to a canvas and downloads `post-<id>.jpeg`. **No server route, no headless browser, no engine surface.** Web fonts and any user-uploaded image must be fully loaded before snapshot (the one fiddly bit).
+- **Frozen at download time.** The JPEG captures whatever the card shows at the moment of download — a photograph of the live card, not a canonical immutable artifact. Two downloads at different times legitimately differ. No historical reconstruction.
+- **Deferred.** Auto-generated social share-cards (Open-Graph images a crawler fetches) are **deferred** (SYNC.3.5 refinement-03 Part 2) — they would require a server-side renderer; if taken up, the download button and share-card should share one pipeline. Exact JPEG layout finalises at UI time.
+
+### 21.3 Download debate → `.md`
+
+Every debate carries a **"download as `.md`"** button that exports the **whole debate** — the post plus all Support / Counter reply-bets — as structured Markdown, including text and images and attributes (stakes, Support / Counter tallies, sides, timestamps) **as of download time**.
+
+- **Text, not image.** Output is `.md` because the intended consumer is a RAG / text tool (the operator's off-platform daily-report workflow), which ingests machine-readable text cleanly; an image would force OCR. The serialization schema (headings per post, attribute block, image references) finalises at spec time and should be RAG-friendly.
+- **Frozen at download time** — identical semantics to §21.2 ("download = photograph of now"); no as-of-T replay.
+- **Implementation (recommended).** Bundle as a **ZIP** (`.md` + the actual image files) for portability and to beat R2 link-rot, via a **small read-only server route** that gathers the full thread and its images (the client may not hold the whole thread / image bytes). This route is read-only — **not** engine surface (no transaction, no bet constraint). Client-zip with R2 image links is the weaker fallback.
+- **Out of product scope.** The downstream daily NotebookLM / ElevenLabs report is an operator content-ops workflow built off-platform — **not** a product feature and **not** specified here. It reads the exported `.md`, never the live DB. (Hard lines for that workflow — paraphrase not verbatim impersonation; generic synthetic voices, no real-voice cloning — are operator-owned with a ToS lawyer flag.)
+
+### 21.4 Historical-debate showcase
+
+A separate **read-only tab** displaying resolved "markets" reconstructed from famous historical debates (e.g. the 2008 financial crisis, COVID-19, wave–particle duality), each rendered as a two-sided debate of **named real figures** in the product's own card + debate-view components.
+
+- **Frozen showcase, zero engine contact (architectural).** Fed from a **static seed file** (build-time JSON / MDX or a curated read-only table explicitly outside the engine schema), **not** the `posts` / `bets` / market tables. Writes nothing; reads no live ledger; contributes zero to `n`, K_eff, ranking, or resolution. A museum diorama that looks like a resolved market but is wired to nothing. Curated seed bypasses the ADR-0014 moderation pipeline entirely (the inverse of the rejected user-submitted PDF surface).
+- **Demarcation (hard).** Must be visibly labelled historical / illustrative; author-stake / Support / Counter numbers render as clearly non-live, illustrative values. A reader must never mistake a showcase card for a live market (anti-conflation, as §21.1).
+- **Named-paraphrase + citation (hard editorial lines — do not move).** Real figures are **named**; positions are **paraphrased in our own words from research**, each with a **source citation** to the actual paper / talk. **Claude authors no verbatim quotes attributed to real people** — paraphrase only; the *event* is public-domain history but the *specific words* are copyrighted, and a citation credits a source, it does not grant reproduction rights. If a specific public-domain line is wanted, the **operator** sources and verifies it and places it as a marked citation. **Every attributed position must be checkable against its cited source** — the citation is the safety mechanism, not decoration. Operator sign-off is required per seeded debate (analogous to "no inventing live-market content").
+- **Synergy.** Showcase cards reuse the live card component and therefore **inherit the §21.2 download affordance for free** — which is the promotional mechanism this tab exists for.
+- **Lawyer flag (mid-July).** Sanity pass on the named-paraphrase + citation model for public / promotional historical content, and on any operator-placed public-domain verbatim quotes.
+
+### 21.5 Radio / music widget
+
+An ambient **radio / music-player widget** — a custom-skinned single Play button (Poolsuite-style) — whose audio is served by an **embedded licensed platform**. The product **hosts and streams nothing itself**.
+
+- **Embed model (hard line — do not move).** Audio comes from the **YouTube IFrame Player API** (the player runs hidden behind the custom skin; the product's own button drives `playVideo()` / `pauseVideo()`). **Never self-host MP3s and never self-stream commercial music** — self-hosting relocates infringement, it does not remove it; credit ≠ license. Content model: a continuous "ON AIR" channel / live stream first; a track-by-track playlist is a later option only if song-level control is wanted.
+- **Platform constraints (hard).** YouTube branding / attribution must remain visible (`modestbranding` is non-functional); build the skin around it. Player ≥ 200×200 px; do not obscure attribution, strip standard functionality, extract audio-only, or play in the background when the window is closed.
+- **Playback on user gesture only.** Starts on the Play-button click, never on page load (browsers block audible autoplay-on-load). Cross-origin iframe needs `allow="autoplay"`; listen for `onAutoplayBlocked` and fall back to a "tap to play" affordance or a redirect that opens a continuous YouTube radio session in a new tab (linking out is unambiguously ToS-safe).
+- **Lawyer flag (mid-July).** Confirm YouTube embed ToS for the product's context **if** the experiment ever takes on a commercial character; low risk for a non-commercial ~45-day experiment.
+
+### 21.6 Feature-guide page + "i" deep-link buttons
+
+One canonical **feature-guide page** ("how it works") cataloguing the product's features, each with a critical explainer — what it does, how it works, and **why it was built**. Every novel feature carries a small **"i" button** that **anchor-deep-links** into that page at the feature's section.
+
+- **Single content source.** The "i" buttons are doors into the one page — **not** modals and **not** a second content surface — so there is no modal-vs-page content drift. Read-only static content; touches no engine surface.
+- **Naming (rename-pending).** Not "FAQ" (it is not Q&A); recommended "feature guide" / "how it works". The name doubles as the share link. Recommended as a top-level nav route.
+- **Mechanism now, words last.** Build the page shell + "i"-anchor mechanism whenever convenient; write each feature's explainer **only once that feature's spec is locked**, to avoid documenting a moving target. Explainers are written only for genuinely novel features (Support/Counter, mandatory commentary / no-stake-no-voice, soulbound Dharma, `.md` download, frozen showcase); commodity UI gets none.
+- **Supersedes.** The §18 "About / FAQ" deferral and §19 Q8 — this page replaces the whitepaper-link-only posture (the footer whitepaper link remains alongside it).
 
 ---
 
 ## Appendix A — AI moderation category-to-track mapping
 
-Source vendor: OpenAI omni-moderation (text + multimodal; snapshot-pinned `omni-moderation-2024-09-26`) is the SOLE moderation vendor in experiment phase per SCAFFOLD.16 LD-1. The `harassment`, `harassment/threatening`, `hate`, `hate/threatening`, `illicit`, `illicit/violent`, and `sexual/minors` categories accept text inputs only per `omni-moderation-2024-09-26`'s capability table. The 6 non-CSAM text-only categories form an accepted v1 image-input gap (omni-moderation-2024-09-26 limitation, not a Zugzwang design choice); operational mitigation via SPEC.1 §15 F-ADMIN-4 extended scope (per SCAFFOLD.16 F-γ-thin: admin inline removal of pass-verdict comments); empirical measurement via HARDEN.5 sample-content testing. `sexual/minors` is also text-only but is routed per the SCAFFOLD.16 LD-3 carve-out (text-only → Track B admin review; `imageR2Key`-present escalation → Track A), not as an accepted v1 gap. `weapons` is not an OpenAI moderation category; weapon-policy content moderation relies on F-ADMIN-4 end-to-end. Second-vendor optionality deferred per `docs/parked.md`.
+Source vendors: OpenAI moderation API (text), PhotoDNA-or-equivalent (image hash for CSAM), general image classifier TBD (adult / violence / weapons).
 
 | AI category | Source layer | Track | Notes |
 |---|---|---|---|
-| `sexual/minors` | Text — OpenAI | A (image-attached) / B (text-only) | Image-attached: auto-block + Track A auto-ban contract (caller-side per SCAFFOLD.16 LD-6). Text-only: Track B (admin review via `/admin/moderation`) per SCAFFOLD.16 LD-3 — text-classifier false-positive mitigation. Per research-brief finding, `sexual/minors` is text-only on `omni-moderation-2024-09-26` at the model level (image input returns score 0 for this category); the carve-out aligns with what the classifier can actually attribute. |
+| `csam` (hash match) | Image — PhotoDNA | A | Auto-block + auto-report + auto-ban. Legal floor. |
+| `sexual/minors` | Text — OpenAI | A | Auto-block + auto-report + auto-ban. |
 | `sexual` | Text — OpenAI | A | Auto-block + auto-ban. No product fit. |
-| `nsfw` / adult imagery | Image — OpenAI (`sexual` category, image inputs supported per `omni-moderation-2024-09-26`) | A | Auto-block + auto-ban. No product fit. |
+| `nsfw` / adult imagery | Image — classifier | A | Auto-block + auto-ban. No product fit. |
 | `violence/graphic` | Text — OpenAI | B | Admin review. Edges: war markets, journalistic context. |
-| `violence` (image) | Image — OpenAI (`violence` category, image inputs supported per `omni-moderation-2024-09-26`) | B | Admin review. |
+| `violence` (image) | Image — classifier | B | Admin review. |
 | `harassment` | Text — OpenAI | B | Admin review. |
 | `harassment/threatening` | Text — OpenAI | B | Admin review. Threats specifically. |
 | `hate` | Text — OpenAI | B | Admin review. Edges: quoting slurs to criticise. |
 | `hate/threatening` | Text — OpenAI | B | Admin review. |
 | `self-harm` | Text — OpenAI | B | Admin review. |
-| `weapons` | Image — N/A (`weapons` is not an OpenAI moderation category; SPEC.1 §15 F-ADMIN-4 extended scope per SCAFFOLD.16 F-γ-thin mitigates) | B | Admin review. Edges: weapon-policy markets. |
+| `weapons` | Image — classifier | B | Admin review. Edges: weapon-policy markets. |
 | (below threshold) | — | C | Posts normally. |
 
 Specific confidence thresholds per category per track → number-tuning pass after Aug 15–31 sample-content testing.
@@ -1303,13 +1388,14 @@ Specific confidence thresholds per category per track → number-tuning pass aft
 This appendix is the structural placeholder for the number-tuning pass. Each constant has a `value` field set to `TBD` until that pass completes. The number-tuning pass produces an ADR documenting the values and the test data they were tuned against.
 
 ```
-INITIAL_USER_DHARMA = TBD
+INITIAL_USER_DHARMA = TBD  # equal flat grant for every user (ADR-0018)
 ADMIN_INITIAL_DHARMA = TBD
-DAILY_ALLOWANCE_DHARMA = TBD
+DAILY_CREDIT_DHARMA = TBD  # flat, non-escalating; paid only on a commented-bet day (ADR-0018)
 POOL_SEED_PER_MARKET_DEFAULT = TBD
-BET_MIN_STAKE = TBD
+BET_MIN_STAKE_POST = TBD  # post floor, low (ADR-0018)
+BET_MIN_STAKE_REPLY = 50  # reply floor, pinned > post floor (ADR-0018)
 COMMENT_MAX_LENGTH = TBD
-REPLY_DEPTH_MAX = 1  # pinned by ADR-0009 (flat replies; not deferred to tuning pass)
+REPLY_DEPTH_MAX = 1  # pinned by ADR-0017 (flat replies; not deferred to tuning pass)
 SLIPPAGE_WARNING_PCT_THRESHOLD = TBD
 IN_FLIGHT_BET_TIMEOUT_SEC = TBD
 POLL_INTERVAL_MS_DEBATE_VIEW = TBD
@@ -1332,4 +1418,4 @@ AI_FLAG_THRESHOLD_TRACK_B_HARASSMENT = TBD
 
 ---
 
-*End SPEC.1 v1.0-draft.*
+*End SPEC.1 v1.9.0-draft.*
