@@ -58,3 +58,6 @@ supabase/
 # === Misc ===
 *.pem
 .vercel
+
+# === SYNC recon scratch (local-only; substance promoted into docs/logs/SYNC.2.md) ===
+docs/sync/
