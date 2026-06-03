@@ -10,13 +10,13 @@
 
 ## What landed (files + PR#)
 
-PR #69, three commits (squash collapses them):
-- `docs/plans/ENGINE.0.md` (`53d47e8`) — plan reconstructed from the reconciled inline kickoff content.
-- `src/server/events/schemas.ts` (`919ee9b`) — `EVENT_TYPES` 11→22; 11 new `eventPayloadSchemas` entries; exported `numericString` validator. Existing 11 schemas + `eventMetadataSchema` byte-unchanged.
-- `tests/server/events/insert.test.ts` (`919ee9b`) — inventory floor 11→22 + 11 round-trip driver CASES (written tests-first by `@test-writer`).
-- `docs/logs/ENGINE.0.md` (this file) — separate close-out commit on the same branch.
+PR #69, four commits (squash collapses them):
+- `docs/plans/ENGINE.0.md` (`53d47e8`, amended `e2c7ad2`) — plan reconstructed from the reconciled inline kickoff content.
+- `src/server/events/schemas.ts` — **final state:** `EVENT_TYPES` 11→**21**; 10 new `eventPayloadSchemas` entries; exported `numericString` validator. Existing 11 schemas + `eventMetadataSchema` byte-unchanged. (`919ee9b` added 11; `e2c7ad2` removed `payout.settled` — see the pre-merge amendment below.)
+- `tests/server/events/insert.test.ts` — inventory floor 11→**21** + **10** round-trip driver CASES (tests-first by `@test-writer`; `payout.settled` CASE removed at `e2c7ad2`).
+- `docs/logs/ENGINE.0.md` (this file) — separate close-out commit.
 
-Final 11: `market.created/opened/closed/resolved/corrected/voided`, `bet.placed`, `bet.sold`, `comment.placed`, `dharma.credited`, `payout.settled`.
+Final 21 = 11 existing + **10** new: `market.created/opened/closed/resolved/corrected/voided`, `bet.placed`, `bet.sold`, `comment.placed`, `dharma.credited`. (No `payout.*` — see amendment.)
 
 ## Decisions made
 
@@ -40,9 +40,9 @@ None blocking ENGINE.0. Two ENGINE.9 wiring questions (below).
 
 ENGINE.9 (resolution/payout emit sites), when it lands, must:
 - Add `.max(N)` on `resolutionNote`/`voidReason` at the admin Server Action (match `resolution_events.note` width).
-- Resolve whether `payout.settled` is emitted **per-bet** or stays `payout_events`-table-only — SPEC.2 §3.6 says resolution emits "a single terminal `events` row"; the registered shape is per-bet (plan self-critique #3). Then wire `correctsEventId`/`resolutionEventId` → `resolution_events.id`.
+- Wire `correctsEventId` → `resolution_events.id` at the resolution emit site (the `market.corrected` referent). *(The prior "`payout.settled` per-bet vs table-only" question is RESOLVED — see the amendment below: table-only; `payout.settled` removed.)*
 
-Immediate next action: monitor PR #69 CI (the 22-case real-Postgres round-trip runs there — not runnable locally, Docker off), then operator squash-merges.
+Immediate next action: web reviews the pre-merge re-run, then operator squash-merges PR #69. CI on the latest commit (`e2c7ad2`) is **green** — round-trip evidence in the amendment below.
 
 ## Context to preserve
 
@@ -53,4 +53,20 @@ Immediate next action: monitor PR #69 CI (the 22-case real-Postgres round-trip r
 
 ## Time
 
-2026-06-03. One execute session. Two web rulings mid-session (event names, `numericString`); one concurrent-session commit-entanglement recovery.
+2026-06-03. One execute session + a pre-merge amendment round. Two web rulings mid-session (event names, `numericString`); a third pre-merge directive (remove `payout.settled` + supply CI evidence); one concurrent-session commit-entanglement recovery.
+
+---
+
+## Pre-merge amendment (round 2) — `payout.settled` removed (D-B reversed) + CI round-trip evidence
+
+**D-B reversed (pre-merge).** The web-ratified decision D-B (register a per-bet `payout.settled` generic event) **contradicted SPEC.2 §3.6**: the resolution flow emits a *single terminal* `events` row (`market.resolved`/`corrected`/`voided`), and per-bet payouts are rows in the `payout_events` **table** (append-only Bucket A, trigger-protected, already built) — not generic `events`. SPEC.2 names no `payout.*` event_type anywhere. Removed from `EVENT_TYPES` + `eventPayloadSchemas` + the test CASES + the plan. **Final `EVENT_TYPES` = 21** (10 new). `resolutionEventId` (lived only in `payout.settled`) dropped; `correctsEventId` (in `market.corrected`) stays. This **closes** the prior ENGINE.9 "per-bet vs table-only" question — answer: **table-only**. Commit `e2c7ad2`.
+
+**Meta-learning.** Design decisions (D-A/B/C) must be cross-checked against SPEC.2 **§3.2/§3.6 flow event-count shapes** (how many `events` rows a flow emits, into which table) **before** founder ratification — not only against the §19.4.1/§13.1 *name* tables. ENGINE.0's first pass conformed the *names* (`resolution.*`→`market.*`, `comment.posted`→`comment.placed`) but missed that D-B's *emission shape* (one event per bet) violated §3.6's one-terminal-row model. The name layer and the event-count/table layer are independent review axes; both must be walked.
+
+**D-A confirmed spec-consistent.** Retaining both `bet.placed` and `comment.placed` is correct — both are spec-named (§19.4.1 / §13.1), and whether a commented bet emits one combined event or two is an **ENGINE.7 emit-site decision**, not a vocabulary concern. No change.
+
+**CI round-trip evidence (CHANGE 2).** `ci.yml` provisions a **Postgres 17 service** + applies migrations (`drizzle-kit migrate`) + runs **`pnpm vitest run`** — which covers `tests/server/events/` (it is NOT in `pnpm test:integration`/`just test-db`; those scope to `tests/integration/` + `tests/db/` only, so the events round-trip runs **only** under bare `vitest run` = CI). Run **26896309112** on the latest commit `e2c7ad2`: **green**. The test log shows all **21 driver round-trip CASES by name** (10 new: `market.{created,opened,closed,resolved,corrected,voided}`, `bet.{placed,sold}`, `comment.placed`, `dharma.credited`; 11 existing) **+ `events::canonical-event-types-inventory-shape`** (the 21-member floor, `length===21`) — **0 failures**; `events::driver-payout*` absent and `payout.settled` appears 0 times. Totals: **49 test files passed / 320 tests passed**, 3 skipped (pg_cron probes), 5 todo.
+
+**Re-reviews on the removal delta:** `@code-reviewer` APPROVE (0 findings); `@security-auditor` clean (0 CRITICAL/HIGH/MEDIUM; 1 LOW = 2 stale count comments at `schemas.ts:33,169`, **fixed in-session** before `e2c7ad2`). The security-auditor caught the stale comments the code-reviewer missed — dual-review earned its keep.
+
+**Do not merge** — web reviews this re-run before the operator squash-merges.
