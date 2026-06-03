@@ -16,9 +16,9 @@ import { z } from "zod";
  * ".5"); plain decimal only (no exponent, no leading "+").
  *
  * Exported for ENGINE.5/8 reuse (`import { numericString }`). Single SIGNED
- * validator — `dharmaDelta` is explicitly negative-capable. Per-field
- * sign/positivity (stake > 0, payout ≥ 0) is business logic deferred to
- * ENGINE.5/8, NOT encoded here.
+ * validator (web ruling) — forward-looking for ENGINE.5/8 ledger deltas that
+ * can be negative. Per-field sign/positivity (stake > 0, payout ≥ 0) is
+ * business logic deferred to ENGINE.5/8, NOT encoded here.
  */
 export const numericString = z
 	.string()
@@ -30,7 +30,7 @@ export const numericString = z
 /**
  * ENGINE.6 §A — Per-event-type Zod schemas for the `events.payload` JSONB
  * column + the canonical `event_type` enum (ENGINE.6 seeded 11; ENGINE.0
- * added 11 forward-stratum types ⇒ 22 — plan §3).
+ * added 10 forward-stratum types ⇒ 21 — plan §3).
  *
  * Hand-rolled per the closed inventory; drizzle-zod's `createInsertSchema`
  * produces `z.any()` for JSONB columns (ENGINE.6 technical-research brief
@@ -81,8 +81,6 @@ export const EVENT_TYPES = [
 	"comment.placed",
 	// dharma domain (1) — ENGINE.0
 	"dharma.credited",
-	// payout domain (1) — ENGINE.0
-	"payout.settled",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -97,10 +95,14 @@ export type EventType = (typeof EVENT_TYPES)[number];
  * Better Auth-hook stratum `.oauth_signed_in`/`.otp_signed_in`; future
  * emit site `user.pseudonym_assigned`).
  *
- * ENGINE.0 (plan §3) adds 11 forward-stratum entries (6 market + 2 bet +
- * 1 comment + 1 dharma + 1 payout) — schema-only registration; emit sites
- * land at ENGINE.5 (dharma) / 7–8 (market lifecycle, bet, comment) / 9
- * (settlement + payout). Money/share/price/delta fields use `numericString`.
+ * ENGINE.0 (plan §3) adds 10 forward-stratum entries (6 market + 2 bet +
+ * 1 comment + 1 dharma) — schema-only registration; emit sites land at
+ * ENGINE.5 (dharma) / 7–8 (market lifecycle, bet, comment) / 9 (settlement).
+ * Money/share/price fields use `numericString`.
+ *
+ * No `payout.*` type: SPEC.2 §3.6 — resolution emits ONE terminal events row
+ * (`market.resolved`/`corrected`/`voided`); per-bet payouts are rows in the
+ * `payout_events` TABLE, not generic events (D-B reversed pre-merge).
  *
  * `as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>` is
  * load-bearing: `as const` preserves per-key narrowing so
@@ -164,7 +166,7 @@ export const eventPayloadSchemas = {
 	"admin.signed_out": z.object({
 		sessionId: z.string().uuid(),
 	}),
-	// === ENGINE.0 forward-stratum types (11 — plan §3) =======================
+	// === ENGINE.0 forward-stratum types (10 — plan §3) =======================
 	// market lifecycle. seedAmount is the CPMM seed (numericString);
 	// resolutionDeadline is an ISO-8601 instant with offset.
 	"market.created": z.object({
@@ -240,22 +242,6 @@ export const eventPayloadSchemas = {
 		creditedForDate: z
 			.string()
 			.regex(/^\d{4}-\d{2}-\d{2}$/, "UTC date YYYY-MM-DD"),
-	}),
-	// payout. payoutType mirrors the `payout_type` pgEnum (src/db/schema/
-	// events.ts) verbatim. resolutionEventId references resolution_events.id
-	// (ENGINE.9 wires it). dharmaDelta is signed (losing-side = negative).
-	"payout.settled": z.object({
-		betId: z.string().uuid(),
-		marketId: z.string().uuid(),
-		userId: z.string().uuid(),
-		resolutionEventId: z.string().uuid(),
-		payoutType: z.enum([
-			"bet_payout",
-			"correction_reverse",
-			"correction_apply",
-			"void_refund",
-		]),
-		dharmaDelta: numericString,
 	}),
 } as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>;
 

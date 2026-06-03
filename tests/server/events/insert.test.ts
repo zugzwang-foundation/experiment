@@ -314,20 +314,6 @@ const CASES: Case[] = [
 		actorId: (userId) => userId,
 		userIdInMetadata: (userId) => userId,
 	},
-	{
-		eventType: "payout.settled",
-		aggregateType: "bet",
-		buildPayload: ({ userId, aggregateId }) => ({
-			betId: aggregateId,
-			marketId: uuidv7(),
-			userId,
-			resolutionEventId: uuidv7(),
-			payoutType: "bet_payout",
-			dharmaDelta: "-50",
-		}),
-		actorId: () => "admin-singleton",
-		userIdInMetadata: () => null,
-	},
 ];
 
 describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
@@ -596,11 +582,11 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 	// === EVENT_TYPES inventory floor =========================================
 
 	it("events::canonical-event-types-inventory-shape", async () => {
-		// ENGINE.0 expanded the canonical enum 11 → 22: the original
-		// LD-1 set (4 image + 5 user + 2 admin) plus 11 forward-stratum
-		// types (6 market + 2 bet + 1 comment + 1 dharma + 1 payout) added
-		// by ENGINE.0 (plan §3). Domain breakdown: 4 + 5 + 2 + 6 + 2 + 1 +
-		// 1 + 1 = 22. The schema file at `src/server/events/schemas.ts`
+		// ENGINE.0 expanded the canonical enum 11 → 21: the original
+		// LD-1 set (4 image + 5 user + 2 admin) plus 10 forward-stratum
+		// types (6 market + 2 bet + 1 comment + 1 dharma) added by
+		// ENGINE.0 (plan §3). Domain breakdown: 4 + 5 + 2 + 6 + 2 + 1 +
+		// 1 = 21. The schema file at `src/server/events/schemas.ts`
 		// exports `EVENT_TYPES`. If a future PR drops or adds one without
 		// amending plan §3 + this floor, surface. `r2_delete_failed` MUST
 		// NOT be present (SCAFFOLD.5 Sentry owns).
@@ -619,7 +605,7 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"user.pseudonym_assigned",
 				"user.signed_out",
 				"user.tos_accepted",
-				// ENGINE.0 forward-stratum set (11)
+				// ENGINE.0 forward-stratum set (10)
 				"market.created",
 				"market.opened",
 				"market.closed",
@@ -630,10 +616,9 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"bet.sold",
 				"comment.placed",
 				"dharma.credited",
-				"payout.settled",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(22);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(21);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });

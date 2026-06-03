@@ -8,6 +8,8 @@
 
 > **Provenance note.** This plan was reconstructed from the reconciled *inline* content of the ENGINE.0 execution kickoff (payload shapes + amendments A1–A5, A6 retracted + the web event-name ruling + the verbatim `numericString` definition). The kickoff cited a committed plan at `.claude/plans/engine-0-cc-plan-mode-harmonic-fiddle.md`; that file exists nowhere readable by the execution chat (no `.claude/plans/` dir, absent from `git log --all` and `~/Downloads`). Per the web source-of-truth correction, the inline kickoff content is authoritative and the missing file is moot.
 
+> **Amendment record (pre-merge, 2026-06-03).** `payout.settled` REMOVED (web decision D-B reversed). SPEC.2 §3.6 — the resolution flow emits a *single terminal* `events` row (`market.resolved`/`corrected`/`voided`); per-bet payouts are rows in the `payout_events` **table**, not generic `events`, and SPEC.2 names no `payout.*` event_type. This closes the prior ENGINE.9 "per-bet vs table-only" question — answer: **table-only**. Net: `EVENT_TYPES` 11 → **21** (10 new); `resolutionEventId` dropped (lived only in `payout.settled`); `correctsEventId` stays (in `market.corrected`).
+
 ---
 
 ## Tracker context
@@ -18,7 +20,7 @@
 
 ## Approach (one paragraph)
 
-Add 11 new `event_type` strings + their per-type payload Zod schemas to `src/server/events/schemas.ts`, plus one new exported `numericString` validator for the `NUMERIC(38,18)` money/share/price fields. This is a **type-only / shape-only** change: no business logic, no schema/migration, no edit to `insert.ts` (the helper already keys validation off `eventPayloadSchemas[eventType]`), and the existing 11 entries are untouched. The `as const satisfies Record<EventType, …>` clause makes the 11 additions tsc-enforced (a string without a matching schema fails the type-check). TDD: `@test-writer` first expands the round-trip driver + inventory floor to 22 (RED), then implementation turns it GREEN.
+Add 10 new `event_type` strings + their per-type payload Zod schemas to `src/server/events/schemas.ts`, plus one new exported `numericString` validator for the `NUMERIC(38,18)` money/share/price fields. This is a **type-only / shape-only** change: no business logic, no schema/migration, no edit to `insert.ts` (the helper already keys validation off `eventPayloadSchemas[eventType]`), and the existing 11 entries are untouched. The `as const satisfies Record<EventType, …>` clause makes the 10 additions tsc-enforced (a string without a matching schema fails the type-check). TDD: `@test-writer` first expands the round-trip driver + inventory floor to 21 (RED), then implementation turns it GREEN.
 
 ---
 
@@ -29,7 +31,7 @@ Add 11 new `event_type` strings + their per-type payload Zod schemas to `src/ser
 | 2.1 Bet ↔ comment atomicity (INV-1) | no — registration only | `bet.placed` + `comment.placed` shapes are *registered*; atomicity is the SERIALIZABLE bet transaction at ENGINE.7/8, not this payload schema. | n/a here (`tests/invariants/I-ATOMICITY-*` at ENGINE.7/8) |
 | 2.2 Dharma non-transferable / no overdraft (INV-2) | partial — *exactness* only | All Dharma/money fields use `numericString` (exact base-10 string), **never `z.number()`** — preserving the CLAUDE.md §2 "no JS floats for balances" rule so amounts survive the Zod→jsonb boundary without double-precision drift. Conservation / no-overdraft is business logic deferred to ENGINE.5/8. | `tests/server/events/insert.test.ts` round-trip CASES assert the exact string survives jsonb (`row.payload` `toEqual` payload) |
 | 2.3 Side frozen at comment-time (INV-3) | no — registration only | `comment.placed.side` is *registered*; immutability is `comments.side_at_post_time` + its trigger, not this schema. | n/a here (DEBATE.2) |
-| 2.4 Resolutions append-only (INV-4) | no — registration only | `market.resolved/corrected/voided` + `payout.settled` shapes are *registered*; append-only is the `events`/`resolution_events`/`payout_events` Bucket-A triggers. **A6 retracted:** `correctsEventId`/`resolutionEventId` reference `resolution_events.id` per SPEC.2 §3.6 (ENGINE.9 wires the referent; the field stays `z.string().uuid()`). | n/a here (`tests/db/triggers/*` + ENGINE.9) |
+| 2.4 Resolutions append-only (INV-4) | no — registration only | `market.resolved/corrected/voided` shapes are *registered*; append-only is the `events`/`resolution_events`/`payout_events` Bucket-A triggers. Per-bet payouts are `payout_events` rows, not a `payout.*` event (SPEC.2 §3.6). **A6 retracted:** `correctsEventId` references `resolution_events.id` per SPEC.2 §3.6 (ENGINE.9 wires the referent; the field stays `z.string().uuid()`). | n/a here (`tests/db/triggers/*` + ENGINE.9) |
 
 No invariant is *enforced* by this task — it registers shapes the enforcing strata consume. The one substantive guarantee is INV-2 *exactness*: `numericString` (not `z.number()`) is the boundary that keeps balances/prices/shares exact.
 
@@ -49,13 +51,13 @@ No invariant is *enforced* by this task — it registers shapes the enforcing st
      .string()
      .regex(/^-?\d{1,20}(?:\.\d{1,18})?$/, "must be a NUMERIC(38,18) decimal string");
    ```
-   Single **signed** validator: `≤20` integer digits (precision−scale = 38−18) + `≤18` fractional ⇒ `≤38` significant digits; canonical form (leading integer digit required → `"0.5"` not `".5"`); plain decimal only (no exponent, no leading `+`). Reused on every money/share/price/delta field. Per-field positivity/sign (`stake > 0`, `payout ≥ 0`) is **business logic, deferred to ENGINE.5/8**; `dharmaDelta` is explicitly signed.
+   Single **signed** validator: `≤20` integer digits (precision−scale = 38−18) + `≤18` fractional ⇒ `≤38` significant digits; canonical form (leading integer digit required → `"0.5"` not `".5"`); plain decimal only (no exponent, no leading `+`). Reused on every money/share/price field. Per-field positivity/sign (`stake > 0`, `payout ≥ 0`) is **business logic, deferred to ENGINE.5/8**; the validator stays signed (web ruling) for ENGINE.5/8 ledger deltas that can be negative.
 
-2. **`EVENT_TYPES`** — expanded 11 → **22** (existing 11 untouched; +11 below, grouped by domain).
+2. **`EVENT_TYPES`** — expanded 11 → **21** (existing 11 untouched; +10 below, grouped by domain).
 
-3. **`eventPayloadSchemas`** — +11 entries; the `as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>` clause forces 1:1 string↔schema coverage at tsc time.
+3. **`eventPayloadSchemas`** — +10 entries; the `as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>` clause forces 1:1 string↔schema coverage at tsc time.
 
-**The 11 new event types (SPEC.2 v1.0 canonical names) + payload shapes.** `uuid = z.string().uuid()`; `side = z.enum(["YES","NO"])` (mirrors the `side` pgEnum, `src/db/schema/_enums.ts`); `payoutType = z.enum(["bet_payout","correction_reverse","correction_apply","void_refund"])` (mirrors the `payout_type` pgEnum, `src/db/schema/events.ts:91`, verbatim). `aggregate_type` column noted per type (free union in `insert.ts`; not constrained by the payload schema).
+**The 10 new event types (SPEC.2 v1.0 canonical names) + payload shapes.** `uuid = z.string().uuid()`; `side = z.enum(["YES","NO"])` (mirrors the `side` pgEnum, `src/db/schema/_enums.ts`). `aggregate_type` column noted per type (free union in `insert.ts`; not constrained by the payload schema).
 
 | `event_type` | `aggregate_type` | Payload |
 |---|---|---|
@@ -69,7 +71,6 @@ No invariant is *enforced* by this task — it registers shapes the enforcing st
 | `bet.sold` | `bet` | `{ betId: uuid, marketId: uuid, userId: uuid, side: side, sharesSold: numericString, proceeds: numericString, price: numericString }` |
 | `comment.placed` | `comment` | `{ commentId: uuid, betId: uuid, userId: uuid, marketId: uuid, side: side, parentCommentId: uuid.nullable(), bodyLength: z.number().int().nonnegative(), uploadId: uuid.nullable() }` — renamed from kickoff `comment.posted`; **A3:** `userId` (not `authorId`); **A4:** `uploadId` (not `imageUploadId`) |
 | `dharma.credited` | `dharma_account` | `{ userId: uuid, amount: numericString, creditedForDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "UTC date YYYY-MM-DD") }` — **A5:** regex date, not `z.string().date()` |
-| `payout.settled` | `bet` | `{ betId: uuid, marketId: uuid, userId: uuid, resolutionEventId: uuid, payoutType: payoutType, dharmaDelta: numericString }` — `resolutionEventId` → `resolution_events.id` (A6 retracted) |
 
 ## 4. UI / user flow
 
@@ -94,15 +95,15 @@ None — backend-only (server-side schema registry).
 
 | Layer | Scenarios | Invariants asserted (§1) |
 |---|---|---|
-| Unit-ish regression guard (`tests/server/events/insert.test.ts::canonical-event-types-inventory-shape`) | Inventory floor: `EVENT_TYPES` = the **22**-member set (existing 11 + new 11, canonical names), length 22, `image_upload.r2_delete_failed` still excluded. | — (vocabulary lock) |
-| Integration — real Postgres (`tests/server/events/insert.test.ts` driver CASES) | **+11 new CASES** (existing 11 unchanged): for each new `event_type`, build a valid payload (synthetic `uuidv7()` ids, `numericString` values, `side`/`payoutType` enum values) → `insertEvent` inside a tx → assert all 8 columns land, `row.payload` `toEqual` the payload (exact string round-trip). Existing atomicity/rollback/retry/payload-version tests unchanged. | INV-2 *exactness* (money string survives jsonb round-trip byte-for-byte) |
+| Unit-ish regression guard (`tests/server/events/insert.test.ts::canonical-event-types-inventory-shape`) | Inventory floor: `EVENT_TYPES` = the **21**-member set (existing 11 + new 10, canonical names), length 21, `image_upload.r2_delete_failed` still excluded. | — (vocabulary lock) |
+| Integration — real Postgres (`tests/server/events/insert.test.ts` driver CASES) | **+10 new CASES** (existing 11 unchanged): for each new `event_type`, build a valid payload (synthetic `uuidv7()` ids, `numericString` values, `side` enum values) → `insertEvent` inside a tx → assert all 8 columns land, `row.payload` `toEqual` the payload (exact string round-trip). Existing atomicity/rollback/retry/payload-version tests unchanged. | INV-2 *exactness* (money string survives jsonb round-trip byte-for-byte) |
 
 `@test-writer` owns the test changes (forbidden from `src/`). RED before implementation, GREEN after. No new invariant `I-*` spec at ENGINE.0 (the enforcing assertions land with their modules per CLAUDE.md §2 note).
 
 ## 8. Out of scope
 
 - **All business logic** — CPMM math, Dharma accounting, payout/bet/resolution flow, conservation, per-field positivity/sign. Deferred to ENGINE.5/7/8/9.
-- **Emit sites** — nothing calls `insertEvent` with these new types at ENGINE.0; wiring is ENGINE.5 (`dharma.credited`), ENGINE.7/8 (`market.*` lifecycle, `bet.*`, `comment.placed`), ENGINE.9 (`market.resolved/corrected/voided`, `payout.settled` + the `resolution_events.id` referent for `correctsEventId`/`resolutionEventId`).
+- **Emit sites** — nothing calls `insertEvent` with these new types at ENGINE.0; wiring is ENGINE.5 (`dharma.credited`), ENGINE.7/8 (`market.*` lifecycle, `bet.*`, `comment.placed`), ENGINE.9 (`market.resolved/corrected/voided` + the `resolution_events.id` referent for `correctsEventId`). Per-bet payout settlement writes `payout_events` rows, not a `payout.*` event (SPEC.2 §3.6).
 - **Schema / migration / new `dharma_entry_type`** — the signup-grant tag is ENGINE.5; no DDL here.
 - **The existing 11 strings/schemas + `eventMetadataSchema`** — untouched.
 - **`dharma.granted`; moderation / conclusion-freeze / system event types** — not added.
@@ -131,11 +132,11 @@ None. This implements the existing SPEC.2 §7.6 per-`event_type` Zod boundary + 
 
 `insert.ts`, `events.ts` (schema), `dharma.ts`, and `drizzle/migrations/*` MUST be unchanged. Confirmed by `git diff --stat`.
 
-**Gates (§6).** `just verify` (typecheck → biome → build) + the real-Postgres round-trip (`just test-db` / `pnpm test:integration`): 22 driver CASES + inventory floor green.
+**Gates (§6).** `just verify` (typecheck → biome → build) + the real-Postgres round-trip (CI `pnpm vitest run` — note `tests/server/events/` is NOT covered by `pnpm test:integration` / `just test-db`; it runs under bare `vitest run` = CI): 21 driver CASES + inventory floor green.
 
 **Pre-PR self-audit (§7)** — item-by-item PASS/FAIL/SURPRISE before `gh pr create`:
-1. All 11 new `EVENT_TYPES` strings = the SPEC.2 canonical names (no `resolution.*`, no `comment.posted`).
-2. All 11 payload schemas match the §3 table exactly (field names, `numericString` on every money/share/price/delta, `side`/`payoutType` enum values verbatim, `.nullable()` only on `parentCommentId`/`uploadId`, `z.string().min(1)` on free-text, A5 regex on `creditedForDate`).
+1. All 10 new `EVENT_TYPES` strings = the SPEC.2 canonical names (no `resolution.*`, no `comment.posted`, no `payout.*`).
+2. All 10 payload schemas match the §3 table exactly (field names, `numericString` on every money/share/price, `side` enum values verbatim, `.nullable()` only on `parentCommentId`/`uploadId`, `z.string().min(1)` on free-text, A5 regex on `creditedForDate`).
 3. `numericString` exported, placed before `EVENT_TYPES`, regex verbatim.
 4. `as const satisfies Record<EventType, …>` intact; tsc green (string↔schema 1:1).
 5. Existing 11 strings/schemas + `eventMetadataSchema` byte-unchanged.
@@ -150,7 +151,7 @@ None. This implements the existing SPEC.2 §7.6 per-`event_type` Zod boundary + 
 |---|---|---|---|
 | 1 | medium | `numericString` regex permits leading zeros (`007`, `00.5`) and `-0` — not strictly canonical. | Accepted as known limitation: the web-ruled definition is verbatim and the char-class bound is the load-bearing property; Postgres normalizes on store and exact-string round-trip is still asserted. Tightening canonicality is a business-logic/serializer concern deferred to ENGINE.5/8. Noted, not changed (the validator is ruled verbatim). |
 | 2 | low | `aggregate_type` is not constrained per `event_type` by the payload schema, so a CASES row could pair e.g. `market.created` with `aggregate_type: "bet"` and still pass. | Out of scope — `AggregateType` is a free 8-value union validated in `insert.ts`, not per-type. The CASES use the sensible mapping (§3 table) for realism; no schema-level coupling is in scope at ENGINE.0. |
-| 3 | low | `payout.settled` is a *per-bet* shape, but SPEC.2 §3.6 says resolution emits "a single terminal `events` row" (payouts live in the `payout_events` table). | Registration only — ENGINE.0 does not emit; whether `payout.settled` becomes a per-bet `events` row or stays table-only is an ENGINE.9 wiring decision. The shape is registered per the kickoff; no emit-site commitment is made here. Flagged for ENGINE.9. |
+| 3 | ~~low~~ **resolved** | `payout.settled` was a *per-bet* shape, but SPEC.2 §3.6 says resolution emits "a single terminal `events` row" (payouts live in the `payout_events` table). | **RESOLVED pre-merge — `payout.settled` removed** (D-B reversed). The §3.6 answer is table-only: no `payout.*` event exists in the vocabulary. `EVENT_TYPES` 11→21. See the Amendment record at top. |
 
 Checked: invariants coverage, scope discipline, test assertions, edge-case enumeration, zero-edit proof, name-reconciliation against SPEC.2 v1.0.
 
