@@ -12,6 +12,41 @@
 
 ---
 
+## Patch record
+
+### P1 — Friendly-fire removed entirely; ADR-Index pointer (PRECURSOR.4 lock review, 2026-06-03)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The load-bearing decision is unchanged** — the multi-lane "Top" composite, the single-axis
+filter modes, reply-ranking by stake-descending-within-side, shared time-decay, author-stake as
+seed-and-tiebreaker, read-time computation (no projection table), and the v1 ship set all stand;
+Option 7 (free up/down votes on replies as a ranking signal) remains rejected. This patch scopes
+*description* to the reply-as-bet model that SPEC.1 and SPEC.2 (both at v1.0) now lock.
+
+Read the body below through these reconciliations:
+
+1. **Friendly-fire is removed, not "display-only."** Every reference to friendly-fire
+   "remaining / staying **display-only**" (Consequences → Neutral; the Flow & invariant table's
+   *SPEC.1 §8 F-COMMENT-6* row; More Information) is superseded. Friendly-fire has **no** mechanic
+   — no vote affordance, no `↑ N ↓ M` count. A post's Support / Counter signal is the read-time
+   per-side reply-bet aggregate already specified under "Per-side data model the ranking reads."
+
+2. **No `friendly_fire_events` read-source.** Decision Drivers' "reads from `comments` + `bets`
+   (+ `friendly_fire_events` only where / if a mode / lane uses it)" is superseded.
+   `friendly_fire_events` is struck from the schema; **no mode or lane reads it.** Ranking
+   read-sources are `comments` + `bets` only.
+
+3. **F-COMMENT-6/7/8 struck.** References to F-COMMENT-6 and its DEBATE.6 eligibility rules are
+   superseded — the F-COMMENT-6/7/8 contracts and the `castFriendlyFire` / `clearFriendlyFire`
+   actions are removed (SPEC.2 §5.5, §13.3); the physical `friendly_fire_events` drop is forward
+   work at DEBATE.9. The SPEC.1 §9 friendly-fire-as-input removal this ADR flagged "for same-commit
+   SYNC.7/8" was completed in SYNC.7.
+
+4. **ADR Index is SPEC.2 §22, not §23.** This ADR's inline "SPEC.2 §23 (ADR Index)" references
+   (metadata *Frame document* row; Flow & invariant table; More Information) predate the
+   PRECURSOR.2-B renumber (§23 → §22). The canonical index is **SPEC.2 §22**; the inline §23
+   pointers are left as historical, uniform with ADR-0018/0019 which carry the same pre-strike number.
+
 ## Context and Problem Statement
 
 ADR-0009 locked a single deterministic ranking function — an HN-style time-decayed numerator combining stake, friendly-fire net score, and side-split reply counts — as the *one* order in which debate-view comments render. The SYNC.3.5 refinement pass (item 02, reply-as-bet model) reopened the reply/ranking model, and **ADR-0009 is rejected and superseded**. This ADR replaces it. It does not amend ADR-0009's function; it discards the single-function model and decides the ranking model afresh.
