@@ -6,8 +6,9 @@ import { afterEach, describe, expect, it } from "vitest";
 // exist — these tests are RED until ENGINE.6 implementation lands).
 //
 // Three load-bearing properties verified:
-//   1. For each of the 11 canonical EVENT_TYPES, a valid payload + valid
-//      7-field metadata → row appears in `events` with correct columns.
+//   1. For each of the 22 canonical EVENT_TYPES (ENGINE.0 expanded 11→22),
+//      a valid payload + valid 7-field metadata → row appears in `events`
+//      with correct columns.
 //   2. Atomicity: insertEvent inside a tx commits/rolls-back with the rest
 //      of the tx. Roll-back leaves no events row.
 //   3. Retry-with-same-eventId: two transactions with the same eventId →
@@ -61,8 +62,8 @@ function baseMetadata(userId: string | null, actorId: string) {
 /**
  * Each entry constructs a valid payload + valid surrounding scaffolding for
  * one canonical EVENT_TYPE. The driver iterates this list and asserts the
- * row lands with all 8 columns correct. If ENGINE.6 ships an 11-entry enum
- * that disagrees with this table, this file FAILs at the type level
+ * row lands with all 8 columns correct. If the enum (ENGINE.0 expanded
+ * 11→22) disagrees with this table, this file FAILs at the type level
  * (eventType: EventType) — surfaces the drift before the runtime assertion.
  */
 type Case = {
@@ -195,6 +196,138 @@ const CASES: Case[] = [
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
 	},
+	// === ENGINE.0 forward-stratum types (11 — plan §3) =======================
+	{
+		eventType: "market.created",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({
+			marketId: aggregateId,
+			resolutionDeadline: "2026-11-06T23:59:00+05:30",
+			seedAmount: "1000",
+		}),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "market.opened",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({ marketId: aggregateId }),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "market.closed",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({ marketId: aggregateId }),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "market.resolved",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({
+			marketId: aggregateId,
+			winningSide: "YES",
+			resolutionNote: "Resolved YES per criteria.",
+		}),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "market.corrected",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({
+			marketId: aggregateId,
+			correctsEventId: uuidv7(),
+			correctedWinningSide: "NO",
+			resolutionNote: "Corrected to NO after review.",
+		}),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "market.voided",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({
+			marketId: aggregateId,
+			voidReason: "Outcome unresolvable.",
+		}),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
+	{
+		eventType: "bet.placed",
+		aggregateType: "bet",
+		buildPayload: ({ userId, aggregateId }) => ({
+			betId: aggregateId,
+			marketId: uuidv7(),
+			userId,
+			side: "YES",
+			stake: "50",
+			shares: "33.333333333333333333",
+			price: "0.6",
+			commentId: uuidv7(),
+			parentCommentId: null,
+		}),
+		actorId: (userId) => userId,
+		userIdInMetadata: (userId) => userId,
+	},
+	{
+		eventType: "bet.sold",
+		aggregateType: "bet",
+		buildPayload: ({ userId, aggregateId }) => ({
+			betId: aggregateId,
+			marketId: uuidv7(),
+			userId,
+			side: "NO",
+			sharesSold: "10",
+			proceeds: "4.5",
+			price: "0.45",
+		}),
+		actorId: (userId) => userId,
+		userIdInMetadata: (userId) => userId,
+	},
+	{
+		eventType: "comment.placed",
+		aggregateType: "comment",
+		buildPayload: ({ userId, aggregateId }) => ({
+			commentId: aggregateId,
+			betId: uuidv7(),
+			userId,
+			marketId: uuidv7(),
+			side: "YES",
+			parentCommentId: null,
+			bodyLength: 140,
+			uploadId: null,
+		}),
+		actorId: (userId) => userId,
+		userIdInMetadata: (userId) => userId,
+	},
+	{
+		eventType: "dharma.credited",
+		aggregateType: "dharma_account",
+		buildPayload: ({ userId }) => ({
+			userId,
+			amount: "100",
+			creditedForDate: "2026-09-15",
+		}),
+		actorId: (userId) => userId,
+		userIdInMetadata: (userId) => userId,
+	},
+	{
+		eventType: "payout.settled",
+		aggregateType: "bet",
+		buildPayload: ({ userId, aggregateId }) => ({
+			betId: aggregateId,
+			marketId: uuidv7(),
+			userId,
+			resolutionEventId: uuidv7(),
+			payoutType: "bet_payout",
+			dharmaDelta: "-50",
+		}),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
 ];
 
 describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
@@ -205,9 +338,9 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 			// Per plan §A + §B: the helper writes 8 columns (event_id,
 			// event_type, aggregate_type, aggregate_id, payload,
 			// payload_version=1, metadata, created_at derived from
-			// uuidv7ToCreatedAt). For each of the 11 canonical EVENT_TYPES we
-			// build a valid payload and assert the row lands with all 8
-			// columns set as the helper documents.
+			// uuidv7ToCreatedAt). For each of the 22 canonical EVENT_TYPES
+			// (ENGINE.0 expanded 11→22) we build a valid payload and assert
+			// the row lands with all 8 columns set as the helper documents.
 			const { userId } = await seedUser(`drv-${c.eventType}`);
 			const eventId = uuidv7();
 			const aggregateId = uuidv7();
@@ -463,14 +596,18 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 	// === EVENT_TYPES inventory floor =========================================
 
 	it("events::canonical-event-types-inventory-shape", async () => {
-		// Plan LD-1: 11-string canonical enum (4 image + 5 user + 2 admin),
-		// alpha-sorted within domain. The schema file at
-		// `src/server/events/schemas.ts` exports `EVENT_TYPES`. If a future PR
-		// drops or adds one without amending plan §A + this floor, surface.
-		// `r2_delete_failed` MUST NOT be present (SCAFFOLD.5 Sentry owns).
+		// ENGINE.0 expanded the canonical enum 11 → 22: the original
+		// LD-1 set (4 image + 5 user + 2 admin) plus 11 forward-stratum
+		// types (6 market + 2 bet + 1 comment + 1 dharma + 1 payout) added
+		// by ENGINE.0 (plan §3). Domain breakdown: 4 + 5 + 2 + 6 + 2 + 1 +
+		// 1 + 1 = 22. The schema file at `src/server/events/schemas.ts`
+		// exports `EVENT_TYPES`. If a future PR drops or adds one without
+		// amending plan §3 + this floor, surface. `r2_delete_failed` MUST
+		// NOT be present (SCAFFOLD.5 Sentry owns).
 		const { EVENT_TYPES } = await import("@/server/events/schemas");
 		expect([...EVENT_TYPES].sort()).toEqual(
 			[
+				// original LD-1 set (11)
 				"admin.signed_in",
 				"admin.signed_out",
 				"image_upload.blocked",
@@ -482,9 +619,21 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"user.pseudonym_assigned",
 				"user.signed_out",
 				"user.tos_accepted",
+				// ENGINE.0 forward-stratum set (11)
+				"market.created",
+				"market.opened",
+				"market.closed",
+				"market.resolved",
+				"market.corrected",
+				"market.voided",
+				"bet.placed",
+				"bet.sold",
+				"comment.placed",
+				"dharma.credited",
+				"payout.settled",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(11);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(22);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });
