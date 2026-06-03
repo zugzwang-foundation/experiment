@@ -11,8 +11,8 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | v0.4.0-draft |
-| **Date** | 2026-06-01 |
+| **Version** | 1.0.0 |
+| **Date** | 2026-06-03 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
 | **Lock gate** | PRECURSOR.4 (Fresh-session lock review, writer/reviewer split per CLAUDE.md) — promotes this doc from `v0.3-draft` → `v1.0` |
@@ -47,6 +47,7 @@
 | v0.3.3-draft | 2026-05-27 | HMH | **SCAFFOLD.18 execute — Path A → Path B pivot (continuation of v0.3.2-draft erratum).** After the tag-fix amend at v0.3.2-draft, CI run 26477860192 against the corrected `supabase/postgres:17.6.1.107` image surfaced the second-stage failure mode anticipated by plan §8 Risk 1: image pulls and container starts, but the Supabase entrypoint's role-bootstrap scripts fail with `psql: FATAL: password authentication failed for user "supabase_admin"` — the image is designed for Supabase CLI orchestration (`supabase start`) which provides a broader env-var ecosystem including platform-role passwords; bare `docker run -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres` triggers a partial-bootstrap with `supabase_admin` role password misalignment. Plan §8 Risk 1 documented this exact failure mode as anticipated, with Path B (vanilla `postgres:17` + CI-only exclusion of `0007_pg_cron_jobs.sql`) as the documented fallback. CI now runs against `postgres:17` (Docker Hub official manifest-list, GHA-service-container-native, no Supabase-CLI coupling). The 0007 migration is excluded at a CI step before `drizzle-kit migrate` via `rm` of the `.sql` file plus `jq` strip of the corresponding `_journal.json` manifest entry — both edits operate against the ephemeral CI-runner workdir only; committed source-control files remain immutable per ADR-0008 / AGENTS.md §6 file-level append-only invariant. Sandbox-verified pre-amend: jq filter takes 8 entries → 7 entries, top-level keys `dialect`/`entries`/`version` preserved verbatim. ADR-0016 D1–D6 substance still unaffected: Supabase's prod platform offering remains `supabase/postgres:17.6.1.107` per SPEC.1 §20 v1.8.0-draft cross-reference (the CI substrate divergence does not change the PG 18 rejection rationale that was the load-bearing point of that citation). Propagation trail at pivot: `.github/workflows/ci.yml` image swap (line 35 `supabase/postgres:17.6.1.107` → `postgres:17`) + new "Exclude pg_cron migration" step inserted before `drizzle-kit migrate`; SPEC.1 §20 line 1274 not re-touched (its claim about Supabase's prod offering remains accurate). HARDEN-phase carry-forwards flagged: (a) formalize local `supabase start` test surface for the 0007 migration (currently exercised manually per `docs/plans/SCAFFOLD.17.md` line 223 verification note); (b) image-tag manifest-resolution lint at write-time (carry-forward already flagged in v0.3.2-draft erratum row above); (c) reusable Path-B-style CI-substrate-divergence template for future vendor-image-vs-CI-runner compatibility gaps (the GHA-service-container model assumes standard postgres env-var conventions; vendor images with broader env-var ecosystems are systematically incompatible). Two CI runs preserved in the audit trail: 26476831221 (manifest-unknown on the malformed `-x-6-x86` suffix), 26477860192 (supabase_admin bootstrap auth failure on corrected tag). See `docs/logs/SCAFFOLD.18-execute.md` for full pivot rationale + both CI run logs. |
 | v0.3.4-draft | 2026-05-27 | HMH | **SCAFFOLD.18 execute — surgical statement strip refinement (continuation of v0.3.3-draft pivot).** Path B initial implementation (whole-file strip of `0007_pg_cron_jobs.sql` via `rm` + `jq` journal-strip per v0.3.3-draft row above) surfaced a second-order knock-on in CI run 26478587027: 6 tests in `tests/db/identity-pool/watermark.test.ts` failed with `PostgresError: relation "watermark_state" does not exist`. Root cause: migration 0007 is mixed-concern — only 2 of its 8 statements are Supabase-coupled (line 16 `CREATE EXTENSION pg_cron WITH SCHEMA extensions;` + lines 78-82 `SELECT cron.schedule(...)`); the remaining 6 statements are vanilla-portable (the `watermark_state` and `cron_alarms` tables, the `check_identity_pool_watermark()` PL/pgSQL function, and the seed row in `watermark_state`). Whole-file strip was over-broad. Refined to a surgical statement strip via `sed -i -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron/d' -e '/^SELECT cron\.schedule(/,/^);$/d' drizzle/migrations/0007_pg_cron_jobs.sql` in the CI step, replacing the prior `rm` + `jq` mechanism (the `_journal.json` no longer needs stripping because the migration file still applies, just with the 2 pg_cron-coupled statements removed). Sandbox-verified pre-amend: sed strips exactly the 2 targeted statements (1 single-line + 1 multi-line range); preserved-keyword grep returns 7 matches across `watermark_state` (3) / `cron_alarms` (3) / `check_identity_pool_watermark` (1); removed-keyword grep returns 0 for both `CREATE EXTENSION pg_cron` and `cron.schedule`. Test-level skip: test 6 (`registers the 'identity-pool-watermark' cron job exactly once`) in `tests/db/identity-pool/watermark.test.ts` gains a runtime `pg_extension` probe via `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron')` and calls `ctx.skip()` when pg_cron is absent. The `it.skipIf()` declarative form in the original sketch was deferred in favour of `ctx.skip()` inside the test body because vitest evaluates `it.skipIf(condition)` at collection time (before `beforeAll` runs), making it incompatible with a runtime DB probe — `ctx.skip()` runs at test execution time and observes the post-probe value. Tests 1-5 remain unconditional; they test the watermark function logic, not pg_cron itself. Net coverage: 5/6 watermark tests run in CI (function-logic assertions); test 6 (cron-registration assertion) skipped in CI with self-documenting reason, runs against real Supabase via local `supabase start`. HARDEN-phase carry-forwards refined: (a) formalize local `supabase start` test surface for the 2 stripped statements + test 6 (was already on the list); (b) image-tag manifest-resolution lint at write-time (carry-forward from v0.3.2-draft erratum row); (c) reusable Path-B-style CI-substrate-divergence template (from v0.3.3-draft erratum row); (d) NEW — surgical-vs-whole-file CI patching pattern for mixed-concern migrations (this row's contribution); (e) NEW — vitest collection-time vs runtime skip semantics documentation (this row's contribution). Three CI runs preserved in the audit trail: 26476831221 (manifest-unknown), 26477860192 (supabase_admin bootstrap), 26478587027 (watermark_state-missing knock-on). See `docs/logs/SCAFFOLD.18-execute.md` for full refinement rationale + the three CI run logs. |
 | v0.4.0-draft | 2026-06-01 | HMH | **SYNC.7 — SPEC.2 rebuild: ADR-0017/0018/0019 fold + ADR-0009 supersession + RLS posture + drift reconciliation.** (1) §22 ADR Index: added ADR-0017 (ranking modes & "Top" composite — supersedes ADR-0009), ADR-0018 (Dharma issuance + asymmetric two-floor minimum bet), ADR-0019 (RLS out of scope); flipped ADR-0009 status `accepted` → `superseded` (by ADR-0017); index 14 → 17 rows (15 accepted + 1 superseded + 1 in-flight); §22.4 property 3 reworded — the prior "no minting ADR-0017 while ADR-0012 in flight" clause conflated in-flight with gap and is superseded (0017/0018/0019 minted under SYNC.4/SYNC.5; numbering stays dense, 0012 is a filled in-flight slot); §22.3 Direction-B example repointed 0009 → 0017. (2) **§22/§23 numbering reconciliation:** ADR-0017/0018/0019 + SYNC.5 + the SYNC.7 kickoff cite "§23 ADR Index," but the ADR Index has been **§22** since the PRECURSOR.2-B K_eff-dashboard strike renumbered §23 → §22 (2026-05-08 row above); the ADRs carry the stale pre-strike number — SPEC.2 §22 is canonical, edits applied there. (3) §18.5 (new) records the RLS posture per ADR-0019 — server-only Architecture 2, build skipped, decision recorded, tripwire (any client-direct DB path makes RLS mandatory before it ships), testnet revisit; prior §18.5 (Single source of truth) → §18.6; §6.5 cross-references it. (4) §1.4 #2 enriched with the `cpmm.md` authoring forward-reference (purpose, Manifold lift-and-attribute lineage MIT → AGPL, invariants, impl home, status — full authoring deferred to the cpmm.md chat per SYNC.7 scope). (5) Drift folds: "14 ADRs / 0003–0016" → "17 ADRs / 0003–0019" across §0 + §1; §23.3 + §23.4 PRECURSOR.5 → SYNC.8 (PRECURSOR.5 dissolved into SYNC.8 per tracker v11); Appendix A + B "PRECURSOR.5 column-name/file-map sweep" → PRECURSOR.4 (the lock-review verification, distinct from the CLAUDE/AGENTS rebuild). (6) **Full removal of friendly-fire + `stake_at_post_time` (replaces the earlier annotate-not-rewrite pass).** Per SPEC.1 v1.9.0-draft + ADR-0017 (sharpened SYNC.7): the standalone friendly-fire vote is gone entirely. `friendly_fire_events` (table + Bucket-B trigger + the F-COMMENT-6/7/8 `castFriendlyFire`/`clearFriendlyFire` Server Actions) and `comments.stake_at_post_time` are **struck from the schema and from every operational reference** — §5.1 (inventory: row dropped, renumbered; counts 23→22 tables / Bucket B 4→3 / protected 13→12), §5.2, §5.4 (rewritten to the four read-time per-side reply-bet aggregates), §5.5 (audit-trace bullet added), §6.3, §7.4/§7.5, §9 lock-order (`pools → positions → dharma_ledger → events`; `friendly_fire_events` removed), §11 (comment+friendly-fire budget removed), §13.3, §18.2/§18.4, §19.3/§19.5, Appendix A (file-map rows removed) + Appendix B (B.6 column dropped, B.8 deleted + renumbered). (7) **Reply-as-bet write-path rework.** Per SPEC.1 v1.9.0-draft §7/§8 + ADR-0017/0018: every comment rides a bet (post-bet = top-level, post floor; reply-bet = `parent_comment_id`, reply floor 50); the only comment-free write is the sell (F-BET-3). The old W-2 "comment, no pool lock" pattern is **retired** — comment/reply writes are bets that take the pool-row lock and run the §9 W-1 chain. Folded: §3.1 (moderation-skip set = sells only), §3.2 (W-2 retired into the bet flow; pattern table repointed), §9 (chain covers comment-bearing bets), §10 (moderation runs on every comment-bearing bet), §11 (posts/replies use the bet anti-abuse posture; **open question recorded** — whether reply-bets carry a per-market productive cap distinct from top-level bets, deferred to §11 + the number-tuning pass per SPEC.1 §8), §13.3 (F-COMMENT-1/2/3 reclassified as bet-flows; F-COMMENT-6/7/8 rows removed; 40→37 F-* files), §14 (INV-1 binds **every** bet; `comments.bet_id` NOT NULL; INV-3 mechanism moved off the retired W-2 onto the bet transaction). Per-flow `F-*.md` contract files stay deferred to their gating ENGINE.*/DEBATE.* tasks per §13.4. (8) **Two-floor minimum bet, Daily Credit, marker.** `BET_MIN_STAKE_POST` (ranged) + `BET_MIN_STAKE_REPLY` (50 pinned) referenced as bet write-path checks (constants SPEC.1 §16.1-owned per ADR-0018); "Daily Allowance" → **Daily Credit** as the concept/rule (accrual now conditional — paid only on a UTC day with a commented bet, use-or-lose) — **DB identifiers retained** per SPEC.1 §10.4 (`dharma_ledger` source tag stays `daily_allowance`; cursor stays `users.last_allowance_accrued_at`; the `daily_allowance_events` dropped-table note in §5.5 stands); three-state marker → **Flipped/Exited** ("In" dropped). NOT changed: ADR substance (0017/0018/0019 unmodified — note ADR-0017's body still says friendly-fire "stays display-only," now contradicted by both specs; a later in-place ADR-0017 patch reconciles it, flagged §5.5 + §23.3); CLAUDE.md/AGENTS.md (SYNC.8); no v1.0 promotion (PRECURSOR.4). New-ADR status recorded `accepted` (2026-06-01, founder ratification); ADR file headers flip `proposed` → `accepted` at SYNC.BACKFILL. |
+| 1.0.0 | 2026-06-03 | HMH | **PRECURSOR.4 v1.0 lock.** Promotes SPEC.2 v0.4.0-draft → 1.0.0 (paired with SPEC.1 → 1.0.0). **§0** version → 1.0.0, date → 2026-06-03. **§5.1/§5.3/§5/§23** schema census reconciled — "nine domains" → "ten domains" (four sites); §5 single-source row → "ten domain files". **§6** "eight Bucket C tables" → "ten" (9 Bucket A + 3 Bucket B + 10 Bucket C = 22). **§19.3** header reconciled to the 22-table model: twenty dataset-relevant (the two pg_cron operational tables `watermark_state` + `cron_alarms` excluded entirely); fifteen ship / five do not (table + post-table summary already correct). **§19.1 / §19.7 / §19 deferred-items row** dataset licence resolved → **CC-BY-4.0** (paired with SPEC.1 §12.2). **§19.4 + Appendix B.1** PII inventory extended — `users.name` + `users.image` added as STRIP (eight → ten PII columns; STRIP count 7 → 9); Appendix B.1 also adds `email_verified` (SHIP) + `updated_at` (SHIP) to match the built `users` schema; `pfp_filename` NULL_IF_ERASED nuance preserved. **§15** §15.4 named the canonical 38-code catalogue at v1.0; `docs/specs/error-codes.md` + the §15.5 cross-reference CI lint marked forward deliverables (ENGINE error-envelope / HARDEN-phase), not v1.0 files; 38-code baseline unchanged. **§23** tracker filename `zugzwang_experiment_tracker_v7.html` → `tracker_v11.html`. **Recorded conditions:** ADR-0012 remains in-flight (§22.2); admin-flow product-validation error codes remain unenumerated (F-ADMIN-* Errors blocks are placeholders — §15.4 deferred item, accepted as in-scope-but-unenumerated); the `error_`-prefix sweep across ADR prose + the error-codes.md catalogue file is forward (ENGINE) work; the built schema retains vestigial `friendly_fire_events` / `comments.stake_at_post_time` / nullable `comments.bet_id` pending DEBATE.8/9; §23 Direction-A phase-model reconciliation to tracker v11 deferred to the tracker sweep, Direction-B section coverage verified complete in this review; §15.4's 38-code baseline is the cross-cutting + folded-ADR set, and nine participant-flow product-validation codes referenced in SPEC.1 flow contracts (`insufficient_dharma`, `below_post_floor`, `opposite_side_held`, `position_not_held`, `comment_too_long`, `comment_track_a_blocked`, `comment_track_b_under_review`, `market_resolving`, `banned_user`) are accepted as in-scope-but-unenumerated (parallel to admin-flow codes), aggregated into `error-codes.md` (forward), with §15.4 carrying a scoping note to this effect. |
 
 ---
 
@@ -454,7 +455,7 @@ ADRs consumed by §4: ADR-0003 (Server Actions vs Route Handlers default + runti
 
 §5 owns the *complete table inventory* for the experiment-phase build — every Postgres table the v1 codebase reads or writes, with append-only-vs-mutable classification per ADR-0005's Bucket A / B / C scheme, the per-domain schema home per ADR-0008 §4, and the load-bearing ADR(s) that mint the table's substance. SPEC.2 §5 is the single inventory; per-table DDL substance lives in ADR-0005 (table shape + classification rationale) + ADR-0008 (Drizzle declaration + migration discipline) + ADR-0016 (universal UUIDv7 PK). A reader who needs the column-by-column DDL goes to the schema file at `src/db/schema/<domain>.ts`; a reader who needs the inventory shape stays here.
 
-Twenty-two tables in v1 across nine domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
+Twenty-two tables in v1 across ten domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
 
 ### §5.1 Inventory table
 
@@ -513,7 +514,7 @@ Total protected (Bucket A + Bucket B): **twelve tables**. The §6 test contract 
 
 **UUIDv7 primary keys.** Every PK in §5.1 is `uuid` declared as `id: uuid("id").primaryKey().default(sql\`uuidv7()\`)` per ADR-0016 D1–D4. This applies uniformly across the inventory: participant tables, audit tables, the four Better Auth tables (which override Better Auth's default 32-char base62 string per ADR-0016 D4 + ADR-0004 `advanced.database.generateId`), the hand-rolled `admin_sessions`, and the synthetic-PK tables (`identity_pool` carries a UUIDv7 `id` PK plus a separate `UNIQUE (colour, animal, number)` constraint per ADR-0016 D5). The `session.token` field on Better Auth's `session` table is **untouched** by this convention — that's the cookie-payload random string, not a row PK.
 
-**Per-domain schema-file split.** Tables are grouped into domain files at `src/db/schema/<domain>.ts` per ADR-0008 §4 with a barrel re-export at `src/db/schema/index.ts`. Nine domains in v1: `auth`, `markets`, `bets`, `comments`, `dharma`, `events`, `identity`, `image-uploads`, `audit`, `system`. The `auth` domain spans two ADR ownerships (ADR-0004 for the four Better Auth tables; ADR-0010 for `admin_sessions`); both groups share the same schema file because they share the auth surface conceptually.
+**Per-domain schema-file split.** Tables are grouped into domain files at `src/db/schema/<domain>.ts` per ADR-0008 §4 with a barrel re-export at `src/db/schema/index.ts`. Ten domains in v1: `auth`, `markets`, `bets`, `comments`, `dharma`, `events`, `identity`, `image-uploads`, `audit`, `system`. The `auth` domain spans two ADR ownerships (ADR-0004 for the four Better Auth tables; ADR-0010 for `admin_sessions`); both groups share the same schema file because they share the auth surface conceptually.
 
 **`created_at` + cross-row ordering.** All tables carry `created_at TIMESTAMPTZ DEFAULT now()`. Per ADR-0016's monotonicity caveat, `created_at` is the canonical chronological-sort column for cross-row ordering — UUIDv7's time prefix is per-backend monotonic only and MUST NOT be assumed monotonic across the Supavisor connection pool.
 
@@ -545,7 +546,7 @@ Six tables that appeared in earlier outlines but are absent from the v1 inventor
 
 | Concern | Source-of-truth file |
 |---|---|
-| Per-domain table declarations | `src/db/schema/<domain>.ts` (ten files across nine domains) |
+| Per-domain table declarations | `src/db/schema/<domain>.ts` (ten domain files) |
 | Barrel re-export of all schemas | `src/db/schema/index.ts` |
 | Drizzle config (migration set + schema barrel pointer) | `drizzle.config.ts` |
 | Append-only trigger SQL (Bucket A + Bucket B per-table functions) | `drizzle/migrations/<NNNN>_append_only_triggers.sql` |
@@ -561,7 +562,7 @@ ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session /
 
 §6 owns the *physical-enforcement contract* by which Bucket A and Bucket B tables in the §5.1 inventory cannot be silently mutated outside the permitted patterns. The mechanism is Postgres triggers — `BEFORE UPDATE` and `BEFORE DELETE` triggers that `RAISE EXCEPTION` on disallowed mutations — installed via a single hand-written raw SQL migration in the Drizzle migration set per ADR-0005 §3 + ADR-0008 §3. The triggers are the ground truth; handler-layer checks are advisory; service-role credentials cannot circumvent them without an audit-visible schema change. The contract is what makes INV-2 (no-Dharma-overdraft via append-only `dharma_ledger`), INV-3 (comments side-bound at post time via append-only `comments`), and INV-4 (append-only resolutions via append-only `resolution_events` + `payout_events`) enforceable at the database layer rather than only at the application layer.
 
-Twelve protected tables in v1: nine Bucket A (strictly append-only) + three Bucket B (append-only with one whitelisted column-set transition). The eight Bucket C tables in §5.1 carry no append-only triggers; their integrity rides on FK constraints, UNIQUE constraints, NOT NULL constraints, and CHECK constraints declared in their `src/db/schema/<domain>.ts` files via Drizzle DDL.
+Twelve protected tables in v1: nine Bucket A (strictly append-only) + three Bucket B (append-only with one whitelisted column-set transition). The ten Bucket C tables in §5.1 carry no append-only triggers; their integrity rides on FK constraints, UNIQUE constraints, NOT NULL constraints, and CHECK constraints declared in their `src/db/schema/<domain>.ts` files via Drizzle DDL.
 
 ### §6.1 The five-clause contract
 
@@ -1463,7 +1464,7 @@ The asymmetry between `retry_safe` (rare) and `do_not_retry` (default for most c
 
 ### §15.4 The catalogue baseline — 38 codes at SPEC.2 v1.0 lock
 
-Catalogue file: `docs/specs/error-codes.md`. **Baseline: 38 codes** at SPEC.2 v1.0 lock; PRECURSOR.4 mechanical cross-reference invariant verifies this count. Codes mint from the following sources — every code in the catalogue MUST originate from one:
+**§15.4 is the canonical 38-code catalogue at v1.0 lock** — the source-breakdown table below is the authoritative enumeration. The standalone catalogue file `docs/specs/error-codes.md` is a **named forward deliverable** (ENGINE error-envelope work), not a v1.0 artifact: it is materialized from this table when the error-envelope module lands, and the §15.5 cross-reference CI lint that checks it is a HARDEN-phase deliverable. **Baseline: 38 codes**, verified at PRECURSOR.4. This catalogue is the v1.0 baseline of cross-cutting and folded-ADR codes; additional per-flow product-validation codes defined in the flow contracts (the participant flows and the admin flows) are aggregated into the complete `error-codes.md` catalogue (forward deliverable), which the §15.5 lint verifies. Codes mint from the following sources — every code in the catalogue MUST originate from one:
 
 | Source | Count | Examples |
 |---|---|---|
@@ -1505,7 +1506,7 @@ Two-direction invariant between flow files and catalogue:
 | Six-field envelope shape | §15.1 |
 | Closed 9-value `error_type` enum | §15.2 |
 | Closed 3-value `retry_semantics` enum | §15.3 |
-| Catalogue file (38 rows at v1.0 lock) | `docs/specs/error-codes.md` |
+| Canonical 38-code catalogue at v1.0 lock | **§15.4 source-breakdown table** (`docs/specs/error-codes.md` is the forward materialization — ENGINE error-envelope work) |
 | Per-flow Errors blocks | `docs/specs/flows/F-*.md` (per §13) |
 | Bare-vs-`error_`-prefix decision | PRECURSOR.4 carry-forward (per §0.1 row) |
 | Admin-only flow code completeness | PRECURSOR.4 carry-forward (per §0.1 row) |
@@ -1774,7 +1775,7 @@ ADRs consumed by §18: ADR-0004 (Better Auth + Cloudflare Turnstile via `hooks.b
 
 ## §19 Public Dataset Export
 
-§19 owns the *public-dataset release contract* for the experiment-phase build — the 2026-11-06 GitHub release artifact at `zugzwang-foundation/experiment` that ships the canonical research dataset; the 13-tables-shipped / 4-not-shipped policy that determines what enters the public archive vs what is operationally-only; the PII strip-not-hash treatment that drops the eight PII columns rather than pseudo-anonymizing them; the export-time JOIN pseudonymization that maps `users.id` to pseudonym slugs at build time so cross-table joins in the released archive work via pseudonym keys; the K_eff(t) trajectory as the *only* K_eff derivation surface in v1 per SPEC.1 G3; and the `/api/dataset/manifest` endpoint contract per §4.3. SPEC.1 §12.2 owns the *product-level* dataset commitment (the public release happens, ships under a permissive license, supports replication); §3.7 + §7 own the *event-row contract* that the dataset structurally is `pg_dump` over; this §19 sits at the *export pipeline + privacy + access* layer, naming what gets shipped, how it's pseudonymized, and where readers find it.
+§19 owns the *public-dataset release contract* for the experiment-phase build — the 2026-11-06 GitHub release artifact at `zugzwang-foundation/experiment` that ships the canonical research dataset; the 13-tables-shipped / 4-not-shipped policy that determines what enters the public archive vs what is operationally-only; the PII strip-not-hash treatment that drops the ten PII columns rather than pseudo-anonymizing them; the export-time JOIN pseudonymization that maps `users.id` to pseudonym slugs at build time so cross-table joins in the released archive work via pseudonym keys; the K_eff(t) trajectory as the *only* K_eff derivation surface in v1 per SPEC.1 G3; and the `/api/dataset/manifest` endpoint contract per §4.3. SPEC.1 §12.2 owns the *product-level* dataset commitment (the public release happens, ships under a permissive license, supports replication); §3.7 + §7 own the *event-row contract* that the dataset structurally is `pg_dump` over; this §19 sits at the *export pipeline + privacy + access* layer, naming what gets shipped, how it's pseudonymized, and where readers find it.
 
 The discipline is strict: §19 names the table inventory + per-column treatment + the export-time JOIN mechanism + the K_eff derivation surface; it does NOT pick file format (Parquet vs CSV vs SQL dump — that's §19.6 deferred to HARDEN.* per the SCAFFOLD.* cadence-aligned implementation), it does NOT decide the manifest JSON schema's exact field set (deferred to HARDEN.* alongside the manifest endpoint implementation), and it does NOT design researcher-tooling integration (out of scope; researchers use whatever they want against the static archive).
 
@@ -1786,7 +1787,7 @@ The discipline is strict: §19 names the table inventory + per-column treatment 
 
 **Format.** Tabular (per-table CSVs or per-table Parquet — final pick deferred to HARDEN.*) compressed into a single tarball per release. The manifest JSON file (per §19.7) names the tarball's checksum, the included file inventory, the schema-version cursor, and the per-table row counts.
 
-**License.** Permissive (CC0 or CC-BY-4.0 — final pick locked at PRECURSOR.4 alongside SPEC.1 §12.2 license language). The dataset is research-grade public-good output; the soulbound-Dharma score makes it not commercially-replicable as the live experiment, so the license question is about academic citation requirements + zero-friction usage, not commercial use protection.
+**License.** CC-BY-4.0 — locked at PRECURSOR.4 alongside SPEC.1 §12.2 license language. The dataset is research-grade public-good output; the soulbound-Dharma score makes it not commercially-replicable as the live experiment, so the license question is about academic citation requirements + zero-friction usage, not commercial use protection.
 
 ### §19.2 Dataset architecture
 
@@ -1800,7 +1801,7 @@ The build pipeline runs `pg_dump` against a freeze-snapshot Postgres replica (Su
 
 ### §19.3 Tables shipped vs not shipped
 
-Per §5.1, twenty-one tables in v1. **Thirteen ship; eight do not (four operational-by-policy + four PII-by-policy).**
+Per §5.1, twenty-two tables in v1; twenty are dataset-relevant (the two pg_cron operational tables `watermark_state` + `cron_alarms` are excluded from the dataset inventory entirely). **Of those twenty: fifteen ship; five do not (operational / privacy-sensitive).**
 
 | # | Table | Bucket | Shipped? | Rationale |
 |---|---|---|---|---|
@@ -1818,7 +1819,7 @@ Per §5.1, twenty-one tables in v1. **Thirteen ship; eight do not (four operatio
 | 12 | `markets` | C | YES | Market metadata |
 | 13 | `pools` | C | YES | CPMM pool reserves at freeze |
 | 14 | `positions` | C | YES | Per-user-per-market position cache (final positions at freeze) |
-| 15 | `users` | C | **YES with PII strip per §19.4** | Pseudonym + ToS metadata + bet/comment join keys; eight PII columns dropped |
+| 15 | `users` | C | **YES with PII strip per §19.4** | Pseudonym + ToS metadata + bet/comment join keys; ten PII columns dropped |
 | 16 | `system_state` | B | NO | Operational singleton; the freeze itself is observable from the events log without the row |
 | 17 | `sessions` | C | NO | Operational; per ADR-0016 D6 + SPEC.1 §16.4 — privacy-sensitive (cookie tokens, last-seen timestamps) |
 | 18 | `accounts` | C | NO | Provider-side identity proof (Google OAuth account linkage); no thesis-relevant signal; PII-adjacent |
@@ -1831,7 +1832,7 @@ The earlier "13 shipped + 4 not shipped" 3-E baseline was an undercount (it omit
 
 ### §19.4 PII strip-not-hash policy
 
-Per ADR-0016 D6 + 3-E A1: the eight PII columns are **dropped** (set to NULL or removed from the released schema) rather than pseudo-anonymized via hash. Strip-not-hash is the chosen treatment because:
+Per ADR-0016 D6 + 3-E A1: the ten PII columns are **dropped** (set to NULL or removed from the released schema) rather than pseudo-anonymized via hash. Strip-not-hash is the chosen treatment because:
 
 (a) **Hash collisions across columns expose patterns.** A `hash(email)` column would let an attacker who knows a target email confirm membership in the dataset; strip-not-hash forecloses confirmation attacks entirely.
 
@@ -1839,12 +1840,14 @@ Per ADR-0016 D6 + 3-E A1: the eight PII columns are **dropped** (set to NULL or 
 
 (c) **Research signal from PII columns is zero.** Email, IP, and user-agent carry no thesis-relevant signal; researchers studying market behavior + commentary correctness do not need them. The hash form would be tolerated only if the signal warranted; it doesn't, so strip is strictly better.
 
-**The eight PII columns dropped at export:**
+**The ten PII columns dropped at export:**
 
 | Column | Source table | Treatment |
 |---|---|---|
 | `email` | `users` | Removed from released schema (column does not appear in dataset) |
 | `google_id` | `users` | Removed |
+| `name` | `users` | Removed (Google display name) |
+| `image` | `users` | Removed (Google avatar URL) |
 | `tos_acceptance_ip` | `users` | Removed |
 | `tos_acceptance_user_agent` | `users` | Removed |
 | `pfp_filename` (subset — only when null-ed by H2 erasure) | `users` | Released as-is; H2-erased rows release as NULL |
@@ -1914,7 +1917,7 @@ Per §4.3 row 8: `GET /api/dataset/manifest`. Public read (no auth). Active **po
   "tarball_url": "https://github.com/zugzwang-foundation/experiment/releases/download/dataset-v1/zugzwang-experiment-2026-11-06.tar.gz",
   "tarball_sha256": "<hex>",
   "tarball_size_bytes": 0,
-  "license": "<final license per §19.1>",
+  "license": "CC-BY-4.0",
   "tables": [
     {
       "name": "events",
@@ -1937,12 +1940,12 @@ The endpoint is a thin static-file pointer; it does not serve the tarball itself
 | Release date + GitHub artifact location | §19.1 + SPEC.1 §12.2 |
 | Build pipeline (one-shot Postgres point-in-time recovery + pg_dump + post-process + tarball) | HARDEN.10 (per §21.3 + ADR-0006) |
 | Tables-shipped vs not-shipped policy | §19.3 |
-| PII strip-not-hash policy + eight PII columns dropped | §19.4 |
+| PII strip-not-hash policy + ten PII columns dropped | §19.4 |
 | Export-time JOIN pseudonymization | §19.5 |
 | K_eff(t) derivation surface (post-hoc, against this dataset only) | §19.6 + SPEC.1 G3 |
 | `/api/dataset/manifest` Route Handler | `src/app/api/dataset/manifest/route.ts` (per §4.3 + §13 — F-DATASET-1 minted alongside; gating SCAFFOLD.18) |
 | Manifest JSON schema | §19.7 (preliminary; final at HARDEN.*) |
-| Final license selection (CC0 vs CC-BY-4.0) | PRECURSOR.4 |
+| Final license selection (CC0 vs CC-BY-4.0) | ✅ Resolved at PRECURSOR.4 → **CC-BY-4.0** |
 
 ADRs consumed by §19: ADR-0005 (events log + Pattern A backing dataset architecture), ADR-0006 (Supabase point-in-time recovery for freeze-snapshot replica), ADR-0011 (pseudonym slug formation backing export-time JOIN), ADR-0016 (raw UUIDs in live database vs pseudonym slugs in dataset, per D6). 3-E A1 absorbs strip-not-hash treatment; 3-E §19.3 source-row reconciliation (3-E baseline of "13 shipped" was an undercount; v0.3-draft corrects to 16 shipped + 5 not shipped per §19.3 inventory). PRECURSOR.2-B D4 absorbs K_eff(t) derivation as the only surface in v1 — no live in-product K_eff component.
 
@@ -2166,7 +2169,7 @@ Three properties locked at the ADR file shape:
 
 ## §23 Tracker Task Gating Map
 
-§23 owns the *bidirectional gating trace* between tracker tasks and SPEC.2 sections + ADRs + F-* flow files for the experiment-phase build — Direction A maps each tracker phase to the SPEC.2 sections + ADRs + F-* files that gate its tasks; Direction B maps each SPEC.2 section to the tracker tasks that unblock when the section locks. The trace is the load-bearing PRECURSOR.4 review surface — coverage gaps surface here before they land as blocked downstream tasks. SPEC.1 owns the *product-level* tracker cadence; the tracker HTML at `zugzwang_experiment_tracker_v7.html` is the *operational* Kanban surface; this §23 sits at the *gating-relationship contract* layer, naming what blocks what and what unblocks what.
+§23 owns the *bidirectional gating trace* between tracker tasks and SPEC.2 sections + ADRs + F-* flow files for the experiment-phase build — Direction A maps each tracker phase to the SPEC.2 sections + ADRs + F-* files that gate its tasks; Direction B maps each SPEC.2 section to the tracker tasks that unblock when the section locks. The trace is the load-bearing PRECURSOR.4 review surface — coverage gaps surface here before they land as blocked downstream tasks. SPEC.1 owns the *product-level* tracker cadence; the tracker HTML at `tracker_v11.html` is the *operational* Kanban surface; this §23 sits at the *gating-relationship contract* layer, naming what blocks what and what unblocks what.
 
 The discipline is strict: §23 names the gating relationships at phase grain (Direction A) and section grain (Direction B); it does NOT enumerate every task's status (the tracker HTML owns), it does NOT decide implementation priority within a phase (the tracker's per-phase ordering owns), and it does NOT track day-to-day progress (the tracker's status field owns).
 
@@ -2205,7 +2208,7 @@ Each SPEC.2 section row names which tracker tasks unblock when the section reach
 | **§0** | Document metadata + change log | All downstream tasks (provides versioning policy + lock-gate framing for change-log audit trail) |
 | **§3** | Data flows | ENGINE.7 (bet wrapper), ENGINE.8 (bet handlers), ENGINE.9 (resolution), DEBATE.2 (comment-bearing-bet write), SCAFFOLD.3 (auth flows) |
 | **§4** | API surface | UI.* (Server Actions consumed by every UI page); SCAFFOLD.2 (Route Handler skeleton mint) |
-| **§5** | Data model — table inventory | SCAFFOLD.2 (Drizzle schemas across nine domains); HARDEN.* CI lint for table inventory drift |
+| **§5** | Data model — table inventory | SCAFFOLD.2 (Drizzle schemas across ten domains); HARDEN.* CI lint for table inventory drift |
 | **§6** | Append-only enforcement | SCAFFOLD.2 (trigger SQL migration); HARDEN.6 (append-only test floor, twelve-table protected set) |
 | **§7** | Event model | ENGINE.7/ENGINE.8/ENGINE.9 (events insert at every state mutation); SCAFFOLD.2 (events partitioning DDL); HARDEN.* (events-emit CI lint) |
 | **§8** | Authentication & sessions | SCAFFOLD.3 (Better Auth wiring); UI.* (auth-gated pages); ENGINE.* (auth gate on every state-mutating endpoint) |
@@ -2471,6 +2474,9 @@ The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECU
 | `pseudonym` | text | SHIP | The colour-animal-number slug; load-bearing as the dataset's user-identification key |
 | `email` | text | STRIP | PII per §19.4 — column removed from released schema |
 | `google_id` | text | STRIP | PII per §19.4 — column removed |
+| `name` | text | STRIP | PII per §19.4 — Google display name; column removed |
+| `image` | text | STRIP | PII per §19.4 — Google avatar URL; column removed |
+| `email_verified` | boolean | SHIP | Email-verification flag; no PII, research-relevant for auth-completion analysis |
 | `pfp_filename` | text | NULL_IF_ERASED | Slug for `zugzwang-pfp/v1/<slug>` per §12.7; H2 erasure null-s; otherwise ships |
 | `tos_accepted_at` | timestamptz | SHIP | Research-relevant (ToS evidence timestamp) |
 | `tos_version_hash` | text | SHIP | Research-relevant (which ToS version was accepted) |
@@ -2480,6 +2486,7 @@ The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECU
 | `last_allowance_accrued_at` | timestamptz | SHIP | Daily-allowance idempotency cursor; research-relevant for allowance-flow analysis |
 | `banned_at` | timestamptz \| null | SHIP | Track A automatic ban + Track B admin manual ban evidence per §8.6 |
 | `created_at` | timestamptz | SHIP | Canonical chronological-sort column |
+| `updated_at` | timestamptz | SHIP | Better Auth row-update timestamp; research-relevant for account-mutation analysis |
 
 ### B.2 `markets` (Bucket C)
 
@@ -2700,8 +2707,8 @@ Post-experiment, all 50K rows ship with `assigned_at` populated only for tuples 
 **Coverage observation.** The 15 tables × ~10 columns each = ~150 column-level decisions. Of these:
 - ~118 are SHIP (audit-trail integrity preserved)
 - ~14 are PSEUDO (every `user_id` / `target_user_id` FK gets rewritten)
-- 7 are STRIP / STRIP_KEY (the eight PII columns/keys per §19.4 minus one — `pfp_filename` is NULL_IF_ERASED instead of STRIP because it survives non-erasure)
+- 9 are STRIP / STRIP_KEY (the ten PII columns/keys per §19.4 minus one — `pfp_filename` is NULL_IF_ERASED instead of STRIP because it survives non-erasure)
 - 1 is NULL_IF_ERASED (`users.pfp_filename`)
 - ~12 are SHIP-with-policy-aware-treatment (e.g., `events.aggregate_id` resolves PSEUDO or SHIP per `aggregate_type`)
 
-The asymmetric distribution reflects the privacy-by-design property: the dataset is **mostly preserved** (audit trail intact, K_eff(t) reconstructible from events log) with **narrow PII redaction** (only the eight columns/keys named in §19.4 actually leave the dataset).
+The asymmetric distribution reflects the privacy-by-design property: the dataset is **mostly preserved** (audit trail intact, K_eff(t) reconstructible from events log) with **narrow PII redaction** (only the ten columns/keys named in §19.4 actually leave the dataset).
