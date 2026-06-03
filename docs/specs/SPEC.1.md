@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.9.0-draft (semver; bump major on invariant changes)
-- **Last updated:** 2026-06-01
+- **Version:** 1.0.0 (semver; bump major on invariant changes)
+- **Last updated:** 2026-06-03
 - **Authors:** The Zugzwang Authors
 - **Status:** Working draft — folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor. Promotes to Approved on v1.0.0 lock at PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md).
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -53,10 +53,10 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 | **Side** | YES or NO. The market's two share types. | `comments.side_at_post_time`, `bets.side` |
 | **Position** | A user's net share holding in a market. Computed from the bet ledger. | derived; not a column |
 | **Pool** | The CPMM share reserves for a market. Counterparty to every user trade. | `pools` table |
-| **Pool seed** | A `pool_seed` Dharma flow from the admin account into the market pool at market creation. | `dharma_ledger.tag = 'pool_seed'` |
-| **Pool unwind** | A `pool_unwind` Dharma flow from the pool back to the admin account at resolution or void. | `dharma_ledger.tag = 'pool_unwind'` |
+| **Pool seed** | A `pool_seed` Dharma flow from the admin account into the market pool at market creation. | `dharma_ledger.entry_type = 'pool_seed'` |
+| **Pool unwind** | A `pool_unwind` Dharma flow from the pool back to the admin account at resolution or void. | `dharma_ledger.entry_type = 'pool_unwind'` |
 | **Dharma** | Non-transferable reputation score. Single fluid unit; same instrument is staked, won, and lost. | `NUMERIC(38,18)` column on user rows; flows in `dharma_ledger` |
-| **Daily Credit** | A small, **flat** (never escalating) per-user Dharma credit, paid once per UTC day **only when the user places a commented bet that day** (per ADR-0018). Use-or-lose; does not accumulate. | `dharma_ledger.tag = 'daily_allowance'` + `users.last_allowance_accrued_at` cursor |
+| **Daily Credit** | A small, **flat** (never escalating) per-user Dharma credit, paid once per UTC day **only when the user places a commented bet that day** (per ADR-0018). Use-or-lose; does not accumulate. | `dharma_ledger.entry_type = 'daily_allowance'` + `users.last_allowance_accrued_at` cursor |
 | **Pseudonym** | The user's auto-assigned public display name of the form `<Colour><Animal><Number>` where `<Number>` is three-digit zero-padded (e.g., `RedFox001`, `BlueWolf472`). Permanent. Not user-chosen, not user-editable. Not an alias for a real-world identity. | `users.pseudonym` |
 | **PFP** | Profile picture: a pre-generated illustration of the user's `(colour, animal, number)` tuple, served from CDN. Coherent with the pseudonym. Permanent. | `users.pfp_filename` |
 | **Identity Pool** | The pre-generated bank of `(colour, animal, number)` tuples and matching PFP images consumed by signup. Filled pre-launch via the asset pipeline (§13 F-AUTH-3); FIFO-consumed at signup; never replenished except by re-running the pipeline operationally. | `identity_pool` table |
@@ -155,7 +155,7 @@ This section mirrors `CLAUDE.md` §2.1–§2.4 verbatim in semantics. It exists 
 
 - **Statement.** Dharma moves only as a market mechanic — staking on a bet, settling on resolution, or seeding/unwinding a pool. There is no user-to-user transfer.
 - **Rationale.** Reputation that can be bought, gifted, or laundered is not reputation. The K × n term collapses if Dharma is fungible across identities.
-- **Enforcement.** No `dharma_transfer` table by design. Every `dharma_ledger` row carries a `source` tag in a fixed enum: `bet_stake`, `bet_settle`, `daily_allowance`, `pool_seed`, `pool_unwind`, `correction_reverse`, `correction_apply`, `void_refund`. No "send Dharma" UI surface. No admin override that moves Dharma between accounts except via a resolution event.
+- **Enforcement.** No `dharma_transfer` table by design. Every `dharma_ledger` row carries an `entry_type` in a fixed enum: `bet_stake`, `bet_payout`, `daily_allowance`, `pool_seed`, `pool_unwind`, `correction_reverse`, `correction_apply`, `void_refund`, `uncollectable`. No "send Dharma" UI surface. No admin override that moves Dharma between accounts except via a resolution event.
 - **Test assertions.** `tests/server/dharma/non-transferable.test.ts`:
   - `it("rejects any direct user-to-user dharma write")`
   - `it("requires a tag from the fixed enum on every ledger row")`
@@ -219,7 +219,7 @@ stateDiagram-v2
 **Transitions.**
 - `Draft → Open`: admin commits market parameters (question, criterion, deadline ≤ 2026-11-05 23:59 UTC per `J10`) and the `pool_seed` Dharma flow lands in the pool.
 - `Open → Closed`: server clock crosses `resolution_deadline`. Hard cutoff, no grace window (per `B7`).
-- `Closed → Resolving`: admin triggers resolution. Bets in flight at trigger are allowed to commit or timeout (per `G6`); new bets after this transition return 400 `market_closed_at`.
+- `Closed → Resolving`: admin triggers resolution. Bets in flight at trigger are allowed to commit or timeout (per `G6`); new bets after this transition return 400 `error_market_closed_at`.
 - `Resolving → Resolved`: in-flight window clears. Payouts compute and write per §11.
 - `Open|Closed → Voided`: admin voids with free-text reason (per `B3`). Stakes refunded, Dharma effects reversed, comments lock with `voided` marker.
 - `Resolved|Voided → Frozen`: hard freeze at 2026-11-05 23:59 UTC. Read-only mode.
@@ -278,7 +278,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 - **Pre.** `market.state = Open` ∧ stake `S` clears the applicable floor (`S ≥ BET_MIN_STAKE_POST` for a top-level post; `S ≥ BET_MIN_STAKE_REPLY` if the entry is placed as a reply, i.e. `parent_comment_id` is set) ∧ `C.length ∈ [1, COMMENT_MAX_LENGTH]` ∧ user `Active` ∧ user not admin ∧ user has no current position in this market (i.e., zero shares on both sides) ∧ user balance ≥ S.
 - **System.** Open one Postgres transaction. Read market state and pool reserves. Compute CPMM share quantity for stake `S` at current price `p` for the chosen side. Run text and image moderation on `C`; if Track A or Track B, abort transaction (see §14 F-MOD-4). Insert comment row with `side_at_post_time` = chosen side and `parent_comment_id` (NULL for a post, set for a reply). Insert bet row with `comment_id` set and `side` = chosen side. Decrement user balance by `S`; increment pool reserves; write `dharma_ledger` row tagged `bet_stake`. Commit. The user is now committed to this side for the lifetime of this position.
 - **Response.** `{ betId, commentId, side, sharesBought, newPrice }`.
-- **Errors.** 400 `insufficient_dharma`, 400 `market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 409 `market_resolving`, 403 `banned_user`.
+- **Errors.** 400 `insufficient_dharma`, 400 `error_market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 409 `market_resolving`, 403 `banned_user`.
 - **Invariants.** INV-1, INV-3.
 - **Acceptance.** `tests/server/bets/atomicity.test.ts::happy-path-entry`.
 
@@ -296,7 +296,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 - **Pre.** User holds a non-zero position in this market on the side being sold. `market.state = Open`.
 - **System.** Single transaction. **A sell carries no comment** — it is a position unwind, not an argument, and is neither a post nor a reply. Compute Dharma return at current price. Increment user balance; decrement pool reserves; write `dharma_ledger` row tagged `bet_stake` with negative direction (or equivalently `bet_unwind` — schema decides). Position adjusts; comment and reply records are unaffected (per `B1`, INV-3) and remain in the debate as permanent record; the **Flipped / Exited marker** recomputes on next read (Exited once the position reaches zero).
 - **Response.** `{ sharesSold, dharmaReturned, newPrice }`.
-- **Errors.** 400 `position_not_held`, 400 `market_closed_at`.
+- **Errors.** 400 `position_not_held`, 400 `error_market_closed_at`.
 - **Invariants.** INV-2, INV-3 (selling does *not* delete or alter prior comments).
 - **Acceptance.** `tests/server/bets/sell.test.ts::sell-preserves-comments`.
 
@@ -311,8 +311,8 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 ### F-BET-5 — Market closed mid-bet
 
 - **Pre.** Bet submitted; before transaction commits, server clock crosses `resolution_deadline`.
-- **System.** Transaction reads market state at step 1 (per `G5`). If `Closed` or `Resolving`: 400 with `market_closed_at` timestamp. No partial commits.
-- **Response.** 400 `market_closed_at`.
+- **System.** Transaction reads market state at step 1 (per `G5`). If `Closed` or `Resolving`: 400 with `error_market_closed_at` timestamp. No partial commits.
+- **Response.** 400 `error_market_closed_at`.
 - **Invariants.** None special.
 - **Acceptance.** `tests/server/bets/race-conditions.test.ts::closed-mid-bet`.
 
@@ -320,7 +320,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 
 - **Pre.** Bet initiated before `Open → Resolving` transition; transaction not yet committed.
 - **System.** Per `G6`: in-flight bets initiated before the `Resolving` flag are allowed to commit or timeout (timeout value → number-tuning pass). Bets initiated *after* the flag return 400.
-- **Response.** Either F-BET-1/2 success path on commit, or 400 `in_flight_timeout`.
+- **Response.** Either F-BET-1/2 success path on commit, or 400 `error_in_flight_timeout`.
 - **Invariants.** INV-1, INV-3.
 - **Acceptance.** `tests/server/bets/race-conditions.test.ts::in-flight-resolving`.
 
@@ -364,7 +364,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 - **Pre.** User has a current non-zero position in the market on the side they are arguing from. `market.state = Open`. Stake clears the post floor (`BET_MIN_STAKE_POST`). Comment passes moderation Track C. (An additional argument is a new post-bet — it buys shares on the held side per F-BET-2; it is not a free comment.)
 - **System.** Per F-BET-2 (subsequent bet+comment): single transaction; moderation; insert comment row (`side_at_post_time` = held side, `parent_comment_id` NULL); insert bet row; `dharma_ledger` row; price moves.
 - **Response.** `{ betId, commentId, side }`.
-- **Errors.** 400 `insufficient_dharma`, 400 `below_post_floor`, 400 `market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 423 `comment_track_b_under_review`, 400 `opposite_side_held`.
+- **Errors.** 400 `insufficient_dharma`, 400 `below_post_floor`, 400 `error_market_closed_at`, 400 `comment_too_long`, 400 `comment_track_a_blocked`, 423 `comment_track_b_under_review`, 400 `opposite_side_held`.
 - **Invariants.** INV-1, INV-3.
 - **Acceptance.** `tests/server/comments/direct.test.ts::additional-argument-is-a-post-bet`.
 
@@ -541,7 +541,7 @@ The over-issuance pressure of §10.2 (grant + Daily Credit, no decay, no forced 
 ### F-RESOLVE-1 — Resolution event
 
 - **Pre.** `market.state = Resolving`. In-flight bet window has cleared.
-- **System.** In a single transaction: write `resolution_event` row (winning side, resolver = admin, criterion-met evidence). For each bet on the winning side, settle shares to 1 Dharma each via `payout_event` rows tagged `bet_settle` (positive). For each bet on the losing side, settle shares to 0 (`bet_settle` with `dharma_delta = 0` or `−S` per A2 form). Compute residual pool balance. Write `pool_unwind` flow to admin account. Transition market to `Resolved`. Lock comments.
+- **System.** In a single transaction: write `resolution_event` row (winning side, resolver = admin, criterion-met evidence). For each bet on the winning side, settle shares to 1 Dharma each via `payout_event` rows tagged `bet_payout` (positive). For each bet on the losing side, settle shares to 0 (`bet_payout` with `dharma_delta = 0` or `−S` per A2 form). Compute residual pool balance. Write `pool_unwind` flow to admin account. Transition market to `Resolved`. Lock comments.
 - **Response.** `{ resolutionEventId, winningSide, totalPaidOut, poolUnwindAmount }`.
 - **Invariants.** INV-2, INV-4.
 - **Acceptance.** `tests/server/resolution/happy-path.test.ts::resolution-settles-and-locks`.
@@ -585,7 +585,7 @@ On 2026-11-06, the full archive is released as a public dataset. Includes:
 - All comments — including frozen Flipped/Exited markers — *excluding* Track A hard-removed content.
 - Aggregated event timeline + the K_eff trajectory series.
 
-Format: CSV / JSON. Distribution: GitHub release at `zugzwang-foundation/experiment` plus a long-lived static URL. Removed media (Track A images) explicitly *not* released.
+Format: CSV / JSON. Distribution: GitHub release at `zugzwang-foundation/experiment` plus a long-lived static URL. Removed media (Track A images) explicitly *not* released. Released under CC-BY-4.0.
 
 ### 12.3 No in-product analytics surface
 
@@ -614,7 +614,7 @@ Per `K1` and `I4`. Auth surface is intentionally minimal in v1.
 - **Pre.** Anonymous user clicks `Sign in with Google`.
 - **System.** Direct redirect to Google OAuth 2.0. **No CAPTCHA gate** (Google's own abuse signals replace it). On callback with valid token, server matches the Google account ID against the `users` table. Match found → issue session cookie, log session row. No match → route to F-AUTH-3 (auto-generate pseudonym) before issuing session.
 - **Response.** Authenticated session.
-- **Errors.** 400 `oauth_callback_error` (Google declined or returned malformed token), 500 `session_persistence_failed`.
+- **Errors.** 400 `error_oauth_callback_error` (Google declined or returned malformed token), 500 `error_session_persistence_failed`.
 - **Acceptance.** `tests/server/auth/google.test.ts::google-no-captcha`, `tests/server/auth/google.test.ts::existing-user-match`, `tests/server/auth/google.test.ts::new-user-routes-to-pseudonym`.
 
 ### F-AUTH-2 — Email + OTP
@@ -622,7 +622,7 @@ Per `K1` and `I4`. Auth surface is intentionally minimal in v1.
 - **Pre.** Anonymous user submits email address and completes the Cloudflare Turnstile challenge (invisible for most users; falls back to a visible non-puzzle widget if the user's signals are atypical).
 - **System.** Server validates the Turnstile token via Cloudflare's siteverify endpoint before any further action. On valid token, generate a 6-digit OTP, persist with TTL `OTP_TTL_MIN` and a hashed reference to the email, send via Resend. Rate-limit: per-email OTP requests capped per hour (number-tuning pass), per-IP burst capped per minute. User submits the OTP within the TTL. On valid OTP, server matches the email against the `users` table. Match found → issue session cookie. No match → route to F-AUTH-3 (auto-generate pseudonym) before issuing session.
 - **Response.** Authenticated session.
-- **Errors.** 400 `turnstile_failed` (CAPTCHA validation failed), 400 `otp_invalid` (wrong code), 410 `otp_expired` (TTL exceeded), 429 `otp_rate_limited` (per-email or per-IP burst exceeded), 500 `email_delivery_failed` (Resend bounce / vendor outage).
+- **Errors.** 400 `error_turnstile_failed` (CAPTCHA validation failed), 400 `error_otp_invalid` (wrong code), 410 `error_otp_expired` (TTL exceeded), 429 `error_otp_rate_limited` (per-email or per-IP burst exceeded), 500 `error_email_delivery_failed` (Resend bounce / vendor outage).
 - **Acceptance.** `tests/server/auth/otp.test.ts::turnstile-required`, `tests/server/auth/otp.test.ts::otp-ttl-respected`, `tests/server/auth/otp.test.ts::otp-rate-limited`.
 
 ### F-AUTH-3 — Pseudonym + PFP (auto-assigned, permanent)
@@ -636,7 +636,7 @@ Every user is assigned an identity pair at signup completion: a **pseudonym** of
   3. Pseudonym + PFP render on the F-AUTH-4 ToS / acceptance screen alongside a label clarifying they are permanent. User cannot regenerate, swap, edit, or refresh.
   4. PFP is served from an object store (Cloudflare R2 or equivalent) via CDN at a stable URL derived from `pfp_filename`. No runtime image generation.
 - **Response.** New `users` row written. Routed to F-AUTH-4 (ToS gate).
-- **Errors.** 503 `identity_pool_exhausted` (pool drained — see *Asset pool exhaustion* below). User-facing message: "Signup temporarily unavailable; please try again shortly." Operational alarm fires; admin extends the pool.
+- **Errors.** 503 `error_identity_pool_exhausted` (pool drained — see *Asset pool exhaustion* below). User-facing message: "Signup temporarily unavailable; please try again shortly." Operational alarm fires; admin extends the pool.
 - **Acceptance.** `tests/server/auth/pseudonym.test.ts::auto-assigned-permanent`, `tests/server/auth/pseudonym.test.ts::pfp-coherent-with-name`, `tests/server/auth/pseudonym.test.ts::pool-fifo-selection`, `tests/server/auth/pseudonym.test.ts::pool-fifo-no-double-assignment-under-concurrency`, `tests/server/auth/pseudonym.test.ts::pool-exhaustion-503`.
 
 #### Asset pipeline (pre-launch, deferred to ADR-0011)
@@ -663,7 +663,7 @@ Locked at **50,000 identities** for v1. Composition (illustrative; final word li
 
 If signups exhaust the 50,000-tuple pool:
 - **First-line response (operational, not v1 build).** The admin extends the pool by re-running the generation pipeline with a wider word-list or higher number range. Hours of wall-clock; no spec change.
-- **In-flight behaviour during exhaustion.** F-AUTH-3 returns 503 `identity_pool_exhausted` until the pool is replenished. The user-facing message is non-alarming and re-tryable.
+- **In-flight behaviour during exhaustion.** F-AUTH-3 returns 503 `error_identity_pool_exhausted` until the pool is replenished. The user-facing message is non-alarming and re-tryable.
 - **Operational alarm.** When `identity_pool` unassigned count drops below 5% of total, an admin alert fires. Lead time to extend the pool before exhaustion.
 
 #### Permanence and `H2` scrub interaction
@@ -704,7 +704,7 @@ The pseudonym and PFP are permanent. On `H2` scrub:
 
 - **Response.** Session cookie issued. User redirected to the post-signup landing page (market list / debate view).
 
-- **Errors.** 400 `tos_acceptance_required` (Continue pressed without checkbox ticked — should be UI-prevented but server-side check exists). 410 `tos_version_changed` (ToS document hash changed between page load and Continue press — re-renders the screen with the new version, defensive against deploy-during-signup races).
+- **Errors.** 400 `error_tos_acceptance_required` (Continue pressed without checkbox ticked — should be UI-prevented but server-side check exists). 410 `error_tos_version_changed` (ToS document hash changed between page load and Continue press — re-renders the screen with the new version, defensive against deploy-during-signup races).
 
 - **Acceptance.** `tests/server/auth/tos.test.ts::warning-rendered-emphasised`, `tests/server/auth/tos.test.ts::pseudonym-and-pfp-shown-as-permanent`, `tests/server/auth/tos.test.ts::tos-and-privacy-rendered-inline`, `tests/server/auth/tos.test.ts::checkbox-required-before-continue`, `tests/server/auth/tos.test.ts::acceptance-evidence-recorded`, `tests/server/auth/tos.test.ts::cancel-leaves-tos-null`, `tests/server/auth/tos.test.ts::reentry-routes-back-to-tos-without-pool-reconsumption`, `tests/server/auth/tos.test.ts::tab-race-idempotent-acceptance`, `tests/server/auth/tos.test.ts::stale-unaccepted-users-swept-after-30d`.
 
@@ -719,12 +719,12 @@ The auth method is a static password held in env var `ADMIN_PASSWORD`. There is 
 - **Pre.** Admin navigates directly to `/admin/login` (URL not linked from any public surface; `robots.txt` Disallow `/admin/`; `<meta name="robots" content="noindex,nofollow">` on the `/admin/login` page). Discovered out-of-band; no public navigation entry point.
 - **System.**
   1. `/admin/login` renders a single password field and a Submit button. No email field. No third-party-OAuth button.
-  2. On submit, server applies the per-IP rate limit `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` (per §16.1). If the limit is exceeded, return 401 `admin_login_invalid` (same response as wrong password — see Errors).
+  2. On submit, server applies the per-IP rate limit `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` (per §16.1). If the limit is exceeded, return 401 `error_admin_login_invalid` (same response as wrong password — see Errors).
   3. Server compares the submitted password against env var `ADMIN_PASSWORD` using a constant-time comparison primitive (e.g., Node's `crypto.timingSafeEqual` over equal-length byte buffers). The comparison runs on every request regardless of input shape — no early-return paths that would create a timing oracle.
   4. **Match:** server runs `DELETE FROM admin_sessions; INSERT INTO admin_sessions (session_id, issued_at, last_seen_at) VALUES ($1, NOW(), NOW())` in a single transaction (the SERIALIZABLE isolation level per §16 `K3` applies; D2 ratification per SPEC.2 §9). Server sets the admin-session cookie `zugzwang_admin_session` (HTTP-only, Secure, SameSite=Lax, Path=/admin, indefinite Max-Age per §13 preamble + ADR-0010) and redirects to `/admin` (the Control Centre hub).
-  5. **No match (or rate-limit exceeded):** server rejects with 401 `admin_login_invalid`. No row written to `admin_sessions`. No partial state. The error page returns identical content and identical timing whether the cause was wrong password or rate-limit-exceeded — no information leak about which condition fired.
+  5. **No match (or rate-limit exceeded):** server rejects with 401 `error_admin_login_invalid`. No row written to `admin_sessions`. No partial state. The error page returns identical content and identical timing whether the cause was wrong password or rate-limit-exceeded — no information leak about which condition fired.
 - **Response.** Admin session established; redirect to `/admin`.
-- **Errors.** 401 `admin_login_invalid` (single error code for wrong password and rate-limit-exceeded; no information leak); 500 `admin_session_persistence_failed` (DB transaction failed).
+- **Errors.** 401 `error_admin_login_invalid` (single error code for wrong password and rate-limit-exceeded; no information leak); 500 `error_admin_session_persistence_failed` (DB transaction failed).
 - **Auth-flow boundaries** (unchanged from prior version — structural-separation rule is auth-method-agnostic):
   - Admin sign-in does **not** create or touch a `users` row. The admin cannot accidentally end up with a participant identity.
   - Admin session does **not** grant participant powers. The participant write paths (F-BET-1, F-COMMENT-1, F-COMMENT-2, etc.) require a participant session and a `user_id` — admin has neither.
@@ -956,7 +956,7 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 | Trigger | User sees | System does |
 |---|---|---|
 | Insufficient Dharma (pre-submit) | Form-level error with current balance + required stake. | No transaction opened. |
-| Market closed mid-bet | "Market closed at HH:MM:SS UTC". | 400 `market_closed_at`; transaction aborted. |
+| Market closed mid-bet | "Market closed at HH:MM:SS UTC". | 400 `error_market_closed_at`; transaction aborted. |
 | Comment auto-banned (Track A) | Entry bet rejected; comment-revision UI prompts retry without indicating *which* category fired. | F-MOD-4 atomicity; mod-action row written; user banned. |
 | Comment held in admin review (Track B) | "Comment under review" surface on user's *own* profile only. | Hidden from public; queue row written. |
 | User banned mid-session | 403 with notice; session cookie remains but write paths reject. | F-MOD-5. |
@@ -1291,6 +1291,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-05-08 | 1.8.0-draft | §0, §17, §20 | ID schema (UUIDv7) locked by ADR-0016. §0 version bumped to 1.8.0-draft; last-updated bumped to 2026-05-08. §17 acceptance-test catalogue adds five new `id::*` rows covering: (1) `id::uuidv7-monotonic-within-millisecond` — two PK insertions in the same millisecond from the **same backend session** produce monotonically-increasing UUIDs (the rand_a counter increments). The test verifies *within-backend* monotonicity only; cross-backend ordering across the Supavisor connection pool is explicitly NOT tested per ADR-0016 §Consequences/Negative — application code MUST NOT assume `id(N+1) > id(N)` across requests; (2) `id::uuidv7-time-prefix-extractable` — the 48-bit Unix-millisecond timestamp prefix is extractable via Postgres 18's `uuid_extract_timestamp()` (or the userspace equivalent on PG 17) and matches the row's `created_at` to within milliseconds for typical inserts; (3) `id::uuidv7-rfc9562-compliant` — version field = `0b0111`, variant field = `0b10`, layout matches RFC 9562 §5.7; (4) `id::uuidv7-no-collision-under-load` — 100K UUIDs generated in a tight loop produce zero collisions; (5) `id::raw-uuid-not-in-participant-urls` — every URL exposed by a participant-facing route handler is checked against a UUID regex and asserted-not-matching (per ADR-0016 §6 URL-exposure rule consuming ADR-0011's pseudonym contract — pseudonyms are the URL-exposed identifier on every user-routed page; raw UUIDs allowed only on `/admin/*` routes per F-AUTH-ADMIN structural separation per ADR-0010 and in the 2026-11-06 dataset release per §12.2). No §5 / §7 / §8 / §13 / §14 amendments — ADR-0016 mints implementation specifics for the universal PK type, not new product behaviour; INV-1 / INV-2 / INV-3 / INV-4 mechanisms are unchanged. SPEC.2 back-pressure absorbed in same commit: §0 status line + §0.1 change-log row + §5 stub one-line addition (ADR-0016 added to "Drizzle DDL substance lives in" tail naming the universal `uuid().primaryKey().default(sql\`uuidv7()\`)` declaration discipline + the four Better Auth column-type overrides + `identity_pool` synthetic-PK + UNIQUE-natural-triple) + §17 substantive stub absorption (full rewrite covering substrate, Drizzle column declaration, Better Auth full override, `identity_pool` PK shape, URL-exposure rule, per-backend monotonicity caveat, single-source-of-truth file map) + §23 ADR Index status flip for ADR-0016. SPEC.17 is the last ADR before SPEC.8 fresh-session review. | ADR-0016 ratifies the ID-schema contract for the Zugzwang experiment phase: UUIDv7 (RFC 9562) as the universal primary-key type across the SPEC.2 §5 inventory; userspace `public.uuidv7()` PL/pgSQL function shipped as a hand-written raw SQL migration in the Drizzle migration set (forward-compatible with PG 18's native `pg_catalog.uuidv7()` via one-statement function drop at cutover — function-name choice locks the cheap-migration path); Drizzle column declaration `uuid().primaryKey().default(sql\`uuidv7()\`)` schema-wide (DB-side default emits in DDL so raw-SQL inserts get a correct PK without app-layer participation; Drizzle's `$defaultFn` rejected as invisible to drizzle-kit-emitted DDL); full override of Better Auth's `generateId` to UUIDv7 across all four Better Auth tables (`user`, `session`, `account`, `verification`) for schema uniformity (partial and full carve-out alternatives rejected on FK-uniformity grounds); synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` for `identity_pool` (composite natural-triple PK rejected for negligible 800 kB storage saving at schema-uniformity cost); raw UUIDs forbidden on participant-facing URLs (pseudonyms only per ADR-0011), allowed on admin-only routes (per F-AUTH-ADMIN structural separation per ADR-0010), allowed in the 2026-11-06 dataset release (per §12.2). Per-backend monotonicity caveat documented but not relied on across the Supavisor connection pool. PG 18 native `uuidv7()` rejected as v1 substrate because Supabase has not shipped PG 18 (latest `supabase/postgres:17.6.1.107-x-6-x86`, 29 Apr 2026; original Q1 2026 target slipped per discussion #42681); `pg_uuidv7` C extension rejected because not on Supabase's allowlist on any plan tier (three open requests since March 2024 unactioned); kjmph gist's pure-SQL variant adopted because endorsed by Supabase staff in discussion #9500 as the recommended PL/pgSQL workaround on PG 17. SCAFFOLD.2 (Postgres + Drizzle + event-sourced schema) is the implementation task that consumes ADR-0016. | ADR-0016 |
 | 2026-05-08 | 1.8.0 | §0, §20 | Anchor lock in PRECURSOR.2. Version field bumped `1.8.0-draft` → `1.8.0` (drop `-draft` suffix; this minor is now the locked anchor). Status field updated to **Locked anchor** with PRECURSOR.4 promotion path named (writer/reviewer fresh-session review per CLAUDE.md). New §0 `Anchor lock:` metadata line declares: anchor effective 2026-05-08; supersedes prior working copies; planned revision post-SPEC.13 (`design.md`) finalization (next bump: `1.9.0-draft`); v1.0 promotion at PRECURSOR.4. No substantive content change. | Establish a single named anchor for downstream chats (PRECURSOR.2/3/4/5 and β-phase SCAFFOLD.*) so chats no longer ambiguate between v1.5.0-draft mounts and v1.8.0-draft uploads, and so the v1.0 promotion path through PRECURSOR.4 stays unambiguous. | — |
 | 2026-06-01 | 1.9.0-draft | §0, §2, §3, §5, §6, §7, §8, §9, §10, §12.2, §13, §14, §16.1, §16.3, §16.4, §17, §18, §19, §21 (new), Appendix B | **SYNC.7 ADR-fold + scope-update pass.** Folds ADR-0017 (ranking model), ADR-0018 (Dharma issuance + two-floor minimum bet), ADR-0019 (RLS out of scope); resolves drift signal D11; folds six TYPE-2 product surfaces. **§0** version → 1.9.0-draft, last-updated → 2026-06-01 (D11), status + related-contracts updated. **§2** glossary: Bet/Comment/Reply reframed as reply-as-bet; Daily Allowance → Daily Credit; In/Flipped/Exited → Flipped/Exited marker (the "In" state dropped — same-side default renders no marker); Friendly-fire entry removed; Ranking function → Ranking model (ADR-0017); added Post/Reply floor, Support/Counter, Top/ranking-mode. **§3** G5 generalised: commentary mandatory at every bet. **§5** INV-1 generalised to bind every bet (post + reply); INV-3 marker rename. **§6.2** marker rename. **§7** every buy is a commented bet — F-BET-1 (post/reply floors, `parent_comment_id`), F-BET-2 now requires a comment, F-BET-3 sell stays comment-free. **§8** every comment rides a bet; F-COMMENT-1 = post-bet, F-COMMENT-2 = Support/Counter reply-bet (reply floor 50), F-COMMENT-5 = no-stake-no-voice; **F-COMMENT-6/7/8 (friendly-fire cast/clear/freeze) removed entirely**; rate-limit posture = bet posture, reply-bet class deferred to SPEC.2 §11. **§9** rewritten as the ADR-0017 ranking model: **Top** multi-lane dominance default (traction / stake / split lanes, ratio-to-#2 + activity floor, graceful degradation) + filter modes (Most Debated, Highest Stakes, Contested, Newest; Surging deferred); reply ordering stake-descending within side, earlier-wins tiebreak, two-slot Support/Counter render; Support/Counter as read-time aggregates (no `↑N↓M` vote); marker enum `{Flipped, Exited, none}`; no anti-capital logic; `stake_at_post_time` dropped. **§10** ADR-0018: equal initial grant; **Daily Credit** (flat, non-escalating, paid only on a commented-bet day); over-issuance recorded as central risk; new §10.9 two-floor minimum bet (post floor ranged, reply floor 50 pinned); new §10.10 reserved-but-deferred in-window sink. **§12.2** frozen Flipped/Exited markers; `friendly_fire_events` dropped from release. **§13** hijacked-session list drops friendly-fire votes. **§14** ban: Daily Credit rename. **§16.1** constants: `DAILY_CREDIT_DHARMA`, split `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY` (50), `REPLY_DEPTH_MAX` → ADR-0017, rate-limit constants reshaped (friendly-fire removed). **§16.3** new ADR-0019 server-only / RLS-out-of-scope posture bullet. **§16.4** `friendly_fire_events` audit row removed; append-only note updated. **§17** removed all friendly-fire + friendly-fire-freeze rows; repointed comment/reply rows; added ~24 ADR-0017 ranking + ADR-0018 economy rows. **§18** ranking out-of-scope reworded (modes IN scope; filters / Best / shuffle / weighted-average / free-vote / Surging OUT); ADR-0018 rejects (escalating credit, large referral grants); About/FAQ deferral superseded by §21.6 feature-guide. **§19** Q13 superseded by ADR-0017, Q14 obsolete (friendly-fire gone), Q8 superseded by §21.6, Q4 folds issuance + ranking constants + pinned reply floor, new Q19 (deferred sink). **§21 (new)** Ancillary Product Surfaces: visitor counter, download-post-JPEG, download-debate-`.md`, historical-debate showcase, radio/music widget, feature-guide page — all read-only / render-only TYPE-2 surfaces, zero engine/ledger/`n` contact, with editorial + lawyer flags carried from SYNC.3.5 refinement logs 01/03/04/06/07/08. **Appendix B** constant renames mirror §16.1. **Section structure:** §21 appended after §20 to avoid renumbering §0–§20 (which would corrupt point-in-time §-citations in historical change-log rows + the few forward refs to §18/§19); change-log rows dated before 2026-06-01 retain the section numbering in effect at the time. | SYNC.7: bring SPEC.1 into consistency with ADR-0017 / ADR-0018 / ADR-0019, SPEC.2 v0.4.0-draft (read-models §5.4, server-only §18.5, ADR Index §22), and the six confirmed TYPE-2 product surfaces; resolve D11. v1.0 promotion deferred to PRECURSOR.4 fresh-session review. | ADR-0017, ADR-0018, ADR-0019 |
+| 2026-06-03 | 1.0.0 | §0, §2, §3, §7, §8, §11, §12.2, §13, §16, §20 | **PRECURSOR.4 v1.0 lock.** Promotes SPEC.1 1.9.0-draft → 1.0.0 (paired with SPEC.2 → 1.0.0). **§0** version → 1.0.0, last-updated → 2026-06-03. **§2** glossary `dharma_ledger.tag` → `dharma_ledger.entry_type` (3 rows) to match the built `dharma_entry_type` enum column. **§3** Dharma fixed-enum: `source` tag → `entry_type`; `bet_settle` → `bet_payout`; `uncollectable` added (now the 9-value schema set). **§11** resolution payout tag `bet_settle` → `bet_payout` (verb "settle" retained). **§12.2** public-dataset release licensed **CC-BY-4.0**. **Error-code prefix sweep:** 23 backtick error-code references across §7 / §8 / §13 / §16 error blocks aligned to the §15.4 catalogue's `error_`-prefixed form (14 distinct codes); 9 SPEC.1-local codes absent from §15.4 left unchanged (catalogue-completeness flagged for the §15 forward-deliverable); historical §20 change-log rows untouched. | PRECURSOR.4 fresh-session lock review: normalize SPEC.1↔schema naming (`entry_type`, `bet_payout` / `uncollectable`), pin the public-dataset licence to CC-BY-4.0, align error-code references to the §15.4 38-code catalogue. | — |
 
 ---
 
