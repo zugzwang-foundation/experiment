@@ -24,7 +24,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 **Critical paths** — touching any triggers the full ritual (writer/reviewer §5.6 · invariant gate §5.7 · same-commit ADR §5.12 · pre-PR self-audit §5.10 · subagent review §5.11):
 
 - Greenfield (not built): `src/server/{bets,comments,dharma,resolution}/`
-- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`
+- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`, `src/server/cpmm/`
 - Schema / migrations: `src/db/schema/`, `drizzle/migrations/`
 
 *(RLS / `supabase/migrations/` out of scope — ADR-0019.)*
@@ -65,7 +65,7 @@ SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`; the trigger
 
 **Refuse to weaken any invariant** — "just for testing" / "temporary admin override" / "while we clean up" included. State it, name the violation, propose an alternative, stop.
 
-**Architecture & money (correctness landmines).** The system is **event-sourced**: every state change is an append to `events`, projected into read models, idempotent by `event_id`, replayable (ADR-0005). **Never mutate state in place.** All monetary/Dharma math is `NUMERIC(38,18)` — **never JS floats** for balances, prices, or shares; there is no decimal library yet, so keep arithmetic exact and server-side. Handler failure posture: rate-limit fails **open**, idempotency fails **closed**, moderation fails **closed** on a terminal error (ADR-0014/0015).
+**Architecture & money (correctness landmines).** The system is **event-sourced**: every state change is an append to `events`, projected into read models, idempotent by `event_id`, replayable (ADR-0005). **Never mutate state in place.** All monetary/Dharma math is `NUMERIC(38,18)` — **never JS floats** for balances, prices, or shares; app-side decimal arithmetic is decimal.js 10.6.0 (literal pin) via the CpmmDecimal constructor exported from `src/server/cpmm/decimal.ts` (precision 50 — ENGINE.5 reuses it); keep arithmetic exact and server-side. Handler failure posture: rate-limit fails **open**, idempotency fails **closed**, moderation fails **closed** on a terminal error (ADR-0014/0015).
 
 ---
 
