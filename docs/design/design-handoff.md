@@ -1,14 +1,14 @@
 # Zugzwang — Design Handoff (how we deliver to Claude Code)
 
 > **Doc:** `docs/design/design-handoff.md`
-> **Status:** v0-draft · delivery contract
+> **Status:** v0.2-draft · delivery contract
 > **Phase:** experiment-phase VISUAL stratum
 >
 > **What this is.** The contract for delivering a signed-off surface from Claude Design (CD) to Claude Code (CC) for production build: what the handoff package contains, which route we use, which repo code CC builds against, the build instruction CC receives, the review ritual, the per-surface cadence, and the rule for keeping things in sync afterward.
 >
 > **What this is NOT.** It is not the produce-side — that is `design-workflow.md` (how a surface is made in CD). It is not the design *language* — that is `design-language.md`. It is not the *sequence* — that is the planner. This doc runs alongside `design-workflow.md` as the deliver-side of the same pipeline.
 >
-> **Grounding.** The handoff mechanics are distilled from the Claude Design research in PK (`Research_Report.md`, §d). The build ritual follows `CLAUDE.md` and `docs/workflows/plan-then-execute.md`; the stack references follow `AGENTS.md`.
+> **Grounding.** The handoff mechanics are distilled from the Claude Design research in PK — primary: `Research_Report_v2.md`; `Research_Report.md` (v1) §d remains valid background. The build ritual follows `CLAUDE.md` and `docs/workflows/plan-then-execute.md`; the stack references follow `AGENTS.md`.
 >
 > **Staging — read first.** Designing a surface and *building* it are separate moments. The VISUAL design bucket runs in parallel with the backend (ENGINE). Most surface builds (the UI / DEBATE tasks each surface maps to) depend on backend that may not exist yet. So a handoff **produces an approved mockup + a handoff package now**; CC **consumes it when the mapped build task is sequenced** and its backend dependencies are met. The design bucket delivers handoff packages, not finished screens.
 
@@ -18,7 +18,7 @@
 
 A handoff package is two things delivered together:
 
-1. **The CD-native handoff bundle.** Claude Design's **Export → Handoff to Claude Code** packages the design files, the design-system tokens, the component structure, and the design *intent* behind the surface — not just a screenshot. This carries the *design*.
+1. **The CD-native handoff bundle.** Claude Design's **Export → Handoff to Claude Code** packages: the design files as **standalone HTML with inline CSS/JS**, the **design tokens actually used on the canvas**, the **component structure / hierarchy**, a **README** instructing the consuming model how to interpret the designs, and the **chat log** carrying the design intent — not just a screenshot. This carries the *design*. *(The bundle's internal format is research-preview behaviour — version-sensitive, unpublished by Anthropic, and may change before GA. Verify the contents at the first real handoff.)*
 
 2. **The web-authored build brief.** A pin-point instruction to CC (§4) that the generic CD bundle cannot know: our stack, the rule to rebuild against real repo components, the monochrome/desktop/branding-deferred constraints, the plan-first requirement, which subfolders to link, the mapped build task, the invariant-visual obligations, and acceptance. web Claude authors this (prescriptive-doc discipline). This carries the *instructions and guardrails*.
 
@@ -67,6 +67,11 @@ BUILD AGAINST REAL CODE: Rebuild this surface using the real components
 in [component library] and the design tokens in globals.css. Do NOT
 reproduce the CD bundle's inline styles verbatim — map them onto our
 components and tokens.
+
+PRESERVE THE APPROVED DESIGN: Preserve design intent; do not change
+the approved design. Where mapping onto real components forces a
+deviation, surface it in the plan for review — never absorb it
+silently.
 
 CONSTRAINTS:
 - Monochrome only — implement in the monochrome token system. The brand
@@ -124,7 +129,7 @@ The **debate view** (→ DEBATE.4) is the highest-stakes surface: it renders the
 
 The design→code direction is strong; the **code→design direction is awkward** (CD does not cleanly re-absorb changed code). So:
 
-- **Do not keep iterating a surface in CD after it has been built.** Once handed off and built, visual changes happen **in code**.
+- **Do not keep iterating a surface in CD after it has been built.** Once handed off and built, visual changes happen **in code** — code-level fixes happen in CC; never go back to CD to fix code.
 - **The repo is the source of truth post-handoff.** Treat the built surface as canonical.
 - **If a genuine fresh visual exploration is needed**, feed screenshots of the *live coded* surface back into CD for a new exploration, then re-hand-off — rather than diverging an old CD project from the shipped code.
 - **Keep the linked subfolders current** so any later CD session extracts from the real, evolving components — not a stale snapshot.
@@ -139,4 +144,8 @@ The design→code direction is strong; the **code→design direction is awkward*
 
 ---
 
-*End design-handoff v0-draft. Handoff mechanics from `Research_Report.md` §d (verify CD route/limit specifics if behaviour shifts); build ritual per `CLAUDE.md` + `plan-then-execute.md`; stack per `AGENTS.md`. The §3 production subfolders are distinct from the CD-seed kit in `design-workflow.md` §7.*
+> **Changelog.**
+> **v0.2-draft (2026-06-04):** §1 bundle contents specified per current behaviour (standalone HTML + inline CSS/JS, on-canvas tokens, component structure, README, chat log) and flagged version-sensitive; §4 build brief gains the **PRESERVE THE APPROVED DESIGN** instruction (implement, don't redesign; deviations surfaced in the plan); §7 sharpened (code fixes in CC, never back in CD); grounding → `Research_Report_v2.md`.
+> **v0-draft:** initial authoring (visual-backbone thread).
+
+*End design-handoff v0.2-draft. Handoff mechanics from `Research_Report_v2.md` (verify CD route/bundle specifics if behaviour shifts); build ritual per `CLAUDE.md` + `plan-then-execute.md`; stack per `AGENTS.md`. The §3 production subfolders are distinct from the CD-seed kit in `design-workflow.md` §7.*

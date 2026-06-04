@@ -1,7 +1,7 @@
 # Zugzwang — Design Language (high-fidelity monochrome)
 
 > **Doc:** `docs/design/design-language.md`
-> **Status:** v0-draft · precursor · living document
+> **Status:** v0.2-draft · precursor · living document
 > **Phase:** experiment-phase VISUAL stratum
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
@@ -11,7 +11,7 @@
 >
 > **Division of labour.** This document carries *vocabulary and constraints* — token *names* and their semantic roles, the primitive list, the rules that must hold. It does **not** carry *values*. Exact greys, type family, and spacing/radius/elevation/motion scales are designed by the operator in Claude Design. The token tables here are intentionally empty: locked names, blank values.
 >
-> **Grounding.** Constraints and conventions trace to SPEC.1 (§6 lifecycles · §7 bet flow · §9 debate view · §11 invariants), SPEC.2 (§14 invariant contract), and ADR-0017 (ranking). Spec IDs are cited as anchors; the rules are stated in plain design terms.
+> **Grounding.** Constraints and conventions trace to SPEC.1 (§6 lifecycles · §7 bet flow · §9 debate view · §11 invariants), SPEC.2 (§14 invariant contract), and ADR-0017 (ranking). Spec IDs are cited as anchors; the rules are stated in plain design terms. The house-style and exactness constraints (§1.9–§1.10) and the state-completeness rules (§4.9–§4.10) trace to the Claude Design high-fidelity research (`Research_Report_v2.md`).
 >
 > **Living.** The primitive vocabulary (§3) grows additively as each surface is designed, per the placeholder convention in the planner. Additions never silently rewrite a locked constraint (§1) or a state-shape rule (§4); those change only by explicit decision.
 
@@ -29,7 +29,7 @@ Every Claude Design session and every Claude Code handoff carries these. Non-neg
    - **Support / YES → black** *(default — see the flagged choice at the end of this section)*
    - **Counter / NO → white**
 
-   This binding is semantic and permanent. It is the visual form of the thesis: every market has two opposed sides, and the design never lets you forget which side you're reading. The exact *rendering* (filled vs. outline, inverted panels, badge treatment) is a high-fidelity decision made in Claude Design at DESIGN.1; the *binding* of side → pole is locked here.
+   This binding is semantic and permanent. It is the visual form of the thesis: every market has two opposed sides, and the design never lets you forget which side you're reading. The exact *rendering* (filled vs. outline, inverted panels, badge treatment) is a high-fidelity decision made in Claude Design at the **look-anchor slot (Slot 1 / tracker DESIGN.3)**; the *binding* of side → pole is locked here.
 
 4. **Grey is the default — and the future-colour placeholder.** Everything that is not a side — surfaces, borders, text hierarchy, structure, disabled states — lives on a neutral grey ramp. The grey ramp does double duty: it is the working neutral palette now, **and** it is the slot the brand accent fills later. (See §2.1 and §7.)
 
@@ -44,6 +44,16 @@ Every Claude Design session and every Claude Code handoff carries these. Non-neg
    - **INV-2 — no Dharma overdraft.** The live balance is visible wherever a stake is committed; the two bet floors are enforced at the input.
    - **INV-3 — a comment's side is frozen at post-time.** The YES/NO badge on a post never changes, even if its author later flips or exits.
    - **INV-4 — resolved markets are frozen.** Resolved / voided surfaces read as permanently locked, not editable.
+
+9. **The Claude Design house style is banned, by name.** Claude Design's underlying model carries a default "house style" that surfaces whenever context is thin. Every element of it is banned, each paired with its neutral replacement:
+   - warm / cream / parchment ground → **white or near-white, true-neutral ground**
+   - serif display type → **a single neutral sans-serif family** carries display *and* body this phase; hierarchy comes from weight and size, never from family changes (the brand pass may revisit — §7)
+   - terracotta or any warm accent → **no accent at all** (the accent is deferred and applied in code — constraint 5)
+   - warm-tinted greys → **true-neutral greys**, zero warm cast, across the entire ramp
+   - large border radii → **small-or-zero radius**, with **hairline (1px) borders** carrying separation
+   Where elevation/shadow is used, it is neutral grey — never warm-tinted (§2.3). If any of these house-style elements appears in a mockup, it is wrong, the same way colour is wrong (constraint 6).
+
+10. **Specs and prompts speak in exact values, never adjectives.** Aesthetic adjectives — "modern", "clean", "minimal", "professional", "sleek" — are banned from this document, from the constraints block, and from every Claude Design prompt. The model resolves such adjectives against its own priors, and they can silently override explicit specs (e.g. "modern" re-rounding corners that were specified square). Wherever a value is stated, it is exact — a hex, a px, a named family, a count. Tokens not yet designed stay **explicitly blank** (per the division of labour above) rather than vaguely described.
 
 > **One flagged choice — confirm or flip.** I defaulted **Support/YES = black, Counter/NO = white**. There is no canonical reason it can't be the reverse. If you want NO = black, say so and I flip the binding everywhere.
 
@@ -61,7 +71,7 @@ Colour carries exactly three roles. Only the **side** role has locked values (bl
 |---|---|---|---|
 | Side — Support/YES | `color.side.support` | **black (locked)** | One pole. Permanent, semantic. |
 | Side — Counter/NO | `color.side.counter` | **white (locked)** | The other pole. Permanent, semantic. |
-| Neutral ramp | `color.neutral.0 … color.neutral.N` | *(blank — CD)* | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. |
+| Neutral ramp | `color.neutral.0 … color.neutral.N` | *(blank — CD)* | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. True-neutral greys only — no warm cast (§1.9). |
 | Accent | `color.accent.*` | *(deferred — CC)* | One brand accent. Applied in code at the brand pass, into a defined slice of the neutral ramp. Never used in CD. |
 
 *The number of neutral steps, their exact greys, and which steps the accent later replaces are designed in CD / decided at the brand pass.*
@@ -76,13 +86,15 @@ Colour carries exactly three roles. Only the **side** role has locked values (bl
 | Scale | `type.scale.*` | *(blank — CD)* | |
 | Weights | `type.weight.*` | *(blank — CD)* | |
 
+*This phase, `type.family.display` and `type.family.body` resolve to **one neutral sans-serif family** (§1.9) — hierarchy is carried by weight and size contrast, not by switching families. Which family is a CD decision; serif display faces are banned as house style; the brand pass may revisit families (§7).*
+
 ### §2.3 Spacing · radius · elevation · motion
 
 | System | Token | Value | Notes |
 |---|---|---|---|
 | Spacing scale | `space.*` | *(blank — CD)* | |
-| Radius scale | `radius.*` | *(blank — CD)* | |
-| Elevation / shadow | `elevation.*` | *(blank — CD)* | Monochrome — shadow as grey, never colour. |
+| Radius scale | `radius.*` | *(blank — CD)* | Small or zero (§1.9). |
+| Elevation / shadow | `elevation.*` | *(blank — CD)* | Monochrome — shadow as true-neutral grey, never colour, never warm-tinted (§1.9). |
 | Motion | `motion.duration.*`, `motion.ease.*` | *(blank — CD)* | Motion polish is a later pass (§7); names reserved now. |
 
 ### §2.4 Breakpoints
@@ -176,6 +188,8 @@ The visual rules that MUST hold identically on every surface. Thesis-load-bearin
 6. **Resolved is read-only.** Resolved / voided / frozen markets render as permanently locked — no bet, no comment affordances (INV-4).
 7. **Moderation is invisible to the public.** Track-B (queued) comments are hidden from anonymous and non-admin users; an authenticated admin sees them inline with a pending-review marker; the author sees their own on their profile. (Admin's full visual language is a later pass — §7.)
 8. **Balance and floors are honest.** Where a stake is committed, the live Dharma balance and the applicable floor are visible; the input cannot submit below the floor or above the balance (INV-2).
+9. **Interactive states are part of the primitive.** Every interactive primitive — buttons, inputs, tabs, category chips, cards-as-links, the buy/sell panel controls — defines **hover · focus · active · disabled** on the neutral ramp, monochrome only, with a *visible* focus treatment. These states are designed in Claude Design as part of the primitive, not improvised at build time.
+10. **Surface states ship with the surface.** Each surface's **loading, empty, and error** shapes are part of its design and are rendered before handoff — never left for the build to invent. (The empty-side CTA in §3.1 is the debate-view instance of this rule.)
 
 ---
 
@@ -234,4 +248,8 @@ Scheduled, not excluded. These run after the five monochrome surfaces are design
 
 ---
 
-*End design-language v0-draft. Values designed in Claude Design; derived into `design.md` at DESIGN.8. Living vocabulary — §3 grows additively; §1 and §4 change only by explicit decision.*
+> **Changelog.**
+> **v0.2-draft (2026-06-04):** added §1.9 (Claude Design house style banned by name, each element paired with its neutral replacement) and §1.10 (exact values, never adjectives — vague-descriptor specs banned); added §4.9 (interactive states are part of the primitive) and §4.10 (loading/empty/error ship with the surface); propagated §1.9 cross-notes into §2.1 (true-neutral ramp), §2.2 (one neutral sans family this phase), §2.3 (radius small-or-zero; neutral shadows); clarified §1.3's rendering-decision anchor from "DESIGN.1" to "the look-anchor slot (Slot 1 / tracker DESIGN.3)"; grounding line now cites `Research_Report_v2.md`. Source: Claude Design high-fidelity research, 2026-06-04.
+> **v0-draft:** initial authoring (visual-backbone thread).
+
+*End design-language v0.2-draft. Values designed in Claude Design; derived into `design.md` at DESIGN.8. Living vocabulary — §3 grows additively; §1 and §4 change only by explicit decision.*
