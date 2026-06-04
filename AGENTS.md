@@ -24,7 +24,7 @@
 - **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
 - **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`.
 - **Build-script approval:** `package.json` → `pnpm.onlyBuiltDependencies` (`esbuild`, `lefthook`, `sharp`). *(Not a `pnpm-workspace.yaml` allow-list.)*
-- **Not installed yet:** Playwright / any E2E runner; a decimal math library (`decimal.js`/`big.js`); `commitlint`.
+- **Not installed yet:** Playwright / any E2E runner; `commitlint`.
 
 ---
 
