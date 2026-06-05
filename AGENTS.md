@@ -22,7 +22,7 @@
 - **Moderation:** OpenAI omni-moderation (`openai 6.39`).
 - **Email:** Resend `6.12`. **Canonical JSON:** `canonicalize 3.0`. **IDs:** `uuid 11`. **Validation:** `zod 3.25`.
 - **Observability:** Sentry (`@sentry/nextjs 10.53`) + PostHog (`posthog-js 1.376`, `posthog-node 5.35`). Two-vendor. **No Axiom.**
-- **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`.
+- **Tooling:** `pnpm 10.33.2` (the `packageManager` field), Biome `2.4.13`, Lefthook `2.1.6`, `just`, `tsx 4.22`, Vitest `3`, fast-check `4.8.0`.
 - **Build-script approval:** `package.json` → `pnpm.onlyBuiltDependencies` (`esbuild`, `lefthook`, `sharp`). *(Not a `pnpm-workspace.yaml` allow-list.)*
 - **Not installed yet:** Playwright / any E2E runner; `commitlint`.
 
@@ -205,14 +205,14 @@ tests/
 ├── integration/   7 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock)
 ├── invariants/    I-APPEND-ONLY-001.<slug>.spec.ts   (only this one exists so far)
 ├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. Only `I-APPEND-ONLY-001` exists; INV-1/2/3 canonical tests are written as their modules land (enforcement currently lives in `tests/db/triggers/` + the schema + the session-gate).
 - **`_probe-*.test.ts`** = vendor-contract **regression guards** (e.g. `_probe-openai-omni-shape`, auth probes) — they assert a third-party/library shape, distinct from TDD drivers (CLAUDE.md §5.6).
-- **Naming:** `<subject>.test.ts` (unit), `<subject>.integration.test.ts` (integration), `<area>.spec.ts` (db/invariant specs). One subject per file.
+- **Naming:** `<subject>.test.ts` (unit), `<subject>.integration.test.ts` (integration), `<area>.spec.ts` (db/invariant specs), `<area>.property.test.ts` (fast-check property suites). One subject per file.
 
 ---
 
