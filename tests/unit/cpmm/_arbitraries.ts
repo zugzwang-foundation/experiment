@@ -181,7 +181,7 @@ export const sellScenario: fc.Arbitrary<SellScenario> =
 	makeSellScenario(RESERVE_MIN);
 
 // Bare main-domain reserve pair as 18-dp strings (R-3b, CP-1 ruling 2026-06-05);
-// consumed ONLY by the prices-sum-to-1 property.
+// consumed by the prices-sum-to-1 and INV-C5 unwind-determinism properties.
 export const reservesArb: fc.Arbitrary<Reserves> =
 	reservePairUnits(RESERVE_MIN).map(reservesOf);
 
