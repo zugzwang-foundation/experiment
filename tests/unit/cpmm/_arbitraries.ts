@@ -180,6 +180,11 @@ export const buyScenario: fc.Arbitrary<BuyScenario> =
 export const sellScenario: fc.Arbitrary<SellScenario> =
 	makeSellScenario(RESERVE_MIN);
 
+// Bare main-domain reserve pair as 18-dp strings (R-3b, CP-1 ruling 2026-06-05);
+// consumed ONLY by the prices-sum-to-1 property.
+export const reservesArb: fc.Arbitrary<Reserves> =
+	reservePairUnits(RESERVE_MIN).map(reservesOf);
+
 // OQ-5 cross-consistency: the same buy/sell domain but reserves floored at 1 Đ
 // (pool total ≥ 2 Đ). Bounds the 1/total price-divergence amplification (A1) so
 // |getPrices(result.reserves)[side] − p1| ≤ 1 ulp is provable; consumed ONLY by
@@ -238,6 +243,26 @@ export const impactParityScenario: fc.Arbitrary<ImpactPair> = reservePairUnits(
 		);
 	}),
 );
+
+// Ordered stake pair (R-3a, CP-1 ruling 2026-06-05): same (reserves, side),
+// S₁ < S₂ BOTH in the main buy window [TRADE_MIN, min(1e9, 1e3·b)] (gap ≥ 1 unit;
+// sMax ≥ 1e19 ⇒ the window is non-empty). Consumed ONLY by the WEAK
+// monotone-impact assertion (impact(S₂) ≥ impact(S₁), the "always" form).
+export const orderedStakePairScenario: fc.Arbitrary<ImpactPair> =
+	reservePairUnits(RESERVE_MIN).chain((pair) =>
+		sideArb.chain((side) => {
+			const b = side === "yes" ? pair.no : pair.yes;
+			const sMax = bigMin(STAKE_ABS_MAX, b * REL_CAP);
+			return stratUnits(TRADE_MIN, sMax - BigInt(1)).chain((stake1) =>
+				stratUnits(stake1 + BigInt(1), sMax).map((stake2) => ({
+					reserves: reservesOf(pair),
+					side,
+					stake1: decimalString(stake1),
+					stake2: decimalString(stake2),
+				})),
+			);
+		}),
+	);
 
 // ─── INV-C4 solvency-sequence domain ────────────────────────────────────────
 // A market is seeded with C Đ (reserves (C, C); D = C; holdings 0/0 — the
