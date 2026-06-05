@@ -10,8 +10,8 @@
  * every generated quantity is built as a scaled `bigint` of 1e-18 units → 18-dp
  * decimal string. NO JS float (`Number`) is ever used to construct a value —
  * fast-check yields `bigint` directly (`fc.bigInt`), and all arithmetic is
- * bigint. (SEED / NUM_RUNS / maxLength are fast-check *config* integers, not
- * quantities under test.)
+ * bigint. (SEED / NUM_RUNS / maxLength / decade indices are fast-check *config*
+ * integers, not quantities under test.)
  *
  * Out-of-domain (ENGINE.2 security triage; plan carry-forward #2 / A7): the
  * sub-ULP-reserve × near-ceiling-stake corner is excluded by TEST POLICY, not
@@ -21,7 +21,12 @@
  * headroom are sized for realistic magnitudes, not the full `numericString`
  * envelope). Separately, magnitudes ≥ 1e20 Đ are impossible under the
  * 20-integer-digit regex (`/^-?\d{1,20}(?:\.\d{1,18})?$/`). Every reserve,
- * stake, and share generated below sits strictly inside that safe interior.
+ * stake, and share drawn by the SINGLE-OP scenario generators sits strictly
+ * inside that safe interior. The INV-C4 sequence harness instead resolves each
+ * op amount against live state — a buy floored at `max(1 unit, b·f)` (never 0),
+ * a sell capped at `floor(holdings·f) ≤ holdings` — and its drifting
+ * intermediate states are asserted ONLY under A4's exact-identities regime,
+ * never the bound-based strict/gap forms.
  */
 import fc from "fast-check";
 
@@ -77,24 +82,51 @@ const STAKE_ABS_MAX = pow10(27); // 1e9 Đ — absolute stake cap
 const REL_CAP = pow10(3); // 1e3 — relative cap factor (S ≤ 1e3·b ; s ≤ 1e3·a)
 const OQ5_RESERVE_MIN = SCALE; // 1 Đ floor ⇒ pool total ≥ 2 Đ (OQ-5)
 
+// ─── magnitude-stratified bigint draw (CP-1 review F-1, 2026-06-05) ─────────
+// fc.bigInt({min,max}) draws LINEAR-uniformly, so over a multi-decade window
+// ~90% of the mass sits in the top decade — every reserve would cluster at
+// ~1e8–1e9 Đ, every stake at the 1e3·b cap. With the fixed seed that bias is
+// permanent and collapses the plan's "multi-order-of-magnitude spans" vacuity
+// guard. stratUnits restores DECADE-uniform coverage: enumerate the decades (by
+// digit length) intersecting [min, max], pick one uniformly, then draw uniformly
+// within decade ∩ [min, max]. Constructed (never rejection-sampled); bigint-only
+// (magnitude via toString().length — never Math.log10 on a value). The SUPPORT
+// is byte-identical to fc.bigInt({min,max}); only the weighting changes — so
+// every bound-based soundness proof (ratio guard, p1 < 1 cap, material-impact
+// floor, A3 gap) is untouched. Single-decade windows degenerate to plain uniform.
+function stratUnits(min: bigint, max: bigint): fc.Arbitrary<bigint> {
+	const dMin = min.toString().length;
+	const dMax = max.toString().length;
+	if (dMin === dMax) {
+		return fc.bigInt({ min, max });
+	}
+	return fc.integer({ min: dMin, max: dMax }).chain((d) => {
+		const lo = bigMax(min, pow10(d - 1));
+		const hi = bigMin(max, pow10(d) - BigInt(1));
+		return fc.bigInt({ min: lo, max: hi });
+	});
+}
+
 // ─── the side arbitrary (lowercase per cpmm.md §13, verbatim) ───────────────
 const SIDES = ["yes", "no"] as const satisfies readonly Side[];
 const KINDS = ["buy", "sell"] as const;
 export const sideArb: fc.Arbitrary<Side> = fc.constantFrom(...SIDES);
 
 // ─── reserve-pair generator (constructed ratio guard, never rejection-sampled) ─
-// Pick a base magnitude `a` uniformly across the 11-order band, then the partner
-// `b` inside the ratio window [ceil(a / 1e4), a · 1e4] clamped into the band.
-// This guarantees BOTH reserves ∈ [reserveMin, RESERVE_MAX] AND 1e-4 ≤ a/b ≤ 1e4
-// by construction (the plan's "base magnitude + skew exponent in [−4, 4],
-// clamped"); `a ∈ [lo, hi]` always, so the dependent range is non-empty.
+// Pick a base magnitude `a` decade-uniformly (stratUnits) across the 11-order
+// band, then the partner `b` decade-uniformly inside the ratio window
+// [ceil(a / 1e4), a · 1e4] clamped into the band — realizing the plan's
+// skew-exponent span as sub-decade coverage of b/a across the full 1e-4..1e4
+// window. BOTH reserves ∈ [reserveMin, RESERVE_MAX] AND 1e-4 ≤ a/b ≤ 1e4 hold by
+// construction (stratification leaves the support unchanged); `a ∈ [lo, hi]`
+// always, so the dependent range is non-empty.
 function reservePairUnits(
 	reserveMin: bigint,
 ): fc.Arbitrary<{ yes: bigint; no: bigint }> {
-	return fc.bigInt({ min: reserveMin, max: RESERVE_MAX }).chain((a) => {
+	return stratUnits(reserveMin, RESERVE_MAX).chain((a) => {
 		const lo = bigMax(reserveMin, ceilDiv(a, RATIO_MAX));
 		const hi = bigMin(RESERVE_MAX, a * RATIO_MAX);
-		return fc.bigInt({ min: lo, max: hi }).map((b) => ({ yes: a, no: b }));
+		return stratUnits(lo, hi).map((b) => ({ yes: a, no: b }));
 	});
 }
 
@@ -120,7 +152,7 @@ function makeBuyScenario(reserveMin: bigint): fc.Arbitrary<BuyScenario> {
 		sideArb.chain((side) => {
 			const b = side === "yes" ? pair.no : pair.yes; // opposite reserve
 			const sMax = bigMin(STAKE_ABS_MAX, b * REL_CAP);
-			return fc.bigInt({ min: TRADE_MIN, max: sMax }).map((stake) => ({
+			return stratUnits(TRADE_MIN, sMax).map((stake) => ({
 				reserves: reservesOf(pair),
 				side,
 				stake: decimalString(stake),
@@ -134,7 +166,7 @@ function makeSellScenario(reserveMin: bigint): fc.Arbitrary<SellScenario> {
 	return reservePairUnits(reserveMin).chain((pair) =>
 		sideArb.chain((side) => {
 			const a = side === "yes" ? pair.yes : pair.no; // sold-side reserve
-			return fc.bigInt({ min: TRADE_MIN, max: a * REL_CAP }).map((shares) => ({
+			return stratUnits(TRADE_MIN, a * REL_CAP).map((shares) => ({
 				reserves: reservesOf(pair),
 				side,
 				shares: decimalString(shares),
@@ -167,7 +199,7 @@ export const materialBuyScenario: fc.Arbitrary<BuyScenario> = reservePairUnits(
 ).chain((pair) =>
 	sideArb.chain((side) => {
 		const b = side === "yes" ? pair.no : pair.yes;
-		return fc.bigInt({ min: b / REL_CAP, max: b * REL_CAP }).map((stake) => ({
+		return stratUnits(b / REL_CAP, b * REL_CAP).map((stake) => ({
 			reserves: reservesOf(pair),
 			side,
 			stake: decimalString(stake),
@@ -179,13 +211,11 @@ export const materialSellScenario: fc.Arbitrary<SellScenario> =
 	reservePairUnits(RESERVE_MIN).chain((pair) =>
 		sideArb.chain((side) => {
 			const a = side === "yes" ? pair.yes : pair.no;
-			return fc
-				.bigInt({ min: a / REL_CAP, max: a * REL_CAP })
-				.map((shares) => ({
-					reserves: reservesOf(pair),
-					side,
-					shares: decimalString(shares),
-				}));
+			return stratUnits(a / REL_CAP, a * REL_CAP).map((shares) => ({
+				reserves: reservesOf(pair),
+				side,
+				shares: decimalString(shares),
+			}));
 		}),
 	);
 
@@ -198,18 +228,14 @@ export const impactParityScenario: fc.Arbitrary<ImpactPair> = reservePairUnits(
 ).chain((pair) =>
 	sideArb.chain((side) => {
 		const b = side === "yes" ? pair.no : pair.yes;
-		return fc
-			.bigInt({ min: b / REL_CAP, max: (b * REL_CAP) / BigInt(2) })
-			.chain((stake1) =>
-				fc
-					.bigInt({ min: stake1 * BigInt(2), max: b * REL_CAP })
-					.map((stake2) => ({
-						reserves: reservesOf(pair),
-						side,
-						stake1: decimalString(stake1),
-						stake2: decimalString(stake2),
-					})),
-			);
+		return stratUnits(b / REL_CAP, (b * REL_CAP) / BigInt(2)).chain((stake1) =>
+			stratUnits(stake1 * BigInt(2), b * REL_CAP).map((stake2) => ({
+				reserves: reservesOf(pair),
+				side,
+				stake1: decimalString(stake1),
+				stake2: decimalString(stake2),
+			})),
+		);
 	}),
 );
 
@@ -226,15 +252,17 @@ export const impactParityScenario: fc.Arbitrary<ImpactPair> = reservePairUnits(
 //           a sell whose resolved share count is 0 (no / sub-ulp holdings).
 // Intermediate states drift outside the single-op ratio guard, so the sequence
 // asserts ONLY the exact bigint identities (+ no-throw / 18-dp shape) — never a
-// strict / gap-conditioned form (A4).
-export const seedArb: fc.Arbitrary<string> = fc
-	.bigInt({ min: RESERVE_MIN, max: RESERVE_MAX })
-	.map(decimalString);
+// strict / gap-conditioned form (A4). amountNum is decade-stratified so f spans
+// tiny fractions, not just near-1 (F-1).
+export const seedArb: fc.Arbitrary<string> = stratUnits(
+	RESERVE_MIN,
+	RESERVE_MAX,
+).map(decimalString);
 
 export const seqOpArb: fc.Arbitrary<SeqOp> = fc.record({
 	side: sideArb,
 	kind: fc.constantFrom(...KINDS),
-	amountNum: fc.bigInt({ min: BigInt(1), max: SCALE }), // f = amountNum/SCALE ∈ (0,1]
+	amountNum: stratUnits(BigInt(1), SCALE), // f = amountNum / SCALE ∈ (0, 1]
 });
 
 export const sequenceArb: fc.Arbitrary<SeqOp[]> = fc.array(seqOpArb, {

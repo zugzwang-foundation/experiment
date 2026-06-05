@@ -145,6 +145,7 @@ describe("E3 — immediate full sell-back of E2's shares (cpmm.md §12)", () => 
 			out.p0,
 			out.pEff,
 			out.p1,
+			out.impact,
 		);
 	});
 });
