@@ -262,3 +262,15 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 **Conditional trigger.** False-positive rates from real usage data, OR HARDEN.5 sample-content testing (Aug 15-31) surfaces a problem the simple-boolean predicate can't handle, OR a near-miss CSAM escape that R-1's defense-in-depth would have caught.
 
 **Expected next task.** Post-experiment hardening stratum (TBD) OR HARDEN.5 close-out memo if pre-launch hardening absorbs.
+
+## ENGINE.4 OQ-F(b) — SPEC.1 §2 glossary + ADR-0013 market-status wording drift → PRECURSOR.5
+
+**Originating task:** ENGINE.4 OQ-F ruling (founder, 2026-06-05); same drift-class as the F-1 SPEC.2 listing already PRECURSOR.5-bound (`src/db/schema/markets.ts:13-14`).
+
+**Deferred work.** Editorial-only SPEC/ADR fixes (F-4/F-6): SPEC.1 §2 glossary row — add `Draft`, say "seven" states, name the column `markets.status` (not `markets.state`); ADR-0013 — correct `markets.state` → `markets.status` and drop the reference to the non-existent `markets.resolving_at`.
+
+**Why deferred.** ENGINE.4 reads `markets`/`pools` as built with no SPEC/ADR edits; consolidating the market-status wording sweep into PRECURSOR.5 beats scattering tiny SPEC/ADR riders across execute PRs. Drift is noted in-code, not fixed here.
+
+**Conditional trigger.** PRECURSOR.5 (the SPEC.2 market-status listing reconciliation) runs.
+
+**Expected next task.** PRECURSOR.5.
