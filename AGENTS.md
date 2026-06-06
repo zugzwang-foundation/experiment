@@ -51,6 +51,8 @@ Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/inva
 
 **Before claiming a change is done:** `just verify`. Critical-path work additionally runs the test suites above (CLAUDE.md §5.7).
 
+**`just verify` build env:** `next build` (and therefore bare `just verify`) requires `ZUGZWANG_ENV=preview` — the `getRedisKey` build-env gate rejects `"unknown"`, failing `/admin/login` page-data collection. Run `ZUGZWANG_ENV=preview just verify`; env-only, not a regression.
+
 ---
 
 ## 3. Project structure (the real tree)
@@ -205,7 +207,7 @@ tests/
 ├── integration/   7 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock)
 ├── invariants/    I-APPEND-ONLY-001.<slug>.spec.ts   (only this one exists so far)
 ├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
