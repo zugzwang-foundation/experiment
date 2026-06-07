@@ -61,3 +61,47 @@ Carry-forwards minted (no `#`, to avoid autolink): carry-forward 1 (`uncollectab
 **Time.** 2026-06-07 (IST) — single plan-chat session: read-only preflight recon under a sync-gate STOP (local HEAD on the merged `chore/engine-4-execute-log` branch, not `main`; founder-adjudicated ff-only recovery to `671c484`) → P-flags P-0..P-9 → founder rulings R-1/R-2/R-3 → in-chat draft + web review (A1–A8, D-1–D-4) → A1 bidirectional re-derivation → PROBE-1/PROBE-3 (read-only) + PROBE-2 re-sequence → D-1 simplification + RED-limitation line → docs-only PR #85 (initial `0530e97`, A9 fold `5784711`) → founder squash-merge (`c7acc1b`) → post-merge sync (clean ff-only under L-E4.2; plan branch deleted) → this log.
 
 ---
+
+## Execute session — 2026-06-07
+
+> **Entry:** execute session on `feat/engine-5-dharma-ledger` (fresh CC session + fresh web chat, §5.8). FULL ritual, no narrowing: `@test-writer` RED → STEP 3 PROBE-2 migration → implement → `@code-reviewer` → full-scope `@security-auditor` → `@db-migration-reviewer` → §5.10 audit → PR. Web-gated at STOP-0 / CP-1 / CP-2 / PR.
+
+**What landed (files + PR).**
+- `src/server/dharma/{errors,canonical,tags,ledger,conservation,persist}.ts` — pure core + thin persistence (`server-only`, named exports, module-local sentinels; no barrel, no Manifold header).
+- `src/db/schema/dharma.ts` — `dharma_entry_type` gains `initial_grant` (10th value, R-1) + the 9→10 inline-comment fix (C1).
+- `drizzle/migrations/0009_dharma_initial_grant_enum.sql` (`ALTER TYPE … ADD VALUE 'initial_grant';`, additive — not drop/recreate) + `meta/_journal.json` idx 9 + `meta/0009_snapshot.json` (drizzle-generated; CI applies via `drizzle-kit migrate`).
+- Tests: `tests/unit/dharma/{canonical,_probe-decimal-negzero,ledger,conservation}.test.ts` (DB-free, 59 assertions) + `tests/server/dharma/non-transferable.test.ts` + `tests/integration/dharma-ledger.integration.test.ts` + `tests/invariants/I-NO-OVERDRAFT-001.dharma-ledger-monotone.spec.ts` (DB-backed, CI-gated).
+- Riders (R-3 closed set, same commit): SPEC.1 §2/§5/§10.1/§10.2/§16.4, SPEC.2 B.7/§3.6/§14.1, CLAUDE.md §1 (`dharma/` greenfield → built-sensitive), AGENTS.md §6 (enum 9→10) + §9 (test tree).
+- **PR #87** → squash-merged to `main` at **`da4618d4bc26b5007aeae321165cf0e1267656ed`** (`feat(dharma): ENGINE.5 — Dharma append-only ledger (#87)`). 21-file closed set, +4351/−19 (2767 = auto-gen snapshot). Two pre-squash branch commits: `90f8385` (feature) + `03c8963` (F-4).
+
+**Decisions made — execute-phase rulings (web-gated).**
+- **CP-1 (test suite locked).** `@test-writer` authored the §7 suite RED-first; consolidated edit pass **E-1..E-7** applied + the **R-CP1-A** binding ruling: `computeLedgerRow` canonicalizes **both** `previousBalance` **and** `amount` through the `numericString` gate (invalid either → `DharmaInputError`); `previousBalance` is NOT assumed pre-canonical. E-1 (invariant ≥0 → float-free `startsWith("-")` sign check), E-2 (`discrepancy = canonicalize(actual − expected)` RATIFIED, no assertion flip), E-3 (integration `stake/payout` → `debit/credit` rename), E-4 (uncollectable `amount 0` ≤0-boundary pin), E-5 (R-CP1-A gate pins — both operands), E-6 (canonical 21-int-digit reject), E-7 (checker defensive-gate pin). 59 unit assertions green locally.
+- **CP-2 (implementation reviewed).** **F-1** (ledger docstring: "exact 18-dp add/sub on the canonicalized operands … post-gate, R-CP1-A"); **F-2** (rider R4 SPEC.1 §10.2 final wording — system-total vs per-market identities kept distinct); **F-3** (rider R7 SPEC.2 §3.6 — drop "drains it from the `pools` reserve and"; the rider re-routes only the RECORD, not the drain); **C1** (dharma.ts 9→10 inline comment, folded into the schema commit). Out-of-set ruling: the 5 remaining admin-pool-in-ledger references stay OUT of the closed set → "R-2 supersession sweep" carry-forward.
+- **F-4 (post-cascade, PR gate).** SPEC.1 §10.1 admin parenthetical `(singular, ledger-only)` → `(singular, events-only)` — fixed a self-contradiction the R3 rider left (line ends "admin has no `dharma_ledger` row"). Commit `03c8963`, byte-match to web-authored string; CI re-ran green.
+
+**Review cascade (§5.11) + dispositions.**
+- **`@code-reviewer`** — CLEAN at all ranks (no CRITICAL/HIGH/MEDIUM/LOW). Verified the binding rulings, INV-2 at every layer, decimal exactness, the tx-bound signature, scope = closed set.
+- **`@security-auditor` (full scope)** — no CRITICAL/HIGH. **2 MEDIUM**, both contract-boundary / consistent with the ratified design:
+  - **M1** — `readLatestBalance` cursor `id DESC` is a deterministic TOTAL order but NOT a sub-ms chronological tie-break (userspace `uuidv7()` trailing bits random, per ADR-0016); the >1-row/user/tx case is foreclosed by the required `previousBalance` chaining (D-2). **Disposition:** in-module comment corrected (the "deterministic tie-break" claim removed; points to the chaining contract); structural enforcement → ENGINE.7/9/12 (carry-forward 4).
+  - **M2** — `appendLedgerRow` does not validate `betId` against tag class (issuance ⇒ NULL / flow ⇒ non-NULL); producer-owned per A9; the conservation checker already defends at read-time. **Disposition:** carry-forward to ENGINE.9/12 producer audits; no in-module guard (would pre-constrain ENGINE.9 — the A9 concern).
+  - **LOW** — `numericString` admits column-ceiling magnitudes (no app-side upper bound; caller-contract, ~1,510-Dharma cap) → HARDEN defense-in-depth.
+- **`@db-migration-reviewer`** — **PASS** on every artifact (enum additive `ADD VALUE`; schema/SQL/journal/snapshot coherent; table body + Bucket-A + INV-2 CHECK untouched; 10-value set consistent across schema ↔ SPEC.2 B.7 ↔ SPEC.1 §5 ↔ AGENTS.md §6). SURPRISE (benign): SPEC.1:1294 immutable change-log "9-value set" correctly left untouched (historical).
+- **§5.10 pre-PR audit** — all PASS (enum shape · 8/2 tag↔green-test map · (★) uncollectable-excluded + test · canonical-form on stored strings · overdraft path · diff-stat = closed set · grep-proven no event/admin-ledger/issuance-constant lines).
+
+**CI receipts (Postgres-17 service).**
+- **Run 27096235662** (sha `90f8385`, feature) — SUCCESS. DB-backed dharma suites executed nonzero vs PG-17: `non-transferable` 5 · `dharma-ledger.integration` 4 · `I-NO-OVERDRAFT-001` 2. PG logs show the asserted enforcement firing: `23502` (entry_type/user_id NOT NULL), `23514` (CHECK `dharma_ledger_balance_non_negative`), `P0001` (append-only UPDATE/DELETE). Summary: Test Files 63 passed | 3 skipped (66); Tests 551 passed | 3 skipped | 5 todo (559).
+- **Run 27097016634** (sha `03c8963`, F-4 / merged tree) — SUCCESS, same dharma counts (5/4/2), identical summary.
+
+**Open questions.** None — the CP-1/CP-2/F-4 cycle closed every gate; the 2 MEDIUM + 1 LOW are dispositioned carry-forwards, not open.
+
+**Next session starts at.** **ENGINE.7** (bet-transaction primitive — SERIALIZABLE wrapper + pool `FOR NO KEY UPDATE` lock + idempotency + the concurrent-overdraft composition `I-NO-OVERDRAFT-002`) and/or **ENGINE.9** (resolution/correction/void fan-out — produces `bet_payout`/`uncollectable`/`void_refund` rows + admin `pool_unwind` as events; the secondary reverse+uncollectable identity). Both consume `appendLedgerRow`/`computeLedgerRow`/`checkMarketConservation` and MUST supply per-user serialization (carry-forward 4) + betId-class discipline (M2) that this module delegates.
+
+**Context to preserve.**
+- **Canonical execute SHA:** `da4618d4bc26b5007aeae321165cf0e1267656ed` (squash of PR #87). Plan SHA: `c7acc1b` (PR #85).
+- **Module API (as built):** `canonicalize(value) → string` · `computeLedgerRow({previousBalance,amount,entryType}) → {amount,balanceAfter}` · `checkMarketConservation({ledgerFlows, netAdminPoolInjection}) → {ok:true} | {ok:false,expected,actual,discrepancy}` · `appendLedgerRow(tx, {userId,amount,entryType,betId?,previousBalance?}) → {id,balanceAfter}`. Errors `DharmaInputError` / `DharmaOverdraftError` / `DharmaPoolTagError`. Tags: `DharmaEntryType` (10-set derived), `LEDGER_WRITABLE_TAGS` (8), `POOL_DORMANT_TAGS` (2), `FLOW_TAGS` (5). `discrepancy = actual − expected`.
+- **Caller obligations (carry-forwards):** (4) per-user write serialization — SERIALIZABLE + ADR-0013 full-jitter retry (default) / `pg_advisory_xact_lock(user_id)` fallback — for grant/daily/resolution writes outside the pool lock; multi-row-same-user-one-tx MUST chain `previousBalance` (M1); betId-class discipline issuance⇒NULL / flow⇒non-NULL (M2). Plus plan-entry carry-forwards 1/2/3/5/6 (ENGINE.9/7).
+- **R-2 supersession sweep (out-of-set, founder-ruled):** SPEC.1 :162/:544/:561/:868 + SPEC.2 :229/:235 still describe admin pool flows as ledger rows (:868 = headline verbatim admin-actor-in-ledger; :544 already rides carry-forward 6 / ENGINE.9) — fold in a later doc sweep.
+
+**Time.** 2026-06-07 (IST) — single execute session on `feat/engine-5-dharma-ledger`: STOP-0 sync (HEAD `0b69dd6`, ff-only) → `@test-writer` RED (7 files; CP-1 web line-review → E-1..E-7 + R-CP1-A) → STEP 3 PROBE-2 (`0009` `ADD VALUE` generated, no hand-write) → implement to green (59 unit) → CP-2 web review (F-1..F-3 + C1) → riders R1..R11 applied → cascade (code-reviewer clean · security-auditor 2 MEDIUM carry-forwards · db-migration-reviewer PASS) → §5.10 audit (all PASS) → PR #87 → CI 27096235662 green → F-4 (`03c8963`) → CI 27097016634 green → founder squash-merge (`da4618d`) → post-merge sync (clean ff-only, L-E4.2; branch deleted; END ON MAIN) → this log (separate chore PR).
+
+---
