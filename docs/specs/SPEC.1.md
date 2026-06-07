@@ -53,8 +53,8 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 | **Side** | YES or NO. The market's two share types. | `comments.side_at_post_time`, `bets.side` |
 | **Position** | A user's net share holding in a market. Computed from the bet ledger. | derived; not a column |
 | **Pool** | The CPMM share reserves for a market. Counterparty to every user trade. | `pools` table |
-| **Pool seed** | A `pool_seed` Dharma flow from the admin account into the market pool at market creation. | `dharma_ledger.entry_type = 'pool_seed'` |
-| **Pool unwind** | A `pool_unwind` Dharma flow from the pool back to the admin account at resolution or void. | `dharma_ledger.entry_type = 'pool_unwind'` |
+| **Pool seed** | A `pool_seed` Dharma flow from the admin account into the market pool at market creation. | enum value reserved (`dharma_entry_type = 'pool_seed'`); v1 records the flow via `events` + `pools` reserve deltas, **not** a `dharma_ledger` row (R-2) |
+| **Pool unwind** | A `pool_unwind` Dharma flow from the pool back to the admin account at resolution or void. | enum value reserved (`dharma_entry_type = 'pool_unwind'`); v1 records the flow via `events` + `pools` reserve deltas, **not** a `dharma_ledger` row (R-2) |
 | **Dharma** | Non-transferable reputation score. Single fluid unit; same instrument is staked, won, and lost. | `NUMERIC(38,18)` column on user rows; flows in `dharma_ledger` |
 | **Daily Credit** | A small, **flat** (never escalating) per-user Dharma credit, paid once per UTC day **only when the user places a commented bet that day** (per ADR-0018). Use-or-lose; does not accumulate. | `dharma_ledger.entry_type = 'daily_allowance'` + `users.last_allowance_accrued_at` cursor |
 | **Pseudonym** | The user's auto-assigned public display name of the form `<Colour><Animal><Number>` where `<Number>` is three-digit zero-padded (e.g., `RedFox001`, `BlueWolf472`). Permanent. Not user-chosen, not user-editable. Not an alias for a real-world identity. | `users.pseudonym` |
@@ -155,7 +155,7 @@ This section mirrors `CLAUDE.md` §2.1–§2.4 verbatim in semantics. It exists 
 
 - **Statement.** Dharma moves only as a market mechanic — staking on a bet, settling on resolution, or seeding/unwinding a pool. There is no user-to-user transfer.
 - **Rationale.** Reputation that can be bought, gifted, or laundered is not reputation. The K × n term collapses if Dharma is fungible across identities.
-- **Enforcement.** No `dharma_transfer` table by design. Every `dharma_ledger` row carries an `entry_type` in a fixed enum: `bet_stake`, `bet_payout`, `daily_allowance`, `pool_seed`, `pool_unwind`, `correction_reverse`, `correction_apply`, `void_refund`, `uncollectable`. No "send Dharma" UI surface. No admin override that moves Dharma between accounts except via a resolution event.
+- **Enforcement.** No `dharma_transfer` table by design. Every `dharma_ledger` row carries an `entry_type` in a fixed enum: `bet_stake`, `bet_payout`, `daily_allowance`, `pool_seed`, `pool_unwind`, `correction_reverse`, `correction_apply`, `void_refund`, `uncollectable`, `initial_grant`. (`pool_seed` / `pool_unwind` are reserved but DORMANT in v1 — admin↔pool flows are `events` + `pools` reserve deltas, never a user `dharma_ledger` row; R-2.) No "send Dharma" UI surface. No admin override that moves Dharma between accounts except via a resolution event.
 - **Test assertions.** `tests/server/dharma/non-transferable.test.ts`:
   - `it("rejects any direct user-to-user dharma write")`
   - `it("requires a tag from the fixed enum on every ledger row")`
@@ -461,12 +461,12 @@ Per `Cluster_B` (A2, B1, B5, F5/F6), `cluster_a_ratify.md` (B6, B7, B8), and **A
 Three logical account roles, all on the same single Dharma ledger (Path A):
 
 - **User accounts.** Receive an **equal initial grant** at signup (a single flat amount, identical for every user — magnitude ranged, ~1,000 Dharma, pinned at number-tuning; per ADR-0018). Earn a **Daily Credit** on each UTC day they place a commented bet (§10.4). Can stake on bets, hold positions, post and reply (every comment is a bet), sell, and collect resolution payouts. Subject to leaderboard, profile pages, and the **Flipped / Exited marker**.
-- **Admin account** (singular, ledger-only). Operational. Seeds pools at market creation. Receives `pool_unwind` flows at resolution and void. **Not a `users` row** — admin authenticates via F-AUTH-ADMIN and exists only as an actor identifier in the Dharma ledger (per `B5`, `J3`). Cannot bet, post, reply, or hold positions because the data model offers no participant identity to act under. No Daily Credit. Naturally absent from the leaderboard, which queries `users`.
+- **Admin account** (singular, events-only). Operational. Seeds pools at market creation. Receives `pool_unwind` flows at resolution and void. **Not a `users` row** — admin authenticates via F-AUTH-ADMIN and exists only as an actor identifier in the **events log** (`events.metadata.actor_id = 'admin-singleton'`); admin has no `dharma_ledger` row (R-2; per `B5`, `J3`). Cannot bet, post, reply, or hold positions because the data model offers no participant identity to act under. No Daily Credit. Naturally absent from the leaderboard, which queries `users`.
 - **Pool accounts.** One per market. Hold pool reserves denominated in shares. Counterparty to every user trade. Created at market `Draft → Open` transition, dissolved at `Resolved → Frozen` or `Voided → Frozen`.
 
 ### 10.2 Conservation
 
-Dharma is conserved across the system: total Dharma equals admin seed + sum of equal initial grants + sum of Daily Credits paid. **Conservation is not strictly bettor-zero-sum** — the pool is a real counterparty, and the admin's expected aggregate PnL across the experiment is negative when informed traders systematically extract value from it (per `B5`). This is the K × n > C signal showing up as MM PnL — *correct* behaviour, not a bug.
+Dharma is conserved across the system: total Dharma equals admin seed + sum of equal initial grants + sum of Daily Credits paid. (System-total conservation is an issuance-side identity. The admin seed is an `events` + `pools` reserve fact, not a user `dharma_ledger` row — R-2. Separately, the per-market identity reconciles each market's bet-tied user flows against that market's net admin↔pool injection.) **Conservation is not strictly bettor-zero-sum** — the pool is a real counterparty, and the admin's expected aggregate PnL across the experiment is negative when informed traders systematically extract value from it (per `B5`). This is the K × n > C signal showing up as MM PnL — *correct* behaviour, not a bug.
 
 Every CPMM trade is a Dharma flow between user and pool. There are no synthetic mints. There is no separate liquidity ledger. INV-2 (non-transferability) holds because account ↔ pool flows are market-mechanic flows, not user-to-user transfers.
 
@@ -987,7 +987,7 @@ Append-only ledgers underpinning the public dataset. Enforcement is at row-level
 
 | Table | Rows | Visibility (during experiment) | Public release |
 |---|---|---|---|
-| `dharma_ledger` | Every Dharma flow with tag from fixed enum. | Per-user views on profile. | Full at 2026-11-06. |
+| `dharma_ledger` | Every **user-side** Dharma flow with tag from fixed enum (admin↔pool flows are `events` + `pools`, not ledger rows — R-2). | Per-user views on profile. | Full at 2026-11-06. |
 | `bets` | Every bet ever placed. | Public via debate view + profile. | Full at 2026-11-06. |
 | `comments` | Every comment ever posted (excluding Track A removed). | Public via debate view + profile. | Full at 2026-11-06 (Track A removed media not released). |
 | `resolution_events` | Resolution + correction + void events. | Public on market detail page. | Full at 2026-11-06. |
