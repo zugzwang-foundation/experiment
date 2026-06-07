@@ -1,6 +1,6 @@
 # ENGINE.5 — Dharma append-only ledger logic (`src/server/dharma/`)
 
-> **Status:** reviewed — founder-ratified R-1/R-2/R-3 (2026-06-07); web amendments A1–A8 folded; web directives D-1 (simplified)/D-2/D-3/D-4; PROBE-1/PROBE-3 folded, PROBE-2 re-sequenced to execute. Ratification = plan-PR merge.
+> **Status:** reviewed — founder-ratified R-1/R-2/R-3 (2026-06-07); web amendments A1–A9 folded; web directives D-1 (simplified)/D-2/D-3/D-4; PROBE-1/PROBE-3 folded, PROBE-2 re-sequenced to execute. Ratification = plan-PR merge.
 > **Date:** 2026-06-07
 > **Author:** Hrishikesh + Claude Code (plan tab)
 > **Critical-path?** **YES.** `src/server/dharma/` is a CLAUDE.md §1 greenfield critical path; INV-2 (soulbound + no-overdraft) is thesis-load-bearing; Dharma-accounting money math (§5.6). ⇒ **FULL ritual, no narrowing:** `@test-writer` RED → implement → `@code-reviewer` → **full-scope** `@security-auditor` → `@db-migration-reviewer` (enum migration) → §5.10 audit. No post-PR soak (CLAUDE.md §5.10 supersedes `plan-then-execute.md`'s 24h).
@@ -37,7 +37,7 @@ Build `src/server/dharma/` as a **pure core + thin persistence layer** mirroring
 - **D-2** — pure core + thin persistence on the caller's tx handle; caller owns SERIALIZABLE + per-user serialization (grant/daily/resolution writes sit outside the ADR-0013 pool lock); inherit cpmm no-sub-ULP/near-ceiling note at the seam.
 - **D-3** — `I-NO-OVERDRAFT-001` minted here at testable layers; concurrent-bet composition at ENGINE.7. Test split pinned by PROBE-3.
 - **D-4** — value-agnostic; no issuance constants in the module.
-- **A1** — conservation (★) **excludes `uncollectable`** (re-derived below). **A2** — (★) RHS = net admin↔pool injection. **A3** — `appendLedgerRow` gains optional `previousBalance` (resolves OQ-2). **A4** — OQ-1/3/4 ruling records (below). **A5** — commit identity citation. **A6** — migration filename = next sequential at execute. **A7** — self-critique #1 L-E4.1 annotation. **A8** — checker throws on tag-contract violations; `ok:false` only on numeric mismatch.
+- **A1** — conservation (★) **excludes `uncollectable`** (re-derived below). **A2** — (★) RHS = net admin↔pool injection. **A3** — `appendLedgerRow` gains optional `previousBalance` (resolves OQ-2). **A4** — OQ-1/3/4 ruling records (below). **A5** — commit identity citation. **A6** — migration filename = next sequential at execute. **A7** — self-critique #1 L-E4.1 annotation. **A8** — checker throws on tag-contract violations; `ok:false` only on numeric mismatch. **A9** — `uncollectable` sign guard (`amount ≤ 0` core-enforced — the only defense, since it bypasses balance arithmetic + the CHECK); per-tag sign enforcement for the other 7 accepted tags **declined** (producer-owned); `checkMarketConservation` canonicalizes inputs defensively.
 
 ---
 
@@ -98,7 +98,7 @@ Local Postgres is **down**. Pinned test split (memory `project_whole_suite_needs
 | `void_refund` | **accept** | bet.id | + | stake reversal on void |
 | `correction_reverse` | **accept** | bet.id | − | floored at zero; remainder → `uncollectable` |
 | `correction_apply` | **accept** | bet.id | + | corrected payout |
-| `uncollectable` | **accept** | bet.id | − (forgiven remainder) | **special case** (OQ-1 model A) — `balance_after` = prev (unchanged) |
+| `uncollectable` | **accept** | bet.id | − (forgiven remainder; **`amount ≤ 0` enforced — A9**) | **special case** (OQ-1 model A) — `balance_after` = prev (unchanged) |
 | `pool_seed` | **REJECT** (`DharmaPoolTagError`) | — | — | R-2 dormant; admin↔pool = events + pool reserves |
 | `pool_unwind` | **REJECT** (`DharmaPoolTagError`) | — | — | R-2 dormant |
 
@@ -118,7 +118,7 @@ canonicalize(value: string): string
 Two spec texts on "current balance" reconcile once `uncollectable` is pinned (OQ-1 model A):
 - **Canonical balance = latest `balance_after`** (running total) — source of truth.
 - 7 balance-moving tags: `balance_after = previous_balance + amount` (exact 18-dp add/sub) — ENGINE.5's application-layer running-total guarantee.
-- **`uncollectable` exception**: `amount` ≤ 0 (forgiven remainder) but `balance_after = previous_balance` (**unchanged** — user at floor; Dharma is gone). The single row where `amount ≠ balance_after − prev`.
+- **`uncollectable` exception**: `amount` ≤ 0 (forgiven remainder) but `balance_after = previous_balance` (**unchanged** — user at floor; Dharma is gone). The single row where `amount ≠ balance_after − prev`. **A9 sign guard:** because its `amount` **bypasses** balance arithmetic, neither `DharmaOverdraftError` nor the storage CHECK can catch a wrong-signed `uncollectable` — so `computeLedgerRow` enforces `amount ≤ 0` for `entryType = uncollectable` (positive → `DharmaInputError`); this guard is the **only** line of defense for the audit record.
 - ⇒ `latest balance_after = SUM(amount over balance-moving rows) = SUM(all amount) − SUM(uncollectable amount)`. SPEC.2 §14.1's `SUM`-form equals the balance **only excluding `uncollectable`** — a SPEC.2 rider (appendix).
 - **CHECK `balance_after ≥ 0`** (`0001:157`, the lone storage CHECK) is the **per-row INV-2 storage floor**; `DharmaOverdraftError` is its advisory mirror (§14.1 mech iii→iv).
 
@@ -156,9 +156,10 @@ export function computeLedgerRow(args: {
   amount: string;                     // signed; canonicalized internally
   entryType: DharmaEntryType;
 }): LedgerComputation;
-// throws DharmaPoolTagError (pool tag), DharmaInputError (bad string),
-// DharmaOverdraftError (balanceAfter < 0 for a balance-moving tag);
-// uncollectable ⇒ balanceAfter = previousBalance (OQ-1 model A).
+// throws DharmaPoolTagError (pool tag), DharmaInputError (bad string, OR
+//   uncollectable with amount > 0 — A9 sign guard), DharmaOverdraftError
+//   (balanceAfter < 0 for a balance-moving tag);
+// uncollectable ⇒ amount ≤ 0 enforced (A9); balanceAfter = previousBalance (OQ-1 model A).
 
 // conservation.ts — pure (A1/A2/A8)
 export type ConservationResult =
@@ -171,6 +172,8 @@ export function checkMarketConservation(args: {
 // actual = Σ amount WHERE entryType ∈ FLOW_TAGS (the 5);  uncollectable present-but-IGNORED;
 // pool_seed/pool_unwind in input → throw DharmaPoolTagError (A8, same sentinel as write path);
 // initial_grant/daily_allowance in input → throw DharmaInputError (bet_id-NULL rows the gathering query MUST exclude);
+// ledgerFlows amounts + netAdminPoolInjection canonicalized defensively INSIDE the checker
+//   (DB-sourced strings are NOT assumed canonical — A9);
 // ok ⇔ exact canonical-decimal equality(actual, netAdminPoolInjection).
 
 // persist.ts — thin persistence, caller's tx (A3)
@@ -262,7 +265,7 @@ export function appendLedgerRow(
 |---|---|---|---|
 | Unit (DB-free, **RED-locally**) | `tests/unit/dharma/canonical.test.ts` | −0/0.0/007/signed/≤18dp pad; invalid → `DharmaInputError` | — |
 | Unit (**RED-locally**) | `tests/unit/dharma/_probe-decimal-negzero.test.ts` | `canonicalize("-0") === canonicalize("0.0") === "0.000000000000000000"`; `canonicalize("007") === "7.000000000000000000"` (vendor-pin, decimal.js 10.6.0) | — |
-| Unit (**RED-locally**) | `tests/unit/dharma/ledger.test.ts` | `balance_after = prev+amount` exact; overdraft → `DharmaOverdraftError`; 8-accept/2-reject tag table; sell-sign; `uncollectable` special-case; first-row grant shape | **INV-2** |
+| Unit (**RED-locally**) | `tests/unit/dharma/ledger.test.ts` | `balance_after = prev+amount` exact; overdraft → `DharmaOverdraftError`; 8-accept/2-reject tag table; sell-sign; `uncollectable` special-case; **positive `uncollectable` → `DharmaInputError` (A9 sign guard)**; first-row grant shape | **INV-2** |
 | Unit (**RED-locally**) | `tests/unit/dharma/conservation.test.ts` | (★) happy path; **uncollectable-EXCLUSION** case (worked example: {−10,+25,−5,−20(unc),+15}, injection 25 → `ok:true`, −20 ignored); numeric mismatch → `ok:false`+`discrepancy`; **stray `pool_seed`/`pool_unwind` → throws `DharmaPoolTagError`** (A8); stray `initial_grant`/`daily_allowance` → throws `DharmaInputError` | conservation |
 | Server (DB-backed, **CI-only**) | `tests/server/dharma/non-transferable.test.ts` | SPEC.1 §5:159 — rejects pool tags; tag required on every row | **INV-2** |
 | Integration (DB-backed, **CI-only**) | `tests/integration/dharma-ledger.integration.test.ts` | persistence running-total across a sequence; first-row grant; **multi-row-same-user-one-tx chaining** via `previousBalance` (ENGINE.9 reverse+uncollectable shape); DB-backed conservation reconciliation | INV-2 |
@@ -356,8 +359,9 @@ No residual open questions at plan time.
 | 3 | medium | DB-backed suites can't RED locally (ECONNREFUSED ≠ assertion red). | Mitigated by the RED-limitation line: CP-1 web line-review + DB-free unit twins that RED locally cover the same logic; first true run is CI. |
 | 4 | low | First-in-module-twin `.enumValues` derivation repeats ENGINE.4's pattern. | Defended (single-source-of-truth; ENGINE.4 precedent `671c484`); DB-free testable. |
 | 5 | low | PROBE-2 (drizzle-kit `ADD VALUE`) could mis-generate. | Mitigated: hand-written raw-SQL fallback (AGENTS.md §6); `@db-migration-reviewer` gate. |
+| 6 | low | **(A9 considered-and-declined):** per-tag sign enforcement for the other 7 accepted tags (e.g. `bet_stake` buy<0/sell>0, `bet_payout`≥0) was considered for the core. | **Declined — producer-owned** (ENGINE.9/12/signup); the core's floor is the overdraft check. Hard-enforcing signs now would pre-constrain ENGINE.9's correction mechanics before that stratum is planned. Only `uncollectable`'s `amount ≤ 0` is core-enforced (A9), because it alone bypasses balance arithmetic + the storage CHECK. |
 
-Checked: INV-2 coverage (overdraft + transfer-surface + tag-policy + append-only), R-1/R-2/R-3 + D-1–D-4 + A1–A8 fold, P-5 reconciliation, (★) derivation + uncollectable exclusion (independently reproduced), scope discipline (no event/admin-ledger/issuance-constant), value-agnosticism, the closed rider sweep, full-ritual (no narrowing), the probe folds + RED-limitation line.
+Checked: INV-2 coverage (overdraft + transfer-surface + tag-policy + append-only), R-1/R-2/R-3 + D-1–D-4 + A1–A9 fold, P-5 reconciliation, (★) derivation + uncollectable exclusion (independently reproduced), scope discipline (no event/admin-ledger/issuance-constant), value-agnosticism, the closed rider sweep, full-ritual (no narrowing), the probe folds + RED-limitation line.
 
 ## References
 
@@ -371,4 +375,4 @@ Checked: INV-2 coverage (overdraft + transfer-surface + tag-policy + append-only
 
 ---
 
-*Plan reviewed 2026-06-07 — founder-ratified R-1/R-2/R-3; web A1–A8 + D-1(simplified)/D-2/D-3/D-4; PROBE-1/PROBE-3 folded, PROBE-2 re-sequenced. Ratification = plan-PR merge. Execute happens in a fresh session on `feat/engine-5-dharma-ledger`.*
+*Plan reviewed 2026-06-07 — founder-ratified R-1/R-2/R-3; web A1–A9 + D-1(simplified)/D-2/D-3/D-4; PROBE-1/PROBE-3 folded, PROBE-2 re-sequenced. Ratification = plan-PR merge. Execute happens in a fresh session on `feat/engine-5-dharma-ledger`.*
