@@ -13,8 +13,9 @@ import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { users } from "./auth";
 import { bets } from "./bets";
 
-// SPEC.2 B.7. 9 entry types per ADR-0008 absorption. bet_payout per SPEC.2
-// B.7 (SPEC.1's bet_settle is deprecated, flagged for PRECURSOR.5).
+// SPEC.2 B.7. 10 entry types: 9 per ADR-0008 absorption + initial_grant
+// (R-1, ENGINE.5). bet_payout per SPEC.2 B.7 (SPEC.1's bet_settle is
+// deprecated, flagged for PRECURSOR.5).
 export const dharmaEntryTypeEnum = pgEnum("dharma_entry_type", [
 	"bet_stake",
 	"bet_payout",
@@ -25,6 +26,7 @@ export const dharmaEntryTypeEnum = pgEnum("dharma_entry_type", [
 	"correction_apply",
 	"void_refund",
 	"uncollectable",
+	"initial_grant",
 ]);
 
 // Bucket A (strictly append-only — 3.C trigger). The CHECK on balance_after

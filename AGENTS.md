@@ -143,7 +143,7 @@ const placeBetSchema = z.object({
 - **PKs:** UUIDv7 — `uuid("id").primaryKey().default(sql\`uuidv7()\`)`. The userspace `public.uuidv7()` function ships in **`drizzle/migrations/0000_uuidv7_function.sql`**.
 - **Timestamps:** `timestamp("…", { withTimezone: true })` everywhere.
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
-- **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 9 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable`.
+- **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
 - **One file may hold several related tables.** 21 tables live across 11 files — e.g. `bets.ts` (bets + positions), `comments.ts` (comments + `friendly_fire_events`), `events.ts` (events + resolution_events + payout_events).
 
@@ -204,10 +204,10 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
-├── integration/   7 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock)
-├── invariants/    I-APPEND-ONLY-001.<slug>.spec.ts   (only this one exists so far)
-├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts)
+├── integration/   8 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger)
+├── invariants/    I-APPEND-ONLY-001 + I-NO-OVERDRAFT-001 (dharma-ledger-monotone)
+├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/, dharma/ (non-transferable)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), dharma/ (canonical, _probe-decimal-negzero, ledger, conservation)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.

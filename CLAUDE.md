@@ -23,8 +23,8 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 
 **Critical paths** — touching any triggers the full ritual (writer/reviewer §5.6 · invariant gate §5.7 · same-commit ADR §5.12 · pre-PR self-audit §5.10 · subagent review §5.11):
 
-- Greenfield (not built): `src/server/{bets,comments,dharma,resolution}/`
-- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`, `src/server/cpmm/`
+- Greenfield (not built): `src/server/{bets,comments,resolution}/`
+- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`, `src/server/cpmm/`, `src/server/dharma/`
 - Schema / migrations: `src/db/schema/`, `drizzle/migrations/`
 
 *(RLS / `supabase/migrations/` out of scope — ADR-0019.)*

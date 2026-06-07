@@ -1,0 +1,1 @@
+ALTER TYPE "public"."dharma_entry_type" ADD VALUE 'initial_grant';
