@@ -71,6 +71,20 @@
       "when": 1780822311049,
       "tag": "0009_dharma_initial_grant_enum",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780913473896,
+      "tag": "0010_positions_constraints",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1780913505889,
+      "tag": "0011_position_drift_pg_cron",
+      "breakpoints": true
     }
   ]
 }

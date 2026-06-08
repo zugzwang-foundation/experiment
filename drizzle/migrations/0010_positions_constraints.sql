@@ -1,0 +1,2 @@
+CREATE UNIQUE INDEX "positions_one_held_side_idx" ON "positions" USING btree ("user_id","market_id") WHERE "positions"."quantity" > 0;--> statement-breakpoint
+ALTER TABLE "positions" ADD CONSTRAINT "positions_quantity_non_negative" CHECK ("positions"."quantity" >= 0);

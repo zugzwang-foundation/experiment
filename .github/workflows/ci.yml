@@ -75,27 +75,32 @@ jobs:
       - name: Typecheck
         run: pnpm tsc --noEmit
 
-      - name: Strip pg_cron statements from 0007 (Path B substrate; see SPEC.2 §0.1 erratum)
+      - name: Strip pg_cron statements (Path B substrate; see SPEC.2 §0.1 erratum)
         # plan §8 Risk 1 Path B fallback: pg_cron is Supabase-only;
         # vanilla postgres:17 (CI substrate) lacks pg_cron extension.
-        # Surgical strip removes ONLY the 2 pg_cron-coupled statements
-        # from 0007_pg_cron_jobs.sql:
-        #   - CREATE EXTENSION IF NOT EXISTS pg_cron (line 16)
-        #   - SELECT cron.schedule(...); block (lines 78-82)
-        # Preserves: watermark_state table, cron_alarms table,
-        # check_identity_pool_watermark() PL/pgSQL function, seed row.
-        # Migration file still applies (journal entry stays intact); only
-        # the 2 pg_cron-coupled statements are dropped. Test 6
-        # (cron.schedule registration) skipped via ctx.skip() runtime
-        # pg_cron probe in tests/db/identity-pool/watermark.test.ts.
-        # HARDEN-phase covers the 2 stripped statements + test 6 via
-        # local supabase start. Edits are ephemeral CI-workdir only;
-        # committed repo files remain immutable per ADR-0008 / AGENTS.md §6.
+        # Generalized (ENGINE.11) from the single 0007 file to a LOOP over
+        # every drizzle/migrations/*pg_cron*.sql, so any pg_cron-coupled
+        # migration applies on the CI substrate. The surgical strip removes
+        # ONLY the pg_cron-coupled statements per file:
+        #   - CREATE EXTENSION IF NOT EXISTS pg_cron (0007 only)
+        #   - SELECT cron.schedule(...); block(s)
+        # Preserves every plain table / function / seed (watermark_state,
+        # cron_alarms, check_identity_pool_watermark(), check_nightly_drift()).
+        # Migration files still apply (journal entries stay intact); only the
+        # pg_cron-coupled statements are dropped. cron.schedule registration is
+        # not exercised in CI (no pg_cron): 0007's is skipped via ctx.skip() in
+        # tests/db/identity-pool/watermark.test.ts; 0011's check_nightly_drift()
+        # is tested directly via `SELECT check_nightly_drift()` (no registration
+        # test charted). HARDEN-phase covers the stripped statements via local
+        # supabase start. Edits are ephemeral CI-workdir only; committed repo
+        # files remain immutable per ADR-0008 / AGENTS.md §6.
         run: |
-          sed -i \
-            -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron/d' \
-            -e '/^SELECT cron\.schedule(/,/^);$/d' \
-            drizzle/migrations/0007_pg_cron_jobs.sql
+          for f in drizzle/migrations/*pg_cron*.sql; do
+            sed -i \
+              -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron/d' \
+              -e '/^SELECT cron\.schedule(/,/^);$/d' \
+              "$f"
+          done
 
       - name: Apply database migrations
         # Applies drizzle migrations against the Postgres service
