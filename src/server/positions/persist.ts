@@ -27,6 +27,16 @@ const CANONICAL_ZERO = "0.000000000000000000";
  * `positions_user_market_side_idx`, setting `updated_at = now()` explicitly
  * (Drizzle 0.45 won't auto-bump on UPDATE).
  *
+ * **`previousQuantity` caller contract (Option A — ENGINE.7 owns the backstop).**
+ * A caller that supplies `previousQuantity` (skipping the in-tx read) MUST hold
+ * the ADR-0013 per-`(user, market)` serialization lock (`FOR NO KEY UPDATE` on
+ * the pool row) for the whole chain — else a stale base oversells silently. The
+ * storage `CHECK (quantity >= 0)` does NOT backstop this: it rejects a literal
+ * negative write, not a non-negative delta applied to a stale base. The runtime
+ * detector is the D1 nightly drift cron (positions vs events-canonical replay).
+ * Resolving the chaining-path backstop (relative-UPSERT or enforced lock) is
+ * ENGINE.7's to settle before wiring any `previousQuantity` caller; v1 has none.
+ *
  * No opposite-side read (the hot path stays one read): a flip-order violation
  * surfaces as the `positions_one_held_side_idx` 23505, caught here and
  * re-thrown as `PositionSingleSideError`. The friendly F-BET-10
@@ -103,14 +113,21 @@ async function readQuantity(
 }
 
 /**
- * Postgres unique-violation on the single-side partial index. Reads the
- * driver error shape at the trust boundary (the `auth/admin/login.ts:86`
- * precedent for SQLSTATE inspection).
+ * Postgres unique-violation on the single-side partial index. Drizzle 0.45 wraps
+ * query-builder driver errors in a `DrizzleQueryError` and leaves the postgres-js
+ * SQLSTATE (`code` / `constraint_name`) on `.cause`, undefined at the top level
+ * (evidence: `tests/db/triggers/events-append-only.spec.ts:18-19`). The insert
+ * here goes through the query builder, so read `.cause` first; fall back to the
+ * top level so a raw (non-builder) error still matches. `as` at the trust
+ * boundary — the driver error shape.
  */
 function isSingleSideViolation(e: unknown): boolean {
-	const err = e as { code?: unknown; constraint_name?: unknown };
-	return (
-		err.code === "23505" &&
-		err.constraint_name === "positions_one_held_side_idx"
-	);
+	const err = e as {
+		code?: unknown;
+		constraint_name?: unknown;
+		cause?: { code?: unknown; constraint_name?: unknown };
+	};
+	const code = err.cause?.code ?? err.code;
+	const constraint = err.cause?.constraint_name ?? err.constraint_name;
+	return code === "23505" && constraint === "positions_one_held_side_idx";
 }

@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { events, markets, positions, users } from "@/db/schema";
 import { computeBuy, seedPool } from "@/server/cpmm/calculate";
+import { PositionSingleSideError } from "@/server/positions/errors";
 import { upsertPositionDelta } from "@/server/positions/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
 
@@ -263,6 +264,30 @@ describe("ENGINE.11 positions persistence + nightly drift", () => {
 			code: "23505",
 			constraint_name: "positions_one_held_side_idx",
 		});
+	});
+
+	it("positions-upsert::flip-order-23505-translates-to-PositionSingleSideError", async () => {
+		// The path NO existing test exercised: a flip-order violation THROUGH the
+		// single gate (not raw SQL). User holds YES; upsertPositionDelta for the
+		// opposite side inserts a 2nd quantity>0 row → positions_one_held_side_idx
+		// 23505 → caught and translated to PositionSingleSideError. RED on the old
+		// top-level-only error read (Drizzle wraps the SQLSTATE on `.cause`); green
+		// once isSingleSideViolation unwraps `.cause`.
+		const userId = await seedUser("flip-xlate", "flip-xlate");
+		const marketId = await seedMarket("flip-xlate-market");
+
+		await seedPosition({ userId, marketId, side: "YES", quantity: "10" });
+
+		await expect(
+			testDb.transaction((tx) =>
+				upsertPositionDelta(tx, {
+					userId,
+					marketId,
+					side: "NO",
+					shareDelta: "10",
+				}),
+			),
+		).rejects.toBeInstanceOf(PositionSingleSideError);
 	});
 
 	// ── D1: positions vs events-canonical replay ──────────────────────────────

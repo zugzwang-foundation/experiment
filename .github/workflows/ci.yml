@@ -1,1 +1,115 @@
+# .github/workflows/ci.yml
+# Zugzwang CI gate — runs on every PR to main.
+# Scope: install -> lint/format check -> typecheck -> tests.
+# Out of scope (HARDEN.* / post-experiment): e2e, build, secret scan,
+# dependency audit, coverage, bundle/perf budgets, matrix testing.
 
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cancel stale runs when a PR is force-pushed or has new commits.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Minimum GITHUB_TOKEN scope. No PR comments, no deploys, no releases.
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    # Timeout absorbs container init + drizzle-kit migrate + sequential
+    # vitest wall-clock per plan §5.5.
+    timeout-minutes: 25
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      # MUST run before setup-node so pnpm is on PATH when setup-node
+      # locates the store directory for caching.
+      # Omitting the version input reads the pin from package.json
+      # packageManager (single source of truth; matches Lefthook
+      # locally).
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # --reporter=github emits ::error annotations inline on the PR
+      # diff. If you see ANSI escape codes corrupting the output
+      # (biome #9189), append: --colors=off
+      - name: Lint and format check (Biome)
+        run: pnpm biome check . --reporter=github
+
+      - name: Typecheck
+        run: pnpm tsc --noEmit
+
+      - name: Strip pg_cron statements (Path B substrate; see SPEC.2 §0.1 erratum)
+        # plan §8 Risk 1 Path B fallback: pg_cron is Supabase-only;
+        # vanilla postgres:17 (CI substrate) lacks pg_cron extension.
+        # Generalized (ENGINE.11) from the single 0007 file to a LOOP over
+        # every drizzle/migrations/*pg_cron*.sql, so any pg_cron-coupled
+        # migration applies on the CI substrate. The surgical strip removes
+        # ONLY the pg_cron-coupled statements per file:
+        #   - CREATE EXTENSION IF NOT EXISTS pg_cron (0007 only)
+        #   - SELECT cron.schedule(...); block(s)
+        # Preserves every plain table / function / seed (watermark_state,
+        # cron_alarms, check_identity_pool_watermark(), check_nightly_drift()).
+        # Migration files still apply (journal entries stay intact); only the
+        # pg_cron-coupled statements are dropped. cron.schedule registration is
+        # not exercised in CI (no pg_cron): 0007's is skipped via ctx.skip() in
+        # tests/db/identity-pool/watermark.test.ts; 0011's check_nightly_drift()
+        # is tested directly via `SELECT check_nightly_drift()` (no registration
+        # test charted). HARDEN-phase covers the stripped statements via local
+        # supabase start. Edits are ephemeral CI-workdir only; committed repo
+        # files remain immutable per ADR-0008 / AGENTS.md §6.
+        run: |
+          for f in drizzle/migrations/*pg_cron*.sql; do
+            sed -i \
+              -e '/^CREATE EXTENSION IF NOT EXISTS pg_cron/d' \
+              -e '/^SELECT cron\.schedule(/,/^);$/d' \
+              "$f"
+          done
+
+      - name: Apply database migrations
+        # Applies drizzle migrations against the Postgres service
+        # container. drizzle-kit migrate is the locked command per
+        # ADR-0008 (not push). Fails loudly on migration error;
+        # exit code propagates to job failure.
+        run: pnpm drizzle-kit migrate
+
+      # Vitest auto-detects GITHUB_ACTIONS=true and adds the
+      # github-actions reporter alongside default. run = non-watch.
+      - name: Unit and integration tests
+        run: pnpm vitest run
