@@ -163,8 +163,8 @@ const placeBetSchema = z.object({
 
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
-- `0007_pg_cron_jobs.sql` is the pg_cron Path-A substrate; CI strips the `CREATE EXTENSION pg_cron` + `cron.schedule()` statements before applying (the CI runner has no pg_cron).
-- Current head: `0008_comments_bet_id_idx.sql`.
+- pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
+- Current head: `0011_position_drift_pg_cron.sql`.
 
 ### Transactions, queries, validation
 
