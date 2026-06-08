@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
+	check,
 	index,
 	numeric,
 	pgTable,
@@ -95,6 +96,17 @@ export const positions = pgTable(
 		),
 		index("positions_user_market_idx").on(table.userId, table.marketId),
 		index("positions_user_id_idx").on(table.userId),
+		// ENGINE.11 R-5: structural single-side — at most one HELD (quantity>0)
+		// row per (user,market). Partial unique index (bets_idempotency_key_idx
+		// precedent). The built positions_user_market_side_idx still permits both
+		// sides; this closes the SPEC.1 §7-preamble gap.
+		uniqueIndex("positions_one_held_side_idx")
+			.on(table.userId, table.marketId)
+			.where(sql`${table.quantity} > 0`),
+		// ENGINE.11 R-3: oversell storage floor — the application mirror is
+		// applyPositionDelta's PositionOversellError (dharma_ledger_balance_non_negative
+		// precedent; INV-class integrity, mints I-NO-OVERSELL-001).
+		check("positions_quantity_non_negative", sql`${table.quantity} >= 0`),
 	],
 );
 
