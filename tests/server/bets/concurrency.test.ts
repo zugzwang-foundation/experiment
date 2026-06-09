@@ -24,6 +24,9 @@ vi.mock("@sentry/nextjs", () => ({
 }));
 
 import {
+	bets,
+	comments,
+	dharmaLedger,
 	events,
 	friendlyFireEvents,
 	markets,
@@ -31,7 +34,10 @@ import {
 	positions,
 	users,
 } from "@/db/schema";
-import { BetSerializationExhaustedError } from "@/server/bets/errors";
+import {
+	BetSerializationExhaustedError,
+	MarketNotOpenError,
+} from "@/server/bets/errors";
 import { runBetTransaction } from "@/server/bets/transaction";
 import { computeBuy } from "@/server/cpmm/calculate";
 import { appendLedgerRow } from "@/server/dharma/persist";
@@ -98,13 +104,16 @@ async function seedUser(emailTag: string, pseudonym: string): Promise<string> {
 	return user?.id ?? "";
 }
 
-async function seedOpenMarketWithPool(slug: string): Promise<string> {
+async function seedMarketWithPool(
+	slug: string,
+	status: "Open" | "Closed" | "Resolving",
+): Promise<string> {
 	const [market] = await testDb
 		.insert(markets)
 		.values({
 			slug,
 			title: "Concurrency Market",
-			status: "Open",
+			status,
 			resolutionDeadline: new Date("2027-01-01T00:00:00Z"),
 		})
 		.returning({ id: markets.id });
@@ -115,6 +124,10 @@ async function seedOpenMarketWithPool(slug: string): Promise<string> {
 		noReserves: SEED_RESERVES,
 	});
 	return marketId;
+}
+
+async function seedOpenMarketWithPool(slug: string): Promise<string> {
+	return seedMarketWithPool(slug, "Open");
 }
 
 // Positive Dharma balance so the in-spine bet_stake debit does not overdraft.
@@ -145,10 +158,10 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 		const isolation = await runBetTransaction(
 			{ marketId, flow: "F-BET-1" },
 			async ({ tx }) => {
-				// `execute<T>` types the WHOLE result as T (drizzle pg-core
-				// session: `execute<T>(query): Promise<T>`), so T is the row ARRAY
-				// — postgres-js returns an array-like of result rows.
-				const rows = await tx.execute<{ transaction_isolation: string }[]>(
+				// postgres-js `execute<TRow extends Record<string, unknown>>`
+				// returns `Promise<TRow[]>` — TRow is the ROW shape, the result is
+				// the row array (the sweep-orphans.ts `UpdateReturningRow` precedent).
+				const rows = await tx.execute<{ transaction_isolation: string }>(
 					sql`SELECT current_setting('transaction_isolation') AS transaction_isolation`,
 				);
 				return rows[0]?.transaction_isolation;
@@ -398,12 +411,12 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 
 		expect(caught).toBeInstanceOf(BetSerializationExhaustedError);
 		const err = caught as BetSerializationExhaustedError;
-		// Carries the last SQLSTATE + originating flow.
+		// Carries the last SQLSTATE + originating flow. (The class-level 503 /
+		// Retry-After:1 / code / errorType envelope mapping is asserted in the pure
+		// tests/unit/bets/errors.test.ts — here we only assert wrapper BEHAVIOR:
+		// the right class was thrown carrying the right data.)
 		expect(err.sqlstate).toBe("40001");
 		expect(err.flow).toBe("F-BET-2");
-		// Class-level §15 envelope mapping.
-		expect(BetSerializationExhaustedError.httpStatus).toBe(503);
-		expect(BetSerializationExhaustedError.retryAfterSeconds).toBe(1);
 
 		// captureMessage fired exactly once, for the alarm-3 message.
 		expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
@@ -497,5 +510,135 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 		// created_at is the UUIDv7-derived timestamp, STABLE across the retry
 		// (insertEvent derives it from the event_id prefix, never now()).
 		expect(eventRows[0]?.createdAt.getTime()).toBe(expectedCreatedAt.getTime());
+	});
+
+	// ── Coarse market-state gate (ruling a) ───────────────────────────────────
+	// The wrapper's one non-concurrency responsibility: after the pool lock, an
+	// UNLOCKED `SELECT status FROM markets` gate. Open → run the callback;
+	// non-Open → MarketNotOpenError carrying the observed status, NOT retried
+	// (no SQLSTATE → the retry filter rethrows immediately). Fine F-BET-6
+	// in-flight window deferred (S1: no resolving_at column) → coarse reject-all.
+	describe("coarse market-state gate (ruling a)", () => {
+		it("bets::gate-open-invokes-callback", async () => {
+			// Open → the gate passes and the callback IS invoked.
+			const marketId = await seedMarketWithPool("gate-open-market", "Open");
+
+			let invoked = false;
+			const result = await runBetTransaction(
+				{ marketId, flow: "F-BET-1" },
+				async () => {
+					invoked = true;
+					return "ran";
+				},
+			);
+
+			expect(invoked).toBe(true);
+			expect(result).toBe("ran");
+		});
+
+		it("bets::gate-closed-throws-skips-callback-zero-rows", async () => {
+			// Closed → MarketNotOpenError(status='Closed'); the callback is NEVER
+			// invoked and NOTHING is written (the gate is BEFORE the callback).
+			const marketId = await seedMarketWithPool("gate-closed-market", "Closed");
+
+			let attempts = 0;
+			const caught = await runBetTransaction(
+				{ marketId, flow: "F-BET-1" },
+				async () => {
+					attempts += 1; // must never run
+					return "should-not-run";
+				},
+			).catch((e: unknown) => e);
+
+			expect(caught).toBeInstanceOf(MarketNotOpenError);
+			expect((caught as MarketNotOpenError).status).toBe("Closed");
+			expect(attempts).toBe(0);
+
+			// Zero rows across the spine; pool reserves untouched.
+			const [poolRow] = await testDb
+				.select({
+					yesReserves: pools.yesReserves,
+					noReserves: pools.noReserves,
+				})
+				.from(pools)
+				.where(eq(pools.marketId, marketId));
+			expect(poolRow?.yesReserves).toBe(SEED_RESERVES);
+			expect(poolRow?.noReserves).toBe(SEED_RESERVES);
+
+			const positionRows = await testDb
+				.select()
+				.from(positions)
+				.where(eq(positions.marketId, marketId));
+			expect(positionRows.length).toBe(0);
+			const betRows = await testDb
+				.select()
+				.from(bets)
+				.where(eq(bets.marketId, marketId));
+			expect(betRows.length).toBe(0);
+			const commentRows = await testDb
+				.select()
+				.from(comments)
+				.where(eq(comments.marketId, marketId));
+			expect(commentRows.length).toBe(0);
+			const eventRows = await testDb
+				.select()
+				.from(events)
+				.where(eq(events.aggregateId, marketId));
+			expect(eventRows.length).toBe(0);
+			// No grant seeded → the ledger is globally empty (no dharma write).
+			const ledgerRows = await testDb.select().from(dharmaLedger);
+			expect(ledgerRows.length).toBe(0);
+		});
+
+		it("bets::gate-resolving-coarse-rejects-all", async () => {
+			// Resolving → coarse reject-all (S1: the fine in-flight window is
+			// deferred — no resolving_at column). MarketNotOpenError carries the
+			// EXACT observed status 'Resolving' so ENGINE.8 can pick the §15 code.
+			const marketId = await seedMarketWithPool(
+				"gate-resolving-market",
+				"Resolving",
+			);
+
+			let attempts = 0;
+			const caught = await runBetTransaction(
+				{ marketId, flow: "F-BET-1" },
+				async () => {
+					attempts += 1;
+					return "should-not-run";
+				},
+			).catch((e: unknown) => e);
+
+			expect(caught).toBeInstanceOf(MarketNotOpenError);
+			expect((caught as MarketNotOpenError).status).toBe("Resolving");
+			expect(attempts).toBe(0);
+		});
+
+		it("bets::gate-rejection-not-retried-single-pass", async () => {
+			// The gate throw is NOT retried: MarketNotOpenError has no retryable
+			// SQLSTATE, so it bubbles on the first pass — no retry breadcrumb, no
+			// alarm-3, the callback never reached. (A wrongly-retried gate would
+			// loop the gate SELECT, emit retry breadcrumbs, and could even exhaust
+			// the budget into a BetSerializationExhaustedError.)
+			const marketId = await seedMarketWithPool(
+				"gate-noretry-market",
+				"Closed",
+			);
+
+			let attempts = 0;
+			const caught = await runBetTransaction(
+				{ marketId, flow: "F-BET-1" },
+				async () => {
+					attempts += 1;
+					return "should-not-run";
+				},
+			).catch((e: unknown) => e);
+
+			expect(caught).toBeInstanceOf(MarketNotOpenError);
+			// The callback (downstream of the gate) is never reached → single pass.
+			expect(attempts).toBe(0);
+			// No retry was scheduled: zero retry breadcrumbs, no alarm-3.
+			expect(mockAddBreadcrumb).not.toHaveBeenCalled();
+			expect(mockCaptureMessage).not.toHaveBeenCalled();
+		});
 	});
 });
