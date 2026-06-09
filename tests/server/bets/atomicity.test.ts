@@ -154,18 +154,15 @@ describe("ENGINE.8 F-BET-1 — place happy-path entry (INV-1 + INV-3)", () => {
 			),
 		);
 
-		// 200 + the response DTO shape: { betId, commentId, side, sharesBought,
-		// newPrice } (plan §"happy-path-entry"). The §4.4 success envelope wraps it
-		// as { ok:true, data:<shape> }; the route serializes data inline — assert
-		// the load-bearing fields are present + typed.
+		// 200 + the §4.4 success envelope: { ok:true, data:<flow-specific-shape> }.
+		// Assert the envelope STRICTLY; the contents/shape of `data` are the
+		// implementer's open contract (plan §4.4 wire shape) — not pinned here. The
+		// `data.betId` field is READ below only to drive the persisted-row lookup.
 		expect(res.status).toBe(200);
 		const payload = await res.json();
-		const data = payload.data ?? payload;
-		expect(typeof data.betId).toBe("string");
-		expect(typeof data.commentId).toBe("string");
-		expect(data.side).toBe("YES");
-		expect(typeof data.sharesBought).toBe("string");
-		expect(typeof data.newPrice).toBe("string");
+		expect(payload.ok).toBe(true);
+		expect(payload.data).toBeDefined();
+		const data = payload.data;
 
 		// ── INV-1: ALL spine rows present TOGETHER (atomic) ────────────────────
 		// positions: one held YES row.

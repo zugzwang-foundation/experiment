@@ -177,6 +177,11 @@ describe("ENGINE.8 F-BET-3 — comment-free sell [R4]", () => {
 			),
 		);
 		expect(sell.status).toBe(200);
+		// §4.4 success envelope (strict on the wrapper; `data` contents are the
+		// implementer's open contract — not pinned).
+		const payload = await sell.json();
+		expect(payload.ok).toBe(true);
+		expect(payload.data).toBeDefined();
 
 		// Prior comment UNTOUCHED — still exactly one comment, same id + side.
 		const afterSellComments = await testDb

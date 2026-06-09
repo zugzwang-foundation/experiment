@@ -87,6 +87,7 @@ vi.mock("@/server/positions/persist", async (importOriginal) => {
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { POST as sellPOST } from "@/app/api/bets/sell/route";
 import { events, markets, pools, users } from "@/db/schema";
+import { upsertPositionDelta } from "@/server/positions/persist";
 
 import { createdAtFromUuidV7, testClient, testDb } from "../../db/_fixtures/db";
 
@@ -213,6 +214,14 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 		expect(commentEvents[0]?.createdAt.getTime()).toBe(
 			createdAtFromUuidV7(commentEventId).getTime(),
 		);
+
+		// Prove the retry ACTUALLY fired (not a zero-retry happy path): positions is
+		// the FIRST spine write [R1], so a 2nd invocation = a genuine top-of-callback
+		// re-run. clearAllMocks() in beforeEach zeroes the counter; this is the only
+		// op in the test, so 2 = attempt-1 throw + attempt-2 success.
+		expect(vi.mocked(upsertPositionDelta)).toHaveBeenCalledTimes(2);
+		// The synthetic 40001 was actually consumed (guards a silently no-op'd fault).
+		expect(positionFault.remaining).toBe(0);
 	});
 
 	it("bet-sell::one-bet-sold-event-market-aggregate [R4]", async () => {
@@ -234,6 +243,10 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 		const { getHeldPosition } = await import("@/server/positions/read");
 		const held = await getHeldPosition(testDb, { userId, marketId });
 		const heldQuantity = held?.quantity ?? "0";
+
+		// The unfaulted ENTRY placePOST above called upsertPositionDelta ONCE. Reset
+		// the call counter so toHaveBeenCalledTimes(2) isolates the SELL's invocations.
+		vi.mocked(upsertPositionDelta).mockClear();
 
 		// Force ONE retry on the SELL too, to prove the single sell event is stable.
 		positionFault.remaining = 1;
@@ -261,5 +274,11 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 		expect(soldEvents[0]?.createdAt.getTime()).toBe(
 			createdAtFromUuidV7(sellEventId).getTime(),
 		);
+
+		// Prove the SELL callback ACTUALLY re-ran (not a zero-retry happy path):
+		// counter cleared after the entry, so 2 = attempt-1 throw + attempt-2 success.
+		expect(vi.mocked(upsertPositionDelta)).toHaveBeenCalledTimes(2);
+		// The synthetic 40001 was actually consumed (guards a silently no-op'd fault).
+		expect(positionFault.remaining).toBe(0);
 	});
 });

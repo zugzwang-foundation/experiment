@@ -152,6 +152,11 @@ describe("ENGINE.8 F-BET-2 — same-side subsequent buy (INV-1)", () => {
 			),
 		);
 		expect(second.status).toBe(200);
+		// §4.4 success envelope (strict on the wrapper; `data` contents are the
+		// implementer's open contract — not pinned).
+		const payload = await second.json();
+		expect(payload.ok).toBe(true);
+		expect(payload.data).toBeDefined();
 
 		// (1) INV-1: the subsequent bet rode its OWN comment → TWO comments now.
 		const commentRows = await testDb
