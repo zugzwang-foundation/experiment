@@ -47,6 +47,14 @@ export interface BetEndpointCtx {
 	userAgent: string;
 }
 
+/**
+ * A client-supplied `x-request-id` is echoed for trace correlation ONLY if it
+ * is a safe token; otherwise the handler mints a fresh UUIDv7. Reflecting a raw
+ * value (e.g. a CR/LF-poisoned header) would throw in `new Response(...)` and
+ * self-500 the request (security-auditor MEDIUM, ENGINE.8 cascade).
+ */
+const REQUEST_ID_SAFE = /^[A-Za-z0-9_-]{1,200}$/;
+
 /** §4.4 error envelope. `retry_after` (body) is present only for 429 / 503. */
 function envelope(
 	code: string,
@@ -127,7 +135,11 @@ export async function runBetEndpoint(
 	request: Request,
 	inner: (ctx: BetEndpointCtx) => Promise<{ status: number; body: unknown }>,
 ): Promise<Response> {
-	const requestId = request.headers.get("x-request-id") ?? uuidv7();
+	const inboundRequestId = request.headers.get("x-request-id");
+	const requestId =
+		inboundRequestId && REQUEST_ID_SAFE.test(inboundRequestId)
+			? inboundRequestId
+			: uuidv7();
 
 	// 0. Origin (§4.3).
 	if (!checkOrigin(request)) {

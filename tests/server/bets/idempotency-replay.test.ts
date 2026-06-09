@@ -16,9 +16,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // (`@/app/api/bets/place/route`) keeps this unresolvable until ENGINE.8 lands.
 // We mock the idempotency cache + moderation + transaction wrapper at the module
 // boundary (the runBetTransaction call-count is the load-bearing assertion, so
-// it IS mocked here — distinct from the DB-backed flow tests), so this file does
-// NOT need Postgres: it REDs at collection on the missing route import and GREENs
-// once the route lands. The idem cache is a stateful single-key mock mirroring
+// it IS mocked here — distinct from the DB-backed flow tests). The route's
+// auth+ban step reads the `users` table, so this runs against CI Postgres: the
+// unseeded USER_ID returns no row → not banned → the call-count assertions hold.
+// Locally it is CI-RED (collection-fails first on the missing route import),
+// GREEN on CI once the route lands. The idem cache is a stateful single-key mock mirroring
 // the SPEC.2 §11 single-key-encoding-both-states machine.
 //
 // Mocks (module boundary):

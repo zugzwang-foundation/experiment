@@ -10,9 +10,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //
 // CI-RED (route-backed): the greenfield VALUE import of the place Route Handler
 // keeps this unresolvable until ENGINE.8 lands. The wrapper is mocked here (we
-// assert ORDER relative to it, not its DB writes), so this file does NOT need
-// Postgres — it REDs at collection on the missing route import and GREENs once
-// the route lands.
+// assert ORDER relative to it, not its DB writes). The route's auth+ban step
+// still reads the `users` table, so this runs against CI Postgres (the unseeded
+// USER_ID returns no row → not banned → the order assertion holds); locally it
+// is CI-RED, collection-failing first on the missing route import.
 //
 // Mocks (module boundary):
 //   - `@sentry/nextjs`, `@/server/auth`, `@/server/middleware/origin-allowlist`,
