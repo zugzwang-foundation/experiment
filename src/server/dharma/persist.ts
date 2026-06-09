@@ -35,6 +35,16 @@ async function readLatestBalance(
 }
 
 /**
+ * Exported balance read (carry-forward 2) — the public alias of the module's
+ * `readLatestBalance` cursor. ENGINE.8's bet handlers read it inside the locked
+ * snapshot for the friendly `insufficient_dharma` (F-BET-4) pre-check, then
+ * thread the value into `appendLedgerRow({ previousBalance })`. The
+ * `DharmaOverdraftError` + storage `CHECK (balance_after >= 0)` remain the
+ * authoritative INV-2 backstop; this read is the user-facing courtesy gate only.
+ */
+export { readLatestBalance as readBalance };
+
+/**
  * Appends one Dharma ledger row on the caller's bound transaction (V3
  * precedent — `insertEvent(tx, …)`; compile-error to pass top-level `db`).
  *

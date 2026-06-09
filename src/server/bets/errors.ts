@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+	ModerationInFlightError,
+	ModerationUnavailableError,
+} from "@/lib/errors";
 import type { MarketStatus } from "@/server/markets/transitions";
 
 import type { BetFlow } from "./transaction";
@@ -66,4 +70,208 @@ export class MarketNotOpenError extends Error {
 		this.name = "MarketNotOpenError";
 		this.status = status;
 	}
+}
+
+/**
+ * ENGINE.8 §4.4 layer (Q4). The bet PRODUCT errors (SPEC.1 §7 / §15) + the thin
+ * `toWireError` formatter mapping every thrown error onto the §4.4 wire envelope
+ * `{ ok:false, error:{ code, message, retry_after? } }`. The six-field §15.1
+ * catalogue metadata (`error_type` / `retry_semantics` / `field_errors`) +
+ * `docs/specs/error-codes.md` + the §15.5 lint stay forward (CF3).
+ *
+ * Each product class mirrors the ENGINE.7 static-fields pattern — `extends Error`
+ * (via `BetProductError`) + static `httpStatus` / `code` + an explicit
+ * `this.name` so `instanceof` AND `.name` survive native subclassing under the
+ * ES2017 target. `toWireError` reads the statics off `err.constructor`.
+ */
+export abstract class BetProductError extends Error {}
+
+/** F-BET-4 → 400. The friendly in-snapshot `readBalance` pre-check; the authoritative INV-2 backstop is `DharmaOverdraftError` + `CHECK (balance_after >= 0)`. */
+export class InsufficientDharmaError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "insufficient_dharma";
+	readonly balance: string;
+	readonly required: string;
+	constructor(args: { balance: string; required: string }) {
+		super(
+			`insufficient dharma: balance ${args.balance} < required ${args.required}`,
+		);
+		this.name = "InsufficientDharmaError";
+		this.balance = args.balance;
+		this.required = args.required;
+	}
+}
+
+/** ADR-0018 post floor → 400 (the place route's branch). */
+export class BelowPostFloorError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "below_post_floor";
+	constructor() {
+		super("stake is below the post floor (BET_MIN_STAKE_POST)");
+		this.name = "BelowPostFloorError";
+	}
+}
+
+/** ADR-0018 reply floor → 400 (exercised by DEBATE.2; minted here). */
+export class BelowReplyFloorError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "below_reply_floor";
+	constructor() {
+		super("stake is below the reply floor (BET_MIN_STAKE_REPLY)");
+		this.name = "BelowReplyFloorError";
+	}
+}
+
+/** F-BET-10 → 400. The held-side read predicate rejected an opposite-side entry. */
+export class OppositeSideHeldError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "opposite_side_held";
+	readonly currentSide: "YES" | "NO";
+	readonly shares: string;
+	constructor(args: { currentSide: "YES" | "NO"; shares: string }) {
+		super(
+			`opposite side held: current ${args.currentSide} (${args.shares} shares)`,
+		);
+		this.name = "OppositeSideHeldError";
+		this.currentSide = args.currentSide;
+		this.shares = args.shares;
+	}
+}
+
+/** F-BET-3 → 400. A sell against a market the user holds no position in. */
+export class PositionNotHeldError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "position_not_held";
+	constructor() {
+		super("no position held in this market");
+		this.name = "PositionNotHeldError";
+	}
+}
+
+/** F-BET-7 → 403. `users.banned_at IS NOT NULL` (the auth+ban gate). */
+export class BannedUserError extends BetProductError {
+	static readonly httpStatus = 403;
+	static readonly code = "banned_user";
+	constructor() {
+		super("user is banned");
+		this.name = "BannedUserError";
+	}
+}
+
+/** F-COMMENT (length) → 400. Body length exceeds `COMMENT_MAX_LENGTH`. */
+export class CommentTooLongError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "comment_too_long";
+	constructor() {
+		super("comment body exceeds COMMENT_MAX_LENGTH");
+		this.name = "CommentTooLongError";
+	}
+}
+
+/** Moderation Track A verdict → 400 (R2 — F-COMMENT-1; both tracks abort per F-MOD-4). */
+export class CommentTrackABlockedError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "comment_track_a_blocked";
+	constructor() {
+		super("comment blocked by moderation (track A)");
+		this.name = "CommentTrackABlockedError";
+	}
+}
+
+/** Moderation Track B verdict → 423 (R2 — F-COMMENT-1; the deliberate, spec-locked 423). */
+export class CommentTrackBUnderReviewError extends BetProductError {
+	static readonly httpStatus = 423;
+	static readonly code = "comment_track_b_under_review";
+	constructor() {
+		super("comment under moderation review (track B)");
+		this.name = "CommentTrackBUnderReviewError";
+	}
+}
+
+/** Malformed request body (bad shape / non-positive stake|shares) → 400. */
+export class InvalidRequestBodyError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "error_invalid_request_body";
+	constructor(message = "invalid request body") {
+		super(message);
+		this.name = "InvalidRequestBodyError";
+	}
+}
+
+/** The §4.4 wire envelope + the HTTP status, plus the optional HTTP `Retry-After` header value (distinct from the body `retry_after`, which is present only for 429/503 per §4.4). */
+export interface WireError {
+	status: number;
+	body: {
+		ok: false;
+		error: { code: string; message: string; retry_after?: number };
+	};
+	retryAfterHeader?: number;
+}
+
+function buildWire(
+	status: number,
+	code: string,
+	message: string,
+	opts?: { retryAfterBody?: number; retryAfterHeader?: number },
+): WireError {
+	const error: { code: string; message: string; retry_after?: number } = {
+		code,
+		message,
+	};
+	if (opts?.retryAfterBody !== undefined) {
+		error.retry_after = opts.retryAfterBody;
+	}
+	const retryAfterHeader = opts?.retryAfterHeader ?? opts?.retryAfterBody;
+	const wire: WireError = { status, body: { ok: false, error } };
+	if (retryAfterHeader !== undefined) {
+		wire.retryAfterHeader = retryAfterHeader;
+	}
+	return wire;
+}
+
+/**
+ * Map any thrown error onto the §4.4 wire envelope + HTTP status. The body
+ * `retry_after` field is present IFF the status is 429 / 503 (§4.4 verbatim);
+ * the 409 in-flight cases carry a `Retry-After` HTTP header (`retryAfterHeader`)
+ * but no body field. The two ENGINE.7 wrapper classes + the two moderation
+ * classes (`@/lib/errors`) are mapped explicitly; the bet product classes read
+ * their `static httpStatus` / `code`. An unrecognized error → 500
+ * `error_internal` (the caller releases the idempotency sentinel as a crash).
+ */
+export function toWireError(err: unknown): WireError {
+	if (err instanceof BetSerializationExhaustedError) {
+		return buildWire(
+			BetSerializationExhaustedError.httpStatus,
+			BetSerializationExhaustedError.code,
+			err.message,
+			{ retryAfterBody: BetSerializationExhaustedError.retryAfterSeconds },
+		);
+	}
+	if (err instanceof MarketNotOpenError) {
+		if (err.status === "Closed") {
+			return buildWire(400, "error_market_closed_at", err.message);
+		}
+		if (err.status === "Resolving") {
+			return buildWire(409, "market_resolving", err.message);
+		}
+		return buildWire(400, "error_market_not_open", err.message);
+	}
+	if (err instanceof ModerationInFlightError) {
+		return buildWire(409, "error_moderation_in_flight", err.message, {
+			retryAfterHeader: 2,
+		});
+	}
+	if (err instanceof ModerationUnavailableError) {
+		return buildWire(503, "error_moderation_unavailable", err.message, {
+			retryAfterBody: 5,
+		});
+	}
+	if (err instanceof BetProductError) {
+		const ctor = err.constructor as unknown as {
+			httpStatus: number;
+			code: string;
+		};
+		return buildWire(ctor.httpStatus, ctor.code, err.message);
+	}
+	return buildWire(500, "error_internal", "internal error");
 }

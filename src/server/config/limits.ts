@@ -99,3 +99,18 @@ export const RESERVATION_KEY_BASE = "mod-reserve";
 
 /** Reservation TTL (s). Per SPEC.2 §10.10 — 10s spans the moderation call's worst case + slack. Auto-expires if `precommitModerate` crashes between SET-NX and DEL-in-finally; a retry from the same idempotency key then proceeds cleanly. */
 export const RESERVATION_TTL_SECONDS = 10;
+
+// === ENGINE.8: bet stake floors (ADR-0018) + comment length ===============
+//
+// The two-floor economy per ADR-0018 + SPEC.1 §10.9. `assertStakeFloor`
+// (src/server/bets/floors.ts) selects the floor by post-vs-reply. Decimal
+// STRINGS (the NUMERIC(38,18) domain) — never JS floats (CLAUDE.md §2).
+
+/** Top-level post-bet minimum stake. PLACEHOLDER VALUE (~10) — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0018. Decimal string. */
+export const BET_MIN_STAKE_POST = "10";
+
+/** Reply-bet minimum stake — PINNED at 50 (higher than the post floor) per ADR-0018; NOT a HARDEN.6 placeholder. Decimal string. Exercised by DEBATE.2's reply route; ENGINE.8 ships the tested validator. */
+export const BET_MIN_STAKE_REPLY = "50";
+
+/** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
+export const COMMENT_MAX_LENGTH = 5000;
