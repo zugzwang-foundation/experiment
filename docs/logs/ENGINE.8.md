@@ -57,3 +57,51 @@
 **Time.** 2026-06-09 (IST). Single-session plan/review loop: sync-gated read-only recon (HEAD `cf461e8`) → SURFACE → founder rulings Q1–Q4 → in-chat draft (190 lines) → WEB CP review (R1–R4 + A–C) → rev-2 draft → **WEB GREEN + founder ratification** → docs-only PR #97 (pre-squash `44dc5b9`) → squash-merge (`c87eb9a`) → post-merge ff-only sync (END ON MAIN) → this log (separate `chore/engine-8-log` PR).
 
 ---
+
+## Execute session — 2026-06-09 → 2026-06-10
+
+**What landed.**
+- **9 `src/` files** (green, commit `a8d7149`): NEW `src/server/bets/{place,sell,floors,endpoint}.ts` + `src/app/api/bets/{place,sell}/route.ts`; EDITED (additive) `src/server/bets/errors.ts` (+208: 7 product classes + 2 moderation-track classes + `InvalidRequestBodyError` + the `toWireError` §4.4 formatter), `src/server/config/limits.ts` (`BET_MIN_STAKE_POST` placeholder + `BET_MIN_STAKE_REPLY="50"` pinned + `COMMENT_MAX_LENGTH=5000`), `src/server/dharma/persist.ts` (`export { readLatestBalance as readBalance }`).
+- **10 test files** (RED): `tests/invariants/I-SIDE-BIND-001.comment-side-bound-at-post-time.spec.ts` + `tests/server/bets/{atomicity,subsequent-buy,sell,validation,idempotency-replay,moderation-outside-transaction,events-idempotency}.test.ts` + `tests/unit/bets/{floors,wire-envelope}.test.ts`.
+- **Commit chain:** `b9f5752` (RED suite) → `47cd16b` (RED strengthen: events-idempotency retry-proof `toHaveBeenCalledTimes(2)` + `positionFault.remaining===0` on both place+sell; strict §4.4 `{ok:true,data}` success envelope on the 3 happy-path tests) → `a8d7149` (green) → `024ed8c` (cascade fix). **Squash-merged to `main` at `66fa532`** (`feat(bets): ENGINE.8 … (#99)`); **PR #99**, **CI run #58 green** (Biome → tsc → strip pg_cron → migrate → unit+integration vitest against Postgres-17).
+
+**Decisions made (execute) — 5 web-ratified deviations.**
+- **`endpoint.ts` §3.1 factoring** — the shared stack (origin → auth+ban → idem-key → idem-lookup → rate-limit → release-in-finally) lives ONCE in `runBetEndpoint(request, inner)`; the two `route.ts` are thin (validate → [moderate, place-only] → wrapper). Accepted (DRY on the ordering invariant; avoided ~100 duplicated lines).
+- **`COMMENT_MAX_LENGTH=5000`** placeholder (HARDEN.6) — §3.1 step 5 references it by name; not in the plan's literal limits.ts line.
+- **In-handler `X-Request-Id` mint** — `proxy.ts` defers request-id injection (TODO); the route echoes a safe-token `x-request-id` else mints a UUIDv7, and uses it as `metadata.request_id`.
+- **Ban via DB query** (step 1, `db.query.users.findFirst` on `banned_at`) — the DB is the authority on `banned_at` (the `banned_user` test seeds it in the DB, not the session); stronger than a stale session. The defensive onboarding 403 is `user &&`-guarded (opt-A: never fires for a valid session; skips the unseeded handler-test users).
+- **`flow:"F-BET-1"` for all place** (entry + subsequent) — the wrapper `flow` arg + `metadata.flow_id` are alarm/audit tags only; entry-vs-subsequent is a read-time classification inside the snapshot. (sell → `F-BET-3`.)
+- **RED-layer web rulings:** the `expect(betRows[0]?.id).toBe(data.betId)` cross-check in `atomicity.test.ts` KEPT (a persisted-row consistency proof, not envelope shape-pinning); the success envelope pinned `{ok:true,data}` (`data` contents stay the implementer's open contract).
+
+**Surprises caught + fixed in-session.**
+- **events-idempotency retry-proof gap (caught at web's RED gate, fixed BEFORE implement).** The end-state-only assertions (place: exactly 2 events; sell: 1) pass equally on a zero-retry happy path, so they did not prove a rollback-and-retry fired. Strengthened (`47cd16b`): `toHaveBeenCalledTimes(2)` on the wrapped `upsertPositionDelta` (the callback re-ran) + `expect(positionFault.remaining).toBe(0)` (the synthetic 40001 was consumed), both place+sell; the sell `mockClear()`s after the unfaulted entry to isolate the count. Role separation preserved — the test layer authored the proof, not the implementer.
+- **Security-auditor MEDIUM (reflected `X-Request-Id`), fixed `024ed8c`.** `endpoint.ts` echoed a client `x-request-id` verbatim; a CR/LF-poisoned value threw in `new Response(...)` and self-500'd the request (bounded — attacker's own request; undici blocks true header-splitting). Now gated by `REQUEST_ID_SAFE` (`/^[A-Za-z0-9_-]{1,200}$/`) else minted.
+- **RED-branch ↔ pre-push-hook collision (surfaced, NOT bypassed).** Lefthook `pre-push` runs `tsc --noEmit`; a RED-only branch is intentionally tsc-red (greenfield TS2305/TS2307), so the durability push was rejected. Held the push (no `--no-verify`) until implement turned tsc green, then pushed clean. **Pattern: a RED-only branch cannot be pushed past the pre-push tsc gate — push after green, or the operator accepts a documented `--no-verify` for off-machine durability.**
+
+**Reviewer cascade verdicts (full critical-path ritual).**
+- `@code-reviewer`: **0 CRITICAL/HIGH/MEDIUM**; 2 LOW (no-action: `comment.placed` carries the bet's `flow_id`; `stakeAtPostTime` ADR-0009 provenance). All 3 web-flagged surfaces PASS.
+- `@security-auditor`: **0 CRITICAL/HIGH**; 1 MEDIUM (fixed `024ed8c`); 2 LOW forward. All 7 targeted seams + INV-1/2/3 verified SAFE under attempted attack (idem-before-rate-limit, release-no-sentinel-leak, moderation-pre-tx CSAM-abort, retry-purity, gate order/fail-posture, structural separation, userId-from-session).
+- §5.10 self-audit: every §3.1 step + each invariant assertion — **PASS**. No `@db-migration-reviewer` (no schema/migration).
+
+**Carry-forwards.**
+- **NEW → HARDEN.6:** (i) `x-forwarded-for` leftmost-trust for the per-IP rate-limit identifier (inherited from the `uploads/sign` precedent; rate-limit fails-open) — derive the IP from the trusted platform hop. (ii) the `proxy.ts` request-id TODO stays owned-forward; the in-handler `X-Request-Id` mint stands until then.
+- **CONSUMED:** CF2 (`readBalance` exported + threaded into the friendly `insufficient_dharma` pre-check), CF3 (the §4.4 wire subset; the six-field §15.1 + `docs/specs/error-codes.md` + the §15.5 lint stay forward).
+- **UNCHANGED:** CF1 (the fine F-BET-6 in-flight window; no `markets.resolving_at`; coarse gate rejects all Resolving as `market_resolving` 409; `error_in_flight_timeout` reserved).
+
+**Boundary handed to DEBATE.2.** The parameterized `place.ts` write (`parentCommentId: string|null` + the two-floor selector) + the tested `assertStakeFloor` (both branches). DEBATE.2 (F-COMMENT-2) owns the `below_reply_floor` exercise, reply preconditions (`parent_comment_not_found` 404, `reply_depth_exceeded` 400, `REPLY_DEPTH_MAX=1`), and replier side-inheritance — calling `place()` with a validated parent + the reply floor; it **never re-touches the SERIALIZABLE write**.
+
+**Open questions.** None.
+
+**Next session starts at.** Fable 5 model-upgrade pass (operator-initiated) → tracker sweep (≥3 strata closed since the last sweep) → next stratum per tracker: **ENGINE.9 now unblocked** (resolution / W-3 / payout) in the engine lane, **DESIGN.5** in the design lane.
+
+**Context to preserve.**
+- **Canonical execute SHA:** `66fa532` (squash of PR #99); CI run **#58** green.
+- **§3.1 step order (in code, `endpoint.ts`):** origin → auth+ban → defensive-onboarding → idem-key validate → idem-lookup → rate-limit → [moderation place-only, OUTSIDE the tx] → `runBetTransaction` → release-in-finally. **idem-lookup precedes rate-limit** (the §3.1 ordering invariant).
+- **Place spine [R1]:** positions → comments → bets → dharma_ledger(bet_id=bet.id) → events(bet.placed "bet" + comment.placed "comment") → pools. **Sell [R4]:** positions → dharma_ledger(bet_id=null, bet_stake positive) → bet.sold "market" (synthetic `payload.betId`) → pools; no comment/bet rows.
+- **Retry-purity:** place mints 2 event_ids, sell 1 (+ synthetic betId), plus `metadata.idempotency_key`, ALL at handler entry, closed over the callback — never per attempt.
+- **Fail posture:** rate-limit fails OPEN, idempotency fails 503 CLOSED, moderation fails 503 CLOSED; `release(null)` on transient-503/crash, `release(response)` on success/4xx/429.
+- **Mode-label note:** the harness showed "ultracode" while the session ran **gated-max per the kickoff** (single sequential recon, the prescribed `@test-writer`/reviewer subagents, NO workflow fan-out). Recorded as a label/behavior mismatch — no drift.
+
+**Tracker reconciliation (operator-applied — recorded, NOT edited by CC).** ENGINE.6 / ENGINE.7-plan / ENGINE.7-execute / **ENGINE.8-plan / ENGINE.8-execute → DONE**. The `DEBATE.3-claims-I-SIDE-BIND-001` drift stays recorded (ENGINE.8 mints it; DEBATE.3 shares). ENGINE.9 unblocked.
+
+**Time.** 2026-06-09 → 2026-06-10 (IST). Fresh CC + fresh web chat (plan/execute split). STEP 1 live-repo recon (HEAD `34b6c9a`; all (a)/(b)/(c) anchors verified, no drift) → branch `feat/engine-8-bet-handlers` → `@test-writer` RED (`b9f5752`) → web RED gate → RED strengthen (`47cd16b`) → web implement-relay → implement (`a8d7149`; `just verify` + unit 268 green) → `@code-reviewer` → `@security-auditor` → §5.10 audit → cascade fix (`024ed8c`) → push clean → PR #99 → CI #58 green → squash `66fa532` → post-merge ff-only sync (END ON MAIN) → this log (`chore/engine-8-log` PR).
