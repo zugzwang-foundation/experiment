@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dharma_ledger_daily_allowance_day_uq" ON "dharma_ledger" USING btree ("user_id",((timezone('UTC', "created_at"))::date)) WHERE "dharma_ledger"."entry_type" = 'daily_allowance';

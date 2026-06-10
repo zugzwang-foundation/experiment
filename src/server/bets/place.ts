@@ -6,6 +6,7 @@ import type { DbTransaction } from "@/db";
 import { bets, comments, pools } from "@/db/schema";
 import { computeBuy, type Side } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
+import { accrueDailyCredit } from "@/server/dharma/accrual";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
 import { upsertPositionDelta } from "@/server/positions/persist";
@@ -27,6 +28,8 @@ export interface PlaceParams {
 	/** Generated at handler entry, closed over (retry-purity) — NEVER regenerated here. */
 	betEventId: string;
 	commentEventId: string;
+	/** Generated at handler entry, closed over — NEVER regenerated here. USED only when the accrual pays (ENGINE.12 P1). */
+	creditEventId: string;
 	metadata: BetEventMetadata;
 }
 
@@ -45,12 +48,13 @@ export interface PlaceResult {
  * reused by DEBATE.2 (which passes a validated `parentCommentId` + the reply
  * floor); ENGINE.8 always passes `parentCommentId: null` (the post branch).
  *
- * Write order [R1]: positions → comments → bets → dharma_ledger(bet_id=bet.id) →
- * events(bet.placed + comment.placed) → pools. comments + bets move AHEAD of
+ * Write order [R1 + ENGINE.12 R4]: reads → accrual unit (cursor → credit →
+ * dharma.credited) → positions → comments → bets → dharma_ledger(bet_id=bet.id)
+ * → events(bet.placed + comment.placed) → pools. comments + bets move AHEAD of
  * dharma_ledger so the `bet_stake` debit can link `bet_id` (the FK is
- * satisfiable). The two `event_id`s + `metadata` are caller-generated at handler
- * entry and closed over — the wrapper re-runs this callback per attempt, so
- * regenerating them here would drift `created_at` and defeat the
+ * satisfiable). The three `event_id`s + `metadata` are caller-generated at
+ * handler entry and closed over — the wrapper re-runs this callback per
+ * attempt, so regenerating them here would drift `created_at` and defeat the
  * `ON CONFLICT (event_id, created_at)` dedupe.
  */
 export async function place(
@@ -70,9 +74,23 @@ export async function place(
 		});
 	}
 	const balance = await readBalance(tx, userId);
-	if (new CpmmDecimal(balance).lessThan(stake)) {
-		// F-BET-4 friendly pre-check; DharmaOverdraftError + CHECK are the backstop.
-		throw new InsufficientDharmaError({ balance, required: stake });
+	// ENGINE.12 R4 — accrue-if-unpaid BETWEEN the balance read and the friendly
+	// pre-check: the day's credit funds the day's first bet (ADR-0018's "one
+	// extra post-floor unit of voice per active day").
+	const accrual = await accrueDailyCredit(tx, {
+		userId,
+		previousBalance: balance,
+		creditEventId: params.creditEventId,
+		metadata: params.metadata,
+	});
+	if (new CpmmDecimal(accrual.balanceAfter).lessThan(stake)) {
+		// F-BET-4 friendly pre-check against the POST-credit balance;
+		// DharmaOverdraftError + CHECK are the backstop. The reported balance is
+		// post-credit (wire shape unchanged; rollback reverts the credit too).
+		throw new InsufficientDharmaError({
+			balance: accrual.balanceAfter,
+			required: stake,
+		});
 	}
 	const cpmmSide: Side = side === "YES" ? "yes" : "no";
 	const buy = computeBuy({
@@ -127,7 +145,9 @@ export async function place(
 		amount: new CpmmDecimal(stake).negated().toFixed(18), // bet_stake debit
 		entryType: "bet_stake",
 		betId: bet.id, // bets-before-dharma_ledger [R1]
-		previousBalance: balance,
+		// CHAINED off the accrual's returned balance — the persist.ts >1-row
+		// same-user contract's FIRST live same-tx pair (credit + debit, ENGINE.12).
+		previousBalance: accrual.balanceAfter,
 	});
 
 	await insertEvent(tx, {

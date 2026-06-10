@@ -85,6 +85,13 @@
       "when": 1780913505889,
       "tag": "0011_position_drift_pg_cron",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781080325673,
+      "tag": "0012_daily_allowance_day_unique",
+      "breakpoints": true
     }
   ]
 }

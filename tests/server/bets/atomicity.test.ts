@@ -65,6 +65,10 @@ import {
 	positions,
 	users,
 } from "@/db/schema";
+// ENGINE.12 (RC9): greenfield constant import — the credit amount is never a
+// literal so the suite tracks HARDEN.5 retuning.
+import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -198,20 +202,43 @@ describe("ENGINE.8 F-BET-1 — place happy-path entry (INV-1 + INV-3)", () => {
 		expect(betRows[0]?.id).toBe(data.betId);
 		expect(betRows[0]?.side).toBe("YES");
 
-		// dharma_ledger: initial_grant + bet_stake debit; the stake links the bet
-		// (bet_id = bet.id) [R1]. Balance 1000 → 990.
+		// dharma_ledger: initial_grant + ENGINE.12 daily_allowance credit (the
+		// first commented bet of the UTC day pays it INSIDE this same tx) +
+		// bet_stake debit; the stake links the bet (bet_id = bet.id) [R1].
+		// Balance 1000 → +credit → −stake.
 		const ledgerRows = await testDb
 			.select({
 				entryType: dharmaLedger.entryType,
+				amount: dharmaLedger.amount,
 				balanceAfter: dharmaLedger.balanceAfter,
 				betId: dharmaLedger.betId,
 			})
 			.from(dharmaLedger)
 			.where(eq(dharmaLedger.userId, userId));
+		expect(ledgerRows.length).toBe(3);
+		const creditRow = ledgerRows.find((r) => r.entryType === "daily_allowance");
+		expect(creditRow).toBeDefined();
+		expect(creditRow?.betId).toBeNull();
+		expect(creditRow?.amount).toBe(
+			new CpmmDecimal(DAILY_CREDIT_DHARMA).toFixed(18),
+		);
+		expect(creditRow?.balanceAfter).toBe(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).toFixed(18),
+		);
 		const stakeRow = ledgerRows.find((r) => r.entryType === "bet_stake");
 		expect(stakeRow).toBeDefined();
 		expect(stakeRow?.betId).toBe(betRows[0]?.id);
-		expect(stakeRow?.balanceAfter).toBe("990.000000000000000000");
+		expect(stakeRow?.balanceAfter).toBe(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).minus("10").toFixed(18),
+		);
+		// The debit CHAINS off the credit (persist.ts:58-62): its implied
+		// previous balance (balance_after − amount) equals the credit's
+		// balance_after exactly.
+		expect(
+			new CpmmDecimal(stakeRow?.balanceAfter ?? "0")
+				.minus(stakeRow?.amount ?? "0")
+				.toFixed(18),
+		).toBe(creditRow?.balanceAfter);
 
 		// events ×2 [R3]: bet.placed (aggregate "bet", aggregateId = bet.id) +
 		// comment.placed (aggregate "comment", aggregateId = comment.id).
@@ -237,6 +264,20 @@ describe("ENGINE.8 F-BET-1 — place happy-path entry (INV-1 + INV-3)", () => {
 		expect(commentEventRows.length).toBe(1);
 		expect(commentEventRows[0]?.eventType).toBe("comment.placed");
 		expect(commentEventRows[0]?.aggregateId).toBe(commentRows[0]?.id);
+
+		// ENGINE.12: the credit's event rides the SAME atomic tx — exactly one
+		// dharma.credited (aggregate "dharma_account", aggregateId = userId).
+		const dharmaEventRows = await testDb
+			.select({
+				eventType: events.eventType,
+				aggregateType: events.aggregateType,
+				aggregateId: events.aggregateId,
+			})
+			.from(events)
+			.where(eq(events.aggregateType, "dharma_account"));
+		expect(dharmaEventRows.length).toBe(1);
+		expect(dharmaEventRows[0]?.eventType).toBe("dharma.credited");
+		expect(dharmaEventRows[0]?.aggregateId).toBe(userId);
 
 		// pools: reserves UPDATED off the seed (the CPMM buy moved them).
 		const [poolRow] = await testDb

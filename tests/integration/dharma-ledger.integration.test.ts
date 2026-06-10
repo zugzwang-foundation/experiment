@@ -156,11 +156,14 @@ describe("INV-2: dharma_ledger persistence (appendLedgerRow)", () => {
 		);
 		expect(debit.balanceAfter).toBe("90.000000000000000000");
 
+		// bet_payout (not a second daily_allowance): I-DAILY-ONCE-001's backstop
+		// index (ENGINE.12, 0012) permits at most ONE daily_allowance row per
+		// user per UTC day — the running-total intent is tag-agnostic.
 		const credit = await testDb.transaction((tx) =>
 			appendLedgerRow(tx, {
 				userId,
 				amount: "25",
-				entryType: "daily_allowance",
+				entryType: "bet_payout",
 			}),
 		);
 		expect(credit.balanceAfter).toBe("115.000000000000000000");

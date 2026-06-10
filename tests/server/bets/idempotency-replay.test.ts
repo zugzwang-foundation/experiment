@@ -112,7 +112,12 @@ vi.mock("@/server/bets/transaction", () => ({
 	runBetTransaction: mockRunBetTransaction,
 }));
 
+import { eq } from "drizzle-orm";
+
 import { POST as placePOST } from "@/app/api/bets/place/route";
+import { dharmaLedger, users } from "@/db/schema";
+
+import { testClient, testDb } from "../../db/_fixtures/db";
 
 const USER_ID = "0190b3a0-2222-7000-8000-000000000002";
 const MARKET_ID = "0190b3a0-3333-7000-8000-000000000003";
@@ -182,5 +187,69 @@ describe("ENGINE.8 handler — idempotency replay", () => {
 		// same body), per ADR-0015 §11 verbatim replay.
 		expect(second.status).toBe(first.status);
 		expect(secondBody).toEqual(firstBody);
+	});
+
+	// ENGINE.12 T7 — the replay arm can never double-pay the Daily Credit: the
+	// step-3 idem HIT short-circuits BEFORE the handler tail where the accrual
+	// seam lives (P1: `creditEventId` is minted at handler entry on the MISS
+	// arm only; a replay never re-enters the handler). With the tx wrapper
+	// mocked, the load-bearing proof is the call count; the DB snapshots pin
+	// that the REPLAY itself changed nothing (ledger row count + cursor).
+	describe("ENGINE.12 — replay never re-pays the Daily Credit", () => {
+		afterEach(async () => {
+			await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		});
+
+		it("bet-place::replay-leaves-ledger-and-cursor-untouched [T7]", async () => {
+			// Seed a REAL user so the gate-1 read + the DB snapshots are genuine.
+			const [seeded] = await testDb
+				.insert(users)
+				.values({
+					name: "Replay-Credit User",
+					email: "replay-credit@example.com",
+					pseudonym: "replay-credit",
+					tosAcceptedAt: new Date("2026-01-01T00:00:00Z"),
+				})
+				.returning({ id: users.id });
+			const userId = seeded?.id ?? "";
+			mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+			const readSnapshot = async () => {
+				const ledgerRows = await testDb
+					.select({ id: dharmaLedger.id })
+					.from(dharmaLedger)
+					.where(eq(dharmaLedger.userId, userId));
+				const userRows = await testDb
+					.select({ lastAllowanceAccruedAt: users.lastAllowanceAccruedAt })
+					.from(users)
+					.where(eq(users.id, userId));
+				return {
+					ledgerCount: ledgerRows.length,
+					cursor: userRows[0]?.lastAllowanceAccruedAt ?? null,
+				};
+			};
+
+			// First request: idem MISS → the handler tail runs (tx mocked here).
+			const first = await placePOST(placeRequest("replay-credit-key"));
+			expect(first.status).toBe(200);
+			const firstBody = await first.clone().json();
+			expect(mockRunBetTransaction).toHaveBeenCalledTimes(1);
+			const afterFirst = await readSnapshot();
+
+			// Second, IDENTICAL request: idem HIT → cached response verbatim,
+			// handler tail (and thus the accrual seam) NEVER re-runs.
+			const second = await placePOST(placeRequest("replay-credit-key"));
+			expect(second.status).toBe(200);
+			expect(await second.clone().json()).toEqual(firstBody);
+			expect(mockRunBetTransaction).toHaveBeenCalledTimes(1);
+
+			// The replay changed NOTHING: ledger row count and the accrual
+			// cursor are identical to the post-first-request snapshot.
+			const afterReplay = await readSnapshot();
+			expect(afterReplay.ledgerCount).toBe(afterFirst.ledgerCount);
+			expect(afterReplay.cursor?.getTime() ?? null).toBe(
+				afterFirst.cursor?.getTime() ?? null,
+			);
+		});
 	});
 });

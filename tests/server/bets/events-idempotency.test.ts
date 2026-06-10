@@ -14,6 +14,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //   [R4] A successful SELL writes EXACTLY ONE — bet.sold (aggregateType
 //        "market", aggregateId = marketId; payload.betId = a synthetic fresh
 //        UUIDv7; no bets/comments row).
+//   [ENGINE.12] The day's FIRST commented place ALSO pays the Daily Credit —
+//        a THIRD event row, dharma.credited (aggregateType "dharma_account",
+//        aggregateId = userId), whose event_id (`creditEventId`) is minted at
+//        handler entry per P1 — so its created_at too is STABLE across the
+//        forced retry. The comment-free sell never adds a second one.
 //
 // Fault injection (mirrors concurrency.test.ts::retry-on-40001 / ::concurrency-
 // retry-events-idempotent): partial-mock the FIRST spine write
@@ -215,6 +220,36 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 			createdAtFromUuidV7(commentEventId).getTime(),
 		);
 
+		// ENGINE.12 (RC9): the first commented place of the day pays the Daily
+		// Credit in the SAME tx — exactly ONE dharma.credited row (aggregate
+		// "dharma_account", aggregateId = userId), created_at UUIDv7-derived and
+		// STABLE across the retry (P1: creditEventId minted ONCE at handler
+		// entry, closed over — never per attempt).
+		const creditEvents = await testDb
+			.select({
+				eventId: events.eventId,
+				createdAt: events.createdAt,
+				aggregateType: events.aggregateType,
+				aggregateId: events.aggregateId,
+			})
+			.from(events)
+			.where(eq(events.eventType, "dharma.credited"));
+		expect(creditEvents.length).toBe(1);
+		expect(creditEvents[0]?.aggregateType).toBe("dharma_account");
+		expect(creditEvents[0]?.aggregateId).toBe(userId);
+		const creditEventId = creditEvents[0]?.eventId ?? "";
+		expect(creditEvents[0]?.createdAt.getTime()).toBe(
+			createdAtFromUuidV7(creditEventId).getTime(),
+		);
+
+		// Per-type counts: the committed place wrote EXACTLY three event rows —
+		// bet.placed + comment.placed + dharma.credited; nothing leaked from the
+		// rolled-back attempt 1.
+		const allEvents = await testDb
+			.select({ eventType: events.eventType })
+			.from(events);
+		expect(allEvents.length).toBe(3);
+
 		// Prove the retry ACTUALLY fired (not a zero-retry happy path): positions is
 		// the FIRST spine write [R1], so a 2nd invocation = a genuine top-of-callback
 		// re-run. clearAllMocks() in beforeEach zeroes the counter; this is the only
@@ -280,5 +315,14 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 		expect(vi.mocked(upsertPositionDelta)).toHaveBeenCalledTimes(2);
 		// The synthetic 40001 was actually consumed (guards a silently no-op'd fault).
 		expect(positionFault.remaining).toBe(0);
+
+		// ENGINE.12 (RC9): the ENTRY paid the day's credit; the comment-free
+		// SELL — even retried — never pays a second one. Still exactly ONE
+		// dharma.credited row.
+		const creditEvents = await testDb
+			.select({ eventId: events.eventId })
+			.from(events)
+			.where(eq(events.eventType, "dharma.credited"));
+		expect(creditEvents.length).toBe(1);
 	});
 });

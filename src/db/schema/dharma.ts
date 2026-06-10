@@ -6,6 +6,7 @@ import {
 	pgEnum,
 	pgTable,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
@@ -63,6 +64,16 @@ export const dharmaLedger = pgTable(
 		index("dharma_ledger_bet_id_idx")
 			.on(table.betId)
 			.where(sql`${table.betId} IS NOT NULL`),
+		// I-DAILY-ONCE-001 storage backstop (ENGINE.12, plan R3): at most ONE
+		// daily_allowance row per user per UTC day. The PRIMARY mechanism is the
+		// SSI cursor conflict on users.last_allowance_accrued_at inside the W-1
+		// SERIALIZABLE tx; this index can only fire on a future logic bug — it
+		// fails loudly (23505) rather than ever double-paying. Both expression
+		// steps are IMMUTABLE (timezone('UTC', timestamptz) → timestamp;
+		// timestamp::date), verified at migration apply.
+		uniqueIndex("dharma_ledger_daily_allowance_day_uq")
+			.on(table.userId, sql`((timezone('UTC', ${table.createdAt}))::date)`)
+			.where(sql`${table.entryType} = 'daily_allowance'`),
 		check(
 			"dharma_ledger_balance_non_negative",
 			sql`${table.balanceAfter} >= 0`,
