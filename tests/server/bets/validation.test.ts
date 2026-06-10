@@ -61,7 +61,12 @@ vi.mock("@/server/moderation/precommit", () => ({
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { POST as sellPOST } from "@/app/api/bets/sell/route";
-import { markets, pools, positions, users } from "@/db/schema";
+import { dharmaLedger, markets, pools, positions, users } from "@/db/schema";
+// ENGINE.12 (RC9): greenfield constant import — the insufficient_dharma
+// fixture must clear the POST-credit pre-check (balance + credit < stake),
+// derived from the live constant so HARDEN.5 retunes keep it honest.
+import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -148,9 +153,17 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 	});
 
 	it("bet-place::rejects-insufficient-dharma (F-BET-4 → 400, INV-2)", async () => {
-		// Balance 5 < stake 10 → the in-snapshot readBalance pre-check rejects with
-		// 400 insufficient_dharma. INV-2 friendly seam (the authoritative backstop
-		// is DharmaOverdraftError + CHECK; this is the user-facing pre-check).
+		// ENGINE.12: the pre-check now runs against the POST-credit balance (R4
+		// — the day's first commented bet accrues before the check), so the
+		// fixture must satisfy balance + credit < stake. Seed 5; stake =
+		// 5 + DAILY_CREDIT_DHARMA + 1 (still ≥ BET_MIN_STAKE_POST today) → the
+		// in-snapshot pre-check rejects with 400 insufficient_dharma. INV-2
+		// friendly seam (the authoritative backstop is DharmaOverdraftError +
+		// CHECK; this is the user-facing pre-check).
+		const stake = new CpmmDecimal("5")
+			.plus(DAILY_CREDIT_DHARMA)
+			.plus("1")
+			.toFixed(0);
 		const userId = await seedUser("insuff", "insuff");
 		const marketId = await seedMarketWithPool("insuff-market", "Open");
 		await seedDharmaGrant(userId, "5");
@@ -159,12 +172,29 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 		const res = await placePOST(
 			req(
 				"/api/bets/place",
-				{ marketId, side: "YES", stake: "10", body: "cannot afford this" },
+				{ marketId, side: "YES", stake, body: "cannot afford this" },
 				"insuff-key",
 			),
 		);
 		expect(res.status).toBe(400);
 		expect((await errorBody(res)).code).toBe("insufficient_dharma");
+
+		// ENGINE.12 (ADR-0018 conditionality by rollback): the rejection throws
+		// INSIDE the tx, AFTER the accrual step — the whole tx rolls back, so
+		// no credit row persists and the cursor stays NULL (the failed attempt
+		// did not consume the day's credit).
+		const ledgerRows = await testDb
+			.select({ entryType: dharmaLedger.entryType })
+			.from(dharmaLedger)
+			.where(eq(dharmaLedger.userId, userId));
+		expect(
+			ledgerRows.filter((r) => r.entryType === "daily_allowance").length,
+		).toBe(0);
+		const userRows = await testDb
+			.select({ lastAllowanceAccruedAt: users.lastAllowanceAccruedAt })
+			.from(users)
+			.where(eq(users.id, userId));
+		expect(userRows[0]?.lastAllowanceAccruedAt).toBeNull();
 	});
 
 	it("bet-place::rejects-opposite-side-held (F-BET-10 → 400)", async () => {

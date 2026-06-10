@@ -65,6 +65,10 @@ import {
 	positions,
 	users,
 } from "@/db/schema";
+// ENGINE.12 (T6 + RC9): greenfield constant import — the credit amount is
+// never a literal so the suite tracks HARDEN.5 retuning.
+import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -220,6 +224,7 @@ describe("ENGINE.8 F-BET-3 — comment-free sell [R4]", () => {
 			.select({
 				entryType: dharmaLedger.entryType,
 				amount: dharmaLedger.amount,
+				balanceAfter: dharmaLedger.balanceAfter,
 				betId: dharmaLedger.betId,
 			})
 			.from(dharmaLedger)
@@ -231,8 +236,78 @@ describe("ENGINE.8 F-BET-3 — comment-free sell [R4]", () => {
 		// Positive credit (proceeds > 0) — first char is not '-'.
 		expect(sellCredit?.amount.startsWith("-")).toBe(false);
 
+		// ENGINE.12 (RC9): the day's first commented bet (the entry) paid the
+		// Daily Credit; the sell added NO second one — exactly ONE
+		// daily_allowance row across the whole place→sell day.
+		const dailyCreditRows = ledgerRows.filter(
+			(r) => r.entryType === "daily_allowance",
+		);
+		expect(dailyCreditRows.length).toBe(1);
+		// Balance math after a paying first place: the sell credit's implied
+		// previous balance (balance_after − amount) is grant + credit − stake.
+		expect(
+			new CpmmDecimal(sellCredit?.balanceAfter ?? "0")
+				.minus(sellCredit?.amount ?? "0")
+				.toFixed(18),
+		).toBe(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).minus("10").toFixed(18),
+		);
+
 		// Position is flat (sold the full held quantity → no held row).
 		const { heldSideOrNull } = await import("@/server/positions/read");
 		expect(await heldSideOrNull(testDb, { userId, marketId })).toBeNull();
+	});
+
+	it("bet-sell::sell-only-day-never-pays-daily-credit [ENGINE.12 T6]", async () => {
+		// ADR-0018 / SPEC.1 §10.4: the credit is paid ONLY on placing a
+		// COMMENTED bet. A comment-free sell is an authenticated write but must
+		// NOT pay (the tracker's "first authenticated write" prose is recorded
+		// drift — plan §Context). Seed the position DIRECTLY (no place() entry)
+		// so the day is sell-only, then assert zero accrual artifacts.
+		const userId = await seedUser("sell-only", "sell-only");
+		const marketId = await seedOpenMarketWithPool("sell-only-market");
+		// Direct position seed — Bucket C, no entry bet (fixture bypass).
+		await testDb.insert(positions).values({
+			userId,
+			marketId,
+			side: "YES",
+			quantity: "10.000000000000000000",
+		});
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const sell = await sellPOST(
+			req(
+				"/api/bets/sell",
+				{ marketId, shares: "10.000000000000000000" },
+				"sell-only-key",
+			),
+		);
+		expect(sell.status).toBe(200);
+
+		// ZERO daily_allowance rows after the sell-only day.
+		const ledgerRows = await testDb
+			.select({ entryType: dharmaLedger.entryType })
+			.from(dharmaLedger)
+			.where(eq(dharmaLedger.userId, userId));
+		expect(
+			ledgerRows.filter((r) => r.entryType === "daily_allowance").length,
+		).toBe(0);
+		// The sell's own proceeds credit (bet_stake, positive) is the ONLY row.
+		expect(ledgerRows.length).toBe(1);
+		expect(ledgerRows[0]?.entryType).toBe("bet_stake");
+
+		// Cursor still NULL — never paid.
+		const userRows = await testDb
+			.select({ lastAllowanceAccruedAt: users.lastAllowanceAccruedAt })
+			.from(users)
+			.where(eq(users.id, userId));
+		expect(userRows[0]?.lastAllowanceAccruedAt).toBeNull();
+
+		// No dharma.credited event either.
+		const creditEvents = await testDb
+			.select({ eventId: events.eventId })
+			.from(events)
+			.where(eq(events.eventType, "dharma.credited"));
+		expect(creditEvents.length).toBe(0);
 	});
 });

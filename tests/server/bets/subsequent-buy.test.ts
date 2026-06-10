@@ -47,7 +47,18 @@ vi.mock("@/server/moderation/precommit", () => ({
 }));
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
-import { comments, markets, pools, positions, users } from "@/db/schema";
+import {
+	comments,
+	dharmaLedger,
+	markets,
+	pools,
+	positions,
+	users,
+} from "@/db/schema";
+// ENGINE.12 (RC9): greenfield constant import — balance math after a paying
+// first place tracks the live constant, not a literal.
+import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 
@@ -178,5 +189,34 @@ describe("ENGINE.8 F-BET-2 — same-side subsequent buy (INV-1)", () => {
 		expect(
 			BigInt(afterSecond[0]?.quantity.split(".")[0] ?? "0"),
 		).toBeGreaterThan(BigInt(entryQuantity.split(".")[0] ?? "0"));
+
+		// ENGINE.12 (RC9): the FIRST place of the UTC day paid the Daily Credit;
+		// the same-day subsequent buy paid NOTHING — exactly ONE daily_allowance
+		// row, and both stake debits chain off the post-credit running balance
+		// (grant 1000 → +credit → −10 → −10).
+		const ledgerRows = await testDb
+			.select({
+				entryType: dharmaLedger.entryType,
+				balanceAfter: dharmaLedger.balanceAfter,
+			})
+			.from(dharmaLedger)
+			.where(eq(dharmaLedger.userId, userId));
+		const creditRows = ledgerRows.filter(
+			(r) => r.entryType === "daily_allowance",
+		);
+		expect(creditRows.length).toBe(1);
+		expect(creditRows[0]?.balanceAfter).toBe(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).toFixed(18),
+		);
+		const stakeBalances = ledgerRows
+			.filter((r) => r.entryType === "bet_stake")
+			.map((r) => r.balanceAfter);
+		expect(stakeBalances.length).toBe(2);
+		expect(stakeBalances).toContain(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).minus("10").toFixed(18),
+		);
+		expect(stakeBalances).toContain(
+			new CpmmDecimal("1000").plus(DAILY_CREDIT_DHARMA).minus("20").toFixed(18),
+		);
 	});
 });
