@@ -164,15 +164,15 @@ Branches `feat/` · `fix/` · `chore/` · `refactor/`. **Squash-merge only; PRs 
 - `BETTER_AUTH_URL` fails at **build time**, not request time — the custom domain must be attached and the URL set *before* deploy.
 
 ### `ultrathink`
-First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, payout math, side-freeze semantics, cross-service state machines, auth, moderation failure modes, ADR drafting, and CLAUDE.md / AGENTS.md audits.
+First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, payout math, side-freeze semantics, cross-service state machines, auth, moderation failure modes, ADR drafting, and CLAUDE.md / AGENTS.md audits. Mechanism: an in-context deeper-reasoning instruction for that turn only — it does **not** change the session/API effort level (effort policy is §6).
 
 ---
 
 ## 6. Subagents, hooks, model
 
-**Claude Code runs on Opus 4.8** — no `model` pin, so the account default carries (the 4.7 → 4.8 move per SYNC `D-CC-MODEL` holds). Max effort (`CLAUDE_CODE_EFFORT_LEVEL=max` in the shell rc) + `ultrathink` in every coding prompt.
+**Claude Code runs on Claude Fable 5** — pinned `claude-fable-5`, requires Claude Code ≥ 2.1.170; supersedes Opus 4.8 (`D-CC-MODEL` updated 2026-06-10). Select with `/model fable`, which persists via user settings. **Effort is "gated-xhigh":** persistent default `xhigh`, set once via `/effort xhigh`; `max` is on-demand and session-only (`/effort max`) for genuinely ambiguous/hard problems. The `CLAUDE_CODE_EFFORT_LEVEL` env var is **retired** — it outranks subagent frontmatter; never set it. `ultracode` is opt-in for low-stakes parallelizable chores only, **never critical paths** (auto-orchestrated workflows bypass the plan→execute + named-reviewer cascade). `ultrathink` stays in every coding prompt (§5). Fable 5 runs cyber/bio safety classifiers; flagged requests auto-fallback to Opus 4.8 (can trip on repo/CLAUDE.md context alone) — expected, non-blocking; return with `/model fable`.
 
-**Subagents** — auto-discovered from `.claude/agents/*.md`; all four are tracked, each `model: opus` / `effort: xhigh` with a "MUST BE USED" routing description. Full briefings live in those files; invocation policy is §5.11.
+**Subagents** — auto-discovered from `.claude/agents/*.md`; all four are tracked, each `model: claude-fable-5` / `effort: xhigh` with a "MUST BE USED" routing description. Full briefings live in those files; invocation policy is §5.11.
 
 - `code-reviewer` — diff under `src/server/` vs §2/§3 + stack patterns; returns CRITICAL/HIGH/MEDIUM/LOW with `file:line`.
 - `db-migration-reviewer` — schema vs SPEC.2 §5 inventory, FK lambdas, indexes, Bucket A/B/C, trigger SQL; returns PASS/FAIL/SURPRISE per table.
@@ -211,7 +211,7 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 - Moderation runs **outside** the bet transaction and fails closed on terminal errors (ADR-0014); CSAM via PhotoDNA + image classifier.
 - RLS out of scope for the experiment (ADR-0019).
 - Same-commit doctrine: fixes to guardrail mechanisms are absorbed in-session, never deferred.
-- CC on Opus 4.8 (`D-CC-MODEL`); subagents stay `model: opus` / `effort: xhigh`.
+- CC on Claude Fable 5, pin `claude-fable-5` (`D-CC-MODEL` updated 2026-06-10; supersedes Opus 4.8); subagents pin `model: claude-fable-5` / `effort: xhigh`; effort policy gated-xhigh — `max` on-demand session-only, `CLAUDE_CODE_EFFORT_LEVEL` retired.
 - Enforcement hooks / `permissions.deny` not yet installed — this file is advisory until they are (§6).
 
 **Closing ritual**, every task: "Should CLAUDE.md / AGENTS.md / the workflow / the tracker change as a result of this session?" Usually no — the discipline is asking. If yes, same PR, never a follow-up (follow-ups never happen).

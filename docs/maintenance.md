@@ -157,4 +157,10 @@ Yes, this file gets audited too. The loop checks itself.
 
 ---
 
-*Last revised in SCAFFOLD.13-B (May 20, 2026) — §5.11 routing extension added.*
+## Maintenance log
+
+- **2026-06-10 — CC harness → Claude Fable 5.** Executor pinned `claude-fable-5` (requires Claude Code ≥ 2.1.170; supersedes Opus 4.8 — `D-CC-MODEL` updated); all four subagents pin `model: claude-fable-5` / `effort: xhigh`. Effort policy: gated-xhigh — persistent `xhigh` via `/effort xhigh`; `max` on-demand, session-only; `CLAUDE_CODE_EFFORT_LEVEL` env var retired. ultracode = opt-in for low-stakes parallelizable chores only, never critical paths. `/loop` PARKED (no monitoring use case in build phase). `/goal` PILOT PENDING (one low-stakes, transcript-verifiable chore with a hard turn cap; never critical-path).
+
+---
+
+*Last revised 2026-06-10 — Fable 5 harness maintenance entry (maintenance log added). Previous: SCAFFOLD.13-B (May 20, 2026), §5.11 routing extension.*
