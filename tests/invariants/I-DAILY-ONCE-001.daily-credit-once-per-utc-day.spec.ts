@@ -57,12 +57,12 @@ describe("I-DAILY-ONCE-001: one daily_allowance row per user per UTC day", () =>
 		const userId = await seedUser("once-dup", "once-dup");
 
 		// First credit of the day — allowed.
-		await insertCreditRow(userId, "10", "2026-06-10T04:00:00+00");
+		await insertCreditRow(userId, "10", "2026-06-10T04:00:00+00:00");
 
 		// Second credit, SAME user, SAME UTC day (different time) → the
 		// backstop index rejects with unique_violation.
 		await expect(
-			insertCreditRow(userId, "20", "2026-06-10T21:30:00+00"),
+			insertCreditRow(userId, "20", "2026-06-10T21:30:00+00:00"),
 		).rejects.toMatchObject({
 			code: "23505",
 			constraint_name: "dharma_ledger_daily_allowance_day_uq",
@@ -87,21 +87,21 @@ describe("I-DAILY-ONCE-001: one daily_allowance row per user per UTC day", () =>
 		const userA = await seedUser("once-a", "once-a");
 		const userB = await seedUser("once-b", "once-b");
 
-		await insertCreditRow(userA, "10", "2026-06-10T12:00:00+00");
+		await insertCreditRow(userA, "10", "2026-06-10T12:00:00+00:00");
 
 		// (a) The NEXT UTC day for the same user is allowed — including the
 		// midnight boundary instant.
-		await insertCreditRow(userA, "20", "2026-06-11T00:00:00+00");
+		await insertCreditRow(userA, "20", "2026-06-11T00:00:00+00:00");
 
 		// (b) A DIFFERENT user on the same UTC day is allowed.
-		await insertCreditRow(userB, "10", "2026-06-10T12:00:00+00");
+		await insertCreditRow(userB, "10", "2026-06-10T12:00:00+00:00");
 
 		// (c) The partial WHERE scopes the index to daily_allowance only —
 		// other same-user same-day entry types are unconstrained.
 		await testClient.unsafe(
 			`INSERT INTO dharma_ledger (user_id, entry_type, amount, balance_after, created_at)
-			 VALUES ($1, 'bet_payout', '5', '15', '2026-06-10T13:00:00+00'),
-			        ($1, 'bet_payout', '5', '20', '2026-06-10T14:00:00+00')`,
+			 VALUES ($1, 'bet_payout', '5', '15', '2026-06-10T13:00:00+00:00'),
+			        ($1, 'bet_payout', '5', '20', '2026-06-10T14:00:00+00:00')`,
 			[userA],
 		);
 
