@@ -75,3 +75,38 @@
 **Time.** 2026-06-10 (IST). Session arc: kickoff → Segment 1 recon (plan-mode, read-only; report with 7 surprises + 7 open questions) → web SURFACE (6 rulings + the pre-resolved set) → founder "best recoms" → Segment 2 in-chat draft (D-N1 flagged by CC) → web CP review (R-CP1–4 + F1–F3) → Segment 3 fold/commit (first relay lost in transit; re-issue with state probe, first-run clean) → PR #102, CI `27257468866` green → founder squash-merge `ca790ca`, branch deleted → this log (`chore/engine-12-log`).
 
 ---
+
+## Execute session — 2026-06-10
+
+**What landed.** ENGINE.12 execute, squash-merged to `main` as **`af61ce5`** (PR **#104**, CI run `27270073245` green, 1m55s + Vercel pass). The 5-commit branch story (branch SHAs ephemeral, recorded for the audit trail): `3cbfaf8` RED set (T1–T8 + T10 + RC9 additive touches; 9 test files) → `55d6722` 0012 backstop index (PROBE: drizzle-kit CAN express the partial UNIQUE expression index — generated path, hand-written fallback unused; F3a `users.updated_at` exists, F3b true-next = 0012) → `7f1c9d9` implementation + riders 1–5 (`accrual.ts` producer, R4 `place()` seam, P1 mint-site, `DAILY_CREDIT_DHARMA`, SPEC.2 :541/:477/B.12/§19.4.1 + ADR-0013 §5.12 Patch record `pools → users`) → `c422f9c` decoder fix (S1) → `5304016` gate-adjudicated test fixes (W-RULE-2/3, S4/S5).
+
+**Mode pins.** `claude-fable-5` (exact ID `claude-fable-5[1m]`), ultrathink every turn, ultracode OFF after the operator reset cleared a harness-injected session flag (turn-1 injection only; verified by absence thereafter; the TUI status-line label adjudicated cosmetic/stale). Zero Fable→Opus fallbacks across the whole session. Effort not in-context-readable; operator-side `xhigh` uncontradicted.
+
+**Decisions made / rulings consumed.**
+- Web RED green-light: R-RED-1 (T8b scope guard ratified), R-RED-2 (T3 rendezvous latch = scheduling device, not a fault vehicle; F1 governs fault injectors only), R-RED-3 (`DharmaInputError` is module-local at `@/server/dharma/errors`).
+- **W-RULE-1** (blocking, pre-PR): §5.7 critical-path gates must run locally before the PR — local Postgres was down all session and CI is PR-gated, so "ride CI" mischaracterized the gate. Docker Desktop + `supabase start` brought `:54322` up in-session (no operator action; note: `/usr/local/bin/docker` is a broken symlink to a stale `/Volumes/Docker` mount — the live CLI is the app bundle's).
+- **W-RULE-2** (S4 fix): T8/T8b RED-set fixture used bare `+00`-offset T-form literals — Invalid Date in V8 → postgres-js bind-serializer `RangeError` before any SQL. Format-only fix to `+00:00`; `+05:30` case kept; constraint name/23505 matcher/scope assertions byte-identical.
+- **W-RULE-3** (S5 fix, authorized beyond-plan touch): pre-existing ENGINE.5 fixture (`dharma-ledger.integration.test.ts`) wrote two same-user same-UTC-day `daily_allowance` rows — illegal by design post-0012; the +25 row's `entry_type` → `bet_payout` (canonical positive tag, no bespoke core guard, in-file precedent), zero assertion lines touched. The backstop firing here (23505, right constraint, right key) was the invariant's first empirical proof.
+
+**SURPRISE trail (S1–S5).** S1 — `sql<Date>` tx-clock fragment had NO runtime decoder (drizzle/postgres-js parses timestamptz transparently): every place would have 500'd unretryably; invisible to tsc/T10/local-DB-down; caught by `@code-reviewer` (CRITICAL), fixed `c422f9c` via `.mapWith(users.lastAllowanceAccruedAt)` (borrows the cursor column's own decoder — congruent operands, single-clock at runtime), security-covered, re-gated. S2 — W-RULE-1 above (gates initially unexecuted anywhere). S3 — administrative: `@db-migration-reviewer`'s commit-inventory delta (c422f9c postdated its kickoff; it IS the S1 fix). S4/S5 — the two gate-adjudicated test-file defects above.
+
+**Gates (final, local Postgres `:54322`, post-0012 apply).** 0012 apply `[✓]`; catalog proof: `CREATE UNIQUE INDEX dharma_ledger_daily_allowance_day_uq ON public.dharma_ledger USING btree (user_id, ((timezone('UTC'::text, created_at))::date)) WHERE (entry_type = 'daily_allowance'::dharma_entry_type)` — PG-17 accepted = expression immutability proven; CI's postgres:17 migrate on PR #104 is the second, independent apply proof. Tallies: invariants **15/15** (I-DAILY-ONCE-001 rejection fires live) · integration **92/92** · test-db **78/78** · bets suites **36/36** (T1–T5 incl. THE RACE T3, T6, T7, six RC9) · unit **284/284** (T10) · full vitest **665/0** · `ZUGZWANG_ENV=preview just verify` pass.
+
+**Cascade.** `@code-reviewer` (1 CRITICAL→fixed; P1 mint-site PASS, seam/cycle PASS, invariants PASS) → `@security-auditor` (zero blocking; five money surfaces SOUND; one LOW: mid-flight ban pays one credit — admin-gated, within spec per P4/SPEC.1 §10.7/SPEC.2 §8.6) → `@db-migration-reviewer` (all PASS; snapshot round-trip empirically no-drift) → §5.10 self-audit CLEAN (amended to CLEAN-PENDING-§5.7 by W-RULE-1, then discharged by the local gate run).
+
+**Open questions.** None blocking. The mid-flight-ban LOW is recorded as within-spec (no action). AGENTS.md §9's invariant-inventory line remains stale (now 5 specs on disk) — owned by the periodic SYNC sweep, per plan.
+
+**Carry-forwards (minted/affirmed for successors).**
+- **DEBATE.2:** the reply route MUST mint `creditEventId` at ITS handler entry when it reuses `place()` (one line; `PlaceParams.creditEventId` is now required).
+- **ENGINE.9:** still owes its own per-user serialization for resolution writes — named as consumer in the ADR-0013 §5.12 Patch record (`pools → users` canonical order).
+- **§19.4.1 catch-up rows** for `bet.placed`/`bet.sold`/`comment.placed` (pre-existing ENGINE.7/8 gap) — SYNC-sweep forward (R-CP3).
+- **R6 — AUTH-lane tracker row:** mint/amend a row for the **initial-grant producer**, carrying `persist.ts` D-2's per-user-serialization warning (the grant writes sit outside the pool lock).
+- **Maintenance sweep:** `.env.local` lacks `DATABASE_URL` — the committed `tests/_setup/env.ts` default (`postgresql://postgres:postgres@localhost:54322/postgres`) was passed inline for the local migrate; environment-hygiene note (also: the broken `/usr/local/bin/docker` symlink).
+
+**Tracker (operator-maintained — recorded, NOT edited).** ENGINE.12-plan → DONE and ENGINE.12-execute → DONE, both queued for the reconciliation sweep (threshold met — the sweep is its own small chat, not this session). ENGINE.10's gate now has only ENGINE.9 outstanding.
+
+**Next session starts at.** The tracker reconciliation sweep (own chat), or ENGINE.9 per the tracker's sequencing — operator's call.
+
+**Context to preserve.** Canonical execute SHA: `af61ce5` (#104). The accrual unit's load-bearing one-liner for successors: decision read = ONE statement (cursor + `now()` via `.mapWith` — the decoder is load-bearing, see S1); cursor-first write order (D-N1) makes the same-user race a retryable 40001, never the index's 23505; the paid day is a pure read. Local DB now RUNS on this machine (`supabase start`; Docker Desktop via `open -a Docker`).
+
+**Time.** 2026-06-10 (IST). Session arc: sync-gate → post-switch mode reset → `@test-writer` RED (scratchpad #1 → web GREEN + 2 pins) → RED commit → PROBE (generated 0012) → implement + riders → gates (unit-proxy) → cascade (S1 CRITICAL→fix) → scratchpad #2 → web CODE-GREEN + W-RULE-1 → local Postgres up in-session → real gates (S4/S5 surfaced, adjudicated W-RULE-2/3, fixed, 665/0) → PR #104 → operator byte-check (artifacts a–f) → squash `af61ce5` → this log.
