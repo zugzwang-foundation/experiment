@@ -1,12 +1,12 @@
 // Per SPEC.1 §16.1 (operational floor constants) + SPEC.2 §11 ¶"Per-
 // surface rate-limit table" + ADR-0015 D6/D7. Seven numeric placeholders
 // consumed by `src/server/middleware/rate-limit.ts` to instantiate the
-// seven sliding-window Ratelimit surfaces. HARDEN.6 owns the real-value
+// seven sliding-window Ratelimit surfaces. HARDEN.5 owns the real-value
 // tuning pass; SCAFFOLD.4 ships conservative anti-abuse defaults so the
 // substrate is operationally testable end-to-end before HARDEN.* lands.
 //
 // Per SCAFFOLD.4 plan §F4 + plan-Q5 carve-out: PLACEHOLDER VALUES — name
-// each constant's intended HARDEN.6 source in its JSDoc so a future reader
+// each constant's intended HARDEN.5 source in its JSDoc so a future reader
 // who finds a 5 looks up §16.1 / §19 Q4/Q16 / ADR-0010 / ADR-0015 for the
 // real cap rather than treating these as production numbers.
 //
@@ -16,30 +16,30 @@
 // SCAFFOLD.15 Q2/Q3/Q5/Q6/Q7 + SPEC.2 §10.10 + §12.3 + §12.6 amendments.
 // JSDoc per-constant cites the ratification source for greppability.
 
-/** Per-email OTP request cap (anti-spam / anti-bot). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + §19 Q4/Q16. */
+/** Per-email OTP request cap (anti-spam / anti-bot). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + §19 Q4/Q16. */
 export const OTP_REQUESTS_PER_EMAIL_PER_HOUR = 5;
 
-/** Per-IP OTP request burst cap. PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + §19 Q4/Q16. */
+/** Per-IP OTP request burst cap. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + §19 Q4/Q16. */
 export const OTP_REQUESTS_PER_IP_BURST_PER_MIN = 10;
 
-/** Per-IP rate limit on /admin/login POST attempts. PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0010. */
+/** Per-IP rate limit on /admin/login POST attempts. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0010. */
 export const ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR = 10;
 
-/** Per-user, per-market write cap (shared by comments / replies / image-comments / friendly-fire). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + §19 Q4. */
+/** Per-user, per-market write cap (shared by comments / replies / image-comments / friendly-fire). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + §19 Q4. */
 export const RATE_LIMIT_PER_MARKET_PER_DAY = 50;
 
-/** Per-user write burst cap (shared with the per-market budget). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1. */
+/** Per-user write burst cap (shared with the per-market budget). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1. */
 export const RATE_LIMIT_BURST_PER_MIN = 5;
 
-/** Per-IP anti-abuse burst cap on bet place/sell. PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0015 D7. */
+/** Per-IP anti-abuse burst cap on bet place/sell. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
 export const BET_ATTEMPTS_PER_IP_PER_MIN = 30;
 
-/** Per-IP anti-abuse burst cap on R2 signed-PUT URL mint. PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0015 D7. */
+/** Per-IP anti-abuse burst cap on R2 signed-PUT URL mint. PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0015 D7. */
 export const IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN = 10;
 
 // === SCAFFOLD.15: R2 storage substrate + moderation pipeline constants ====
 
-/** Signed-PUT URL TTL. Ratified at SCAFFOLD.15 Q2 + SPEC.2 §12.3 — long enough for `pick file → review → submit` (~30s typical), short enough to bound exfiltrated-URL exposure. NOT a HARDEN.6-tuned placeholder. */
+/** Signed-PUT URL TTL. Ratified at SCAFFOLD.15 Q2 + SPEC.2 §12.3 — long enough for `pick file → review → submit` (~30s typical), short enough to bound exfiltrated-URL exposure. NOT a HARDEN.5-tuned placeholder. */
 export const PUT_URL_TTL_SECONDS = 60;
 
 /** Signed-READ URL TTL for moderation hop. Per SCAFFOLD.15 Q3 + SPEC.2 §10.10 — 60s spans OpenAI's 3s call + 1 retry + slack. Discarded after the call returns; never flows to client. */
@@ -106,13 +106,13 @@ export const RESERVATION_TTL_SECONDS = 10;
 // (src/server/bets/floors.ts) selects the floor by post-vs-reply. Decimal
 // STRINGS (the NUMERIC(38,18) domain) — never JS floats (CLAUDE.md §2).
 
-/** Top-level post-bet minimum stake. PLACEHOLDER VALUE (~10) — tuned by HARDEN.6 per SPEC.1 §16.1 + ADR-0018. Decimal string. */
+/** Top-level post-bet minimum stake. PLACEHOLDER VALUE (~10) — tuned by HARDEN.5 per SPEC.1 §16.1 + ADR-0018. Decimal string. */
 export const BET_MIN_STAKE_POST = "10";
 
-/** Reply-bet minimum stake — PINNED at 50 (higher than the post floor) per ADR-0018; NOT a HARDEN.6 placeholder. Decimal string. Exercised by DEBATE.2's reply route; ENGINE.8 ships the tested validator. */
+/** Reply-bet minimum stake — PINNED at 50 (higher than the post floor) per ADR-0018; NOT a HARDEN.5 placeholder. Decimal string. Exercised by DEBATE.2's reply route; ENGINE.8 ships the tested validator. */
 export const BET_MIN_STAKE_REPLY = "50";
 
-/** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
+/** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
 export const COMMENT_MAX_LENGTH = 5000;
 
 // === ENGINE.12: Daily Credit (ADR-0018 + SPEC.1 §10.4) ====================
