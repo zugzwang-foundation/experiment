@@ -136,7 +136,12 @@ export async function accrueDailyCredit(
 	const rows = await tx
 		.select({
 			cursor: users.lastAllowanceAccruedAt,
-			txNow: sql<Date>`now()`,
+			// `.mapWith` is LOAD-BEARING: a bare sql<Date> fragment has NO runtime
+			// decoder (drizzle's postgres-js driver parses timestamptz transparently
+			// as a wire string), while the `cursor` column decodes via its column
+			// decoder. Borrowing that same decoder keeps both operands congruent
+			// Dates — the single-clock rule at the type AND runtime layer.
+			txNow: sql`now()`.mapWith(users.lastAllowanceAccruedAt),
 		})
 		.from(users)
 		.where(eq(users.id, args.userId));
