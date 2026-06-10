@@ -61,10 +61,14 @@ export async function POST(request: Request): Promise<Response> {
 			throw new CommentTrackBUnderReviewError();
 		}
 
-		// Retry-purity: BOTH event_ids + metadata ONCE here, closed over the
+		// Retry-purity: ALL THREE event_ids + metadata ONCE here, closed over the
 		// callback (the wrapper re-runs the callback per attempt — never these).
+		// creditEventId is minted UNCONDITIONALLY and USED only when the accrual
+		// pays (ENGINE.12 P1); an idempotency replay never re-enters this
+		// handler, so there is no double-pay path here.
 		const betEventId = uuidv7();
 		const commentEventId = uuidv7();
+		const creditEventId = uuidv7();
 		const metadata = buildBetMetadata({
 			requestId: ctx.requestId,
 			flowId: "F-BET-1",
@@ -88,6 +92,7 @@ export async function POST(request: Request): Promise<Response> {
 					idempotencyKey: ctx.idempotencyKey,
 					betEventId,
 					commentEventId,
+					creditEventId,
 					metadata,
 				}),
 		);

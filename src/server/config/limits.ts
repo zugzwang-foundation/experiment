@@ -114,3 +114,8 @@ export const BET_MIN_STAKE_REPLY = "50";
 
 /** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.6 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
 export const COMMENT_MAX_LENGTH = 5000;
+
+// === ENGINE.12: Daily Credit (ADR-0018 + SPEC.1 §10.4) ====================
+
+/** Flat (non-escalating) Daily Credit, paid once per UTC day only on a day the user places a commented bet (ADR-0018 + SPEC.1 §10.4/§16.1). Use-or-lose. PLACEHOLDER VALUE (~10, ranged) — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */
+export const DAILY_CREDIT_DHARMA = "10";

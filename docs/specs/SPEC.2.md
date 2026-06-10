@@ -474,7 +474,7 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 6 | `payout_events` | `events` | ADR-0005 | One row per bet settlement during W-3 fan-out; corrections write paired `correction_reverse` + `correction_apply` rows per §3.6 |
 | 7 | `mod_actions` | `audit` | ADR-0014 | Moderation audit trail; pre-commit verdict + image-upload linkage via `image_r2_key` per §10 |
 | 8 | `admin_events` | `audit` | ADR-0010 | Admin-action audit trail; admin-actor encoding `metadata.user_id = NULL`, `metadata.actor_id = 'admin-singleton'` per §3.6 + §8.8 |
-| 9 | `user_events` | `audit` | ADR-0005 | User lifecycle audit trail (ToS acceptance, pseudonym assignment, daily-allowance accrual); replaces dropped `daily_allowance_events` |
+| 9 | `user_events` | `audit` | ADR-0005 | User lifecycle audit trail (ToS acceptance, pseudonym assignment). Daily Credit accrual is NOT here — its complete write set is `events` (`dharma.credited`) + `dharma_ledger` + the `users.last_allowance_accrued_at` cursor per §5.5 (ENGINE.12 R2) |
 
 **Bucket B — append-only with one whitelisted column transition**
 
@@ -538,7 +538,7 @@ Six tables that appeared in earlier outlines but are absent from the v1 inventor
 
 - **`admin`** — no admin user row exists. F-AUTH-ADMIN structural separation per ADR-0010 + §8.7 puts admin entirely outside the participant graph; auth is via `ADMIN_PASSWORD` env var against `admin_sessions` only. The "admin" actor is encoded at events-row write time (`metadata.user_id = NULL`, `metadata.actor_id = 'admin-singleton'`) per §3.6 + §8.8.
 - **`otp_codes`** — renamed to `verifications` per ADR-0004 (Better Auth's Email-OTP plugin owns the table name).
-- **`daily_allowance_events`** — collapsed into `events` (event-type `user.daily_allowance_accrued`) + `dharma_ledger` (the credit row) + `users.last_allowance_accrued_at` (the idempotency cursor) per ADR-0005. No separate domain table needed.
+- **`daily_allowance_events`** — collapsed into `events` (event-type `dharma.credited`, aggregate `dharma_account` — the built ENGINE.0 name, kept per the ENGINE.12 R1 founder ruling; this entry previously said `user.daily_allowance_accrued`) + `dharma_ledger` (the credit row) + `users.last_allowance_accrued_at` (the idempotency cursor) per ADR-0005. No separate domain table needed; no `user_events` row either (ENGINE.12 R2 — this three-part collapse is the complete write set).
 - **`projections_state`** — no async projector cursor needed in v1. ADR-0005 Pattern A maintains read-models synchronously inside the originating transaction; there is no out-of-band projector to track.
 - **`k_eff_dashboard`** — struck per PRECURSOR.2-B D4 (2026-05-08). The K_eff dashboard product surface was removed entirely; the only K_eff trajectory derivation is the post-hoc one against the 2026-11-06 public dataset (per §5.4 + §19.5).
 - **`friendly_fire_events`** — removed entirely per **ADR-0017** (reply-as-bet model, sharpened SYNC.7) + SPEC.1 v1.9.0-draft. The standalone friendly-fire up/down vote is gone — there is no vote affordance and no table. The "Support / Counter" signal a post displays is now read-time aggregated over its reply-bets (§5.4), not a stored vote. This table was present in the v0.3-draft "as-built" inventory (and in the SCAFFOLD.2 build) with a two-column Bucket-B trigger and F-COMMENT-6/7/8 Server Actions; all of it — table, trigger, `castFriendlyFire`/`clearFriendlyFire` — is struck from the architecture. (The physical migration dropping the built table + the F-COMMENT-6/7/8 retirement are forward engineering work tracked on the tracker; see §23.3.) **Note:** ADR-0017's own body text still says friendly-fire "stays display-only"; that wording is stale and contradicted by both specs — reconciled by a later in-place ADR-0017 patch (flagged §23.3), not in this pass per the "don't flip ADR status" scope.
@@ -1879,6 +1879,7 @@ Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR
 | `image_upload.orphaned` | `payload.key` | R2 key strip; `uploadId` is the row id (SHIP — not PII) |
 | `admin.signed_in` | `payload.sessionId`, `payload.ip` | Cookie value + admin IP defense-in-depth (mitigation layer beyond `BREAK_GLASS.md` rotation pre-freeze) |
 | `admin.signed_out` | `payload.sessionId` | Cookie value defense-in-depth |
+| `dharma.credited` | `payload.userId` | PSEUDO defense-in-depth — `aggregate_id` carries the user id; same rationale as `user.signed_out` (ENGINE.12 emit site) |
 
 **Adding a new event_type or modifying a payload shape** is a same-commit amendment to this table plus the schema declaration at `src/server/events/schemas.ts` plus the per-site emit call. The export pipeline reads this table to derive its per-payload-key strip lambdas (implementation deferred to HARDEN.* / DATASET.* stratum; runtime emission codifies the strip-key contract at the spec layer NOW so future emit sites cannot accidentally bypass).
 
@@ -2632,7 +2633,7 @@ Inferred from §3.7 + INV-2 mechanism per §14.1; PRECURSOR.4 verifies entry-typ
 |---|---|---|---|
 | `id` | uuid | SHIP | User event PK |
 | `user_id` | uuid | PSEUDO | Rewritten to `user_pseudonym` per §19.5 |
-| `event_type` | text | SHIP | `user.oauth_signed_in` / `user.otp_signed_in` / `user.pseudonym_assigned` / `user.tos_accepted` / `user.daily_allowance_accrued` / `user.signed_out` |
+| `event_type` | text | SHIP | `user.oauth_signed_in` / `user.otp_signed_in` / `user.pseudonym_assigned` / `user.tos_accepted` / `user.signed_out` (Daily Credit accrual rides `events` as `dharma.credited` per §5.5 — ENGINE.12 R1/R2; no `user_events` row) |
 | `payload` | jsonb | SHIP (with per-event-type variations) | E.g., `user.tos_accepted` carries version hashes; `user.pseudonym_assigned` carries the pseudonym slug |
 | `metadata` | jsonb | SHIP (with PII strip per below) | |
 | `metadata.request_id` | text | SHIP_KEY | |

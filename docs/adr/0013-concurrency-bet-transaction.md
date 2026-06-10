@@ -12,6 +12,21 @@
 
 ---
 
+## Patch record
+
+### P1 — Canonical lock order extends `pools → users` (ENGINE.12 daily-credit cursor, 2026-06-10)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The load-bearing decision is unchanged.** ENGINE.12's lazy Daily Credit writes the
+`users.last_allowance_accrued_at` cursor inside W-1 (`src/server/dharma/accrual.ts`, called from
+`place()`) — the first contended non-pool row lock. Global order is **pools → users**: the wrapper
+acquires the pool row first; the users-row write happens second, inside the callback, co-located in
+the per-user write block of the §2 chain (before the terminal `events` write, per the same
+co-location rationale). Consistent across all writers — different-market same-user races collide on
+the users row as a retryable `40001` (wrapper retry), never a deadlock. No other code path writes
+`users` inside a pool-locked transaction. **Consumer:** ENGINE.9's outstanding per-user
+serialization obligation for resolution writes (`persist.ts` D-2) must slot into this same order.
+
 ## Context and Problem Statement
 
 The bet handler is the most write-contended code path in the experiment. Every entry bet (F-BET-1) is an atomic write to six tables — `pools`, `positions`, `dharma_ledger`, `bets`, `comments`, `events` — and INV-1 (bet+comment atomicity) requires that all six commit or none do. Subsequent buys (F-BET-2) and sells (F-BET-3) write subsets of the same tables; F-BET-3 additionally triggers F-COMMENT-8 (friendly-fire freeze) inside the same transaction by updating `friendly_fire_events.frozen_at` for the user's votes in this market. Two concurrent users bidding on the same market hit the same `pools` row.
