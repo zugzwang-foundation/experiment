@@ -20,14 +20,14 @@ export const IDEMPOTENCY_KEY_REGEX = /^[A-Za-z0-9_-]{1,255}$/;
  * Pending-sentinel TTL in seconds. Sized for SPEC.2 §10 / ADR-0014's
  * 10-second moderation reservation worst case + SPEC.2 §9 / ADR-0013's
  * bet-transaction worst case (~600ms upper) + slack. Per ADR-0015 D1
- * this is a ratified value, NOT a HARDEN.6 tuning knob.
+ * this is a ratified value, NOT a HARDEN.5 tuning knob.
  */
 export const PENDING_TTL_SECONDS = 30;
 
 /**
  * Completed-response cache TTL in seconds (24 hours). Matches Stripe's
  * published Idempotency-Key contract per ADR-0015 D1. Ratified value;
- * NOT tuned by HARDEN.6.
+ * NOT tuned by HARDEN.5.
  */
 export const COMPLETED_TTL_SECONDS = 86400;
 

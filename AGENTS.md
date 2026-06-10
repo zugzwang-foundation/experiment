@@ -78,7 +78,7 @@ experiment/
 │   └── server/                     # server-side business logic
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── config/ events/ idempotency/ identity-pool/ middleware/ moderation/ storage/ upstash/
+│       ├── bets/ config/ cpmm/ dharma/ events/ idempotency/ identity-pool/ markets/ middleware/ moderation/ positions/ storage/ upstash/
 ├── tests/                          # dedicated dir (NOT colocated) — see §9
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
@@ -89,7 +89,7 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** `src/server/bets/`, `src/server/comments/`, `src/server/dharma/`, `src/server/resolution/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases.
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/resolution/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
@@ -164,7 +164,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0011_position_drift_pg_cron.sql`.
+- Current head: `0012_daily_allowance_day_unique.sql`.
 
 ### Transactions, queries, validation
 
@@ -204,15 +204,22 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
-├── integration/   8 *.integration.test.ts (idempotency, orphan-sweep, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger)
-├── invariants/    I-APPEND-ONLY-001 + I-NO-OVERDRAFT-001 (dharma-ledger-monotone)
-├── server/        auth/ (incl. _probe-*), events/, identity/, middleware/, moderation/, storage/, admin/moderation/, dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, cpmm/ (smoke + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), dharma/ (canonical, _probe-decimal-negzero, ledger, conservation)
+├── integration/   9 *.integration.test.ts (idempotency, orphan-sweep, positions, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger)
+├── invariants/    7 specs — see the Invariant-tests bullet below
+├── server/        auth/ (incl. _probe-*), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), events/, identity/, middleware/, moderation/, storage/, admin/moderation/, dharma/ (non-transferable)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
-- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`. Only `I-APPEND-ONLY-001` exists; INV-1/2/3 canonical tests are written as their modules land (enforcement currently lives in `tests/db/triggers/` + the schema + the session-gate).
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 7 on disk:
+  - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
+  - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).
+  - `I-DAILY-ONCE-001.daily-credit-once-per-utc-day` — at most one `daily_allowance` ledger row per user per UTC day; storage backstop is the unique partial index `dharma_ledger_daily_allowance_day_uq` (minted ENGINE.12).
+  - `I-NO-OVERDRAFT-001.dharma-ledger-monotone` (INV-2) — `dharma_ledger` `balance_after >= 0`; no overdraft.
+  - `I-NO-OVERSELL-001.positions-quantity-non-negative` — position quantity never negative (invariant-class spec rule, not INV-1..4).
+  - `I-SIDE-BIND-001.comment-side-bound-at-post-time` (INV-3) — `comments.side_at_post_time` is frozen at post-time; selling out and re-entering the other side never moves prior comments (minted ENGINE.8; DEBATE.3 reuses).
+  - `I-SINGLE-SIDE-001.positions-one-held-side` — at most one held side per (user, market) (invariant-class spec rule).
 - **`_probe-*.test.ts`** = vendor-contract **regression guards** (e.g. `_probe-openai-omni-shape`, auth probes) — they assert a third-party/library shape, distinct from TDD drivers (CLAUDE.md §5.6).
 - **Naming:** `<subject>.test.ts` (unit), `<subject>.integration.test.ts` (integration), `<area>.spec.ts` (db/invariant specs), `<area>.property.test.ts` (fast-check property suites). One subject per file.
 

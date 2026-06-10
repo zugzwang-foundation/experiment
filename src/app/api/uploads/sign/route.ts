@@ -175,7 +175,7 @@ export async function POST(request: Request): Promise<Response> {
 		}
 		if (err instanceof StorageUnavailableError) {
 			// Retry-After per SPEC.2 §11 fail-CLOSED convention. 5s matches the
-			// idempotency-cache 503 surface; tunable in HARDEN.6 if needed.
+			// idempotency-cache 503 surface; tunable in HARDEN.5 if needed.
 			return jsonResponse(err.toEnvelope(), {
 				status: 503,
 				headers: { "retry-after": "5" },
