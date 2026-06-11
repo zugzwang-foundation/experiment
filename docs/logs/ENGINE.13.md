@@ -56,3 +56,56 @@
 - **Tracker (operator-maintained — recorded, NOT edited):** ENGINE.13-plan DONE; ENGINE.13-execute next.
 
 **Time.** 2026-06-11 (IST). Session arc: kickoff (OQ-A/OQ-C pre-flipped by the web lane) → S1 sync-gate (6/6 PASS @ `3720935`) → S2 read-only recon (P1–P6; SURPRISES S1–S5; founder-OQ candidates F1/F2) → S3 founder "best recoms" (R1a–R4a; P1–P5 unvetoed) → S4 in-chat draft (D-N1–D-N7) → web line review GREEN + F-1/F-2 → S5 branch commit `171ade0` → PR #108, CI `27326963097` green (1m57s) → founder squash-merge `7f3214c`, branch deleted → END-ON-MAIN → this log (`chore/engine-13-log`).
+
+---
+
+## Execute session — 2026-06-11
+
+**What landed.**
+- The full ENGINE.13 implementation via **PR #110**, squash-merged to `main` at **`76877e6`** (`feat(dharma): ENGINE.13 — initial grant at first ToS acceptance (F-AUTH-4 tx + I-GRANT-ONCE-001)`). Four branch commits: `0cc50a5` (RED test set, 4 files +757) → `0f630b5` (server + riders: `grant.ts` NEW 111 lines, the tos-accept seam +30, `INITIAL_USER_DHARMA`, `dharma.granted` vocabulary, riders R-A..R-D) → `22f1d48` (schema uniqueIndex + generated 0013 + meta + the gate-ruled D2 drop/restore edit + CLAUDE/AGENTS one-liners) → `583bbaf` (the inventory-floor fix-up, S5 SURPRISE-ruled). Final diff: 18 files, ~3.85k insertions. CI green on the PR head (run `27338416918`, 1m59s + Vercel pass).
+- **0013 DDL (applied + backstop-proven):** `CREATE UNIQUE INDEX "dharma_ledger_initial_grant_user_uq" ON "dharma_ledger" USING btree ("user_id") WHERE "dharma_ledger"."entry_type" = 'initial_grant';` — single statement, GENERATED path, byte-matches the plan P2 expectation.
+- **Tests:** `tos-accept-grant.test.ts` (T1/T2/T3/T5/T7a/T7b, DB-backed real-action vehicle) · `I-GRANT-ONCE-001.initial-grant-once-per-user.spec.ts` (T4 fixture-bypass 23505 + scope guards; invariants 7 → 8) · `tests/unit/dharma/grant.test.ts` (T6 ×8) · `tos.test.ts` +173/−0 additive (called-once with `(tx, { userId, grantEventId, metadata })` + 6 not-called guards) · the D2 duplicated-genesis drop/restore edit · the EVENT_TYPES inventory floor 21 → 22.
+
+**Surprises caught + fixed in-session (§5.10 surprises-as-wins — both chains in the PR body so they survive the squash).**
+1. **S1 F-2b fixture sweep → Option-A ruling.** The plan's own F-2b micro-pin caught `tests/integration/positions.integration.test.ts:529-583` (`drift-D2::duplicated-genesis`) deliberately inserting a SECOND same-user `initial_grant` row — the ENGINE.11 A1/A2 D2-B drift belt, a guaranteed fixture-seed 23505 under 0013. Outside the CLOSED set → surfaced via `claude-progress.md`, STOPPED before branch checkout. **Founder ruling (Option A, the D3 mirror):** the file joins the closed set, edit scoped to that one test — DROP INDEX → seed → drift assertions → TRUNCATE + re-CREATE **byte-faithful to 0013** in `try/finally`, same commit as the migration (`22f1d48`). `@db-migration-reviewer` verified restore fidelity character-for-character; post-suite `pg_indexes` confirmed live restore. *Attribution correction (web-lane re-derivation):* the D2-B duplicated-genesis detector is **ENGINE.11's** A1/A2 work, not ENGINE.12's as the S1 report first stated.
+2. **S5 inventory floor → fix-up `583bbaf`.** Post-PR-open CI red: ONE test of 695 — `tests/server/events/insert.test.ts::events::canonical-event-types-inventory-shape`, the deliberate EVENT_TYPES exhaustive floor (sorted equality + length pin 21), tripped by the R2a-added `"dharma.granted"`. The plan's break-risk section analyzed `tos.test.ts` + `tos-accept-event.test.ts` but missed this consumer; outside the CLOSED set → surfaced, STOPPED. **Founder ruling:** scoped edit — append `"dharma.granted"` (sort preserved), count 21 → 22, provenance git-verified before writing (`dharma.credited` = ENGINE.0 `4dc16d7`; `dharma.granted` = ENGINE.13). Re-runs: events suite 57/57; full `pnpm vitest run` 688 passed / 0 failed; CI green.
+
+**Session arc + gate evidence.**
+- **S1 sync-gate:** items 1–5 + 7 PASS at `b62ec12` (HEAD = the #109 squash itself); item 6 = the F-2b SURPRISE above; item 8 checkout withheld until the ruling, then `feat/engine-13-initial-grant` created (name verified free both sides). Greenfield re-confirmed: 6 `initial_grant` hits in `src/`, all definitional. Next-free migration index re-verified = 0013 (F-2a, no drift). Local `:54322` already up.
+- **S2 RED (@test-writer, plan passed as first-read; never touched `src/` or the D2 file):** RED shapes — greenfield-import **collection failure** for `tos-accept-grant.test.ts` + `grant.test.ts` (the plan's designed mechanism; load-bearing for T5/T7, which would be vacuously green pre-seam — the current action's writes already roll back under the T5 fault); **live assertion failure** for T4 against `:54322` (no 23505 pre-index); **assertion failure** for the `tos.test.ts` called-once (0 calls). Note for future RED designs: `vi.mock` with a factory registers fine against a then-nonexistent module path (lazy resolution) — the whole-suite collection-RED fallback did NOT occur; the suite REDs by assertion, the cleaner shape.
+- **S3 implement + gates:** CLOSED file set built exactly (plus the drizzle GENERATED-path meta artifacts, 0012 precedent); riders same-commit as the code they describe. Five local gates PASS: `ZUGZWANG_ENV=preview just verify` · `pnpm test:invariants` (8 files/17) · `pnpm test:integration` (9/92) · `just test-db` (23/80) · targeted auth+dharma (22 files/189+2 todo). RED→GREEN flip verified per-test with the verbose reporter, in-session (not subagent-claimed).
+- **S4 cascade (all PASS; zero fixes → no gate re-runs):** `@code-reviewer` PASS — 6/6 gate-mandated checks (retry purity / P3 path / seam placement / R4a fidelity / validateGrantAmount mirror / general), 2 LOW both no-code-change (the log-duty item, discharged by this section + the PR body; the T3 note below). `@security-auditor` PASS — full scope incl. the auth/signup path: reachability single-call-site, HMAC onboarding-ref boundary (stolen ref grants into the VICTIM's account only), no-op integrity (purge-set and grant-set disjoint by construction — the R1a rationale survives attack), cross-lambda FOR UPDATE serialization, 23505 loud posture (zero try/catch in the chain). `@db-migration-reviewer` PASS — schema↔SQL↔plan coherent, meta coherent, D2 restore byte-faithful, blast radius confined (actual numstat +62/−45; the "+107/−48" in the gate text was the `--stat` combined-line figure).
+- **S5:** §5.10 audit 10/10 PASS (+ the post-ruling inventory addendum) → PR #110 opened with the mandated body → CI red → SURPRISE 2 chain above → fix-up → CI green → founder merge `76877e6`.
+
+**Web-lane facts (gate).**
+- The S4 report relay truncated at the operator paste; the gate held open and a scoped verbatim re-emit (no subagent re-runs) completed the review.
+- Both SURPRISE rulings (S1 Option-A; S5 inventory floor) were founder-approved on web-lane recommendation.
+- The ENGINE.11-not-ENGINE.12 attribution correction originated from web-lane re-derivation against the ENGINE.11 plan/log in PK.
+- The founder merged #110 after CI green and the full cascade, ahead of the formal web-lane diff-review step; sequence recorded as-is.
+
+**Decisions made.**
+- Both SURPRISE rulings (above) — closed-set additions, scoped edits only.
+- **Process lesson adopted for future strata:** the mandated local gate list did not cover `tests/server/events/` — **full-suite `pnpm vitest run` becomes the final pre-PR local gate** (the documented CI proxy). The CLAUDE.md §5.7 gate-list edit is batched to the next sweep per house pattern (closing ritual answered: yes, change needed; deferred-by-ruling, not forgotten).
+- S4 out-of-scope findings recorded in `claude-progress.md` (ENGINE.2/ENGINE.7 precedent), both PRE-EXISTING: (a) LOW — Set-Cookie string concatenation without charset validation (`src/app/api/auth/[...all]/route.ts:48`); owner HARDEN.* auth-hardening. (b) LOW — conclusion-freeze enforcement must include `acceptTosAction` in its blocked set now that F-AUTH-4 is money-issuing (`system_state.frozen_at` is schema-only today); owner: the freeze-enforcement task.
+
+**Open questions.** None for ENGINE.13. The R4a isolation truth-up + S2/S4/S5 drift set remain with the truth-up sweep (plan-session forwards 1–2, unchanged).
+
+**Forwards & queued notes (minted this session).**
+1. **Tracker note (operator-maintained — recorded, NOT edited):** ENGINE.13-execute → DONE; plus the T3 single-connection limitation — the concurrency test runs both actions over the fixture's single connection (`max: 1`), so cross-connection FOR UPDATE contention is not exercised locally (disclosed in-file; production safety = Postgres row-lock semantics + the 0013 backstop; ENGINE.12 T3 precedent).
+2. **CLAUDE.md §5.7 gate-list amendment** (full-suite vitest as final pre-PR local gate) → next SYNC sweep.
+3. The two PRE-EXISTING security LOWs (owners above) → `claude-progress.md` carries them.
+
+**Process verifications & anomalies (recorded).**
+- Mode pin held: `claude-fable-5`, gated-xhigh, ultrathink every coding turn, NOT ultracode (session-level ultracode flag ON at injection; overridden by the kickoff pin per CLAUDE.md §6). Zero Fable→Opus classifier fallbacks across S1–S6.
+- Hygiene: branch names verified free pre-`checkout -b`; heredoc-appended files tail-verified; CI watched to terminal state both runs; END-ON-MAIN used checkout → branch-assert → fetch → reset (verify-before-reset guard); unique per-task `/tmp` filenames, written and consumed same-turn.
+- One relay loss (the S4 report top) — handled by gate-supervised verbatim re-emit, no re-derivation.
+
+**Next session starts at.** **S7 — PK staging + tracker note** (operator-relayed), per the gate sequence. No repo work pending beyond this log's PR; the next code stratum picks up from the tracker queue in a fresh CC session + fresh web chat (§5.8).
+
+**Context to preserve.**
+- **Canonical execute SHA:** `76877e6` (PR #110; branch commits `0cc50a5` / `0f630b5` / `22f1d48` / `583bbaf`, ephemeral).
+- **The shipped grant unit, one line:** first-acceptance branch — 5-column UPDATE → `grantInitialDharma(tx, { userId, grantEventId, metadata })` → `user.tos_accepted` emit; `grantEventId` handler-entry-minted beside `eventId`; auto-read first-row path ⇒ `balance_after = amount`; no-op branches unreachable; 0013 backstop loud-23505.
+- **EVENT_TYPES is now 22** (the inventory floor at `tests/server/events/insert.test.ts` pins it — any future event type must amend the floor same-commit).
+- **Invariant specs are now 8** (`I-GRANT-ONCE-001` joined); CLAUDE.md §2 + AGENTS.md §9 already say so.
+
+**Time.** 2026-06-11 (IST). Session arc: S1 sync-gate (7/8 + F-2b SURPRISE → STOP → Option-A ruling → branch) → S2 @test-writer RED (collection/assertion shapes as designed) → S3 implement + 0013 + riders + five gates green → S4 cascade 3× PASS (2 PRE-EXISTING LOWs banked) → S5 §5.10 audit clean → PR #110 → CI red (inventory floor) → SURPRISE → ruling → fix-up `583bbaf` → CI green → founder squash-merge `76877e6` → END-ON-MAIN → this log (`chore/engine-13-execute-log`).
