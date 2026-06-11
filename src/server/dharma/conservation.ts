@@ -66,3 +66,65 @@ export function checkMarketConservation(args: {
 		discrepancy: actual.minus(expected).toFixed(18),
 	};
 }
+
+/**
+ * The correction-variant sibling (ENGINE.9, identity (ii) — plan
+ * §Conservation; S2 option b / C-5; the shipped (★) body above is untouched):
+ *
+ *   Σ FLOW == netAdminPoolInjection − reverseRecordedTotal
+ *                                   + applyRecordedTotal + uncollectableTotal
+ *
+ * All operands from RECORDED rows, never recomputed (R-9.8 corollary):
+ * `reverseRecordedTotal` = Σ |correction_reverse payout legs| (≥ 0, the
+ * recorded entitlements — NOT the floored ledger sum); `applyRecordedTotal`
+ * = Σ correction_apply payout legs; `uncollectableTotal` = Σ |uncollectable
+ * ledger rows| — the EXPLICIT named operand (R-9.6 explicitness over
+ * tolerance). An `uncollectable` row inside `ledgerFlows` THROWS
+ * `DharmaInputError` ("pass the total explicitly") — the loss is a named
+ * operand, never an absorbed row. Pool tags throw (`DharmaPoolTagError`);
+ * stray issuance tags throw (`DharmaInputError`); same A9 defensive
+ * canonicalization as (★). With zero correction operands this degenerates
+ * to (★) exactly.
+ */
+export function checkCorrectedMarketConservation(args: {
+	ledgerFlows: readonly { amount: string; entryType: DharmaEntryType }[];
+	netAdminPoolInjection: string;
+	reverseRecordedTotal: string;
+	applyRecordedTotal: string;
+	uncollectableTotal: string;
+}): ConservationResult {
+	let actual = new CpmmDecimal(0);
+
+	for (const flow of args.ledgerFlows) {
+		if (POOL_TAGS.has(flow.entryType)) {
+			throw new DharmaPoolTagError(
+				`pool tag in conservation input (R-2): ${flow.entryType}`,
+			);
+		}
+		if (flow.entryType === "uncollectable") {
+			throw new DharmaInputError(
+				"uncollectable row in correction-conservation input — pass the total explicitly (R-9.6)",
+			);
+		}
+		if (!FLOW_SET.has(flow.entryType)) {
+			throw new DharmaInputError(
+				`non-flow tag in conservation input (gathering query must exclude bet_id-NULL rows): ${flow.entryType}`,
+			);
+		}
+		actual = actual.plus(canonicalize(flow.amount));
+	}
+
+	const expected = new CpmmDecimal(canonicalize(args.netAdminPoolInjection))
+		.minus(canonicalize(args.reverseRecordedTotal))
+		.plus(canonicalize(args.applyRecordedTotal))
+		.plus(canonicalize(args.uncollectableTotal));
+	if (actual.equals(expected)) {
+		return { ok: true };
+	}
+	return {
+		ok: false,
+		expected: expected.toFixed(18),
+		actual: actual.toFixed(18),
+		discrepancy: actual.minus(expected).toFixed(18),
+	};
+}

@@ -238,6 +238,7 @@ const CASES: Case[] = [
 			marketId: aggregateId,
 			winningSide: "YES",
 			resolutionNote: "Resolved YES per criteria.",
+			poolUnwindAmount: "50.000000000000000000",
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
@@ -260,6 +261,7 @@ const CASES: Case[] = [
 		buildPayload: ({ aggregateId }) => ({
 			marketId: aggregateId,
 			voidReason: "Outcome unresolvable.",
+			poolUnwindAmount: "100.000000000000000000",
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
