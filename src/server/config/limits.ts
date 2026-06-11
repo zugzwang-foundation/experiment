@@ -119,3 +119,12 @@ export const COMMENT_MAX_LENGTH = 5000;
 
 /** Flat (non-escalating) Daily Credit, paid once per UTC day only on a day the user places a commented bet (ADR-0018 + SPEC.1 §10.4/§16.1). Use-or-lose. PLACEHOLDER VALUE (~10, ranged) — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */
 export const DAILY_CREDIT_DHARMA = "10";
+
+// === ENGINE.13: Initial grant (ADR-0018 + SPEC.1 §10.1/§16.1) =============
+
+/** Equal initial Dharma grant, paid once per user inside the F-AUTH-4 first-
+ * acceptance tx (ADR-0018 Driver 3 — equal for all; differentiation by
+ * deployment, not endowment). PLACEHOLDER VALUE (~1,000, ranged 1,000–2,000)
+ * — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string
+ * — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */
+export const INITIAL_USER_DHARMA = "1000";

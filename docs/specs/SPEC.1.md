@@ -460,7 +460,7 @@ Per `Cluster_B` (A2, B1, B5, F5/F6), `cluster_a_ratify.md` (B6, B7, B8), and **A
 
 Three logical account roles, all on the same single Dharma ledger (Path A):
 
-- **User accounts.** Receive an **equal initial grant** at signup (a single flat amount, identical for every user — magnitude ranged, ~1,000 Dharma, pinned at number-tuning; per ADR-0018). Earn a **Daily Credit** on each UTC day they place a commented bet (§10.4). Can stake on bets, hold positions, post and reply (every comment is a bet), sell, and collect resolution payouts. Subject to leaderboard, profile pages, and the **Flipped / Exited marker**.
+- **User accounts.** Receive an **equal initial grant** at signup (granted at first ToS acceptance — F-AUTH-4, the participant threshold; a single flat amount, identical for every user — magnitude ranged, ~1,000 Dharma, pinned at number-tuning; per ADR-0018). Earn a **Daily Credit** on each UTC day they place a commented bet (§10.4). Can stake on bets, hold positions, post and reply (every comment is a bet), sell, and collect resolution payouts. Subject to leaderboard, profile pages, and the **Flipped / Exited marker**.
 - **Admin account** (singular, events-only). Operational. Seeds pools at market creation. Receives `pool_unwind` flows at resolution and void. **Not a `users` row** — admin authenticates via F-AUTH-ADMIN and exists only as an actor identifier in the **events log** (`events.metadata.actor_id = 'admin-singleton'`); admin has no `dharma_ledger` row (R-2; per `B5`, `J3`). Cannot bet, post, reply, or hold positions because the data model offers no participant identity to act under. No Daily Credit. Naturally absent from the leaderboard, which queries `users`.
 - **Pool accounts.** One per market. Hold pool reserves denominated in shares. Counterparty to every user trade. Created at market `Draft → Open` transition, dissolved at `Resolved → Frozen` or `Voided → Frozen`.
 
@@ -691,6 +691,8 @@ The pseudonym and PFP are permanent. On `H2` scrub:
   - `users.privacy_version_hash` — content hash of the Privacy Policy the user was shown.
   - `users.tos_acceptance_ip` — IP address at acceptance time.
   - `users.tos_acceptance_user_agent` — User-Agent header at acceptance time.
+
+  In the same transaction, on the first-acceptance branch only, the server writes the equal initial grant (ADR-0018): one `dharma_ledger` row (`entry_type = 'initial_grant'`, `bet_id` NULL, `amount = INITIAL_USER_DHARMA`, `balance_after = amount` — the user's first ledger row) and one `dharma.granted` events row. The tab-race no-op acceptance never reaches the grant write; a UNIQUE partial index (`dharma_ledger_initial_grant_user_uq`, migration 0013) is the storage backstop — at most one grant per user, ever.
 
   This is the dispute-resolution record: which versions were accepted, by which client, when. Document version hashes are computed at deployment time and frozen; rendered alongside the documents on the acceptance screen for transparency (small footer text: "ToS v1.0 · `<hash>`").
 
