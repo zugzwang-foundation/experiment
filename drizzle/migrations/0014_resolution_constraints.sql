@@ -1,0 +1,5 @@
+ALTER TABLE "resolution_events" ALTER COLUMN "reason" SET NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "resolution_events_terminal_market_uq" ON "resolution_events" USING btree ("market_id") WHERE "resolution_events"."event_kind" IN ('resolve', 'void');--> statement-breakpoint
+ALTER TABLE "payout_events" ADD CONSTRAINT "payout_events_amount_sign_check" CHECK (("payout_events"."payout_type" = 'correction_reverse' AND "payout_events"."amount" <= 0) OR ("payout_events"."payout_type" <> 'correction_reverse' AND "payout_events"."amount" >= 0));--> statement-breakpoint
+ALTER TABLE "resolution_events" ADD CONSTRAINT "resolution_events_kind_outcome_check" CHECK (("resolution_events"."event_kind" IN ('resolve', 'correct') AND "resolution_events"."outcome" IN ('YES', 'NO')) OR ("resolution_events"."event_kind" = 'void' AND "resolution_events"."outcome" = 'VOID'));--> statement-breakpoint
+ALTER TABLE "resolution_events" ADD CONSTRAINT "resolution_events_correct_link_check" CHECK (("resolution_events"."event_kind" = 'correct') = ("resolution_events"."corrects_event_id" IS NOT NULL));
