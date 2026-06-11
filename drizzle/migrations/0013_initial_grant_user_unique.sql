@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "dharma_ledger_initial_grant_user_uq" ON "dharma_ledger" USING btree ("user_id") WHERE "dharma_ledger"."entry_type" = 'initial_grant';

@@ -74,6 +74,15 @@ export const dharmaLedger = pgTable(
 		uniqueIndex("dharma_ledger_daily_allowance_day_uq")
 			.on(table.userId, sql`((timezone('UTC', ${table.createdAt}))::date)`)
 			.where(sql`${table.entryType} = 'daily_allowance'`),
+		// I-GRANT-ONCE-001 storage backstop (ENGINE.13, plan P2): at most ONE
+		// initial_grant row per user, EVER. The PRIMARY mechanism is the F-AUTH-4
+		// users-row FOR UPDATE + tab-race no-op branch (tos-accept.ts); this index
+		// can only fire on a future logic bug — it fails loudly (23505) rather than
+		// ever double-granting. Plain-column partial index (no expression — simpler
+		// than 0012; both halves IMMUTABLE-trivial).
+		uniqueIndex("dharma_ledger_initial_grant_user_uq")
+			.on(table.userId)
+			.where(sql`${table.entryType} = 'initial_grant'`),
 		check(
 			"dharma_ledger_balance_non_negative",
 			sql`${table.balanceAfter} >= 0`,

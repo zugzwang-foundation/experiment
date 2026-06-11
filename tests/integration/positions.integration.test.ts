@@ -533,52 +533,69 @@ describe("ENGINE.11 positions persistence + nightly drift", () => {
 		// D2-A: two net=+1 sinks (965, 500), Σ = 1465 matches no candidate → fires.
 		const userId = await seedUser("d2-dup", "d2-dup");
 
-		await seedLedgerRow({
-			userId,
-			entryType: "initial_grant",
-			amount: "1000",
-			balanceAfter: "1000",
-		});
-		await seedLedgerRow({
-			userId,
-			entryType: "bet_stake",
-			amount: "-10",
-			balanceAfter: "990",
-		});
-		await seedLedgerRow({
-			userId,
-			entryType: "bet_stake",
-			amount: "-50",
-			balanceAfter: "940",
-		});
-		await seedLedgerRow({
-			userId,
-			entryType: "bet_payout",
-			amount: "25",
-			balanceAfter: "965",
-		});
-		await seedLedgerRow({
-			userId,
-			entryType: "uncollectable",
-			amount: "-20",
-			balanceAfter: "965",
-		});
-		// The duplicated genesis (second implied_prev = 0 row).
-		await seedLedgerRow({
-			userId,
-			entryType: "initial_grant",
-			amount: "500",
-			balanceAfter: "500",
-		});
+		// ENGINE.13 (0013): the partial unique index normally makes a second
+		// initial_grant row per user impossible — so to EXERCISE the D2-B
+		// duplicated-genesis belt we must SIMULATE the index being absent (a
+		// bad/mis-applied migration), the drift-D3 pattern below. Drop it,
+		// seed the duplicated genesis, run drift, then RESTORE the index
+		// exactly as migration 0013 defines it (leave the schema as the
+		// migration left it).
+		await testClient.unsafe(`DROP INDEX dharma_ledger_initial_grant_user_uq`);
+		try {
+			await seedLedgerRow({
+				userId,
+				entryType: "initial_grant",
+				amount: "1000",
+				balanceAfter: "1000",
+			});
+			await seedLedgerRow({
+				userId,
+				entryType: "bet_stake",
+				amount: "-10",
+				balanceAfter: "990",
+			});
+			await seedLedgerRow({
+				userId,
+				entryType: "bet_stake",
+				amount: "-50",
+				balanceAfter: "940",
+			});
+			await seedLedgerRow({
+				userId,
+				entryType: "bet_payout",
+				amount: "25",
+				balanceAfter: "965",
+			});
+			await seedLedgerRow({
+				userId,
+				entryType: "uncollectable",
+				amount: "-20",
+				balanceAfter: "965",
+			});
+			// The duplicated genesis (second implied_prev = 0 row).
+			await seedLedgerRow({
+				userId,
+				entryType: "initial_grant",
+				amount: "500",
+				balanceAfter: "500",
+			});
 
-		const alarms = await runDriftAndReadAlarms("dharma_chain_drift");
-		const derivations = new Set(
-			alarms.map((a) => a.payload.derivation as string),
-		);
-		expect(derivations.has("D2-A")).toBe(true);
-		expect(derivations.has("D2-B")).toBe(true);
-		for (const a of alarms) {
-			expect(a.payload.user_id).toBe(userId);
+			const alarms = await runDriftAndReadAlarms("dharma_chain_drift");
+			const derivations = new Set(
+				alarms.map((a) => a.payload.derivation as string),
+			);
+			expect(derivations.has("D2-A")).toBe(true);
+			expect(derivations.has("D2-B")).toBe(true);
+			for (const a of alarms) {
+				expect(a.payload.user_id).toBe(userId);
+			}
+		} finally {
+			// Clear the illegal rows BEFORE re-creating the unique index, then
+			// restore the index byte-faithful to 0013.
+			await testClient.unsafe(`TRUNCATE dharma_ledger CASCADE`);
+			await testClient.unsafe(
+				`CREATE UNIQUE INDEX "dharma_ledger_initial_grant_user_uq" ON "dharma_ledger" USING btree ("user_id") WHERE "dharma_ledger"."entry_type" = 'initial_grant'`,
+			);
 		}
 	});
 

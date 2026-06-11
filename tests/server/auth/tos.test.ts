@@ -64,6 +64,23 @@ vi.mock("next/headers", () => ({
 	}),
 }));
 
+// ENGINE.13 (@docs/plans/ENGINE.13.md): the first-acceptance branch calls
+// `grantInitialDharma` inside the same tx. This mocked-layer suite has no
+// usable tx surface for the real producer (the mocked tx above has no
+// `insert` and a bare `select` vi.fn) — the module mock is mandatory; the
+// called / not-called assertions in the ENGINE.13 describe below are the
+// additive budget. The DB-backed twin is tos-accept-grant.test.ts.
+const { mockGrantInitialDharma } = vi.hoisted(() => ({
+	mockGrantInitialDharma: vi.fn(async (..._args: unknown[]) => ({
+		balanceAfter: "1000.000000000000000000",
+	})),
+}));
+
+vi.mock("@/server/dharma/grant", () => ({
+	validateGrantAmount: vi.fn(),
+	grantInitialDharma: mockGrantInitialDharma,
+}));
+
 import { acceptTosAction } from "@/server/auth/tos-accept";
 import {
 	PRIVACY_VERSION_HASH,
@@ -356,4 +373,160 @@ describe("ToS gate + acceptance Server Action (F-AUTH-4)", () => {
 	// === Plan §8 + plan §7 — HARDEN-deferred stale-30d sweep ================
 
 	it.todo("tos::stale-30d-sweep — HARDEN-era; SPEC.1 line 704 + plan §8");
+});
+
+// ENGINE.13 — grant-producer wiring at the mocked layer (@docs/plans/
+// ENGINE.13.md §"Test plan", "Unit additions to tos.test.ts"): the
+// first-acceptance branch calls `grantInitialDharma(tx, { userId,
+// grantEventId, metadata })` EXACTLY ONCE — and never on the checkbox
+// early-return, the missing/invalid/expired cookie redirects, the
+// missing-row branch, or the tab-race branch. The grant module is mocked
+// above; the DB-backed twin (real producer, real Postgres) is
+// tests/server/auth/tos-accept-grant.test.ts.
+describe("ToS acceptance — initial-grant producer wiring (ENGINE.13)", () => {
+	const userId = "01234567-89ab-cdef-0123-456789abcdef";
+
+	function armHappyPathContext(): void {
+		mockCookiesGet.mockImplementation((name: string) =>
+			name === "onboarding_ref"
+				? { name: "onboarding_ref", value: "signed-ref-token" }
+				: undefined,
+		);
+		mockHeadersGet.mockImplementation((h: string) => {
+			if (h === "x-forwarded-for") return "1.2.3.4";
+			if (h === "user-agent") return "Mozilla/5.0 (test browser)";
+			return null;
+		});
+	}
+
+	it("tos::grant-called-exactly-once-on-first-acceptance", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce({
+			id: userId,
+			pseudonym: "RedFox001",
+			tosAcceptedAt: null,
+		});
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// NEXT_REDIRECT throw on success.
+		}
+
+		expect(mockGrantInitialDharma).toHaveBeenCalledTimes(1);
+		const call = mockGrantInitialDharma.mock.calls[0];
+		// Signature per plan §"The grant unit": (tx, { userId, grantEventId,
+		// metadata }) — on the SAME tx the acceptance UPDATE rode.
+		expect(call?.[0]).toBe(mockDb._tx);
+		const args = call?.[1] as
+			| {
+					userId: string;
+					grantEventId: string;
+					metadata: Record<string, unknown>;
+			  }
+			| undefined;
+		expect(args?.userId).toBe(userId);
+		// grantEventId minted at handler entry as a UUIDv7 (ADR-0016 D1 —
+		// the ENGINE.12 creditEventId precedent), distinct id per event.
+		expect(args?.grantEventId).toMatch(
+			/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+		);
+		// The SAME 7-field metadata object the events carry (plan seam #2).
+		expect(args?.metadata).toEqual({
+			request_id: "unknown",
+			flow_id: "F-AUTH-4",
+			user_id: userId,
+			actor_id: userId,
+			idempotency_key: null,
+			ip: "1.2.3.4",
+			user_agent: "Mozilla/5.0 (test browser)",
+		});
+	});
+
+	it("tos::grant-not-called-on-checkbox-early-return", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+
+		const result = await acceptTosAction(fd(false));
+		expect(result).toEqual({ ok: false, code: "tos_acceptance_required" });
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+
+	it("tos::grant-not-called-on-missing-cookie-redirect", async () => {
+		mockCookiesGet.mockReturnValue(undefined);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect to /sign-in.
+		}
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+
+	it("tos::grant-not-called-on-expired-cookie-redirect", async () => {
+		mockCookiesGet.mockImplementation((name: string) =>
+			name === "onboarding_ref"
+				? { name: "onboarding_ref", value: "expired-token" }
+				: undefined,
+		);
+		mockVerifyOnboardingRef.mockReturnValueOnce(null);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect to /sign-in.
+		}
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+
+	it("tos::grant-not-called-on-tampered-cookie-redirect", async () => {
+		mockCookiesGet.mockImplementation((name: string) =>
+			name === "onboarding_ref"
+				? { name: "onboarding_ref", value: "tampered-token" }
+				: undefined,
+		);
+		mockVerifyOnboardingRef.mockReturnValueOnce(null);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect to /sign-in.
+		}
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+
+	it("tos::grant-not-called-on-missing-users-row", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		// The `:125` silent no-op branch — no users row.
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce(undefined);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect after the no-op tx.
+		}
+		expect(mockDb.transaction).toHaveBeenCalled();
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+
+	it("tos::grant-not-called-on-tab-race-no-op", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		// The `:126` tab-race branch — acceptance already recorded.
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce({
+			id: userId,
+			pseudonym: "RedFox001",
+			tosAcceptedAt: new Date("2026-05-15T12:00:00Z"),
+		});
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect after the no-op tx.
+		}
+		expect(mockDb.transaction).toHaveBeenCalled();
+		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
 });

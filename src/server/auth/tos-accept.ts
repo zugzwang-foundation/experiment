@@ -11,6 +11,7 @@ import {
 	PRIVACY_VERSION_HASH,
 	TOS_VERSION_HASH,
 } from "@/server/auth/tos-versions";
+import { grantInitialDharma } from "@/server/dharma/grant";
 import { insertEvent } from "@/server/events/insert";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
@@ -38,6 +39,21 @@ import { insertEvent } from "@/server/events/insert";
 // On success: clear the `onboarding_ref` cookie + redirect to `/`. The
 // next request hits Better Auth's session-create path; with
 // `tos_accepted_at` now set, the session-deferral hook permits issuance.
+//
+// ENGINE.13: the equal initial Dharma grant (ADR-0018 + SPEC.1 §10.1)
+// joins the FIRST-ACCEPTANCE branch of this same transaction — after the
+// 5-column UPDATE, before the `user.tos_accepted` emit (lock order
+// users → dharma_ledger → events, R1a). The missing-row and tab-race
+// branches `return` before the grant call, so neither path can write a
+// grant row, a `dharma.granted` event, or any ledger state — the grant is
+// once-per-user by construction; migration 0013's UNIQUE partial index is
+// the loud-23505 storage backstop. R4a posture: this tx actually runs at
+// READ COMMITTED with the `FOR UPDATE` row lock (lock-then-recheck) —
+// SPEC.2 §3.5's SERIALIZABLE wording (and this file's older comments) is
+// recorded drift, carried to the truth-up sweep; do NOT "fix" by adding
+// `isolationLevel` without a proper retry loop (SSI would degrade the
+// handled tab-race into a user-visible 40001). Grant safety is
+// isolation-independent.
 
 const ONBOARDING_REF_COOKIE = "onboarding_ref";
 
@@ -98,6 +114,13 @@ export async function acceptTosAction(
 	// S-C deferral placeholder until HARDEN.* request-context middleware
 	// populates at handler entry.
 	const eventId = uuidv7();
+	// grantEventId minted at handler entry BESIDE eventId, both closed over,
+	// NEVER regenerated per attempt (retry purity — ADR-0016 D1; the
+	// ENGINE.12 creditEventId precedent). Minting order is load-bearing for
+	// log chronology: events-row created_at derives from the UUIDv7 ms
+	// prefix (insert.ts), so user.tos_accepted ≤ dharma.granted in the log
+	// regardless of INSERT order inside the tx.
+	const grantEventId = uuidv7();
 	const metadata = {
 		request_id: "unknown",
 		flow_id: "F-AUTH-4",
@@ -137,6 +160,13 @@ export async function acceptTosAction(
 			    tos_acceptance_user_agent = ${ua}
 			WHERE id = ${userId}
 		`);
+
+		// ENGINE.13 R1a: the equal initial grant, on the first-acceptance
+		// branch only — one dharma_ledger(initial_grant) row + one
+		// events(dharma.granted) row, same tx, SAME metadata object as the
+		// tos event (same flow F-AUTH-4, same self-actor). In-tx write order:
+		// users (FOR UPDATE → UPDATE) → dharma_ledger → events — strictly.
+		await grantInitialDharma(tx, { userId, grantEventId, metadata });
 
 		// ENGINE.6 §D.2: emission INSIDE the existing tx. Commits atomic
 		// with the UPDATE — either both rows persist or neither (V3 sync

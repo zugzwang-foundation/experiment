@@ -79,8 +79,9 @@ export const EVENT_TYPES = [
 	"bet.sold",
 	// comment domain (1) — ENGINE.0 (SPEC.2 §13.1 canonical name)
 	"comment.placed",
-	// dharma domain (1) — ENGINE.0
+	// dharma domain (2) — ENGINE.0 + ENGINE.13
 	"dharma.credited",
+	"dharma.granted",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -242,6 +243,13 @@ export const eventPayloadSchemas = {
 		creditedForDate: z
 			.string()
 			.regex(/^\d{4}-\d{2}-\d{2}$/, "UTC date YYYY-MM-DD"),
+	}),
+	// dharma.granted — the one-time genesis issuance (ENGINE.13). No day key:
+	// a genesis row has no accrual date (creditedForDate is dharma.credited's
+	// key, not this event's). amount is the equal grant (numericString).
+	"dharma.granted": z.object({
+		userId: z.string().uuid(),
+		amount: numericString,
 	}),
 } as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>;
 
