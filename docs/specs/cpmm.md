@@ -303,7 +303,9 @@ concern (§10 fixes stored precision at 18 dp; UI rounding is design.md's).
 ### 7.1 Seed mechanism
 
 At the `Draft → Open` transition the admin commits a seed of C Đ to the
-market's pool (ledger entry `pool_seed`, admin → pool; SPEC.1 §10.1). In
+market's pool — recorded as the `seedAmount` payload field on the
+`market.opened` events row plus the `pools` reserve initialisation,
+never a `dharma_ledger` row (R-2; SPEC.1 §10.1). In
 pair-mint terms (§3.2) the seed mints C share pairs, initialising the
 reserves symmetrically:
 

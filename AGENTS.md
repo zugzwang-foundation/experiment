@@ -76,9 +76,12 @@ experiment/
 │   │                               #   events, identity, image-uploads, index, markets, system
 │   ├── lib/                        # auth-client, errors, utils, posthog/
 │   └── server/                     # server-side business logic
+│       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ config/ cpmm/ dharma/ events/ idempotency/ identity-pool/ markets/ middleware/ moderation/ positions/ resolution/ storage/ upstash/
+│       ├── bets/ config/ cpmm/ dharma/ events/ idempotency/ identity-pool/
+│       ├── markets/                # transitions, errors + ENGINE.14: transaction (W-4), create, open, close (incl. the closeDueMarkets sweep)
+│       ├── middleware/ moderation/ positions/ resolution/ storage/ upstash/
 ├── tests/                          # dedicated dir (NOT colocated) — see §9
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
@@ -89,7 +92,7 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9.)
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
