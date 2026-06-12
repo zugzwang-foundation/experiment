@@ -61,6 +61,11 @@ export function prorate(args: {
 	let allocated = new CpmmDecimal(0);
 	for (const row of sorted.slice(0, -1)) {
 		const amount = floor18(total.times(row.weight).dividedBy(sumWeights));
+		if (new CpmmDecimal(amount).lessThan(0)) {
+			throw new Error(
+				`prorate: negative row amount ${amount} (caller bug — weights must be non-negative)`,
+			);
+		}
 		allocated = allocated.plus(amount);
 		out.push({ id: row.id, amount });
 	}

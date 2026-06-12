@@ -37,7 +37,8 @@ export async function voidMarket(args: {
 	voidEventId: string;
 	metadata: ResolutionEventMetadata;
 }): Promise<{
-	voidEventId: string;
+	/** The `resolution_events` row id — NOT the caller-minted events id. */
+	voidResolutionEventId: string;
 	betsRefunded: number;
 	poolUnwindAmount: string;
 }> {
@@ -228,7 +229,11 @@ export async function voidMarket(args: {
 				metadata: args.metadata,
 			});
 
-			return { voidEventId: voidRowId, betsRefunded, poolUnwindAmount };
+			return {
+				voidResolutionEventId: voidRowId,
+				betsRefunded,
+				poolUnwindAmount,
+			};
 		},
 	);
 }

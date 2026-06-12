@@ -173,10 +173,11 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 			stake: "50",
 		});
 
+		const inputVoidEventId = uuidv7();
 		const result = await voidMarket({
 			marketId,
 			reason: VOID_REASON,
-			voidEventId: uuidv7(),
+			voidEventId: inputVoidEventId,
 			metadata: adminMetadata(),
 		});
 
@@ -185,7 +186,6 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 		// back out whole and exits circulation.
 		expect(new CpmmDecimal(result.poolUnwindAmount).equals("100")).toBe(true);
 		expect(result.betsRefunded).toBe(2);
-		expect(result.voidEventId).toBeDefined();
 
 		const refundRows = await testDb
 			.select({
@@ -227,7 +227,7 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 		// resolution_events: one terminal `void` row, outcome VOID, reason
 		// persisted (R-9.1), corrects NULL.
 		const resolutionRows = await testClient.unsafe(
-			`SELECT event_kind, outcome, corrects_event_id, reason
+			`SELECT id, event_kind, outcome, corrects_event_id, reason
 			 FROM resolution_events WHERE market_id = $1`,
 			[marketId],
 		);
@@ -236,6 +236,11 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 		expect(resolutionRows[0]?.outcome).toBe("VOID");
 		expect(resolutionRows[0]?.corrects_event_id).toBeNull();
 		expect(resolutionRows[0]?.reason).toBe(VOID_REASON);
+
+		// MEDIUM-1 ruling (a): the response names the resolution_events row
+		// id — load-bearing semantics, NOT the caller-minted events-table id.
+		expect(result.voidResolutionEventId).toBe(resolutionRows[0]?.id);
+		expect(result.voidResolutionEventId).not.toBe(inputVoidEventId);
 
 		// markets: Voided + VOID outcome.
 		const [marketRow] = await testDb
