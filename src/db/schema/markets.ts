@@ -10,8 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 
-// SPEC.1 §6.1: 7-state market lifecycle. SPEC.2 B.2's 3-state listing is
-// drift (PRECURSOR.5 backlog).
+// SPEC.1 §6.1: 7-state market lifecycle.
 export const marketStatusEnum = pgEnum("market_status", [
 	"Draft",
 	"Open",

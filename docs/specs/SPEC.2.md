@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | 1.0.3 |
+| **Version** | 1.0.4 |
 | **Date** | 2026-06-12 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
@@ -51,6 +51,7 @@
 | 1.0.1 | 2026-06-03 | HMH | **Post-SYNC tracker sweep — §23 + §0 reconciled to tracker v11; post-lock status-prose hygiene.** No v1.0 substance reopened (patch-level editorial reconciliation completing the §23 Direction-A item the PRECURSOR.4 lock explicitly deferred to this sweep). **§23.1 Direction A** phase table rebuilt to the v11 phase model: added **SYNC** + **TESTING** rows; removed **LIVE** + **CONCLUDE** (relocated to the separate post-launch tracker per SYNC.6 — not lost); **UI → VISUAL** (DESIGN ∥ ENGINE + UI ∥ DEBATE lanes); ENGINE/DEBATE task-ID lists corrected (ENGINE.1→0; DEBATE.6 removed, DEBATE.9 added); HARDEN row corrected to HARDEN.1–6; task column rendered as ID-ranges and the running total re-pointed to the tracker (the census owner per §23.4); hard F-* file counts removed from the phase rows and re-pointed to §13.3. **§23.2 Direction B** stale task refs reconciled to v11 — `SCAFFOLD.4` (moderation→Upstash), `SCAFFOLD.5` (Upstash→Sentry), `SCAFFOLD.6` (conflated→PostHog/flags), `SCAFFOLD.18` (manifest→CI); `HARDEN.6/7/10` → the real HARDEN.1–6 set + TESTING; `CONCLUDE.*`/`LIVE.*` consumers re-pointed to build-phase tasks with post-launch build noted out-of-tracker; the "40 F-*" de-numbered to §13.3. **§23.3** the four 3-C tracker-description drifts (DEBATE.4 / SCAFFOLD.3 / SCAFFOLD.13 / SCAFFOLD.4) struck (already current in the v11 tracker); the moot "SYNC.8" routing removed; the ADR-0017-body row marked **resolved by the P1 patch (#65)**; DEBATE.6 marked removed; the friendly-fire physical-drop + `comments.bet_id`/`stake_at_post_time` retained as DEBATE.8/9-sequenced carry-forwards; the **§13.3 F-* count reconciliation re-homed to MAINT.15**. **§23.4** footer "ADRs consumed … 0003–0016" → 0003–0019. **§0** "Gates downstream" `UI.*` → `VISUAL.*`, `TESTING.*` added; top status blockquote version + stale prose reconciled to the locked state. **Not changed:** §13.3 itself (count re-homed to MAINT.15; its existing drift-note left in place); all v1.0-locked architecture substance; the spec-wide HARDEN task-ID renumber (v7 HARDEN.5/6/7/10 refs in §8.10/§10/§11/§12/§17–§21 + Appendix A) is re-homed to MAINT.16 — §23.2 states the canonical v11 mapping, propagation deferred; the external `tracker_v11.html`. Paired SPEC.1 → 1.0.1 (status-prose hygiene only). |
 | 1.0.2 | 2026-06-10 | HMH | **§19.4.1 catch-up STRIP rows for engine event types — reconciliation sweep 2026-06.** Three rows appended to the §19.4.1 table for the ENGINE.8-emitted event types (`bet.placed`, `bet.sold`, `comment.placed`) — each STRIPs `payload.userId` (PSEUDO defense-in-depth, same rationale as the existing `user.signed_out` / `dharma.credited` rows); all research keys SHIP. Rows grounded against the built payload schemas (`src/server/events/schemas.ts`): `bet.sold`'s research key is `sharesSold` (the actual payload key; not `shares`); `comment.placed`'s payload carries `bodyLength`, not `body` — the comment body + `side_at_post_time` ship via the `comments` table per Appendix B.13, not via the event payload (rationale text corrected accordingly from the web-authored rider). `dharma.credited` row pre-existing (ENGINE.12) — unchanged. The six `market.*` types carry no PII-class payload keys; their rows are deferred to the emit-site stratum (ENGINE.9 / market-lifecycle) per the §19.4.1 same-commit amendment rule. No other §19.4.1 edits. **§0** version → 1.0.2, date → 2026-06-10. |
 | 1.0.3 | 2026-06-12 | HMH | **ENGINE.9 riders R-F..R-K — resolution stratum same-commit amendments** (docs/plans/ENGINE.9.md, founder-ratified 2026-06-11). **§3.6** (R-H): pool-unwind encoding corrected to the `poolUnwindAmount` payload-field form on the terminal `market.resolved`/`market.voided` events rows (R-9.5e — not a dedicated event type, never a `dharma_ledger` row); the two-transaction resolution entry point named (F-ADMIN-3 trigger tx + settle tx, composed at ENGINE.10); F-RESOLVE-3 refund stated as `f × stake` (R-9.8); wrapper name aligned `resolutionTransaction()` → `runResolutionTransaction()` with the W-3 lock order (markets FIRST then pools, ADR-0013 §5.12 P2) + OQ-1 parameterised statement_timeout. **B.9** (R-F): `reason` → text NOT NULL, mandatory for all three kinds (R-9.1 — the prior "NULL for F-RESOLVE-1" was drift, exactly backwards); 0014 constraints noted (kind↔outcome CHECK, corrects-link CHECK, terminal-once partial unique index — OQ-7). **B.8** (R-G): `amount` semantics — zero legs legal; per-type signs (`correction_reverse` ≤ 0, others ≥ 0, 0014 CHECK); gross winner form at the R-9.8 pro-rata basis; reversals from recorded rows. **§17.2** (R-K): alarm row 7 `resolution_serialization_exhausted` (W-3 retry exhaustion); catalogue six → seven master rows. **§19.4.1** (R-I): four `market.*` rows appended (`resolving`/`resolved`/`corrected`/`voided`) — STRIP targets "— (none)", no PII-class payload keys, all research keys SHIP, admin actor never pseudonymised. Paired SPEC.1 riders R-A..R-E + R-J land same-commit (SPEC.1 §6.1/§10.3/§10.7/§11). **§0** version → 1.0.3, date → 2026-06-12. |
+| 1.0.4 | 2026-06-12 | HMH | **ENGINE.14 riders R-D..R-F — market-lifecycle stratum same-commit amendments** (docs/plans/ENGINE.14.md, founder-ratified 2026-06-12; paired with SPEC.1 → 1.0.4, riders R-A..R-C). **§3.8 NEW** (R-D): "Market lifecycle writes (W-4)" — the three `market.*` lifecycle events with one emit per flow inside the W-4 transaction; the admin actor form (`actor_id = 'admin-singleton'`, `user_id = NULL`) asserted at every flow entry; `seedAmount` rides `market.opened` (the seed instant is `Draft → Open`, not creation — R-14.1); zero `dharma_ledger` rows (R-2); W-4 duplicates the W-3 spine (C-3; ADR-0013 §5.12 P3); mirrors §3.6's form. **Plan-deviation, gate-ratified 2026-06-12:** plan §Riders assigned this block §3.7 — occupied on disk by the events-row contract (cross-referenced from nine `src/` sites + six SPEC.2-internal sites); landed as §3.8 per the append-don't-renumber convention (the SPEC.1 1.9.0-draft §21 precedent); placed after §3.7's content, before the §3 closing sub-sections (structure-first reading of the ruling). **B.2** (R-F): `status` row 3-state listing → the built 7-state `market_status` enum (SPEC.1 §6.1; the PRECURSOR.5 drift backlog item killed); the stale "Inferred-but-unconfirmed… pending SCAFFOLD.2" trailer removed after a 1:1 column-row match against the built `src/db/schema/markets.ts` (10/10 — gate ruling 2). **B.3** (R-F): one sentence — reserves initialised symmetrically to `seedAmount` at `Draft → Open` (W-4, §3.8). **§19.4.1** (R-E, verify-only): the three ENGINE.14 STRIP rows (`market.created`/`opened`/`closed`) landed at S2 in the same commit as the emit sites per the table's own amendment rule — no edit this commit. **§17.2 (row 8) + §3.8 (caller-freshness sentence)** — S5 reviewer-driven amendments, gate-ratified 2026-06-12 (ledger CR-1 + SA-M-1 docs half). **§0** version → 1.0.4, date unchanged (2026-06-12). |
 
 ---
 
@@ -322,6 +323,16 @@ Every state-mutating data flow MUST emit at least one `events` row in the same t
 **Events insertion helper.** `src/server/events/insert.ts` exposes a single `insertEvent(tx, eventInput)` function that runs `INSERT INTO events (...) VALUES (...) ON CONFLICT (event_id, created_at) DO NOTHING` against the bound transaction (composite key per §7.1 + §7.3 partition-constraint reconciliation). The `event_id` is generated client-side via UUIDv7 (per ADR-0016) at handler-entry — used as the storage-layer dedupe primitive per ADR-0005 §5; `created_at` is derived deterministically from the UUIDv7 millisecond prefix. The `payload` is Zod-validated against the per-`event_type` schema at `src/server/events/schemas.ts` before insertion; schema mismatches are runtime errors, not silent inserts.
 
 **CI lint enforcement (HARDEN.\* task).** Every state-mutating handler — defined as any file under `src/server/{bets,comments,dharma,resolution,auth,identity,moderation}/` that opens a `db.transaction(...)` — MUST contain at least one `insertEvent(...)` call inside the transaction body. The lint rule scans for the pattern and fails the build on a missing call. Acceptable false-positive (rare): a transaction that legitimately reads but does not write — these mark the handler with a `// no-event` comment, audited at code review.
+
+### §3.8 Market lifecycle writes (W-4)
+
+The lifecycle half of the market state machine — F-ADMIN-1 creation into `Draft`, the F-ADMIN-2 seeded `Draft → Open` commit, and the clock-driven `Open → Closed` cutoff — runs through a fourth write wrapper, W-4 (`runLifecycleTransaction()`), duplicating the W-3 spine per the C-3 no-extraction doctrine (W-1 and W-3 byte-untouched; ADR-0013 §5.12 P3). Open and close lock the `markets` row FIRST (`FOR NO KEY UPDATE`) with an `expectedStatus` precondition (`['Draft']` for open, `['Open']` for close); create acquires no row lock — no row exists yet, and SSI's predicate handling covers the slug race (a surfaced 23505 signals a logic bug, not a handled path).
+
+**One emit per flow, inside the W-4 transaction.** `market.created` (payload `marketId` + `resolutionDeadline`) · `market.opened` (payload `marketId` + `seedAmount` — the seed instant is `Draft → Open`, not creation; R-14.1) · `market.closed` (payload `marketId`). Event ids resolve once at service entry and are closed over across retries (ADR-0016 D1), so a retried attempt re-emits the same id and the §3.7 helper's `ON CONFLICT (event_id, created_at)` dedupes. Callers supplying `eventId` to `createMarket` MUST mint a fresh UUIDv7 per logical create — the §3.7 dedupe is retry-purity for the *same* operation, not cross-create replay protection (insertion is not verified); ENGINE.10's wire layer mints server-side only.
+
+**Actor identity.** All three flows assert the admin actor form at service entry (`src/server/admin/actor.ts`): `metadata.actor_id = 'admin-singleton'`, `metadata.user_id` genuinely `NULL` — the §3.6 admin-actor encoding, uniform across lifecycle writes. The `closeDueMarkets` sweep emits as `admin-singleton` too (D-14.d): the deadline is the admin's committed market parameter; the clock executes the admin's standing instruction. Lifecycle flows write **zero `dharma_ledger` rows** — the seed is an `events` + `pools` reserve fact (R-2; the dormant `pool_seed` enum value stays dormant).
+
+Single source of truth: `src/server/markets/create.ts` (F-ADMIN-1), `src/server/markets/open.ts` (F-ADMIN-2), `src/server/markets/close.ts` (the clock-driven close + the `closeDueMarkets` sweep), all through `src/server/markets/transaction.ts` (W-4); the pure state machine consumed is `src/server/markets/transitions.ts`.
 
 ### §3 Single source of truth
 
@@ -1584,9 +1595,9 @@ The two-vendor-plus-Vercel split is deliberate. A third vendor for structured re
 
 **Sentry deploy hook.** Vercel deploys fire a webhook to Sentry tagging the deploy SHA as a Sentry release; source maps upload alongside. Stack traces in Sentry events resolve to TypeScript source positions automatically. The webhook URL lives in Vercel project settings under `SENTRY_DEPLOY_HOOK_URL`; same lifecycle as `SENTRY_AUTH_TOKEN` per ADR-0007.
 
-### §17.2 Master alarm catalogue (seven rows + alarm-6 sub-table)
+### §17.2 Master alarm catalogue (eight rows + alarm-6 sub-table)
 
-The alarm catalogue consolidates every Sentry alarm fired across the codebase. Seven master rows; alarm 6 has a five-row sub-table per §17.3 because vendor-unavailability alarms have distinct sub-IDs per vendor that downstream code (per §11, per §10, per §17.6) cites directly.
+The alarm catalogue consolidates every Sentry alarm fired across the codebase. Eight master rows; alarm 6 has a five-row sub-table per §17.3 because vendor-unavailability alarms have distinct sub-IDs per vendor that downstream code (per §11, per §10, per §17.6) cites directly.
 
 | # | Alarm name | Trigger | Cited from |
 |---|---|---|---|
@@ -1597,6 +1608,7 @@ The alarm catalogue consolidates every Sentry alarm fired across the codebase. S
 | **5** | Identity-pool low-watermark | `identity_pool` row count drops below 5% of initial 50,000 — fired by `pg_cron` meta-query per §3.4 Pattern A-1 | §3.5, SPEC.1 §15.2, ADR-0011 |
 | **6** | Per-vendor unavailability + cron job failure | Five sub-IDs per §17.3 — Upstash rate-limit, Upstash idempotency, R2, pg_cron job-run failures, Vercel Cron R2-orphan-sweep handler 5xx | §10, §11, §12, §17.6 |
 | **7** | 40001-retry exhaustion (resolution transaction wrapper) | W-3 wrapper at `src/server/resolution/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `resolution_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.9, rider R-K) | §3.6, §9, ADR-0013 §5.12 P2 |
+| **8** | 40001-retry exhaustion (lifecycle transaction wrapper) | W-4 wrapper at `src/server/markets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `lifecycle_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.14, S5 disposition CR-1, gate-ratified 2026-06-12) | §3.8, §9, ADR-0013 §5.12 P3 |
 
 Alarm rows 1-5 and 7 are consumed by single citation surfaces; alarm 6's sub-IDs are consumed across multiple citation surfaces (§10 cites 6c, §11 cites 6a + 6b, §12 cites 6c + 6e, §17.6 cites 6d), warranting the structuring elaboration.
 
@@ -1887,6 +1899,9 @@ Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR
 | `bet.placed` | `payload.userId` | Defense-in-depth — actor identity ships via `metadata.user_id` (PSEUDO per §19.5); explicit payload strip prevents re-identification via cross-join. Research keys (stake, side, price, market/comment ids) SHIP — K_eff(t) derivation core per §19.6 (ENGINE.8 emit site) |
 | `bet.sold` | `payload.userId` | Same rationale; sell-leg research keys (`sharesSold`, `proceeds`, `price`) SHIP (ENGINE.8 emit site) |
 | `comment.placed` | `payload.userId` | Same rationale; payload research keys (`side`, `bodyLength`, market/bet/comment ids, `uploadId`) SHIP — the comment `body` + `side_at_post_time` are not payload keys; they SHIP via the `comments` table per Appendix B.13, commentary being the dataset's thesis-core signal (ENGINE.8 emit site) |
+| `market.created` | — (none) | marketId + resolutionDeadline both SHIP (ENGINE.14 emit site) |
+| `market.opened` | — (none) | marketId + seedAmount SHIP (seed is public CPMM state — it IS the reserves) (ENGINE.14 emit site) |
+| `market.closed` | — (none) | marketId SHIPS (ENGINE.14 emit site) |
 | `market.resolving` | — (none) | No PII-class payload keys; all research keys SHIP (settlement core for K_eff derivation); actor identity is `metadata.actor_id = 'admin-singleton'`, never pseudonymised (§19.5) (ENGINE.9 emit site) |
 | `market.resolved` | — (none) | Same rationale — `winningSide`, `resolutionNote`, `poolUnwindAmount` (R-9.5e) all SHIP (ENGINE.9 emit site) |
 | `market.corrected` | — (none) | Same rationale — `correctsEventId`, `correctedWinningSide`, `resolutionNote` SHIP; the corrections chain is thesis-core audit (ENGINE.9 emit site) |
@@ -2506,14 +2521,12 @@ The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECU
 | `slug` | text | SHIP | Participant-facing URL slug (per §16) |
 | `title` | text | SHIP | Market question (e.g., "Will event X happen by Nov 5?") |
 | `description` | text | SHIP | Market context |
-| `status` | text | SHIP | `Open` / `Resolved` / `Voided` (whitelisted Bucket-C transition per §3.6) |
+| `status` | text | SHIP | `Draft` / `Open` / `Closed` / `Resolving` / `Resolved` / `Voided` / `Frozen` — the built 7-state `market_status` enum (SPEC.1 §6.1; whitelisted Bucket-C transitions per §3.6 + §3.8) |
 | `resolution_deadline` | timestamptz | SHIP | When the market is scheduled to resolve |
 | `resolved_at` | timestamptz \| null | SHIP | Actual resolution timestamp; NULL until F-RESOLVE-1 fires |
 | `resolution_outcome` | text \| null | SHIP | `YES` / `NO` / `VOID`; NULL until F-RESOLVE-1 fires |
 | `created_by` | text | SHIP | `'admin-singleton'` sentinel per §3.6 (admin-actor created markets) |
 | `created_at` | timestamptz | SHIP | |
-
-Inferred-but-unconfirmed: exact column list pending SCAFFOLD.2 implementation. Above derived from §3.6 + ADR-0010 admin-actor encoding + SPEC.1 §10 product behavior. PRECURSOR.4 column-name correctness sweep verifies against `src/db/schema/markets.ts`.
 
 ### B.3 `pools` (Bucket C)
 
@@ -2524,6 +2537,8 @@ Inferred-but-unconfirmed: exact column list pending SCAFFOLD.2 implementation. A
 | `yes_reserves` | numeric(38,18) | SHIP | CPMM YES-side reserves at freeze instant |
 | `no_reserves` | numeric(38,18) | SHIP | CPMM NO-side reserves at freeze instant |
 | `created_at` | timestamptz | SHIP | |
+
+Reserves are initialised symmetrically to `seedAmount` at `Draft → Open` (W-4, §3.8; cpmm.md §7.1 — exactly once).
 
 Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.4 verifies precision + column names.
 

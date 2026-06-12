@@ -203,7 +203,6 @@ const CASES: Case[] = [
 		buildPayload: ({ aggregateId }) => ({
 			marketId: aggregateId,
 			resolutionDeadline: "2026-11-06T23:59:00+05:30",
-			seedAmount: "1000",
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
@@ -211,7 +210,10 @@ const CASES: Case[] = [
 	{
 		eventType: "market.opened",
 		aggregateType: "market",
-		buildPayload: ({ aggregateId }) => ({ marketId: aggregateId }),
+		buildPayload: ({ aggregateId }) => ({
+			marketId: aggregateId,
+			seedAmount: "1000",
+		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
 	},

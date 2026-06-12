@@ -38,7 +38,7 @@ reserved (W-1's status read is unlocked precisely so a `pools → markets` order
 dharma_ledger → events**, with the P1 `pools → users` suffix preserved (resolution's per-user
 ledger writes — settle payouts, the correction reverse+uncollectable pair, void refunds — chain via
 `previousBalance` inside the pool-locked section, discharging the P1 consumer obligation above).
-No-cycle argument: `markets` is locked by W-3 only, so no path acquires `pools → markets`;
+No-cycle argument: `markets` is locked by W-3 and W-4 only (P3), so no path acquires `pools → markets`;
 cross-wrapper contention lands as retryable `40001` (consistent order ⇒ never `40P01`). The pool
 lock doubles as the in-flight fence (R-9.4): settle/void block behind any uncommitted W-1 bet tx
 and read `bets`/`positions` after it resolves; the trigger takes no pool lock (its `Closed`
@@ -47,6 +47,25 @@ at ENGINE.9); the W-3 spine duplicates the retry helpers rather than extracting 
 jitter ladder, SQLSTATE set, breadcrumb discipline: identical to the §2 decision; the one
 parameterisation is `statement_timeout` (default 1 000 ms; the settle/correct/void fan-out flows
 pass 5 000 ms — ENGINE.9 OQ-1, HARDEN re-tunes).
+
+### P3 — W-4 lifecycle wrapper registers as the second markets-first writer (ENGINE.14, 2026-06-12)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The load-bearing decision is unchanged.** ENGINE.14's W-4 wrapper
+(`src/server/markets/transaction.ts` — `runLifecycleTransaction()`) duplicates the W-3 spine
+(C-3 — no extraction; W-1 and W-3 byte-untouched at ENGINE.14) and joins W-3 in the
+`markets → …` slot: open and close lock the `markets` row FIRST (`FOR NO KEY UPDATE`) with an
+`expectedStatus` precondition; open's `pools` INSERT follows its `markets` lock (the
+`markets → pools` order); create acquires NO row locks (no row exists yet — SSI's predicate
+handling covers the slug race; lock order trivially conforms). P2's no-cycle sentence is
+updated in place: `markets` is locked by **W-3 and W-4 only**, so no path acquires
+`pools → markets` — W-1 still never locks `markets` (its status read stays unlocked), W-4
+never acquires `pools → markets` (open creates the pool row inside its own markets-locked tx;
+close touches no pool row), and the middle tables (`positions`, `dharma_ledger`, `users`) are
+untouched by every lifecycle flow. Cross-wrapper contention stays retryable `40001` (consistent
+order ⇒ never `40P01`). Retry policy, jitter ladder, SQLSTATE set, breadcrumb discipline:
+identical to the §2 decision; `statement_timeout` is 1 000 ms for all three lifecycle flows
+(no fan-out anywhere in W-4).
 
 ## Context and Problem Statement
 
