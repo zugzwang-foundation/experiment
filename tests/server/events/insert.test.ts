@@ -222,6 +222,15 @@ const CASES: Case[] = [
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
 	},
+	// ENGINE.9 (F-ADMIN-3 trigger): payload is marketId ONLY (plan C-1 —
+	// outcome/evidence live on resolution_events per R-9.1).
+	{
+		eventType: "market.resolving",
+		aggregateType: "market",
+		buildPayload: ({ aggregateId }) => ({ marketId: aggregateId }),
+		actorId: () => "admin-singleton",
+		userIdInMetadata: () => null,
+	},
 	{
 		eventType: "market.resolved",
 		aggregateType: "market",
@@ -229,6 +238,7 @@ const CASES: Case[] = [
 			marketId: aggregateId,
 			winningSide: "YES",
 			resolutionNote: "Resolved YES per criteria.",
+			poolUnwindAmount: "50.000000000000000000",
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
@@ -251,6 +261,7 @@ const CASES: Case[] = [
 		buildPayload: ({ aggregateId }) => ({
 			marketId: aggregateId,
 			voidReason: "Outcome unresolvable.",
+			poolUnwindAmount: "100.000000000000000000",
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,
@@ -586,10 +597,11 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 		// LD-1 set (4 image + 5 user + 2 admin) plus 10 forward-stratum
 		// types (6 market + 2 bet + 1 comment + 1 dharma) added by
 		// ENGINE.0 (plan §3). ENGINE.13 appended `dharma.granted` (the
-		// initial-grant emit site, R2a) ⇒ 22. Domain breakdown: 4 + 5 +
-		// 2 + 6 + 2 + 1 + 2 = 22. The schema file at
-		// `src/server/events/schemas.ts` exports `EVENT_TYPES`. If a
-		// future PR drops or adds one without amending plan §3 + this
+		// initial-grant emit site, R2a) ⇒ 22. ENGINE.9 appends
+		// `market.resolving` (the F-ADMIN-3 trigger emit, plan C-1) ⇒ 23.
+		// Domain breakdown: 4 + 5 + 2 + 7 + 2 + 1 + 2 = 23. The schema
+		// file at `src/server/events/schemas.ts` exports `EVENT_TYPES`.
+		// If a future PR drops or adds one without amending plan §3 + this
 		// floor, surface. `r2_delete_failed` MUST NOT be present
 		// (SCAFFOLD.5 Sentry owns).
 		const { EVENT_TYPES } = await import("@/server/events/schemas");
@@ -620,9 +632,11 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"dharma.credited",
 				// ENGINE.13 (1)
 				"dharma.granted",
+				// ENGINE.9 (1) — the F-ADMIN-3 Closed→Resolving emit
+				"market.resolving",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(22);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(23);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });

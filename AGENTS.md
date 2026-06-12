@@ -78,7 +78,7 @@ experiment/
 │   └── server/                     # server-side business logic
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ config/ cpmm/ dharma/ events/ idempotency/ identity-pool/ markets/ middleware/ moderation/ positions/ storage/ upstash/
+│       ├── bets/ config/ cpmm/ dharma/ events/ idempotency/ identity-pool/ markets/ middleware/ moderation/ positions/ resolution/ storage/ upstash/
 ├── tests/                          # dedicated dir (NOT colocated) — see §9
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
@@ -89,7 +89,7 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/resolution/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12.)
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
@@ -164,7 +164,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0012_daily_allowance_day_unique.sql`.
+- Current head: `0015_nightly_drift_zero_terminal_fix.sql` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent).
 
 ### Transactions, queries, validation
 
@@ -174,7 +174,7 @@ const placeBetSchema = z.object({
 
 ### Events
 
-`events.event_type` is **`text`** (open-extensibility, SPEC.2 §7.1), **not** a `pgEnum`. The closed value set is the TS const `EVENT_TYPES` in `src/server/events/schemas.ts` (currently 11 values: 4 `image_upload.*`, 5 `user.*`, 2 `admin.*`), compile-guarded by `as const satisfies Record<EventType, …>`. When a new event type is added, extend `EVENT_TYPES` **and** its Zod payload schema in the **same commit** (enum-hygiene).
+`events.event_type` is **`text`** (open-extensibility, SPEC.2 §7.1), **not** a `pgEnum`. The closed value set is the TS const `EVENT_TYPES` in `src/server/events/schemas.ts` (currently 23 values: 4 `image_upload.*`, 5 `user.*`, 2 `admin.*`, 7 `market.*`, 2 `bet.*`, 1 `comment.*`, 2 `dharma.*`), compile-guarded by `as const satisfies Record<EventType, …>`. When a new event type is added, extend `EVENT_TYPES` **and** its Zod payload schema in the **same commit** (enum-hygiene).
 
 ---
 
@@ -204,21 +204,22 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
-├── integration/   9 *.integration.test.ts (idempotency, orphan-sweep, positions, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger)
-├── invariants/    8 specs — see the Invariant-tests bullet below
-├── server/        auth/ (incl. _probe-*), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), events/, identity/, middleware/, moderation/, storage/, admin/moderation/, dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation)
+├── integration/   11 *.integration.test.ts (idempotency, orphan-sweep, positions, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger, resolution-conservation, nightly-drift-resolution)
+├── invariants/    9 specs — see the Invariant-tests bullet below
+├── server/        auth/ (incl. _probe-*), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency), storage/, admin/ (moderation/ + resolution.test.ts), dharma/ (non-transferable)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
-- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 8 on disk:
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 9 on disk:
   - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
   - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).
   - `I-DAILY-ONCE-001.daily-credit-once-per-utc-day` — at most one `daily_allowance` ledger row per user per UTC day; storage backstop is the unique partial index `dharma_ledger_daily_allowance_day_uq` (minted ENGINE.12).
   - `I-GRANT-ONCE-001.initial-grant-once-per-user` — at most one `initial_grant` ledger row per user, EVER; storage backstop is the unique partial index `dharma_ledger_initial_grant_user_uq` (minted ENGINE.13).
   - `I-NO-OVERDRAFT-001.dharma-ledger-monotone` (INV-2) — `dharma_ledger` `balance_after >= 0`; no overdraft.
   - `I-NO-OVERSELL-001.positions-quantity-non-negative` — position quantity never negative (invariant-class spec rule, not INV-1..4).
+  - `I-RESOLVE-ONCE-001.market-terminates-once` — a market terminates exactly one way, once; storage backstop is the partial unique index `resolution_events_terminal_market_uq` (fixture-bypass second terminal row → 23505; `correct` rows keep the chain open — minted ENGINE.9, OQ-7).
   - `I-SIDE-BIND-001.comment-side-bound-at-post-time` (INV-3) — `comments.side_at_post_time` is frozen at post-time; selling out and re-entering the other side never moves prior comments (minted ENGINE.8; DEBATE.3 reuses).
   - `I-SINGLE-SIDE-001.positions-one-held-side` — at most one held side per (user, market) (invariant-class spec rule).
 - **`_probe-*.test.ts`** = vendor-contract **regression guards** (e.g. `_probe-openai-omni-shape`, auth probes) — they assert a third-party/library shape, distinct from TDD drivers (CLAUDE.md §5.6).

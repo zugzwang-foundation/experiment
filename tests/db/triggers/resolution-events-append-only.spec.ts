@@ -32,6 +32,7 @@ describe("resolution_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				eventKind: "resolve",
 				outcome: "YES",
+				reason: "initial",
 			})
 			.returning({ id: resolutionEvents.id });
 
@@ -62,6 +63,7 @@ describe("resolution_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				eventKind: "resolve",
 				outcome: "YES",
+				reason: "initial",
 			})
 			.returning({ id: resolutionEvents.id });
 

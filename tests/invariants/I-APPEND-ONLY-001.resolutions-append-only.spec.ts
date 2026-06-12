@@ -126,6 +126,7 @@ describe("INV-4: resolutions append-only (storage-layer foundation)", () => {
 				marketId: market?.id ?? "",
 				eventKind: "resolve",
 				outcome: "YES",
+				reason: "initial",
 			})
 			.returning({ id: resolutionEvents.id });
 

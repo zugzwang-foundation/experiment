@@ -1,6 +1,7 @@
 import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
+	check,
 	index,
 	jsonb,
 	numeric,
@@ -9,6 +10,7 @@ import {
 	smallint,
 	text,
 	timestamp,
+	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
@@ -77,7 +79,9 @@ export const resolutionEvents = pgTable(
 			(): AnyPgColumn => resolutionEvents.id,
 			{ onDelete: "restrict" },
 		),
-		reason: text("reason"),
+		// R-9.1 (ENGINE.9): mandatory for ALL three kinds — the criterion-met
+		// evidence note on resolve; the already-required reasons on correct/void.
+		reason: text("reason").notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.notNull()
 			.defaultNow(),
@@ -85,6 +89,24 @@ export const resolutionEvents = pgTable(
 	(table) => [
 		index("resolution_events_market_idx").on(table.marketId),
 		index("resolution_events_corrects_idx").on(table.correctsEventId),
+		// OQ-7 (ENGINE.9): a market terminates exactly one way, once. Belt-vs-bugs
+		// only — the W-3 markets lock + state gate serialize clean concurrent
+		// settles; a 23505 from this index is always a logic bug, surfaced loud.
+		// `correct` kinds are excluded: the corrections chain stays open.
+		uniqueIndex("resolution_events_terminal_market_uq")
+			.on(table.marketId)
+			.where(sql`${table.eventKind} IN ('resolve', 'void')`),
+		// R-9.3 (ENGINE.9): corrected outcomes are YES/NO only — a correction can
+		// never flip a market to VOID; `void` is the only VOID-outcome kind.
+		check(
+			"resolution_events_kind_outcome_check",
+			sql`(${table.eventKind} IN ('resolve', 'correct') AND ${table.outcome} IN ('YES', 'NO')) OR (${table.eventKind} = 'void' AND ${table.outcome} = 'VOID')`,
+		),
+		// R-9.3 (ENGINE.9): the corrects link exists iff the kind is 'correct'.
+		check(
+			"resolution_events_correct_link_check",
+			sql`(${table.eventKind} = 'correct') = (${table.correctsEventId} IS NOT NULL)`,
+		),
 	],
 );
 
@@ -123,6 +145,13 @@ export const payoutEvents = pgTable(
 		index("payout_events_user_idx").on(table.userId),
 		index("payout_events_market_idx").on(table.marketId),
 		index("payout_events_resolution_idx").on(table.resolutionEventId),
+		// C-6 (ENGINE.9): per-type sign — correction_reverse ≤ 0, every other
+		// type ≥ 0 (zero legs are legal settlement records; a blanket >= 0 is
+		// falsified by correction_reverse, SPEC.1's "negative of original").
+		check(
+			"payout_events_amount_sign_check",
+			sql`(${table.payoutType} = 'correction_reverse' AND ${table.amount} <= 0) OR (${table.payoutType} <> 'correction_reverse' AND ${table.amount} >= 0)`,
+		),
 	],
 );
 

@@ -71,6 +71,7 @@ describe("payout_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				eventKind: "resolve",
 				outcome: "YES",
+				reason: "initial",
 			})
 			.returning({ id: resolutionEvents.id });
 
@@ -145,6 +146,7 @@ describe("payout_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				eventKind: "resolve",
 				outcome: "YES",
+				reason: "initial",
 			})
 			.returning({ id: resolutionEvents.id });
 

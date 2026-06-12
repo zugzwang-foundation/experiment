@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.2 (semver; bump major on invariant changes)
-- **Last updated:** 2026-06-04
+- **Version:** 1.0.3 (semver; bump major on invariant changes)
+- **Last updated:** 2026-06-12
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -219,7 +219,7 @@ stateDiagram-v2
 **Transitions.**
 - `Draft → Open`: admin commits market parameters (question, criterion, deadline ≤ 2026-11-05 23:59 UTC per `J10`) and the `pool_seed` Dharma flow lands in the pool.
 - `Open → Closed`: server clock crosses `resolution_deadline`. Hard cutoff, no grace window (per `B7`).
-- `Closed → Resolving`: admin triggers resolution. Bets in flight at trigger are allowed to commit or timeout (per `G6`); new bets after this transition return 400 `error_market_closed_at`.
+- `Closed → Resolving`: admin triggers resolution. Bets in flight at trigger are allowed to commit or timeout (per `G6`); new bets after this transition return 409 `market_resolving` (the shipped §15 mapping — E-1).
 - `Resolving → Resolved`: in-flight window clears. Payouts compute and write per §11.
 - `Open|Closed → Voided`: admin voids with free-text reason (per `B3`). Stakes refunded, Dharma effects reversed, comments lock with `voided` marker.
 - `Resolved|Voided → Frozen`: hard freeze at 2026-11-05 23:59 UTC. Read-only mode.
@@ -483,6 +483,8 @@ Convexity-in-confidence and time-weighting are *emergent* properties of CPMM sha
 
 Per-bet `dharma_delta` is computed independently. A user holding multiple bets in one market sees their total movement as the sum of per-bet `dharma_delta` values.
 
+**Pro-rata basis after partial sells (R-9.8).** The per-bet math above holds exactly for unsold bets. After partial sells, the surviving fraction `f = position quantity / Σ same-side share_quantity` applies uniformly to every same-side bet of that user — surviving shares per bet `= f × share_quantity`; sale proceeds stand (the sale was a real trade). Exact-sum rounding: per-bet floors with a deterministic last-row remainder ordered by bet id, so per-bet amounts sum exactly to the position-level truth.
+
 ### 10.4 Daily Credit
 
 Per ADR-0018, the daily issuance is a **Daily Credit**, not an unconditional allowance:
@@ -509,7 +511,7 @@ Per `B6`: pool seed is fixed at market creation. Mid-market injections re-price 
 ### 10.7 Edge cases
 
 - **Resolution correction (per `B4`).** Reverse original payout, apply corrected payout. Floored at zero — uncollectable remainder logged. INV-4 holds.
-- **Market void (per `B3`).** Stakes refunded, Dharma effects reversed via compensating ledger entries. Pool unwinds back to admin. Comments lock with `voided` marker.
+- **Market void (per `B3`).** Stakes refunded at `f × stake` (sale proceeds stand — R-9.8), Dharma effects reversed via compensating ledger entries. The residual pool Dharma exits circulation, recorded as `poolUnwindAmount` on the terminal events row (R-9.5) — there is no admin balance. Comments lock with `voided` marker.
 - **Banned user (per `E2`).** Existing positions ride to resolution. Resolution payouts apply normally. No Daily Credit from ban-time forward. No forced liquidation.
 - **Erasure scrub (per `H2`).** Pseudonym replaced; ledger rows persist under placeholder. Balance unaffected.
 
@@ -541,7 +543,7 @@ The over-issuance pressure of §10.2 (grant + Daily Credit, no decay, no forced 
 ### F-RESOLVE-1 — Resolution event
 
 - **Pre.** `market.state = Resolving`. In-flight bet window has cleared.
-- **System.** In a single transaction: write `resolution_event` row (winning side, resolver = admin, criterion-met evidence). For each bet on the winning side, settle shares to 1 Dharma each via `payout_event` rows tagged `bet_payout` (positive). For each bet on the losing side, settle shares to 0 (`bet_payout` with `dharma_delta = 0` or `−S` per A2 form). Compute residual pool balance. Write `pool_unwind` flow to admin account. Transition market to `Resolved`. Lock comments.
+- **System.** In a single transaction: write `resolution_event` row (winning side, resolver = admin, criterion-met evidence — the note is mandatory and immutable; `resolution_events.reason` is NOT NULL, R-9.1). For each bet on the winning side, settle surviving shares to 1 Dharma each via `payout_event` rows tagged `bet_payout` (positive, gross shares-settle value — `shares × 1 Đ = S/p` for an unsold bet; after partial sells the surviving fraction applies uniformly per bet, the §10.3 pro-rata basis, R-9.8). For each bet on the losing side, settle shares to 0 (`bet_payout` with `dharma_delta = 0` — the stake was already debited at bet time; a `−S` at resolution would double-debit, R-9.2). Compute residual pool balance. Record the residual as `poolUnwindAmount` on the terminal `market.resolved` events row (`metadata.actor_id = 'admin-singleton'`); there is no admin balance — the Dharma exits circulation, visibly (R-9.5/R-9.5e). Transition market to `Resolved`. Lock comments.
 - **Response.** `{ resolutionEventId, winningSide, totalPaidOut, poolUnwindAmount }`.
 - **Invariants.** INV-2, INV-4.
 - **Acceptance.** `tests/server/resolution/happy-path.test.ts::resolution-settles-and-locks`.
@@ -549,7 +551,7 @@ The over-issuance pressure of §10.2 (grant + Daily Credit, no decay, no forced 
 ### F-RESOLVE-2 — Resolution correction (clawback floored at zero)
 
 - **Pre.** Prior `resolution_event` exists. Admin determines it was wrong.
-- **System.** Per `B4`: write a new `resolution_event` row with `corrects_event_id` referencing the prior. For each affected bet, write two `payout_event` rows: `correction_reverse` (negative of original) and `correction_apply` (corrected delta). Floored at zero per user — if reversal would drive a user balance negative, truncate at current balance and write `uncollectable` ledger entry for the remainder. Comments do not unlock.
+- **System.** Per `B4`: write a new `resolution_event` row with `corrects_event_id` referencing the prior. For each affected bet, write two `payout_event` rows: `correction_reverse` (negative of original) and `correction_apply` (corrected delta) — reversal amounts are read from the RECORDED `payout_event` rows of the corrected event, never recomputed (R-9.8 corollary). Floored at zero per user — if reversal would drive a user balance negative, truncate at current balance and write the `uncollectable` ledger entry for the remainder (at most ONE `uncollectable` row per user per correction — the per-user aggregate floor). Comments do not unlock.
 - **Response.** `{ correctionEventId, betsAffected, uncollectableTotal }`.
 - **Errors.** None — operation is admin-only and append-only by construction.
 - **Invariants.** INV-4 (correction is a new event, not a mutation), INV-2 (every flow tagged).
@@ -558,8 +560,8 @@ The over-issuance pressure of §10.2 (grant + Daily Credit, no decay, no forced 
 ### F-RESOLVE-3 — Market void
 
 - **Pre.** `market.state ∈ {Open, Closed}`. Admin determines market is unresolvable (resolution source unavailable, event cancelled, criterion ambiguous — per `B3`).
-- **System.** Single transaction: market state → `Voided`. For every bet, write a compensating ledger entry tagged `void_refund` reversing its Dharma effect. Pool unwinds back to admin via `pool_unwind`. Comments lock with `voided` marker. Single `voided` event written to `admin_events` log with admin's free-text reason. INV-4 preserved (no mutations, only new compensating entries).
-- **Response.** `{ voidEventId, betsRefunded, poolUnwindAmount }`.
+- **System.** Single transaction: market state → `Voided`. For every bet, write a compensating ledger entry tagged `void_refund` of `f × stake`, where `f` is the surviving fraction of the user's held-side position — sale proceeds stand; a full-stake refund would over-refund sellers (R-9.8). The residual pool cash is recorded as `poolUnwindAmount` on the terminal `market.voided` events row; there is no admin balance — the Dharma exits circulation, visibly (R-9.5/R-9.5e). Comments lock with `voided` marker. The terminal `market.voided` events row (SPEC.2 §3.6 form) carries the admin's free-text reason (OQ-4 — supersedes the prior `admin_events`-log wording). INV-4 preserved (no mutations, only new compensating entries).
+- **Response.** `{ voidResolutionEventId, betsRefunded, poolUnwindAmount }` — the `resolution_events` row id, distinct from the caller-minted `market.voided` events id.
 - **Invariants.** INV-2, INV-4.
 - **Acceptance.** `tests/server/resolution/void.test.ts::full-refund-and-pool-unwind`.
 
@@ -1296,6 +1298,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-06-03 | 1.0.0 | §0, §2, §3, §7, §8, §11, §12.2, §13, §16, §20 | **PRECURSOR.4 v1.0 lock.** Promotes SPEC.1 1.9.0-draft → 1.0.0 (paired with SPEC.2 → 1.0.0). **§0** version → 1.0.0, last-updated → 2026-06-03. **§2** glossary `dharma_ledger.tag` → `dharma_ledger.entry_type` (3 rows) to match the built `dharma_entry_type` enum column. **§3** Dharma fixed-enum: `source` tag → `entry_type`; `bet_settle` → `bet_payout`; `uncollectable` added (now the 9-value schema set). **§11** resolution payout tag `bet_settle` → `bet_payout` (verb "settle" retained). **§12.2** public-dataset release licensed **CC-BY-4.0**. **Error-code prefix sweep:** 23 backtick error-code references across §7 / §8 / §13 / §16 error blocks aligned to the §15.4 catalogue's `error_`-prefixed form (14 distinct codes); 9 SPEC.1-local codes absent from §15.4 left unchanged (catalogue-completeness flagged for the §15 forward-deliverable); historical §20 change-log rows untouched. | PRECURSOR.4 fresh-session lock review: normalize SPEC.1↔schema naming (`entry_type`, `bet_payout` / `uncollectable`), pin the public-dataset licence to CC-BY-4.0, align error-code references to the §15.4 38-code catalogue. | — |
 | 2026-06-03 | 1.0.1 | §0 | **Post-lock status-prose hygiene (paired with SPEC.2 → 1.0.1).** No v1.0 substance reopened. §0 version → 1.0.1; status prose reconciled to the locked state ("Working draft … promotes to Approved at PRECURSOR.4" → Approved/locked, PRECURSOR.4 completed 2026-06-03; the "v1.9.0-draft … promotes to v1.0" anchor-lock note past-tensed). | SPEC.1 carries no tracker-gating / phase-model content, so the SPEC.2 §23 tracker-v11 reconciliation requires no SPEC.1 change beyond this editorial hygiene. | — |
 | 2026-06-04 | 1.0.2 | §2; §20 | **ENGINE.1 — cpmm.md authored + companion landing.** `docs/specs/cpmm.md` v1.0.0 committed (CPMM math companion per SPEC.2 §1.4 #2): Manifold lineage pinned (`zugzwang-foundation/manifold-reference` @ `d5b55cf9`, tag `ref-2026-04-28-found5`); MIT notice preserved verbatim in `THIRD_PARTY_NOTICES.md` (repo root, same commit). Decimal arithmetic pinned: decimal.js ^10.6, precision 50, 18-dp directional boundary rounding (floor on user-credited quantities) — resolves ADR-0008 §8 deferral, binds ENGINE.2 + ENGINE.5. Slippage pinned as absolute probability-point impact with strict-> threshold trigger (F-BET-9 consumable; gates DESIGN.4). cpmm.md §7.2 records the pre-launch curation slate as standard launch procedure (product definition deferred to SPEC.1 / debate-phase market design). §2 glossary CPMM row repointed `src/server/markets/cpmm.ts` → `src/server/cpmm/` (drift fix; canon per SPEC.2 §1.4 + ENGINE.2 home). | Companion math spec must merge before any ENGINE.2 module code (no-code-before-spec; CPMM is critical-path money math); glossary path was drift against SPEC.2 §1.4 canon; MIT attribution is a license obligation of the Manifold lift. | ADR-0008 (§8 resolved-by-ENGINE.1); ADR-0001 |
+| 2026-06-12 | 1.0.3 | §0; §6.1; §10.3; §10.7; §11 | **ENGINE.9 riders R-A..R-E + R-J — resolution stratum same-commit amendments** (docs/plans/ENGINE.9.md, founder-ratified 2026-06-11; paired with SPEC.2 → 1.0.3, riders R-F..R-K). **§11 F-RESOLVE-1** (R-A): criterion-met note mandatory + immutable (`resolution_events.reason` NOT NULL — R-9.1); winners settle at the GROSS shares-settle value on the §10.3 pro-rata basis (R-9.8); losers settle to 0 — the `−S` per-A2 form STRUCK (stake already debited at bet time; −S at resolution would double-debit — R-9.2); "write `pool_unwind` flow to admin account" → residual recorded as `poolUnwindAmount` on the terminal `market.resolved` events row, no admin balance, the Dharma exits circulation visibly (R-9.5/R-9.5e). **§11 F-RESOLVE-2** (R-J): reversal amounts read from the RECORDED `payout_event` rows of the corrected event, never recomputed (R-9.8 corollary); at most one `uncollectable` row per user per correction (the per-user aggregate floor). **§11 F-RESOLVE-3** (R-B): refund = `f × stake`, sale proceeds stand (R-9.8); pool unwind → exits-circulation wording (R-9.5); "single `voided` event written to `admin_events` log" → one terminal `market.voided` events row, SPEC.2 §3.6 form (OQ-4). **§10.7** (R-C): void bullet — exits-circulation + `f × stake`. **§10.3** (R-D): pro-rata note added (per-bet math exact for unsold bets; surviving fraction uniform after partial sells; deterministic last-row remainder). **§6.1** (R-E): Closed→Resolving bullet "400 `error_market_closed_at`" → "409 `market_resolving`" (the shipped §15 mapping — E-1). **§11 F-RESOLVE-3 Response** (S6 gate ruling on reviewer MEDIUM-1, disposition (a)): response field `voidEventId` → `voidResolutionEventId` — the response names the `resolution_events` row id, distinct from the caller-minted `market.voided` events id (a plan §W-3d naming defect; plan not amended; settle/correct already used distinct names). **§0** version → 1.0.3, last-updated → 2026-06-12. | ENGINE.9 execute landed `src/server/resolution/` (W-3 trio + F-ADMIN-3 trigger) + migrations 0014/0015; these riders pin the founder-ratified rulings the implementation encodes — same-commit doctrine. | — |
 
 ---
 

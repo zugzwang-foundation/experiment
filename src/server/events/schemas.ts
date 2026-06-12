@@ -66,11 +66,13 @@ export const EVENT_TYPES = [
 	// admin domain (2)
 	"admin.signed_in",
 	"admin.signed_out",
-	// market domain (6) — ENGINE.0; lifecycle (created→opened→closed) +
-	// settlement (resolved/corrected/voided). All ride aggregate_type "market".
+	// market domain (7) — ENGINE.0 + ENGINE.9 (resolving); lifecycle
+	// (created→opened→closed→resolving) + settlement (resolved/corrected/
+	// voided). All ride aggregate_type "market".
 	"market.created",
 	"market.opened",
 	"market.closed",
+	"market.resolving",
 	"market.resolved",
 	"market.corrected",
 	"market.voided",
@@ -181,13 +183,23 @@ export const eventPayloadSchemas = {
 	"market.closed": z.object({
 		marketId: z.string().uuid(),
 	}),
+	// market.resolving — the F-ADMIN-3 trigger emit (ENGINE.9, plan C-1):
+	// payload is marketId ONLY; outcome/evidence live on `resolution_events`
+	// per R-9.1, never duplicated.
+	"market.resolving": z.object({
+		marketId: z.string().uuid(),
+	}),
 	// market settlement. winningSide mirrors the `side` pgEnum
 	// (src/db/schema/_enums.ts). correctsEventId references resolution_events.id
 	// (SPEC.2 §3.6) — ENGINE.9 wires the referent; stays a uuid here.
+	// poolUnwindAmount (R-9.5e): the residual pool Dharma exiting circulation,
+	// recorded as a payload field on the terminal emit — NOT a dedicated
+	// pool_unwind event type and never a dharma_ledger row (ENGINE.5 R-2).
 	"market.resolved": z.object({
 		marketId: z.string().uuid(),
 		winningSide: z.enum(["YES", "NO"]),
 		resolutionNote: z.string().min(1),
+		poolUnwindAmount: numericString,
 	}),
 	"market.corrected": z.object({
 		marketId: z.string().uuid(),
@@ -198,6 +210,7 @@ export const eventPayloadSchemas = {
 	"market.voided": z.object({
 		marketId: z.string().uuid(),
 		voidReason: z.string().min(1),
+		poolUnwindAmount: numericString,
 	}),
 	// bet domain. side mirrors the `side` pgEnum. stake/shares/price are exact
 	// NUMERIC(38,18) strings. parentCommentId null = top-level post-bet;

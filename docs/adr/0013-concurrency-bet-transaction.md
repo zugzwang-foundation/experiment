@@ -27,6 +27,27 @@ the users row as a retryable `40001` (wrapper retry), never a deadlock. No other
 `users` inside a pool-locked transaction. **Consumer:** ENGINE.9's outstanding per-user
 serialization obligation for resolution writes (`persist.ts` D-2) must slot into this same order.
 
+### P2 — W-3 resolution wrapper consumes the reserved `markets → …` slot (ENGINE.9, 2026-06-12)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The load-bearing decision is unchanged.** ENGINE.9's W-3 wrapper
+(`src/server/resolution/transaction.ts` — `runResolutionTransaction()`) locks the `markets` row
+FIRST (`FOR NO KEY UPDATE`), then the pool row, consuming the lock-order slot W-1 deliberately
+reserved (W-1's status read is unlocked precisely so a `pools → markets` order never exists —
+`src/server/bets/transaction.ts:79-82`). Global order is **markets → pools → positions →
+dharma_ledger → events**, with the P1 `pools → users` suffix preserved (resolution's per-user
+ledger writes — settle payouts, the correction reverse+uncollectable pair, void refunds — chain via
+`previousBalance` inside the pool-locked section, discharging the P1 consumer obligation above).
+No-cycle argument: `markets` is locked by W-3 only, so no path acquires `pools → markets`;
+cross-wrapper contention lands as retryable `40001` (consistent order ⇒ never `40P01`). The pool
+lock doubles as the in-flight fence (R-9.4): settle/void block behind any uncommitted W-1 bet tx
+and read `bets`/`positions` after it resolves; the trigger takes no pool lock (its `Closed`
+precondition means no W-1 traffic gates open). **W-1 is unchanged and untouched** (zero-line diff
+at ENGINE.9); the W-3 spine duplicates the retry helpers rather than extracting them. Retry policy,
+jitter ladder, SQLSTATE set, breadcrumb discipline: identical to the §2 decision; the one
+parameterisation is `statement_timeout` (default 1 000 ms; the settle/correct/void fan-out flows
+pass 5 000 ms — ENGINE.9 OQ-1, HARDEN re-tunes).
+
 ## Context and Problem Statement
 
 The bet handler is the most write-contended code path in the experiment. Every entry bet (F-BET-1) is an atomic write to six tables — `pools`, `positions`, `dharma_ledger`, `bets`, `comments`, `events` — and INV-1 (bet+comment atomicity) requires that all six commit or none do. Subsequent buys (F-BET-2) and sells (F-BET-3) write subsets of the same tables; F-BET-3 additionally triggers F-COMMENT-8 (friendly-fire freeze) inside the same transaction by updating `friendly_fire_events.frozen_at` for the user's votes in this market. Two concurrent users bidding on the same market hit the same `pools` row.
