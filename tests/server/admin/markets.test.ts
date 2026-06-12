@@ -90,7 +90,7 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 		vi.clearAllMocks();
 	});
 
-	it("admin-markets::M1-ceiling-reject", async () => {
+	it("admin-markets::M1-deadline-form-validation-ceiling-reject", async () => {
 		// One millisecond past the freeze instant → MarketDeadlineCeilingError;
 		// NOTHING written (asserted, not assumed).
 		const caught = await createMarket(
@@ -105,7 +105,7 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 		expect((await allEventRows()).length).toBe(0);
 	});
 
-	it("admin-markets::M1-boundary-pass-at-freeze", async () => {
+	it("admin-markets::M1-deadline-form-validation-boundary-pass", async () => {
 		// deadline == FREEZE passes ("≤" per SPEC.1 §12.1). The supplied-eventId
 		// round-trip rides this boundary call: the explicit uuidv7() is used
 		// VERBATIM (createdEventId === supplied === the events row's event_id).
@@ -124,7 +124,7 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 		expect(eventRows[0]?.eventId).toBe(suppliedEventId);
 	});
 
-	it("admin-markets::M1-past-deadline-reject", async () => {
+	it("admin-markets::M1-deadline-form-validation-past-reject", async () => {
 		// Both halves of D-14.b: deadline === now AND deadline < now reject.
 		const caughtEq = await createMarket(
 			createArgs("placeholder-m1-past-eq", NOW),
