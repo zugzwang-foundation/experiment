@@ -215,9 +215,11 @@ Pending elsewhere: the tracker sweep (below).
 The **tracker sweep** (its own chat, sweep-owned per R-9.7): ENGINE.9 → DONE rows +
 the **ENGINE.14 mint** (F-ADMIN-1 create, F-ADMIN-2 seed/open + dormant `pool_seed`
 activation, the close transition, the three remaining `market.*` emits + STRIP rows;
-ENGINE.10 + UI.6 gain ENGINE.14 as a dep). The sweep is due. After it: ENGINE.10
-(admin HTTP surface — composed trigger→settle endpoint, resolution error envelopes,
-and the three security-handoff items above). The close-out staging step
+ENGINE.10 + UI.6 gain ENGINE.14 as a dep). The sweep is due. After it, the tracker names the next
+stratum — ENGINE.14 now precedes ENGINE.10 on the dep graph (R-9.7), so expect
+ENGINE.14 (market lifecycle writes) before ENGINE.10 (admin HTTP surface — composed
+trigger→settle endpoint, resolution error envelopes, the three security-handoff
+items above) unless the sweep re-sequences. The close-out staging step
 (END-ON-MAIN + `~/Desktop/zz-pk-refresh-ENGINE.9/` with `-plan`/`-log` dest
 suffixes, md5-verified) is its own gated step after THIS log PR merges.
 
