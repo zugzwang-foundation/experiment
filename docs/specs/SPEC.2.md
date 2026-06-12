@@ -1887,6 +1887,9 @@ Audit trails are exhaustive at the runtime emission layer by design (INV-4 + ADR
 | `bet.placed` | `payload.userId` | Defense-in-depth — actor identity ships via `metadata.user_id` (PSEUDO per §19.5); explicit payload strip prevents re-identification via cross-join. Research keys (stake, side, price, market/comment ids) SHIP — K_eff(t) derivation core per §19.6 (ENGINE.8 emit site) |
 | `bet.sold` | `payload.userId` | Same rationale; sell-leg research keys (`sharesSold`, `proceeds`, `price`) SHIP (ENGINE.8 emit site) |
 | `comment.placed` | `payload.userId` | Same rationale; payload research keys (`side`, `bodyLength`, market/bet/comment ids, `uploadId`) SHIP — the comment `body` + `side_at_post_time` are not payload keys; they SHIP via the `comments` table per Appendix B.13, commentary being the dataset's thesis-core signal (ENGINE.8 emit site) |
+| `market.created` | — (none) | marketId + resolutionDeadline both SHIP (ENGINE.14 emit site) |
+| `market.opened` | — (none) | marketId + seedAmount SHIP (seed is public CPMM state — it IS the reserves) (ENGINE.14 emit site) |
+| `market.closed` | — (none) | marketId SHIPS (ENGINE.14 emit site) |
 | `market.resolving` | — (none) | No PII-class payload keys; all research keys SHIP (settlement core for K_eff derivation); actor identity is `metadata.actor_id = 'admin-singleton'`, never pseudonymised (§19.5) (ENGINE.9 emit site) |
 | `market.resolved` | — (none) | Same rationale — `winningSide`, `resolutionNote`, `poolUnwindAmount` (R-9.5e) all SHIP (ENGINE.9 emit site) |
 | `market.corrected` | — (none) | Same rationale — `correctsEventId`, `correctedWinningSide`, `resolutionNote` SHIP; the corrections chain is thesis-core audit (ENGINE.9 emit site) |

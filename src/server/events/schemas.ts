@@ -170,15 +170,16 @@ export const eventPayloadSchemas = {
 		sessionId: z.string().uuid(),
 	}),
 	// === ENGINE.0 forward-stratum types (10 — plan §3) =======================
-	// market lifecycle. seedAmount is the CPMM seed (numericString);
-	// resolutionDeadline is an ISO-8601 instant with offset.
+	// market lifecycle. resolutionDeadline is an ISO-8601 instant with offset.
+	// seedAmount (the CPMM seed, numericString) rides market.opened — the
+	// seed instant is Draft → Open, not creation (R-14.1, ENGINE.14).
 	"market.created": z.object({
 		marketId: z.string().uuid(),
 		resolutionDeadline: z.string().datetime({ offset: true }),
-		seedAmount: numericString,
 	}),
 	"market.opened": z.object({
 		marketId: z.string().uuid(),
+		seedAmount: numericString,
 	}),
 	"market.closed": z.object({
 		marketId: z.string().uuid(),
