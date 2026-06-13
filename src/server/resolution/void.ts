@@ -9,6 +9,7 @@ import {
 	positions,
 	resolutionEvents,
 } from "@/db/schema";
+import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
@@ -42,6 +43,8 @@ export async function voidMarket(args: {
 	betsRefunded: number;
 	poolUnwindAmount: string;
 }> {
+	// CF-6 belt (ENGINE.15 S4): admin-actor assert at entry — mirrors W-4.
+	assertAdminActor(args.metadata);
 	if (args.reason.trim() === "") {
 		throw new Error("voidMarket: reason is mandatory (R-9.1)");
 	}

@@ -3,6 +3,7 @@ import "server-only";
 import { and, eq } from "drizzle-orm";
 
 import { markets } from "@/db/schema";
+import { assertAdminActor } from "@/server/admin/actor";
 import { insertEvent } from "@/server/events/insert";
 import { transition } from "@/server/markets/transitions";
 
@@ -32,6 +33,8 @@ export async function triggerResolution(args: {
 	triggerEventId: string;
 	metadata: ResolutionEventMetadata;
 }): Promise<{ marketId: string; status: "Resolving" }> {
+	// CF-6 belt (ENGINE.15 S4): admin-actor assert at entry — mirrors W-4.
+	assertAdminActor(args.metadata);
 	return runResolutionTransaction(
 		{
 			marketId: args.marketId,

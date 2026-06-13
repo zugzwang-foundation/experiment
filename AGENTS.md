@@ -64,10 +64,10 @@ experiment/
 ├── .github/workflows/ci.yml        # the ONLY workflow
 ├── src/
 │   ├── app/                        # Next.js App Router
-│   │   ├── (admin)/admin/login/    # admin login (separate from Better Auth)
+│   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages)
 │   │   ├── (auth)/                 # onboarding, sign-in, sign-in/otp
 │   │   ├── (dev)/                  # scaffold smoke page
-│   │   ├── api/                    # _smoke-error, auth/[...all], cron/r2-orphan-sweep, health, uploads/sign
+│   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets}, health, uploads/sign
 │   │   ├── globals.css, layout.tsx, page.tsx
 │   ├── components/ui/              # shadcn primitives (button.tsx …)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
@@ -131,7 +131,7 @@ const placeBetSchema = z.object({
 // validate → run externals (e.g. moderation) → db.transaction(bet + comment) → revalidate
 ```
 
-**Route handlers** (`app/api/*/route.ts`) — external-facing endpoints (auth callback, uploads, health, cron). Same zod + auth rules.
+**Route handlers** (`app/api/*/route.ts`) — external-facing endpoints (auth callback, bets place/sell, uploads, health, cron — incl. `cron/close-due-markets`). Same zod + auth rules.
 
 **Caching.** `next.config.ts` is currently a Sentry wrapper + env injection only — **`cacheComponents` is NOT enabled** and no Turbopack flags are set. If `cacheComponents` is turned on later, fetches become uncached by default and you mark scopes with `'use cache'`, reading cookies/headers *outside* cached scopes. Until then, standard Next 16 caching applies.
 
@@ -171,7 +171,7 @@ const placeBetSchema = z.object({
 
 ### Transactions, queries, validation
 
-- **Any multi-write user action runs in `db.transaction(...)`.** Bet placement is `SERIALIZABLE` + `SELECT … FOR NO KEY UPDATE` on the pool row with full-jitter retry on `40001/40P01` (ADR-0013) — *forward spec; the `bets/` handler is greenfield.*
+- **Any multi-write user action runs in `db.transaction(...)`.** Bet placement is `SERIALIZABLE` + `SELECT … FOR NO KEY UPDATE` on the pool row with full-jitter retry on `40001/40P01` (ADR-0013) — landed at ENGINE.7/8 (W-1 `src/server/bets/transaction.ts` + `endpoint.ts`); the market-lifecycle W-4 (`src/server/markets/transaction.ts`) and resolution W-3 (`src/server/resolution/transaction.ts`) wrappers mirror the same retry spine.
 - Drizzle query builder for typed reads; raw `sql<T>` only for hot paths. Avoid N+1 (`db.query.<t>.findMany({ with })`). Don't `SELECT *` in hot paths. Don't expose Drizzle row types in API responses — map to DTOs in the server layer.
 - **`drizzle-zod`** (`createInsertSchema` / `createSelectSchema`) derives zod schemas from tables — one source of truth for shape.
 
@@ -209,7 +209,7 @@ tests/
 ├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
 ├── integration/   11 *.integration.test.ts (idempotency, orphan-sweep, positions, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger, resolution-conservation, nightly-drift-resolution)
 ├── invariants/    9 specs — see the Invariant-tests bullet below
-├── server/        auth/ (incl. _probe-*), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency), storage/, admin/ (moderation/ + resolution.test.ts), dharma/ (non-transferable)
+├── server/        auth/ (incl. _probe-* + admin-login-result), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/, admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks), dharma/ (non-transferable)
 └── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction)
 ```
 

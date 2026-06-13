@@ -10,6 +10,7 @@ import {
 	positions,
 	resolutionEvents,
 } from "@/db/schema";
+import { assertAdminActor } from "@/server/admin/actor";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
@@ -51,6 +52,8 @@ export async function correctResolution(args: {
 	betsAffected: number;
 	uncollectableTotal: string;
 }> {
+	// CF-6 belt (ENGINE.15 S4): admin-actor assert at entry — mirrors W-4.
+	assertAdminActor(args.metadata);
 	// R-9.3 hard constraint: corrected outcomes are YES/NO only — checked
 	// before any IO (a JS caller can bypass the TS union).
 	if (args.correctedSide !== "YES" && args.correctedSide !== "NO") {
