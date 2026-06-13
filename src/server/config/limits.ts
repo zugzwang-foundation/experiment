@@ -128,3 +128,24 @@ export const DAILY_CREDIT_DHARMA = "10";
  * — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string
  * — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */
 export const INITIAL_USER_DHARMA = "1000";
+
+// === ENGINE.15: admin form-boundary bounds + close-sweep lock (D-15.f) =====
+//
+// SA-L-1 ceiling enforcement at the admin form boundary — the lifecycle/
+// resolution services validate presence only (`trim() !== ""`, no ceiling), so
+// the wire enforces the max-char bound. The three max-char values are
+// PLACEHOLDER safety bounds owned by the number-tuning pass (HARDEN); names
+// pinned now + registered in SPEC.1 Appendix B (R-15-G). The lock TTL is the
+// provisional close-sweep lease, HARDEN-tunable (R-15.2 cadence pass).
+
+/** Admin market title (the question) max length (chars). PLACEHOLDER VALUE — tuned by HARDEN per SPEC.1 §16.1 + R-15-G. SA-L-1 form-boundary ceiling. */
+export const MARKET_TITLE_MAX_CHARS = 200;
+
+/** Admin market description (the resolution criterion) max length (chars). PLACEHOLDER VALUE — tuned by HARDEN per SPEC.1 §16.1 + R-15-G. SA-L-1 form-boundary ceiling. */
+export const MARKET_DESCRIPTION_MAX_CHARS = 4000;
+
+/** Resolution / correction / void `reason` max length (chars) — the ENGINE.9 R-9.1 mandatory note. PLACEHOLDER VALUE — tuned by HARDEN per SPEC.1 §16.1 + R-15-G. SA-L-1 form-boundary ceiling. */
+export const RESOLUTION_REASON_MAX_CHARS = 1000;
+
+/** Distributed-lock TTL (s) for the close-due-markets cron sweep (D-15.g). Provisional 55s — under the per-minute (`* * * * *`) cadence so a crashed sweep's lease expires before the next tick. HARDEN-tunable (R-15.2 cadence pass). */
+export const CLOSE_SWEEP_LOCK_TTL_SECONDS = 55;

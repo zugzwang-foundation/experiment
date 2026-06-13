@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+
 import { adminLoginAction } from "@/server/auth/admin/login";
 
 // F-AUTH-ADMIN login page per plan §4 + SPEC.1 §13 + SPEC.2 §8.4.
@@ -12,23 +14,25 @@ export const metadata: Metadata = {
 	},
 };
 
-// Server Action wrapper: discards the `{ ok: false, code }` return shape
-// so the form's `action` prop accepts it (form actions are typed
-// `(formData) => Promise<void>` — Next.js doesn't propagate return
-// values to the browser without useActionState). Failure surfaces as a
-// page re-render with the identical-401 error message visible via flash
-// state in a future iteration; for the SCAFFOLD.3 scope the
-// adminLoginAction's side effects (cookie set on success, redirect) are
-// the user-facing signal.
-async function submitAdminLogin(formData: FormData): Promise<void> {
+// R-15.6 (ENGINE.15 S4): surface the failure code instead of discarding it. On
+// success `adminLoginAction` redirects to /admin (throws NEXT_REDIRECT), so
+// reaching the redirect below means a failure envelope — render its code on the
+// login page via the ?error param (the D-15.e redirect-param pattern). The
+// `submitAdminLogin` export build-survival is the separate S6 gate (R-15-2).
+export async function submitAdminLogin(formData: FormData): Promise<void> {
 	"use server";
-	await adminLoginAction(formData);
+	const result = await adminLoginAction(formData);
+	redirect(`/admin/login?error=${result.code}`);
 }
 
-export default function AdminLoginPage(): React.ReactElement {
+export default async function AdminLoginPage(props: {
+	searchParams: Promise<{ error?: string }>;
+}): Promise<React.ReactElement> {
+	const { error } = await props.searchParams;
 	return (
 		<main>
 			<h1>Admin sign-in</h1>
+			{error ? <p>Error: {error}</p> : null}
 			<form action={submitAdminLogin}>
 				<label>
 					Password:
