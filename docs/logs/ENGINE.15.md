@@ -197,30 +197,38 @@ creep — every file traces to the plan or a ratified ruling).
 
 ## (b) Plan deviations (web-ratified) — 10 entries
 
-1. **R-15.6 login test is a NEW file** `tests/server/auth/admin-login-result.test.ts` (not an
-   extension of `admin-login.test.ts`) — `vi.mock` file-hoist collision with the real
-   `adminLoginAction` imported there. [S1]
-2–4. **`markets.test.ts` fixture corrections** exposed by the real clock + freeze (masked at S1
-   because the stub returned a fixed envelope for all):
-   - `WIRE_NOW_DEADLINE` `2027-01-01` → `2026-10-01` (2027 was past the freeze ceiling → happy
-     path would reject `deadline_ceiling`).
-   - `CLOSE_DEADLINE` `2026-08-01` → `2026-01-01` (future vs the test clock 2026-06-13 → the close
-     happy path's "deadline reached" never fired).
-   - `CEILING_BREACH` `…23:59:00.001Z` → `2026-11-06T00:00:00.000Z` (`datetimeLocal()`
-     minute-truncation lands a sub-minute over-freeze breach back on the allowed inclusive instant).
-   [S2]
-5. **cron test `CRON_SECRET`** `= undefined` → `delete` (Node coerces `= undefined` to the truthy
-   string `"undefined"`, so the route's `if (!secret)` never fired → 401 not 500). [S3]
-6. **Freeze-ceiling precision note** added to SPEC.1 §15 F-ADMIN-1 — web-ruled same-commit rider
-   addition (the property is CREATED by this stratum's `datetime-local` form boundary). [S4]
-7. **§3.4:282 precision fix** — web-ruled same-commit rider addition (the "(b) HTTP-fanout job that
-   mutates state outside Postgres" generalization was FALSIFIED by the close-due job, which mutates
-   Postgres via the app; rewritten to cover both HTTP-fanout cases). [S4]
-8. **§12.6 cross-ref `§3.5 → §3.4`** correction — in-scope R-15-C find. [S4]
-9. **SPEC.1 change-log row-order** (`1.0.5` moved below `1.0.4`, restoring ascending order) —
-   `@code-reviewer` LOW-1, own doc-fix commit. [S5]
-10. **S5 security remediation** — per-page admin auth guard (`requireAdminPage`) + `marketId` UUID
-    validation (`requireUuidParam`), web-ruled in-scope fix for the auditor HIGH + MEDIUM. [S5]
+**1.** R-15.6 login test is a NEW file `tests/server/auth/admin-login-result.test.ts` (not an
+extension of `admin-login.test.ts`) — `vi.mock` file-hoist collision with the real
+`adminLoginAction` imported there. [S1]
+
+**2–4.** `markets.test.ts` fixture corrections exposed by the real clock + freeze (masked at S1
+because the stub returned a fixed envelope for all):
+
+- `WIRE_NOW_DEADLINE` `2027-01-01` → `2026-10-01` (2027 was past the freeze ceiling → happy
+  path would reject `deadline_ceiling`).
+- `CLOSE_DEADLINE` `2026-08-01` → `2026-01-01` (future vs the test clock 2026-06-13 → the close
+  happy path's "deadline reached" never fired).
+- `CEILING_BREACH` `…23:59:00.001Z` → `2026-11-06T00:00:00.000Z` (`datetimeLocal()`
+  minute-truncation lands a sub-minute over-freeze breach back on the allowed inclusive instant).
+  [S2]
+
+**5.** cron test `CRON_SECRET` `= undefined` → `delete` (Node coerces `= undefined` to the truthy
+string `"undefined"`, so the route's `if (!secret)` never fired → 401 not 500). [S3]
+
+**6.** Freeze-ceiling precision note added to SPEC.1 §15 F-ADMIN-1 — web-ruled same-commit rider
+addition (the property is CREATED by this stratum's `datetime-local` form boundary). [S4]
+
+**7.** §3.4:282 precision fix — web-ruled same-commit rider addition (the "(b) HTTP-fanout job that
+mutates state outside Postgres" generalization was FALSIFIED by the close-due job, which mutates
+Postgres via the app; rewritten to cover both HTTP-fanout cases). [S4]
+
+**8.** §12.6 cross-ref `§3.5 → §3.4` correction — in-scope R-15-C find. [S4]
+
+**9.** SPEC.1 change-log row-order (`1.0.5` moved below `1.0.4`, restoring ascending order) —
+`@code-reviewer` LOW-1, own doc-fix commit. [S5]
+
+**10.** S5 security remediation — per-page admin auth guard (`requireAdminPage`) + `marketId` UUID
+validation (`requireUuidParam`), web-ruled in-scope fix for the auditor HIGH + MEDIUM. [S5]
 
 ## (c) Ratified amendment note
 
