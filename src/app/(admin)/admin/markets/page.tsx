@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { db } from "@/db";
 import { markets } from "@/db/schema";
+import { requireAdminPage } from "@/server/admin/page-guards";
 
 // ENGINE.15 S3 — R-15.1 admin markets list. Server Component, ZERO client JS
 // (D-15.e), direct read-only Drizzle read. Unstyled — DESIGN/UI lanes own
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
 export default async function AdminMarketsPage(props: {
 	searchParams: Promise<{ ok?: string; error?: string }>;
 }): Promise<React.ReactElement> {
+	await requireAdminPage();
+
 	const { ok, error } = await props.searchParams;
 
 	const rows = await db

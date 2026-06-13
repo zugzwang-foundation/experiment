@@ -8,6 +8,7 @@ import { correctResolutionAction } from "@/server/admin/markets/correct";
 import { resolveMarketAction } from "@/server/admin/markets/resolve";
 import { seedPoolAction } from "@/server/admin/markets/seed";
 import { voidMarketAction } from "@/server/admin/markets/void";
+import { requireAdminPage, requireUuidParam } from "@/server/admin/page-guards";
 
 // ENGINE.15 S3 — R-15.1 market detail + state-appropriate forms. Server
 // Component, ZERO client JS (D-15.e). Each form binds an inline wrapper that
@@ -20,7 +21,8 @@ export default async function MarketDetailPage(props: {
 	params: Promise<{ marketId: string }>;
 	searchParams: Promise<{ ok?: string; error?: string }>;
 }): Promise<React.ReactElement> {
-	const { marketId } = await props.params;
+	await requireAdminPage();
+	const marketId = requireUuidParam((await props.params).marketId);
 	const { ok, error } = await props.searchParams;
 
 	const [market] = await db

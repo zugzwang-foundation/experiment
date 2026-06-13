@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createMarketAction } from "@/server/admin/markets/create";
+import { requireAdminPage } from "@/server/admin/page-guards";
 
 // ENGINE.15 S3 — R-15.1 create form. Server Component, ZERO client JS (D-15.e).
 // The inline wrapper calls the wire action and surfaces the result via a
@@ -9,6 +10,8 @@ import { createMarketAction } from "@/server/admin/markets/create";
 export default async function NewMarketPage(props: {
 	searchParams: Promise<{ error?: string }>;
 }): Promise<React.ReactElement> {
+	await requireAdminPage();
+
 	const { error } = await props.searchParams;
 
 	async function submit(formData: FormData): Promise<void> {
