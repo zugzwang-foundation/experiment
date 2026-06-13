@@ -305,10 +305,17 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 // description (≤MARKET_DESCRIPTION_MAX_CHARS), resolutionDeadline (a
 // datetime-local string → Date). Success → { marketId, slug }.
 
-const WIRE_NOW_DEADLINE = new Date("2027-01-01T00:00:00.000Z");
+// S2 correction (was 2027-01-01, which is PAST the §12.1 freeze ceiling
+// 2026-11-05T23:59Z → createMarket would reject with deadline_ceiling, not ok).
+// A future deadline (> now, the test clock 2026-06-13) that is ≤ the ceiling,
+// so the happy path creates a Draft.
+const WIRE_NOW_DEADLINE = new Date("2026-10-01T00:00:00.000Z");
 const PAST_DEADLINE = new Date("2020-01-01T00:00:00.000Z");
-// One millisecond past the §12.1 freeze ceiling (FREEZE_INSTANT_UTC).
-const CEILING_BREACH = new Date("2026-11-05T23:59:00.001Z");
+// S2 correction (was freeze+1ms: `datetimeLocal()` truncates to the minute,
+// which parses back to EXACTLY the freeze instant — allowed under "≤", so no
+// ceiling fired). The next minute past the freeze survives minute-truncation
+// as a genuine breach.
+const CEILING_BREACH = new Date("2026-11-06T00:00:00.000Z");
 
 /** A datetime-local string (no seconds/zone) the browser form would submit. */
 function datetimeLocal(d: Date): string {
@@ -489,7 +496,10 @@ describe("createMarketAction wire surface", () => {
 // §State×Action matrix: Open + past-deadline → ok → Closed; Open + pre-deadline
 // → deadline_not_reached; Draft → market_not_open. DB-BACKED (:54322).
 
-const CLOSE_DEADLINE = new Date("2026-08-01T00:00:00.000Z");
+// S2 correction (was 2026-08-01, which is in the FUTURE relative to the test
+// clock 2026-06-13 → the close happy path's "deadline reached" never fired). A
+// past deadline so the wire-injected `now: new Date()` is at/after it.
+const CLOSE_DEADLINE = new Date("2026-01-01T00:00:00.000Z");
 
 async function seedMarketFixture(
 	slug: string,
@@ -536,7 +546,7 @@ describe("closeMarketAction wire surface", () => {
 
 	it("close-market::happy-path-open-past-deadline", async () => {
 		await withAdminSession();
-		// now (S2 injects new Date()) is well past CLOSE_DEADLINE (2026-08-01).
+		// now (S2 injects new Date()) is past CLOSE_DEADLINE (2026-01-01).
 		const marketId = await seedMarketFixture("wire-close-happy", "Open");
 
 		const result = await closeMarketAction(closeFormData(marketId));
