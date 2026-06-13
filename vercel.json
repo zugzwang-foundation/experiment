@@ -4,6 +4,10 @@
 		{
 			"path": "/api/cron/r2-orphan-sweep",
 			"schedule": "0 */6 * * *"
+		},
+		{
+			"path": "/api/cron/close-due-markets",
+			"schedule": "* * * * *"
 		}
 	]
 }

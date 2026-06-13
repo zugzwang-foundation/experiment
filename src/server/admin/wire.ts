@@ -2,6 +2,7 @@ import "server-only";
 
 import { captureException } from "@sentry/nextjs";
 import { cookies, headers } from "next/headers";
+import { v7 as uuidv7 } from "uuid";
 import type { z } from "zod";
 import { AdminActorError } from "@/server/admin/actor";
 import { validateAdminSession } from "@/server/auth/admin/validate";
@@ -81,9 +82,11 @@ function getClientIp(get: (name: string) => string | null): string {
  * D-15.b — the §3.7 metadata block: EXACTLY the 7 `eventMetadataSchema` keys.
  * `actor_id: 'admin-singleton'` + `user_id: null` is the admin-actor surface
  * (also satisfies `assertAdminActor`, SA-M-1); `idempotency_key: null` (admin
- * actions carry no Idempotency-Key header). `ip`/`user_agent`/`request_id` come
- * from `next/headers` (or the passed `request` for the cron route). No event
- * id is ever derived here — ids are minted in the action wrappers (B-8/SA-M-1).
+ * actions carry no Idempotency-Key header). `ip`/`user_agent` come from
+ * `next/headers` (or the passed `request` for the cron route); `request_id` is
+ * the `x-vercel-id` header or a minted uuidv7 (RULING B — never 'unknown', so
+ * admin/resolution mutations stay traceable). No event id is ever derived here
+ * — ids are minted in the action wrappers (B-8/SA-M-1).
  */
 export async function buildAdminMetadata(args: {
 	flowId: AdminFlow;
@@ -92,7 +95,7 @@ export async function buildAdminMetadata(args: {
 	const headerStore = args.request ? args.request.headers : await headers();
 	const get = (name: string): string | null => headerStore.get(name);
 	return {
-		request_id: get("x-vercel-id") ?? "unknown",
+		request_id: get("x-vercel-id") ?? uuidv7(),
 		flow_id: args.flowId,
 		user_id: null,
 		actor_id: "admin-singleton",

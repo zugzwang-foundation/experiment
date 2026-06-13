@@ -93,7 +93,10 @@ describe("GET /api/cron/close-due-markets wire surface", () => {
 	it("close-due-cron::missing-secret-env-returns-500", async () => {
 		const original = process.env.CRON_SECRET;
 		try {
-			process.env.CRON_SECRET = undefined;
+			// S3 correction: `process.env.X = undefined` coerces to the STRING
+			// "undefined" (truthy) — the route's `if (!secret)` would not fire, so
+			// the test got 401 not 500. `delete` genuinely unsets the var.
+			delete process.env.CRON_SECRET;
 			const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
 			expect(res.status).toBe(500);
 			expect(mockCloseDueMarkets).not.toHaveBeenCalled();
