@@ -1,5 +1,6 @@
 import { eq } from "drizzle-orm";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { v7 as uuidv7 } from "uuid";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@sentry/nextjs", () => ({
 	captureMessage: vi.fn(),
@@ -7,7 +8,31 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
+// ENGINE.15 S1 wire-surface session-mock recipe (charter §SESSION-MOCK) — see
+// markets.test.ts for the rationale. Inert at S1, load-bearing for S2-green.
+const { mockCookiesGet, mockHeadersGet } = vi.hoisted(() => ({
+	mockCookiesGet: vi.fn(),
+	mockHeadersGet: vi.fn(),
+}));
+
+vi.mock("next/headers", () => ({
+	cookies: () => ({
+		get: mockCookiesGet,
+		set: vi.fn(),
+		delete: vi.fn(),
+	}),
+	headers: () => ({
+		get: mockHeadersGet,
+	}),
+}));
+
+vi.mock("next/cache", () => ({
+	revalidatePath: vi.fn(),
+}));
+
 import { events, markets, pools } from "@/db/schema";
+import { seedPoolAction } from "@/server/admin/markets/seed";
+import { canonicalizeAmount18 } from "@/server/admin/wire";
 import {
 	MarketDeadlineInPastError,
 	MarketLifecycleStateError,
@@ -16,6 +41,25 @@ import {
 import { openMarket } from "@/server/markets/open";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+
+const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
+
+async function withAdminSession(): Promise<string> {
+	const sessionId = uuidv7();
+	await testClient.unsafe(
+		`INSERT INTO admin_sessions (session_id, issued_at, last_seen_at) VALUES ($1, now(), now())`,
+		[sessionId],
+	);
+	mockCookiesGet.mockReturnValue({
+		name: ADMIN_COOKIE_NAME,
+		value: sessionId,
+	});
+	return sessionId;
+}
+
+function withoutAdminSession(): void {
+	mockCookiesGet.mockReturnValue(undefined);
+}
 
 // ENGINE.14 §5.6 tests-first (S1, plan §Test plan charter) — the F-ADMIN-2
 // seed/open acceptance home (P1–P5). Greenfield VALUE imports from
@@ -260,4 +304,192 @@ describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () =
 		expect((await allEventRows()).length).toBe(0);
 		expect(await marketStatus(marketId)).toBe("Draft");
 	});
+});
+
+// ENGINE.15 S1 tests-first (charter file 2) — the `seedPoolAction` wire surface
+// (F-ADMIN-2; seed rides Draft → Open, R-14.1, via the `openMarket` service).
+// VALUE import from `@/server/admin/markets/seed` resolves against the S1 stub,
+// which returns { ok: false, error: { code: "stub_not_implemented" } } — every
+// assertion below is RED on the ASSERTION. S2 wires per D-15.a:
+// requireAdminSession → canonicalizeAmount18(seedAmount) → openMarket → map.
+// DB-BACKED (:54322).
+
+// Far-future deadline so the S2-injected `now: new Date()` never trips
+// openMarket's `now >= deadline` reject on the wire happy path.
+const WIRE_DEADLINE = new Date("2099-01-01T00:00:00.000Z");
+
+async function seedDraftFixture(slug: string): Promise<string> {
+	const [market] = await testDb
+		.insert(markets)
+		.values({
+			slug,
+			title: "PLACEHOLDER — not a real market",
+			description: "PLACEHOLDER criterion — not a real criterion",
+			status: "Draft",
+			resolutionDeadline: WIRE_DEADLINE,
+		})
+		.returning({ id: markets.id });
+	return market?.id ?? "";
+}
+
+async function seedOpenFixtureWithPool(slug: string): Promise<string> {
+	const [market] = await testDb
+		.insert(markets)
+		.values({
+			slug,
+			title: "PLACEHOLDER — not a real market",
+			description: "PLACEHOLDER criterion — not a real criterion",
+			status: "Open",
+			resolutionDeadline: WIRE_DEADLINE,
+		})
+		.returning({ id: markets.id });
+	const marketId = market?.id ?? "";
+	await testDb.insert(pools).values({
+		marketId,
+		yesReserves: SEED,
+		noReserves: SEED,
+	});
+	return marketId;
+}
+
+function seedFormData(marketId: string, seedAmount: string): FormData {
+	const fd = new FormData();
+	fd.append("marketId", marketId);
+	fd.append("seedAmount", seedAmount);
+	return fd;
+}
+
+async function openedEventRows() {
+	return testDb
+		.select({ eventId: events.eventId, payload: events.payload })
+		.from(events)
+		.where(eq(events.eventType, "market.opened"));
+}
+
+describe("seedPoolAction wire surface", () => {
+	beforeEach(() => {
+		mockCookiesGet.mockReset();
+		mockHeadersGet.mockReset();
+	});
+
+	afterEach(async () => {
+		await testClient.unsafe(
+			`TRUNCATE events, pools, markets, admin_sessions CASCADE`,
+		);
+		vi.clearAllMocks();
+	});
+
+	it("seed-pool::happy-path-draft-to-open-canonical-payload", async () => {
+		await withAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-happy");
+
+		// Loose form "100" must canonicalize to 18-dp before openMarket.
+		const result = await seedPoolAction(seedFormData(marketId, "100"));
+
+		expect(result.ok).toBe(true);
+		if (!result.ok) throw new Error("unreachable — asserted ok above");
+		expect(typeof result.data.poolId).toBe("string");
+		expect(result.data.seedAmount).toBe("100.000000000000000000");
+
+		// Market flipped Draft → Open.
+		expect(await marketStatus(marketId)).toBe("Open");
+
+		// market.opened payload carries the CANONICAL 18-dp string (CR-3).
+		const eventRows = await openedEventRows();
+		expect(eventRows.length).toBe(1);
+		expect(eventRows[0]?.payload).toEqual({
+			marketId,
+			seedAmount: "100.000000000000000000",
+		});
+	});
+
+	it("seed-pool::rejects-double-seed-with-market-not-draft", async () => {
+		await withAdminSession();
+		// An Open fixture already carries its pool — double-seed must reject.
+		const marketId = await seedOpenFixtureWithPool("wire-seed-double");
+
+		const result = await seedPoolAction(seedFormData(marketId, "100"));
+
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(result.error.code).toBe("market_not_draft");
+
+		// Still exactly the ONE pre-seeded pool; no new opened event.
+		expect((await poolRowsFor(marketId)).length).toBe(1);
+		expect((await openedEventRows()).length).toBe(0);
+	});
+
+	it("seed-pool::rejects-over-18dp-seed-with-seed-invalid", async () => {
+		await withAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-19dp");
+
+		// 19 fractional digits — rejected at the wire (pre-service), seed_invalid.
+		const result = await seedPoolAction(
+			seedFormData(marketId, "1.2345678901234567891"),
+		);
+
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(result.error.code).toBe("seed_invalid");
+
+		// Nothing written: still Draft, no pool, no event.
+		expect(await marketStatus(marketId)).toBe("Draft");
+		expect((await poolRowsFor(marketId)).length).toBe(0);
+		expect((await openedEventRows()).length).toBe(0);
+	});
+
+	it("seed-pool::rejects-without-admin-session", async () => {
+		withoutAdminSession();
+		const marketId = await seedDraftFixture("wire-seed-no-session");
+
+		const result = await seedPoolAction(seedFormData(marketId, "100"));
+
+		expect(result.ok).toBe(false);
+		if (result.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(result.error.code).toBe("admin_session_required");
+
+		expect(await marketStatus(marketId)).toBe("Draft");
+		expect((await poolRowsFor(marketId)).length).toBe(0);
+		expect((await openedEventRows()).length).toBe(0);
+	});
+});
+
+// ENGINE.15 S1 tests-first (charter file 2) — `canonicalizeAmount18` DIRECT
+// unit (no DB, no session). Encodes EVERY row of the §State×Action
+// `canonicalizeAmount18` worked table LITERALLY. The S1 stub returns its input
+// UNCHANGED and never throws, so: valid rows are RED on the wrong (un-
+// canonicalized) output; reject rows are RED on the missing throw. S2
+// implements the real canonicalizer (returns `^[0-9]+\.[0-9]{18}$`; throws
+// MarketSeedInvalidError on invalid — no rounding, money never rounds at the
+// wire).
+describe("canonicalizeAmount18", () => {
+	it("canonicalize-amount18::pads-integer-to-18-dp", () => {
+		expect(canonicalizeAmount18("100")).toBe("100.000000000000000000");
+	});
+
+	it("canonicalize-amount18::pads-fraction-to-18-dp", () => {
+		expect(canonicalizeAmount18("0.5")).toBe("0.500000000000000000");
+	});
+
+	it("canonicalize-amount18::strips-leading-zeros-and-pads", () => {
+		expect(canonicalizeAmount18("01.50")).toBe("1.500000000000000000");
+	});
+
+	it("canonicalize-amount18::passes-exact-18-dp-unchanged", () => {
+		expect(canonicalizeAmount18("1.234567890123456789")).toBe(
+			"1.234567890123456789",
+		);
+	});
+
+	it("canonicalize-amount18::rejects-19-dp-no-rounding", () => {
+		expect(() => canonicalizeAmount18("1.2345678901234567891")).toThrow(
+			MarketSeedInvalidError,
+		);
+	});
+
+	for (const bad of ["-5", "0", "", "1e3", "1."]) {
+		it(`canonicalize-amount18::rejects-${bad === "" ? "empty" : bad}`, () => {
+			expect(() => canonicalizeAmount18(bad)).toThrow(MarketSeedInvalidError);
+		});
+	}
 });

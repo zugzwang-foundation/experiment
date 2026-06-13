@@ -20,7 +20,12 @@ export const metadata: Metadata = {
 // state in a future iteration; for the SCAFFOLD.3 scope the
 // adminLoginAction's side effects (cookie set on success, redirect) are
 // the user-facing signal.
-async function submitAdminLogin(formData: FormData): Promise<void> {
+// ENGINE.15 S1 RED scaffold: `submitAdminLogin` is exported (was module-local)
+// so the R-15.6 wrapper test can import it. Behavior UNCHANGED at S1 — the
+// result is still discarded, so the test asserting the failure-surfacing
+// redirect (`?error=admin_login_invalid`) fails on ASSERTION. S2 adds the
+// ≤12-line result-surfacing fix (R-15.6).
+export async function submitAdminLogin(formData: FormData): Promise<void> {
 	"use server";
 	await adminLoginAction(formData);
 }
