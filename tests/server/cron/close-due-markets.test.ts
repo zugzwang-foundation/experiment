@@ -45,6 +45,18 @@ vi.mock("@sentry/nextjs", () => ({
 	addBreadcrumb: vi.fn(),
 }));
 
+// ENGINE.16 (b)/(c) — the §20.2 freeze gate on the automated W-4 write surface.
+// `@/server/system/is-frozen` is GREENFIELD until S2; the FACTORY mock makes the
+// missing module resolve to a spy (no collection error). The existing ENGINE.15
+// scenarios default to NOT-frozen (set in beforeEach) so the sweep still runs.
+const { mockIsFrozen } = vi.hoisted(() => ({
+	mockIsFrozen: vi.fn(),
+}));
+
+vi.mock("@/server/system/is-frozen", () => ({
+	isFrozen: mockIsFrozen,
+}));
+
 import { GET } from "@/app/api/cron/close-due-markets/route";
 
 const CRON_SECRET = "test-cron-secret-32-bytes-minimum-xxxxx";
@@ -70,6 +82,8 @@ describe("GET /api/cron/close-due-markets wire surface", () => {
 		// Default: lock acquired, release succeeds — individual tests override.
 		mockAcquireLock.mockResolvedValue({ token: "lock-token" });
 		mockReleaseLock.mockResolvedValue(true);
+		// ENGINE.16: the ENGINE.15 sweep scenarios run with the experiment LIVE.
+		mockIsFrozen.mockResolvedValue(false);
 	});
 
 	afterEach(() => {
@@ -153,5 +167,64 @@ describe("GET /api/cron/close-due-markets wire surface", () => {
 		const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
 		expect(res.status).toBe(503);
 		expect(mockCloseDueMarkets).not.toHaveBeenCalled();
+	});
+});
+
+// ENGINE.16 §5.6 tests-first (charter rows (b) + (c)) — the §20.2 freeze gate on
+// the automated W-4 close-due cron. The gate sits AFTER the Bearer-CRON_SECRET
+// auth check, BEFORE lock acquisition (FIX-2): frozen → HTTP 200
+// `{ status: "frozen" }` (the §3.4 A-2 clientless-scheduler in-body-status
+// contract — NOT a 410, which is the participant-client envelope), with NO lock
+// acquired and NO closeDueMarkets call (work skipped). RED until S2 wires
+// `isFrozen` into the route: today the frozen arm runs the normal sweep
+// (status "ok") and acquireLock/closeDueMarkets WERE called → the assertions
+// fail. No DB — `isFrozen` is mocked.
+describe("GET /api/cron/close-due-markets freeze gate (§20.2 / FIX-2)", () => {
+	beforeEach(() => {
+		mockCloseDueMarkets.mockReset();
+		mockAcquireLock.mockReset();
+		mockReleaseLock.mockReset();
+		mockCaptureException.mockReset();
+		mockIsFrozen.mockReset();
+		process.env.CRON_SECRET = CRON_SECRET;
+		mockAcquireLock.mockResolvedValue({ token: "lock-token" });
+		mockReleaseLock.mockResolvedValue(true);
+	});
+
+	afterEach(() => {
+		vi.clearAllMocks();
+	});
+
+	it("close-due-cron::frozen-returns-200-status-frozen-no-work", async () => {
+		// The gate sits AFTER auth, so a VALID Bearer is supplied (auth must be
+		// reached for the gate to be exercised).
+		mockIsFrozen.mockResolvedValue(true);
+
+		const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { status: string };
+		expect(body.status).toBe("frozen");
+
+		// Work is skipped — no lock acquired, no sweep run (explicitly NOT a 410).
+		expect(mockAcquireLock).not.toHaveBeenCalled();
+		expect(mockCloseDueMarkets).not.toHaveBeenCalled();
+	});
+
+	it("close-due-cron::not-frozen-runs-the-sweep (control)", async () => {
+		mockIsFrozen.mockResolvedValue(false);
+		mockCloseDueMarkets.mockResolvedValueOnce({
+			closed: 0,
+			skipped: 0,
+			closedMarketIds: [],
+		});
+
+		const res = await GET(cronRequest(`Bearer ${CRON_SECRET}`));
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as { status: string };
+		expect(body.status).toBe("ok");
+
+		// Not frozen → the normal sweep path: lock acquired, sweep run.
+		expect(mockAcquireLock).toHaveBeenCalled();
+		expect(mockCloseDueMarkets).toHaveBeenCalledTimes(1);
 	});
 });
