@@ -20,6 +20,7 @@ import {
 } from "@/server/idempotency/types";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
+import { isFrozen } from "@/server/system/is-frozen";
 import { toWireError } from "./errors";
 
 // The shared §3.1 handler stack for the two bet endpoints (`/api/bets/place`,
@@ -180,6 +181,15 @@ export async function runBetEndpoint(
 			requestId,
 			403,
 			envelope("error_onboarding_required", "onboarding required"),
+		);
+	}
+
+	// 1.5 Freeze gate (§20.2) — adjacent to auth, before idempotency; no tx opens.
+	if (await isFrozen()) {
+		return jsonResponse(
+			requestId,
+			410,
+			envelope("error_experiment_concluded", "The experiment has concluded."),
 		);
 	}
 
