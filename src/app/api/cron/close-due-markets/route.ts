@@ -5,6 +5,7 @@ import { captureException } from "@sentry/nextjs";
 import { buildAdminMetadata } from "@/server/admin/wire";
 import { CLOSE_SWEEP_LOCK_TTL_SECONDS } from "@/server/config/limits";
 import { closeDueMarkets } from "@/server/markets/close";
+import { isFrozen } from "@/server/system/is-frozen";
 import { getRedisKey } from "@/server/upstash/keys";
 import { acquireLock, releaseLock } from "@/server/upstash/lock";
 
@@ -52,6 +53,14 @@ export async function GET(request: Request): Promise<Response> {
 	const authHeader = request.headers.get("authorization") ?? "";
 	if (!constantTimeStringCompare(authHeader, `Bearer ${secret}`)) {
 		return jsonResponse({ error: "error_unauthenticated" }, { status: 401 });
+	}
+
+	// Freeze gate (§20.2) — the automated W-4 write surface. Post-freeze the sweep
+	// is skipped (no lock, no closeDueMarkets). HTTP 200 + in-body status per the
+	// §3.4 A-2 cron contract (clientless scheduler — the 410 client envelope is the
+	// participant contract, not this surface).
+	if (await isFrozen()) {
+		return jsonResponse({ status: "frozen" }, { status: 200 });
 	}
 
 	// 2. Lock — at-most-one-runner across Vercel cron fanout.
