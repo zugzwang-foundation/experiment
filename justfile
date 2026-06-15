@@ -66,3 +66,9 @@ db-reset:
 # Run trigger + invariant tests against local Postgres.
 test-db:
     pnpm vitest run tests/db/ tests/invariants/
+
+# ENGINE.10 correctness-at-scale battery (Q-2) — the gated, named-required exit
+# gate component. Engineered-collision storms + hard reconciliation against
+# local Postgres (:54322); excluded from the default `vitest run` / test-db.
+test-scale:
+    pnpm test:scale
