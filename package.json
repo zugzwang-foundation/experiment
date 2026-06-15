@@ -16,7 +16,8 @@
 		"verify:r2-scope": "tsx scripts/verify-r2-scope.ts",
 		"smoke:staging": "tsx scripts/smoke-staging.ts",
 		"test:invariants": "vitest run tests/invariants/",
-		"test:integration": "vitest run tests/integration/"
+		"test:integration": "vitest run tests/integration/",
+		"test:scale": "vitest run --config vitest.scale.config.ts"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "3.1045.0",

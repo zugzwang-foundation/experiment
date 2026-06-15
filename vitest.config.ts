@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import tsconfigPaths from "vite-tsconfig-paths";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 // Per SPEC.2 §6.6 + AGENTS.md §9. Minimal config — no coverage (HARDEN.*
 // owns coverage thresholds), no globals (explicit imports per AGENTS.md §4),
@@ -45,5 +45,11 @@ export default defineConfig({
 			enabled: false,
 		},
 		include: ["tests/**/*.{test,spec}.ts"],
+		// ENGINE.10 Q-2: the correctness-at-scale battery (`tests/scale/`) is a
+		// SEPARATE, gated `test:scale` CI step (vitest.scale.config.ts) — a named
+		// required gate component, NOT part of the fast default `vitest run`,
+		// `test:invariants`, or `test:integration` sweeps. Exclude it here so those
+		// runs never pick up the heavy `*.scale.test.ts` collision storms.
+		exclude: [...configDefaults.exclude, "tests/scale/**"],
 	},
 });
