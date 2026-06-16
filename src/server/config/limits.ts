@@ -115,6 +115,9 @@ export const BET_MIN_STAKE_REPLY = "50";
 /** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
 export const COMMENT_MAX_LENGTH = 5000;
 
+/** Maximum reply depth — PINNED at 1 (flat replies) per ADR-0017 / SPEC.1 §8 F-COMMENT-2. A reply (a comment with a non-null `parent_comment_id`) cannot itself be replied to; `reply-validate` rejects a parent already at this depth with `reply_depth_exceeded`. Integer, not a decimal string (a count, not Dharma). */
+export const REPLY_DEPTH_MAX = 1;
+
 // === ENGINE.12: Daily Credit (ADR-0018 + SPEC.1 §10.4) ====================
 
 /** Flat (non-escalating) Daily Credit, paid once per UTC day only on a day the user places a commented bet (ADR-0018 + SPEC.1 §10.4/§16.1). Use-or-lose. PLACEHOLDER VALUE (~10, ranged) — HARDEN.5 (number-tuning pass, 2026-09-01) owns the value. Decimal string — never a JS float (CLAUDE.md §2). Name adopted from SPEC.1 §16.1. */

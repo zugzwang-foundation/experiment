@@ -549,6 +549,30 @@ Two architecturally-significant read-models compute at read time rather than per
   These derive entirely from existing columns (`bets.stake`, `bets.side` / `comments.side_at_post_time`, `comments.parent_comment_id`) via SQL aggregation per render. The "Support / Counter" counts a post displays are these read-time aggregates, **not** a friendly-fire vote tally. The model is **read-time-computed**: **no projection table, no `ranking_snapshots`, no materialised view, no cached score column** — pure TypeScript at `src/lib/ranking.ts` (tunables in `src/lib/ranking.config.ts`), computed per render, with `now` frozen to the resolution timestamp for resolved markets (INV-4). Lane ratios, the activity floor, and the gravity term are owned by `RANKING.md` and pinned at the 2026-09-01 number-tuning pass; the reply floor (`BET_MIN_STAKE_REPLY` = 50, ADR-0018) is the parameter-level lever on ADR-0017's conceded reply-level `C > n`. Lane-aggregation index requirements are a SCAFFOLD.2 deliverable. `RANKING.md` itself is rewritten at DEBATE.8 (it still reflects the old ADR-0009 single-scalar function until then).
 - **K_eff(t) trajectory.** Per SPEC.1 G3 + §12.2 + §19.5, `K_eff(t)` is derived **post-hoc, out-of-band, against the 2026-11-06 public dataset only**. No live in-product surface, no materialised view, no cron job. The PRECURSOR.2-B D4 lock prohibits any in-product K_eff component in v1.
 
+### Read-time reply affordance (ReplyAffordance)
+
+The set of reply sides available to a viewer on a given parent comment is a pure, read-time
+derivation — never a stored field, never written. It is computed from (a) the parent comment's
+frozen side at post time and (b) the viewer's currently held position in that market.
+
+Let P = parent.side_at_post_time ∈ {YES, NO}, and H = the viewer's held side ∈ {YES, NO, ∅}.
+
+- H = P  → Counter is foreclosed; Support is allowed.
+- H = ¬P → Support is foreclosed; Counter is allowed.
+- H = ∅  → both Support and Counter are allowed (entry reply).
+
+The derivation is total over these inputs and has no side effects. It informs the UI's
+affordance only; it is NOT the write-path guard. The write-path enforcement of a foreclosed side
+is the existing single-side rule (F-BET-10, opposite_side_held), which rejects an attempt to take
+a side opposed to the viewer's held position. The two agree by construction: a side the
+affordance marks foreclosed is exactly a side the write-path rejects.
+
+Shape:
+  Affordance = "allowed" | "foreclosed"
+  ReplyAffordance = { support: Affordance; counter: Affordance; reason: string | null }
+  computeReplyAffordance(P, H) -> ReplyAffordance            (pure)
+  readReplyAffordance(client, { viewerId, parentComment: { marketId, sideAtPostTime } }) -> ReplyAffordance
+
 ### §5.5 Removed from prior outline (audit trace)
 
 Six tables that appeared in earlier outlines but are absent from the v1 inventory. Retained here as audit trace so a reviewer comparing v0.1-outline / v0.2-draft (and the v0.3-draft "as-built" inventory) against the current model sees the resolution path:

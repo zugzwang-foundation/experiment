@@ -353,6 +353,108 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 		expect(eventRows[0]?.eventType).toBe("bet.placed");
 	});
 
+	it("bet-comment-atomicity::every-comment-has-a-referencing-bet-construction", async () => {
+		// DEBATE.1 — the comment→bet CONSTRUCTION direction of INV-1. comments are
+		// only ever inserted inside the W-1 tx, always paired with a bet whose
+		// `comment_id` references the comment (the schema half — `bets.comment_id`
+		// NOT NULL FK → comments.id). `comments.bet_id` stays NULL on disk (DEBATE.8/9
+		// reconciliation) and is NOT relied on here. There is no comment-only write
+		// path. After a committed spine, the persisted comment is referenced by a
+		// bet's comment_id.
+		const userId = await seedUser("atom-ctor", "atom-ctor");
+		const marketId = await seedOpenMarketWithPool("atom-ctor-market");
+		await seedDharmaGrant(userId);
+
+		const eventId = uuidv7();
+		await runBetTransaction(
+			{ marketId, flow: "F-BET-1" },
+			async ({ tx, pool }) => {
+				const buy = computeBuy({
+					reserves: { yes: pool.yesReserves, no: pool.noReserves },
+					side: "yes",
+					stake: "10",
+				});
+				await tx
+					.update(pools)
+					.set({ yesReserves: buy.reserves.yes, noReserves: buy.reserves.no })
+					.where(eq(pools.id, pool.id));
+				await upsertPositionDelta(tx, {
+					userId,
+					marketId,
+					side: "YES",
+					shareDelta: buy.shares,
+				});
+				await appendLedgerRow(tx, {
+					userId,
+					amount: "-10",
+					entryType: "bet_stake",
+				});
+				// comment FIRST (bet_id null on disk — the construction bind is the
+				// bet's comment_id FK, not comments.bet_id).
+				const [comment] = await tx
+					.insert(comments)
+					.values({
+						userId,
+						marketId,
+						body: "construction-direction argument",
+						sideAtPostTime: "YES",
+						stakeAtPostTime: "10",
+					})
+					.returning({ id: comments.id });
+				const commentId = comment?.id ?? "";
+				// bet SECOND — comment_id references the comment (NOT NULL).
+				const [bet] = await tx
+					.insert(bets)
+					.values({
+						userId,
+						marketId,
+						side: "YES",
+						stake: "10",
+						shareQuantity: buy.shares,
+						priceAtBet: buy.pEff,
+						commentId,
+					})
+					.returning({ id: bets.id });
+				const betId = bet?.id ?? "";
+				await insertEvent(tx, {
+					eventId,
+					eventType: "bet.placed",
+					aggregateType: "market",
+					aggregateId: marketId,
+					payload: {
+						betId,
+						marketId,
+						userId,
+						side: "YES",
+						stake: "10",
+						shares: buy.shares,
+						price: buy.pEff,
+						commentId,
+						parentCommentId: null,
+					},
+					metadata: META,
+				});
+				return { commentId, betId };
+			},
+		);
+
+		// CONSTRUCTION assertion: every persisted comment is referenced by exactly
+		// one bet's comment_id — no comment without a bet pointing at it.
+		const commentRows = await testDb
+			.select({ id: comments.id })
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		const betRows = await testDb
+			.select({ commentId: bets.commentId })
+			.from(bets)
+			.where(eq(bets.marketId, marketId));
+		expect(commentRows.length).toBe(1);
+		const referenced = new Set(betRows.map((r) => r.commentId));
+		for (const c of commentRows) {
+			expect(referenced.has(c.id)).toBe(true);
+		}
+	});
+
 	it("bet-comment-atomicity::throw-before-events-rolls-back-all-tables", async () => {
 		// EDGE (terminal-step abort): the callback writes the FULL spine THROUGH
 		// bets, then throws BEFORE events. Same zero-rows assertion — even a

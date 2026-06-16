@@ -188,6 +188,54 @@ export class CommentTrackBUnderReviewError extends BetProductError {
 	}
 }
 
+/**
+ * DEBATE.1 / SPEC.1 §8 F-COMMENT-5 → 400. A place request that is not a complete
+ * atomic bet+comment pair — the comment body is absent/empty (no comment without
+ * a stake; no stake without a comment, INV-1). The comment-only direction is
+ * structurally impossible (there is no comment endpoint), so the live trigger is
+ * the missing-body branch. The `error-codes.md` catalogue stays forward (Finding
+ * B / SPEC.2 §15.4); this is minted as a stable string here per the ENGINE.8
+ * precedent.
+ */
+export class CommentRequiresBetError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "comment_requires_bet";
+	constructor() {
+		super("a comment requires a bet (no comment without a stake)");
+		this.name = "CommentRequiresBetError";
+	}
+}
+
+/**
+ * DEBATE.2 / SPEC.1 §8 F-COMMENT-2 → 400. The parent comment is itself a reply
+ * (`parent_comment_id` non-null) — flat replies only (`REPLY_DEPTH_MAX = 1`,
+ * ADR-0017). A reply cannot be replied to.
+ */
+export class ReplyDepthExceededError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "reply_depth_exceeded";
+	constructor() {
+		super(
+			"reply depth exceeded (REPLY_DEPTH_MAX = 1; cannot reply to a reply)",
+		);
+		this.name = "ReplyDepthExceededError";
+	}
+}
+
+/**
+ * DEBATE.2 / SPEC.1 §8 F-COMMENT-2 → 404. The parent comment is absent OR in a
+ * different market than the reply targets (a reply must reference an existing
+ * comment in the same market).
+ */
+export class ParentCommentNotFoundError extends BetProductError {
+	static readonly httpStatus = 404;
+	static readonly code = "parent_comment_not_found";
+	constructor() {
+		super("parent comment not found");
+		this.name = "ParentCommentNotFoundError";
+	}
+}
+
 /** Malformed request body (bad shape / non-positive stake|shares) → 400. */
 export class InvalidRequestBodyError extends BetProductError {
 	static readonly httpStatus = 400;

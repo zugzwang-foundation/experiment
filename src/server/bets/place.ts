@@ -1,9 +1,9 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { DbTransaction } from "@/db";
-import { bets, comments, pools } from "@/db/schema";
+import { bets, comments, imageUploads, pools } from "@/db/schema";
 import { computeBuy, type Side } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { accrueDailyCredit } from "@/server/dharma/accrual";
@@ -30,6 +30,19 @@ export interface PlaceParams {
 	commentEventId: string;
 	/** Generated at handler entry, closed over — NEVER regenerated here. USED only when the accrual pays (ENGINE.12 P1). */
 	creditEventId: string;
+	/**
+	 * The resolved image attachment (DEBATE.2 F-COMMENT-3), or null/omitted for a
+	 * no-image bet. `committedEventId` is generated at handler entry + closed over
+	 * per the retry-purity contract (like the three event_ids above) — NEVER
+	 * regenerated here, so a SERIALIZABLE retry re-uses the same id and the
+	 * `image_upload.committed` insert dedupes via `ON CONFLICT (event_id, created_at)`.
+	 * Optional so the pre-DEBATE.2 callers (no image) need no change.
+	 */
+	image?: {
+		uploadId: string;
+		r2ObjectKey: string;
+		committedEventId: string;
+	} | null;
 	metadata: BetEventMetadata;
 }
 
@@ -39,6 +52,8 @@ export interface PlaceResult {
 	side: "YES" | "NO";
 	sharesBought: string;
 	newPrice: string;
+	/** Echoed for a reply (F-COMMENT-2 response shape); null for a top-level post. */
+	parentCommentId: string | null;
 }
 
 /**
@@ -63,6 +78,7 @@ export async function place(
 ): Promise<PlaceResult> {
 	const { tx, pool } = ctx;
 	const { userId, marketId, side, stake, body, parentCommentId } = params;
+	const image = params.image ?? null;
 
 	// READS in the locked snapshot.
 	const held = await getHeldPosition(tx, { userId, marketId });
@@ -114,8 +130,9 @@ export async function place(
 			marketId,
 			parentCommentId,
 			body,
-			sideAtPostTime: side, // INV-3 — frozen at post time
-			stakeAtPostTime: stake, // vestigial NOT-NULL column (ADR-0009); satisfied
+			sideAtPostTime: side, // INV-3 — the REPLIER's side, frozen at post time
+			stakeAtPostTime: "0", // vestigial: ADR-0009-dead, dropped DEBATE.8/9 (Call A)
+			imageUploadsId: image?.uploadId ?? null, // F-COMMENT-3 link (in-tx)
 			betId: null, // Bucket-A circular pair; stays null in v1
 		})
 		.returning({ id: comments.id });
@@ -181,10 +198,43 @@ export async function place(
 			side,
 			parentCommentId,
 			bodyLength: body.length,
-			uploadId: null,
+			uploadId: image?.uploadId ?? null,
 		},
 		metadata: params.metadata,
 	});
+
+	// F-COMMENT-3 PASS branch (SPEC.2 §12.2 step 6) — ONE atomic op, three writes
+	// in this W-1 tx: (1) the comment carries the image_uploads_id FK [above];
+	// (2) terminalize the upload `committed` — the whitelisted Bucket-B two-column
+	// NULL→set transition (§12-R1), so the orphan sweep (which reaps
+	// `terminal_state IS NULL`) never deletes a committed image's R2 object; the
+	// `terminal_state IS NULL` CAS keeps the §6.3 trigger happy and is idempotent
+	// under retry; (3) emit `image_upload.committed` (id minted at handler entry +
+	// closed over → `ON CONFLICT (event_id, created_at)` dedupes on retry).
+	if (image !== null) {
+		await tx
+			.update(imageUploads)
+			.set({ terminalState: "committed", terminalAt: sql`now()` })
+			.where(
+				and(
+					eq(imageUploads.id, image.uploadId),
+					isNull(imageUploads.terminalState),
+				),
+			);
+		await insertEvent(tx, {
+			eventId: image.committedEventId,
+			eventType: "image_upload.committed",
+			aggregateType: "image_upload",
+			aggregateId: image.uploadId,
+			payload: {
+				uploadId: image.uploadId,
+				userId,
+				commentId: comment.id,
+				key: image.r2ObjectKey,
+			},
+			metadata: params.metadata,
+		});
+	}
 
 	await tx
 		.update(pools)
@@ -197,5 +247,6 @@ export async function place(
 		side,
 		sharesBought: buy.shares,
 		newPrice: buy.p1,
+		parentCommentId,
 	};
 }
