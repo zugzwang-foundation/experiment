@@ -3,7 +3,7 @@
 > **Doc:** `docs/logs/ENGINE-phase-record.md`
 > **Status:** ENGINE phase **CLOSED** — all strata `.0`–`.16` DONE and green on `main`.
 > **Authored:** 2026-06-15 (web, at the ENGINE.10 close), from the read-only engine-close recon + orchestration context. CC-committed, PK-mirrored.
-> **Purpose.** One commit-referenced index for the whole ENGINE phase. **GitHub retains the full per-stratum plan + log set forever** (17 plans + 23 logs under `docs/plans/` + `docs/logs/`); this record is the standing index that replaces the ~35 scattered ENGINE plan/log/close-out files in the PK mirror. It also **subsumes the post-phase reconciliation sweep** (§3) — there is no separate sweep-log file.
+> **Purpose.** One commit-referenced index for the whole ENGINE phase. **GitHub retains the full per-stratum plan + log set forever** (17 plans + 23 logs under `docs/plans/` + `docs/logs/`); this record is the standing index that replaces the ~35 scattered ENGINE plan/log/close-out files in the PK mirror. It also **subsumes the post-phase reconciliation sweep** (§4) — there is no separate sweep-log file.
 
 ---
 
@@ -16,9 +16,33 @@
 
 ---
 
-## 2. Per-stratum record (canonical SHA spine + key decisions)
+## 2. Engine contract for forward work — DEBATE / UI / LAUNCH honor this
 
-Hierarchy reminder: SPEC.1 / SPEC.2 > ADRs > tracker. Full detail per stratum lives in the repo logs (§7).
+> The orchestration brief: the load-bearing rules and seams the next phases plug into. The per-stratum spine is §3; the ADRs that govern these are §7.
+
+**Invariants that cannot be weakened** (proven under concurrency at ENGINE.10 — §5):
+
+- **Bet ↔ comment atomicity (INV-1).** No comment-free buy; `bets.comment_id` NOT NULL, written in one tx. "No stake, no voice" is **structural**, not a runtime check.
+- **No-overdraft (INV-2)** · **side-bind frozen at post-time (INV-3)** · **append-only resolutions (INV-4).**
+- **Dharma is soulbound** (non-transferable, never negative) and **admin is not a participant** (data-model separation — no admin account can bet, comment, or hold a position).
+
+**Seams the forward surfaces plug into:**
+
+- **Reply-as-bet.** A reply IS a Support/Counter market bet through the **W-1 path** (ADR-0013) — Support = the parent post's side, Counter = the opposite. It **moves the CPMM price** (it's a real bet). Support/Counter counts are **read-time aggregates** (no vote, no friendly-fire). **Sells write no `bets` row** (Amendment D — Dharma via the ledger + a `bet.sold` event), which is why the NOT-NULL comment is consistent with comment-free selling.
+- **Single-side × Counter foreclosure.** F-BET-10 rejects a bet on the side opposite your held position (`opposite_side_held`) — so your held side **forecloses** the opposite Support/Counter affordance. UI must **disable-and-explain** the foreclosed side (ruling 1a; on the DESIGN.5 lock checklist), never a raw submit-time error.
+- **Moderation gates the commit.** Pre-commit (ADR-0014) — on a flag the bet+comment tx **never opens**; nothing unmoderated reaches the append-only ledger. Safety-critical, applies to **posts and replies both**, never weakened or made optional.
+- **Ranking is read-time.** Top composite + filter modes (ADR-0017), computed from `comments` + `bets` at read time — no projection table, and **no anti-capital logic by design** (K·n>C is upheld by mandatory commentary in the open, not by ranking suppression).
+- **Conclusion freeze.** Participant writes → 410, reads → 200, cron no-op; resolution/market-admin paths intentionally exempt. UI must handle the 410.
+
+**Open items forward work resolves** (detail in §6): the A-lite throughput target N; the DEBATE.9 `friendly_fire_events` drop; the reply-as-bet load test (post-DEBATE.2 k6); the HARDEN.5 number-tuning pass; PhotoDNA CSAM onboarding.
+
+**Retrieval protocol.** This record + the ADRs/SPECs are the standing engine reference. For **code-level detail** not synthesized here, fire a **targeted CC recon against the SHA spine in §3** (e.g. "show `settle.ts` at `af28566`"). **GitHub is canonical and retains the full per-stratum logs** — nothing here replaces it; this is the map to it.
+
+---
+
+## 3. Per-stratum record (canonical SHA spine + key decisions)
+
+Hierarchy reminder: SPEC.1 / SPEC.2 > ADRs > tracker. Full detail per stratum lives in the repo logs (§8).
 
 | Stratum | Merge SHA · PR | Primary deliverable(s) | Key decision / note |
 |---|---|---|---|
@@ -38,9 +62,9 @@ Hierarchy reminder: SPEC.1 / SPEC.2 > ADRs > tracker. Full detail per stratum li
 | **ENGINE.14** | `a29ef7e` · #118 | `src/server/markets/{transaction,create,open,close}` + `src/server/admin/actor.ts` | Market lifecycle writes — admin create · seed/open · clock-driven Open→Closed; `market.*` emits. **W-4 wrapper** joins W-3 in the `markets`-first lock slot (ADR-0013 P3). |
 | **ENGINE.15** | `b8d4ee4` · #122 (#123/#124) | `src/app/(admin)/admin/markets` + `api/cron/close-due-markets` + resolution actor belt | HTTP / cron / admin wiring stratum. **In-stratum HIGH security fix:** admin read pages had no real Layer-2 auth (fixed in-stratum). **Surfaced the `frozen_at` write-freeze gap → minted ENGINE.16.** |
 | **ENGINE.16** | `f7d1ab2` · #127 (plan #125/#126, log #128) | `src/server/system/is-frozen.ts` | Conclusion-freeze write-seal — participant writes → **410** (`error_experiment_concluded`), reads → **200**, cron → **200 no-op**. Gated at the **handler layer** (place/sell via `runBetEndpoint`), **not** inside the W-1/W-3/W-4 tx wrappers (the guard is non-locking by design). **Resolution + market-admin paths intentionally exempt (§20.3** — conclusion/last-mile work runs post-freeze); a regression guard locks the exemption. |
-| **ENGINE.10** | `239ecb9` · #131 (plan #129/#130, log #132) | `tests/scale/` (correctness-at-scale harness) | **ENGINE-phase EXIT gate** — see §2.1. Test-harness-only (no `src/`, no schema, no new ADR); one same-commit SPEC.2 §3 rider (→ v1.0.6). |
+| **ENGINE.10** | `239ecb9` · #131 (plan #129/#130, log #132) | `tests/scale/` (correctness-at-scale harness) | **ENGINE-phase EXIT gate** — see §3.1. Test-harness-only (no `src/`, no schema, no new ADR); one same-commit SPEC.2 §3 rider (→ v1.0.6). |
 
-### 2.1 ENGINE.10 — the exit gate (detail)
+### 3.1 ENGINE.10 — the exit gate (detail)
 
 ENGINE.10 load-tests a system already *proven correct* — never the reverse. Ratified scope (**Option C**, NOT the old "10k bets / 100 markets / p95<500ms" framing):
 
@@ -50,24 +74,24 @@ ENGINE.10 load-tests a system already *proven correct* — never the reverse. Ra
 - **Amendment E — global conservation by TWO independent derivations** + cross-check (per-market checker reuse = #1; an independent global re-derivation = #2). **The conservation-formula catch — it caught a real bug:** during the execute run the two derivations **diverged (d1 ≠ d2) and the gate fired RED** — a genuine CPMM arithmetic error in the global conservation formula. It was corrected to the **pool-cash measure**, after which the derivations agreed. That divergence-then-fix is the evidence the checker is **non-vacuous** — it provably catches a real Dharma leak rather than tautologically passing (ENGINE.10 execute log).
 - **Amendment F — the two-spine race is INDUCED, not happy-pathed:** fire W-3 while a W-1 bet is mid-flight at the unlocked `markets.status` read window; assert the **XOR** (commit-before-flip ⇒ in the payout set; rejected-on-SSI-retry ⇒ not; **never both, never torn**).
 - **Amendment D — sells are NOT `bets` rows** (`bets.comment_id` NOT NULL + selling is the only comment-free action, confirmed `sell.ts:36–38,71–76`); INV-1 count-parity is scoped to commented **posts**; sell-driven Dharma flows via the **ledger** (`bet_id` NULL), with the `bet.sold` event for per-market attribution. *(This closes the comment_id-vs-sell seam — no comment is needed because no bet row is written.)*
-- **Perf RECORDED, not gated** — the hard `p95<500ms @ 5k VUs` latency gate is deferred to the next-P0 k6/staging stratum (see §3 / §5).
+- **Perf RECORDED, not gated** — the hard `p95<500ms @ 5k VUs` latency gate is deferred to the next-P0 k6/staging stratum (see §4 / §6).
 - **INV fence held:** driven via `place()` top-level only (`parentCommentId: null`); the reply-as-bet **load** half (50 Đ floor + Support/Counter aggregates) defers to the post-DEBATE.2 k6 stratum.
 
 ---
 
-## 3. The closing reconciliation sweep (2026-06-15) — folded in here, no separate file
+## 4. The closing reconciliation sweep (2026-06-15) — folded in here, no separate file
 
 At the ENGINE.10 close, the post-phase sweep ran and produced the v13 tracker:
 
 - **Three tracker rows minted DONE:** ENGINE.14 (lifecycle), ENGINE.15 (wiring), ENGINE.16 (freeze) — none had a tracker row before.
 - **ENGINE.10 scope correction:** the stale "10k bets / 100 markets / p95<500ms @ 50/sec" row replaced by the ratified Option-C scope (above), deps → 8/9/11/12/13/14/15/16.
 - **ID-ORDER ERRATA:** ENGINE.16 executed **before** ENGINE.10 (out-of-order minting). The phase is complete regardless; the errata is recorded so the SHA order isn't mistaken for a build order.
-- **Carry-forward correction (important):** the three "open spec gaps" memory/kickoff carried are **CLOSED** — see §5.
+- **Carry-forward correction (important):** the three "open spec gaps" memory/kickoff carried are **CLOSED** — see §6.
 - **A-lite probe minted (HARDEN.2-PRE)** as the next-P0 (off the critical path), plus the **founder latency ruling** (throughput-at-relaxed-latency replaces the p95<500ms gate; N deferred).
 
 ---
 
-## 4. Invariants proven + test floor
+## 5. Invariants proven + test floor
 
 **Invariants (all asserted under engineered-collision concurrency at ENGINE.10):**
 
@@ -81,7 +105,7 @@ At the ENGINE.10 close, the post-phase sweep ran and produced the v13 tracker:
 
 ---
 
-## 5. Standing carry-forwards into later phases
+## 6. Standing carry-forwards into later phases
 
 **Closed — no longer carry-forwards** (recon-confirmed on `main`):
 
@@ -101,7 +125,7 @@ At the ENGINE.10 close, the post-phase sweep ran and produced the v13 tracker:
 
 ---
 
-## 6. Cross-cutting decisions (the ADRs that govern the engine)
+## 7. Cross-cutting decisions (the ADRs that govern the engine)
 
 - **ADR-0005** — Postgres event sourcing; Pattern A (synchronous same-tx read-model writes; no async projectors); append-only triggers.
 - **ADR-0013** — bet-tx concurrency: SERIALIZABLE, `FOR NO KEY UPDATE` pool lock, canonical lock order `markets → pools → positions → dharma_ledger → events` (P1 `pools → users` suffix; P2 W-3 `markets`-first; P3 W-4 `markets`-first), full-jitter retry, idempotency-first ordering, moderation outside the tx.
@@ -113,7 +137,7 @@ At the ENGINE.10 close, the post-phase sweep ran and produced the v13 tracker:
 
 ---
 
-## 7. Appendix — what the repo retains (safe to prune the PK mirror)
+## 8. Appendix — what the repo retains (safe to prune the PK mirror)
 
 GitHub keeps the full per-stratum set; this record is the index. Repo inventory (recon-listed):
 
