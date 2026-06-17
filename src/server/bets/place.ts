@@ -212,7 +212,7 @@ export async function place(
 	// under retry; (3) emit `image_upload.committed` (id minted at handler entry +
 	// closed over → `ON CONFLICT (event_id, created_at)` dedupes on retry).
 	if (image !== null) {
-		await tx
+		const claimed = await tx
 			.update(imageUploads)
 			.set({ terminalState: "committed", terminalAt: sql`now()` })
 			.where(
@@ -220,7 +220,26 @@ export async function place(
 					eq(imageUploads.id, image.uploadId),
 					isNull(imageUploads.terminalState),
 				),
+			)
+			.returning({ id: imageUploads.id });
+		// The CAS claims exactly ONE row IFF the upload was still un-terminalized in
+		// this tx's snapshot. Zero rows ⇒ a CONCURRENT writer (a racing commit or the
+		// orphan sweep) terminalized it in the TOCTOU window between the pre-tx
+		// ownership+un-attached validation (resolveImageAttachment, OUTSIDE this tx)
+		// and this in-tx CAS. Fail CLOSED: throw so the whole W-1 tx rolls back (bet +
+		// comment + ledger + events + positions all unwind) and NO phantom
+		// `image_upload.committed` is appended to the append-only log. A plain Error
+		// (no SQLSTATE) is non-retryable — it bubbles to a 500 `error_internal`
+		// (toWireError fallback; NO new wire code), mirroring the place: RETURNING-empty
+		// internal-invariant guards above. Should-never-fire under the un-attached
+		// validation (which makes the sequential reuse/dangling case impossible); this
+		// catches ONLY the concurrent race. A legitimate SERIALIZABLE 40001 retry fully
+		// rolls back first → terminal_state is NULL again → the CAS reclaims its one row.
+		if (claimed.length === 0) {
+			throw new Error(
+				`place: image_uploads CAS claimed 0 rows — upload ${image.uploadId} already terminal (concurrent terminalization race); rolling back the bet+comment`,
 			);
+		}
 		await insertEvent(tx, {
 			eventId: image.committedEventId,
 			eventType: "image_upload.committed",

@@ -1,26 +1,35 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { imageUploads } from "@/db/schema";
 import { InvalidRequestBodyError } from "@/server/bets/errors";
 
-// DEBATE.2 — image-attach RESOLVE + OWNERSHIP (plan §3 step 3). Resolves the
-// `image_uploads.r2_object_key` for an `imageUploadsId` and asserts the uploader
-// is the bettor (no cross-user image disclosure). Reads only; NO write — the
-// route routes the resolved `r2ObjectKey` into the (already image-capable)
-// precommitModerate seam, and place() links the upload in-tx.
+// DEBATE.2 — image-attach RESOLVE + OWNERSHIP + UN-ATTACHED (plan §3 step 3 +
+// the MEDIUM image-attach ruling). Resolves the `image_uploads.r2_object_key`
+// for an `imageUploadsId` and asserts the uploader is the bettor (no cross-user
+// image disclosure) AND the upload is still un-attached (`terminal_state IS
+// NULL`). Reads only; NO write — the route routes the resolved `r2ObjectKey`
+// into the (already image-capable) precommitModerate seam, and place() links
+// the upload in-tx.
 //
-// Ownership/missing error class (NOT pinned by tests; the plan mints NO new wire
-// code for it — DEBATE.2's only new codes are comment_requires_bet /
-// reply_depth_exceeded / parent_comment_not_found): a UNIFORM
-// `InvalidRequestBodyError` (400 `error_invalid_request_body`) for BOTH the
-// absent and the cross-user case. Uniform on purpose — it denies an existence
-// oracle (a cross-user caller cannot distinguish "exists but not yours" from
-// "does not exist") and a bad `imageUploadsId` reference is a malformed request.
-// The `u/${userId}/` namespace gate in precommitModerate is the defense-in-depth
-// backstop.
+// The `terminal_state IS NULL` predicate closes the SEQUENTIAL half of the
+// reuse/dangling hole: an upload already `committed` (attached to a prior
+// comment), `blocked`, or `orphan` (swept — its R2 object deleted) is filtered
+// out here so re-attaching it can neither double-link a live image nor point a
+// new comment at a deleted object. The CONCURRENT half (a racing commit / the
+// orphan sweep terminalizing in the TOCTOU window between this pre-tx read and
+// place()'s in-tx CAS) is closed by place()'s claimed-exactly-one-row assertion.
+//
+// Error class (NOT pinned by a new wire code — DEBATE.2's only new codes are
+// comment_requires_bet / reply_depth_exceeded / parent_comment_not_found): a
+// UNIFORM `InvalidRequestBodyError` (400 `error_invalid_request_body`) for the
+// absent, the already-terminalized, AND the cross-user case. Uniform on purpose
+// — it denies an existence/reuse oracle (a caller cannot distinguish "exists but
+// not yours" / "already used" from "does not exist") and a bad `imageUploadsId`
+// reference is a malformed request. The `u/${userId}/` namespace gate in
+// precommitModerate is the defense-in-depth backstop.
 
 type Reader = DbClient | DbTransaction;
 
@@ -40,9 +49,18 @@ export async function resolveImageAttachment(
 			r2ObjectKey: imageUploads.r2ObjectKey,
 		})
 		.from(imageUploads)
-		.where(eq(imageUploads.id, args.imageUploadsId));
+		.where(
+			and(
+				eq(imageUploads.id, args.imageUploadsId),
+				// Un-attached only: an already-terminal upload (committed by a prior
+				// comment, or blocked / orphan-swept) is filtered out so it collapses
+				// into the same uniform reject below — no reuse, no dangling ref.
+				isNull(imageUploads.terminalState),
+			),
+		);
 
-	// Absent OR not owned by the bettor → uniform 400 (no existence oracle).
+	// Absent OR already-terminalized OR not owned by the bettor → uniform 400 (no
+	// existence/reuse oracle — the caller cannot distinguish the cases).
 	if (upload === undefined || upload.userId !== args.userId) {
 		throw new InvalidRequestBodyError("invalid image attachment");
 	}
