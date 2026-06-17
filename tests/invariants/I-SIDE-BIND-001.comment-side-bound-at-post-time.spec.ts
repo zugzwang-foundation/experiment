@@ -250,4 +250,40 @@ describe("I-SIDE-BIND-001: comments side-bound at post-time across a flip", () =
 		expect(yesRow?.sideAtPostTime).toBe("YES");
 		expect(noRow?.sideAtPostTime).toBe("NO");
 	});
+
+	it("comment-side-bound::direct-update-of-side-at-post-time-rejected", async () => {
+		// STORAGE-LAYER half of INV-3 (DEBATE.3) — column-targeted + named. comments
+		// is Bucket A (0003 lines 48-49; SPEC.2 §6.5), so the whole-row append-only
+		// trigger rejects ANY UPDATE; a direct mutation of side_at_post_time raises
+		// P0001 "UPDATE not permitted". REGRESSION GUARD, not a TDD driver: the
+		// trigger has shipped since SCAFFOLD.2 3.C, so this is green from day one —
+		// DEBATE.3 proves the obligation is already delivered, it builds no new
+		// enforcement. The flip-flow `it` above is the FLOW half; this is the storage
+		// half, asserted in the canonical invariant home with the named P0001 (vs the
+		// scale test's bare `.rejects.toThrow()` outside `pnpm test:invariants`).
+		const userId = await seedUser("side-bind-storage", "side-bind-storage");
+		const marketId = await seedOpenMarketWithPool("side-bind-storage-market");
+
+		const [comment] = await testDb
+			.insert(comments)
+			.values({
+				userId,
+				marketId,
+				body: "frozen-side argument",
+				sideAtPostTime: "YES",
+				stakeAtPostTime: "0",
+			})
+			.returning({ id: comments.id });
+		const commentId = comment?.id ?? "";
+
+		await expect(
+			testClient.unsafe(
+				`UPDATE comments SET side_at_post_time = 'NO' WHERE id = $1`,
+				[commentId],
+			),
+		).rejects.toMatchObject({
+			code: "P0001",
+			message: expect.stringContaining("UPDATE not permitted"),
+		});
+	});
 });
