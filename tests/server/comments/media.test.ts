@@ -500,4 +500,185 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 		// (distinct from "tx opened then rolled back", which row-absence can't show).
 		expect(vi.mocked(runBetTransaction)).not.toHaveBeenCalled();
 	});
+
+	// === Image-attach terminal_state guard (the MEDIUM ruling) ================
+	// resolveImageAttachment now rejects any non-un-attached upload (sequential
+	// reuse + dangling), and place()'s CAS asserts it claimed exactly one row
+	// (the concurrent TOCTOU race). All three reject UNIFORMLY (no oracle) and
+	// fail CLOSED — nothing persists, no phantom image_upload.committed.
+
+	it("image-attach-rejects-reuse-of-already-committed-upload", async () => {
+		// SEQUENTIAL REUSE: a first place COMMITS the upload (terminal_state →
+		// committed, one committed event). A second place re-attaching the SAME
+		// uploadId the user owns → uniform generic 400 (no second committed event,
+		// the reuse comment never persists / never links the image).
+		const userId = await seedUser("media-reuse");
+		const marketId = await seedOpenMarketWithPool("media-reuse-market");
+		await seedDharmaGrant(userId);
+		const { uploadId } = await seedImageUpload(userId);
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+		precommitState.outcome = "pass";
+
+		const first = await placePOST(
+			placeRequest(
+				{
+					marketId,
+					side: "YES",
+					stake: "10",
+					body: "first argument with image",
+					imageUploadsId: uploadId,
+				},
+				"media-reuse-key-1",
+			),
+		);
+		expect(first.status).toBe(200);
+
+		const second = await placePOST(
+			placeRequest(
+				{
+					marketId,
+					side: "YES",
+					stake: "10",
+					body: "second argument reusing the same image",
+					imageUploadsId: uploadId,
+				},
+				"media-reuse-key-2",
+			),
+		);
+		expect(second.status).toBe(400);
+		const payload = await second.json();
+		expect(payload.error.code).toBe("error_invalid_request_body");
+
+		// Exactly ONE image_upload.committed — no phantom from the reuse attempt.
+		const committedEvents = await testDb
+			.select({ eventId: events.eventId })
+			.from(events)
+			.where(eq(events.eventType, "image_upload.committed"));
+		expect(committedEvents.length).toBe(1);
+
+		// Only the FIRST comment exists and links the image; the reuse never persisted.
+		const commentRows = await testDb
+			.select({ id: comments.id, imageUploadsId: comments.imageUploadsId })
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		expect(commentRows.length).toBe(1);
+		expect(commentRows[0]?.imageUploadsId).toBe(uploadId);
+	});
+
+	it("image-attach-rejects-swept-orphan-upload", async () => {
+		// DANGLING REFERENCE: an upload the user owns that the orphan sweep already
+		// terminalized (terminal_state='orphan', R2 object deleted) → uniform generic
+		// 400. Nothing persists; no dangling comment→deleted-image reference.
+		const userId = await seedUser("media-orphan");
+		const marketId = await seedOpenMarketWithPool("media-orphan-market");
+		await seedDharmaGrant(userId);
+		// Direct INSERT with the terminal columns set — the Bucket-B trigger guards
+		// UPDATE/DELETE, not INSERT, so seeding a pre-terminalized row is legal.
+		const uploadId = uuidv7();
+		await testDb.insert(imageUploads).values({
+			id: uploadId,
+			userId,
+			r2ObjectKey: `u/${userId}/${uploadId}.png`,
+			contentType: "image/png",
+			byteSize: 1024,
+			terminalState: "orphan",
+			terminalAt: new Date("2026-01-01T00:00:00Z"),
+		});
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+		precommitState.outcome = "pass";
+
+		const res = await placePOST(
+			placeRequest(
+				{
+					marketId,
+					side: "YES",
+					stake: "10",
+					body: "argument attaching a swept image",
+					imageUploadsId: uploadId,
+				},
+				"media-orphan-key",
+			),
+		);
+		expect(res.status).toBe(400);
+		const payload = await res.json();
+		expect(payload.error.code).toBe("error_invalid_request_body");
+
+		// Nothing persisted: no comment, no bet, no committed event.
+		const commentRows = await testDb
+			.select()
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		expect(commentRows.length).toBe(0);
+		const betRows = await testDb
+			.select()
+			.from(bets)
+			.where(eq(bets.marketId, marketId));
+		expect(betRows.length).toBe(0);
+		const committedEvents = await testDb
+			.select()
+			.from(events)
+			.where(eq(events.eventType, "image_upload.committed"));
+		expect(committedEvents.length).toBe(0);
+	});
+
+	it("image-attach-cas-rolls-back-on-concurrent-terminalization", async () => {
+		// CONCURRENT TOCTOU RACE (the CAS assertion): the upload passes the pre-tx
+		// un-attached validation (terminal_state NULL), then a CONCURRENT writer
+		// terminalizes it BEFORE place()'s in-tx CAS. Simulated by flipping the row
+		// to 'committed' inside the precommit mock — which runs AFTER
+		// resolveImageAttachment and BEFORE runBetTransaction (route step 5c → 6 → 7).
+		// place()'s CAS then claims ZERO rows and must FAIL CLOSED: the whole W-1 tx
+		// rolls back (bet + comment unwind), no phantom image_upload.committed event.
+		const userId = await seedUser("media-race");
+		const marketId = await seedOpenMarketWithPool("media-race-market");
+		await seedDharmaGrant(userId);
+		const { uploadId } = await seedImageUpload(userId); // terminal_state NULL
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		// The race: terminalize between the validation SELECT and the in-tx CAS.
+		mockPrecommit.mockImplementation(async (args: { imageR2Key?: string }) => {
+			precommitState.lastArgs = args;
+			await testDb
+				.update(imageUploads)
+				.set({ terminalState: "committed", terminalAt: new Date() })
+				.where(eq(imageUploads.id, uploadId));
+			return { outcome: "pass", categories: [] };
+		});
+
+		const res = await placePOST(
+			placeRequest(
+				{
+					marketId,
+					side: "YES",
+					stake: "10",
+					body: "argument that loses the image race",
+					imageUploadsId: uploadId,
+				},
+				"media-race-key",
+			),
+		);
+		// Fails closed — a should-never-fire-under-the-guard internal invariant →
+		// 500 error_internal (toWireError fallback; no new wire code), non-retryable.
+		expect(res.status).toBe(500);
+		const payload = await res.json();
+		expect(payload.error.code).toBe("error_internal");
+
+		// No phantom committed event from place() (the mock's flip is a direct write,
+		// not an event); the bet + comment rolled back — nothing persisted.
+		const committedEvents = await testDb
+			.select()
+			.from(events)
+			.where(eq(events.eventType, "image_upload.committed"));
+		expect(committedEvents.length).toBe(0);
+		const commentRows = await testDb
+			.select()
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		expect(commentRows.length).toBe(0);
+		const betRows = await testDb
+			.select()
+			.from(bets)
+			.where(eq(bets.marketId, marketId));
+		expect(betRows.length).toBe(0);
+	});
 });
