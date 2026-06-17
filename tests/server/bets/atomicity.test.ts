@@ -286,4 +286,98 @@ describe("ENGINE.8 F-BET-1 — place happy-path entry (INV-1 + INV-3)", () => {
 			.where(eq(pools.marketId, marketId));
 		expect(poolRow?.yesReserves).not.toBe(SEED_RESERVES);
 	});
+
+	// ── DEBATE.1 — INV-1 API frontstop (bet→comment) ──────────────────────────
+	it("bet-place::rejects-bet-without-comment-400-comment-requires-bet", async () => {
+		// The bet→comment half of INV-1, at the API layer: a place request with an
+		// EMPTY comment body is not a valid atomic bet+comment pair → 400
+		// `comment_requires_bet` (the NAMED code, NOT the generic
+		// `error_invalid_request_body`). No bet, no comment, no position persists —
+		// there is no way to land a stake without an argument.
+		const userId = await seedUser("atom-nocomment", "atom-nocomment");
+		const marketId = await seedOpenMarketWithPool("atom-nocomment-market");
+		await seedDharmaGrant(userId);
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			placeRequest(
+				{ marketId, side: "YES", stake: "10", body: "" },
+				"atom-nocomment-key",
+			),
+		);
+
+		expect(res.status).toBe(400);
+		const payload = await res.json();
+		expect(payload.ok).toBe(false);
+		expect(payload.error.code).toBe("comment_requires_bet");
+
+		// Nothing wrote — no orphan bet without its argument.
+		const betRows = await testDb
+			.select()
+			.from(bets)
+			.where(eq(bets.marketId, marketId));
+		expect(betRows.length).toBe(0);
+		const commentRows = await testDb
+			.select()
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		expect(commentRows.length).toBe(0);
+		const positionRows = await testDb
+			.select()
+			.from(positions)
+			.where(
+				and(eq(positions.userId, userId), eq(positions.marketId, marketId)),
+			);
+		expect(positionRows.length).toBe(0);
+	});
+
+	// ── DEBATE.1 — INV-1 construction (comment→bet) ───────────────────────────
+	it("bet-place::every-persisted-comment-has-a-bet-referencing-it", async () => {
+		// The comment→bet half of INV-1, BY CONSTRUCTION: comments are only ever
+		// inserted inside place()'s single SERIALIZABLE tx, always paired with a
+		// bet whose `comment_id` references the comment (`comments.bet_id` stays
+		// NULLABLE — DEBATE.8/9 — and is NOT relied on here). There is NO
+		// comment-only write path (no `/api/comments` route). After several places,
+		// EVERY persisted comment is referenced by exactly one bet's `comment_id`.
+		const userA = await seedUser("atom-ctor-a", "atom-ctor-a");
+		const userB = await seedUser("atom-ctor-b", "atom-ctor-b");
+		const marketId = await seedOpenMarketWithPool("atom-ctor-market");
+		await seedDharmaGrant(userA);
+		await seedDharmaGrant(userB);
+
+		mockGetSession.mockResolvedValue({ user: { id: userA } });
+		const r1 = await placePOST(
+			placeRequest(
+				{ marketId, side: "YES", stake: "10", body: "A's argument" },
+				"atom-ctor-a-key",
+			),
+		);
+		expect(r1.status).toBe(200);
+
+		mockGetSession.mockResolvedValue({ user: { id: userB } });
+		const r2 = await placePOST(
+			placeRequest(
+				{ marketId, side: "NO", stake: "10", body: "B's argument" },
+				"atom-ctor-b-key",
+			),
+		);
+		expect(r2.status).toBe(200);
+
+		// Every comment row is referenced by a bet's comment_id (the INV-1 schema
+		// half, NOT NULL). No comment exists without a bet pointing at it.
+		const commentRows = await testDb
+			.select({ id: comments.id })
+			.from(comments)
+			.where(eq(comments.marketId, marketId));
+		const betRows = await testDb
+			.select({ commentId: bets.commentId })
+			.from(bets)
+			.where(eq(bets.marketId, marketId));
+		expect(commentRows.length).toBe(2);
+		expect(betRows.length).toBe(2);
+		const referencedCommentIds = new Set(betRows.map((r) => r.commentId));
+		for (const c of commentRows) {
+			expect(referencedCommentIds.has(c.id)).toBe(true);
+		}
+	});
 });
