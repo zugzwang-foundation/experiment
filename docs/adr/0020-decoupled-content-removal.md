@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| **Status** | accepted |
+| **Status** | superseded |
 | **Date** | 2026-06-18 |
 | **Deciders** | Hrishikesh Manoj Hundekari |
 | **Tracker task** | Admin-dashboard ideation (origin); DEBATE.7 + admin-dashboard stratum (consumers) |
 | **Frame document** | SPEC.1 §14 (Moderation — F-MOD-3 product behaviour); SPEC.2 §10 (Pre-Commit Moderation Contract — interacts), §23 (ADR Index) |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0021 |
 
 ---
 
