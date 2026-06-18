@@ -9,6 +9,7 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §10 (Pre-Commit Moderation Contract), §23 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Amended-by** | ADR-0021 (Track B verdict consequence only — held → block; reactive moderation; text-only `sexual/minors` carve-out. Gate architecture, vendor, fail-closed, Redis reservation, idempotency-first, CSAM short-circuit, F-MOD-4 atomicity unchanged.) |
 
 ---
 
