@@ -17,6 +17,7 @@ describe("mod_actions — append-only trigger", () => {
 		const [action] = await testDb
 			.insert(modActions)
 			.values({
+				reason: "track_b_blocked",
 				verdict: "pass",
 				categories: {},
 				actorId: "admin-singleton",
@@ -38,6 +39,7 @@ describe("mod_actions — append-only trigger", () => {
 		const [action] = await testDb
 			.insert(modActions)
 			.values({
+				reason: "track_b_blocked",
 				verdict: "pass",
 				categories: {},
 				actorId: "admin-singleton",

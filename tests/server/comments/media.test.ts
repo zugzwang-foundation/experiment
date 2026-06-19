@@ -49,7 +49,11 @@ const { mockGetSession, mockPrecommit, precommitState, positionFault } =
 
 mockPrecommit.mockImplementation(async (args: { imageR2Key?: string }) => {
 	precommitState.lastArgs = args;
-	return { outcome: precommitState.outcome, categories: [] };
+	return {
+		outcome: precommitState.outcome,
+		categories: [],
+		categoryScores: {},
+	};
 });
 
 vi.mock("@sentry/nextjs", () => ({
@@ -220,7 +224,11 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 		// clearAllMocks resets the implementation registration — re-attach it.
 		mockPrecommit.mockImplementation(async (args: { imageR2Key?: string }) => {
 			precommitState.lastArgs = args;
-			return { outcome: precommitState.outcome, categories: [] };
+			return {
+				outcome: precommitState.outcome,
+				categories: [],
+				categoryScores: {},
+			};
 		});
 	});
 	afterEach(async () => {
@@ -333,7 +341,7 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 	});
 
 	it("image-track-b-aborts-no-tx", async () => {
-		// (b) track_b: the tx NEVER opens — 423, no bet/comment/committed event.
+		// (b) track_b: the tx NEVER opens — 400, no bet/comment/committed event.
 		const userId = await seedUser("media-track-b");
 		const marketId = await seedOpenMarketWithPool("media-track-b-market");
 		await seedDharmaGrant(userId);
@@ -353,9 +361,9 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 				"media-track-b-key",
 			),
 		);
-		expect(res.status).toBe(423);
+		expect(res.status).toBe(400);
 		const payload = await res.json();
-		expect(payload.error.code).toBe("comment_track_b_under_review");
+		expect(payload.error.code).toBe("comment_track_b_blocked");
 
 		// No bet, no comment, no committed event (mirror image-track-a).
 		const betRows = await testDb
@@ -642,7 +650,7 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 				.update(imageUploads)
 				.set({ terminalState: "committed", terminalAt: new Date() })
 				.where(eq(imageUploads.id, uploadId));
-			return { outcome: "pass", categories: [] };
+			return { outcome: "pass", categories: [], categoryScores: {} };
 		});
 
 		const res = await placePOST(

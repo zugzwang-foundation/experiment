@@ -13,6 +13,29 @@
 
 ---
 
+## Patch record
+
+### P1 — A2: the gate realises the App. A image→Track A mapping for adult `sexual` (DEBATE.7, 2026-06-19)
+
+In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession).
+**The load-bearing decision is unchanged** — the gate runs entirely before the bet transaction,
+fails closed, holds no Postgres tx across the OpenAI call, and the category→track map stays fixed
+(SPEC.1 §14 Appendix A). DEBATE.7 scopes *which* App. A rows the gate realises: `precommitModerate`
+previously routed only `sexual/minors` + `imageR2Key` → `track_a` (SCAFFOLD.16); it now ALSO routes
+adult `sexual === true` + `imageR2Key` → `track_a` (`src/server/moderation/precommit.ts`, the new
+`TRACK_A_SEXUAL_CATEGORY` branch), implementing the fixed App. A image-attached adult-imagery rows.
+**Rationale:** with PhotoDNA parked and `omni-moderation-2024-09-26` scoring image-borne CSAM as
+adult `sexual` (not `sexual/minors`, which is text-only on the snapshot), the adult-`sexual` + image
+→ auto-ban rule is the live CSAM-image backstop. Adult `sexual` on **text** stays `track_b`
+(auto-ban-on-text escalation deferred to HARDEN.5; text-first platform). **Consumers:** SPEC.1
+Appendix A (adult-`sexual` text row → Track B; the new image-attached adult-`sexual` → Track A row;
+the "image adult-imagery → Track A realisation" note) and SPEC.2 §10 (the A2 note on the Track-A
+image-presence paragraph). CSAM-image coverage = this backstop + reactive admin removal (SPEC.1 §15
+F-ADMIN-4) until PhotoDNA / NCMEC land (parked — `docs/parked.md` LD-1 / LD-7). Orthogonal to the
+ADR-0021 Track B *consequence* amendment (held → block): this P1 scopes the *gate mapping*.
+
+---
+
 ## Context and Problem Statement
 
 SPEC.1 §14 mandates AI-driven pre-commit moderation across Tracks A (auto-ban categories: CSAM, sexual/minors, NSFW), B (admin-review categories: violence, hate, harassment, threats, self-harm, weapons), and C (passes). The moderation runs on every comment: F-BET-1 entry (atomic with bet, governed by INV-1 and F-MOD-4), F-COMMENT-1 (direct), F-COMMENT-2 (reply), and F-COMMENT-3 (image-attached). Per SPEC.1 §14 Appendix A, the canonical category-to-track mapping is fixed; threshold values per category are deferred to HARDEN.5 sample-content testing (target: 2026-09-01).

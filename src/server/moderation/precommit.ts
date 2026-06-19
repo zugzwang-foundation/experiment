@@ -21,11 +21,16 @@ import { redis } from "@/server/upstash/redis";
 //   2. SET NX EX 10. Null → ModerationInFlightError (caller → HTTP 409).
 //   3. try { ... } finally { redis.del(reservationKey) }
 //   4. Inside try: if imageR2Key → mint 60s read URL; openai.moderate(...)
-//   5. Map verdict per SCAFFOLD.16 LD-3:
+//   5. Map verdict per ADR-0014 §18 (App.A image→Track A) — DEBATE.7 A2:
 //      - 'sexual/minors' true + imageR2Key → track_a (REFUSAL-2 CSAM legal
 //        floor, image-attached path);
 //      - 'sexual/minors' true + no imageR2Key → track_b (text-only carve-out;
 //        admin review mitigates text-classifier false-positive risk);
+//      - adult 'sexual' true + imageR2Key → track_a (A2 — the CSAM-image
+//        backstop while PhotoDNA is parked; omni scores image-CSAM as adult
+//        'sexual', NOT 'sexual/minors', so this is the live image floor);
+//      - adult 'sexual' true + no imageR2Key → track_b (adult-sexual TEXT
+//        stays B; auto-ban-on-text is HARDEN.5, not here);
 //      - any other flagged → track_b;
 //      - none → pass.
 //
@@ -34,6 +39,10 @@ import { redis } from "@/server/upstash/redis";
 // "SCAFFOLD.16 §6 — Second moderation vendor deferred" for resolution path.
 
 const TRACK_A_CATEGORY = "sexual/minors" as const;
+// DEBATE.7 A2 — adult `sexual` on an IMAGE escalates to track_a (the fixed
+// App.A image→Track A row; the live CSAM-image backstop while PhotoDNA is
+// parked). On TEXT, adult `sexual` stays track_b (auto-ban-on-text is HARDEN.5).
+const TRACK_A_SEXUAL_CATEGORY = "sexual" as const;
 
 // `u/<userId>/<uploadId>.<ext>` shape from `signUploadAndInsert` per
 // SCAFFOLD.15 Q9 + SPEC.2 §12.9. Defensive shape gate at the precommit
@@ -56,6 +65,11 @@ interface PrecommitArgs {
 interface PrecommitResult {
 	outcome: "pass" | "track_a" | "track_b";
 	categories: string[];
+	// DEBATE.7 §6 — the raw OpenAI category SCORES at decision time, threaded
+	// through so `recordGateBlock` can persist them into `mod_actions.categories`
+	// ("with confidence" — SPEC.1 §786 / App.B.10). The boolean `categories` map
+	// drives the A2 mapping; these scores are audit payload only.
+	categoryScores: Record<string, number>;
 }
 
 export async function precommitModerate(
@@ -124,14 +138,26 @@ export async function precommitModerate(
 			}
 		}
 
+		// A2 ordering (DEBATE.7 §3 / ADR-0014 §18): sexual/minors first (image →
+		// track_a, text → track_b carve-out), THEN adult `sexual`+image → track_a
+		// (the A2 image backstop), THEN any other flagged → track_b, else pass.
 		let outcome: PrecommitResult["outcome"] = "pass";
 		if (result.categories[TRACK_A_CATEGORY] === true) {
 			outcome = imageR2Key ? "track_a" : "track_b";
+		} else if (
+			result.categories[TRACK_A_SEXUAL_CATEGORY] === true &&
+			imageR2Key
+		) {
+			outcome = "track_a";
 		} else if (flaggedCategories.length > 0) {
 			outcome = "track_b";
 		}
 
-		return { outcome, categories: flaggedCategories };
+		return {
+			outcome,
+			categories: flaggedCategories,
+			categoryScores: result.scores,
+		};
 	} finally {
 		await redis.del(reservationKey);
 	}
