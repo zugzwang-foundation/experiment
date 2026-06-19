@@ -15,7 +15,7 @@ export const textareaClass = `${inputClass} min-h-24 resize-y`;
 
 export const selectClass = inputClass;
 
-export const labelClass = "text-sm font-medium text-foreground";
+export const labelClass = "block text-sm font-medium text-foreground";
 
 export const buttonClass =
 	"inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60";
