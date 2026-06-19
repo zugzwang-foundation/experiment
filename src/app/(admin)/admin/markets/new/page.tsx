@@ -24,7 +24,7 @@ import {
 const ERROR_MESSAGES: Record<string, string> = {
 	slug_invalid:
 		"Slug is invalid. Use lowercase kebab-case: a–z, 0–9 and single hyphens between words, 3–80 characters (no spaces, uppercase, underscores, or leading/trailing/double hyphens). Example: will-eth-flip-btc-2026",
-	slug_already_taken:
+	slug_taken:
 		"That slug is already in use by another market. Pick a different one.",
 	validation_error:
 		"One or more fields are invalid — check the title, resolution criterion, and deadline.",
