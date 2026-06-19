@@ -20,7 +20,13 @@
 import { readFileSync } from "node:fs";
 import postgres from "postgres";
 
-const dbUrl = process.env.DATABASE_URL;
+// Resolve the target the same way the migrate scripts do: the suffix-separated
+// per-env vars take precedence (so `doppler run --config prd|stg` Just Works
+// without remapping), falling back to plain DATABASE_URL for CI / local.
+const dbUrl =
+	process.env.DATABASE_URL_PROD ??
+	process.env.DATABASE_URL_STAGING ??
+	process.env.DATABASE_URL;
 
 function safeHost(url: string): string {
 	try {
@@ -32,7 +38,7 @@ function safeHost(url: string): string {
 
 if (!dbUrl) {
 	console.error(
-		"[check-drift] DATABASE_URL is not set. Run with: doppler run --config <stg|prd> -- pnpm db:check-drift",
+		"[check-drift] No DB URL set. Set DATABASE_URL_PROD / DATABASE_URL_STAGING / DATABASE_URL. Run with: doppler run --config <stg|prd> -- pnpm db:check-drift",
 	);
 	process.exit(1);
 }
