@@ -1,10 +1,9 @@
 import { desc } from "drizzle-orm";
 import Link from "next/link";
-
+import { Banner, buttonClass, Shell } from "@/components/internal-ui";
 import { db } from "@/db";
 import { markets } from "@/db/schema";
 import { requireAdminPage } from "@/server/admin/page-guards";
-import { AdminShell, adminButtonClass, Banner } from "../_ui";
 
 // ENGINE.15 S3 — R-15.1 admin markets list. Server Component, ZERO client JS
 // (D-15.e), direct read-only Drizzle read. UI.6 admin-fixes: legibility pass
@@ -35,7 +34,7 @@ export default async function AdminMarketsPage(props: {
 	}
 
 	return (
-		<AdminShell title="Markets" maxWidth="max-w-5xl">
+		<Shell title="Markets" maxWidth="max-w-5xl">
 			{ok ? <Banner tone="ok">OK: {ok}</Banner> : null}
 			{error ? <Banner tone="error">Error: {error}</Banner> : null}
 
@@ -45,7 +44,7 @@ export default async function AdminMarketsPage(props: {
 						? "No markets yet."
 						: [...counts.entries()].map(([s, n]) => `${s}: ${n}`).join(" · ")}
 				</p>
-				<Link href="/admin/markets/new" className={adminButtonClass}>
+				<Link href="/admin/markets/new" className={buttonClass}>
 					+ New market
 				</Link>
 			</div>
@@ -96,6 +95,6 @@ export default async function AdminMarketsPage(props: {
 					</table>
 				</div>
 			)}
-		</AdminShell>
+		</Shell>
 	);
 }

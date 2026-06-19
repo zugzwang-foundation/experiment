@@ -1,7 +1,15 @@
 import { eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-
+import {
+	Banner,
+	buttonClass,
+	inputClass,
+	labelClass,
+	Shell,
+	selectClass,
+	textareaClass,
+} from "@/components/internal-ui";
 import { db } from "@/db";
 import { markets, pools } from "@/db/schema";
 import { closeMarketAction } from "@/server/admin/markets/close";
@@ -10,15 +18,6 @@ import { resolveMarketAction } from "@/server/admin/markets/resolve";
 import { seedPoolAction } from "@/server/admin/markets/seed";
 import { voidMarketAction } from "@/server/admin/markets/void";
 import { requireAdminPage, requireUuidParam } from "@/server/admin/page-guards";
-import {
-	AdminShell,
-	adminButtonClass,
-	adminInputClass,
-	adminLabelClass,
-	adminSelectClass,
-	adminTextareaClass,
-	Banner,
-} from "../../_ui";
 
 // ENGINE.15 S3 — R-15.1 market detail + state-appropriate forms. Server
 // Component, ZERO client JS (D-15.e). Each form binds an inline wrapper that
@@ -89,7 +88,7 @@ export default async function MarketDetailPage(props: {
 	const isResuming = market.status === "Resolving";
 
 	return (
-		<AdminShell title={market.slug} maxWidth="max-w-2xl">
+		<Shell title={market.slug} maxWidth="max-w-2xl">
 			<nav className="mb-6 text-sm">
 				<Link
 					href="/admin/markets"
@@ -144,17 +143,17 @@ export default async function MarketDetailPage(props: {
 						<h2 className="text-lg font-semibold">Seed pool (open market)</h2>
 						<input type="hidden" name="marketId" value={marketId} />
 						<div className="space-y-1.5">
-							<label htmlFor="seedAmount" className={adminLabelClass}>
+							<label htmlFor="seedAmount" className={labelClass}>
 								Seed amount
 							</label>
 							<input
 								id="seedAmount"
 								name="seedAmount"
 								required
-								className={adminInputClass}
+								className={inputClass}
 							/>
 						</div>
-						<button type="submit" className={adminButtonClass}>
+						<button type="submit" className={buttonClass}>
 							Seed &amp; open
 						</button>
 					</form>
@@ -167,7 +166,7 @@ export default async function MarketDetailPage(props: {
 					>
 						<h2 className="text-lg font-semibold">Close market</h2>
 						<input type="hidden" name="marketId" value={marketId} />
-						<button type="submit" className={adminButtonClass}>
+						<button type="submit" className={buttonClass}>
 							Close
 						</button>
 					</form>
@@ -183,30 +182,30 @@ export default async function MarketDetailPage(props: {
 						</h2>
 						<input type="hidden" name="marketId" value={marketId} />
 						<div className="space-y-1.5">
-							<label htmlFor="winningSide" className={adminLabelClass}>
+							<label htmlFor="winningSide" className={labelClass}>
 								Winning side
 							</label>
 							<select
 								id="winningSide"
 								name="winningSide"
-								className={adminSelectClass}
+								className={selectClass}
 							>
 								<option value="YES">YES</option>
 								<option value="NO">NO</option>
 							</select>
 						</div>
 						<div className="space-y-1.5">
-							<label htmlFor="resolve-reason" className={adminLabelClass}>
+							<label htmlFor="resolve-reason" className={labelClass}>
 								Reason
 							</label>
 							<textarea
 								id="resolve-reason"
 								name="reason"
 								required
-								className={adminTextareaClass}
+								className={textareaClass}
 							/>
 						</div>
-						<button type="submit" className={adminButtonClass}>
+						<button type="submit" className={buttonClass}>
 							{isResuming ? "Complete settlement" : "Resolve"}
 						</button>
 					</form>
@@ -220,30 +219,30 @@ export default async function MarketDetailPage(props: {
 						<h2 className="text-lg font-semibold">Correct resolution</h2>
 						<input type="hidden" name="marketId" value={marketId} />
 						<div className="space-y-1.5">
-							<label htmlFor="correctedSide" className={adminLabelClass}>
+							<label htmlFor="correctedSide" className={labelClass}>
 								Corrected side
 							</label>
 							<select
 								id="correctedSide"
 								name="correctedSide"
-								className={adminSelectClass}
+								className={selectClass}
 							>
 								<option value="YES">YES</option>
 								<option value="NO">NO</option>
 							</select>
 						</div>
 						<div className="space-y-1.5">
-							<label htmlFor="correct-reason" className={adminLabelClass}>
+							<label htmlFor="correct-reason" className={labelClass}>
 								Reason
 							</label>
 							<textarea
 								id="correct-reason"
 								name="reason"
 								required
-								className={adminTextareaClass}
+								className={textareaClass}
 							/>
 						</div>
-						<button type="submit" className={adminButtonClass}>
+						<button type="submit" className={buttonClass}>
 							Correct
 						</button>
 					</form>
@@ -257,22 +256,22 @@ export default async function MarketDetailPage(props: {
 						<h2 className="text-lg font-semibold">Void market</h2>
 						<input type="hidden" name="marketId" value={marketId} />
 						<div className="space-y-1.5">
-							<label htmlFor="void-reason" className={adminLabelClass}>
+							<label htmlFor="void-reason" className={labelClass}>
 								Reason
 							</label>
 							<textarea
 								id="void-reason"
 								name="reason"
 								required
-								className={adminTextareaClass}
+								className={textareaClass}
 							/>
 						</div>
-						<button type="submit" className={adminButtonClass}>
+						<button type="submit" className={buttonClass}>
 							Void
 						</button>
 					</form>
 				) : null}
 			</div>
-		</AdminShell>
+		</Shell>
 	);
 }

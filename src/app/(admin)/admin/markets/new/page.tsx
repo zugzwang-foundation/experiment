@@ -1,22 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import {
+	Banner,
+	buttonClass,
+	cardClass,
+	FormField,
+	inputClass,
+	Shell,
+	textareaClass,
+} from "@/components/internal-ui";
 import { createMarketAction } from "@/server/admin/markets/create";
 import { requireAdminPage } from "@/server/admin/page-guards";
-import {
-	AdminShell,
-	adminButtonClass,
-	adminInputClass,
-	adminLabelClass,
-	adminTextareaClass,
-	Banner,
-} from "../../_ui";
 
 // ENGINE.15 S3 — R-15.1 create form. Server Component, ZERO client JS (D-15.e).
 // The inline wrapper calls the wire action and surfaces the result via a
 // redirect param (the R-15.6 / D-15.e pattern); the service + state machine
-// remain the real gate. UI.6 admin-fixes: legibility pass + slug helper/error
-// (STYLE + form copy only — the `submit` action and field names are unchanged).
+// remain the real gate. UI.6 polish: STYLE + form copy only — the `submit`
+// action and field names are unchanged.
 
 // UI.6 admin-fixes (Problem 3) — map the create action's typed error codes to
 // specific, operator-actionable messages. The slug rule lives in the service
@@ -51,7 +52,7 @@ export default async function NewMarketPage(props: {
 	}
 
 	return (
-		<AdminShell title="New market" maxWidth="max-w-2xl">
+		<Shell title="New market" maxWidth="max-w-2xl">
 			<nav className="mb-6 text-sm">
 				<Link
 					href="/admin/markets"
@@ -63,61 +64,54 @@ export default async function NewMarketPage(props: {
 
 			{error ? <Banner tone="error">{errorMessage(error)}</Banner> : null}
 
-			<form
-				action={submit}
-				className="space-y-5 rounded-lg border border-border bg-card p-6 shadow-sm"
-			>
-				<div className="space-y-1.5">
-					<label htmlFor="slug" className={adminLabelClass}>
-						Slug
-					</label>
-					<input id="slug" name="slug" required className={adminInputClass} />
-					<p className="text-xs text-muted-foreground">
-						Lowercase kebab-case: a–z, 0–9 and single hyphens. 3–80 characters.
-						Example:{" "}
-						<code className="rounded bg-muted px-1 py-0.5 font-mono">
-							will-eth-flip-btc-2026
-						</code>
-					</p>
-				</div>
+			<form action={submit} className={`${cardClass} space-y-5 p-6`}>
+				<FormField
+					label="Slug"
+					htmlFor="slug"
+					helper={
+						<>
+							Lowercase kebab-case: a–z, 0–9 and single hyphens. 3–80
+							characters. Example:{" "}
+							<code className="rounded bg-muted px-1 py-0.5 font-mono">
+								will-eth-flip-btc-2026
+							</code>
+						</>
+					}
+				>
+					<input id="slug" name="slug" required className={inputClass} />
+				</FormField>
 
-				<div className="space-y-1.5">
-					<label htmlFor="title" className={adminLabelClass}>
-						Title (question)
-					</label>
-					<input id="title" name="title" required className={adminInputClass} />
-				</div>
+				<FormField label="Title (question)" htmlFor="title">
+					<input id="title" name="title" required className={inputClass} />
+				</FormField>
 
-				<div className="space-y-1.5">
-					<label htmlFor="description" className={adminLabelClass}>
-						Resolution criterion
-					</label>
+				<FormField label="Resolution criterion" htmlFor="description">
 					<textarea
 						id="description"
 						name="description"
 						required
-						className={adminTextareaClass}
+						className={textareaClass}
 					/>
-				</div>
+				</FormField>
 
-				<div className="space-y-1.5">
-					<label htmlFor="resolutionDeadline" className={adminLabelClass}>
-						Resolution deadline
-					</label>
+				<FormField
+					label="Resolution deadline"
+					htmlFor="resolutionDeadline"
+					helper="Interpreted as UTC."
+				>
 					<input
 						id="resolutionDeadline"
 						type="datetime-local"
 						name="resolutionDeadline"
 						required
-						className={adminInputClass}
+						className={inputClass}
 					/>
-					<p className="text-xs text-muted-foreground">Interpreted as UTC.</p>
-				</div>
+				</FormField>
 
-				<button type="submit" className={adminButtonClass}>
+				<button type="submit" className={buttonClass}>
 					Create market
 				</button>
 			</form>
-		</AdminShell>
+		</Shell>
 	);
 }

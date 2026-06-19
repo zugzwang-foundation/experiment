@@ -1,13 +1,20 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import {
+	buttonClass,
+	CenteredShell,
+	cardClass,
+	FormField,
+	inputClass,
+} from "@/components/internal-ui";
 import { adminLoginAction } from "@/server/auth/admin/login";
-import { adminButtonClass, adminInputClass, adminLabelClass } from "../_ui";
 
 // F-AUTH-ADMIN login page per plan §4 + SPEC.1 §13 + SPEC.2 §8.4.
 // Single password field, no Turnstile (Q1 — SPEC.1 line 609). URL not
 // linked from any public surface; robots.txt Disallow + noindex below.
-// UI.6 admin-fixes: legibility pass (STYLE-ONLY — the action + field unchanged).
+// UI.6 polish: STYLE-ONLY via the shared internal-ui primitives — the action +
+// field name are unchanged.
 
 export const metadata: Metadata = {
 	robots: {
@@ -32,41 +39,42 @@ export default async function AdminLoginPage(props: {
 }): Promise<React.ReactElement> {
 	const { error } = await props.searchParams;
 	return (
-		<main className="grid min-h-dvh place-items-center bg-background px-6 text-foreground">
-			<div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-sm">
-				<h1 className="text-xl font-semibold tracking-tight">Admin sign-in</h1>
-				<p className="mt-1 text-sm text-muted-foreground">
-					Restricted — operator access only.
-				</p>
+		<CenteredShell>
+			<div className={`${cardClass} p-6`}>
+				<header className="mb-5">
+					<h1 className="text-xl font-semibold tracking-tight">
+						Admin sign-in
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Restricted — operator access only.
+					</p>
+				</header>
 
 				{error ? (
 					<div
 						role="status"
-						className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+						className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
 					>
 						Sign-in failed: {error}
 					</div>
 				) : null}
 
-				<form action={submitAdminLogin} className="mt-5 space-y-4">
-					<div className="space-y-1.5">
-						<label htmlFor="password" className={adminLabelClass}>
-							Password
-						</label>
+				<form action={submitAdminLogin} className="space-y-4">
+					<FormField label="Password" htmlFor="password">
 						<input
 							id="password"
 							type="password"
 							name="password"
 							required
 							autoComplete="current-password"
-							className={adminInputClass}
+							className={inputClass}
 						/>
-					</div>
-					<button type="submit" className={`${adminButtonClass} w-full`}>
+					</FormField>
+					<button type="submit" className={`${buttonClass} w-full`}>
 						Sign in
 					</button>
 				</form>
 			</div>
-		</main>
+		</CenteredShell>
 	);
 }
