@@ -6,6 +6,10 @@
 >
 > **Nothing in this file has been executed.** No prod was touched, no PR merged, no infra mutated overnight. Every code change is in a reviewed (draft) PR; every infra/DNS/dashboard step below is for the operator to run.
 >
+> **Prepared PRs (both draft, do not merge — gate first):**
+> - **PR #147** — `fix/auth-otp-gate-context` — email-OTP send fix (item #1). https://github.com/zugzwang-foundation/experiment/pull/147
+> - **PR #148** — `feat/migrate-on-deploy-drift-guard` — prod migrate path + drift guard + this runbook (items #2/#4). https://github.com/zugzwang-foundation/experiment/pull/148
+>
 > **Legend:** 🧑 = HUMAN-ONLY (dashboard / DNS / billing) · ⌨️ = command-run · ✅ = verification.
 
 ---
@@ -24,7 +28,7 @@
 | 2 | Google/email signup fails `unable_to_create_user` | staging `identity_pool` is unseeded → `consumeIdentityPoolTuple` returns null → user-create hook throws | Seed staging pool (step 3) | ⌨️ |
 | 3 | Email OTP won't deliver to real inboxes | `RESEND_FROM_EMAIL` is the `resend.dev` sandbox (only delivers to `zugzwangworld@proton.me`) | Verify a sending domain (DNS) + set Doppler `stg` (step 4) | 🧑 + ⌨️ |
 | 4 | Google OAuth at risk | free trial expiry + new callback URL propagation | Billing (above) + confirm callback (step 2) | 🧑 |
-| 5 | Prod was 11 migrations behind, silently | `vercel.json` runs `next build` only; no prod migrate path; `drizzle-kit migrate` 55P04s on the batch | Merge the **migrate/drift PR** (`feat/migrate-on-deploy-drift-guard`); use `db:migrate:prod` + `db:check-drift` going forward | ⌨️ merge |
+| 5 | Prod was 11 migrations behind, silently | `vercel.json` runs `next build` only; no prod migrate path; `drizzle-kit migrate` 55P04s on the batch | Merge the **migrate/drift PR #148** (`feat/migrate-on-deploy-drift-guard`); use `db:migrate:prod` + `db:check-drift` going forward | ⌨️ merge |
 
 Dependencies: **email-OTP signup needs BOTH #1 (send fix) AND step 3 (pool seed).** Google signup needs **step 3 (pool seed) + step 2 (billing/callback)** only.
 
@@ -50,7 +54,7 @@ doppler run --config stg -- pnpm db:check-drift     # expect: IN SYNC ✓ (17 en
 Both are draft/unmerged, prepared overnight, awaiting this gate. Merge order:
 
 1. **PR #147** — `fix(auth): email-OTP send no longer short-circuited by Turnstile before-hook (AUTH-OTP-GATE)`. Critical-path auth; full ritual ran (RED-first test, `@code-reviewer`, `@security-auditor`, self-audit, `just verify`, full suite). Mark ready → squash-merge.
-2. **migrate/drift PR** — `feat(ops): prod migrate path (per-migration-tx) + schema-drift guard` (`feat/migrate-on-deploy-drift-guard`, ADR-0022). `@code-reviewer` clean; ops tooling + read-only health field. Squash-merge.
+2. **PR #148** — `feat(ops): prod migrate path (per-migration-tx) + schema-drift guard + staging runbook` (`feat/migrate-on-deploy-drift-guard`, ADR-0022). `@code-reviewer` clean; ops tooling + read-only health field. Squash-merge.
 
 Independent of each other; #147 first only because it's the user-facing unblock.
 
