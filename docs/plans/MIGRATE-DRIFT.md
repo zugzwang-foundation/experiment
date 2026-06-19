@@ -46,7 +46,7 @@ None — backend/ops only.
 
 - No migrations applied at all → drift (DB head null ≠ journal head).
 - DB head equals journal head as a bigint string vs number → normalized via `Number()` (unit-tested both forms).
-- No-breakpoint multi-statement migration (0004) + PL/pgSQL bodies (0003/0011) → applied via postgres-js parameterless `unsafe` (simple protocol).
+- PL/pgSQL `$$` bodies (0003/0007/0011) + `ALTER TYPE ... ADD VALUE` (0009) → applied via postgres-js parameterless `unsafe` (simple protocol), which runs every migration chunk verbatim.
 - CI strips pg_cron (changes file hashes) → drift compares `created_at`/count, not hash, so no CI false-positive.
 
 ## 7. Test plan

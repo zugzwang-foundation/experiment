@@ -122,9 +122,9 @@ async function main(url: string): Promise<void> {
 					if (trimmed.length === 0) {
 						continue;
 					}
-					// Parameterless → postgres-js simple protocol, which permits the
-					// multi-statement, no-breakpoint files (e.g. 0004) and PL/pgSQL
-					// bodies (0003/0011) verbatim.
+					// Parameterless → postgres-js simple protocol, which runs every
+					// migration chunk verbatim — including PL/pgSQL `$$` bodies
+					// (0003/0007/0011) and `ALTER TYPE ... ADD VALUE` (0009).
 					await tx.unsafe(trimmed);
 				}
 				await tx.unsafe(
