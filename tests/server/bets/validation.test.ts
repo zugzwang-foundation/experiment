@@ -13,7 +13,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //   comment_too_long               → 400
 //   below_post_floor      ADR-0018 → 400   (place route exercises the POST floor)
 //   comment_track_a_blocked   R2   → 400   (moderation track_a aborts the entry)
-//   comment_track_b_under_review R2→ 423   (moderation track_b aborts the entry — F-MOD-4)
+//   comment_track_b_blocked  R2   → 400   (moderation track_b aborts the entry — F-MOD-4; DEBATE.7)
 //
 // Invariants exercised: INV-2 (insufficient_dharma friendly pre-check, F-BET-4).
 //
@@ -359,6 +359,7 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 		mockPrecommit.mockResolvedValue({
 			outcome: "track_a",
 			categories: ["sexual/minors"],
+			categoryScores: { "sexual/minors": 0.99 },
 		});
 
 		const res = await placePOST(
@@ -379,10 +380,10 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 		expect(positionRows.length).toBe(0);
 	});
 
-	it("bet-place::comment-track-b-under-review-423 [R2]", async () => {
-		// Moderation verdict track_b → 423 comment_track_b_under_review (the
-		// deliberate, spec-locked 423 — NOT normalized to 400). Both tracks abort
-		// the entry per F-MOD-4.
+	it("bet-place::comment-track-b-blocked-400 [R2]", async () => {
+		// Moderation verdict track_b → 400 comment_track_b_blocked (DEBATE.7 /
+		// ADR-0021 — the held queue is removed; the old 423 under-review code is
+		// superseded). Both tracks abort the entry per F-MOD-4.
 		const userId = await seedUser("track-b", "track-b");
 		const marketId = await seedMarketWithPool("track-b-market", "Open");
 		await seedDharmaGrant(userId, "1000");
@@ -390,17 +391,18 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 		mockPrecommit.mockResolvedValue({
 			outcome: "track_b",
 			categories: ["harassment"],
+			categoryScores: { harassment: 0.95 },
 		});
 
 		const res = await placePOST(
 			req(
 				"/api/bets/place",
-				{ marketId, side: "YES", stake: "10", body: "under review content" },
+				{ marketId, side: "YES", stake: "10", body: "blocked content" },
 				"track-b-key",
 			),
 		);
-		expect(res.status).toBe(423);
-		expect((await errorBody(res)).code).toBe("comment_track_b_under_review");
+		expect(res.status).toBe(400);
+		expect((await errorBody(res)).code).toBe("comment_track_b_blocked");
 
 		// Aborted before the tx — no position written.
 		const positionRows = await testDb

@@ -178,13 +178,20 @@ export class CommentTrackABlockedError extends BetProductError {
 	}
 }
 
-/** Moderation Track B verdict → 423 (R2 — F-COMMENT-1; the deliberate, spec-locked 423). */
-export class CommentTrackBUnderReviewError extends BetProductError {
-	static readonly httpStatus = 423;
-	static readonly code = "comment_track_b_under_review";
+/**
+ * Moderation Track B verdict → 400 (DEBATE.7 / ADR-0021 — supersedes the old 423
+ * `comment_track_b_under_review` now that the held queue is removed; aligns to
+ * SPEC.1 §8 F-BET-1/F-COMMENT-1). BOTH the ordinary Track-B block AND the
+ * text-only `sexual/minors` carve-out throw THIS — the carve-out distinction
+ * lives ONLY in `mod_actions.reason`, never in the user response (the category is
+ * never revealed to the author, SPEC.1 §983).
+ */
+export class CommentTrackBBlockedError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "comment_track_b_blocked";
 	constructor() {
-		super("comment under moderation review (track B)");
-		this.name = "CommentTrackBUnderReviewError";
+		super("comment blocked by moderation (track B); revise and resubmit");
+		this.name = "CommentTrackBBlockedError";
 	}
 }
 

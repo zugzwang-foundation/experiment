@@ -6,7 +6,7 @@ import {
 	CommentRequiresBetError,
 	CommentTooLongError,
 	CommentTrackABlockedError,
-	CommentTrackBUnderReviewError,
+	CommentTrackBBlockedError,
 	InvalidRequestBodyError,
 } from "@/server/bets/errors";
 import { assertStakeFloor } from "@/server/bets/floors";
@@ -17,6 +17,7 @@ import { validateReplyParent } from "@/server/comments/reply-validate";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { numericString } from "@/server/events/schemas";
+import { recordGateBlock } from "@/server/moderation/consequences";
 import { precommitModerate } from "@/server/moderation/precommit";
 
 // POST /api/bets/place — F-BET-1 (entry) / F-BET-2 (subsequent), comment-bearing.
@@ -96,11 +97,28 @@ export async function POST(request: Request): Promise<Response> {
 			userId: ctx.userId,
 			marketId,
 		});
-		if (verdict.outcome === "track_a") {
-			throw new CommentTrackABlockedError();
-		}
-		if (verdict.outcome === "track_b") {
-			throw new CommentTrackBUnderReviewError();
+		// 6b. Gate-block consequences (DEBATE.7 / ADR-0021). On track_a / track_b,
+		// run the standalone-tx writer (mod_actions audit row + track_a auto-ban +
+		// image-block flip + CSAM seam) BEFORE throwing. The reservation is already
+		// released (precommit's finally) and the OpenAI hop is done, so this is a
+		// pure-DB tx with no HTTP in flight (the golden rule). INV-1 holds: the
+		// bet+comment tx never opens. Both Track-B dispositions throw the SAME error
+		// — the carve-out distinction lives ONLY in mod_actions.reason (SPEC.1 §983).
+		if (verdict.outcome === "track_a" || verdict.outcome === "track_b") {
+			await recordGateBlock({
+				outcome: verdict.outcome,
+				categories: verdict.categories,
+				categoryScores: verdict.categoryScores,
+				userId: ctx.userId,
+				marketId,
+				blockedText: body,
+				imageR2Key,
+				imageUploadId: resolvedImage?.uploadId,
+			});
+			if (verdict.outcome === "track_a") {
+				throw new CommentTrackABlockedError();
+			}
+			throw new CommentTrackBBlockedError();
 		}
 
 		// Retry-purity: ALL event_ids + metadata generated ONCE here, closed over
