@@ -27,3 +27,38 @@ Fresh **execute** chat (Fable 5), after web + operator review the plan: `git che
 
 ## Time
 2026-06-20.
+
+---
+
+# Session log — FIX-AUTH-SIGNUP (execute) — Session 2
+
+**Stratum/state:** Execute — fix + e2e test landed; PR #149 OPEN, NOT merged (web+operator gate). PR only, no prod touch (HARD STOP honored).
+
+## What landed (files + PR#)
+- `src/server/auth/index.ts` — `user.additionalFields` for `pseudonym`/`pfpFilename`/`googleId` (`{type:"string",required:false,input:false}`). Code-only, no migration. (commit `d9a9ebb`)
+- `tests/integration/signup-create-path.integration.test.ts` — first real-DB e2e signup test (real `auth.$context.internalAdapter.createOAuthUser`, no adapter/hook mocking).
+- **PR #149** → `main` (base `origin/main` `bdb4e71`; all commits signed). DO NOT MERGE.
+
+## Decisions made
+- RED witnessed (verbatim `null value in column "pseudonym" … 23502`) → GREEN after fix.
+- Web+operator rulings applied: `google_id` populated (not dropped); TASK-ID `FIX-AUTH-SIGNUP`.
+- AGENTS.md auth-gotcha line NOT added unilaterally — surfaced in the PR body for web to ratify; if approved, amend into this same unmerged PR.
+
+## Open questions (→ gate)
+- AGENTS.md gotcha line: add or not (recommended).
+- `google_id` denormalization (duplicate of `accounts.account_id`, not an auth key) — keep or drop the column in a later schema task.
+
+## Next session starts at (exact next action)
+Gate: web + operator review PR #149. On approval → merge → deploy to staging → operator completes a real Google + email-OTP signup (runbook step #2) as acceptance.
+
+## Verification (all green)
+- New test RED→GREEN; `@code-reviewer` clean (no findings); `@security-auditor` gate holds (client cannot self-assign identity; INV-1..4 untouched; admin untouched).
+- `ZUGZWANG_ENV=preview just verify` → All checks passed; full `pnpm vitest run` → 966 passed / 0 failed (134 files).
+
+## Context to preserve
+- The fix is complete: the other 7 custom `users` columns bypass Better Auth's adapter (direct Drizzle/raw SQL), so only the 3 create-path columns needed declaring (code-reviewer-verified).
+- Pre-existing LOW (out of scope): `better-auth` `link-account.mjs:107` `logger.error(e)` logs raw errors.
+- Stranded tuples RedFox000/RedWolf001 → 30-day sweep, no action.
+
+## Time
+2026-06-20.
