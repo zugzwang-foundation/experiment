@@ -70,8 +70,8 @@ export const users = pgTable(
 
 // Better Auth 1.6.x core session shape. expires_at NOT NULL per SCAFFOLD.3
 // step-3 reviewer finding: Better Auth's internalAdapter.createSession always
-// populates a Date (sessionExpiration default 7d, overridden via large
-// `expiresIn` sentinel per SPEC.2 §8.2). disableSessionRefresh suppresses the
+// populates a Date (sessionExpiration default 7d, overridden via the 400-day
+// `expiresIn` cap per SPEC.2 §8.2). disableSessionRefresh suppresses the
 // sliding-window UPDATE, not the INSERT.
 export const sessions = pgTable(
 	"sessions",

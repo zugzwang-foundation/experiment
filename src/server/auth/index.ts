@@ -39,13 +39,21 @@ if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
 	throw new Error("GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET not set");
 }
 
-// Indefinite-session sentinel per SPEC.2 §8.2 line 818 ("Indefinite cookie
-// lifetime"). Large `expiresIn` (100y) makes Better Auth's
-// internalAdapter.createSession write a far-future Date for `expires_at`;
-// `disableSessionRefresh: true` is the canonical Better Auth 1.6.11 option
-// (verified at init-options.d.mts, surfaced during step-10 check-in) that
-// overrides any updateAge sliding-window refresh.
-const ONE_HUNDRED_YEARS_SEC = 60 * 60 * 24 * 365 * 100;
+// Session lifetime capped at 400 days per SPEC.2 §8.2. The cap is the hard
+// maximum enforced by BOTH better-call's cookie serializer
+// (better-call/dist/cookies.mjs:55 throws when a cookie `maxAge` exceeds
+// 34,560,000s) AND modern browsers (Chrome 104+ clamp cookie Max-Age/Expires
+// to 400 days). Better Auth feeds `session.expiresIn` straight into the session
+// cookie's `maxAge` (cookies/index.mjs:126-127), so the prior 100-year value
+// threw a 500 on cookie issuance for every onboarded/returning-user sign-in —
+// the create-path onboarding gate (ONBOARDING_REQUIRED) defers first-time
+// signup, which masked it until a user was onboarded. 60*60*24*400 =
+// 34,560,000 == the cap exactly; better-call's guard is strict (`> 34,560,000`)
+// so the boundary value passes, and browsers keep (don't clamp) a value equal
+// to the 400-day max. Far exceeds the ~51-day live window. `disableSessionRefresh:
+// true` stays — no sliding-window re-issue; truly-indefinite sessions (long-lived
+// `sessions` row + per-visit cookie re-issue) are out of scope (SPEC.2 §8.2).
+const SESSION_MAX_AGE_SEC = 60 * 60 * 24 * 400;
 
 // === Custom plugin: Turnstile + rate-limit on email-OTP send ================
 //
@@ -205,7 +213,7 @@ export const auth = betterAuth({
 	baseURL: process.env.BETTER_AUTH_URL,
 	trustedOrigins,
 	session: {
-		expiresIn: ONE_HUNDRED_YEARS_SEC,
+		expiresIn: SESSION_MAX_AGE_SEC,
 		disableSessionRefresh: true,
 	},
 	// FIX-AUTH-SIGNUP — declare the three custom `users` columns the
