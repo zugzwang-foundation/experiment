@@ -208,6 +208,33 @@ export const auth = betterAuth({
 		expiresIn: ONE_HUNDRED_YEARS_SEC,
 		disableSessionRefresh: true,
 	},
+	// FIX-AUTH-SIGNUP — declare the three custom `users` columns the
+	// databaseHooks populate so Better Auth's drizzle adapter actually writes
+	// them. `transformInput` (adapter-factory.mjs) copies ONLY fields present in
+	// the user MODEL, and the model = 6 core fields + `user.additionalFields`
+	// (get-tables.mjs). Without these declarations the `pseudonym`/`pfpFilename`
+	// injected by `user.create.before` and the `googleId` from `mapProfileToUser`
+	// are silently stripped before the INSERT — and `users.pseudonym` is NOT NULL
+	// with no default, so the user INSERT throws 23502 and the whole OAuth/OTP
+	// create rolls back (the `unable_to_create_user` failure; root cause in
+	// docs/plans/FIX-AUTH-SIGNUP.md).
+	//
+	// `input: false` is SECURITY-LOAD-BEARING: parseInputData (db/schema.mjs:40-51)
+	// REJECTS any client-supplied value for these fields ("<key> is not allowed to
+	// be set"), so a participant cannot self-assign a pseudonym/pfp/google_id via
+	// request input — the curated identity_pool tuple (server-side hook) is the
+	// only writer. Hook-injected data does NOT pass through parseInputData, so the
+	// injection is unaffected. `required: false` because the value comes from the
+	// hook, never the request. All three columns are `text` → "string". Keys are
+	// the Drizzle table-property names so getFieldName resolves them to the
+	// pseudonym / pfp_filename / google_id columns.
+	user: {
+		additionalFields: {
+			pseudonym: { type: "string", required: false, input: false },
+			pfpFilename: { type: "string", required: false, input: false },
+			googleId: { type: "string", required: false, input: false },
+		},
+	},
 	advanced: {
 		database: {
 			generateId: () => uuidv7(),
