@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | proposed |
+| **Status** | accepted |
 | **Date** | 2026-06-20 |
 | **Deciders** | Hrishikesh (operator) + web Claude (gate) — proposed by Claude Code overnight prep |
 | **Tracker task** | Staging-provisioning prep, work item #2 (2026-06-20) |
