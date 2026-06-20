@@ -12,6 +12,12 @@
 
 ---
 
+## Patch record
+
+**P1 (2026-06-20, FIX-AUTH-LOGIN).** In-place Patch record per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession). **The load-bearing decision is unchanged** — Better Auth remains the auth library on the locked vendor stack, with the §13 onboarding-gate hook and the structural admin/participant separation intact. **Corrected:** the "indefinite cookie lifetime via very-large `session.expiresIn` (~100 years)" consequence below is **removed**. That value was never achievable — browsers (Chrome 104+) clamp cookie `Max-Age`/`Expires` to 400 days client-side regardless — **and** it exceeded better-call's cookie-serialization cap (`better-call/dist/cookies.mjs:55` throws when `maxAge > 34,560,000s`), so Better Auth's `setSessionCookie` (`cookies/index.mjs:126-127`, which feeds `expiresIn` straight into the cookie `maxAge`) threw an **uncaught 500** on cookie issuance for every onboarded/returning-user sign-in (the create-path `ONBOARDING_REQUIRED` gate defers first-time signup, masking it until a user was onboarded). `session.expiresIn` is now capped at 400 days (`60*60*24*400 = 34,560,000`, `src/server/auth/index.ts`). `disableSessionRefresh: true` is **retained**, so the cookie is **not** silently re-issued — the earlier "re-issued on next request" wording was also incorrect. A 400-day session far exceeds the ~51-day live window; truly-indefinite sessions (long-lived `sessions` row + per-visit cookie re-issue) are out of scope. Reconciles SPEC.2 §8.2 (same fix, same commit).
+
+---
+
 ## Context and Problem Statement
 
 SPEC.1 §13 locks the participant authentication model: two sign-in paths (Google OAuth via F-AUTH-1, Email + 6-digit OTP via F-AUTH-2) converging on an indefinite server-side participant session, manual-logout-only invalidation, HTTP-only/Secure/SameSite=Lax cookies, structurally separate from the admin path. The vendor stack is locked: Google Identity Services, Resend for OTP delivery, Cloudflare Turnstile for CAPTCHA on the email path, Postgres on Supabase, Drizzle ORM, Vercel Node.js runtime, Next.js 16 App Router with Server Actions per ADR-0003.
@@ -147,7 +153,7 @@ ADR-0011 (pseudonym pool, F-AUTH-3 substance) and SCAFFOLD.3 (auth wiring) consu
 - **Younger track record than Clerk or Auth.js v4.** Better Auth shipped v1 in early 2025; ~16 months of production exposure as of this ADR. Mitigation: the build window ends 2026-11-08 with codebase archive; pin to a known-good patch version after launch and update only on CVE or required bugfix.
 - **No commercial SLA.** Support is community + maintainer-team via GitHub Issues and Discord; response time is observably hours-to-days, but there is no ticket-and-engineer-on-the-other-end. Acceptable because: build window is 1.75 months live, the library's core auth flow is small enough that critical-path bugs are reproducible quickly, and the AGPL codebase can fork-and-patch a Better Auth dependency if needed without licensing friction.
 - **`onAPIError.errorURL` is ignored on the OAuth callback path** (Better Auth issue #5518). The OAuth-callback failure redirect must be handled in an explicit `app/auth/error/page.tsx` that reads error query params and routes accordingly. Mitigated by: SCAFFOLD.3 owns the error page; one-time cost.
-- **Indefinite cookie lifetime is achieved by very-large `session.expiresIn` (~100 years), not a literal `Infinity`.** Combined with `disableSessionRefresh: true` to prevent sliding-window updates. Functionally indefinite for the build window (codebase archives Nov 2026); browsers cap visible cookie lifetime at ~400 days (Chrome) regardless of what the server sends, but the server-side row remains valid and the cookie is silently re-issued on next request.
+- **Indefinite cookie lifetime is achieved by very-large `session.expiresIn` (~100 years), not a literal `Infinity`.** Combined with `disableSessionRefresh: true` to prevent sliding-window updates. Functionally indefinite for the build window (codebase archives Nov 2026); browsers cap visible cookie lifetime at ~400 days (Chrome) regardless of what the server sends, but the server-side row remains valid and the cookie is silently re-issued on next request. **(Corrected by Patch record P1: the ~100-year value is removed and `expiresIn` capped at 400 days; with `disableSessionRefresh: true` the cookie is not re-issued.)**
 - **Stale-pseudonym-row drainage.** A user who completes F-AUTH-3 (pseudonym assigned) but cancels at F-AUTH-4 (ToS not accepted) leaves a `users` row with `pseudonym IS NOT NULL` and `tos_accepted_at IS NULL`, holding an `identity_pool` tuple. SPEC.1 §13 F-AUTH-4 already specifies the 30-day daily admin-sweep that releases the tuple back to the pool; this ADR does not change that mechanism, only notes it is the relevant cleanup path.
 - **Server-Action client-side session-state lag** (Better Auth issue #3608). After a server-side `signIn` / `signOut` action completes, `useSession` on the client does not auto-refresh until `router.refresh()` or `authClient.useSession().refetch()` is called. SCAFFOLD.3 absorbs this in the post-action client handler.
 
@@ -176,7 +182,7 @@ ADR-0011 (pseudonym pool, F-AUTH-3 substance) and SCAFFOLD.3 (auth wiring) consu
 - ~16 months of production exposure as of decision date; younger than Clerk or Auth.js v4
 - Community-only support model
 - Issue #5518 forces an explicit OAuth error page (one-time cost)
-- Indefinite cookie via large `expiresIn`, not a literal flag
+- Indefinite cookie via large `expiresIn`, not a literal flag *(→ Patch record P1: now a 400-day `expiresIn` cap)*
 
 ### Option 2 — Auth.js v5 (NextAuth v5) + Drizzle adapter
 
