@@ -153,11 +153,18 @@ const otpGateBeforeHooks = [
 				});
 			}
 
-			// Return empty context object — Better Auth's runtime ignores the
-			// return value of before-hooks at the aggregator boundary, but
-			// having a defined return value lets unit tests assert "resolved
-			// without throw" via `resolves.toBeDefined()`.
-			return {};
+			// Continue to the real send endpoint. Better Auth 1.6.11's hook
+			// aggregator (to-auth-endpoints.mjs: runBeforeHooks L222-236 + main
+			// flow L79/L90) treats a before-hook that returns an object WITHOUT
+			// a truthy `context` key as a deliberate SHORT-CIRCUIT response — it
+			// returns that object as the HTTP body and NEVER invokes the
+			// endpoint. A bare `{}` therefore silently 200-empties
+			// /email-otp/send-verification-otp: no OTP is generated, stored, or
+			// sent (AUTH-OTP-GATE). Returning `{ context: {} }` is the "proceed,
+			// merge no context changes" signal — the aggregator merges the empty
+			// context and falls through to the real endpoint that
+			// generates/stores/dispatches the OTP.
+			return { context: {} };
 		},
 	},
 ];
