@@ -167,7 +167,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0015_nightly_drift_zero_terminal_fix.sql` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent).
+- Current head: `0016_mod_actions_reason.sql` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent; 0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143).
 
 ### Transactions, queries, validation
 
@@ -187,6 +187,7 @@ const placeBetSchema = z.object({
 - **Structured logging** via the `src/server/middleware/logging.ts` logger — no `console.log` in server code (a convention today, *not* a Biome rule; `console.error` does appear in auth). No request bodies in logs.
 - Middleware: `logging`, `origin-allowlist`, `rate-limit`. Idempotency store + lock in `idempotency/` + `upstash/`. Moderation is `moderation/precommit.ts` (OpenAI **before** the bet tx, guarded by a Redis SETNX reservation; fail-closed on terminal — ADR-0014). Rate-limit fails **open**; idempotency fails **closed** (ADR-0015).
 - **Better Auth custom `users` columns:** the drizzle adapter persists only fields in Better Auth's user model (6 core + `user.additionalFields`). Any custom `users` column written through a `databaseHook`/`mapProfileToUser` **must** be declared in `user.additionalFields` (`type:"string"`, `required:false`, `input:false` for server-only/identity fields) or it is silently stripped before INSERT — the cause of the `unable_to_create_user`/`23502` null-`pseudonym` signup bug (FIX-AUTH-SIGNUP). `input:false` also blocks client identity-spoofing at `parseInputData`.
+- **Better Auth `session.expiresIn` → cookie `Max-Age` 400-day ceiling:** `expiresIn` is fed straight into the session-cookie `maxAge` by Better Auth's `setSessionCookie`, and the better-call cookie serializer **throws** when `maxAge > 34,560,000 s` (400 days). The throw fires at **cookie-serialization time on sign-in, not at token creation**, surfacing as an uncaught 500 for onboarded/returning users (first-time signup is deferred by the `session.create.before` onboarding gate, which masks it). Cap `expiresIn` at `SESSION_MAX_AGE_SEC = 60*60*24*400`; modern browsers (Chrome 104+) clamp `Max-Age`/`Expires` to the same 400-day ceiling regardless (FIX-AUTH-LOGIN / ADR-0004 Patch P1; SPEC.2 §8.2).
 
 ---
 
