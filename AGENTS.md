@@ -167,7 +167,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0015_nightly_drift_zero_terminal_fix.sql` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent).
+- Current head: `0016_mod_actions_reason.sql` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent; 0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143).
 
 ### Transactions, queries, validation
 
