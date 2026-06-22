@@ -11,8 +11,8 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | 1.0.8 |
-| **Date** | 2026-06-15 |
+| **Version** | 1.0.9 |
+| **Date** | 2026-06-22 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
 | **Lock gate** | PRECURSOR.4 (Fresh-session lock review, writer/reviewer split per CLAUDE.md) — promotes this doc from `v0.3-draft` → `v1.0` |
@@ -56,6 +56,7 @@
 | 1.0.6 | 2026-06-15 | HMH | **ENGINE.10 plan rider — §3 forward-refs realigned to the §9 gating map** (docs/plans/ENGINE.10.md, founder-ratified 2026-06-15). §3 ENGINE.10 forward-refs realigned to the §9 gating map — resolution composition → ENGINE.15 (R-15.3), wire layer → ENGINE.15, W-3 → ENGINE.9; ENGINE.10 named as the cross-flow correctness-at-scale exit gate. Three edits: §3 closing ¶ (implementer line "ENGINE.7 / ENGINE.10 / ENGINE.13 implement." → "ENGINE.7 (W-1) / ENGINE.9 (W-3) / ENGINE.13 (grant) implement; ENGINE.10 is the cross-flow correctness-at-scale exit gate."), §3.6 resolution fan-out (composed-at endpoint → ENGINE.15, R-15.3 `resolveMarketAction`), §3.7 event-emit (wire layer → ENGINE.15). The §9 Tracker Task Gating Map already names ENGINE.10 "full-invariant stress test" — the anchor this realigns §3 to, unchanged; the v1.0.3 row's historical "composed at ENGINE.10" prose is a dated change-log entry, left as-is. **§0** version → 1.0.6, date → 2026-06-15. |
 | 1.0.7 | 2026-06-18 | HMH | **Reactive moderation amendment, per ADR-0021** (supersedes ADR-0020's held queue; amends ADR-0014 Track B consequence only). Paired with SPEC.1 → 1.0.7. **§10:** header note added (Track B consequence amended: held → block, reactive, text-only `sexual/minors` carve-out; gate shape / vendor / fail-closed / Redis reservation / idempotency-first / CSAM short-circuit / F-MOD-4 atomicity UNCHANGED); the LD-3 carve-out paragraph rewritten to the reactive model (block-then-surface for ban-review, no held queue; resolves the SPEC.1 Appendix A ↔ §10 drift in favour of LD-3); Server-Action step 5 annotated (Track B = content block, not held; reason codes `track_b_blocked` / `sexual_minors_text_blocked`); Track A degrade-mode clause annotated (no held queue — HARDEN.5 re-homes flag-only items to the reactive feed). **§22:** ADR-0020 **added** as superseded (omitted from the §22 catch-up at its own v1.0.6 amendment — PR #140 did not touch SPEC.2) and ADR-0021 added as accepted; prose counts 17 → 19 (16 accepted, 2 superseded, 1 in flight); §22.1 header 17-row → 19-row. ADR-0014's gate architecture is otherwise unchanged. **§0** version → 1.0.7, date → 2026-06-18. |
 | 1.0.8 | 2026-06-19 | HMH | **DEBATE.7 reactive-moderation consequence wiring — same-commit amendment** (docs/plans/DEBATE.7.md; paired with SPEC.1 → 1.0.8 + the ADR-0014 §18 patch-record). **App. B.10 (`mod_actions`):** added `target_market_id` (uuid \| null; SHIP — F-ADMIN-5 market search for gate-blocks that have no comment/bet to JOIN), `reason` (mod_reason; SHIP, NOT NULL — gate auto-actions `track_a_autoban` / `track_b_blocked` / `sexual_minors_text_blocked` + reactive-admin `content_removed` / `user_banned` forward-compat), `blocked_text` (text \| null; STRIP — the rejected body retained for reactive ban-review, removed from the released dataset); `verdict` relaxed to nullable (NULL for reactive admin-action rows); `actor_id` note corrected (`'system'` for ALL gate auto-actions, `'admin-singleton'` for reactive Remove/Ban); `categories` note expanded (full OpenAI response — scores + applied-input-types). **§10:** step-4 return shape → `{ outcome; categories; categoryScores }` (the §6 enrichment threaded into `mod_actions.categories`); the Track-A image-presence paragraph gains the A2 note (adult `sexual` + image → Track A — the live CSAM-image backstop while PhotoDNA is parked; adult-sexual text stays Track B, auto-ban-on-text → HARDEN.5). The `mod_reason` enum is documented in App. B.10. **§0** version → 1.0.8, date → 2026-06-19. |
+| 1.0.9 | 2026-06-22 | HMH | **DEBATE.5 — debate-view comment-list read-model (DebateComment) added to §5.4.** New §5.4 read-time-derivation subsection codifying the canonical oldest-first comment-list loader (`listMarketComments`, `src/server/debate-view/list-comments.ts`): per-comment live marker {Flipped/Exited/none} via the existing `computeMarker` over the ENGINE.11 held-side read; viewer-independent; frozen-by-construction at resolution (INV-4; emergent, no snapshot); exposure boundary type-enforced (no held-side/quantity in the DTO); ordering oldest-first `(created_at, id)` and explicitly NOT ranked (ranking stays the §5.4 multi-mode model / DEBATE.8). Moderation seam recorded as render-time masking preserving thread integrity per ADR-0021 (NOT a row-exclusion filter), with the hard precondition that the unfiltered list must not back a public surface until masking is attached. Frozen `side_at_post_time` badge (INV-3) kept distinct from the live marker. Zero-schema: no migration/column/event-type; migration head + EVENT_TYPES unchanged. Paired same-commit with the DEBATE.5 code PR per the §0 same-commit doctrine. SPEC.1 back-pressure: none (F-DEBATE-2/3 already in SPEC.1 §9). |
 
 ---
 
@@ -574,6 +575,41 @@ Shape:
   ReplyAffordance = { support: Affordance; counter: Affordance; reason: string | null }
   computeReplyAffordance(P, H) -> ReplyAffordance            (pure)
   readReplyAffordance(client, { viewerId, parentComment: { marketId, sideAtPostTime } }) -> ReplyAffordance
+
+### Read-time debate-view comment list (DebateComment)
+
+The debate view's comment list is a read-time read-model: a flat, oldest-first list of a market's comments, each carrying a live **marker** (`Flipped` | `Exited` | `none`) recomputed on every read — never stored, never written. It is the canonical comment-list read the debate-view render (DEBATE.4) consumes. The marker is **viewer-independent**: it reflects the *author's* current position, identical for every reader.
+
+The marker is the live overlay; the comment's frozen `side_at_post_time` badge is a *separate* field that never moves (INV-3). For each comment, let X = `comment.side_at_post_time` ∈ {YES, NO} and Y = the comment author's currently-held side in that market ∈ {YES, NO, ∅}:
+
+- Y = X  → `none` (author still holds the comment's side; renders no badge).
+- Y = ¬X → `Flipped` (author now holds the opposite side).
+- Y = ∅  → `Exited` (author holds no position).
+
+Y is read from the ENGINE.11 position layer (`heldSideOrNull` / `getHeldPosition`, `src/server/positions/read.ts`), where a sold-to-zero position reads as ∅ (`null`); the marker is computed by the existing pure `computeMarker` (`src/server/positions/compute.ts`). Because every comment rides a bet at post time (INV-1), Y = ∅ unambiguously means *exited*, never *never-participated*.
+
+**Frozen-by-construction at resolution (INV-4).** The marker recomputes per read yet is **stable forever once the market leaves `Open`**: `positions` has exactly one writer (`upsertPositionDelta`, reachable only from buy/sell, which require `market.state = Open`), and resolution writes `resolution_events` / `payout_events` but **never** `positions`. No stored marker, no snapshot table, no freeze write — the freeze is emergent (the ENGINE.11 R-4 "emergent marker" decision; F-DEBATE-3).
+
+**Ordering is not ranking.** The list is returned **oldest-first**, key `(created_at ASC, id ASC)` (UUIDv7 tiebreak), and carries no rank. Debate-view ordering/ranking is the separate multi-mode model in §5.4 above (ADR-0017 / `RANKING.md`, built at DEBATE.8), layered on top of this list by its consumer — never inside this loader.
+
+**Exposure boundary.** The DTO surfaces only the marker enum. The author's raw held side and quantity are consumed by `computeMarker` and dropped; they are **never** returned. The boundary is type-enforced — `DebateComment` has no `heldSide` / `quantity` member, so a leak is a compile error.
+
+**Moderation seam (forward; not built here).** This read-model returns **all** Track-C (passed) comments **unfiltered**, including any an admin has reactively **Removed**. Under ADR-0021, reactive removal is a *soft* action: the comment row persists (marked by a `mod_actions` row), and the public view must render a `removed by moderator` placeholder **with the thread intact** (replies under a removed parent survive — they are other participants' stake-backed arguments). The removal treatment is therefore **render-time masking that preserves thread structure** — the consumer (DEBATE.4 render, paired with the DEBATE.7 moderation schema) masks a removed parent's body while keeping its thread node — **not** a `WHERE`-clause row exclusion, which would orphan the replies. The forward shape is a per-comment removed-state field consumed by the render, plus a viewer/role parameter on the read (public vs admin-review); the marker itself stays viewer-independent. **Hard precondition:** this read-model MUST NOT back any public surface until the removal-masking is attached — public consumption of the unfiltered list is a moderation read-bypass. (Track A / Track B content never reaches `comments`; it is blocked at the gate per ADR-0021. This seam concerns reactive removal only, not gate-blocked or CSAM content.)
+
+Shape:
+  Marker = "Flipped" | "Exited" | "none"                          (ENGINE.11; computeMarker)
+  DebateComment = {
+    id: string;
+    parentCommentId: string | null;        // depth-1 thread linkage (DEBATE.4 threads on this)
+    userId: string;                         // author (public; identity resolved downstream)
+    body: string;
+    sideAtPostTime: "YES" | "NO";           // FROZEN badge (INV-3) — distinct from marker
+    imageUploadsId: string | null;          // the comment's own attachment (F-COMMENT-3)
+    createdAt: Date;                        // timestamptz; HTTP serialization is DEBATE.4's layer
+    marker: Marker;                         // live overlay — recomputed per read
+  }
+  listMarketComments(client, { marketId }) -> Promise<DebateComment[]>     (read-only; oldest-first)
+  Single source of truth: `src/server/debate-view/list-comments.ts` (`server-only`, named export, no barrel).
 
 ### §5.5 Removed from prior outline (audit trace)
 
