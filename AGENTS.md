@@ -6,7 +6,7 @@
 >
 > **Descriptive, not aspirational.** It documents the repo as it actually is at the current commit. Where it and a SPEC disagree, the SPEC is the *target* and this file is the *present reality* — see "Specs-ahead-of-code" below. Keep it accurate and lean; it loads in full every session alongside `CLAUDE.md`.
 
-**Specs-ahead-of-code (read once).** The built schema still carries pre-fold artifacts the specs have removed: `comments.bet_id` is **nullable** (target `NOT NULL`, ADR-0017), and `friendly_fire_events` + `stake_at_post_time` still exist. Code catch-up is DEBATE.8/9. This file describes what is *on disk now*; don't "correct" the schema to the spec outside that task.
+**Specs-ahead-of-code (read once).** The built schema still carries pre-fold artifacts the specs have removed: `friendly_fire_events` + `stake_at_post_time` still exist (code catch-up is DEBATE.9 + DEBATE.8). Separately, `comments.bet_id` is **deliberately nullable** — INV-1 is enforced by `bets.comment_id` NOT NULL + the W-1 atomic transaction; the comment↔`bets` pair only sets the `bets.comment_id` direction at write time (Bucket-A append-only forbids a later back-fill). It is **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation). This file describes what is *on disk now*; don't "correct" the schema to the spec outside that task.
 
 ---
 
@@ -153,7 +153,7 @@ const placeBetSchema = z.object({
 ### Reply-as-bet schema reality (specs-ahead)
 
 - `bets.comment_id` — **`NOT NULL`**, FK to `comments.id` (the built half of INV-1). Indexed.
-- `comments.bet_id` — **EXISTS but NULLABLE**; target is `NOT NULL` per ADR-0017 (catch-up DEBATE.8/9). Indexed (`comments_bet_id_idx`, migration 0008).
+- `comments.bet_id` — **EXISTS but NULLABLE by design**; INV-1 is enforced via `bets.comment_id` NOT NULL + the W-1 atomic transaction, not via `comments.bet_id` (the circular pair sets only the `bets.comment_id` direction at write time; Bucket-A append-only forbids a later back-fill) — **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation, DEBATE.8). Indexed (`comments_bet_id_idx`, migration 0008).
 - `friendly_fire_events` (in `comments.ts`) and `comments.stake_at_post_time` (an ADR-0009 ranking input) are **vestigial** — superseded by ADR-0017 ranking, removed in DEBATE.8/9. Don't build new logic on them.
 
 ### Append-only buckets
