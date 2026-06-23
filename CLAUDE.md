@@ -38,7 +38,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 - **Pool** — the CPMM reserve row backing a market (`pools`); seeded/unwound admin-side only.
 - **Support / Counter** — a reply-bet's stance toward its parent; not a separate vote — derived from side at read time.
 - **Bet** — a stake on a side (`bets` + `positions`); carries `comment_id`, its argument.
-- **Comment** — argued commentary; rides a bet via `comments.bet_id` (reply-as-bet).
+- **Comment** — argued commentary; every comment rides a bet (reply-as-bet), linked via `bets.comment_id` (the populated FK; `comments.bet_id` is deliberately NULL — see §2).
 - **Reply-bet** — a reply *is* a Support/Counter bet on the parent (depth 1, flat).
 - **Dharma** — soulbound reputation; append-only `dharma_ledger`; never transferable.
 - **Daily Credit** — the daily Dharma allowance (DB: `daily_allowance`, `last_allowance_accrued_at`); two stake floors `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY` (ADR-0018).
@@ -56,7 +56,7 @@ SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`; the trigger
 
 | ID | Rule | Mechanism |
 |---|---|---|
-| **INV-1** | Bet ↔ comment atomicity (reply-as-bet) | One SERIALIZABLE tx wraps both inserts (ADR-0013). `bets.comment_id NOT NULL` (built); `comments.bet_id` → target `NOT NULL` per ADR-0017 (now nullable; DEBATE.8/9). |
+| **INV-1** | Bet ↔ comment atomicity (reply-as-bet) | One SERIALIZABLE tx wraps both inserts (ADR-0013). `bets.comment_id NOT NULL` (built); `comments.bet_id` **deliberately nullable** (circular `comments`↔`bets` pair; comment inserted before its bet exists, Bucket-A append-only forbids back-fill) — INV-1 enforced via `bets.comment_id` NOT NULL + W-1 atomicity, **not** via `comments.bet_id`; not a pending NOT-NULL migration (ADR-0017 ranking reconciliation, DEBATE.8). |
 | **INV-2** | Dharma non-transferable; no overdraft | Append-only `dharma_ledger`; **no** transfer table, by design; `CHECK (balance_after >= 0)`. |
 | **INV-3** | Comments side-bound at post-time | `comments.side_at_post_time` immutable post-INSERT. Flipping sides never moves prior comments. |
 | **INV-4** | Resolutions append-only | `resolution_events` + `payout_events` immutable post-INSERT. |
