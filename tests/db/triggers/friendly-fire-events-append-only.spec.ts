@@ -49,7 +49,6 @@ describe("friendly_fire_events — append-only trigger (Bucket B)", () => {
 				marketId: market?.id ?? "",
 				body: "tgt",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 

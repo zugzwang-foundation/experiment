@@ -202,8 +202,8 @@ In v1 there is **no sort-mode selector**. The market-detail page is **always** i
 ### 5.1 The badge rule
 
 1. A badge is a **read-time label** computed by `ranking.ts` from the same lane values it already computes for Top. It is **not** stored, **not** a ranking input, and adds **no** schema, column, or event type — identical read-time posture to the order and the four aggregates.
-2. A post is badged **only if it dominates a lane** — i.e. its best `qualified_margin` (§3.3) clears `k_lane` *and* the lane value clears `floor_lane`. Posts that dominate no lane (the majority) carry **no badge**.
-3. A badged post carries **exactly one** badge — the lane of its **highest margin** (its single strongest dominance). This is the same lane that earns the post its Top position, so the badge and the ordering are **consistent by construction**.
+2. A post is badged **only if it dominates a badge lane**. The badge lanes are `{traction n, stake D, contestation n^b}` — these differ from the Top-order lanes `{n, D, lop}` on the third axis (badges read even-contestation `n^b`; Top reads dominance `lop`, §3.1). The badge margin uses the same ratio-to-second-place shape as §3.3, computed over the badge lanes; a post is badged only if its **best** badge margin clears `k_lane` and that lane's value clears `floor_lane`. Posts that dominate no lane (the majority) carry **no badge**.
+3. A badged post carries **exactly one** badge — the lane of its **highest margin** (its single strongest dominance). The badge coincides with the post's strongest Top-order lane on the **traction** and **stake** axes; on the **balance** axis the two differ by design — Top's third lane ranks dominance-split (`lop`), the Contested badge marks even contestation (`n^b`). A post may earn its Top position via one lane yet wear a badge from another: a big, fairly-even post can top the order via its traction lead while wearing a **Contested** badge, because its `n^b` dominance exceeds its `n` dominance. Top surfaces decisive standing; the badge names the post's single most distinctive lane.
 
 ### 5.2 The badge vocabulary (three lanes)
 
@@ -211,7 +211,9 @@ In v1 there is **no sort-mode selector**. The market-detail page is **always** i
 |---|---|---|
 | **Most Debated** | traction (`n`) | the most replies — sheer volume of argument |
 | **Highest Stakes** | stake (`D`) | the most Dharma committed — value at risk |
-| **Contested** | dominance/split lens (`n^b`) | big **and** evenly split — a live cliffhanger |
+| **Contested** | even-contestation (`n^b`) — distinct from Top's dominance-split lane (`lop`, §3.1) | big **and** evenly split — a live cliffhanger |
+
+The badge lanes share the **traction** (`n`) and **stake** (`D`) lanes with Top, but on the balance axis the badge reads **even-contestation** (`n^b`) where Top's third lane reads **dominance-split** (`lop`, §3.1) — see §5.1(3).
 
 **"Newest" is not a badge** — recency is a *position* fact surfaced by the interleave (§4), not a lane a post "wins." (If a "🆕 New" tag on interleaved posts is wanted later, it is a clean UI addition that requires no model change — out of v1 scope unless reopened.)
 
@@ -358,7 +360,7 @@ All values below are **named placeholders**. They pin against dogfooded markets 
 
 > An abstract illustration of Top, the badges, and the interleave. The posts and numbers are fictional placeholders for explanation only — **not** a real market or resolution question. Constants are shown with illustrative values purely to make the arithmetic concrete; the real values pin at tuning.
 
-Assume a single market's post pool with these computed substrates, and illustrative `floor_lane = 5` (for `n`), `floor_lane = 200` (for `D`), `k_lane = 3`, `floor_split = 6`:
+Assume a single market's post pool with these computed substrates, and illustrative `floor_lane = 5` (for `n`), `floor_lane = 200` (for `D`), `floor_lane = 3` (for `n^b`), `k_lane = 3`, `floor_split = 6`:
 
 | Post | `n` | `D` (Đ) | `lop` | `a` (Đ) | created |
 |---|---|---|---|---|---|
@@ -369,11 +371,12 @@ Assume a single market's post pool with these computed substrates, and illustrat
 
 Lane-by-lane (second place is the next-highest post *that clears the floor* in that lane):
 
-- **Traction (`n`):** P1 = 40, P2 = 12, P3 = 9 clear the floor (≥ 5); P4 (2) is `BELOW_FLOOR`. P1's margin = 40 / 12 = **3.33×** (≥ `k_lane` 3 → dominates). → **P1 badge: Most Debated.**
+- **Traction (`n`):** P1 = 40, P2 = 12, P3 = 9 clear the floor (≥ 5); P4 (2) is `BELOW_FLOOR`. P1's margin = 40 / 12 = **3.33×** (≥ `k_lane` 3 → dominates the traction badge lane).
 - **Stake (`D`):** P2 = 2,840, P1 = 1,200 clear the floor (≥ 200); P3 (300) clears too, P4 (50) does not. P2's margin = 2,840 / 1,200 = **2.37×** (< 3 → does *not* dominate, no badge from this lane). P2's best lane is stake at 2.37× — below `k_lane`, so **P2 is unbadged** unless another lane qualifies it (it does not). P2 still ranks by its 2.37× `Top_score`.
-- **Split (`lop`, gated `n ≥ 6`):** P2 (`n`=12, lop 0.55) and P3 (`n`=9, lop 0.80) clear the `n`-gate; P4 fails the gate. P3's margin = 0.80 / 0.55 = **1.45×** (< 3 → no badge).
+- **Split (`lop`, gated `n ≥ 6`) — a Top-order lane, not a badge lane:** P2 (`n`=12, lop 0.55) and P3 (`n`=9, lop 0.80) clear the `n`-gate; P4 fails the gate. P3's margin = 0.80 / 0.55 = **1.45×** (< 3 → this is P3's best Top lane, but P3 dominates no *badge* lane).
+- **Contestation (`n^b`, badge lane, floor 3):** P1 `n^b` = 40^0.90 ≈ **27.7**, P2 = 12^0.45 ≈ **3.06** clear the floor (≥ 3); P3 (9^0.20 ≈ 1.55) and P4 (≤ 2) do not. P1's contestation margin = 27.7 / 3.06 ≈ **9.0×** (≥ `k_lane` 3 → dominates). P1's `n^b` margin (9.0×) **exceeds** its traction margin (3.33×), so P1's single **highest-margin** badge lane is contestation → **P1 badge: Contested** (OD-1(A) / §5.1(3)).
 
-`Top_score`: P1 = 3.33 (its best across lanes), P2 = 2.37, P3 = 1.45, P4 = `BELOW_FLOOR`. **Order: P1, P2, P3, P4.** Only **P1** is badged (**Most Debated**). P4 (the newest, all-sub-floor) sits last, ordered there by the §3.4 chain (author stake, then recency) — and would be the post the **interleave** injects at the first cadence point if the list were longer than `LATEST_INTERLEAVE_INTERVAL`.
+`Top_score`: P1 = 3.33 (its best across the Top lanes `{n, D, lop}`), P2 = 2.37, P3 = 1.45, P4 = `BELOW_FLOOR`. **Order: P1, P2, P3, P4** (unchanged). Only **P1** is badged, and as **Contested** — P1 tops the *order* via its traction lead (3.33×) but wears the Contested *badge* because its `n^b` margin (9.0×) is its highest *badge*-lane margin (the §5.1(3) divergence). P2 stays unbadged (its 2.37× stake margin is below `k_lane` — leading a lane is not dominating it). P4 (the newest, all-sub-floor) sits last, ordered there by the §3.4 chain (author stake, then recency) — and would be the post the **interleave** injects at the first cadence point if the list were longer than `LATEST_INTERLEAVE_INTERVAL`.
 
 *(If P2 also reached, say, 9× on stake while staying even, it would dominate the stake lane and the Contested signal; it could earn a badge — and per §5.1(3) the single badge shown would be its **highest-margin** lane.)*
 
@@ -393,3 +396,4 @@ Lane-by-lane (second place is the next-highest post *that clears the floor* in t
 | Version | Date | Author | Change |
 |---|---|---|---|
 | v1.0.0-draft | 2026-06-23 | HMH (web-authored, founder-ratified) | Initial authoring at DEBATE.8. Specifies the full ADR-0017 model — per-side data model and read-time join; Top (lanes, ratio-to-#2 margin, floor/SENTINEL_MAX, the single continuous ordering formula synthesising the floor + continuous-order decisions, author-stake/earlier-wins ties, no-fade-on-Top); the latest interleave (P2); lane-dominance badges replacing the v1 selector (P3); the computed-but-unexposed filter modes and the Contested zero-reply guard; reply ranking (depth-1, stake-within-side, two-slot edges); author-stake seed/tiebreaker; shared gravity; determinism/freeze/auditability; the read-time/performance contract (keeps comments_ranking_idx); the placeholder-constant table; and an abstract worked example. Numeric constants deferred to the 2026-09-01 number-tuning pass (→ v1.0.0). |
+| v1.0.0-draft | 2026-06-23 | HMH (founder-ratified, OD-1(A)) | DEBATE.8 execution reconciliation (Gate-2 OD-1(A)): §5.1(2)/(3) + §5.2 clarified so the **badge lanes `{n, D, n^b}`** are distinct from the **Top-order lanes `{n, D, lop}`** on the balance axis — a post may top the order via one lane yet wear a badge from another (no longer "consistent by construction" on the third axis). §13 worked example reconciled: order unchanged (P1, P2, P3, P4), but P1's badge corrected **Most Debated → Contested** (its `n^b` margin ≈ 9.0× beats its traction 3.33×); `floor_lane = 3` (for `n^b`) added to the illustrative constants. No shape change to Top; the model lands at `src/lib/ranking.ts` + `ranking.config.ts` this stratum. |

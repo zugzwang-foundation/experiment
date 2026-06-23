@@ -131,7 +131,6 @@ export async function place(
 			parentCommentId,
 			body,
 			sideAtPostTime: side, // INV-3 — the REPLIER's side, frozen at post time
-			stakeAtPostTime: "0", // vestigial: ADR-0009-dead, dropped DEBATE.8/9 (Call A)
 			imageUploadsId: image?.uploadId ?? null, // F-COMMENT-3 link (in-tx)
 			betId: null, // Bucket-A circular pair; stays null in v1
 		})

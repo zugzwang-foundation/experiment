@@ -2,7 +2,6 @@ import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
 	index,
-	numeric,
 	pgEnum,
 	pgTable,
 	text,
@@ -23,9 +22,11 @@ export const ffDirectionEnum = pgEnum("ff_direction", ["up", "down"]);
 // Bucket A. side_at_post_time is INV-3 (comments side-bound at post-time);
 // 3.C's append-only trigger enforces immutability.
 //
-// stake_at_post_time is the ADR-0009 ranking-function input (absorbed into
-// SPEC.2 §9 line 220) — used in the
-// (parent_comment_id, side_at_post_time) aggregate.
+// stake_at_post_time (the dead ADR-0009 ranking-function input) was dropped at
+// DEBATE.8 (migration 0017) — the ADR-0017 model aggregates value from
+// reply-bets at read time, so the frozen column is unneeded. comments_ranking_idx
+// (parent_comment_id, side_at_post_time) SURVIVES — it serves that per-side
+// aggregation (PRECURSOR.4 lock).
 //
 // parent_comment_id is self-ref; bet_id is the comments↔bets circular pair
 // (matching bets.comment_id NOT NULL — INV-1). Both use lambda form per
@@ -52,10 +53,6 @@ export const comments = pgTable(
 			onDelete: "restrict",
 		}),
 		sideAtPostTime: sideEnum("side_at_post_time").notNull(),
-		stakeAtPostTime: numeric("stake_at_post_time", {
-			precision: 38,
-			scale: 18,
-		}).notNull(),
 		betId: uuid("bet_id").references((): AnyPgColumn => bets.id, {
 			onDelete: "restrict",
 		}),

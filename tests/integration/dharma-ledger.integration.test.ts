@@ -25,8 +25,7 @@ import { testClient, testDb } from "../db/_fixtures/db";
 // Mirrors the I-APPEND-ONLY-001 FK-ancestor shapes. comments.bet_id is
 // nullable (built reality, AGENTS.md specs-ahead) → comment inserted first with
 // bet_id NULL, then the bet with comment_id = comment.id (bets.comment_id NOT
-// NULL — the built half of INV-1). comments.stake_at_post_time is the
-// vestigial NOT NULL column still on disk.
+// NULL — the built half of INV-1).
 async function seedBetChain(args: {
 	emailTag: string;
 	pseudonym: string;
@@ -59,7 +58,6 @@ async function seedBetChain(args: {
 			marketId,
 			body: "ledger",
 			sideAtPostTime: "YES",
-			stakeAtPostTime: "10",
 		})
 		.returning({ id: comments.id });
 

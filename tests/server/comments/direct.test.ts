@@ -11,9 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // test Postgres; only externals mocked. Decimal STRINGS (CLAUDE.md §2). Assert
 // POST-CONDITIONS. TRUNCATE in afterEach. The new behaviour this pins beyond the
 // already-green ENGINE.8 happy path is the `parent_comment_id IS NULL` +
-// `side_at_post_time = entry side` contract for the top-level-argument case, and
-// the `stake_at_post_time = "0"` Call-A placeholder (asserted in reply.test.ts /
-// here is the post branch).
+// `side_at_post_time = entry side` contract for the top-level-argument case.
 
 const { mockGetSession } = vi.hoisted(() => ({ mockGetSession: vi.fn() }));
 

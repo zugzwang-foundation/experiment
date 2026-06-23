@@ -36,9 +36,9 @@ import { testClient, testDb } from "../db/_fixtures/db";
 // dharma_ledger, then THROWS PARTWAY — after dharma_ledger, BEFORE the
 // comments/bets/events writes — and we assert ZERO rows persisted across ALL
 // tables (a partial chain unwinds COMPLETELY, the strong proof). Variants:
-//   (a) happy path — the full spine commits iff no throw (comments carries BOTH
-//       side_at_post_time AND stake_at_post_time per the S3 trap; bets.comment_id
-//       links the comment; bets.bet_id stays null on disk — NOT asserted).
+//   (a) happy path — the full spine commits iff no throw (comments carries
+//       side_at_post_time; bets.comment_id links the comment; bets.bet_id stays
+//       null on disk — NOT asserted).
 //   (b) edge throw-BEFORE-events (after bets) — same zero-rows assertion
 //       (terminal-step abort).
 //
@@ -208,8 +208,8 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 
 	it("bet-comment-atomicity::happy-path-commits-full-spine", async () => {
 		// The full spine commits iff no throw. All rows present; comments carries
-		// BOTH side_at_post_time AND stake_at_post_time (S3); bets.comment_id links
-		// the comment (FK order: comment first then bet); events present.
+		// side_at_post_time; bets.comment_id links the comment (FK order: comment
+		// first then bet); events present.
 		const userId = await seedUser("atom-happy", "atom-happy");
 		const marketId = await seedOpenMarketWithPool("atom-happy-market");
 		await seedDharmaGrant(userId);
@@ -243,8 +243,7 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 					amount: "-10",
 					entryType: "bet_stake",
 				});
-				// comment FIRST (bet_id null on disk; side_at_post_time +
-				// stake_at_post_time both NOT NULL → both set — S3).
+				// comment FIRST (bet_id null on disk; side_at_post_time set).
 				const [comment] = await tx
 					.insert(comments)
 					.values({
@@ -252,7 +251,6 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 						marketId,
 						body: "atomicity happy-path argument",
 						sideAtPostTime: "YES",
-						stakeAtPostTime: "10",
 					})
 					.returning({ id: comments.id });
 				const commentId = comment?.id ?? "";
@@ -321,19 +319,17 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 		const stakeRow = ledgerRows.find((r) => r.entryType === "bet_stake");
 		expect(stakeRow?.balanceAfter).toBe("990.000000000000000000");
 
-		// comments: present, side_at_post_time + stake_at_post_time both populated.
+		// comments: present, side_at_post_time populated.
 		const commentRows = await testDb
 			.select({
 				id: comments.id,
 				sideAtPostTime: comments.sideAtPostTime,
-				stakeAtPostTime: comments.stakeAtPostTime,
 				betId: comments.betId,
 			})
 			.from(comments)
 			.where(eq(comments.marketId, marketId));
 		expect(commentRows.length).toBe(1);
 		expect(commentRows[0]?.sideAtPostTime).toBe("YES");
-		expect(commentRows[0]?.stakeAtPostTime).toBe("10.000000000000000000");
 
 		// bets: present, comment_id links the comment.
 		const betRows = await testDb
@@ -398,7 +394,6 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 						marketId,
 						body: "construction-direction argument",
 						sideAtPostTime: "YES",
-						stakeAtPostTime: "10",
 					})
 					.returning({ id: comments.id });
 				const commentId = comment?.id ?? "";
@@ -495,7 +490,6 @@ describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 						marketId,
 						body: "atomicity pre-events argument",
 						sideAtPostTime: "YES",
-						stakeAtPostTime: "10",
 					})
 					.returning({ id: comments.id });
 				const commentId = comment?.id ?? "";
