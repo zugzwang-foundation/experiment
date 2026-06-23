@@ -28,7 +28,6 @@ import {
 	comments,
 	dharmaLedger,
 	events,
-	friendlyFireEvents,
 	markets,
 	pools,
 	positions,
@@ -144,7 +143,7 @@ async function seedDharmaGrant(userId: string): Promise<void> {
 describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 	afterEach(async () => {
 		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users, friendly_fire_events CASCADE`,
+			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
 		);
 		vi.clearAllMocks();
 	});
@@ -270,8 +269,7 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 
 	it("bets::canonical-lock-order", async () => {
 		// A representative callback exercises the 4-table spine
-		// pools → positions → dharma_ledger → events and writes NO
-		// friendly_fire_events row (the struck 5th table — ADR-0017 P1; the
+		// pools → positions → dharma_ledger → events (ADR-0017 P1; the
 		// tracker's 5-table order is superseded by SPEC.2 §9's 4-table order).
 		const userId = await seedUser("lock-order", "lock-order");
 		const marketId = await seedOpenMarketWithPool("lock-order-market");
@@ -323,10 +321,6 @@ describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 				});
 			},
 		);
-
-		// The 4-table spine wrote; friendly_fire_events is NEVER touched.
-		const ffRows = await testDb.select().from(friendlyFireEvents);
-		expect(ffRows.length).toBe(0);
 
 		// Sanity: the spine did write its 4 rows.
 		const positionRows = await testDb

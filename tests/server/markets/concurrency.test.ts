@@ -97,7 +97,7 @@ async function eventsOfType(eventType: string) {
 describe("ENGINE.14 W-4 — lifecycle concurrency (X1–X2)", () => {
 	afterEach(async () => {
 		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users, friendly_fire_events CASCADE`,
+			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
 		);
 		vi.clearAllMocks();
 	});

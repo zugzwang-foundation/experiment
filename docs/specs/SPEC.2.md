@@ -1387,7 +1387,7 @@ Thirty-seven per-flow contract files in v1 across seven prefix families. Each fi
 
 **F-COMMENT-4 + F-COMMENT-5 are struck** per SPEC.1 §8 — comment edit and comment delete are not v1 features (the append-only `comments` discipline per §6.2 forecloses both at the database layer). **F-COMMENT-6 / F-COMMENT-7 / F-COMMENT-8 (friendly-fire up/down/clear) are removed entirely** under the v1.9.0 reply-as-bet model (ADR-0017): there is no standalone friendly-fire vote, so there are no friendly-fire flows. Inventory carries 3 active F-COMMENT-* IDs (1, 2, 3 — all comment-bearing bets) plus the two struck rows (4, 5) retained as audit trace.
 
-**Total: 37 active F-* files** across 7 prefix families: F-BET-* (9), F-COMMENT-* (3 active + 2 struck audit-trace), F-DEBATE-* (4), F-RESOLVE-* (3), F-AUTH-* (6), F-MOD-* (5), F-ADMIN-* (5). *(Drift note: the family breakdown and the "37" total carry a pre-existing internal inconsistency vs the literal active-row count in the table above — F-MOD-3 absent, F-BET-8 deleted — predating this fold; flagged for reconciliation at the §13 redraft / next tracker sweep, see §23.3. This pass changed only the F-COMMENT family, 6 active → 3 active.)*
+**Total: 37 active F-* files** across 7 prefix families: F-BET-* (9), F-COMMENT-* (3 active + 2 struck audit-trace), F-DEBATE-* (4), F-RESOLVE-* (3), F-AUTH-* (6), F-MOD-* (5), F-ADMIN-* (5). *(Drift note: the family breakdown and the "37" total carry a pre-existing internal inconsistency vs the literal active-row count in the table above — `F-MOD-3` absent from the table, `F-BET-8` deleted — predating the SYNC.7 fold. This residual prose↔table reconciliation, plus the `F-MOD-3` in/out and `F-DATASET-1` mint-or-strike calls, is **MAINT.15** (§23.3). **DEBATE.9 physically deletes the three struck `F-COMMENT-6/7/8.md` skeletons** — on disk despite the inventory having written them off — so the `docs/specs/flows/` on-disk file count (previously 40) now matches the "37 active" prose; only the prose↔table gap remains for MAINT.15. This pass changed only the F-COMMENT family, 6 active → 3 active.)*
 
 Multi-task gates use `+`: F-COMMENT-3 = DEBATE.2 + SCAFFOLD.15 (image upload integration spans both DEBATE.2's Server Action wiring and SCAFFOLD.15's R2 bucket policy authoring).
 
@@ -2335,15 +2335,15 @@ The PRECURSOR.4 lock review and this tracker sweep close the §23.3 drifts the S
 - The four 3-C tracker-description drifts (DEBATE.4, SCAFFOLD.3, SCAFFOLD.13, SCAFFOLD.4) — the v11 tracker rebuild (SYNC.6) already carries descriptions consistent with current SPEC.1 + SPEC.2 substance.
 - DEBATE.6 — removed from the v11 tracker (its friendly-fire scope was retired under reply-as-bet); DEBATE.9 (drop vestigial `friendly_fire_events`) stands in its place.
 - ADR-0017 body text ("friendly-fire stays display-only") — reconciled by the in-place P1 patch record (PR #65, PRECURSOR.4 lock review).
+- `friendly_fire_events` table + Bucket-B trigger — physically dropped at **DEBATE.9** (migration 0018: `DROP TABLE` auto-drops the 2 triggers + 3 indexes; plus explicit `DROP FUNCTION enforce_friendly_fire_events_transitions` + `DROP TYPE ff_direction`; the **shared** `enforce_bucket_a_no_delete` retained for the other 12 protected tables). The `castFriendlyFire`/`clearFriendlyFire` Server Actions the SYNC.7 record assumed **were never built** (recon-confirmed) — only the schema + tests referenced the table.
+- `comments.stake_at_post_time` — dropped at **DEBATE.8** (migration 0017). *(Carry-forward row cleared.)*
+- `comments.bet_id` — settled at **DEBATE.8** as **deliberately nullable**, not a pending NOT-NULL migration (INV-1 via `bets.comment_id` NOT NULL + W-1 atomicity; §5.1, §14.1); the comment-without-bet path was reworked to bet-borne at DEBATE.2. The "nullable → NOT NULL" framing in the carry-forward row is superseded. *(Row cleared.)*
 
 **Carry-forwards (specs-ahead-of-code; tracker-sequenced engineering, not this pass).** The v1.0 schema still carries artifacts the specs now omit; the drops are sequenced work:
 
 | Item | Drop / change | Tracker home |
 |---|---|---|
-| `friendly_fire_events` table + Bucket-B trigger + `castFriendlyFire`/`clearFriendlyFire` Server Actions | forward migration drops table + trigger; delete the two Server Actions | DEBATE.9 |
-| `comments.bet_id` nullable → NOT NULL; standalone comment-without-bet path → bet-borne | schema migration (after cutover) + comment-write-path rework | DEBATE.2 / DEBATE.8 |
-| `comments.stake_at_post_time` | forward column-drop migration | DEBATE.8 |
-| §13.3 F-* inventory reconciliation — prose↔table↔disk (40 on disk / "37" prose / 36 table), `F-MOD-3` in/out, `F-DATASET-1` mint-or-strike, delete `F-COMMENT-6/7/8.md` | doc + flow-file truth-up, sequenced with DEBATE.9's friendly-fire teardown | MAINT.15 |
+| §13.3 F-* inventory — residual prose↔table gap ("37" prose / 36 table; `F-MOD-3` absent), `F-MOD-3` in/out, `F-DATASET-1` mint-or-strike | doc truth-up. The friendly-fire slice (delete `F-COMMENT-6/7/8.md` + on-disk 40→37) is **done at DEBATE.9**; this is the remainder. | MAINT.15 |
 | Spec-wide HARDEN task-ID renumber — ~30 refs across §8.10, §10, §11, §12, §17, §18, §19, §20, §21 + Appendix A still use the v7 HARDEN numbering (HARDEN.7/.10 are phantom in v11; "number-tuning" is HARDEN.5 not .6; runbook ownership is the post-launch tracker + HARDEN.4 experiment-grade subset). §23.2 above states the canonical v11 mapping; the rest of the spec lags. | propagate the §23.2 mapping spec-wide + resolve §21's "20-slot runbook inventory is the v1.0 lock surface" framing against the post-launch relocation | MAINT.16 |
 
 ### §23.4 Single source of truth

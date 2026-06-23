@@ -127,6 +127,13 @@
       "when": 1782209249382,
       "tag": "0017_drop_comments_stake_at_post_time",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782236302559,
+      "tag": "0018_drop_friendly_fire_events",
+      "breakpoints": true
     }
   ]
 }

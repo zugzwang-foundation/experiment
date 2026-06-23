@@ -22,8 +22,8 @@ if (!connectionString) {
 // for OIDs 1184/1082/1083/1114/1182/1185/1115/1231 (all date/time types)
 // to identity-parsers, so any timestamptz column read through that client
 // returns a raw text string instead of a Date. Tests that SELECT a Bucket-B
-// whitelisted timestamp via testClient (system_state.frozen_at,
-// friendly_fire_events.frozen_at, etc.) need Date semantics; routing those
+// whitelisted timestamp via testClient (system_state.frozen_at, etc.) need
+// Date semantics; routing those
 // SELECTs through a non-Drizzle-wrapped client preserves the parser path.
 //
 // max: 1 ensures all queries in a file share one connection per client —

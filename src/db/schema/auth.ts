@@ -11,7 +11,7 @@ import {
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { modActions, userEvents } from "./audit";
 import { bets, positions } from "./bets";
-import { comments, friendlyFireEvents } from "./comments";
+import { comments } from "./comments";
 import { dharmaLedger } from "./dharma";
 import { payoutEvents } from "./events";
 import { imageUploads } from "./image-uploads";
@@ -171,7 +171,6 @@ export const usersRelations = relations(users, ({ many }) => ({
 	comments: many(comments),
 	bets: many(bets),
 	positions: many(positions),
-	friendlyFireEvents: many(friendlyFireEvents),
 	dharmaLedger: many(dharmaLedger),
 	payoutEvents: many(payoutEvents),
 	modActions: many(modActions),
