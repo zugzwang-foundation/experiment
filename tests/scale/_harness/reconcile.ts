@@ -264,8 +264,8 @@ async function gatherMarketFlows(marketId: string): Promise<LedgerFlow[]> {
  *                     stakes (the hot-row identity).
  * Sells are attributed per-market via the `bet.sold` event (Amendment D). The
  * global aggregates (derivation #2) come from independent ledger/event reads.
- * Tolerant of `friendly_fire_events` / `image_uploads` existing (empty,
- * non-Dharma) — it queries only the Dharma ledger + resolution/event rows.
+ * Tolerant of `image_uploads` existing (empty, non-Dharma) — it queries
+ * only the Dharma ledger + resolution/event rows.
  */
 export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 	const marketRows = await testDb.select({ id: markets.id }).from(markets);

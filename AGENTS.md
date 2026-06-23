@@ -4,9 +4,9 @@
 >
 > **Claude Code reads this via the `@AGENTS.md` import at the top of `CLAUDE.md`** (Claude Code does not read `AGENTS.md` natively). This file is the *how* of writing code in this stack; `CLAUDE.md` is the *what cannot bend*.
 >
-> **Descriptive, not aspirational.** It documents the repo as it actually is at the current commit. Where it and a SPEC disagree, the SPEC is the *target* and this file is the *present reality* — see "Specs-ahead-of-code" below. Keep it accurate and lean; it loads in full every session alongside `CLAUDE.md`.
+> **Descriptive, not aspirational.** It documents the repo as it actually is at the current commit. Where it and a SPEC disagree, the SPEC is the *target* and this file is the *present reality* — see "Deliberate schema choices" below. Keep it accurate and lean; it loads in full every session alongside `CLAUDE.md`.
 
-**Specs-ahead-of-code (read once).** The built schema still carries pre-fold artifacts the specs have removed: `friendly_fire_events` + `stake_at_post_time` still exist (code catch-up is DEBATE.9 + DEBATE.8). Separately, `comments.bet_id` is **deliberately nullable** — INV-1 is enforced by `bets.comment_id` NOT NULL + the W-1 atomic transaction; the comment↔`bets` pair only sets the `bets.comment_id` direction at write time (Bucket-A append-only forbids a later back-fill). It is **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation). This file describes what is *on disk now*; don't "correct" the schema to the spec outside that task.
+**Deliberate schema choices (read once).** The built schema is reconciled to the specs — the DEBATE.8/9 pre-fold catch-up is complete (`comments.stake_at_post_time` dropped at DEBATE.8, `friendly_fire_events` dropped at DEBATE.9). One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** — INV-1 is enforced by `bets.comment_id` NOT NULL + the W-1 atomic transaction; the comment↔`bets` pair only sets the `bets.comment_id` direction at write time (Bucket-A append-only forbids a later back-fill). It is **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation). This file describes what is *on disk now*; don't "correct" `comments.bet_id` to the spec.
 
 ---
 
@@ -148,18 +148,17 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 21 tables live across 11 files — e.g. `bets.ts` (bets + positions), `comments.ts` (comments + `friendly_fire_events`), `events.ts` (events + resolution_events + payout_events).
+- **One file may hold several related tables.** 20 tables live across 11 files — e.g. `bets.ts` (bets + positions), `events.ts` (events + resolution_events + payout_events).
 
 ### Reply-as-bet schema reality (specs-ahead)
 
 - `bets.comment_id` — **`NOT NULL`**, FK to `comments.id` (the built half of INV-1). Indexed.
 - `comments.bet_id` — **EXISTS but NULLABLE by design**; INV-1 is enforced via `bets.comment_id` NOT NULL + the W-1 atomic transaction, not via `comments.bet_id` (the circular pair sets only the `bets.comment_id` direction at write time; Bucket-A append-only forbids a later back-fill) — **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation, DEBATE.8). Indexed (`comments_bet_id_idx`, migration 0008).
-- `friendly_fire_events` (in `comments.ts`) and `comments.stake_at_post_time` (an ADR-0009 ranking input) are **vestigial** — superseded by ADR-0017 ranking, removed in DEBATE.8/9. Don't build new logic on them.
 
 ### Append-only buckets
 
 - **Bucket A — fully append-only** (9 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events). Protected by `0003_append_only_triggers.sql`; reject UPDATE/DELETE at the storage layer.
-- **Bucket B — append-only with whitelisted column transition(s).** `friendly_fire_events` has **two** independent `NULL→timestamp` transitions (`frozen_at`, `cleared_at`), each fires once, never together. Others: identity-pool, image-uploads, system-state.
+- **Bucket B — append-only with whitelisted column transition(s)** (3 tables: identity-pool, image-uploads, system-state). Each permits a one-shot `NULL→timestamp` transition on a whitelisted column — e.g. `system_state.frozen_at` flips once then is immutable (`image_uploads` transitions `terminal_state` + `terminal_at` together). All other column changes + every DELETE are rejected at the storage layer.
 - **Bucket C — mutable** (e.g. `positions`).
 
 ### Migrations (`drizzle/migrations/`)
@@ -208,7 +207,7 @@ const placeBetSchema = z.object({
 ```
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
-├── db/            _fixtures/, identity-pool/, triggers/ (13 append-only specs, one per protected table)
+├── db/            _fixtures/, identity-pool/, triggers/ (12 append-only specs, one per protected table)
 ├── integration/   11 *.integration.test.ts (idempotency, orphan-sweep, positions, precommit-moderate, rate-limit, sign-*, upstash-lock, dharma-ledger, resolution-conservation, nightly-drift-resolution)
 ├── invariants/    9 specs — see the Invariant-tests bullet below
 ├── server/        auth/ (incl. _probe-* + admin-login-result), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/, admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks), dharma/ (non-transferable)

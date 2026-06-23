@@ -2,11 +2,9 @@ import { relations, sql } from "drizzle-orm";
 import {
 	type AnyPgColumn,
 	index,
-	pgEnum,
 	pgTable,
 	text,
 	timestamp,
-	uniqueIndex,
 	uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
@@ -16,8 +14,6 @@ import { users } from "./auth";
 import { bets } from "./bets";
 import { imageUploads } from "./image-uploads";
 import { markets } from "./markets";
-
-export const ffDirectionEnum = pgEnum("ff_direction", ["up", "down"]);
 
 // Bucket A. side_at_post_time is INV-3 (comments side-bound at post-time);
 // 3.C's append-only trigger enforces immutability.
@@ -74,41 +70,11 @@ export const comments = pgTable(
 	],
 );
 
-// Bucket B with TWO INDEPENDENT whitelisted transitions: frozen_at and
-// cleared_at each flip NULL → timestamp once, NEITHER together. 3.C's
-// trigger permits either column transitioning alone, rejects both
-// transitioning in the same UPDATE, rejects re-firing, rejects other
-// column changes.
-//
-// Ratified by SCAFFOLD.2 stratum 3.B (per session AskUserQuestion); SPEC.2
-// §5.1 row 10 + Appendix B.8 amended same-commit.
-export const friendlyFireEvents = pgTable(
-	"friendly_fire_events",
-	{
-		id: uuid("id").primaryKey().default(sql`uuidv7()`),
-		voterId: uuid("voter_id")
-			.notNull()
-			.references(() => users.id, { onDelete: "restrict" }),
-		commentId: uuid("comment_id")
-			.notNull()
-			.references(() => comments.id, { onDelete: "restrict" }),
-		direction: ffDirectionEnum("direction").notNull(),
-		clearedAt: timestamp("cleared_at", { withTimezone: true }),
-		frozenAt: timestamp("frozen_at", { withTimezone: true }),
-		createdAt: timestamp("created_at", { withTimezone: true })
-			.notNull()
-			.defaultNow(),
-	},
-	(table) => [
-		uniqueIndex("friendly_fire_unique_idx").on(table.voterId, table.commentId),
-		index("friendly_fire_ranking_idx").on(
-			table.commentId,
-			table.frozenAt,
-			table.clearedAt,
-		),
-		index("friendly_fire_voter_idx").on(table.voterId),
-	],
-);
+// friendly_fire_events (+ the ff_direction enum) was dropped at DEBATE.9
+// (migration 0018). ADR-0017's reply-as-bet model makes Support/Counter a
+// read-time aggregate over reply-bets — there is no standalone friendly-fire
+// up/down vote to store. SPEC.2 §5.5 records the removal; the comments↔bets
+// circular pair is unaffected.
 
 export const commentsRelations = relations(comments, ({ one, many }) => ({
 	user: one(users, { fields: [comments.userId], references: [users.id] }),
@@ -127,26 +93,7 @@ export const commentsRelations = relations(comments, ({ one, many }) => ({
 		references: [imageUploads.id],
 	}),
 	bet: one(bets, { fields: [comments.betId], references: [bets.id] }),
-	friendlyFireEvents: many(friendlyFireEvents),
 }));
-
-export const friendlyFireEventsRelations = relations(
-	friendlyFireEvents,
-	({ one }) => ({
-		voter: one(users, {
-			fields: [friendlyFireEvents.voterId],
-			references: [users.id],
-		}),
-		comment: one(comments, {
-			fields: [friendlyFireEvents.commentId],
-			references: [comments.id],
-		}),
-	}),
-);
 
 export const insertCommentSchema = createInsertSchema(comments);
 export const selectCommentSchema = createSelectSchema(comments);
-export const insertFriendlyFireEventSchema =
-	createInsertSchema(friendlyFireEvents);
-export const selectFriendlyFireEventSchema =
-	createSelectSchema(friendlyFireEvents);

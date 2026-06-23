@@ -17,7 +17,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
 - **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0019` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
-- **Specs-ahead-of-code:** the built schema still carries pre-fold artifacts the spec removed (detail in AGENTS.md §6). **Do not reconcile the schema to the spec outside the DEBATE.8/9 task.**
+- **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
 **Operating model.** Claude Code executes; web Claude reviews and gates decisions; Hrishikesh relays and operates the dashboards. One task per chat; a fresh session for each major phase transition (§5.8).
 

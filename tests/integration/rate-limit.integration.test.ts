@@ -136,13 +136,14 @@ afterEach(() => {
 describe("rate-limit middleware", () => {
 	// === §7.3 row 1 =========================================================
 
-	it("rate-limit::shared-budget-comments-and-friendly-fire", async () => {
-		// Two parallel checkRateLimit() calls on write-budget + write-burst;
-		// both must allow for the consumer to admit. SPEC.2 §11 names
-		// comments + friendly-fire as the two write-budget consumers; this
-		// test asserts the substrate exposes BOTH surfaces and they admit
-		// independently (no AND combinator in the middleware itself —
-		// consumers compose the AND at their boundary).
+	it("rate-limit::write-budget-and-burst-admit-independently", async () => {
+		// Two parallel checkRateLimit() calls on the write-budget (per
+		// user+market) and write-burst (per user) surfaces; both must allow
+		// for a write to admit. Asserts the substrate exposes BOTH surfaces,
+		// they admit independently — no AND combinator in the middleware,
+		// consumers compose the AND at their boundary (see the row-7 test) —
+		// and each helper emits its documented scoped identifier
+		// (user:{id}:market:{id} / user:{id}).
 		const userId = "user-123";
 		const marketId = "market-abc";
 
