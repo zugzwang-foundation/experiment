@@ -421,8 +421,8 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 
 - **Pre.** User (anonymous or authenticated) requests market detail page.
 - **System.** Two columns: YES side (left), NO side (right). Posts ordered by **Top** (per the §9 ranking model), with the latest-interleave (ADR-0017 P2) injecting the newest unshown post every `LATEST_INTERLEAVE_INTERVAL` positions. **No mode selector in v1 (ADR-0017 P3):** each dominating post wears a single lane-dominance badge (Most Debated / Highest Stakes / Contested). Under each post, the two-slot reply rule renders the best Support reply and the best Counter reply (stake-descending within side, earlier-wins on ties); a "show all replies" affordance expands each side's full stake-sorted list. Replies are flat (depth = 1 per ADR-0017). Each post renders the author's stake `a` at its header and the **Support (count) : Đ / Counter (count) : Đ** aggregate footer (read-time over reply-bets — there is no `↑ N ↓ M` vote control). Empty side renders `Be the first to argue [YES/NO]` CTA until at least one post exists (per `C8`). Track B hidden comments invisible to anonymous and authenticated non-admin users (visible to author on their own profile only).
-- **Response.** Two-column rendered list with the active mode echoed.
-- **Acceptance.** `tests/server/debate-view/sort.test.ts::top-default-order`, `tests/server/debate-view/sort.test.ts::mode-selector-switches-order`, `tests/server/debate-view/replies.test.ts::two-slot-best-support-and-counter`, `tests/server/debate-view/replies.test.ts::expansion-stake-sorted-within-side`.
+- **Response.** Two-column rendered list in **Top** order — no mode selector in v1 (ADR-0017 P3); each dominating post wears a single lane-dominance badge, and the latest-interleave (ADR-0017 P2) injects the newest unshown post every `LATEST_INTERLEAVE_INTERVAL` positions.
+- **Acceptance.** Render (DEBATE.4, forward): `tests/server/debate-view/sort.test.ts::top-default-order`, `tests/server/debate-view/sort.test.ts::lane-dominance-badge-rendered`, `tests/server/debate-view/sort.test.ts::latest-interleave-rendered`, `tests/server/debate-view/replies.test.ts::two-slot-best-support-and-counter`, `tests/server/debate-view/replies.test.ts::expansion-stake-sorted-within-side`. Ranking-logic acceptance (DEBATE.8): the `ranking::*` rows in §17 (`tests/unit/ranking/*`).
 
 ### F-DEBATE-2 — Marker computation (Flipped / Exited)
 
@@ -1084,7 +1084,8 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `comment-media::moderation-routes` | §8 F-COMMENT-3 | INV-1, INV-3 |
 | `comment-validation::length-limit` | §8 F-COMMENT-4 | — |
 | `debate-view::top-default-order` | §9 F-DEBATE-1, RANKING.md | ADR-0017 |
-| `debate-view::mode-selector-switches-order` | §9 F-DEBATE-1, RANKING.md | ADR-0017 |
+| `debate-view::lane-dominance-badge-rendered` | §9 F-DEBATE-1, RANKING.md §5 | ADR-0017 P3 |
+| `debate-view::latest-interleave-rendered` | §9 F-DEBATE-1, RANKING.md §4 | ADR-0017 P2 |
 | `debate-view::replies-two-slot-best-support-and-counter` | §9 F-DEBATE-1 | ADR-0017 |
 | `debate-view::replies-expansion-stake-sorted-within-side` | §9 F-DEBATE-1 | ADR-0017 |
 | `debate-view::support-counter-aggregate-display` | §9 (preamble) | ADR-0017 |
@@ -1103,6 +1104,13 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `ranking::mode-tiebreak-author-stake-then-recency` | §9 + RANKING.md | ADR-0017 |
 | `ranking::replies-stake-descending-within-side` | §9 + RANKING.md | ADR-0017 |
 | `ranking::replies-tie-break-earlier-wins` | §9 + RANKING.md, ADR-0016 | ADR-0017 |
+| `ranking::top-sentinel-no-competitor` | §9 + RANKING.md §3.3 | ADR-0017 |
+| `ranking::contested-zero-reply-guard` | §9 + RANKING.md §6.1 | ADR-0017 |
+| `ranking::lane-dominance-badge-highest-margin` | §9 + RANKING.md §5, ADR-0017 P3 | ADR-0017 |
+| `ranking::lane-dominance-badge-k-lane-gated` | §9 + RANKING.md §5.1 | ADR-0017 |
+| `ranking::latest-interleave-every-N` | §9 + RANKING.md §4, ADR-0017 P2 | ADR-0017 |
+| `ranking::latest-interleave-no-duplication` | §9 + RANKING.md §4.3 | ADR-0017 |
+| `ranking::profile-ordering-posts-above-replies` | §9 + RANKING.md §3.6 | ADR-0017 |
 | `economy::equal-initial-grant` | §10.1, §16.1 | ADR-0018 |
 | `economy::daily-credit-only-on-commented-bet-day` | §10.4 | ADR-0018 |
 | `economy::daily-credit-flat-non-escalating` | §10.4 | ADR-0018 |

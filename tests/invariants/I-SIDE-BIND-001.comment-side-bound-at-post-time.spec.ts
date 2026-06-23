@@ -271,7 +271,6 @@ describe("I-SIDE-BIND-001: comments side-bound at post-time across a flip", () =
 				marketId,
 				body: "frozen-side argument",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "0",
 			})
 			.returning({ id: comments.id });
 		const commentId = comment?.id ?? "";

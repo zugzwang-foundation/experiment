@@ -48,7 +48,6 @@ describe("payout_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 
@@ -123,7 +122,6 @@ describe("payout_events — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 

@@ -42,7 +42,6 @@ describe("bets — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 
@@ -95,7 +94,6 @@ describe("bets — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 

@@ -24,9 +24,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //     goes through THIS path).
 //   ::response-echoes-parent-comment-id — a reply's success response includes
 //     `parentCommentId` (F-COMMENT-2 response shape; currently omitted).
-//   ::call-a-stake-at-post-time-literal-zero — place() writes the LITERAL "0" into
-//     comments.stake_at_post_time for a reply (NOT the stake) — read the persisted
-//     row (Call A, plan §2, operator-ratified "0").
 //
 // Mirrors atomicity.test.ts: REAL place route + REAL runBetTransaction against
 // test Postgres; only externals mocked. Decimal STRINGS (CLAUDE.md §2). TRUNCATE
@@ -444,47 +441,5 @@ describe("F-COMMENT-2 — reply is a Support/Counter reply-bet", () => {
 		expect(res.status).toBe(200);
 		const payload = await res.json();
 		expect(payload.data.parentCommentId).toBe(parentCommentId);
-	});
-
-	it("call-a-stake-at-post-time-literal-zero", async () => {
-		// Call A (operator-ratified "0"): place() writes the LITERAL "0" into the
-		// vestigial comments.stake_at_post_time for a reply — NOT the stake (50).
-		// Read the persisted row.
-		const parentAuthor = await seedUser("reply-calla-parent");
-		const replier = await seedUser("reply-calla-replier");
-		const marketId = await seedOpenMarketWithPool("reply-calla-market");
-		await seedDharmaGrant(parentAuthor);
-		await seedDharmaGrant(replier);
-
-		const parentCommentId = await placeParentPost({
-			userId: parentAuthor,
-			marketId,
-			side: "YES",
-			idempotencyKey: "reply-calla-parent-key",
-		});
-
-		mockGetSession.mockResolvedValue({ user: { id: replier } });
-		const res = await placePOST(
-			placeRequest(
-				{
-					marketId,
-					side: "YES",
-					stake: REPLY_STAKE,
-					body: "call-a reply",
-					parentCommentId,
-				},
-				"reply-calla-replier-key",
-			),
-		);
-		expect(res.status).toBe(200);
-		const replyCommentId = (await res.json()).data.commentId as string;
-
-		const [replyRow] = await testDb
-			.select({ stakeAtPostTime: comments.stakeAtPostTime })
-			.from(comments)
-			.where(eq(comments.id, replyCommentId));
-		// The dead column is written the literal "0", not the 50-stake (the NUMERIC
-		// canonical form is the 18-dp zero string).
-		expect(replyRow?.stakeAtPostTime).toBe("0.000000000000000000");
 	});
 });

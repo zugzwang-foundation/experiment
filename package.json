@@ -17,6 +17,7 @@
 		"db:seed:staging": "tsx scripts/seed-staging.ts",
 		"verify:r2-scope": "tsx scripts/verify-r2-scope.ts",
 		"smoke:staging": "tsx scripts/smoke-staging.ts",
+		"verify:ranking:staging": "tsx scripts/verify-ranking-staging.ts",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/",
 		"test:scale": "vitest run --config vitest.scale.config.ts"

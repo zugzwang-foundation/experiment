@@ -120,6 +120,13 @@
       "when": 1781807918121,
       "tag": "0016_mod_actions_reason",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782209249382,
+      "tag": "0017_drop_comments_stake_at_post_time",
+      "breakpoints": true
     }
   ]
 }

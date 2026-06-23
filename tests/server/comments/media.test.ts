@@ -444,8 +444,7 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 		await seedDharmaGrant(replier);
 
 		// Seed a real depth-0 PARENT comment DIRECTLY (its own rows don't pollute
-		// counts — no bet, no event). side_at_post_time + stake_at_post_time are
-		// NOT NULL — supply both.
+		// counts — no bet, no event). side_at_post_time is NOT NULL — supply it.
 		const [parent] = await testDb
 			.insert(comments)
 			.values({
@@ -453,7 +452,6 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 				marketId,
 				body: "parent",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "0",
 				parentCommentId: null,
 				betId: null,
 			})

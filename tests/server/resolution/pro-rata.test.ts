@@ -346,7 +346,6 @@ describe("ENGINE.9 R-9.8 — pro-rata settlement basis after sells", () => {
 					marketId,
 					body: "remainder fixture",
 					sideAtPostTime: side,
-					stakeAtPostTime: "1",
 					betId: null,
 				})
 				.returning({ id: comments.id });

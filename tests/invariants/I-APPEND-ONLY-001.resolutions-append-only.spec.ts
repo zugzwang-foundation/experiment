@@ -103,7 +103,6 @@ describe("INV-4: resolutions append-only (storage-layer foundation)", () => {
 				marketId: market?.id ?? "",
 				body: "inv4",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 

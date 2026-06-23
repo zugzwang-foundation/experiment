@@ -41,7 +41,6 @@ describe("comments — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 
@@ -81,7 +80,6 @@ describe("comments — append-only trigger", () => {
 				marketId: market?.id ?? "",
 				body: "test",
 				sideAtPostTime: "YES",
-				stakeAtPostTime: "1",
 			})
 			.returning({ id: comments.id });
 

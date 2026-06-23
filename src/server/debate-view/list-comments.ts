@@ -15,9 +15,9 @@ type DebateViewReader = DbClient | DbTransaction;
  * `marker` is the LIVE overlay (recomputed per read); `sideAtPostTime` is the
  * SEPARATE frozen badge (INV-3) that never moves. The author's raw held side /
  * quantity are NOT members — they are consumed by `computeMarker` and dropped,
- * so a leak is a compile error (the exposure boundary). `betId` /
- * `stakeAtPostTime` are vestigial (ADR-0009-dead; dropped DEBATE.8/9) and
- * deliberately omitted.
+ * so a leak is a compile error (the exposure boundary). `stakeAtPostTime` was
+ * dropped at DEBATE.8 (migration 0017); `betId` is deliberately NULL (the
+ * comments↔bets circular pair, SPEC.2 §14.1) — both are absent from this DTO.
  */
 export type DebateComment = {
 	id: string;

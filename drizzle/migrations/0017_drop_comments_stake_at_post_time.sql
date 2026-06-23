@@ -1,0 +1,1 @@
+ALTER TABLE "comments" DROP COLUMN "stake_at_post_time";
