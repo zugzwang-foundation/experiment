@@ -2,6 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
+import {
+	buttonClass,
+	buttonSecondaryClass,
+	CenteredShell,
+	cardClass,
+	FormField,
+	inputClass,
+} from "@/components/internal-ui";
 import { authClient } from "@/lib/auth-client";
 
 // F-AUTH-1 + F-AUTH-2 sign-in landing per plan §4 page inventory.
@@ -9,9 +17,12 @@ import { authClient } from "@/lib/auth-client";
 // better-call enforces JSON-only on /sign-in/social and the email-OTP
 // endpoints, so native form POSTs return 415. The SDK wraps fetch with
 // the correct Content-Type and surface-specific transport (Q6: header
-// `x-turnstile-token` for the Turnstile gate, not body). Visual
-// treatment (typography, spacing, brand colors) deferred to DESIGN.1
-// + DESIGN.7 per plan §8 out-of-scope.
+// `x-turnstile-token` for the Turnstile gate, not body).
+//
+// UI.6 polish: STYLE-ONLY internal-tooling treatment via the shared
+// `@/components/internal-ui` primitives (stable shadcn semantic tokens; no
+// placeholder brand tokens). Handlers, state, form field names, and the hidden
+// turnstile-token anchor are unchanged. Final brand visuals: DESIGN.7.
 
 export default function SignInPage(): ReactElement {
 	const router = useRouter();
@@ -74,44 +85,75 @@ export default function SignInPage(): ReactElement {
 	}
 
 	return (
-		<main>
-			<h1>Sign in to Zugzwang</h1>
+		<CenteredShell>
+			<div className={`${cardClass} p-6`}>
+				<header className="mb-5">
+					<h1 className="text-xl font-semibold tracking-tight">
+						Sign in to Zugzwang
+					</h1>
+					<p className="mt-1 text-sm text-muted-foreground">
+						Continue with Google, or get a one-time code by email.
+					</p>
+				</header>
 
-			{/* F-AUTH-1 — Google OAuth. */}
-			<section>
-				<h2>Sign in with Google</h2>
+				{/* F-AUTH-1 — Google OAuth. */}
 				<form onSubmit={handleGoogle}>
-					<button type="submit" disabled={googleLoading}>
+					<button
+						type="submit"
+						disabled={googleLoading}
+						className={`${buttonSecondaryClass} w-full`}
+					>
 						{googleLoading ? "Redirecting…" : "Continue with Google"}
 					</button>
-					{googleError ? <p>{googleError}</p> : null}
+					{googleError ? (
+						<p className="mt-2 text-sm text-destructive">{googleError}</p>
+					) : null}
 				</form>
-			</section>
 
-			{/* F-AUTH-2 — Email + OTP. Hidden `turnstileToken` input retained
-			    per Plan-Q7 sub-verdict (anchor for future Cloudflare Turnstile
-			    widget mount once DESIGN.* lands). The onSubmit handler reads
-			    it from form data and passes the value as the
-			    `x-turnstile-token` HEADER on the SDK call. */}
-			<section>
-				<h2>Sign in with email</h2>
-				<form onSubmit={handleEmailOtp}>
-					<label>
-						Email:
-						<input type="email" name="email" required />
-					</label>
+				<div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
+					<span className="h-px flex-1 bg-border" />
+					or
+					<span className="h-px flex-1 bg-border" />
+				</div>
+
+				{/* F-AUTH-2 — Email + OTP. Hidden `turnstileToken` input retained
+				    per Plan-Q7 sub-verdict (anchor for the future Cloudflare
+				    Turnstile widget once DESIGN.* lands). The onSubmit handler
+				    reads it from form data and passes the value as the
+				    `x-turnstile-token` HEADER on the SDK call. */}
+				<form onSubmit={handleEmailOtp} className="space-y-4">
+					<FormField
+						label="Email"
+						htmlFor="email"
+						helper="We'll email you a one-time code to finish signing in."
+					>
+						<input
+							id="email"
+							type="email"
+							name="email"
+							required
+							placeholder="you@example.com"
+							className={inputClass}
+						/>
+					</FormField>
 					{/* TODO(DESIGN.*): Cloudflare Turnstile widget client-side. */}
 					<input
 						type="hidden"
 						name="turnstileToken"
 						value="placeholder-token"
 					/>
-					<button type="submit" disabled={emailLoading}>
+					<button
+						type="submit"
+						disabled={emailLoading}
+						className={`${buttonClass} w-full`}
+					>
 						{emailLoading ? "Sending…" : "Send code"}
 					</button>
-					{emailError ? <p>{emailError}</p> : null}
+					{emailError ? (
+						<p className="text-sm text-destructive">{emailError}</p>
+					) : null}
 				</form>
-			</section>
-		</main>
+			</div>
+		</CenteredShell>
 	);
 }

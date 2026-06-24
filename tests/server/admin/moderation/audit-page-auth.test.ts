@@ -45,8 +45,6 @@ vi.mock("@/server/admin/moderation/audit-feed", () => ({
 
 import ModerationAuditPage from "@/app/(admin)/admin/moderation/audit/page";
 
-const LOADER_SENTINEL = new Error("LOADER_REACHED");
-
 describe("moderation audit page — Layer-2 auth gate (a)", () => {
 	beforeEach(() => {
 		mockRedirect.mockClear();
@@ -67,12 +65,14 @@ describe("moderation audit page — Layer-2 auth gate (a)", () => {
 
 	it("audit-page::valid-admin-session-reaches-the-feed-loader", async () => {
 		mockValidate.mockResolvedValue({ sessionId: "admin-session-1" });
-		// Sentinel-throw at the data read proves the gate passed and the loader was
-		// reached — without evaluating the page's JSX tail.
-		mockLoadFeed.mockRejectedValue(LOADER_SENTINEL);
+		// The page degrades gracefully on a loader failure (P1 fix), so it no longer
+		// propagates loader errors. Resolve the loader and assert the gate passed and
+		// the loader was reached, with no redirect.
+		mockLoadFeed.mockResolvedValue([]);
 
-		await expect(ModerationAuditPage()).rejects.toBe(LOADER_SENTINEL);
+		const element = await ModerationAuditPage();
 
+		expect(element).toBeDefined();
 		expect(mockRedirect).not.toHaveBeenCalled();
 		expect(mockLoadFeed).toHaveBeenCalledTimes(1);
 	});

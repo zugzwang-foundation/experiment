@@ -1,3 +1,4 @@
+import { captureException } from "@sentry/nextjs";
 import Link from "next/link";
 import {
 	type LoadModerationAuditFeedOptions,
@@ -229,10 +230,48 @@ function AuditRow({
 	);
 }
 
+// Graceful-degradation panel — rendered when the feed read fails (e.g. the
+// moderation schema is behind on this environment). Never a raw 500; the
+// underlying error is sent to Sentry, NOT leaked into the page.
+function AuditUnavailable(): React.ReactElement {
+	return (
+		<main className="min-h-dvh bg-background text-foreground">
+			<div className="mx-auto max-w-5xl px-6 py-10">
+				<h1 className="text-2xl font-semibold tracking-tight">
+					Moderation · Blocked submissions
+				</h1>
+				<div
+					role="alert"
+					className="mt-6 rounded-lg border border-destructive/30 bg-destructive/5 px-5 py-6 text-sm"
+				>
+					<p className="font-semibold text-destructive">
+						Moderation audit unavailable
+					</p>
+					<p className="mt-2 text-muted-foreground">
+						The audit feed could not be loaded. The moderation tables may be out
+						of date on this environment — apply the pending database migrations,
+						then reload. If the problem persists, check the server logs (the
+						error has been reported).
+					</p>
+				</div>
+			</div>
+		</main>
+	);
+}
+
 export default async function ModerationAuditPage(): Promise<React.ReactElement> {
 	await requireAdminPage();
 
-	const rows = await loadModerationAuditFeed({ limit: ROW_LIMIT });
+	let rows: ModerationAuditRowView[];
+	try {
+		rows = await loadModerationAuditFeed({ limit: ROW_LIMIT });
+	} catch (err) {
+		// Read failure (e.g. a missing-column 42703 when a migration is behind) must
+		// degrade to a clear admin panel, not a raw 500. requireAdminPage() is above
+		// the try so its redirect still propagates.
+		captureException(err);
+		return <AuditUnavailable />;
+	}
 
 	return (
 		<main className="min-h-dvh bg-background text-foreground">
