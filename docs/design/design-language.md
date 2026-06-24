@@ -1,7 +1,7 @@
 # Zugzwang — Design Language (high-fidelity monochrome)
 
 > **Doc:** `docs/design/design-language.md`
-> **Status:** v0.2-draft · precursor · living document
+> **Status:** v0.3-draft · precursor · living document
 > **Phase:** experiment-phase VISUAL stratum
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
@@ -65,16 +65,18 @@ Locked token *names* + their semantic role. **Values are blank** — designed by
 
 ### §2.1 Colour — three roles
 
-Colour carries exactly three roles. Only the **side** role has locked values (black / white); the rest are designed in Claude Design.
+Colour carries exactly three roles. The **side** poles and the **neutral ramp** now carry landed OKLCH values (minted at SHELL/UI.0 — see the provenance note below); only the **accent** remains deferred to the brand pass (Claude Code).
 
 | Role | Token | Value | Notes |
 |---|---|---|---|
-| Side — Support/YES | `color.side.support` | **black (locked)** | One pole. Permanent, semantic. |
-| Side — Counter/NO | `color.side.counter` | **white (locked)** | The other pole. Permanent, semantic. |
-| Neutral ramp | `color.neutral.0 … color.neutral.N` | *(blank — CD)* | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. True-neutral greys only — no warm cast (§1.9). |
+| Side — YES (Support pole) | `color.side.support` | **black — `oklch(0.145 0 0)` (landed)** | One pole. Permanent, semantic. Bound to the **YES side**, not the Support/Counter relation (see provenance). |
+| Side — NO (Counter pole) | `color.side.counter` | **white — `oklch(1 0 0)` (landed)** | The other pole. Permanent, semantic. Bound to the **NO side**. |
+| Neutral ramp | `color.neutral.0 … color.neutral.8` | **landed — 9-step true-neutral ramp** | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. True-neutral greys only — no warm cast (§1.9). |
 | Accent | `color.accent.*` | *(deferred — CC)* | One brand accent. Applied in code at the brand pass, into a defined slice of the neutral ramp. Never used in CD. |
 
-*The number of neutral steps, their exact greys, and which steps the accent later replaces are designed in CD / decided at the brand pass.*
+*The accent still chooses which neutral steps it later replaces at the brand pass; the ramp's step count and greys are now landed (below).*
+
+**Provenance — SHELL/UI.0 token mint (the DESIGN.7 mint).** The values above are minted in `src/app/globals.css` as the locked v1.0 monochrome system. The neutral ramp is `--color-n0 … --color-n7` + `--color-ink` (9 true-neutral greys, chroma 0 — the Tailwind-neutral OKLCH equivalents of the design hex, verified by deterministic conversion): `n0 oklch(1 0 0)` · `n1 oklch(0.971 0 0)` · `n2 oklch(0.922 0 0)` · `n3 oklch(0.871 0 0)` · `n4 oklch(0.708 0 0)` · `n5 oklch(0.556 0 0)` · `n6 oklch(0.371 0 0)` · `n7 oklch(0.205 0 0)` · `ink oklch(0.145 0 0)`. The side poles are `--color-yes oklch(0.145 0 0)` (YES = black = ink) and `--color-no oklch(1 0 0)` (NO = white = n0). The code comments name the **SIDE** (YES/NO) and explicitly disavow the Support/Counter relation (`NOT Support`) — Support/Counter is a read-time stance toward a parent, not a colour pole. The `--color-accent` token is deliberately absent (the brand pass mints it). The shadcn semantic `:root` ramp resolves to these same greys (intentional duplication: `--color-n*` is the design-system vocabulary, the semantic tokens the shadcn-consumed one).
 
 ### §2.2 Typography
 
@@ -249,6 +251,7 @@ Scheduled, not excluded. These run after the five monochrome surfaces are design
 ---
 
 > **Changelog.**
+> **v0.3-draft (2026-06-24):** §2.1 token values landed — the neutral ramp (`color.neutral.0 … 8`) and the two side poles now carry minted OKLCH values, replacing the `*(blank — CD)*` placeholders, with a SHELL/UI.0 provenance note pointing at `src/app/globals.css`. The side rows are clarified to bind the **YES/NO side** (not the Support/Counter relation), matching §3.1's side-badge rule. The accent remains deferred. No §1 constraint or §4 state-shape rule changed. Source: SHELL/UI.0 token mint (the DESIGN.7 mint), 2026-06-24.
 > **v0.2-draft (2026-06-04):** added §1.9 (Claude Design house style banned by name, each element paired with its neutral replacement) and §1.10 (exact values, never adjectives — vague-descriptor specs banned); added §4.9 (interactive states are part of the primitive) and §4.10 (loading/empty/error ship with the surface); propagated §1.9 cross-notes into §2.1 (true-neutral ramp), §2.2 (one neutral sans family this phase), §2.3 (radius small-or-zero; neutral shadows); clarified §1.3's rendering-decision anchor from "DESIGN.1" to "the look-anchor slot (Slot 1 / tracker DESIGN.3)"; grounding line now cites `Research_Report_v2.md`. Source: Claude Design high-fidelity research, 2026-06-04.
 > **v0-draft:** initial authoring (visual-backbone thread).
 

@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 
 export default function Scaffold1SmokePage() {
 	return (
-		<main className="min-h-screen bg-yes/50 p-8 font-mono">
+		<main className="min-h-screen bg-muted p-8 font-mono">
 			<h1 className="text-3xl font-bold tracking-tight">SCAFFOLD.1 smoke</h1>
 			<p className="mt-4 text-sm">
 				Verifies Tailwind v4 + shadcn/ui + Geist font pipeline. Lives under the{" "}
