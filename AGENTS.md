@@ -67,9 +67,10 @@ experiment/
 │   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages)
 │   │   ├── (auth)/                 # onboarding, sign-in, sign-in/otp
 │   │   ├── (dev)/                  # scaffold smoke page
+│   │   ├── (public)/               # participant shell (SHELL/UI.0): layout.tsx placeholder shell + m/[slug] market scaffold
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets}, health, uploads/sign
 │   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/ui/              # shadcn primitives (button.tsx …)
+│   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   12 files: _enums, audit, auth, bets, comments, dharma,
@@ -92,7 +93,7 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/`, `src/server/identity/` (the built dir is `identity-pool/`), and `src/app/(public)/` (the market-list/detail/debate route group). These arrive in the ENGINE / DEBATE / UI phases. (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14.)
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/` and `src/server/identity/` (the built dir is `identity-pool/`). These arrive in the DEBATE / later phases. The `src/app/(public)/` participant route group now EXISTS — its shell (`layout.tsx`) + the `/m/[slug]` market scaffold landed at SHELL/UI.0; the market-list / debate-view surfaces under it are still to come (DEBATE.4 / DESIGN.* / UI.*). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
@@ -194,7 +195,7 @@ const placeBetSchema = z.object({
 
 - **CSS-first config** in `src/app/globals.css`: `@import "tailwindcss"`, `tw-animate-css`, `shadcn/tailwind.css`, then `@custom-variant dark`. **`postcss.config.mjs`** loads `@tailwindcss/postcss` (Next.js needs it).
 - **OKLCH only** in `@theme` — no hex/HSL/RGB (perceptually uniform; opacity like `bg-yes/50` behaves). Defining `--color-yes` auto-generates `bg-yes`, `text-yes`, etc.
-- **Tokens are PLACEHOLDER.** The `@theme` block (`--color-yes/no/brand`, `--font-sans/mono` → Geist) is a SCAFFOLD.1 placeholder per SPEC.2 §22.2; DESIGN.1 mints real values and DESIGN.7 back-applies. **Do not consume brand tokens in business logic until DESIGN.7 lands.**
+- **Tokens are MINTED (monochrome v1.0).** The `@theme` block in `globals.css` carries the locked monochrome system minted at SHELL/UI.0 (the DESIGN.7 mint): a true-neutral grey ramp `--color-n0 … --color-n7` + `--color-ink` (chroma 0; generates `bg-n*`/`text-n*`) and the two side poles `--color-yes` = `oklch(0.145 0 0)` (YES side = black) / `--color-no` = `oklch(1 0 0)` (NO side = white). The poles name the **SIDE** (YES/NO), never the Support/Counter relation. `--color-brand` is gone (the accent is deferred to the brand pass — minted in code then, design-language §1.5/§7). `--font-sans/mono` stay → Geist (the CD-deferred neutral-sans placeholder). The shadcn semantic `:root` ramp resolves to the same greys (intentional duplication; design-language §2.1). Still OKLCH-only in `@theme`. `--imgr` (image radius) is a flagged CD-deferred placeholder.
 - shadcn primitives carry `data-slot`; use the current variant, don't mix older styles; `Sonner` for toasts.
 - **Accessibility:** `aria-label` on icon-only buttons and YES/NO toggles; Tab-reachable; focus-trap via shadcn `Dialog`; `aria-live="polite"` for price/status; pair colour with icon/text. *(No axe/Playwright accessibility project is installed yet — manual review for now.)*
 

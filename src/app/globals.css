@@ -117,17 +117,45 @@
 }
 
 /*
- * AGENTS.md §8 placeholder tokens — Zugzwang brand surface.
- * SCAFFOLD.1 ships PLACEHOLDER OKLCH color values + Geist font-var mappings
- * per SPEC.2 §22.2 design-independence carve-out. DESIGN.1 mints real values;
- * DESIGN.7 back-applies. Do not consume in business logic until DESIGN.7 lands.
+ * Zugzwang monochrome design tokens — minted at SHELL/UI.0 (the DESIGN.7
+ * token mint). The locked v1.0 system (design-language §1.2/§2.1) is
+ * monochrome: a true-neutral grey ramp (chroma 0) + the two side poles.
+ * OKLCH only (AGENTS.md §8). These are the real design-system values, not a
+ * placeholder. Provenance: docs/design/design-language.md §2.1.
  */
 @theme {
-	--color-yes: oklch(0.65 0.18 145);
-	--color-no: oklch(0.65 0.18 25);
-	--color-brand: oklch(0.55 0.2 270);
+	/* Neutral ramp — Tailwind-neutral OKLCH equivalents of the design-language
+	 * hex (deterministic conversion; pure greys -> chroma 0). Generates the
+	 * bg-n, text-n, border-n utilities. The shadcn semantic :root ramp below
+	 * already resolves to these same greys (intentional duplication: --color-n*
+	 * is the design-system vocabulary, the semantic tokens the shadcn one). */
+	--color-n0: oklch(1 0 0);
+	--color-n1: oklch(0.971 0 0);
+	--color-n2: oklch(0.922 0 0);
+	--color-n3: oklch(0.871 0 0);
+	--color-n4: oklch(0.708 0 0);
+	--color-n5: oklch(0.556 0 0);
+	--color-n6: oklch(0.371 0 0);
+	--color-n7: oklch(0.205 0 0);
+	--color-ink: oklch(0.145 0 0);
+	/* YES side = black — frozen post-side; NOT Support (design-language §1.3/§2.1) */
+	--color-yes: oklch(0.145 0 0);
+	/* NO side = white */
+	--color-no: oklch(1 0 0);
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
+}
+
+/*
+ * SHELL/UI.0 raw custom properties — NOT utility-generating; consumed directly
+ * via var() by participant surfaces. The --color-n* ramp above is emitted to
+ * :root by @theme, so var(--color-n2) resolves here. This block does NOT edit
+ * the shadcn semantic :root ramp above.
+ */
+:root {
+	--hairline: 1px solid var(--color-n2);
+	--imgmax: 160px; /* tunable — comment-image max (consumed by DEBATE.4) */
+	--imgr: 6px; /* image corner radius — CD-DEFERRED placeholder; finalized at the branding pass */
 }
 
 @layer base {
