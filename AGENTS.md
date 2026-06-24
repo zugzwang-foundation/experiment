@@ -151,7 +151,7 @@ const placeBetSchema = z.object({
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
 - **One file may hold several related tables.** 20 tables live across 11 files — e.g. `bets.ts` (bets + positions), `events.ts` (events + resolution_events + payout_events).
 
-### Reply-as-bet schema reality (specs-ahead)
+### Reply-as-bet schema reality
 
 - `bets.comment_id` — **`NOT NULL`**, FK to `comments.id` (the built half of INV-1). Indexed.
 - `comments.bet_id` — **EXISTS but NULLABLE by design**; INV-1 is enforced via `bets.comment_id` NOT NULL + the W-1 atomic transaction, not via `comments.bet_id` (the circular pair sets only the `bets.comment_id` direction at write time; Bucket-A append-only forbids a later back-fill) — **not** a pending NOT-NULL migration (ADR-0017 ranking reconciliation, DEBATE.8). Indexed (`comments_bet_id_idx`, migration 0008).

@@ -45,3 +45,19 @@ Post-merge close-out of **#157**: after squash-merge, run the tree-content proof
 ## Time
 
 2026-06-23 (evening session).
+
+---
+
+## Post-merge close-out (2026-06-24)
+
+**Merged.** #157 → squash `c5b0410`; #158 → squash `9332562` (current `main` HEAD).
+
+**1. Tree-content proof + branch cleanup.** `git diff c5b0410 0d1c36a` = **0 lines** (the #157 squash tree is byte-identical to the work-branch tip); `git diff 9332562 010646f -- docs/logs/DEBATE.9.md` = **0 lines** (#158 log identical). Guard greps on main all ✓ (0018 present, "Deliberate schema choices" in both contract files, test renamed, FF spec gone, F-COMMENT-6/7/8 gone, 37 flow files). Gated on those zero-diffs, deleted `chore/debate-9-friendly-fire-drop` + `chore/debate-9-session-log` locally; both confirmed already gone from remote (auto-deleted).
+
+**2. Staging drift — NOT yet cleared; operator redeploy pending.** DB head == main bundled journal head == `1782236302559` (both at 0018); `friendly_fire_events` is dropped on the staging DB. But `/api/health` still returns `migrations:"drift"` because the **staging Vercel deployment last ran 2026-06-22 (pre-#157)** and staging does **not** auto-deploy (runbook §5: "treat auto-redeploy as not firing" — a manual ⌨️/🧑 step). The drift is therefore purely a stale-deploy artifact, **guaranteed to flip to `"ok"` on the next staging redeploy** — no schema/code action remains. **Operator action: redeploy staging (runbook §5), then `curl …/api/health` → `migrations:"ok"`.**
+
+**3. Test-count arithmetic (re-derived from disk).** Fresh `pnpm vitest run` on main = **999 passed** (1006 total, 144 files). Deleted FF trigger spec = **10** `it()` cases (DB-backed, previously passing). Edited specs unchanged (`bets/concurrency` 12→12, `markets/concurrency` 2→2, `rate-limit` 8→8) — the stripped lock-order assertion removed `expect()`s inside a surviving test, **0** test-count effect. Whole-tree static decl count `872 → 862` (−10); test-file count `153 → 152` (−1). **`999 = 1009 (DEBATE.8 baseline) − 10` — no collateral test loss.**
+
+**4. Framing fixes (this doc-tidy PR, §D residuals resolved).** AGENTS.md heading `### Reply-as-bet schema reality (specs-ahead)` → `### Reply-as-bet schema reality`; SPEC.2 §23.3 carry-forward intro rewritten to "tracker-sequenced reconciliation" (schema-artifact drops all settled).
+
+**Next frontier.** DEBATE.9 closes the **last friendly-fire vestige** — no pre-fold artifacts remain on disk (the DEBATE.8/9 schema catch-up is complete). DEBATE.4 (debate-view) is unblocked on the **backend** side; it remains **gated on DESIGN.5**.

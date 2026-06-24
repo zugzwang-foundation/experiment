@@ -2339,7 +2339,7 @@ The PRECURSOR.4 lock review and this tracker sweep close the §23.3 drifts the S
 - `comments.stake_at_post_time` — dropped at **DEBATE.8** (migration 0017). *(Carry-forward row cleared.)*
 - `comments.bet_id` — settled at **DEBATE.8** as **deliberately nullable**, not a pending NOT-NULL migration (INV-1 via `bets.comment_id` NOT NULL + W-1 atomicity; §5.1, §14.1); the comment-without-bet path was reworked to bet-borne at DEBATE.2. The "nullable → NOT NULL" framing in the carry-forward row is superseded. *(Row cleared.)*
 
-**Carry-forwards (specs-ahead-of-code; tracker-sequenced engineering, not this pass).** The v1.0 schema still carries artifacts the specs now omit; the drops are sequenced work:
+**Carry-forwards (tracker-sequenced reconciliation, not this pass).** The schema-artifact drops are complete (see Resolved above) — `friendly_fire_events`, `comments.stake_at_post_time`, and the `comments.bet_id` framing are all settled. What remains is documentation and tracker reconciliation:
 
 | Item | Drop / change | Tracker home |
 |---|---|---|
