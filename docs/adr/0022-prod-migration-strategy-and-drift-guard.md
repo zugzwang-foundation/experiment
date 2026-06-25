@@ -8,7 +8,7 @@
 | **Tracker task** | Staging-provisioning prep, work item #2 (2026-06-20) |
 | **Frame document** | AGENTS.md §6 (Migrations), CLAUDE.md §5.13 Gotchas (drizzle-kit / pg_cron / migrations) |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0024 (scoped: the `/api/health` drift-comparison method + the "health route reads only its two named env vars" line; ADR-0022's prod-apply path and its `db:check-drift` timestamp+count method stand) |
 
 ---
 
