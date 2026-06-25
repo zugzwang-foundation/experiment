@@ -1,25 +1,138 @@
-import { describe, expect, it } from "vitest";
+import { readMigrationFiles } from "drizzle-orm/migrator";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import {
-	dbMigrationHeadMillis,
-	journalHead,
-	migrationDriftStatus,
-} from "@/server/health/migration-drift";
-import { testDb } from "../db/_fixtures/db";
+import { migrationDriftStatus } from "@/server/health/migration-drift";
 
-// MIGRATE-DRIFT §7 — real-DB coverage for the migration drift guard. The test
-// Postgres is migrated to the journal head by CI (and locally by the operator),
-// so the guard must report "ok". This is the path the /api/health drift field
-// runs in production; if it ever reported "drift" here it would mean the test
-// DB is behind the code's journal — which is itself the exact signal the guard
-// exists to surface.
+import { testClient, testDb } from "../db/_fixtures/db";
 
-describe("migration drift guard (real DB)", () => {
-	it("reports 'ok' when the connected DB is at the journal head", async () => {
+// D1 Change #2 (ADR-0024 §Decision Outcome #6) — RED-first guard for the
+// PER-HASH migration-drift detector on `/api/health`.
+//
+// WHAT THIS GUARDS: `migrationDriftStatus(db)` must report "drift" when an
+// APPLIED migration's content has silently diverged from the committed journal
+// — the exact failure drizzle-orm #5769 documents ("migrate exits 0 while a
+// migration is skipped/divergent"). The OLD detector compared only the head's
+// `created_at` TIMESTAMP, so a same-timestamp content divergence read "ok" and
+// the rewrite to a per-hash multiset compare closes that hole. Scenario (b)
+// below is the regression assertion: it FAILS against the current timestamp
+// detector (head `created_at` is untouched) and passes once the per-hash
+// rewrite lands. Signature is UNCHANGED by the rewrite — this file imports ONLY
+// the one public function `migrationDriftStatus` (the rewrite DELETES the old
+// `journalHead` / `dbMigrationHeadMillis` exports, so they are not imported).
+//
+// WHY THE SEED USES `readMigrationFiles` (unstripped) HASHES, NOT THE RAW
+// MIGRATED STATE: CI strips `pg_cron` from `*pg_cron*.sql` (migrations
+// 0007/0011) before applying, so in CI the test DB's APPLIED hashes for those
+// two rows are STRIPPED-file hashes — which never equal the committed/unstripped
+// file hashes. A per-hash assertion against the raw migrated state therefore
+// false-positives to "drift" in CI. The detector is correct to do this: it runs
+// only in deployed (pg_cron-present, unstripped) environments, never in CI
+// (ADR-0024 #6). So every scenario WIPES and RE-SEEDS `drizzle.__drizzle_
+// migrations` with the unstripped `readMigrationFiles` hash set first —
+// reproducing the real deployed condition deterministically, independent of how
+// the harness DB was migrated. `readMigrationFiles` is the same function the
+// detector and `scripts/migrate-prod.ts` use (identical sha256 + ordering to
+// what `__drizzle_migrations` stores).
+//
+// The fixture mutates the SHARED test DB's `drizzle.__drizzle_migrations`
+// (which lives in the `drizzle` schema and is NOT guarded by the public
+// Bucket-A append-only triggers — legitimate fixture bypass, SPEC.2 §6.6).
+// beforeAll snapshots the real rows; afterAll restores them so the table is
+// left pristine for the rest of the suite.
+
+type AppliedRow = { id: number; hash: string; created_at: string };
+
+// The committed (unstripped) journal hash set, computed independently in the
+// test — the same source the detector compares against. `folderMillis` is the
+// value drizzle stores as `__drizzle_migrations.created_at`.
+const journalMigrations = readMigrationFiles({
+	migrationsFolder: "drizzle/migrations",
+});
+
+// Snapshot of the real applied rows, captured before any mutation.
+let snapshot: AppliedRow[] = [];
+
+// Re-seed `__drizzle_migrations` to the IN-SYNC, unstripped baseline: one row
+// per committed migration, hashes from `readMigrationFiles`, in folderMillis
+// order. Reproduces the real deployed condition (pg_cron present → unstripped).
+async function seedInSync(): Promise<void> {
+	const ordered = [...journalMigrations].sort(
+		(a, b) => a.folderMillis - b.folderMillis,
+	);
+	await testClient.unsafe("delete from drizzle.__drizzle_migrations");
+	for (const m of ordered) {
+		await testClient`
+			insert into drizzle.__drizzle_migrations (hash, created_at)
+			values (${m.hash}, ${m.folderMillis})
+		`;
+	}
+}
+
+// The head migration's `created_at` (= max folderMillis) — the row both the old
+// timestamp detector and the new per-hash detector treat as the chain tip.
+const headMillis = journalMigrations.reduce(
+	(max, m) => (m.folderMillis > max ? m.folderMillis : max),
+	0,
+);
+
+describe("migration drift guard — per-hash on /api/health (D1 #2)", () => {
+	beforeAll(async () => {
+		snapshot = (await testClient.unsafe(
+			"select id, hash, created_at::text as created_at from drizzle.__drizzle_migrations order by id",
+		)) as unknown as AppliedRow[];
+	});
+
+	afterAll(async () => {
+		// Restore the real applied rows so the shared table is left pristine.
+		// id is re-generated by the serial default; hash + created_at preserved.
+		// created_at is a Postgres bigint but every real folderMillis (epoch-ms)
+		// is far below Number.MAX_SAFE_INTEGER, so a JS number round-trips exact —
+		// matching the numeric folderMillis the in-sync seed already inserts.
+		await testClient.unsafe("delete from drizzle.__drizzle_migrations");
+		for (const row of snapshot) {
+			await testClient`
+				insert into drizzle.__drizzle_migrations (hash, created_at)
+				values (${row.hash}, ${Number(row.created_at)})
+			`;
+		}
+	});
+
+	// Each test sets ABSOLUTE state (re-seeds from scratch) — never depends on a
+	// previous test's leftover. afterEach restores the in-sync baseline so a
+	// throwing test cannot poison the next one before afterAll runs.
+	afterEach(async () => {
+		await seedInSync();
+	});
+
+	it("reports 'ok' when applied hashes match the journal multiset (in-sync)", async () => {
+		await seedInSync();
+
 		expect(await migrationDriftStatus(testDb)).toBe("ok");
 	});
 
-	it("DB head millis equals the journal head 'when'", async () => {
-		expect(await dbMigrationHeadMillis(testDb)).toBe(journalHead().when);
+	// THE RED ASSERTION (drizzle-orm #5769): a single applied migration's hash is
+	// corrupted while its created_at (and the row count, and the head timestamp)
+	// stay identical. The OLD timestamp detector reads head created_at, sees it
+	// unchanged, and returns "ok" — i.e. this `it` FAILS against the current
+	// implementation. The per-hash rewrite detects the multiset divergence and
+	// returns "drift", turning it green. This is the regression the rewrite closes.
+	it("reports 'drift' on a planted head-hash mismatch (created_at untouched) [RED until per-hash lands]", async () => {
+		await seedInSync();
+		await testClient`
+			update drizzle.__drizzle_migrations
+			set hash = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef'
+			where created_at = ${headMillis}
+		`;
+
+		expect(await migrationDriftStatus(testDb)).toBe("drift");
+	});
+
+	it("reports 'drift' when the DB is behind the journal (head row deleted)", async () => {
+		await seedInSync();
+		await testClient`
+			delete from drizzle.__drizzle_migrations where created_at = ${headMillis}
+		`;
+
+		expect(await migrationDriftStatus(testDb)).toBe("drift");
 	});
 });

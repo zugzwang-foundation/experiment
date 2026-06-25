@@ -28,6 +28,17 @@ const nextConfig: NextConfig = {
 		// prod / staging / preview.
 		ZUGZWANG_ENV: process.env.ZUGZWANG_ENV ?? "unknown",
 	},
+	// D1 / ADR-0024 §Decision Outcome #6: the per-hash drift check on
+	// `/api/health` calls `readMigrationFiles("drizzle/migrations")`, which reads
+	// the journal + every `.sql` from disk at runtime via a runtime-computed
+	// path. @vercel/nft cannot trace that path, so without this the migration
+	// files are absent from the route's Lambda and the detector returns "error"
+	// in every deployed env. This forces them into the route's traced bundle —
+	// it IMPLEMENTS ADR-0024's mandated mechanism (readMigrationFiles unchanged),
+	// it does not change it.
+	outputFileTracingIncludes: {
+		"/api/health": ["./drizzle/migrations/**/*"],
+	},
 };
 
 // `withSentryConfig` wraps the Next.js config with Sentry's build-time
