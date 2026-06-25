@@ -2256,7 +2256,7 @@ Three properties locked at the ADR file shape:
 
 | Concern | Source-of-truth file |
 |---|---|
-| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (22 ADRs (21 ADR files + ADR-0012 in-flight); 19 accepted + 2 superseded + 1 in-flight; files committed at SYNC.BACKFILL) |
+| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (22 ADRs — 21 ADR files + ADR-0012 in-flight; 19 accepted + 2 superseded + 1 in-flight; files committed at SYNC.BACKFILL) |
 | ADR file template | `docs/adr/_template.md` |
 | Index + status flips | §22.1 (this section) |
 | In-flight carve-out | §22.2 (this section) |
