@@ -83,17 +83,59 @@ Full reset (only if the sandbox is wedged): drop the staging schema → re-run `
 
 ---
 
-## 3. Production — migrate-before-serve  *(PLACEHOLDER — web-authored, to be finalized at D5)*
+## 3. Production — migrate-before-serve
 
-> ⚠️ **STUB — NOT YET OPERATIONAL. Do not promote to production from this section.** The prescriptive prod-promote sequence (the exact operator steps, the per-hash go/no-go wording, the rollback) is **authored by web-Claude and finalized at D5**. It is intentionally left as a pointer here so this runbook does not fabricate an irreversible-action procedure ahead of its ratification.
+> **STATUS: DRAFT — finalize at D5.** This sequence is **not yet exercised**. As of D3, production is *gated* (auto-assign-domains OFF — Vercel shows *"Production deployments will need to be manually promoted"*), but the first real prod migrate + promote happens at **D5**. The staging-auto-deploy mechanics in §2 are live; this prod path is the deliberate, single human checkpoint that reaches production. **Governed by [ADR-0024](../adr/0024-deploy-pipeline-migration-sequencing.md) item 5 (inheriting [ADR-0022](../adr/0022-prod-migration-strategy-and-drift-guard.md)'s apply path); do not weaken.**
 
-The **decided** shape (ADR-0024 **item 5**, inheriting ADR-0022's apply path) is:
+### Why this exists (the load-bearing reason — read before executing)
 
-> merge → staged build (auto-serve **disabled**, so `main` does not auto-promote) → **gated-manual** `doppler run --config prd -- pnpm db:migrate:prod` (ADR-0022: per-migration-transaction, `DATABASE_URL_PROD` + `PROD_PROJECT_REF_FRAGMENT` guard) → verify the **staged build's** `/api/health` reports `migrations:"ok"` against the now-migrated prod DB → **promote**.
+The ledger is append-only and frozen-at-resolution. Production must **never** serve new code against an un-migrated database — there is no acceptable window where the app writes the ledger through a schema the DB hasn't applied. So production is **migrate-before-serve**: the database is migrated and *objectively verified* **before** the new build is allowed to take the `zugzwangworld.com` alias. The `drizzle-kit migrate` exit code is **not trusted** (drizzle-orm #5769 — a silent high-water-mark skip can exit `0` with a migration unapplied); the **per-hash `/api/health` result on the staged build is the only promote authority**. No `migrations:"ok"`, no promote.
 
-The prod migrate + promote is the **single execution-time human checkpoint** (ADR-0024 driver 3 — no reviewer-gated GHA self-approval). Migrate exit codes are **not** trusted (#5769); the per-hash `/api/health` result is the promote authority — **no promote without per-hash `ok`**. Every promote records SHA / who / when / the per-hash result (ADR-0024 item 10).
+### Preconditions (one-time D5 pre-flight — verify before the first promote)
 
-**Until D5 finalizes this section, see [ADR-0024 item 5](../adr/0024-deploy-pipeline-migration-sequencing.md) and [ADR-0022](../adr/0022-prod-migration-strategy-and-drift-guard.md) as the source of truth.**
+- **Auto-assign OFF.** Production → Branch Tracking → "Auto-assign Custom Production Domains" = **Disabled** (set in D3; confirm still off).
+- **Prod env vars populated** in Doppler `prd` (→ synced to Vercel Production): `DATABASE_URL_PROD`, `PROD_PROJECT_REF_FRAGMENT`. *(D1 flagged both as not-yet-verified — confirm present before D5; the migrate guard refuses without them.)*
+- **`Doppler prd → Vercel Production` sync = In Sync** (1 active).
+- **Every pending schema change is expand/contract** (additive-then-cleanup). During a promote the old and new builds briefly coexist (a Vercel alias swap is not atomic across running function instances), so the currently-serving code must tolerate the new schema. No destructive rewrite a live build can't survive.
+- **Config name is `prd`, never `production`.** Migrations run over the session pooler `:5432`.
+
+### The promote sequence (the single execution-time human checkpoint)
+
+1. **Merge to `main`.** With auto-assign OFF, this creates a **staged** production build that does **not** serve `zugzwangworld.com`. Record the merged SHA («PROMOTE-SHA»).
+2. **Wait for the staged build to reach Ready** in Vercel. Note its unique deployment URL (`<staged-url>`). The live alias is still serving the *previous* deployment — untouched.
+3. **Gated-manual prod migrate** (ADR-0022 apply path — *not re-specified here; see ADR-0022*):
+```
+   doppler run --config prd -- pnpm db:migrate:prod
+```
+   Runs `scripts/migrate-prod.ts`: per-migration-transaction (avoids the enum-add→use 55P04 case), guarded by `DATABASE_URL_PROD` + `PROD_PROJECT_REF_FRAGMENT`, session pooler `:5432`. **The exit code is NOT the gate** (#5769) — step 4 is.
+4. **THE GATE — verify on the STAGED BUILD, not the live alias yet:**
+```
+   curl https://<staged-url>/api/health
+```
+   **Require ALL of:**
+   - `migrations:"ok"` — per-hash: the applied-hash multiset equals the journal-hash multiset, against the **now-migrated prod DB**.
+   - `canary == «PROMOTE-SHA»` — proves the staged build is the commit you just merged (canary is `VERCEL_GIT_COMMIT_SHA`).
+   - `db:"ok"`, `status:"ok"`.
+   **If `migrations` is anything but `"ok"` → STOP. Do not promote.** A failed or forgotten migrate cannot reach users; the live alias keeps serving the prior build. Investigate, fix, re-run from step 3.
+5. **Promote the staged build to production** (manual alias swap — instant, byte-identical, no rebuild):
+   - **[VERIFY THE EXACT CONTROL AT D5 EXECUTION — Vercel UI shifts.]** Mechanism is one of: the **"Promote to Production"** action on the staged deployment in the Vercel dashboard, or `vercel promote <staged-url>` via CLI. Confirm the current path against Vercel docs at D5 rather than trusting this line.
+6. **Verify live:**
+```
+   curl https://zugzwangworld.com/api/health
+```
+   Require `migrations:"ok"`, `canary == «PROMOTE-SHA»`, serving `200`. The live alias now points at the migrated build.
+7. **Promotion note (the log — ADR-0024 item 10).** Record: «PROMOTE-SHA» · who · when (UTC) · the per-hash `/api/health` result. GitHub deployment history is the rest of the log. Native Doppler↔Vercel sync is the documented escalation only — not built.
+
+### Rollback
+
+- **Migrate failed / health not `ok` (pre-promote):** do **not** promote. The prior deployment keeps serving, untouched. Fix the migrate; re-run from step 3. Nothing reached users.
+- **Regression discovered after promote (post-serve):** re-promote the prior known-good deployment (instant alias swap, no rebuild). **Caveat:** a schema rolled *forward* is **not** auto-rolled-back — expand/contract is precisely what lets the prior code tolerate the already-applied schema. A destructive schema change is *not* safely reversible by alias swap, which is why every migration is additive-then-cleanup.
+
+### NOT part of this path
+
+- No reviewer-gated GHA migrate job — the prod write is a deliberate manual action by design (solo operator; a reviewer gate would be self-approval theatre — ADR-0024 driver 3).
+- No migrate inside the Vercel `buildCommand` (stays plain `next build`; builds run repeatedly and can't gate prod).
+- No Supabase branching; no auto-promote on merge.
 
 ---
 
@@ -107,4 +149,4 @@ The deploy tooling predates ADR-0024 item 7's bare-SHA canary and carries stale 
 
 ---
 
-*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored placeholder finalized at D5. Maintained per `docs/maintenance.md`.*
+*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored DRAFT finalized at D5. Maintained per `docs/maintenance.md`.*
