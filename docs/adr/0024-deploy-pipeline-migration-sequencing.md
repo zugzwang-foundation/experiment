@@ -156,3 +156,17 @@ This ADR does **not** decide:
 ---
 
 *ADR-0024 ratifies the Experiment-phase deploy pipeline built **around** ADR-0022's primitives: a resettable `staging`-branch sandbox (own Supabase project, seed data, GHA-auto-migrated on push) plus a deliberate staged-production-promote on `main` (auto-assign-domains disabled; merge → staged build → gated-manual `db:migrate:prod` per ADR-0022 → verify the staged build's `/api/health` reports per-hash `migrations: ok` → promote), both environments running the same committed Drizzle migration set with no Supabase branching. It **inherits** ADR-0022's prod-apply path and `check-drift` timestamp+count method unchanged, and **partially supersedes** ADR-0022 only on the `/api/health` surface — rewriting its drift check to per-hash (`readMigrationFiles` vs `__drizzle_migrations`) and its canary to `VERCEL_GIT_COMMIT_SHA`. Per-hash is confined to `/api/health` precisely because that surface runs only in deployed (pg_cron, unstripped) environments and never in CI, so ADR-0022's CI false-positive cannot arise. The prod write is the single human checkpoint; migrate exit codes are not trusted (#5769) and per-hash `/api/health` is the promote authority. CI is made a required check on `main` (required-reviews 0) and gains `drizzle-kit check` + the env audit. This refines ADR-0006 (two-project split) and does not touch RLS (ADR-0019). The primitives in §Decision Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Errata / implementation note (D1 execution)
+
+This is an errata + implementation note. **No decision or primitive in §Decision Outcome changes** — item 4 ("Previews point at the staging DB") stands; the corrections below are factual (the recon premise) and procedural (the executed mechanism).
+
+1. **Recon premise corrected — Doppler↔Vercel syncs DO exist.** The Context/Decision-Drivers/Recon-snapshot statement "No native Doppler↔Vercel sync (all Vercel env manual)" was found false at execution. Live topology: Doppler **stg → Vercel Staging** (In Sync); Doppler **stg → Vercel Preview** (In Sync, created during D1); Doppler **prd → Vercel Production** (In Sync, 1 active). A **prd → Vercel Preview** sync also existed — the reason previews were prod-bound — and was deleted; a disabled duplicate prd→Production sync was removed.
+
+2. **Change #1 mechanism — sync re-source, not a Vercel var edit.** Doppler's Vercel sync has **no per-secret include/exclude filter**, so overriding a single key under a prd-sourced sync is impossible. Change #1 ("previews bind to the staging DB") was therefore executed by deleting the prd→Vercel-Preview sync ("Leave prd secrets in Vercel") and creating a stg→Vercel-Preview sync (All Preview Branches, Sensitive, Import: None), then deleting the orphaned prod-value Preview DATABASE_URL so the stg sync repopulated it. **Consequence:** all Preview secrets now mirror staging (DB + auth + R2 + observability), which also resolves the prior prod-credentials-in-previews exposure. Prereq handled: R2_BUCKET_PFP (missing in stg) was mirrored from prd before re-sourcing.
+
+3. **Forward note (D2).** The D2 "CI env audit fails the build on Doppler↔Vercel divergence" was premised on "all manual" — now false. D2 scope must be re-checked against this corrected topology before it is planned.
+
+Proof: a staging-pointed preview (commit 5d1a4b7) returned `/api/health` env:staging, db:ok, migrations:ok, canary=full git SHA.
