@@ -121,14 +121,22 @@ const REQUIRED_KEYS: readonly string[] = [
 ];
 
 // Sentry keys entered into Vercel directly by design (no Doppler source) — must
-// never orphan. Mirrors scripts/vercel-env-audit.ts INTENTIONAL_MANUAL (the
-// canonical inventory; extend there and here together when a Sentry key joins).
+// never orphan. Two Vercel-direct origins: the operator-pasted set + the connected
+// Sentry↔Vercel marketplace integration's auto-provisioned keys (log drain / OTLP
+// traces / public DSN). Mirrors scripts/vercel-env-audit.ts INTENTIONAL_MANUAL (the
+// canonical inventory; extend BOTH lists together whenever the Sentry integration
+// provisions a new key — by EXACT name, never a SENTRY_* prefix).
 const INTENTIONAL_MANUAL: ReadonlySet<string> = new Set([
 	"NEXT_PUBLIC_SENTRY_DSN",
 	"SENTRY_ORG",
 	"SENTRY_PROJECT",
 	"SENTRY_AUTH_TOKEN",
 	"SENTRY_API_TOKEN",
+	// Sentry↔Vercel marketplace-integration-provisioned (log drain / OTLP
+	// traces / public DSN) — no Doppler source by design (2026-06-26).
+	"SENTRY_VERCEL_LOG_DRAIN_URL",
+	"SENTRY_OTLP_TRACES_URL",
+	"SENTRY_PUBLIC_KEY",
 ]);
 
 // ───────────────────────────── thin IO layer ───────────────────────────────

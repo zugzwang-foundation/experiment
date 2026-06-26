@@ -39,14 +39,20 @@ const REQUIRED_KEYS = [
 
 // The Sentry intentional-manual allow-list, mirrored verbatim from
 // `scripts/vercel-env-audit.ts`'s INTENTIONAL_MANUAL (the reused set). These keys
-// are pasted into Vercel by the operator and have no Doppler source by design —
-// they must NEVER orphan.
+// are pasted into Vercel by the operator / auto-provisioned by the Sentry↔Vercel
+// marketplace integration, and have no Doppler source by design — they must NEVER
+// orphan. Extend in lockstep with the two scripts when the integration adds a key.
 const INTENTIONAL_MANUAL: ReadonlySet<string> = new Set([
 	"NEXT_PUBLIC_SENTRY_DSN",
 	"SENTRY_ORG",
 	"SENTRY_PROJECT",
 	"SENTRY_AUTH_TOKEN",
 	"SENTRY_API_TOKEN",
+	// Sentry↔Vercel marketplace-integration-provisioned (log drain / OTLP
+	// traces / public DSN) — no Doppler source by design (2026-06-26).
+	"SENTRY_VERCEL_LOG_DRAIN_URL",
+	"SENTRY_OTLP_TRACES_URL",
+	"SENTRY_PUBLIC_KEY",
 ]);
 
 // A fully-consistent topology: every Vercel key in a scope is present in that
@@ -141,6 +147,26 @@ describe("auditEnvParity", () => {
 			input.vercelKeysByScope = {
 				...input.vercelKeysByScope,
 				Preview: [...input.vercelKeysByScope.Preview, "SENTRY_AUTH_TOKEN"],
+			};
+			const f = auditEnvParity(input);
+			expect(f.orphans).toEqual([]);
+			expect(findingsTotal(f)).toBe(0);
+		});
+
+		it("does NOT flag the 3 Sentry↔Vercel integration keys (log-drain / OTLP / public DSN) present in Vercel with no Doppler source", () => {
+			const input = cleanInput();
+			// The exact 2026-06-26 incident: the marketplace-integration keys land
+			// in BOTH Production and Preview (Vercel-direct, no Doppler source) — each
+			// must be exempt in both scopes, never orphaned. (Regression guard.)
+			const integrationKeys = [
+				"SENTRY_VERCEL_LOG_DRAIN_URL",
+				"SENTRY_OTLP_TRACES_URL",
+				"SENTRY_PUBLIC_KEY",
+			];
+			input.vercelKeysByScope = {
+				...input.vercelKeysByScope,
+				Production: [...input.vercelKeysByScope.Production, ...integrationKeys],
+				Preview: [...input.vercelKeysByScope.Preview, ...integrationKeys],
 			};
 			const f = auditEnvParity(input);
 			expect(f.orphans).toEqual([]);
