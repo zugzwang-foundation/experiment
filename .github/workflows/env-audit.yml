@@ -1,11 +1,13 @@
 # .github/workflows/env-audit.yml
 # Doppler<->Vercel env-parity audit (D2 / ADR-0024 item 9 + 2026-06-26 errata,
-# Patch P1). SCHEDULED + manual only — deliberately NOT a per-PR ci.yml gate
+# Patch P1 + P2). SCHEDULED + manual only — deliberately NOT a per-PR ci.yml gate
 # (OD-2): env drift is operator-caused, not PR-caused, so a code PR can neither
 # introduce nor fix it. Keeping the audit off the merge path avoids coupling code
 # review to external-API (Vercel + Doppler) flakiness + token-rotation risk.
 # Fails on ANY finding; the script fails CLOSED on any API error (a broken audit
-# never reads green). Reads env-var KEYS / sync METADATA only — no secret values.
+# never reads green). Reads env-var KEYS only — no secret values. Sync-health
+# (c)/(d) was descoped in Patch P2 (no Doppler Team plan → Service Account
+# unavailable); Doppler is read via two config-scoped tokens.
 #
 # Schedule runs only fire from the default branch (main), so this activates on
 # merge; the operator validates immediately via workflow_dispatch (PR checklist).
@@ -49,7 +51,8 @@ jobs:
         run: pnpm ci-env-parity
         env:
           VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
-          DOPPLER_AUDIT_TOKEN: ${{ secrets.DOPPLER_AUDIT_TOKEN }}
+          DOPPLER_TOKEN_STG: ${{ secrets.DOPPLER_TOKEN_STG }}
+          DOPPLER_AUDIT_TOKEN_PRD: ${{ secrets.DOPPLER_AUDIT_TOKEN_PRD }}
           VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
           VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
           DOPPLER_PROJECT: ${{ vars.DOPPLER_PROJECT }}
