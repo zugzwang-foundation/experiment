@@ -76,8 +76,8 @@ This ADR does **not** decide:
 | Prod apply path (per-migration-tx + guard) | `scripts/migrate-prod.ts` | **inherited-0022, unchanged** |
 | Runtime DB client (`prepare:false`) | `src/db/index.ts` | minted |
 | Staging migrate automation | `.github/workflows/` (new staging-migrate job) | minted |
-| CI gate (required check + `drizzle-kit check` + env audit) | `.github/workflows/ci.yml` | minted |
-| Doppler↔Vercel secret audit | `scripts/vercel-env-audit.ts` | minted (added to CI) |
+| CI gate (required check + `drizzle-kit check` + `db:check-drift`) | `.github/workflows/ci.yml` | minted (D2; env-audit moved out per Patch P1) |
+| Doppler↔Vercel secret audit | `scripts/ci-env-parity.ts` + `.github/workflows/env-audit.yml` | minted (D2 **Patch P1**; new API-based file; scheduled, not per-PR) |
 | Vercel build contract (no migrate in build) | `vercel.json` | minted (confirm) |
 | Pipeline runbook | `docs/runbooks/deploy-pipeline.md` (new; or extend the existing `staging-provisioning.md` per ADR-0022's runbook pointer) | minted |
 
@@ -170,3 +170,15 @@ This is an errata + implementation note. **No decision or primitive in §Decisio
 3. **Forward note (D2).** The D2 "CI env audit fails the build on Doppler↔Vercel divergence" was premised on "all manual" — now false. D2 scope must be re-checked against this corrected topology before it is planned.
 
 Proof: a staging-pointed preview (commit 5d1a4b7) returned `/api/health` env:staging, db:ok, migrations:ok, canary=full git SHA.
+
+---
+
+## Patch P1 — env-audit consumer surface + cadence (D2 execution)
+
+In-place **Patch record** (CLAUDE.md §5.12), not a supersession: **no decision or primitive in §Decision Outcome changes** — item 9's "CI becomes a required check; CI gains journal-integrity + secret-drift gates" stands. The two notes below scope the env-audit's *consumer surface* and *cadence*, reconciling item 9 with the 2026-06-26 errata (native Doppler↔Vercel syncs DO exist). The file-map rows for the CI gate + secret audit are patched accordingly, same commit.
+
+1. **Env-audit file — new `scripts/ci-env-parity.ts`, not `vercel-env-audit.ts` (OD-3).** Item 9 / the file map named `scripts/vercel-env-audit.ts` as the env audit "added to CI." That script is the **operator CLI tool** (SCAFFOLD.8 O3.5; it shells the `vercel` CLI, requires an interactive `vercel login`, and talks to no Doppler API → **not CI-runnable**; it stays the operator tool, still referenced by `docs/runbooks/staging-provisioning.md:147`, and is **untouched**). The CI audit is therefore a **new API-based script** `scripts/ci-env-parity.ts` (Vercel + Doppler REST; a pure `auditEnvParity(...)` + thin I/O; unit-tested; reads env-var KEYS / sync METADATA only — no secret values logged). Re-scoped per the errata: value-comparison of synced keys is redundant now that syncs exist, so the audit detects **orphan Vercel keys / missing required keys (a small must-exist allow-list) / unhealthy syncs / duplicate syncs**.
+
+2. **Env-audit cadence — a dedicated scheduled workflow, not a per-PR `ci.yml` step (OD-2).** Item 9 reads "added to CI / fails the build on divergence." The env-audit lands as `.github/workflows/env-audit.yml` (`schedule:` daily + `workflow_dispatch`), failing on any finding (and the script fails **closed** on any API error) — **not** a blocking per-PR `ci.yml` step. Rationale: env drift is **operator-caused, not PR-caused** (a code PR can neither introduce nor fix Doppler↔Vercel drift), so gating code review on it couples unrelated failure domains and injects external-API flakiness + token-rotation risk into the merge path. The **two migration checks** item 9 also mandates — `drizzle-kit check` (journal integrity) and `db:check-drift` (applied-vs-journal, ADR-0022 timestamp+count, CI-safe) — **are** per-PR `ci.yml` steps, exactly as item 9 intends.
+
+D2 plan: `docs/plans/D2.md` (Ratified decisions). Operator-provisioned GHA secrets — `VERCEL_API_TOKEN`, `DOPPLER_AUDIT_TOKEN` (env-audit), `DOPPLER_TOKEN_STG` (staging-migrate) — plus non-secret vars `VERCEL_PROJECT_ID`, `VERCEL_TEAM_ID`, `DOPPLER_PROJECT`. Branch protection adds required status check context `ci` (required-reviews stay 0).

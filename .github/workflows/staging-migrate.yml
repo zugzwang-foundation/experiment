@@ -1,0 +1,54 @@
+# .github/workflows/staging-migrate.yml
+# Staging DB migrate on push to `staging` (ADR-0024 items 2-3).
+#
+# ***INERT until D3.*** This workflow is INERT until D3 creates the `staging`
+# branch + repoints the Vercel staging `branchMatcher` (equals staging). Until
+# then NO push to `staging` occurs, so this workflow NEVER fires. Do NOT create
+# the `staging` branch here — that is D3's job. When D3 lands, a push to
+# `staging` auto-migrates the staging Supabase DB (the resettable
+# migrate-before-serve sandbox). The Doppler CLI action tag + `doppler run`
+# invocation are validated by the operator on D3's first real push.
+
+name: Staging Migrate
+
+on:
+  push:
+    branches: [staging]
+
+permissions:
+  contents: read
+
+jobs:
+  staging-migrate:
+    name: staging-migrate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Doppler CLI
+        uses: dopplerhq/cli-action@v3
+
+      - name: Migrate staging DB
+        # Doppler injects DATABASE_URL_STAGING + STAGING_PROJECT_REF_FRAGMENT (the
+        # migrate-staging.ts guard). No pg_cron strip — staging Supabase HAS the
+        # extension (unlike CI's vanilla postgres:17 substrate). The stg-scoped
+        # service token (OD-4) implies the project; --config stg is explicit per
+        # the established operator command (memory: staging-migrate drift note).
+        run: doppler run --config stg -- pnpm db:migrate:staging
+        env:
+          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN_STG }}

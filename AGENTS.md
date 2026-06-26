@@ -61,7 +61,7 @@ Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/inva
 experiment/
 ├── CLAUDE.md, AGENTS.md            # contract + stack patterns (CLAUDE.md imports @AGENTS.md)
 ├── .claude/agents/                 # 4 subagent briefings (tracked); settings.local.json is gitignored
-├── .github/workflows/ci.yml        # the ONLY workflow
+├── .github/workflows/              # ci.yml (the PR gate) + env-audit.yml + staging-migrate.yml (D2)
 ├── src/
 │   ├── app/                        # Next.js App Router
 │   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages)
@@ -267,7 +267,7 @@ tests/
 - `UPDATE` rows in `resolution_events` or `payout_events` (append-only, INV-4).
 - Commit directly to `main` (PR-only — and server-side protection will reject it).
 
-**What is actually enforced vs. discipline.** Mechanically enforced today: PR-required + squash + signed-commit (GitHub branch protection); Biome + `tsc` (Lefthook pre-push + CI); append-only on Bucket-A tables (DB triggers); `bets.comment_id NOT NULL` (schema). Everything else in this section is **discipline** — no hook blocks it. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → migrate → `vitest run` against a Postgres-17 service.)
+**What is actually enforced vs. discipline.** Mechanically enforced today: PR-required + squash + signed-commit + a required **`ci`** status check (GitHub branch protection; `ci` promoted to a required check at D2, required-reviews still 0); Biome + `tsc` (Lefthook pre-push + CI); append-only on Bucket-A tables (DB triggers); `bets.comment_id NOT NULL` (schema). Everything else in this section is **discipline** — no hook blocks it. (The previously-documented `deploy-prod.yml`, `commitlint`, block-main / block-destructive hooks, Playwright, and `gitleaks`/CodeQL CI steps do **not** exist; CI is `ci.yml` = Biome → tsc → `drizzle-kit check` → migrate → `db:check-drift` → `vitest run` against a Postgres-17 service [the two migration checks added at D2]. The other two workflows — `env-audit.yml` (scheduled Doppler↔Vercel parity, D2) and `staging-migrate.yml` (inert until D3) — are **not** merge gates.)
 
 ---
 
