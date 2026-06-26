@@ -1,0 +1,55 @@
+# .github/workflows/env-audit.yml
+# Doppler<->Vercel env-parity audit (D2 / ADR-0024 item 9 + 2026-06-26 errata,
+# Patch P1). SCHEDULED + manual only — deliberately NOT a per-PR ci.yml gate
+# (OD-2): env drift is operator-caused, not PR-caused, so a code PR can neither
+# introduce nor fix it. Keeping the audit off the merge path avoids coupling code
+# review to external-API (Vercel + Doppler) flakiness + token-rotation risk.
+# Fails on ANY finding; the script fails CLOSED on any API error (a broken audit
+# never reads green). Reads env-var KEYS / sync METADATA only — no secret values.
+#
+# Schedule runs only fire from the default branch (main), so this activates on
+# merge; the operator validates immediately via workflow_dispatch (PR checklist).
+
+name: Env Audit
+
+on:
+  schedule:
+    # Daily at 06:00 UTC.
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  env-audit:
+    name: env-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Doppler<->Vercel env-parity audit
+        # Tokens are operator-provisioned secrets (OD-4); the non-secret IDs are
+        # GitHub Actions vars. A missing/empty value fails CLOSED via requireEnv.
+        run: pnpm ci-env-parity
+        env:
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+          DOPPLER_AUDIT_TOKEN: ${{ secrets.DOPPLER_AUDIT_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_TEAM_ID: ${{ vars.VERCEL_TEAM_ID }}
+          DOPPLER_PROJECT: ${{ vars.DOPPLER_PROJECT }}

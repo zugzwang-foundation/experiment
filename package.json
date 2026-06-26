@@ -11,6 +11,7 @@
 		"seed:identity-pool:prod": "tsx scripts/seed-identity-pool.ts",
 		"verify:identity-pool": "tsx scripts/verify-identity-pool.ts",
 		"vercel-env-audit": "tsx scripts/vercel-env-audit.ts",
+		"ci-env-parity": "tsx scripts/ci-env-parity.ts",
 		"db:migrate:staging": "tsx scripts/migrate-staging.ts",
 		"db:migrate:prod": "tsx scripts/migrate-prod.ts",
 		"db:check-drift": "tsx scripts/check-migration-drift.ts",

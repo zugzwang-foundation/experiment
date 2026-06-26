@@ -75,6 +75,15 @@ jobs:
       - name: Typecheck
         run: pnpm tsc --noEmit
 
+      - name: Drizzle journal integrity (drizzle-kit check)
+        # ADR-0024 item 9: offline validation of the committed migration journal
+        # + snapshots (collision/corruption) — exactly what a migration-adding PR
+        # risks. No DB connection, no secret, no pg_cron interaction; reads
+        # drizzle/migrations/meta only. The job-level DATABASE_URL satisfies
+        # drizzle.config.ts's non-null assertion (the config is loaded, not
+        # dialed). Runs before the strip so it sees the pristine committed state.
+        run: pnpm drizzle-kit check
+
       - name: Strip pg_cron statements (Path B substrate; see SPEC.2 §0.1 erratum)
         # plan §8 Risk 1 Path B fallback: pg_cron is Supabase-only;
         # vanilla postgres:17 (CI substrate) lacks pg_cron extension.
@@ -108,6 +117,16 @@ jobs:
         # ADR-0008 (not push). Fails loudly on migration error;
         # exit code propagates to job failure.
         run: pnpm drizzle-kit migrate
+
+      - name: Migration drift check (db:check-drift)
+        # ADR-0024 item 9, on ADR-0022's timestamp+count method (UNCHANGED). The
+        # pg_cron strip removes statements, not journal entries, so created_at +
+        # count still match — CI-safe (per-hash would false-positive here; it is
+        # confined to /api/health, ADR-0024 item 6). Asserts journal head ==
+        # applied head, catching a drizzle-orm #5769 "migrate exited 0 but
+        # stopped short". DATABASE_URL = the job-level Postgres service container
+        # (no DATABASE_URL_PROD/_STAGING in CI → falls through to DATABASE_URL).
+        run: pnpm db:check-drift
 
       # Vitest auto-detects GITHUB_ACTIONS=true and adds the
       # github-actions reporter alongside default. run = non-watch.
