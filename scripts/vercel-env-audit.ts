@@ -45,15 +45,26 @@ interface EnvRow {
 // and risk the operator deleting them on autopilot. Explicit Set
 // (not regex prefix) per security-auditor L5 absorption — exact
 // membership avoids over-matching future SENTRY_*-prefixed non-Sentry
-// vars an operator might add. The 5 entries below are the complete
-// Sentry env-var inventory; extend only when a new Sentry-managed key
-// joins the project.
+// vars an operator might add.
+//
+// 2026-06-26 amendment: the connected Sentry↔Vercel marketplace
+// integration provisions three further Vercel-direct keys — the log
+// drain URL, the OTLP traces URL, and the public DSN key — likewise
+// with no Doppler source. Added below by EXACT name (not a prefix).
+// The 8 entries are the complete Sentry env-var inventory; extend
+// (here AND scripts/ci-env-parity.ts together) only when the Sentry
+// integration provisions a new key.
 const INTENTIONAL_MANUAL: ReadonlySet<string> = new Set([
 	"NEXT_PUBLIC_SENTRY_DSN",
 	"SENTRY_ORG",
 	"SENTRY_PROJECT",
 	"SENTRY_AUTH_TOKEN",
 	"SENTRY_API_TOKEN",
+	// Sentry↔Vercel marketplace-integration-provisioned (log drain / OTLP
+	// traces / public DSN) — no Doppler source by design (2026-06-26).
+	"SENTRY_VERCEL_LOG_DRAIN_URL",
+	"SENTRY_OTLP_TRACES_URL",
+	"SENTRY_PUBLIC_KEY",
 ]);
 
 function runVercel(args: string[]): {
