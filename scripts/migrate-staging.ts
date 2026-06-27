@@ -5,7 +5,7 @@
  * SCAFFOLD.8 plan §4.3 + OQ-4.
  *
  * Operator usage:
- *   doppler run --config staging -- pnpm db:migrate:staging
+ *   doppler run --config stg -- pnpm db:migrate:staging
  *
  * Guard sequence:
  *   1. DATABASE_URL_STAGING must be set (NOT DATABASE_URL — the suffix
@@ -39,7 +39,7 @@ function safeHost(url: string): string {
 
 if (!dbUrl) {
 	console.error(
-		"[migrate-staging] DATABASE_URL_STAGING is not set. Run with: doppler run --config staging -- pnpm db:migrate:staging",
+		"[migrate-staging] DATABASE_URL_STAGING is not set. Run with: doppler run --config stg -- pnpm db:migrate:staging",
 	);
 	process.exit(1);
 }

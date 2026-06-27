@@ -139,13 +139,14 @@ The ledger is append-only and frozen-at-resolution. Production must **never** se
 
 ---
 
-## 4. Known stale references (tracked chore — not yet fixed)
+## 4. Known stale references
 
-The deploy tooling predates ADR-0024 item 7's bare-SHA canary and carries stale assertions/comments. **A focused chore (post-D3) fixes these; until then, verify staging by direct `/api/health` curl, not `pnpm smoke:staging`:**
+The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale assertions/comments. The focused post-D3 canary chore fixed the load-bearing ones; **`pnpm smoke:staging` is once again a valid staging gate.**
 
-- **`scripts/smoke-staging.ts` (SURPRISE-1, load-bearing):** asserts `canary.startsWith("staging-")` (`:185`) / `"preview-"` (`:202`) — **false-fails a healthy post-D1 staging** because the canary is now the bare SHA. Do **not** use `pnpm smoke:staging` as a deploy gate until this is corrected.
-- **`scripts/migrate-staging.ts:8`** header comment says `--config staging` (stale → `stg`).
-- **`docs/runbooks/staging-provisioning.md:157`** Appendix A lists `ZUGZWANG_ENV_CANARY=staging-...` — the route no longer reads `ZUGZWANG_ENV_CANARY` (canary is `VERCEL_GIT_COMMIT_SHA`).
+- **✅ RESOLVED — `scripts/smoke-staging.ts` (was SURPRISE-1, load-bearing):** the canary assertions (`:185` staging, `:202` preview) now validate a bare 40-char git SHA via `assertCanarySha`, with an optional `EXPECTED_SHA` exact-match (the "canary == pushed SHA" gate; full 40-char SHA only). The `health-preview` `env` assertion (`:199`) was also corrected `"preview" → "staging"` — Preview is `stg`-sourced post-D1, so staging-vs-preview is told apart by which URL is curled, not by env/canary.
+- **✅ RESOLVED — `scripts/migrate-staging.ts:8` / `:42`** `--config staging` → `stg` (header comment + the runtime error message).
+- **✅ RESOLVED — `docs/runbooks/staging-provisioning.md:157`** Appendix A: dropped `ZUGZWANG_ENV_CANARY=staging-...`; the route reads `VERCEL_GIT_COMMIT_SHA` for the canary.
+- **⏳ OPEN (tracked for the next SYNC sweep) — `scripts/seed-staging.ts:8` / `:48`** still carry `--config staging` (the same stale string). Deliberately left out of the canary chore: the file was otherwise untouched, and doc/string reconciliation is periodic, not per-task (`docs/maintenance.md`). Use `stg`.
 
 ---
 

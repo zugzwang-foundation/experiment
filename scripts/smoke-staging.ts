@@ -3,15 +3,15 @@
  * OQ-13 (item 11 R2 token scope).
  *
  * Operator usage:
- *   doppler run --config staging -- pnpm smoke:staging
- *   PREVIEW_URL=https://<deploy>.vercel.app doppler run --config staging -- pnpm smoke:staging
+ *   doppler run --config stg -- pnpm smoke:staging
+ *   PREVIEW_URL=https://<deploy>.vercel.app doppler run --config stg -- pnpm smoke:staging
  *
  * Items:
  *   1. DNS resolves (dig)
  *   2. HTTPS works (HEAD /)
  *   3. App loads (GET /)
  *   4. Staging /api/health DB connects (db: "ok")
- *   5. Staging /api/health env + canary echo ("staging" + "staging-...")
+ *   5. Staging /api/health env + canary echo ("staging" + bare commit SHA)
  *   6. Preview /api/health env + canary (skipped if PREVIEW_URL not set)
  *   7. Drizzle migrations applied to staging DB (count parity with journal)
  *   8. identity_pool seeded (~200 rows)
@@ -34,6 +34,7 @@ import postgres from "postgres";
 
 const STAGING_URL = "https://staging.zugzwangworld.com";
 const PREVIEW_URL = process.env.PREVIEW_URL;
+const EXPECTED_SHA = process.env.EXPECTED_SHA;
 const SENTRY_API_TOKEN = process.env.SENTRY_API_TOKEN;
 const SENTRY_ORG = process.env.SENTRY_ORG;
 const DATABASE_URL_STAGING = process.env.DATABASE_URL_STAGING;
@@ -80,6 +81,23 @@ async function checkWithRetry(
 function skip(item: string, reason: string): void {
 	console.warn(`[SKIP] ${item}: ${reason}`);
 	results.push({ item, pass: true, detail: reason, skipped: true });
+}
+
+// ADR-0024 item 7: /api/health `canary` is the deploy commit SHA
+// (VERCEL_GIT_COMMIT_SHA) — no longer a "staging-"/"preview-" prefixed string.
+// Always validate it is a full 40-char git SHA; when EXPECTED_SHA is set (the
+// operator's just-pushed SHA) also require an exact match — the runbook's
+// "canary == the pushed SHA" gate (deploy-pipeline §2.2 / §3 step 4).
+// EXPECTED_SHA MUST be the full 40-char SHA, never the short form — a short
+// value never equals the full canary and would false-fail with a confusing
+// mismatch.
+function assertCanarySha(canary: string | undefined): void {
+	if (!canary || !/^[0-9a-f]{40}$/.test(canary)) {
+		throw new Error(`canary="${canary}" is not a 40-char git SHA`);
+	}
+	if (EXPECTED_SHA && canary !== EXPECTED_SHA) {
+		throw new Error(`canary="${canary}" != EXPECTED_SHA="${EXPECTED_SHA}"`);
+	}
 }
 
 function countJournalEntries(): number {
@@ -182,9 +200,7 @@ async function main(): Promise<void> {
 		if (body.env !== "staging") {
 			throw new Error(`env=${body.env}, expected "staging"`);
 		}
-		if (!body.canary?.startsWith("staging-")) {
-			throw new Error(`canary="${body.canary}" must start with "staging-"`);
-		}
+		assertCanarySha(body.canary);
 		if (body.db !== "ok") throw new Error(`db=${body.db}`);
 		return `env=${body.env}, canary=${body.canary}, db=${body.db}`;
 	});
@@ -196,12 +212,17 @@ async function main(): Promise<void> {
 			const r = await fetch(`${PREVIEW_URL}/api/health`);
 			if (!r.ok) throw new Error(`status ${r.status}`);
 			const body = (await r.json()) as { env?: string; canary?: string };
-			if (body.env !== "preview") {
-				throw new Error(`env=${body.env}, expected "preview"`);
+			// Post-D1, Preview is sourced from the `stg` Doppler config, so a
+			// preview reports env:"staging" (not "preview"); staging-vs-preview
+			// is told apart by which URL is curled, not by env/canary. Asserting
+			// "staging" is a deliberate fail-closed tripwire — it catches Preview
+			// silently reverting to the prod config (D1 Change #1 regressing).
+			if (body.env !== "staging") {
+				throw new Error(
+					`env=${body.env}, expected "staging" (preview is stg-sourced post-D1)`,
+				);
 			}
-			if (!body.canary?.startsWith("preview-")) {
-				throw new Error(`canary="${body.canary}" must start with "preview-"`);
-			}
+			assertCanarySha(body.canary);
 			return `env=${body.env}, canary=${body.canary}`;
 		});
 	} else {
