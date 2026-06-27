@@ -154,7 +154,7 @@ Needed for the full flow (verify presence with `pnpm vercel-env-audit` / `pnpm s
 - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` (rate-limit + idempotency)
 - `OPENAI_API_KEY` (moderation — needed for the bet flow)
 - `R2_*` credentials + `R2_BUCKET_UPLOADS=zugzwang-uploads`, `R2_BUCKET_PFP=zugzwang-pfp`
-- `ZUGZWANG_ENV=staging`, `ZUGZWANG_ENV_CANARY=staging-...`
+- `ZUGZWANG_ENV=staging` *(no `ZUGZWANG_ENV_CANARY` — `/api/health` reads `VERCEL_GIT_COMMIT_SHA`, the Vercel-injected deploy SHA, for the canary; ADR-0024 item 7)*
 
 ### B. New migration tooling (from the migrate/drift PR)
 
