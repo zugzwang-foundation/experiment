@@ -85,7 +85,7 @@ Full reset (only if the sandbox is wedged): drop the staging schema → re-run `
 
 ## 3. Production — migrate-before-serve
 
-> **STATUS: DRAFT — finalize at D5.** This sequence is **not yet exercised**. As of D3, production is *gated* (auto-assign-domains OFF — Vercel shows *"Production deployments will need to be manually promoted"*), but the first real prod migrate + promote happens at **D5**. The staging-auto-deploy mechanics in §2 are live; this prod path is the deliberate, single human checkpoint that reaches production. **Governed by [ADR-0024](../adr/0024-deploy-pipeline-migration-sequencing.md) item 5 (inheriting [ADR-0022](../adr/0022-prod-migration-strategy-and-drift-guard.md)'s apply path); do not weaken.**
+> **STATUS: ACTIVE.** First exercised 2026-06-27 UTC at «PROMOTE-SHA» (D6). This is the live migrate-before-serve promote path; every production promote follows this sequence. Production is gated — `autoAssignCustomDomains` is OFF, so a `main` merge produces a **staged** build that does not serve `zugzwangworld.com` until this sequence completes and the build is manually promoted. **Governed by ADR-0024 item 5; do not weaken.**
 
 ### Why this exists (the load-bearing reason — read before executing)
 
