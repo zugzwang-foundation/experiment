@@ -14,7 +14,7 @@
 |---|---|---|---|---|
 | **Preview** | any feature branch | **staging** Supabase | per-deploy `*.vercel.app` | none (schema correctness via CI's ephemeral Postgres) |
 | **Staging** | push to **`staging`** branch | **staging** Supabase (`rwfdoqzsghqhhdapxafg`) | `staging.zugzwangworld.com` | **auto** — `staging-migrate.yml` (GHA) on push to `staging` |
-| **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, finalized at D5) |
+| **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, first exercised at D6) |
 
 Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0018`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
 
@@ -31,7 +31,7 @@ Every environment exposes `GET /api/health` (`src/app/api/health/route.ts`, publ
 - **`env`** — `ZUGZWANG_ENV` (`prod` / `staging` / `preview`). Proves *which environment config* the deployment booted with.
 - **`canary`** — `VERCEL_GIT_COMMIT_SHA`, the **bare commit SHA** the deployment is serving (ADR-0024 item 7). This is how you confirm "which SHA is live". *(It is the bare SHA — **not** a `staging-…`/`preview-…` prefixed string. Any tooling that asserts a prefix is stale; see §4.)*
 - **`db`** — `"ok"` iff `SELECT 1` succeeds.
-- **`migrations`** — the **per-hash** drift verdict (`src/server/health/migration-drift.ts`, ADR-0024 item 6): `"ok"` iff the applied-migration-hash multiset equals the journal-hash multiset; `"drift"` if they diverge; `"error"` if the DB is unreachable. Per-hash lives **only** on this surface (deployed envs have pg_cron → unstripped); CI's `db:check-drift` stays timestamp+count (CI strips pg_cron). `migrations:"drift"` on **prod** is *expected* until D5 (prod DB lags the journal by design).
+- **`migrations`** — the **per-hash** drift verdict (`src/server/health/migration-drift.ts`, ADR-0024 item 6): `"ok"` iff the applied-migration-hash multiset equals the journal-hash multiset; `"drift"` if they diverge; `"error"` if the DB is unreachable. Per-hash lives **only** on this surface (deployed envs have pg_cron → unstripped); CI's `db:check-drift` stays timestamp+count (CI strips pg_cron). a `migrations:"drift"` reading on **prod** was expected *pre-D5* (prod DB lagged the journal by design); post-D5 the prod DB is migrated to head, so a `drift` reading now is a **real failure** to investigate before promoting.
 
 ```bash
 curl -s https://staging.zugzwangworld.com/api/health | jq

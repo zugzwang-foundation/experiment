@@ -1,5 +1,7 @@
 # Staging Provisioning Runbook — bring staging to full working parity
 
+> **⚠️ SUPERSEDED (2026-06-28).** This is a one-time pre-execution provisioning snapshot. The work was executed (PRs #147/#148, both merged); the internal head/drift figures and the Appendix D stale-file list reflect that pre-execution moment and are **not** maintained. For live topology, migration head, and the promote path, see the canonical runbook [`docs/runbooks/deploy-pipeline.md`](./deploy-pipeline.md).
+
 > **Prepared:** 2026-06-20, overnight, unattended (Claude Code prep run).
 > **Audience:** operator (Hrishikesh) + web Claude at the morning gate.
 > **Goal:** a clean participant flow on `https://staging.zugzwangworld.com` — sign in (Google **and** email-OTP), place an image bet, see blocked rows in `/admin/moderation/audit` — in ~20 minutes.

@@ -10,7 +10,7 @@
  * isolation failure.
  *
  * Operator usage:
- *   doppler run --config staging -- pnpm verify:r2-scope
+ *   doppler run --config stg -- pnpm verify:r2-scope
  *
  * Reads from the staging Doppler config:
  *   R2_ENDPOINT_UPLOADS / R2_ENDPOINT_PFP   shared with prod (same CF account)
@@ -129,7 +129,7 @@ async function main(): Promise<void> {
 			`[verify-r2-scope] env not configured: ${missing.join(", ")}`,
 		);
 		console.error(
-			"[verify-r2-scope] run with: doppler run --config staging -- pnpm verify:r2-scope",
+			"[verify-r2-scope] run with: doppler run --config stg -- pnpm verify:r2-scope",
 		);
 		process.exit(1);
 	}

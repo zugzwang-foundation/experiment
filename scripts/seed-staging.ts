@@ -5,7 +5,7 @@
  * §4.3 + J2 fix.
  *
  * Operator usage:
- *   doppler run --config staging -- pnpm db:seed:staging
+ *   doppler run --config stg -- pnpm db:seed:staging
  *
  * Guard pattern (preserved from migrate-staging.ts): refuses to run
  * unless DATABASE_URL_STAGING is set AND contains
@@ -45,7 +45,7 @@ function safeHost(url: string): string {
 
 if (!dbUrl) {
 	console.error(
-		"[seed-staging] DATABASE_URL_STAGING is not set. Run with: doppler run --config staging -- pnpm db:seed:staging",
+		"[seed-staging] DATABASE_URL_STAGING is not set. Run with: doppler run --config stg -- pnpm db:seed:staging",
 	);
 	process.exit(1);
 }
