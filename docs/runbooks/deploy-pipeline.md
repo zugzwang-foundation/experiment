@@ -85,16 +85,16 @@ Full reset (only if the sandbox is wedged): drop the staging schema → re-run `
 
 ## 3. Production — migrate-before-serve
 
-> **STATUS: ACTIVE.** First exercised 2026-06-27 UTC at «PROMOTE-SHA» (D6). This is the live migrate-before-serve promote path; every production promote follows this sequence. Production is gated — `autoAssignCustomDomains` is OFF, so a `main` merge produces a **staged** build that does not serve `zugzwangworld.com` until this sequence completes and the build is manually promoted. **Governed by ADR-0024 item 5; do not weaken.**
+> **STATUS: ACTIVE.** First exercised 2026-06-28 UTC at 61abb0485e5ec7b251426932704aabd09f367abf (D6). This is the live migrate-before-serve promote path; every production promote follows this sequence. Production is gated — `autoAssignCustomDomains` is OFF, so a `main` merge produces a **staged** build that does not serve `zugzwangworld.com` until this sequence completes and the build is manually promoted. **Governed by ADR-0024 item 5; do not weaken.**
 
 ### Why this exists (the load-bearing reason — read before executing)
 
 The ledger is append-only and frozen-at-resolution. Production must **never** serve new code against an un-migrated database — there is no acceptable window where the app writes the ledger through a schema the DB hasn't applied. So production is **migrate-before-serve**: the database is migrated and *objectively verified* **before** the new build is allowed to take the `zugzwangworld.com` alias. The `drizzle-kit migrate` exit code is **not trusted** (drizzle-orm #5769 — a silent high-water-mark skip can exit `0` with a migration unapplied); the **per-hash `/api/health` result on the staged build is the only promote authority**. No `migrations:"ok"`, no promote.
 
-### Preconditions (one-time D5 pre-flight — verify before the first promote)
+### Preconditions (verified at the D5 pre-flight, 2026-06-27; re-confirm before each promote)
 
 - **Auto-assign OFF.** Production → Branch Tracking → "Auto-assign Custom Production Domains" = **Disabled** (set in D3; confirm still off).
-- **Prod env vars populated** in Doppler `prd` (→ synced to Vercel Production): `DATABASE_URL_PROD`, `PROD_PROJECT_REF_FRAGMENT`. *(D1 flagged both as not-yet-verified — confirm present before D5; the migrate guard refuses without them.)*
+- **Prod env vars populated** in Doppler `prd` (→ synced to Vercel Production): `DATABASE_URL_PROD`, `PROD_PROJECT_REF_FRAGMENT`. *(D1 flagged both as not-yet-verified; confirmed present at the D5 pre-flight — the migrate guard refuses without them.)*
 - **`Doppler prd → Vercel Production` sync = In Sync** (1 active).
 - **Every pending schema change is expand/contract** (additive-then-cleanup). During a promote the old and new builds briefly coexist (a Vercel alias swap is not atomic across running function instances), so the currently-serving code must tolerate the new schema. No destructive rewrite a live build can't survive.
 - **Config name is `prd`, never `production`.** Migrations run over the session pooler `:5432`.
@@ -118,7 +118,7 @@ The ledger is append-only and frozen-at-resolution. Production must **never** se
    - `db:"ok"`, `status:"ok"`.
    **If `migrations` is anything but `"ok"` → STOP. Do not promote.** A failed or forgotten migrate cannot reach users; the live alias keeps serving the prior build. Investigate, fix, re-run from step 3.
 5. **Promote the staged build to production** (manual alias swap — instant, byte-identical, no rebuild):
-   - **[VERIFY THE EXACT CONTROL AT D5 EXECUTION — Vercel UI shifts.]** Mechanism is one of: the **"Promote to Production"** action on the staged deployment in the Vercel dashboard, or `vercel promote <staged-url>` via CLI. Confirm the current path against Vercel docs at D5 rather than trusting this line.
+   - **Confirmed control (D6, 2026-06-28):** `vercel promote <staged-url> --scope <team-slug>` via CLI — an instant alias swap, byte-identical, no rebuild. **The `--scope` flag is required:** the bare `vercel promote <staged-url>` errors `Error: Deployment belongs to a different team`; pass the team slug (here `zugzwang-worlds-projects`). The dashboard **"Promote to Production"** action on the staged deployment is the equivalent alternative.
 6. **Verify live:**
 ```
    curl https://zugzwangworld.com/api/health
@@ -150,4 +150,4 @@ The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale 
 
 ---
 
-*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored DRAFT finalized at D5. Maintained per `docs/maintenance.md`.*
+*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored section, finalized + first-exercised at D6 (2026-06-28). Maintained per `docs/maintenance.md`.*
