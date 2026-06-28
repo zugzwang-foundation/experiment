@@ -1,13 +1,10 @@
 # .github/workflows/staging-migrate.yml
 # Staging DB migrate on push to `staging` (ADR-0024 items 2-3).
 #
-# ***INERT until D3.*** This workflow is INERT until D3 creates the `staging`
-# branch + repoints the Vercel staging `branchMatcher` (equals staging). Until
-# then NO push to `staging` occurs, so this workflow NEVER fires. Do NOT create
-# the `staging` branch here — that is D3's job. When D3 lands, a push to
-# `staging` auto-migrates the staging Supabase DB (the resettable
-# migrate-before-serve sandbox). The Doppler CLI action tag + `doppler run`
-# invocation are validated by the operator on D3's first real push.
+# ARMED since D3. A push to the `staging` branch fires this workflow, which
+# applies any pending migrations to the staging Supabase DB via
+# `doppler run --config stg -- pnpm db:migrate:staging`. It is part of the
+# gated deploy pipeline — see docs/runbooks/deploy-pipeline.md §3.
 
 name: Staging Migrate
 

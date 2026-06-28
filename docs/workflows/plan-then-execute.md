@@ -209,8 +209,8 @@ gh pr create --fill
 
 No shell exports and no committed `.claude/settings.json` — the repo tracks none (the only local config is a gitignored `.claude/settings.local.json`), and the `ANTHROPIC_MODEL` / `CLAUDE_CODE_EFFORT_LEVEL` env vars are retired (the env var outranks subagent frontmatter; never set it).
 
-- **Model:** Claude Fable 5, pinned `claude-fable-5` (requires Claude Code ≥ 2.1.170). Set once with `/model fable` — persists via user settings.
-- **Effort:** persistent default `xhigh`, set once with `/effort xhigh` (the "gated-xhigh" convention). `max` is on-demand and session-only — `/effort max` for genuinely ambiguous/hard problems; it does not persist.
+- **Model:** Claude Opus 4.8, pinned `claude-opus-4-8` (reverts the 2026-06-10 Fable 5 pin; Fable currently unavailable). Set once with `/model opus` — persists via user settings.
+- **Effort:** default `max` — run at the highest setting always (`/effort max`, persists via user settings; empirically accepted by the subagent schema). Supersedes the prior gated-`xhigh` default.
 
 The `ultrathink` keyword is a habit, not a setting. Drop it as the first word in every coding-task prompt regardless of effort level.
 

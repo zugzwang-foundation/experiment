@@ -15,7 +15,7 @@
 The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
-- **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0019` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
+- **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0024` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
 - **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
@@ -162,6 +162,7 @@ Branches `feat/` · `fix/` · `chore/` · `refactor/`. **Squash-merge only; PRs 
 - Doppler config names are `stg` / `prd` — **never** `staging` / `production`.
 - Supabase direct host (`db.<ref>.supabase.co`) is IPv6-only; local scripts and migrations use the **session pooler** (`...pooler.supabase.com:5432`).
 - `BETTER_AUTH_URL` fails at **build time**, not request time — the custom domain must be attached and the URL set *before* deploy.
+- **Deploy / promote (pipeline is live + gated).** Canonical: `docs/runbooks/deploy-pipeline.md` §3 + ADR-0024 — do not re-derive it here. Load-bearing rules: schema changes are **expand/contract** (additive first; never a destructive in-place alter on a live table); **migrate-before-serve** (the prod migration applies before the new code is promoted); **rehearse on staging first** (push to `staging`, let the auto-deploy + `/api/health` gate go green before touching prod). Two gotchas that bite: (1) `vercel promote` **requires `--scope <team-slug>`** — without it the command errors or hits the wrong project; (2) **trust the `/api/health` gauge, not `migrate` exit codes** — the migrate step can report success while the DB is not actually ready (drizzle-orm #5769), so gate on health, not the exit code.
 
 ### `ultrathink`
 First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, payout math, side-freeze semantics, cross-service state machines, auth, moderation failure modes, ADR drafting, and CLAUDE.md / AGENTS.md audits. Mechanism: an in-context deeper-reasoning instruction for that turn only — it does **not** change the session/API effort level (effort policy is §6).
@@ -170,9 +171,9 @@ First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, p
 
 ## 6. Subagents, hooks, model
 
-**Claude Code runs on Claude Fable 5** — pinned `claude-fable-5`, requires Claude Code ≥ 2.1.170; supersedes Opus 4.8 (`D-CC-MODEL` updated 2026-06-10). Select with `/model fable`, which persists via user settings. **Effort is "gated-xhigh":** persistent default `xhigh`, set once via `/effort xhigh`; `max` is on-demand and session-only (`/effort max`) for genuinely ambiguous/hard problems. The `CLAUDE_CODE_EFFORT_LEVEL` env var is **retired** — it outranks subagent frontmatter; never set it. `ultracode` is opt-in for low-stakes parallelizable chores only, **never critical paths** (auto-orchestrated workflows bypass the plan→execute + named-reviewer cascade). `ultrathink` stays in every coding prompt (§5). Fable 5 runs cyber/bio safety classifiers; flagged requests auto-fallback to Opus 4.8 (can trip on repo/CLAUDE.md context alone) — expected, non-blocking; return with `/model fable`.
+**Claude Code runs on Claude Opus 4.8** — pinned `claude-opus-4-8`. This reverts the 2026-06-10 Fable 5 pin (Fable 5 is currently unavailable). Select with `/model opus`. **Effort default is `max`** — run at the highest setting always (`/effort max`; empirically accepted by the subagent schema). `ultracode` + dynamic / auto-orchestrated workflows are the default working mode for ordinary, reversible, parallelizable work — **but never on the four critical paths (auth, bet engine, ledger, commentary/moderation) or any DDL/migration**, which keep the gated plan→execute + named-reviewer cascade (`ultracode` bypasses it). The `CLAUDE_CODE_EFFORT_LEVEL` env var stays **retired** — it outranks subagent frontmatter; never set it. `ultrathink` stays in every coding prompt (§5).
 
-**Subagents** — auto-discovered from `.claude/agents/*.md`; all four are tracked, each `model: claude-fable-5` / `effort: xhigh` with a "MUST BE USED" routing description. Full briefings live in those files; invocation policy is §5.11.
+**Subagents** — auto-discovered from `.claude/agents/*.md`; all four are tracked, each `model: claude-opus-4-8` / `effort: max` with a "MUST BE USED" routing description. Full briefings live in those files; invocation policy is §5.11.
 
 - `code-reviewer` — diff under `src/server/` vs §2/§3 + stack patterns; returns CRITICAL/HIGH/MEDIUM/LOW with `file:line`.
 - `db-migration-reviewer` — schema vs SPEC.2 §5 inventory, FK lambdas, indexes, Bucket A/B/C, trigger SQL; returns PASS/FAIL/SURPRISE per table.
@@ -202,6 +203,11 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 - Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v11` is planning/sequencing only.
 - Doc authorship: AGENTS.md is descriptive (CC-authored from the live repo); CLAUDE.md is the contract (web-drafted invariants + CC-verified file-map refs).
+- Deploy pipeline + migration sequencing (ADR-0024; scoped-supersedes ADR-0022): staging-as-prod-replica; `staging`-branch sandbox + gated prod-promote; two Supabase projects; per-hash `/api/health` drift. Runbook: `docs/runbooks/deploy-pipeline.md` §3.
+- Participant shell topology (ADR-0023): `(public)/` route group; server-component shell; `/m/[slug]` first route; `getMarketBySlug` excludes Draft.
+- Prod migration strategy + schema-drift guard (ADR-0022): per-migration-tx `db:migrate:prod`; env-fragment guard; status-only `/api/health` drift field; `db:check-drift` (drift method partially superseded by ADR-0024).
+- Reactive moderation, no held queue (ADR-0021; supersedes ADR-0020): gate returns block/pass; admin reviews live content reactively (Remove/Ban); no moderation action touches a position.
+- Decoupled content removal + three-option held queue (ADR-0020) — superseded by ADR-0021 (held queue removed; the content-removal-vs-user-ban decoupling is retained).
 - Ranking = ADR-0017 multi-mode; supersedes ADR-0009. `RANKING.md` stale until DEBATE.8.
 - Reply-as-bet (ADR-0017): a reply **is** a Support/Counter bet; `REPLY_DEPTH_MAX = 1`; no standalone friendly-fire vote.
 - Issuance + two bet floors (ADR-0018): `BET_MIN_STAKE_POST` / `BET_MIN_STAKE_REPLY`; DB identifiers `daily_allowance` / `last_allowance_accrued_at` retained.
@@ -211,7 +217,7 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 - Moderation runs **outside** the bet transaction and fails closed on terminal errors (ADR-0014); CSAM via PhotoDNA + image classifier.
 - RLS out of scope for the experiment (ADR-0019).
 - Same-commit doctrine: fixes to guardrail mechanisms are absorbed in-session, never deferred.
-- CC on Claude Fable 5, pin `claude-fable-5` (`D-CC-MODEL` updated 2026-06-10; supersedes Opus 4.8); subagents pin `model: claude-fable-5` / `effort: xhigh`; effort policy gated-xhigh — `max` on-demand session-only, `CLAUDE_CODE_EFFORT_LEVEL` retired.
+- CC on Claude Opus 4.8, pin `claude-opus-4-8` (reverts the 2026-06-10 Fable 5 pin; Fable currently unavailable); subagents pin `model: claude-opus-4-8` / `effort: max`; effort default `max` (highest always); `ultracode` / dynamic workflows default for low-stakes reversible work, **never** critical paths or DDL; `CLAUDE_CODE_EFFORT_LEVEL` retired.
 - Enforcement hooks / `permissions.deny` not yet installed — this file is advisory until they are (§6).
 
 **Closing ritual**, every task: "Should CLAUDE.md / AGENTS.md / the workflow / the tracker change as a result of this session?" Usually no — the discipline is asking. If yes, same PR, never a follow-up (follow-ups never happen).
@@ -222,4 +228,4 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 **Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything here is wrong, fix it before fixing the code.**
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0019. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0024. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
