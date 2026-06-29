@@ -415,6 +415,7 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 | `GET /api/cron/r2-orphan-sweep` | F6 | `src/app/api/cron/r2-orphan-sweep/route.ts` | Bearer `CRON_SECRET` | N/A | A-2 cron pattern (Vercel Cron contract supports GET only) |
 | `GET /api/health` | F6 | `src/app/api/health/route.ts` | None | N/A | Liveness probe |
 | `GET /api/dataset/manifest` | F6 | `src/app/api/dataset/manifest/route.ts` | None (post-2026-11-06) | N/A | SPEC.1 §12.2 dataset metadata |
+| `GET /m/[slug]/export` | F6 | `src/app/(public)/m/[slug]/export/route.ts` | None | N/A | SPEC.1 §21.3 debate `.md` export — `text/markdown`, `no-store` (ADR-0025 / EXPORT.1) |
 
 **Server-Sent Events / WebSocket: explicitly absent.** Debate view polls per SPEC.1 §9 F-DEBATE-4 — `POLL_INTERVAL_MS_DEBATE_VIEW` deferred to HARDEN.6 number-tuning. SSE / WS deferred to testnet phase per ADR-0006.
 

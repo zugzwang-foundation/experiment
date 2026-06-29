@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | draft (ratified by ADR-0025; promotes on commit) |
+| **Status** | ratified (ADR-0025; route + serializer built at EXPORT.1) |
 | **Date** | 2026-06-29 |
 | **Companion to** | ADR-0025 (Debate `.md` Export) |
 | **Frame** | SPEC.1 §21.3 (the surface); SPEC.2 §3.3 R-1 (read pattern), §4 (route lands at build); `public/zugzwang.md` (context asset) |

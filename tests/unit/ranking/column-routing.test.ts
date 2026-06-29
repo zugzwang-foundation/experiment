@@ -40,6 +40,7 @@ function reply(
 	return {
 		stake: "50",
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
+		priceAtBet: "0.5",
 		...over,
 	};
 }

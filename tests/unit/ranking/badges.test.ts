@@ -30,6 +30,7 @@ function post(
 		counterDharma: "0",
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		authorStake: "0",
+		priceAtBet: "0.5",
 		...over,
 	};
 }
