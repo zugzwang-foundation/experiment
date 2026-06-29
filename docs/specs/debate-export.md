@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Status** | draft (ratified by ADR-0025; promotes on commit) |
+| **Status** | ratified (ADR-0025; route + serializer built at EXPORT.1) |
 | **Date** | 2026-06-29 |
 | **Companion to** | ADR-0025 (Debate `.md` Export) |
 | **Frame** | SPEC.1 §21.3 (the surface); SPEC.2 §3.3 R-1 (read pattern), §4 (route lands at build); `public/zugzwang.md` (context asset) |
@@ -76,9 +76,10 @@ own spec; this schema does not duplicate it.
 
 ## 6. Block 3 — Summary + Contents
 
-- **3a — Summary.** A short prose block stating: the question, resolution criteria, status (and outcome if
-  resolved), the headline statistics (price, total stake, post/reply/participant counts), and **the single
-  highest-ranked argument on each side** (YES and NO). Front-loaded; neutral; names no winner.
+- **3a — Summary.** A short, deterministic, field-derived prose block — neutral, naming no winner — built **only** from the read-model and front matter (the serializer authors **no** participant-voice prose; it never paraphrases a body). Two paragraphs:
+  - **Orientation.** `This debate asks: {market_question verbatim}. It is currently {status phrase}, with the {current|final} price at {yes}% YES / {no}% NO. {participants} participants have staked {total_stake_dharma} Đ across {posts} posts and {replies} replies.` Status phrase: `open`→"open and unresolved"; `resolved`→"resolved {outcome}"; `voided`→"voided"; `resolving`→"resolving"; `closed`→"closed (awaiting resolution)"; `frozen`→"frozen". Use "final price" when resolved/voided, else "current price"; if there is no pool, write "with no market price yet" and drop the YES/NO clause. Numbers render as numerals.
+  - **Top argument each side.** `The most heavily backed YES argument is "{title}" ({pseudonym}, {stake} Đ). The most heavily backed NO argument is "{title}" ({pseudonym}, {stake} Đ).` The post is the **highest-ranked non-removed** post on that side; if the top post on a side is removed, fall through to the next non-removed post on that side; if all posts on a side are removed, write `The leading {SIDE} argument was removed by a moderator.`; if a side has no posts, write `No {SIDE} argument has been posted yet.`
+  - The **resolution criteria is not restated** in the Summary — it appears verbatim in the front matter and the Market section (7a).
 - **3b — Contents.** A numbered list, one line per post: `Post N — SIDE — "title" (pseudonym, stake Đ)`.
   A removed post renders `Post N — SIDE — [removed by moderator]` with no author/stake.
 

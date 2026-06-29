@@ -38,6 +38,10 @@ const nextConfig: NextConfig = {
 	// it does not change it.
 	outputFileTracingIncludes: {
 		"/api/health": ["./drizzle/migrations/**/*"],
+		// EXPORT.1 — the `.md` export route reads `public/zugzwang.md` from disk at
+		// request time (context.ts, runtime-computed path @vercel/nft cannot trace).
+		// Force it into the route's traced bundle, mirroring the /api/health key.
+		"/m/[slug]/export": ["./public/zugzwang.md"],
 	},
 };
 

@@ -145,13 +145,14 @@ async function main(): Promise<void> {
 			p.side_at_post_time AS parent_side,
 			p.created_at,
 			pb.stake AS author_stake,
+			pb.price_at_bet AS price_at_bet,
 			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time) AS support_count,
 			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time) AS counter_count,
 			COALESCE(SUM(rb.stake) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time), 0) AS support_dharma,
 			COALESCE(SUM(rb.stake) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time), 0) AS counter_dharma
 		FROM comments p
 		JOIN LATERAL (
-			SELECT b.stake FROM bets b
+			SELECT b.stake, b.price_at_bet FROM bets b
 			WHERE b.comment_id = p.id
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
@@ -159,7 +160,7 @@ async function main(): Promise<void> {
 		LEFT JOIN comments rc ON rc.parent_comment_id = p.id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
 		WHERE p.market_id = ${marketId} AND p.parent_comment_id IS NULL
-		GROUP BY p.id, p.side_at_post_time, p.created_at, pb.stake
+		GROUP BY p.id, p.side_at_post_time, p.created_at, pb.stake, pb.price_at_bet
 		ORDER BY p.created_at ASC, p.id ASC`;
 
 	const substrate: PostSubstrate[] = rows.map((r) => ({
@@ -171,6 +172,7 @@ async function main(): Promise<void> {
 		counterDharma: r.counter_dharma as string,
 		createdAt: new Date(r.created_at as string),
 		authorStake: r.author_stake as string,
+		priceAtBet: r.price_at_bet as string,
 	}));
 
 	// 4 — compute + print.
