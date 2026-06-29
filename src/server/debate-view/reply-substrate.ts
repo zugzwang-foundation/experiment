@@ -19,6 +19,7 @@ type ReplyRow = {
 	side: "YES" | "NO";
 	created_at: string | Date;
 	stake: string;
+	price_at_bet: string;
 };
 
 /**
@@ -51,10 +52,11 @@ export async function loadReplySubstrate(
 			rc.parent_comment_id,
 			rc.side_at_post_time AS side,
 			rc.created_at,
-			rb.stake
+			rb.stake,
+			rb.price_at_bet
 		FROM comments rc
 		JOIN LATERAL (
-			SELECT b.stake
+			SELECT b.stake, b.price_at_bet
 			FROM bets b
 			WHERE b.comment_id = rc.id
 			ORDER BY b.created_at ASC, b.id ASC
@@ -71,6 +73,7 @@ export async function loadReplySubstrate(
 			id: r.id,
 			side: r.side,
 			stake: r.stake,
+			priceAtBet: r.price_at_bet,
 			// `new Date()` is robust whether the driver returned a Date or a wire
 			// string (timestamptz decode varies by execute path — accrual.ts note).
 			createdAt: new Date(r.created_at),

@@ -68,6 +68,8 @@ export type DebateReply =
 			marker: Marker;
 			author: AuthorIdentity;
 			stake: string;
+			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
+			entryPrice: string;
 	  };
 
 /** A post's replies, ranked + partitioned by relation, plus the two-slot default. */
@@ -99,6 +101,8 @@ export type DebatePost =
 			badge: Badge | null;
 			author: AuthorIdentity;
 			authorStake: string;
+			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
+			entryPrice: string;
 			aggregate: ReplyAggregate;
 			replies: ReplyGroups;
 	  };
@@ -217,6 +221,7 @@ export async function loadDebateView(
 			badge: badgeFor(sub, postSubstrate),
 			author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: sub.authorStake,
+			entryPrice: sub.priceAtBet,
 			aggregate,
 			replies,
 		};
@@ -357,5 +362,6 @@ function buildReply(
 		marker: comment.marker,
 		author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 		stake: sub.stake,
+		entryPrice: sub.priceAtBet,
 	};
 }

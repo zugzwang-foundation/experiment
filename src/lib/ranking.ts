@@ -41,6 +41,13 @@ export type PostSubstrate = {
 	createdAt: Date;
 	/** The post's own entry-bet stake `a` (author conviction) — decimal string. */
 	authorStake: string;
+	/**
+	 * The post's own entry-bet `price_at_bet` — the market YES-probability at the
+	 * instant the post's bet executed (decimal string, 0–1). EXPORT.1 gap-fill:
+	 * carried from the earliest-bet LATERAL for the per-node "entry price" the
+	 * `.md` export surfaces; the pure ranking model does not read it.
+	 */
+	priceAtBet: string;
 };
 
 /** A depth-1 reply's substrate (RANKING.md §7). */
@@ -51,6 +58,12 @@ export type ReplySubstrate = {
 	/** The reply-bet's stake (`bets.stake`) — decimal string. */
 	stake: string;
 	createdAt: Date;
+	/**
+	 * The reply-bet's `price_at_bet` — the market YES-probability at execution
+	 * (decimal string, 0–1). EXPORT.1 gap-fill (per-node entry price); the pure
+	 * ranking model does not read it.
+	 */
+	priceAtBet: string;
 };
 
 /** The three lane-dominance badges (RANKING.md §5.2). */

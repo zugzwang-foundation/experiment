@@ -58,7 +58,19 @@ export function MarketHeader({ market }: { market: DebateMarketHeader }) {
 		<section className="flex flex-col gap-3">
 			<div className="flex items-start justify-between gap-3">
 				<h1 className="text-xl font-semibold tracking-tight">{market.title}</h1>
-				<LifecycleBadge status={market.status} />
+				<div className="flex shrink-0 items-center gap-2">
+					<LifecycleBadge status={market.status} />
+					{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
+					    plain anchor, no client boundary, works signed-out. */}
+					<a
+						download
+						href={`/m/${market.slug}/export`}
+						aria-label="Download this debate as Markdown"
+						className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+					>
+						Download .md
+					</a>
+				</div>
 			</div>
 			{market.description ? (
 				<p className="text-sm text-muted-foreground">{market.description}</p>

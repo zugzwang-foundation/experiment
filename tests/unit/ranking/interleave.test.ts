@@ -37,6 +37,7 @@ function makePost(rank: number): PostSubstrate {
 		// createdAt monotonically NEWER as rank grows → R12 is the newest.
 		createdAt: new Date(2026, 8, 1, rank, 0, 0),
 		authorStake: String(1000 - rank),
+		priceAtBet: "0.5",
 		// keep D meaningful
 		...(dharma ? {} : {}),
 	};
