@@ -15,7 +15,7 @@
 The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
-- **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0026` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
+- **Source of truth:** `SPEC.1` (product, v1.9.0-draft) + `SPEC.2` (technical) + `docs/adr/0003–0027` are canonical. `tracker_v11.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
 - **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
@@ -230,4 +230,4 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 **Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything here is wrong, fix it before fixing the code.**
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0026. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0027. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
