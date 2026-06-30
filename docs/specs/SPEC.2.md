@@ -11,8 +11,8 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | 1.0.11 |
-| **Date** | 2026-06-29 |
+| **Version** | 1.0.12 |
+| **Date** | 2026-06-30 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
 | **Lock gate** | PRECURSOR.4 (Fresh-session lock review, writer/reviewer split per CLAUDE.md) — promotes this doc from `v0.3-draft` → `v1.0` |
@@ -59,6 +59,7 @@
 | 1.0.9 | 2026-06-22 | HMH | **DEBATE.5 — debate-view comment-list read-model (DebateComment) added to §5.4.** New §5.4 read-time-derivation subsection codifying the canonical oldest-first comment-list loader (`listMarketComments`, `src/server/debate-view/list-comments.ts`): per-comment live marker {Flipped/Exited/none} via the existing `computeMarker` over the ENGINE.11 held-side read; viewer-independent; frozen-by-construction at resolution (INV-4; emergent, no snapshot); exposure boundary type-enforced (no held-side/quantity in the DTO); ordering oldest-first `(created_at, id)` and explicitly NOT ranked (ranking stays the §5.4 multi-mode model / DEBATE.8). Moderation seam recorded as render-time masking preserving thread integrity per ADR-0021 (NOT a row-exclusion filter), with the hard precondition that the unfiltered list must not back a public surface until masking is attached. Frozen `side_at_post_time` badge (INV-3) kept distinct from the live marker. Zero-schema: no migration/column/event-type; migration head + EVENT_TYPES unchanged. Paired same-commit with the DEBATE.5 code PR per the §0 same-commit doctrine. SPEC.1 back-pressure: none (F-DEBATE-2/3 already in SPEC.1 §9). |
 | 1.0.10 | 2026-06-23 | HMH | **DEBATE.8 ranking reconciliation (ADR-0017 P2/P3).** §5.4 RANKING.md "rewritten"→"authored at DEBATE.8" (greenfield; no ADR-0009 file existed). Appendix A: `src/lib/ranking.ts` + `docs/specs/RANKING.md` rows repointed ADR-0009 → ADR-0017. §5.1 row 4 + §14.1 INV-1(ii) + §0 carry-forward: `comments.bet_id` corrected to **deliberately nullable** (circular-pair / append-only; INV-1 enforced via `bets.comment_id` NOT NULL + W-1 atomicity) — NOT a pending NOT-NULL migration; DEBATE.8/9 carry-forward reduced to the `stake_at_post_time` (DEBATE.8) + `friendly_fire_events` (DEBATE.9) drops. No schema change in this commit (docs only). Paired with SPEC.1 1.0.9 + the RANKING.md authoring + ADR-0017 P2/P3 patch records. |
 | 1.0.11 | 2026-06-29 | HMH | **§21 amendment pass (ADR-0025 debate `.md` export + §21.6 descope) — SPEC.2 back-pressure.** §22 ADR Index: ADR-0025 (debate `.md` export) added as a row (status accepted, 2026-06-29); inventory 22 → 23 (22 ADR files + ADR-0012 in-flight; 20 accepted + 2 superseded + 1 in-flight); §22.1 heading + §22.5 source-of-truth counts reconciled; upper bound `0024` → `0025`. ADR-0025 ratifies the debate `.md` export serving model (on-demand read-only §3.3 R-1; masking inherited from `loadDebateView`; text-only single file; embedded version-pinned `zugzwang.md` context) — the export route + button **build** lands in §4 at build time (deferred, ritual-gated). Companion serialization contract `docs/specs/debate-export.md`; context asset `public/zugzwang.md`. Paired with SPEC.1 1.0.10 (§21 amendment pass). No schema change (docs only). |
+| 1.0.12 | 2026-06-30 | HMH | **ADR-0026 market-media riders** (same-commit with the accepted ADR; paired with SPEC.1 → 1.0.11). **§5.1** new `market_media` table (#23, **Bucket C**, markets domain, admin-owned, **no `user_id`**) — total 22 → 23 tables, Bucket C 10 → 11, protected set unchanged (12), domains unchanged (10); the `comments` row gains a nullable set-on-insert FK `market_media_id` + the not-both-set CHECK (Bucket-A classification unchanged); the `markets` row gains a nullable `media_video_url`; the §5 ADRs-consumed list adds ADR-0026. **§5.2** Bucket-C summary 10 → 11 (+ `market_media`). **§12.1** third R2 bucket arm `market-media` (`m/<marketId>/` namespace, isolated `R2_*_MARKET_MEDIA` credentials, static lifecycle). **§4.3** admin market-media upload route forward-note (admin-context signed-PUT + moderation-at-upload, distinct from the participant `/api/uploads/sign`; build-deferred to §4). **§22** ADR-0026 index row (23 → 24 ADRs; 20 → 21 accepted; "24-row index"; §22.5 SSOT counts). **Appendix A** extends the `markets.ts` / `r2.ts` / `precommit.ts` rows with the ADR-0026 build extensions. **Appendix B** new B.16 `market_media` (SHIP, no PII) + the `markets.media_video_url` + `comments.market_media_id` rows + coverage count 15 → 16 tables. No migration authored (build-deferred to a new migration, head `0018` → `0019` at execute). **§0** version → 1.0.12, date → 2026-06-30. |
 
 ---
 
@@ -421,6 +422,8 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 
 **Bet endpoint Origin defense.** Both `/api/bets/place` and `/api/bets/sell` validate the `Origin` header at handler entry via the cross-cutting `src/server/middleware/origin-allowlist.ts` (allowlist derived from `BETTER_AUTH_URL`, per §4.1) — mismatch returns HTTP 403 with no state changes. This compensates for the loss of Server Actions' built-in origin check. (The earlier per-endpoint `src/server/bets/origin-check.ts` / `ALLOWED_ORIGINS` design is superseded by that single cross-cutting helper — §4.1 — and is not on disk.)
 
+**Market-media admin upload (ADR-0026; forward — lands at build).** An admin-context market-media upload surface — an admin signed-PUT mint into the `market-media` bucket (§12.1) plus the create-form media handling — lands here at **build** time under the admin surface (`src/server/admin/markets/…`), **distinct** from the participant `POST /api/uploads/sign` (which is hard-bound to a participant session). It runs the **admin-context moderation caller** (ADR-0026 #4 — CSAM hash + general classifier without a participant session) before a `market_media` row is written; a Track-A/Track-B verdict rejects the image and no row is written. Auth contract: admin session (`admin_sessions`), validated at the handler boundary per §4.5. The exact route shape + file is owned by the admin-create build task.
+
 ### §4.4 Request / response envelope
 
 **Route Handler envelope.** JSON over HTTPS. Success: `{ ok: true, data: <flow-specific-shape> }`. Error: `{ ok: false, error: { code: <stable-string>, message: <display-template>, retry_after?: <seconds> } }`. The `code` field references `docs/specs/error-codes.md` per §15; `message` is the display template (interpolated client-side); `retry_after` is present iff the HTTP status is 429 / 503. HTTP status carries equal weight to `ok` — clients SHOULD branch on status, then on `ok`.
@@ -479,7 +482,7 @@ ADRs consumed by §4: ADR-0003 (Server Actions vs Route Handlers default + runti
 
 §5 owns the *complete table inventory* for the experiment-phase build — every Postgres table the v1 codebase reads or writes, with append-only-vs-mutable classification per ADR-0005's Bucket A / B / C scheme, the per-domain schema home per ADR-0008 §4, and the load-bearing ADR(s) that mint the table's substance. SPEC.2 §5 is the single inventory; per-table DDL substance lives in ADR-0005 (table shape + classification rationale) + ADR-0008 (Drizzle declaration + migration discipline) + ADR-0016 (universal UUIDv7 PK). A reader who needs the column-by-column DDL goes to the schema file at `src/db/schema/<domain>.ts`; a reader who needs the inventory shape stays here.
 
-Twenty-two tables in v1 across ten domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); ten mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
+Twenty-three tables in v1 across ten domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); eleven mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
 
 ### §5.1 Inventory table
 
@@ -492,7 +495,7 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 1 | `events` | `events` | ADR-0005 + ADR-0007 + ADR-0016 | Canonical events log per §3.7 + §7; monthly partitioned with twelve pre-created partitions + DEFAULT; composite PK `(event_id, created_at)` per §7.1 partition-constraint reconciliation; storage idempotency via `INSERT ... ON CONFLICT (event_id, created_at) DO NOTHING` |
 | 2 | `dharma_ledger` | `dharma` | ADR-0005 | Append-only Dharma balance ledger; every balance change flows here; INV-2 (no-overdraft) enforced via §6 + ledger discipline |
 | 3 | `bets` | `bets` | ADR-0005 + ADR-0013 | Per-bet record; locked second in §9 W-1 lock-order chain; INV-1 atomic with comment write |
-| 4 | `comments` | `comments` | ADR-0005 + ADR-0017 (supersedes ADR-0009) | Per-comment record; INV-3 (side-bound at post time via `side_at_post_time`). Under reply-as-bet every comment rides a bet (INV-1), enforced by `bets.comment_id` NOT NULL + W-1 transaction atomicity. `comments.bet_id` is **deliberately nullable** — the circular `comments`↔`bets` pair sets only the `bets.comment_id` direction at write time (the comment is inserted before its bet exists, and Bucket-A append-only forbids a later back-fill); `comments.bet_id` stays NULL by construction, relied on by nothing. `parent_comment_id` NULL = top-level **post-bet** comment, non-NULL = **reply-bet** comment (reply floor 50 per ADR-0018). No `stake_at_post_time` column — the superseded ADR-0009 ranking model used it; ADR-0017's multi-mode model reads per-side reply-bet aggregates at render time (§5.4) and needs no frozen post-level stake column |
+| 4 | `comments` | `comments` | ADR-0005 + ADR-0017 (supersedes ADR-0009) | Per-comment record; INV-3 (side-bound at post time via `side_at_post_time`). Under reply-as-bet every comment rides a bet (INV-1), enforced by `bets.comment_id` NOT NULL + W-1 transaction atomicity. `comments.bet_id` is **deliberately nullable** — the circular `comments`↔`bets` pair sets only the `bets.comment_id` direction at write time (the comment is inserted before its bet exists, and Bucket-A append-only forbids a later back-fill); `comments.bet_id` stays NULL by construction, relied on by nothing. `parent_comment_id` NULL = top-level **post-bet** comment, non-NULL = **reply-bet** comment (reply floor 50 per ADR-0018). No `stake_at_post_time` column — the superseded ADR-0009 ranking model used it; ADR-0017's multi-mode model reads per-side reply-bet aggregates at render time (§5.4) and needs no frozen post-level stake column. ADR-0026 adds a nullable FK `market_media_id` → `market_media.id` (`ON DELETE RESTRICT`, indexed; set-on-INSERT only, like `image_uploads_id`) for pick-from-pool image attachment, plus a table CHECK `NOT (image_uploads_id IS NOT NULL AND market_media_id IS NOT NULL)` making the two image sources mutually exclusive — a set-on-insert nullable FK + CHECK does not change the Bucket-A append-only classification |
 | 5 | `resolution_events` | `events` | ADR-0005 | One row per F-RESOLVE-1/2/3 admin fan-out; INV-4 append-only resolutions; corrections reference prior `resolution_events.id` via `corrects_event_id` |
 | 6 | `payout_events` | `events` | ADR-0005 | One row per bet settlement during W-3 fan-out; corrections write paired `correction_reverse` + `correction_apply` rows per §3.6 |
 | 7 | `mod_actions` | `audit` | ADR-0014 | Moderation audit trail; pre-commit verdict + image-upload linkage via `image_r2_key` per §10 |
@@ -516,11 +519,12 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 15 | `accounts` | `auth` | ADR-0004 | Better Auth OAuth provider linkage (per 3-A R1 — fourth Better Auth table) |
 | 16 | `verifications` | `auth` | ADR-0004 | Better Auth Email-OTP storage; single-use enforced by plugin; TTL-bounded; replaces dropped `otp_codes` |
 | 17 | `admin_sessions` | `auth` | ADR-0010 | Hand-rolled three-column schema (`session_id`, `issued_at`, `last_seen_at`); single-row-at-any-moment via transactional `DELETE+INSERT`; cookie name `zugzwang_admin_session` |
-| 18 | `markets` | `markets` | ADR-0005 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6 |
+| 18 | `markets` | `markets` | ADR-0005 + ADR-0026 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6. ADR-0026 adds nullable `media_video_url text` (the outbound YouTube explainer URL; set at create, editable pre-live per the Bucket-C whitelist) |
 | 19 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
 | 20 | `positions` | `bets` | ADR-0005 + ADR-0013 | Per-user-per-market position cache; updated synchronously inside the W-1 bet transaction per §3.7; gates no-stake-no-voice eligibility (INV-3) and feeds W-3 settlement. No ranking role — ADR-0017's model reads per-side reply-bet aggregates at render time (§5.4), not a frozen position derivation |
 | 21 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
 | 22 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
+| 23 | `market_media` | `markets` | ADR-0026 | Admin-set per-market media pool (carousel images + `display_order` + `is_default`); **no `user_id`** — admin-owned, structurally separate from `image_uploads` (admin has no `users` row per F-AUTH-ADMIN). FK `market_id` → `markets.id` (indexed, FK-on-referencing-side); `r2_object_key` in the `m/<marketId>/` namespace (§12.1), immutable post-insert; `created_by` defaults to the `'admin-singleton'` actor per §3.6 (no participant owner); whitelisted Bucket-C curation of `display_order` / `is_default` pre-live; exactly one `is_default = true` per market (partial unique index, strategy at schema build). Drives the §9 Market-Detail header carousel + the F-COMMENT-3 pick-from-pool source |
 
 ### §5.2 Bucket-classification summary
 
@@ -530,7 +534,7 @@ The bucket classification is the load-bearing operational distinction: it determ
 |---|---|---|---|
 | **A** — strictly append-only | 9 | `BEFORE UPDATE` + `BEFORE DELETE` both `RAISE EXCEPTION` | `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events` |
 | **B** — whitelisted transition | 3 | Per-table function comparing OLD/NEW row images, permitting only the named whitelisted column-set transition once | `identity_pool`, `image_uploads`, `system_state` |
-| **C** — mutable | 10 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`, `watermark_state`, `cron_alarms` |
+| **C** — mutable | 11 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`, `watermark_state`, `cron_alarms`, `market_media` |
 
 Total protected (Bucket A + Bucket B): **twelve tables**. The §6 test contract floor (previously sized at 33+ cases for a thirteen-table protected set) reduces with the removal of `friendly_fire_events` — its Bucket-B trigger cases (the two-independent-column `frozen_at` / `cleared_at` transition tests) drop with the table. The floor is re-baselined for the twelve-table protected set per the per-table baseline ratified at 3-A.
 
@@ -637,7 +641,7 @@ Six tables that appeared in earlier outlines but are absent from the v1 inventor
 | Events monthly partitioning DDL | `drizzle/migrations/<NNNN>_events_partitioning.sql` |
 | Drizzle DB client (`server-only` import) | `src/db/index.ts` |
 
-ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session / verification / account schemas), ADR-0005 (Bucket A/B/C classification + per-domain split discipline + events table shape + dropped-tables collapse rationale), ADR-0006 (R2 bucket inventory feeding `image_uploads` lifecycle), ADR-0008 (Drizzle ORM + per-domain schema-file convention), ADR-0010 (`admin_sessions` hand-rolled three-column schema), ADR-0011 (`identity_pool` 50K-row pseudonym pool), ADR-0013 (`pools` / `positions` lock-order participation in the W-1 bet chain), ADR-0014 (`mod_actions` + `image_uploads` moderation linkage via `image_r2_key`), ADR-0016 (universal UUIDv7 PK + `identity_pool` synthetic-PK pattern), ADR-0017 (reply-as-bet model — `comments.parent_comment_id` post/reply split, `comments.bet_id` 1:1 binding, the four per-side reply-bet aggregates read at render time; supersedes ADR-0009 and retires `stake_at_post_time` + `friendly_fire_events`), ADR-0018 (two-floor minimum-bet write-path check). 3-B §12-R1 ratification (`image_uploads` Bucket B classification with two-column atomic transition) and 3-E §20-1 ratification (`system_state` Bucket B classification with `frozen_at` NULL → timestamp transition) are absorbed in this commit.
+ADRs consumed by §5: ADR-0004 (the four Better Auth tables + cookie / session / verification / account schemas), ADR-0005 (Bucket A/B/C classification + per-domain split discipline + events table shape + dropped-tables collapse rationale), ADR-0006 (R2 bucket inventory feeding `image_uploads` lifecycle), ADR-0008 (Drizzle ORM + per-domain schema-file convention), ADR-0010 (`admin_sessions` hand-rolled three-column schema), ADR-0011 (`identity_pool` 50K-row pseudonym pool), ADR-0013 (`pools` / `positions` lock-order participation in the W-1 bet chain), ADR-0014 (`mod_actions` + `image_uploads` moderation linkage via `image_r2_key`), ADR-0016 (universal UUIDv7 PK + `identity_pool` synthetic-PK pattern), ADR-0017 (reply-as-bet model — `comments.parent_comment_id` post/reply split, `comments.bet_id` 1:1 binding, the four per-side reply-bet aggregates read at render time; supersedes ADR-0009 and retires `stake_at_post_time` + `friendly_fire_events`), ADR-0018 (two-floor minimum-bet write-path check), ADR-0026 (the `market_media` table + `comments.market_media_id` FK + not-both-set CHECK + `markets.media_video_url` + the third `market-media` R2 bucket arm). 3-B §12-R1 ratification (`image_uploads` Bucket B classification with two-column atomic transition) and 3-E §20-1 ratification (`system_state` Bucket B classification with `frozen_at` NULL → timestamp transition) are absorbed in this commit.
 
 ---
 
@@ -1188,6 +1192,8 @@ Cloudflare R2, jurisdiction `APAC` (Mumbai region per ADR-0006 §4). Two buckets
 | Bucket-policy detail owner | SCAFFOLD.15 | ADR-0011 + asset pipeline |
 
 The two buckets share the same R2 jurisdiction but no other operational shape. A reader looking at upload-flow code goes to `zugzwang-uploads`; a reader looking at pseudonym-rendering code goes to `zugzwang-pfp`. They are referenced by name across the codebase and do not generalise into a "media bucket" abstraction.
+
+**Third bucket — `market-media` (ADR-0026; lands at build).** A third R2 bucket `zugzwang-market-media` extends `type R2Bucket = "uploads" | "pfp" | "market-media"` to hold admin-set per-market media, with **its own isolated credentials** — preserving the per-bucket compromise-isolation property (`zugzwang-pfp` is the precedent for an admin-owned, non-participant asset class with its own bucket; a third arm preserves that property rather than diluting it into a shared abstraction). Its lifecycle mirrors the **static** pattern (admin-set pre-live, public-read CDN, no per-request mint, no orphan sweep), not the dynamic `zugzwang-uploads` pattern. Key namespace **`m/<marketId>/<mediaId>.<ext>`** — distinct from the participant `u/<userId>/` namespace and the participant moderation read-scope, so the two image sources stay on separate read-scopes (§5.1 `comments`, F-COMMENT-3). Bucket provisioning (Doppler `R2_*_MARKET_MEDIA` credentials across the `stg` / `prd` configs) is build/ops work; the admin-context signed-PUT mint + moderation-at-upload land in §4 at build.
 
 ### §12.2 Image-attached comment flow (F-COMMENT-3)
 
@@ -2189,11 +2195,11 @@ ADRs consumed by §21: ADR-0006 (vendor-incident runbook framing for Vercel + Cl
 
 §22 owns the *consolidated index of architectural decision records* for the experiment-phase build — the ADRs at `docs/adr/0003-…md` through `docs/adr/0025-…md`, their accepted / superseded / in-flight status, the task → ADR-NNNN mapping that gates each ADR, and the cross-reference invariant that every ADR reference in SPEC.2 resolves to an existing ADR file. This §22 sits at the *index layer* — the ADRs themselves are immutable substance per ADR convention; this section catalogues their status and exposes the gating map without restating their decisions.
 
-The inventory is **23 ADRs** (was 14 at v0.3-draft; ADR-0017/0018/0019 folded at SYNC.7; ADR-0020 + ADR-0021 folded at the 2026-06-18 moderation amendments — ADR-0020 added as superseded; ADR-0022 (prod-migration-strategy + drift-guard) + ADR-0023 (participant-shell topology) + ADR-0024 (deploy pipeline + migration sequencing) folded at the 2026-06-25 deploy-pipeline catch-up, ADR-0024 partially superseding ADR-0022's `/api/health` drift-comparison method; ADR-0025 (debate `.md` export) folded 2026-06-29). Two earlier-numbered slots (ADR-0001 + ADR-0002 — brand architecture and experiment/protocol repo split, originally minted under FOUND.7 + FOUND.8 in earlier outline drafts) were never authored as ADR files; the numbering jumps from "no ADR file" to ADR-0003. The ADR file numbering is the canonical inventory; the FOUND.7 + FOUND.8 substance lives in TRADEMARK.md + the repo structure itself, not in the ADR registry.
+The inventory is **24 ADRs** (was 14 at v0.3-draft; ADR-0017/0018/0019 folded at SYNC.7; ADR-0020 + ADR-0021 folded at the 2026-06-18 moderation amendments — ADR-0020 added as superseded; ADR-0022 (prod-migration-strategy + drift-guard) + ADR-0023 (participant-shell topology) + ADR-0024 (deploy pipeline + migration sequencing) folded at the 2026-06-25 deploy-pipeline catch-up, ADR-0024 partially superseding ADR-0022's `/api/health` drift-comparison method; ADR-0025 (debate `.md` export) folded 2026-06-29; ADR-0026 (market media) folded 2026-06-30). Two earlier-numbered slots (ADR-0001 + ADR-0002 — brand architecture and experiment/protocol repo split, originally minted under FOUND.7 + FOUND.8 in earlier outline drafts) were never authored as ADR files; the numbering jumps from "no ADR file" to ADR-0003. The ADR file numbering is the canonical inventory; the FOUND.7 + FOUND.8 substance lives in TRADEMARK.md + the repo structure itself, not in the ADR registry.
 
-Of the 23 ADRs, **20 are accepted** (ADR-0003 through ADR-0008, ADR-0010 through ADR-0011, ADR-0013 through ADR-0019, ADR-0021 through ADR-0025), **2 are superseded** (ADR-0009 by ADR-0017; ADR-0020's held queue by ADR-0021), and **1 is in flight** (ADR-0012). ADR-0022 remains **accepted** — its prod-apply path stands; only its `/api/health` drift-comparison method and health-env-var line are superseded by ADR-0024 (a scoped partial supersession that does not flip 0022's status). Per the §22.2 in-flight carve-out, SPEC.2 v1.0 locks with ADR-0012 in flight; design.md finalization triggers a same-commit SPEC.1 + SPEC.2 minor-version bump (v1.0 → v1.1) without re-opening PRECURSOR.4. SCAFFOLD.* tasks that do not consume design.md proceed in parallel during ADR-0012's in-flight window.
+Of the 24 ADRs, **21 are accepted** (ADR-0003 through ADR-0008, ADR-0010 through ADR-0011, ADR-0013 through ADR-0019, ADR-0021 through ADR-0026), **2 are superseded** (ADR-0009 by ADR-0017; ADR-0020's held queue by ADR-0021), and **1 is in flight** (ADR-0012). ADR-0022 remains **accepted** — its prod-apply path stands; only its `/api/health` drift-comparison method and health-env-var line are superseded by ADR-0024 (a scoped partial supersession that does not flip 0022's status). Per the §22.2 in-flight carve-out, SPEC.2 v1.0 locks with ADR-0012 in flight; design.md finalization triggers a same-commit SPEC.1 + SPEC.2 minor-version bump (v1.0 → v1.1) without re-opening PRECURSOR.4. SCAFFOLD.* tasks that do not consume design.md proceed in parallel during ADR-0012's in-flight window.
 
-### §22.1 The 23-row index
+### §22.1 The 24-row index
 
 Sorted by ADR number. Each row is one ADR file; the file at `docs/adr/<NNNN>-<slug>.md` is the canonical substance.
 
@@ -2222,6 +2228,7 @@ Sorted by ADR number. Each row is one ADR file; the file at `docs/adr/<NNNN>-<sl
 | **0023** | SHELL/UI.0 | `0023-participant-shell-topology.md` | Participant shell topology (`(public)/` route group; server-component shell; `/m/[slug]` first route; `getMarketBySlug` excludes Draft; shadcn baseline) | accepted | 2026-06-24 |
 | **0024** | infra (out-of-tracker) | `0024-deploy-pipeline-migration-sequencing.md` | Deploy pipeline + migration sequencing (staging-as-prod-replica; `staging`-branch sandbox + staged-prod-promote; previews→staging DB; two Supabase projects; per-hash drift on `/api/health` only) — **supersedes ADR-0022** (scoped: `/api/health` drift method + canary); **inherits** ADR-0022 prod-apply path; **refines** ADR-0006 | accepted | 2026-06-25 |
 | **0025** | Debate `.md` export (spec lane) | `0025-debate-md-export.md` | Debate `.md` export — on-demand read-only `GET` (§3.3 Pattern R-1, uncached/per-request fresh); **masking inherited** from `loadDebateView` (removed content never exported; serialize the masked `DebatePost`/`DebateReply` only, never the `DebateComment` intermediate); text-only single file with a version-pinned `zugzwang.md` context block prepended (also served standalone at `/zugzwang.md`); serialization contract in `docs/specs/debate-export.md`. Amends SPEC.1 §21.3; route + button **build** deferred to §4 | accepted | 2026-06-29 |
+| **0026** | Market media (spec lane) | `0026-market-media.md` | Market Media — admin-set asset model: new `market_media` table (Bucket C, **no `user_id`**); third R2 bucket arm `market-media` (`m/<marketId>/` namespace, isolated credentials); reference-model pick-from-pool via `comments.market_media_id` + a not-both-set CHECK; `markets.media_video_url` outbound YouTube link (new tab, not embedded/self-hosted); admin-context upload moderation, pick path pre-vetted by construction. Amends SPEC.1 §15 F-ADMIN-1 + §8 F-COMMENT-3 + a new §9 display subsection; data model in §5; admin upload route + migration **build** deferred to §4 | accepted | 2026-06-30 |
 
 The **task → ADR-NNNN mapping** is canonical: ADR-0003 through ADR-0016 were each minted under a corresponding SPEC.x tracker task (SPEC.3 minted ADR-0003, SPEC.4 minted ADR-0004, etc.). Per memory + tracker conventions: SPEC.8 is renamed to **PRECURSOR.4** (the fresh-session lock review) and does not have an ADR; the SPEC.8 numbering slot is intentionally skipped in the SPEC.x sequence — ADR-0008 is SPEC.9 (ORM), not SPEC.8. **ADR-0017/0018/0019 break the SPEC.x pattern**: they were minted under SYNC tasks (ADR-0017 under SYNC.4; ADR-0018/0019 under SYNC.5), not SPEC.x tasks — the "SPEC.x" column carries the SYNC task for these three. The ADR-NNNN numbering remains dense (no gaps).
 
@@ -2259,7 +2266,7 @@ Three properties locked at the ADR file shape:
 
 | Concern | Source-of-truth file |
 |---|---|
-| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (23 ADRs — 22 ADR files + ADR-0012 in-flight; 20 accepted + 2 superseded + 1 in-flight; files committed at SYNC.BACKFILL) |
+| Per-ADR substance | `docs/adr/<NNNN>-<slug>.md` (24 ADRs — 23 ADR files + ADR-0012 in-flight; 21 accepted + 2 superseded + 1 in-flight; files committed at SYNC.BACKFILL + ADR-0026) |
 | ADR file template | `docs/adr/_template.md` |
 | Index + status flips | §22.1 (this section) |
 | In-flight carve-out | §22.2 (this section) |
@@ -2384,7 +2391,7 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 |---|---|---|
 | `src/db/schema/index.ts` | Barrel re-export of all per-domain schemas | §5.5 |
 | `src/db/schema/auth.ts` | Better Auth four-table schemas (`users`, `sessions`, `accounts`, `verifications`) + hand-rolled `admin_sessions` (per ADR-0008 §4 — single auth-domain file spanning ADR-0004 + ADR-0010) | §5.5, §8.10, §16 |
-| `src/db/schema/markets.ts` | `markets`, `pools` schemas | §5.5 |
+| `src/db/schema/markets.ts` | `markets`, `pools` schemas (ADR-0026 adds the `market_media` table + `markets.media_video_url` + `comments.market_media_id`'s referent here at build — markets domain) | §5.5 |
 | `src/db/schema/bets.ts` | `bets`, `positions` schemas | §5.5 |
 | `src/db/schema/comments.ts` | `comments` schema (reply-as-bet: `bet_id` NOT NULL 1:1 with the comment-bearing bet, `parent_comment_id` post/reply discriminator, `side_at_post_time`; no `stake_at_post_time`, no `friendly_fire_events`) | §5.1, §5.5 |
 | `src/db/schema/dharma.ts` | `dharma_ledger` schema | §5.5 |
@@ -2436,12 +2443,12 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 | `src/server/events/insert.ts` | Events insertion helper `insertEvent(tx, eventInput)` (bound-transaction-only; Zod-validates payload) | §3.7, §7.8, §16 |
 | `src/server/events/schemas.ts` | Per-event-type Zod schema map (hand-written, not drizzle-zod) | §7.8 |
 | `src/server/identity/assign.ts` | Pseudonym pool consumer (F-AUTH-3 transaction with `SELECT ... FOR UPDATE SKIP LOCKED`) | §3.7 |
-| `src/server/moderation/precommit.ts` | `precommitModerate()` orchestration (OpenAI omni-moderation + Redis intent reservation) | §10 |
+| `src/server/moderation/precommit.ts` | `precommitModerate()` orchestration (OpenAI omni-moderation + Redis intent reservation; ADR-0026 factors an admin-context caller — moderate market-media bytes without a participant session — at build) | §10 |
 | `src/server/moderation/openai.ts` | OpenAI moderation HTTP wrapper | §10 |
 | `src/server/middleware/rate-limit.ts` | Per-surface `Ratelimit` instances + fail-open posture + alarm-6a emission | §11 |
 | `src/server/idempotency/cache.ts` | `idempotencyLookupOrReserve` helper + body-fingerprint computation + fail-closed posture + alarm-6b emission | §11 |
 | `src/server/idempotency/types.ts` | Constants (`Idempotency-Key` header name, validation regex, `PENDING_TTL_SECONDS = 30`, `COMPLETED_TTL_SECONDS = 86400`) + error-envelope codes | §11 |
-| `src/server/storage/r2.ts` | R2 client wrapper (S3-compatible SDK + R2 endpoint config) | §12.10 |
+| `src/server/storage/r2.ts` | R2 client wrapper (S3-compatible SDK + R2 endpoint config; ADR-0026 adds the third `market-media` bucket arm + `m/<marketId>/` namespace at build) | §12.10 |
 | `src/server/storage/sign-upload.ts` | Server logic for sign-URL mint + `image_uploads` insert | §12.10 |
 | `src/server/storage/sign-read.ts` | Signed-READ URL helper (consumed by §10 moderation) | §12.10 |
 | `src/server/system/is-frozen.ts` | `isFrozen()` middleware helper (handler-stack step 1 freeze gate per §20.2) | §20.4 |
@@ -2602,6 +2609,7 @@ The discipline: this appendix is **derived** from §19.4 + §19.5 + §5.1. PRECU
 | `resolution_outcome` | text \| null | SHIP | `YES` / `NO` / `VOID`; NULL until F-RESOLVE-1 fires |
 | `created_by` | text | SHIP | `'admin-singleton'` sentinel per §3.6 (admin-actor created markets) |
 | `created_at` | timestamptz | SHIP | |
+| `media_video_url` | text \| null | SHIP | ADR-0026 — outbound YouTube explainer URL; public, no PII; NULL when unset |
 
 ### B.3 `pools` (Bucket C)
 
@@ -2654,6 +2662,7 @@ Inferred from CPMM math substrate per `cpmm.md`; PRECURSOR.4 verifies precision 
 | `parent_comment_id` | uuid \| null | SHIP | NULL = top-level **post-bet** comment; non-NULL = **reply-bet** comment (F-COMMENT-2; FK to parent `comments.id`; `REPLY_DEPTH_MAX = 1`) |
 | `body` | text | SHIP | Comment text content (post-moderation; only `pass`-verdict comments exist in this table per §10) |
 | `image_uploads_id` | uuid \| null | SHIP | FK to `image_uploads.id` for F-COMMENT-3; NULL for text-only comments |
+| `market_media_id` | uuid \| null | SHIP | ADR-0026 — FK to `market_media.id` for pick-from-pool (F-COMMENT-3); mutually exclusive with `image_uploads_id` (DB CHECK); a context FK revealing which admin image a comment used; no PII |
 | `side_at_post_time` | text | SHIP | INV-3 binding: `YES` / `NO` frozen at insert — the side of the bet this comment rides (§14.1). The render-time ranking aggregates (§5.4) read this across reply-bets; there is no `stake_at_post_time` column |
 | `bet_id` | uuid | SHIP | **NOT NULL** — FK to `bets.id`, 1:1 with the comment-bearing bet (INV-1). Every comment rides a bet (post-bet or reply-bet); the only comment-free bet is the sell |
 | `created_at` | timestamptz | SHIP | |
@@ -2799,6 +2808,20 @@ Post-experiment, all 50K rows ship with `assigned_at` populated only for tuples 
 | `terminal_at` | timestamptz \| null | SHIP | Bucket-B whitelisted transition partner; matches `terminal_state` non-NULL |
 | `created_at` | timestamptz | SHIP | |
 
+### B.16 `market_media` (Bucket C)
+
+| Column | Type | Treatment | Notes |
+|---|---|---|---|
+| `id` | uuid | SHIP | Market-media PK |
+| `market_id` | uuid | SHIP | FK to `markets.id` |
+| `r2_object_key` | text | SHIP | Asset reference in the `m/<marketId>/` namespace (§12.1); admin-set, pre-vetted, public market context — the removed-media exclusion does not apply (pool images are pre-vetted and never published if blocked) |
+| `display_order` | int | SHIP | Carousel order |
+| `is_default` | boolean | SHIP | Exactly one `true` per market; backs the F-COMMENT-3 default-image render fallback |
+| `created_by` | text | SHIP | `'admin-singleton'` sentinel per §3.6 (admin-owned context; **no `user_id`** column — not participant content) |
+| `created_at` | timestamptz | SHIP | |
+
+`market_media` ships in full as **market context** — admin-set, public, pre-moderated, no PII.
+
 ### B.17 Closing notes
 
 **Tables not shipped (5):** `system_state`, `sessions`, `accounts`, `verifications`, `admin_sessions` per §19.3. Per-column treatment is undefined because the tables don't ship. Rationale per §19.3 row-by-row.
@@ -2809,8 +2832,8 @@ Post-experiment, all 50K rows ship with `assigned_at` populated only for tuples 
 
 **H2 erasure interaction.** Per §19.4 + SPEC.1 §16.6, H2 erasure scrubs `users` PII columns + null-s `pfp_filename`. At dataset-export time, H2-erased rows ship in the same shape as not-erased rows — both have NULL email, NULL google_id, etc. The dataset consumer cannot distinguish "user erased pre-freeze" from "user never had data."
 
-**Coverage observation.** The 15 tables × ~10 columns each = ~150 column-level decisions. Of these:
-- ~118 are SHIP (audit-trail integrity preserved)
+**Coverage observation.** The 16 tables × ~10 columns each = ~157 column-level decisions. Of these:
+- ~125 are SHIP (audit-trail integrity preserved; `market_media`'s 7 columns are all SHIP — admin-set public context, no PII)
 - ~14 are PSEUDO (every `user_id` / `target_user_id` FK gets rewritten)
 - 9 are STRIP / STRIP_KEY (the ten PII columns/keys per §19.4 minus one — `pfp_filename` is NULL_IF_ERASED instead of STRIP because it survives non-erasure)
 - 1 is NULL_IF_ERASED (`users.pfp_filename`)
