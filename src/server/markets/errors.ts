@@ -86,3 +86,44 @@ export class LifecycleSerializationExhaustedError extends Error {
 		this.name = "LifecycleSerializationExhaustedError";
 	}
 }
+
+// MEDIA.1 (ADR-0026 #5 / SPEC.1 §15 service invariant) — the at-create media
+// guards: a market is never live without media (≥1 image, exactly one
+// is_default). Service-required VALIDATION (not moderation — ADR-0027). Thrown
+// at `createMarket` entry, before any write; wire-mapped to `media_required` /
+// `default_media_required` in `toActionError`.
+export class MediaRequiredError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "MediaRequiredError";
+	}
+}
+
+export class DefaultMediaRequiredError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "DefaultMediaRequiredError";
+	}
+}
+
+// MEDIA.1 (ADR-0026 #6) — the optional outbound video URL failed validation
+// (must be a well-formed https YouTube URL). Wire-mapped to `video_url_invalid`.
+export class MarketVideoUrlInvalidError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "MarketVideoUrlInvalidError";
+	}
+}
+
+// MEDIA.1 (Q3 client-supplied-PK trust boundary) — the client-pre-generated
+// `marketId` PK already exists. `createMarket` is STRICT INSERT-ONLY (plain
+// INSERT, no onConflict): a supplied existing/arbitrary id REJECTS (never
+// upserts), so it cannot mutate any existing market's data. Mapped from the
+// markets-PK 23505 to a typed error (never a raw 500); wire code
+// `market_id_conflict`.
+export class MarketIdConflictError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = "MarketIdConflictError";
+	}
+}

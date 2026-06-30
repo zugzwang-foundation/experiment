@@ -173,9 +173,26 @@ export const eventPayloadSchemas = {
 	// market lifecycle. resolutionDeadline is an ISO-8601 instant with offset.
 	// seedAmount (the CPMM seed, numericString) rides market.opened — the
 	// seed instant is Draft → Open, not creation (R-14.1, ENGINE.14).
+	// MEDIA.1 (OD-2): the media manifest rides the EXISTING market.created event
+	// — NO new EVENT_TYPE, NO new aggregate_type (EVENT_TYPES stays 23). `media`
+	// is the at-create image set (object key + carousel order + default flag;
+	// the mediaId is not recorded — the R2 key is the durable reference);
+	// `mediaVideoUrl` is the optional outbound YouTube link (null when unset).
+	// Required fields: the sole emitter is `createMarket`, which always supplies
+	// them, and no read-side replay re-validates this schema (write-time only).
 	"market.created": z.object({
 		marketId: z.string().uuid(),
 		resolutionDeadline: z.string().datetime({ offset: true }),
+		media: z
+			.array(
+				z.object({
+					key: z.string(),
+					displayOrder: z.number().int().nonnegative(),
+					isDefault: z.boolean(),
+				}),
+			)
+			.min(1),
+		mediaVideoUrl: z.string().nullable(),
 	}),
 	"market.opened": z.object({
 		marketId: z.string().uuid(),

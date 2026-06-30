@@ -105,13 +105,41 @@ function adminMetadata(flowId: string) {
 	};
 }
 
+/** MEDIA.1 — a media manifest entry (the createMarket / FormData shape). */
+type MediaItem = {
+	mediaId: string;
+	key: string;
+	displayOrder: number;
+	isDefault: boolean;
+};
+
+/** A valid one-image manifest (≥1 image, exactly one default) for `marketId`. */
+function defaultMedia(marketId: string): MediaItem[] {
+	const mediaId = uuidv7();
+	return [
+		{
+			mediaId,
+			key: `m/${marketId}/${mediaId}.jpg`,
+			displayOrder: 0,
+			isDefault: true,
+		},
+	];
+}
+
+// MEDIA.1: every createMarket call now threads the client-pre-generated UUIDv7
+// PK (`marketId`) + a valid media manifest. The reject scenarios get a fresh
+// id + a valid manifest so they reach their intended reject with the new
+// required fields supplied; happy paths read `args.marketId`/`args.media` back.
 function createArgs(slug: string, resolutionDeadline: Date) {
+	const marketId = uuidv7();
 	return {
+		marketId,
 		slug,
 		title: TITLE,
 		description: DESCRIPTION,
 		resolutionDeadline,
 		now: NOW,
+		media: defaultMedia(marketId),
 		metadata: adminMetadata("F-ADMIN-1"),
 	};
 }
@@ -163,13 +191,13 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 		// deadline == FREEZE passes ("≤" per SPEC.1 §12.1). The supplied-eventId
 		// round-trip rides this boundary call: the explicit uuidv7() is used
 		// VERBATIM (createdEventId === supplied === the events row's event_id).
+		const args = createArgs("placeholder-m1-boundary", FREEZE_INSTANT_UTC);
 		const suppliedEventId = uuidv7();
-		const result = await createMarket({
-			...createArgs("placeholder-m1-boundary", FREEZE_INSTANT_UTC),
-			eventId: suppliedEventId,
-		});
+		const result = await createMarket({ ...args, eventId: suppliedEventId });
 
 		expect(result.status).toBe("Draft");
+		// MEDIA.1: the client-supplied UUIDv7 PK is inserted VERBATIM.
+		expect(result.marketId).toBe(args.marketId);
 		expect(result.createdEventId).toBe(suppliedEventId);
 		expect(result.createdEventId).not.toBe(result.marketId);
 
@@ -201,13 +229,13 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 	it("admin-markets::M2-create-happy-draft-and-event", async () => {
 		// NO eventId supplied — the mint-if-absent path: the service mints ONCE
 		// at entry (closed over across W-4 retries) and returns it.
-		const result = await createMarket(
-			createArgs("placeholder-m2-happy", DEADLINE),
-		);
+		const args = createArgs("placeholder-m2-happy", DEADLINE);
+		const result = await createMarket(args);
 
-		// D-14.f response shape — key-set EXACT.
+		// D-14.f response shape — key-set EXACT. MEDIA.1: the returned marketId
+		// is the client-supplied UUIDv7 PK (inserted VERBATIM), not a DB default.
 		expect(result).toEqual({
-			marketId: result.marketId,
+			marketId: args.marketId,
 			slug: "placeholder-m2-happy",
 			status: "Draft",
 			createdEventId: result.createdEventId,
@@ -234,13 +262,21 @@ describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 			createdBy: "admin-singleton",
 		});
 
-		// Exactly ONE market.created events row; payload EXACT — NO seedAmount
-		// key (R-14.1: the seed instant is Draft → Open, not creation).
+		// Exactly ONE market.created events row. MEDIA.1 OD-2: the SAME
+		// "market.created" event, payload EXTENDED with the media manifest
+		// ({key,displayOrder,isDefault} — NO mediaId) + the normalized
+		// mediaVideoUrl (null when omitted). Still no seedAmount (R-14.1).
 		const eventRows = await createdEventRows();
 		expect(eventRows.length).toBe(1);
 		expect(eventRows[0]?.payload).toEqual({
-			marketId: result.marketId,
+			marketId: args.marketId,
 			resolutionDeadline: DEADLINE.toISOString(),
+			media: args.media.map((m) => ({
+				key: m.key,
+				displayOrder: m.displayOrder,
+				isDefault: m.isDefault,
+			})),
+			mediaVideoUrl: null,
 		});
 		const metadata = eventRows[0]?.metadata as {
 			actor_id?: unknown;
@@ -322,17 +358,32 @@ function datetimeLocal(d: Date): string {
 	return d.toISOString().slice(0, 16);
 }
 
+// MEDIA.1: the admin create FormData now also carries the client-pre-generated
+// UUIDv7 `marketId`, the `media` manifest (a JSON string), and an optional
+// `mediaVideoUrl`. `marketId`/`media` default to a fresh id + a valid one-image
+// manifest so the existing reject scenarios reach their intended reject with the
+// new required fields supplied; the happy path overrides both to assert the
+// round-tripped payload exactly.
 function createFormData(fields: {
 	slug: string;
 	title: string;
 	description: string;
 	resolutionDeadline: Date;
+	marketId?: string;
+	media?: MediaItem[];
+	mediaVideoUrl?: string;
 }): FormData {
 	const fd = new FormData();
 	fd.append("slug", fields.slug);
 	fd.append("title", fields.title);
 	fd.append("description", fields.description);
 	fd.append("resolutionDeadline", datetimeLocal(fields.resolutionDeadline));
+	const marketId = fields.marketId ?? uuidv7();
+	fd.append("marketId", marketId);
+	fd.append("media", JSON.stringify(fields.media ?? defaultMedia(marketId)));
+	if (fields.mediaVideoUrl !== undefined) {
+		fd.append("mediaVideoUrl", fields.mediaVideoUrl);
+	}
 	return fd;
 }
 
@@ -352,21 +403,31 @@ describe("createMarketAction wire surface", () => {
 	it("create-market::happy-path-draft-and-event", async () => {
 		await withAdminSession();
 
+		// MEDIA.1: explicit client-pre-generated marketId + a one-image manifest
+		// so the round-tripped event payload is asserted exactly.
+		const marketId = uuidv7();
+		const mediaId = uuidv7();
+		const key = `m/${marketId}/${mediaId}.jpg`;
+		const media: MediaItem[] = [
+			{ mediaId, key, displayOrder: 0, isDefault: true },
+		];
+
 		const result = await createMarketAction(
 			createFormData({
 				slug: "wire-create-happy",
 				title: "PLACEHOLDER — not a real market",
 				description: "PLACEHOLDER criterion — not a real criterion",
 				resolutionDeadline: WIRE_NOW_DEADLINE,
+				marketId,
+				media,
 			}),
 		);
 
-		// Lead with the envelope assertion so RED is clean (got
-		// { ok: false, error: { code: "stub_not_implemented" } }).
 		expect(result.ok).toBe(true);
 		if (!result.ok) throw new Error("unreachable — asserted ok above");
 		expect(result.data.slug).toBe("wire-create-happy");
-		expect(typeof result.data.marketId).toBe("string");
+		// The client-supplied UUIDv7 PK round-trips (inserted VERBATIM).
+		expect(result.data.marketId).toBe(marketId);
 
 		// Exactly ONE markets row in Draft.
 		const marketRows = await testDb
@@ -376,13 +437,15 @@ describe("createMarketAction wire surface", () => {
 		expect(marketRows.length).toBe(1);
 		expect(marketRows[0]?.status).toBe("Draft");
 
-		// Exactly ONE market.created events row; canonical payload
-		// { marketId, resolutionDeadline } (no seedAmount — R-14.1).
+		// Exactly ONE market.created events row; payload EXTENDED with the media
+		// manifest + mediaVideoUrl (null when omitted) — still "market.created".
 		const eventRows = await createdEventRows();
 		expect(eventRows.length).toBe(1);
 		expect(eventRows[0]?.payload).toEqual({
-			marketId: result.data.marketId,
+			marketId,
 			resolutionDeadline: WIRE_NOW_DEADLINE.toISOString(),
+			media: [{ key, displayOrder: 0, isDefault: true }],
+			mediaVideoUrl: null,
 		});
 	});
 

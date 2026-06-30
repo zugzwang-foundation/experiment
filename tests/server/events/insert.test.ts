@@ -200,9 +200,16 @@ const CASES: Case[] = [
 	{
 		eventType: "market.created",
 		aggregateType: "market",
+		// MEDIA.1: the market.created payload now carries the at-create media
+		// manifest (≥1 image) + the optional outbound video URL (OD-2). Still
+		// the SAME event type / aggregate_type — EVENT_TYPES stays 23.
 		buildPayload: ({ aggregateId }) => ({
 			marketId: aggregateId,
 			resolutionDeadline: "2026-11-06T23:59:00+05:30",
+			media: [
+				{ key: `m/${aggregateId}/img.jpg`, displayOrder: 0, isDefault: true },
+			],
+			mediaVideoUrl: null,
 		}),
 		actorId: () => "admin-singleton",
 		userIdInMetadata: () => null,

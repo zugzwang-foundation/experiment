@@ -89,10 +89,25 @@ export const imagePutUrlPerIp = new Ratelimit({
 	analytics: false,
 });
 
+// MEDIA.1 (OD-4) — per-IP anti-abuse cap on the admin market-media signed-PUT
+// mint (`/admin/markets/media/sign`). Distinct surface (distinct prefix —
+// the §11 disjointness invariant) from the participant `image-put-ip`; reuses
+// the same per-minute limit value. Anti-abuse on the URL-mint, NOT moderation.
+export const adminMediaPutUrlPerIp = new Ratelimit({
+	redis,
+	limiter: Ratelimit.slidingWindow(
+		IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
+		"1 m",
+	),
+	prefix: getRedisKey("ratelimit", "admin-media-put-ip"),
+	analytics: false,
+});
+
 /**
  * String-literal union of valid surface keys consumed by `checkRateLimit`.
- * Each value maps 1:1 to one of the seven Ratelimit instances declared
- * above, which in turn map 1:1 to SPEC.2 §11's per-surface table.
+ * Each value maps 1:1 to one of the eight Ratelimit instances declared above:
+ * the seven SPEC.2 §11 per-surface-table rows + the MEDIA.1
+ * `adminMediaPutUrlPerIp` arm (a §11 table row to be synced in the SPEC sweep).
  */
 export type RateLimitSurface =
 	| "otpRequestPerEmail"
@@ -101,7 +116,8 @@ export type RateLimitSurface =
 	| "writeBudgetPerMarket"
 	| "writeBurstPerUser"
 	| "betPerIp"
-	| "imagePutUrlPerIp";
+	| "imagePutUrlPerIp"
+	| "adminMediaPutUrlPerIp";
 
 const SURFACE_INSTANCES: Record<RateLimitSurface, Ratelimit> = {
 	otpRequestPerEmail,
@@ -111,6 +127,7 @@ const SURFACE_INSTANCES: Record<RateLimitSurface, Ratelimit> = {
 	writeBurstPerUser,
 	betPerIp,
 	imagePutUrlPerIp,
+	adminMediaPutUrlPerIp,
 };
 
 /**
