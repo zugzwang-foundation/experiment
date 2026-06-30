@@ -11,7 +11,7 @@
 | Field | Value |
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
-| **Version** | 1.0.13 |
+| **Version** | 1.0.14 |
 | **Date** | 2026-06-30 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
@@ -61,6 +61,7 @@
 | 1.0.11 | 2026-06-29 | HMH | **§21 amendment pass (ADR-0025 debate `.md` export + §21.6 descope) — SPEC.2 back-pressure.** §22 ADR Index: ADR-0025 (debate `.md` export) added as a row (status accepted, 2026-06-29); inventory 22 → 23 (22 ADR files + ADR-0012 in-flight; 20 accepted + 2 superseded + 1 in-flight); §22.1 heading + §22.5 source-of-truth counts reconciled; upper bound `0024` → `0025`. ADR-0025 ratifies the debate `.md` export serving model (on-demand read-only §3.3 R-1; masking inherited from `loadDebateView`; text-only single file; embedded version-pinned `zugzwang.md` context) — the export route + button **build** lands in §4 at build time (deferred, ritual-gated). Companion serialization contract `docs/specs/debate-export.md`; context asset `public/zugzwang.md`. Paired with SPEC.1 1.0.10 (§21 amendment pass). No schema change (docs only). |
 | 1.0.12 | 2026-06-30 | HMH | **ADR-0026 market-media riders** (same-commit with the accepted ADR; paired with SPEC.1 → 1.0.11). **§5.1** new `market_media` table (#23, **Bucket C**, markets domain, admin-owned, **no `user_id`**) — total 22 → 23 tables, Bucket C 10 → 11, protected set unchanged (12), domains unchanged (10); the `comments` row gains a nullable set-on-insert FK `market_media_id` + the not-both-set CHECK (Bucket-A classification unchanged); the `markets` row gains a nullable `media_video_url`; the §5 ADRs-consumed list adds ADR-0026. **§5.2** Bucket-C summary 10 → 11 (+ `market_media`). **§12.1** third R2 bucket arm `market-media` (`m/<marketId>/` namespace, isolated `R2_*_MARKET_MEDIA` credentials, static lifecycle). **§4.3** admin market-media upload route forward-note (admin-context signed-PUT + moderation-at-upload, distinct from the participant `/api/uploads/sign`; build-deferred to §4). **§22** ADR-0026 index row (23 → 24 ADRs; 20 → 21 accepted; "24-row index"; §22.5 SSOT counts). **Appendix A** extends the `markets.ts` / `r2.ts` / `precommit.ts` rows with the ADR-0026 build extensions. **Appendix B** new B.16 `market_media` (SHIP, no PII) + the `markets.media_video_url` + `comments.market_media_id` rows + coverage count 15 → 16 tables. No migration authored (build-deferred to a new migration, head `0018` → `0019` at execute). **§0** version → 1.0.12, date → 2026-06-30. |
 | 1.0.13 | 2026-06-30 | HMH | **ADR-0027 — admin market-media direct upload (no moderation)** (same-commit; paired with SPEC.1 → 1.0.12). §4.3 admin-upload forward-note: moderation-caller clause removed — market-media written directly, no moderation-at-upload (ADR-0027). §12.1: 'moderation-at-upload' dropped from the build note. Appendix A `precommit.ts` row: ADR-0026 admin-caller clause → ADR-0027 'not moderated, does not call this file'. Appendix B.16: 'pre-vetted / pre-moderated' → 'operator-curated'. §22 ADR-0027 row added (24 → 25 ADRs; 21 → 22 accepted), ADR-0026 row annotated. §0 → 1.0.13. No data-model/migration change. The phantom `/api/admin/uploads/sign` (F-ADMIN-4 mislabel) is NOT addressed here — separate deferred SPEC-sweep item per MEDIA.1 OD-4. |
+| 1.0.14 | 2026-06-30 | HMH | **MEDIA.1 footprint into canon** (PR #184, `a08fc46`). **§11** gains the admin market-media signed-PUT per-IP surface (`admin-media-put-ip:{ip}`, 1m, REUSES `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` — no new constant). **§4.3** catalogue (count Nine → Ten Route Handlers + forward-note now points at the built route) + **§4.6** rate-limit class + **§12.10** SSOT + **Appendix A** document the real route `/admin/markets/media/sign` (`src/app/(admin)/admin/markets/media/sign/route.ts` — under the `(admin)/` group, admin cookie `Path=/admin`, NOT `/api/admin/...`; admin-session-gated, forked from the participant sign route, per-IP capped). **§0** version → 1.0.14. NOT addressed (separate backlog): the phantom `POST /api/admin/uploads/sign` (F-ADMIN-4) refs + the stale 'moderation affordance' label; the `rate-limit.ts` write-budget/write-burst code↔§11 drift. |
 
 ---
 
@@ -405,7 +406,7 @@ Every Server Action returns a typed result object discriminated by `ok: true | f
 
 ### §4.3 Route Handlers catalogue
 
-Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primitive 7 (no `runtime = 'edge'` exports under `src/server/{bets,comments,dharma,resolution}/` or anywhere downstream).
+Ten Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primitive 7 (no `runtime = 'edge'` exports under `src/server/{bets,comments,dharma,resolution}/` or anywhere downstream).
 
 | Method + path | Family | File path | Auth | Idempotency-Key | SPEC.1 F-* |
 |---|---|---|---|---|---|
@@ -413,6 +414,7 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 | `POST /api/bets/sell` | F4 | `src/app/api/bets/sell/route.ts` | Participant | **Required** | F-BET-3 |
 | `POST /api/uploads/sign` | F6 | `src/app/api/uploads/sign/route.ts` | Participant | Optional | F-COMMENT-3 prep |
 | `POST /api/admin/uploads/sign` | F5 | `src/app/api/admin/uploads/sign/route.ts` | Admin | Optional | F-ADMIN-4 image affordance prep |
+| `POST /admin/markets/media/sign` | F5 | `src/app/(admin)/admin/markets/media/sign/route.ts` | Admin | Optional | F-ADMIN-1 market-media upload (MEDIA.1) |
 | `GET/POST /api/auth/[...all]` | F6 | (Better Auth mounted) `src/app/api/auth/[...all]/route.ts` | Pre-auth | N/A | F-AUTH-1 OAuth callback, OTP request, session validation |
 | `GET /api/cron/r2-orphan-sweep` | F6 | `src/app/api/cron/r2-orphan-sweep/route.ts` | Bearer `CRON_SECRET` | N/A | A-2 cron pattern (Vercel Cron contract supports GET only) |
 | `GET /api/health` | F6 | `src/app/api/health/route.ts` | None | N/A | Liveness probe |
@@ -423,7 +425,7 @@ Nine Route Handlers in v1. All run on the Node.js runtime per ADR-0003 §Primiti
 
 **Bet endpoint Origin defense.** Both `/api/bets/place` and `/api/bets/sell` validate the `Origin` header at handler entry via the cross-cutting `src/server/middleware/origin-allowlist.ts` (allowlist derived from `BETTER_AUTH_URL`, per §4.1) — mismatch returns HTTP 403 with no state changes. This compensates for the loss of Server Actions' built-in origin check. (The earlier per-endpoint `src/server/bets/origin-check.ts` / `ALLOWED_ORIGINS` design is superseded by that single cross-cutting helper — §4.1 — and is not on disk.)
 
-**Market-media admin upload (ADR-0026; forward — lands at build).** An admin-context market-media upload surface — an admin signed-PUT mint into the `market-media` bucket (§12.1) plus the create-form media handling — lands here at **build** time under the admin surface (`src/server/admin/markets/…`), **distinct** from the participant `POST /api/uploads/sign` (which is hard-bound to a participant session). Per ADR-0027, market-media is operator-curated trusted content and is **not** moderated on upload (the moderation pipeline gates untrusted user-generated content; the admin is structurally not a participant) — the admin signed-PUT writes the `market_media` row directly, with no moderation caller. Auth contract: admin session (`admin_sessions`), validated at the handler boundary per §4.5. The exact route shape + file is owned by the admin-create build task.
+**Market-media admin upload (ADR-0026; forward — lands at build).** An admin-context market-media upload surface — an admin signed-PUT mint into the `market-media` bucket (§12.1) plus the create-form media handling — lands here at **build** time under the admin surface (`src/server/admin/markets/…`), **distinct** from the participant `POST /api/uploads/sign` (which is hard-bound to a participant session). Per ADR-0027, market-media is operator-curated trusted content and is **not** moderated on upload (the moderation pipeline gates untrusted user-generated content; the admin is structurally not a participant) — the admin signed-PUT writes the `market_media` row directly, with no moderation caller. Auth contract: admin session (`admin_sessions`), validated at the handler boundary per §4.5. **Built at MEDIA.1** as the Route Handler `POST /admin/markets/media/sign` (`src/app/(admin)/admin/markets/media/sign/route.ts`, catalogued above) — placed under the `(admin)/` route group, NOT `/api/admin/...`, so the `Path=/admin` admin session cookie reaches it; admin-session-gated, forked from the participant sign route, per-IP capped (`admin-media-put-ip`, §11).
 
 ### §4.4 Request / response envelope
 
@@ -456,6 +458,7 @@ Every endpoint in §4.2 / §4.3 is bound to a rate-limit class from §11's per-s
 | `placeDirectComment`, `placeReply`, `placeImageComment` (comment-bearing bets) | `bet-ip` (per IP, 1m) — the bet anti-abuse posture (posts/replies are bets, per SPEC.1 §8). Whether reply-bets additionally carry a per-market productive cap is **deferred to §11 + the number-tuning pass** |
 | `POST /api/bets/place`, `POST /api/bets/sell` | `bet-ip` (per IP, 1m) |
 | `POST /api/uploads/sign` | `image-put-ip` (per IP, 1m) |
+| `POST /admin/markets/media/sign` (F-ADMIN-1 market-media upload) | `admin-media-put-ip` (per IP, 1m) |
 | `POST /api/admin/uploads/sign` | None — admin path |
 | F-RESOLVE-1/2/3, F-ADMIN-1/2/3/4/5 | None — admin path |
 | F1 public read pages, `/api/health`, `/api/dataset/manifest` | None — read-only |
@@ -1142,6 +1145,7 @@ Every state-mutating endpoint runs through a five-step shared contract: auth gat
 | Admin login (per-IP) | `admin-login-ip:{ip}` | 1h | `ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR` |
 | Bet `place` / `sell` **and comment-bearing bets** (posts/replies) per-IP anti-abuse burst | `bet-ip:{ip}` | 1m | `BET_ATTEMPTS_PER_IP_PER_MIN` *(new — minted by ADR-0015)* |
 | R2 signed-PUT URL mint per-IP | `image-put-ip:{ip}` | 1m | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` *(new — minted by ADR-0015)* |
+| Admin market-media signed-PUT URL mint (per-IP burst) | `admin-media-put-ip:{ip}` | 1m | `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` (reused — ADR-0026 / MEDIA.1; no new constant) |
 
 Under the v1.9.0 reply-as-bet model there is **no standalone comment or vote rate-limit budget** — the v1.8.x `write-budget` (per-market 24h) + `write-burst` (per-user 1m) pair is removed, and friendly-fire is gone entirely. Posts and replies are bets, so their anti-abuse posture is the bet posture: the per-IP burst cap (`bet-ip`, `BET_ATTEMPTS_PER_IP_PER_MIN`). Bet placement and image-PUT-URL surfaces use **per-IP** identifiers because the threat model is credential-stuffed bot traffic across many compromised accounts; per-user limits only fire after a successful login and are the wrong defense surface. **Open question (deferred):** whether reply-bets warrant an *additional* per-market productive cap distinct from top-level bets (which are exempt from a per-market productive cap by design) — to bound reply-flooding within a single market — is left to the HARDEN.6 number-tuning pass per SPEC.1 §8; if adopted it would mint a new per-market reply-bet constant, otherwise the per-IP cap is the sole control. Numeric values for every constant are deferred to HARDEN.6 per the project-wide deferral rule.
 
@@ -1299,6 +1303,7 @@ Fourteen-row partition of concerns. §12 owns the structural and flow-contract s
 |---|---|
 | `POST /api/uploads/sign` Route Handler | `src/app/api/uploads/sign/route.ts` |
 | `POST /api/admin/uploads/sign` Route Handler (admin moderation affordance) | `src/app/api/admin/uploads/sign/route.ts` |
+| `POST /admin/markets/media/sign` Route Handler (admin market-media signed-PUT mint, MEDIA.1) | `src/app/(admin)/admin/markets/media/sign/route.ts` |
 | Server logic for sign-URL mint + `image_uploads` insert | `src/server/storage/sign-upload.ts` |
 | Signed-READ URL helper (consumed by §10 moderation) | `src/server/storage/sign-read.ts` |
 | Drizzle schema for `image_uploads` | `src/db/schema/image-uploads.ts` |
@@ -2468,6 +2473,7 @@ Files are grouped into seven categories for readability: **A.1** Drizzle schema 
 | `src/app/api/bets/sell/route.ts` | F-BET-3 bet sell Route Handler | §4 |
 | `src/app/api/uploads/sign/route.ts` | Participant signed-PUT URL mint Route Handler (per §12.3) | §4, §12.10 |
 | `src/app/api/admin/uploads/sign/route.ts` | Admin signed-PUT URL mint Route Handler (F-ADMIN-4 image affordance) | §12.10 |
+| `src/app/(admin)/admin/markets/media/sign/route.ts` | Admin market-media signed-PUT URL mint Route Handler (MEDIA.1 — admin-session-gated, forked from the participant sign route, per-IP capped via `admin-media-put-ip`) | §4.3, §12.10 |
 | `src/app/api/cron/r2-orphan-sweep/route.ts` | Vercel Cron orphan-sweep target (Bearer `CRON_SECRET`) — A-2 cron pattern | §4, §12.10 |
 | `src/app/api/health/route.ts` | Liveness probe | §4 |
 | `src/app/api/dataset/manifest/route.ts` | F-DATASET-1 manifest endpoint (post-2026-11-06; HTTP 503 pre-release per §19.7) | §4, §19.8 |
