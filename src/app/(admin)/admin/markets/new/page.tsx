@@ -1,12 +1,13 @@
-import { redirect } from "next/navigation";
-
-import { createMarketAction } from "@/server/admin/markets/create";
 import { requireAdminPage } from "@/server/admin/page-guards";
 
-// ENGINE.15 S3 — R-15.1 create form. Server Component, ZERO client JS (D-15.e).
-// The inline wrapper calls the wire action and surfaces the result via a
-// redirect param (the R-15.6 / D-15.e pattern); the service + state machine
-// remain the real gate.
+import { CreateMarketForm } from "./create-market-form";
+
+// ENGINE.15 S3 — R-15.1 create form. MEDIA.1: the form now sets the market-media
+// pool at create, which mandates out-of-band signed-PUT (browser → R2 direct).
+// The D-15.e zero-client-JS posture is intentionally broken here — SPEC-mandated
+// (SPEC.1 §15 / K3), not optional — so the page is a thin Server Component shell
+// (admin gate + initial error param) wrapping the `CreateMarketForm` client
+// island. The service + state machine remain the real gate.
 export default async function NewMarketPage(props: {
 	searchParams: Promise<{ error?: string }>;
 }): Promise<React.ReactElement> {
@@ -14,43 +15,10 @@ export default async function NewMarketPage(props: {
 
 	const { error } = await props.searchParams;
 
-	async function submit(formData: FormData): Promise<void> {
-		"use server";
-		const result = await createMarketAction(formData);
-		if (result.ok) {
-			redirect(`/admin/markets/${result.data.marketId}?ok=created`);
-		}
-		redirect(`/admin/markets/new?error=${result.error.code}`);
-	}
-
 	return (
 		<main>
 			<h1>New market</h1>
-			{error ? <p>Error: {error}</p> : null}
-			<form action={submit}>
-				<p>
-					<label>
-						Slug <input name="slug" required />
-					</label>
-				</p>
-				<p>
-					<label>
-						Title (question) <input name="title" required />
-					</label>
-				</p>
-				<p>
-					<label>
-						Resolution criterion <textarea name="description" required />
-					</label>
-				</p>
-				<p>
-					<label>
-						Resolution deadline{" "}
-						<input type="datetime-local" name="resolutionDeadline" required />
-					</label>
-				</p>
-				<button type="submit">Create</button>
-			</form>
+			<CreateMarketForm initialError={error} />
 		</main>
 	);
 }

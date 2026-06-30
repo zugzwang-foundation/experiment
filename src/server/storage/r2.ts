@@ -28,7 +28,7 @@ import {
 // the same posture as `src/server/upstash/redis.ts` (env-validate at load,
 // throw with a pointer to .env.example on missing values).
 
-type R2Bucket = "uploads" | "pfp";
+type R2Bucket = "uploads" | "pfp" | "market-media";
 
 interface R2BucketEnv {
 	endpoint: string;
@@ -50,13 +50,31 @@ function resolveBucketEnv(bucket: R2Bucket): R2BucketEnv {
 		}
 		return { endpoint, accessKeyId, secretAccessKey, bucketName };
 	}
-	const endpoint = process.env.R2_ENDPOINT_PFP;
-	const accessKeyId = process.env.R2_ACCESS_KEY_ID_PFP;
-	const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_PFP;
-	const bucketName = process.env.R2_BUCKET_PFP;
+	if (bucket === "pfp") {
+		const endpoint = process.env.R2_ENDPOINT_PFP;
+		const accessKeyId = process.env.R2_ACCESS_KEY_ID_PFP;
+		const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_PFP;
+		const bucketName = process.env.R2_BUCKET_PFP;
+		if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
+			throw new Error(
+				"R2 pfp env not configured: set R2_ENDPOINT_PFP, R2_ACCESS_KEY_ID_PFP, R2_SECRET_ACCESS_KEY_PFP, R2_BUCKET_PFP (see .env.example).",
+			);
+		}
+		return { endpoint, accessKeyId, secretAccessKey, bucketName };
+	}
+
+	// ADR-0026 #2 / SPEC.2 §12.1: the third `market-media` bucket arm, with its
+	// OWN isolated credentials (R2_*_MARKET_MEDIA) — preserves the per-bucket
+	// compromise-isolation property (a leak in one token's creds cannot reach
+	// another bucket). Admin-set per-market media in the `m/<marketId>/`
+	// namespace.
+	const endpoint = process.env.R2_ENDPOINT_MARKET_MEDIA;
+	const accessKeyId = process.env.R2_ACCESS_KEY_ID_MARKET_MEDIA;
+	const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY_MARKET_MEDIA;
+	const bucketName = process.env.R2_BUCKET_MARKET_MEDIA;
 	if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
 		throw new Error(
-			"R2 pfp env not configured: set R2_ENDPOINT_PFP, R2_ACCESS_KEY_ID_PFP, R2_SECRET_ACCESS_KEY_PFP, R2_BUCKET_PFP (see .env.example).",
+			"R2 market-media env not configured: set R2_ENDPOINT_MARKET_MEDIA, R2_ACCESS_KEY_ID_MARKET_MEDIA, R2_SECRET_ACCESS_KEY_MARKET_MEDIA, R2_BUCKET_MARKET_MEDIA (see .env.example).",
 		);
 	}
 	return { endpoint, accessKeyId, secretAccessKey, bucketName };

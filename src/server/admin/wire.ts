@@ -8,15 +8,19 @@ import { AdminActorError } from "@/server/admin/actor";
 import { validateAdminSession } from "@/server/auth/admin/validate";
 import type { eventMetadataSchema } from "@/server/events/schemas";
 import {
+	DefaultMediaRequiredError,
 	LifecycleSerializationExhaustedError,
 	MarketContentRequiredError,
 	MarketDeadlineCeilingError,
 	MarketDeadlineInPastError,
 	MarketDeadlineNotReachedError,
+	MarketIdConflictError,
 	MarketLifecycleStateError,
 	MarketSeedInvalidError,
 	MarketSlugInvalidError,
 	MarketSlugTakenError,
+	MarketVideoUrlInvalidError,
+	MediaRequiredError,
 } from "@/server/markets/errors";
 import type { LifecycleFlow } from "@/server/markets/transaction";
 import {
@@ -210,6 +214,30 @@ export function toActionError(
 		return err(
 			"content_required",
 			"Title and resolution criterion are required.",
+		);
+	}
+	// MEDIA.1 (SPEC.1 §15 F-ADMIN-1 media errors).
+	if (error instanceof MediaRequiredError) {
+		return err(
+			"media_required",
+			"At least one market-media image is required.",
+		);
+	}
+	if (error instanceof DefaultMediaRequiredError) {
+		return err(
+			"default_media_required",
+			"Exactly one media image must be set as the default.",
+		);
+	}
+	if (error instanceof MarketVideoUrlInvalidError) {
+		return err("video_url_invalid", "The video URL must be a YouTube URL.");
+	}
+	// MEDIA.1 (Q3): the client-supplied marketId PK already exists — strict
+	// insert-only reject, surfaced typed (never a raw 500).
+	if (error instanceof MarketIdConflictError) {
+		return err(
+			"market_id_conflict",
+			"That market id already exists; please retry.",
 		);
 	}
 	if (error instanceof MarketDeadlineInPastError) {

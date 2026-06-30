@@ -134,6 +134,13 @@
       "when": 1782236302559,
       "tag": "0018_drop_friendly_fire_events",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1782832985700,
+      "tag": "0019_market_media",
+      "breakpoints": true
     }
   ]
 }

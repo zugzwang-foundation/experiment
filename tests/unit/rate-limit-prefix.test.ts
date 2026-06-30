@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 // Per SCAFFOLD.8 plan §4.5 Test 2 — rate-limit ctor prefix audit.
 //
-// `rate-limit.ts` constructs seven `Ratelimit` instances at module-load.
+// `rate-limit.ts` constructs eight `Ratelimit` instances at module-load
+// (seven SCAFFOLD.8 surfaces + the MEDIA.1 `adminMediaPutUrlPerIp` arm).
 // After the C4 refactor each `prefix:` literal flows through
 // `getRedisKey()`, which prepends `process.env.ZUGZWANG_ENV` as the
 // leftmost segment. This test mocks the `Ratelimit` ctor, dynamically
@@ -43,12 +44,17 @@ vi.mock("@/server/upstash/redis", () => ({ redis: {} }));
 vi.mock("@sentry/nextjs", () => ({ captureException: vi.fn() }));
 
 describe("Ratelimit prefixes", () => {
-	it("constructs all 7 surfaces with env-prefixed prefix at module-load", async () => {
+	it("constructs all 8 surfaces with env-prefixed prefix at module-load", async () => {
 		process.env.ZUGZWANG_ENV = "prod";
 		await import("@/server/middleware/rate-limit");
-		expect(hoisted.ctors).toHaveLength(7);
+		expect(hoisted.ctors).toHaveLength(8);
 		for (const c of hoisted.ctors) {
 			expect(c.prefix).toMatch(/^prod:ratelimit:/);
 		}
+		// MEDIA.1: the admin market-media signed-PUT cap is its own surface with
+		// a distinct prefix (the §11 disjointness invariant).
+		expect(hoisted.ctors.map((c) => c.prefix)).toContain(
+			"prod:ratelimit:admin-media-put-ip",
+		);
 	});
 });
