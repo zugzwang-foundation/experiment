@@ -7,8 +7,6 @@ import {
 	IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
 	OTP_REQUESTS_PER_EMAIL_PER_HOUR,
 	OTP_REQUESTS_PER_IP_BURST_PER_MIN,
-	RATE_LIMIT_BURST_PER_MIN,
-	RATE_LIMIT_PER_MARKET_PER_DAY,
 } from "@/server/config/limits";
 import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
@@ -18,7 +16,7 @@ import { redis } from "@/server/upstash/redis";
  * ¶"Per-surface rate-limit table" + ADR-0015 D6 (sliding-window via
  * `@upstash/ratelimit` v2.0.8 `Ratelimit.slidingWindow(maxRequests, window)`).
  *
- * Seven Ratelimit instances, one per surface row in §11. Each instance is
+ * Six Ratelimit instances, one per surface row in §11. Each instance is
  * constructed once at module-load with a distinct `prefix` (load-bearing
  * for the disjointness invariant per SPEC.2 §11 ¶"Distinction from §10";
  * also disjoint from `cache.ts`'s `idem:*` key space). Identifier-extraction
@@ -58,20 +56,6 @@ export const adminLoginPerIp = new Ratelimit({
 	analytics: false,
 });
 
-export const writeBudgetPerMarket = new Ratelimit({
-	redis,
-	limiter: Ratelimit.slidingWindow(RATE_LIMIT_PER_MARKET_PER_DAY, "24 h"),
-	prefix: getRedisKey("ratelimit", "write-budget"),
-	analytics: false,
-});
-
-export const writeBurstPerUser = new Ratelimit({
-	redis,
-	limiter: Ratelimit.slidingWindow(RATE_LIMIT_BURST_PER_MIN, "1 m"),
-	prefix: getRedisKey("ratelimit", "write-burst"),
-	analytics: false,
-});
-
 export const betPerIp = new Ratelimit({
 	redis,
 	limiter: Ratelimit.slidingWindow(BET_ATTEMPTS_PER_IP_PER_MIN, "1 m"),
@@ -105,16 +89,13 @@ export const adminMediaPutUrlPerIp = new Ratelimit({
 
 /**
  * String-literal union of valid surface keys consumed by `checkRateLimit`.
- * Each value maps 1:1 to one of the eight Ratelimit instances declared above:
- * the seven SPEC.2 §11 per-surface-table rows + the MEDIA.1
- * `adminMediaPutUrlPerIp` arm (a §11 table row to be synced in the SPEC sweep).
+ * Each value maps 1:1 to one of the six Ratelimit instances declared above,
+ * one per SPEC.2 §11 per-surface-table row.
  */
 export type RateLimitSurface =
 	| "otpRequestPerEmail"
 	| "otpRequestPerIpBurst"
 	| "adminLoginPerIp"
-	| "writeBudgetPerMarket"
-	| "writeBurstPerUser"
 	| "betPerIp"
 	| "imagePutUrlPerIp"
 	| "adminMediaPutUrlPerIp";
@@ -123,8 +104,6 @@ const SURFACE_INSTANCES: Record<RateLimitSurface, Ratelimit> = {
 	otpRequestPerEmail,
 	otpRequestPerIpBurst,
 	adminLoginPerIp,
-	writeBudgetPerMarket,
-	writeBurstPerUser,
 	betPerIp,
 	imagePutUrlPerIp,
 	adminMediaPutUrlPerIp,
@@ -149,12 +128,6 @@ export type RateLimitDecision =
  */
 export const ipIdentifier = (ip: string): string => ip;
 export const otpEmailIdentifier = (email: string): string => email;
-export const writeBudgetIdentifier = (
-	userId: string,
-	marketId: string,
-): string => `user:${userId}:market:${marketId}`;
-export const writeBurstIdentifier = (userId: string): string =>
-	`user:${userId}`;
 
 /**
  * Surface-keyed dispatcher per SPEC.2 §11 ¶"In-handler call sequence"

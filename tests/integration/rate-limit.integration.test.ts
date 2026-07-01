@@ -100,8 +100,6 @@ import {
 	IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN,
 	OTP_REQUESTS_PER_EMAIL_PER_HOUR,
 	OTP_REQUESTS_PER_IP_BURST_PER_MIN,
-	RATE_LIMIT_BURST_PER_MIN,
-	RATE_LIMIT_PER_MARKET_PER_DAY,
 } from "@/server/config/limits";
 import {
 	betPerIp,
@@ -111,10 +109,6 @@ import {
 	otpEmailIdentifier,
 	otpRequestPerEmail,
 	otpRequestPerIpBurst,
-	writeBudgetIdentifier,
-	writeBudgetPerMarket,
-	writeBurstIdentifier,
-	writeBurstPerUser,
 } from "@/server/middleware/rate-limit";
 import { getRedisKey } from "@/server/upstash/keys";
 
@@ -134,52 +128,6 @@ afterEach(() => {
 });
 
 describe("rate-limit middleware", () => {
-	// === §7.3 row 1 =========================================================
-
-	it("rate-limit::write-budget-and-burst-admit-independently", async () => {
-		// Two parallel checkRateLimit() calls on the write-budget (per
-		// user+market) and write-burst (per user) surfaces; both must allow
-		// for a write to admit. Asserts the substrate exposes BOTH surfaces,
-		// they admit independently — no AND combinator in the middleware,
-		// consumers compose the AND at their boundary (see the row-7 test) —
-		// and each helper emits its documented scoped identifier
-		// (user:{id}:market:{id} / user:{id}).
-		const userId = "user-123";
-		const marketId = "market-abc";
-
-		// Both surfaces script "allow" (success: true); reset is now+60s.
-		const futureReset = Date.now() + 60_000;
-		ratelimitInstances["write-budget"]?.limit.mockResolvedValue({
-			success: true,
-			remaining: 49,
-			reset: futureReset,
-		});
-		ratelimitInstances["write-burst"]?.limit.mockResolvedValue({
-			success: true,
-			remaining: 4,
-			reset: futureReset,
-		});
-
-		const [budgetResult, burstResult] = await Promise.all([
-			checkRateLimit(
-				"writeBudgetPerMarket",
-				writeBudgetIdentifier(userId, marketId),
-			),
-			checkRateLimit("writeBurstPerUser", writeBurstIdentifier(userId)),
-		]);
-
-		expect(budgetResult.allowed).toBe(true);
-		expect(burstResult.allowed).toBe(true);
-		// Identifier helpers produce the documented bare-value shape (the
-		// library prepends the configured prefix).
-		expect(ratelimitInstances["write-budget"]?.limit).toHaveBeenCalledWith(
-			`user:${userId}:market:${marketId}`,
-		);
-		expect(ratelimitInstances["write-burst"]?.limit).toHaveBeenCalledWith(
-			`user:${userId}`,
-		);
-	});
-
 	// === §7.3 row 2 =========================================================
 
 	it("rate-limit::otp-per-ip-burst-throttles", async () => {
@@ -338,80 +286,6 @@ describe("rate-limit middleware", () => {
 		expect(ADMIN_LOGIN_ATTEMPTS_PER_IP_PER_HOUR).toBeGreaterThan(0);
 	});
 
-	// === §7.3 row 7 (extension) =============================================
-
-	it("rate-limit::write-budget-and-burst-must-both-allow", async () => {
-		// Substrate exposes both surfaces; consumer composes the AND.
-		// One returns success:true, the other success:false → combined
-		// admit decision is FALSE. Reverse holds (both must succeed).
-		const userId = "user-burst";
-		const marketId = "market-burst";
-
-		// Case 1: budget allows, burst denies → consumer must NOT admit.
-		ratelimitInstances["write-budget"]?.limit.mockResolvedValueOnce({
-			success: true,
-			remaining: 49,
-			reset: Date.now() + 86_400_000,
-		});
-		ratelimitInstances["write-burst"]?.limit.mockResolvedValueOnce({
-			success: false,
-			remaining: 0,
-			reset: Date.now() + 60_000,
-		});
-		const [a1, a2] = await Promise.all([
-			checkRateLimit(
-				"writeBudgetPerMarket",
-				writeBudgetIdentifier(userId, marketId),
-			),
-			checkRateLimit("writeBurstPerUser", writeBurstIdentifier(userId)),
-		]);
-		expect(a1.allowed && a2.allowed).toBe(false);
-
-		// Case 2: budget denies, burst allows → consumer must NOT admit.
-		ratelimitInstances["write-budget"]?.limit.mockResolvedValueOnce({
-			success: false,
-			remaining: 0,
-			reset: Date.now() + 86_400_000,
-		});
-		ratelimitInstances["write-burst"]?.limit.mockResolvedValueOnce({
-			success: true,
-			remaining: 4,
-			reset: Date.now() + 60_000,
-		});
-		const [b1, b2] = await Promise.all([
-			checkRateLimit(
-				"writeBudgetPerMarket",
-				writeBudgetIdentifier(userId, marketId),
-			),
-			checkRateLimit("writeBurstPerUser", writeBurstIdentifier(userId)),
-		]);
-		expect(b1.allowed && b2.allowed).toBe(false);
-
-		// Case 3: BOTH allow → consumer admits.
-		ratelimitInstances["write-budget"]?.limit.mockResolvedValueOnce({
-			success: true,
-			remaining: 49,
-			reset: Date.now() + 86_400_000,
-		});
-		ratelimitInstances["write-burst"]?.limit.mockResolvedValueOnce({
-			success: true,
-			remaining: 4,
-			reset: Date.now() + 60_000,
-		});
-		const [c1, c2] = await Promise.all([
-			checkRateLimit(
-				"writeBudgetPerMarket",
-				writeBudgetIdentifier(userId, marketId),
-			),
-			checkRateLimit("writeBurstPerUser", writeBurstIdentifier(userId)),
-		]);
-		expect(c1.allowed && c2.allowed).toBe(true);
-
-		// Constants exist for both surfaces.
-		expect(RATE_LIMIT_PER_MARKET_PER_DAY).toBeGreaterThan(0);
-		expect(RATE_LIMIT_BURST_PER_MIN).toBeGreaterThan(0);
-	});
-
 	// === §7.3 row 8 (extension) =============================================
 
 	it("rate-limit::idempotency-and-rate-limit-key-prefixes-disjoint", async () => {
@@ -434,8 +308,6 @@ describe("rate-limit middleware", () => {
 			"otp-email",
 			"otp-ip",
 			"admin-login-ip",
-			"write-budget",
-			"write-burst",
 			"bet-ip",
 			"image-put-ip",
 		];
@@ -459,8 +331,6 @@ describe("rate-limit middleware", () => {
 		// the consumer side).
 		expect(otpRequestPerEmail).toBeDefined();
 		expect(otpRequestPerIpBurst).toBeDefined();
-		expect(writeBudgetPerMarket).toBeDefined();
-		expect(writeBurstPerUser).toBeDefined();
 		expect(betPerIp).toBeDefined();
 		expect(imagePutUrlPerIp).toBeDefined();
 	});
