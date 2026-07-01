@@ -115,4 +115,10 @@ md5-verified copies of every changed file staged into `~/Desktop/zz-pk-refresh-B
 
 ## Next session starts at
 
-BC.3 — rate-limit `writeBudgetPerMarket`/`writeBurstPerUser` code↔§11 ruling (DEFERRED above), plus the `SPEC.2 §22:2202` "through 0025-…md" residual micro-fix. Both are recorded; neither is started.
+BC.3 — rate-limit `writeBudgetPerMarket`/`writeBurstPerUser` code↔§11 ruling (DEFERRED above). Recorded, not started. *(The `SPEC.2 §22` "through 0025-…md" range residual was finished at BC.2.1 — see the follow-up note below.)*
+
+---
+
+## BC.2.1 follow-up (post-merge finish-out)
+
+**`SPEC.2 §22` opening sentence (ADR-index range) — fixed.** Both bounds were stale: `the ADRs at docs/adr/0003-…md through docs/adr/0025-…md` → `the ADRs at docs/adr/0001-…md and docs/adr/0003-…md through docs/adr/0027-…md` (gap-aware form, mirroring the "0001, (0002 skipped), 0003–0027" phrasing E1/E4 set at the inventory paragraph + the §22.1 index row). This was a **BC.2 Part-E miss** — Part E admitted ADR-0001 and moved the range to 0027 at every locus the edit list named, but the §22 *opening sentence* range was not on the list; caught in the post-merge audit (already flagged as DEFERRED above). Same logical change set as BC.2 → **no version bump** (SPEC.2 stays 1.0.15); split into its own review-gated PR only. PR: `docs: BC.2.1 — finish §22 ADR-index range (0001, 0003–0027)`, branched off `main` @ `abf0d79` (the #189 squash).
