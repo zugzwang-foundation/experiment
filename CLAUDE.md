@@ -23,8 +23,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 
 **Critical paths** — touching any triggers the full ritual (writer/reviewer §5.6 · invariant gate §5.7 · same-commit ADR §5.12 · pre-PR self-audit §5.10 · subagent review §5.11):
 
-- Greenfield (not built): `src/server/comments/`
-- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`, `src/server/cpmm/`, `src/server/dharma/`, `src/server/positions/`, `src/server/bets/`, `src/server/resolution/`
+- Built, sensitive: `src/server/auth/` (+ `auth/admin/`), `src/server/identity-pool/`, `src/server/moderation/`, `src/server/cpmm/`, `src/server/dharma/`, `src/server/positions/`, `src/server/bets/`, `src/server/comments/`, `src/server/resolution/`
 - Schema / migrations: `src/db/schema/`, `drizzle/migrations/`
 
 *(RLS / `supabase/migrations/` out of scope — ADR-0019.)*
@@ -32,7 +31,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 **Vocabulary** — use these exact terms in code, comments, and commits:
 
 - **Market** — a binary YES/NO question with a CPMM pool (`markets` + `pools`).
-- **CPMM** — constant-product market maker (lifted from Manifold, attributed; fee-less, single-MM). Pure TS in `src/server/cpmm/` (greenfield).
+- **CPMM** — constant-product market maker (lifted from Manifold, attributed; fee-less, single-MM). Pure TS in `src/server/cpmm/`.
 - **Market states** — `Draft → Open → Closed → Resolving → Resolved` / `Voided` / `Frozen`; pure transition functions, illegal transitions are negative tests (ENGINE.4).
 - **Side** — `YES` | `NO` (pgEnum `side`); a bet and its comment share one side.
 - **Pool** — the CPMM reserve row backing a market (`pools`); seeded/unwound admin-side only.
@@ -230,4 +229,4 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 **Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything here is wrong, fix it before fixing the code.**
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0027. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0027; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
