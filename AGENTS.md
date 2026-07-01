@@ -93,7 +93,7 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** `src/server/comments/` and `src/server/identity/` (the built dir is `identity-pool/`). These arrive in the DEBATE / later phases. The `src/app/(public)/` participant route group now EXISTS — its shell (`layout.tsx`) + the `/m/[slug]` market scaffold landed at SHELL/UI.0; the market-list / debate-view surfaces under it are still to come (DEBATE.4 / DESIGN.* / UI.*). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
+**Greenfield — implied by the specs but NOT yet on disk:** `src/server/identity/` (the built dir is `identity-pool/`). It arrives in the DEBATE / later phases. The `src/app/(public)/` participant route group now EXISTS — its shell (`layout.tsx`) + the `/m/[slug]` market scaffold landed at SHELL/UI.0; the market-list surface under it is still to come (DESIGN.* / UI.*). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
@@ -151,7 +151,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 20 tables live across 11 files — e.g. `bets.ts` (bets + positions), `events.ts` (events + resolution_events + payout_events).
+- **One file may hold several related tables.** 21 tables live across 10 files — e.g. `bets.ts` (bets + positions), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
 
 ### Reply-as-bet schema reality
 
@@ -169,7 +169,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0018_drop_friendly_fire_events` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent; 0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9)).
+- Current head: `0019_market_media` (0014 = resolution constraints + the terminal-once index; 0015 = the full `check_nightly_drift()` re-statement correcting 0011's two zero-terminal false-positive clauses — the 0007→0011 function-replace precedent; 0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1)).
 
 ### Transactions, queries, validation
 
@@ -275,4 +275,4 @@ tests/
 
 ---
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0027. Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0027; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`. Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
