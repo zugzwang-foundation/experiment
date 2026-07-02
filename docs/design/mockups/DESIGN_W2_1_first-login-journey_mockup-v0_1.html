@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<!--
+  DESIGN.W2.1 — FIRST-LOGIN JOURNEY  ·  mockup v0.1  ·  Part 3
+  ────────────────────────────────────────────────────────────────────────
+  WHAT THIS IS
+    The post-signup user JOURNEY, mapped end-to-end and operable. Continues
+    from the picker (Part 2): sign-in success → a 6-card onboarding deck →
+    into the app, with the nav flipping signed-out → signed-in and a
+    persistent "About" tab appearing in the header.
+
+    The deck CARDS are PLACEHOLDERS — content/design is deferred to branding
+    (and the real invariant cards are W2.2). What is being LOCKED here is the
+    JOURNEY: the sequence, the stepper, the not-skippable-on-first-login
+    rule, the nav flip, and the About-tab entry point. NOT the card visuals.
+
+  THE 6-CARD DECK (first login only)
+    1. Identity reveal — "You're umber-falcon-31" + Dharma grant   (reveal)
+    2. No stake, no voice                                          (rule)
+    3. Soulbound reputation                                        (rule)
+    4. Single-side binding (no positions on both sides)            (rule)
+    5. Support / Counter — how a reply-bet adds to the tally       (rule)
+    6. The Goal — beat capital (C) by aggregating (n) knowledge (K)(thesis)
+
+  PERSISTENT "ABOUT" TAB  (renamed from "Rules"; final name + position TBD)
+    Lives in the header in BOTH signed-out and signed-in states. Holds the
+    4 rules + the Goal (NO identity card — username + Dharma are in the nav).
+    Opening it re-shows that set, SKIPPABLE (not first-login).
+
+  FLOW (locked Part-1 map, extended)
+    N0 signed-out → picker → [auth success] → DECK (cards 1–6, NEXT only,
+       NO dismiss on first login) → N5 signed-in app.
+    Identity APPEARS in nav (balchip Đ + navid umber-falcon-31) — no separate
+    "confirmation" (R1: the reveal is card 1; there is no extra confirm step).
+
+  RULES BAKED IN
+    · First-login deck = NOT skippable: no × / no Esc / no backdrop-dismiss.
+    · About-tab deck = skippable (× / Esc / backdrop).
+    · Look = canonical v1.0 verbatim (tokens / nav / balchip / navid lifted
+      from surface_discovery_v1.0 + surface_d5_v1.0). Monochrome. Desktop.
+    · Side binding: YES = black · NO = white.
+
+  THROWAWAY REFERENCE — not repo code, not the CD deliverable, not the seed
+  kit. ALL names / numbers / questions = dummy. Card bodies = placeholder.
+-->
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DESIGN.W2.1 — first-login journey v0.1</title>
+<style>
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --r:8px; --imgr:6px;
+    --hairline:1px solid var(--n2);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--n0);
+            font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--ink);}
+
+  /* signed-out / signed-in nav toggle (v1.0 pattern) */
+  body.out .auth-in{display:none!important;}
+  body.in  .auth-out{display:none!important;}
+
+  /* ===================================================================
+     BACKDROP — representative Discovery (so the nav-flip + About tab show
+     in context, and the Discovery auth-in widget fold-in is visible).
+     =================================================================== */
+  .screen{width:100vw;height:100vh;display:flex;flex-direction:column;overflow:hidden;}
+
+  .nav{height:60px;flex:0 0 60px;border-bottom:var(--hairline);
+       display:flex;align-items:center;padding:0 28px;gap:24px;}
+  .wordmark{font-size:19px;font-weight:800;letter-spacing:.16em;}
+  /* About tab — persistent, both states. Position TBD (placeholder slot). */
+  .abouttab{font-size:13px;font-weight:600;color:var(--n5);background:none;border:none;
+            font-family:inherit;cursor:pointer;padding:0;letter-spacing:.01em;
+            position:relative;}
+  .abouttab:hover{color:var(--ink);}
+  .abouttab:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:3px;}
+  .abouttab::after{content:"position TBD";position:absolute;top:-13px;left:50%;transform:translateX(-50%);
+                   font-size:7px;letter-spacing:.08em;color:var(--n4);white-space:nowrap;font-weight:700;}
+  .navright{margin-left:auto;display:flex;align-items:center;gap:20px;}
+  .signin{font-size:13px;color:var(--ink);text-decoration:none;background:none;border:none;
+          font-family:inherit;padding:0;cursor:pointer;}
+  .signin:hover{color:var(--n5);}
+  .signin:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:3px;}
+  .btn-primary{background:var(--ink);color:var(--n0);font-size:13px;font-weight:600;
+               padding:9px 18px;border:1px solid var(--ink);border-radius:var(--r);
+               letter-spacing:.01em;cursor:pointer;font-family:inherit;}
+  .btn-primary:hover{background:var(--n7);border-color:var(--n7);}
+  .btn-primary:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+  /* auth-in nav — verbatim v1.0 (balchip + navid + 26px avatar) */
+  .balchip{font-size:13px;font-weight:700;border:1px solid var(--ink);
+           padding:7px 12px;letter-spacing:.02em;border-radius:var(--r);}
+  .navid{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:650;cursor:pointer;}
+  .navav{width:26px;height:26px;border-radius:var(--imgr);border:1.5px solid var(--ink);
+         background:var(--n1);flex:0 0 auto;}
+
+  .content{flex:1 1 auto;padding:20px 28px;overflow:hidden;}
+  .ctitle{font-size:15px;font-weight:800;letter-spacing:.02em;margin-bottom:14px;}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .mcard{border:1px solid var(--ink);border-radius:var(--r);padding:14px;display:flex;
+         flex-direction:column;gap:10px;background:var(--n0);}
+  .mc-top{display:flex;gap:10px;align-items:flex-start;}
+  .mc-thumb{width:40px;height:40px;flex:0 0 auto;background:var(--n1);border:var(--hairline);
+            border-radius:var(--imgr);display:flex;align-items:center;justify-content:center;
+            font-size:7px;letter-spacing:.12em;color:var(--n4);}
+  .mc-q{font-size:13px;font-weight:700;line-height:1.32;}
+  .mc-bar{display:flex;flex-direction:column;gap:4px;}
+  .mc-lab{display:flex;justify-content:space-between;font-size:10px;font-weight:800;
+          letter-spacing:.05em;text-transform:uppercase;}
+  .mc-lab .no{color:var(--n5);}
+  .mc-track{height:7px;border:1px solid var(--ink);border-radius:5px;overflow:hidden;}
+  .mc-fill{height:100%;background:var(--ink);}
+  .mc-foot{font-size:10px;color:var(--n5);font-weight:600;}
+
+  /* ===================================================================
+     OVERLAY + MODAL (shared shell — picker, first-login deck, About deck)
+     =================================================================== */
+  .overlay{position:fixed;inset:0;background:rgba(10,10,10,.55);
+           display:flex;align-items:center;justify-content:center;z-index:50;}
+  .overlay[hidden]{display:none;}
+
+  .modal{width:432px;max-width:calc(100vw - 40px);background:var(--n0);
+         border:1px solid var(--ink);border-radius:var(--r);
+         box-shadow:0 24px 60px rgba(10,10,10,.28);
+         padding:30px;position:relative;}
+
+  .mclose{position:absolute;top:14px;right:14px;width:28px;height:28px;border-radius:50%;
+          border:var(--hairline);background:var(--n0);color:var(--n5);font-size:17px;line-height:1;
+          cursor:pointer;display:none;align-items:center;justify-content:center;font-family:inherit;}
+  .mclose.show{display:flex;}
+  .mclose:hover{background:var(--n1);color:var(--ink);}
+  .mclose:focus-visible{outline:2px solid var(--ink);outline-offset:2px;}
+
+  /* --- picker pane --- */
+  .mhead{text-align:center;font-size:18px;font-weight:700;margin:2px 0 22px;}
+  .gbtn{width:100%;display:flex;align-items:center;justify-content:center;gap:11px;
+        background:var(--ink);color:var(--n0);border:1px solid var(--ink);border-radius:var(--r);
+        padding:13px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .gbtn:hover{background:var(--n7);border-color:var(--n7);}
+  .gbtn:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+  .gmark{width:20px;height:20px;border-radius:50%;background:var(--n0);color:var(--ink);
+         font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+  .ordiv{display:flex;align-items:center;gap:12px;margin:18px 0;
+         font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--n4);}
+  .ordiv::before,.ordiv::after{content:"";flex:1 1 auto;height:1px;background:var(--n2);}
+  .emailrow{display:flex;gap:9px;}
+  .email{flex:1 1 auto;min-width:0;border:1px solid var(--n3);border-radius:var(--r);
+         padding:12px 13px;font-size:14px;font-family:inherit;color:var(--ink);}
+  .email::placeholder{color:var(--n4);}
+  .email:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 3px rgba(10,10,10,.08);}
+  .econt{flex:0 0 auto;border-radius:var(--r);padding:0 18px;font-size:14px;font-weight:600;
+         font-family:inherit;border:1px solid var(--n2);background:var(--n2);color:var(--n4);cursor:not-allowed;}
+  .econt.on{background:var(--ink);color:var(--n0);border-color:var(--ink);cursor:pointer;}
+  .mfoot{margin-top:20px;text-align:center;font-size:11.5px;color:var(--n5);}
+  .mfoot a{color:var(--n5);text-decoration:none;font-weight:600;}
+  .mfoot .dot{margin:0 7px;color:var(--n3);}
+
+  /* --- deck pane (cards) --- */
+  .deck{display:none;}
+  .deck.show{display:block;}
+  /* progress */
+  .dprog{display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+  .dots{display:flex;gap:6px;}
+  .dot-i{width:7px;height:7px;border-radius:50%;border:1px solid var(--ink);background:var(--n0);}
+  .dot-i.on{background:var(--ink);}
+  .dstep{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.1em;
+         text-transform:uppercase;color:var(--n5);}
+
+  /* placeholder card body */
+  .card{min-height:218px;display:flex;flex-direction:column;}
+  .ckind{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+         color:var(--n4);margin-bottom:10px;}
+  .ctitle2{font-size:21px;font-weight:800;line-height:1.18;letter-spacing:-.01em;margin-bottom:14px;}
+  .cph{flex:1 1 auto;border:1px dashed var(--n3);border-radius:var(--r);background:var(--n1);
+       display:flex;align-items:center;justify-content:center;text-align:center;padding:18px;
+       font-size:11px;font-weight:600;letter-spacing:.04em;color:var(--n4);line-height:1.6;}
+  /* card 1 identity bits (real journey data, placeholder-styled) */
+  .idrow{display:flex;align-items:center;gap:12px;margin-bottom:12px;}
+  .idav{width:46px;height:46px;border-radius:var(--imgr);border:1.5px solid var(--ink);
+        background:var(--n1);flex:0 0 auto;}
+  .idname{font-size:18px;font-weight:800;}
+  .idgrant{font-size:11px;font-weight:700;color:var(--n6);margin-top:3px;}
+
+  .dnav{margin-top:22px;display:flex;align-items:center;gap:12px;}
+  .dnext{flex:1 1 auto;text-align:center;background:var(--ink);color:var(--n0);
+         border:1px solid var(--ink);border-radius:var(--r);padding:13px;font-size:14px;
+         font-weight:700;cursor:pointer;font-family:inherit;letter-spacing:.01em;}
+  .dnext:hover{background:var(--n7);border-color:var(--n7);}
+  .dnext:active{background:var(--n6);}
+  .dnext:focus-visible{outline:2px solid var(--ink);outline-offset:3px;}
+  .dback{flex:0 0 auto;background:none;border:none;font-family:inherit;font-size:13px;
+         font-weight:600;color:var(--n5);cursor:pointer;padding:0 4px;}
+  .dback:hover{color:var(--ink);}
+  .dback:disabled{color:var(--n3);cursor:default;}
+  .dback:focus-visible{outline:2px solid var(--ink);outline-offset:3px;border-radius:3px;}
+
+  /* ===================================================================
+     DEV LEGEND — meta, not design. Throwaway aid.
+     =================================================================== */
+  .legend{position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--n7);color:var(--n3);
+          font-size:10.5px;letter-spacing:.02em;padding:7px 16px;display:flex;gap:16px;
+          align-items:center;justify-content:center;flex-wrap:wrap;}
+  .legend b{color:var(--n0);font-weight:700;}
+  .legend .x{color:var(--n5);}
+  .legend button{background:var(--n6);color:var(--n0);border:none;border-radius:5px;
+                 font-family:inherit;font-size:10px;font-weight:700;padding:3px 9px;cursor:pointer;}
+</style>
+</head>
+<body class="out">
+
+  <!-- ===== backdrop: representative Discovery ===== -->
+  <div class="screen" aria-hidden="true">
+    <div class="nav">
+      <div class="wordmark">ZUGZWANG</div>
+      <button class="abouttab" onclick="openAbout()">About</button>
+      <div class="navright auth-out">
+        <button class="signin" onclick="openPicker()">Sign in</button>
+        <span class="btn-primary" onclick="openPicker()">Sign up</span>
+      </div>
+      <div class="navright auth-in">
+        <span class="balchip">Đ 1,000</span>
+        <span class="navid"><span class="navav"></span>umber-falcon-31</span>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="ctitle">Discovery</div>
+      <div class="grid" id="grid"></div>
+    </div>
+  </div>
+
+  <!-- ===== shared overlay/modal ===== -->
+  <div class="overlay" id="overlay" role="dialog" aria-modal="true" onclick="backdropClose(event)">
+    <div class="modal" id="modal">
+      <button class="mclose" id="mclose" aria-label="Close" onclick="closeAll()">×</button>
+
+      <!-- picker pane -->
+      <div class="picker" id="picker">
+        <div class="mhead">Continue to Zugzwang</div>
+        <button class="gbtn" onclick="authSuccess()">
+          <span class="gmark">G</span><span>Continue with Google</span>
+        </button>
+        <div class="ordiv">or</div>
+        <div class="emailrow">
+          <input class="email" id="email" type="email" placeholder="Email address"
+                 aria-label="Email address" oninput="syncEmail()"
+                 onkeydown="if(event.key==='Enter'&&this.value.includes('@'))authSuccess()">
+          <button class="econt" id="econt" onclick="if(this.classList.contains('on'))authSuccess()">Continue</button>
+        </div>
+        <div class="mfoot">
+          <a href="#" onclick="return false">Terms</a><span class="dot">·</span><a href="#" onclick="return false">Privacy</a>
+        </div>
+      </div>
+
+      <!-- deck pane (first-login + About both render here) -->
+      <div class="deck" id="deck">
+        <div class="dprog">
+          <div class="dots" id="dots"></div>
+          <div class="dstep" id="dstep">Step 1 of 6</div>
+        </div>
+        <div class="card" id="card"></div>
+        <div class="dnav">
+          <button class="dback" id="dback" onclick="prevCard()">Back</button>
+          <button class="dnext" id="dnext" onclick="nextCard()">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== dev legend ===== -->
+  <div class="legend">
+    <span><b>MOCKUP</b> · DESIGN.W2.1 first-login journey v0.1</span>
+    <span class="x">|</span>
+    <span><b>Sign up</b> → auth → <b>6-card deck (NEXT only, no dismiss)</b> → app</span>
+    <span class="x">|</span>
+    <span><b>About</b> tab → same rules, skippable</span>
+    <span class="x">|</span>
+    <span>Cards = <b>placeholders</b> (design later)</span>
+    <button onclick="location.reload()">↻ replay</button>
+  </div>
+
+<script>
+  /* ---- backdrop market grid (dummy) ---- */
+  var MK=[
+    {q:"Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?",y:38,f:"Đ 14,260 · 28 posts"},
+    {q:"Will India's CPI print under 4% for the September reading?",y:61,f:"Đ 9,400 · 19 posts"},
+    {q:"Will the BMC pass the coastal-road toll proposal this session?",y:24,f:"Đ 6,120 · 12 posts"},
+    {q:"Will Sensex close above 92,000 before the freeze?",y:47,f:"Đ 22,800 · 41 posts"},
+    {q:"Will the monsoon onset over Kerala beat the IMD's stated date?",y:72,f:"Đ 5,300 · 9 posts"},
+    {q:"Will ETHGlobal Mumbai exceed 1,200 registered hackers?",y:55,f:"Đ 3,900 · 15 posts"}
+  ];
+  document.getElementById('grid').innerHTML = MK.map(function(m){
+    return '<div class="mcard"><div class="mc-top"><div class="mc-thumb">IMG</div>'+
+      '<div class="mc-q">'+m.q+'</div></div>'+
+      '<div class="mc-bar"><div class="mc-lab"><span>YES '+m.y+'%</span><span class="no">NO '+(100-m.y)+'%</span></div>'+
+      '<div class="mc-track"><div class="mc-fill" style="width:'+m.y+'%"></div></div></div>'+
+      '<div class="mc-foot">'+m.f+'</div></div>';
+  }).join('');
+
+  /* ---- card definitions (PLACEHOLDER content) ---- */
+  var IDENTITY = {kind:'Welcome', id:true};
+  var RULES = [
+    {kind:'Rule', title:'No stake, no voice', ph:'PLACEHOLDER — every bet carries an argument; a reply is itself a bet. Card design + final copy: branding.'},
+    {kind:'Rule', title:'Soulbound reputation', ph:'PLACEHOLDER — your Dharma is yours alone, never bought, sold, or transferred. Card design + final copy: branding.'},
+    {kind:'Rule', title:'Single-side binding', ph:'PLACEHOLDER — you cannot hold positions on both sides of a market; your side is fixed when you post. Card design + final copy: branding.'},
+    {kind:'Rule', title:'Support / Counter', ph:'PLACEHOLDER — replying with Support or Counter adds your stake to that side of the post\u2019s tally. Card design + final copy: branding.'}
+  ];
+  var GOAL = {kind:'The Goal', title:'Beat capital with knowledge',
+    ph:'PLACEHOLDER — beat manipulative capital (C) by aggregating (n) the knowledge (K) of informed participants. K\u00b7n > C. Card design + final copy: branding.'};
+
+  /* first-login deck = identity + 4 rules + goal (6) ; About = 4 rules + goal (5) */
+  var FIRST = [IDENTITY].concat(RULES, [GOAL]);
+  var ABOUT = RULES.concat([GOAL]);
+
+  var deck=FIRST, idx=0, firstLogin=true;
+  var overlay=document.getElementById('overlay');
+  var picker=document.getElementById('picker');
+  var deckEl=document.getElementById('deck');
+  var mclose=document.getElementById('mclose');
+  var emailEl=document.getElementById('email');
+  var contEl=document.getElementById('econt');
+
+  /* ---- picker ---- */
+  function openPicker(){
+    overlay.hidden=false; picker.style.display='block'; deckEl.classList.remove('show');
+    mclose.classList.add('show');           // picker IS dismissible
+    emailEl.value=''; syncEmail();
+    setTimeout(function(){emailEl.focus();},0);
+  }
+  function syncEmail(){
+    if(/\S+@\S+\.\S+/.test(emailEl.value.trim())) contEl.classList.add('on');
+    else contEl.classList.remove('on');
+  }
+
+  /* ---- auth success → first-login deck ---- */
+  function authSuccess(){
+    deck=FIRST; idx=0; firstLogin=true;
+    picker.style.display='none';
+    deckEl.classList.add('show');
+    mclose.classList.remove('show');        // FIRST LOGIN: no dismiss
+    renderCard();
+  }
+
+  /* ---- About tab → rules deck (skippable) ---- */
+  function openAbout(){
+    deck=ABOUT; idx=0; firstLogin=false;
+    overlay.hidden=false;
+    picker.style.display='none';
+    deckEl.classList.add('show');
+    mclose.classList.add('show');           // About: dismissible
+    renderCard();
+  }
+
+  /* ---- card render ---- */
+  function renderCard(){
+    var c=deck[idx], n=deck.length;
+    // dots
+    var dots='';
+    for(var i=0;i<n;i++) dots+='<span class="dot-i'+(i<=idx?' on':'')+'"></span>';
+    document.getElementById('dots').innerHTML=dots;
+    document.getElementById('dstep').textContent='Step '+(idx+1)+' of '+n;
+    // body
+    var html='';
+    if(c.id){
+      html='<div class="ckind">Welcome</div>'+
+           '<div class="idrow"><span class="idav"></span>'+
+           '<div><div class="idname">You\u2019re umber-falcon-31</div>'+
+           '<div class="idgrant">Đ 1,000 granted · earn ~10 Đ a day by posting</div></div></div>'+
+           '<div class="cph">PLACEHOLDER — identity + Dharma reveal. This card is shown once, on first login only. Card design + final copy: branding.</div>';
+    } else {
+      html='<div class="ckind">'+c.kind+'</div>'+
+           '<div class="ctitle2">'+c.title+'</div>'+
+           '<div class="cph">'+c.ph+'</div>';
+    }
+    document.getElementById('card').innerHTML=html;
+    // nav
+    var back=document.getElementById('dback');
+    back.disabled=(idx===0);
+    var next=document.getElementById('dnext');
+    next.textContent=(idx===n-1)?(firstLogin?'Enter Zugzwang':'Done'):'Next';
+  }
+  function nextCard(){
+    if(idx<deck.length-1){ idx++; renderCard(); }
+    else { finishDeck(); }
+  }
+  function prevCard(){ if(idx>0){ idx--; renderCard(); } }
+
+  function finishDeck(){
+    overlay.hidden=true;
+    deckEl.classList.remove('show');
+    if(firstLogin){ document.body.classList.remove('out'); document.body.classList.add('in'); }
+  }
+
+  /* ---- dismiss (only when allowed) ---- */
+  function closeAll(){
+    // mclose only visible for picker + About → safe to just hide overlay
+    overlay.hidden=true; deckEl.classList.remove('show'); picker.style.display='block';
+  }
+  function backdropClose(e){
+    if(e.target!==overlay) return;
+    if(mclose.classList.contains('show')) closeAll();   // first-login deck: no-op
+  }
+  document.addEventListener('keydown',function(e){
+    if(e.key==='Escape' && !overlay.hidden && mclose.classList.contains('show')) closeAll();
+  });
+
+  /* open picker on load */
+  openPicker();
+</script>
+</body>
+</html>

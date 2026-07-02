@@ -1,19 +1,21 @@
 # Zugzwang — Design Language (high-fidelity monochrome)
 
 > **Doc:** `docs/design/design-language.md`
-> **Status:** v0.3-draft · precursor · living document
+> **Status:** v0.5-draft · precursor · living document
 > **Phase:** experiment-phase VISUAL stratum
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
 > **What this is.** The shared design *language* for every experiment-phase surface: the locked visual constraints, the token vocabulary, the component primitives, the state-shape rules, and the per-surface primitive map. It is the single reference every Claude Design session and every Claude Code handoff is built against.
 >
-> **What this is NOT.** It is not `design.md`. `design.md` (locked by ADR-0012 / SPEC.13) is *derived* from the approved high-fidelity mockups at task **DESIGN.8** — it is the final, value-filled, version-locked spec. This document is the precursor DESIGN.8 derives from. Its sections are organised to map cleanly onto `design.md`'s token + applied-pattern structure.
+> **What this is NOT.** It is not `design.md`. `design.md` (locked by ADR-0012 / SPEC.13) is *derived* from the approved high-fidelity mockups at task **DESIGN.SPEC** (formerly DESIGN.8) — it is the final, value-filled, version-locked spec. This document is the precursor DESIGN.SPEC derives from. Its sections are organised to map cleanly onto `design.md`'s token + applied-pattern structure.
 >
-> **Division of labour.** This document carries *vocabulary and constraints* — token *names* and their semantic roles, the primitive list, the rules that must hold. It does **not** carry *values*. Exact greys, type family, and spacing/radius/elevation/motion scales are designed by the operator in Claude Design. The token tables here are intentionally empty: locked names, blank values.
+> **Division of labour.** This document carries *vocabulary and constraints* — token *names* and their semantic roles, the primitive list, the rules that must hold. Values land here only once they are minted in the built system: the colour **side poles** and the **neutral ramp** now carry landed OKLCH values (SHELL/UI.0 mint — §2.1 provenance); typography, spacing, radius, elevation, and motion values remain **blank**, designed by the operator in Claude Design; the **accent** is deferred to the brand pass. Tokens not yet designed stay explicitly blank (§1.10) — never vaguely described.
 >
 > **Grounding.** Constraints and conventions trace to SPEC.1 (§6 lifecycles · §7 bet flow · §9 debate view · §11 invariants), SPEC.2 (§14 invariant contract), and ADR-0017 (ranking). Spec IDs are cited as anchors; the rules are stated in plain design terms. The house-style and exactness constraints (§1.9–§1.10) and the state-completeness rules (§4.9–§4.10) trace to the Claude Design high-fidelity research (`Research_Report_v2.md`).
 >
 > **Living.** The primitive vocabulary (§3) grows additively as each surface is designed, per the placeholder convention in the planner. Additions never silently rewrite a locked constraint (§1) or a state-shape rule (§4); those change only by explicit decision.
+>
+> **v1.0 lock (2026-06-17).** The four core surfaces (Discovery · Market Detail · Reply · Profile) + the Bookmark page are now **LOCKED at integration-shell v1.0**. This design language is the constraint set they embody and the reference the **DESIGN Wave-2** surfaces and the **Claude Design handover** are built against. The locked detail lives in the consolidated design PK (`DESIGN-phase-record`, motion / spec / copy consolidated); the final value-filled spec is derived at **DESIGN.SPEC**.
 
 ---
 
@@ -25,11 +27,13 @@ Every Claude Design session and every Claude Code handoff carries these. Non-neg
 
 2. **Monochrome is the language, not a placeholder.** The entire experiment-phase design is black, white, and grey. This is the durable look — not a stand-in for a colour design that arrives later.
 
-3. **Black and white are the two poles of the debate.** The two sides of every market are encoded as the two monochrome extremes:
-   - **Support / YES → black** *(default — see the flagged choice at the end of this section)*
-   - **Counter / NO → white**
+3. **Black and white are the two poles of the debate.** The two **sides** of every market — its **YES** and its **NO** — are encoded as the two monochrome extremes:
+   - **YES → black** *(side→pole binding CONFIRMED by operator, 2026-06-05)*
+   - **NO → white**
 
-   This binding is semantic and permanent. It is the visual form of the thesis: every market has two opposed sides, and the design never lets you forget which side you're reading. The exact *rendering* (filled vs. outline, inverted panels, badge treatment) is a high-fidelity decision made in Claude Design at the **look-anchor slot (Slot 1 / tracker DESIGN.3)**; the *binding* of side → pole is locked here.
+   This binding is semantic and permanent, and it encodes the **side** (the position a bet takes, frozen at post-time — INV-3) and only the side. It is the visual form of the thesis: every market has two opposed sides, and the design never lets you forget which side you're reading. The exact *rendering* (filled vs. outline, inverted panels, badge treatment) is realised in the locked **v1.0** surfaces; the *binding* of side → pole is locked here.
+
+   > **Side ≠ Support/Counter — the axis correction (v1.0 lock, 2026-06-17).** The black/white poles encode **side (YES/NO)**, nothing else. **Support/Counter is a separate, post-relative relation** — whether a reply *agrees or disagrees with its parent post* — and is **never** a colour, a pole, or a column. Supporting a YES post means betting YES (black); supporting a NO post means betting NO (white) — so Support has no fixed colour. Support/Counter appears only on the post's **split bar** and in the **composer**. (See §6. This supersedes the earlier "Support↔YES / Counter↔NO" wording.)
 
 4. **Grey is the default — and the future-colour placeholder.** Everything that is not a side — surfaces, borders, text hierarchy, structure, disabled states — lives on a neutral grey ramp. The grey ramp does double duty: it is the working neutral palette now, **and** it is the slot the brand accent fills later. (See §2.1 and §7.)
 
@@ -51,32 +55,32 @@ Every Claude Design session and every Claude Code handoff carries these. Non-neg
    - terracotta or any warm accent → **no accent at all** (the accent is deferred and applied in code — constraint 5)
    - warm-tinted greys → **true-neutral greys**, zero warm cast, across the entire ramp
    - large border radii → **small-or-zero radius**, with **hairline (1px) borders** carrying separation
-   Where elevation/shadow is used, it is neutral grey — never warm-tinted (§2.3). If any of these house-style elements appears in a mockup, it is wrong, the same way colour is wrong (constraint 6).
+   Where elevation/shadow is used, it is neutral grey — never warm-tinted (§2.3). If any of these house-style elements appears in a mockup, it is wrong, the same way colour is wrong (constraint 6). *Slot-1 record (2026-06-05): a serif/aged-paper "old newspaper" direction was explored at the operator's request and **rejected** — the one-sans + true-neutral rules stand reaffirmed, and "no editorial/newspaper styling" is carried into every CD prompt as a named negative.*
 
 10. **Specs and prompts speak in exact values, never adjectives.** Aesthetic adjectives — "modern", "clean", "minimal", "professional", "sleek" — are banned from this document, from the constraints block, and from every Claude Design prompt. The model resolves such adjectives against its own priors, and they can silently override explicit specs (e.g. "modern" re-rounding corners that were specified square). Wherever a value is stated, it is exact — a hex, a px, a named family, a count. Tokens not yet designed stay **explicitly blank** (per the division of labour above) rather than vaguely described.
 
-> **One flagged choice — confirm or flip.** I defaulted **Support/YES = black, Counter/NO = white**. There is no canonical reason it can't be the reverse. If you want NO = black, say so and I flip the binding everywhere.
+> **Binding resolved.** **YES = black, NO = white** — the **side → pole** binding, confirmed by the operator at the look-anchor slot, 2026-06-05, and held through the v1.0 lock. Support/Counter is a separate, post-relative relation (§1.3 note, §6), never a colour or column. Locked alongside the constraint set; flipping now requires explicitly reopening this section.
 
 ---
 
-## §2 — Token vocabulary (empty schemas)
+## §2 — Token vocabulary
 
-Locked token *names* + their semantic role. **Values are blank** — designed by the operator in Claude Design, finalised into `design.md` at DESIGN.8.
+Locked token *names* + their semantic role. The colour **side poles** and the **neutral ramp** carry **landed values** (minted at SHELL/UI.0 — the DESIGN.7 back-apply; provenance below). Typography, spacing, radius, elevation, and motion remain **blank — CD**; the **accent** is **deferred** to the brand pass. Remaining values are designed by the operator in Claude Design and finalised into `design.md` at DESIGN.SPEC.
 
 ### §2.1 Colour — three roles
 
-Colour carries exactly three roles. The **side** poles and the **neutral ramp** now carry landed OKLCH values (minted at SHELL/UI.0 — see the provenance note below); only the **accent** remains deferred to the brand pass (Claude Code).
+Colour carries exactly three roles. The **side** poles and the **neutral ramp** carry landed OKLCH values; only the **accent** remains deferred to the brand pass.
 
 | Role | Token | Value | Notes |
 |---|---|---|---|
-| Side — YES (Support pole) | `color.side.support` | **black — `oklch(0.145 0 0)` (landed)** | One pole. Permanent, semantic. Bound to the **YES side**, not the Support/Counter relation (see provenance). |
-| Side — NO (Counter pole) | `color.side.counter` | **white — `oklch(1 0 0)` (landed)** | The other pole. Permanent, semantic. Bound to the **NO side**. |
-| Neutral ramp | `color.neutral.0 … color.neutral.8` | **landed — 9-step true-neutral ramp** | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. True-neutral greys only — no warm cast (§1.9). |
-| Accent | `color.accent.*` | *(deferred — CC)* | One brand accent. Applied in code at the brand pass, into a defined slice of the neutral ramp. Never used in CD. |
+| Side — YES | `color.side.yes` | **black — `oklch(0.145 0 0)` (locked)** | One pole. Permanent, semantic. Encodes **side**, not Support/Counter (§1.3). ↔ `--color-yes`. |
+| Side — NO | `color.side.no` | **white — `oklch(1 0 0)` (locked)** | The other pole. Permanent, semantic. ↔ `--color-no`. |
+| Neutral ramp | `color.neutral.0 … .7` + `color.neutral.ink` | **landed — 9-step true-neutral ramp (OKLCH, chroma 0)** | Surfaces, borders, text hierarchy, structure, disabled. Working palette **and** future-accent slot. True-neutral greys only — no warm cast (§1.9). ↔ `--color-n0 … --color-n7` + `--color-ink`. |
+| Accent | `color.accent.*` | *(deferred — brand pass, applied in CC)* | One brand accent. Applied in code at the brand pass, into a defined slice of the neutral ramp. Never used in CD. `--color-accent` is deliberately absent from the built system until the brand pass mints it. |
 
-*The accent still chooses which neutral steps it later replaces at the brand pass; the ramp's step count and greys are now landed (below).*
+*The ramp's step count and exact greys are landed (provenance below); which neutral steps the accent later replaces is decided at the brand pass.*
 
-**Provenance — SHELL/UI.0 token mint (the DESIGN.7 mint).** The values above are minted in `src/app/globals.css` as the locked v1.0 monochrome system. The neutral ramp is `--color-n0 … --color-n7` + `--color-ink` (9 true-neutral greys, chroma 0 — the Tailwind-neutral OKLCH equivalents of the design hex, verified by deterministic conversion): `n0 oklch(1 0 0)` · `n1 oklch(0.971 0 0)` · `n2 oklch(0.922 0 0)` · `n3 oklch(0.871 0 0)` · `n4 oklch(0.708 0 0)` · `n5 oklch(0.556 0 0)` · `n6 oklch(0.371 0 0)` · `n7 oklch(0.205 0 0)` · `ink oklch(0.145 0 0)`. The side poles are `--color-yes oklch(0.145 0 0)` (YES = black = ink) and `--color-no oklch(1 0 0)` (NO = white = n0). The code comments name the **SIDE** (YES/NO) and explicitly disavow the Support/Counter relation (`NOT Support`) — Support/Counter is a read-time stance toward a parent, not a colour pole. The `--color-accent` token is deliberately absent (the brand pass mints it). The shadcn semantic `:root` ramp resolves to these same greys (intentional duplication: `--color-n*` is the design-system vocabulary, the semantic tokens the shadcn-consumed one).
+**Provenance — SHELL/UI.0 token mint (the DESIGN.7 back-apply · 2026-06-24 · PR #161).** The values live in `src/app/globals.css` as the locked v1.0 monochrome system. The neutral ramp is `--color-n0 … --color-n7` + `--color-ink` — 9 true-neutral greys, chroma 0 (the Tailwind-neutral OKLCH equivalents of the design hex, verified by deterministic conversion): `n0 oklch(1 0 0)` · `n1 oklch(0.971 0 0)` · `n2 oklch(0.922 0 0)` · `n3 oklch(0.871 0 0)` · `n4 oklch(0.708 0 0)` · `n5 oklch(0.556 0 0)` · `n6 oklch(0.371 0 0)` · `n7 oklch(0.205 0 0)` · `ink oklch(0.145 0 0)`. The side poles are `--color-yes oklch(0.145 0 0)` (YES = black = ink) and `--color-no oklch(1 0 0)` (NO = white = n0). The code comments bind **side** (YES/NO) and explicitly disavow the Support/Counter relation ("NOT Support") — Support/Counter is a read-time stance toward a parent, not a colour pole. `--color-accent` is deliberately absent (the brand pass mints it). The shadcn semantic `:root` ramp (`--background`, `--foreground`, `--card`, …) resolves to these same greys — `--color-n*` is the design-system vocabulary; the shadcn semantic layer is the component-consumed one. The monochrome system is pinned by `tests/unit/design/tokens-monochrome.test.ts` — a slot rename or chroma drift fails CI.
 
 ### §2.2 Typography
 
@@ -130,7 +134,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 
 **Top-level post**
 - *Intent:* one stake-backed argument.
-- *Slots:* side badge · position marker · author's own stake (`a`) at the header · argument text/image · **Support/Counter aggregate** footer.
+- *Slots:* side badge · position marker · author pseudonym/avatar + own stake (`a`) at the header · argument **title + body** *(two text parts — pending SPEC.1 amendment, SCL-1)* + optional attachment · **Support/Counter aggregate** footer (rendered as the reply stake bar where compact).
 - *Rule:* every post rides a bet (INV-1).
 
 **Reply (depth-1)**
@@ -139,7 +143,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 - *Slots:* side badge · position marker · reply stake · argument text.
 
 **Support/Counter aggregate**
-- *Intent:* the weight of replies on each side of a post.
+- *Intent:* the weight of replies that **support vs. counter** a post (post-relative — see §6).
 - *Form:* `Support (count) : Đ  /  Counter (count) : Đ` — a **read-only** read-time aggregate.
 - *Rule:* **there is no vote control.** No up/down arrows, no `↑N ↓M`. Friendly-fire is removed entirely. Support/Counter are computed, never cast.
 
@@ -149,11 +153,11 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 
 **Single-side buy/sell panel**
 - *Intent:* commit, add to, or exit a position.
-- *Rule:* a user holds at most one side at a time. To switch sides: sell to zero, then re-enter with a fresh commented bet. Buy enforces the bet floor (post floor / reply floor) against the live Dharma balance (INV-2).
-- *Slots:* side selector (entry only) · amount · slippage control · mandatory comment field (on buy) · live balance · cost/payout preview.
+- *Rule:* a user holds at most one side at a time. To switch sides: sell to zero, then re-enter with a fresh commented bet. Buy enforces the bet floor (post floor / reply floor) against the live Dharma balance (INV-2) and the per-bet cap `BET_MAX_STAKE` (buy/add only — **sell is never clamped**). A partial sell is native CPMM behaviour — sell N shares, the curve reprices, proceeds are credited; no new mechanism, no extra parameter.
+- *Slots:* side selector (entry only) · amount input with the per-bet cap clamp (buy/add: over-cap disables submit + inline max strip, the W2.11 P3 primitive) · mandatory comment field (on buy) · live balance · price/shares/cost-or-proceeds display · **sell module** (defaults to the full position, editable to a partial amount).
 
-**Slippage modal**
-- *Intent:* confirm price impact on a CPMM trade (per the slippage spec).
+**Slippage modal — RETIRED** *(W2.10 · deep-liquidity Option A, ratified 2026-06-27)*
+- Deep-liquidity seeding + the per-bet cap `BET_MAX_STAKE` keep single-bet price impact sub-threshold, so there is **no slippage warning and no tolerance control — buy or sell**. The d5 "Price impact warning" modal is retired. Kept here as a named-retired record so no CD prompt or build resurrects it.
 
 **Dharma balance**
 - *Intent:* the user's spendable Đ.
@@ -165,12 +169,16 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 ### §3.2 Surface & navigation primitives
 
 - **App shell / nav** — global navigation + auth/identity entry point.
-- **Market card** — a market at a glance (odds/price, title, category, activity). Reused across Discovery and Profile; must be identical everywhere.
+- **Market card** — a market at a glance. **Locked composition (Slot 1):** image thumb + question · two-line sparkline · YES/NO split bar · `Đ volume · posts · replies`. *(Category chip, lifecycle marker, and close date are parked off the Discovery card — still in the vocabulary for other renders.)* Reused across Discovery and Profile; must be identical everywhere.
 - **Category / tab vocabulary** — the taxonomy that groups and filters markets.
 - **Featured / trending rail** — a curated horizontal rail of highlighted markets.
 - **Price chart** — a market's price history.
 - **Debate mode selector** — switches the debate-view ranking mode; echoes the active mode.
 - **Pseudonym / PFP** — a participant's anonymous identity (name + avatar from the identity pool). Renders a permanent placeholder once scrubbed (erasure).
+- **Split bar** *(originated Slot 1)* — the shared two-pole bar: **label — bar — label**, text never inside the bar. Two variants on two different axes: the **market price bar** (`YES n% — bar — NO m%` — a **side** bar; black fill = the YES-side share, anchored to the YES side) and the **reply stake bar** (`SUPPORT Đx — bar — COUNTER Đy`, under a `Replies · count · Đ total` header — a **post-relative** Support/Counter bar, §6). *(The reply stake bar's exact fill mapping follows the locked v1.0 surface.)*
+- **Two-line price graph** *(originated Slot 1)* — YES and NO as two always-complementary lines (mirrors crossing at 50%): YES = solid ink, NO = grey *(grey stands in for the white pole, which cannot render on a white ground)*. Full-size on market panels; sparkline on cards.
+- **Market image thumb** *(originated Slot 1)* — every market carries an image reference rendered beside its question (hero and card sizes); labelled placeholder until the asset exists *(field pends SPEC.1 amendment, SCL-2)*.
+- **Featured-market hero** *(originated Slot 1)* — the Discovery centerpiece: three panels — top YES post | the market (image+question · two-line graph · price bar · `Đ staked · posts · replies`) | top NO post — over a dot-indicator carousel. Supersedes the generic rail on Discovery; the reduced-rail wording stays for any landing use.
 
 ### §3.3 Generic primitives
 
@@ -204,17 +212,16 @@ Which primitives each surface composes — the anchor that keeps shared primitiv
 | App shell / nav | ● | ● | ● | ● | ● |
 | Market card | | ● | | | ● |
 | Category / tab vocabulary | | ● | | | |
-| Featured / trending rail | ◐ | ● | | | |
-| Price chart | | | ● | ◐ | |
+| Featured / trending rail → **featured-market hero** on Discovery | ◐ | ● | | | |
+| Price chart | | ◐ | ● | ◐ | |
 | Single-side buy/sell panel | | | ● | | |
 | Mandatory comment field | | | ● | ● | |
-| Slippage modal | | | ● | | |
-| Side badge | | | ◐ | ● | ◐ |
+| Side badge | | ◐ | ◐ | ● | ◐ |
 | Position marker | | | | ● | ◐ |
 | Resolution / lifecycle marker | | ◐ | ● | ● | ◐ |
-| Top-level post | | | | ● | ◐ |
+| Top-level post | | ◐ | | ● | ◐ |
 | Reply (depth-1) | | | | ● | |
-| Support/Counter aggregate | | | | ● | |
+| Support/Counter aggregate | | ◐ | | ● | |
 | Debate mode selector | | | | ● | |
 | Dharma balance | | | ● | ● | ● |
 | Pseudonym / PFP | | | | ● | ● |
@@ -222,17 +229,20 @@ Which primitives each surface composes — the anchor that keeps shared primitiv
 
 ● primary · ◐ present in a secondary/compact form (e.g., profile history rows show frozen badges/markers; a landing rail is a reduced market card).
 
+*(The Slippage modal row is removed — the primitive is retired, §3.1.)*
+
 ---
 
 ## §6 — Debate-view conventions
 
 The highest-iteration surface. Its structure is locked here so every iteration in Claude Design holds the same shape.
 
-- **Two columns: YES (Support) and NO (Counter)** — the two poles side by side.
+- **Two columns are the two fixed poles: left = YES (black), right = NO (white)** — the **same for every post**, regardless of the post's own side. Replies are routed into a column by their **own** YES/NO side.
+- **Support/Counter is post-relative — never a column.** Whether a reply *supports* or *counters* a post is its stance toward that post (Support = agrees → same side as the post; Counter = disagrees → opposite side); because it flips with the post's side, it is never a column label or a colour. It appears only on the post's **split bar** (`SUPPORT Đx — bar — COUNTER Đy`) and in the **composer**.
 - **Top-level posts are ranked**, default **Top** (a composite), with selectable modes: **Most Debated**, **Highest Stakes**, **Contested**, **Newest**. The active mode is echoed in the UI. (Surging is deferred.)
 - **Replies are flat (one level only)**, ranked **by stake descending within their side**, earlier-posted winning ties.
-- **Two-slot default render:** each post surfaces the **top reply of each side** (one Support, one Counter); expanding shows that side's full stake-sorted list.
-- **Each post** shows the author's own stake at its header and the **Support/Counter aggregate** at its footer — no vote control.
+- **Two-slot default render:** each post surfaces the **top reply in each column** (its top YES reply and its top NO reply); expanding shows that column's full stake-sorted list.
+- **Each post** shows the author's own stake at its header and the **Support/Counter aggregate** (post-relative — stake agreeing vs. disagreeing with *this* post) at its footer — no vote control.
 - **Empty side** shows `Be the first to argue [YES/NO]` until a post exists.
 - **Refresh is polled**, not pushed (no live sockets this phase); new posts, new reply-bets, changed markers, and re-ranking appear on the next poll.
 - **Track-B comments** are admin-only inline (pending-review marker); never visible to the public.
@@ -241,9 +251,9 @@ The highest-iteration surface. Its structure is locked here so every iteration i
 
 ## §7 — Later passes (in scope, sequenced after the five monochrome surfaces)
 
-Scheduled, not excluded. These run after the five monochrome surfaces are designed and signed off.
+Scheduled, not excluded. These run after the core monochrome surfaces (now **locked at v1.0**) and the **DESIGN Wave-2** surfaces are designed and signed off.
 
-1. **Brand pass.** The one brand accent (applied in Claude Code as a token swap into the designated greys — *side black/white untouched*), logo, mascots, and type refinement. Feeds `design.md` / ADR-0012 at DESIGN.8.
+1. **Brand pass.** The one brand accent (applied in Claude Code as a token swap into the designated greys — *side black/white untouched*), logo, mascots, and type refinement. Feeds `design.md` / ADR-0012 at DESIGN.SPEC.
 2. **Admin visual language.** The admin hub and inline moderation surfaces get their own visual language — deliberately distinct from participant surfaces, reinforcing the structural rule that **admin is not a participant** (no account, no bet, no comment, no position). Designed as its own pass.
 3. **Mobile / responsive.** A responsive pass over the desktop surfaces.
 4. **Motion polish.** Finalising motion tokens and transitions.
@@ -251,8 +261,11 @@ Scheduled, not excluded. These run after the five monochrome surfaces are design
 ---
 
 > **Changelog.**
-> **v0.3-draft (2026-06-24):** §2.1 token values landed — the neutral ramp (`color.neutral.0 … 8`) and the two side poles now carry minted OKLCH values, replacing the `*(blank — CD)*` placeholders, with a SHELL/UI.0 provenance note pointing at `src/app/globals.css`. The side rows are clarified to bind the **YES/NO side** (not the Support/Counter relation), matching §3.1's side-badge rule. The accent remains deferred. No §1 constraint or §4 state-shape rule changed. Source: SHELL/UI.0 token mint (the DESIGN.7 mint), 2026-06-24.
-> **v0.2-draft (2026-06-04):** added §1.9 (Claude Design house style banned by name, each element paired with its neutral replacement) and §1.10 (exact values, never adjectives — vague-descriptor specs banned); added §4.9 (interactive states are part of the primitive) and §4.10 (loading/empty/error ship with the surface); propagated §1.9 cross-notes into §2.1 (true-neutral ramp), §2.2 (one neutral sans family this phase), §2.3 (radius small-or-zero; neutral shadows); clarified §1.3's rendering-decision anchor from "DESIGN.1" to "the look-anchor slot (Slot 1 / tracker DESIGN.3)"; grounding line now cites `Research_Report_v2.md`. Source: Claude Design high-fidelity research, 2026-06-04.
+> **v0.5-draft (2026-07-02) — fork-merge + lineage repair (DC.1).** Two branches had forked from v0.2 with **colliding "v0.3" labels**: the **PK branch** (v0.3-draft 2026-06-05 → v0.4-draft 2026-06-17, never committed — design lane's pre-DC.3 posture) and the **disk branch** (v0.3-draft 2026-06-24, committed at SHELL/UI.0 PR #161, unaware of the PK line). v0.5 merges them. Base = PK v0.4 (axis correction + v1.0-lock reflection + DESIGN.SPEC renames, all retained). Folded in from disk = the §2.1 landed OKLCH values + SHELL/UI.0 provenance, restated onto the **corrected** side tokens (`color.side.yes`/`color.side.no` ↔ `--color-yes`/`--color-no`; the disk copy's `color.side.support`/`.counter` labels are dropped); neutral-ramp vocabulary aligned to the built CSS (`color.neutral.0 … .7` + `color.neutral.ink` ↔ `--color-n0…n7` + `--color-ink`); provenance gains the `tests/unit/design/tokens-monochrome.test.ts` CI pin. Stale residue repaired: §2 heading/intro and the header division-of-labour no longer claim all values blank; the closing line is version-synced (the disk copy's was stuck at v0.2). **Rulings fold (operator-ratified 2026-07-02):** §3.1 **Slippage modal → RETIRED** (W2.10 / deep-liquidity Option A, 2026-06-27 — no warning, no tolerance control, buy or sell; d5 "Price impact warning" modal retired; §5 map row removed); §3.1 buy/sell panel restated — per-bet cap `BET_MAX_STAKE` on buy/add (sell never clamped), sell module defaults to full position editable to partial, partial sell is native CPMM (no new mechanism); slots gain the cap clamp + price/shares/cost-or-proceeds display, drop the slippage control. No §1 constraint or §4 state-shape rule changed beyond the already-recorded axis correction. Authored at DC.1; committed at DC.3. Source: DC.1 fork-merge — disk verbatims via CC micro-recon, PK v0.4 copy, `slippage_bet-cap_FINAL-spec-package.md`, 2026-07-02.
+> **[PK lineage] v0.4-draft (2026-06-17):** **Axis correction (the load-bearing fix)** — removed the Support↔YES / Counter↔NO conflation throughout (§1.3, §1 binding note, §2.1 token names, §3.1 aggregate, §6). The black/white poles now encode **side (YES/NO) only**; **Support/Counter is a separate, post-relative relation** (split bar + composer), never a colour or column. §2.1 tokens renamed `color.side.support→.yes`, `.counter→.no`. §6 columns restated as fixed YES/NO poles with replies routed by side; two-slot render restated per-column; split bar (§3.2) split into a side bar + a post-relative bar. **v1.0-lock reflection** — added the lock note (core surfaces + Bookmark locked at integration-shell v1.0; consolidated design PK canonical); retired task ref **DESIGN.8 → DESIGN.SPEC** throughout; §7 "five surfaces" → core (locked) + Wave-2. Source: v1.0 lock + `DESIGN-spec-changes-consolidated`, 2026-06-17.
+> **[disk lineage] v0.3-draft (2026-06-24):** §2.1 token values landed — the neutral ramp and the two side poles gained minted OKLCH values, replacing the `*(blank — CD)*` placeholders, with a SHELL/UI.0 provenance note pointing at `src/app/globals.css`. The side rows were clarified to bind the **YES/NO side** (not the Support/Counter relation), matching the built code comments; accent remained deferred. No §1 constraint or §4 state-shape rule changed. *(Committed at PR #161; carried the pre-correction `color.side.support`/`.counter` token labels — superseded by the v0.5 merge.)* Source: SHELL/UI.0 token mint (the DESIGN.7 mint), 2026-06-24.
+> **[PK lineage] v0.3-draft (2026-06-05):** §1.3 binding **CONFIRMED** by the operator (flagged-choice block resolved); §1.9 gains the Slot-1 rejected-direction record (newspaper/editorial styling — named negative for CD prompts); §3.1 top-level post slots amended (pseudonym/avatar header; argument = **title + body**, pending SCL-1); §3.2 gains four Slot-1 primitives (**split bar**, **two-line price graph**, **market image thumb**, **featured-market hero**) and the market card's **locked composition**; §5 map updated for Discovery (price chart ◐, side badge ◐, top-level post ◐, Support/Counter aggregate ◐; rail → hero). Source: Slot-1 lock (still v0.13) + operator decisions, 2026-06-05.
+> **v0.2-draft (2026-06-04):** added §1.9 (Claude Design house style banned by name, each element paired with its neutral replacement) and §1.10 (exact values, never adjectives — vague-descriptor specs banned); added §4.9 (interactive states are part of the primitive) and §4.10 (loading/empty/error ship with the surface); propagated §1.9 cross-notes into §2.1 (true-neutral ramp), §2.2 (one neutral sans family this phase), §2.3 (radius small-or-zero; neutral shadows); clarified §1.3's rendering-decision anchor from "DESIGN.1" to "the look-anchor slot (Slot 1 / tracker DESIGN.3)"; grounding line now cites `Research_Report_v2.md`. Source: Claude Design high-fidelity research, 2026-06-04. *(Common ancestor of both lineages.)*
 > **v0-draft:** initial authoring (visual-backbone thread).
 
-*End design-language v0.2-draft. Values designed in Claude Design; derived into `design.md` at DESIGN.8. Living vocabulary — §3 grows additively; §1 and §4 change only by explicit decision.*
+*End design-language v0.5-draft. Remaining blank values designed in Claude Design; derived into `design.md` at DESIGN.SPEC. Living vocabulary — §3 grows additively; §1 and §4 change only by explicit decision.*

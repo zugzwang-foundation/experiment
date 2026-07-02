@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zugzwang — Profile /me · DESIGN.6 v0.18</title>
+<!-- ===========================================================================
+  DESIGN.6 v0.18 — current value shows profit (operator, 2026-06-13)
+  · Current column appends position P/L inline: "Đ 310 (+Đ 70)" (current −
+    staked; grey, smaller). · gap between the Staked and Current columns
+    tightened (grid gap 10 → 6; arrow column 18 → 16; Current column widened
+    to fit the (+Đ N)).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.17 — Arguments breakdown parenthesised (operator, 2026-06-13)
+  · "3 Posts | 2 Replies" → "(3 Posts | 2 Replies)".
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.16 — Arguments breakdown (operator, 2026-06-13)
+  · Arguments tile gains a sub-line: "3 Posts | 2 Replies" (matches the 5
+    positions: rows split 3 post / 2 reply).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.15 — six account tiles (operator, 2026-06-13)
+  · trivia tiles 4 → 6 (3×2, uniform size). Row 1: Wallet value · Positions
+    value · Net profit/loss. Row 2: Arguments · Total Support received · Total
+    Counter received.
+  · derived identities (all demo, internally consistent):
+      unstaked balance = Đ 1,240 (nav chip) ; staked (cost) = Đ 1,190
+      Wallet value     = balance + staked            = Đ 2,430
+      Positions value  = balance + current stake val = Đ 2,668  (curr = Đ 1,428)
+      Net P/L          = Positions − Wallet          = +Đ 238   (= 1,428 − 1,190)
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.14 — auto-select + status filter (operator, 2026-06-13)
+  · the list auto-selects the first visible row — the replica always shows an
+    argument; the "select a position" empty state only appears when a filter
+    yields zero rows. · "Top" is replaced by an Open / Closed segmented filter
+    (default Open). · market filter AND status filter compose (logical AND) and
+    share one refresh path; whenever the active selection is filtered out, the
+    first remaining row auto-selects. The right colhead title now always
+    follows the SELECTED row's market.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.13 — filter button copy (operator, 2026-06-13)
+  · filter button is a STABLE label: "Select market ▾" by default and whenever
+    a specific market is chosen (the chosen market shows in the right colhead +
+    the popover's checked row, not on the button); choosing "All markets" in
+    the popover labels the button "All markets ▾". Button no longer echoes the
+    long market title.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.12 — equal-thirds rows + header on filter (operator, 2026-06-13)
+  · rows are now EQUAL THIRDS of the list panel (flex-basis 100%/3) — three
+    fill the whole left space at uniform height, the 4th/5th reached by scroll
+    (the JS height-cap of v0.11 is removed; pure CSS, matches the v0.8 ref).
+  · selecting a market in the "All markets ▾" filter now writes that market's
+    FULL title into the right colhead header (all filtered rows share it);
+    "All markets" resets it to "Market title". Row-click still sets it too.
+    Filter button is sentence-case now (was uppercase).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.11 — true 3-row window + colhead title fix (operator, 2026-06-13)
+  · v0.10 fixed 118px clipped the 3-line first row and let the 4th peek.
+    Now: rows size to CONTENT; the rows container is height-capped to exactly
+    the first three rows (JS measures the 3rd row's bottom) so the 4th sits
+    below the fold and the list scrolls. No row content is clipped.
+  · colhead market title wraps in FULL (2-line clamp, smaller if needed) and
+    is sentence-case (text-transform:none) — was a single uppercase ellipsis.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.10 — 3-row viewport + market filter (operator, 2026-06-13)
+  · list shows exactly 3 rows by default (no clipped 4th); each row a fixed
+    height so all line items match width/height (the v0.8 geometry) and the
+    rest scroll. · "All markets ▾" opens a popover of the distinct markets in
+    the list; picking one filters the rows to that market, "All markets"
+    clears. Active filter reflects in the button label.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.9 — replica = D5 card + list scroll (operator, 2026-06-13)
+  · sell input box height matched to the Sell button · thumbs (👍/👎) beside
+    Yes/No in the position cell · list scrolls (5 demo rows; rows no longer
+    stretch to fill — fixed natural height so the 4th/5th sit below the fold)
+  · replica title is now a 2-line clamp (D4/D5) with the "+" pop-up at its end;
+    the ↗ moves UP beside REPLIES · N (D5 head-row grammar). The title-row ↗
+    is gone (the head-row ↗ is the single enter affordance again).
+  · adds the "+" post pop-up (blurred backdrop, scrolling body) carried from D5.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.8 — trivia tiles finalised (operator, 2026-06-13)
+  · four tiles in two lines: [Positions value · Arguments] / [Total Support
+    received · Total Counter received]. Support/Counter received = Σ of all
+    Support/Counter Đ staked on THIS user's posts (read aggregate over
+    reply-bets; SPEC.2 §5.4 family) — a reach metric, distinct from the
+    user's own positions.
+  · balance tile + erasure link removed (balance + positions value move to a
+    top bar, to be designed separately).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.7 — D5 title size + value-column moves (operator, 2026-06-13)
+  · titles = D4/D5 card-title rule exactly (14px/700/1.35) — left list, right
+    colhead market title, replica post title
+  · the % move leaves the position cell: entry% sits under STAKED Đ, live%
+    under CURRENT Đ; a grey → column sits between the two value stacks
+  · position cell order: side word ABOVE the Sell/Open/Closed button
+  · ARGUMENT column header centred.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.6 — arrows + size unification (operator, 2026-06-12)
+  · type scale: left post title 13px, left market line 11px; right colhead
+    market title AND replica post title = 13px (one title size everywhere)
+  · ↗ after the colhead market title (opens D4 — stub) and after the replica
+    post title (opens D5 — stub); the v0.1 head-row ↗ removed (superseded)
+  · colhead live price gains the monochrome thumb (Yes 👍 38% grammar)
+  · position cell: side word on its own line above the % move
+  · slot parity: SELL / OPEN (visitor view replaces Sell) / CLOSED all share
+    the same button geometry; visitor "Open" selects the row into the panel
+  · sell module: SELL = list-Sell size; "You receive" → "Profit / Loss"
+    (current − staked, static).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.5 — prominence + alignment pass (operator, 2026-06-12)
+  · right colhead market title = left post-title size (12px/700); LIVE side
+    price added at the colhead's right ("Yes 38%"), fills on select
+  · staked/current values enlarged (14px) · POSITION header centred, column
+    narrowed (96px) · .deb frames rounded (var(--r)) as D4/D5
+  · position cell reordered: BIG SELL on top (ink border, 800) — or the
+    CLOSED tag — with "Yes 31% → 38%" (side word + entry → live) beneath;
+    the side chip leaves the list (side-coding rides the replica chip).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.4 — sell-in-position + D5-exact proportions (operator, 2026-06-12)
+  · sell column REMOVED — Sell (or CLOSED) lives in the POSITION cell under the
+    price move; Argument column takes the freed width · footer box = D4/D5 f2
+    dimensions exactly (50px); sell module compacted to fit the same box (the
+    comment-free note moved to the input's title) · replica image flex-fills
+    like a D5 card, footer pinned — right panel proportions = D4/D5 · the THREE
+    rows split the left panel height exactly (no scroll) · market-title line =
+    post-title font size, full line, POST/OPEN tags removed · table headers
+    are "Staked / Current" (the v0.3 text miss, fixed).
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.3 — list + footer refinements (operator, 2026-06-12)
+  · colheads match the D4/D5 action-bar height (52px) · right colhead shows
+    the SELECTED MARKET TITLE (was "Argument") · table headers one-line
+    "Staked / Current", centred with their values · 3 rows shown, NOTHING
+    truncated (titles + market questions render in full) · status vocabulary
+    is OPEN / CLOSED only (no "resolved"); open ranks above closed, before
+    Top ranking · position cell = side chip with entry% → current% beneath
+    (live market price of that side; closed winner settles to 100%) · reply
+    footer reads: Replied to {author}'s argument — "{full 125-char title}"
+    · replica footer zone is FIXED-HEIGHT — S/C bar, replied-to line, and
+    the sell module all occupy the same box, so the sell slide never
+    reflows the panel.
+  ----------------------------------------------------------------------------
+  DESIGN.6 v0.2 — PROFILE (/me) + SELL · structural alignment to D5
+  (operator, 2026-06-12)
+
+  v0.2: page now uses the D5 v1.12 grid VERBATIM — .screen/.content/.headzone
+  (188px) /.arena (1fr 1fr, gap 16) /.slot/.deb/.colhead/.colwrap/.panel.
+  · headzone: LEFT half = PFP (large) + pseudonym + trivia tiles;
+    RIGHT half = graph placeholder filling the whole rectangle (separate task).
+  · both rectangles get D5-style COLHEAD bars: left "Positions · All markets ▾
+    · Top", right "Argument".
+  · positions list is now a TABLE: header row POSITION · ARGUMENT · STAKED
+    VALUE · CURRENT VALUE (+ fixed sell slot); titles wrap to 2 lines, no
+    ellipsis; row geometry identical in owner/visitor views (sell slot is
+    reserved — visibility, not display) and on frozen rows (slot carries the
+    RESOLVED tag).
+  · replica panel + sell-slide motion carried from v0.1 unchanged.
+  HOTKEYS: V owner/visitor · ESC close sell. ALL CONTENT PLACEHOLDER DUMMY.
+  THROWAWAY REFERENCE — not repo code, not the CD deliverable.
+============================================================================ -->
+<style>
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --hairline:1px solid var(--n2);
+    --imgr:6px; --r:8px; --imgmax:160px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--n0);
+            font-family:var(--sans);-webkit-font-smoothing:antialiased;color:var(--ink);}
+  .screen{width:100vw;height:100vh;background:var(--n0);overflow:hidden;
+          display:flex;flex-direction:column;color:var(--ink);}
+
+  /* ── nav (verbatim shell) ─────────────────────────────────────────── */
+  .nav{height:60px;flex:0 0 60px;border-bottom:var(--hairline);
+       display:flex;align-items:center;padding:0 28px;gap:24px;}
+  .wordmark{font-size:15px;font-weight:800;letter-spacing:.34em;}
+  .navright{margin-left:auto;display:flex;align-items:center;gap:20px;}
+  .balchip{font-size:12.5px;font-weight:750;border:1px solid var(--ink);
+           border-radius:var(--r);padding:6px 13px;font-variant-numeric:tabular-nums;}
+  .navid{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:650;}
+  .avatar{width:26px;height:26px;border-radius:var(--imgr);border:1.5px solid var(--ink);
+          background:var(--n1);flex:0 0 auto;}
+  .viewchip{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+            border:1px dashed var(--n4);color:var(--n5);border-radius:var(--r);padding:5px 10px;}
+
+  .content{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;padding:16px 28px 16px;}
+
+  /* ── headzone: identity | graph — halves align with the arena columns ── */
+  .headzone{flex:0 0 188px;display:grid;grid-template-columns:1fr 1fr;gap:16px;min-height:0;}
+  .idcard{display:flex;gap:18px;align-items:center;min-width:0;}
+  .pfp{height:100%;aspect-ratio:1/1;border-radius:var(--imgr);border:1.5px solid var(--ink);
+       background:var(--n1);flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+       font-size:9px;font-weight:800;letter-spacing:.12em;color:var(--n4);text-transform:uppercase;}
+  .idcol{display:flex;flex-direction:column;gap:12px;min-width:0;flex:1 1 auto;}
+  .uname{font-size:20px;font-weight:800;letter-spacing:.01em;}
+  /* v0_37 — username row + bookmark/download combo (headzone idcard) */
+  .unamerow{display:flex;align-items:center;gap:10px;}
+  .idacts{display:flex;align-items:center;gap:4px;}
+  .idact{display:flex;align-items:center;justify-content:center;width:28px;height:28px;color:var(--n4);
+         background:transparent;border:none;border-radius:7px;cursor:pointer;padding:0;}
+  .idact:hover{color:var(--ink);background:var(--n1);}
+  .idact svg{display:block;}
+  body.bookmarks #bmgo{color:var(--ink);background:var(--n1);}   /* active state on the bookmark page */
+  .tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-rows:1fr;gap:10px;}
+  .tile{border:var(--hairline);border-radius:var(--r);padding:9px 13px;min-width:0;
+        display:flex;flex-direction:column;justify-content:center;}
+  .tile .tv{font-size:14px;font-weight:800;font-variant-numeric:tabular-nums;}
+  .tile .tl{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+            color:var(--n4);margin-top:3px;}
+  .tile .tv .tsub{font-size:10px;font-weight:700;color:var(--n4);margin-left:7px;
+                  font-variant-numeric:tabular-nums;letter-spacing:0;}
+  .erase{font-size:9px;color:var(--n4);font-weight:600;text-decoration:none;
+         border-bottom:1px dotted var(--n3);align-self:flex-start;}
+  .erase:hover{color:var(--ink);border-color:var(--ink);}
+  .gph{border:var(--hairline);border-radius:var(--r);background:var(--n1);min-width:0;
+       display:flex;align-items:center;justify-content:center;text-align:center;
+       font-size:9px;font-weight:800;letter-spacing:.14em;color:var(--n4);
+       text-transform:uppercase;line-height:1.8;}
+
+  /* ── arena: Positions | Argument (D5 grid verbatim) ───────────────── */
+  .arena{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;
+         gap:16px;margin-top:12px;}
+  .slot{position:relative;min-height:0;overflow:hidden;}
+  .deb{position:absolute;inset:0;display:flex;flex-direction:column;
+       border:1px solid var(--ink);background:var(--n0);
+       border-radius:var(--r);overflow:hidden;} /* v0.5: curved as D4/D5 */
+  .colhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;position:relative;
+           padding:10px 14px;border-bottom:var(--hairline);min-height:52px;}
+  .chttl.mkt{font-size:13px;font-weight:700;letter-spacing:.01em;text-transform:none;
+             min-width:0;flex:1 1 auto;line-height:1.3;
+             display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+             /* v0.11: full wrap, sentence-case (was uppercase ellipsis) */
+  .chprice{margin-left:auto;font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;flex:0 0 auto;}
+  .chprice b{font-weight:800;}
+  .chttl{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;}
+  .mfilter{font:inherit;font-size:10.5px;font-weight:700;letter-spacing:.01em;
+           border:1px solid var(--n3);background:var(--n0);border-radius:var(--r);
+           padding:7px 13px;cursor:pointer;max-width:240px;white-space:nowrap;overflow:hidden;
+           text-overflow:ellipsis;} /* v0.12: sentence-case, ellipsis */
+  .mfilter:hover{border-color:var(--ink);}
+  .mfilter.on{border-color:var(--ink);background:var(--ink);color:var(--n0);}
+  .fpop{position:absolute;top:46px;left:14px;z-index:20;min-width:260px;max-width:calc(100% - 28px);
+        background:var(--n0);border:1px solid var(--ink);border-radius:var(--r);
+        box-shadow:0 8px 24px rgba(10,10,10,.12);padding:5px;display:none;}
+  .fpop.open{display:block;}
+  .fopt{display:block;width:100%;text-align:left;font:inherit;font-size:11px;font-weight:650;
+        color:var(--ink);background:none;border:0;border-radius:6px;padding:9px 11px;cursor:pointer;
+        white-space:normal;line-height:1.3;}
+  .fopt:hover{background:var(--n1);}
+  .fopt.sel{font-weight:800;}
+  .fopt.all{border-bottom:var(--hairline);border-radius:0;margin-bottom:4px;padding-bottom:11px;}
+  .segwrap{margin-left:auto;display:inline-flex;border:1px solid var(--n3);
+           border-radius:var(--r);overflow:hidden;flex:0 0 auto;}
+  .seg{font:inherit;font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+       padding:7px 13px;background:var(--n0);color:var(--n5);border:0;cursor:pointer;}
+  .seg+.seg{border-left:1px solid var(--n3);}
+  .seg.on{background:var(--ink);color:var(--n0);}
+  .colwrap{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;
+           flex-direction:column;padding:14px;}
+
+  /* positions table */
+  .thead,.prow{display:grid;grid-template-columns:96px 1fr 78px 16px 118px;
+               gap:6px;align-items:center;}
+  .thead span:first-child{text-align:center;} /* v0.5: POSITION centred over its cell */
+  .thead span:nth-child(2){text-align:center;} /* v0.7: ARGUMENT centred */
+  .parrow{color:var(--n4);font-weight:400;font-size:13px;text-align:center;}
+  .thead{padding:0 12px 8px;font-size:8.5px;font-weight:800;letter-spacing:.12em;
+         text-transform:uppercase;color:var(--n4);}
+  .thead .num,.pnum{text-align:center;} /* v0.3: headers centred to values */
+  .rows{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:0;
+        border:var(--hairline);border-radius:var(--r);}
+  /* v0.12: three EQUAL-THIRD rows fill the panel; 4th+ scroll (CSS only) */
+  .rows .prow{flex:0 0 calc(100% / 3);min-height:0;}
+  .prow{padding:10px 12px;border-bottom:var(--hairline);cursor:pointer;}
+  .prow:last-child{border-bottom:0;}
+  .prow:hover{background:var(--n1);}
+  .prow.sel{outline:2px solid var(--ink);outline-offset:-2px;border-radius:var(--r);background:var(--n1);}
+  .sidechip{font-weight:800;letter-spacing:.1em;flex:0 0 auto;border-radius:var(--r);}
+  .sidechip.sm{font-size:8.5px;padding:2px 7px;letter-spacing:.08em;}
+  .sidechip.yes{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .sidechip.no{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+  .poscell{display:flex;flex-direction:column;align-items:center;gap:5px;}
+  .pside{font-size:11px;font-weight:800;color:var(--ink);display:inline-flex;align-items:center;gap:4px;}
+  .pside svg{display:block;}
+  .pmove{font-size:10.5px;font-weight:700;color:var(--n6);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .pmove .arrow{color:var(--n4);font-weight:400;margin:0 2px;}
+  .pcellt{min-width:0;}
+  .ptitle{font-size:14px;font-weight:700;line-height:1.35;}   /* v0.7: = D4/D5 .rtitle; full wrap, no ellipsis */
+  .pmkt{display:flex;align-items:center;gap:7px;margin-top:3px;font-size:9px;color:var(--n4);min-width:0;}
+  .pmkt{align-items:flex-start;}
+  .pmkt .mq{white-space:normal;min-width:0;font-size:11px;font-weight:600;color:var(--n5);
+            line-height:1.35;} /* v0.6: −1 from title */
+  .tag{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+       border:1px solid var(--n3);border-radius:var(--r);padding:1.5px 6px;color:var(--n5);flex:0 0 auto;}
+  .tag.frz{border-color:var(--ink);color:var(--n0);background:var(--ink);}
+  .pnum{display:flex;flex-direction:column;align-items:center;gap:2px;
+        font-size:14px;font-weight:750;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .pnum .sub{font-size:10.5px;font-weight:700;color:var(--n5);} /* entry%/live% under the Đ */
+  .pnum .val{display:inline-flex;align-items:baseline;gap:6px;}
+  .pnum .pl{font-size:10.5px;font-weight:700;color:var(--n5);} /* v0.18: position P/L next to current */
+  .sellbtn{font:inherit;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+           padding:9px 22px;border:1.5px solid var(--ink);background:var(--n0);color:var(--ink);
+           border-radius:var(--r);cursor:pointer;} /* v0.5: bigger, prominent */
+  .sellbtn:hover{background:var(--ink);color:var(--n0);}
+  .openrow{font:inherit;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+           padding:9px 22px;border:1.5px solid var(--n3);background:var(--n0);color:var(--ink);
+           border-radius:var(--r);cursor:pointer;}
+  .openrow:hover{border-color:var(--ink);}
+  .closedbtn{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+           padding:9px 16px;border:1.5px solid var(--ink);background:var(--ink);color:var(--n0);
+           border-radius:var(--r);cursor:default;}
+  body.visitor .sellbtn{display:none;}        /* v0.6: visitor sees OPEN in the same slot */
+  body:not(.visitor) .openrow{display:none;}
+
+  /* ── replica (D5 card anatomy, panel verbatim) ────────────────────── */
+  .panel{border:1px solid var(--ink);background:var(--n0);flex:1 1 auto;min-height:0;
+         display:flex;flex-direction:column;border-radius:var(--r);}
+  .rempty{flex:1 1 auto;display:flex;align-items:center;justify-content:center;text-align:center;
+          font-size:11px;color:var(--n4);font-weight:600;letter-spacing:.04em;padding:30px;line-height:1.8;}
+  .argbody{padding:14px 14px 12px;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+  .rchead{display:flex;align-items:center;gap:8px;font-size:12.5px;min-width:0;}
+  .rchead .avatar{width:18px;height:18px;border-width:1.5px;}
+  .pseud{font-weight:650;color:var(--ink);}
+  .vsep{color:var(--n3);font-weight:400;flex:0 0 auto;}
+  .argstake{color:var(--n6);font-weight:700;font-size:11.5px;font-variant-numeric:tabular-nums;}
+  .argstake .arrow{color:var(--n4);font-weight:400;margin:0 2px;}
+  .repmeta{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.12em;
+           text-transform:uppercase;color:var(--ink);flex:0 0 auto;}
+  /* v0_35 (Req 2) — D5 card-head action cluster (bookmark + download), replaces the ↗ */
+  .cardacts{margin-left:auto;display:flex;align-items:center;gap:4px;flex:0 0 auto;}
+  .cardact{display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:var(--n4);background:transparent;border:none;border-radius:6px;cursor:pointer;padding:0;}
+  .cardact:hover{color:var(--ink);background:var(--n1);}
+  .cardact svg{display:block;}
+  /* v0_36 — D5 number treatments (ported verbatim): big reply count + big staked total */
+  .repmeta.inl{margin-left:0;}
+  .repn{font-size:13px;letter-spacing:0;}
+  .stkn{font-size:12px;letter-spacing:0;color:var(--ink);}   /* F2 v0_37 — dark like the market page */
+  .openbtn{margin-left:8px;width:24px;height:22px;flex:0 0 auto;cursor:pointer;padding:0;
+           border:1px solid var(--n3);background:var(--n0);color:var(--n6);
+           border-radius:var(--r);display:flex;align-items:center;justify-content:center;}
+  .openbtn svg{display:block;}
+  .openbtn:hover{border-color:var(--ink);color:var(--ink);}
+  .rtitle{font-size:14px;font-weight:700;line-height:1.35;margin-top:10px;position:relative;
+          padding-right:22px;} /* v0.9: = D4/D5 .rtitle, 2-line clamp + "+" */
+  .rtitle .tx{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .rtitle .plus{position:absolute;right:0;bottom:0;width:20px;height:20px;padding:0;
+                border:1px solid var(--n3);background:var(--n0);color:var(--n6);border-radius:var(--r);
+                font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+  .rtitle .plus:hover{border-color:var(--ink);color:var(--ink);}
+  .rimg{margin-top:12px;flex:1 1 auto;min-height:0;border:var(--hairline);border-radius:var(--imgr);
+        background:var(--n1);display:flex;align-items:center;justify-content:center;
+        font-size:9px;font-weight:800;letter-spacing:.14em;color:var(--n4);text-transform:uppercase;}
+  .rfootwrap{flex:0 0 50px;height:50px;margin-top:auto;position:relative;overflow:hidden;} /* v0.4: = D4/D5 f2 footer height */
+  .rfoot,.sellmod{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;
+                  transition:transform .26s ease,opacity .26s ease;}
+  .rfootwrap.selling .rfoot{transform:translateY(110%);opacity:0;}
+  .rfootwrap:not(.selling) .sellmod{visibility:hidden;}
+
+  .barrow{display:flex;align-items:center;gap:9px;}
+  .barrow.f2{border-top:var(--hairline);padding-top:10px;align-items:flex-start;}
+  .barrow.f2 .bar{margin-top:5px;}
+  .bar{flex:1 1 auto;position:relative;border:1px solid var(--ink);height:14px;
+       border-radius:var(--r);overflow:hidden;background:var(--n0);}
+  .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ink);}
+  .sidewrap{display:flex;flex-direction:column;gap:3px;align-items:center;flex:0 0 auto;}
+  .midwrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;gap:9px;}
+  .midwrap .bar{width:100%;}
+  .rbtn2{font:inherit;font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+         padding:4px 12px;cursor:default;border-radius:var(--r);}
+  .rbtn2.y{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .rbtn2.n{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+  .sb2{font-size:10px;font-weight:700;color:var(--n4);font-variant-numeric:tabular-nums;}
+  .sb2.mid{letter-spacing:.1em;text-transform:uppercase;}
+  .parline{border-top:var(--hairline);padding-top:10px;font-size:10.5px;line-height:1.55;
+           color:var(--n5);font-weight:600;
+           display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}  /* F1 v0_37 — fit the fixed 50px footer */
+  .parline b{color:var(--ink);font-weight:700;}
+
+  .sellmod{border-top:1px solid var(--ink);padding-top:10px;}
+  .smrow{display:flex;align-items:center;gap:12px;}
+  .smfield{display:flex;align-items:center;gap:7px;border:1.5px solid var(--ink);
+           border-radius:var(--r);padding:9px 14px;flex:0 0 auto;} /* v0.9: height = Sell button */
+  .smfield .cur{font-size:14px;font-weight:750;}
+  .smfield input{border:0;outline:0;font:inherit;font-size:14px;font-weight:750;width:80px;
+                 font-variant-numeric:tabular-nums;color:var(--ink);background:transparent;}
+  .smrecv{display:flex;flex-direction:column;gap:1px;line-height:1.12;}
+  .smrecv .poslab{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--n4);}
+  .smrecv .posval{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .smcancel{font:inherit;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+            padding:5px 11px;border:1px solid var(--n3);background:var(--n0);border-radius:var(--r);
+            cursor:pointer;margin-left:auto;}
+  .smcancel:hover{border-color:var(--ink);}
+  .smsell{display:flex;align-items:center;justify-content:center;font:inherit;cursor:pointer;
+          background:var(--ink);color:var(--n0);border:1.5px solid var(--ink);
+          border-radius:var(--r);padding:9px 22px;}
+  .smsell .pbw{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;line-height:1.1;}
+
+  /* v0.9 — "+" full-argument pop-up (D5 grammar) */
+  .pmwrap{position:fixed;inset:0;background:rgba(10,10,10,.45);display:none;
+          backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+          align-items:center;justify-content:center;z-index:50;padding:28px;}
+  body.ppop .pmwrap{display:flex;}
+  .pmcard{position:relative;width:620px;max-width:calc(100vw - 48px);max-height:82vh;
+          background:var(--n0);border:1px solid var(--ink);border-radius:var(--r);
+          display:flex;flex-direction:column;overflow:hidden;}
+  .pmx{position:absolute;top:10px;right:10px;z-index:2;width:24px;height:24px;padding:0;
+       border:1px solid var(--n3);background:var(--n0);color:var(--n6);border-radius:var(--r);
+       font-size:15px;line-height:1;cursor:pointer;}
+  .pmx:hover{border-color:var(--ink);color:var(--ink);}
+  .pmscroll{overflow-y:auto;padding:16px 18px 20px;}
+  .argprofile{display:flex;align-items:center;gap:8px;font-size:12.5px;padding-right:30px;}
+  .pmtitle{font-size:18px;font-weight:800;line-height:1.3;margin-top:12px;}
+  .pmimg{margin-top:14px;border:var(--hairline);border-radius:var(--imgr);overflow:hidden;
+         background:var(--n1);height:200px;display:flex;align-items:center;justify-content:center;
+         font-size:9px;font-weight:800;letter-spacing:.14em;color:var(--n4);text-transform:uppercase;}
+  .pmbody{margin-top:14px;font-size:13.5px;line-height:1.65;color:var(--n7);}
+  .pmbody p{margin-bottom:12px;}
+</style>
+</head>
+<body>
+<div class="screen">
+  <div class="nav">
+    <div class="wordmark">ZUGZWANG</div>
+    <div class="navright">
+      <span class="viewchip" id="viewchip">Viewing as owner · V toggles</span>
+      <span class="balchip">Đ 1,240</span>
+      <span class="navid"><span class="avatar"></span>umber-falcon-31</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== headzone: identity | graph placeholder ===== -->
+    <div class="headzone">
+      <div class="idcard">
+        <div class="pfp">PFP · R2</div>
+        <div class="idcol">
+          <div class="unamerow"><div class="uname">umber-falcon-31</div><span class="idacts"><button class="idact" id="bmgo" title="Bookmarks" aria-label="Open bookmarks"><svg viewBox="0 0 14 14" width="15" height="15"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="idact" title="Download profile card" aria-label="Download profile card"><svg viewBox="0 0 14 14" width="15" height="15"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span></div>
+          <div class="tiles">
+            <div class="tile"><div class="tv">Đ 2,430</div><div class="tl">Wallet value</div></div>
+            <div class="tile"><div class="tv">Đ 2,668</div><div class="tl">Positions value</div></div>
+            <div class="tile"><div class="tv">+Đ 238</div><div class="tl">Net profit / loss</div></div>
+            <div class="tile"><div class="tv">5<span class="tsub">(3 Posts | 2 Replies)</span></div><div class="tl">Arguments</div></div>
+            <div class="tile"><div class="tv">Đ 8,640</div><div class="tl">Total Support received</div></div>
+            <div class="tile"><div class="tv">Đ 5,210</div><div class="tl">Total Counter received</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="gph">Dharma / activity graph<br>placeholder — separate task</div>
+    </div>
+
+    <!-- ===== arena: Positions | Argument ===== -->
+    <div class="arena">
+      <div class="slot">
+        <div class="deb">
+          <div class="colhead">
+            <span class="chttl">Positions</span>
+            <button class="mfilter" id="mfilter" onclick="toggleFilter(event)">Select market ▾</button>
+            <div class="fpop" id="fpop"></div>
+            <span class="segwrap">
+              <button class="seg on" id="segOpen" onclick="setStatus('open')">Open</button>
+              <button class="seg" id="segClosed" onclick="setStatus('closed')">Closed</button>
+            </span>
+          </div>
+          <div class="colwrap">
+            <div class="thead">
+              <span>Position</span><span>Argument</span>
+              <span class="num">Staked</span><span></span><span class="num">Current</span>
+            </div>
+            <div class="rows" id="rows"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="slot">
+        <div class="deb">
+          <div class="colhead"><span class="chttl mkt mktlink" id="mktttl" title="Open market">Market title</span><span class="chprice" id="chprice"></span></div>
+          <div class="colwrap">
+            <div class="panel" id="replica">
+              <div class="rempty">Select a position to read its argument.<br>Sell lives here too — the footer slides into the sell action.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="pmwrap" onclick="if(event.target===this)closePop()">
+  <div class="pmcard">
+    <button class="pmx" onclick="closePop()" aria-label="Close">×</button>
+    <div class="pmscroll">
+      <div class="argprofile"><span class="avatar"></span><span class="pseud" id="pmAuthor"></span><span class="vsep">|</span><span class="sidechip sm yes" id="pmChip"></span><span class="vsep">|</span><span class="argstake" id="pmStake"></span></div>
+      <div class="pmtitle" id="pmTitle"></div>
+      <div class="pmimg">Image · shown whole</div>
+      <div class="pmbody">
+        <p>Ridership has doubled every quarter since Phase 2 opened, and nothing in the operating data says that run is finished. The early jumps were line-opening novelty; the current ones are commuter conversion, which is the signature of habit rather than curiosity.</p>
+        <p>Monthly-pass volumes are climbing faster than single-journey tokens. Habitual demand doesn’t churn when the weather turns, and the supply side is still loosening — two more entry gates at Marol and the CSMT second exit both land before the freeze.</p>
+        <p>Put the feeder’s 180k daily trips on top of a base that’s already compounding, and 1M isn’t an optimistic target — it’s the straight-line extension of what the dailies already show.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* DESIGN.6 v0.1 — demo data: umber-falcon-31's bets. Stake-currents illustrative. */
+  /* v0.6 — monochrome thumbs (price grammar) + NE arrow */
+  var THUP = '<svg viewBox="0 0 14 14" width="12" height="12"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+  var THDN = '<svg viewBox="0 0 14 14" width="12" height="12" style="transform:rotate(180deg)"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+
+  var ROWS = [
+    { kind:'post',  status:'open', side:'yes', e:31, p:38, st:'Đ 240', cur:'Đ 310', curN:310,
+      t:'Monsoon rebound is already in the dailies — the October base makes 1M arithmetic, not hope.',
+      mq:'Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?',
+      reps:9, sPct:44, sDh:'1,250', cDh:'1,590', tot:'Đ 2,840' },
+    { kind:'reply', status:'open', side:'no',  e:47, p:52, st:'Đ 300', cur:'Đ 312', curN:312,
+      t:'Slot allocations published so far cover barely 60% of the claimed schedule.',
+      mq:'Will Navi Mumbai airport handle 1M passengers in its first quarter?',
+      rel:'counter', relN:7, parentA:'marble-crane-15',
+      parent:'Opening-quarter demand is pre-sold — the airlines’ own filings say so.' },
+    { kind:'post',  status:'closed', side:'yes', e:44, p:100, st:'Đ 300', cur:'Đ 682', curN:682,
+      t:'Committee math was already 5–2 before the recess; the vote was a formality.',
+      mq:'Did the council pass the BKC rezoning by June 1?',
+      reps:3, sPct:71, sDh:'520', cDh:'210', tot:'Đ 730' },
+    { kind:'reply', status:'open', side:'yes', e:29, p:34, st:'Đ 180', cur:'Đ 214', curN:214,
+      t:'Monthly-pass volumes are climbing faster than single-journey tokens — that’s habit forming, and habit doesn’t churn when the weather turns.',
+      mq:'Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?',
+      rel:'support', relN:13, parentA:'verdant-heron-07',
+      parent:'The airport feeder opens October 1 and MMRC’s own note adds 180k daily trips from day one — none of it is in the curve we see today.' },
+    { kind:'post', status:'closed', side:'no', e:54, p:100, st:'Đ 420', cur:'Đ 905', curN:905,
+      t:'The tender timeline alone rules it out — procurement to commissioning is eighteen months on the operator’s own filing.',
+      mq:'Will the coastal-road spur open to traffic before the freeze?',
+      reps:6, sPct:38, sDh:'340', cDh:'560', tot:'Đ 900' }
+  ];
+  var sel = -1, selling = false, mFilter = null, statusFilter = 'open';  /* market query|null ; 'open'|'closed' */
+
+  function rowHTML(r,i){
+    /* v0.3 grid: POSITION (side chip, entry% → current% beneath) · ARGUMENT (full title +
+       full market line + post/reply + open/closed) · STAKED · CURRENT · sell slot.
+       Status vocabulary is OPEN/CLOSED only; open partitions above closed before Top rank.
+       Geometry identical in owner/visitor views and on closed rows (tag fills the slot). */
+    /* v0.4: Sell (or CLOSED) lives inside the POSITION cell; market title is a full
+       untagged line at post-title size; the freed column widens ARGUMENT. */
+    var closed = r.status === 'closed';
+    var slot = closed ? '<span class="closedbtn">Closed</span>'
+                      : '<button class="sellbtn" onclick="sellRow(event,'+i+')">Sell</button>'
+                        + '<button class="openrow" onclick="event.stopPropagation();pick('+i+')">Open</button>';
+    var sideLab = (r.side === 'yes' ? 'Yes ' + THUP : 'No ' + THDN);
+    /* v0.7/0.9: side word + thumb ABOVE the slot; entry% under STAKED, live% under CURRENT */
+    var poscell = '<span class="poscell"><span class="pside">'+sideLab+'</span>' + slot + '</span>';
+    return '<div class="prow'+(i===sel?' sel':'')+'" onclick="pick('+i+')">'
+      + poscell
+      + '<span class="pcellt"><div class="ptitle tlink" title="Open replies">'+r.t+'</div>'
+      + '<div class="pmkt"><span class="mq">'+r.mq+'</span></div></span>'
+      + '<span class="pnum">'+r.st+'<span class="sub">'+r.e+'%</span></span>'
+      + '<span class="parrow">→</span>'
+      + '<span class="pnum"><span class="val">'+r.cur+'<span class="pl">('+plShort(r)+')</span></span><span class="sub">'+r.p+'%</span></span></div>';
+  }
+  function matches(r){ return (mFilter===null || r.mq===mFilter) && r.status===statusFilter; }
+  function visibleIndices(){ var v=[]; ROWS.forEach(function(r,i){ if(matches(r)){ v.push(i); } }); return v; }
+  function renderRows(){
+    var vis = visibleIndices();
+    document.getElementById('rows').innerHTML = vis.length
+      ? vis.map(function(i){ return rowHTML(ROWS[i], i); }).join('')
+      : '<div class="rempty">No '+statusFilter+' positions'+(mFilter?' in this market':'')+'.</div>';
+  }
+  /* v0.14 — single refresh: keep/auto-pick selection, render rows + replica */
+  function refresh(){
+    var vis = visibleIndices();
+    if(vis.indexOf(sel) < 0){ sel = vis.length ? vis[0] : -1; selling = false; }
+    renderRows();
+    if(sel >= 0){ renderReplica(); }
+    else {
+      document.getElementById('replica').innerHTML =
+        '<div class="rempty">No positions to show.<br>Adjust the market or status filter.</div>';
+    }
+  }
+  /* v0.10 — market filter popover: distinct markets from the list */
+  function buildFilter(){
+    var seen = [], opts = '<button class="fopt all'+(mFilter===null?' sel':'')+'" onclick="setFilter(null)">All markets</button>';
+    ROWS.forEach(function(r){ if(seen.indexOf(r.mq)<0){ seen.push(r.mq);
+      opts += '<button class="fopt'+(mFilter===r.mq?' sel':'')+'" onclick="setFilter(this.dataset.mq)" data-mq="'+r.mq.replace(/"/g,'&quot;')+'">'+r.mq+'</button>'; } });
+    document.getElementById('fpop').innerHTML = opts;
+  }
+  function toggleFilter(ev){ ev.stopPropagation(); buildFilter();
+    document.getElementById('fpop').classList.toggle('open'); }
+  function setFilter(mq){
+    mFilter = mq;
+    var btn = document.getElementById('mfilter');
+    btn.textContent = (mq===null ? 'All markets' : 'Select market') + ' ▾';
+    btn.classList.toggle('on', mq!==null);
+    document.getElementById('fpop').classList.remove('open');
+    refresh();
+  }
+  /* v0.14 — status (Open/Closed) filter; composes with the market filter */
+  function setStatus(st){
+    statusFilter = st;
+    document.getElementById('segOpen').classList.toggle('on', st==='open');
+    document.getElementById('segClosed').classList.toggle('on', st==='closed');
+    refresh();
+  }
+
+  function footHTML(r){
+    if(r.kind==='reply'){
+      return '<div class="rfoot parline">Replied to '+r.parentA+'’s argument — <b>“'+r.parent+'”</b></div>';
+    }
+    var sSide = r.side, cSide = r.side==='yes'?'no':'yes';
+    return '<div class="rfoot"><div class="barrow f2">'
+      + '<span class="sidewrap"><span class="rbtn2 '+(sSide==='yes'?'y':'n')+'">Support</span><span class="sb2">Đ '+r.sDh+'</span></span>'
+      + '<span class="midwrap"><div class="bar"><div class="fill" style="width:'+r.sPct+'%"></div></div><span class="sb2 mid"><b class="stkn">'+r.tot+'</b> staked</span></span>'
+      + '<span class="sidewrap"><span class="rbtn2 '+(cSide==='yes'?'y':'n')+'">Counter</span><span class="sb2">Đ '+r.cDh+'</span></span>'
+      + '</div></div>';
+  }
+  function replicaHTML(r){
+    /* v0_36 (Req1) post: 'Replies · N' rides the left cluster (| sep, big number, D5 .repn),
+       cardacts pushed right. (Req4) reply: the SUPPORT/COUNTER meta is dropped — the footer's
+       "Replied to …" already states the relation. */
+    var metaHTML = r.kind==='post'
+      ? '<span class="vsep">|</span><span class="repmeta inl">Replies · <span class="repn">'+r.reps+'</span></span>'
+      : '';
+    var sellable = r.status !== 'closed';
+    return '<div class="argbody">'
+      + '<div class="rchead"><span class="avatar"></span><span class="pseud">umber-falcon-31</span>'
+      + '<span class="vsep">|</span><span class="sidechip sm '+r.side+'">'+r.side.toUpperCase()+' @ '+r.e+'%</span>'
+      + '<span class="vsep">|</span><span class="argstake">'+r.st+' <span class="arrow">→</span> '+r.cur+'</span>'
+      + metaHTML
+      + '<span class="cardacts"><button class="cardact" aria-label="Bookmark"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="cardact" aria-label="Download"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span></div>'
+      + '<div class="rtitle"><span class="tx tlink" title="Open replies">'+r.t+'</span>'
+      + '<button class="plus" onclick="openPop()" aria-label="Show full argument">+</button></div>'
+      + '<div class="rimg">Image · shown whole</div>'
+      + '<div class="rfootwrap" id="rfw">'
+      + footHTML(r)
+      + (sellable ? '<div class="sellmod">'
+        + '<div class="smrow">'
+        + '<span class="smfield" title="No argument needed — selling is the only comment-free action. Default = full position; edit for a partial sell."><span class="cur">Đ</span><input id="sellamt" type="text" value="'+r.curN+'"></span>'
+        + '<span class="smrecv"><span class="poslab">Profit / Loss</span><span class="posval" id="sellrecv">'+pl(r)+'</span></span>'
+        + '<button class="smcancel" onclick="closeSell(event)">Cancel</button>'
+        + '<button class="smsell"><span class="pbw">Sell</span></button>'
+        + '</div>'
+        + '</div>' : '')
+      + '</div></div>';
+  }
+  function renderReplica(){
+    var box = document.getElementById('replica');
+    if(sel < 0){ return; }
+    box.innerHTML = replicaHTML(ROWS[sel]);
+    var fw = document.getElementById('rfw');
+    if(selling && ROWS[sel].status !== 'closed'){ fw.classList.add('selling'); }
+    document.getElementById('mktttl').textContent = ROWS[sel].mq;
+    var r0 = ROWS[sel];
+    document.getElementById('chprice').innerHTML =
+      (r0.side === 'yes' ? 'Yes ' + THUP : 'No ' + THDN) + ' <b>' + r0.p + '%</b>';
+
+  }
+  /* v0.9 — "+" full-argument pop-up (D5 grammar: blurred backdrop, scrolling body) */
+  function openPop(){
+    if(sel < 0){ return; }
+    var r = ROWS[sel];
+    document.getElementById('pmAuthor').textContent = 'umber-falcon-31';
+    var ch = document.getElementById('pmChip');
+    ch.textContent = r.side.toUpperCase() + ' @ ' + r.e + '%'; ch.className = 'sidechip sm ' + r.side;
+    document.getElementById('pmStake').innerHTML = r.st + ' <span class="arrow">→</span> ' + r.cur;
+    document.getElementById('pmTitle').textContent = r.t;
+    document.body.classList.add('ppop');
+  }
+  function closePop(){ document.body.classList.remove('ppop'); }
+  function pl(r){
+    /* Profit / Loss = current − staked (static, position-level) */
+    var stN = parseInt(String(r.st).replace(/[^0-9]/g,''),10);
+    var d = r.curN - stN;
+    return (d >= 0 ? '+Đ ' : '−Đ ') + Math.abs(d);
+  }
+  function plShort(r){
+    var stN = parseInt(String(r.st).replace(/[^0-9]/g,''),10);
+    var d = r.curN - stN;
+    return (d >= 0 ? '+Đ' : '−Đ') + Math.abs(d);
+  }
+  function pick(i){ sel = i; selling = false; refresh(); }
+  function sellRow(ev,i){
+    ev.stopPropagation();
+    if(document.body.classList.contains('visitor')){ return; }
+    sel = i; selling = true; renderRows(); renderReplica();
+  }
+  function closeSell(ev){ if(ev){ ev.stopPropagation(); } selling = false; renderReplica(); }
+
+  document.addEventListener('keydown', function(e){
+    if(e.key==='Escape'){ closeSell(); closePop(); document.getElementById('fpop').classList.remove('open'); }
+    if(e.key==='v' || e.key==='V'){
+      if(document.body.classList.contains('bookmarks')) return;   /* bookmark mode is locked to visitor */
+      document.body.classList.toggle('visitor');
+      var owner = !document.body.classList.contains('visitor');
+      document.getElementById('viewchip').textContent =
+        owner ? 'Viewing as owner · V toggles' : 'Viewing as visitor · V toggles';
+      if(!owner){ closeSell(); }
+    }
+  });
+
+  document.addEventListener('click', function(){ document.getElementById('fpop').classList.remove('open'); });
+  refresh();
+</script>
+
+<style id="zz-shell-style">.uname,.navid,.pseud,.wordmark{cursor:pointer}
+  .tlink,.mktlink{cursor:pointer;}
+  .tlink:hover,.mktlink:hover{text-decoration:underline;text-underline-offset:2px;}</style>
+<script>
+(function(){
+  function nav(page,sub,post){ try{ parent.postMessage({zz:1,type:'nav',page:page,sub:sub,post:post},'*'); }catch(e){} }
+
+  /* Req 4 — the right colhead market TITLE opens the market overview (the ↗ is gone) */
+  document.addEventListener('click', function(ev){
+    if(ev.target.closest && ev.target.closest('#mktttl')){ ev.stopPropagation(); nav('market','market'); }
+  });
+
+  /* Req 5 — an argument TITLE (list row OR replica card) opens that post's reply thread.
+     Mockup-data stand-in (Option 1): all rows resolve to the one real d5 post ('ashen');
+     in production each position carries its own post id (and a reply -> its parent's). */
+  document.addEventListener('click', function(ev){
+    var t = ev.target.closest ? ev.target.closest('.tlink') : null;
+    if(t){ ev.stopPropagation(); nav('market','reply','ashen'); }
+  });
+
+  /* Req 1 — the nav identity (avatar + pseudonym) opens the profile (no-op here; lives for parity).
+     Exclude the idact buttons (bookmark/download) which sit next to the uname. */
+  document.addEventListener('click', function(ev){
+    if(ev.target.closest && ev.target.closest('.idact')) return;
+    var p = ev.target.closest ? ev.target.closest('.uname,.navid,.pseud') : null;
+    if(p && !ev.target.closest('.tlink')){ nav('profile'); }
+  });
+  /* Req 3 (bookmark) — the headzone bookmark button opens the bookmark page; download is visual-only */
+  document.addEventListener('click', function(ev){
+    if(ev.target.closest && ev.target.closest('#bmgo')){ ev.stopPropagation(); nav('bookmark'); }
+  });
+  document.querySelectorAll('.wordmark').forEach(function(el){
+    el.style.cursor='pointer';
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); nav('discovery'); });
+  });
+
+  /* Req 3 — Up/Down step the selection through the CURRENTLY VISIBLE (filtered) rows.
+     The shell forwards arrow keys as {type:'key'}; we also catch direct keydowns. */
+  function stepRow(dir){
+    if(typeof visibleIndices!=='function' || typeof pick!=='function') return;
+    var vis = visibleIndices(); if(!vis.length) return;
+    var at = vis.indexOf(sel);
+    var next = at < 0 ? 0 : (at + dir + vis.length) % vis.length;
+    pick(vis[next]);
+    var el = document.querySelectorAll('#rows .prow')[next];
+    if(el && el.scrollIntoView) el.scrollIntoView({block:'nearest'});
+  }
+  function onKey(k){ if(k==='ArrowUp'){ stepRow(-1); } else if(k==='ArrowDown'){ stepRow(1); } }
+  document.addEventListener('keydown', function(e){
+    if(e.key==='ArrowUp'||e.key==='ArrowDown'){
+      if(document.body.classList.contains('ppop')) return;   /* let the pop-up own keys when open */
+      e.preventDefault(); onKey(e.key);
+    }
+  });
+  window.addEventListener('message', function(e){
+    var d=e.data||{}; if(d.type==='key' && /^Arrow/.test(d.key)){
+      if(document.body.classList.contains('ppop')) return;
+      onKey(d.key);
+    }
+    /* Bookmark page = this same blob, entered via setsub:'bookmark'. It is the visitor view
+       (Open, never Sell) with the list titled "Bookmarks". (Mockup reuses the demo rows;
+       production loads the user's bookmarked posts/replies here.) */
+    else if(d.type==='setsub' && d.sub==='bookmark'){
+      document.body.classList.add('bookmarks','visitor');
+      var t=document.querySelector('.chttl:not(.mkt)'); if(t) t.textContent='Bookmarks';
+      var vc=document.getElementById('viewchip'); if(vc) vc.textContent='Your bookmarks';
+      if(typeof closeSell==='function') closeSell();
+      if(typeof refresh==='function') refresh();
+    }
+  });
+})();
+</script>
+
+</body>
+</html>

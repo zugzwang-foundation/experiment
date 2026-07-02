@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zugzwang — DESIGN.W2.8 · Fresh-post entry (colhead Đ BET) · mockup v0.1</title>
+<!--
+  Zugzwang · DESIGN.W2.8 — Fresh-post compose ENTRY · focused snippet (mockup v0.1)
+  ===================================================================================
+  SCOPE: the ENTIRE W2.8 change is one label. The Market-Detail per-side column-header
+  bet-entry button "Buy" is relabelled to the "Đ BET" wordmark — bringing the entry
+  into the same wordmark as the composer ("Place your Đ BET") and its submit ("PLACE
+  Đ BET"). Nothing else on the locked v1.0 surface (surface_d5) changes.
+
+  This snippet is NOT a new surface. It reproduces ONLY the two column headers (.colhead)
+  from surface_d5 — verbatim tokens + CSS — with the single relabel applied, plus the
+  entry button's interactive states. The rest of Market Detail (post columns, composer,
+  carousels, split bars) is unchanged and not redrawn here.
+
+  Tokens + colhead/tradebtn/sellbtn/pricetxt/pos CSS are lifted verbatim from
+  surface_d5_v1_0.html (DESIGN.5 v1.12). NEW in W2.8 (entry-state completion, per
+  design-language §4.9): the entry button's :focus-visible ring and its :disabled
+  (INV-4 closed/resolved/frozen) treatment — both monochrome.
+
+  NOTES that ride this entry (recorded in the close-out, not visible chrome):
+   · Side comes from the COLUMN, not the button. The "Đ BET" button is neutral and
+     IDENTICAL in both columns; the column frame + price carry YES(black)/NO(white).
+   · "Sell" is unchanged — the only comment-free action, not a bet, not relabelled.
+   · Signed-out: clicking "Đ BET" routes to the W2.1 picker (act-gate). The composer's
+     in-module sign-in gate is dead UI post-W2.1 → drop at the UI.4 build.
+   · Empty-market / empty-side are NOT designed here — resolved product-wide by the
+     cpmm.md §7.2 pre-launch curation slate (both columns seeded; posts append-only).
+  ===================================================================================
+-->
+<style>
+  /* ---- tokens (verbatim from surface_d5_v1_0.html) ---- */
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --hairline:1px solid var(--n2);
+    --r:8px;            /* UI-chrome radius — placeholder value, real token is CD's */
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--n0);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .page{max-width:900px;margin:0 auto;padding:40px 28px 64px;}
+
+  /* ---- doc-annotation chrome (NOT product UI — neutral, clearly meta) ---- */
+  .doc-h1{font-size:18px;font-weight:800;letter-spacing:.01em;}
+  .doc-sub{font-size:13px;color:var(--n5);line-height:1.55;margin-top:7px;}
+  .doc-sub code{font-weight:700;color:var(--ink);}
+  .rule{height:1px;background:var(--n2);margin:26px 0;}
+  .sect-lab{font-size:9.5px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--n4);margin-bottom:14px;}
+  .col-cap{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--n4);margin-bottom:7px;}
+  .foot{font-size:12px;color:var(--n5);line-height:1.7;margin-top:8px;}
+  .foot b{color:var(--n6);font-weight:700;}
+  .foot code{font-weight:700;color:var(--ink);}
+
+  /* ---- column frame + colhead (verbatim from surface_d5; .deb + .colhead) ---- */
+  .cols{display:flex;gap:22px;align-items:flex-start;}
+  .col{flex:1 1 0;min-width:0;}
+  .deb{display:flex;flex-direction:column;
+       border:1px solid var(--ink);background:var(--n0);}
+  .colhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;position:relative;
+           padding:12px 14px;border-bottom:var(--hairline);}
+  .col-rest{min-height:120px;display:flex;align-items:center;justify-content:center;
+            text-align:center;padding:0 16px;}
+  .col-rest span{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+            color:var(--n4);line-height:1.7;}
+
+  /* trade / sell buttons (verbatim) */
+  .sellbtn,.tradebtn{font:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;
+           text-transform:uppercase;padding:7px 13px;border:1px solid var(--n3);
+           background:var(--n0);color:var(--ink);border-radius:var(--r);cursor:pointer;
+           flex:0 0 auto;}
+  .sellbtn:hover,.tradebtn:hover,.tradebtn.is-hover{border-color:var(--ink);}
+  /* NEW (W2.8) — visible focus ring (design-language §4.9), monochrome */
+  .tradebtn:focus-visible,.tradebtn.is-focus{outline:2px solid var(--ink);outline-offset:2px;}
+  /* NEW (W2.8) — disabled = INV-4 closed/resolved/frozen (no bet affordance) */
+  .tradebtn:disabled,.tradebtn.is-disabled{color:var(--n4);border-color:var(--n2);
+           background:var(--n1);cursor:not-allowed;}
+  .tradebtn:disabled:hover,.tradebtn.is-disabled:hover{border-color:var(--n2);}
+
+  /* position cluster (verbatim) */
+  .poswrap{margin-left:auto;display:flex;align-items:center;gap:12px;}
+  .pos{display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.12;}
+  .pos.towin{align-items:flex-start;}
+  .poslab{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--n4);}
+  .posval{font-size:11.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .posval .arrow{color:var(--n4);margin:0 3px;font-weight:400;}
+
+  /* centred price text + thumb (verbatim) */
+  .pricetag{position:absolute;left:50%;transform:translateX(-50%);cursor:default;}
+  .pricetxt{font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--ink);
+          display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+  .pricetxt b{font-weight:800;}
+  .pricetxt svg{display:block;}
+
+  /* ---- states strip ---- */
+  .states{display:flex;flex-wrap:wrap;gap:26px;align-items:flex-start;
+          border:var(--hairline);border-radius:var(--r);padding:22px 20px;background:var(--n0);}
+  .state{display:flex;flex-direction:column;align-items:center;gap:9px;}
+  .state .lab{font-size:8.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--n4);}
+  .state .lab small{display:block;font-weight:600;letter-spacing:.06em;color:var(--n4);margin-top:2px;}
+  .state.live .lab{color:var(--n6);}
+</style></head>
+<body>
+<div class="page">
+
+  <div class="doc-h1">DESIGN.W2.8 — Fresh-post compose entry</div>
+  <div class="doc-sub">
+    The entire change to Market Detail is one label: the per-side column-header bet-entry
+    button <code>Buy</code> &rarr; <code>Đ BET</code>. The entry now shares the composer's
+    wordmark end-to-end — entry <code>Đ BET</code> &rarr; header <code>Place your Đ BET</code>
+    &rarr; submit <code>PLACE Đ BET</code>. Everything else on the locked v1.0 surface is
+    unchanged. Below: the two column headers in context, then the entry button's states.
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- ===================== A · in context ===================== -->
+  <div class="sect-lab">A · the two column headers, in context (verbatim from v1.0 — only the label differs)</div>
+  <div class="cols">
+
+    <!-- YES column (left) -->
+    <div class="col">
+      <div class="col-cap">YES column · left</div>
+      <div class="deb">
+        <div class="colhead">
+          <button class="tradebtn">Đ BET</button>
+          <span class="pos towin"><span class="poslab">To win</span><span class="posval">Đ 1<span class="arrow">&rarr;</span>Đ 2.63x</span></span>
+          <span class="pricetxt pricetag">Yes
+            <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+            <b>38%</b></span>
+          <span class="poswrap">
+            <span class="pos">
+              <span class="poslab">Your position</span>
+              <span class="posval">Đ 240<span class="arrow">&rarr;</span>Đ 310</span>
+            </span>
+            <button class="sellbtn">Sell</button>
+          </span>
+        </div>
+        <div class="col-rest"><span>&darr; YES post column<br>unchanged from v1.0</span></div>
+      </div>
+    </div>
+
+    <!-- NO column (right) -->
+    <div class="col">
+      <div class="col-cap">NO column · right</div>
+      <div class="deb">
+        <div class="colhead">
+          <button class="tradebtn">Đ BET</button>
+          <span class="pos towin"><span class="poslab">To win</span><span class="posval">Đ 1<span class="arrow">&rarr;</span>Đ 1.61x</span></span>
+          <span class="pricetxt pricetag">No
+            <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true" style="transform:rotate(180deg)"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>
+            <b>62%</b></span>
+          <span class="poswrap">
+            <span class="pos"><span class="poslab">No active position</span></span>
+          </span>
+        </div>
+        <div class="col-rest"><span>&darr; NO post column<br>unchanged from v1.0</span></div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="rule"></div>
+
+  <!-- ===================== B · entry states ===================== -->
+  <div class="sect-lab">B · the “Đ BET” entry — states (the button is neutral &amp; identical in both columns)</div>
+  <div class="states">
+    <div class="state">
+      <span class="lab">Default</span>
+      <button class="tradebtn is-default">Đ BET</button>
+    </div>
+    <div class="state">
+      <span class="lab">Hover</span>
+      <button class="tradebtn is-hover">Đ BET</button>
+    </div>
+    <div class="state">
+      <span class="lab">Focus</span>
+      <button class="tradebtn is-focus">Đ BET</button>
+    </div>
+    <div class="state">
+      <span class="lab">Disabled<small>closed · resolved · frozen (INV-4)</small></span>
+      <button class="tradebtn is-disabled" disabled>Đ BET</button>
+    </div>
+    <div class="state live">
+      <span class="lab">Live — try it<small>hover · tab-focus · click</small></span>
+      <button class="tradebtn">Đ BET</button>
+    </div>
+  </div>
+
+  <div class="rule"></div>
+
+  <div class="foot">
+    <b>Why this is the whole task.</b> The composer, the side&rarr;slot open, the signed-out
+    routing, and the empty states are all already settled — so W2.8 reduces to this one
+    relabel.<br>
+    &bull; <b>Side</b> comes from the column, not the button — the <code>Đ BET</code> control is
+    neutral and identical on both sides; the frame + price carry YES (black) / NO (white).<br>
+    &bull; <b>Sell</b> is untouched — the only comment-free action.<br>
+    &bull; <b>Signed-out</b> &rarr; the W2.1 picker (act-gate); the composer's in-module sign-in
+    gate is dead UI post-W2.1 (drop at UI.4).<br>
+    &bull; <b>Disabled</b> = INV-4 (no bet affordance on closed / resolved / frozen markets).<br>
+    &bull; <b>Empty market / empty side</b> are not designed here — resolved product-wide by the
+    cpmm.md §7.2 curation slate (both columns seeded; posts append-only).
+  </div>
+
+</div>
+</body></html>

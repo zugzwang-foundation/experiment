@@ -1,0 +1,485 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zugzwang — Discovery · core mockup v1</title>
+<!--
+  Zugzwang · VISUAL Slot 1 (DESIGN.3 → UI.3) · Discovery / market-list front page
+  ============================================================================
+  CORE MOCKUP v1 — LOCKED (2026-06-05). The pure core surface, non-core
+  elements parked (see planner §4 Slot-1 register). Lineage: v0.13 layout
+  lock → v0.14 motion-discussion consequences → v1 rename. Known render gap:
+  post panels show body only — the title+body post structure (SCL-1) patches
+  the post primitive at the DESIGN.5 lock and back-propagates here at refine.
+  ============================================================================
+  v0.14 — motion-discussion consequences (2026-06-05):
+    · Dot rail: 8 dots (one per market — the page shows ALL 8 markets; hero
+      cycles through all of them in display_order). Active dot = pill; the
+      10s dash-progress fill is motion (M-2), logged not mocked.
+    · "SLIDES EVERY 10S" caption removed (superseded by the dash loader).
+    · Grid now contains the hero's market too (momentary duplication while
+      spotlit — intended): Mumbai Metro is grid card #1; lunar-flyby dropped
+      to keep the 8-market set.
+  v0.13 — per operator (2026-06-05):
+    · Reply-bar Đ amounts back UNDER Support/Counter (stacked) — the v0.11 revert of
+      stacking was an over-read of the theme rejection; corrected.
+    · YES/NO chips beside "Top post" enlarged above the label size.
+    · Tagline and Markets nav link removed (parked for later).
+    · "Create account" → "Sign up".
+  v0.12 — NEWSPAPER THEME REJECTED:
+    · Full revert to the original system: true-neutral monochrome ramp
+      (#FFFFFF / #0A0A0A), one neutral sans, horizontal nav bar. Serif system,
+      aged-paper palette, broadsheet masthead and section bar all removed.
+    · Retained from the post-theme rounds: single-line SUPPORT/COUNTER bar labels
+      and reply COUNTS in the Replies headers ("Replies · 24" / "Replies · 16").
+    · Design-language v0.2 working rules (one neutral sans / true-neutral ramp)
+      stand reaffirmed; newspaper direction logged as explored-and-rejected.
+  Structure: nav · hero 3-panel (top YES post | market | top NO post) · dots · 2×4 grid.
+  Full-screen: 100vw × 100vh, no scroll. Desktop-only. Monochrome.
+  THROWAWAY REFERENCE: not repo code, not the CD deliverable, not the seed kit.
+  Side binding at the flagged DEFAULT: Support/YES = black · Counter/NO = white.
+  ALL questions, pseudonyms, numbers: PLACEHOLDER DUMMY CONTENT.
+-->
+<style>
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --r:8px; --imgr:6px;
+    --hairline:1px solid var(--n2);
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--n0);
+            font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  .screen{width:100vw;height:100vh;background:var(--n0);overflow:hidden;
+          display:flex;flex-direction:column;color:var(--ink);}
+
+  /* — nav — */
+  .nav{height:60px;flex:0 0 60px;border-bottom:var(--hairline);
+       display:flex;align-items:center;padding:0 28px;gap:24px;}
+  .wordmark{font-size:19px;font-weight:800;letter-spacing:.16em;}
+  .navright{margin-left:auto;display:flex;align-items:center;gap:20px;}
+  .signin{font-size:13px;color:var(--ink);text-decoration:none;}
+  .btn-primary{background:var(--ink);color:var(--n0);font-size:13px;font-weight:600;
+               padding:9px 18px;border:1px solid var(--ink);border-radius:var(--r);letter-spacing:.01em;}
+
+  .content{flex:1 1 auto;display:flex;flex-direction:column;
+           padding:16px 28px 12px;min-height:0;}
+
+  /* ===== HERO — featured market, three columns ===== */
+  .hero{flex:1 1 auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.9fr) minmax(0,1fr);
+        gap:14px;min-height:0;}
+  .herocol{display:flex;flex-direction:column;min-height:0;}
+  .collabel{height:20px;flex:0 0 20px;margin-bottom:6px;display:flex;
+            align-items:center;gap:9px;font-size:9.5px;font-weight:800;
+            letter-spacing:.14em;text-transform:uppercase;color:var(--ink);}
+  .collabel .sidechip{font-size:11.5px;padding:3px 9px;}
+  .panel{border:1px solid var(--ink);border-radius:var(--r);background:var(--n0);flex:1 1 auto;
+         display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+
+  /* side post panels */
+  .argbody{padding:12px 12px 11px;display:flex;flex-direction:column;flex:1;min-height:0;}
+  .argprofile{display:flex;align-items:center;gap:6px;font-size:9.5px;flex:0 0 auto;white-space:nowrap;overflow:hidden;}
+  .avatar{width:16px;height:16px;border-radius:50%;border:1.5px solid var(--ink);flex:0 0 auto;}
+  .pseud{font-weight:650;color:var(--ink);}
+  .argstake{color:var(--n6);font-weight:700;}
+  .argprofile .vsep{color:var(--n3);font-weight:400;flex:0 0 auto;}
+  .argprofile .arrow{color:var(--n4);font-weight:400;margin:0 2px;}
+  .argtext{font-size:11.5px;line-height:1.45;color:var(--ink);margin-top:8px;flex:0 0 auto;
+           display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  .argimg{flex:1 1 auto;min-height:40px;background:var(--n1);border:var(--hairline);border-radius:var(--imgr);
+          margin-top:8px;display:flex;align-items:center;justify-content:center;
+          font-size:9px;letter-spacing:.18em;color:var(--n4);}
+  .replyhead{display:flex;justify-content:space-between;font-size:9.5px;font-weight:700;
+             letter-spacing:.12em;text-transform:uppercase;color:var(--n4);flex:0 0 auto;
+             border-top:var(--hairline);margin-top:9px;padding-top:8px;}
+
+  /* split bar pattern: LABEL — BAR — LABEL (no text inside the bar) */
+  .barrow{display:flex;align-items:center;gap:9px;margin-top:9px;flex:0 0 auto;}
+  .blab{font-weight:700;white-space:nowrap;letter-spacing:.05em;color:var(--ink);}
+  .barrow.f .blab{font-size:12px;}
+  .barrow.m .blab{font-size:10.5px;}
+  .blab2{display:flex;flex-direction:column;gap:1px;flex:0 0 auto;}
+  .blab2.right{align-items:flex-end;}
+  .blab2 .w{font-size:8.5px;font-weight:800;letter-spacing:.12em;color:var(--ink);}
+  .blab2 .d{font-size:9.5px;font-weight:700;color:var(--n6);letter-spacing:.02em;}
+  .barrow .bar{flex:1 1 auto;position:relative;border:1px solid var(--ink);border-radius:var(--r);
+               background:var(--n0);overflow:hidden;}
+  .barrow.f .bar{height:22px;}
+  .barrow.m .bar{height:16px;}
+  .barrow.r .bar{height:16px;}
+  .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ink);}
+  .bar .fill.right{inset:0 0 0 auto;}
+
+  .sidechip{font-size:8.5px;font-weight:800;letter-spacing:.1em;padding:2px 6px;flex:0 0 auto;border-radius:var(--r);}
+  .sidechip.md{font-size:9px;padding:2px 7px;letter-spacing:.06em;}
+  .sidechip.yes{background:var(--ink);color:var(--n0);}
+  .sidechip.no{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+
+  /* center market panel */
+  .mktpanel{padding:14px 16px 12px;}
+  .qrow{display:flex;gap:12px;align-items:center;flex:0 0 auto;}
+  .mthumb{background:var(--n1);border:var(--hairline);border-radius:var(--imgr);display:flex;align-items:center;
+          justify-content:center;font-size:8.5px;letter-spacing:.16em;color:var(--n4);flex:0 0 auto;}
+  .mthumb.big{width:54px;height:54px;}
+  .mthumb.sm{width:52px;height:52px;}
+  .question{font-size:16.5px;font-weight:700;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .qmeta{display:flex;flex-direction:column;justify-content:center;min-width:0;flex:1 1 auto;gap:4px;}
+  .qmeta .attrs,.qmeta .meta{margin-top:0;}
+  .graph{flex:1 1 auto;min-height:0;margin-top:11px;border:var(--hairline);border-radius:var(--r);
+         background:var(--n0);position:relative;}
+  .graph svg,.spark svg{position:absolute;inset:0;width:100%;height:100%;}
+  .attrs{font-size:11.5px;color:var(--n5);margin-top:10px;letter-spacing:.01em;flex:0 0 auto;}
+  .attrs b{color:var(--n6);font-weight:650;}
+  .attrs .sep{color:var(--n3);margin:0 6px;}
+
+  /* carousel indicator */
+  .sliderwrap{position:relative;display:flex;align-items:center;justify-content:center;
+              gap:7px;flex:0 0 18px;margin:9px 0 8px;}
+  .sarrow{font:inherit;font-size:16px;line-height:1;color:var(--n4);background:transparent;border:none;cursor:pointer;padding:0 9px;}
+  .sarrow:hover{color:var(--ink);}
+  .sdot{width:6px;height:6px;border-radius:50%;border:1px solid var(--ink);background:var(--n0);}
+  .sdot.on{width:22px;border-radius:3px;background:var(--n2);position:relative;overflow:hidden;}
+  .sdot.on::after{content:'';position:absolute;left:0;top:0;bottom:0;width:0;background:var(--ink);border-radius:inherit;animation:sdotfill 10s linear forwards;}
+  @keyframes sdotfill{from{width:0;}to{width:100%;}}
+
+  /* ===== GRID ===== */
+  .grid{display:grid;grid-template-columns:repeat(4,1fr);grid-template-rows:repeat(2,min-content);
+        gap:12px;flex:0 0 auto;align-content:start;min-height:0;}
+  .mcard{border:var(--hairline);border-radius:var(--r);background:var(--n0);padding:13px;justify-content:space-between;
+         display:flex;flex-direction:column;min-height:0;}
+  .mcard.athero{outline:1.5px solid var(--ink);outline-offset:3px;}
+  .mtitle{font-size:13.5px;font-weight:600;line-height:1.32;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .spark{flex:1 1 auto;min-height:30px;margin-top:9px;border:var(--hairline);border-radius:var(--imgr);
+         background:var(--n0);position:relative;}
+  .meta{font-size:11px;color:var(--n5);margin-top:9px;flex:0 0 auto;letter-spacing:.01em;}
+  .meta b{color:var(--n6);font-weight:650;}
+  .meta .sep{color:var(--n3);margin:0 5px;}
+</style>
+</head>
+<body>
+<div class="screen">
+
+  <!-- nav -->
+  <div class="nav">
+    <div class="wordmark">ZUGZWANG</div>
+    <div class="navright">
+      <a class="signin" href="#">Sign in</a>
+      <span class="btn-primary">Sign up</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== HERO: featured market ===== -->
+    <div class="hero">
+
+      <!-- top YES post -->
+      <div class="herocol">
+        
+        <div class="panel">
+          <div class="argbody" data-post="ashen">
+            <div class="argprofile">
+              <span class="avatar"></span>
+              <span class="pseud">ashen-rook-12</span>
+              <span class="vsep">|</span>
+              <span class="sidechip md yes">YES @ 27%</span>
+              <span class="vsep">|</span>
+              <span class="argstake">Đ 1,000 <span class="arrow">→</span> Đ 1,407</span>
+            </div>
+            <div class="argtext">"Ridership has doubled every quarter since Phase 2 opened. The airport feeder alone adds 180k daily trips, and the BKC interchange isn't even at half capacity yet."</div>
+            <div class="argimg">IMAGE ATTACHMENT</div>
+            <div class="replyhead"><span>Replies · 24</span><span>Đ 10,000 staked</span></div>
+            <div class="barrow r">
+              <span class="blab2"><span class="w">SUPPORT</span><span class="d">Đ 3,800</span></span>
+              <div class="bar"><div class="fill" style="width:38%"></div></div>
+              <span class="blab2 right"><span class="w">COUNTER</span><span class="d">Đ 6,200</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- center: the market -->
+      <div class="herocol">
+        
+        <div class="panel mktpanel">
+          <div class="qrow">
+            <div class="mthumb big">IMG</div>
+            <div class="qmeta">
+              <div class="question">Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?</div>
+              <div class="attrs"><b>Đ 14,260</b> staked<span class="sep">|</span><b>28</b> posts<span class="sep">|</span><b>68</b> replies</div>
+            </div>
+          </div>
+          <div class="graph">
+            <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+              <polyline points="0,18 5,22 10,16 15,24 20,19 25,26 30,21 35,14 40,22 45,17 50,25 55,19 60,12 65,18 70,10 75,16 80,12 85,18 90,13 95,16 100,15"
+                        fill="none" stroke="#A3A3A3" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+              <polyline points="0,22 5,18 10,24 15,16 20,21 25,14 30,19 35,26 40,18 45,23 50,15 55,21 60,28 65,22 70,30 75,24 80,28 85,22 90,27 95,24 100,25"
+                        fill="none" stroke="#0A0A0A" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+            </svg>
+          </div>
+          <div class="barrow f">
+            <span class="blab">YES 38%</span>
+            <div class="bar"><div class="fill" style="width:38%"></div></div>
+            <span class="blab">NO 62%</span>
+          </div>
+          
+        </div>
+      </div>
+
+      <!-- top NO post -->
+      <div class="herocol">
+        
+        <div class="panel">
+          <div class="argbody" data-post="tidal">
+            <div class="argprofile">
+              <span class="avatar"></span>
+              <span class="pseud">tidal-knight-88</span>
+              <span class="vsep">|</span>
+              <span class="sidechip md no">NO @ 55%</span>
+              <span class="vsep">|</span>
+              <span class="argstake">Đ 800 <span class="arrow">→</span> Đ 902</span>
+            </div>
+            <div class="argtext">"Peak-hour throughput is capped by the 8-coach limit. Even at crush load the corridor maths tops out near 850k — the affidavit's own annexure says so."</div>
+            <div class="argimg">IMAGE ATTACHMENT</div>
+            <div class="replyhead"><span>Replies · 16</span><span>Đ 6,400 staked</span></div>
+            <div class="barrow r">
+              <span class="blab2"><span class="w">SUPPORT</span><span class="d">Đ 4,400</span></span>
+              <div class="bar"><div class="fill right" style="width:31%"></div></div>
+              <span class="blab2 right"><span class="w">COUNTER</span><span class="d">Đ 2,000</span></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- carousel indicator -->
+    <div class="sliderwrap">
+      <button class="sarrow" id="sprev" aria-label="Previous market">‹</button>
+      <span class="sdot on"></span><span class="sdot"></span><span class="sdot"></span><span class="sdot"></span><span class="sdot"></span><span class="sdot"></span><span class="sdot"></span><span class="sdot"></span>
+      <button class="sarrow" id="snext" aria-label="Next market">›</button>
+    </div>
+
+    <!-- ===== GRID ===== -->
+    <div class="grid">
+
+      <div class="mcard athero">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?</div>
+            <div class="meta"><b>Đ 14,260</b> staked<span class="sep">|</span><b>28</b> posts<span class="sep">|</span><b>68</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 38%</span>
+          <div class="bar"><div class="fill" style="width:38%"></div></div>
+          <span class="blab">NO 62%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will India win the home T20 series 4–1 or better?</div>
+            <div class="meta"><b>Đ 7,420</b> staked<span class="sep">|</span><b>18</b> posts<span class="sep">|</span><b>46</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 56%</span>
+          <div class="bar"><div class="fill" style="width:56%"></div></div>
+          <span class="blab">NO 44%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will October set a new global average-temperature record?</div>
+            <div class="meta"><b>Đ 5,980</b> staked<span class="sep">|</span><b>15</b> posts<span class="sep">|</span><b>36</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 63%</span>
+          <div class="bar"><div class="fill" style="width:63%"></div></div>
+          <span class="blab">NO 37%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will any MLB postseason game run past 14 innings?</div>
+            <div class="meta"><b>Đ 3,240</b> staked<span class="sep">|</span><b>11</b> posts<span class="sep">|</span><b>27</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 18%</span>
+          <div class="bar"><div class="fill" style="width:18%"></div></div>
+          <span class="blab">NO 82%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will the Coastal Road southbound stretch open before Nov 5?</div>
+            <div class="meta"><b>Đ 6,110</b> staked<span class="sep">|</span><b>21</b> posts<span class="sep">|</span><b>52</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 44%</span>
+          <div class="bar"><div class="fill" style="width:44%"></div></div>
+          <span class="blab">NO 56%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will a teenager sit in the live top-10 ratings at the freeze?</div>
+            <div class="meta"><b>Đ 2,870</b> staked<span class="sep">|</span><b>8</b> posts<span class="sep">|</span><b>18</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 29%</span>
+          <div class="bar"><div class="fill" style="width:29%"></div></div>
+          <span class="blab">NO 71%</span>
+        </div>
+      </div>
+
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will municipal-poll turnout exceed 55% citywide?</div>
+            <div class="meta"><b>Đ 8,640</b> staked<span class="sep">|</span><b>34</b> posts<span class="sep">|</span><b>84</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 51%</span>
+          <div class="bar"><div class="fill" style="width:51%"></div></div>
+          <span class="blab">NO 49%</span>
+        </div>
+      </div>
+
+      
+      <div class="mcard">
+        <div class="qrow">
+          <div class="mthumb sm">IMG</div>
+          <div class="qmeta">
+            <div class="mtitle">Will the Asia Cup final be decided by a margin under 10 runs?</div>
+            <div class="meta"><b>Đ 12,975</b> staked<span class="sep">|</span><b>39</b> posts<span class="sep">|</span><b>102</b> replies</div>
+          </div>
+        </div>
+        <div class="barrow m">
+          <span class="blab">YES 82%</span>
+          <div class="bar"><div class="fill" style="width:82%"></div></div>
+          <span class="blab">NO 18%</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<style id="zz-shell-style">.pseud,.mcard,.mktpanel,.wordmark{cursor:pointer}.argbody[data-post]{cursor:pointer}</style>
+<script>
+(function(){
+  function nav(page,sub,post){ try{ parent.postMessage({zz:1,type:'nav',page:page,sub:sub,post:post},'*'); }catch(e){} }
+  document.querySelectorAll('.mcard,.mktpanel').forEach(function(el){
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); nav('market'); });
+  });
+  document.querySelectorAll('.argbody[data-post]').forEach(function(el){
+    el.addEventListener('click', function(ev){
+      if(ev.target.closest && ev.target.closest('.pseud')) return;
+      ev.stopPropagation(); nav('market','reply', el.getAttribute('data-post'));
+    });
+  });
+  document.addEventListener('click', function(ev){
+    var p = ev.target.closest ? ev.target.closest('.pseud') : null;
+    if(p){ nav('profile'); }
+  });
+  document.querySelectorAll('.wordmark').forEach(function(el){
+    el.style.cursor='pointer';
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); nav('discovery'); });
+  });
+})();
+  /* carousel: < > + Left/Right keys cycle hero (market + both YES/NO posts) + highlight + dots; 10s auto-advance, reset by any manual click/key */
+  (function(){
+    var cards=[].slice.call(document.querySelectorAll('.mcard')),
+        dots=[].slice.call(document.querySelectorAll('.sdot')),
+        hero=document.querySelector('.mktpanel'),
+        yB=document.querySelector('.argbody[data-post="ashen"]'),
+        nB=document.querySelector('.argbody[data-post="tidal"]');
+    if(!cards.length||!hero) return;
+    var MK=cards.map(function(c){
+      var t=c.querySelector('.mtitle'),m=c.querySelector('.meta'),
+          bl=c.querySelectorAll('.barrow .blab'),f=c.querySelector('.barrow .fill');
+      return {title:t?t.innerHTML:'',meta:m?m.innerHTML:'',yes:bl[0]?bl[0].textContent:'',no:bl[1]?bl[1].textContent:'',w:f?f.style.width:'50%'};
+    });
+    /* dummy per-market top posts [pseud, entry%, stake, now, text, replies, staked, support, counter] */
+    var POSTS=[
+      {y:['ashen-rook-12',27,1000,1407,"Ridership has doubled every quarter since Phase 2 opened. The airport feeder alone adds 180k daily trips, and the BKC interchange isn't even at half capacity yet.",24,10000,3800,6200],
+       n:['tidal-knight-88',55,800,902,"Peak-hour throughput is capped by the 8-coach limit. Even at crush load the corridor maths tops out near 850k — the affidavit's own annexure says so.",16,6400,4400,2000]},
+      {y:['willow-sparrow-04',56,1200,1340,"The middle order has chased 180+ three games running and the pace attack is fully fit — 4–1 is well within reach against a depleted touring side.",31,9200,5400,3800],
+       n:['gully-medlar-77',44,900,980,"One washout or a single off day flips the series; 'or better' is a tall order when the dew makes the toss a coin-flip every night.",22,7100,4100,3000]},
+      {y:['cinder-heron-19',63,1500,1880,"Nine of the last ten months have set records and the warming signal is still strengthening — October beating the mark is the base case now.",40,13400,8900,4500],
+       n:['frost-marten-52',37,700,760,"Anomalies have already started cooling off the peak; a single record month is far noisier than a year-long trend and easily misses.",18,5200,2400,2800]},
+      {y:['diamond-finch-31',18,600,540,"Postseason bullpens are deeper than ever and low-scoring duels are common — one extra-long game across a whole bracket beats 18%.",14,4300,1800,2500],
+       n:['sandlot-vireo-88',82,1400,1510,"Pitch clocks and the ghost-runner rule have crushed extra-inning marathons; 14+ innings has happened just once in three seasons.",33,11800,7600,4200]},
+      {y:['harbor-plover-26',44,1000,1120,"The southbound deck is 90% poured and the contractor has hit every milestone this quarter — a pre-freeze opening is realistic.",27,8600,4900,3700],
+       n:['tidewrack-snipe-63',56,850,910,"Final safety certification alone takes six weeks, and monsoon repairs to the access ramp aren't even scheduled yet.",19,6200,3500,2700]},
+      {y:['amber-kestrel-12',29,700,640,"Two 17-year-olds are already inside the top-15 and trending up weekly — by the freeze one cracking the top-10 is very plausible.",16,4800,2100,2700],
+       n:['static-grouse-49',71,1300,1390,"The top-10 has been locked by veterans for two years; a teenager would need a historic run in a very short window.",29,10200,6500,3700]},
+      {y:['civic-warbler-08',51,1100,1180,"Early-voting numbers are already 12% above the last cycle and the ward drives are aggressive — 55% is a coin-flip leaning yes.",25,7900,4300,3600],
+       n:['ballot-shrike-70',49,950,1010,"Turnout hasn't cleared 55% in this city since 2014, and a midweek polling date historically suppresses it.",21,6700,3400,3300]},
+      {y:['pitch-osprey-15',82,1600,1740,"Finals here are routinely nail-biters — five of the last six were decided inside 10 runs or the final over.",44,14900,10100,4800],
+       n:['boundary-tern-91',18,650,590,"If either side bats first and posts 200+, the chase often collapses by 30+; blowouts are more common than 82% implies.",20,5600,2600,3000]}
+    ];
+    function fmt(x){ return x.toLocaleString('en-US'); }
+    function setPost(b,d,isYes){
+      if(!b||!d) return; var q=function(s){return b.querySelector(s);};
+      if(q('.pseud')) q('.pseud').textContent=d[0];
+      if(q('.sidechip')) q('.sidechip').textContent=(isYes?'YES @ ':'NO @ ')+d[1]+'%';
+      if(q('.argstake')) q('.argstake').innerHTML='\u0110 '+fmt(d[2])+' <span class="arrow">\u2192</span> \u0110 '+fmt(d[3]);
+      if(q('.argtext')) q('.argtext').textContent='"'+d[4]+'"';
+      var rh=q('.replyhead'); if(rh&&rh.children.length>=2){ rh.children[0].textContent='Replies \u00b7 '+d[5]; rh.children[1].textContent='\u0110 '+fmt(d[6])+' staked'; }
+      var ds=b.querySelectorAll('.barrow .blab2 .d'); if(ds[0])ds[0].textContent='\u0110 '+fmt(d[7]); if(ds[1])ds[1].textContent='\u0110 '+fmt(d[8]);
+      var f=q('.barrow .fill'), tot=d[7]+d[8], sup=tot?Math.round(d[7]/tot*100):50;
+      if(f) f.style.width=(isYes?sup:(100-sup))+'%';
+    }
+    var hQ=hero.querySelector('.question'),hA=hero.querySelector('.attrs'),
+        hBl=hero.querySelectorAll('.barrow .blab'),hF=hero.querySelector('.barrow .fill'),pos=0,timer=null;
+    function render(){
+      var k=MK[pos];
+      if(hQ)hQ.innerHTML=k.title; if(hA)hA.innerHTML=k.meta;
+      if(hBl[0])hBl[0].textContent=k.yes; if(hBl[1])hBl[1].textContent=k.no;
+      if(hF)hF.style.width=k.w;
+      setPost(yB,POSTS[pos].y,true); setPost(nB,POSTS[pos].n,false);
+      cards.forEach(function(c,i){ c.classList.toggle('athero',i===pos); });
+      dots.forEach(function(d,i){ d.classList.toggle('on',i===pos); });
+    }
+    function schedule(){ clearTimeout(timer); timer=setTimeout(function(){ go(1); }, 10000); }
+    function go(d){ pos=(pos+d+MK.length)%MK.length; render(); schedule(); }
+    var pv=document.getElementById('sprev'),nx=document.getElementById('snext');
+    if(pv)pv.addEventListener('click',function(e){ e.stopPropagation(); go(-1); });
+    if(nx)nx.addEventListener('click',function(e){ e.stopPropagation(); go(1); });
+    function key(k){ if(k==='ArrowLeft')go(-1); else if(k==='ArrowRight')go(1); }
+    document.addEventListener('keydown',function(e){ if(e.key==='ArrowLeft'||e.key==='ArrowRight'){ e.preventDefault(); key(e.key); } });
+    window.addEventListener('message',function(e){ var d=e.data||{}; if(d.type==='key') key(d.key); });
+    render(); schedule();
+  })();
+</script>
+
+</body>
+</html>

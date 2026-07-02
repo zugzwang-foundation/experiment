@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1440">
+<title>DESIGN.W2.4/.5/.14 — Global Header — mockup v0.2</title>
+<style>
+/* ============================================================
+   Zugzwang — Global Header (mockup v0.2)
+   v0.2 changes: back↔home swapped · radio = animated synth-wave
+   (depicts live music when ON) · social menu (dropdown) added after
+   radio · Research placeholder (external sub-domain) beside it.
+   W2.4 timer · W2.5 visitor · W2.3 back-visual · W2.14 radio (placeholder).
+   Monochrome · desktop-only · 60px register · design-language §1.
+   Greys/type = throwaway working values; real tokens are CD/brand-pass.
+   ============================================================ */
+:root{
+  --ground:#ffffff; --page:#f4f4f5; --ink:#18181b; --ink-2:#52525b;
+  --muted:#a1a1aa; --hair:#e4e4e7; --hair-2:#d4d4d8; --disabled:#d4d4d8;
+  --chip:#fafafa; --focus:#18181b;
+  --r:8px; --r-sm:6px; --pill:999px; --h:60px;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--page);font-family:var(--sans);color:var(--ink);
+  padding:36px 0 90px;-webkit-font-smoothing:antialiased;}
+.frame{width:1440px;margin:0 auto;padding:0 24px;}
+.cap{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);
+  font-weight:700;margin:34px 0 10px;display:flex;align-items:baseline;gap:10px;}
+.cap .note{text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted);}
+.shadow{box-shadow:0 1px 0 rgba(0,0,0,.02);}
+code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.92em;}
+
+/* ---------------- HEADER SHELL ---------------- */
+.hdr{height:var(--h);background:var(--ground);
+  border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);
+  display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+  padding:0 16px;gap:18px;}
+.zone{display:flex;align-items:center;gap:8px;}
+.zone.left{justify-self:start;}
+.zone.center{justify-self:center;}
+.zone.right{justify-self:end;gap:14px;}
+
+/* ---------------- ICON BUTTON ---------------- */
+.ib{width:38px;height:38px;border:1px solid var(--hair);border-radius:var(--r-sm);
+  background:var(--ground);display:flex;align-items:center;justify-content:center;
+  color:var(--ink);cursor:pointer;transition:background .12s,border-color .12s;}
+.ib svg{width:18px;height:18px;display:block;}
+.ib:hover{background:var(--chip);border-color:var(--hair-2);}
+.ib.is-focus{outline:2px solid var(--focus);outline-offset:2px;}
+.ib.is-active{background:#ececee;}
+.ib.is-disabled{color:var(--disabled);background:var(--chip);border-color:var(--hair);cursor:default;}
+
+/* ---------------- RADIO — animated synth-wave ---------------- */
+/* Placeholder SKIN for W2.14; here it depicts "live music" when ON. */
+.radio{display:flex;align-items:center;gap:9px;height:38px;padding:0 12px;
+  border:1px solid var(--hair);border-radius:var(--r-sm);background:var(--ground);
+  cursor:pointer;color:var(--ink);transition:background .12s;}
+.radio:hover{background:var(--chip);}
+.eq{display:flex;align-items:flex-end;gap:2.5px;height:16px;}
+.eq span{width:3px;height:30%;background:var(--ink);border-radius:1px;}
+.radio.on .eq span{animation:eq 1s ease-in-out infinite;}
+.radio.on .eq span:nth-child(1){animation-duration:.90s;animation-delay:-.10s;}
+.radio.on .eq span:nth-child(2){animation-duration:1.15s;animation-delay:-.50s;}
+.radio.on .eq span:nth-child(3){animation-duration:.80s;animation-delay:-.20s;}
+.radio.on .eq span:nth-child(4){animation-duration:1.05s;animation-delay:-.40s;}
+.radio.on .eq span:nth-child(5){animation-duration:.95s;animation-delay:-.05s;}
+@keyframes eq{0%,100%{height:18%}50%{height:100%}}
+.radio .lab{font-size:10px;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  display:flex;align-items:center;gap:6px;color:var(--ink-2);}
+.radio .dot{width:6px;height:6px;border-radius:50%;background:var(--ink);}
+.radio.on .dot{animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.2}}
+.radio:not(.on) .txt-on,.radio:not(.on) .dot{display:none;}
+.radio.on .txt-off{display:none;}
+
+/* ---------------- SOCIAL — opens a box of channels ---------------- */
+.social{position:relative;}
+.social-pop{position:absolute;top:46px;left:0;min-width:172px;background:#fff;
+  border:1px solid var(--hair);border-radius:var(--r);box-shadow:0 10px 28px rgba(0,0,0,.11);
+  padding:6px;display:none;z-index:60;}
+.social.open .social-pop{display:block;}
+.sl{display:flex;align-items:center;gap:11px;padding:8px 9px;border-radius:var(--r-sm);
+  font-size:12.5px;font-weight:600;color:var(--ink);text-decoration:none;}
+.sl:hover{background:var(--chip);}
+.sl svg{width:17px;height:17px;color:var(--ink-2);flex:0 0 auto;}
+.pop-foot{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);
+  padding:6px 9px 3px;border-top:1px solid var(--hair);margin-top:4px;}
+
+/* ---------------- RESEARCH — external sub-domain (placeholder) ---------------- */
+.research{display:flex;align-items:center;gap:7px;height:38px;padding:0 13px;
+  border:1px dashed var(--muted);border-radius:var(--r-sm);color:var(--ink-2);
+  font-size:12px;font-weight:600;text-decoration:none;transition:background .12s;}
+.research:hover{background:var(--chip);}
+.research svg{width:13px;height:13px;color:var(--muted);}
+
+/* ---------------- BRAND ---------------- */
+.brand{display:flex;align-items:center;gap:13px;}
+.mark{width:30px;height:30px;color:var(--ink);}     /* animated in build; static here */
+.mark svg{width:100%;height:100%;}
+.wm{display:flex;flex-direction:column;line-height:1;gap:5px;}
+.wm .name{font-size:17px;font-weight:700;letter-spacing:.05em;}
+.wm .timer{font-size:11px;font-weight:500;color:var(--ink-2);letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;}
+.tab{height:30px;padding:0 13px;display:flex;align-items:center;border:1px solid var(--hair);
+  border-radius:var(--r-sm);font-size:12px;font-weight:700;letter-spacing:.1em;
+  color:var(--ink-2);cursor:pointer;background:var(--ground);}
+.tab:hover{background:var(--chip);}
+
+/* ---------------- RIGHT — SIGNED-OUT ---------------- */
+.d-info{position:relative;width:38px;height:38px;border:1px solid var(--hair);
+  border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:17px;cursor:pointer;background:var(--ground);}
+.d-info:hover{background:var(--chip);}
+.d-info .i{position:absolute;top:-6px;right:-6px;width:15px;height:15px;border-radius:50%;
+  background:var(--ink);color:var(--ground);font-size:9px;font-weight:700;font-style:italic;
+  display:flex;align-items:center;justify-content:center;}
+.join{height:38px;padding:0 20px;display:flex;align-items:center;border-radius:var(--r-sm);
+  background:var(--ink);color:var(--ground);font-size:12px;font-weight:700;letter-spacing:.12em;cursor:pointer;}
+.join:hover{background:#000;}
+
+/* ---------------- RIGHT — SIGNED-IN ---------------- */
+.d-cluster{display:flex;align-items:center;gap:13px;height:44px;padding:0 14px 0 12px;
+  border:1px solid var(--hair);border-radius:var(--r);background:var(--ground);}
+.d-cluster .glyph{font-size:17px;font-weight:700;}
+.d-cluster .sep{width:1px;height:26px;background:var(--hair);}
+.stat{display:flex;flex-direction:column;line-height:1;gap:4px;}
+.stat .lab{font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.stat .val{font-size:13px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+.ident{display:flex;align-items:center;gap:9px;height:40px;padding:0 12px 0 6px;
+  border:1px solid var(--hair);border-radius:var(--pill);cursor:pointer;background:var(--ground);}
+.ident:hover{background:var(--chip);}
+.ident .av{width:28px;height:28px;border-radius:50%;background:var(--ink);
+  display:flex;align-items:center;justify-content:center;color:var(--ground);font-size:11px;font-weight:700;}
+.ident .nm{font-size:12px;font-weight:600;color:var(--ink);}
+
+/* ---------------- VISITOR — separated vanity metric (§21.1) ---------------- */
+.vis-wrap{display:flex;align-items:center;gap:16px;}
+.vis-div{width:1px;height:30px;background:var(--hair-2);}
+.visitor{display:flex;align-items:center;gap:7px;color:var(--muted);}
+.visitor svg{width:16px;height:16px;}
+.visitor .v{display:flex;flex-direction:column;line-height:1;gap:4px;}
+.visitor .v .n{font-size:13px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums;}
+.visitor .v .l{font-size:8.5px;letter-spacing:.13em;text-transform:uppercase;}
+
+/* ---------------- ANNOTATION / EXHIBITS ---------------- */
+.ann{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px;}
+.pin{font-size:10.5px;color:var(--ink-2);background:#fff;border:1px solid var(--hair);
+  border-radius:5px;padding:3px 8px;}
+.pin b{color:var(--ink);font-weight:700;}
+.pin.k{border-color:var(--ink);}
+.exhibit{display:flex;gap:30px;align-items:flex-start;background:#fff;border:1px solid var(--hair);
+  border-radius:var(--r);padding:20px 24px;margin-top:12px;flex-wrap:wrap;}
+.st{display:flex;flex-direction:column;align-items:center;gap:9px;}
+.st .sl2{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.legend{display:flex;flex-direction:column;gap:7px;background:#fff;border:1px solid var(--hair);
+  border-radius:var(--r);padding:16px 20px;margin-top:12px;}
+.legend .row{display:flex;gap:10px;align-items:flex-start;font-size:12px;color:var(--ink-2);line-height:1.5;}
+.legend .row b{color:var(--ink);}
+.legend .dot2{flex:0 0 auto;width:7px;height:7px;border-radius:50%;background:var(--ink);margin-top:6px;}
+.legend .row.open b{color:#fff;background:var(--ink);padding:0 5px;border-radius:3px;}
+
+@media (prefers-reduced-motion:reduce){
+  .radio .eq span,.radio .dot{animation:none!important;}
+  .radio.on .eq span:nth-child(odd){height:70%;}
+  .radio.on .eq span:nth-child(even){height:40%;}
+}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <!-- ===== shared left zone markup (duplicated per header) ===== -->
+  <!-- order: BACK · HOME · RADIO · SOCIAL · RESEARCH -->
+
+  <!-- ======================= SIGNED-OUT ======================= -->
+  <div class="cap">Global header — signed-out <span class="note">(Audience · reads the whole app)</span></div>
+  <div class="hdr shadow">
+    <div class="zone left">
+      <button class="ib" title="Back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button>
+      <button class="ib" title="Home" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 9.6V20h14V9.6"/></svg></button>
+
+      <button class="radio on" aria-label="Radio" title="Radio — depicts live music when ON (placeholder skin; built in W2.14)">
+        <span class="eq"><span></span><span></span><span></span><span></span><span></span></span>
+        <span class="lab"><span class="dot"></span><span class="txt-on">On Air</span><span class="txt-off">Radio</span></span>
+      </button>
+
+      <div class="social">
+        <button class="social-btn ib" aria-haspopup="true" aria-expanded="false" title="Our channels">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="5.7" r="2.4"/><circle cx="18" cy="18.3" r="2.4"/><path d="M8.1 10.9 15.9 6.8M8.1 13.1 15.9 17.2"/></svg>
+        </button>
+        <div class="social-pop">
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>X</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>Instagram</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.2v5.6l4.8-2.8z" fill="currentColor" stroke="none"/></svg>YouTube</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"><path d="M21.5 4.6 2.9 11.7l5.3 1.7 1.9 5.5 2.8-3.3 4.4 3.2z"/><path d="M8.2 13.4 17 6.6"/></svg>Telegram</a>
+          <div class="pop-foot">Placeholder set — final accounts TBD</div>
+        </div>
+      </div>
+
+      <a class="research" href="#" title="Research — redirects to a sub-domain (TBD)"><span>Research</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></a>
+    </div>
+
+    <div class="zone center">
+      <div class="brand">
+        <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12"/><path d="M7.5 3c0 4.5 4.5 5.5 4.5 9 0-3.5 4.5-4.5 4.5-9"/><path d="M7.5 21c0-4.5 4.5-5.5 4.5-9 0 3.5 4.5 4.5 4.5 9"/></svg></span>
+        <div class="wm"><span class="name">ZUGZWANG</span><span class="timer">45d : 06h : 15m</span></div>
+        <span class="tab" title="Rules — how it works (4 rules + the goal)">RULES</span>
+      </div>
+    </div>
+
+    <div class="zone right">
+      <div class="d-info" title="What is Dharma? — opens the Đ explainer"><span>Đ</span><span class="i">i</span></div>
+      <span class="join">JOIN</span>
+      <div class="vis-wrap">
+        <span class="vis-div"></span>
+        <div class="visitor" title="Total page visits (vanity) — not participants">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="v"><span class="n">1,024,883</span><span class="l">visitors</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ann">
+    <span class="pin"><b>Back ↔ Home swapped</b> — Back now leftmost</span>
+    <span class="pin"><b>Radio</b> = animated synth-wave (open in a browser to see it move)</span>
+    <span class="pin"><b>Social</b> after radio — click it to open the channel box</span>
+    <span class="pin"><b>Research</b> beside it — external sub-domain, placeholder</span>
+    <span class="pin k"><b>Visitor</b> still held clear of Đ (§21.1)</span>
+  </div>
+
+  <!-- ======================= SIGNED-IN ======================= -->
+  <div class="cap">Global header — signed-in <span class="note">(the W2.1 nav flip)</span></div>
+  <div class="hdr shadow">
+    <div class="zone left">
+      <button class="ib" title="Back" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button>
+      <button class="ib" title="Home" aria-label="Home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 4l9 7"/><path d="M5 9.6V20h14V9.6"/></svg></button>
+
+      <button class="radio on" aria-label="Radio" title="Radio — depicts live music when ON (placeholder skin; built in W2.14)">
+        <span class="eq"><span></span><span></span><span></span><span></span><span></span></span>
+        <span class="lab"><span class="dot"></span><span class="txt-on">On Air</span><span class="txt-off">Radio</span></span>
+      </button>
+
+      <div class="social">
+        <button class="social-btn ib" aria-haspopup="true" aria-expanded="false" title="Our channels">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="5.7" r="2.4"/><circle cx="18" cy="18.3" r="2.4"/><path d="M8.1 10.9 15.9 6.8M8.1 13.1 15.9 17.2"/></svg>
+        </button>
+        <div class="social-pop">
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>X</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>Instagram</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.2v5.6l4.8-2.8z" fill="currentColor" stroke="none"/></svg>YouTube</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"><path d="M21.5 4.6 2.9 11.7l5.3 1.7 1.9 5.5 2.8-3.3 4.4 3.2z"/><path d="M8.2 13.4 17 6.6"/></svg>Telegram</a>
+          <div class="pop-foot">Placeholder set — final accounts TBD</div>
+        </div>
+      </div>
+
+      <a class="research" href="#" title="Research — redirects to a sub-domain (TBD)"><span>Research</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg></a>
+    </div>
+
+    <div class="zone center">
+      <div class="brand">
+        <span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h12M6 21h12"/><path d="M7.5 3c0 4.5 4.5 5.5 4.5 9 0-3.5 4.5-4.5 4.5-9"/><path d="M7.5 21c0-4.5 4.5-5.5 4.5-9 0 3.5 4.5 4.5 4.5 9"/></svg></span>
+        <div class="wm"><span class="name">ZUGZWANG</span><span class="timer">45d : 06h : 15m</span></div>
+        <span class="tab" title="Rules — how it works (4 rules + the goal)">RULES</span>
+      </div>
+    </div>
+
+    <div class="zone right">
+      <div class="d-cluster" title="Your Dharma — Portfolio (open positions) + Balance (spendable)">
+        <span class="glyph">Đ</span><span class="sep"></span>
+        <span class="stat"><span class="lab">Portfolio</span><span class="val">Đ 2,480</span></span>
+        <span class="stat"><span class="lab">Balance</span><span class="val">Đ 610</span></span>
+      </div>
+      <div class="ident" title="umber-falcon-31 → Profile"><span class="av">u</span><span class="nm">umber-falcon-31</span></div>
+      <div class="vis-wrap">
+        <span class="vis-div"></span>
+        <div class="visitor" title="Total page visits (vanity) — not participants">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span class="v"><span class="n">1,024,883</span><span class="l">visitors</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="ann">
+    <span class="pin"><b>Đ</b> + <b>Portfolio</b> + <b>Balance</b> (2 stats, monochrome)</span>
+    <span class="pin"><b>Identity</b> → Profile</span>
+    <span class="pin k"><b>§21.1</b> — visitor count held off the Đ cluster by the identity chip + divider</span>
+  </div>
+
+  <!-- ===== EXHIBIT: social menu open + radio off ===== -->
+  <div class="cap">Exhibits <span class="note">(social menu — open · radio — off)</span></div>
+  <div class="exhibit">
+    <div class="st">
+      <div class="social open" style="position:relative;height:220px;">
+        <button class="social-btn ib" aria-expanded="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="12" r="2.4"/><circle cx="18" cy="5.7" r="2.4"/><circle cx="18" cy="18.3" r="2.4"/><path d="M8.1 10.9 15.9 6.8M8.1 13.1 15.9 17.2"/></svg></button>
+        <div class="social-pop" style="display:block;top:46px;">
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 5l14 14M19 5L5 19"/></svg>X</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1.1" fill="currentColor" stroke="none"/></svg>Instagram</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.5 9.2v5.6l4.8-2.8z" fill="currentColor" stroke="none"/></svg>YouTube</a>
+          <a class="sl" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linejoin="round"><path d="M21.5 4.6 2.9 11.7l5.3 1.7 1.9 5.5 2.8-3.3 4.4 3.2z"/><path d="M8.2 13.4 17 6.6"/></svg>Telegram</a>
+          <div class="pop-foot">Placeholder set — final accounts TBD</div>
+        </div>
+      </div>
+      <span class="sl2">social — open</span>
+    </div>
+    <div class="st">
+      <button class="radio" aria-label="Radio (off)"><span class="eq"><span></span><span></span><span></span><span></span><span></span></span><span class="lab"><span class="dot"></span><span class="txt-on">On Air</span><span class="txt-off">Radio</span></span></button>
+      <span class="sl2">radio — off (flat)</span>
+    </div>
+  </div>
+
+  <!-- ===== EXHIBIT: back states (W2.3) ===== -->
+  <div class="cap">Back control — states <span class="note">(W2.3 visual; disabled at root / Discovery)</span></div>
+  <div class="exhibit">
+    <div class="st"><button class="ib" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button><span class="sl2">default</span></div>
+    <div class="st"><button class="ib" style="background:var(--chip);border-color:var(--hair-2)" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button><span class="sl2">hover</span></div>
+    <div class="st"><button class="ib is-focus" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button><span class="sl2">focus</span></div>
+    <div class="st"><button class="ib is-active" aria-label="Back"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button><span class="sl2">active</span></div>
+    <div class="st"><button class="ib is-disabled" aria-disabled="true" aria-label="Back (disabled)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="M11 6l-6 6 6 6"/></svg></button><span class="sl2">disabled · root</span></div>
+  </div>
+
+  <!-- ===== READ-ME ===== -->
+  <div class="cap">Reading the still</div>
+  <div class="legend">
+    <div class="row"><span class="dot2"></span><span><b>Left zone (L→R):</b> Back · Home · Radio · Social · Research. Five controls — fits at 1440 with the brand centered; flag if it reads cramped and I'll group.</span></div>
+    <div class="row"><span class="dot2"></span><span><b>Radio.</b> Animated synth-wave depicts live music when <b>On Air</b>. Shown ON here so you can see it; real default is OFF (play-on-gesture per §21.5). Still the placeholder skin — the YouTube-backed player + final look are W2.14.</span></div>
+    <div class="row open"><span class="dot2"></span><span><b>Social.</b> Click the share icon → a box drops under it with the channels (X · Instagram · YouTube · Telegram, placeholder set). Each is an external link. Open-state shown in the exhibit above.</span></div>
+    <div class="row"><span class="dot2"></span><span><b>Research.</b> Dashed = placeholder. External ↗ to a sub-domain you'll define. Both Social and Research are <b>new header elements</b> — no SPEC.1 / tracker home yet (flagged in chat).</span></div>
+    <div class="row"><span class="dot2"></span><span><b>Anti-conflation (§21.1).</b> Visitor count stays structurally apart from Đ — outside a divider, muted, labelled "visitors". Unchanged from v0.1.</span></div>
+    <div class="row"><span class="dot2"></span><span><b>Open — user-search.</b> Still not in this still; treating it as its own task unless you say otherwise.</span></div>
+  </div>
+
+</div>
+
+<script>
+  // Radio: toggle the synth-wave on/off
+  document.querySelectorAll('.hdr .radio').forEach(function(b){
+    b.addEventListener('click', function(){ b.classList.toggle('on'); });
+  });
+  // Social: click opens the channel box; click-outside / another button closes
+  document.querySelectorAll('.hdr .social-btn').forEach(function(b){
+    b.addEventListener('click', function(e){
+      e.stopPropagation();
+      var box = b.parentElement, open = box.classList.contains('open');
+      document.querySelectorAll('.hdr .social').forEach(function(s){
+        s.classList.remove('open');
+        s.querySelector('.social-btn').setAttribute('aria-expanded','false');
+      });
+      if(!open){ box.classList.add('open'); b.setAttribute('aria-expanded','true'); }
+    });
+  });
+  document.addEventListener('click', function(){
+    document.querySelectorAll('.hdr .social').forEach(function(s){
+      s.classList.remove('open');
+      s.querySelector('.social-btn').setAttribute('aria-expanded','false');
+    });
+  });
+</script>
+</body>
+</html>
