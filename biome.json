@@ -7,7 +7,7 @@
 	},
 	"files": {
 		"ignoreUnknown": true,
-		"includes": ["**", "!drizzle/migrations/meta"]
+		"includes": ["**", "!drizzle/migrations/meta", "!docs/design/mockups"]
 	},
 	"formatter": {
 		"enabled": true,

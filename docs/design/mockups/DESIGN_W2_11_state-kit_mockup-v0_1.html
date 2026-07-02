@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DESIGN.W2.11 — State-primitive kit (v0.1)</title>
+<!--
+  DESIGN.W2.11 — STATE-PRIMITIVE KIT · mockup v0.1 · web-authored (orchestrator), monochrome, desktop.
+  WHAT THIS IS: the cross-surface robustness layer as ONE reusable kit (P1–P6) + a placement table.
+  Deliverable shape D (operator-chosen): one combined kit still + the state->primitive->host->§15-code
+  table (also folded into spec-changes-consolidated). CC builds from this still at UI.* (DEBATE.4 pattern;
+  no Claude Design — that is branding-only).
+
+  LOCKED RULINGS EMBODIED HERE:
+   · T1 — NO first-load skeletons. Pages are server-rendered (populated HTML); polls swap silently.
+          (loading rows 3/6/16 KILLED). The only real "loading" is auth waiting on a vendor (already shipped).
+   · T2 — NO per-surface error panels. Rare fetch failures surface the generic modal / offline banner
+          (rows 4/17 FOLDED into 28/30).
+   · T3 — input clamp prevents below-floor / insufficient-balance (row 8 KILLED). Surviving validation:
+          market_resolving (open-composer race), floor-above-balance (disabled composer), one generic
+          server-reject line.
+   · INV-4 rider — a non-Open market disables Sell + reply triggers, not only the entry button
+          (no participant-facing "resolved/resolving" banner; that read-only event is the Nov-5 freeze).
+   · Banned removes voice AND Sell (positions ride to resolution; no exit). Terminal, no appeal (E2).
+   · Moderation model = ADR-0021 (no held queue). Track B is a SYNCHRONOUS block-and-revise at submit;
+          there is NO "under review on profile" state. The public removed-by-moderator mask is DEBATE.7's.
+
+  SAFETY INVARIANTS (hold across every moderation state): never echo/quote/describe the flagged content;
+  never name the category (never confirm/deny CSAM); never give evasion guidance; PRESERVE the user's
+  typed argument on every revise/retry state; Track A / banned read as FINAL.
+
+  COPY IS ILLUSTRATIVE — it locks intent + safety, not final wording (final copy is build-time per the
+  copy register). Side binding (YES=black / NO=white) is untouched; these chrome states are side-neutral.
+-->
+<style>
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --hair:1px solid var(--n2);
+    --hair-2:1px solid var(--n3);
+    --r:8px; --r-sm:6px;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--n1);font-family:var(--sans);color:var(--ink);
+       -webkit-font-smoothing:antialiased;line-height:1.45;}
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 28px 80px;}
+
+  /* ---- exhibit chrome ---- */
+  .top{border:var(--hair);background:var(--n0);border-radius:var(--r);padding:22px 24px;margin-bottom:28px;}
+  .top h1{font-size:18px;font-weight:700;margin:0 0 6px;letter-spacing:.01em;}
+  .top .sub{font-size:12px;color:var(--n5);}
+  .top .tags{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
+  .tag{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--n5);
+       border:var(--hair);border-radius:999px;padding:3px 9px;background:var(--n0);}
+
+  .sec{margin:34px 0 0;}
+  .cap{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin-bottom:12px;
+       padding-bottom:8px;border-bottom:var(--hair-2);}
+  .cap .pid{font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--ink);
+            border:1px solid var(--ink);border-radius:var(--r-sm);padding:2px 7px;}
+  .cap .ttl{font-size:14px;font-weight:700;letter-spacing:.02em;}
+  .cap .note{font-size:11.5px;color:var(--n5);}
+
+  .grid{display:grid;gap:16px;}
+  .g2{grid-template-columns:1fr 1fr;}
+  .g3{grid-template-columns:1fr 1fr 1fr;}
+
+  .st{border:var(--hair);background:var(--n0);border-radius:var(--r);overflow:hidden;}
+  .st .lbl{display:flex;align-items:center;justify-content:space-between;gap:8px;
+           padding:9px 12px;border-bottom:var(--hair);background:var(--n1);}
+  .st .lbl .nm{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--n6);}
+  .code{font-family:var(--mono);font-size:10px;color:var(--n5);background:var(--n0);
+        border:var(--hair);border-radius:4px;padding:1px 6px;white-space:nowrap;}
+  .stbody{padding:18px 16px;}
+
+  /* ---- P1 empty / no-results block ---- */
+  .emptyblk{border:var(--hair);border-radius:var(--r);background:var(--n0);
+            min-height:148px;display:flex;flex-direction:column;align-items:center;justify-content:center;
+            text-align:center;gap:10px;padding:24px;}
+  .emptyblk .msg{font-size:13.5px;color:var(--n6);max-width:320px;}
+  .emptyblk .sub{font-size:12px;color:var(--n4);}
+  .cta{font-size:12px;font-weight:600;color:var(--ink);background:var(--n0);
+       border:1px solid var(--ink);border-radius:var(--r-sm);padding:8px 14px;cursor:pointer;}
+  .cta:hover{background:var(--n1);}
+
+  /* ---- P2 blocking modal ---- */
+  .stage{position:relative;border:var(--hair);border-radius:var(--r);overflow:hidden;min-height:230px;
+         background:repeating-linear-gradient(45deg,var(--n1),var(--n1)10px,#f0f0f0 10px,#f0f0f0 20px);}
+  .scrim{position:absolute;inset:0;background:rgba(10,10,10,.42);}
+  .modal{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+         width:340px;max-width:88%;background:var(--n0);border:var(--hair);border-radius:var(--r);
+         box-shadow:0 12px 40px rgba(10,10,10,.18);padding:22px 22px 18px;}
+  .modal h3{font-size:14px;font-weight:700;margin:0 0 8px;}
+  .modal p{font-size:12.5px;color:var(--n6);margin:0 0 16px;}
+  .modal .act{display:flex;justify-content:flex-end;gap:8px;}
+  .btn{font-size:12px;font-weight:600;border-radius:var(--r-sm);padding:8px 14px;cursor:pointer;}
+  .btn.solid{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .btn.ghost{background:var(--n0);color:var(--ink);border:var(--hair-2);}
+  /* compact "same shell, these contents" variants */
+  .mcard{border:var(--hair);border-radius:var(--r);background:var(--n0);padding:16px;}
+  .mcard h4{font-size:12.5px;font-weight:700;margin:0 0 6px;}
+  .mcard p{font-size:11.5px;color:var(--n6);margin:0 0 12px;}
+  .mcard .act{display:flex;justify-content:flex-end;}
+
+  /* ---- P3 composer repro + inline states ---- */
+  .composer{border:var(--hair);border-radius:var(--r);background:var(--n0);overflow:hidden;}
+  .composer .ch{padding:12px 14px;border-bottom:var(--hair);font-size:12.5px;font-weight:700;letter-spacing:.01em;}
+  .composer .cb{padding:14px;}
+  .lab{font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--n5);margin-bottom:6px;}
+  .fld{border:var(--hair-2);border-radius:var(--r-sm);background:var(--n0);padding:10px 12px;
+       font-size:12.5px;color:var(--n6);min-height:38px;}
+  .fld.body{min-height:60px;margin-top:10px;}
+  .fld.kept{color:var(--n6);} /* "argument preserved" */
+  .amt{display:flex;align-items:center;justify-content:space-between;margin-top:12px;
+       font-size:12px;color:var(--n5);}
+  .amt .v{font-family:var(--mono);color:var(--n6);}
+  .submit{margin-top:14px;width:100%;text-align:center;font-size:12.5px;font-weight:700;letter-spacing:.04em;
+          border:1px solid var(--ink);background:var(--ink);color:var(--n0);border-radius:var(--r-sm);
+          padding:11px;cursor:pointer;}
+  .submit.is-disabled{background:var(--n1);color:var(--n4);border-color:var(--n2);cursor:default;}
+  /* the inline state strip (sits above submit; never a popup) */
+  .strip{margin-top:14px;border:var(--hair-2);border-left:3px solid var(--ink);border-radius:var(--r-sm);
+         background:var(--n1);padding:10px 12px;font-size:12px;color:var(--n6);}
+  .strip.muted{border-left-color:var(--n4);}
+  .strip .h{font-weight:700;color:var(--ink);display:block;margin-bottom:3px;font-size:12px;}
+  .xref{font-size:11px;color:var(--n5);margin-top:8px;}
+
+  /* ---- P4 banner ---- */
+  .navbar{height:52px;border:var(--hair);border-radius:var(--r) var(--r) 0 0;background:var(--n0);
+          display:flex;align-items:center;padding:0 16px;font-weight:700;font-size:12.5px;letter-spacing:.04em;}
+  .banner{border:var(--hair);border-top:none;border-radius:0 0 var(--r) var(--r);
+          background:var(--n7);color:var(--n0);font-size:12px;padding:9px 16px;}
+  .banner.soft{background:var(--n2);color:var(--n6);}
+  .banner b{font-weight:700;}
+
+  /* ---- P5 silent fallback ---- */
+  .chiprow{display:flex;gap:14px;align-items:center;}
+  .vc{border:var(--hair);border-radius:999px;padding:6px 12px;font-size:12px;color:var(--n6);background:var(--n0);}
+  .vc .n{font-family:var(--mono);font-weight:700;color:var(--ink);}
+  .vc .dash{color:var(--n4);}
+
+  /* ---- P6 dormant ---- */
+  .dormant{border:1px dashed var(--n3);border-radius:var(--r);background:var(--n0);padding:18px;text-align:center;}
+  .dormant .cta-side{display:inline-block;font-size:12.5px;font-weight:700;color:var(--ink);
+       border:1px solid var(--ink);border-radius:var(--r-sm);padding:9px 16px;}
+  .stamp{display:inline-block;margin-top:12px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+         color:var(--n5);border:var(--hair);border-radius:999px;padding:3px 9px;}
+
+  /* ---- placement table ---- */
+  table.map{width:100%;border-collapse:collapse;font-size:11.5px;background:var(--n0);
+            border:var(--hair);border-radius:var(--r);overflow:hidden;}
+  table.map th,table.map td{text-align:left;padding:9px 11px;border-bottom:var(--hair);vertical-align:top;}
+  table.map th{background:var(--n1);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--n5);font-weight:700;}
+  table.map td.mono{font-family:var(--mono);font-size:10.5px;color:var(--n5);}
+  table.map tr:last-child td{border-bottom:none;}
+  .safe{font-size:11px;color:var(--n5);margin-top:10px;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="top">
+    <h1>DESIGN.W2.11 — State-primitive kit <span style="color:var(--n4);font-weight:600;">v0.1</span></h1>
+    <div class="sub">Cross-surface robustness layer as one reusable kit. Monochrome · desktop · v1.0 tokens · illustrative copy. CC builds from this still at UI.*.</div>
+    <div class="tags">
+      <span class="tag">P1 empty / no-results</span>
+      <span class="tag">P2 blocking modal</span>
+      <span class="tag">P3 composer-inline</span>
+      <span class="tag">P4 banner</span>
+      <span class="tag">P5 silent fallback</span>
+      <span class="tag">P6 dormant shell</span>
+    </div>
+  </div>
+
+  <!-- ============================ P1 ============================ -->
+  <section class="sec">
+    <div class="cap"><span class="pid">P1</span><span class="ttl">Empty / no-results block</span>
+      <span class="note">One shape. The three shipped Profile empties reconcile into this. Hairline panel, optional single CTA.</span></div>
+    <div class="grid g3">
+
+      <div class="st">
+        <div class="lbl"><span class="nm">No-results · filter (Discovery)</span><span class="code">id 2</span></div>
+        <div class="stbody">
+          <div class="emptyblk">
+            <div class="msg">No markets match this filter.</div>
+            <button class="cta">Clear filter</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="st">
+        <div class="lbl"><span class="nm">Empty Bookmarks</span><span class="code">id 18</span></div>
+        <div class="stbody">
+          <div class="emptyblk">
+            <div class="msg">No bookmarks yet.</div>
+            <div class="sub">Saved arguments will appear here.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="st">
+        <div class="lbl"><span class="nm">No positions (new user / filter)</span><span class="code">id 11–13 · shipped</span></div>
+        <div class="stbody">
+          <div class="emptyblk">
+            <div class="msg">No positions to show.</div>
+            <div class="sub">Adjust the market or status filter.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================ P2 ============================ -->
+  <section class="sec">
+    <div class="cap"><span class="pid">P2</span><span class="ttl">Blocking modal</span>
+      <span class="note">Hard stops only. Dialog over the dimmed app (the W2.1 picker shell). Title · body · single action. Same shell, different contents.</span></div>
+
+    <div class="grid g2" style="align-items:start;">
+      <div class="st">
+        <div class="lbl"><span class="nm">Canonical shell — Session expired</span><span class="code">id 29</span></div>
+        <div class="stbody">
+          <div class="stage">
+            <div class="scrim"></div>
+            <div class="modal">
+              <h3>Session expired</h3>
+              <p>You’ve been signed out. Sign in again to keep going — anything you were viewing is still here.</p>
+              <div class="act"><button class="btn solid">Sign in</button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="st">
+        <div class="lbl"><span class="nm">Same shell · the other four contents</span><span class="code">ids 27 · 30 · 38 · 42</span></div>
+        <div class="stbody">
+          <div class="grid g2">
+            <div class="mcard">
+              <h4>No identities available</h4>
+              <p>We’ve run out of identities to assign right now. Please try again later.</p>
+              <div class="act"><button class="btn ghost">Close</button></div>
+              <div class="xref">Signup · <span class="code">identity_pool_exhausted · 503</span></div>
+            </div>
+            <div class="mcard">
+              <h4>Something went wrong</h4>
+              <p>That didn’t go through. Please try again in a moment.</p>
+              <div class="act"><button class="btn ghost">Close</button></div>
+              <div class="xref">Generic · <span class="code">internal · 500</span> · also covers rare fetch failures (ids 4/17)</div>
+            </div>
+            <div class="mcard">
+              <h4>Account suspended</h4>
+              <p>This submission broke our standards and your account has been suspended. You can still view markets, but can no longer post, reply, or trade. This decision is final.</p>
+              <div class="act"><button class="btn solid">OK</button></div>
+              <div class="xref">Track A · <span class="code">moderation_track_a</span> · terminal → banned state</div>
+            </div>
+            <div class="mcard">
+              <h4>Account suspended</h4>
+              <p>Your account has been suspended. You can view markets but can no longer post, reply, or trade. This decision is final.</p>
+              <div class="act"><button class="btn solid">OK</button></div>
+              <div class="xref">Banned · <span class="code">banned_user</span> · shown once / session, then controls disabled</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================ P3 ============================ -->
+  <section class="sec">
+    <div class="cap"><span class="pid">P3</span><span class="ttl">Composer-inline</span>
+      <span class="note">In the locked composer (reproduced verbatim, not redrawn). Inline strip / disabled submit — never a popup. Typed argument is preserved on every revise &amp; retry state.</span></div>
+
+    <div class="grid g2" style="align-items:start;">
+
+      <!-- normal composer for reference -->
+      <div class="st">
+        <div class="lbl"><span class="nm">Composer — reference (no state)</span><span class="code">locked v1.0</span></div>
+        <div class="stbody">
+          <div class="composer">
+            <div class="ch">Place your Đ BET</div>
+            <div class="cb">
+              <div class="lab">Your argument — required</div>
+              <div class="fld">Ridership has doubled every quarter since Phase 2…</div>
+              <div class="fld body">…the airport feeder alone adds 180k daily trips, and BKC is still below half capacity.</div>
+              <div class="amt"><span>Amount</span><span class="v">Đ 50</span></div>
+              <div class="amt"><span>To win</span><span class="v">Đ 126.6</span></div>
+              <button class="submit">PLACE Đ BET</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Track B block-and-revise -->
+      <div class="st">
+        <div class="lbl"><span class="nm">Track B — block &amp; revise</span><span class="code">id 39 · moderation_track_b</span></div>
+        <div class="stbody">
+          <div class="composer">
+            <div class="ch">Place your Đ BET</div>
+            <div class="cb">
+              <div class="lab">Your argument — required</div>
+              <div class="fld kept">[ your argument is kept here, editable ]</div>
+              <div class="strip">
+                <span class="h">This argument can’t be posted as written</span>
+                Please revise it to meet our community standards and try again.
+              </div>
+              <button class="submit is-disabled">PLACE Đ BET</button>
+              <div class="xref">Submit re-enables once the text is edited; resubmit re-runs the gate. No category named, no echo, no evasion hint.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- moderation_unavailable + in_flight -->
+      <div class="st">
+        <div class="lbl"><span class="nm">Moderation unavailable / still checking</span><span class="code">ids 40 · 41</span></div>
+        <div class="stbody">
+          <div class="composer">
+            <div class="ch">Place your Đ BET</div>
+            <div class="cb">
+              <div class="fld kept">[ argument preserved ]</div>
+              <div class="strip muted">
+                <span class="h">We couldn’t check your argument just now</span>
+                Try again in a few seconds.
+              </div>
+              <button class="submit is-disabled">PLACE Đ BET</button>
+              <div class="xref"><span class="code">moderation_unavailable · 503</span> → ~5s, then re-enabled (fail-closed). Sibling: <span class="code">moderation_in_flight · 409</span> → “Still checking your last submission — one moment.” (~2s).</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- market_resolving + floor-above-balance + server-reject -->
+      <div class="st">
+        <div class="lbl"><span class="nm">Resolving · floor&gt;balance · reject race</span><span class="code">id 45</span></div>
+        <div class="stbody">
+          <div class="composer">
+            <div class="ch">Place your Đ BET</div>
+            <div class="cb">
+              <div class="fld kept">[ argument preserved ]</div>
+              <div class="strip">
+                <span class="h">This market is now resolving</span>
+                No further bets can be placed.
+              </div>
+              <button class="submit is-disabled">PLACE Đ BET</button>
+              <div class="xref"><span class="code">market_resolving</span> — only catches a composer opened just before the flip (entry buttons already disabled going forward, INV-4).</div>
+
+              <div class="strip" style="margin-top:14px;">
+                <span class="h">You need Đ 50 to reply</span>
+                You have Đ 30 available.
+              </div>
+              <div class="xref">Floor-above-balance → composer disabled (no valid range to clamp into). Post variant: “You need Đ 10…”.</div>
+
+              <div class="strip muted" style="margin-top:14px;">
+                <span class="h">We couldn’t place that bet</span>
+                Your position may have changed. Refresh and try again.
+              </div>
+              <div class="xref">One generic line for <span class="code">opposite_side_held</span> / <span class="code">position_not_held</span> two-tab races.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <div class="safe">Track A does <b>not</b> render inline — it is terminal, so it routes to the P2 “Account suspended” modal (above). A banned user hitting the act-gate sees the P2 banned modal once, then Đ BET / Support / Counter / <b>Sell</b> render disabled.</div>
+  </section>
+
+  <!-- ============================ P4 ============================ -->
+  <section class="sec">
+    <div class="cap"><span class="pid">P4</span><span class="ttl">Global banner</span>
+      <span class="note">Persistent chrome strip, non-blocking. The freeze is the one loud participant-facing read-only event.</span></div>
+    <div class="grid g2" style="align-items:start;">
+
+      <div class="st">
+        <div class="lbl"><span class="nm">Nov-5 freeze · read-only</span><span class="code">id 33 · experiment_concluded · 410</span></div>
+        <div class="stbody">
+          <div class="navbar">ZUGZWANG</div>
+          <div class="banner"><b>The experiment has concluded.</b> Markets are frozen and read-only. Thank you for taking part.</div>
+        </div>
+      </div>
+
+      <div class="st">
+        <div class="lbl"><span class="nm">Offline (auto-clears)</span><span class="code">id 28 · banner, not modal</span></div>
+        <div class="stbody">
+          <div class="navbar">ZUGZWANG</div>
+          <div class="banner soft">You’re offline. We’ll reconnect automatically — some actions are paused.</div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================ P5 / P6 ============================ -->
+  <section class="sec">
+    <div class="grid g2" style="align-items:start;">
+
+      <div>
+        <div class="cap"><span class="pid">P5</span><span class="ttl">Silent fallback</span>
+          <span class="note">No message — dash or hide.</span></div>
+        <div class="st">
+          <div class="lbl"><span class="nm">Visitor counter</span><span class="code">id 32 · minor</span></div>
+          <div class="stbody">
+            <div class="chiprow">
+              <span class="vc"><span class="n">12,480</span> visitors</span>
+              <span style="color:var(--n4);">→</span>
+              <span class="vc"><span class="dash">—</span> visitors</span>
+            </div>
+            <div class="xref" style="margin-top:10px;">Count unavailable → dash (or hide). Never an error surface. (Visitor count is HARD anti-conflation — never co-located with n / stake / Dharma.)</div>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="cap"><span class="pid">P6</span><span class="ttl">Dormant shell</span>
+          <span class="note">Build-time only — never publicly reached (curation seeds both columns).</span></div>
+        <div class="st">
+          <div class="lbl"><span class="nm">Empty-side / empty-market</span><span class="code">ids 7 · 36 · 37</span></div>
+          <div class="stbody">
+            <div class="dormant">
+              <span class="cta-side">Be the first to argue YES</span>
+              <div><span class="stamp">Dormant · build-time safety shell</span></div>
+            </div>
+            <div class="xref" style="margin-top:10px;">Rendered per design-language §4.10 so the build is complete; the curation slate (cpmm.md §7.2) means no public market reaches it.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- ============================ placement table ============================ -->
+  <section class="sec">
+    <div class="cap"><span class="pid">MAP</span><span class="ttl">State → primitive → host → §15 code</span>
+      <span class="note">CC placement reference (also folded into spec-changes-consolidated).</span></div>
+    <table class="map">
+      <thead><tr><th style="width:34px;">id</th><th>State</th><th style="width:128px;">Primitive</th><th>Host / trigger</th><th style="width:200px;">SPEC.2 §15 code</th></tr></thead>
+      <tbody>
+        <tr><td>2</td><td>No-results under filter</td><td>P1 empty block</td><td>Discovery / Profile filter yields none</td><td class="mono">—</td></tr>
+        <tr><td>18</td><td>Empty Bookmarks</td><td>P1 empty block</td><td>Bookmark page, zero saved</td><td class="mono">—</td></tr>
+        <tr><td>11–13</td><td>Profile empties (shipped)</td><td>P1 (reconciled)</td><td>Profile positions list</td><td class="mono">—</td></tr>
+        <tr><td>27</td><td>Pool-exhausted at signup</td><td>P2 modal</td><td>Signup, no identity left</td><td class="mono">identity_pool_exhausted · 503</td></tr>
+        <tr><td>29</td><td>Session expired</td><td>P2 modal</td><td>Any authed action, dead session</td><td class="mono">—</td></tr>
+        <tr><td>30</td><td>Generic 500 / internal</td><td>P2 modal</td><td>Catch-all (covers ids 4/17)</td><td class="mono">internal · 500</td></tr>
+        <tr><td>38</td><td>Track A block + auto-ban</td><td>P2 modal</td><td>Composer submit, terminal</td><td class="mono">moderation_track_a</td></tr>
+        <tr><td>42</td><td>Banned user</td><td>P2 once + disabled controls</td><td>Act-gate; Đ BET / Support / Counter / Sell off</td><td class="mono">banned_user</td></tr>
+        <tr><td>39</td><td>Track B block &amp; revise</td><td>P3 inline</td><td>Composer submit; revise in place</td><td class="mono">moderation_track_b</td></tr>
+        <tr><td>40</td><td>Moderation unavailable</td><td>P3 inline</td><td>Composer submit, gate down (fail-closed)</td><td class="mono">moderation_unavailable · 503</td></tr>
+        <tr><td>41</td><td>Moderation in-flight</td><td>P3 inline</td><td>Composer submit, duplicate</td><td class="mono">moderation_in_flight · 409</td></tr>
+        <tr><td>45a</td><td>Market resolving (open composer)</td><td>P3 inline</td><td>Composer open when market flips</td><td class="mono">market_resolving</td></tr>
+        <tr><td>45b</td><td>Floor above free balance</td><td>P3 disabled composer</td><td>Free Đ &lt; floor (50 reply / 10 post)</td><td class="mono">below_post_floor (prevented elsewhere)</td></tr>
+        <tr><td>45c</td><td>Server-reject race</td><td>P3 inline line</td><td>Two-tab side/position conflict</td><td class="mono">opposite_side_held / position_not_held</td></tr>
+        <tr><td>33</td><td>Nov-5 freeze read-only</td><td>P4 banner</td><td>App-wide after 2026-11-05 23:59 UTC</td><td class="mono">experiment_concluded · 410</td></tr>
+        <tr><td>28</td><td>Offline</td><td>P4 banner (auto-clear)</td><td>Connectivity lost; covers ids 4/17 fetch fails</td><td class="mono">—</td></tr>
+        <tr><td>32</td><td>Visitor-counter fallback</td><td>P5 silent</td><td>Count unavailable → dash/hide</td><td class="mono">—</td></tr>
+        <tr><td>7·36·37</td><td>Empty-side / empty-market</td><td>P6 dormant</td><td>Build-time only; never public</td><td class="mono">—</td></tr>
+      </tbody>
+    </table>
+    <div class="safe">
+      <b>Out of W2.11 (cross-ref only):</b> slippage modal + Sell (id 5/10 → W2.10) · Dharma graph load/empty (id 15 → W2.6) · public removed-by-moderator mask (id 43 → DEBATE.7 / dashboard).
+      <b>Removed / non-existent:</b> author “under review on profile” (id 44 → ADR-0021; correct design-language §4.7/§4.10).
+      <b>Killed by ruling:</b> empty-Discovery, all first-load skeletons, below-floor/insufficient-balance error UI, per-surface error panels.
+    </div>
+  </section>
+
+</div>
+</body>
+</html>

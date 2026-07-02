@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Zugzwang — Debate view (Market detail) · DESIGN.5 v1.12</title>
+<!--
+  Zugzwang · VISUAL Slot 3 (DESIGN.5 → UI.5) · Debate view, in situ on the
+  market-detail page · CONTINUATION of DESIGN.4 v1.2 (one lineage, not a re-open)
+  ============================================================================
+  DESIGN.5 v1.12 — Đ BET wordmark in the composers (operator, 2026-06-11):
+      · all bet composers (D4 fresh-post + D5 Support/Counter; the modules are
+        shared): header "Place your bet" → "Place your Đ BET"; submit
+        PLACE/BET → PLACE/Đ BET. "Đ BET" reads as DEBATE — brand pun; the
+        Đ glyph chosen over plain "D" to carry the Dharma mark (operator typed
+        "D BET"; flip to the bare letter if intended).
+      · reply mode keeps its verb-line header ("Support {name}'s argument",
+        D5-08) — unchanged.
+  ============================================================================
+  DESIGN.5 v1.11 — pop-up head correction (operator, 2026-06-11):
+      · × back at the RIGHT (absolute, as v1.6); the ↗ is REMOVED from the
+        pop-up head (and its enter-debate wiring with it).
+      · head left cluster: avatar · name | SIDE @ entry% | staked → now |
+        Đ N staked in Replies · N  (post pop-ups only; reply pop-ups end at
+        the stake pair).
+  ============================================================================
+  DESIGN.5 v1.10 — pop-up size revert (operator, 2026-06-11):
+      · the v1.9 width/image-cap stretched the image — pop-up SIZE reverts to
+        the v1.6 original (620px card, 82vh, Medium-style scrolling body).
+      · KEPT from v1.9: the blurred backdrop and the rebuilt head row
+        (× at left · avatar · name | SIDE @ entry% | staked → now …
+        Replies · N · ↗). Applies to both the D4 and D5 "+" pop-ups
+        (one shared component; reply pop-ups keep their own chip, no ↗).
+  ============================================================================
+  DESIGN.5 v1.9 — pop-up rebuild + header counts (operator, 2026-06-11):
+    D4 (market page):
+      · stats-line arrow: now ↗ and OPENS the debate view (demo: wired to the
+        top post; production target = the market's debate surface). Button no
+        longer inflates the line height; the market question is flex-locked so
+        it can't be vertically squeezed again (the v1.8 ↖ shrank it).
+      · post pop-up: width min(1560px, 94vw) so the full 2200-char body reads
+        without scroll at desktop heights (scroll remains as a small-screen
+        fallback); image capped at 34vh; backdrop now BLURS the page behind.
+        Head row rebuilt: × at the LEFT, then avatar · name | SIDE @ entry% |
+        staked → now … Replies · N · ↗ (the ↗ closes the pop-up and opens this
+        post's debate view). Reply pop-ups: same head with the reply's OWN
+        chip; no count/arrow cluster (you are already in the debate).
+      · colhead with no held position shows grey "No active position" in the
+        position slot (demo: the NO column) instead of rendering nothing.
+    D5 (drilled-in debate view):
+      · colhead staked figure stacks: Đ value over a "support/counter staked"
+        label, centre-aligned, ink (was one inline line).
+      · header title bar: "Replies · N" precedes the ↙ — the row now mirrors
+        the card row completely (count + arrow, direction flipped).
+  ============================================================================
+  DESIGN.5 v1.8 — same-day refinements on v1.7 (operator, 2026-06-11):
+    D4 (market page):
+      · card body TEASER reverted — removed from cards; the image takes the
+        height back; the "+" returns to the TITLE end (still body-conditional).
+        The drilled-in header KEEPS its teaser (revert was scoped to D4 cards).
+      · card footer: side Đ amounts centred under their Support/Counter pills;
+        the staked TOTAL returns to the card footer as a centred "Đ N staked"
+        under the bar, on the amounts' line (v1.5 removal partially reversed).
+      · TO WIN preview is now a unit multiplier: Đ 1 → Đ 2.63x (yes @ 38%) /
+        Đ 1 → Đ 1.61x (no @ 62%). (Operator wrote 2.36x — corrected to 2.63 =
+        1/0.38.)
+      · market header stats line gains a ↖ button (functional affordance;
+        production target = back to the discovery feed — stubbed here).
+    D5 (drilled-in debate view):
+      · column headers gain the same TO WIN multiplier beside Support / Counter
+        (side-specific: Support pays the post's side, Counter the opposite).
+      · header footer re-cloned from the D4 card footer: Support/Counter pill
+        BUTTONS (pole-coded, open the reply composer — same action as the
+        colhead buttons) with grey Đ amounts centred beneath, split bar with
+        centred "Đ N staked" total under it. The v1.7 one-line static labels +
+        separate stakedline are gone.
+      · "Đ N support/counter staked" in the colhead: ink, not grey.
+    D4 + D5:
+      · centre price is PLAIN TEXT, not a pill: no padding/background/border.
+        Format: Yes 〔thumb-up〕 38% · No 〔thumb-down〕 62%, monochrome inline
+        SVG thumbs. Side identity rides the thumbs + word (the black/white
+        price pill is retired).
+  ============================================================================
+  DESIGN.5 v1.7 — D4/D5 row unification + D5 aggregate plumbing (operator, 2026-06-11):
+    D4 (market page):
+      · post-card top row gains the author's bet chip — avatar · name | SIDE @ entry%
+        | staked → now … REPLIES · N · ↗. Closes the v1.3 "core point a" gap: card
+        row and drilled-in header now share one anatomy.
+      · 2-line grey body TEASER between title and image; the "+" (show-more) moves
+        from the title end to the teaser end. Teaser + "+" render ONLY when a body
+        exists; the zone keeps its height (blank, middle-aligned) when bodyless.
+        Demo teasers excerpt the body's continuation — the title already IS the
+        argument's first 125 chars (D5-13), so repeating it would be noise.
+    D5 (drilled-in debate view):
+      · header row mirrors the card row exactly, arrow flipped: avatar · name |
+        SIDE @ entry% | staked → now … ↙ at the RIGHT END — same slot as the
+        card's ↗, so the same spot toggles in/out. The ↙ is the ONLY exit.
+      · header gets the same 2-line teaser + "+" under its title (pop-up trigger).
+      · thumbnail card: "↩ BACK TO MARKET" row and its click REMOVED; card
+        flattened (no cursor/hover) — pure context. Exit lives on the ↙ arrows.
+      · header footer: SUPPORT · Đ N — split bar — COUNTER · Đ N (side Dharma;
+        % dead, counts moved to reply cards), centred "Đ N staked" line below.
+        Labels are now STATIC — the reply action lives in the column headers.
+        The "Replies · N" line is retired here.
+      · column headers (post view): Support / Counter BUTTON (outline, opens the
+        reply composer exactly as before, side→slot motion unchanged) · static
+        centred MARKET-price pill (Yes 38% / No 62% — the canonical %, kept) ·
+        grey "Đ N support/counter staked" at right. YOUR POSITION + SELL leave
+        the post-view row (now market-view dressing only; sell stays
+        profile-only per D4-12). Supersedes the BUY/SELL wording of the ask.
+      · reply cards: row = avatar · name | OWN side @ OWN entry% | staked → now
+        … SIDE · count · ↙. Count = that side's reply total; ↙ exits to market
+        (usable from deep in the scroll once the D5-11 full list lands). The "+"
+        stays at the reply TITLE end (replies show no teaser; bodies open there).
+      · demo numbers reconciled: 24 replies = 13 support + 11 counter (ashen),
+        16 = 9 + 7 (tidal); side-Đ sums to the staked total; per-reply entry %s
+        added (dressing — reply stake-currents stay illustrative, D5-12 note).
+  ============================================================================
+  DESIGN.5 v1.6 — footer buttons + the "+" post pop-up (operator, 2026-06-11):
+      · "Đ N staked" line removed from card footers; the image area takes the
+        freed height (the card already flex-fills its column).
+      · footer Support/Counter are now real side-coded pill BUTTONS (black = the
+        bet's YES side, white = NO, same binding as everywhere); the grey Dharma
+        count sits OUTSIDE, below each button. Bar aligns with the button row.
+      · grey "|" divider between username and the staked → now pair (cards,
+        reply cards, and the pop-up head).
+      · REPLIES · N in the card row is ink, not grey.
+      · every title ends with a "+" (show more): opens the post as a pop-up —
+        same layout, full title, image, and a scrollable Medium-style body
+        under the image. Works on both market cards, the drilled-in header
+        title, and reply cards. ESC or × or backdrop closes. Post bodies
+        extended to full multi-paragraph arguments to make the scroll real.
+  ============================================================================
+  DESIGN.5 v1.5 — market-page card rows + BUY header (operator, 2026-06-11):
+      · post-card top row: avatar · name · staked→now · (right) REPLIES · N · ↗.
+        Support/Counter pills leave the row entirely.
+      · post-card footer (discovery-page pattern): SUPPORT over Đ amount (button) ·
+        split bar · COUNTER over Đ amount (button) · centred "Đ N staked" below.
+        The side amounts are Dharma, not % — % was misleading next to the YES/NO
+        price. The buttons keep the old pills' behaviour (composer slides open in
+        the opposite column, post stays visible).
+      · column header: BUY (outlined, like SELL) now opens the fresh-bet composer;
+        "Yes 38%" / "No 62%" is a static centred price pill (text, not a control).
+        A "TO WIN" preview sits beside BUY: Đ 100 → Đ 263 at 38¢ (left),
+        Đ 100 → Đ 161 at 62¢ (right) — stake → payout if the side wins.
+      · market page only; the drilled-in post view mirrors in a later pass.
+  ============================================================================
+  DESIGN.5 v1.4 — title size + remove "Show all" + reply motion (operator, 2026-06-09):
+      · drilled-in post title now uses the market-question type scale (21px / 1.24),
+        2 lines, so it fills the header where the 1-line question sits in market view.
+        (market CARD titles stay at the small 14px card size — headline vs list item.)
+      · "Show all N" and its expand/scroll removed — each side renders only its top
+        reply, filling the column (one screen). full-list view is a later pass.
+      · all 12 reply titles rewritten to ~125-char 2-liners (match the post-title shape).
+      · post-view Support / Counter now use the fresh-post side->slot motion
+        (YES->right slot, NO->left slot): clicking one side slides the OTHER column
+        out and opens the bet composer there — identical to a fresh-post bet.
+  ============================================================================
+  DESIGN.5 v1.3 — unified card + post footer + one-screen fit (operator, 2026-06-09):
+      · ONE card for posts and replies. Reply card = avatar + name + (staked->now)
+        + bold title + image. Post card = the same PLUS ↗ + Support/Counter buttons
+        PLUS a footer under the image: "Replies · N · Đ N staked" + the
+        SUPPORT/COUNTER bar. Replies have no footer (REPLY_DEPTH_MAX = 1).
+      · the drilled-in header is that same post: author + bold title + image, with
+        the footer PINNED to the bottom so its lower edge lines up with the chart
+        (left) and the market thumbnail (right). The split bar lives in that footer.
+      · every stake renders staked -> current (Đ in -> Đ now), like Your Position.
+        (reply currents are illustrative ~+30%; the post's 27%->38% is exact.)
+      · reply bodies removed; the image fills the column so the DEFAULT debate is
+        one screen, no scroll. "Show all N" expands that column and scrolls.
+      · the v1.2 next-post peek is gone — that space is the reply-aggregate footer.
+      · open: the market card still omits the YES @ 27% chip (row density) — the
+        last gap before market card and header are identical (core point a).
+  ============================================================================
+  DESIGN.5 v1.2 — post-view header reorder + reply images (operator, 2026-06-09):
+      · header order is now: author + the poster's bet (SIDE @ entry% in ONE chip,
+        plus staked -> now) -> Support/Counter bar -> "Đ N in N replies" -> the
+        125-char argument as the TITLE, at the BOTTOM, clamped to 2 lines. The
+        short invented title is gone; the argument quote IS the title; there is no
+        separate body line in the header.
+      · reply cards are no longer text-only — they carry an image (top reply each
+        side shows one). Reply cards still have NO reply buttons / aggregate bar
+        (REPLY_DEPTH_MAX = 1 — you cannot reply to a reply).
+      · market columns: a greyed next-post title peeks at the bottom of each side's
+        list (scroll affordance — a first taste of the ranked list, core point c).
+  ============================================================================
+  DESIGN.5 v1.1 — post-view header tightening (operator changes, 2026-06-09):
+      · the post's Support/Counter split bar moves OUT of the right rail (under
+        the thumbnail) to sit between the author line and the reply-aggregate
+        line. The discovery thumbnail now fills the full header height, so the
+        post image (left) and the market thumbnail (right) read at one size.
+      · the side chip becomes the poster's own bet: "<SIDE> @ <entry>%" plus the
+        staked -> current position (Đ in -> Đ now), styled like Your Position.
+        Demo: ashen YES @ 27% Đ1,000->Đ1,407 · tidal NO @ 55% Đ800->Đ902.
+      · market-view post cards: the Support/Counter aggregate bar is removed
+        (the split now lives in the post view). Card titles + position chip on
+        the card are still open (core point a) — say the word to align them.
+  ============================================================================
+  DESIGN.5 v1.0 — STEP B: post -> reply drill-in (operator changes, 2026-06-09):
+    The page is recursive. Pressing the ↗ on a post re-skins THIS SAME shell one
+    level down: market -> post becomes post -> reply. There is no second screen.
+      · ↗ arrow (per post, between username and Support/Counter) replaces "Z".
+        Opens that post's thread. Reply cards carry NO ↗ (REPLY_DEPTH_MAX = 1).
+      · header media -> the post's image (aspect-respecting; flag 1 still PAUSED).
+      · market question + the dropped resolver space -> the post's 125-char TITLE
+        (now multi-line, taking the freed room). Author + side chip sit with it.
+      · market stats -> this post's reply aggregate (Đ staked · N replies).
+      · resolution criterion -> the post BODY. Resolver cards: dropped in post view.
+      · graph -> the DISCOVERY THUMBNAIL for this market (same 340px — that is why
+        the graph was sized to the tile). It doubles as the back-to-market target.
+      · YES / NO -> SUPPORT / COUNTER everywhere (heads, price bar, pole-coding).
+        Support inherits the post's side; Counter is the opposite (visible flip).
+      · reply list: two-slot default (best Support + best Counter), stake-desc,
+        earlier-wins; "Show all N" expands each column. Reply cards = same
+        title->body->image anatomy, minus reply buttons / arrow / aggregate bar.
+    Both ↗ arrows are wired to their own post (YES: ashen-rook · NO: tidal-knight)
+    so the pole-coding flip is visible; enterPost(id) fills from a data map and
+    production swaps in real post data the same way.
+    NOTE — two bars sit in the post-view right rail: the thumbnail's own YES/NO
+    (market recall) and the standalone SUPPORT/COUNTER (this post). Both kept for
+    parity; the standalone bar is a display-only candidate, like the market bar.
+    NOT in this pass: composer instruction-4 changes; market-view post-card titles
+    (core point a); ranking / filter modes (core point c).
+  ============================================================================
+  DESIGN.5 v0.1 — STEP A: header zone (operator changes 1 + 2), 2026-06-08:
+    · D5-01 — Market media slot is now a 1:1 SQUARE, contain-fit: any aspect
+      shown whole (letterboxed), X-style. Same principle as D4-10's composer
+      preview, now applied to the market/posted render. Real media renders as
+      <img style="width:100%;height:100%;object-fit:contain">.
+    · D5-02 — Header tightened to echo the DESIGN.3 discovery surface: the
+      graph column is narrowed to ~discovery-tile width (340px) and shortened
+      (it fills the reduced header height; the dead gap is gone); the question
+      widens into the reclaimed space (fewer wrap lines → header shifts up);
+      the stats line (Đ staked · posts · replies) sits directly under the graph.
+    TUNABLE KNOBS (eyeball + nudge): header-zone height (200px) · media square
+      size (= zone height) · graph column width (340px ≈ tile) · question font.
+  DESIGN.5 v0.9 — 1-line title + stats relocation + shown-whole image (operator), 2026-06-08:
+    · Market title → single line (no wrap; ellipsis if it ever overflows).
+    · Stats line ("Đ … staked · posts · replies") MOVED from the right column to
+      the LEFT, directly under the question; font now matches the resolver name
+      (12px / 700 / ink). Right column is now graph → price bar.
+    · Post image → "shown whole, any orientation" (aspect-respecting, contain) —
+      REVERTS last turn's forced 16:9. Demo: YES = wide chart at its own shape,
+      NO = 640:586 (the Reddit example). OPEN: hard 640:586 box for all posts vs
+      aspect-respecting (this gates the composer image too).
+    · NOTE: wide images (chart) show whole + centered, so they leave vertical
+      space in a filled card; near-square (640:586) fills better.
+    · (Bet composer / image 4 — image 640:586, title +line, body −line, amount
+      tighter, button — pending one confirm; not yet applied.)
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.8 — header bottom-align + taller posts + 16:9 post image (operator), 2026-06-08:
+    · Header: price bar reduced (bar 22→14, font 12→10) and the market media now
+      FILLS the header height (16:9) — so media, resolver cards, and the right
+      column (graph → bar → stats) bottom-align. Header zone 200→188 (tunable).
+    · Post card now FILLS its column (covers the empty bottom space).
+    · Post image → 16:9, grows to fill the card's free space, contain, centered
+      ("fit best"). Both card images are 16:9 now (portrait demo gone — say if
+      you want portrait uploads to render tall again, X-style).
+    · NOTE: single card filling the column is for the single-post view; when the
+      ranked list of multiple posts lands, cards go content-sized + the list scrolls.
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.7 — market-media aspect + price-bar relocation (operator), 2026-06-08:
+    · Market media aspect → 16:9 (YouTube-thumbnail standard), height = --imgmax.
+    · Full-width YES/NO price bar REMOVED from between header and columns; MOVED
+      into the header's right column — below the graph, above the stats line
+      (mirrors DESIGN.3 hero order: graph → bar → stats). Still click-to-bet
+      (redundant with the column buy buttons — can be made display-only).
+    · Freed full-width-bar space flows to the ARENA (flex) → taller debate
+      columns. Post card is content-sized; raise --imgmax for a taller card.
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.6 — page-squeeze CANCELLED (operator), 2026-06-08:
+    · v0.5's whole-page squeeze (--pagemax) is reverted — back to FULL-WIDTH.
+    · The only width change that stands is the ~20% image + market-media
+      reduction (--imgmax 160). Card fills its column; no page max-width.
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.5 — page squeeze + image reduction (operator changes), 2026-06-08:
+    · WHOLE PAGE constrained to --pagemax (1120px), centered — empty margins
+      now sit AROUND the page, not within the post. Tunable: --pagemax.
+    · Post card no longer width-capped/centered (v0.4 reverted): it FILLS its
+      column again — no within-post margin.
+    · Both images reduced ~20%: --imgmax 200→160. Market media sized to --imgmax
+      (matches the post image), top-aligned in the header.
+    · NOTE: an aspect-locked image, once 20% smaller, sits centered in the
+      column-filling card with side space (image-level, X-style — not the card
+      floating). Filling edge-to-edge would fight the 20% reduction.
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.4 — width/sizing pass (operator changes), 2026-06-08:
+    · Post card constrained to --postmax (520px) and CENTERED in the column
+      (X-style contained post, ref: X landscape post). Wide-column side margin
+      is reserved space. Tunable: --postmax.
+    · Market media now matches the POST-IMAGE frame (X-style, contain, height =
+      header zone) — NO LONGER a forced 1:1 square (relaxes D5-01). Landscape
+      placeholder, so it "stretches right" into the header.
+    · As the media widened: market question nudged 25→21px and resolution
+      tightened; GRAPH left intact (340px). Question/resolution can squeeze more
+      on request.
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.3 — no-scroll fix (operator change), 2026-06-08:
+    · Posted image is now HEIGHT-capped via --imgmax (200px) and aspect-
+      preserving. v0.2's landscape was width:100%, so on a wide column its
+      height scaled up (~480px) and clipped the page. Both orientations now
+      cap at --imgmax tall; landscape no longer fills the full column width
+      (narrower, free side margin — accepted). One knob: --imgmax.
+    · Result: a post card fits one screen with free space below it in the
+      column — reserved for later elements (replies, more posts).
+  ----------------------------------------------------------------------------
+  DESIGN.5 v0.2 — operator changes 3 + 4 + 5 applied, 2026-06-08:
+    · #3 — column header "YES ARGUMENTS" → Polymarket-style outcome buy
+      button "Yes 38%" / "No 62%" (monochrome: YES solid black, NO outlined).
+      Same M1 motion (click opens the bet module). The "ARGUMENTS" label is
+      dropped (the button + the posts below carry the column's meaning).
+    · #5 — the "click [side] to bet" hint → YOUR POSITION on the held side
+      (Đ staked → current value) + a Sell button (PLACEHOLDER — Sell design
+      is later). Demo state: signed-in user holds YES, so only the YES header
+      shows a position + Sell; the NO header shows just its buy button. You
+      hold ≤ 1 side, so this readout doubles as the held-side marker (D4-13a).
+    · #4 — posted card image → X-style frame: aspect-respecting, NO crop,
+      capped height (340px), centered. Landscape fills the column width (YES
+      card chart); portrait shows tall + narrower than the column with empty
+      side space accepted (NO card — chart swapped for a portrait demo box).
+      Enlarge/lightbox still owed (D4-10) — not built in v0.2.
+    ⚠ STILL DRESSING (next steps): post TITLES, rendered REPLIES (two-slot
+      best-Support/best-Counter), RANKING + filter modes, empty/loading states.
+  ----------------------------------------------------------------------------
+  ↓↓↓ Inherited DESIGN.4 v1.2 lock notes below (history, unchanged) ↓↓↓
+  ============================================================================
+  v1.2 — LOCK AMENDMENT (operator, 2026-06-08, spec-log walk point ②):
+  composer image preview is X-style — accepts ANY aspect and shows the
+  WHOLE image (object-fit: contain, centered) within the full-height image
+  slot, neutral letterbox around it. Both orientations (portrait/landscape)
+  are supported/stored. Scope = PRE-POST composer preview only; the posted-
+  image render + placement is DESIGN.5. No upload-time aspect validation,
+  no crop in preview. (The 4:5 label is retired; the slot shape is cosmetic
+  once contain-fit does the work.)
+
+  v1.1 — LOCK AMENDMENT (operator, 2026-06-07, spec-log walk point A1):
+  the Amount input DEFAULTS to the applicable floor — Đ 10 on a fresh
+  post-bet, Đ 50 on a reply-bet (Support/Counter) — set on every module
+  open, freely editable. Floor visibility now rides the prefilled default
+  (completes the INV-2 amendment). Floor values pin at number-tuning.
+
+  v1 — LOCKED at operator freeze, 2026-06-07 (= v0.11, promoted unchanged).
+  The debate columns are REFERENCE DRESSING ONLY — the ranked debate view
+  is the DESIGN.5 lock. This page locks: layout, the two bet modes
+  (fresh post-bet + reply-bet via Support/Counter), and all demoed motion.
+  Lineage: … → v0.9 reply-bet mode → v0.10 reply placement opposite-the-post
+  + toggle-to-close → v0.11 → v1 (this file).
+
+  CHANGES IN v0.11 (operator notes 1–2):
+   1. Title and body fields now share EQUAL flex height — the full 125-char
+      title stays visible during composition (no clipping).
+   2. Reply header: post title removed; the verb line ("Counter
+      {pseudonym}'s argument") enlarged — 13.5px, ink, single line.
+
+  v0.10 — operator notes applied (2026-06-07).
+  Lineage: v0 → v0.1 slide-to-bet → v0.2 composite/resolver/samples →
+  v0.3 header relayout/Polymarket/x-axis → v0.4 compact module →
+  v0.4.1 VisBug note → v0.5 Figma outline/portrait attach →
+  v0.6 INV-2 amendment/full-height attach → v0.7 glued Đ/twin panels →
+  v0.8 stacked PLACE/BET + smooth corners (--r) → v0.9 reply-bet mode →
+  v0.10 (this file).
+
+  CHANGES IN v0.10 (operator notes):
+   1. Reply header verb: "Support {pseudonym}'s argument" /
+      "Counter {pseudonym}'s argument" — one line, imperative form
+      matching the buttons.
+   2. The FULL post title renders under it (wraps, no ellipsis).
+      NOTE: the dressing posts are body-only (Slot-1 gap), so their lead
+      sentence stands in as the title; DESIGN.5 renders true titles.
+   3. ⚠ REPLY PLACEMENT RULE CHANGED (operator decision, supersedes the
+      v0.9 rule): a reply-bet module — Support OR Counter — opens in the
+      slot OPPOSITE THE POST, keeping the post being replied to visible.
+      The side chip still carries the TRUE bet side (Counter on a NO post
+      shows a YES chip), so the reply-as-bet semantics stay legible while
+      the reading context is preserved. Fresh post-bets keep the original
+      side-slot rule (YES module right, NO module left).
+      Architecture: each slot now hosts BOTH side modules (four module
+      nodes); JS routes side × slot.
+   4. TOGGLE-TO-CLOSE: clicking the same control again (side chip, bar
+      label, Support/Counter button) returns to the default two-column
+      debate — no need to reach for ×. × and ESC still work.
+
+  v0.9 (carried): SUPPORT/COUNTER buttons beside each post author,
+  pole-coded by the RESULTING bet side (Support inherits the post's side,
+  Counter takes the opposite — ADR-0017/0018); same module serves both bet
+  kinds; reply floor Đ 50 (pinned) vs post floor ~Đ 10 surfaces only as
+  below-floor errors per the INV-2 amendment; scope note — reply-bet
+  composer pulled forward from DESIGN.5 into this shared module.
+
+  Earlier (carried): information-first layout, slide-to-bet arena,
+  composer-first module (portrait 4:5 attach, full height), Amount with
+  glued travelling Đ, greyed To win, stacked PLACE/BET, smooth corners
+  (--r token, value CD's — ripples to Slot-1 at refine), resolver + X
+  cards, market media img/video (SCL candidate), graph x-axis 45d/15d,
+  twin ink-framed panels, mandatory p0 → p1 SOLELY on the slippage modal,
+  signed-out gate in-module, NO SCROLLING in the module.
+
+  HIDDEN REVIEW HOTKEYS (scaffolding, trimmed at packaging):
+   S = toggle signed-in/out · M = slippage modal · ESC = close.
+
+  STILL OPEN: position strip (sell/holding home) · non-Open lifecycle
+  renders (states section).
+
+  SCL-2 rounded-square images (--imgr placeholder; token is CD's).
+  Side binding (locked): Support/YES = black · Counter/NO = white.
+  Monochrome true-neutral · one sans · desktop-only · hairline borders.
+  ALL content PLACEHOLDER DUMMY. THROWAWAY REFERENCE: not repo code, not
+  the CD deliverable, not the seed kit.
+============================================================================ -->
+<style>
+  :root{
+    --n0:#FFFFFF; --n1:#F5F5F5; --n2:#E5E5E5; --n3:#D4D4D4;
+    --n4:#A3A3A3; --n5:#737373; --n6:#404040; --n7:#171717;
+    --ink:#0A0A0A;
+    --hairline:1px solid var(--n2);
+    --imgr:6px; /* SCL-2 rounded-square images — placeholder value, token is CD's */
+    --r:8px;    /* corner radius for UI chrome — placeholder value, token is CD's */
+    --imgmax:160px; /* D5 — image + market-media frame height (reduced ~20% from 200); tunable */
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{margin:0;padding:0;box-sizing:border-box;}
+  html,body{height:100%;overflow:hidden;background:var(--n0);
+            font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  .screen{width:100vw;height:100vh;background:var(--n0);overflow:hidden;
+          display:flex;flex-direction:column;color:var(--ink);}
+
+  /* — nav — */
+  .nav{height:60px;flex:0 0 60px;border-bottom:var(--hairline);
+       display:flex;align-items:center;padding:0 28px;gap:24px;}
+  .wordmark{font-size:19px;font-weight:800;letter-spacing:.16em;}
+  .navright{margin-left:auto;display:flex;align-items:center;gap:20px;}
+  .signin{font-size:13px;color:var(--ink);text-decoration:none;}
+  .btn-primary{background:var(--ink);color:var(--n0);font-size:13px;font-weight:600;
+               padding:9px 18px;border:1px solid var(--ink);letter-spacing:.01em;cursor:pointer;}
+  .balchip{font-size:13px;font-weight:700;border:1px solid var(--ink);
+           padding:7px 12px;letter-spacing:.02em;}
+  .navid{display:flex;align-items:center;gap:9px;font-size:13px;font-weight:650;}
+  .avatar{width:26px;height:26px;border-radius:var(--imgr);border:1.5px solid var(--ink);
+          background:var(--n1);flex:0 0 auto;}
+
+  body.out .auth-in{display:none!important;}
+  body.in  .auth-out{display:none!important;}
+
+  .content{flex:1 1 auto;display:flex;flex-direction:column;
+           min-height:0;padding:16px 28px 16px;}
+
+  /* ===== header zone ===== */
+  .headzone{flex:0 0 188px;display:flex;gap:20px;min-height:0;} /* D5: bottom-aligns right column w/ media+resolver (tunable) */
+  .hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px;} /* D5-02: grows — question widens */
+  .hright{flex:0 0 340px;min-width:0;display:flex;flex-direction:column;} /* D5-02: ≈ discovery tile width */
+
+  /* D5: market media = 16:9 (YouTube thumb), contain; FILLS the header height so
+     it bottom-aligns with the resolver cards + the right column. */
+  .mmedia{flex:0 0 auto;aspect-ratio:16/9;height:100%;width:auto;overflow:hidden;
+          border:var(--hairline);border-radius:var(--imgr);
+          background:var(--n1);display:flex;flex-direction:column;
+          align-items:center;justify-content:center;gap:10px;}
+  .playmark{width:44px;height:44px;border:1.5px solid var(--n4);border-radius:50%;
+            display:flex;align-items:center;justify-content:center;}
+  .playmark svg{width:14px;height:14px;display:block;margin-left:2px;}
+  .mmedia .cap{font-size:8.5px;letter-spacing:.18em;color:var(--n4);font-weight:700;}
+
+  .hstack{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;}
+  .question{font-size:21px;font-weight:700;line-height:1.24;flex:0 0 auto;
+            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} /* D5: single line, no wrap; v1.9: flex-locked (the v1.8 attrs button squeezed it) */
+  .attrs .openbtn{height:18px;width:20px;margin:-3px 0 -3px 8px;vertical-align:middle;}
+
+  .criterion{margin-top:12px;border-top:var(--hairline);padding-top:10px;}
+  .overline{font-size:9.5px;font-weight:800;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--n4);}
+  .crittext{font-size:11px;line-height:1.5;color:var(--n6);margin-top:5px;
+            display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  .rescards{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+  .rescard{border:var(--hairline);padding:9px 11px;display:flex;
+           align-items:center;gap:10px;min-width:0;}
+  .reslogo{width:30px;height:30px;background:var(--n1);border:var(--hairline);
+           border-radius:var(--imgr);display:flex;align-items:center;justify-content:center;
+           font-size:6.5px;letter-spacing:.12em;color:var(--n4);flex:0 0 auto;}
+  .xmark{width:30px;height:30px;border:1px solid var(--ink);
+         display:flex;align-items:center;justify-content:center;
+         font-size:14px;font-weight:800;flex:0 0 auto;}
+  .resmeta{min-width:0;}
+  .reslabel{font-size:8px;font-weight:800;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--n4);}
+  .resname{font-size:12px;font-weight:700;color:var(--ink);margin-top:1px;
+           white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ressrc{font-size:10px;color:var(--n5);margin-top:1px;white-space:nowrap;
+          overflow:hidden;text-overflow:ellipsis;}
+  a.ressrc{display:block;text-decoration:none;}
+  a.ressrc:hover{text-decoration:underline;text-underline-offset:2px;color:var(--ink);}
+
+  /* — graph + x-axis (45d span · 15d breaks) — */
+  .graph{flex:1 1 auto;min-height:0;border:var(--hairline);
+         background:var(--n0);position:relative;}
+  .graph svg.plot{position:absolute;inset:0 0 18px 0;width:100%;height:calc(100% - 18px);}
+  .xtick{position:absolute;top:0;bottom:18px;border-left:1px dotted var(--n2);}
+  .xlab{position:absolute;bottom:3px;font-size:9px;color:var(--n4);
+        letter-spacing:.04em;transform:translateX(-50%);}
+  .xlab.end{transform:none;right:6px;}
+  .attrs{font-size:12px;font-weight:700;color:var(--ink);margin-top:8px;flex:0 0 auto;letter-spacing:.01em;} /* D5: same as resolver name */
+  .attrs b{color:var(--ink);font-weight:700;}
+  .attrs .sep{color:var(--n3);font-weight:400;margin:0 6px;}
+
+  /* — split bar — */
+  .barrow{display:flex;align-items:center;gap:9px;margin-top:14px;flex:0 0 auto;}
+  .blab{font-weight:700;white-space:nowrap;letter-spacing:.05em;color:var(--ink);}
+  .barrow.f .blab{font-size:10px;}
+  .barrow.f .bar{height:14px;}
+  .barrow.r .bar{height:16px;}
+  .barrow .bar{flex:1 1 auto;position:relative;border:1px solid var(--ink);
+               background:var(--n0);overflow:hidden;}
+  .bar .fill{position:absolute;inset:0 auto 0 0;background:var(--ink);}
+  .bar .fill.right{inset:0 0 0 auto;}
+  .blab.click{cursor:pointer;}
+  .blab.click:hover{text-decoration:underline;text-underline-offset:3px;}
+  .blab2{display:flex;flex-direction:column;gap:1px;flex:0 0 auto;}
+  .blab2.right{align-items:flex-end;}
+  .blab2 .w{font-size:8.5px;font-weight:800;letter-spacing:.12em;color:var(--ink);}
+  .blab2 .d{font-size:9.5px;font-weight:700;color:var(--n6);letter-spacing:.02em;}
+
+  /* ===== arena: each slot hosts the debate frame + BOTH side modules ===== */
+  .arena{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:1fr 1fr;
+         gap:16px;margin-top:12px;}
+  .slot{position:relative;min-height:0;overflow:hidden;}
+
+  .deb{position:absolute;inset:0;display:flex;flex-direction:column;
+       border:1px solid var(--ink);background:var(--n0);
+       transition:transform .3s ease,opacity .3s ease;}
+  .slot.l.bet .deb{transform:translateX(-36px);opacity:0;pointer-events:none;}
+  .slot.r.bet .deb{transform:translateX(36px);opacity:0;pointer-events:none;}
+
+  .colhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;position:relative;
+           padding:12px 14px;border-bottom:var(--hairline);box-sizing:border-box;}
+  /* reply view: header reduced to the centred price pill only (Support/Counter is a
+     property of the post, not the column — it lives on the split bar + composer). The
+     vp price tag is position:absolute, so guarantee the row keeps the vm header height. */
+  body.postview .colhead{min-height:48px;}
+  .sidechip{font-weight:800;letter-spacing:.1em;flex:0 0 auto;}
+  .sidechip.lg{font-size:13px;padding:6px 16px;}
+  .sidechip.md{font-size:10px;padding:3px 9px;}
+  .sidechip.sm{font-size:8.5px;padding:2px 7px;letter-spacing:.08em;}
+  .sidechip.yes{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .sidechip.no{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+  .sidechip.click{cursor:pointer;}
+  .sidechip.click:hover{outline:2px solid var(--n3);outline-offset:1px;}
+  /* D5 #3 — Polymarket-style outcome buy button (monochrome) */
+  .buybtn{font:inherit;font-size:13px;font-weight:600;letter-spacing:.01em;
+          padding:8px 16px;border-radius:var(--r);cursor:pointer;flex:0 0 auto;}
+  .buybtn b{font-weight:800;margin-left:3px;}
+  .buybtn.yes{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .buybtn.no{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+  .buybtn:hover{outline:2px solid var(--n3);outline-offset:1px;}
+  /* D5 #5 — held-side position + Sell (Sell is a PLACEHOLDER; design later) */
+  .poswrap{margin-left:auto;display:flex;align-items:center;gap:12px;}
+  .pos{display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.12;}
+  .poslab{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--n4);}
+  .posval{font-size:11.5px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums;}
+  .posval .arrow{color:var(--n4);margin:0 3px;font-weight:400;}
+  .sellbtn,.tradebtn{font:inherit;font-size:10px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+           padding:7px 13px;border:1px solid var(--n3);background:var(--n0);color:var(--ink);
+           border-radius:var(--r);cursor:pointer;flex:0 0 auto;}
+  .sellbtn:hover,.tradebtn:hover{border-color:var(--ink);}
+  /* D5 v1.5 — BUY opens the composer; the price pill is static text, centred */
+  .pricetag{position:absolute;left:50%;transform:translateX(-50%);cursor:default;}
+  .pricetag:hover{outline:none;}
+  .pos.towin{align-items:flex-start;}
+
+  .colwrap{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;
+           flex-direction:column;padding:14px;}
+
+  /* — sample post (Slot-1 panel anatomy, verbatim values + reply buttons) — */
+  .panel{border:1px solid var(--ink);background:var(--n0);flex:1 1 auto;min-height:0;
+         display:flex;flex-direction:column;} /* card fills the column (covers the bottom space) */
+  .argbody{padding:12px 12px 11px;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+  .argprofile{display:flex;align-items:center;gap:8px;font-size:11.5px;}
+  .argprofile .avatar{width:18px;height:18px;border-width:1.5px;}
+  .pseud{font-weight:650;color:var(--ink);}
+  /* D5 v1.5 — card top row: REPLIES · N pushed right, before the ↗ */
+  .repn{font-size:13px;letter-spacing:0;}
+  .repmeta{margin-left:auto;font-size:9.5px;font-weight:700;letter-spacing:.12em;
+           text-transform:uppercase;color:var(--ink);}
+  /* D5 v1.6 — card footer: side-coded pill buttons, Dharma count below (outside) */
+  .barrow.f2{border-top:var(--hairline);margin-top:9px;padding-top:9px;align-items:flex-start;}
+  .barrow.f2 .bar{margin-top:5px;}
+  .sidewrap{display:flex;flex-direction:column;gap:3px;align-items:center;flex:0 0 auto;}  /* v1.8: Đ centred under its pill */
+  .sidewrap.r{align-items:center;}
+  /* v1.8: bar + centred staked total share the middle cell */
+  .midwrap{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;align-items:center;gap:9px;}
+  .midwrap .bar{width:100%;}
+  .rbtn2{font:inherit;font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+         padding:4px 12px;cursor:pointer;border-radius:var(--r);}
+  .rbtn2.y{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .rbtn2.n{background:var(--n0);color:var(--ink);border:1px solid var(--ink);}
+  .rbtn2:hover{outline:2px solid var(--n3);outline-offset:1px;}
+  .sb2{font-size:10px;font-weight:700;color:var(--n4);font-variant-numeric:tabular-nums;}
+  /* D5 v1.6 — "+" show-more + post pop-up (Medium-style long read) */
+  .plust{position:relative;padding-right:19px;}
+  .plus{font:inherit;position:absolute;right:0;bottom:1px;width:15px;height:15px;line-height:13px;
+        padding:0;text-align:center;font-size:12px;font-weight:800;cursor:pointer;
+        border:1px solid var(--n3);border-radius:4px;background:var(--n0);color:var(--ink);}
+  .plus:hover{border-color:var(--ink);}
+  /* D5 v1.7 — body teaser: 2-line grey dek between title and image; the "+" moved
+     here from the title end. Zone keeps its height (blank) when no body exists. */
+  .tease{position:relative;padding-right:19px;min-height:32px;margin-top:6px;
+         display:flex;align-items:center;flex:0 0 auto;}
+  .tease .tx{font-size:12px;line-height:1.35;color:var(--n6);
+         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .tease.h{margin-top:8px;min-height:36px;}
+  .tease.h .tx{font-size:13px;line-height:1.4;}
+  /* D5 v1.7 — post-view colhead staked figure + footer centred total */
+  .colstk{margin-left:auto;display:flex;flex-direction:column;align-items:center;gap:1px;
+          line-height:1.15;color:var(--ink);white-space:nowrap;}  /* v1.9: Đ over label, centred */
+  .colstk b{font-size:11.5px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .colstk .lab{font-size:8px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;}
+  /* v1.8: centre price = plain text + monochrome thumb (pill retired) */
+  .pricetxt{font-size:13px;font-weight:600;letter-spacing:.01em;color:var(--ink);
+          display:inline-flex;align-items:center;gap:5px;white-space:nowrap;}
+  .pricetxt b{font-weight:800;}
+  .pricetxt svg{display:block;}
+  .sb2.mid{letter-spacing:.1em;text-transform:uppercase;}
+  .pmwrap{position:fixed;inset:0;background:rgba(10,10,10,.45);display:none;
+          backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+          align-items:center;justify-content:center;z-index:80;}
+  body.ppop .pmwrap{display:flex;}
+  .pmcard{position:relative;width:620px;max-width:calc(100vw - 48px);max-height:82vh;
+          background:var(--n0);border:1px solid var(--ink);border-radius:var(--r);
+          display:flex;flex-direction:column;overflow:hidden;}
+  .pmx{position:absolute;top:10px;right:10px;z-index:2;width:24px;height:24px;padding:0;
+       font:inherit;font-size:14px;font-weight:700;line-height:22px;text-align:center;cursor:pointer;
+       border:var(--hairline);border-radius:var(--r);background:var(--n0);color:var(--n6);}
+  .pmx:hover{border-color:var(--ink);color:var(--ink);}
+  .pmscroll{flex:1 1 auto;min-height:0;overflow-y:auto;padding:20px 22px 24px;}
+  .pmtitle{font-size:21px;font-weight:700;line-height:1.24;color:var(--ink);margin-top:10px;}
+  .pmimg{margin-top:14px;border:var(--hairline);border-radius:var(--imgr);overflow:hidden;background:var(--n1);} /* v1.10: image cap reverted */
+  .repmeta.flat{margin-left:0;} /* v1.11: pop-up aggregate sits left, not pushed right */
+  .pmimg .media{width:100%;height:auto;max-height:none;border:0;border-radius:0;}
+  .pmimg .rimg{margin-top:0;border:0;border-radius:0;flex:0 0 auto;aspect-ratio:16/9;
+               display:flex;align-items:center;justify-content:center;}
+  .pmbody{margin-top:14px;font-size:13.5px;line-height:1.62;color:var(--n6);}
+  .pmbody p{margin:0 0 12px;}
+  .argstake{color:var(--n6);font-weight:700;}
+  .vsep{color:var(--n3);font-weight:400;flex:0 0 auto;}
+  .argtext{font-size:11.5px;line-height:1.45;color:var(--n6);margin-top:8px;
+           display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;}
+  /* D5: posted image — "shown whole, any orientation" (Reddit/X-style): each
+     image shown WHOLE at its own aspect (contain), grows to fill the card's free
+     space, centered. Demo aspects below (YES = wide chart, NO = 640:586 example). */
+  .argimg{flex:1 1 auto;min-height:0;margin-top:8px;display:flex;align-items:center;justify-content:center;}
+  .media{height:100%;width:auto;max-width:100%;max-height:100%;
+         border:var(--hairline);border-radius:var(--imgr);overflow:hidden;background:var(--n1);
+         display:flex;align-items:center;justify-content:center;}
+  .media.land{aspect-ratio:220/96;}   /* wide image (chart) — shown whole */
+  .media.rdt{aspect-ratio:640/586;}   /* 640:586 (the Reddit example) — shown whole */
+  .media svg{width:100%;height:100%;display:block;}
+  .media .ph{font-size:9px;letter-spacing:.16em;color:var(--n4);font-weight:700;text-align:center;line-height:1.7;padding:10px;}
+  /* real <img>: width:auto;height:100%;max-width:100%;object-fit:contain — shown whole */
+
+  /* — bet module (one per side per slot; JS routes) — */
+  .mod{position:absolute;inset:0;display:flex;flex-direction:column;
+       border:1px solid var(--ink);background:var(--n0);
+       opacity:0;pointer-events:none;
+       transition:transform .3s ease,opacity .3s ease;}
+  .slot.l .mod{transform:translateX(-105%);}
+  .slot.r .mod{transform:translateX(105%);}
+  .mod.on{transform:translateX(0)!important;opacity:1;pointer-events:auto;}
+
+  .modhead{flex:0 0 auto;display:flex;align-items:center;gap:10px;
+           padding:12px 14px;border-bottom:var(--hairline);}
+  .modhead .t{font-size:10px;font-weight:800;letter-spacing:.14em;
+              text-transform:uppercase;color:var(--n6);}
+  .treply{display:none;flex:1 1 auto;min-width:0;}
+  .treply .r1{display:block;font-size:13.5px;font-weight:750;color:var(--ink);
+              line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .treply .r2{display:none;}
+  .modx{margin-left:auto;border:0;background:none;font:inherit;font-size:17px;
+        line-height:1;color:var(--n5);cursor:pointer;padding:2px 4px;flex:0 0 auto;}
+  .modx:hover{color:var(--ink);}
+
+  /* no scrolling anywhere in the module — everything fits */
+  .modbody{flex:1 1 auto;min-height:0;overflow:hidden;padding:14px;
+           display:flex;flex-direction:column;}
+  .modbody .auth-in{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+
+  .seclabel{font-size:9.5px;font-weight:800;letter-spacing:.14em;
+            text-transform:uppercase;color:var(--n4);margin:0 0 8px;flex:0 0 auto;}
+
+  /* — composer: PORTRAIT attach FULL MODULE HEIGHT · title/body/money right — */
+  .compgrid{flex:1 1 auto;min-height:0;display:grid;
+            grid-template-columns:minmax(210px,40%) 1fr;
+            gap:12px;align-items:stretch;}
+  .attach{border:1px dashed var(--n3);border-radius:var(--imgr);
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:9px;font-size:9.5px;letter-spacing:.1em;color:var(--n5);cursor:pointer;
+          text-align:center;line-height:1.6;min-height:0;height:100%;padding:12px;}
+  .attach .imgprev{width:100%;aspect-ratio:4/5;max-height:calc(100% - 22px);
+          background:var(--n1);border:var(--hairline);border-radius:var(--imgr);
+          display:flex;align-items:center;justify-content:center;
+          font-size:9px;letter-spacing:.18em;color:var(--n4);font-weight:700;}
+  .attach .acap{font-size:8.5px;letter-spacing:.12em;color:var(--n4);}
+  .attach .asp{font-size:8px;letter-spacing:.16em;color:var(--n4);}
+  .attach:hover{border-color:var(--n5);}
+  .compright{min-width:0;min-height:0;display:flex;flex-direction:column;}
+  .field input,.field textarea{width:100%;border:1px solid var(--n3);background:var(--n0);
+        font:inherit;color:var(--ink);padding:11px 12px;outline:0;resize:none;display:block;}
+  .field input:focus,.field textarea:focus{border-color:var(--ink);}
+  .compright>.field:first-child{flex:1 1 0;min-height:0;display:flex;flex-direction:column;}
+  .field .title{flex:1 1 auto;min-height:0;height:auto;
+                font-size:17px;font-weight:700;line-height:1.35;}
+  .field.grow{flex:1 1 0;min-height:0;display:flex;flex-direction:column;margin-top:10px;}
+  .field.grow .body{flex:1 1 auto;min-height:0;height:auto;
+                    font-size:13px;line-height:1.55;}
+  .counter{display:flex;justify-content:flex-end;font-size:10px;color:var(--n4);
+           margin-top:4px;flex:0 0 auto;}
+
+  /* — money block: right column footer · aligned rows — */
+  .footblock{flex:0 0 auto;border-top:var(--hairline);margin-top:10px;padding-top:12px;}
+  .betgrid{display:grid;grid-template-columns:1fr 150px;gap:10px;align-items:stretch;}
+  .pm{min-width:0;display:flex;flex-direction:column;justify-content:center;}
+  .pmrow{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .pmrow.amount .lab{font-size:18px;font-weight:750;line-height:1;}
+  .amtval{display:flex;align-items:center;justify-content:flex-end;min-width:0;}
+  .amtval .cur{font-size:22px;font-weight:800;line-height:1;margin-right:3px;}
+  .amtval input{border:0;outline:0;background:transparent;text-align:right;
+                font:inherit;font-size:22px;font-weight:800;line-height:1;
+                font-variant-numeric:tabular-nums;color:var(--ink);
+                width:3ch;min-width:2ch;padding:0;} /* width JS-managed: tracks content so Đ travels with the digits */
+  .pmdiv{border-top:var(--hairline);margin:8px 0;}
+  .pmrow.towin .lab{font-size:15px;font-weight:650;color:var(--n5);line-height:1;}
+  .winval{font-size:15px;font-weight:700;letter-spacing:.01em;line-height:1;
+          white-space:nowrap;color:var(--n5);}
+
+  .submit{display:flex;flex-direction:column;align-items:center;justify-content:center;
+          gap:2px;font:inherit;cursor:pointer;}
+  .submit .pbw{font-size:14px;font-weight:800;letter-spacing:.16em;
+               text-transform:uppercase;line-height:1.15;}
+  .submit.y{background:var(--ink);color:var(--n0);border:1px solid var(--ink);}
+  .submit.n{background:var(--n0);color:var(--ink);border:2px solid var(--ink);}
+
+  /* — smooth corners: UI chrome takes the --r token (value is CD's) — */
+  .mod,.deb,.panel,.gate,.gate .ghost,.btn-primary,.balchip,.submit,
+  .modalbox,.modalbtns .ghost,.modalbtns .confirm,.rescard,.xmark,
+  .graph,.bar,.field input,.field textarea,.sidechip{border-radius:var(--r);}
+
+  /* — signed-out gate — */
+  .gate{border:1px solid var(--ink);padding:20px 16px;margin-top:4px;}
+  .gate h3{font-size:14px;font-weight:800;letter-spacing:.02em;}
+  .gate p{font-size:11.5px;color:var(--n6);line-height:1.55;margin-top:8px;}
+  .gate .btn-primary{display:block;width:100%;text-align:center;margin-top:14px;
+                     padding:11px 0;font-size:13px;}
+  .gate .ghost{display:block;width:100%;text-align:center;margin-top:8px;padding:10px 0;
+               border:1px solid var(--n3);font-size:13px;font-weight:600;color:var(--ink);
+               cursor:pointer;}
+  .gate .micro{font-size:9.5px;color:var(--n4);margin-top:11px;text-align:center;}
+
+  /* — slippage modal (sole carrier of mandatory p0 → p1) — */
+  .overlay{position:fixed;inset:0;background:rgba(10,10,10,.45);display:none;
+           align-items:center;justify-content:center;z-index:50;}
+  body.modal .overlay{display:flex;}
+  .modalbox{width:420px;background:var(--n0);border:1px solid var(--ink);padding:20px 22px;}
+  .modalbox h3{font-size:14px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;}
+  .bigmove{font-size:24px;font-weight:800;letter-spacing:.02em;margin-top:14px;}
+  .bigmove .arrow{font-size:20px;color:var(--n4);font-weight:400;}
+  .modalmeta{font-size:11.5px;color:var(--n5);margin-top:7px;line-height:1.55;}
+  .modalmeta b{color:var(--n6);font-weight:700;}
+  .modalbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:18px;}
+  .modalbtns .ghost{border:1px solid var(--n3);background:var(--n0);color:var(--ink);
+                    font:inherit;font-size:12.5px;font-weight:600;padding:11px 0;cursor:pointer;}
+  .modalbtns .confirm{background:var(--ink);color:var(--n0);border:1px solid var(--ink);
+                      font:inherit;font-size:12.5px;font-weight:800;padding:11px 0;cursor:pointer;}
+
+  /* ============================================================================
+     D5 v1.0 — POST -> REPLY VIEW. Same shell, re-skinned via body.postview.
+     Paired toggles: .vm = market view · .vp = post view. Bet modules are shared
+     (a reply is a bet — reply-as-bet, ADR-0017/0018).
+     ============================================================================ */
+  body:not(.postview) .vp{display:none!important;}
+  body.postview       .vm{display:none!important;}
+
+  /* ↗ open-thread control — per post, between username and Support/Counter. */
+  .openbtn{margin-left:8px;width:24px;height:22px;flex:0 0 auto;cursor:pointer;padding:0;
+           display:inline-flex;align-items:center;justify-content:center;
+           border:var(--hairline);border-radius:var(--r);background:var(--n0);color:var(--n6);}
+  .openbtn svg{display:block;}
+  .openbtn:hover{border-color:var(--ink);color:var(--ink);}
+
+  /* — post-view header (mirrors the market header; content swapped) — */
+  .hpimg{flex:0 0 auto;aspect-ratio:16/9;height:100%;width:auto;overflow:hidden;
+         border:var(--hairline);border-radius:var(--imgr);background:var(--n1);
+         display:flex;align-items:center;justify-content:center;}
+  .hpimg svg{display:block;width:100%;height:auto;max-height:100%;}
+  .phead{flex:0 0 auto;min-width:0;}
+  .ptitle{font-size:21px;font-weight:700;line-height:1.24;color:var(--ink);margin-top:10px;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .pauthor{display:flex;align-items:center;gap:8px;margin-top:0;font-size:12.5px;min-width:0;}
+  .pauthor .avatar{width:20px;height:20px;}
+  .pauthor .pseud{font-weight:700;color:var(--ink);}
+  .pbody{font-size:11.5px;line-height:1.5;color:var(--n6);margin-top:10px;flex:1 1 auto;min-height:0;
+         display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+
+  /* discovery thumbnail (this market's tile, DESIGN.3) -> fills the graph slot;
+     same 340px column; click returns to the market. */
+  .mcard{border:var(--hairline);border-radius:var(--r);background:var(--n0);padding:12px;
+         display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+  /* v1.7: .mcard hover/cursor removed — the thumbnail is context, exit lives on ↙ */
+  .qrow{display:flex;gap:11px;align-items:flex-start;flex:0 0 auto;}
+  .mthumb{background:var(--n1);border:var(--hairline);border-radius:var(--imgr);
+          display:flex;align-items:center;justify-content:center;
+          font-size:8.5px;letter-spacing:.16em;color:var(--n4);flex:0 0 auto;}
+  .mthumb.sm{width:40px;height:40px;}
+  .mtitle{font-size:12.5px;font-weight:600;line-height:1.3;color:var(--ink);
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .spark{flex:1 1 auto;min-height:24px;margin-top:9px;border:var(--hairline);border-radius:var(--imgr);
+         background:var(--n0);position:relative;overflow:hidden;}
+  .spark svg{position:absolute;inset:0;width:100%;height:100%;}
+  .barrow.m{margin-top:9px;}
+  .barrow.m .blab{font-size:10.5px;}
+  .barrow.m .bar{height:16px;}
+  .meta{font-size:10.5px;color:var(--n5);margin-top:8px;flex:0 0 auto;letter-spacing:.01em;}
+  .meta b{color:var(--n6);font-weight:650;}
+  .meta .sep{color:var(--n3);margin:0 5px;}
+  .entry{font-size:11px;font-weight:600;color:var(--n5);letter-spacing:.01em;}
+  .ppos{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--ink);
+        font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .ppos .arrow{color:var(--n4);font-weight:400;margin:0 2px;}
+  /* D5 v1.7 — header row mirrors the card row: pair inline, ↙ pushed right */
+  .pauthor .ppos{margin-left:0;}
+  .pauthor .openbtn{margin-left:8px;}  /* v1.9: repmeta's auto margin does the push */
+  .barrow.f.vp{margin-top:9px;}
+
+  /* — reply list: two-slot default (best per side) + Show all — */
+  .replylist{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .rpanel{border:1px solid var(--ink);border-radius:var(--r);background:var(--n0);
+          padding:11px 12px;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;}
+  .rpanel + .rpanel,.morewrap .rpanel{margin-top:10px;}
+  .rcardhead{display:flex;align-items:center;gap:8px;font-size:11.5px;}
+  .rcardhead .avatar{width:18px;height:18px;}
+  .rcardhead .pseud{font-weight:650;color:var(--ink);}
+  .rcardhead .argstake{color:var(--n6);font-weight:700;}
+  .rtt{cursor:pointer;border-radius:4px;padding:0 3px;margin:0 -3px;-webkit-box-decoration-break:clone;box-decoration-break:clone;transition:background .12s;}
+  .rtt:hover{background:var(--n1);}
+  .rtitle{font-size:14px;font-weight:700;line-height:1.35;color:var(--ink);margin-top:8px;
+          display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+  .rbody{font-size:11.5px;line-height:1.45;color:var(--n6);margin-top:5px;}
+  .morewrap{display:none;}
+  .morewrap.open{display:block;}
+  .showall{margin-top:10px;align-self:flex-start;flex:0 0 auto;cursor:pointer;padding:2px 0;
+           font:inherit;font-size:11px;font-weight:700;letter-spacing:.04em;color:var(--ink);
+           border:0;background:none;text-decoration:underline;text-underline-offset:3px;}
+  .showall:hover{color:var(--n6);}
+  /* D5 v1.2 — reply image (replies are no longer text-only) */
+  .rimg{margin-top:9px;flex:1 1 auto;min-height:0;overflow:hidden;border:var(--hairline);border-radius:var(--imgr);
+        background:var(--n1);display:flex;align-items:center;justify-content:center;}
+  .rimg svg{width:100%;height:100%;display:block;}
+  .rimg .ph{font-size:9px;letter-spacing:.16em;color:var(--n4);font-weight:700;}
+  /* D5 v1.3 — post footer pinned to bottom of header (bottoms align with image + thumbnail) */
+  .pfoot{margin-top:auto;flex:0 0 auto;}
+  .argstake .arrow{color:var(--n4);font-weight:400;margin:0 2px;}
+  /* D5 v1.4 — "Show all" removed; only the top reply per side renders (full list TBD) */
+</style>
+<style>
+.imglb{display:none;position:fixed;inset:0;z-index:300;background:rgba(10,10,10,.82);align-items:center;justify-content:center;padding:40px;cursor:zoom-out;}
+.imglb.on{display:flex;}
+.imglb-box{max-width:90vw;max-height:90vh;background:var(--n0);border-radius:8px;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:default;}
+.imglb .media{height:auto;width:auto;max-width:none;max-height:none;}
+.imglb .media.land{width:min(86vw,860px);}
+.imglb .media.rdt{height:min(86vh,640px);}
+.imglb .media svg{width:100%;height:100%;display:block;}
+.imglb .media .ph{font-size:13px;letter-spacing:.16em;color:var(--n4);font-weight:700;text-align:center;}
+</style>
+<style>
+.repmeta.inl{margin-left:0;}
+.cardacts{margin-left:auto;display:flex;align-items:center;gap:4px;flex:0 0 auto;}
+.cardact{display:flex;align-items:center;justify-content:center;width:24px;height:24px;color:var(--n4);background:transparent;border:none;border-radius:6px;cursor:pointer;padding:0;}
+.cardact:hover{color:var(--ink);background:var(--n1);}
+.cardact svg{display:block;}
+</style>
+<style>
+.panel.vm .sb2.mid{color:var(--ink);}
+.stkn{font-size:12px;letter-spacing:0;}
+.panel.vm .midwrap{gap:6px;}
+.panel.vm .pseud{font-size:13px;}
+.panel.vm .sidechip.sm{border-radius:4px;}
+.panel.vm .plus{width:18px;height:18px;line-height:1;font-size:13px;color:var(--n4);border:1px solid var(--n3);border-radius:6px;background:var(--n0);padding:0;bottom:0;display:flex;align-items:center;justify-content:center;}
+.panel.vm .plus:hover{border-color:var(--ink);color:var(--ink);}
+</style>
+<style>
+.pscroll{position:absolute;top:50%;transform:translateY(-50%);z-index:25;display:flex;flex-direction:column;align-items:center;gap:9px;}
+.slot.l .pscroll{right:2px;}
+.slot.r .pscroll{left:2px;}
+.psbtn{font:inherit;display:flex;align-items:center;justify-content:center;width:14px;height:13px;color:var(--n4);background:transparent;border:none;cursor:pointer;padding:0;}
+.psbtn:hover{color:var(--ink);}
+.psbtn svg{display:block;}
+.psload{width:5px;height:92px;border-radius:3px;background:var(--n2);overflow:hidden;position:relative;}
+.psfill{position:absolute;left:0;top:0;width:100%;height:0;background:var(--ink);border-radius:inherit;}
+.panel.vm{overflow:hidden;transition:transform .16s ease, box-shadow .16s ease;}
+.slot.picked .panel.vm{transform:translateY(-5px);box-shadow:0 6px 16px rgba(10,10,10,.12);}
+.slot.picked .psload{display:none;}
+body.mkpick .slot:not(.picked) .psbtn{display:none;}
+.postview .pscroll, .pslock .pscroll{display:none;}
+</style>
+<style>
+.colstk.vp{line-height:1.05;}
+.colstk.vp b{font-size:14px;}
+</style>
+<style>
+.replylist.vp .plus, .tease.vp .plus{width:18px;height:18px;line-height:1;font-size:13px;color:var(--n4);border:1px solid var(--n3);border-radius:6px;background:var(--n0);padding:0;bottom:0;display:flex;align-items:center;justify-content:center;}
+.replylist.vp .plus:hover, .tease.vp .plus:hover{border-color:var(--ink);color:var(--ink);}
+</style>
+<style>
+.replylist.vp .pseud{font-size:13px;}
+.replylist.vp .sidechip.sm{border-radius:4px;}
+</style>
+<style>
+.rpanel{padding:0;overflow:hidden;transition:transform .16s ease, box-shadow .16s ease;}
+.rinner{padding:11px 12px;display:flex;flex-direction:column;flex:1 1 auto;min-height:0;}
+.slot.rpicked .rpanel{transform:translateY(-5px);box-shadow:0 6px 16px rgba(10,10,10,.12);}
+.rps{position:absolute;top:50%;transform:translateY(-50%);z-index:25;display:none;flex-direction:column;align-items:center;gap:9px;}
+.postview .slot.l .rps,.postview .slot.r .rps{display:flex;}
+body.rpsoff.postview .slot .rps{display:none;}
+.slot.l .rps{right:2px;}
+.slot.r .rps{left:2px;}
+.slot.rpicked .rps .psload{display:none;}
+body.rppick .slot:not(.rpicked) .rps .psbtn{display:none;}
+.replylist.vp .rtitle{cursor:pointer;}
+.pricetxt.vp{cursor:pointer;}
+</style>
+</head>
+<body class="in">
+<div class="screen">
+
+  <!-- nav -->
+  <div class="nav">
+    <div class="wordmark">ZUGZWANG</div>
+    <div class="navright auth-out">
+      <a class="signin" href="#">Sign in</a>
+      <span class="btn-primary">Sign up</span>
+    </div>
+    <div class="navright auth-in">
+      <span class="balchip">Đ 1,240</span>
+      <span class="navid"><span class="avatar"></span>umber-falcon-31</span>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ===== header zone ===== -->
+    <div class="headzone">
+      <div class="hleft">
+        <div class="mmedia vm">
+          <div class="playmark">
+            <svg viewBox="0 0 12 14"><polygon points="1,1 11,7 1,13" fill="none" stroke="#A3A3A3" stroke-width="1.4"/></svg>
+          </div>
+          <div class="cap">MARKET MEDIA — IMG / VIDEO</div>
+        </div>
+        <!-- post view: the post's image (shown whole at its own aspect; flag 1 paused) -->
+        <div class="hpimg vp" id="pv-img"></div>
+        <div class="hstack">
+          <div class="question vm">Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?</div>
+          <!-- post view: author + the poster's own bet (side @ entry%, staked -> now) -->
+          <div class="pauthor vp">
+            <span class="avatar"></span>
+            <span class="pseud" id="pv-author">ashen-rook-12</span>
+            <span class="vsep">|</span>
+            <span class="sidechip md yes" id="pv-sidechip">YES @ 27%</span>
+            <span class="vsep">|</span>
+            <span class="ppos" id="pv-ppos">Đ 1,000 <span class="arrow">→</span> Đ 1,407</span>
+            <span class="vsep">|</span><span class="repmeta inl" id="pv-reps">Replies · <span class="repn">24</span></span><span class="cardacts"><button class="cardact" aria-label="Bookmark"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="cardact" aria-label="Download"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
+          </div>
+          <!-- post view: the post's argument as the bold title, right under the author -->
+          <div class="ptitle vp"><span id="pv-title">Ridership has doubled every quarter since Phase 2 opened. The airport feeder alone adds 180k daily trips, and the BKC interchange isn’t even at half capacity yet.</span></div>
+          <!-- v1.7: 2-line body teaser; the "+" moved here from the title end. Hidden-but-reserved when bodyless. -->
+          <div class="tease h vp" id="pv-teasewrap"><span class="tx" id="pv-tease"></span><button class="plus" onclick="openPostPop(openPost)" aria-label="Show more">+</button></div>
+          <div class="attrs vm"><b>Đ 14,260</b> staked<span class="sep">·</span><b>28</b> posts<span class="sep">·</span><b>68</b> replies</div>
+          <div class="criterion vm">
+            <div class="overline">Resolution</div>
+            <div class="crittext">Resolves YES if reported average daily ridership on Line 3 exceeds 1,000,000 across any 7-day window ending on or before Nov 5, 2026, 23:59 UTC. Interim press releases do not count.</div>
+          </div>
+          <!-- post view: FOOTER (reply aggregate) — pinned to bottom so bottoms align with image + thumbnail -->
+          <div class="pfoot vp">
+            <div class="barrow f f2" id="pv-bar">
+              <span class="sidewrap"><button class="rbtn2 y" id="pv-fs" onclick="replyToPost('support')">Support</button><span class="sb2" id="pv-fsd">Đ 3,800</span></span>
+              <span class="midwrap"><div class="bar"><div class="fill" id="pv-fill" style="width:38%"></div></div><span class="sb2 mid" id="pv-ftot">Đ 10,000 staked</span></span>
+              <span class="sidewrap r"><button class="rbtn2 n" id="pv-fc" onclick="replyToPost('counter')">Counter</button><span class="sb2" id="pv-fcd">Đ 6,200</span></span>
+            </div>
+          </div>
+          <div class="rescards vm">
+            <div class="rescard">
+              <div class="reslogo">LOGO</div>
+              <div class="resmeta">
+                <div class="reslabel">Resolver</div>
+                <div class="resname">Brihanmumbai Municipal Corporation</div>
+                <div class="ressrc">Monthly operational bulletins</div>
+              </div>
+            </div>
+            <div class="rescard">
+              <div class="xmark">X</div>
+              <div class="resmeta">
+                <div class="reslabel">X — official</div>
+                <div class="resname">BMC</div>
+                <a class="ressrc" href="#">@mybmc ↗</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hright">
+        <div class="graph vm">
+          <svg class="plot" viewBox="0 0 100 40" preserveAspectRatio="none">
+            <polyline points="0,18 5,22 10,16 15,24 20,19 25,26 30,21 35,14 40,22 45,17 50,25 55,19 60,12 65,18 70,10 75,16 80,12 85,18 90,13 95,16 100,15"
+                      fill="none" stroke="#A3A3A3" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+            <polyline points="0,22 5,18 10,24 15,16 20,21 25,14 30,19 35,26 40,18 45,23 50,15 55,21 60,28 65,22 70,30 75,24 80,28 85,22 90,27 95,24 100,25"
+                      fill="none" stroke="#0A0A0A" stroke-width="1.4" vector-effect="non-scaling-stroke"/>
+          </svg>
+          <div class="xtick" style="left:33.33%"></div>
+          <div class="xtick" style="left:66.66%"></div>
+          <span class="xlab" style="left:33.33%">Sep 30</span>
+          <span class="xlab" style="left:66.66%">Oct 15</span>
+          <span class="xlab end">Oct 30</span>
+        </div>
+        <!-- post view: graph slot -> this market's discovery thumbnail (same 340px); v1.7: context only — no click, exit lives on the ↙ arrows -->
+        <div class="mcard vp" onclick="exitPost()" style="cursor:pointer">
+          <div class="qrow">
+            <div class="mthumb sm">IMG</div>
+            <div class="mtitle">Will Mumbai Metro Line 3 average over 1M daily riders before the freeze?</div>
+          </div>
+          <div class="spark"><svg viewBox="0 0 100 28" preserveAspectRatio="none">
+            <polyline points="0,14 8,10 16,16 24,11 32,17 40,12 48,8 56,13 64,9 72,14 80,10 88,12 100,10" fill="none" stroke="#A3A3A3" stroke-width="1.3" vector-effect="non-scaling-stroke"/>
+            <polyline points="0,14 8,18 16,12 24,17 32,11 40,16 48,20 56,15 64,19 72,14 80,18 88,16 100,18" fill="none" stroke="#0A0A0A" stroke-width="1.3" vector-effect="non-scaling-stroke"/></svg></div>
+          <div class="barrow m">
+            <span class="blab">YES 38%</span>
+            <div class="bar"><div class="fill" style="width:38%"></div></div>
+            <span class="blab">NO 62%</span>
+          </div>
+          <div class="meta"><b>Đ 14,260</b><span class="sep">·</span><b>28</b> posts<span class="sep">·</span><b>68</b> replies</div>
+        </div>
+        <!-- price bar (below graph) — market view only -->
+        <div class="barrow f vm">
+          <span class="blab click" onclick="pick('yes')">YES 38%</span>
+          <div class="bar"><div class="fill" style="width:38%"></div></div>
+          <span class="blab click" onclick="pick('no')">NO 62%</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== arena: YES | NO ===== -->
+    <div class="arena" id="arena">
+
+      <!-- LEFT slot: YES debate frame + both side modules -->
+      <div class="slot l"><div class="pscroll" data-side="yes"><button class="psbtn psup" aria-label="Previous post"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 8 L7 3 L12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="psload"><div class="psfill"></div></div><button class="psbtn psdn" aria-label="Next post"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 2 L7 7 L12 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+        <div class="rps"><button class="psbtn rpsup" aria-label="Previous reply"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 8 L7 3 L12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="psload"><div class="psfill"></div></div><button class="psbtn rpsdn" aria-label="Next reply"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 2 L7 7 L12 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="deb">
+          <div class="colhead">
+            <button class="tradebtn vm" onclick="pick('yes')">Buy</button>
+            <span class="pos towin vm"><span class="poslab">To win</span><span class="posval">Đ 1<span class="arrow">→</span>Đ 2.63x</span></span>
+            <span class="pricetxt vm pricetag">Yes <svg viewBox="0 0 14 14" width="12" height="12"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><b>38%</b></span>
+            <span class="pricetxt vp pricetag" id="pv-sprice">Yes <svg viewBox="0 0 14 14" width="12" height="12"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><b>38%</b></span>
+            <span class="poswrap vm">
+              <span class="pos">
+                <span class="poslab">Your position</span>
+                <span class="posval">Đ 240<span class="arrow">→</span>Đ 310</span>
+              </span>
+              <button class="sellbtn">Sell</button>
+            </span>
+          </div>
+          <div class="colwrap">
+            <div class="panel vm">
+              <div class="argbody">
+                <div class="argprofile">
+                  <span class="avatar"></span>
+                  <span class="pseud">ashen-rook-12</span>
+                  <span class="vsep">|</span>
+                  <span class="sidechip sm yes">YES @ 27%</span>
+                  <span class="vsep">|</span>
+                  <span class="argstake">Đ 1,000 <span class="arrow">→</span> Đ 1,407</span>
+                  <span class="vsep">|</span><span class="repmeta inl">Replies · <span class="repn">24</span></span><span class="cardacts"><button class="cardact" aria-label="Bookmark"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="cardact" aria-label="Download"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
+                  
+                </div>
+                <div class="rtitle plust"><span class="rtt" onclick="enterPost('ashen')">Ridership has doubled every quarter since Phase 2 opened. The airport feeder alone adds 180k daily trips, and the BKC interchange isn’t even at half capacity yet.</span><button class="plus" onclick="openPostPop('ashen')" aria-label="Show more">+</button></div>
+                <div class="argimg">
+                  <div class="media land">
+                  <svg viewBox="0 0 220 96" preserveAspectRatio="xMidYMid meet">
+                    <text x="10" y="13" font-size="6.5" letter-spacing="1.5" fill="#A3A3A3" font-weight="700">LINE 3 — AVG DAILY RIDERSHIP (LAKH)</text>
+                    <line x1="10" y1="84" x2="210" y2="84" stroke="#D4D4D4" stroke-width="0.8"/>
+                    <line x1="10" y1="26" x2="210" y2="26" stroke="#737373" stroke-width="0.8" stroke-dasharray="3 2.5"/>
+                    <text x="210" y="22.5" font-size="6" fill="#737373" text-anchor="end" font-weight="700">10 L TARGET</text>
+                    <rect x="22"  y="70" width="22" height="14" fill="#D4D4D4"/>
+                    <rect x="56"  y="62" width="22" height="22" fill="#A3A3A3"/>
+                    <rect x="90"  y="52" width="22" height="32" fill="#737373"/>
+                    <rect x="124" y="44" width="22" height="40" fill="#404040"/>
+                    <rect x="158" y="34" width="22" height="50" fill="#0A0A0A"/>
+                    <text x="33"  y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">FEB</text>
+                    <text x="67"  y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">MAR</text>
+                    <text x="101" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">APR</text>
+                    <text x="135" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">MAY</text>
+                    <text x="169" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">JUN</text>
+                    <text x="169" y="30.5" font-size="6" fill="#0A0A0A" text-anchor="middle" font-weight="700">8.6</text>
+                  </svg>
+                  </div>
+                </div>
+                <div class="barrow f f2">
+                  <span class="sidewrap"><button class="rbtn2 y" onclick="openReply('l','yes','Support','ashen-rook-12','Ridership has doubled every quarter since Phase 2 opened')">Support</button><span class="sb2">Đ 3,800</span></span>
+                  <span class="midwrap"><div class="bar"><div class="fill" style="width:38%"></div></div><span class="sb2 mid"><b class="stkn">Đ 10,000</b> staked</span></span>
+                  <span class="sidewrap r"><button class="rbtn2 n" onclick="openReply('l','no','Counter','ashen-rook-12','Ridership has doubled every quarter since Phase 2 opened')">Counter</button><span class="sb2">Đ 6,200</span></span>
+                </div>
+              </div>
+            </div>
+            <div class="replylist vp" id="pv-slist"></div>
+          </div>
+        </div>
+
+        <!-- NO module (left slot) -->
+        <div class="mod mno">
+          <div class="modhead">
+            <span class="sidechip md no">NO</span>
+            <span class="t">Place your Đ BET</span>
+            <span class="treply"><span class="r1"></span><span class="r2"></span></span>
+            <button class="modx" onclick="closeMod()" aria-label="Close">×</button>
+          </div>
+          <div class="modbody">
+            <div class="auth-in">
+              <div class="seclabel">Your argument — required</div>
+              <div class="compgrid">
+                <div class="attach"><div class="imgprev">IMAGE</div><div class="acap">Shown whole · any orientation</div></div>
+                <div class="compright">
+                  <div class="field">
+                    <textarea class="title" aria-label="Argument title">Crush-load math caps the corridor near 850k</textarea>
+                    <div class="counter">44 / 125</div>
+                  </div>
+                  <div class="field grow">
+                    <textarea class="body" aria-label="Argument body">Peak throughput is bounded by the 8-coach limit; the affidavit's own annexure concedes it.</textarea>
+                    <div class="counter">91 / 2,200 · optional</div>
+                  </div>
+                  <div class="footblock">
+                    <div class="betgrid">
+                      <div class="pm">
+                        <div class="pmrow amount">
+                          <span class="lab">Amount</span>
+                          <span class="amtval"><span class="cur">Đ</span><input class="stake" data-eff="0.635" value="10" aria-label="Stake amount"></span>
+                        </div>
+                        <div class="pmdiv"></div>
+                        <div class="pmrow towin">
+                          <span class="lab">To win</span>
+                          <span class="winval">Đ 15.7</span>
+                        </div>
+                      </div>
+                      <button class="submit n"><span class="pbw">Place</span><span class="pbw">Đ BET</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="auth-out">
+              <div class="gate">
+                <h3>Sign in to bet NO</h3>
+                <p>Reading is public. Placing a bet needs an account — every bet carries an argument, staked in Dharma.</p>
+                <span class="btn-primary">Sign up</span>
+                <span class="ghost">Sign in</span>
+                <div class="micro">No stake, no voice.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- YES module (left slot — hosts YES reply-bets on right-column posts) -->
+        <div class="mod myes">
+          <div class="modhead">
+            <span class="sidechip md yes">YES</span>
+            <span class="t">Place your Đ BET</span>
+            <span class="treply"><span class="r1"></span><span class="r2"></span></span>
+            <button class="modx" onclick="closeMod()" aria-label="Close">×</button>
+          </div>
+          <div class="modbody">
+            <div class="auth-in">
+              <div class="seclabel">Your argument — required</div>
+              <div class="compgrid">
+                <div class="attach"><div class="imgprev">IMAGE</div><div class="acap">Shown whole · any orientation</div></div>
+                <div class="compright">
+                  <div class="field">
+                    <textarea class="title" aria-label="Argument title">Ridership compounding is already visible in the MMRC dailies</textarea>
+                    <div class="counter">58 / 125</div>
+                  </div>
+                  <div class="field grow">
+                    <textarea class="body" aria-label="Argument body">Phase 2 added 180k daily trips in eight weeks and the airport feeder has not opened yet. The BKC interchange is still running below half its design throughput.</textarea>
+                    <div class="counter">158 / 2,200 · optional</div>
+                  </div>
+                  <div class="footblock">
+                    <div class="betgrid">
+                      <div class="pm">
+                        <div class="pmrow amount">
+                          <span class="lab">Amount</span>
+                          <span class="amtval"><span class="cur">Đ</span><input class="stake" data-eff="0.395" value="10" aria-label="Stake amount"></span>
+                        </div>
+                        <div class="pmdiv"></div>
+                        <div class="pmrow towin">
+                          <span class="lab">To win</span>
+                          <span class="winval">Đ 25.3</span>
+                        </div>
+                      </div>
+                      <button class="submit y"><span class="pbw">Place</span><span class="pbw">Đ BET</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="auth-out">
+              <div class="gate">
+                <h3>Sign in to bet YES</h3>
+                <p>Reading is public. Placing a bet needs an account — every bet carries an argument, staked in Dharma.</p>
+                <span class="btn-primary">Sign up</span>
+                <span class="ghost">Sign in</span>
+                <div class="micro">No stake, no voice.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT slot: NO debate frame + both side modules -->
+      <div class="slot r"><div class="pscroll" data-side="no"><button class="psbtn psup" aria-label="Previous post"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 8 L7 3 L12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="psload"><div class="psfill"></div></div><button class="psbtn psdn" aria-label="Next post"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 2 L7 7 L12 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+        <div class="rps"><button class="psbtn rpsup" aria-label="Previous reply"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 8 L7 3 L12 8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button><div class="psload"><div class="psfill"></div></div><button class="psbtn rpsdn" aria-label="Next reply"><svg viewBox="0 0 14 10" width="11" height="8"><path d="M2 2 L7 7 L12 2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div><div class="deb">
+          <div class="colhead">
+            <button class="tradebtn vm" onclick="pick('no')">Buy</button>
+            <span class="pos towin vm"><span class="poslab">To win</span><span class="posval">Đ 1<span class="arrow">→</span>Đ 1.61x</span></span>
+            <span class="poswrap vm"><span class="pos"><span class="poslab">No active position</span></span></span>
+            <span class="pricetxt vm pricetag">No <svg viewBox="0 0 14 14" width="12" height="12" style="transform:rotate(180deg)"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><b>62%</b></span>
+            <span class="pricetxt vp pricetag" id="pv-cprice">No <svg viewBox="0 0 14 14" width="12" height="12" style="transform:rotate(180deg)"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg><b>62%</b></span>
+          </div>
+          <div class="colwrap">
+            <div class="panel vm">
+              <div class="argbody">
+                <div class="argprofile">
+                  <span class="avatar"></span>
+                  <span class="pseud">tidal-knight-88</span>
+                  <span class="vsep">|</span>
+                  <span class="sidechip sm no">NO @ 55%</span>
+                  <span class="vsep">|</span>
+                  <span class="argstake">Đ 800 <span class="arrow">→</span> Đ 902</span>
+                  <span class="vsep">|</span><span class="repmeta inl">Replies · <span class="repn">16</span></span><span class="cardacts"><button class="cardact" aria-label="Bookmark"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="cardact" aria-label="Download"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span>
+                  
+                </div>
+                <div class="rtitle plust"><span class="rtt" onclick="enterPost('tidal')">Peak-hour throughput is bounded by the 8-coach trainset and the signalling headway. Even at crush load the corridor tops out near 850k — the affidavit’s own annexure concedes it.</span><button class="plus" onclick="openPostPop('tidal')" aria-label="Show more">+</button></div>
+                <div class="argimg">
+                  <div class="media rdt">
+                    <span class="ph">POST IMAGE · 640:586</span>
+                  </div>
+                </div>
+                <div class="barrow f f2">
+                  <span class="sidewrap"><button class="rbtn2 n" onclick="openReply('r','no','Support','tidal-knight-88','Peak-hour throughput is capped by the 8-coach limit')">Support</button><span class="sb2">Đ 4,400</span></span>
+                  <span class="midwrap"><div class="bar"><div class="fill" style="width:69%"></div></div><span class="sb2 mid"><b class="stkn">Đ 6,400</b> staked</span></span>
+                  <span class="sidewrap r"><button class="rbtn2 y" onclick="openReply('r','yes','Counter','tidal-knight-88','Peak-hour throughput is capped by the 8-coach limit')">Counter</button><span class="sb2">Đ 2,000</span></span>
+                </div>
+              </div>
+            </div>
+            <div class="replylist vp" id="pv-clist"></div>
+          </div>
+        </div>
+
+        <!-- YES module (right slot) -->
+        <div class="mod myes">
+          <div class="modhead">
+            <span class="sidechip md yes">YES</span>
+            <span class="t">Place your Đ BET</span>
+            <span class="treply"><span class="r1"></span><span class="r2"></span></span>
+            <button class="modx" onclick="closeMod()" aria-label="Close">×</button>
+          </div>
+          <div class="modbody">
+            <div class="auth-in">
+              <div class="seclabel">Your argument — required</div>
+              <div class="compgrid">
+                <div class="attach"><div class="imgprev">IMAGE</div><div class="acap">Shown whole · any orientation</div></div>
+                <div class="compright">
+                  <div class="field">
+                    <textarea class="title" aria-label="Argument title">Ridership compounding is already visible in the MMRC dailies</textarea>
+                    <div class="counter">58 / 125</div>
+                  </div>
+                  <div class="field grow">
+                    <textarea class="body" aria-label="Argument body">Phase 2 added 180k daily trips in eight weeks and the airport feeder has not opened yet. The BKC interchange is still running below half its design throughput.</textarea>
+                    <div class="counter">158 / 2,200 · optional</div>
+                  </div>
+                  <div class="footblock">
+                    <div class="betgrid">
+                      <div class="pm">
+                        <div class="pmrow amount">
+                          <span class="lab">Amount</span>
+                          <span class="amtval"><span class="cur">Đ</span><input class="stake" data-eff="0.395" value="10" aria-label="Stake amount"></span>
+                        </div>
+                        <div class="pmdiv"></div>
+                        <div class="pmrow towin">
+                          <span class="lab">To win</span>
+                          <span class="winval">Đ 25.3</span>
+                        </div>
+                      </div>
+                      <button class="submit y"><span class="pbw">Place</span><span class="pbw">Đ BET</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="auth-out">
+              <div class="gate">
+                <h3>Sign in to bet YES</h3>
+                <p>Reading is public. Placing a bet needs an account — every bet carries an argument, staked in Dharma.</p>
+                <span class="btn-primary">Sign up</span>
+                <span class="ghost">Sign in</span>
+                <div class="micro">No stake, no voice.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- NO module (right slot — hosts NO reply-bets on left-column posts) -->
+        <div class="mod mno">
+          <div class="modhead">
+            <span class="sidechip md no">NO</span>
+            <span class="t">Place your Đ BET</span>
+            <span class="treply"><span class="r1"></span><span class="r2"></span></span>
+            <button class="modx" onclick="closeMod()" aria-label="Close">×</button>
+          </div>
+          <div class="modbody">
+            <div class="auth-in">
+              <div class="seclabel">Your argument — required</div>
+              <div class="compgrid">
+                <div class="attach"><div class="imgprev">IMAGE</div><div class="acap">Shown whole · any orientation</div></div>
+                <div class="compright">
+                  <div class="field">
+                    <textarea class="title" aria-label="Argument title">Crush-load math caps the corridor near 850k</textarea>
+                    <div class="counter">44 / 125</div>
+                  </div>
+                  <div class="field grow">
+                    <textarea class="body" aria-label="Argument body">Peak throughput is bounded by the 8-coach limit; the affidavit's own annexure concedes it.</textarea>
+                    <div class="counter">91 / 2,200 · optional</div>
+                  </div>
+                  <div class="footblock">
+                    <div class="betgrid">
+                      <div class="pm">
+                        <div class="pmrow amount">
+                          <span class="lab">Amount</span>
+                          <span class="amtval"><span class="cur">Đ</span><input class="stake" data-eff="0.635" value="10" aria-label="Stake amount"></span>
+                        </div>
+                        <div class="pmdiv"></div>
+                        <div class="pmrow towin">
+                          <span class="lab">To win</span>
+                          <span class="winval">Đ 15.7</span>
+                        </div>
+                      </div>
+                      <button class="submit n"><span class="pbw">Place</span><span class="pbw">Đ BET</span></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="auth-out">
+              <div class="gate">
+                <h3>Sign in to bet NO</h3>
+                <p>Reading is public. Placing a bet needs an account — every bet carries an argument, staked in Dharma.</p>
+                <span class="btn-primary">Sign up</span>
+                <span class="ghost">Sign in</span>
+                <div class="micro">No stake, no voice.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- slippage modal — F-BET-9 · cpmm.md §6 · sole carrier of mandatory p0 → p1 · hotkey M -->
+<div class="overlay">
+  <div class="modalbox">
+    <h3>Price impact warning</h3>
+    <div class="bigmove">38%<span class="arrow"> → </span>47%</div>
+    <div class="modalmeta">Your bet of <b>Đ 500 on YES</b> moves the price by <b>+9.0 points</b> — above the warning threshold. Avg price paid <b>41.8%</b> · shares <b>1,196.2</b>.</div>
+    <div class="modalmeta">The trade executes at the curve as found on confirm. There is no tolerance setting and no auto-cancel.</div>
+    <div class="modalbtns">
+      <button class="ghost" onclick="document.body.classList.remove('modal')">Cancel</button>
+      <button class="confirm">Confirm bet · Đ 500</button>
+    </div>
+  </div>
+</div>
+
+<!-- D5 v1.6 — post pop-up (the title's "+"): same card layout, scrollable Medium-style body -->
+<div class="pmwrap" onclick="if(event.target===this)closePop()">
+  <div class="pmcard">
+    <button class="pmx" onclick="closePop()" aria-label="Close">×</button>
+    <div class="pmscroll">
+      <div class="argprofile"><span class="avatar"></span><span class="pseud" id="pm-author"></span><span class="vsep">|</span><span class="sidechip sm yes" id="pm-chip"></span><span class="vsep">|</span><span class="argstake" id="pm-stake"></span><span class="vsep" id="pm-repsep">|</span><span class="repmeta flat" id="pm-reps"></span></div>
+      <div class="pmtitle" id="pm-title"></div>
+      <div class="pmimg" id="pm-img"></div>
+      <div class="pmbody" id="pm-body"></div>
+    </div>
+  </div>
+</div>
+
+<!-- HIDDEN REVIEW HOTKEYS (scaffolding, trimmed at packaging):
+     S = toggle signed-in / signed-out · M = toggle slippage modal ·
+     ESC = close bet module / modal -->
+<script>
+  var cur=null; /* current open key — repeat click on the same control toggles closed */
+
+  function resetHeads(){
+    document.querySelectorAll('.mod').forEach(function(m){
+      m.querySelector('.t').style.display='';
+      var tr=m.querySelector('.treply');
+      tr.style.display='none';
+      tr.querySelector('.r1').textContent='';
+      tr.querySelector('.r2').textContent='';
+    });
+  }
+  function closeAll(){
+    document.querySelectorAll('.slot').forEach(function(s){s.classList.remove('bet');});
+    document.querySelectorAll('.mod').forEach(function(m){m.classList.remove('on');});
+    resetHeads();
+  }
+  function closeMod(){closeAll();cur=null;}
+
+  function openMod(slotEl,side,key,defAmt,headerFn){
+    if(cur===key){closeMod();return;}   /* toggle back to the debate */
+    closeAll();
+    slotEl.classList.add('bet');
+    var mod=slotEl.querySelector('.mod.m'+side);
+    mod.classList.add('on');
+    var inp=mod.querySelector('.stake');
+    inp.value=defAmt;                   /* default stake = applicable floor (editable) */
+    recompute(inp);
+    if(headerFn)headerFn(mod);
+    cur=key;
+  }
+
+  /* fresh post-bet: side-slot rule (YES → right slot, NO → left slot) · default Đ 10 (post floor) */
+  function pick(side){
+    var slot=document.querySelector(side==='yes'?'.slot.r':'.slot.l');
+    openMod(slot,side,'fresh-'+side,10,null);
+  }
+
+  /* reply-bet: opens OPPOSITE THE POST so the post stays visible;
+     side chip carries the true bet side · default Đ 50 (reply floor, pinned) */
+  function openReply(postSlot,side,verb,pseud,title){
+    var slot=document.querySelector(postSlot==='l'?'.slot.r':'.slot.l');
+    openMod(slot,side,'reply-'+verb+'-'+pseud,50,function(mod){
+      mod.querySelector('.t').style.display='none';
+      var tr=mod.querySelector('.treply');
+      tr.style.display='block';
+      tr.querySelector('.r1').textContent=verb+' '+pseud+'\u2019s argument';
+    });
+  }
+
+  function fmt(n){return n.toFixed(1).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+  function sizeAmt(inp){inp.style.width=Math.max(2,(inp.value||'').length)+'ch';}
+  function recompute(inp){
+    var s=parseFloat(inp.value)||0, eff=parseFloat(inp.dataset.eff);
+    var mod=inp.closest('.mod');
+    mod.querySelector('.winval').textContent='Đ '+fmt(s/eff);
+    sizeAmt(inp);
+  }
+  document.querySelectorAll('.stake').forEach(function(inp){
+    sizeAmt(inp);
+    inp.addEventListener('input',function(){recompute(inp);});
+  });
+
+  /* hidden review hotkeys (scaffolding) */
+  document.addEventListener('keydown',function(e){
+    if(e.target.tagName==='TEXTAREA'||e.target.tagName==='INPUT'||e.target.isContentEditable)return;
+    var k=e.key.toLowerCase();
+    if(k==='s'){
+      var si=!document.body.classList.contains('in');
+      document.body.classList.toggle('in',si);
+      document.body.classList.toggle('out',!si);
+    }
+    if(k==='m'){document.body.classList.toggle('modal');}
+    if(k==='escape'){
+      if(document.body.classList.contains('ppop')){ closePop(); return; }
+      document.body.classList.remove('modal');closeMod();
+    }
+  });
+
+  /* ============================================================================
+     D5 v1.0 — post -> reply drill-in. Same shell, re-skinned (body.postview).
+     ============================================================================ */
+  var CHART_SVG = '<svg viewBox="0 0 220 96" preserveAspectRatio="xMidYMid meet">'
+    + '<text x="10" y="13" font-size="6.5" letter-spacing="1.5" fill="#A3A3A3" font-weight="700">LINE 3 \u2014 AVG DAILY RIDERSHIP (LAKH)</text>'
+    + '<line x1="10" y1="84" x2="210" y2="84" stroke="#D4D4D4" stroke-width="0.8"/>'
+    + '<line x1="10" y1="26" x2="210" y2="26" stroke="#737373" stroke-width="0.8" stroke-dasharray="3 2.5"/>'
+    + '<text x="210" y="22.5" font-size="6" fill="#737373" text-anchor="end" font-weight="700">10 L TARGET</text>'
+    + '<rect x="22" y="70" width="22" height="14" fill="#D4D4D4"/><rect x="56" y="62" width="22" height="22" fill="#A3A3A3"/>'
+    + '<rect x="90" y="52" width="22" height="32" fill="#737373"/><rect x="124" y="44" width="22" height="40" fill="#404040"/>'
+    + '<rect x="158" y="34" width="22" height="50" fill="#0A0A0A"/>'
+    + '<text x="33" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">FEB</text><text x="67" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">MAR</text>'
+    + '<text x="101" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">APR</text><text x="135" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">MAY</text>'
+    + '<text x="169" y="92" font-size="5.5" fill="#A3A3A3" text-anchor="middle">JUN</text><text x="169" y="30.5" font-size="6" fill="#0A0A0A" text-anchor="middle" font-weight="700">8.6</text></svg>';
+  var RDT_PH = '<div style="height:94%;aspect-ratio:640/586;background:var(--n2);border-radius:var(--imgr);display:flex;align-items:center;justify-content:center">'
+    + '<span style="font-size:8.5px;letter-spacing:.16em;color:var(--n5);font-weight:700;text-align:center;padding:8px">POST IMAGE \u00b7 640:586</span></div>';
+
+  var POSTS = {
+    ashen:{
+      side:'yes', author:'ashen-rook-12', img:CHART_SVG, entry:27, staked:'Đ 1,000', now:'Đ 1,407',
+      title:'Ridership has doubled every quarter since Phase 2 opened. The airport feeder alone adds 180k daily trips, and the BKC interchange isn’t even at half capacity yet.',
+      body:'Ridership has doubled every quarter since Phase 2 opened, and nothing in the operating data says that run is finished. The airport feeder alone adds 180k daily trips, and the BKC interchange is still running below half its design capacity \u2014 so the compounding has room to continue.\n\nLook at where the growth is coming from. The early jumps were novelty and line-opening effects; the current ones are commuter conversion \u2014 monthly-pass volumes are climbing faster than single-journey tokens, which is the signature of habit, not curiosity. Habitual demand doesn\u2019t churn when the weather turns.\n\nThe supply side is still loosening too. Two more entry gates at Marol, the CSMT second exit this month, and the feeder timetable going public all pull forward trips that were being turned away at the margin. None of that needs new track or new trains \u2014 it is latent demand meeting an unclogged funnel.\n\nAgainst that, the bear case leans on a single annexure figure written before the signalling upgrade was commissioned. The 7-day window only needs one strong week before Nov 5. On the current slope, that window arrives in September with margin to spare.',
+      repStaked:'\u0110 10,000', replies:24, sPct:38, cPct:62, sDh:'3,800', cDh:'6,200', sCount:13, cCount:11,
+      support:[
+        {a:'verdant-heron-07', e:31, s:'\u0110 1,400', t:'The airport feeder opens October 1 and MMRC\u2019s own note adds 180k daily trips from day one \u2014 none of it is in the curve we see today.', b:'MMRC\u2019s own timeline puts the feeder live four weeks before the freeze. None of the current ridership includes it.'},
+        {a:'umber-bishop-30', e:29, s:'\u0110 900', t:'The CSMT second exit opens this month, uncapping the worst interchange on the line and pulling forward demand that was being turned away.', b:'More boardings the daily bulletins haven\u2019t captured yet \u2014 the count lags reality here.'},
+        {a:'hollow-pawn-05', e:34, s:'\u0110 600', t:'The monsoon dip is already priced into these numbers \u2014 the dailies rebound hard every October, and this year\u2019s base is far higher.', b:'Last July cost about 6% and the curve recovered inside three weeks.'}
+      ],
+      counter:[
+        {a:'slate-marten-44', e:66, s:'\u0110 2,100', t:'Compounding always flattens, and the daily series already shows the second derivative turning \u2014 growth has roughly halved since Phase 2.', b:'Week-on-week growth in the same bulletin fell from 11% to 4% over three weeks. The curve is bending, not compounding.'},
+        {a:'quiet-falcon-77', e:70, s:'\u0110 1,300', t:'The fare revision lands before the freeze, and every elasticity estimate in the DPR says a hike this size suppresses discretionary trips.', b:'An 18% hike is scheduled for October \u2014 elasticity alone takes a bite out of this.'},
+        {a:'level-rook-41', e:63, s:'\u0110 800', t:'Feeder-bus capacity is the real ceiling \u2014 the metro can\u2019t carry riders the last-mile network can\u2019t deliver, and those routes are saturated.', b:'Last-mile throughput caps the corridor regardless of what the trunk line can carry.'}
+      ]
+    },
+    tidal:{
+      side:'no', author:'tidal-knight-88', img:RDT_PH, entry:55, staked:'Đ 800', now:'Đ 902',
+      title:'Peak-hour throughput is bounded by the 8-coach trainset and the signalling headway. Even at crush load the corridor tops out near 850k — the affidavit’s own annexure concedes it.',
+      body:'Peak-hour throughput is bounded by the 8-coach trainset and the signalling headway. Even at crush load the corridor tops out near 850k \u2014 the affidavit\u2019s own annexure concedes it.\n\nCapacity is not a vibe; it is arithmetic. Trains per hour, times passengers per train, times operating hours \u2014 every term in that product is fixed before November. No new rakes arrive this year, the safety clearance for denser headways takes months, and dwell times already eat the schedule\u2019s slack at the worst stations.\n\nThe growth curve everyone is extrapolating is a ramp, not a trend. Each jump maps to a one-off unlock \u2014 a station opening, an interchange, a fare promotion. You cannot compound one-offs. Strip them out and the underlying week-on-week growth has already fallen from 11% to 4%.\n\nAnd the resolution bar is a 7-day average, not a single record day. To clear 10 lakh on the mean, the system has to hold a number it has never touched once \u2014 across festival closures and a monsoon tail. The corridor maths says it cannot, and the affidavit agrees.',
+      repStaked:'\u0110 6,400', replies:16, sPct:69, cPct:31, sDh:'4,400', cDh:'2,000', sCount:9, cCount:7,
+      support:[
+        {a:'cinder-otter-19', e:57, s:'\u0110 1,600', t:'The 8-coach cap is in the signed affidavit, not a modelling assumption \u2014 the trainset cannot move more than the corridor maths allows.', b:'Annexure C, line 14. The operator can\u2019t exceed it before the freeze without a fresh safety clearance, which takes months.'},
+        {a:'ember-knight-12', e:59, s:'\u0110 950', t:'Dwell times blow up past 800k as platforms congest, dragging headway and capping real throughput below the theoretical line being quoted.', b:'Platform crowding adds seconds per stop and the schedule has no slack left to absorb it.'},
+        {a:'plain-rook-22', e:61, s:'\u0110 500', t:'No new rakes arrive before November, so the fleet that has to carry any record is the one running today \u2014 and it is already stretched thin.', b:'Procurement is a 2027 line item. The fleet that runs the freeze is the fleet today.'}
+      ],
+      counter:[
+        {a:'amber-lynx-23', e:36, s:'\u0110 1,150', t:'Headway, not coach count, is the binding constraint \u2014 and the CBTC upgrade cuts it by about a third, more than offsetting the 8-coach limit.', b:'The new signalling is commissioned on the central section. 90-second headways move far more than the affidavit assumes.'},
+        {a:'north-bishop-08', e:34, s:'\u0110 700', t:'Crush-load standards are deliberately conservative; actual peak boardings routinely beat the rated figure, so the cap has real headroom left.', b:'Real peak densities routinely exceed the nameplate figure the annexure quotes.'},
+        {a:'sable-pawn-19', e:31, s:'\u0110 450', t:'Off-peak and weekend growth lifts the daily average even if the peak is capped \u2014 resolution is on the daily mean, not the busiest single hour.', b:'The cap is a peak-hour limit; the daily mean has plenty of headroom below it.'}
+      ]
+    }
+  };
+
+  var openPost = null;
+
+  var RIMG = '<div class="rimg"><span class="ph">IMAGE</span></div>';
+  /* v1.8 — monochrome thumbs for the plain-text centre price */
+  var THUP = '<svg viewBox="0 0 14 14" width="12" height="12"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+  var THDN = '<svg viewBox="0 0 14 14" width="12" height="12" style="transform:rotate(180deg)"><path d="M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linejoin="round"/></svg>';
+  function betPair(s){
+    var n = parseInt(String(s).replace(/[^0-9]/g,''),10) || 0;
+    var cur = Math.round(n * 1.3 / 10) * 10;
+    return s + ' <span class="arrow">\u2192</span> \u0110 ' + cur.toLocaleString('en-US');
+  }
+  function cardHTML(c, side, i){
+    /* v0_33 row: avatar · name | side @ entry% | staked→now …
+       `side` is the COLUMN's fixed side ('yes'|'no'), so the chip reads it directly;
+       "+" carries the same ('yes'|'no') side so the popover resolves the right reply. */
+    var chipSide = side;
+    return '<div class="rpanel"><div class="rinner"><div class="rcardhead"><span class="avatar"></span>'
+      + '<span class="pseud">'+c.a+'</span><span class="vsep">|</span>'
+      + '<span class="sidechip sm '+chipSide+'">'+chipSide.toUpperCase()+' @ '+c.e+'%</span>'
+      + '<span class="vsep">|</span><span class="argstake">'+betPair(c.s)+'</span>'
+      + '<span class="cardacts"><button class="cardact" aria-label="Bookmark"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M3.5 2.5 H10.5 V12 L7 9 L3.5 12 Z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button><button class="cardact" aria-label="Download"><svg viewBox="0 0 14 14" width="13" height="13"><path d="M7 2.5 V9 M4 6 L7 9 L10 6 M3 11.5 H11" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg></button></span></div>'
+      + '<div class="rtitle plust"><span>'+c.t+'</span>'
+      + (c.b ? '<button class="plus" onclick="openCardPop(\''+side+'\','+i+')" aria-label="Show more">+</button>' : '')
+      + '</div>'
+      + RIMG+'</div></div>';
+  }
+  function renderCol(el, items, side){
+    el.innerHTML = cardHTML(items[0], side, 0);   /* top reply per side; full list is a later pass */
+  }
+
+  function enterPost(which){
+    var d = POSTS[which]; if(!d){ return; }
+    openPost = which;
+    document.getElementById('pv-img').innerHTML = d.img;
+    document.getElementById('pv-title').textContent = d.title;
+    document.getElementById('pv-author').textContent = d.author;
+    var sc = document.getElementById('pv-sidechip');
+    sc.textContent = d.side.toUpperCase() + ' @ ' + d.entry + '%';
+    sc.className = 'sidechip md ' + d.side;
+    document.getElementById('pv-ppos').innerHTML = d.staked + ' <span class="arrow">→</span> ' + d.now;
+    /* v1.7 — teaser: the body's continuation (the title IS the argument's first
+       125 chars, D5-13). No body -> zone stays, blank ("+" hidden with it). */
+    var tw = document.getElementById('pv-teasewrap');
+    if (d.body) {
+      var paras = String(d.body).split('\n\n');
+      document.getElementById('pv-tease').textContent = paras[1] || paras[0];
+      tw.style.visibility = 'visible';
+    } else {
+      document.getElementById('pv-tease').textContent = '';
+      tw.style.visibility = 'hidden';
+    }
+    /* v0_33 — columns are FIXED poles: left = YES, right = NO, for every post.
+       Support/Counter is a property of the POST (it lives on the split bar + the
+       composer), never a column. So the column headers are static market prices,
+       and reply CONTENT is routed by each reply's actual YES/NO side below. */
+    var MKT = {yes:38, no:62};
+    document.getElementById('pv-sprice').innerHTML = 'Yes ' + THUP + '<b>' + MKT.yes + '%</b>';
+    document.getElementById('pv-cprice').innerHTML = 'No ' + THDN + '<b>' + MKT.no + '%</b>';
+    /* v1.8 — TO WIN unit multiplier per side (Support pays the post's side) */
+    document.getElementById('pv-reps').innerHTML = 'Replies \u00b7 <span class="repn">' + d.replies + '</span>';
+    /* v1.8 — footer = D4 card-footer clone: pole-coded pills + grey Đ, centred total */
+    var fs = document.getElementById('pv-fs'), fc = document.getElementById('pv-fc');
+    fs.className = 'rbtn2 ' + (d.side === 'yes' ? 'y' : 'n');
+    fc.className = 'rbtn2 ' + (d.side === 'yes' ? 'n' : 'y');
+    document.getElementById('pv-fsd').textContent = '\u0110 ' + d.sDh;
+    document.getElementById('pv-fcd').textContent = '\u0110 ' + d.cDh;
+    document.getElementById('pv-ftot').textContent = d.repStaked + ' staked';
+    document.getElementById('pv-fill').style.width = d.sPct + '%';
+    /* v0_33 — left column ALWAYS gets the YES-side replies, right the NO-side.
+       For a YES post: yes = its own (support), no = counter. For a NO post: swap. */
+    var yesR = d.side === 'yes' ? d.support : d.counter;
+    var noR  = d.side === 'yes' ? d.counter : d.support;
+    renderCol(document.getElementById('pv-slist'), yesR, 'yes');
+    renderCol(document.getElementById('pv-clist'), noR, 'no');
+    closeMod();
+    document.body.classList.add('postview');
+    var c = document.querySelector('.content'); if(c){ c.scrollTop = 0; }
+  }
+  function exitPost(){
+    closeMod();
+    document.body.classList.remove('postview');
+    openPost = null;
+  }
+
+  /* D5 v1.6 — the "+" pop-up · v1.11 head: avatar name | chip | stake | Đ N staked in Replies · N … × right */
+  function openPostPop(key){
+    var d = POSTS[key]; if(!d){ return; }
+    fillPop(d.author, d.staked + ' <span class="arrow">\u2192</span> ' + d.now, d.title, d.img, d.body,
+            d.side, d.entry, d.repStaked + ' staked in Replies \u00b7 ' + d.replies);
+  }
+  function openCardPop(side, i){
+    if(!openPost){ return; }
+    /* v0_33 — `side` is the column's fixed side ('yes'|'no'). The reply array is the
+       post's own list when the column matches the post side, else the counter list. */
+    var d = POSTS[openPost];
+    var arr = d.side === side ? d.support : d.counter;
+    var c = arr[i]; if(!c){ return; }
+    fillPop(c.a, betPair(c.s), c.t, RIMG, c.b, side, c.e, '');
+  }
+  function fillPop(author, stakeHTML, title, imgHTML, body, chipSide, chipEntry, repsText){
+    document.getElementById('pm-author').textContent = author;
+    var ch = document.getElementById('pm-chip');
+    ch.textContent = chipSide.toUpperCase() + ' @ ' + chipEntry + '%';
+    ch.className = 'sidechip sm ' + chipSide;
+    document.getElementById('pm-stake').innerHTML = stakeHTML;
+    document.getElementById('pm-reps').textContent = repsText;
+    document.getElementById('pm-repsep').style.display = repsText ? '' : 'none';
+    document.getElementById('pm-title').textContent = title;
+    document.getElementById('pm-img').innerHTML = imgHTML;
+    document.getElementById('pm-body').innerHTML = String(body).split('\n\n')
+      .map(function(p){ return '<p>'+p+'</p>'; }).join('');
+    document.body.classList.add('ppop');
+    var sc = document.querySelector('.pmscroll'); if(sc){ sc.scrollTop = 0; }
+  }
+  function closePop(){ document.body.classList.remove('ppop'); }
+
+  /* reply to the post in the header (reply-as-bet, floor Đ 50) */
+  function replyToPost(role){
+    if(!openPost){ return; }
+    var d = POSTS[openPost];
+    var verb = role === 'support' ? 'Support' : 'Counter';
+    var side = role === 'support' ? d.side : (d.side === 'yes' ? 'no' : 'yes');
+    /* v0_34 — match the market-detail rule (pick(): YES bet -> right slot, NO -> left).
+       The composer opens in the OPPOSITE slot so the side you're betting on stays
+       visible and the other side slides away. With fixed columns (left=YES, right=NO)
+       this lands correctly: Support-on-YES -> .slot.r -> the NO side slides. */
+    var slot = document.querySelector(side === 'yes' ? '.slot.r' : '.slot.l');
+    openMod(slot, side, 'postreply-'+role, 50, function(mod){
+      mod.querySelector('.t').style.display = 'none';
+      var tr = mod.querySelector('.treply');
+      tr.style.display = 'block';
+      tr.querySelector('.r1').textContent = verb + ' ' + d.author + '\u2019s argument';
+    });
+  }
+</script>
+<div id="imglb" class="imglb" onclick="zzCloseImg(event)"><div class="imglb-box" id="imglb-box"></div></div>
+<script>
+function zzOpenImg(el){var m=el.querySelector(".media");if(!m)return;var b=document.getElementById("imglb-box");b.innerHTML="";b.appendChild(m.cloneNode(true));document.getElementById("imglb").classList.add("on");}
+function zzCloseImg(e){if(e&&e.target&&e.target.closest&&e.target.closest(".imglb-box"))return;document.getElementById("imglb").classList.remove("on");}
+document.addEventListener("keydown",function(e){if(e.key==="Escape")document.getElementById("imglb").classList.remove("on");});
+document.querySelectorAll(".argimg").forEach(function(a){a.style.cursor="zoom-in";a.addEventListener("click",function(){zzOpenImg(a);});});
+</script>
+<script>
+
+(function(){
+  if(typeof POSTS==='undefined') return;
+  var L=document.querySelector('.slot.l'), R=document.querySelector('.slot.r');
+  if(!L||!R) return;
+  var slots={yes:L, no:R};
+  var panels={yes:L.querySelector('.panel.vm'), no:R.querySelector('.panel.vm')};
+  var fills={yes:L.querySelector('.psfill'), no:R.querySelector('.psfill')};
+  if(!panels.yes||!panels.no) return;
+  var origImg={yes:panels.yes.querySelector('.argimg').innerHTML, no:panels.no.querySelector('.argimg').innerHTML};
+  var PH='<div class="media rdt"><span class="ph">POST IMAGE \u00b7 640:586</span></div>';
+  var picked=null, locked=false, lastSide=null, timers={yes:null,no:null}, idx={yes:0,no:0};
+
+  function num(s){return parseInt(String(s).replace(/[^0-9]/g,''),10)||0;}
+  function fmt(n){return n.toLocaleString('en-US');}
+  function build(key){
+    var d=POSTS[key], side=d.side;
+    var a=[{p:d.author,e:d.entry,st:num(d.staked),nw:num(d.now),t:d.title,r:d.replies,s:num(d.sDh),c:num(d.cDh),sp:d.sPct,img:origImg[side]}];
+    d.support.forEach(function(rp){
+      var st=num(rp.s), s=Math.round(st*2.6), c=Math.round(st*1.7), tot=s+c;
+      a.push({p:rp.a,e:rp.e,st:st,nw:Math.round(st*1.12),t:rp.t,r:Math.max(4,Math.round(st/110)),s:s,c:c,sp:Math.round(s/tot*100),img:PH});
+    });
+    return a;
+  }
+  var posts={yes:build('ashen'), no:build('tidal')};
+
+  function setC(panel,d,side){
+    var q=function(s){return panel.querySelector(s);};
+    if(q('.pseud'))q('.pseud').textContent=d.p;
+    if(q('.sidechip'))q('.sidechip').textContent=(side==='yes'?'YES @ ':'NO @ ')+d.e+'%';
+    if(q('.argstake'))q('.argstake').innerHTML='\u0110 '+fmt(d.st)+' <span class="arrow">\u2192</span> \u0110 '+fmt(d.nw);
+    var rn=q('.repmeta .repn'); if(rn)rn.textContent=d.r; else if(q('.repmeta'))q('.repmeta').textContent='Replies \u00b7 '+d.r;
+    var tt=q('.rtt'); if(tt)tt.textContent=d.t; else if(q('.rtitle span'))q('.rtitle span').textContent=d.t;
+    if(q('.argimg'))q('.argimg').innerHTML=d.img;
+    var sb=panel.querySelectorAll('.barrow.f2 .sb2');
+    if(sb[0])sb[0].textContent='\u0110 '+fmt(d.s);
+    if(sb[1])sb[1].innerHTML='<b class="stkn">\u0110 '+fmt(d.s+d.c)+'</b> staked';
+    if(sb[2])sb[2].textContent='\u0110 '+fmt(d.c);
+    var f=q('.barrow.f2 .fill'); if(f)f.style.width=d.sp+'%';
+  }
+  function show(side,i,dir){
+    i=(i%posts[side].length+posts[side].length)%posts[side].length; idx[side]=i;
+    var p=panels[side], b=p.querySelector('.argbody');
+    setC(p,posts[side][i],side);
+    if(dir){
+      b.style.transition='none'; b.style.transform='translateY('+(dir>0?14:-14)+'px)'; b.style.opacity='0';
+      void b.offsetHeight;
+      b.style.transition='transform .26s ease, opacity .26s ease'; b.style.transform='translateY(0)'; b.style.opacity='1';
+    }
+  }
+  function step(side,dir){ show(side, idx[side]+dir, dir); lastSide=side; }
+
+  /* 20s vertical loader; the two sides are offset 10s so posts advance one-after-another */
+  function startFill(f,from){
+    if(!f)return; from=from||0;
+    f.style.transition='none'; f.style.height=from+'%'; void f.offsetHeight;
+    var sec=20*(1-from/100);
+    f.style.transition='height '+sec+'s linear'; f.style.height='100%';
+  }
+  function stopFill(f){ if(!f)return; f.style.transition='none'; f.style.height='0%'; }
+  function startSide(side,delay,from){
+    clearTimeout(timers[side]);
+    startFill(fills[side],from);
+    timers[side]=setTimeout(function tk(){
+      if(locked||picked===side) return;
+      step(side,1); lastSide=side; startFill(fills[side],0);
+      timers[side]=setTimeout(tk,20000);
+    },delay);
+  }
+  function stopSide(side){ clearTimeout(timers[side]); stopFill(fills[side]); }
+  function resumeAuto(){ startSide('yes',20000,0); startSide('no',10000,50); }  /* NO leads by 10s */
+
+  /* side-pick: picked side is manual (loader off); the OTHER side keeps auto-scrolling */
+  function lift(){ slots.yes.classList.toggle('picked',picked==='yes'); slots.no.classList.toggle('picked',picked==='no'); document.body.classList.toggle('mkpick', !!picked); }
+  function pickSide(side){
+    if(locked) return;
+    var prev=picked; picked=side;
+    lift();                                           /* bug1: flip classes FIRST so the freed side's loader is visible */
+    stopSide(side);                                   /* this side -> manual */
+    if(prev&&prev!==side) startSide(prev,20000,0);    /* toggled-away side resumes auto (now visible -> animates) */
+  }
+  function unpick(){ if(!picked)return; picked=null; lift(); resumeAuto(); }
+
+  /* lock: any sub-view hides controls + freezes both sides until back to plain market view */
+  function inDefault(){
+    var b=document.body.classList;
+    if(b.contains('postview')||b.contains('ppop')) return false;
+    if(L.classList.contains('bet')||R.classList.contains('bet')) return false;
+    return true;
+  }
+  function applyLock(){
+    if(!inDefault()){
+      if(locked) return;
+      locked=true; document.body.classList.add('pslock');
+      picked=null; lift(); stopSide('yes'); stopSide('no');
+    } else {
+      if(!locked) return;
+      locked=false; document.body.classList.remove('pslock'); resumeAuto();
+    }
+  }
+  var mo=new MutationObserver(applyLock);
+  mo.observe(document.body,{attributes:true,attributeFilter:['class']});
+  mo.observe(L,{attributes:true,attributeFilter:['class']});
+  mo.observe(R,{attributes:true,attributeFilter:['class']});
+
+  /* controls + interaction */
+  ['yes','no'].forEach(function(side){
+    var sc=slots[side].querySelector('.pscroll');
+    sc.querySelector('.psup').addEventListener('click',function(e){ e.stopPropagation(); if(locked)return; pickSide(side); step(side,-1); });
+    sc.querySelector('.psdn').addEventListener('click',function(e){ e.stopPropagation(); if(locked)return; pickSide(side); step(side,1); });
+    slots[side].addEventListener('click',function(ev){
+      if(locked) return;
+      if(ev.target.closest('.rtt,.argimg,button,a,.pscroll')) return;
+      pickSide(side);
+    });
+  });
+  document.addEventListener('click',function(ev){ if(locked)return; if(ev.target.closest('.slot'))return; unpick(); });
+  function onKey(k){
+    if(locked) return;
+    if(picked){
+      if(k==='ArrowUp')step(picked,-1);
+      else if(k==='ArrowDown')step(picked,1);
+      else if(k==='ArrowLeft')pickSide('yes');
+      else if(k==='ArrowRight')pickSide('no');
+      return;
+    }
+    /* no side selected: Left/Right pick a side; Up/Down resume the most-recently-scrolled side */
+    if(k==='ArrowLeft')pickSide('yes');
+    else if(k==='ArrowRight')pickSide('no');
+    else if((k==='ArrowUp'||k==='ArrowDown')&&lastSide){ pickSide(lastSide); step(lastSide, k==='ArrowUp'?-1:1); }
+  }
+  document.addEventListener('keydown',function(e){ if(/^Arrow/.test(e.key)&&!locked){ e.preventDefault(); onKey(e.key); } });
+  window.addEventListener('message',function(e){ var d=e.data||{}; if(d.type==='key')onKey(d.key);
+    /* v0.26: the shell renders iframes display:none until shown, so the init resumeAuto() ran on a
+       hidden element and never animated. Re-kick-start when this surface is (re)shown — the shell
+       sends setsub on every show. inDefault() guard => only when actually on the market view. */
+    else if(d.type==='setsub'){ setTimeout(function(){ if(inDefault())resumeAuto(); },120); } });
+
+  resumeAuto();
+})();
+
+</script>
+<script>
+
+(function(){
+  if(typeof POSTS==='undefined'||typeof cardHTML!=='function') return;
+  var L=document.querySelector('.slot.l'), R=document.querySelector('.slot.r');
+  if(!L||!R) return;
+  var lists={support:document.getElementById('pv-slist'), counter:document.getElementById('pv-clist')};
+  if(!lists.support||!lists.counter) return;
+  var slots={support:L, counter:R};
+  var fills={support:L.querySelector('.rps .psfill'), counter:R.querySelector('.rps .psfill')};
+  var panels={support:null, counter:null};
+  var idx={support:0,counter:0}, timers={support:null,counter:null}, picked=null, lastCol=null, frozen=true, wasPV=false;
+
+  /* v0_33 — internal keys 'support'/'counter' are just LEFT/RIGHT column labels.
+     Left (support) ALWAYS shows YES-side replies, right (counter) NO-side, per post. */
+  function items(side){ var d=POSTS[openPost]; if(!d) return [];
+    var y=(d.side==='yes'?d.support:d.counter), n=(d.side==='yes'?d.counter:d.support);
+    return side==='support'?y:n; }
+
+  /* swap fields in place — the market's setC, adapted to the reply card */
+  function setCard(panel,c,side,i){
+    if(!panel||!c) return;
+    var chipSide=side==='support'?'yes':'no';   /* v0_33 — fixed column side, not post-relative */
+    var ps=panel.querySelector('.pseud'); if(ps)ps.textContent=c.a;
+    var ch=panel.querySelector('.sidechip'); if(ch){ ch.textContent=chipSide.toUpperCase()+' @ '+c.e+'%'; ch.className='sidechip sm '+chipSide; }
+    var st=panel.querySelector('.argstake'); if(st)st.innerHTML=betPair(c.s);
+    var ti=panel.querySelector('.rtitle span'); if(ti)ti.textContent=c.t;
+    var pl=panel.querySelector('.plus'); if(pl){ if(c.b){ pl.style.display=''; pl.setAttribute('onclick',"openCardPop('"+chipSide+"',"+i+")"); } else pl.style.display='none'; }
+  }
+  /* animate only the inner (.rinner), like the market animates .argbody — the border never moves */
+  function show(side,dir){
+    var panel=panels[side], it=items(side); if(!panel||!it.length) return;
+    var i=((idx[side]%it.length)+it.length)%it.length; idx[side]=i;
+    setCard(panel, it[i], side, i);
+    if(dir){ var b=panel.querySelector('.rinner'); if(b){
+      b.style.transition='none'; b.style.transform='translateY('+(dir>0?14:-14)+'px)'; b.style.opacity='0';
+      void b.offsetHeight;
+      b.style.transition='transform .26s ease, opacity .26s ease'; b.style.transform='translateY(0)'; b.style.opacity='1'; } }
+  }
+  function step(side,dir){ idx[side]+=dir; show(side,dir); lastCol=side; }
+
+  function startFill(f,from){ if(!f)return; from=from||0; f.style.transition='none'; f.style.height=from+'%'; void f.offsetHeight; var sec=20*(1-from/100); f.style.transition='height '+sec+'s linear'; f.style.height='100%'; }
+  function stopFill(f){ if(!f)return; f.style.transition='none'; f.style.height='0%'; }
+  function startSide(side,delay,from){ clearTimeout(timers[side]); startFill(fills[side],from); timers[side]=setTimeout(function tk(){ if(frozen||picked===side) return; step(side,1); startFill(fills[side],0); timers[side]=setTimeout(tk,20000); },delay); }
+  function stopSide(side){ clearTimeout(timers[side]); stopFill(fills[side]); }
+  function resumeAuto(){ startSide('support',20000,0); startSide('counter',10000,50); }
+
+  function lift(){ slots.support.classList.toggle('rpicked',picked==='support'); slots.counter.classList.toggle('rpicked',picked==='counter'); document.body.classList.toggle('rppick', !!picked); }
+  function pick(side){ if(frozen)return; var prev=picked; picked=side; lift(); stopSide(side); if(prev&&prev!==side) startSide(prev,20000,0); }
+  function unpick(){ if(!picked)return; picked=null; lift(); resumeAuto(); }
+
+  function ok(){ var b=document.body.classList; return b.contains('postview')&&!b.contains('ppop')&&!L.classList.contains('bet')&&!R.classList.contains('bet'); }
+  function cache(){ panels.support=lists.support.querySelector('.rpanel'); panels.counter=lists.counter.querySelector('.rpanel'); }
+  function update(){
+    var pv=document.body.classList.contains('postview');
+    if(pv&&!wasPV){ cache(); idx.support=0; idx.counter=0; picked=null; lift(); frozen=false; resumeAuto(); }   /* entered a post */
+    else if(!pv&&wasPV){ frozen=true; picked=null; lift(); stopSide('support'); stopSide('counter'); }          /* left to market */
+    else if(pv){ if(ok()){ if(frozen){ cache(); frozen=false; resumeAuto(); } } else if(!frozen){ frozen=true; stopSide('support'); stopSide('counter'); } }
+    document.body.classList.toggle('rpsoff', pv && (L.classList.contains('bet')||R.classList.contains('bet')||document.body.classList.contains('ppop')));
+    wasPV=pv;
+  }
+  var mo=new MutationObserver(update);
+  mo.observe(document.body,{attributes:true,attributeFilter:['class']});
+  mo.observe(L,{attributes:true,attributeFilter:['class']});
+  mo.observe(R,{attributes:true,attributeFilter:['class']});
+
+  ['support','counter'].forEach(function(side){
+    var w=slots[side].querySelector('.rps'); if(!w) return;
+    w.querySelector('.rpsup').addEventListener('click',function(e){ e.stopPropagation(); if(frozen)return; pick(side); step(side,-1); });
+    w.querySelector('.rpsdn').addEventListener('click',function(e){ e.stopPropagation(); if(frozen)return; pick(side); step(side,1); });
+    /* click anywhere in the column (the Yes/No side-label, the reply title, the body) picks it —
+       like clicking the market post; only buttons/links/the arrows are excluded */
+    slots[side].addEventListener('click',function(ev){ if(frozen)return; if(ev.target.closest('button,a,.rps'))return; pick(side); });
+  });
+  document.addEventListener('click',function(ev){ if(frozen)return; if(ev.target.closest('.slot'))return; unpick(); });
+  function onKey(k){
+    if(frozen)return;
+    if(picked){ if(k==='ArrowUp')step(picked,-1); else if(k==='ArrowDown')step(picked,1); else if(k==='ArrowLeft')pick('support'); else if(k==='ArrowRight')pick('counter'); return; }
+    if(k==='ArrowLeft')pick('support');
+    else if(k==='ArrowRight')pick('counter');
+    else if((k==='ArrowUp'||k==='ArrowDown')&&lastCol){ pick(lastCol); step(lastCol,k==='ArrowUp'?-1:1); }
+  }
+  document.addEventListener('keydown',function(e){ if(/^Arrow/.test(e.key)&&!frozen){ e.preventDefault(); onKey(e.key); } });
+  window.addEventListener('message',function(e){ var d=e.data||{}; if(d.type==='key'&&!frozen)onKey(d.key);
+    /* v0.26: re-kick-start when this surface is (re)shown (shell sends setsub on every show); ok()
+       guard => only when actually on the reply view. cache() re-binds in case enterPost re-rendered. */
+    else if(d.type==='setsub'){ setTimeout(function(){ if(ok()){ cache(); frozen=false; resumeAuto(); } },120); } });
+})();
+
+</script>
+
+<style id="zz-shell-style">.pseud,.navid,.wordmark{cursor:pointer}</style>
+<script>
+(function(){
+  function nav(page,sub,post){ try{ parent.postMessage({zz:1,type:'nav',page:page,sub:sub,post:post},'*'); }catch(e){} }
+  document.querySelectorAll('.sellbtn').forEach(function(el){
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); nav('profile'); });
+  });
+  document.addEventListener('click', function(ev){
+    var p = ev.target.closest ? ev.target.closest('.pseud,.navid') : null;
+    if(p){ nav('profile'); }
+  });
+  window.addEventListener('message', function(e){
+    var d=e.data||{}; if(d.type!=='setsub') return;
+    if(d.sub==='reply'){ if(typeof enterPost==='function') enterPost(d.post||'ashen'); }
+    else if(d.sub==='market'){ if(document.body.classList.contains('postview') && typeof exitPost==='function') exitPost(); }
+  });
+  document.querySelectorAll('.wordmark').forEach(function(el){
+    el.style.cursor='pointer';
+    el.addEventListener('click', function(ev){ ev.stopPropagation(); nav('discovery'); });
+  });
+})();
+</script>
+
+</body>
+</html>
