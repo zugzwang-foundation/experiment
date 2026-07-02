@@ -16,7 +16,7 @@
 | **Staging** | push to **`staging`** branch | **staging** Supabase (`rwfdoqzsghqhhdapxafg`) | `staging.zugzwangworld.com` | **auto** — `staging-migrate.yml` (GHA) on push to `staging` |
 | **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, first exercised at D6) |
 
-Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0018`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
+Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0019`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
 
 ---
 
