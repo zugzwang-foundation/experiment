@@ -1041,6 +1041,7 @@ Append-only enforcement on `mod_actions` and `admin_events` parallels INV-4 mech
 - **Privacy Policy.** Drafted; lawyer-finalised. Cross-references §16.3.
 - **DPDPA grievance contact.** Email + named officer (per Indian Digital Personal Data Protection Act). Surfaced in footer and Privacy Policy.
 - **PhotoDNA + reporting compliance.** CSAM hash service onboarded pre-launch. Auto-report to NCMEC (or jurisdictional equivalent) on Track A CSAM detection.
+- **Moderated-image byte integrity (ADR-0028).** Participant image uploads are write-once (`If-None-Match: *`, SPEC.2 §12.3): a moderated image is immutable from first write, so the bytes that pass the CSAM/adult gate are the bytes rendered — the post-approval swap window is closed at the storage layer. The pre-moderation `HeadObject` verify fails closed on a missing or oversized object.
 - **DSA notice-and-action.** Small-platform exposure noted. ToS includes notice-and-action contact + procedure.
 
 Lawyer engagement target: mid-July 2026. ToS / Privacy Policy drafts ready four weeks before launch.

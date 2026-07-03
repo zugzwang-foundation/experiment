@@ -164,13 +164,12 @@ export async function verifyUploadedObject(
   `error_internal`). Add, grouped with the existing moderation-class mappings:
   - `ImageOversizeError → buildWire(400, "error_image_oversize", msg)` — cached
     terminal 4xx (the object won't shrink; a fresh attempt uses a new key).
-  - `StorageObjectMissingError → buildWire(409, "error_storage_object_missing",
-    msg)` — cached terminal 4xx. **Open decision** (kickoff wrote "400/409"):
-    chosen **409** (state-conflict: the `image_uploads` row exists + is owned +
-    un-attached, but the physical object isn't present — a conflict, not a
-    malformed body; parallels the `error_moderation_in_flight` 409). Flagged for
-    web confirmation in the PR; trivially flippable to 400 if the ratified plan
-    said 400.
+  - `StorageObjectMissingError → buildWire(400, "error_storage_object_missing",
+    msg)` — cached terminal 4xx. **RESOLVED** (ADR-0028 §Decision Outcome RULING;
+    kickoff wrote "400/409"): **400** `validation_error` — the client referenced
+    an upload it never completed (bad request), symmetric with
+    `error_image_oversize → 400`; 409 in this codebase denotes a clash with
+    existing/in-flight state, which an absent object is not.
   - `StorageUnavailableError → buildWire(503, "error_storage_unavailable", msg,
     { retryAfterBody: 5 })` — status ≥ 500 ⇒ `runBetEndpoint` does **NOT** cache
     it ⇒ a retry re-attempts cleanly. Correct fail-open-on-retry for transient
@@ -258,11 +257,12 @@ new module boundary — implementer updates these, they are not new-behavior TDD
   contract (ADR-0028 AMD-3); building it is not this stratum.
 - No changes to `precommitModerate`, `openai.ts`, `consequences.ts`, read paths.
 
-## 9. Open decisions (surface in PR for web confirmation)
+## 9. Open decisions (RESOLVED)
 
-- **Missing-object HTTP status** — chosen **409** `error_storage_object_missing`
-  (kickoff wrote "400/409"; rationale in §3.7). Flip to 400 if the ratified plan
-  specified 400.
+- **Missing-object HTTP status** — **RESOLVED to 400** `error_storage_object_missing`
+  (`validation_error`) per ADR-0028 §Decision Outcome RULING (web-authored). The
+  kickoff wrote "400/409"; the ratified call is 400 (bad request, symmetric with
+  `error_image_oversize`), landed in `bets/errors.ts` + the one test assertion.
 
 ## 10. Rollout — HARD DEPLOY GATE (staging-412)
 

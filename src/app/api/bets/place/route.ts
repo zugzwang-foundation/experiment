@@ -19,6 +19,7 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { numericString } from "@/server/events/schemas";
 import { recordGateBlock } from "@/server/moderation/consequences";
 import { precommitModerate } from "@/server/moderation/precommit";
+import { verifyUploadedObject } from "@/server/storage/verify-object";
 
 // POST /api/bets/place — F-BET-1 (entry) / F-BET-2 (subsequent), comment-bearing.
 // Runs the full §3.1 stack via `runBetEndpoint` (origin → auth+ban → idem →
@@ -75,13 +76,35 @@ export async function POST(request: Request): Promise<Response> {
 		// 5c. Image resolve + ownership (DEBATE.2 F-COMMENT-3) — pre-tx. The resolved
 		// r2 key is routed into the ALREADY-image-capable moderation seam below
 		// (route-wire only — the classifier is SCAFFOLD.15/16, consequences DEBATE.7).
+		//
+		// 5c'. Verify the uploaded object BEFORE moderation (AUDIT-FIX-A1, pre-tx,
+		// FAIL-CLOSED, HTTP outside the tx per CLAUDE.md §3). One HeadObject: (A10)
+		// reject a real-byte oversize / 0-byte object; reject a missing object or
+		// unavailable R2; capture the ETag + REAL size for the append-only
+		// image_upload.committed audit record. Any throw blocks the request and the
+		// W-1 bet tx NEVER opens — toWireError maps ImageOversizeError→400,
+		// StorageObjectMissingError→400 (ADR-0028), StorageUnavailableError→503. The write-once
+		// arming at sign time (If-None-Match) is the swap guarantee; the ETag here is
+		// a forensic fingerprint only, never a security control.
 		let imageR2Key: string | undefined;
-		let resolvedImage: { uploadId: string; r2ObjectKey: string } | null = null;
+		let resolvedImage: {
+			uploadId: string;
+			r2ObjectKey: string;
+			etag: string | null;
+			byteSizeActual: number;
+		} | null = null;
 		if (imageUploadsId !== undefined) {
-			resolvedImage = await resolveImageAttachment(db, {
+			const resolved = await resolveImageAttachment(db, {
 				userId: ctx.userId,
 				imageUploadsId,
 			});
+			const verified = await verifyUploadedObject(resolved.r2ObjectKey);
+			resolvedImage = {
+				uploadId: resolved.uploadId,
+				r2ObjectKey: resolved.r2ObjectKey,
+				etag: verified.etag ?? null,
+				byteSizeActual: verified.byteSize,
+			};
 			imageR2Key = resolvedImage.r2ObjectKey;
 		}
 

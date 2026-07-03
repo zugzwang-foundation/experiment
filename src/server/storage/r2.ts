@@ -106,12 +106,21 @@ function getClient(bucket: R2Bucket): { client: S3Client; bucketName: string } {
  * Sign a PUT URL for the given bucket + key + content-type. Returns the
  * signed URL string. Caller is responsible for handing it back to the
  * browser; R2 enforces method + key + content-type bind at PUT time.
+ *
+ * AUDIT-FIX-A1: `opts.ifNoneMatch` arms **write-once**. When true, the
+ * presigned PUT carries `If-None-Match: "*"` — the first PUT creates the
+ * object, every later PUT to the same key → HTTP 412. The header joins the
+ * SigV4 `SignedHeaders`, so a client cannot drop it to bypass write-once (the
+ * signature would not validate). This binds the moderated bytes ≡ the rendered
+ * bytes BY CONSTRUCTION (participant sign path). The admin market-media sign
+ * path passes NO opts and stays mutable (trusted/unmoderated — ADR-0026/0027).
  */
 export async function mintPutUrl(
 	bucket: R2Bucket,
 	key: string,
 	contentType: string,
 	ttlSeconds: number,
+	opts?: { ifNoneMatch?: boolean },
 ): Promise<string> {
 	const { client, bucketName } = getClient(bucket);
 	try {
@@ -121,6 +130,9 @@ export async function mintPutUrl(
 				Bucket: bucketName,
 				Key: key,
 				ContentType: contentType,
+				// Write-once binding (participant path only). `"*"` = "no object may
+				// already exist at this key" — R2 rejects any overwrite with 412.
+				...(opts?.ifNoneMatch ? { IfNoneMatch: "*" } : {}),
 			}),
 			{ expiresIn: ttlSeconds },
 		);
@@ -151,22 +163,28 @@ export async function mintReadUrl(
 }
 
 /**
- * HeadObject — returns object metadata (size + content-type). Used by the
- * post-PUT verification path (not in SCAFFOLD.15 caller scope; the
- * primitive is shipped for DEBATE.2 + admin moderation paths). Throws
+ * HeadObject — returns object metadata (size + content-type + ETag). The
+ * post-PUT verification path (`verify-object.ts`, AUDIT-FIX-A1) consumes
+ * `contentLength` for the A10 real-byte size backstop and `etag` as the
+ * append-only forensic fingerprint (R2 ETag is a quoted MD5, kept verbatim —
+ * a fingerprint, NEVER a security primitive). Throws
  * `StorageObjectMissingError` on 404, `StorageUnavailableError` on 5xx.
  */
 export async function headObject(
 	bucket: R2Bucket,
 	key: string,
-): Promise<{ contentLength: number; contentType: string | undefined }> {
+): Promise<{
+	contentLength: number;
+	contentType: string | undefined;
+	etag: string | undefined;
+}> {
 	const { client, bucketName } = getClient(bucket);
 	try {
 		const out = await client.send(
 			new HeadObjectCommand({ Bucket: bucketName, Key: key }),
 		);
 		const contentLength = out.ContentLength ?? 0;
-		return { contentLength, contentType: out.ContentType };
+		return { contentLength, contentType: out.ContentType, etag: out.ETag };
 	} catch (err) {
 		if (err && typeof err === "object" && "name" in err) {
 			const name = (err as { name?: unknown }).name;

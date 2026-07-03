@@ -156,11 +156,19 @@ export async function POST(request: Request): Promise<Response> {
 		// CLAUDE.md §3 + ADR-0014. A failure here returns 503 to the client
 		// but leaves the image_uploads row + events row committed; the
 		// orphan-sweep cron (SCAFFOLD.15) cleans the unused row within ≤2h.
+		//
+		// AUDIT-FIX-A1: `{ ifNoneMatch: true }` arms write-once. CLIENT CONTRACT:
+		// the PUT MUST send header `If-None-Match: *` (it is a SigV4-signed header
+		// — omitting it fails signature validation). The FIRST PUT creates the
+		// object; a repeat PUT to the same URL/key → HTTP 412, which the client
+		// treats as idempotent success (already-uploaded). This makes the object
+		// physically immutable so the moderated bytes ≡ the rendered bytes.
 		const putUrl = await mintPutUrl(
 			"uploads",
 			result.key,
 			parsed.contentType,
 			PUT_URL_TTL_SECONDS,
+			{ ifNoneMatch: true },
 		);
 		return jsonResponse(
 			{ uploadId: result.uploadId, putUrl, key: result.key },

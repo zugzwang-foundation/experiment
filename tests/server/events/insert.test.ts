@@ -99,6 +99,9 @@ const CASES: Case[] = [
 			userId,
 			commentId: uuidv7(),
 			key: `u/${userId}/${aggregateId}.jpg`,
+			// AUDIT-FIX-A1: forensic ETag (nullable) + REAL size, now required.
+			etag: '"insert-probe-etag"',
+			byteSizeActual: 50_000,
 		}),
 		actorId: (userId) => userId,
 		userIdInMetadata: (userId) => userId,

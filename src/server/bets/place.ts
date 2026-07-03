@@ -42,6 +42,16 @@ export interface PlaceParams {
 		uploadId: string;
 		r2ObjectKey: string;
 		committedEventId: string;
+		/**
+		 * AUDIT-FIX-A1: the forensic ETag (null iff R2 omitted the header) + the
+		 * REAL object size, both captured by the pre-moderation HeadObject
+		 * (`verifyUploadedObject`) at handler entry. Recorded verbatim in the
+		 * append-only `image_upload.committed` payload — the ETag is an audit
+		 * fingerprint (collision-weak MD5), NEVER a security primitive; the swap
+		 * guarantee is the sign-time write-once arming, not this value.
+		 */
+		etag: string | null;
+		byteSizeActual: number;
 	} | null;
 	metadata: BetEventMetadata;
 }
@@ -249,6 +259,11 @@ export async function place(
 				userId,
 				commentId: comment.id,
 				key: image.r2ObjectKey,
+				// AUDIT-FIX-A1: the forensic fingerprint + REAL size from the pre-tx
+				// HeadObject. Audit-only — the swap guarantee is the sign-time
+				// write-once binding (If-None-Match), not an ETag comparison.
+				etag: image.etag,
+				byteSizeActual: image.byteSizeActual,
 			},
 			metadata: params.metadata,
 		});

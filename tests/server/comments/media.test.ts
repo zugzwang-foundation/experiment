@@ -27,7 +27,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //   is stable across attempts). A per-attempt-regenerated id would fail this.
 //
 // `image_upload.committed` is ALREADY in EVENT_TYPES with payload
-// { uploadId, userId, commentId, key } (schemas.ts) — no new event type.
+// { uploadId, userId, commentId, key, etag, byteSizeActual } (schemas.ts;
+// etag + byteSizeActual added at AUDIT-FIX-A1) — no new event type.
 //
 // Mirrors atomicity.test.ts + events-idempotency.test.ts. REAL place route +
 // REAL runBetTransaction against test Postgres; only externals mocked. The
@@ -84,6 +85,16 @@ vi.mock("@/server/idempotency/cache", () => ({
 }));
 vi.mock("@/server/moderation/precommit", () => ({
 	precommitModerate: mockPrecommit,
+}));
+// AUDIT-FIX-A1: the place route now runs `verifyUploadedObject` (a real R2
+// HeadObject) pre-moderation. Mock it benign here so these route-integration
+// tests never hit the network — the byte-identity mechanism is proven in
+// tests/server/storage/* + tests/server/bets/place-image-verify-*, not here.
+vi.mock("@/server/storage/verify-object", () => ({
+	verifyUploadedObject: vi.fn(async () => ({
+		etag: '"media-fixture-etag"',
+		byteSize: 1024,
+	})),
 }));
 
 // Partial-mock positions persist: throw ONE synthetic 40001 on the first spine

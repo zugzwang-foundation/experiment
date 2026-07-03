@@ -1,8 +1,11 @@
 import "server-only";
 
 import {
+	ImageOversizeError,
 	ModerationInFlightError,
 	ModerationUnavailableError,
+	StorageObjectMissingError,
+	StorageUnavailableError,
 } from "@/lib/errors";
 import type { MarketStatus } from "@/server/markets/transitions";
 
@@ -289,9 +292,10 @@ function buildWire(
  * `retry_after` field is present IFF the status is 429 / 503 (§4.4 verbatim);
  * the 409 in-flight cases carry a `Retry-After` HTTP header (`retryAfterHeader`)
  * but no body field. The two ENGINE.7 wrapper classes + the two moderation
- * classes (`@/lib/errors`) are mapped explicitly; the bet product classes read
- * their `static httpStatus` / `code`. An unrecognized error → 500
- * `error_internal` (the caller releases the idempotency sentinel as a crash).
+ * classes + the three AUDIT-FIX-A1 storage/image classes (`@/lib/errors`) are
+ * mapped explicitly; the bet product classes read their `static httpStatus` /
+ * `code`. An unrecognized error → 500 `error_internal` (the caller releases the
+ * idempotency sentinel as a crash).
  */
 export function toWireError(err: unknown): WireError {
 	if (err instanceof BetSerializationExhaustedError) {
@@ -318,6 +322,28 @@ export function toWireError(err: unknown): WireError {
 	}
 	if (err instanceof ModerationUnavailableError) {
 		return buildWire(503, "error_moderation_unavailable", err.message, {
+			retryAfterBody: 5,
+		});
+	}
+	// AUDIT-FIX-A1 — the pre-moderation `verifyUploadedObject` HeadObject (image
+	// path) fails closed; map its `@/lib/errors` DomainError classes onto the §4.4
+	// wire envelope (they are NOT BetProductError, so without these they fall
+	// through to 500 error_internal). ImageOversize (A10, real-byte cap) + object
+	// missing are terminal 4xx (cached per §11); storage-unavailable is a 503
+	// (status ≥ 500 ⇒ runBetEndpoint does NOT cache it → a retry re-attempts).
+	if (err instanceof ImageOversizeError) {
+		return buildWire(400, "error_image_oversize", err.message);
+	}
+	if (err instanceof StorageObjectMissingError) {
+		// ADR-0028 RULING (§9 #4): missing object → 400 (validation_error), NOT 409.
+		// The client referenced an upload it never completed (or a stale/foreign id)
+		// — a bad request, symmetric with error_image_oversize → 400; 409 in this
+		// codebase denotes a clash with existing/in-flight state, which an absent
+		// object is not.
+		return buildWire(400, "error_storage_object_missing", err.message);
+	}
+	if (err instanceof StorageUnavailableError) {
+		return buildWire(503, "error_storage_unavailable", err.message, {
 			retryAfterBody: 5,
 		});
 	}

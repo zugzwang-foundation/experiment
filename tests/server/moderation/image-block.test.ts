@@ -60,6 +60,16 @@ vi.mock("@/server/idempotency/cache", () => ({
 vi.mock("@/server/moderation/precommit", () => ({
 	precommitModerate: mockPrecommit,
 }));
+// AUDIT-FIX-A1: the place route runs `verifyUploadedObject` (a real R2
+// HeadObject) pre-moderation. Mock it benign so this route-integration test
+// never hits the network — the seeded u/<userId>/<uploadId>.jpg image still
+// flows through the (mocked) precommit block path unchanged.
+vi.mock("@/server/storage/verify-object", () => ({
+	verifyUploadedObject: vi.fn(async () => ({
+		etag: '"imgblock-fixture-etag"',
+		byteSize: 1024,
+	})),
+}));
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { imageUploads, modActions, users } from "@/db/schema";

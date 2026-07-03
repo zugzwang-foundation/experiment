@@ -127,6 +127,12 @@ export const eventPayloadSchemas = {
 		userId: z.string().uuid(),
 		commentId: z.string().uuid(),
 		key: z.string(),
+		// AUDIT-FIX-A1: the pre-moderation HeadObject's forensic ETag (nullable —
+		// R2 may omit the header) + the REAL landed object size. Write-time
+		// validation only (no read-side replay re-validates this payload); the
+		// ETag is an audit fingerprint, never a security control.
+		etag: z.string().nullable(),
+		byteSizeActual: z.number().int().positive(),
 	}),
 	"image_upload.blocked": z.object({
 		uploadId: z.string().uuid(),
