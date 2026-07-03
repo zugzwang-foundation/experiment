@@ -22,6 +22,26 @@ export async function register(): Promise<void> {
 		);
 	}
 
+	// AUDIT-FIX-B1 A18-DSN (ruling #9): a missing NEXT_PUBLIC_SENTRY_DSN
+	// silently no-ops all three Sentry.init sites, so assert presence at boot.
+	// Mechanism (same posture as the ZUGZWANG_ENV gate above): Next 16 skips
+	// register() during `next build` (NEXT_PHASE guard) and runs it at server
+	// cold start — the throw 500s every invocation including /api/health, so
+	// the deploy-pipeline health gates (runbook §3, staging gate + pre-promote
+	// staged-build curl) catch absence before any traffic is served.
+	// `staging` sits INSIDE the throw scope (PRIMARY variant, execute-gate F2:
+	// DSN confirmed in both Vercel scopes) so absence blows up at rehearsal,
+	// never first at prod. `preview` never throws (local builds + CI). Client
+	// init stays no-op-if-absent — this server gate catches absence first.
+	if (
+		(env === "prod" || env === "staging") &&
+		!process.env.NEXT_PUBLIC_SENTRY_DSN
+	) {
+		throw new Error(
+			`instrumentation.register: NEXT_PUBLIC_SENTRY_DSN is required when ZUGZWANG_ENV="${env}" — Sentry.init would silently no-op (SPEC.2 §17)`,
+		);
+	}
+
 	if (process.env.NEXT_RUNTIME === "nodejs") {
 		await import("./sentry.server.config");
 	}

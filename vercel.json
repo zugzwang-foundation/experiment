@@ -8,6 +8,10 @@
 		{
 			"path": "/api/cron/close-due-markets",
 			"schedule": "* * * * *"
+		},
+		{
+			"path": "/api/cron/alarms-drain",
+			"schedule": "*/5 * * * *"
 		}
 	]
 }

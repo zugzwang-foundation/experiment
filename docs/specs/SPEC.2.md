@@ -1678,22 +1678,23 @@ The two-vendor-plus-Vercel split is deliberate. A third vendor for structured re
 
 **Sentry deploy hook.** Vercel deploys fire a webhook to Sentry tagging the deploy SHA as a Sentry release; source maps upload alongside. Stack traces in Sentry events resolve to TypeScript source positions automatically. The webhook URL lives in Vercel project settings under `SENTRY_DEPLOY_HOOK_URL`; same lifecycle as `SENTRY_AUTH_TOKEN` per ADR-0007.
 
-### §17.2 Master alarm catalogue (eight rows + alarm-6 sub-table)
+### §17.2 Master alarm catalogue (nine rows + alarm-6 sub-table)
 
-The alarm catalogue consolidates every Sentry alarm fired across the codebase. Eight master rows; alarm 6 has a five-row sub-table per §17.3 because vendor-unavailability alarms have distinct sub-IDs per vendor that downstream code (per §11, per §10, per §17.6) cites directly.
+The alarm catalogue consolidates every Sentry alarm fired across the codebase. Nine master rows; alarm 6 has a five-row sub-table per §17.3 because vendor-unavailability alarms have distinct sub-IDs per vendor that downstream code (per §11, per §10, per §17.6) cites directly.
 
 | # | Alarm name | Trigger | Cited from |
 |---|---|---|---|
 | **1** | Append-only-trigger violation | Postgres `RAISE EXCEPTION` from BEFORE UPDATE / BEFORE DELETE on any of the 13 protected tables per §6 | §6.7, ADR-0005, ADR-0008, ADR-0014 |
-| **2** | DEFAULT-partition insert (events table) | Insert into `events_default` partition (any insert with `created_at` outside the 12 named monthly partitions per §7.2) — fired by `pg_cron` meta-query per §3.4 Pattern A-1 | §7.2, ADR-0005 |
+| **2** | DEFAULT-partition insert (events table) | A row present in the `events_default` partition (any insert with `created_at` outside the 12 named monthly partitions per §7.2). Detected drain-side: the `alarms-drain` cron probes `SELECT count(*) FROM events_default` each `*/5` tick and fires the `events_default_nonempty` Sentry event (title-matched) when non-zero; re-fires under Sentry fingerprint dedup while the partition stays non-empty (AUDIT-FIX-B1 / OQ-c). Supersedes the prior `pg_cron` meta-query transport — `pg_cron` cannot emit to Sentry, which is why the drain exists. | §7.2, ADR-0005 |
 | **3** | 40001-retry exhaustion (bet transaction wrapper) | Bet wrapper at `src/server/bets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 per ADR-0013 + §9 | §9, ADR-0013 |
-| **4** | OpenAI moderation upstream failure rate | Moderation upstream-failure custom event volume threshold per ADR-0014 + §10 (incl. `openai_moderation_auth_failure` for 4xx auth-error sub-class — failed-closed without retry) | §10, ADR-0014 |
+| **4** | OpenAI moderation upstream failure rate | Volume/rate threshold (HARDEN.* per §17.7) over OpenAI moderation vendor-boundary terminal-failure events, fired at `src/server/moderation/openai.ts`: `safeCaptureException(err, { tags: { kind: "openai_moderation_upstream_failure" } })` on the non-transient and retries-exhausted arms, plus `safeCaptureException(err, { tags: { kind: "openai_moderation_auth_failure" } })` on the 4xx auth-error sub-class (failed-closed without retry). Both fail closed to `ModerationUnavailableError`; the captures are fail-open side-effects that never alter the throw (AUDIT-FIX-B1 / A6). | §10, ADR-0014 |
 | **5** | Identity-pool low-watermark | `identity_pool` row count drops below 5% of initial 50,000 — fired by `pg_cron` meta-query per §3.4 Pattern A-1 | §3.5, SPEC.1 §15.2, ADR-0011 |
 | **6** | Per-vendor unavailability + cron job failure | Five sub-IDs per §17.3 — Upstash rate-limit, Upstash idempotency, R2, pg_cron job-run failures, Vercel Cron R2-orphan-sweep handler 5xx | §10, §11, §12, §17.6 |
 | **7** | 40001-retry exhaustion (resolution transaction wrapper) | W-3 wrapper at `src/server/resolution/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `resolution_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.9, rider R-K) | §3.6, §9, ADR-0013 §5.12 P2 |
 | **8** | 40001-retry exhaustion (lifecycle transaction wrapper) | W-4 wrapper at `src/server/markets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `lifecycle_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.14, S5 disposition CR-1, gate-ratified 2026-06-12) | §3.8, §9, ADR-0013 §5.12 P3 |
+| **9** | Bet-handler internal error (caught 500) | Bet endpoint catch (`src/server/bets/endpoint.ts`) converts an unrecognized failure to a `500 error_internal` envelope — `safeCaptureException(err, { tags: { kind: "bet_handler_internal_error" } })` fires only on that fallthrough arm (the 503 paths are captured at their own sources). The original `err` is preserved, so a caught append-only `RAISE` reaches Sentry with its message intact (available to alarm-1 tuning at HARDEN.*). Covers `/api/bets/place` + `/api/bets/sell` (shared catch) (AUDIT-FIX-B1 / A5) | §9, ADR-0005, ADR-0013 |
 
-Alarm rows 1-5 and 7 are consumed by single citation surfaces; alarm 6's sub-IDs are consumed across multiple citation surfaces (§10 cites 6c, §11 cites 6a + 6b, §12 cites 6c + 6e, §17.6 cites 6d), warranting the structuring elaboration.
+Alarm rows 1-5, 7, and 9 are consumed by single citation surfaces; alarm 6's sub-IDs are consumed across multiple citation surfaces (§10 cites 6c, §11 cites 6a + 6b, §12 cites 6c + 6e, §17.6 cites 6d), warranting the structuring elaboration.
 
 ### §17.3 Alarm-6 sub-table
 
@@ -1703,7 +1704,7 @@ Five sub-IDs. Each fires a distinct Sentry custom event with a distinct tag for 
 |---|---|---|---|
 | **6a** | Upstash (rate-limit) | Rate-limit middleware catches Upstash error per §11 fail-mode contract; admits the request (fail-open posture) | `upstash_unavailable_rate_limit` |
 | **6b** | Upstash (idempotency) | Idempotency cache helper catches Upstash error per §11 fail-mode contract; rejects the request with HTTP 503 (fail-closed posture) | `upstash_unavailable_idempotency` |
-| **6c** | R2 (object storage) | R2 client wrapper at `src/server/storage/r2.ts` catches R2 outage per §12.8 — fires on signed-PUT mint failure, signed-READ mint failure, orphan-sweep DELETE failure | `r2_unavailable` |
+| **6c** | R2 (object storage) | R2 client wrapper at `src/server/storage/r2.ts` catches R2 outage per §12.8 — fires on signed-PUT mint failure, signed-READ mint failure, orphan-sweep DELETE failure, and `headObject` failure (the pre-moderation verify-object HEAD per ADR-0028, non-404 R2-down arm) | `r2_unavailable` |
 | **6d** | `pg_cron` job-run failures | `pg_cron` meta-query over `cron.job_run_details` per §3.4 Pattern A-1 catches any job's terminal failure (events partition monitor, `identity_pool` low-watermark check, `markets`-state drift detection) | `pg_cron_job_failure` |
 | **6e** | Vercel Cron R2-orphan-sweep handler 5xx | Vercel Cron HTTP-fanout target at `src/app/api/cron/r2-orphan-sweep/route.ts` returns non-2xx; Vercel surfaces in cron run history | `vercel_cron_handler_5xx` |
 

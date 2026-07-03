@@ -15,6 +15,7 @@ import {
 	OPENAI_MODERATION_MODEL_SNAPSHOT,
 	OPENAI_TIMEOUT_MS,
 } from "@/server/config/limits";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // OpenAI v6 client wrapper for the omni-moderation-2024-09-26 snapshot per
 // SCAFFOLD.15 plan §5.2 + SPEC.2 §10.10 + ADR-0014. Module-load construction
@@ -26,9 +27,10 @@ import {
 //     OPENAI_MAX_RETRIES; on second failure, fail-CLOSED via
 //     ModerationUnavailableError. Per ADR-0006 §"Failure-mode profile".
 //   - Auth (401/403): throw immediately WITHOUT retry (retrying a bad key
-//     would burn rate-limit on the OpenAI side); emit the byte-stable
-//     `openai_moderation_auth_failure` Sentry tag (per SPEC.2 §17.2 row 4)
-//     via console.error for SCAFFOLD.5 swap.
+//     would burn rate-limit on the OpenAI side); capture with the byte-stable
+//     `openai_moderation_auth_failure` Sentry tag (per SPEC.2 §17.2 row 4).
+//   - All captures sit at THIS vendor boundary (AUDIT-FIX-B1 A6, ruling #4)
+//     — precommit re-wraps but mints no vendor failure of its own.
 
 let cachedClient: OpenAI | null = null;
 
@@ -106,17 +108,27 @@ export async function moderate(args: ModerateArgs): Promise<ModerateResult> {
 		} catch (err) {
 			lastErr = err;
 			if (isAuthFailure(err)) {
-				// TODO(SCAFFOLD.5): replace console.error with Sentry captureException
-				// + tag `openai_moderation_auth_failure` per SPEC.2 §17.2 row 4. Tag
-				// string MUST stay byte-identical so text-search-and-replace lands.
-				console.error("openai_moderation_auth_failure", err);
+				// Tag `openai_moderation_auth_failure` per SPEC.2 §17.2 row 4
+				// (byte-identical). Auth failures never retry.
+				safeCaptureException(err, {
+					tags: { kind: "openai_moderation_auth_failure" },
+				});
 				throw new ModerationUnavailableError(err);
 			}
 			if (!isTransient(err)) {
+				// Non-transient upstream failure (incl. the empty-results anomaly,
+				// which lands here as a plain Error) — capture, then fail closed.
+				safeCaptureException(err, {
+					tags: { kind: "openai_moderation_upstream_failure" },
+				});
 				throw new ModerationUnavailableError(err);
 			}
 			// transient → loop; if we've exhausted retries, fall through
 		}
 	}
+	// Retries exhausted on transients — same upstream tag with the last error.
+	safeCaptureException(lastErr, {
+		tags: { kind: "openai_moderation_upstream_failure" },
+	});
 	throw new ModerationUnavailableError(lastErr);
 }

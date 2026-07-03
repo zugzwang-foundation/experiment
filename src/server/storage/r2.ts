@@ -12,6 +12,7 @@ import {
 	StorageObjectMissingError,
 	StorageUnavailableError,
 } from "@/lib/errors";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // R2 S3-compat client wrapper. Two bucket-scoped clients constructed once at
 // module load per SCAFFOLD.15 plan §5.1 + B2 ratification. The env vars are
@@ -137,6 +138,11 @@ export async function mintPutUrl(
 			{ expiresIn: ttlSeconds },
 		);
 	} catch (err) {
+		// AUDIT-FIX-B1 A5 (§17.3 6c): `r2_unavailable` capture-at-source — the
+		// four vendor-failure arms in this wrapper cover every R2 caller (sign
+		// routes, precommit signRead, verify-object, orphan sweep) with no
+		// second string. Never on the 404 product arm (headObject below).
+		safeCaptureException(err, { tags: { kind: "r2_unavailable" } });
 		throw new StorageUnavailableError(err);
 	}
 }
@@ -158,6 +164,7 @@ export async function mintReadUrl(
 			{ expiresIn: ttlSeconds },
 		);
 	} catch (err) {
+		safeCaptureException(err, { tags: { kind: "r2_unavailable" } });
 		throw new StorageUnavailableError(err);
 	}
 }
@@ -189,9 +196,11 @@ export async function headObject(
 		if (err && typeof err === "object" && "name" in err) {
 			const name = (err as { name?: unknown }).name;
 			if (name === "NotFound" || name === "NoSuchKey") {
+				// Client-error product condition, not vendor-down — no capture.
 				throw new StorageObjectMissingError(key);
 			}
 		}
+		safeCaptureException(err, { tags: { kind: "r2_unavailable" } });
 		throw new StorageUnavailableError(err);
 	}
 }
@@ -210,6 +219,7 @@ export async function deleteObject(
 			new DeleteObjectCommand({ Bucket: bucketName, Key: key }),
 		);
 	} catch (err) {
+		safeCaptureException(err, { tags: { kind: "r2_unavailable" } });
 		throw new StorageUnavailableError(err);
 	}
 }

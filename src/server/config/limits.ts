@@ -146,3 +146,14 @@ export const RESOLUTION_REASON_MAX_CHARS = 1000;
 
 /** Distributed-lock TTL (s) for the close-due-markets cron sweep (D-15.g). Provisional 55s — under the per-minute (`* * * * *`) cadence so a crashed sweep's lease expires before the next tick. HARDEN-tunable (R-15.2 cadence pass). */
 export const CLOSE_SWEEP_LOCK_TTL_SECONDS = 55;
+
+// === AUDIT-FIX-B1: cron_alarms drain (A7) ==================================
+
+/** Distributed-lock TTL (s) for the alarms-drain cron. 240s — under the every-5-minutes (300s) cadence so a crashed drain's lease expires before the next tick (mirrors CLOSE_SWEEP 55 < 60). HARDEN-tunable. */
+export const ALARMS_DRAIN_LOCK_TTL_SECONDS = 240;
+
+/** Alarms-drain per-tick SELECT limit. Leftovers drain next tick — bounded, not silent (the `selected` count returns in the route body). HARDEN-tunable. */
+export const ALARMS_DRAIN_BATCH_SIZE = 200;
+
+/** Sentry transport flush budget (ms) for the alarms-drain. The drain awaits `safeFlush(this)` after emitting and BEFORE stamping any row — a delivery timeout (resolve false) or a flush throw retires NOTHING, so the row re-drains next tick (fingerprint dedup absorbs the re-emit). 2000ms spans the SDK HTTP send + slack, far under the 240s lock TTL. Upgrades the drain from enqueue-level to DELIVERY-level at-least-once (B1 close-out ruling). HARDEN-tunable. */
+export const ALARMS_DRAIN_FLUSH_TIMEOUT_MS = 2000;
