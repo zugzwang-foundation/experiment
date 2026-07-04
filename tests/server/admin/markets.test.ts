@@ -51,6 +51,7 @@ import {
 } from "@/server/markets/errors";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
 
@@ -168,7 +169,7 @@ async function createdEventRows() {
 
 describe("ENGINE.14 F-ADMIN-1 — createMarket (W-4 create branch)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE events, pools, markets CASCADE`);
+		await truncateTables(testClient, ["events", "pools", "markets"]);
 		vi.clearAllMocks();
 	});
 
@@ -394,9 +395,12 @@ describe("createMarketAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, pools, markets, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"pools",
+			"markets",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 
@@ -601,9 +605,12 @@ describe("closeMarketAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, pools, markets, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"pools",
+			"markets",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 

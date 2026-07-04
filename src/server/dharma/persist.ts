@@ -12,14 +12,18 @@ const CANONICAL_ZERO = "0.000000000000000000";
 
 /**
  * Reads the user's latest `balance_after` inside the caller's transaction —
- * the running-total cursor. `ORDER BY created_at DESC, id DESC LIMIT 1` is a
- * deterministic TOTAL order (`id` is the unique secondary key), but `id` is
- * NOT a sub-millisecond chronological tie-break — the userspace `uuidv7()`
- * fills trailing bits randomly (ADR-0016). This single-append read is correct
- * for ONE row per user per tx; for >1 row in one tx (`created_at` ties on the
- * frozen `now()`) the caller MUST use the `previousBalance` chaining contract
- * (see `appendLedgerRow`), not this ordering. Returns the canonical zero
- * string when the user has no rows yet (first ledger row).
+ * the running-total cursor. `ORDER BY seq DESC LIMIT 1` is the TOTAL-ORDER
+ * contract (ADR-0029, migration 0020): `seq` is `GENERATED ALWAYS AS
+ * IDENTITY`, so per-user seq order ≡ insert order ≡ chain order under the
+ * caller's per-user write serialization (D-2). The previous
+ * `(created_at DESC, id DESC)` ordering was NOT chain-safe: `created_at` is
+ * tx-frozen `now()` (ties across one tx's appends) and the userspace
+ * `uuidv7()` fills trailing bits randomly (ADR-0016) — a cross-tx read over
+ * a tie-group could return the chain-earlier row, minting/burning Dharma off
+ * the stale base (the A2 defect, AUDIT-FIX-B2). The `previousBalance`
+ * chaining contract (see `appendLedgerRow`) remains the in-tx optimization.
+ * Returns the canonical zero string when the user has no rows yet (first
+ * ledger row).
  */
 async function readLatestBalance(
 	tx: DbTransaction,
@@ -29,7 +33,7 @@ async function readLatestBalance(
 		.select({ balanceAfter: dharmaLedger.balanceAfter })
 		.from(dharmaLedger)
 		.where(eq(dharmaLedger.userId, userId))
-		.orderBy(desc(dharmaLedger.createdAt), desc(dharmaLedger.id))
+		.orderBy(desc(dharmaLedger.seq))
 		.limit(1);
 	return rows[0]?.balanceAfter ?? CANONICAL_ZERO;
 }
@@ -56,10 +60,12 @@ export { readLatestBalance as readBalance };
  * per-user serialization.
  *
  * `previousBalance` is optional: when supplied it SKIPS the in-tx latest read.
- * It is REQUIRED for >1 row for the same user in one tx — `now()` is tx-frozen,
- * so `created_at` ties; the caller MUST chain via the prior call's returned
- * `balanceAfter` (live case: ENGINE.9 reverse+uncollectable pair). The PK is a
- * DB DEFAULT `uuidv7()` (ADR-0016 — no app-side id).
+ * Multi-row-per-user txs chain via the prior call's returned `balanceAfter`
+ * (live case: ENGINE.9 reverse+uncollectable pair). Post-0020 the auto-read
+ * is seq-ordered and correct even over same-tx `created_at` ties (ADR-0029);
+ * chaining stays as the convention — it saves the read and keeps multi-leg
+ * intent explicit. The PK is a DB DEFAULT `uuidv7()` (ADR-0016 — no
+ * app-side id).
  */
 export async function appendLedgerRow(
 	tx: DbTransaction,

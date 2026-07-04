@@ -27,13 +27,14 @@ import {
 } from "@/server/config/limits";
 import { sweepOrphans } from "@/server/storage/sweep-orphans";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	// no module-level mocks — deleteObject is injected as a function param
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, image_uploads, users CASCADE`);
+	await truncateTables(testClient, ["events", "image_uploads", "users"]);
 	vi.clearAllMocks();
 });
 

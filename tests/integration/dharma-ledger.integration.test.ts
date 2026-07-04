@@ -2,8 +2,9 @@ import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { bets, comments, dharmaLedger, markets, users } from "@/db/schema";
 import { checkMarketConservation } from "@/server/dharma/conservation";
-import { appendLedgerRow } from "@/server/dharma/persist";
+import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // ENGINE.5 §5.6 tests-first — INV-2 persistence (running-total guarantee +
 // conservation reconciliation). DB-BACKED: cannot RED locally (PROBE-3 —
@@ -94,9 +95,13 @@ async function seedUser(args: {
 
 describe("INV-2: dharma_ledger persistence (appendLedgerRow)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE dharma_ledger, bets, comments, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("dharma-ledger-persist::first-row-grant", async () => {
@@ -282,5 +287,65 @@ describe("INV-2: dharma_ledger persistence (appendLedgerRow)", () => {
 				netAdminPoolInjection: "15",
 			}),
 		).toEqual({ ok: true });
+	});
+
+	it("dharma-ledger-persist::cross-tx-read-over-same-created-at-tie-returns-chain-latest", async () => {
+		// AUDIT-FIX-B2 (i) — the A2 money-mint REPRODUCTION, the deterministic
+		// RED driver. Two rows for one user share an EXACT created_at (T); the
+		// chain runs grant (+100 → 100) then bet_stake (-10 → 90), so the
+		// chain-latest balance is 90. The ids are crafted so a uuid-DESC tiebreak
+		// INVERTS the chain: the chain-EARLIER grant carries the byte-HIGH id
+		// (ffff…ffff), the chain-LATER stake the byte-LOW id (0000…0001).
+		//
+		// PRE-FIX (RED): readLatestBalance ordered by `(created_at DESC, id
+		// DESC)`; the created_at tie fell through to `id DESC`, which selects the
+		// byte-HIGH id = the chain-EARLIER grant → readBalance returned "100…"
+		// (the stale base the next append would mint off). Observed in the
+		// tests-first run: "expected 90, received 100".
+		// POST-FIX (GREEN): `ORDER BY seq DESC` (seq GENERATED ALWAYS AS
+		// IDENTITY, migration 0020) is the total-order contract (ADR-0029) — the
+		// stake row is inserted second, takes the higher seq, and wins → "90".
+		const userId = await seedUser({
+			emailTag: "persist-tie",
+			pseudonym: "persist-tie",
+		});
+
+		// The SAME created_at for both rows — the tie the old order could only
+		// break by falling back to the (random-bit) uuid.
+		const tiedCreatedAt = "2026-09-15T06:00:00Z";
+
+		// Chain-EARLIER: initial_grant +100 → 100, byte-HIGH id, inserted FIRST
+		// (→ the lower seq).
+		await testClient.unsafe(
+			`INSERT INTO dharma_ledger (id, user_id, entry_type, amount, balance_after, created_at)
+			 VALUES ($1, $2, $3::dharma_entry_type, $4, $5, $6)`,
+			[
+				"ffffffff-ffff-7fff-bfff-ffffffffffff",
+				userId,
+				"initial_grant",
+				"100",
+				"100",
+				tiedCreatedAt,
+			],
+		);
+		// Chain-LATER: bet_stake -10 → 90, byte-LOW id, inserted SECOND (→ the
+		// higher seq; the true chain-latest).
+		await testClient.unsafe(
+			`INSERT INTO dharma_ledger (id, user_id, entry_type, amount, balance_after, created_at)
+			 VALUES ($1, $2, $3::dharma_entry_type, $4, $5, $6)`,
+			[
+				"00000000-0000-7000-8000-000000000001",
+				userId,
+				"bet_stake",
+				"-10",
+				"90",
+				tiedCreatedAt,
+			],
+		);
+
+		// A SUBSEQUENT, separate transaction reads the running-total cursor —
+		// the cross-tx read A2 corrupts.
+		const result = await testDb.transaction((tx) => readBalance(tx, userId));
+		expect(result).toBe("90.000000000000000000");
 	});
 });

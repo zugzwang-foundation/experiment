@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { markets } from "@/db/schema";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-RESOLVE-ONCE-001 canonical (MINTED by ENGINE.9, plan OQ-7): a market
 // terminates exactly ONE way, ONCE — at most one `resolution_events` row with
@@ -67,7 +68,7 @@ function insertResolutionRow(args: {
 
 describe("I-RESOLVE-ONCE-001: a market terminates exactly one way, once", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE resolution_events, markets CASCADE`);
+		await truncateTables(testClient, ["resolution_events", "markets"]);
 	});
 
 	it("resolve-once::backstop-rejects-second-resolve-same-market", async () => {

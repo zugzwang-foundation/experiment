@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { markets, users } from "@/db/schema";
 import { getHeldPosition } from "@/server/positions/read";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-SINGLE-SIDE-001 (at most one held side per (user,market)). Naming per
 // SPEC.2 §14.2 — slug SINGLE-SIDE, seed 001, canonical slug
@@ -62,7 +63,7 @@ async function seedPosition(args: {
 
 describe("I-SINGLE-SIDE-001: at most one held side per (user,market)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE positions, markets, users CASCADE`);
+		await truncateTables(testClient, ["positions", "markets", "users"]);
 	});
 
 	it("positions-single-side::partial-unique-rejects-second-held-side", async () => {

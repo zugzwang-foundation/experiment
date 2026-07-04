@@ -13,8 +13,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // runs FOR REAL, so a captureMessage throw on ONE row makes safeCaptureMessage
 // return false → that row is NOT stamped (the at-least-once heart). `drainCronAlarms`
 // uses the real `@/db` client; rows are seeded/read via `testClient` (same DB,
-// :54322). cron_alarms + events_default are TRUNCATEd in setup/teardown
-// (events_default is a partition — TRUNCATE bypasses the append-only trigger).
+// :54322). cron_alarms + events_default are cleared in setup/teardown
+// (events_default via the truncateTables fixture — 0021 guards partitions too).
 
 const { mockCaptureMessage, mockFlush } = vi.hoisted(() => ({
 	mockCaptureMessage: vi.fn(),
@@ -29,6 +29,7 @@ vi.mock("@sentry/nextjs", () => ({
 
 import { drainCronAlarms } from "@/server/observability/drain-cron-alarms";
 import { testClient } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 async function seedAlarm(
 	alarmId: string,
@@ -50,9 +51,10 @@ async function readAlarms(): Promise<
 
 async function truncate(): Promise<void> {
 	await testClient.unsafe(`TRUNCATE cron_alarms`);
-	// events_default is a partition — TRUNCATE bypasses the row-level append-only
-	// trigger (which fires only on UPDATE/DELETE).
-	await testClient.unsafe(`TRUNCATE events_default`);
+	// events_default is a partition: 0003's row-level guard never fired on
+	// TRUNCATE, and 0021 now rejects it outright — cleared via the fixture
+	// (owner-privilege disable → TRUNCATE → re-enable).
+	await truncateTables(testClient, ["events_default"]);
 }
 
 describe("drainCronAlarms — cron_alarms drain (A7, real Postgres)", () => {

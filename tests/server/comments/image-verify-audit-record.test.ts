@@ -79,6 +79,7 @@ import {
 } from "@/db/schema";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -162,9 +163,17 @@ describe("image_upload.committed carries the verified etag + byteSizeActual (aud
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, image_uploads, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"image_uploads",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("image-verify-audit::committed-event-carries-etag-and-bytesize", async () => {

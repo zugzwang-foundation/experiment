@@ -7,6 +7,7 @@ import {
 } from "@/server/comments/foreclosure";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // DEBATE.2 §5.6 tests-first — the single-side × Counter FORECLOSURE read surface
 // (plan §3 "foreclosure read surface"; Open Item 1 / ruling 1a). PURE FUNCTION,
@@ -110,7 +111,7 @@ describe("computeReplyAffordance — viewer holds nothing (H == null)", () => {
 // REDs on the greenfield `@/server/comments/foreclosure` import.
 describe("readReplyAffordance — reads viewer's held side via heldSideOrNull", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE positions, markets, users CASCADE`);
+		await truncateTables(testClient, ["positions", "markets", "users"]);
 	});
 
 	async function seedUser(tag: string): Promise<string> {

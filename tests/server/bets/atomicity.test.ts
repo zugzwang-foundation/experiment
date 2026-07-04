@@ -71,6 +71,7 @@ import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -135,9 +136,16 @@ describe("ENGINE.8 F-BET-1 — place happy-path entry (INV-1 + INV-3)", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("bet-place::happy-path-entry", async () => {

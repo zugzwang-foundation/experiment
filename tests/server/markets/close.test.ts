@@ -15,6 +15,7 @@ import {
 } from "@/server/markets/errors";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.14 §5.6 tests-first (S1, plan §Test plan charter) — the clock-driven
 // Open → Closed cutoff (C1–C5): closeMarket (W-4 locked, expectedStatus
@@ -91,7 +92,7 @@ async function eventRowsForAggregate(aggregateId: string) {
 
 describe("ENGINE.14 — closeMarket + closeDueMarkets (W-4, Open → Closed)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE events, markets CASCADE`);
+		await truncateTables(testClient, ["events", "markets"]);
 		vi.clearAllMocks();
 	});
 

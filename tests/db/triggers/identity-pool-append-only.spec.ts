@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { identityPool } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket B — identity_pool. Per SPEC.2 §6.3 + 0003 lines 108-129.
 // Single whitelisted column: assigned_at (NULL → timestamp once).
@@ -12,7 +13,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("identity_pool — append-only trigger (Bucket B)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE identity_pool CASCADE`);
+		await truncateTables(testClient, ["identity_pool"]);
 	});
 
 	async function setupRow(suffix: string) {

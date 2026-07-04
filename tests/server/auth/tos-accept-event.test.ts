@@ -65,6 +65,7 @@ import { eq } from "drizzle-orm";
 import { users } from "@/db/schema";
 import { acceptTosAction } from "@/server/auth/tos-accept";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	mockVerifyOnboardingRef.mockReset();
@@ -74,7 +75,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, users CASCADE`);
+	await truncateTables(testClient, ["events", "users"]);
 	vi.clearAllMocks();
 });
 

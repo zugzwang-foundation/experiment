@@ -56,6 +56,7 @@ import {
 } from "@/server/markets/errors";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
 const NOW = new Date("2026-09-15T00:00:00.000Z");
@@ -204,9 +205,12 @@ afterEach(async () => {
 	// the un-named form still succeeds PRE-impl when the table does not yet
 	// exist — so cleanup never throws and RED stays the intended assertion (not
 	// a leaked-slug `MarketSlugTakenError`).
-	await testClient.unsafe(
-		`TRUNCATE events, pools, markets, admin_sessions CASCADE`,
-	);
+	await truncateTables(testClient, [
+		"events",
+		"pools",
+		"markets",
+		"admin_sessions",
+	]);
 	vi.clearAllMocks();
 });
 

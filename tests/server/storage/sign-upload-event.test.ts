@@ -29,6 +29,7 @@ import { v7 as uuidv7 } from "uuid";
 import { users } from "@/db/schema";
 import { signUploadAndInsert } from "@/server/storage/sign-upload";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	mockMintPutUrl.mockReset();
@@ -42,7 +43,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, image_uploads, users CASCADE`);
+	await truncateTables(testClient, ["events", "image_uploads", "users"]);
 	vi.clearAllMocks();
 });
 

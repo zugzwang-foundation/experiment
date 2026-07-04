@@ -2,13 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { userEvents, users } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — user_events. Per SPEC.2 §6.2 + 0003 lines 58-59.
 // FK chain: users → user_events.
 
 describe("user_events — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE user_events, users CASCADE`);
+		await truncateTables(testClient, ["user_events", "users"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

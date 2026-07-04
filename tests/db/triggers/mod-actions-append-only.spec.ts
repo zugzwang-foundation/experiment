@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { modActions } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — mod_actions. Per SPEC.2 §6.2 + 0003 lines 54-55.
 // No FKs required for the test row — target_user_id / target_comment_id /
@@ -10,7 +11,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("mod_actions — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE mod_actions CASCADE`);
+		await truncateTables(testClient, ["mod_actions"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

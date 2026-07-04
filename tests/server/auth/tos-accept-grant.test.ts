@@ -135,6 +135,7 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 // so the whole suite REDs at collection — T5/T7 included.
 import { grantInitialDharma } from "@/server/dharma/grant";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	mockVerifyOnboardingRef.mockReset();
@@ -145,7 +146,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, dharma_ledger, users CASCADE`);
+	await truncateTables(testClient, ["events", "dharma_ledger", "users"]);
 	vi.clearAllMocks();
 });
 

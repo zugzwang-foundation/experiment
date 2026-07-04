@@ -74,6 +74,7 @@ vi.mock("@/server/storage/verify-object", () => ({
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { imageUploads, modActions, users } from "@/db/schema";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 import {
 	placeRequest,
 	seedDharmaGrant,
@@ -87,9 +88,18 @@ describe("DEBATE.7 moderation — image-block (both tracks)", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE mod_actions, events, dharma_ledger, bets, comments, positions, pools, image_uploads, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"mod_actions",
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"image_uploads",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("image-block::track-a-image-blocks-upload-and-bans", async () => {

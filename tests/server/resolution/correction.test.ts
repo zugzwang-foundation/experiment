@@ -29,6 +29,7 @@ import {
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S4, plan §Test plan) — `clawback-floors-at-zero`
 // + the correction suite (F-RESOLVE-2, W-3c). Greenfield value imports from
@@ -221,9 +222,18 @@ async function seedCorrectionScenario(slug: string): Promise<{
 
 describe("ENGINE.9 F-RESOLVE-2 — correctResolution (W-3c)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

@@ -5,6 +5,7 @@ import { computeBuy, seedPool } from "@/server/cpmm/calculate";
 import { PositionSingleSideError } from "@/server/positions/errors";
 import { upsertPositionDelta } from "@/server/positions/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // ENGINE.11 §5.6 tests-first — position persistence + the nightly drift cron
 // (D1/D2/D3). DB-BACKED: cannot RED locally (PROBE-P2 — local Postgres :54322
@@ -143,9 +144,14 @@ async function runDriftAndReadAlarms(
 
 describe("ENGINE.11 positions persistence + nightly drift", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE positions, events, dharma_ledger, cron_alarms, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"positions",
+			"events",
+			"dharma_ledger",
+			"cron_alarms",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("positions-upsert::conflict-accumulates-single-row", async () => {
@@ -592,7 +598,7 @@ describe("ENGINE.11 positions persistence + nightly drift", () => {
 		} finally {
 			// Clear the illegal rows BEFORE re-creating the unique index, then
 			// restore the index byte-faithful to 0013.
-			await testClient.unsafe(`TRUNCATE dharma_ledger CASCADE`);
+			await truncateTables(testClient, ["dharma_ledger"]);
 			await testClient.unsafe(
 				`CREATE UNIQUE INDEX "dharma_ledger_initial_grant_user_uq" ON "dharma_ledger" USING btree ("user_id") WHERE "dharma_ledger"."entry_type" = 'initial_grant'`,
 			);

@@ -56,6 +56,7 @@ import { POST as sellPOST } from "@/app/api/bets/sell/route";
 import { comments, markets, pools, positions, users } from "@/db/schema";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -133,9 +134,16 @@ describe("F-COMMENT-5 — no stake, no voice (DEBATE.1 frontstop + re-entry)", (
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("comment-requires-bet", async () => {

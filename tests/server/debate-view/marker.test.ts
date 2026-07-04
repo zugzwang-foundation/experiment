@@ -51,6 +51,7 @@ import {
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED = "100.000000000000000000";
 const REASON = "Criterion met: documented evidence attached.";
@@ -192,9 +193,18 @@ function countingClient(count: { selects: number }): typeof testDb {
 
 describe("DEBATE.5 F-DEBATE-2 / F-DEBATE-3 — debate-view marker read-loader", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

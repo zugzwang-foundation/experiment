@@ -35,6 +35,7 @@ import { runResolutionTransaction } from "@/server/resolution/transaction";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S6, plan §Test plan) — the W-3 vs W-1 fences.
 // Greenfield value imports from `@/server/resolution/{transaction,settle,
@@ -168,9 +169,18 @@ function sqlstateOf(err: unknown): string | null {
 
 describe("ENGINE.9 W-3 — resolution concurrency fences", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

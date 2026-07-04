@@ -28,6 +28,7 @@ import { imageUploads, users } from "@/db/schema";
 import { resolveImageAttachment } from "@/server/comments/image-attach";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 async function seedUser(tag: string): Promise<string> {
 	const [user] = await testDb
@@ -62,7 +63,7 @@ async function seedImageUpload(userId: string): Promise<{
 
 describe("resolveImageAttachment — resolve + ownership", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE image_uploads, users CASCADE`);
+		await truncateTables(testClient, ["image_uploads", "users"]);
 	});
 
 	it("image-attach::owner-resolves-r2-object-key", async () => {

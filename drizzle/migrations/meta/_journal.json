@@ -141,6 +141,20 @@
       "when": 1782832985700,
       "tag": "0019_market_media",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783158953008,
+      "tag": "0020_dharma_ledger_seq",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1783158969192,
+      "tag": "0021_truncate_guards",
+      "breakpoints": true
     }
   ]
 }

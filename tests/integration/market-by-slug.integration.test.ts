@@ -4,6 +4,7 @@ import { markets } from "@/db/schema";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // SHELL/UI.0 plan §10 — the slug resolver is the one logic piece warranting a
 // test (shell UI/RSC scaffolding is TDD-exempt per CLAUDE.md §5.6). DB-BACKED:
@@ -41,7 +42,7 @@ async function seedMarket(args: {
 
 describe("getMarketBySlug — public slug resolver (SHELL/UI.0)", () => {
 	afterEach(async () => {
-		await testClient.unsafe("TRUNCATE markets CASCADE");
+		await truncateTables(testClient, ["markets"]);
 	});
 
 	it("resolves an Open market to its DTO", async () => {

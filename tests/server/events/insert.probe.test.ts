@@ -28,11 +28,15 @@ import { v7 as uuidv7 } from "uuid";
 import { users } from "@/db/schema";
 import { insertEvent } from "@/server/events/insert";
 import { createdAtFromUuidV7, testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 afterEach(async () => {
-	await testClient.unsafe(
-		`TRUNCATE events, image_uploads, users, admin_sessions CASCADE`,
-	);
+	await truncateTables(testClient, [
+		"events",
+		"image_uploads",
+		"users",
+		"admin_sessions",
+	]);
 });
 
 async function seedUser(suffix: string): Promise<{ userId: string }> {

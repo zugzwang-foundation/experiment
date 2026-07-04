@@ -75,6 +75,7 @@ vi.mock("@/server/storage/sign-read", () => ({
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { bets, comments, modActions } from "@/db/schema";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 import {
 	placeRequest,
 	seedDharmaGrant,
@@ -91,9 +92,17 @@ describe("DEBATE.7 moderation — fail-closed writes NO mod_actions row", () => 
 		mockSignRead.mockReset();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE mod_actions, events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"mod_actions",
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("fail-closed::terminal-openai-failure-503-and-no-mod-actions-row", async () => {

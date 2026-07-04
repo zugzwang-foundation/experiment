@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { markets, positions, users } from "@/db/schema";
 import { upsertPositionDelta } from "@/server/positions/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-NO-OVERSELL-001 (positions quantity ≥ 0). Naming per SPEC.2 §14.2 — slug
 // NO-OVERSELL, seed 001, canonical slug positions-quantity-non-negative.
@@ -50,7 +51,7 @@ async function seedMarket(slug: string): Promise<string> {
 
 describe("I-NO-OVERSELL-001: positions.quantity ≥ 0", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE positions, markets, users CASCADE`);
+		await truncateTables(testClient, ["positions", "markets", "users"]);
 	});
 
 	it("positions-no-oversell::quantity-stays-non-negative-across-sequence", async () => {

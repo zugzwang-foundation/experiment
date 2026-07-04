@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import { DharmaPoolTagError } from "@/server/dharma/errors";
 import { appendLedgerRow } from "@/server/dharma/persist";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.5 §5.6 tests-first — INV-2 (Dharma non-transferable), SPEC.1 §5:159.
 // DB-BACKED: cannot RED locally (local Postgres :54322 is DOWN per PROBE-3;
@@ -23,7 +24,7 @@ import { testClient, testDb } from "../../db/_fixtures/db";
 
 describe("INV-2: Dharma non-transferable (no transfer surface)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		await truncateTables(testClient, ["dharma_ledger", "users"]);
 	});
 
 	it("dharma-non-transferable::no-dharma-transfer-table-exists", async () => {

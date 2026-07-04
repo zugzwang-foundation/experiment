@@ -21,6 +21,7 @@ import { MarketLifecycleStateError } from "@/server/markets/errors";
 import { openMarket } from "@/server/markets/open";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.14 §5.6 tests-first (S1, plan §Test plan charter) — the W-4
 // concurrency pair (X1–X2): opened-exactly-once under a double open, and the
@@ -96,9 +97,16 @@ async function eventsOfType(eventType: string) {
 
 describe("ENGINE.14 W-4 — lifecycle concurrency (X1–X2)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

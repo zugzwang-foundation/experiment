@@ -28,6 +28,7 @@ import { getPrices } from "@/server/cpmm/calculate";
 import { getMarketPricing } from "@/server/debate-view/market-pricing";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 async function seedMarket(slug: string): Promise<string> {
 	const [market] = await testDb
@@ -44,9 +45,19 @@ async function seedMarket(slug: string): Promise<string> {
 
 describe("DEBATE.4 §5 — getMarketPricing (pool reserves → spot prices)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, mod_actions, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"mod_actions",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

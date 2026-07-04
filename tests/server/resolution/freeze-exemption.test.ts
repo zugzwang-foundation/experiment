@@ -16,6 +16,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.16 §5.6 tests-first (charter row (d)) — the §20.3 admin-exemption
 // regression guard. SPEC.2 §20.3 deliberately leaves admin paths UNGATED ("admin
@@ -141,12 +142,21 @@ async function freezeSystem(): Promise<void> {
 
 describe("ENGINE.16 (d) — admin resolution paths stay LIVE post-freeze (§20.3)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		// FIX-1: system_state cannot reset via UPDATE (once-only trigger) — TRUNCATE
 		// bypasses it, then reseed the pre-freeze singleton.
-		await testClient.unsafe(`TRUNCATE system_state`);
+		await truncateTables(testClient, ["system_state"]);
 		await testClient.unsafe(
 			`INSERT INTO system_state (id, frozen_at) VALUES ('system', NULL)`,
 		);

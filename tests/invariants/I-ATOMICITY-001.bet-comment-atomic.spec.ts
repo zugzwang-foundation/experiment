@@ -19,6 +19,7 @@ import { insertEvent } from "@/server/events/insert";
 import { upsertPositionDelta } from "@/server/positions/persist";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-ATOMICITY-001 — INV-1 (bet ↔ comment atomicity), wrapper-level. ENGINE.7
 // MINTS the canonical test (plan ruling (d); thesis-invariants §INV-1). The W-1
@@ -106,9 +107,16 @@ async function seedDharmaGrant(userId: string): Promise<void> {
 
 describe("I-ATOMICITY-001: bet+comment atomic under the W-1 wrapper", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("bet-comment-atomicity::mid-spine-abort-rolls-back-all-tables", async () => {

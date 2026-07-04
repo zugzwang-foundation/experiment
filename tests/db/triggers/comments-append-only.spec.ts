@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { comments, markets, users } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — comments. Per SPEC.2 §6.2 + 0003 lines 48-49.
 // Case 1 (UPDATE rejected) is the literal INV-3 mechanism — comments is
@@ -12,7 +13,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("comments — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE comments, markets, users CASCADE`);
+		await truncateTables(testClient, ["comments", "markets", "users"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

@@ -27,11 +27,15 @@ import { imageUploads, users } from "@/db/schema";
 import { type AggregateType, insertEvent } from "@/server/events/insert";
 import type { EventType } from "@/server/events/schemas";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 afterEach(async () => {
-	await testClient.unsafe(
-		`TRUNCATE events, image_uploads, users, admin_sessions CASCADE`,
-	);
+	await truncateTables(testClient, [
+		"events",
+		"image_uploads",
+		"users",
+		"admin_sessions",
+	]);
 });
 
 async function seedUser(suffix: string): Promise<{ userId: string }> {

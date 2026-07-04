@@ -1,5 +1,6 @@
 import { relations, sql } from "drizzle-orm";
 import {
+	bigint,
 	check,
 	index,
 	numeric,
@@ -44,6 +45,13 @@ export const dharmaLedger = pgTable(
 	"dharma_ledger",
 	{
 		id: uuid("id").primaryKey().default(sql`uuidv7()`),
+		// A2 total-order contract (ADR-0029, migration 0020): per-user seq order
+		// ≡ insert order ≡ chain order (per-user write serialization is the
+		// caller's obligation, persist.ts D-2). GENERATED ALWAYS — the DB
+		// assigns; app INSERTs never name it (drizzle-zod auto-omits it from
+		// createInsertSchema). mode "number": tsconfig targets ES2017 (no bigint
+		// literals) and app code only ORDER-BYs it, never does arithmetic.
+		seq: bigint("seq", { mode: "number" }).generatedAlwaysAsIdentity(),
 		userId: uuid("user_id")
 			.notNull()
 			.references(() => users.id, { onDelete: "restrict" }),
@@ -83,6 +91,10 @@ export const dharmaLedger = pgTable(
 		uniqueIndex("dharma_ledger_initial_grant_user_uq")
 			.on(table.userId)
 			.where(sql`${table.entryType} = 'initial_grant'`),
+		// A2 (ADR-0029): serves the ORDER BY seq DESC LIMIT 1 latest-balance
+		// read path (persist.ts) + belts per-user seq uniqueness (seq is
+		// globally unique via IDENTITY; the composite exists for the read).
+		uniqueIndex("dharma_ledger_user_seq_uq").on(table.userId, table.seq),
 		check(
 			"dharma_ledger_balance_non_negative",
 			sql`${table.balanceAfter} >= 0`,

@@ -41,6 +41,7 @@ import {
 import { openMarket } from "@/server/markets/open";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
 
@@ -145,7 +146,7 @@ async function marketStatus(marketId: string): Promise<string | undefined> {
 
 describe("ENGINE.14 F-ADMIN-2 — openMarket (W-4 locked, Draft → Open)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE events, pools, markets CASCADE`);
+		await truncateTables(testClient, ["events", "pools", "markets"]);
 		vi.clearAllMocks();
 	});
 
@@ -373,9 +374,12 @@ describe("seedPoolAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, pools, markets, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"pools",
+			"markets",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 

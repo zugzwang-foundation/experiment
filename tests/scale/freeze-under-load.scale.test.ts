@@ -61,6 +61,7 @@ import { GET as cronGET } from "@/app/api/cron/close-due-markets/route";
 import { bets, comments, dharmaLedger } from "@/db/schema";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import { seedOpenMarketWithPool, seedUser } from "./_fixtures/seed";
 import { collide } from "./_harness/collide";
 
@@ -87,10 +88,11 @@ async function freeze(): Promise<void> {
 
 async function resetSystemState(): Promise<void> {
 	// The once-only trigger rejects `frozen_at timestamp→NULL`, so the freeze
-	// CANNOT be reset via UPDATE. The triggers are BEFORE UPDATE / BEFORE DELETE
-	// only (no BEFORE TRUNCATE), so the reset is TRUNCATE + reseed the singleton
-	// ('system', frozen_at NULL) — the is-frozen.test.ts FIX-1 precedent.
-	await testClient.unsafe(`TRUNCATE system_state`);
+	// CANNOT be reset via UPDATE. Since 0021, TRUNCATE is trigger-rejected too;
+	// the reset is the truncateTables fixture (owner-privilege guard toggle) +
+	// reseed the singleton ('system', frozen_at NULL) — the is-frozen.test.ts
+	// FIX-1 precedent.
+	await truncateTables(testClient, ["system_state"]);
 	await testClient.unsafe(
 		`INSERT INTO system_state (id, frozen_at) VALUES ('system', NULL)`,
 	);
@@ -105,12 +107,21 @@ describe("scale — freeze write-seal under load (axis 10)", () => {
 	});
 
 	afterEach(async () => {
-		// Reset the freeze sentinel to its pre-freeze singleton via TRUNCATE +
-		// reseed (the one-shot trigger forbids a timestamp→NULL UPDATE).
+		// Reset the freeze sentinel to its pre-freeze singleton via the fixture
+		// + reseed (the one-shot trigger forbids a timestamp→NULL UPDATE).
 		await resetSystemState();
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

@@ -20,6 +20,7 @@ import type { DharmaEntryType } from "@/server/dharma/tags";
 import { FLOW_TAGS } from "@/server/dharma/tags";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import { SYNTHETIC_SEED_RESERVES } from "./_fixtures/markets";
 import {
 	seedAllSyntheticMarkets,
@@ -102,9 +103,18 @@ async function gatherBetTiedFlows(
 
 describe("scale — hot-row contention (axes 1,2,3)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 
@@ -181,8 +191,10 @@ describe("scale — hot-row contention (axes 1,2,3)", () => {
 
 		await collide(factories, { degree: 48 });
 
-		// INV-2: for every user, the (created_at, id)-ordered chain satisfies
-		// balance_after[i] == balance_after[i-1] + amount[i] and >= 0 everywhere.
+		// INV-2: for every user, the seq-ordered chain (ADR-0029 total order)
+		// satisfies balance_after[i] == balance_after[i-1] + amount[i] and >= 0
+		// everywhere. The former (created_at, id) walk was a latent flake: a
+		// same-ms tie could invert two rows and fail a CORRECT ledger.
 		for (const userId of userIds) {
 			const rows = await testDb
 				.select({
@@ -191,7 +203,7 @@ describe("scale — hot-row contention (axes 1,2,3)", () => {
 				})
 				.from(dharmaLedger)
 				.where(eq(dharmaLedger.userId, userId))
-				.orderBy(dharmaLedger.createdAt, dharmaLedger.id);
+				.orderBy(dharmaLedger.seq);
 			const walk = walkLedgerChain(rows);
 			expect(walk.ok).toBe(true);
 			for (const row of rows) {

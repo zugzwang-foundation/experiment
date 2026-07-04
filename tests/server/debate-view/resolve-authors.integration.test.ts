@@ -22,6 +22,7 @@ import { users } from "@/db/schema";
 import { resolveAuthors } from "@/server/debate-view/resolve-authors";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const PFP_PLACEHOLDER = "/pfp-placeholder.svg";
 
@@ -43,9 +44,19 @@ async function seedUser(args: {
 
 describe("DEBATE.4 §5 — resolveAuthors (batch pseudonym + placeholder PFP)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, mod_actions, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"mod_actions",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

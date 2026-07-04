@@ -26,6 +26,7 @@ import { ResolutionStateError } from "@/server/resolution/errors";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S5, plan §Test plan) —
 // `full-refund-and-pool-unwind` + the void suite (F-RESOLVE-3, W-3d).
@@ -150,9 +151,18 @@ async function setStatus(marketId: string, status: string): Promise<void> {
 
 describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

@@ -146,6 +146,7 @@ import {
 import { runBetTransaction } from "@/server/bets/transaction";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -243,9 +244,17 @@ describe("F-COMMENT-3 — image attachment moderation routing (verdict mocked)",
 		});
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, image_uploads, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"image_uploads",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("image-moderation-routes", async () => {

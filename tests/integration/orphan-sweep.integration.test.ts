@@ -35,6 +35,7 @@ import {
 } from "@/server/config/limits";
 import { sweepOrphans } from "@/server/storage/sweep-orphans";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 beforeEach(() => {
 	// no module-level mocks — see file header
@@ -45,7 +46,7 @@ afterEach(async () => {
 	// `image_upload.orphaned` event per CAS-success, so the events table
 	// accumulates rows alongside image_uploads. TRUNCATE both to keep tests
 	// isolated.
-	await testClient.unsafe(`TRUNCATE events, image_uploads, users CASCADE`);
+	await truncateTables(testClient, ["events", "image_uploads", "users"]);
 	vi.clearAllMocks();
 });
 

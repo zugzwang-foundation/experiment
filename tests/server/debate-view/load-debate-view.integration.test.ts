@@ -52,6 +52,7 @@ import { loadDebateView } from "@/server/debate-view/load-debate-view";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED = "100.000000000000000000";
 
@@ -206,9 +207,19 @@ function walkAssertNoLeak(node: unknown): void {
 
 describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author never serialize)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, mod_actions, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"mod_actions",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

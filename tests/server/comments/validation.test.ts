@@ -50,6 +50,7 @@ import { bets, comments, markets, pools, users } from "@/db/schema";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -114,9 +115,16 @@ describe("F-COMMENT-4 — comment exceeds length limit", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("length-limit", async () => {

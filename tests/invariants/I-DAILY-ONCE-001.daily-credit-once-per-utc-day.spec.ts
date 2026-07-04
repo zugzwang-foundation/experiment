@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { users } from "@/db/schema";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-DAILY-ONCE-001 canonical (MINTED by ENGINE.12, plan P5): at most ONE
 // `daily_allowance` ledger row per user per UTC calendar day. Two mechanisms:
@@ -50,7 +51,7 @@ function insertCreditRow(
 
 describe("I-DAILY-ONCE-001: one daily_allowance row per user per UTC day", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		await truncateTables(testClient, ["dharma_ledger", "users"]);
 	});
 
 	it("daily-credit-once::backstop-rejects-second-same-utc-day-credit", async () => {

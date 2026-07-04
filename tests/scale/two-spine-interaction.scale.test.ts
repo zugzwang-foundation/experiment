@@ -14,6 +14,7 @@ import { runBetTransaction } from "@/server/bets/transaction";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import {
 	adminMetadata,
 	seedOpenMarketWithPool,
@@ -114,9 +115,18 @@ async function ensureVoided(marketId: string): Promise<void> {
 
 describe("scale — two-spine interaction / induced bet-during-resolution (axis 5, Amendment F)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 
