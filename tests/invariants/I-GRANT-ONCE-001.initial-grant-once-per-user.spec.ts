@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { users } from "@/db/schema";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // I-GRANT-ONCE-001 canonical (MINTED by ENGINE.13, plan P1): at most ONE
 // `initial_grant` ledger row per user, EVER. Two mechanisms:
@@ -52,7 +53,7 @@ function insertGrantRow(
 
 describe("I-GRANT-ONCE-001: at most one initial_grant row per user, ever", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		await truncateTables(testClient, ["dharma_ledger", "users"]);
 	});
 
 	it("initial-grant-once::backstop-rejects-second-grant-same-user", async () => {

@@ -64,6 +64,7 @@ vi.mock("@/db/index", async () => {
 
 import { signOutAction } from "@/server/auth/logout";
 import { testClient } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	mockGetSession.mockReset();
@@ -72,7 +73,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, users CASCADE`);
+	await truncateTables(testClient, ["events", "users"]);
 	vi.clearAllMocks();
 });
 

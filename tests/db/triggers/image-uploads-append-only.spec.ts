@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { imageUploads, users } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket B — image_uploads. Per SPEC.2 §6.3 + 0003 lines 134-162.
 // Two-column atomic transition: terminal_state AND terminal_at must
@@ -22,7 +23,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("image_uploads — append-only trigger (Bucket B)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE image_uploads, users CASCADE`);
+		await truncateTables(testClient, ["image_uploads", "users"]);
 	});
 
 	async function setupRow(suffix: string) {

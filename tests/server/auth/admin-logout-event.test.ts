@@ -39,6 +39,7 @@ vi.mock("@/db/index", async () => {
 
 import { adminLogoutAction } from "@/server/auth/admin/logout";
 import { testClient } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 beforeEach(() => {
 	mockCookiesGet.mockReset();
@@ -46,7 +47,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
-	await testClient.unsafe(`TRUNCATE events, admin_sessions CASCADE`);
+	await truncateTables(testClient, ["events", "admin_sessions"]);
 	vi.clearAllMocks();
 });
 

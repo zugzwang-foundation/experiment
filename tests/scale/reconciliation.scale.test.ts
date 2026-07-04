@@ -15,6 +15,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import {
 	adminMetadata,
 	seedAllSyntheticMarkets,
@@ -100,9 +101,18 @@ async function setResolving(marketId: string): Promise<void> {
 
 describe("scale — reconciliation HEADLINE (axis 11, Amendment E)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

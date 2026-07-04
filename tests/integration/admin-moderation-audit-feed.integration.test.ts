@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { markets, modActions, users } from "@/db/schema";
 import { loadModerationAuditFeed } from "@/server/admin/moderation/audit-feed";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // UI.6 slice A — RED-first INTEGRATION proof for the read-only moderation audit
 // loader against real Postgres. Seeds blocked + reactive-admin `mod_actions`
@@ -50,7 +51,7 @@ async function seedMarket(slug: string): Promise<string> {
 
 describe("loadModerationAuditFeed — blocked-rows read surface", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE mod_actions, markets, users CASCADE`);
+		await truncateTables(testClient, ["mod_actions", "markets", "users"]);
 	});
 
 	it("audit-feed::empty-state-returns-no-rows", async () => {

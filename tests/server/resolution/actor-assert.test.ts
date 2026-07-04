@@ -15,6 +15,7 @@ import { triggerResolution } from "@/server/resolution/trigger";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.15 S1 tests-first (charter file 3 — CF-6 belt, §Actor retrofit). The
 // four W-3 resolution services (trigger/settle/correct/void) must each
@@ -131,9 +132,18 @@ async function seedResolvingMarket(slug: string): Promise<string> {
 
 describe("resolution actor-assert belt (CF-6)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

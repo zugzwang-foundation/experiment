@@ -60,6 +60,7 @@ vi.mock("@/server/moderation/precommit", () => ({
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { bets, comments, modActions, users } from "@/db/schema";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 import {
 	placeRequest,
 	seedDharmaGrant,
@@ -77,9 +78,17 @@ describe("DEBATE.7 moderation::sexual-minors-text-blocked-surfaced (carve-out)",
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE mod_actions, events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"mod_actions",
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("sexual-minors-text-blocked-surfaced", async () => {

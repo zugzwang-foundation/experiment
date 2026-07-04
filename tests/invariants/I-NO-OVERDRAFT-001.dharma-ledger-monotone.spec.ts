@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { dharmaLedger, users } from "@/db/schema";
 import { appendLedgerRow } from "@/server/dharma/persist";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // INV-2 canonical (no-overdraft). Naming per SPEC.2 §14.2:1375 — slug
 // NO-OVERDRAFT, seed 001, canonical slug dharma-ledger-monotone.
@@ -38,7 +39,7 @@ async function seedUser(emailTag: string, pseudonym: string): Promise<string> {
 
 describe("I-NO-OVERDRAFT-001: dharma_ledger balance_after ≥ 0", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		await truncateTables(testClient, ["dharma_ledger", "users"]);
 	});
 
 	it("dharma-no-overdraft::balance-stays-non-negative-across-sequence", async () => {

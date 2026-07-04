@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { users } from "@/db/schema";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (I2, plan §Test plan) — the zero-alarms drift
 // charter over resolution-shaped ledger histories, including the D-1 fixture
@@ -102,9 +103,7 @@ async function totalAlarmCount(): Promise<number> {
 
 describe("ENGINE.9 I2 — nightly drift over resolution ledger shapes", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE cron_alarms, dharma_ledger, users CASCADE`,
-		);
+		await truncateTables(testClient, ["cron_alarms", "dharma_ledger", "users"]);
 	});
 
 	it("nightly-drift::settled-market-shapes-zero-alarms", async () => {
@@ -230,5 +229,51 @@ describe("ENGINE.9 I2 — nightly drift over resolution ledger shapes", () => {
 		const alarms = await dharmaAlarmsFor(userId);
 		expect(alarms.some((a) => a.derivation === "D2-B")).toBe(true);
 		expect(alarms.some((a) => a.derivation === "D2-A")).toBe(true);
+	});
+
+	it("nightly-drift::pin-uncollectable-fork-evades-both-derivations-zero-alarms", async () => {
+		// PIN test — documents the order-free detector residual (0015 header
+		// residual class; an A2 fork of this shape evades BOTH D2-A and D2-B). A
+		// seq-ordered per-user walk (a "D2-C", parked in docs/parked.md per
+		// OQ-3) would flip this to alarm. A deliberate behavioral pin, not an
+		// endorsement.
+		//
+		// Fork: [+10 → 10], [-3 → 7], [uncollectable -5 → 10 (stale base 10)].
+		// uncollectable's implied_prev := balance_after = 10, so ip = {0,10,10},
+		// ba = {10,7,10}: Z - L = 1 ⇒ D2-B silent; a single net-+1 sink 7 = the
+		// sum of non-uncollectable amounts (10 - 3) ⇒ D2-A silent. The forked
+		// row's stale base is invisible: 10 already balances as both a ba and ip.
+		const userId = await seedUser("drift-pin-uncollectable-fork");
+		await insertHistory(userId, [
+			["initial_grant", "10", "10"],
+			["bet_stake", "-3", "7"],
+			["uncollectable", "-5", "10"],
+		]);
+
+		await runDrift();
+		expect(await totalAlarmCount()).toBe(0);
+	});
+
+	it("nightly-drift::pin-balance-value-collision-fork-zero-alarms", async () => {
+		// PIN test — documents the order-free detector residual (0015 header
+		// residual class; an A2 fork of this shape evades BOTH D2-A and D2-B). A
+		// seq-ordered per-user walk (a "D2-C", parked in docs/parked.md per
+		// OQ-3) would flip this to alarm. A deliberate behavioral pin, not an
+		// endorsement.
+		//
+		// Fork: [+10 → 10], [-3 → 7], [bet_payout +3 → 10 (implied_prev 7)]. The
+		// fork multiset is identical to the legit linear chain +10,-3,+3:
+		// ip = {0,10,7}, ba = {10,7,10} ⇒ Z - L = 1 (D2-B silent); a single
+		// net-+1 sink 10 = the sum of amounts 10 (D2-A silent). Indistinguishable
+		// from a legit chain under any order-free check.
+		const userId = await seedUser("drift-pin-balance-collision-fork");
+		await insertHistory(userId, [
+			["initial_grant", "10", "10"],
+			["bet_stake", "-3", "7"],
+			["bet_payout", "3", "10"],
+		]);
+
+		await runDrift();
+		expect(await totalAlarmCount()).toBe(0);
 	});
 });

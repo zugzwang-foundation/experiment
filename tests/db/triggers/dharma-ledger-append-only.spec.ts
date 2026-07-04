@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { dharmaLedger, users } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — dharma_ledger. Per SPEC.2 §6.2 + 0003 lines 44-45.
 // Storage-layer half of INV-2 (no overdraft) — append-only ledger means a
@@ -14,7 +15,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("dharma_ledger — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+		await truncateTables(testClient, ["dharma_ledger", "users"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

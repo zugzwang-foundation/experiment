@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { identityPool } from "@/db/schema";
 import { runSeed } from "../../../scripts/seed-identity-pool";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 const FIXTURE_DIR = `${path.dirname(fileURLToPath(import.meta.url))}/_fixtures`;
 const MANIFEST_100 = path.join(FIXTURE_DIR, "manifest-100.csv");
@@ -27,7 +28,7 @@ const PSEUDONYM_SHAPE = /^[A-Z][a-z]+[A-Z][a-z]+\d{3}$/;
 
 describe("seed-identity-pool — runSeed against real Postgres", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE identity_pool CASCADE`);
+		await truncateTables(testClient, ["identity_pool"]);
 	});
 
 	// === Plan §D Test 1 — happy path =======================================

@@ -34,6 +34,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { accounts, identityPool, users } from "@/db/schema";
 import { auth } from "@/server/auth/index";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // Deterministic Google profile `sub`. Drives both the account.accountId and
 // (post-fix) users.google_id.
@@ -76,16 +77,20 @@ const accountData = {
 	refreshTokenExpiresAt: null,
 };
 
-// TRUNCATE (not DELETE): identity_pool carries a Bucket-B BEFORE DELETE
+// truncateTables (not DELETE): identity_pool carries a Bucket-B BEFORE DELETE
 // no-delete trigger (0003_append_only_triggers.sql:194) — DELETE is forbidden
-// at the storage layer. TRUNCATE bypasses row-level delete triggers, exactly
-// like the dharma-ledger / positions integration tests. CASCADE clears the
+// at the storage layer — and, since 0021, a no-truncate guard; the fixture
+// disables the guards for exactly one teardown transaction. CASCADE clears the
 // FK-dependent auth tables; identity_pool is NOT FK-referenced by users
 // (pseudonym is copied, not referenced) so it is listed explicitly.
 async function truncateAll(): Promise<void> {
-	await testClient.unsafe(
-		"TRUNCATE users, accounts, sessions, identity_pool, verifications CASCADE",
-	);
+	await truncateTables(testClient, [
+		"users",
+		"accounts",
+		"sessions",
+		"identity_pool",
+		"verifications",
+	]);
 }
 
 async function seedOneTuple(): Promise<void> {

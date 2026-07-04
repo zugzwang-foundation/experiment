@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { markets, resolutionEvents } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — resolution_events. Per SPEC.2 §6.2 + 0003 lines 50-51.
 // Storage-layer mechanism (ii) of INV-4 (append-only resolutions) at the
@@ -13,7 +14,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("resolution_events — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE resolution_events, markets CASCADE`);
+		await truncateTables(testClient, ["resolution_events", "markets"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

@@ -41,6 +41,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { triggerResolution } from "@/server/resolution/trigger";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
 
@@ -125,9 +126,18 @@ async function seedMarketWithPool(
 
 describe("ENGINE.9 F-ADMIN-3 — triggerResolution (W-3a)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 
@@ -321,9 +331,19 @@ describe("resolveMarketAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 
@@ -505,9 +525,19 @@ describe("correctResolutionAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 
@@ -573,9 +603,19 @@ describe("voidMarketAction wire surface", () => {
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users, admin_sessions CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+			"admin_sessions",
+		]);
 		vi.clearAllMocks();
 	});
 

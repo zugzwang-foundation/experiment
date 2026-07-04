@@ -17,6 +17,7 @@ import {
 } from "@/db/schema";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 /** Canonical 18-dp NUMERIC from a whole number (stakes). */
 const c18 = (n: number): string => `${n}.000000000000000000`;
@@ -131,9 +132,17 @@ const REMOVED_PSEUDONYM = "RemovedGhost999";
 const REMOVED_PRICE_DISPLAY = "0.37";
 
 afterEach(async () => {
-	await testClient.unsafe(
-		`TRUNCATE mod_actions, payout_events, resolution_events, bets, comments, positions, pools, markets, users CASCADE`,
-	);
+	await truncateTables(testClient, [
+		"mod_actions",
+		"payout_events",
+		"resolution_events",
+		"bets",
+		"comments",
+		"positions",
+		"pools",
+		"markets",
+		"users",
+	]);
 });
 
 describe("debate-export route — masking + gap-fills (open market, injected content_removed)", () => {

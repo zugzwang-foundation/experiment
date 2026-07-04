@@ -13,6 +13,7 @@ import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import {
 	seedOpenMarketWithPool,
 	seedUser,
@@ -69,9 +70,18 @@ function identicalPlaceTask(args: {
 
 describe("scale — idempotency dedup (axis 7, Q-3)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

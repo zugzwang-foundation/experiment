@@ -9,6 +9,7 @@ import {
 	users,
 } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — payout_events. Per SPEC.2 §6.2 + 0003 lines 52-53.
 // Storage-layer mechanism (ii) of INV-4 at the per-table layer.
@@ -17,9 +18,14 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("payout_events — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE payout_events, bets, comments, resolution_events, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"payout_events",
+			"bets",
+			"comments",
+			"resolution_events",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

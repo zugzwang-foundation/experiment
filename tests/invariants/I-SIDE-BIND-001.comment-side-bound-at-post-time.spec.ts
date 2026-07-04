@@ -80,6 +80,7 @@ import { POST as sellPOST } from "@/app/api/bets/sell/route";
 import { comments, markets, pools, users } from "@/db/schema";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -148,9 +149,16 @@ describe("I-SIDE-BIND-001: comments side-bound at post-time across a flip", () =
 	});
 
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("comment-side-bound::flip-does-not-move-frozen-side", async () => {

@@ -10,6 +10,7 @@ import {
 	users,
 } from "@/db/schema";
 import { createdAtFromUuidV7, testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // INV-4 canonical: storage-layer foundation for "Resolutions append-only".
 //
@@ -41,9 +42,15 @@ import { createdAtFromUuidV7, testClient, testDb } from "../db/_fixtures/db";
 
 describe("INV-4: resolutions append-only (storage-layer foundation)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, bets, comments, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"bets",
+			"comments",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("INV-4 mechanism (ii): resolution_events UPDATE rejected at storage layer", async () => {

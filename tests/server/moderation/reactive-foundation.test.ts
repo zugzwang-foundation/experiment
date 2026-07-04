@@ -33,6 +33,7 @@ import {
 	users,
 } from "@/db/schema";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const ADMIN_ACTION_REASONS = ["content_removed", "user_banned"] as const;
 
@@ -64,9 +65,13 @@ async function seedMarket(slug: string): Promise<string> {
 
 describe("DEBATE.7 moderation::reactive-remove-ban-positions-ride (foundation)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE mod_actions, dharma_ledger, positions, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"mod_actions",
+			"dharma_ledger",
+			"positions",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("reactive-foundation::mod-reason-enum-carries-content-removed-and-user-banned", async () => {

@@ -13,6 +13,7 @@ import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import {
 	seedAllSyntheticMarkets,
 	seedUserUnpaidCursor,
@@ -72,9 +73,18 @@ async function dailyAllowanceCount(userId: string): Promise<number> {
 
 describe("scale — daily-credit first-bet-of-day race (axis 8, I-DAILY-ONCE)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

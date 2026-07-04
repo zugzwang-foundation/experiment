@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { events } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — events. Per SPEC.2 §6.2 + 0003_append_only_triggers.sql lines 42-43:
 // BEFORE UPDATE / BEFORE DELETE both fire enforce_bucket_a_no_update /
@@ -20,7 +21,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("events — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE events CASCADE`);
+		await truncateTables(testClient, ["events"]);
 	});
 
 	it("rejects UPDATE with P0001 (append-only violation)", async () => {

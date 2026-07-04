@@ -2,13 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { adminEvents } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — admin_events. Per SPEC.2 §6.2 + 0003 lines 56-57.
 // No FKs (admin has no users row per §8.7 pillar 1).
 
 describe("admin_events — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE admin_events CASCADE`);
+		await truncateTables(testClient, ["admin_events"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

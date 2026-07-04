@@ -25,6 +25,7 @@ import { CpmmDecimal, floor18 } from "@/server/cpmm/decimal";
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S3, plan §Test plan) — the R-9.8 settlement
 // basis after sells (DB-backed). Greenfield value import from
@@ -174,9 +175,18 @@ async function setResolving(marketId: string): Promise<void> {
 
 describe("ENGINE.9 R-9.8 — pro-rata settlement basis after sells", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

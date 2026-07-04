@@ -44,6 +44,7 @@ import { insertEvent } from "@/server/events/insert";
 import { upsertPositionDelta } from "@/server/positions/persist";
 
 import { createdAtFromUuidV7, testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.7 §5.6 tests-first — the 7 W-1 wrapper concurrency tests + 1 events-
 // idempotency property test (plan ruling (e)/(f); §"Test plan").
@@ -142,9 +143,16 @@ async function seedDharmaGrant(userId: string): Promise<void> {
 
 describe("ENGINE.7 W-1 runBetTransaction — concurrency + retry", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

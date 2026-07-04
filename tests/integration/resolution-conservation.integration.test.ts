@@ -31,6 +31,7 @@ import { settleMarket } from "@/server/resolution/settle";
 import { voidMarket } from "@/server/resolution/void";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (I1, plan §Test plan) — the three conservation
 // identities (i)/(ii)/(iii) close on REAL DB fixtures via the shipped (★)
@@ -169,9 +170,18 @@ async function gatherBetTiedFlows(
 
 describe("ENGINE.9 — resolution conservation identities (i)/(ii)/(iii)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

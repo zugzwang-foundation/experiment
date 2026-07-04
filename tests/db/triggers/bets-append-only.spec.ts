@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { bets, comments, markets, users } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 // Bucket A — bets. Per SPEC.2 §6.2 + 0003 lines 46-47.
 // INV-1 (bet ↔ comment atomicity) is application-layer (SERIALIZABLE
@@ -13,7 +14,7 @@ import { testClient, testDb } from "../_fixtures/db";
 
 describe("bets — append-only trigger", () => {
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE bets, comments, markets, users CASCADE`);
+		await truncateTables(testClient, ["bets", "comments", "markets", "users"]);
 	});
 
 	it("rejects UPDATE with P0001", async () => {

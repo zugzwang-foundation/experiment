@@ -95,6 +95,7 @@ import { events, markets, pools, users } from "@/db/schema";
 import { upsertPositionDelta } from "@/server/positions/persist";
 
 import { createdAtFromUuidV7, testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -160,9 +161,16 @@ describe("ENGINE.8 events-idempotency [R3/R4]", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("bet-place::two-events-stable-created-at-across-retry [R3]", async () => {

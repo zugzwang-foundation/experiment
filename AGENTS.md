@@ -160,8 +160,8 @@ const placeBetSchema = z.object({
 
 ### Append-only buckets
 
-- **Bucket A — fully append-only** (9 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events). Protected by `0003_append_only_triggers.sql`; reject UPDATE/DELETE at the storage layer.
-- **Bucket B — append-only with whitelisted column transition(s)** (3 tables: identity-pool, image-uploads, system-state). Each permits a one-shot `NULL→timestamp` transition on a whitelisted column — e.g. `system_state.frozen_at` flips once then is immutable (`image_uploads` transitions `terminal_state` + `terminal_at` together). All other column changes + every DELETE are rejected at the storage layer.
+- **Bucket A — fully append-only** (9 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events). Protected by `0003_append_only_triggers.sql` (row-level UPDATE/DELETE) + `0021` (statement-level TRUNCATE, ADR-0030); reject UPDATE/DELETE/TRUNCATE at the storage layer.
+- **Bucket B — append-only with whitelisted column transition(s)** (3 tables: identity-pool, image-uploads, system-state). Each permits a one-shot `NULL→timestamp` transition on a whitelisted column — e.g. `system_state.frozen_at` flips once then is immutable (`image_uploads` transitions `terminal_state` + `terminal_at` together). All other column changes, every DELETE, and every TRUNCATE are rejected at the storage layer (TRUNCATE statement-level, ADR-0030).
 - **Bucket C — mutable** (e.g. `positions`).
 
 ### Migrations (`drizzle/migrations/`)

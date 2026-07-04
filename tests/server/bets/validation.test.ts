@@ -69,6 +69,7 @@ import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 
@@ -147,9 +148,16 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 		mockPrecommit.mockResolvedValue({ outcome: "pass", categories: [] });
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("bet-place::rejects-insufficient-dharma (F-BET-4 → 400, INV-2)", async () => {

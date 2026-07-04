@@ -66,6 +66,7 @@ import { comments, markets, pools, users } from "@/db/schema";
 import { BET_MIN_STAKE_REPLY } from "@/server/config/limits";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 // A reply stake at/above the pinned reply floor (50) — clears the floor so the
@@ -159,9 +160,16 @@ describe("F-COMMENT-2 — reply is a Support/Counter reply-bet", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("reply-is-a-bet-replier-side-not-parent", async () => {

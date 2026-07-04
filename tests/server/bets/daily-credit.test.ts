@@ -170,6 +170,7 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { getHeldPosition } from "@/server/positions/read";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED_RESERVES = "100.000000000000000000";
 const GRANT = "1000";
@@ -275,9 +276,16 @@ describe("ENGINE.12 Daily Credit — lazy accrual inside the commented-bet tx", 
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("bet-place::first-commented-bet-of-day-pays-daily-credit [T1]", async () => {
@@ -650,5 +658,57 @@ describe("ENGINE.12 Daily Credit — lazy accrual inside the commented-bet tx", 
 			.from(pools)
 			.where(eq(pools.marketId, marketId));
 		expect(poolRow?.yesReserves).toBe(SEED_RESERVES);
+	});
+
+	it("bet-place::daily-credit-pair-subsequent-read-returns-post-stake-balance [A2 fix-validation]", async () => {
+		// AUDIT-FIX-B2 (ii) — the place()-level A2 FIX-VALIDATION. A user whose
+		// daily credit is DUE places a minimum post-stake bet (BET_MIN_STAKE_POST
+		// == DAILY_CREDIT_DHARMA == "10" — the plan's modal net-zero tie): the
+		// W-1 tx appends daily_allowance (+10) THEN bet_stake (-10) with the SAME
+		// tx-frozen created_at. A SUBSEQUENT tx then reads the running-total
+		// cursor; the post-stake balance is the seed grant unchanged
+		// (1010 - 10 = 1000).
+		//
+		// PREDECESSOR SURPRISE (recorded): this test passes deterministically
+		// even PRE-fix at typical statement spacing — the userspace uuidv7()
+		// draws its ms-prefix from clock_timestamp(), which ADVANCES between the
+		// pair's two INSERTs (~4 statements apart), so the old `(created_at DESC,
+		// id DESC)` order broke the created_at tie on a monotonically-later id
+		// and still picked bet_stake. The A2 defect needs a SAME-millisecond
+		// landing (random trailing bits decide) or an NTP backward step. So this
+		// is the place()-level FIX-VALIDATION (deterministically correct-for-the-
+		// right-reason POST-fix via seq), while T1 (crafted ids in
+		// dharma-ledger.integration) is the deterministic RED driver. Observed
+		// 11/11 PASS pre-fix in the tests-first run.
+		const userId = await seedUser("dc-a2-read", "dc-a2-read");
+		const marketId = await seedOpenMarketWithPool("dc-a2-read-market");
+		await seedDharmaGrant(userId, GRANT);
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			req(
+				{
+					marketId,
+					side: "YES",
+					stake: BET_MIN_STAKE_POST,
+					body: "first bet of the day: the net-zero credit+stake pair",
+				},
+				"dc-a2-read-key",
+			),
+		);
+		expect(res.status).toBe(200);
+
+		// The credit (+10) and stake (-10) committed with a tied created_at; a
+		// subsequent, separate tx's readBalance returns the CHAIN-latest balance
+		// = the post-stake value (grant + credit - stake = grant). Imported (not
+		// literal) so a HARDEN.5 retune keeps the assertion honest.
+		const { readBalance } = await import("@/server/dharma/persist");
+		const balance = await testDb.transaction((tx) => readBalance(tx, userId));
+		expect(balance).toBe(
+			new CpmmDecimal(GRANT)
+				.plus(DAILY_CREDIT_DHARMA)
+				.minus(BET_MIN_STAKE_POST)
+				.toFixed(18),
+		);
 	});
 });

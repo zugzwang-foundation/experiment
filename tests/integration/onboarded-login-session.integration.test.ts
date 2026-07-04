@@ -74,6 +74,7 @@ vi.hoisted(() => {
 import { sessions, users, verifications } from "@/db/schema";
 import { auth } from "@/server/auth/index";
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 
 // SPEC.2 §8.5 cookie table — participant session cookie. `secure:true` (set in
 // auth/index.ts advanced.cookies.session_token.attributes) + the https baseURL
@@ -99,16 +100,20 @@ const OTP_CODE = "424242";
 // user branch (routes.mjs:401-426) without an emailVerified UPDATE detour.
 const SEEDED_PSEUDONYM = "OnboardedHawk777";
 
-// TRUNCATE (not DELETE): users/sessions/verifications are append-only or
+// truncateTables (not DELETE): users/sessions/verifications are append-only or
 // FK-anchored; identity_pool carries a Bucket-B no-delete trigger
-// (0003_append_only_triggers.sql). TRUNCATE bypasses row-level delete
-// triggers, exactly like signup-create-path / dharma-ledger integration tests.
+// (0003_append_only_triggers.sql) and, since 0021, a no-truncate guard — the
+// fixture disables the guards for exactly one teardown transaction.
 // CASCADE clears FK dependents of users (sessions, accounts, dharma_ledger,
 // …). Mirrors signup-create-path.integration.test.ts verbatim.
 async function truncateAll(): Promise<void> {
-	await testClient.unsafe(
-		"TRUNCATE users, accounts, sessions, identity_pool, verifications CASCADE",
-	);
+	await truncateTables(testClient, [
+		"users",
+		"accounts",
+		"sessions",
+		"identity_pool",
+		"verifications",
+	]);
 }
 
 let seededUserId: string;

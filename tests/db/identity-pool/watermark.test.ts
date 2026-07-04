@@ -21,6 +21,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityPool } from "@/db/schema";
 import { testClient, testDb } from "../_fixtures/db";
+import { truncateTables } from "../_fixtures/truncate";
 
 const COLOURS = [
 	"Red",
@@ -113,11 +114,14 @@ async function runWatermarkCheck() {
 
 describe("check_identity_pool_watermark — pg_cron alarm transition", () => {
 	beforeEach(async () => {
-		// TRUNCATE bypasses per-row Bucket B triggers; watermark_state +
-		// cron_alarms are operational (Bucket C) with no append-only trigger.
-		await testClient.unsafe(
-			`TRUNCATE identity_pool, watermark_state, cron_alarms CASCADE`,
-		);
+		// truncateTables toggles the 0021 no-truncate guard on identity_pool
+		// for one teardown transaction; watermark_state + cron_alarms are
+		// operational (Bucket C) with no append-only trigger.
+		await truncateTables(testClient, [
+			"identity_pool",
+			"watermark_state",
+			"cron_alarms",
+		]);
 		// Re-seed the watermark_state row to the migration's initial state.
 		// ON CONFLICT DO NOTHING in case TRUNCATE left it behind on some
 		// fixtures (PRIMARY KEY metric); safe-idempotent.
@@ -190,7 +194,7 @@ describe("check_identity_pool_watermark — pg_cron alarm transition", () => {
 		// Step 2: TRUNCATE identity_pool only (preserve watermark_state +
 		// cron_alarms to verify continuity); re-seed 100 with 94 assigned →
 		// 6 unassigned = 6% > 5%, above.
-		await testClient.unsafe(`TRUNCATE identity_pool CASCADE`);
+		await truncateTables(testClient, ["identity_pool"]);
 		await seedPool(100, 94);
 
 		// Step 3: invoke; assert state cleared, alarm count UNCHANGED (only
@@ -214,14 +218,14 @@ describe("check_identity_pool_watermark — pg_cron alarm transition", () => {
 		expect(await alarmCount()).toBe(1);
 
 		// Recovery: below → above (no alarm).
-		await testClient.unsafe(`TRUNCATE identity_pool CASCADE`);
+		await truncateTables(testClient, ["identity_pool"]);
 		await seedPool(100, 94);
 		await runWatermarkCheck();
 		expect(await readWatermarkState()).toBe("above");
 		expect(await alarmCount()).toBe(1);
 
 		// Episode 2: above → below (new alarm).
-		await testClient.unsafe(`TRUNCATE identity_pool CASCADE`);
+		await truncateTables(testClient, ["identity_pool"]);
 		await seedPool(100, 96);
 		await runWatermarkCheck();
 		expect(await readWatermarkState()).toBe("below");

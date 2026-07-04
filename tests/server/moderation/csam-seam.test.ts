@@ -39,6 +39,7 @@ import { modActions } from "@/db/schema";
 // fields §2/§7 name. VALUE import → RED until consequences.ts lands.
 import { recordGateBlock } from "@/server/moderation/consequences";
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 import { seedOpenMarketWithPool, seedUser } from "./_fixtures/wire";
 
 describe("DEBATE.7 moderation — CSAM seam (Sentry-only; no NCMEC)", () => {
@@ -46,7 +47,7 @@ describe("DEBATE.7 moderation — CSAM seam (Sentry-only; no NCMEC)", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await testClient.unsafe(`TRUNCATE mod_actions, markets, users CASCADE`);
+		await truncateTables(testClient, ["mod_actions", "markets", "users"]);
 	});
 
 	it("csam-seam::track-a-sexual-minors-fires-sentry-seam", async () => {

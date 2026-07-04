@@ -26,6 +26,7 @@ import { ResolutionStateError } from "@/server/resolution/errors";
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.9 §5.6 tests-first (S2, plan §Test plan) —
 // `resolution-settles-and-locks` + the settle suite (F-RESOLVE-1, W-3b).
@@ -187,9 +188,18 @@ async function seedSettleScenario(slug: string): Promise<{
 
 describe("ENGINE.9 F-RESOLVE-1 — settleMarket (W-3b)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

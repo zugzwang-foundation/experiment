@@ -287,25 +287,50 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Expected next task.** HARDEN.* observability hardening (TBD).
 
-## SYNC-sweep — spec/doc reconciliation owed by AUDIT-FIX-A1 + AUDIT-FIX-B1 (FOUR targets)
+## SYNC-sweep — spec/doc reconciliation owed by AUDIT-FIX-A1 + AUDIT-FIX-B1 + AUDIT-FIX-B2 (FOUR targets)
 
-**Originating task:** AUDIT-FIX-A1 (PR #197, squash `4350406`) + AUDIT-FIX-B1 (PR #199, squash `72ce26c`) — both landed same-commit spec riders but neither ran the §0 version/changelog bump nor the ADR-index/footer count reconciliation (per CLAUDE.md §7 these are a periodic SYNC sweep, not per-task). **FOUR distinct targets** — the sweep must not do the SPEC.2 §0 bump alone and miss the SPEC.1 bump + the ADR-index/footer reconciliation. State verified current 2026-07-04.
+**Originating task:** AUDIT-FIX-A1 (PR #197, squash `4350406`) + AUDIT-FIX-B1 (PR #199, squash `72ce26c`) + AUDIT-FIX-B2 (rider commit on `fix/audit-fix-b2`; PR# in `docs/logs/AUDIT-FIX-B2.md`) — all landed same-commit spec riders but none ran the §0 version/changelog bump nor the ADR-index/footer count reconciliation (per CLAUDE.md §7 these are a periodic SYNC sweep, not per-task). **FOUR distinct targets** — the sweep must not do the SPEC.2 §0 bump alone and miss the SPEC.1 bump + the ADR-index/footer reconciliation. State verified current 2026-07-04 (B2 extension same day).
 
 **Deferred work (all four).**
 
 1. **SPEC.2 §0 — version + change log** (currently **v1.0.15**). Bump + add §0.1 change-log row(s) covering:
    - **A1** riders — §12.2 / §12.3 (write-once `If-None-Match: *` PUT + pre-moderation `HeadObject` verify) · §10 (pre-moderation object verify) · the §22 ADR-0028 row (already in the table). ADR-0028 = moderated-image byte-identity binding.
    - **B1** riders — §17.2 (row 2 `events_default_nonempty` drain-side transport; row 4 `openai_moderation_upstream_failure` pin; new row 9 `bet_handler_internal_error`; count-prose eight→nine) · §17.3 6c (`headObject` 4th `r2_unavailable` source).
-   - The §0 status-header ADR line ("25 ADRs at `0003–0027`") also moves to `0003–0028` (it lives in §0).
+   - **B2** riders — §5.1 row 2 (`dharma_ledger` seq clause) · Appendix B.7 (new `seq` column row) · §6 intro + §6.1 clauses 1&2 + §6.2 addendum (`enforce_bucket_a_no_truncate()`, 25 triggers, forward obligation) + §6.5 owner-privilege reconciliation (ADR-0029 / ADR-0030).
+   - The §0 status-header ADR line ("25 ADRs at `0003–0027`") also moves to **28 ADRs at `0003–0030`** (it lives in §0).
 
-2. **SPEC.1 §0 — version + change log** (currently **v1.0.13**; re-verify at sweep). Bump + add a change-log row for **A1's §16.5** CSAM-compliance rider (swap-window-closure note). B1 did not touch SPEC.1, so this bump is A1-only.
+2. **SPEC.1 §0 — version + change log** (currently **v1.0.13**; re-verify at sweep). Bump + add a change-log row for **A1's §16.5** CSAM-compliance rider (swap-window-closure note). B1 and B2 did not touch SPEC.1, so this bump is A1-only.
 
-3. **SPEC.2 §22 ADR-index count-prose.** §22.1 currently reads "**26 ADRs** … `0003–0027`" (26 = ADR-0001 + 0003–0027 per BC.2). The ADR-0028 **row** is already in the §22 table (A1 — target 1's "§22 ADR-row"); only the **count-prose** is stale → **27 ADRs**, range `0003–0028`. Distinct from the row already added.
+3. **SPEC.2 §22 ADR-index.** §22.1 currently reads "**26 ADRs** … `0003–0027`" (26 = ADR-0001 + 0003–0027 per BC.2). The ADR-0028 **row** is already in the §22 table (A1 — target 1's "§22 ADR-row"); B2 deliberately added **no** §22 rows, so the sweep owes **two new table rows (ADR-0029, ADR-0030)** plus the **count-prose** → **29 ADRs**, range `0003–0030`.
 
-4. **CLAUDE.md + AGENTS.md footers.** Both "Rebuilt at …" footers cite "**ADRs 0003–0027**" → `0003–0028`; CLAUDE.md §"Source of truth" also cites `docs/adr/0003–0027` → `0003–0028`.
+4. **CLAUDE.md + AGENTS.md footers.** Both "Rebuilt at …" footers cite "**ADRs 0003–0027**" → `0003–0030`; CLAUDE.md §"Source of truth" also cites `docs/adr/0003–0027` → `0003–0030`.
 
 **Why deferred.** §0 version bumps + change-log + ADR-index/footer count reconciliation are a periodic SYNC sweep (CLAUDE.md §7 "reconcile periodically"), not per-task — batching avoids a metadata-churn commit on every rider PR. The rider text itself landed same-commit (the load-bearing part); only the metadata is swept.
 
 **Conditional trigger.** The next SYNC.* reconciliation sweep (version-bump + changelog + ADR-index/footer pass).
 
 **Expected next task.** SYNC.* (next reconciliation sweep).
+
+## AUDIT-FIX-B2 OQ-2 — app-as-owner role split (the only COMPLETE TRUNCATE fix)
+
+**Originating task:** AUDIT-FIX-B2 A20 STEP-0 probe (2026-07-04, operator-ratified park; target **before Sep 15, 2026 launch**).
+
+**Deferred work.** Provision a dedicated **non-owner runtime role** for the app connection (staging + prod Supabase) and re-point the Doppler `stg`/`prd` `DATABASE_URL` (and Vercel-synced env) at it: the app role must not OWN the 12 protected tables. Grant only the DML the handlers need (SELECT/INSERT everywhere; UPDATE only on Bucket-B whitelisted-transition tables + Bucket-C `positions`/`pools`/`markets`/auth tables); no TRUNCATE, no TRIGGER, no DDL.
+
+**Why deferred.** The STEP-0 probe found the app role (Doppler `DATABASE_URL`) is **`postgres` — the table OWNER** on all 12 protected tables. TRUNCATE privilege **cannot be revoked from an owner** (owner privileges are implicit), so grant surgery is a no-op, and an owner-level attacker can also `ALTER TABLE … DISABLE TRIGGER` — i.e., migration 0021's BEFORE TRUNCATE guards (B2) close the accident/blast-radius/unsophisticated-injection class but NOT the owner-level class. The role split is Supabase role/connection/Vercel-env re-plumbing — its own hardening task, out of B2's additive-DDL scope. Recorded in ADR-0030.
+
+**Conditional trigger.** Pre-launch hardening (target before Sep 15), OR any incident involving unexpected DDL/TRUNCATE from the app connection.
+
+**Expected next task.** Dedicated HARDEN-ROLE-SPLIT task (TBD; pairs naturally with the RLS-out-of-scope posture review, ADR-0019).
+
+## AUDIT-FIX-B2 OQ-3 — "D2-C" seq-ordered chain walk (closes the order-free detector blind spot)
+
+**Originating task:** AUDIT-FIX-B2 detector-loop analysis (2026-07-04, operator-ratified park as fast-follow).
+
+**Deferred work.** Add a third dharma-chain derivation to `check_nightly_drift()` — a strict per-user **seq-ordered walk** (`LAG(balance_after) OVER (PARTITION BY user_id ORDER BY seq)`; uncollectable rule: `balance_after = prev`) that alarms on the first broken link. Function-replace via the 0007→0011→0015 precedent (new migration re-states the full body; 0011/0015 stay append-only). The B2 PR's post-migration chain-vs-seq audit query (session log AUDIT-FIX-B2) is the exact walk — promote it from one-off query to detector clause.
+
+**Why deferred.** D2-A/D2-B are order-free by ADR-0016 necessity (pre-seq, no trustworthy order existed). B2's migration 0020 makes a total order available for the first time, but folding a detector change into a ledger-fix PR grows a critical-path diff; and the A2 fix itself stops production of new forks, so the blind spot matters only for pre-fix or non-app corruption. Two zero-alarm **pin tests** document the residual live (`nightly-drift::pin-uncollectable-fork-evades-both-derivations-zero-alarms`, `nightly-drift::pin-balance-value-collision-fork-zero-alarms`) — D2-C's landing flips them to alarm, consciously.
+
+**Conditional trigger.** Fast-follow after B2 merges (next maintenance window), OR any `dharma_chain_drift` alarm whose payload derivation is ambiguous, OR pre-launch HARDEN detector pass.
+
+**Expected next task.** Dedicated fast-follow stratum (AUDIT-FIX-B2-FOLLOWUP or HARDEN.* detector pass).

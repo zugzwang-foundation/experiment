@@ -118,6 +118,7 @@ import { POST as placePOST } from "@/app/api/bets/place/route";
 import { dharmaLedger, users } from "@/db/schema";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const USER_ID = "0190b3a0-2222-7000-8000-000000000002";
 const MARKET_ID = "0190b3a0-3333-7000-8000-000000000003";
@@ -197,7 +198,7 @@ describe("ENGINE.8 handler — idempotency replay", () => {
 	// that the REPLAY itself changed nothing (ledger row count + cursor).
 	describe("ENGINE.12 — replay never re-pays the Daily Credit", () => {
 		afterEach(async () => {
-			await testClient.unsafe(`TRUNCATE dharma_ledger, users CASCADE`);
+			await truncateTables(testClient, ["dharma_ledger", "users"]);
 		});
 
 		it("bet-place::replay-leaves-ledger-and-cursor-untouched [T7]", async () => {

@@ -1,0 +1,2 @@
+ALTER TABLE "dharma_ledger" ADD COLUMN "seq" bigint NOT NULL GENERATED ALWAYS AS IDENTITY (sequence name "dharma_ledger_seq_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1);--> statement-breakpoint
+CREATE UNIQUE INDEX "dharma_ledger_user_seq_uq" ON "dharma_ledger" USING btree ("user_id","seq");

@@ -28,6 +28,7 @@ import { bets, comments, markets, pools, users } from "@/db/schema";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 const SEED = "100.000000000000000000";
 
@@ -97,9 +98,19 @@ async function seedCommentWithBet(args: {
 
 describe("DEBATE.4 §5 — getMarketTotals (dharma staked + post/reply counts)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, mod_actions, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"mod_actions",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 

@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { testClient } from "../../db/_fixtures/db";
+import { truncateTables } from "../../db/_fixtures/truncate";
 
 // ENGINE.16 §5.6 tests-first (charter "helper" row) — the §20.2 conclusion-
 // freeze read-guard `isFrozen()`. The helper is GREENFIELD
@@ -31,7 +32,7 @@ const HELPER_PATH = fileURLToPath(
 async function resetSystemState(): Promise<void> {
 	// FIX-1: TRUNCATE bypasses the UPDATE/DELETE once-only trigger; the reseed
 	// restores the pre-freeze singleton ('system', frozen_at NULL).
-	await testClient.unsafe(`TRUNCATE system_state`);
+	await truncateTables(testClient, ["system_state"]);
 	await testClient.unsafe(
 		`INSERT INTO system_state (id, frozen_at) VALUES ('system', NULL)`,
 	);

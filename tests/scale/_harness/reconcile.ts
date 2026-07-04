@@ -387,13 +387,15 @@ export async function gatherSnapshot(): Promise<ConservationSnapshot> {
 	};
 }
 
-/** Σ of each user's MOST-RECENT `balance_after` over the `(created_at, id)` chain
- *  order — DISTINCT ON the same key the chain walk uses. */
+/** Σ of each user's MOST-RECENT `balance_after` in the `seq` total order
+ *  (ADR-0029) — DISTINCT ON the same key the chain walk uses. The former
+ *  `(created_at, id)` key could pick a chain-earlier row on a same-ms tie
+ *  (uuidv7 trailing bits are random) and report false conservation drift. */
 async function sumLatestBalancesPerUser(): Promise<string> {
 	const rows = (await testClient.unsafe(
 		`SELECT DISTINCT ON (user_id) balance_after
 		   FROM dharma_ledger
-		  ORDER BY user_id, created_at DESC, id DESC`,
+		  ORDER BY user_id, seq DESC`,
 	)) as unknown as Array<{ balance_after: string }>;
 	return rows
 		.reduce((acc, r) => acc.plus(r.balance_after), new CpmmDecimal(0))

@@ -16,6 +16,7 @@ import { prorate } from "@/server/resolution/basis";
 import { settleMarket } from "@/server/resolution/settle";
 
 import { testClient, testDb } from "../db/_fixtures/db";
+import { truncateTables } from "../db/_fixtures/truncate";
 import {
 	adminMetadata,
 	seedOpenMarketWithPool,
@@ -165,9 +166,18 @@ function placeTask(args: {
 
 describe("scale — money-math determinism / real settle fan-out (axis 11, D1)", () => {
 	afterEach(async () => {
-		await testClient.unsafe(
-			`TRUNCATE events, payout_events, resolution_events, dharma_ledger, bets, comments, positions, pools, markets, users CASCADE`,
-		);
+		await truncateTables(testClient, [
+			"events",
+			"payout_events",
+			"resolution_events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
 		vi.clearAllMocks();
 	});
 
