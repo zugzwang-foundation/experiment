@@ -274,3 +274,15 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 **Conditional trigger.** PRECURSOR.5 (the SPEC.2 market-status listing reconciliation) runs.
 
 **Expected next task.** PRECURSOR.5.
+
+## AUDIT-FIX-B1 A7 — invalid-but-present Sentry DSN residual → HARDEN canary probe
+
+**Originating task:** AUDIT-FIX-B1 A7 flush-before-stamp close-out (2026-07-04); surfaced by `@code-reviewer` + `@security-auditor` on the flush delta (PR #199).
+
+**Deferred work.** A synthetic canary-event health probe that confirms Sentry is actually *ingesting* events (not merely that a DSN string is present), closing the invalid-but-present-DSN gap. The `alarms-drain` flush-before-stamp guarantees delivery only insofar as `Sentry.flush()` reflects real transport success; with an **invalid** (but non-empty) DSN the SDK's no-op/failing transport can resolve `flush()` in a way A18's presence-only boot check does not catch, so the drain could stamp `cron_alarms` rows (including `dharma_chain_drift`, the money-mint tripwire) without a real send.
+
+**Why deferred.** The three DSN states form a ladder: flush-before-stamp closes the **valid-DSN Sentry-outage** case (PR #199); the **absent-DSN** case is closed by the A18 `register()` boot-throw for prod/staging (also PR #199); only the **invalid-but-present-DSN** case remains, and closing it needs an active probe (emit a known canary event, assert it lands) rather than a static presence check — a larger, standalone health-check surface out of B1's additive-only scope.
+
+**Conditional trigger.** HARDEN observability pass, OR any incident where a Sentry alarm was expected but never arrived despite a configured DSN.
+
+**Expected next task.** HARDEN.* observability hardening (TBD).

@@ -10,6 +10,7 @@ import {
 } from "@/lib/errors";
 import { auth } from "@/server/auth";
 import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
+import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
 import { mintPutUrl } from "@/server/storage/r2";
@@ -75,6 +76,8 @@ function jsonResponse(body: unknown, init: ResponseInit): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+	const startedAt = Date.now();
+
 	// 1. Origin allowlist (per SPEC.2 §4.1 amendment)
 	if (!checkOrigin(request)) {
 		return jsonResponse({ error: "error_origin_rejected" }, { status: 403 });
@@ -111,15 +114,22 @@ export async function POST(request: Request): Promise<Response> {
 		);
 	}
 
+	// AUDIT-FIX-B1 A17 (§16.3): handler-body outcomes only — step 5 onward
+	// logs; the origin/auth/onboarding/429 prefix rejections above never do.
+	const log = (status: number): void =>
+		logRequest({ request, status, userId: session.user.id, startedAt });
+
 	// 5. Body validate (shape only; semantic checks in signUploadAndInsert)
 	let raw: unknown;
 	try {
 		raw = await request.json();
 	} catch {
+		log(400);
 		return jsonResponse({ error: "error_invalid_json" }, { status: 400 });
 	}
 	const parsed = parseBody(raw);
 	if (!parsed) {
+		log(400);
 		return jsonResponse(
 			{ error: "error_invalid_request_body" },
 			{ status: 400 },
@@ -170,25 +180,30 @@ export async function POST(request: Request): Promise<Response> {
 			PUT_URL_TTL_SECONDS,
 			{ ifNoneMatch: true },
 		);
+		log(200);
 		return jsonResponse(
 			{ uploadId: result.uploadId, putUrl, key: result.key },
 			{ status: 200 },
 		);
 	} catch (err) {
 		if (err instanceof ImageMimeRejectedError) {
+			log(400);
 			return jsonResponse(err.toEnvelope(), { status: 400 });
 		}
 		if (err instanceof ImageOversizeError) {
+			log(400);
 			return jsonResponse(err.toEnvelope(), { status: 400 });
 		}
 		if (err instanceof StorageUnavailableError) {
 			// Retry-After per SPEC.2 §11 fail-CLOSED convention. 5s matches the
 			// idempotency-cache 503 surface; tunable in HARDEN.5 if needed.
+			log(503);
 			return jsonResponse(err.toEnvelope(), {
 				status: 503,
 				headers: { "retry-after": "5" },
 			});
 		}
+		// Crash path — unlogged (Next onRequestError → Sentry owns it).
 		throw err;
 	}
 }

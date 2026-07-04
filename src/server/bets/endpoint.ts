@@ -18,8 +18,10 @@ import {
 	IDEMPOTENCY_KEY_REGEX,
 	RATE_LIMIT_ERROR_CODE,
 } from "@/server/idempotency/types";
+import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 import { isFrozen } from "@/server/system/is-frozen";
 import { toWireError } from "./errors";
 
@@ -136,6 +138,7 @@ export async function runBetEndpoint(
 	request: Request,
 	inner: (ctx: BetEndpointCtx) => Promise<{ status: number; body: unknown }>,
 ): Promise<Response> {
+	const startedAt = Date.now();
 	const inboundRequestId = request.headers.get("x-request-id");
 	const requestId =
 		inboundRequestId && REQUEST_ID_SAFE.test(inboundRequestId)
@@ -276,6 +279,10 @@ export async function runBetEndpoint(
 	const userAgent = request.headers.get("user-agent") ?? "unknown";
 
 	let completed: CompletedResponse | null = null;
+	// AUDIT-FIX-B1 A17 (§16.3): only handler-body outcomes log — set at the
+	// `inner` result and the catch's wire, never at the 429 arm or any §3.1
+	// prefix rejection above (those never reached the handler body).
+	let logStatus: number | null = null;
 	try {
 		// 4. Rate-limit (betPerIp; fails OPEN). 429 IS cached per §11.
 		const rl = await checkRateLimit("betPerIp", ipIdentifier(ip));
@@ -303,15 +310,26 @@ export async function runBetEndpoint(
 			body: result.body,
 			bodyFingerprint: fingerprint,
 		};
+		logStatus = result.status;
 		return jsonResponse(requestId, result.status, result.body);
 	} catch (err) {
 		const wire = toWireError(err);
+		// AUDIT-FIX-B1 A5 (rulings #1, #2): the 500 fallthrough is the only
+		// money-path arm with no capture at source (the 4xx/503 classes are
+		// captured where they're minted). Original err object — an append-only
+		// trigger RAISE message survives verbatim, no rewrap.
+		if (wire.body.error.code === "error_internal") {
+			safeCaptureException(err, {
+				tags: { kind: "bet_handler_internal_error" },
+			});
+		}
 		// Cache terminal product errors (4xx) + 429; release(null) on a transient
 		// 503 / uncaught 5xx so a retry re-attempts cleanly (opt-C / ADR-0015 §4).
 		completed =
 			wire.status < 500
 				? { status: wire.status, body: wire.body, bodyFingerprint: fingerprint }
 				: null;
+		logStatus = wire.status;
 		return jsonResponse(
 			requestId,
 			wire.status,
@@ -319,6 +337,14 @@ export async function runBetEndpoint(
 			wire.retryAfterHeader,
 		);
 	} finally {
+		if (logStatus !== null) {
+			try {
+				logRequest({ request, status: logStatus, userId, startedAt });
+			} catch {
+				// Fail-open (§17.5 discipline): a log emission failure must never
+				// strand the idempotency reservation released below.
+			}
+		}
 		await release(completed);
 	}
 }

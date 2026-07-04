@@ -9,6 +9,7 @@ import {
 	PUT_URL_TTL_SECONDS,
 } from "@/server/config/limits";
 import { isUuidV7 } from "@/server/markets/media";
+import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
 import { mintPutUrl } from "@/server/storage/r2";
@@ -93,6 +94,8 @@ function jsonResponse(body: unknown, init: ResponseInit): Response {
 }
 
 export async function POST(request: Request): Promise<Response> {
+	const startedAt = Date.now();
+
 	// 1. Origin allowlist (CSRF defense per SPEC.2 §4.1).
 	if (!checkOrigin(request)) {
 		return jsonResponse({ error: "error_origin_rejected" }, { status: 403 });
@@ -113,15 +116,24 @@ export async function POST(request: Request): Promise<Response> {
 		);
 	}
 
+	// AUDIT-FIX-B1 A17 (§16.3): handler-body outcomes only — step 4 onward
+	// logs; origin/admin-session/429 rejections above never do. `userId: null`
+	// — the admin has no `users` row (refusal trigger §3); the `route` field
+	// marks the row as the admin surface in the dataset.
+	const log = (status: number): void =>
+		logRequest({ request, status, userId: null, startedAt });
+
 	// 4. Body validate (shape + UUIDv7 marketId + MIME/size upload hygiene).
 	let raw: unknown;
 	try {
 		raw = await request.json();
 	} catch {
+		log(400);
 		return jsonResponse({ error: "error_invalid_json" }, { status: 400 });
 	}
 	const parsed = parseBody(raw);
 	if (!parsed) {
+		log(400);
 		return jsonResponse(
 			{ error: "error_invalid_request_body" },
 			{ status: 400 },
@@ -130,9 +142,11 @@ export async function POST(request: Request): Promise<Response> {
 	// The client-supplied marketId is the pre-generated PK (a trust boundary,
 	// Q3) — reject anything not a well-formed UUIDv7.
 	if (!isUuidV7(parsed.marketId)) {
+		log(400);
 		return jsonResponse({ error: "error_invalid_market_id" }, { status: 400 });
 	}
 	if (!isAllowedMime(parsed.contentType)) {
+		log(400);
 		return jsonResponse(
 			{ error: "error_image_mime_rejected" },
 			{ status: 400 },
@@ -143,6 +157,7 @@ export async function POST(request: Request): Promise<Response> {
 		parsed.byteSize <= 0 ||
 		parsed.byteSize > IMAGE_UPLOADS_MAX_BYTES
 	) {
+		log(400);
 		return jsonResponse({ error: "error_image_oversize" }, { status: 400 });
 	}
 
@@ -159,14 +174,17 @@ export async function POST(request: Request): Promise<Response> {
 			parsed.contentType,
 			PUT_URL_TTL_SECONDS,
 		);
+		log(200);
 		return jsonResponse({ mediaId, putUrl, key }, { status: 200 });
 	} catch (err) {
 		if (err instanceof StorageUnavailableError) {
+			log(503);
 			return jsonResponse(err.toEnvelope(), {
 				status: 503,
 				headers: { "retry-after": "5" },
 			});
 		}
+		// Crash path — unlogged (Next onRequestError → Sentry owns it).
 		throw err;
 	}
 }
