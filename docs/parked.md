@@ -286,3 +286,26 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 **Conditional trigger.** HARDEN observability pass, OR any incident where a Sentry alarm was expected but never arrived despite a configured DSN.
 
 **Expected next task.** HARDEN.* observability hardening (TBD).
+
+## SYNC-sweep — spec/doc reconciliation owed by AUDIT-FIX-A1 + AUDIT-FIX-B1 (FOUR targets)
+
+**Originating task:** AUDIT-FIX-A1 (PR #197, squash `4350406`) + AUDIT-FIX-B1 (PR #199, squash `72ce26c`) — both landed same-commit spec riders but neither ran the §0 version/changelog bump nor the ADR-index/footer count reconciliation (per CLAUDE.md §7 these are a periodic SYNC sweep, not per-task). **FOUR distinct targets** — the sweep must not do the SPEC.2 §0 bump alone and miss the SPEC.1 bump + the ADR-index/footer reconciliation. State verified current 2026-07-04.
+
+**Deferred work (all four).**
+
+1. **SPEC.2 §0 — version + change log** (currently **v1.0.15**). Bump + add §0.1 change-log row(s) covering:
+   - **A1** riders — §12.2 / §12.3 (write-once `If-None-Match: *` PUT + pre-moderation `HeadObject` verify) · §10 (pre-moderation object verify) · the §22 ADR-0028 row (already in the table). ADR-0028 = moderated-image byte-identity binding.
+   - **B1** riders — §17.2 (row 2 `events_default_nonempty` drain-side transport; row 4 `openai_moderation_upstream_failure` pin; new row 9 `bet_handler_internal_error`; count-prose eight→nine) · §17.3 6c (`headObject` 4th `r2_unavailable` source).
+   - The §0 status-header ADR line ("25 ADRs at `0003–0027`") also moves to `0003–0028` (it lives in §0).
+
+2. **SPEC.1 §0 — version + change log** (currently **v1.0.13**; re-verify at sweep). Bump + add a change-log row for **A1's §16.5** CSAM-compliance rider (swap-window-closure note). B1 did not touch SPEC.1, so this bump is A1-only.
+
+3. **SPEC.2 §22 ADR-index count-prose.** §22.1 currently reads "**26 ADRs** … `0003–0027`" (26 = ADR-0001 + 0003–0027 per BC.2). The ADR-0028 **row** is already in the §22 table (A1 — target 1's "§22 ADR-row"); only the **count-prose** is stale → **27 ADRs**, range `0003–0028`. Distinct from the row already added.
+
+4. **CLAUDE.md + AGENTS.md footers.** Both "Rebuilt at …" footers cite "**ADRs 0003–0027**" → `0003–0028`; CLAUDE.md §"Source of truth" also cites `docs/adr/0003–0027` → `0003–0028`.
+
+**Why deferred.** §0 version bumps + change-log + ADR-index/footer count reconciliation are a periodic SYNC sweep (CLAUDE.md §7 "reconcile periodically"), not per-task — batching avoids a metadata-churn commit on every rider PR. The rider text itself landed same-commit (the load-bearing part); only the metadata is swept.
+
+**Conditional trigger.** The next SYNC.* reconciliation sweep (version-bump + changelog + ADR-index/footer pass).
+
+**Expected next task.** SYNC.* (next reconciliation sweep).
