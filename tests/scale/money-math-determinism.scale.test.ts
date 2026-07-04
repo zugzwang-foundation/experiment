@@ -156,6 +156,7 @@ function placeTask(args: {
 				body,
 				parentCommentId: null,
 				idempotencyKey,
+				bodyFingerprint: uuidv7(),
 				betEventId,
 				commentEventId,
 				creditEventId,

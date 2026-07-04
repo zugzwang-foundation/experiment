@@ -133,6 +133,7 @@ async function placeBet(args: {
 				body: `void argument ${uuidv7()}`,
 				parentCommentId: null,
 				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				betEventId: uuidv7(),
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),
@@ -315,6 +316,8 @@ describe("ENGINE.9 F-RESOLVE-3 — voidMarket (W-3d)", () => {
 				shares: "60",
 				sellEventId: uuidv7(),
 				syntheticBetId: uuidv7(),
+				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				metadata: userMetadata(userJ, "F-BET-3"),
 			}),
 		);

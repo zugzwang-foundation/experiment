@@ -140,6 +140,7 @@ async function placeBet(args: {
 				body: `pro-rata argument ${uuidv7()}`,
 				parentCommentId: null,
 				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				betEventId: uuidv7(),
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),
@@ -161,6 +162,8 @@ async function sellShares(args: {
 			shares: args.shares,
 			sellEventId: uuidv7(),
 			syntheticBetId: uuidv7(),
+			idempotencyKey: uuidv7(),
+			bodyFingerprint: uuidv7(),
 			metadata: userMetadata(args.userId, "F-BET-3"),
 		}),
 	);

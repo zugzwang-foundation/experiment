@@ -155,6 +155,13 @@
       "when": 1783158969192,
       "tag": "0021_truncate_guards",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1783177160596,
+      "tag": "0022_bet_receipts",
+      "breakpoints": true
     }
   ]
 }

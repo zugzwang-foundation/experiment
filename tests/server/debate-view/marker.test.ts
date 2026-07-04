@@ -145,6 +145,7 @@ async function placeBet(args: {
 				body: args.body,
 				parentCommentId: null,
 				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				betEventId: uuidv7(),
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),
@@ -167,6 +168,8 @@ async function sellPosition(args: {
 			shares: args.shares,
 			sellEventId: uuidv7(),
 			syntheticBetId: uuidv7(),
+			idempotencyKey: uuidv7(),
+			bodyFingerprint: uuidv7(),
 			metadata: betMetadata(args.userId),
 		}),
 	);

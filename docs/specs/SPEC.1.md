@@ -294,11 +294,11 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 ### F-BET-3 — Sell (in-stream exit)
 
 - **Pre.** User holds a non-zero position in this market on the side being sold. `market.state = Open`.
-- **System.** Single transaction. **A sell carries no comment** — it is a position unwind, not an argument, and is neither a post nor a reply. Compute Dharma return at current price. Increment user balance; decrement pool reserves; write `dharma_ledger` row tagged `bet_stake` with negative direction (or equivalently `bet_unwind` — schema decides). Position adjusts; comment and reply records are unaffected (per `B1`, INV-3) and remain in the debate as permanent record; the **Flipped / Exited marker** recomputes on next read (Exited once the position reaches zero).
-- **Response.** `{ sharesSold, dharmaReturned, newPrice }`.
-- **Errors.** 400 `position_not_held`, 400 `error_market_closed_at`.
+- **System.** Single transaction. **A sell carries no comment** — it is a position unwind, not an argument, and is neither a post nor a reply. An in-snapshot product pre-check rejects a sell of more shares than held (`shares > held.quantity` → 400 `insufficient_shares`, AUDIT-FIX-B3 / ADR-0031; `shares == held.quantity` is legal — sell-to-zero); `PositionOversellError` + the storage `CHECK (positions_quantity_non_negative)` are the backstop. Compute Dharma return at current price. Increment user balance; decrement pool reserves; write `dharma_ledger` row tagged `bet_stake` with negative direction (or equivalently `bet_unwind` — schema decides). Position adjusts; comment and reply records are unaffected (per `B1`, INV-3) and remain in the debate as permanent record; the **Flipped / Exited marker** recomputes on next read (Exited once the position reaches zero). The `bet_receipts` durable receipt is the transaction's last write (ADR-0031).
+- **Response.** `{ sharesSold, dharmaReturned, newPrice }`. **Durably backed by `bet_receipts` for replay fidelity (AUDIT-FIX-B3 / ADR-0031):** on an idempotent replay of a committed sell, the **original** response is returned from the stored receipt `result`, not re-derived — `newPrice` (`p1`) is persisted only in the receipt (it remains reconstructable from canonical state, `getPrices(post-trade reserves)`, for the dataset, but the synchronous replay path reads the receipt).
+- **Errors.** 400 `position_not_held`, 400 `insufficient_shares` (oversell pre-check, ADR-0031), 400 `error_market_closed_at`, 409 `error_idempotency_key_reused` (durable body-fingerprint mismatch, ADR-0031).
 - **Invariants.** INV-2, INV-3 (selling does *not* delete or alter prior comments).
-- **Acceptance.** `tests/server/bets/sell.test.ts::sell-preserves-comments`.
+- **Acceptance.** `tests/server/bets/sell.test.ts::sell-preserves-comments`; `tests/server/bets/sell-oversell.test.ts`, `tests/server/bets/sell-replay-durable.test.ts`, `tests/server/bets/double-sell-chain.test.ts` (AUDIT-FIX-B3).
 
 ### F-BET-4 — Insufficient Dharma
 

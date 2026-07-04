@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { captureException } from "@sentry/nextjs";
+import { createHash, randomUUID } from "node:crypto";
 import canonicalize from "canonicalize";
 
 import {
@@ -9,8 +8,32 @@ import {
 	PENDING_SENTINEL_PREFIX,
 	PENDING_TTL_SECONDS,
 } from "@/server/idempotency/types";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 import { getRedisKey } from "@/server/upstash/keys";
 import { redis } from "@/server/upstash/redis";
+
+// AUDIT-FIX-B3 A4 — the ownership-checked release Lua (the upstash/lock.ts:24-30
+// compare-and-* precedent, inline EVAL). Each compares the stored value against
+// the caller's OWN pending sentinel (ARGV[1]) before acting, so a >30s straggler
+// can neither delete a successor's sentinel/completed response nor clobber a
+// successor's state. A mismatch returns 0 (no-op).
+const RELEASE_DELETE_LUA = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("DEL", KEYS[1])
+else
+  return 0
+end
+`;
+
+// Promote pending → completed: compare-and-SET the completed JSON (ARGV[2]) with
+// the 24h TTL (ARGV[3]). Same ownership guard as the delete.
+const RELEASE_PROMOTE_LUA = `
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+  return redis.call("SET", KEYS[1], ARGV[2], "EX", tonumber(ARGV[3]))
+else
+  return 0
+end
+`;
 
 /*
  * Body-fingerprint uses RFC 8785 (JSON Canonicalization Scheme) via the
@@ -73,8 +96,12 @@ export async function idempotencyLookupOrReserve(
 	try {
 		return await tryReserveOrLookup(redisKey, bodyFingerprint, true);
 	} catch (err) {
-		// Tag `upstash_unavailable_idempotency` per SPEC.2 §17.3 alarm-6b.
-		captureException(err, {
+		// Tag `upstash_unavailable_idempotency` per SPEC.2 §17.3 alarm-6b. AUDIT-FIX-B3
+		// (B1 ruling #8): route through the fail-open safeCaptureException — this sits
+		// OUTSIDE the endpoint's try (endpoint.ts), so a raw captureException throw
+		// here would escape idempotencyLookupOrReserve and 500 a request the
+		// fail-closed contract means to surface as a clean 503.
+		safeCaptureException(err, {
 			tags: { kind: "upstash_unavailable_idempotency" },
 		});
 		return { kind: "unavailable", error: err };
@@ -86,26 +113,52 @@ async function tryReserveOrLookup(
 	bodyFingerprint: string,
 	allowRaceRetry: boolean,
 ): Promise<IdempotencyResult> {
-	const reservation = await redis.set(
-		redisKey,
-		`${PENDING_SENTINEL_PREFIX}${bodyFingerprint}`,
-		{ nx: true, ex: PENDING_TTL_SECONDS },
-	);
+	// AUDIT-FIX-B3 A4 — the reservation sentinel gains an owner token
+	// (`PENDING:{fingerprint}:{token}`, token = randomUUID per lock.ts) so the
+	// ownership-checked release can only ever touch OUR OWN sentinel.
+	const token = randomUUID();
+	const pendingValue = `${PENDING_SENTINEL_PREFIX}${bodyFingerprint}:${token}`;
+	const reservation = await redis.set(redisKey, pendingValue, {
+		nx: true,
+		ex: PENDING_TTL_SECONDS,
+	});
 	if (reservation === "OK") {
 		return {
 			kind: "miss",
 			release: async (response) => {
-				if (response === null) {
-					await redis.del(redisKey);
-					return;
+				// AUDIT-FIX-B3 A4 — ownership-checked (the lock.ts compare-and-* Lua)
+				// + NEVER throws. release(null) compare-and-DELETEs; release(completed)
+				// compare-and-SETs the completed JSON with the 24h TTL. If our sentinel
+				// already expired and was re-reserved, the GET != pendingValue → the
+				// guarded op no-ops (lost cache optimization only — the durable receipt
+				// answers the replay). Any Redis error routes through the fail-open
+				// safeCaptureException (the ADR-0015 §3 completion-write alarm half,
+				// `site: release`) and RETURNS: a completion-write failure must never
+				// supersede the already-built (committed) response. Post-failure the
+				// sentinel dangles ≤ PENDING_TTL_SECONDS (a retry gets 409 in-flight);
+				// after expiry it re-executes and the durable layer resolves it.
+				try {
+					if (response === null) {
+						await redis.eval(RELEASE_DELETE_LUA, [redisKey], [pendingValue]);
+						return;
+					}
+					await redis.eval(
+						RELEASE_PROMOTE_LUA,
+						[redisKey],
+						[
+							pendingValue,
+							JSON.stringify(response),
+							String(COMPLETED_TTL_SECONDS),
+						],
+					);
+				} catch (err) {
+					safeCaptureException(err, {
+						tags: {
+							kind: "upstash_unavailable_idempotency",
+							site: "release",
+						},
+					});
 				}
-				// Atomic transition pending → completed: SET without NX
-				// (the key currently holds the pending sentinel; this
-				// overwrites it). Per SPEC.2 §11 ¶"Single-key-encoding-
-				// both-states pattern" Redis guarantees the SET is atomic.
-				await redis.set(redisKey, JSON.stringify(response), {
-					ex: COMPLETED_TTL_SECONDS,
-				});
 			},
 		};
 	}
@@ -128,7 +181,13 @@ async function tryReserveOrLookup(
 	}
 
 	if (existing.startsWith(PENDING_SENTINEL_PREFIX)) {
-		const heldFingerprint = existing.slice(PENDING_SENTINEL_PREFIX.length);
+		// AUDIT-FIX-B3 A4 — the value is now `${PREFIX}${fingerprint}:${token}`;
+		// extract the fingerprint as the segment between the prefix and the LAST
+		// colon (the fingerprint is hex and the token is a UUID — neither carries a
+		// colon, so there is exactly one separator; `lastIndexOf` is robust anyway).
+		const rest = existing.slice(PENDING_SENTINEL_PREFIX.length);
+		const lastColon = rest.lastIndexOf(":");
+		const heldFingerprint = lastColon === -1 ? rest : rest.slice(0, lastColon);
 		// Per Q4 (2026-05-15): pending arm returns 'pending' regardless of
 		// whether `bodyFingerprint` matches `heldFingerprint`. Body-mismatch
 		// on a pending sentinel maps to the in-flight collision shape (HTTP

@@ -33,11 +33,16 @@ export const COMPLETED_TTL_SECONDS = 86400;
 
 /**
  * Distinguishes a pending sentinel value from a completed-response JSON
- * body in a single Redis key. The sentinel value is `${PREFIX}${body
- * fingerprint}` so the in-flight collision check can detect body-mismatch
- * on a still-pending key (per SPEC.2 §11 ¶"Single-key-encoding-both-states
- * pattern" + Q4 ratification 2026-05-15: pending body-mismatch returns
- * the in-flight shape, NOT the completed-mismatch shape).
+ * body in a single Redis key. The sentinel value is
+ * `${PREFIX}${bodyFingerprint}:${token}` (AUDIT-FIX-B3 A4 — the owner token
+ * is a `randomUUID`, the `upstash/lock.ts` precedent) so the in-flight
+ * collision check can detect body-mismatch on a still-pending key (per
+ * SPEC.2 §11 ¶"Single-key-encoding-both-states pattern" + Q4 ratification
+ * 2026-05-15: pending body-mismatch returns the in-flight shape, NOT the
+ * completed-mismatch shape). The `cache.ts` pending-arm parse recovers the
+ * fingerprint as the segment between the prefix and the LAST colon; the
+ * ownership-checked release compares the whole value before acting, so a
+ * >30s straggler can neither delete nor clobber a successor's key.
  */
 export const PENDING_SENTINEL_PREFIX = "PENDING:";
 

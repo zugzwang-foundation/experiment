@@ -136,6 +136,7 @@ async function placeBet(args: {
 				body: `fixture argument ${uuidv7()}`,
 				parentCommentId: null,
 				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				betEventId: uuidv7(),
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),

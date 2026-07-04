@@ -11,12 +11,17 @@ import {
 } from "@/server/bets/errors";
 import { assertStakeFloor } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
+import {
+	isDurableIdempotencyConflict,
+	loadDurableReplay,
+} from "@/server/bets/replay";
 import { runBetTransaction } from "@/server/bets/transaction";
 import { resolveImageAttachment } from "@/server/comments/image-attach";
 import { validateReplyParent } from "@/server/comments/reply-validate";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { numericString } from "@/server/events/schemas";
+import { IDEMPOTENCY_ERROR_CODES } from "@/server/idempotency/types";
 import { recordGateBlock } from "@/server/moderation/consequences";
 import { precommitModerate } from "@/server/moderation/precommit";
 import { verifyUploadedObject } from "@/server/storage/verify-object";
@@ -167,24 +172,56 @@ export async function POST(request: Request): Promise<Response> {
 			userAgent: ctx.userAgent,
 		});
 
-		// 7. Transaction — the per-flow spine inside the W-1 wrapper.
-		const result = await runBetTransaction({ marketId, flow }, (txCtx) =>
-			place(txCtx, {
-				userId: ctx.userId,
-				marketId,
-				side,
-				stake,
-				body,
-				parentCommentId,
-				idempotencyKey: ctx.idempotencyKey,
-				betEventId,
-				commentEventId,
-				creditEventId,
-				image,
-				metadata,
-			}),
-		);
-
-		return { status: 200, body: { ok: true, data: result } };
+		// 7. Transaction — the per-flow spine inside the W-1 wrapper. AUDIT-FIX-B3 A9:
+		// on a Redis-lost concurrent-replay race the durable pre-check missed, the
+		// `bets_idempotency_key_idx` (or `bet_receipts_idempotency_key_uq`) 23505s →
+		// read the committed receipt and answer the ORIGINAL 200 (fingerprint match)
+		// or a 409 reused (mismatch → noCache, poison guard). Receipt absent despite
+		// the 23505 (impossible live — both writes land in one tx, zero users
+		// pre-launch) → rethrow (honest 500 + the B1 capture).
+		try {
+			const result = await runBetTransaction({ marketId, flow }, (txCtx) =>
+				place(txCtx, {
+					userId: ctx.userId,
+					marketId,
+					side,
+					stake,
+					body,
+					parentCommentId,
+					idempotencyKey: ctx.idempotencyKey,
+					bodyFingerprint: ctx.bodyFingerprint,
+					betEventId,
+					commentEventId,
+					creditEventId,
+					image,
+					metadata,
+				}),
+			);
+			return { status: 200, body: { ok: true, data: result } };
+		} catch (err) {
+			if (isDurableIdempotencyConflict(err)) {
+				const replay = await loadDurableReplay(db, {
+					idempotencyKey: ctx.idempotencyKey,
+					bodyFingerprint: ctx.bodyFingerprint,
+				});
+				if (replay?.kind === "replay") {
+					return { status: 200, body: { ok: true, data: replay.result } };
+				}
+				if (replay?.kind === "mismatch") {
+					return {
+						status: 409,
+						body: {
+							ok: false,
+							error: {
+								code: IDEMPOTENCY_ERROR_CODES.KEY_REUSED,
+								message: "Idempotency-Key reused with a different body",
+							},
+						},
+						noCache: true,
+					};
+				}
+			}
+			throw err;
+		}
 	});
 }
