@@ -316,8 +316,9 @@ describe("createMarket — admin market-media create (service)", () => {
 			}),
 		);
 
-		// OD-2: NO new EVENT_TYPE / aggregate_type — EVENT_TYPES stays 23.
-		expect(EVENT_TYPES.length).toBe(23);
+		// OD-2: MEDIA.1 adds NO new EVENT_TYPE / aggregate_type. The absolute count
+		// is 24 post-AUDIT-FIX-B5 (which added `moderation.blocked`, A13).
+		expect(EVENT_TYPES.length).toBe(24);
 
 		const all = await testDb
 			.select({

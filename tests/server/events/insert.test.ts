@@ -615,7 +615,9 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 		// ENGINE.0 (plan §3). ENGINE.13 appended `dharma.granted` (the
 		// initial-grant emit site, R2a) ⇒ 22. ENGINE.9 appends
 		// `market.resolving` (the F-ADMIN-3 trigger emit, plan C-1) ⇒ 23.
-		// Domain breakdown: 4 + 5 + 2 + 7 + 2 + 1 + 2 = 23. The schema
+		// AUDIT-FIX-B5 (A13) appends `moderation.blocked` (the gate-block
+		// consequence emit) ⇒ 24. Domain breakdown:
+		// 4 + 5 + 2 + 7 + 2 + 1 + 2 + 1 = 24. The schema
 		// file at `src/server/events/schemas.ts` exports `EVENT_TYPES`.
 		// If a future PR drops or adds one without amending plan §3 + this
 		// floor, surface. `r2_delete_failed` MUST NOT be present
@@ -650,9 +652,11 @@ describe("insertEvent — driver (ENGINE.6 §F + §B)", () => {
 				"dharma.granted",
 				// ENGINE.9 (1) — the F-ADMIN-3 Closed→Resolving emit
 				"market.resolving",
+				// AUDIT-FIX-B5 (1) — the gate-block consequence emit (A13)
+				"moderation.blocked",
 			].sort(),
 		);
-		expect((EVENT_TYPES as readonly string[]).length).toBe(23);
+		expect((EVENT_TYPES as readonly string[]).length).toBe(24);
 		expect(EVENT_TYPES).not.toContain("image_upload.r2_delete_failed");
 	});
 });

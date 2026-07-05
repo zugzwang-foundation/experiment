@@ -84,6 +84,8 @@ export const EVENT_TYPES = [
 	// dharma domain (2) — ENGINE.0 + ENGINE.13
 	"dharma.credited",
 	"dharma.granted",
+	// moderation domain (1) — AUDIT-FIX-B5 (A13): the gate-block consequence emit
+	"moderation.blocked",
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -180,7 +182,7 @@ export const eventPayloadSchemas = {
 	// seedAmount (the CPMM seed, numericString) rides market.opened — the
 	// seed instant is Draft → Open, not creation (R-14.1, ENGINE.14).
 	// MEDIA.1 (OD-2): the media manifest rides the EXISTING market.created event
-	// — NO new EVENT_TYPE, NO new aggregate_type (EVENT_TYPES stays 23). `media`
+	// — NO new EVENT_TYPE, NO new aggregate_type (no EVENT_TYPES delta at MEDIA.1). `media`
 	// is the at-create image set (object key + carousel order + default flag;
 	// the mediaId is not recorded — the R2 key is the durable reference);
 	// `mediaVideoUrl` is the optional outbound YouTube link (null when unset).
@@ -287,6 +289,24 @@ export const eventPayloadSchemas = {
 	"dharma.granted": z.object({
 		userId: z.string().uuid(),
 		amount: numericString,
+	}),
+	// moderation.blocked — AUDIT-FIX-B5 (A13). The gate-block consequence event,
+	// emitted by `recordGateBlock` inside its standalone tx on every block branch.
+	// `reason` mirrors the three GateBlockReason values (the mod_reason gate
+	// subset); `banned` is the track_a auto-ban boolean; `uploadId` is the
+	// image_uploads row id (a join key) or null on the text-only branch. The raw
+	// `imageR2Key` is deliberately excluded (it embeds the userId → its own strip),
+	// and categoryScores is NOT carried (it duplicates the `mod_actions.categories`
+	// column, which already ships).
+	"moderation.blocked": z.object({
+		userId: z.string().uuid(),
+		reason: z.enum([
+			"track_a_autoban",
+			"track_b_blocked",
+			"sexual_minors_text_blocked",
+		]),
+		banned: z.boolean(),
+		uploadId: z.string().uuid().nullable(),
 	}),
 } as const satisfies Record<EventType, z.ZodObject<z.ZodRawShape>>;
 
