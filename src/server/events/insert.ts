@@ -1,10 +1,12 @@
 import "server-only";
 
+import canonicalize from "canonicalize";
 import { sql } from "drizzle-orm";
 import type { z } from "zod";
 
 import type { DbTransaction } from "@/db";
 import { InvalidEventIdError, InvalidEventPayloadError } from "@/lib/errors";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 
 import {
 	type EventType,
@@ -50,9 +52,12 @@ import {
  *     from the partition-level rule (SCAFFOLD.5 wiring; not the helper's
  *     surface).
  *
- * The helper does NOT add Sentry tags, log enrichers, trace spans, or
- * mutate `metadata` (LD-7 + B3) — the V4 passthrough property is
- * behaviorally locked at `tests/server/events/insert.probe.test.ts`.
+ * On the happy path the helper does NOT add Sentry tags, log enrichers,
+ * trace spans, or mutate `metadata` (LD-7 + B3) — the V4 passthrough
+ * property is behaviorally locked at `tests/server/events/insert.probe.test.ts`.
+ * (AUDIT-FIX-B5 / A30 adds ONE fail-open `safeCaptureException` that fires
+ * only on the ON-CONFLICT payload-mismatch path — never on a successful
+ * insert, and never mutating the payload or metadata.)
  */
 
 function uuidv7ToCreatedAt(eventId: string): Date {
@@ -63,14 +68,17 @@ function uuidv7ToCreatedAt(eventId: string): Date {
 
 /**
  * Closed enum of valid `aggregate_type` values per SPEC.2 §7.1 line 701
- * + Appendix B.14. 8 values total — adding a new aggregate_type is a
- * same-commit amendment to this union, SPEC.2 §7.1 + B.14, and any
+ * + Appendix B.13. 9 values total — adding a new aggregate_type is a
+ * same-commit amendment to this union, SPEC.2 §7.1 + B.13, and any
  * affected per-event-type payload schemas in `schemas.ts`.
  *
  * Narrowed from the prior `string` shape (Checkpoint 4 absorption) to
  * close the defense-in-depth gap surfaced by security-auditor MEDIUM —
  * a future caller passing `'admin'` instead of `'admin_session'` or
  * `'users'` instead of `'user'` now fails at tsc time.
+ *
+ * `mod_action` added at AUDIT-FIX-B5 (A13) — the `moderation.blocked`
+ * gate-block event references the `mod_actions` row it accompanies.
  */
 export type AggregateType =
 	| "market"
@@ -80,7 +88,8 @@ export type AggregateType =
 	| "dharma_account"
 	| "system"
 	| "admin_session"
-	| "image_upload";
+	| "image_upload"
+	| "mod_action";
 
 export interface EventInsertInput<T extends EventType> {
 	eventId: string;
@@ -122,7 +131,20 @@ export async function insertEvent<T extends EventType>(
 	// encoder, which only accepts strings/Buffer/ArrayBuffer — Date trips
 	// `ERR_INVALID_ARG_TYPE` at bind time. ISO-stringify keeps the
 	// deterministic UUIDv7-derived value (millisecond precision intact).
-	await tx.execute(sql`
+	//
+	// `RETURNING event_id` (AUDIT-FIX-B5 / A30): the composite ON CONFLICT keeps
+	// the same-event_id retry idempotent (§7.3). On the happy path exactly one row
+	// returns and the guard below is skipped (no extra cost). A 0-row result means
+	// a row already existed — the drop is SILENT, so re-read the committed payload
+	// in this same tx and, if it diverges from the incoming one (a bug: the same
+	// event_id was reused for different state), fire a fail-open observability
+	// signal. A same-payload retry stays silent (the legitimate dedupe).
+	// `tx.execute` returns the driver RowList (postgres-js `Result extends Array`)
+	// — a numeric `.length`, 0 on the DO-NOTHING conflict path. The `?.length`
+	// guard also fail-opens on a minimal test double whose `execute` returns
+	// `undefined` (never a real driver shape): the observability check is simply
+	// skipped, never crashes the caller's transaction.
+	const inserted = (await tx.execute(sql`
 		INSERT INTO events
 			(event_id, event_type, aggregate_type, aggregate_id,
 			 payload, payload_version, metadata, created_at)
@@ -134,5 +156,62 @@ export async function insertEvent<T extends EventType>(
 			 ${JSON.stringify(metadataResult.data)}::jsonb,
 			 ${createdAt.toISOString()}::timestamptz)
 		ON CONFLICT (event_id, created_at) DO NOTHING
-	`);
+		RETURNING event_id
+	`)) as unknown as { length: number } | undefined;
+
+	if (inserted?.length === 0) {
+		const existing = (await tx.execute(sql`
+			SELECT payload FROM events
+			WHERE event_id = ${input.eventId}::uuid
+			  AND created_at = ${createdAt.toISOString()}::timestamptz
+		`)) as unknown as Array<{ payload: Record<string, unknown> }> | undefined;
+		// Fail-open (§17.5): the divergence check + capture is pure observability
+		// and MUST NOT alter the caller's control flow — swallow any throw. (The
+		// SELECT above is deliberately OUTSIDE this try: a serialization failure
+		// there must propagate to the ADR-0013 retry, and a DB error means the tx is
+		// already doomed. `payloadResult.data` is Zod-validated, so `canonicalize`
+		// cannot reach its NaN/Infinity/circular throw here — this is a belt.)
+		try {
+			const { mismatch, divergentKeys } = comparePayloads(
+				payloadResult.data as Record<string, unknown>,
+				existing?.[0]?.payload ?? null,
+			);
+			if (mismatch) {
+				// key NAMES only — payload values are PII and are NEVER logged.
+				safeCaptureException(new Error("event_id_reuse_payload_mismatch"), {
+					tags: {
+						kind: "event_id_reuse_payload_mismatch",
+						event_id: input.eventId,
+						differing_keys: divergentKeys.join(","),
+					},
+				});
+			}
+		} catch {
+			// Observability must never break the caller's transaction.
+		}
+	}
+}
+
+/**
+ * AUDIT-FIX-B5 (A30) — pure payload-divergence check for the event_id-reuse
+ * guard. Canonicalizes both payloads (RFC 8785 via the `canonicalize` dependency)
+ * so jsonb key-order is irrelevant — a raw string compare would false-mismatch.
+ * Returns whether the incoming payload diverges from the committed one and the
+ * NAMES of the top-level keys that differ (values are PII — never surfaced).
+ * `existing === null` (a re-SELECT found no row — the conflicting row committed
+ * outside this snapshot) is cannot-compare → no mismatch (fail-open).
+ */
+export function comparePayloads(
+	incoming: Record<string, unknown>,
+	existing: Record<string, unknown> | null,
+): { mismatch: boolean; divergentKeys: string[] } {
+	if (existing === null) return { mismatch: false, divergentKeys: [] };
+	if (canonicalize(incoming) === canonicalize(existing)) {
+		return { mismatch: false, divergentKeys: [] };
+	}
+	const keys = new Set([...Object.keys(incoming), ...Object.keys(existing)]);
+	const divergentKeys = [...keys]
+		.filter((k) => canonicalize(incoming[k]) !== canonicalize(existing[k]))
+		.sort();
+	return { mismatch: true, divergentKeys };
 }

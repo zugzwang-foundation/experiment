@@ -2,9 +2,11 @@ import "server-only";
 
 import { captureMessage } from "@sentry/nextjs";
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { v7 as uuidv7 } from "uuid";
 
 import { db } from "@/db";
 import { imageUploads, modActions, users } from "@/db/schema";
+import { insertEvent } from "@/server/events/insert";
 
 // DEBATE.7 — reactive-moderation CONSEQUENCE writer (ADR-0021). The gate
 // (`precommitModerate`) runs entirely BEFORE any DB transaction and releases its
@@ -79,6 +81,25 @@ export async function recordGateBlock(
 	const imageUploadId = args.imageUploadId;
 	const reason = deriveReason(args);
 
+	// AUDIT-FIX-B5 (A13): the events-emit id + 7-field metadata, minted once at
+	// entry. Self-actor participant-flow encoding (`user_id = actor_id = the
+	// blocked user`; the automated gate is not an admin actor — a distinct column
+	// from `mod_actions.actor_id`, which stays `'system'`). flow F-MOD-1 for
+	// track_a, F-MOD-2 for the two track_b branches (SPEC.1 §14). request_id / ip /
+	// user_agent are the S-C `'unknown'` placeholders (this writer takes no
+	// request-scoped metadata; ip/ua are STRIP_KEY at export regardless) — matching
+	// the logout.ts / tos-accept.ts emit sites.
+	const emitEventId = uuidv7();
+	const metadata = {
+		request_id: "unknown",
+		flow_id: outcome === "track_a" ? "F-MOD-1" : "F-MOD-2",
+		user_id: userId,
+		actor_id: userId,
+		idempotency_key: null,
+		ip: "unknown",
+		user_agent: "unknown",
+	};
+
 	const modActionId = await db.transaction(async (tx) => {
 		const [row] = await tx
 			.insert(modActions)
@@ -135,6 +156,24 @@ export async function recordGateBlock(
 					),
 				);
 		}
+
+		// AUDIT-FIX-B5 (A13): emit the moderation.blocked events row INSIDE this
+		// same tx — the §3.7 ≥1-event-per-state-mutation rule + the §7.5 F-MOD-*
+		// write set (mod_actions + events). Fires on ALL THREE branches;
+		// aggregate_type 'mod_action', aggregate_id = the mod_actions.id.
+		await insertEvent(tx, {
+			eventId: emitEventId,
+			eventType: "moderation.blocked",
+			aggregateType: "mod_action",
+			aggregateId: row.id,
+			payload: {
+				userId,
+				reason,
+				banned: outcome === "track_a",
+				uploadId: imageUploadId ?? null,
+			},
+			metadata,
+		});
 
 		return row.id;
 	});
