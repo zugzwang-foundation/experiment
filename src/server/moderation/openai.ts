@@ -95,6 +95,29 @@ export async function moderate(args: ModerateArgs): Promise<ModerateResult> {
 			if (!result) {
 				throw new Error("openai_moderation_empty_results");
 			}
+			// AUDIT-FIX-A21 — well-formedness guard, the sibling of the
+			// empty-results anomaly above. A `flagged === true` verdict with NO
+			// category set true yields no derivable track: the mapper
+			// (precommit.ts) reads specific category booleans / flaggedCategories
+			// and would fall through to `pass` — a fail-open on a legal-floor gate
+			// (SPEC.1 §16.5). Treat it as a malformed vendor shape and fail CLOSED.
+			// Emit the DISTINCT tag `openai_moderation_malformed_flagged` (NOT
+			// upstream_failure) so a category rename under the pinned
+			// omni-moderation-2024-09-26 snapshot reads as label-drift, not an
+			// outage. The capture stays at THIS vendor boundary per AUDIT-FIX-B1
+			// A6 ruling #4; the `instanceof ModerationUnavailableError` re-throw in
+			// the catch below keeps this from being reclassified into
+			// upstream_failure (which would lose the drift signal) or retried.
+			if (
+				result.flagged === true &&
+				!Object.values(result.categories).some((v) => v === true)
+			) {
+				const cause = new Error("openai_moderation_malformed_flagged");
+				safeCaptureException(cause, {
+					tags: { kind: "openai_moderation_malformed_flagged" },
+				});
+				throw new ModerationUnavailableError(cause);
+			}
 			// Cast widens OpenAI's strongly-typed Moderation.Categories /
 			// CategoryScores shapes (per moderations.d.ts) to string-indexed
 			// records so the caller (precommitModerate) can iterate via
@@ -107,6 +130,14 @@ export async function moderate(args: ModerateArgs): Promise<ModerateResult> {
 			};
 		} catch (err) {
 			lastErr = err;
+			if (err instanceof ModerationUnavailableError) {
+				// AUDIT-FIX-A21 malformed-flagged guard already captured with its
+				// distinct tag and failed closed — re-throw as-is. Do NOT fall
+				// through to the classifier below (which would re-capture it as
+				// `openai_moderation_upstream_failure`, losing the drift signal)
+				// or the transient retry loop.
+				throw err;
+			}
 			if (isAuthFailure(err)) {
 				// Tag `openai_moderation_auth_failure` per SPEC.2 §17.2 row 4
 				// (byte-identical). Auth failures never retry.
