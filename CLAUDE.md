@@ -51,7 +51,7 @@ The **Zugzwang Experiment** — a CPMM prediction market with mandatory commenta
 
 ## 2. The four hard-locked invariants
 
-SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`; the triggers in `drizzle/migrations/0003_append_only_triggers.sql` are storage-layer ground truth — Bucket-A/B triggers reject `UPDATE`/`DELETE`/`TRUNCATE` at the storage layer (TRUNCATE statement-level, ADR-0030). *(Canonical tests on disk: INV-1 → `I-ATOMICITY-001`, INV-2 → `I-NO-OVERDRAFT-001`, INV-3 → `I-SIDE-BIND-001`, INV-4 → `I-APPEND-ONLY-001`; plus five invariant-class spec-rule specs — `I-DAILY-ONCE-001`, `I-GRANT-ONCE-001`, `I-NO-OVERSELL-001`, `I-RESOLVE-ONCE-001`, `I-SINGLE-SIDE-001`. Storage-layer backstop remains `tests/db/triggers/` + the schema.)*
+SPEC.1 §5. Tests at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts`; the triggers in `drizzle/migrations/0003_append_only_triggers.sql` are storage-layer ground truth — Bucket-A/B triggers reject `UPDATE`/`DELETE`/`TRUNCATE` at the storage layer (TRUNCATE statement-level, ADR-0030). *(Canonical tests on disk: INV-1 → `I-ATOMICITY-001`, INV-2 → `I-NO-OVERDRAFT-001`, INV-3 → `I-SIDE-BIND-001`, INV-4 → `I-APPEND-ONLY-001`; plus six invariant-class spec-rule specs — `I-DAILY-ONCE-001`, `I-GRANT-ONCE-001`, `I-NO-OVERSELL-001`, `I-RESOLVE-ONCE-001`, `I-SINGLE-SIDE-001`, `I-IDEM-ONCE-001` (once-only bet/sell execution across any crash / Redis-window / retry — the durable `bet_receipts` backstop: UNIQUE on `idempotency_key`, last write in the W-1 tx; a replay 23505s and rolls back, ADR-0031). Storage-layer backstop remains `tests/db/triggers/` + the schema.)*
 
 | ID | Rule | Mechanism |
 |---|---|---|

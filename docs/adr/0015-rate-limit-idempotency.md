@@ -522,3 +522,14 @@ Excluded by ADR-0013 §3 explicit decision: "HTTP 422 is not a valid choice; ide
 ---
 
 *ADR-0015 ratifies the rate-limit and idempotency contract for the Zugzwang experiment phase: sliding-window per-surface rate limits via `@upstash/ratelimit` on Upstash Redis (fail-open on Upstash unreachable); Stripe-style idempotency keys with global scoping, full canonical-body SHA-256 fingerprint, 30-second pending-sentinel TTL plus 24-hour completed-response TTL, fail-closed on Upstash unreachable; HTTP 409 for both body-mismatch and in-flight collision (with `error_idempotency_key_reused` and `error_idempotency_in_flight` envelope codes respectively); two new Appendix B constants `BET_ATTEMPTS_PER_IP_PER_MIN` and `IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN` minted with values deferred to HARDEN.6. The decision body and any constraints minted in §Decision Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — AUDIT-FIX-B3 (2026-07-05)
+
+**Frame:** AUDIT.1 finding A4; `docs/plans/AUDIT-FIX-B3.md`. ADR-0015's decision is **unchanged**; two surfaces it named are now implemented/scoped, and a durable layer beneath its Redis cache is added by ADR-0031.
+
+1. **Completion-write alarm half (§3).** ADR-0015 §3 named the idempotency helper as the alarm-6 site "on cache lookup"; the **completion-write half** (the release / cache-write path) was unimplemented. AUDIT-FIX-B3 implements it: the release path emits **alarm 6b** (`upstash_unavailable_idempotency`) at the **completion-write site**, with a `site` tag discriminating completion-write (`site: release` in `idempotency/cache.ts`, `site: endpoint_finally` in `bets/endpoint.ts`) from the existing cache-lookup site (SPEC.2 §17.3 6b now fires at multiple sites; §11).
+2. **Sentinel ownership token + never-throws release.** The single-key-encoding-both-states pattern (D1) is extended: the pending sentinel value becomes `PENDING:{fingerprint}:{token}` (owner token = `randomUUID`); release is **ownership-checked** (a compare-and-DEL / compare-and-SET Lua `redis.eval` acting only on its own sentinel — the `upstash/lock.ts` token-checked release pattern), closing the >30s-straggler-clobbers-a-successor's-sentinel gap, and **never-throws** (a release/Upstash failure at completion time never converts a committed bet into a 500 — the committed response reaches the client; fail-open on the response path). The pending-arm parse recovers the fingerprint as the segment before the last colon. Substrate, global scoping, RFC 8785 fingerprint, two-tier TTL, and the in-flight / body-mismatch error envelopes are **unchanged**.
+
+**Not owned here:** the durable per-request backstop (`bet_receipts`) that makes **sell** idempotent across a Redis-lost window is a **new mechanism owned by ADR-0031** — ADR-0015's Redis idempotency cache is unchanged; ADR-0031 adds a durable DB layer beneath it.

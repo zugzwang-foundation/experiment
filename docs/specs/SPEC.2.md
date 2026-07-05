@@ -232,11 +232,13 @@ Steps 1–4 and 7 are universal across every state-mutating endpoint; step 5 run
 
 **Failure-mode posture across the stack**: rate-limit fails open (step 4); idempotency fails closed (step 3); pre-commit moderation fails closed (step 5); the bet transaction wrapper retries up to 3× on 40001/40P01 (step 6 for bet flow). **Two-step ordering invariant**: idempotency cache lookup MUST run BEFORE rate-limit (step 3 before step 4) so that a retry of a previously rate-limited request returns the cached 429, not a fresh rate-limit decision. This ordering is locked by §11 / ADR-0015 and is not relitigable in §3.
 
+**Durable bet-receipt pre-check (bet flow, AUDIT-FIX-B3 / ADR-0031).** In addition to the universal steps above, the two bet endpoints (`/api/bets/place`, `/api/bets/sell`) run a bet-flow-specific *durable receipt pre-check* **after** the Redis idempotency cache lookup (step 3) and **before** rate-limit (step 4) and moderation (step 5): on a `bet_receipts` hit with a matching body-fingerprint it returns the original stored response (short-circuiting rate-limit, moderation, and the transaction) and promotes the Redis sentinel; on a fingerprint mismatch it returns 409 `error_idempotency_key_reused` (poison guard; not cached). Its placement **before moderation** is load-bearing — a replay of an already-committed comment-bearing bet can never be re-moderated into a bogus rejection. The pre-check fails **open** (a receipt-read failure degrades to normal execution; correctness is backstopped by the tx-level unique). See §11 + ADR-0031.
+
 ### §3.2 Write-flow patterns
 
 Every state-mutating handler reduces to one of two transaction shapes (a participant bet/comment flow and an admin resolution flow; the v1.8.x comment-only shape is retired under reply-as-bet — see W-1). The shape name appears in the per-flow contract file under `docs/specs/flows/F-*.md` as `Transaction shape:` so a reader knows which §3.2 pattern applies without re-deriving it.
 
-**Pattern W-1 — Bet flow (SERIALIZABLE + pool-row pessimistic lock).** Used by **every bet**: F-BET-1 (entry post-bet), F-BET-2 (subsequent post-bet), F-BET-3 (sell), and — because under the v1.9.0 reply-as-bet model every comment rides a bet — F-COMMENT-1 (additional post-bet), F-COMMENT-2 (reply-bet), F-COMMENT-3 (image-attached bet+comment). One Postgres transaction at SERIALIZABLE isolation; pool row locked via `SELECT … FOR NO KEY UPDATE`; canonical lock order `pools → positions → dharma_ledger → events`; full-jitter retry on bases `[50, 100, 200]` ms on SQLSTATE 40001 / 40P01. A comment-bearing bet additionally inserts the `comments` row and the `bets` row inside the same transaction (INV-1 atomic bet+comment via `bets.comment_id NOT NULL`; `comments.bet_id` is deliberately nullable — the comment is inserted before its bet in the same tx, so the FK can only point one direction; append-only forbids a later back-fill); the comment-free sell (F-BET-3) inserts no comment. The bet transaction wrapper at `src/server/bets/transaction.ts` (per §9 / ADR-0013) is the single source of truth; every bet handler invokes it.
+**Pattern W-1 — Bet flow (SERIALIZABLE + pool-row pessimistic lock).** Used by **every bet**: F-BET-1 (entry post-bet), F-BET-2 (subsequent post-bet), F-BET-3 (sell), and — because under the v1.9.0 reply-as-bet model every comment rides a bet — F-COMMENT-1 (additional post-bet), F-COMMENT-2 (reply-bet), F-COMMENT-3 (image-attached bet+comment). One Postgres transaction at SERIALIZABLE isolation; pool row locked via `SELECT … FOR NO KEY UPDATE`; canonical lock order `pools → positions → dharma_ledger → events`; full-jitter retry on bases `[50, 100, 200]` ms on SQLSTATE 40001 / 40P01. A comment-bearing bet additionally inserts the `comments` row and the `bets` row inside the same transaction (INV-1 atomic bet+comment via `bets.comment_id NOT NULL`; `comments.bet_id` is deliberately nullable — the comment is inserted before its bet in the same tx, so the FK can only point one direction; append-only forbids a later back-fill); the comment-free sell (F-BET-3) inserts no comment. The bet transaction wrapper at `src/server/bets/transaction.ts` (per §9 / ADR-0013) is the single source of truth; every bet handler invokes it. **Durable receipt (AUDIT-FIX-B3 / ADR-0031):** both `place()` and `sell()` write a `bet_receipts` row as the **last write** inside this W-1 transaction (after the pools update); a Redis-lost replay that reaches execute 23505s on `bet_receipts_idempotency_key_uq` (place also on `bets_idempotency_key_idx`) → whole-transaction rollback → no double proceeds → the 23505 catch returns the original response from the stored receipt.
 
 **Pattern W-2 — Retired (reply-as-bet).** The v1.8.x "comment flow" — a standalone `comments` insert with no pool lock, used when a comment was *not* a bet — **no longer exists** in v1.9.0. Every comment now rides a bet (post-bet or reply-bet per SPEC.1 §7/§8 + ADR-0017/0018), so comment and reply writes run the W-1 bet transaction (taking the pool-row lock, moving CPMM reserves, freezing `side_at_post_time` inside the transaction). There is no comment-without-bet path; the only comment-free write is the sell (F-BET-3, still W-1). `src/server/comments/place.ts` is consequently folded into the bet write path (Appendix A).
 
@@ -485,7 +487,7 @@ ADRs consumed by §4: ADR-0003 (Server Actions vs Route Handlers default + runti
 
 §5 owns the *complete table inventory* for the experiment-phase build — every Postgres table the v1 codebase reads or writes, with append-only-vs-mutable classification per ADR-0005's Bucket A / B / C scheme, the per-domain schema home per ADR-0008 §4, and the load-bearing ADR(s) that mint the table's substance. SPEC.2 §5 is the single inventory; per-table DDL substance lives in ADR-0005 (table shape + classification rationale) + ADR-0008 (Drizzle declaration + migration discipline) + ADR-0016 (universal UUIDv7 PK). A reader who needs the column-by-column DDL goes to the schema file at `src/db/schema/<domain>.ts`; a reader who needs the inventory shape stays here.
 
-Twenty-three tables in v1 across ten domains. Nine strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); eleven mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: twelve.
+Twenty-four tables in v1 across ten domains. Ten strictly append-only (Bucket A); three append-only with one whitelisted column transition (Bucket B); eleven mutable with no append-only trigger (Bucket C). Total protected by §6's append-only enforcement contract: thirteen.
 
 ### §5.1 Inventory table
 
@@ -504,30 +506,31 @@ Sorted by bucket. Within each bucket, ordered by §3 lock-order spine where appl
 | 7 | `mod_actions` | `audit` | ADR-0014 | Moderation audit trail; pre-commit verdict + image-upload linkage via `image_r2_key` per §10 |
 | 8 | `admin_events` | `audit` | ADR-0010 | Admin-action audit trail; admin-actor encoding `metadata.user_id = NULL`, `metadata.actor_id = 'admin-singleton'` per §3.6 + §8.8 |
 | 9 | `user_events` | `audit` | ADR-0005 | User lifecycle audit trail (ToS acceptance, pseudonym assignment). Daily Credit accrual is NOT here — its complete write set is `events` (`dharma.credited`) + `dharma_ledger` + the `users.last_allowance_accrued_at` cursor per §5.5 (ENGINE.12 R2) |
+| 10 | `bet_receipts` | `bets` | ADR-0031 + ADR-0016 | Durable per-request idempotency-receipt backstop for the W-1 bet/sell path (ADR-0031); Bucket A append-only (guards in migration 0022, reusing the shared 0003/0021 functions); UNIQUE on `idempotency_key`; FKs `user_id`→users / `market_id`→markets (indexed, ON DELETE restrict); `flow` CHECK IN ('place','sell'); `result` jsonb stores the F-BET response for replay fidelity; excluded from the §19 dataset entirely |
 
 **Bucket B — append-only with one whitelisted column transition**
 
 | # | Table | Domain | Owner ADRs | Whitelisted transition | Notes |
 |---|---|---|---|---|---|
-| 10 | `identity_pool` | `identity` | ADR-0005 + ADR-0011 | `assigned_at` NULL → timestamp | 50,000-row pseudonym pool; consumed via `SELECT ... FOR UPDATE SKIP LOCKED` in F-AUTH-3 per §3.5; synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` per ADR-0016 D5 |
-| 11 | `image_uploads` | `image-uploads` | ADR-0006 + ADR-0014 + 3-B §12-R1 | `terminal_state` + `terminal_at` set together once | Image upload lifecycle; two-column atomic transition (committed / orphan / blocked); orphan sweep per §3.5 Pattern A-2 + §12.6 |
-| 12 | `system_state` | `system` | 3-E §20-1 | `frozen_at` NULL → timestamp | Single-row keyed by `id = 'system'`; conclusion-event freeze trigger per §20.2; reversibility-none enforced at DB level |
+| 11 | `identity_pool` | `identity` | ADR-0005 + ADR-0011 | `assigned_at` NULL → timestamp | 50,000-row pseudonym pool; consumed via `SELECT ... FOR UPDATE SKIP LOCKED` in F-AUTH-3 per §3.5; synthetic UUIDv7 PK + `UNIQUE (colour, animal, number)` per ADR-0016 D5 |
+| 12 | `image_uploads` | `image-uploads` | ADR-0006 + ADR-0014 + 3-B §12-R1 | `terminal_state` + `terminal_at` set together once | Image upload lifecycle; two-column atomic transition (committed / orphan / blocked); orphan sweep per §3.5 Pattern A-2 + §12.6 |
+| 13 | `system_state` | `system` | 3-E §20-1 | `frozen_at` NULL → timestamp | Single-row keyed by `id = 'system'`; conclusion-event freeze trigger per §20.2; reversibility-none enforced at DB level |
 
 **Bucket C — mutable, no append-only trigger**
 
 | # | Table | Domain | Owner ADRs | Notes |
 |---|---|---|---|---|
-| 13 | `users` | `auth` | ADR-0004 + ADR-0011 | Better Auth user row + `pseudonym` + ToS evidence (`tos_accepted_at`, `tos_version_hash`, `privacy_version_hash`, `tos_acceptance_ip`, `tos_acceptance_user_agent`); `last_allowance_accrued_at` carries the **Daily Credit** accrual cursor (DB identifier retained per SPEC.1 §10.4); PII-stripped at H2 erasure |
-| 14 | `sessions` | `auth` | ADR-0004 | Better Auth participant session; cookie name `zugzwang_session`; manual-logout-deletes-row per F-AUTH-5 |
-| 15 | `accounts` | `auth` | ADR-0004 | Better Auth OAuth provider linkage (per 3-A R1 — fourth Better Auth table) |
-| 16 | `verifications` | `auth` | ADR-0004 | Better Auth Email-OTP storage; single-use enforced by plugin; TTL-bounded; replaces dropped `otp_codes` |
-| 17 | `admin_sessions` | `auth` | ADR-0010 | Hand-rolled three-column schema (`session_id`, `issued_at`, `last_seen_at`); single-row-at-any-moment via transactional `DELETE+INSERT`; cookie name `zugzwang_admin_session` |
-| 18 | `markets` | `markets` | ADR-0005 + ADR-0026 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6. ADR-0026 adds nullable `media_video_url text` (the outbound YouTube explainer URL; set at create, editable pre-live per the Bucket-C whitelist) |
-| 19 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
-| 20 | `positions` | `bets` | ADR-0005 + ADR-0013 | Per-user-per-market position cache; updated synchronously inside the W-1 bet transaction per §3.7; gates no-stake-no-voice eligibility (INV-3) and feeds W-3 settlement. No ranking role — ADR-0017's model reads per-side reply-bet aggregates at render time (§5.4), not a frozen position derivation |
-| 21 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
-| 22 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
-| 23 | `market_media` | `markets` | ADR-0026 | Admin-set per-market media pool (carousel images + `display_order` + `is_default`); **no `user_id`** — admin-owned, structurally separate from `image_uploads` (admin has no `users` row per F-AUTH-ADMIN). FK `market_id` → `markets.id` (indexed, FK-on-referencing-side); `r2_object_key` in the `m/<marketId>/` namespace (§12.1), immutable post-insert; `created_by` defaults to the `'admin-singleton'` actor per §3.6 (no participant owner); whitelisted Bucket-C curation of `display_order` / `is_default` pre-live; exactly one `is_default = true` per market (partial unique index, strategy at schema build). Drives the §9 Market-Detail header carousel + the F-COMMENT-3 pick-from-pool source |
+| 14 | `users` | `auth` | ADR-0004 + ADR-0011 | Better Auth user row + `pseudonym` + ToS evidence (`tos_accepted_at`, `tos_version_hash`, `privacy_version_hash`, `tos_acceptance_ip`, `tos_acceptance_user_agent`); `last_allowance_accrued_at` carries the **Daily Credit** accrual cursor (DB identifier retained per SPEC.1 §10.4); PII-stripped at H2 erasure |
+| 15 | `sessions` | `auth` | ADR-0004 | Better Auth participant session; cookie name `zugzwang_session`; manual-logout-deletes-row per F-AUTH-5 |
+| 16 | `accounts` | `auth` | ADR-0004 | Better Auth OAuth provider linkage (per 3-A R1 — fourth Better Auth table) |
+| 17 | `verifications` | `auth` | ADR-0004 | Better Auth Email-OTP storage; single-use enforced by plugin; TTL-bounded; replaces dropped `otp_codes` |
+| 18 | `admin_sessions` | `auth` | ADR-0010 | Hand-rolled three-column schema (`session_id`, `issued_at`, `last_seen_at`); single-row-at-any-moment via transactional `DELETE+INSERT`; cookie name `zugzwang_admin_session` |
+| 19 | `markets` | `markets` | ADR-0005 + ADR-0026 | Market metadata + status; whitelisted Bucket-C `markets.status` update during W-3 (`Open` → `Resolved \| Voided`) per §3.6. ADR-0026 adds nullable `media_video_url text` (the outbound YouTube explainer URL; set at create, editable pre-live per the Bucket-C whitelist) |
+| 20 | `pools` | `markets` | ADR-0005 + ADR-0013 | CPMM pool reserves; locked first in §9 W-1 chain via `SELECT ... FOR NO KEY UPDATE` |
+| 21 | `positions` | `bets` | ADR-0005 + ADR-0013 | Per-user-per-market position cache; updated synchronously inside the W-1 bet transaction per §3.7; gates no-stake-no-voice eligibility (INV-3) and feeds W-3 settlement. No ranking role — ADR-0017's model reads per-side reply-bet aggregates at render time (§5.4), not a frozen position derivation |
+| 22 | `watermark_state` | `system` | ADR-0006 + ADR-0007 | Single-row-per-metric state-machine table backing pg_cron alarm transition detection (alarm 5 per ADR-0007 §4). Ships in `drizzle/migrations/0007_pg_cron_jobs.sql`. Schema: `(metric text PK, state text CHECK IN ('above','below'), since timestamptz)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (CHECK enum). |
+| 23 | `cron_alarms` | `system` | ADR-0006 + ADR-0007 | Queue table for pg_cron-emitted alarms. SCAFFOLD.17 ships the INSERT side; SCAFFOLD.5 ships the drain-and-emit side. Schema: `(id bigserial PK, alarm_id text NOT NULL, payload jsonb NOT NULL, emitted_at timestamptz, processed_at timestamptz NULL)`. Operational / pg_cron-machinery; not a domain entity. Constraint-driven validation only (PK + NOT NULL). |
+| 24 | `market_media` | `markets` | ADR-0026 | Admin-set per-market media pool (carousel images + `display_order` + `is_default`); **no `user_id`** — admin-owned, structurally separate from `image_uploads` (admin has no `users` row per F-AUTH-ADMIN). FK `market_id` → `markets.id` (indexed, FK-on-referencing-side); `r2_object_key` in the `m/<marketId>/` namespace (§12.1), immutable post-insert; `created_by` defaults to the `'admin-singleton'` actor per §3.6 (no participant owner); whitelisted Bucket-C curation of `display_order` / `is_default` pre-live; exactly one `is_default = true` per market (partial unique index, strategy at schema build). Drives the §9 Market-Detail header carousel + the F-COMMENT-3 pick-from-pool source |
 
 ### §5.2 Bucket-classification summary
 
@@ -535,11 +538,11 @@ The bucket classification is the load-bearing operational distinction: it determ
 
 | Bucket | Count | Trigger pattern | Tables |
 |---|---|---|---|
-| **A** — strictly append-only | 9 | `BEFORE UPDATE` + `BEFORE DELETE` both `RAISE EXCEPTION` | `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events` |
+| **A** — strictly append-only | 10 | `BEFORE UPDATE` + `BEFORE DELETE` both `RAISE EXCEPTION` (+ `BEFORE TRUNCATE` statement guard per ADR-0030) | `events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events`, `bet_receipts` |
 | **B** — whitelisted transition | 3 | Per-table function comparing OLD/NEW row images, permitting only the named whitelisted column-set transition once | `identity_pool`, `image_uploads`, `system_state` |
 | **C** — mutable | 11 | No append-only trigger (constraint-driven validation only) | `users`, `markets`, `pools`, `positions`, `sessions`, `accounts`, `verifications`, `admin_sessions`, `watermark_state`, `cron_alarms`, `market_media` |
 
-Total protected (Bucket A + Bucket B): **twelve tables**. The §6 test contract floor (previously sized at 33+ cases for a thirteen-table protected set) reduces with the removal of `friendly_fire_events` — its Bucket-B trigger cases (the two-independent-column `frozen_at` / `cleared_at` transition tests) drop with the table. The floor is re-baselined for the twelve-table protected set per the per-table baseline ratified at 3-A.
+Total protected (Bucket A + Bucket B): **thirteen tables** (AUDIT-FIX-B3 / ADR-0031 adds `bet_receipts` to Bucket A). The §6 test contract floor (previously sized at 33+ cases for a thirteen-table protected set) reduced with the removal of `friendly_fire_events` — its Bucket-B trigger cases (the two-independent-column `frozen_at` / `cleared_at` transition tests) dropped with the table — then rose again with `bet_receipts`'s append-only cases (row-level UPDATE/DELETE rejection + statement-level TRUNCATE rejection per ADR-0030). The floor is re-baselined for the thirteen-table protected set per the per-table baseline ratified at 3-A.
 
 ### §5.3 Universal column conventions
 
@@ -666,7 +669,7 @@ The contract is five clauses, each load-bearing:
 
 ### §6.2 Bucket A trigger pattern
 
-Identical shape across all nine Bucket A tables. Two triggers per table:
+Identical shape across all ten Bucket A tables. Two triggers per table:
 
 ```sql
 CREATE OR REPLACE FUNCTION enforce_bucket_a_no_update()
@@ -685,18 +688,19 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Applied to each of the 9 Bucket A tables:
+-- Applied to each of the 10 Bucket A tables:
 CREATE TRIGGER bucket_a_no_update BEFORE UPDATE ON events
   FOR EACH ROW EXECUTE FUNCTION enforce_bucket_a_no_update();
 CREATE TRIGGER bucket_a_no_delete BEFORE DELETE ON events
   FOR EACH ROW EXECUTE FUNCTION enforce_bucket_a_no_delete();
 -- ... and same for dharma_ledger, bets, comments, resolution_events,
--- payout_events, mod_actions, admin_events, user_events.
+-- payout_events, mod_actions, admin_events, user_events, and bet_receipts
+-- (AUDIT-FIX-B3 / ADR-0031, migration 0022 — same shared functions).
 ```
 
-Two functions, eighteen trigger declarations (nine tables × two triggers). The functions are shared because the message text is parameterised by `TG_TABLE_*` variables — no per-table function needed.
+Two functions, twenty trigger declarations (ten tables × two triggers). The functions are shared because the message text is parameterised by `TG_TABLE_*` variables — no per-table function needed.
 
-ADR-0030 adds a third shared statement-level function, `enforce_bucket_a_no_truncate()` (bare `RAISE EXCEPTION`; a *new* function — the row-level `no_update`/`no_delete` functions are not statement-safe), with `BEFORE TRUNCATE … FOR EACH STATEMENT` triggers across the 8 non-partitioned Bucket-A tables and the `events` parent and all 13 partitions (25 TRUNCATE triggers total including the Bucket-B analog). **Forward obligation:** any future migration adding an `events` partition or a new protected table MUST add the matching TRUNCATE-reject trigger in the same migration.
+ADR-0030 adds a third shared statement-level function, `enforce_bucket_a_no_truncate()` (bare `RAISE EXCEPTION`; a *new* function — the row-level `no_update`/`no_delete` functions are not statement-safe), with `BEFORE TRUNCATE … FOR EACH STATEMENT` triggers across the 8 non-partitioned Bucket-A tables and the `events` parent and all 13 partitions (25 TRUNCATE triggers total including the Bucket-B analog). AUDIT-FIX-B3 / ADR-0031 adds `bet_receipts` as the tenth Bucket-A table; migration `0022` attaches its row-level UPDATE/DELETE + statement-level TRUNCATE guards in the same file, reusing all three shared functions (**no new functions**) — 26 TRUNCATE triggers total, and the append-only guards land in the same migration as the CREATE TABLE so the table is never unguarded. **Forward obligation:** any future migration adding an `events` partition or a new protected table MUST add the matching TRUNCATE-reject trigger in the same migration.
 
 ### §6.3 Bucket B trigger pattern
 
@@ -827,6 +831,8 @@ Two structurally distinct idempotency surfaces. Both consume the request's `idem
 **API-boundary idempotency.** §11 / ADR-0015's `Idempotency-Key` HTTP header (Route Handlers) and Server Action argument surface, with cache lookup against Upstash Redis on `idem:{key}` keys, body-fingerprint match, and 24-hour completed-response replay. Sits at handler entry, before any database work.
 
 The two are orthogonal: a request that survives the API-boundary idempotency cache MAY still be retried at the database layer (e.g., the bet transaction wrapper retrying on SQLSTATE 40001 per ADR-0013); the storage-layer idempotency on `(event_id, created_at)` ensures the events row writes exactly once even across those retries. A reader who needs the API-boundary contract goes to §11; a reader who needs the storage-layer contract stays here.
+
+**Durable receipt backstop — a third layer (AUDIT-FIX-B3 / ADR-0031).** AUDIT-FIX-B3 adds a **third, durable, per-request idempotency layer** beneath both of the above: the `bet_receipts` table (Bucket A; global UNIQUE on `idempotency_key`; written as the last write inside the W-1 bet/sell transaction). It is distinct from both — the events composite-PK storage idempotency (this section) dedupes an *events row* within a retry, and the Redis API-boundary cache (§11) dedupes a *request* across a 24-hour window — whereas the receipt is the durable backstop that makes the **comment-free sell** idempotent across a Redis-lost window, which the events `ON CONFLICT (event_id, created_at) DO NOTHING` cannot: DO NOTHING would silently skip the duplicate event row while the money-moving writes (proceeds credit, position decrement) still commit (a silent double-proceed). A receipt replay 23505s on the global UNIQUE and rolls the whole transaction back. See §11 + ADR-0031.
 
 ### §7.4 Synchronous vs asynchronous read-model classification rule
 
@@ -1079,7 +1085,7 @@ The bet handler runs as a single Postgres SERIALIZABLE transaction. The pool row
 pools → positions → dharma_ledger → events
 ```
 
-`events` is terminal in the chain per ADR-0005's read-model classification convention, with all per-user writes (`positions`, `dharma_ledger`) co-located ahead of it. For a **comment-bearing bet** (every post-bet and reply-bet under reply-as-bet), the `bets` and `comments` rows are Bucket-A appends inserted **within** this transaction (INV-1 atomic bet+comment) — they are not additional lock points (no `SELECT … FOR …` is taken on them), so they do not change the lock-order spine. The comment-free sell (F-BET-3) omits the `comments` insert.
+`events` is terminal in the chain per ADR-0005's read-model classification convention, with all per-user writes (`positions`, `dharma_ledger`) co-located ahead of it. For a **comment-bearing bet** (every post-bet and reply-bet under reply-as-bet), the `bets` and `comments` rows are Bucket-A appends inserted **within** this transaction (INV-1 atomic bet+comment) — they are not additional lock points (no `SELECT … FOR …` is taken on them), so they do not change the lock-order spine. The comment-free sell (F-BET-3) omits the `comments` insert. AUDIT-FIX-B3 / ADR-0031 adds a further Bucket-A append inside this transaction — the `bet_receipts` row, written **last** (after the pools update) by both `place()` and `sell()`; like `bets`/`comments` it is an INSERT, not a lock point, so the lock-order spine is unchanged. Its global UNIQUE on `idempotency_key` provides once-only semantics across a Redis-lost + retry window: a replay that reaches execute 23505s and rolls the whole transaction back (no double proceeds), while the durable pre-check (§11) short-circuits the replay before execute in the common case.
 
 **Retry policy**: full jitter on bases [50, 100, 200] ms, 3-retry budget, retry on SQLSTATE 40001 (`serialization_failure`) AND 40P01 (`deadlock_detected`). Wait formula `wait_ms = floor(random_uniform(0, base_ms[n]))` per Marc Brooker, *"Exponential Backoff And Jitter"*, AWS Architecture Blog, 4 Mar 2015 (https://aws.amazon.com/blogs/architecture/exponential-backoff-and-jitter/). Application errors (validation, slippage, FK violations not caused by 40P01) are NOT retried.
 
@@ -1156,17 +1162,20 @@ Under the v1.9.0 reply-as-bet model there is **no standalone comment or vote rat
 
 **Single-key-encoding-both-states pattern.** One Redis key per idempotency-key encodes both lifecycle states. On cache miss, the handler executes `SET idem:{key} <pending-sentinel> NX EX 30`; the `NX` flag means "only set if key does not exist." If `NX` returns `0`, another in-flight request holds the sentinel and we return HTTP 409 `error_idempotency_in_flight` with `Retry-After: 2`. The pending-sentinel value is the constant string `"PENDING"` plus the body fingerprint (so the in-flight collision check can already detect body mismatch on a still-pending key). A body-fingerprint mismatch against a still-pending sentinel returns the in-flight collision shape (HTTP 409 `error_idempotency_in_flight + Retry-After: 2`), NOT the completed-mismatch shape (`error_idempotency_key_reused`) — surfacing two different errors mid-flight would confuse client retry policy, and the still-pending request may yet complete with a body that matches the eventual retry. On handler completion (success or terminal error), the handler executes `SET idem:{key} <completed-payload> EX 86400` where `<completed-payload>` is JSON-encoded `{ status, body, body_fingerprint }`. The atomic transition pending → completed is just a `SET` without `NX`, which Redis guarantees as atomic.
 
+**Ownership-checked, never-throws release (AUDIT-FIX-B3 / ADR-0031; scopes ADR-0015 — see its Patch record).** Refining the plain-`SET` transition above: the pending sentinel value gains an **owner token** — `PENDING:{body-fingerprint}:{token}` (token = `randomUUID`) — and the pending → completed / pending → deleted transition becomes an **ownership-checked** `redis.eval` (a compare-and-SET / compare-and-DEL Lua that acts only when the stored value equals the caller's own sentinel — the `upstash/lock.ts` token-checked release pattern), so a >30s straggler can no longer clobber a successor's sentinel or completed response. The pending-arm parse recovers the fingerprint as the segment before the last colon (the fingerprint is hex and the token is a UUID — neither carries a colon). The release path **never throws**: any Upstash error at completion-write time is swallowed (fail-open on the response path) so a committed bet's response always reaches the client, and it emits **alarm 6b** (`upstash_unavailable_idempotency`) at the **completion-write site** with a `site` tag discriminating it from the cache-lookup site (`site: release` in `idempotency/cache.ts`; a belt `site: endpoint_finally` in `bets/endpoint.ts`) — implementing ADR-0015 §3's completion-write alarm half (§17.3).
+
 **In-handler call sequence (consumed by every state-mutating endpoint).**
 
 1. **Auth gate** at the Server Action / route-handler boundary (per ADR-0004 / SPEC.4).
 2. **Idempotency-key validation.** Reject missing required header with HTTP 400 `error_idempotency_key_required`; reject malformed with HTTP 400 `error_idempotency_key_invalid`.
 3. **Idempotency cache lookup** via `idempotencyLookupOrReserve(key, bodyFingerprint)`. Branch on the tagged-union result: `hit` returns the cached response verbatim; `pending` returns HTTP 409 `error_idempotency_in_flight + Retry-After: 2`; `mismatch` returns HTTP 409 `error_idempotency_key_reused`; `unavailable` returns HTTP 503 `error_idempotency_unavailable + Retry-After: 5`; `miss` returns a `release` callback the handler MUST call in `finally` to either write the completed response (success / terminal error) or `DEL` the pending sentinel (handler crash).
+3a. **Durable bet-receipt pre-check** (bet flow only, AUDIT-FIX-B3 / ADR-0031). After the cache lookup (step 3) and **before** rate-limit (step 4) and moderation (step 5), the two bet endpoints query `bet_receipts` by `idempotency_key`: a receipt hit with a **matching** body-fingerprint returns the original stored response (HTTP 200) and promotes the Redis sentinel; a **mismatched** fingerprint returns HTTP 409 `error_idempotency_key_reused` (poison guard; not cached). Placement before rate-limit **and** moderation is deliberate — a replay consumes no rate budget and is never re-moderated into a bogus rejection. Fails **open** to normal execution on a receipt-read error; correctness is backstopped by the tx-level unique (§9).
 4. **Rate-limit check** (per the surface table). On rate-limit-exceeded, write the HTTP 429 response into the idempotency cache (so subsequent retries with the same key return the cached 429), then return HTTP 429 `error_rate_limit_exceeded` with `Retry-After: <seconds>` derived from `Ratelimit.limit().reset`.
 5. **Pre-commit moderation** (per §10 / ADR-0014 — every comment-bearing bet; the comment-free sell skips).
 6. **Bet transaction wrapper** (per §9 / ADR-0013) or other handler body.
 7. **Cache the completed response** under the 24h outer TTL via the `release` callback from step 3.
 
-Steps 1–4 and step 7 are universal for every state-mutating endpoint; steps 5–6 are bet-flow-specific.
+Steps 1–4 and step 7 are universal for every state-mutating endpoint; step 3a and steps 5–6 are bet-flow-specific.
 
 **Failure-mode contract: three concerns, three postures.** **Rate-limit fails OPEN on Upstash unreachable** — middleware catches the error, emits a Sentry event tagged `upstash_unavailable_rate_limit` (per §17 alarm 6a), and admits the request. Brief abuse windows are accepted as the cost of not user-blocking on a vendor outage. **Idempotency fails CLOSED on Upstash unreachable** — cache helper catches the error, emits a Sentry event tagged `upstash_unavailable_idempotency` (per §17 alarm 6b), and returns HTTP 503 `error_idempotency_unavailable + Retry-After: 5` without executing the handler. The bet+comment is never persisted; the user retries. **Pre-commit moderation also fails CLOSED** (per §10 / ADR-0014) on legal-floor grounds — SPEC.1 §16.5 CSAM detection + reporting compliance cannot be bypassed by a fail-open moderation outage (NCMEC auto-report mechanism deferred to post-experiment per SCAFFOLD.16 LD-7; the legal-floor framing remains via SPEC.1 §16.5's CSAM detection + reporting compliance bullet). The asymmetry across the three concerns is deliberate per ADR-0006 §"Failure-mode profile": open / closed / closed.
 
@@ -1561,9 +1570,9 @@ Three canonical retry modes. Every code in the catalogue MUST carry exactly one.
 
 The asymmetry between `retry_safe` (rare) and `do_not_retry` (default for most codes) is deliberate: SPEC.1 §13 + §16.4's product behaviour favours explicit user action on most error paths over silent client retry, on the principle that the user benefits from seeing the error and choosing whether to proceed (rather than the client silently retrying and the user not learning what went wrong).
 
-### §15.4 The catalogue baseline — 38 codes at SPEC.2 v1.0 lock
+### §15.4 The catalogue baseline — 39 codes (38 at SPEC.2 v1.0 lock + AUDIT-FIX-B3)
 
-**§15.4 is the canonical 38-code catalogue at v1.0 lock** — the source-breakdown table below is the authoritative enumeration. The standalone catalogue file `docs/specs/error-codes.md` is a **named forward deliverable** (ENGINE error-envelope work), not a v1.0 artifact: it is materialized from this table when the error-envelope module lands, and the §15.5 cross-reference CI lint that checks it is a HARDEN-phase deliverable. **Baseline: 38 codes**, verified at PRECURSOR.4. This catalogue is the v1.0 baseline of cross-cutting and folded-ADR codes; additional per-flow product-validation codes defined in the flow contracts (the participant flows and the admin flows) are aggregated into the complete `error-codes.md` catalogue (forward deliverable), which the §15.5 lint verifies. Codes mint from the following sources — every code in the catalogue MUST originate from one:
+**§15.4 is the canonical 39-code catalogue** (38 at v1.0 lock + `error_position_conflict`, added by AUDIT-FIX-B3 / ADR-0031) — the source-breakdown table below is the authoritative enumeration. The standalone catalogue file `docs/specs/error-codes.md` is a **named forward deliverable** (ENGINE error-envelope work), not a v1.0 artifact: it is materialized from this table when the error-envelope module lands, and the §15.5 cross-reference CI lint that checks it is a HARDEN-phase deliverable. **Baseline: 39 codes** (38 verified at PRECURSOR.4 + `error_position_conflict` added by AUDIT-FIX-B3 / ADR-0031; the SPEC.2 §0 changelog reconciliation is sweep-deferred per `parked.md`). This catalogue is the baseline of cross-cutting and folded-ADR codes; additional per-flow product-validation codes defined in the flow contracts (the participant flows and the admin flows) — including `insufficient_shares` (HTTP 400 `error_type: validation`, `retry_semantics: do_not_retry` — the F-BET-3 oversell pre-check, AUDIT-FIX-B3 / ADR-0031, mirroring `insufficient_dharma`) — are aggregated into the complete `error-codes.md` catalogue (forward deliverable), which the §15.5 lint verifies. Codes mint from the following sources — every code in the catalogue MUST originate from one:
 
 | Source | Count | Examples |
 |---|---|---|
@@ -1577,7 +1586,8 @@ The asymmetry between `retry_safe` (rare) and `do_not_retry` (default for most c
 | **SPEC.2 §10** (moderation in-flight collision distinct from idempotency) | 1 | `error_image_moderation_failed` (multimodal-API-specific failure distinct from `error_moderation_unavailable`) |
 | **SPEC.2 §17** (observability surface — alarm-1 trigger-violation surfacing) | 2 | `error_validation` (catch-all for handler-level Zod validation failures), `error_payload_too_large` (per ADR-0006 R2 PUT body-size violations) |
 | **SPEC.2 §20** (conclusion-event freeze) | 1 | `error_experiment_concluded` (HTTP 410 `error_type: gone`, `retry_semantics: do_not_retry` — fired by middleware on any state-mutating endpoint after 2026-11-05 23:59 UTC per §20.2) |
-| **Total** | **38** | |
+| **ADR-0031 / AUDIT-FIX-B3** (durable bet receipts + terminal error mapping) | 1 | `error_position_conflict` (HTTP 503, `error_type: unavailable`, `retry_semantics: retry_after`, `retry_after: 1` — the single-side write-race loser per §9 / ADR-0031; prefixed despite its bare sibling `bet_serialization_exhausted`, a known bare-vs-`error_` drift PRECURSOR.4 sweeps) |
+| **Total** | **39** | |
 
 **Codes NOT yet in catalogue, deferred to PRECURSOR.4.** Two known gaps surfaced during 3-C absorption:
 
@@ -1596,7 +1606,7 @@ Two-direction invariant between flow files and catalogue:
 
 **Catalogue row shape.** Each row carries: `code`, `error_type`, `retry_semantics`, `retry_after_default` (NULL for non-retry-after codes), `http_status` (for Route Handler responses), `description`, `internal_only` flag, source citation (which §/ADR mints the code). The catalogue shape is a versioned markdown table; SCAFFOLD.* implements alongside the F-*.md skeleton mint.
 
-**Catalogue row count cross-reference.** §15.4's 38-code baseline is the canonical count at SPEC.2 v1.0 lock. PRECURSOR.4 verifies the catalogue file has exactly 38 rows (modulo any codes that PRECURSOR.4 adds via the deferred items). A drift between §15.4's count and the catalogue file's row count is a PRECURSOR.4 review fail.
+**Catalogue row count cross-reference.** §15.4's 39-code baseline (38 at v1.0 lock + `error_position_conflict` from AUDIT-FIX-B3 / ADR-0031) is the canonical count. PRECURSOR.4 verifies the catalogue file has exactly 39 rows (modulo any codes that PRECURSOR.4 adds via the deferred items). A drift between §15.4's count and the catalogue file's row count is a PRECURSOR.4 review fail.
 
 ### §15.6 Single source of truth
 
@@ -1605,7 +1615,7 @@ Two-direction invariant between flow files and catalogue:
 | Six-field envelope shape | §15.1 |
 | Closed 9-value `error_type` enum | §15.2 |
 | Closed 3-value `retry_semantics` enum | §15.3 |
-| Canonical 38-code catalogue at v1.0 lock | **§15.4 source-breakdown table** (`docs/specs/error-codes.md` is the forward materialization — ENGINE error-envelope work) |
+| Canonical 39-code catalogue (38 at v1.0 lock + `error_position_conflict`, AUDIT-FIX-B3 / ADR-0031) | **§15.4 source-breakdown table** (`docs/specs/error-codes.md` is the forward materialization — ENGINE error-envelope work) |
 | Per-flow Errors blocks | `docs/specs/flows/F-*.md` (per §13) |
 | Bare-vs-`error_`-prefix decision | PRECURSOR.4 carry-forward (per §0.1 row) |
 | Admin-only flow code completeness | PRECURSOR.4 carry-forward (per §0.1 row) |
@@ -1694,7 +1704,7 @@ The alarm catalogue consolidates every Sentry alarm fired across the codebase. N
 | **6** | Per-vendor unavailability + cron job failure | Five sub-IDs per §17.3 — Upstash rate-limit, Upstash idempotency, R2, pg_cron job-run failures, Vercel Cron R2-orphan-sweep handler 5xx | §10, §11, §12, §17.6 |
 | **7** | 40001-retry exhaustion (resolution transaction wrapper) | W-3 wrapper at `src/server/resolution/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `resolution_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.9, rider R-K) | §3.6, §9, ADR-0013 §5.12 P2 |
 | **8** | 40001-retry exhaustion (lifecycle transaction wrapper) | W-4 wrapper at `src/server/markets/transaction.ts` exhausts 3 retries on SQLSTATE 40001 / 40P01 — Sentry event `lifecycle_serialization_exhausted`, tags `{ sqlstate, flow }` (ENGINE.14, S5 disposition CR-1, gate-ratified 2026-06-12) | §3.8, §9, ADR-0013 §5.12 P3 |
-| **9** | Bet-handler internal error (caught 500) | Bet endpoint catch (`src/server/bets/endpoint.ts`) converts an unrecognized failure to a `500 error_internal` envelope — `safeCaptureException(err, { tags: { kind: "bet_handler_internal_error" } })` fires only on that fallthrough arm (the 503 paths are captured at their own sources). The original `err` is preserved, so a caught append-only `RAISE` reaches Sentry with its message intact (available to alarm-1 tuning at HARDEN.*). Covers `/api/bets/place` + `/api/bets/sell` (shared catch) (AUDIT-FIX-B1 / A5) | §9, ADR-0005, ADR-0013 |
+| **9** | Bet-handler internal error (caught 500) | Bet endpoint catch (`src/server/bets/endpoint.ts`) converts an unrecognized failure to a `500 error_internal` envelope — `safeCaptureException(err, { tags: { kind: "bet_handler_internal_error" } })` fires only on that fallthrough arm (the 503 paths are captured at their own sources). The original `err` is preserved, so a caught append-only `RAISE` reaches Sentry with its message intact (available to alarm-1 tuning at HARDEN.*). Covers `/api/bets/place` + `/api/bets/sell` (shared catch) (AUDIT-FIX-B1 / A5). **AUDIT-FIX-B3 / ADR-0031** adds two *sibling tagged captures* on the bet path — **not** numbered master alarms (tag notes, recorded here beside their shared catch): (a) `position_oversell_backstop` — fires in the same endpoint catch when a `PositionOversellError` storage-backstop reaches it *after* the `sell()` product pre-check should have caught it; it maps to `400 insufficient_shares` (not 500), so it is distinct from this alarm's fallthrough arm; (b) `durable_replay_precheck_failed` — the durable receipt pre-check fails **open** on a DB error in `src/server/bets/replay.ts` (correctness is backstopped by the tx-level unique per §9). | §9, ADR-0005, ADR-0013, ADR-0031 |
 
 Alarm rows 1-5, 7, and 9 are consumed by single citation surfaces; alarm 6's sub-IDs are consumed across multiple citation surfaces (§10 cites 6c, §11 cites 6a + 6b, §12 cites 6c + 6e, §17.6 cites 6d), warranting the structuring elaboration.
 
@@ -1705,7 +1715,7 @@ Five sub-IDs. Each fires a distinct Sentry custom event with a distinct tag for 
 | Sub-ID | Vendor | Trigger | Sentry tag |
 |---|---|---|---|
 | **6a** | Upstash (rate-limit) | Rate-limit middleware catches Upstash error per §11 fail-mode contract; admits the request (fail-open posture) | `upstash_unavailable_rate_limit` |
-| **6b** | Upstash (idempotency) | Idempotency cache helper catches Upstash error per §11 fail-mode contract; rejects the request with HTTP 503 (fail-closed posture) | `upstash_unavailable_idempotency` |
+| **6b** | Upstash (idempotency) | Idempotency cache helper catches Upstash error. **Two site classes** (AUDIT-FIX-B1 / B3): (i) the cache-**lookup** path per §11 fail-mode contract rejects the request with HTTP 503 (fail-closed posture); (ii) the completion-**write / release** path (AUDIT-FIX-B3 / ADR-0031) swallows the error — fail-**open** on the response path, so a committed bet's response still reaches the client — and alarms. A `site` sub-tag discriminates them (implements ADR-0015 §3's completion-write alarm half). | `upstash_unavailable_idempotency` (`site` sub-tag: lookup — absent; release closure — `site: release`; endpoint finally belt — `site: endpoint_finally`) |
 | **6c** | R2 (object storage) | R2 client wrapper at `src/server/storage/r2.ts` catches R2 outage per §12.8 — fires on signed-PUT mint failure, signed-READ mint failure, orphan-sweep DELETE failure, and `headObject` failure (the pre-moderation verify-object HEAD per ADR-0028, non-404 R2-down arm) | `r2_unavailable` |
 | **6d** | `pg_cron` job-run failures | `pg_cron` meta-query over `cron.job_run_details` per §3.4 Pattern A-1 catches any job's terminal failure (events partition monitor, `identity_pool` low-watermark check, `markets`-state drift detection) | `pg_cron_job_failure` |
 | **6e** | Vercel Cron R2-orphan-sweep handler 5xx | Vercel Cron HTTP-fanout target at `src/app/api/cron/r2-orphan-sweep/route.ts` returns non-2xx; Vercel surfaces in cron run history | `vercel_cron_handler_5xx` |
@@ -1903,7 +1913,7 @@ The build pipeline runs `pg_dump` against a freeze-snapshot Postgres replica (Su
 
 ### §19.3 Tables shipped vs not shipped
 
-Per §5.1, twenty-two tables in v1; twenty are dataset-relevant (the two pg_cron operational tables `watermark_state` + `cron_alarms` are excluded from the dataset inventory entirely). **Of those twenty: fifteen ship; five do not (operational / privacy-sensitive).**
+Per §5.1's inventory; twenty are dataset-relevant. **Three** tables are excluded from the dataset inventory entirely: the two pg_cron operational tables `watermark_state` + `cron_alarms`, and the AUDIT-FIX-B3 idempotency backstop `bet_receipts` (ADR-0031 — an operational per-request receipt whose `result` content is fully derivable from `events` + `pools` (`newPrice = getPrices(post-trade reserves)`), so it carries no independent research signal). **Of those twenty: fifteen ship; five do not (operational / privacy-sensitive).** *(Pre-existing SYNC drift, not B3's to reconcile: `market_media` (ADR-0026) is not yet enumerated in this §19.3 table — tracked for the deferred sweep per `parked.md`.)*
 
 | # | Table | Bucket | Shipped? | Rationale |
 |---|---|---|---|---|
@@ -1930,7 +1940,7 @@ Per §5.1, twenty-two tables in v1; twenty are dataset-relevant (the two pg_cron
 
 **Shipped: 15 tables; not shipped: 5.** Shipped = the 9 Bucket-A audit tables (`events`, `dharma_ledger`, `bets`, `comments`, `resolution_events`, `payout_events`, `mod_actions`, `admin_events`, `user_events`) + 2 Bucket-B (`identity_pool`, `image_uploads`) + 3 current-state-context Bucket-C (`markets`, `pools`, `positions`) + `users` (PII-stripped per §19.4). Not shipped = `system_state`, `sessions`, `accounts`, `verifications`, `admin_sessions` (operational / privacy-sensitive). The two pg_cron operational tables (`watermark_state`, `cron_alarms`) are not part of the dataset inventory at all.
 
-The earlier "13 shipped + 4 not shipped" 3-E baseline was an undercount (it omitted `markets` / `pools` / `positions` from the explicit enumeration); the v0.3-draft body corrected it to 16 + 5, and this SYNC.7 pass drops `friendly_fire_events` (removed entirely per ADR-0017 — the reply-as-bet model has no friendly-fire table) bringing the shipped count to **15 + 5**. PRECURSOR.4 verifies the count alongside §15.4's 38-code baseline.
+The earlier "13 shipped + 4 not shipped" 3-E baseline was an undercount (it omitted `markets` / `pools` / `positions` from the explicit enumeration); the v0.3-draft body corrected it to 16 + 5, and this SYNC.7 pass drops `friendly_fire_events` (removed entirely per ADR-0017 — the reply-as-bet model has no friendly-fire table) bringing the shipped count to **15 + 5**. PRECURSOR.4 verifies the count alongside §15.4's 39-code baseline.
 
 ### §19.4 PII strip-not-hash policy
 

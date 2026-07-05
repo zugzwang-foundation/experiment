@@ -3,15 +3,16 @@ import { afterEach, describe, expect, it } from "vitest";
 import { testClient } from "../_fixtures/db";
 import { truncateTables } from "../_fixtures/truncate";
 
-// AUDIT-FIX-B2 A20 — the TRUNCATE-guard storage contract (migration 0021).
+// AUDIT-FIX-B2 A20 — the TRUNCATE-guard storage contract (migration 0021);
+// extended by AUDIT-FIX-B3 0022 (bet_receipts → 13 protected).
 // TRUNCATE fires no ROW-level triggers, so it bypasses the entire 0003
-// append-only guard (INV-2/INV-4 storage ground truth) on all 12 protected
+// append-only guard (INV-2/INV-4 storage ground truth) on all 13 protected
 // tables. 0021 adds BEFORE TRUNCATE … FOR EACH STATEMENT reject triggers
 // (shared enforce_bucket_a_no_truncate(), bare-RAISE → P0001, message
-// "…: TRUNCATE not permitted") on the 8 non-partitioned Bucket-A tables, the
-// events family (parent + all 13 partitions — PG17 statement triggers do NOT
-// clone to partitions, and direct-partition TRUNCATE skips the parent trigger),
-// and the 3 Bucket-B tables.
+// "…: TRUNCATE not permitted") on the 9 non-partitioned Bucket-A tables (8 from
+// 0021 + bet_receipts from 0022), the events family (parent + all 13 partitions —
+// PG17 statement triggers do NOT clone to partitions, and direct-partition
+// TRUNCATE skips the parent trigger), and the 3 Bucket-B tables.
 //
 // COLLECTION-RED now: `../_fixtures/truncate` (the disable→TRUNCATE→re-enable
 // fixture helper) is built by the implementer, not here. Even with a stub
@@ -22,7 +23,7 @@ import { truncateTables } from "../_fixtures/truncate";
 // the rejection-matrix TRUNCATEs would SUCCEED and CASCADE-wipe data — the
 // missing-import collection-RED is the interlock until both halves land.
 
-// The 12 protected tables (9 Bucket A + 3 Bucket B). Every attempt uses CASCADE
+// The 13 protected tables (10 Bucket A + 3 Bucket B). Every attempt uses CASCADE
 // so an FK-referencing precondition never preempts the table's own guard.
 const PROTECTED_TABLES = [
 	"events",
@@ -34,6 +35,8 @@ const PROTECTED_TABLES = [
 	"mod_actions",
 	"admin_events",
 	"user_events",
+	// AUDIT-FIX-B3 0022 — the durable idempotency completion record (Bucket A).
+	"bet_receipts",
 	"identity_pool",
 	"image_uploads",
 	"system_state",
@@ -96,7 +99,7 @@ describe("A20 — TRUNCATE rejected on append-only tables (0021 guard)", () => {
 			[userId, "initial_grant", "100", "100"],
 		);
 
-		// The helper disables the 25 guards, TRUNCATEs CASCADE, re-enables.
+		// The helper disables the 26 guards, TRUNCATEs CASCADE, re-enables.
 		await truncateTables(testClient, ["dharma_ledger", "users"]);
 
 		const ledgerCount = await testClient.unsafe<Array<{ count: number }>>(

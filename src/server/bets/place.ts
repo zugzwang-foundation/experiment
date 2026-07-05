@@ -3,7 +3,7 @@ import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import type { DbTransaction } from "@/db";
-import { bets, comments, imageUploads, pools } from "@/db/schema";
+import { betReceipts, bets, comments, imageUploads, pools } from "@/db/schema";
 import { computeBuy, type Side } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { accrueDailyCredit } from "@/server/dharma/accrual";
@@ -25,6 +25,8 @@ export interface PlaceParams {
 	/** null for a top-level post (ENGINE.8); a validated id for a reply (DEBATE.2). */
 	parentCommentId: string | null;
 	idempotencyKey: string;
+	/** AUDIT-FIX-B3 A9 — the RFC 8785 body fingerprint stored on the durable receipt (fingerprint-mismatch → 409 on replay). */
+	bodyFingerprint: string;
 	/** Generated at handler entry, closed over (retry-purity) — NEVER regenerated here. */
 	betEventId: string;
 	commentEventId: string;
@@ -274,7 +276,7 @@ export async function place(
 		.set({ yesReserves: buy.reserves.yes, noReserves: buy.reserves.no })
 		.where(eq(pools.id, pool.id));
 
-	return {
+	const result: PlaceResult = {
 		betId: bet.id,
 		commentId: comment.id,
 		side,
@@ -282,4 +284,23 @@ export async function place(
 		newPrice: buy.p1,
 		parentCommentId,
 	};
+
+	// AUDIT-FIX-B3 A9 — the durable idempotency receipt, the LAST write inside the
+	// W-1 tx (after pools; it follows the RETURNING ids it stores). Insert-only; the
+	// FK KEY SHARE locks on users/markets are already held by the earlier spine
+	// inserts, so it takes no NEW lock and adds no lock-order edge vs the ADR-0013
+	// spine. `bets_idempotency_key_idx`
+	// already 23505s a place replay, but the receipt makes place + sell symmetric
+	// AND stores the committed `result` (the post-trade `newPrice`/p1 lives in no
+	// other row — STEP 1) so a Redis-lost replay returns the ORIGINAL body verbatim.
+	await tx.insert(betReceipts).values({
+		idempotencyKey: params.idempotencyKey,
+		bodyFingerprint: params.bodyFingerprint,
+		userId,
+		marketId,
+		flow: "place",
+		result,
+	});
+
+	return result;
 }

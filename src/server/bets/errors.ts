@@ -8,6 +8,14 @@ import {
 	StorageUnavailableError,
 } from "@/lib/errors";
 import type { MarketStatus } from "@/server/markets/transitions";
+// AUDIT-FIX-B3 A3 — the two positions sentinels the sell path can surface to the
+// user (`extends Error`, NOT `BetProductError`). `toWireError` maps both
+// explicitly. One-directional edge (bets → positions); positions never imports
+// bets, so no runtime cycle.
+import {
+	PositionOversellError,
+	PositionSingleSideError,
+} from "@/server/positions/errors";
 
 import type { BetFlow } from "./transaction";
 
@@ -102,6 +110,28 @@ export class InsufficientDharmaError extends BetProductError {
 		this.name = "InsufficientDharmaError";
 		this.balance = args.balance;
 		this.required = args.required;
+	}
+}
+
+/**
+ * F-BET-3 → 400 (AUDIT-FIX-B3 A3). The friendly in-snapshot sell pre-check:
+ * `shares > held.quantity`. Name/code mirror F-BET-4's `InsufficientDharmaError`;
+ * the authoritative backstop is `PositionOversellError` + the storage
+ * `CHECK (positions_quantity_non_negative)`. In-snapshot, so a concurrent shrink
+ * surfaces as SSI 40001 → retry re-runs the pre-check → clean 400.
+ */
+export class InsufficientSharesError extends BetProductError {
+	static readonly httpStatus = 400;
+	static readonly code = "insufficient_shares";
+	readonly held: string;
+	readonly requested: string;
+	constructor(args: { held: string; requested: string }) {
+		super(
+			`insufficient shares: held ${args.held} < requested ${args.requested}`,
+		);
+		this.name = "InsufficientSharesError";
+		this.held = args.held;
+		this.requested = args.requested;
 	}
 }
 
@@ -345,6 +375,29 @@ export function toWireError(err: unknown): WireError {
 	if (err instanceof StorageUnavailableError) {
 		return buildWire(503, "error_storage_unavailable", err.message, {
 			retryAfterBody: 5,
+		});
+	}
+	// AUDIT-FIX-B3 A3 — the two positions sentinels (`extends Error`, NOT
+	// BetProductError, so without these they fall through to 500 error_internal for
+	// ordinary user input). Mapped BEFORE the BetProductError block.
+	if (err instanceof PositionOversellError) {
+		// The storage-layer oversell backstop (unreachable-except-bug post the
+		// sell() pre-check). Map to the SAME 400 insufficient_shares as the friendly
+		// pre-check (#8) so a backstop trip is user-legible, not an opaque 500. The
+		// endpoint additionally fires the `position_oversell_backstop` alarm.
+		return buildWire(
+			InsufficientSharesError.httpStatus,
+			InsufficientSharesError.code,
+			err.message,
+		);
+	}
+	if (err instanceof PositionSingleSideError) {
+		// The single-side race-loser: a concurrent flip-order write lost the
+		// positions_one_held_side_idx unique. 503 (uncached by the `<500` rule) so
+		// the retry re-resolves deterministically to `opposite_side_held` 400 — NOT a
+		// cached 409 (which would poison the key). Body + header carry retry_after 1.
+		return buildWire(503, "error_position_conflict", err.message, {
+			retryAfterBody: 1,
 		});
 	}
 	if (err instanceof BetProductError) {

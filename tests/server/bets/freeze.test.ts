@@ -79,6 +79,13 @@ vi.mock("@/db", () => ({
 				})),
 			},
 		},
+		// AUDIT-FIX-B3 A9 — the not-frozen pass-through arm reaches the durable
+		// pre-check (db.select(bet_receipts)); a fresh key finds no receipt → [] → the
+		// pre-check returns null and execution proceeds unchanged. The frozen arm
+		// returns 410 BEFORE the miss arm, so it never touches this.
+		select: () => ({
+			from: () => ({ where: () => ({ limit: async () => [] }) }),
+		}),
 	},
 }));
 

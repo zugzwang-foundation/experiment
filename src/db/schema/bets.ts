@@ -3,6 +3,7 @@ import {
 	type AnyPgColumn,
 	check,
 	index,
+	jsonb,
 	numeric,
 	pgTable,
 	text,
@@ -127,7 +128,46 @@ export const positionsRelations = relations(positions, ({ one }) => ({
 	}),
 }));
 
+// Bucket A (AUDIT-FIX-B3 / ADR-0031). The DURABLE idempotency completion record
+// — the durable twin of ADR-0015's Redis completed-cache, written as the LAST
+// write inside BOTH place() and sell()'s W-1 callback (after the pools UPDATE),
+// so response durability is atomic with commit. `idempotency_key` carries a
+// dedicated UNIQUE (a non-partitioned table, unlike `events`): its 23505 aborts
+// the whole SERIALIZABLE tx (rollback = no double proceeds), which is exactly
+// the A9 semantics. `result` stores the committed 200 body's `data` object
+// verbatim (PlaceResult | SellResult) — money fields are decimal STRINGS, so the
+// jsonb round-trip is byte-stable and a cache-lost retry replays it exactly (the
+// post-trade `newPrice`/p1 exists in no other row — STEP 1). Server-INTERNAL:
+// never exposed on any read/API surface. Non-circular FKs → simple arrow form.
+export const betReceipts = pgTable(
+	"bet_receipts",
+	{
+		id: uuid("id").primaryKey().default(sql`uuidv7()`),
+		idempotencyKey: text("idempotency_key").notNull(),
+		bodyFingerprint: text("body_fingerprint").notNull(),
+		userId: uuid("user_id")
+			.notNull()
+			.references(() => users.id, { onDelete: "restrict" }),
+		marketId: uuid("market_id")
+			.notNull()
+			.references(() => markets.id, { onDelete: "restrict" }),
+		flow: text("flow").notNull(), // 'place' | 'sell' (CHECK below)
+		result: jsonb("result").notNull(), // the 200 body's `data` (PlaceResult | SellResult)
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.notNull()
+			.defaultNow(),
+	},
+	(table) => [
+		uniqueIndex("bet_receipts_idempotency_key_uq").on(table.idempotencyKey),
+		index("bet_receipts_user_id_idx").on(table.userId),
+		index("bet_receipts_market_id_idx").on(table.marketId),
+		check("bet_receipts_flow_check", sql`${table.flow} IN ('place', 'sell')`),
+	],
+);
+
 export const insertBetSchema = createInsertSchema(bets);
 export const selectBetSchema = createSelectSchema(bets);
 export const insertPositionSchema = createInsertSchema(positions);
 export const selectPositionSchema = createSelectSchema(positions);
+export const insertBetReceiptSchema = createInsertSchema(betReceipts);
+export const selectBetReceiptSchema = createSelectSchema(betReceipts);

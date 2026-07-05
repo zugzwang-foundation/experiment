@@ -287,9 +287,9 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Expected next task.** HARDEN.* observability hardening (TBD).
 
-## SYNC-sweep — spec/doc reconciliation owed by AUDIT-FIX-A1 + AUDIT-FIX-B1 + AUDIT-FIX-B2 (FOUR targets)
+## SYNC-sweep — spec/doc reconciliation owed by AUDIT-FIX-A1 + AUDIT-FIX-B1 + AUDIT-FIX-B2 + AUDIT-FIX-B3 (FOUR targets)
 
-**Originating task:** AUDIT-FIX-A1 (PR #197, squash `4350406`) + AUDIT-FIX-B1 (PR #199, squash `72ce26c`) + AUDIT-FIX-B2 (rider commit on `fix/audit-fix-b2`; PR# in `docs/logs/AUDIT-FIX-B2.md`) — all landed same-commit spec riders but none ran the §0 version/changelog bump nor the ADR-index/footer count reconciliation (per CLAUDE.md §7 these are a periodic SYNC sweep, not per-task). **FOUR distinct targets** — the sweep must not do the SPEC.2 §0 bump alone and miss the SPEC.1 bump + the ADR-index/footer reconciliation. State verified current 2026-07-04 (B2 extension same day).
+**Originating task:** AUDIT-FIX-A1 (PR #197, squash `4350406`) + AUDIT-FIX-B1 (PR #199, squash `72ce26c`) + AUDIT-FIX-B2 (PR #201, squash `7fc4c60`) + AUDIT-FIX-B3 (rider commit on `fix/audit-fix-b3`; PR# in `docs/logs/AUDIT-FIX-B3.md`) — all landed same-commit spec riders but none ran the §0 version/changelog bump nor the ADR-index/footer count reconciliation (per CLAUDE.md §7 these are a periodic SYNC sweep, not per-task). **FOUR distinct targets** — the sweep must not do the SPEC.2 §0 bump alone and miss the SPEC.1 bump + the ADR-index/footer reconciliation. State verified current 2026-07-05 (B3 extension same day).
 
 **Deferred work (all four).**
 
@@ -297,13 +297,14 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
    - **A1** riders — §12.2 / §12.3 (write-once `If-None-Match: *` PUT + pre-moderation `HeadObject` verify) · §10 (pre-moderation object verify) · the §22 ADR-0028 row (already in the table). ADR-0028 = moderated-image byte-identity binding.
    - **B1** riders — §17.2 (row 2 `events_default_nonempty` drain-side transport; row 4 `openai_moderation_upstream_failure` pin; new row 9 `bet_handler_internal_error`; count-prose eight→nine) · §17.3 6c (`headObject` 4th `r2_unavailable` source).
    - **B2** riders — §5.1 row 2 (`dharma_ledger` seq clause) · Appendix B.7 (new `seq` column row) · §6 intro + §6.1 clauses 1&2 + §6.2 addendum (`enforce_bucket_a_no_truncate()`, 25 triggers, forward obligation) + §6.5 owner-privilege reconciliation (ADR-0029 / ADR-0030).
-   - The §0 status-header ADR line ("25 ADRs at `0003–0027`") also moves to **28 ADRs at `0003–0030`** (it lives in §0).
+   - **B3** riders (ADR-0031 + ADR-0015 Patch; landed same-commit `fix/audit-fix-b3`) — §3.1 durable pre-check · §3.2 W-1 receipt · §5.1 row 10 (`bet_receipts`) + §5.2 (Bucket A 9→10, protected 12→13) · §6.2 (10 tables, 20+26 triggers) · §7.3 (third idempotency layer) · §9 (receipt append) · §11 (durable pre-check step 3a + ownership-checked never-throws release + alarm-6b two-site) · §15.4 (+1 → **39** codes: `error_position_conflict`; `insufficient_shares` joins the aggregated participant set) · §17.2 alarm-9 sibling tags + §17.3 6b two-site · §19.3 (`bet_receipts` excluded-entirely, 2→3). **Also owed (pre-existing drift surfaced at B3):** §19.3's total-table prose predates `market_media` (ADR-0026) — the §19.3 shipped/excluded enumeration omits it entirely; reconcile against §5.1 (24 tables) in the sweep.
+   - The §0 status-header ADR line ("25 ADRs at `0003–0027`") also moves to **29 ADRs at `0003–0031`** (it lives in §0; +ADR-0031, and the ADR-0015 Patch record is not a new ADR).
 
-2. **SPEC.1 §0 — version + change log** (currently **v1.0.13**; re-verify at sweep). Bump + add a change-log row for **A1's §16.5** CSAM-compliance rider (swap-window-closure note). B1 and B2 did not touch SPEC.1, so this bump is A1-only.
+2. **SPEC.1 §0 — version + change log** (currently **v1.0.13**; re-verify at sweep). Bump + add a change-log row for **A1's §16.5** CSAM-compliance rider (swap-window-closure note) and **B3's §7 F-BET-3** rider (oversell `insufficient_shares` pre-check + error row + acceptance rows + the `bet_receipts` durable-backing note, ADR-0031). B1 and B2 did not touch SPEC.1.
 
-3. **SPEC.2 §22 ADR-index.** §22.1 currently reads "**26 ADRs** … `0003–0027`" (26 = ADR-0001 + 0003–0027 per BC.2). The ADR-0028 **row** is already in the §22 table (A1 — target 1's "§22 ADR-row"); B2 deliberately added **no** §22 rows, so the sweep owes **two new table rows (ADR-0029, ADR-0030)** plus the **count-prose** → **29 ADRs**, range `0003–0030`.
+3. **SPEC.2 §22 ADR-index.** §22.1 currently reads "**26 ADRs** … `0003–0027`" (26 = ADR-0001 + 0003–0027 per BC.2). The ADR-0028 **row** is already in the §22 table (A1 — target 1's "§22 ADR-row"); B2 deliberately added **no** §22 rows, and B3 added none — so the sweep owes **three new table rows (ADR-0029, ADR-0030, ADR-0031)** plus the **count-prose** → **30 ADRs**, range `0003–0031` (the ADR-0015 Patch record is an in-place amendment, not a new §22 row — optionally annotate the existing ADR-0015 row).
 
-4. **CLAUDE.md + AGENTS.md footers.** Both "Rebuilt at …" footers cite "**ADRs 0003–0027**" → `0003–0030`; CLAUDE.md §"Source of truth" also cites `docs/adr/0003–0027` → `0003–0030`.
+4. **CLAUDE.md + AGENTS.md footers.** Both "Rebuilt at …" footers cite "**ADRs 0003–0027**" → `0003–0031`; CLAUDE.md §"Source of truth" also cites `docs/adr/0003–0027` → `0003–0031`.
 
 **Why deferred.** §0 version bumps + change-log + ADR-index/footer count reconciliation are a periodic SYNC sweep (CLAUDE.md §7 "reconcile periodically"), not per-task — batching avoids a metadata-churn commit on every rider PR. The rider text itself landed same-commit (the load-bearing part); only the metadata is swept.
 

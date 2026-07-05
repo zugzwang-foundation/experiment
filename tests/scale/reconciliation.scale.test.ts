@@ -64,6 +64,7 @@ function placeTask(args: {
 				body,
 				parentCommentId: null,
 				idempotencyKey,
+				bodyFingerprint: uuidv7(),
 				betEventId,
 				commentEventId,
 				creditEventId,
@@ -87,6 +88,8 @@ function sellTask(args: {
 				shares: args.shares,
 				sellEventId,
 				syntheticBetId,
+				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
 				metadata: userMetadata(args.userId, "F-BET-3"),
 			}),
 		).then((r) => r.dharmaReturned);

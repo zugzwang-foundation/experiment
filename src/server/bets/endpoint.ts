@@ -22,8 +22,10 @@ import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
 import { safeCaptureException } from "@/server/observability/safe-capture";
+import { PositionOversellError } from "@/server/positions/errors";
 import { isFrozen } from "@/server/system/is-frozen";
 import { toWireError } from "./errors";
+import { loadDurableReplay } from "./replay";
 
 // The shared §3.1 handler stack for the two bet endpoints (`/api/bets/place`,
 // `/api/bets/sell`). Both routes run the SAME prefix — origin → auth+ban →
@@ -45,6 +47,8 @@ export interface BetEndpointCtx {
 	userId: string;
 	rawBody: unknown;
 	idempotencyKey: string;
+	/** AUDIT-FIX-B3 A9 — the RFC 8785 body fingerprint (computed at step 3), threaded to the durable receipt writes + the route 23505-catch replay lookup. */
+	bodyFingerprint: string;
 	ip: string;
 	requestId: string;
 	userAgent: string;
@@ -136,7 +140,9 @@ export function buildBetMetadata(args: {
  */
 export async function runBetEndpoint(
 	request: Request,
-	inner: (ctx: BetEndpointCtx) => Promise<{ status: number; body: unknown }>,
+	inner: (
+		ctx: BetEndpointCtx,
+	) => Promise<{ status: number; body: unknown; noCache?: true }>,
 ): Promise<Response> {
 	const startedAt = Date.now();
 	const inboundRequestId = request.headers.get("x-request-id");
@@ -280,10 +286,41 @@ export async function runBetEndpoint(
 
 	let completed: CompletedResponse | null = null;
 	// AUDIT-FIX-B1 A17 (§16.3): only handler-body outcomes log — set at the
-	// `inner` result and the catch's wire, never at the 429 arm or any §3.1
-	// prefix rejection above (those never reached the handler body).
+	// `inner` result and the catch's wire, never at the 429 arm, the durable
+	// pre-check arms, or any §3.1 prefix rejection (those never reached the handler
+	// body — the durable replay/mismatch is an idempotency-family short-circuit,
+	// mirroring the no-log Redis-hit arm above).
 	let logStatus: number | null = null;
 	try {
+		// 3.5 AUDIT-FIX-B3 A9 — the durable receipt pre-check, BEFORE rate-limit
+		// (part of the step-3 idempotency lookup family: a replay must not consume
+		// rate budget, and it must short-circuit BEFORE step-6 moderation so a
+		// replayed committed place is never re-moderated into a bogus block for a
+		// bet that already landed). Fail-OPEN inside loadDurableReplay: correctness
+		// is backstopped by the tx-level unique 23505 catch in the routes.
+		const replay = await loadDurableReplay(db, {
+			idempotencyKey,
+			bodyFingerprint: fingerprint,
+		});
+		if (replay !== null) {
+			if (replay.kind === "replay") {
+				// Receipt + fingerprint match → replay the ORIGINAL committed 200. Set
+				// `completed` so the finally PROMOTES the sentinel → Redis fast path
+				// repopulated.
+				const body = { ok: true, data: replay.result };
+				completed = { status: 200, body, bodyFingerprint: fingerprint };
+				return jsonResponse(requestId, 200, body);
+			}
+			// Receipt + fingerprint MISMATCH → 409, NEVER cached (caching under the
+			// key would poison the original body's rightful replay). `completed` stays
+			// null → the finally deletes the sentinel.
+			const body = envelope(
+				IDEMPOTENCY_ERROR_CODES.KEY_REUSED,
+				"Idempotency-Key reused with a different body",
+			);
+			return jsonResponse(requestId, 409, body);
+		}
+
 		// 4. Rate-limit (betPerIp; fails OPEN). 429 IS cached per §11.
 		const rl = await checkRateLimit("betPerIp", ipIdentifier(ip));
 		if (!rl.allowed) {
@@ -301,15 +338,22 @@ export async function runBetEndpoint(
 			userId,
 			rawBody,
 			idempotencyKey,
+			bodyFingerprint: fingerprint,
 			ip,
 			requestId,
 			userAgent,
 		});
-		completed = {
-			status: result.status,
-			body: result.body,
-			bodyFingerprint: fingerprint,
-		};
+		// AUDIT-FIX-B3 A9 — cache the 4xx/200 EXCEPT when the inner marks `noCache`
+		// (the route's durable 23505-mismatch 409, whose caching would poison the
+		// key). 5xx stays uncached (opt-C / ADR-0015 §4).
+		completed =
+			result.status < 500 && !result.noCache
+				? {
+						status: result.status,
+						body: result.body,
+						bodyFingerprint: fingerprint,
+					}
+				: null;
 		logStatus = result.status;
 		return jsonResponse(requestId, result.status, result.body);
 	} catch (err) {
@@ -321,6 +365,15 @@ export async function runBetEndpoint(
 		if (wire.body.error.code === "error_internal") {
 			safeCaptureException(err, {
 				tags: { kind: "bet_handler_internal_error" },
+			});
+		}
+		// AUDIT-FIX-B3 A3 — the storage oversell backstop tripped (it maps to a
+		// clean 400 insufficient_shares via toWireError, but a trip means the
+		// sell() pre-check was bypassed → alarm loudly; the A5 lesson: no silent
+		// backstop trips).
+		if (err instanceof PositionOversellError) {
+			safeCaptureException(err, {
+				tags: { kind: "position_oversell_backstop" },
 			});
 		}
 		// Cache terminal product errors (4xx) + 429; release(null) on a transient
@@ -345,6 +398,20 @@ export async function runBetEndpoint(
 				// strand the idempotency reservation released below.
 			}
 		}
-		await release(completed);
+		// AUDIT-FIX-B3 A4 (belt) — the release closure is already never-throws
+		// (cache.ts guarded), but wrap here too so NO release implementation can let
+		// a finally throw supersede the already-built (committed 200 / terminal 4xx)
+		// response. `site: endpoint_finally` distinguishes this alarm from the
+		// closure's own `site: release`.
+		try {
+			await release(completed);
+		} catch (err) {
+			safeCaptureException(err, {
+				tags: {
+					kind: "upstash_unavailable_idempotency",
+					site: "endpoint_finally",
+				},
+			});
+		}
 	}
 }

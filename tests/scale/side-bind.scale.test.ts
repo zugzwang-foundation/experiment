@@ -55,6 +55,7 @@ function placeTask(args: {
 				body,
 				parentCommentId: null, // INV fence — ALWAYS null, NEVER a reply
 				idempotencyKey,
+				bodyFingerprint: uuidv7(),
 				betEventId,
 				commentEventId,
 				creditEventId,
@@ -136,6 +137,8 @@ describe("scale — side-bind / INV-3 frozen side under flips (axis 4, Q-1)", ()
 						shares: "1000000",
 						sellEventId: uuidv7(),
 						syntheticBetId: uuidv7(),
+						idempotencyKey: uuidv7(),
+						bodyFingerprint: uuidv7(),
 						metadata: userMetadata(userId, "F-BET-3"),
 					}),
 				).catch(() => undefined);

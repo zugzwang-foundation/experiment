@@ -60,6 +60,7 @@ function identicalPlaceTask(args: {
 				body: "idempotent submit body",
 				parentCommentId: null,
 				idempotencyKey: args.idempotencyKey,
+				bodyFingerprint: args.idempotencyKey,
 				betEventId: uuidv7(),
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),

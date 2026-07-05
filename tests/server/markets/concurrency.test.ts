@@ -175,6 +175,7 @@ describe("ENGINE.14 W-4 — lifecycle concurrency (X1–X2)", () => {
 						body: "PLACEHOLDER X2 argument — not a real argument.",
 						parentCommentId: null,
 						idempotencyKey: "x2-close-vs-bet",
+						bodyFingerprint: "x2-close-vs-bet-fp",
 						betEventId,
 						commentEventId,
 						creditEventId,

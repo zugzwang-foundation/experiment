@@ -24,7 +24,7 @@ import type postgres from "postgres";
 const TRUNCATE_GUARDS: ReadonlyArray<
 	readonly [table: string, trigger: string]
 > = [
-	// Bucket A — 8 non-partitioned tables.
+	// Bucket A — 9 non-partitioned tables (AUDIT-FIX-B3 0022 adds bet_receipts).
 	["dharma_ledger", "bucket_a_no_truncate"],
 	["bets", "bucket_a_no_truncate"],
 	["comments", "bucket_a_no_truncate"],
@@ -33,6 +33,7 @@ const TRUNCATE_GUARDS: ReadonlyArray<
 	["mod_actions", "bucket_a_no_truncate"],
 	["admin_events", "bucket_a_no_truncate"],
 	["user_events", "bucket_a_no_truncate"],
+	["bet_receipts", "bucket_a_no_truncate"],
 	// events family — parent + all 13 partitions (statement triggers do not
 	// clone to partitions; each carries its own).
 	["events", "bucket_a_no_truncate"],

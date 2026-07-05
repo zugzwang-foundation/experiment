@@ -7,11 +7,20 @@ import {
 	BetSerializationExhaustedError,
 	CommentTooLongError,
 	InsufficientDharmaError,
+	InsufficientSharesError,
 	MarketNotOpenError,
 	OppositeSideHeldError,
 	PositionNotHeldError,
 	toWireError,
 } from "@/server/bets/errors";
+// AUDIT-FIX-B3 A3 — the two positions sentinels the sell path can surface to the
+// user (`extends Error`, NOT `BetProductError`). `toWireError` gains explicit maps
+// for both (import from `@/server/positions/errors`; no runtime cycle — positions
+// never imports bets). These classes ALREADY exist; the MAPS are greenfield.
+import {
+	PositionOversellError,
+	PositionSingleSideError,
+} from "@/server/positions/errors";
 
 // ENGINE.8 §5.6 tests-first — the §4.4 wire envelope formatter + the bet product
 // error classes (plan §"§4.4 wire envelope + bet product codes (Q4)" + §"File
@@ -215,5 +224,78 @@ describe("toWireError — retry_after present IFF status ∈ {429,503}", () => {
 			expect([400, 403, 409]).toContain(status);
 			expect(body.error.retry_after).toBeUndefined();
 		}
+	});
+});
+
+// AUDIT-FIX-B3 A3 — the oversell + unmapped-error sweep (plan §3.4 + §3.6 rows
+// 7/8/9). Three NEW terminal cases the current `toWireError` fall-through maps to
+// an UNCACHED 500 `error_internal` (the finding); the fix routes each to a stable
+// user-facing code:
+//   - InsufficientSharesError  → 400 insufficient_shares   (the sell pre-check, #7)
+//   - PositionOversellError    → 400 insufficient_shares   (the storage backstop, #8)
+//   - PositionSingleSideError  → 503 error_position_conflict + retry_after 1 (#9)
+//
+// RED NOW: `InsufficientSharesError` is greenfield (undefined value import →
+// `new` throws), and the two `PositionError` maps do not exist yet (both currently
+// hit the fall-through → 500). Money/share values cross as decimal STRINGS.
+describe("toWireError — A3 oversell + positions sentinels (plan §3.6 rows 7/8/9)", () => {
+	it("wire-envelope::insufficient-shares-400 (A3 sell pre-check, #7)", () => {
+		// The NEW product pre-check in sell(): shares > held.quantity. Mirrors
+		// F-BET-4's InsufficientDharmaError shape — 400, carries {held, requested}.
+		const err = new InsufficientSharesError({
+			held: "5.000000000000000000",
+			requested: "10.000000000000000000",
+		});
+		const { status, body } = toWireError(err);
+
+		expect(InsufficientSharesError.httpStatus).toBe(400);
+		expect(InsufficientSharesError.code).toBe("insufficient_shares");
+		expect(status).toBe(400);
+		expect(body.error.code).toBe("insufficient_shares");
+		// 400 → cached (deterministic, retry-safe); no retry_after (only 429/503).
+		expect(body.error.retry_after).toBeUndefined();
+	});
+
+	it("wire-envelope::position-oversell-backstop-maps-400-insufficient-shares (A3 storage backstop, #8)", () => {
+		// The module-local `PositionOversellError extends Error` (unreachable-
+		// except-bug post-pre-check) maps to the SAME 400 `insufficient_shares` —
+		// today it falls through to 500 `error_internal`. Same wire code as #7 so a
+		// backstop trip is user-legible, not an opaque 500.
+		const err = new PositionOversellError(
+			"position oversell: 5 + -10 = -5 < 0",
+		);
+		const { status, body } = toWireError(err);
+
+		expect(status).toBe(400);
+		expect(body.error.code).toBe("insufficient_shares");
+		expect(body.error.retry_after).toBeUndefined();
+	});
+
+	it("wire-envelope::position-single-side-maps-503-error_position_conflict-retry-after-1 (A3 race-loser, #9)", () => {
+		// The read-side single-side race-loser (`PositionSingleSideError extends
+		// Error`) maps to 503 `error_position_conflict` + Retry-After 1 — NOT a
+		// cached 409 (503 is uncached by the `<500` rule, so the retry re-resolves
+		// deterministically to the 400 `opposite_side_held` case). Both the body
+		// field and the HTTP header carry 1.
+		const err = new PositionSingleSideError(
+			"single-side violation: a held opposite side already exists",
+		);
+		const { status, body, retryAfterHeader } = toWireError(err);
+
+		expect(status).toBe(503);
+		expect(body.error.code).toBe("error_position_conflict");
+		// 503 ∈ {429,503} → the body carries retry_after (§4.4); header mirrors it.
+		expect(body.error.retry_after).toBe(1);
+		expect(retryAfterHeader).toBe(1);
+	});
+
+	it("wire-envelope::unknown-error-still-falls-through-to-500 (fall-through unchanged)", () => {
+		// The A3 sweep adds maps for the USER-REACHABLE terminal cases only; a
+		// genuinely unrecognized error (bug class — driver/RETURNING-empty/CAS/
+		// 57014, plan §3.6 row 13) still falls through to 500 `error_internal`.
+		const { status, body } = toWireError(new Error("some unexpected boom"));
+
+		expect(status).toBe(500);
+		expect(body.error.code).toBe("error_internal");
 	});
 });

@@ -46,7 +46,15 @@ vi.mock("@/server/auth", () => ({
 	auth: { api: { getSession: mockGetSession } },
 }));
 vi.mock("@/db", () => ({
-	db: { query: { users: { findFirst: mockFindFirst } } },
+	db: {
+		query: { users: { findFirst: mockFindFirst } },
+		// AUDIT-FIX-B3 A9 — the durable pre-check runs db.select(bet_receipts) on the
+		// miss arm; a fresh key finds no receipt → the chain resolves to [] → the
+		// pre-check returns null and execution proceeds to `inner` unchanged.
+		select: () => ({
+			from: () => ({ where: () => ({ limit: async () => [] }) }),
+		}),
+	},
 }));
 vi.mock("@/server/system/is-frozen", () => ({ isFrozen: mockIsFrozen }));
 vi.mock("@/server/middleware/origin-allowlist", () => ({
