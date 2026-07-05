@@ -34,6 +34,10 @@ image-presence paragraph). CSAM-image coverage = this backstop + reactive admin 
 F-ADMIN-4) until PhotoDNA / NCMEC land (parked — `docs/parked.md` LD-1 / LD-7). Orthogonal to the
 ADR-0021 Track B *consequence* amendment (held → block): this P1 scopes the *gate mapping*.
 
+### P2 — AUDIT-FIX-A21: vendor-boundary well-formedness guard — flagged-with-no-mapped-category fails closed (2026-07-05)
+
+**§18 patch-record — AUDIT-FIX-A21 (2026-07-05).** §4 gains a vendor-boundary well-formedness guard (flagged-with-no-mapped-category → malformed → fail-closed 503, tag `openai_moderation_malformed_flagged`, sibling to the empty-results anomaly); §5 aggregation annotated (terminal `pass` reachable only for `!flagged`). Closes the fail-open where `flagged && no-mapped-track` fell through to `pass`. Gate architecture, vendor pin, Redis reservation, idempotency-first ordering, CSAM short-circuit, and F-MOD-4 atomicity unchanged. Realises the SPEC.1 §16.5 fail-closed posture; mints no new ADR.
+
 ---
 
 ## Context and Problem Statement
@@ -159,6 +163,8 @@ The reservation key shape is `mod:reserve:{user_id}:{market_id}:{idempotency_key
 
 **The fail-closed posture is non-negotiable.** SPEC.2 §11's rate-limit-fails-open posture does not apply here. A moderation outage with fail-open behaviour means CSAM detection is bypassed during the outage — a legal-floor breach per SPEC.1 §16.5. Mirror SPEC.2 §11's idempotency-fails-closed posture instead.
 
+**Well-formedness guard — flagged with no mapped category (AUDIT-FIX-A21).** A response where `flagged === true` but no category is `true` (so no track can be derived) is treated as a **malformed / unusable vendor shape**, in the same class as the empty-`results` anomaly. `moderate()` fails closed on it: `ModerationUnavailableError` → HTTP 503 `moderation_unavailable` (`Retry-After: 5`), emitting `safeCaptureException(…, { kind: 'openai_moderation_malformed_flagged' })`. Rationale: `flagged:true` asserts a violation while the empty category map makes the verdict uninterpretable; deriving `pass` from an asserted-violation-we-cannot-classify is a fail-open on a legal-floor gate (SPEC.1 §16.5). The realistic trigger is a future model-snapshot bump that renames categories out from under the pinned `omni-moderation-2024-09-26` map — the guard closes that window pre-emptively. The capture sits at the OpenAI vendor boundary (`openai.ts`) per the AUDIT-FIX-B1 A6 ruling #4; the mapper (`precommit.ts`) mints no vendor failure of its own.
+
 ### 5. PhotoDNA HTTP call shape (image-attached path)
 
 PhotoDNA (or equivalent CSAM hash service onboarded per SPEC.1 §14 Provisional Gates) is called in **parallel** with OpenAI on every image-attached submit. Total moderation latency for image-attached flows = `max(OpenAI_latency, PhotoDNA_latency)`, dominated by whichever finishes last.
@@ -173,10 +179,14 @@ The exact PhotoDNA HTTP shape is owned by SCAFFOLD.16 (vendor-onboarding deliver
 **Verdict aggregation across the two calls** (image-attached path):
 
 ```
+# Precondition (§4 well-formedness guard): a well-formed OpenAI verdict guarantees
+# flagged ⇒ track ∈ {a, b}. A flagged:true response with no mapped category is
+# rejected upstream at the vendor boundary as malformed (fail-closed 503), so it
+# never reaches this aggregation. (AUDIT-FIX-A21 — closes the prior fail-open.)
 if photodna === 'csam_match':                  return { outcome: 'track_a', categories: ['csam'] }
 if openai.flagged && openai.track === 'a':     return { outcome: 'track_a', categories: openai.categories }
 if openai.flagged && openai.track === 'b':     return { outcome: 'track_b', categories: openai.categories }
-return                                                { outcome: 'pass' }
+return                                                { outcome: 'pass' }   # reachable only when !openai.flagged
 ```
 
 A PhotoDNA `csam_match` short-circuits the OpenAI verdict — Track A is the most-restrictive outcome, and CSAM hash match is more reliable than classifier inference for this category specifically.
