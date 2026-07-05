@@ -193,6 +193,10 @@ export async function insertEvent<T extends EventType>(
 			);
 			if (mismatch) {
 				// key NAMES only — payload values are PII and are NEVER logged.
+				// FUTURE-WORK GATE (AUDIT-FIX-B5 LOW-b): logging key names is PII-safe
+				// ONLY because every event payload today has fixed, code-defined keys.
+				// Re-evaluate this capture BEFORE any `z.record()` / user-controlled-key
+				// payload lands — such keys would leak user data through `differing_keys`.
 				safeCaptureException(new Error("event_id_reuse_payload_mismatch"), {
 					tags: {
 						kind: "event_id_reuse_payload_mismatch",
