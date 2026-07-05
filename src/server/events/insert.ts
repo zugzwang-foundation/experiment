@@ -132,49 +132,64 @@ export async function insertEvent<T extends EventType>(
 	// `ERR_INVALID_ARG_TYPE` at bind time. ISO-stringify keeps the
 	// deterministic UUIDv7-derived value (millisecond precision intact).
 	//
-	// `RETURNING event_id` (AUDIT-FIX-B5 / A30): the composite ON CONFLICT keeps
-	// the same-event_id retry idempotent (§7.3). On the happy path exactly one row
-	// returns and the guard below is skipped (no extra cost). A 0-row result means
-	// a row already existed — the drop is SILENT, so re-read the committed payload
-	// in this same tx and, if it diverges from the incoming one (a bug: the same
-	// event_id was reused for different state), fire a fail-open observability
-	// signal. A same-payload retry stays silent (the legitimate dedupe).
-	// `tx.execute` returns the driver RowList (postgres-js `Result extends Array`)
-	// — a numeric `.length`, 0 on the DO-NOTHING conflict path. The `?.length`
-	// guard also fail-opens on a minimal test double whose `execute` returns
-	// `undefined` (never a real driver shape): the observability check is simply
-	// skipped, never crashes the caller's transaction.
-	const inserted = (await tx.execute(sql`
-		INSERT INTO events
-			(event_id, event_type, aggregate_type, aggregate_id,
-			 payload, payload_version, metadata, created_at)
-		VALUES
-			(${input.eventId}::uuid, ${input.eventType},
-			 ${input.aggregateType}, ${input.aggregateId}::uuid,
-			 ${JSON.stringify(payloadResult.data)}::jsonb,
-			 ${input.payloadVersion ?? 1},
-			 ${JSON.stringify(metadataResult.data)}::jsonb,
-			 ${createdAt.toISOString()}::timestamptz)
-		ON CONFLICT (event_id, created_at) DO NOTHING
-		RETURNING event_id
-	`)) as unknown as { length: number } | undefined;
+	// AUDIT-FIX-B5 / A30 — the composite ON CONFLICT keeps the same-event_id retry
+	// idempotent (§7.3). The existing-payload read is FUSED into the write via a
+	// data-modifying CTE, so there is NO separate post-write statement: if the
+	// combined statement errors (40001 / statement_timeout / infra) it propagates
+	// exactly as the bare INSERT always could — the write didn't land, the tx can't
+	// commit its intended state anyway, and 40001 reaches the ADR-0013 retry
+	// unchanged. A bare two-statement re-SELECT would be a fail-open violation (an
+	// observability read could abort an otherwise-committable tx) and MUST NOT be
+	// reintroduced; `DO UPDATE` to fetch the row is likewise forbidden — a no-op
+	// UPDATE trips the §6 append-only BEFORE UPDATE trigger.
+	//
+	// `inserted_count` = rows the INSERT actually wrote (0 on the DO-NOTHING
+	// conflict path, else 1). `existing_payload` is the PRE-EXISTING committed row:
+	// a data-modifying CTE's insert is invisible to the outer SELECT (statement-
+	// start snapshot), so on a real insert it is NULL and the guard is skipped via
+	// `inserted_count >= 1`; on a conflict it is the row that caused the conflict.
+	// A conflict WITH `existing_payload` NULL is a DEFENSIVE belt, not a live path
+	// under the callers' fixed-snapshot isolation: SERIALIZABLE / REPEATABLE READ
+	// raise 40001 at the ON CONFLICT arbiter (→ ADR-0013 retry re-reads on a fresh
+	// snapshot that sees the row, the normal compare path); `comparePayloads(x,
+	// null)` → cannot-compare → silent covers only the residual microsecond race.
+	const rows = (await tx.execute(sql`
+		WITH ins AS (
+			INSERT INTO events
+				(event_id, event_type, aggregate_type, aggregate_id,
+				 payload, payload_version, metadata, created_at)
+			VALUES
+				(${input.eventId}::uuid, ${input.eventType},
+				 ${input.aggregateType}, ${input.aggregateId}::uuid,
+				 ${JSON.stringify(payloadResult.data)}::jsonb,
+				 ${input.payloadVersion ?? 1},
+				 ${JSON.stringify(metadataResult.data)}::jsonb,
+				 ${createdAt.toISOString()}::timestamptz)
+			ON CONFLICT (event_id, created_at) DO NOTHING
+			RETURNING 1 AS inserted
+		)
+		SELECT
+			(SELECT count(*) FROM ins)::int AS inserted_count,
+			(SELECT payload FROM events
+			   WHERE event_id = ${input.eventId}::uuid
+			     AND created_at = ${createdAt.toISOString()}::timestamptz) AS existing_payload
+	`)) as unknown as
+		| Array<{
+				inserted_count: number;
+				existing_payload: Record<string, unknown> | null;
+		  }>
+		| undefined;
 
-	if (inserted?.length === 0) {
-		const existing = (await tx.execute(sql`
-			SELECT payload FROM events
-			WHERE event_id = ${input.eventId}::uuid
-			  AND created_at = ${createdAt.toISOString()}::timestamptz
-		`)) as unknown as Array<{ payload: Record<string, unknown> }> | undefined;
-		// Fail-open (§17.5): the divergence check + capture is pure observability
-		// and MUST NOT alter the caller's control flow — swallow any throw. (The
-		// SELECT above is deliberately OUTSIDE this try: a serialization failure
-		// there must propagate to the ADR-0013 retry, and a DB error means the tx is
-		// already doomed. `payloadResult.data` is Zod-validated, so `canonicalize`
-		// cannot reach its NaN/Infinity/circular throw here — this is a belt.)
+	// Fail-open (§17.5): ONLY the pure compare + capture is guarded — NO DB call
+	// inside the try, NO separate re-SELECT anywhere. A minimal test double whose
+	// `execute` returns undefined leaves `row` undefined → guard skipped, never
+	// crashes the caller's transaction.
+	const row = rows?.[0];
+	if (row && row.inserted_count === 0) {
 		try {
 			const { mismatch, divergentKeys } = comparePayloads(
 				payloadResult.data as Record<string, unknown>,
-				existing?.[0]?.payload ?? null,
+				row.existing_payload ?? null,
 			);
 			if (mismatch) {
 				// key NAMES only — payload values are PII and are NEVER logged.
@@ -198,8 +213,8 @@ export async function insertEvent<T extends EventType>(
  * so jsonb key-order is irrelevant — a raw string compare would false-mismatch.
  * Returns whether the incoming payload diverges from the committed one and the
  * NAMES of the top-level keys that differ (values are PII — never surfaced).
- * `existing === null` (a re-SELECT found no row — the conflicting row committed
- * outside this snapshot) is cannot-compare → no mismatch (fail-open).
+ * `existing === null` (the fused CTE read found no row — the conflicting row
+ * committed outside this snapshot) is cannot-compare → no mismatch (fail-open).
  */
 export function comparePayloads(
 	incoming: Record<string, unknown>,

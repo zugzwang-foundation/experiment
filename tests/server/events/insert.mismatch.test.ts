@@ -150,4 +150,33 @@ describe("AUDIT-FIX-B5 (A30) insertEvent — event_id-reuse payload guard", () =
 			SELECT COUNT(*)::text AS count FROM events WHERE event_id = ${eventId}`;
 		expect(rows[0]?.count).toBe("1");
 	});
+
+	it("happy-path real insert (no conflict) → inserted_count >= 1, guard skipped, no capture", async () => {
+		// The fused CTE runs its `existing_payload` subquery on EVERY call — including
+		// a fresh insert. On a real insert the just-written row is invisible to the
+		// statement-start snapshot, so `existing_payload` comes back NULL; the guard
+		// is skipped PURELY via `inserted_count >= 1`, so NO capture fires despite the
+		// NULL. This locks behaviour 4 in isolation: the redesign made the happy path
+		// traverse the existing-payload read that the superseded two-statement design
+		// skipped, so the `inserted_count >= 1` skip branch is a NEW code path.
+		const eventId = uuidv7();
+		const uploadId = uuidv7();
+		await expect(
+			testDb.transaction((tx) =>
+				insertEvent(tx, {
+					eventId,
+					eventType: "image_upload.orphaned",
+					aggregateType: "image_upload",
+					aggregateId: uploadId,
+					payload: { uploadId, key: "k-fresh" },
+					metadata: baseMetadata(),
+				}),
+			),
+		).resolves.toBeUndefined();
+
+		expect(mockSafeCaptureException).not.toHaveBeenCalled();
+		const rows = await testClient<{ count: string }[]>`
+			SELECT COUNT(*)::text AS count FROM events WHERE event_id = ${eventId}`;
+		expect(rows[0]?.count).toBe("1");
+	});
 });
