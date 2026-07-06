@@ -6,6 +6,10 @@ import { v7 as uuidv7 } from "uuid";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendVerificationOTP } from "@/server/auth/email-otp";
+import {
+	emitPseudonymAssignedEvent,
+	emitSignedInEvent,
+} from "@/server/auth/post-commit-events";
 import { createSessionGate } from "@/server/auth/session-gate";
 import { consumeIdentityPoolTuple } from "@/server/identity-pool/consume";
 import {
@@ -322,6 +326,13 @@ export const auth = betterAuth({
 						},
 					};
 				},
+				// AUDIT-FIX-A22 — `user.pseudonym_assigned` emit. Better Auth
+				// drains create.after hooks POST-COMMIT (never in-tx), so this
+				// is a §7.5.1 sub-case-(b) carve-out with a verify-then-emit
+				// fabrication guard; full justification in post-commit-events.ts.
+				after: async (user: { id: string }) => {
+					await emitPseudonymAssignedEvent(user);
+				},
 			},
 		},
 		session: {
@@ -332,6 +343,16 @@ export const auth = betterAuth({
 				// catch-all route at src/app/api/auth/[...all]/route.ts matches
 				// on to emit the signed onboarding_ref cookie + redirect.
 				before: createSessionGate(db),
+				// AUDIT-FIX-A22 — `user.oauth_signed_in` / `user.otp_signed_in`
+				// emit, discriminated on the endpoint path. Same §7.5.1
+				// sub-case-(b) post-commit carve-out + fabrication guard;
+				// justification in post-commit-events.ts.
+				after: async (
+					session: { id: string },
+					ctx: { path?: string } | null | undefined,
+				) => {
+					await emitSignedInEvent(session, ctx);
+				},
 			},
 		},
 	},
