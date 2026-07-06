@@ -349,3 +349,15 @@ The identity-pool tuple is consumed in Better Auth's `user.create.before` hook (
 **Originating task:** AUDIT-FIX-A22 (PR #207, squash `b15a7f5`, 2026-07-06) — operator-ruled close-out filing; body verbatim from the close-out kickoff.
 
 F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open plain `db.transaction(...)` at default isolation, not the SERIALIZABLE the spec previously claimed (reconciled to default in SPEC.2 §3.5/§16 at A22). The double-assignment guard is the `FOR UPDATE SKIP LOCKED` row-lock, which holds at default isolation. Open correctness question: confirm default is sufficient for both flows (vs promoting to SERIALIZABLE), in particular any read-modify-write in the ToS-acceptance/grant path. Distinct from the W-1/W-3 bet/resolution wrappers, which are correctly SERIALIZABLE per ADR-0013 and out of scope here. Not scheduled.
+
+## AUDIT-FIX-B7b security-auditor SURPRISE — XFF-spoofable `extractIp()` (rate-limit key + `events.metadata.ip`)
+
+**Originating task:** AUDIT-FIX-B7b directed security audit (PR #213, squash `a66d359`, 2026-07-07) — out-of-scope SURPRISE per §5.11: **pre-existing, byte-identical to base `8ef34d4`, not touched by the B7b diff**; recorded, not absorbed.
+
+**Deferred work.** Both sign routes derive the client IP for rate-limit bucketing AND for the append-only `events.metadata.ip` from a local `extractIp()` = LEFTMOST `x-forwarded-for` token (`src/app/api/uploads/sign/route.ts` ~:70; `src/app/(admin)/admin/markets/media/sign/route.ts` ~:90), which is client-controllable when chained — the per-IP mint caps (`imagePutUrlPerIp` / `adminMediaPutUrlPerIp`) are evadable by header rotation and the recorded IP is spoofable. The same local-helper pattern exists in `src/server/bets/endpoint.ts` (~:100, `betPerIp`). Fix direction: switch to Vercel's trusted `ipAddress()` (the parser `logRequest` already uses) or rightmost-hop parsing. **Same class as the SCAFFOLD.3-FOLLOWUP-1 security-auditor SURPRISE-1 row above** (auth `ipFromCtx`) — one HARDEN task should sweep all four call sites in one pass.
+
+**Why deferred.** Pre-existing surface, out of B7b's five-finding scope. Mitigants bound the damage: rate-limit fails open by design (ADR-0015) so the cap is already advisory; the admin route requires a valid admin session before its rate-limit arm; the `logRequest` PII audit path uses the trusted `ipAddress()` parser, not `extractIp`.
+
+**Conditional trigger.** HARDEN.* pre-launch security pass (fires together with the SCAFFOLD.3-FOLLOWUP-1 SURPRISE-1 row), OR first observed abuse pattern hitting a per-IP cap.
+
+**Expected next task.** The same HARDEN task as SURPRISE-1 — a single trusted-IP sweep across `ipFromCtx` + the three `extractIp` copies.
