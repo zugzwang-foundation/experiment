@@ -335,3 +335,15 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 **Conditional trigger.** Fast-follow after B2 merges (next maintenance window), OR any `dharma_chain_drift` alarm whose payload derivation is ambiguous, OR pre-launch HARDEN detector pass.
 
 **Expected next task.** Dedicated fast-follow stratum (AUDIT-FIX-B2-FOLLOWUP or HARDEN.* detector pass).
+
+## AUDIT-FIX-A22 [FU-1] — pool-consumption / user-insert non-atomicity (auth signup)
+
+**Originating task:** AUDIT-FIX-A22 (PR #207, squash `b15a7f5`, 2026-07-06) — operator-ruled close-out filing; body verbatim from the close-out kickoff.
+
+The identity-pool tuple is consumed in Better Auth's `user.create.before` hook (`identity-pool/consume.ts`, its own tx) and Better Auth's adapter INSERTs the `users` row separately — not one atomic transaction. A `users` INSERT that fails after the tuple is consumed leaves it marked `assigned_at` with no owning user: a burned pseudonym. Pre-existing property of the built architecture; recorded as an observation in SPEC.2 §3.5. A22 added audit-log completeness, not atomicity. Options at pickup: (i) move pool consumption into a we-own-it transaction that also inserts the user (the §3.5-original single-tx shape — larger refactor); (ii) a reconciliation pass reclaiming ownerless tuples; (iii) accept-for-experiment (bounded: finite pool, low INSERT-failure rate, 5% low-watermark alarm) and revisit at mainnet. Not scheduled; no live consequence unless the pool depletes.
+
+## AUDIT-FIX-A22 [FU-2] — default-vs-SERIALIZABLE isolation on the two auth transactions
+
+**Originating task:** AUDIT-FIX-A22 (PR #207, squash `b15a7f5`, 2026-07-06) — operator-ruled close-out filing; body verbatim from the close-out kickoff.
+
+F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open plain `db.transaction(...)` at default isolation, not the SERIALIZABLE the spec previously claimed (reconciled to default in SPEC.2 §3.5/§16 at A22). The double-assignment guard is the `FOR UPDATE SKIP LOCKED` row-lock, which holds at default isolation. Open correctness question: confirm default is sufficient for both flows (vs promoting to SERIALIZABLE), in particular any read-modify-write in the ToS-acceptance/grant path. Distinct from the W-1/W-3 bet/resolution wrappers, which are correctly SERIALIZABLE per ADR-0013 and out of scope here. Not scheduled.
