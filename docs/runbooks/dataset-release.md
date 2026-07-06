@@ -37,10 +37,10 @@ DATASET.* / HARDEN.*.
    freeze is the system-level write boundary; CC cannot bypass per
    CLAUDE.md §3 refusal trigger. Manual operator UPDATE only.
 
-5. **Disable participant-side write paths.** Per SPEC.2 §3.5 the
+5. **Disable participant-side write paths.** Per SPEC.2 §20.2 the
    handler-layer guard checks `frozen_at IS NOT NULL` and returns
-   `error_system_frozen` for any state-mutating handler. Verify via
-   curl spot-check of a bet endpoint → 503.
+   `error_experiment_concluded` for any state-mutating handler. Verify
+   via curl spot-check of a bet endpoint → 410.
 
 ## Pre-export (2026-11-06 morning)
 
