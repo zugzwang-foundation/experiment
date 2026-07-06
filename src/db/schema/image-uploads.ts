@@ -33,9 +33,12 @@ export const imageUploads = pgTable(
 			.references(() => users.id, { onDelete: "restrict" }),
 		r2ObjectKey: text("r2_object_key").notNull(),
 		// SCAFFOLD.15 §3.2 — operational columns added by 0006.
-		// CHECK (byte_size > 0 AND byte_size <= 8388608) lives in 0006 SQL;
-		// Drizzle 0.45 pgTable doesn't surface CHECK natively, so the
-		// constraint is migration-only.
+		// CHECK (byte_size > 0 AND byte_size <= 8388608) lives in 0006 SQL,
+		// which is hand-written — the drizzle snapshot doesn't know it.
+		// Drizzle CAN express this (`check()`, see positions in bets.ts), but
+		// declaring it here would make drizzle-kit diff it against the
+		// snapshot and emit a duplicate-constraint migration; pgTable↔DDL
+		// parity is deliberately deferred (AUDIT-FIX-B7b A33).
 		contentType: text("content_type").notNull(),
 		byteSize: integer("byte_size").notNull(),
 		terminalState: imageTerminalStateEnum("terminal_state"),

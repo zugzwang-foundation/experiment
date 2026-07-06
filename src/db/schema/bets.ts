@@ -97,6 +97,11 @@ export const positions = pgTable(
 		),
 		index("positions_user_market_idx").on(table.userId, table.marketId),
 		index("positions_user_id_idx").on(table.userId),
+		// AUDIT-FIX-B7b A31: the W-3 settle/correct/void flows read ALL position
+		// rows by market_id alone (no side predicate — side is a selected column);
+		// also closes the AGENTS.md §6 FK-index convention gap on the market_id
+		// FK (bets_market_id_idx / bet_receipts_market_id_idx precedent).
+		index("positions_market_id_idx").on(table.marketId),
 		// ENGINE.11 R-5: structural single-side — at most one HELD (quantity>0)
 		// row per (user,market). Partial unique index (bets_idempotency_key_idx
 		// precedent). The built positions_user_market_side_idx still permits both

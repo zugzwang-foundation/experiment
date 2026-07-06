@@ -10,6 +10,11 @@ import {
 } from "@/lib/errors";
 import { auth } from "@/server/auth";
 import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
+import {
+	envelope,
+	jsonResponse,
+	resolveRequestId,
+} from "@/server/middleware/envelope";
 import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
@@ -41,7 +46,13 @@ import { signUploadAndInsert } from "@/server/storage/sign-upload";
 // while a retry within the same handler invocation would reuse the captured
 // id and the composite-PK ON CONFLICT dedupes on retry.
 //
-// Returns `{ uploadId, putUrl, key }` JSON HTTP 200 on the happy path.
+// Wire contract (SPEC.2 §4.4, AUDIT-FIX-B7b A29): happy path returns
+// `{ ok: true, data: { uploadId, putUrl, key } }` HTTP 200; every rejection
+// returns `{ ok: false, error: { code, message, retry_after? } }` with
+// `retry_after` in the body only on 429/503; every response carries an
+// `X-Request-Id` header (echo-or-mint via the shared
+// src/server/middleware/envelope.ts helpers). Error CODE strings unchanged
+// (shape-only migration; the error_origin_rejected rename rides ENGINE.8 Q4).
 
 interface SignRequestBody {
 	contentType: string;
@@ -65,28 +76,27 @@ function extractIp(request: Request): string {
 	return "unknown";
 }
 
-function jsonResponse(body: unknown, init: ResponseInit): Response {
-	return new Response(JSON.stringify(body), {
-		...init,
-		headers: {
-			"content-type": "application/json",
-			...(init.headers ?? {}),
-		},
-	});
-}
-
 export async function POST(request: Request): Promise<Response> {
 	const startedAt = Date.now();
+	const requestId = resolveRequestId(request);
 
 	// 1. Origin allowlist (per SPEC.2 §4.1 amendment)
 	if (!checkOrigin(request)) {
-		return jsonResponse({ error: "error_origin_rejected" }, { status: 403 });
+		return jsonResponse(
+			requestId,
+			403,
+			envelope("error_origin_rejected", "origin not allowed"),
+		);
 	}
 
 	// 2. Auth gate — session presence + onboarding-complete
 	const session = await auth.api.getSession({ headers: request.headers });
 	if (!session?.user?.id) {
-		return jsonResponse({ error: "error_unauthenticated" }, { status: 401 });
+		return jsonResponse(
+			requestId,
+			401,
+			envelope("error_unauthenticated", "session required"),
+		);
 	}
 	const user = await db.query.users.findFirst({
 		where: eq(users.id, session.user.id),
@@ -94,8 +104,9 @@ export async function POST(request: Request): Promise<Response> {
 	});
 	if (!user?.pseudonym || !user?.tosAcceptedAt) {
 		return jsonResponse(
-			{ error: "error_onboarding_required" },
-			{ status: 403 },
+			requestId,
+			403,
+			envelope("error_onboarding_required", "onboarding required"),
 		);
 	}
 
@@ -106,11 +117,14 @@ export async function POST(request: Request): Promise<Response> {
 	const rl = await checkRateLimit("imagePutUrlPerIp", ipIdentifier(ip));
 	if (!rl.allowed) {
 		return jsonResponse(
-			{ error: "error_rate_limit_exceeded" },
-			{
-				status: 429,
-				headers: { "retry-after": String(rl.retryAfter) },
-			},
+			requestId,
+			429,
+			envelope(
+				"error_rate_limit_exceeded",
+				"rate limit exceeded",
+				rl.retryAfter,
+			),
+			rl.retryAfter,
 		);
 	}
 
@@ -125,25 +139,31 @@ export async function POST(request: Request): Promise<Response> {
 		raw = await request.json();
 	} catch {
 		log(400);
-		return jsonResponse({ error: "error_invalid_json" }, { status: 400 });
+		return jsonResponse(
+			requestId,
+			400,
+			envelope("error_invalid_json", "invalid JSON body"),
+		);
 	}
 	const parsed = parseBody(raw);
 	if (!parsed) {
 		log(400);
 		return jsonResponse(
-			{ error: "error_invalid_request_body" },
-			{ status: 400 },
+			requestId,
+			400,
+			envelope("error_invalid_request_body", "invalid request body"),
 		);
 	}
 
 	// 6. Handler body — tx wraps signUploadAndInsert (INSERT + sync emit).
 	// `eventId` generated here at handler entry per ADR-0016 D1 + ENGINE.6
 	// plan V6. `metadata` carries the 7-field set per SPEC.2 §3.7;
-	// `request_id`/`user_agent` placeholders 'unknown' pending HARDEN.*
-	// request-context middleware (S-C deferral).
+	// `request_id` carries the §4.4 resolved id (AUDIT-FIX-B7b OD-1) so the
+	// echoed X-Request-Id actually correlates; `user_agent` falls back to
+	// 'unknown' pending HARDEN.* request-context middleware (S-C deferral).
 	const eventId = uuidv7();
 	const metadata = {
-		request_id: "unknown",
+		request_id: requestId,
 		flow_id: "F-COMMENT-3",
 		user_id: session.user.id,
 		actor_id: session.user.id,
@@ -181,27 +201,39 @@ export async function POST(request: Request): Promise<Response> {
 			{ ifNoneMatch: true },
 		);
 		log(200);
-		return jsonResponse(
-			{ uploadId: result.uploadId, putUrl, key: result.key },
-			{ status: 200 },
-		);
+		return jsonResponse(requestId, 200, {
+			ok: true,
+			data: { uploadId: result.uploadId, putUrl, key: result.key },
+		});
 	} catch (err) {
+		// `toEnvelope()` stays the code-string source (lib/errors.ts untouched);
+		// the §4.4 shape wraps it with a display message.
 		if (err instanceof ImageMimeRejectedError) {
 			log(400);
-			return jsonResponse(err.toEnvelope(), { status: 400 });
+			return jsonResponse(
+				requestId,
+				400,
+				envelope(err.toEnvelope().error, "unsupported image type"),
+			);
 		}
 		if (err instanceof ImageOversizeError) {
 			log(400);
-			return jsonResponse(err.toEnvelope(), { status: 400 });
+			return jsonResponse(
+				requestId,
+				400,
+				envelope(err.toEnvelope().error, "image too large"),
+			);
 		}
 		if (err instanceof StorageUnavailableError) {
 			// Retry-After per SPEC.2 §11 fail-CLOSED convention. 5s matches the
 			// idempotency-cache 503 surface; tunable in HARDEN.5 if needed.
 			log(503);
-			return jsonResponse(err.toEnvelope(), {
-				status: 503,
-				headers: { "retry-after": "5" },
-			});
+			return jsonResponse(
+				requestId,
+				503,
+				envelope(err.toEnvelope().error, "storage unavailable", 5),
+				5,
+			);
 		}
 		// Crash path — unlogged (Next onRequestError → Sentry owns it).
 		throw err;

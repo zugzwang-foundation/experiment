@@ -5,7 +5,10 @@ import { Resend } from "resend";
 // SCAFFOLD.14 close-out: `onboarding@resend.dev` only delivers to
 // `zugzwangworld@proton.me` until Resend domain verification ships
 // (tracked in docs/parked.md under the Resend `RESEND_FROM_EMAIL` flip
-// follow-up).
+// follow-up). AUDIT-FIX-B7b A35: in prod the sandbox fallback is REFUSED —
+// an unset RESEND_FROM_EMAIL throws at send time (mirroring the
+// RESEND_API_KEY fail-fast below) as the backstop to the boot-time gate in
+// instrumentation.ts; staging/preview keep the sandbox fallback.
 
 export type SendVerificationOTPArgs = {
 	email: string;
@@ -20,8 +23,16 @@ export async function sendVerificationOTP(
 	if (!apiKey) {
 		throw new Error("RESEND_API_KEY not set; cannot send verification OTP");
 	}
+	// A35 send-time backstop (boot gate in instrumentation.ts): unset/empty in
+	// prod → throw rather than silently fall back to the sandbox sender.
+	const fromEnv = process.env.RESEND_FROM_EMAIL;
+	if (!fromEnv && process.env.ZUGZWANG_ENV === "prod") {
+		throw new Error(
+			"RESEND_FROM_EMAIL not set; refusing the sandbox fallback sender in prod — cannot send verification OTP",
+		);
+	}
 	const resend = new Resend(apiKey);
-	const from = process.env.RESEND_FROM_EMAIL ?? "onboarding@resend.dev";
+	const from = fromEnv || "onboarding@resend.dev";
 
 	const result = await resend.emails.send({
 		from,

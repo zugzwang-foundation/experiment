@@ -21,10 +21,10 @@ interface MediaEntry {
 	fileName: string;
 }
 
+// The sign route speaks the SPEC.2 §4.4 envelope (AUDIT-FIX-B7b A29).
 interface SignResponse {
-	mediaId: string;
-	putUrl: string;
-	key: string;
+	ok: true;
+	data: { mediaId: string; putUrl: string; key: string };
 }
 
 export function CreateMarketForm({
@@ -62,11 +62,13 @@ export function CreateMarketForm({
 				});
 				if (!signRes.ok) {
 					const body = (await signRes.json().catch(() => null)) as {
-						error?: string;
+						error?: { code?: string };
 					} | null;
-					throw new Error(body?.error ?? "sign_failed");
+					throw new Error(body?.error?.code ?? "sign_failed");
 				}
-				const { mediaId, putUrl, key } = (await signRes.json()) as SignResponse;
+				const { mediaId, putUrl, key } = (
+					(await signRes.json()) as SignResponse
+				).data;
 				const putRes = await fetch(putUrl, {
 					method: "PUT",
 					headers: { "content-type": file.type },

@@ -9,6 +9,11 @@ import {
 	PUT_URL_TTL_SECONDS,
 } from "@/server/config/limits";
 import { isUuidV7 } from "@/server/markets/media";
+import {
+	envelope,
+	jsonResponse,
+	resolveRequestId,
+} from "@/server/middleware/envelope";
 import { logRequest } from "@/server/middleware/logging";
 import { checkOrigin } from "@/server/middleware/origin-allowlist";
 import { checkRateLimit, ipIdentifier } from "@/server/middleware/rate-limit";
@@ -45,7 +50,15 @@ import { mintPutUrl } from "@/server/storage/r2";
 //
 // Handler order: origin allowlist → admin session → per-IP rate cap → body
 // validate (UUIDv7 marketId + MIME/size upload hygiene — validation, NOT
-// moderation) → mint. Returns `{ mediaId, putUrl, key }` HTTP 200 on success.
+// moderation) → mint.
+//
+// Wire contract (SPEC.2 §4.4, AUDIT-FIX-B7b A29): success returns
+// `{ ok: true, data: { mediaId, putUrl, key } }` HTTP 200; every rejection
+// returns `{ ok: false, error: { code, message, retry_after? } }` with
+// `retry_after` in the body only on 429/503; every response carries an
+// `X-Request-Id` header (echo-or-mint via the shared
+// src/server/middleware/envelope.ts helpers). Error CODE strings unchanged
+// (shape-only migration; the error_origin_rejected rename rides ENGINE.8 Q4).
 
 type AllowedMime = (typeof IMAGE_UPLOADS_ALLOWED_MIME)[number];
 
@@ -83,27 +96,26 @@ function extractIp(request: Request): string {
 	return "unknown";
 }
 
-function jsonResponse(body: unknown, init: ResponseInit): Response {
-	return new Response(JSON.stringify(body), {
-		...init,
-		headers: {
-			"content-type": "application/json",
-			...(init.headers ?? {}),
-		},
-	});
-}
-
 export async function POST(request: Request): Promise<Response> {
 	const startedAt = Date.now();
+	const requestId = resolveRequestId(request);
 
 	// 1. Origin allowlist (CSRF defense per SPEC.2 §4.1).
 	if (!checkOrigin(request)) {
-		return jsonResponse({ error: "error_origin_rejected" }, { status: 403 });
+		return jsonResponse(
+			requestId,
+			403,
+			envelope("error_origin_rejected", "origin not allowed"),
+		);
 	}
 
 	// 2. Admin session gate (Layer-2, SA-I-1). Zero side effects on reject.
 	if (!(await requireAdminSession())) {
-		return jsonResponse({ error: "admin_session_required" }, { status: 401 });
+		return jsonResponse(
+			requestId,
+			401,
+			envelope("admin_session_required", "admin session required"),
+		);
 	}
 
 	// 3. Per-IP rate cap on the URL mint (anti-abuse, NOT moderation).
@@ -111,8 +123,14 @@ export async function POST(request: Request): Promise<Response> {
 	const rl = await checkRateLimit("adminMediaPutUrlPerIp", ipIdentifier(ip));
 	if (!rl.allowed) {
 		return jsonResponse(
-			{ error: "error_rate_limit_exceeded" },
-			{ status: 429, headers: { "retry-after": String(rl.retryAfter) } },
+			requestId,
+			429,
+			envelope(
+				"error_rate_limit_exceeded",
+				"rate limit exceeded",
+				rl.retryAfter,
+			),
+			rl.retryAfter,
 		);
 	}
 
@@ -129,27 +147,37 @@ export async function POST(request: Request): Promise<Response> {
 		raw = await request.json();
 	} catch {
 		log(400);
-		return jsonResponse({ error: "error_invalid_json" }, { status: 400 });
+		return jsonResponse(
+			requestId,
+			400,
+			envelope("error_invalid_json", "invalid JSON body"),
+		);
 	}
 	const parsed = parseBody(raw);
 	if (!parsed) {
 		log(400);
 		return jsonResponse(
-			{ error: "error_invalid_request_body" },
-			{ status: 400 },
+			requestId,
+			400,
+			envelope("error_invalid_request_body", "invalid request body"),
 		);
 	}
 	// The client-supplied marketId is the pre-generated PK (a trust boundary,
 	// Q3) — reject anything not a well-formed UUIDv7.
 	if (!isUuidV7(parsed.marketId)) {
 		log(400);
-		return jsonResponse({ error: "error_invalid_market_id" }, { status: 400 });
+		return jsonResponse(
+			requestId,
+			400,
+			envelope("error_invalid_market_id", "invalid market id"),
+		);
 	}
 	if (!isAllowedMime(parsed.contentType)) {
 		log(400);
 		return jsonResponse(
-			{ error: "error_image_mime_rejected" },
-			{ status: 400 },
+			requestId,
+			400,
+			envelope("error_image_mime_rejected", "unsupported image type"),
 		);
 	}
 	if (
@@ -158,7 +186,11 @@ export async function POST(request: Request): Promise<Response> {
 		parsed.byteSize > IMAGE_UPLOADS_MAX_BYTES
 	) {
 		log(400);
-		return jsonResponse({ error: "error_image_oversize" }, { status: 400 });
+		return jsonResponse(
+			requestId,
+			400,
+			envelope("error_image_oversize", "image too large"),
+		);
 	}
 
 	// 5. Mint — server-generated mediaId + key in the `m/<marketId>/` namespace
@@ -175,14 +207,21 @@ export async function POST(request: Request): Promise<Response> {
 			PUT_URL_TTL_SECONDS,
 		);
 		log(200);
-		return jsonResponse({ mediaId, putUrl, key }, { status: 200 });
+		return jsonResponse(requestId, 200, {
+			ok: true,
+			data: { mediaId, putUrl, key },
+		});
 	} catch (err) {
 		if (err instanceof StorageUnavailableError) {
+			// `toEnvelope()` stays the code-string source (lib/errors.ts
+			// untouched); the §4.4 shape wraps it with a display message.
 			log(503);
-			return jsonResponse(err.toEnvelope(), {
-				status: 503,
-				headers: { "retry-after": "5" },
-			});
+			return jsonResponse(
+				requestId,
+				503,
+				envelope(err.toEnvelope().error, "storage unavailable", 5),
+				5,
+			);
 		}
 		// Crash path — unlogged (Next onRequestError → Sentry owns it).
 		throw err;
