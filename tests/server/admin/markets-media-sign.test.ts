@@ -129,8 +129,8 @@ describe("POST /admin/markets/media/sign", () => {
 			}),
 		);
 		expect(res.status).toBe(401);
-		const body = (await res.json()) as { error: string };
-		expect(body.error).toBe("admin_session_required");
+		const body = (await res.json()) as { error: { code: string } };
+		expect(body.error.code).toBe("admin_session_required");
 		expect(mockMintPutUrl).not.toHaveBeenCalled();
 	});
 
@@ -148,8 +148,8 @@ describe("POST /admin/markets/media/sign", () => {
 			}),
 		);
 		expect(res.status).toBe(429);
-		const body = (await res.json()) as { error: string };
-		expect(body.error).toBe("error_rate_limit_exceeded");
+		const body = (await res.json()) as { error: { code: string } };
+		expect(body.error.code).toBe("error_rate_limit_exceeded");
 		expect(res.headers.get("retry-after")).toBe("30");
 		expect(mockMintPutUrl).not.toHaveBeenCalled();
 	});
@@ -179,8 +179,8 @@ describe("POST /admin/markets/media/sign", () => {
 			}),
 		);
 		expect(res.status).toBe(400);
-		const body = (await res.json()) as { error: string };
-		expect(body.error).toBe("error_image_mime_rejected");
+		const body = (await res.json()) as { error: { code: string } };
+		expect(body.error.code).toBe("error_image_mime_rejected");
 		expect(mockMintPutUrl).not.toHaveBeenCalled();
 	});
 
@@ -194,8 +194,8 @@ describe("POST /admin/markets/media/sign", () => {
 			}),
 		);
 		expect(res.status).toBe(400);
-		const body = (await res.json()) as { error: string };
-		expect(body.error).toBe("error_image_oversize");
+		const body = (await res.json()) as { error: { code: string } };
+		expect(body.error.code).toBe("error_image_oversize");
 		expect(mockMintPutUrl).not.toHaveBeenCalled();
 	});
 
@@ -209,8 +209,8 @@ describe("POST /admin/markets/media/sign", () => {
 			}),
 		);
 		expect(res.status).toBe(400);
-		const body = (await res.json()) as { error: string };
-		expect(body.error).toBe("error_image_oversize");
+		const body = (await res.json()) as { error: { code: string } };
+		expect(body.error.code).toBe("error_image_oversize");
 		expect(mockMintPutUrl).not.toHaveBeenCalled();
 	});
 
@@ -232,22 +232,20 @@ describe("POST /admin/markets/media/sign", () => {
 		);
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as {
-			mediaId: string;
-			putUrl: string;
-			key: string;
+			data: { mediaId: string; putUrl: string; key: string };
 		};
 
 		// mediaId is a SERVER-generated UUIDv7, never the client-smuggled value.
-		expect(body.mediaId).not.toBe("attacker-supplied-id");
-		expect(body.mediaId).toMatch(UUID_V7_RE);
+		expect(body.data.mediaId).not.toBe("attacker-supplied-id");
+		expect(body.data.mediaId).toMatch(UUID_V7_RE);
 		// key is m/<marketId>/<mediaId>.<ext> with the SERVER mediaId.
-		expect(body.key).toBe(`m/${marketId}/${body.mediaId}.jpg`);
-		expect(body.putUrl).toBe(STUB_PUT_URL);
+		expect(body.data.key).toBe(`m/${marketId}/${body.data.mediaId}.jpg`);
+		expect(body.data.putUrl).toBe(STUB_PUT_URL);
 
 		// Bound to the third R2 arm + the server key + the SPEC TTL.
 		expect(mockMintPutUrl).toHaveBeenCalledWith(
 			"market-media",
-			`m/${marketId}/${body.mediaId}.jpg`,
+			`m/${marketId}/${body.data.mediaId}.jpg`,
 			"image/jpeg",
 			PUT_URL_TTL_SECONDS,
 		);

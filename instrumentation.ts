@@ -42,6 +42,22 @@ export async function register(): Promise<void> {
 		);
 	}
 
+	// AUDIT-FIX-B7b A35: RESEND_FROM_EMAIL presence gate, PROD ONLY. The
+	// email-otp sender silently falls back to Resend's sandbox
+	// `onboarding@resend.dev`, which delivers only to the operator inbox — in
+	// prod that breaks every participant OTP sign-in, so absence fails the
+	// staged deploy at cold boot (same posture as the gates above; the
+	// pre-promote /api/health gate catches it before traffic). `staging` is
+	// deliberately EXEMPT — its sandbox sender is the documented state until
+	// the parked SCAFFOLD.12 §10.b Resend domain-verification/sender flip;
+	// preview/local/CI have no delivery expectations. Send-time backstop in
+	// src/server/auth/email-otp.ts (LD-10 two-lines-of-defense).
+	if (env === "prod" && !process.env.RESEND_FROM_EMAIL) {
+		throw new Error(
+			'instrumentation.register: RESEND_FROM_EMAIL is required when ZUGZWANG_ENV="prod" — the sandbox fallback sender delivers only to the operator inbox (SCAFFOLD.14 caveat)',
+		);
+	}
+
 	if (process.env.NEXT_RUNTIME === "nodejs") {
 		await import("./sentry.server.config");
 	}

@@ -162,6 +162,13 @@
       "when": 1783177160596,
       "tag": "0022_bet_receipts",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783366835710,
+      "tag": "0023_positions_market_id_idx",
+      "breakpoints": true
     }
   ]
 }

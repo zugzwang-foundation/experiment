@@ -1,0 +1,1 @@
+CREATE INDEX "positions_market_id_idx" ON "positions" USING btree ("market_id");
