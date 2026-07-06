@@ -61,11 +61,23 @@ vi.mock("@/server/moderation/precommit", () => ({
 
 import { POST as placePOST } from "@/app/api/bets/place/route";
 import { POST as sellPOST } from "@/app/api/bets/sell/route";
-import { dharmaLedger, markets, pools, positions, users } from "@/db/schema";
+import {
+	bets,
+	comments,
+	dharmaLedger,
+	markets,
+	pools,
+	positions,
+	users,
+} from "@/db/schema";
 // ENGINE.12 (RC9): greenfield constant import — the insufficient_dharma
 // fixture must clear the POST-credit pre-check (balance + credit < stake),
 // derived from the live constant so HARDEN.5 retunes keep it honest.
-import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
+// AUDIT-FIX-B7a: COMMENT_MAX_LENGTH pins the A24 upper-bound-on-raw boundary.
+import {
+	COMMENT_MAX_LENGTH,
+	DAILY_CREDIT_DHARMA,
+} from "@/server/config/limits";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
@@ -418,5 +430,177 @@ describe("ENGINE.8 F-BET — rejection matrix", () => {
 			.from(positions)
 			.where(eq(positions.marketId, marketId));
 		expect(positionRows.length).toBe(0);
+	});
+});
+
+// === AUDIT-FIX-B7a / A24 — whitespace-only comment bodies =================
+//
+// SPEC.1 F-BET-1 C.length rider (2026-07-06): the LOWER bound is evaluated on
+// the whitespace-TRIMMED comment text — a whitespace-only body is an absent
+// argument and rejects `comment_requires_bet` per F-COMMENT-5 (INV-1: no bet
+// whose argument is visually absent). The UPPER bound (`comment_too_long`) and
+// the STORED value are the submitted (RAW) text, byte-identical to the text
+// moderated (moderated ≡ stored). Trim is JS String.prototype.trim() (Unicode
+// WhiteSpace + LineTerminator).
+//
+// RED (pre-impl — route.ts step-5 gates only `body.length === 0`): cases 1–3
+// pass the gate today → moderation runs + a bet/comment/ledger triple mints, so
+// the 400 / no-writes / moderation-not-called assertions FAIL. Cases 4–6 + the
+// raw-storage pins are regression GREEN against current code (the emptiness gate
+// already lets a padded-non-empty body through, the upper bound already runs on
+// raw, and the comment is already stored raw) — they guard against an over-trim
+// "fix" that trims the moderated/stored body or moves the upper bound onto the
+// trimmed length.
+describe("AUDIT-FIX-B7a A24 — whitespace comment semantics", () => {
+	beforeEach(() => {
+		vi.clearAllMocks();
+		mockPrecommit.mockResolvedValue({ outcome: "pass", categories: [] });
+	});
+	afterEach(async () => {
+		await truncateTables(testClient, [
+			"events",
+			"dharma_ledger",
+			"bets",
+			"comments",
+			"positions",
+			"pools",
+			"markets",
+			"users",
+		]);
+	});
+
+	// The W-1 tx never opens: zero bet / comment / dharma_ledger rows for the
+	// user (NO seedDharmaGrant on these cases → an empty ledger means "no
+	// daily_allowance accrual either", not just "no stake row").
+	async function assertNoWrites(userId: string): Promise<void> {
+		const betRows = await testDb
+			.select({ id: bets.id })
+			.from(bets)
+			.where(eq(bets.userId, userId));
+		const commentRows = await testDb
+			.select({ id: comments.id })
+			.from(comments)
+			.where(eq(comments.userId, userId));
+		const ledgerRows = await testDb
+			.select({ id: dharmaLedger.id })
+			.from(dharmaLedger)
+			.where(eq(dharmaLedger.userId, userId));
+		expect(betRows.length).toBe(0);
+		expect(commentRows.length).toBe(0);
+		expect(ledgerRows.length).toBe(0);
+	}
+
+	// Cases 1–3: whitespace-only bodies (ASCII / mixed ASCII / Unicode) all
+	// trim to "" → 400 comment_requires_bet, before moderation, before the tx.
+	it.each([
+		["whitespace-only-ascii", "   "],
+		["mixed-ascii-whitespace", " \t\n "],
+		// NBSP (U+00A0) + EM SPACE (U+2003): JS trim() strips Unicode WhiteSpace.
+		["unicode-nbsp-em-space", "\u00A0\u2003"],
+	])("comment-requires-bet::%s → 400 + no W-1 tx", async (tag, body) => {
+		// NO seedDharmaGrant: the rejection is at step 5 (pre-tx), so the user
+		// needs no balance; an empty ledger post-request proves the tx never
+		// opened (no accrual).
+		const userId = await seedUser(`ws-${tag}`, `ws-${tag}`);
+		const marketId = await seedMarketWithPool(`ws-${tag}-market`, "Open");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			req(
+				"/api/bets/place",
+				{ marketId, side: "YES", stake: "10", body },
+				`ws-${tag}-key`,
+			),
+		);
+		expect(res.status).toBe(400);
+		expect((await errorBody(res)).code).toBe("comment_requires_bet");
+		// Rejection precedes moderation (step 5 < step 6) — the emptiness gate
+		// throws before precommitModerate is reached.
+		expect(mockPrecommit).not.toHaveBeenCalled();
+		await assertNoWrites(userId);
+	});
+
+	it("comment-raw-preserved::single-char-padded → 200, stored + moderated RAW", async () => {
+		// " a " trims to "a" (non-empty) → passes the emptiness gate. The stored
+		// comment body and the moderated text are the RAW " a " byte-identically
+		// (moderated ≡ stored); trim is used ONLY for the emptiness gate.
+		const raw = " a ";
+		const userId = await seedUser("ws-raw", "ws-raw");
+		const marketId = await seedMarketWithPool("ws-raw-market", "Open");
+		await seedDharmaGrant(userId, "1000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			req(
+				"/api/bets/place",
+				{ marketId, side: "YES", stake: "10", body: raw },
+				"ws-raw-key",
+			),
+		);
+		expect(res.status).toBe(200);
+
+		// Moderation saw the RAW text (not the trimmed "a").
+		expect(mockPrecommit).toHaveBeenCalledWith(
+			expect.objectContaining({ text: raw }),
+		);
+
+		// The stored comment body is the RAW " a ", byte-identical.
+		const commentRows = await testDb
+			.select({ body: comments.body })
+			.from(comments)
+			.where(eq(comments.userId, userId));
+		expect(commentRows.length).toBe(1);
+		expect(commentRows[0]?.body).toBe(raw);
+	});
+
+	it("comment-length::raw-exactly-max → 200 (upper bound is inclusive on raw)", async () => {
+		// RAW length exactly COMMENT_MAX_LENGTH, whitespace-padded (1 + (MAX-2) +
+		// 1). Upper bound is `> MAX`, so exactly-MAX passes; the body is stored raw
+		// at full COMMENT_MAX_LENGTH.
+		const raw = ` ${"x".repeat(COMMENT_MAX_LENGTH - 2)} `;
+		expect(raw.length).toBe(COMMENT_MAX_LENGTH);
+		const userId = await seedUser("ws-max", "ws-max");
+		const marketId = await seedMarketWithPool("ws-max-market", "Open");
+		await seedDharmaGrant(userId, "1000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			req(
+				"/api/bets/place",
+				{ marketId, side: "YES", stake: "10", body: raw },
+				"ws-max-key",
+			),
+		);
+		expect(res.status).toBe(200);
+		const commentRows = await testDb
+			.select({ body: comments.body })
+			.from(comments)
+			.where(eq(comments.userId, userId));
+		expect(commentRows.length).toBe(1);
+		expect(commentRows[0]?.body).toBe(raw);
+	});
+
+	it("comment-too-long::padded-past-max → 400 (upper bound on RAW, not trimmed)", async () => {
+		// The discriminating case: trimmed length < MAX (4999) but RAW length > MAX
+		// (5001). The upper bound is evaluated on the RAW text, so this rejects
+		// `comment_too_long` — an over-trim "fix" that measured the trimmed length
+		// would wrongly ACCEPT this, so this pin guards the raw upper bound.
+		const raw = `${"x".repeat(COMMENT_MAX_LENGTH - 1)}  `;
+		expect(raw.trim().length).toBeLessThan(COMMENT_MAX_LENGTH);
+		expect(raw.length).toBeGreaterThan(COMMENT_MAX_LENGTH);
+		const userId = await seedUser("ws-over", "ws-over");
+		const marketId = await seedMarketWithPool("ws-over-market", "Open");
+		await seedDharmaGrant(userId, "1000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await placePOST(
+			req(
+				"/api/bets/place",
+				{ marketId, side: "YES", stake: "10", body: raw },
+				"ws-over-key",
+			),
+		);
+		expect(res.status).toBe(400);
+		expect((await errorBody(res)).code).toBe("comment_too_long");
 	});
 });

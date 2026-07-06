@@ -49,9 +49,9 @@ const placeBodySchema = z.object({
 
 export async function POST(request: Request): Promise<Response> {
 	return runBetEndpoint(request, async (ctx) => {
-		// 5. Body validate (zod). An absent/empty comment body is not a valid atomic
-		// bet+comment pair → the NAMED `comment_requires_bet` (DEBATE.1 frontstop),
-		// NOT the generic `error_invalid_request_body`.
+		// 5. Body validate (zod). An absent, empty, or whitespace-only comment body
+		// is not a valid atomic bet+comment pair → the NAMED `comment_requires_bet`
+		// (DEBATE.1 frontstop), NOT the generic `error_invalid_request_body`.
 		const parsed = placeBodySchema.safeParse(ctx.rawBody);
 		if (!parsed.success) {
 			throw new InvalidRequestBodyError();
@@ -60,7 +60,13 @@ export async function POST(request: Request): Promise<Response> {
 		const body = parsed.data.body ?? "";
 		const parentCommentId = parsed.data.parentCommentId ?? null;
 		const { imageUploadsId } = parsed.data;
-		if (body.length === 0) {
+		// Emptiness gate on the TRIMMED text (AUDIT.1 A24 ruling / SPEC.1 F-BET-1
+		// rider): a whitespace-only body is an absent argument. Trim is JS
+		// `String.prototype.trim()` (Unicode WhiteSpace + LineTerminator). The trim
+		// result gates emptiness ONLY — moderation (step 6) and the W-1 tx (step 7)
+		// receive the raw `body` byte-identical (stored ≡ moderated); the upper
+		// bound below stays on the raw text.
+		if (body.trim().length === 0) {
 			throw new CommentRequiresBetError();
 		}
 		if (!new CpmmDecimal(stake).greaterThan(0)) {
