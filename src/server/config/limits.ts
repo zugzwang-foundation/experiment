@@ -157,3 +157,22 @@ export const ALARMS_DRAIN_BATCH_SIZE = 200;
 
 /** Sentry transport flush budget (ms) for the alarms-drain. The drain awaits `safeFlush(this)` after emitting and BEFORE stamping any row — a delivery timeout (resolve false) or a flush throw retires NOTHING, so the row re-drains next tick (fingerprint dedup absorbs the re-emit). 2000ms spans the SDK HTTP send + slack, far under the 240s lock TTL. Upgrades the drain from enqueue-level to DELIVERY-level at-least-once (B1 close-out ruling). HARDEN-tunable. */
 export const ALARMS_DRAIN_FLUSH_TIMEOUT_MS = 2000;
+
+// === AUDIT-FIX-B7a: Upstash transport bounds (A14 / ADR-0015 Patch) ========
+//
+// Consumed by the shared @upstash/redis singleton (src/server/upstash/
+// redis.ts). Without these the SDK defaults to retries ?? 5 (6 fetch
+// attempts, exponential backoff ≈4.3s of sleep) and NO timeout of any kind
+// — a hung socket rides undici defaults up to the platform function
+// timeout, silently contradicting ADR-0015's no-auto-retry posture on
+// every call from idempotency, rate-limit, and the moderation reservation.
+// Same vendor-transport-bound posture as the OPENAI_* constants above.
+
+/** Upstash transport-level retry budget — a single flat retry (2 fetch attempts total). Application-level no-retry stands (ADR-0015 Patch 2026-07-06 + SPEC.2 §11); B7a OD-1 ratified value. HARDEN-tunable. */
+export const REDIS_MAX_RETRIES = 1;
+
+/** Upstash transport retry backoff (ms) — FLAT via `backoff: () => REDIS_RETRY_BACKOFF_MS`, not the vendor's exponential default. Per ADR-0015 Patch 2026-07-06. HARDEN-tunable. */
+export const REDIS_RETRY_BACKOFF_MS = 200;
+
+/** Upstash per-command abort ceiling (ms) — `signal: () => AbortSignal.timeout(...)`, minted once per command and covering the vendor's whole internal retry loop. Per ADR-0015 Patch 2026-07-06 + SPEC.2 §11; B7a OD-2 ratified value. HARDEN-tunable. */
+export const REDIS_COMMAND_TIMEOUT_MS = 2000;
