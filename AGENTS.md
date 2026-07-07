@@ -67,7 +67,7 @@ experiment/
 │   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages)
 │   │   ├── (auth)/                 # onboarding, sign-in, sign-in/otp
 │   │   ├── (public)/               # participant shell (SHELL/UI.0): layout.tsx placeholder shell + m/[slug] market scaffold
-│   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets}, health, uploads/sign
+│   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign
 │   │   ├── globals.css, layout.tsx, page.tsx
 │   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
