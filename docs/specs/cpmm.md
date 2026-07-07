@@ -5,8 +5,8 @@
 | Field | Value |
 |---|---|
 | **Document** | `cpmm.md` — CPMM math companion (named in SPEC.2 §0 companion files + §1.4 #2) |
-| **Version** | 1.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
-| **Date** | 2026-06-04 |
+| **Version** | 2.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
+| **Date** | 2026-07-07 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Status** | Authored at ENGINE.1 (web-authored, founder-ratified, CC-committed) |
 | **Gates** | ENGINE.2 (module `src/server/cpmm/`), ENGINE.3 (property tests), DESIGN.4 (slippage modal) |
@@ -399,16 +399,32 @@ single terminal `market.resolved` events row; per-bet payouts live in the
 ### 8.2 Voided
 
 Void (SPEC.1 §6 `Open|Closed → Voided`, §10.7 per B3) runs **no curve
-math**. Reversal is ledger arithmetic: every user's net market Đ flow
-(Σ bet stakes − Σ sale proceeds) is reversed by compensating
-`void_refund` entries. Note the sign: a user who realised net gains by
-selling receives a **negative** compensating entry — gains are reversed,
-not just stakes; otherwise the pool is short. Where a clawback exceeds a
-user's balance, the B4 discipline applies: floored at zero, remainder
-logged `uncollectable`. **Residual identity:** with full collection the
-pool's remaining balance after reversal is exactly the seed C; otherwise
-C − Σ uncollectable. The residual returns via `pool_unwind`; positions and
-shares are extinguished without payout; comments lock `voided`.
+math**. Reversal is ledger arithmetic on the founder-ratified **R-9.8
+basis** (SPEC.1 §10.3 + §10.7, v1.0.3 ENGINE.9 riders; shipped
+`src/server/resolution/void.ts`): every bet is refunded **`void_refund` =
+f × stake**, where f is the surviving fraction of the user's held-side
+position (f = position quantity ÷ Σ same-side `share_quantity`; per-bet
+exact-sum rounding — floors with a deterministic last-row remainder
+ordered by bet id — is owned by SPEC.1 §10.3). **Sale proceeds stand** —
+the sale was a real trade at a real price. Proceeds are never reversed,
+no negative compensating entries exist, and a fully-sold side has f = 0
+and refunds 0 (zero legs are legal — SPEC.2 Appendix B.8, R-9.2/R-9.8).
+Refunds are therefore always ≥ 0: the floor-at-zero / `uncollectable`
+discipline (SPEC.1 §10.7 per B4) belongs to the **correction** path
+(§8.3) and has **no void leg**.
+
+**Residual.** The pool's remaining Đ after refunds — D − Σ `void_refund`,
+with D = seed + Σ stakes − Σ proceeds (§8.1) — is **not in general the
+seed**: it differs from the seed by exactly the users' net realized sale
+P&L (a seller's gain stayed with the seller, so the pool carries the
+mirror; a seller's loss likewise stayed in the pool). The residual exits
+circulation as `poolUnwindAmount` on the terminal `market.voided` events
+row (R-9.5/R-9.5e) via `pool_unwind`; there is no admin balance. Shares
+are extinguished without payout; comments lock `voided`. **Audit path:**
+void reproduction is **ledger-based** — recompute f per user-side from
+the shipped `positions`/`bets`, apply f × stake per bet, compare Σ
+against the `void_refund` rows and the event's `poolUnwindAmount` — not
+a frozen-reserve identity (contrast §8.1's Resolved case; see INV-C4).
 
 ### 8.3 Correction
 
@@ -543,9 +559,13 @@ numbered property in §4.2 and §5.2.
 - **INV-C3 — Domain.** y > 0 and n > 0 always; probabilities strictly
   inside (0, 1); s > S on every buy; 0 < M < min(s, b) on every sell.
 - **INV-C4 — Solvency / residual identity.** User-held shares of side X
-  equal D − x_reserve (D = pool Đ balance). Resolved: payout total
-  = D − w, unwind = w (the winning reserve). Voided: residual = seed
-  − Σ uncollectable. All auditable from frozen reserves + ledger (§8).
+  equal D − x_reserve (D = pool Đ balance). **Resolved:** payout = D − w,
+  unwind = w (the winning reserve) — auditable from the frozen reserves
+  alone (§8.1). **Voided:** unwind (`poolUnwindAmount`) = D − Σ
+  `void_refund` on the R-9.8 f × stake basis (§8.2); it equals the seed
+  **only** when no realized sale P&L exists across users, and it audits
+  from the shipped ledger (`bets`, `positions`, `dharma_ledger`) plus the
+  terminal `market.voided` row (R-9.5e) — **not** from reserves alone.
 - **INV-C5 — Frozen determinism.** Terminal CPMM state is immutable; the
   module is pure and deterministic (§10.4); every §8 quantity is exactly
   reproducible by an auditor from the frozen state (upholds INV-4).
@@ -664,3 +684,4 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 | Version | Date | Author | Change |
 |---|---|---|---|
 | 1.0.0 | 2026-06-04 | HMH | Initial authoring at ENGINE.1. Lineage pinned to `zugzwang-foundation/manifold-reference` @ `d5b55cf9` (tag `ref-2026-04-28-found5`), MIT notice landed in `THIRD_PARTY_NOTICES.md` same-commit. Decimal arithmetic pinned: decimal.js ^10.6, precision 50, 18-dp directional boundary rounding (floor on user-credited quantities; resolves ADR-0008 §8; binds ENGINE.2 + ENGINE.5). Slippage pinned as absolute probability-point impact, strict-> threshold trigger (F-BET-9; gates DESIGN.4). §7.2 pre-launch curation slate recorded as standard launch procedure (product definition deferred to SPEC.1 / debate phase). Worked examples E1–E5 are ENGINE.3 fixed vectors. |
+| 2.0.0 | 2026-07-07 | HMH | **§8.2 + INV-C4 rewritten to the founder-ratified R-9.8 void basis** (AUDIT.1 finding D1; canonical sources: SPEC.1/SPEC.2 v1.0.3 ENGINE.9 riders + shipped `resolution/void.ts`): refund = f × stake per bet, sale proceeds stand, no negative compensating entries, no void-leg `uncollectable`; residual (`poolUnwindAmount`, R-9.5e) = D − Σ `void_refund`, equal to seed only absent realized sale P&L; void auditing is ledger-based, not reserve-alone. §13 contract comment verified current (void stays ledger arithmetic, no curve function — unchanged). MAJOR per §0 semver (formula/invariant change). Also records the previously-unlogged ENGINE.14 amendment (`a29ef7e`, pool-seed payload recording form — no version bump was made at the time). |
