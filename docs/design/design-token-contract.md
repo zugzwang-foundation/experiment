@@ -1,13 +1,13 @@
-# Zugzwang — Design Token Contract (named slots · monochrome values)
+# Zugzwang — Design Token Contract (named slots · branded dark values)
 
 > **Doc:** `docs/design/design-token-contract.md`
-> **Status:** v0.2-draft · authored at DC.1 · **slot names freeze on operator ratification**; committed at DC.3
+> **Status:** v0.4 · authored at DC.1 · names frozen (operator-ratified) · values branded at BRIDGE (2026-07-14, values-log v0_3 §3)
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
-> **Grounding:** `src/app/globals.css` (the built system, SHELL/UI.0 mint PR #161 — **full custom-property census recon-verified verbatim, 2026-07-02**) · `design-language.md` v0.5 §2 (vocabulary) · the brand-handover research (DTCG three-tier shape) · `tests/unit/design/tokens-monochrome.test.ts` (the CI pin, read in full)
+> **Grounding:** `src/app/globals.css` (the built system, SHELL/UI.0 mint PR #161 — **full custom-property census recon-verified verbatim, 2026-07-02**) · `design-language.md` v0.5 §2 (vocabulary) · the brand-handover research (DTCG three-tier shape) · `tests/unit/design/tokens-monochrome.test.ts` (the CI pin, read in full) · ZUGZWANG-BRAND_agenda-and-values-log_v0_3.md §3 (the verbatim CD dump — value authority, committed alongside at BRIDGE)
 >
-> **What this is.** The frozen list of semantic slot names the entire UI binds to, each holding its current monochrome value. Branding (DESIGN.B1 → B3) is a **pure value-swap onto these fixed names** — re-fill the buckets, never repaint a screen. **After ratification: no rename, no removal; additions only by contract amendment (operator-ratified, version-bumped), and always *before* a Claude Design session, never inside one.**
+> **What this is.** The frozen list of semantic slot names the entire UI binds to, each holding its branded dark value (landed at BRIDGE, 2026-07-14). The branding swap executed exactly as this contract designed it: values re-filled onto the fixed names in one commit, the CI pin amended in the same commit, zero component edits. After ratification: no rename, no removal; additions only by contract amendment (operator-ratified, version-bumped) — v0.4 is such an amendment (the §3.6 census).
 >
-> **What this is NOT.** Not the brand package (that is B1/B3's `DESIGN.md` + `tokens.json` + value-filled `globals.css`, authored *against* this contract). Not a code change — DC commits docs only; `globals.css` is already the built truth this contract records.
+> **What this is NOT.** Not the brand package's working files — the CD system was disposable (Path B); the values-log §3 dump is the archived value authority, committed alongside. Not a docs-only change this time: v0.4 rides the bridge code commit (same-commit doctrine — swap + CI pin + this amendment together); `globals.css` remains the built truth this contract records.
 
 ---
 
@@ -46,23 +46,24 @@ This test is the *monochrome-era* guard: **at B3 it is amended in the same commi
 
 ## §2 — Tier 1 · Primitives
 
-### §2.1 Neutral ramp — LANDED (frozen names, monochrome values)
+### §2.1 Neutral ramp + ground — LANDED (frozen names, branded dark values)
 
-9 true-neutral steps, OKLCH chroma 0 (SHELL/UI.0 mint, `@theme` block). The ramp is the working palette **and** the slice the accent later repaints (design-language §1.4/§1.5 — *which* steps is a B-track decision).
+9 true-neutral steps + the page ground, hex-authoritative (BRIDGE swap, `@theme` block), achromatic (R=G=B), running dark → bright — **inverted vs the retired light ramp; never copy values across eras by name or lightness.** The ramp is the working palette; the accent question is closed (§2.2 — reserved-empty, permanent this phase).
 
-| Slot (CSS) | Contract name | Value (current) | Swap status |
-|---|---|---|---|
-| `--color-n0` | `primitive.neutral.0` | `oklch(1 0 0)` | retune-only if brand requires; names never change |
-| `--color-n1` | `primitive.neutral.1` | `oklch(0.971 0 0)` | 〃 |
-| `--color-n2` | `primitive.neutral.2` | `oklch(0.922 0 0)` | 〃 |
-| `--color-n3` | `primitive.neutral.3` | `oklch(0.871 0 0)` | 〃 |
-| `--color-n4` | `primitive.neutral.4` | `oklch(0.708 0 0)` | 〃 |
-| `--color-n5` | `primitive.neutral.5` | `oklch(0.556 0 0)` | 〃 |
-| `--color-n6` | `primitive.neutral.6` | `oklch(0.371 0 0)` | 〃 |
-| `--color-n7` | `primitive.neutral.7` | `oklch(0.205 0 0)` | 〃 |
-| `--color-ink` | `primitive.neutral.ink` | `oklch(0.145 0 0)` | 〃 |
+| Slot (CSS)     | Contract name         | Value (branded) | Status                                                                                          |
+|----------------|-----------------------|-----------------|--------------------------------------------------------------------------------------------------|
+| --color-ground | primitive.ground      | #181818         | minted at BRIDGE — page ground; outside the 11-token census (closed alternation); own CI pin      |
+| --color-n0     | primitive.neutral.0   | #212121         | branded at BRIDGE (values-log v0_3 §3); names never change                                         |
+| --color-n1     | primitive.neutral.1   | #2a2a2a         | 〃                                                                                                 |
+| --color-n2     | primitive.neutral.2   | #404040         | 〃                                                                                                 |
+| --color-n3     | primitive.neutral.3   | #545454         | 〃                                                                                                 |
+| --color-n4     | primitive.neutral.4   | #747474         | 〃                                                                                                 |
+| --color-n5     | primitive.neutral.5   | #989898         | 〃                                                                                                 |
+| --color-n6     | primitive.neutral.6   | #bdbdbd         | 〃                                                                                                 |
+| --color-n7     | primitive.neutral.7   | #e4e4e4         | 〃                                                                                                 |
+| --color-ink    | primitive.neutral.ink | #fafafa         | 〃                                                                                                 |
 
-*(A ramp retune at B3 must edit the CI pin's exact-string expectations in the same commit — §1/§5. Any new ramp step must NOT match the `n[0-7]` pattern unless the chroma-census count is amended too.)*
+*(Any ramp retune must edit the CI pin's exact-string expectations in the same commit — §1/§5. Any new step must NOT match the `n[0-7]` pattern unless the census count is amended; `--color-ground` deliberately sits outside the pattern, with its own pin. Landed hex is lowercase — Biome normalizes; CSS hex is case-insensitive.)*
 
 ### §2.2 Accent family — RESERVED (frozen names, **no values until B1/B3**)
 
@@ -76,12 +77,14 @@ Deliberately absent from the built CSS today. The names are frozen **here** so B
 
 *Constraints: never named `--color-brand` (CI ban, §1). Accent discipline (research → every B-track brief): accent on ≤10% of any screen; never on the side poles. These names sit outside the chroma-census pattern, so the mint itself does not trip the count — the census stays 11.*
 
-### §2.3 Typography primitives — names frozen, values are **build placeholders**
+**Status (BRIDGE, 2026-07-14): reserved-EMPTY, permanently this phase.** B1 ratified true-neutral; no accent was minted and none will be inside experiment scope. The reservation survives purely as name-space protection (the `--color-brand` CI ban; §5's accent steps are superseded). The dump's `--accent` shadcn slot is a neutral wash (`var(--color-n1)`), not this reserved family.
+
+### §2.3 Typography primitives — names frozen, values ratified FINAL (B1)
 
 | Slot (CSS) | Contract name | Value (current) | Swap status |
 |---|---|---|---|
-| `--font-sans` | `primitive.font.sans` | `var(--font-geist-sans)` | **placeholder** — the family is an open CD/B1 decision (design-language §2.2: one neutral sans, blank). Geist is the scaffold default standing in, not a ratified choice. |
-| `--font-mono` | `primitive.font.mono` | `var(--font-geist-mono)` | **placeholder** — mono-numeric treatment itself is a CD decision. |
+| `--font-sans` | `primitive.font.sans` | `var(--font-geist-sans)` | ratified FINAL at B1 (WI-13): Geist carries the system — no longer a placeholder; Lucide icons ratified FINAL alongside. |
+| `--font-mono` | `primitive.font.mono` | `var(--font-geist-mono)` | ratified FINAL at B1 (WI-13): Geist carries the system — no longer a placeholder; Lucide icons ratified FINAL alongside. |
 
 Type **scale/weights** (`type.scale.*`, `type.weight.*`) remain *named-in-vocabulary, unminted-in-CSS* (design-language §2.2) — carried by Tailwind utilities in the built surfaces. Promotion to CSS custom properties = contract amendment (DESIGN.SPEC-era, if ever); until then they are **not** contract slots.
 
@@ -100,14 +103,16 @@ Spacing (`space.*`), elevation, and motion stay vocabulary-only (design-language
 
 ### §3.1 Side poles — LOCKED (never rebranded)
 
-The thesis-load-bearing pair. **B3 must not touch these** (design-language §1.5: *repaint the designated greys; leave the black/white side coding untouched*).
+The thesis-load-bearing pair. The BRIDGE swap retuned the values for the dark era; the binding is untouched (R-1): YES = black, NO = white — encoding SIDE, never the Support/Counter relation.
 
-| Slot (CSS) | Contract name | Value | Alias intent |
-|---|---|---|---|
-| `--color-yes` | `semantic.side.yes` | `oklch(0.145 0 0)` — black, **locked** | ≡ `primitive.neutral.ink` |
-| `--color-no` | `semantic.side.no` | `oklch(1 0 0)` — white, **locked** | ≡ `primitive.neutral.0` |
+| Slot (CSS)  | Contract name     | Value               | Alias intent                          |
+|-------------|-------------------|---------------------|---------------------------------------|
+| --color-yes | semantic.side.yes | #181818 — black, locked | literal — de-aliased at BRIDGE (WI-1) |
+| --color-no  | semantic.side.no  | #fafafa — white, locked | literal — de-aliased at BRIDGE (WI-1) |
 
-**Considered and rejected as slots:** on-side foregrounds (`side.yes.foreground` / `side.no.foreground`). Because the poles are locked monochrome forever, text-on-side resolves through the neutral ramp (on-yes = `neutral.0`, on-no = `neutral.ink`) and never needs a swap. Recorded so the question isn't reopened at B3.
+De-aliased, deliberately. On the dark ground the yes-value coincides with `--color-ground` and the no-value with `--color-ink` — coincidences of value, not of role. The old alias intent (yes ≡ neutral.ink, no ≡ neutral.0) belonged to the light era; carrying name-aliases across inverted eras is exactly the pole-flip trap the bridge existed to kill, so the poles bind by literal and the CI pins them by exact string.
+
+Considered and rejected as slots (stands): on-side foregrounds. Text-on-side resolves through existing values — on-yes = the light end (ink `#fafafa`), on-no = the dark end (`#181818`) — the era-specific mapping lives in the applied layer; no dedicated slots, so the question stays closed. (The light-era mapping "on-yes = neutral.0, on-no = neutral.ink" is retired with the era.)
 
 ### §3.2 shadcn semantic ramp — pinned verbatim (light `:root` · dark `.dark`)
 
@@ -153,21 +158,62 @@ The component-consumed layer. Every value below is the live file, verbatim. **Ra
 |---|---|---|---|
 | `--font-heading` | `semantic.type.heading` | `var(--font-sans)` (`@theme inline`) | the display/heading alias — one-sans rule (§1.9) makes it ≡ body today; B1 may re-point it if the brand adopts a second family (a §7 "may revisit" decision, not a default) |
 
-### §3.4 Known off-system values — recorded + dispositioned (no code change in DC)
+### §3.4 Known off-system values — CLOSED at BRIDGE (2026-07-14)
 
-The mint's in-file comment ("the semantic ramp resolves to these same greys") is **approximately** true; the exact census above shows three deviations. Recorded here so they are governed, not rediscovered:
+The three deviations recorded at DC.1 are dispositioned; kept here with their closures so history stays governed:
 
-1. **`--destructive` is chromatic (red) in both modes** — the stock shadcn default, never de-chromed. The design language bans colour on designed surfaces; the locked v1.0/W2 mockups render error states monochrome (W2.11 state kit). Today the red only surfaces if a component uses the `destructive` variant. **Disposition: neutralize-or-ratify at B3** (recommended: retune to a ramp grey in the same swap commit, unless B1 deliberately adopts a status red). If any *pre-brand* build lands a destructive-variant control on a participant surface, neutralize then, as a one-line rider on that PR — not a DC change.
-2. **`.dark --sidebar-primary` is chromatic (blue)** — stock shadcn, unconsumed (no dark-mode surface, no sidebar this phase). **Disposition: rides the `.dark` decision** (below); dies if `.dark` is descoped, retuned if kept.
-3. **Off-ramp achromatic greys** (`0.985`, `0.97`, `0.87`, `0.439`, `0.269`, the `.dark` alpha-whites) — stock shadcn greys that are *not* n-ramp steps (some one-thousandth off: `0.97` vs n1 `0.971`, `0.87` vs n3 `0.871`). Achromatic, so no monochrome violation; the CI pin doesn't govern them. **Disposition: acceptable as-is this phase; optional snap-to-ramp at B3** (a values-only retune under this contract's names, zero component edits).
+1. **`--destructive` chromatic red — CLOSED.** Neutralized to `var(--color-n6)` in BOTH blocks (`:root` + `.dark`); the `:root` form is CI-pinned (`--destructive: var(--color-n6);`). The "adopt a status red" option was not taken (true-neutral ratified at B1).
+2. **`.dark` `--sidebar-primary` chromatic blue — CLOSED.** Neutralized to `var(--color-n7)` (the sidebar mirror rule, OQ-8). The file is achromatic end-to-end (grep-verified at the bridge).
+3. **Off-ramp achromatic greys — CLOSED for `:root`.** The tier-2 re-point replaced the stock literals with `var(--color-*)` chains, so no off-ramp greys remain on the live path. `.dark`'s remaining stock values persist inert under the descope below.
 
-**`.dark` block status.** Present in code (shadcn scaffold), **not a designed surface this phase** (design-language: desktop-only, one monochrome theme). Names are frozen with everything else; whether B3 swaps its values in parallel or the block is explicitly descoped is an **open operator call** — logged here, decided at B-track kickoff.
+**`.dark` block status — DECIDED (OQ-1, BRIDGE).** The single dark theme lives in `:root`/`@theme`; `.dark` is descoped-inert — physically present (names never removed), never applied (no toggler; `layout.tsx` carries no dark class), its two chromatic strays neutralized. Any future second theme is a new contract amendment, not a `.dark` revival.
 
 ### §3.5 Structural semantics (raw custom properties)
 
 | Slot (CSS) | Contract name | Value (current) | Notes |
 |---|---|---|---|
 | `--hairline` | `semantic.border.hairline` | `1px solid var(--color-n2)` | the separation treatment (design-language §1.9). The 1px is locked; the grey may retune within the neutral ramp only. |
+
+### §3.6 Minted at BRIDGE (v0.4) — applied-semantic · state · elevation · radius · misc
+
+New slots minted by the BRIDGE amendment (values-log v0_3 §3, verbatim; ⑤ raw-props `:root` unless noted). Frozen on landing: no rename, no removal; retunes are values-only under §5.
+
+| Slot                      | Value (landed)                                                                                     | Note                                                                                   |
+|---------------------------|-----------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------|
+| --surface-page            | var(--color-ground)                                                                                   | page background alias                                                                  |
+| --surface-inset           | var(--color-n1)                                                                                       | inset wells / input grounds                                                            |
+| --btn-fill                | var(--color-ground)                                                                                   | button fill on card surfaces                                                           |
+| --text-primary            | var(--color-ink)                                                                                      | headline / primary text                                                                |
+| --text-body               | var(--color-n6)                                                                                       | body text                                                                              |
+| --text-meta               | var(--color-n5)                                                                                       | metadata text                                                                          |
+| --text-faint              | var(--color-n4)                                                                                       | faint / near-disabled text                                                             |
+| --border-strong           | var(--color-n2)                                                                                       | kept as alias; the old ink-emphasis border treatment is retired                        |
+| --overlay                 | rgb(10 10 10 / 0.6)                                                                                   | scrim under modals/popovers                                                            |
+| --graph-yes               | #737373                                                                                               | deliberately off-ramp; series-bound grey stand-in for the black pole; CI-pinned        |
+| --graph-no                | #fafafa                                                                                               | series-bound; CI-pinned                                                                |
+| --state-hover-fill        | var(--color-n1)                                                                                       |                                                                                        |
+| --state-pressed-fill      | #333333                                                                                               | minted mid-step between n1 and n2                                                      |
+| --state-hover-border      | var(--color-n3)                                                                                       |                                                                                        |
+| --state-focus-ring        | 0 0 0 2px rgb(255 255 255 / 0.32)                                                                     |                                                                                        |
+| --state-focus-ring-pole   | 0 0 0 2px var(--color-n0), 0 0 0 4px rgb(255 255 255 / 0.32)                                          | on-pole variant                                                                        |
+| --state-hover-glow-pole   | 0 0 8px 0 rgb(255 255 255 / 0.22)                                                                     |                                                                                        |
+| --state-pressed-glow-pole | 0 0 8px 2px rgb(255 255 255 / 0.34)                                                                   |                                                                                        |
+| --state-disabled-opacity  | 0.5                                                                                                   |                                                                                        |
+| --elev-0                  | none                                                                                                  |                                                                                        |
+| --elev-1                  | inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4)                                     |                                                                                        |
+| --elev-2                  | inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.4), 0 6px 16px rgb(0 0 0 / 0.5)        |                                                                                        |
+| --elev-3                  | inset 0 1px 0 rgb(255 255 255 / 0.08), 0 4px 12px rgb(0 0 0 / 0.45), 0 16px 40px rgb(0 0 0 / 0.6)     |                                                                                        |
+| --r                       | 8px                                                                                                   | base radius                                                                            |
+| --r-chip                  | 4px                                                                                                   | side-chip radius                                                                       |
+| --r-dot                   | 3px                                                                                                   | dot radius                                                                             |
+| --avatar-ring             | 1px solid var(--color-n2)                                                                             | ≡ dump literal `1px solid #404040` (var-alias form, OQ-6)                              |
+| --dur-hover               | 0.12s ease                                                                                            | hover transition (OQ-5)                                                                |
+
+28 slots here + `--color-ground` (§2.1) = the **29 minted at BRIDGE**.
+
+**Retired names (recorded, never minted repo-side):** `--pole-hairline`, `--border-emphasis` — CD-internal compat aliases; zero repo consumers ever (OQ-3). Do not mint. **`--chart-1..5`** are retained (shadcn names-never-removed), re-pointed to ramp aliases; the price graph consumes `--graph-*`, never `--chart-*` — they are not the same system.
+
+**Deliberately not tokenized** (component treatments, values-log §3 items 3/5 — they live in the committed values-log for the build lane): the engaged-slot backlight (`0 0 10px 1px rgba(255,255,255,0.2)`), the Support/Counter pill glows (`0.25`/`0.4`), the black-pill 0.5px hairline exception, the header cluster geometry. Do not mint token forms for these without a contract amendment.
 
 ---
 
@@ -183,6 +229,8 @@ Grows additively as surfaces build. Rule: **every new component token aliases a 
 ---
 
 ## §5 — The B3 swap runbook (what "pure value-swap" means, exactly)
+
+> **SUPERSEDED IN PART at BRIDGE (2026-07-14):** the steps that mint an accent and re-point `--primary`/`--accent`/`--ring` to it DO NOT APPLY — B1 ratified true-neutral; §2.2 stays reserved-empty. The executed swap shape (values-only onto frozen names + same-commit CI-pin amendment + doc riders, one commit) is the precedent for any future retune.
 
 One commit, zero per-screen edits:
 
@@ -220,15 +268,15 @@ Anything a B1 asset needs that has no slot here → contract amendment first (v0
       "on":  { "$value": null, "$type": "color" }
     },
     "font": {
-      "sans": { "$value": "Geist Sans (placeholder)", "$type": "fontFamily" },
-      "mono": { "$value": "Geist Mono (placeholder)", "$type": "fontFamily" }
+      "sans": { "$value": "Geist Sans", "$type": "fontFamily" },
+      "mono": { "$value": "Geist Mono", "$type": "fontFamily" }
     },
     "radius": { "base": { "$value": "0.625rem", "$type": "dimension" } }
   },
   "semantic": {
     "side": {
-      "yes": { "$value": "{primitive.neutral.ink}", "$type": "color", "$description": "LOCKED — never rebranded" },
-      "no":  { "$value": "{primitive.neutral.0}",   "$type": "color", "$description": "LOCKED — never rebranded" }
+      "yes": { "$value": "#181818", "$type": "color", "$description": "LOCKED — never rebranded; literal since BRIDGE (WI-1, §3.1)" },
+      "no":  { "$value": "#fafafa", "$type": "color", "$description": "LOCKED — never rebranded; literal since BRIDGE (WI-1, §3.1)" }
     },
     "surface": {
       "base":    { "$value": "{primitive.neutral.0}",   "$type": "color" },
@@ -268,7 +316,9 @@ Anything a B1 asset needs that has no slot here → contract amendment first (v0
 ---
 
 > **Changelog.**
+> v0.4 (2026-07-14, BRIDGE): the brand value-swap amendment — ramp re-valued to the branded dark system (hex-authoritative, lowercase-normalized by Biome; dark → bright, inverted vs the light era); `--color-ground` minted (§2.1, outside the census, own pin); §3.1 poles de-aliased to literals `#181818`/`#fafafa` (binding unchanged, R-1; alias-intent column retired; on-side foreground mapping restated for the dark era); §3.4 all three deviations CLOSED + `.dark` DECIDED descoped-inert (OQ-1); §3.6 minted-at-BRIDGE census added (29 tokens); retired names recorded (`--pole-hairline`, `--border-emphasis`); §2.2 reserved-empty made permanent-this-phase; §5 accent steps superseded; §2.3 + appendix Geist finalized (WI-13) and `side.*` de-aliased (WI-1). CI pin amended in the same commit (hex census R=G=B, ground/graph/destructive pins). Source: values-log v0_3 §3 + docs/plans/BRIDGE.md, operator-ratified 2026-07-14.
+> v0.3 (PK-side, 2026-07-03 — landed here): body-freeze framing for the CI pin + branding-session grounding; existed only as the PK lineage label during the CD sessions, no separate repo landing — its intent is subsumed by v0.4. Recorded so values-log / session-doc references to "v0.3" stay coherent.
 > **v0.2-draft (2026-07-02, DC.1):** shadcn layer pinned **verbatim** from `globals.css` (`:root` + `.dark`, every slot, light+dark values, ramp-mapping annotations); full five-block census recorded incl. the `@theme inline` plumbing, `--font-heading`, and the derived radius scale; **§3.4 added** — the three off-system deviations (chromatic `--destructive`, chromatic `.dark --sidebar-primary`, off-ramp shadcn greys) recorded with dispositions, plus the `.dark` open call; §5 runbook rewritten against the CI pin's exact mechanics (exact-string pins, 11-count chroma census, `--color-brand` ban, comment-string couplings); appendix semantic layer filled. Source: CC micro-recon #2 verbatims, 2026-07-02.
 > **v0.1-draft (2026-07-02, DC.1):** initial contract — built system recorded (n-ramp, side poles, fonts, radius, hairline, imgmax/imgr), accent family reserved, shadcn names mapped with values ⟂, B3 swap runbook + CI-pin amendment rule, on-side-foreground non-slot decision.
 
-*End token contract v0.2-draft. Names freeze at operator ratification; values live. Next: ratify Parts 1+2 → Part 3 (canon + mockup index + CD fine-tune log) → DC.3 commits.*
+*End token contract v0.4. Names frozen; values branded (BRIDGE, 2026-07-14). Values live under §5; the next amendment bumps the version.*

@@ -1,12 +1,12 @@
 # Zugzwang — Design Canon (consolidated · v1.0-era + Wave-2 + DC rulings)
 
 > **Doc:** `docs/design/design-canon.md`
-> **Status:** v1.0-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3**
+> **Status:** v1.1-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3** · BRIDGE amendments 2026-07-14
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
 > **What this is.** The single consolidated record of the DESIGN phase: the locked surfaces, the locked decisions, motion/timing, copy, spec deltas, the five DC rulings, the per-surface mockup index (the handoff unit), and the CD fine-tune log. It **absorbs** `DESIGN-phase-record.md` + the three by-type consolidations (motion / spec-changes / copy-register), reconciled against the 2026-07-02 rulings. Those four source docs are **superseded by this canon** (delete-after-verify from PK once DC.3 lands).
 >
-> **The canonical design set** (after DC.3): this canon · `design-language.md` **v0.5** (the living constraint/vocabulary guide) · `design-token-contract.md` **v0.2** (the frozen slot names + monochrome values) · the living guides (`design-workflow.md`, `design-handoff.md`, `visual_precursor_planner.md`, `Research_Report_v2.md`) · `docs/design/mockups/` (the per-surface artifacts, §8).
+> **The canonical design set** (after DC.3): this canon · `design-language.md` **v0.7** (the living constraint/vocabulary guide) · `design-token-contract.md` **v0.4** (the frozen slot names + branded dark values — the monochrome era closed at BRIDGE) · the living guides (`design-workflow.md`, `design-handoff.md`, `visual_precursor_planner.md`, `Research_Report_v2.md`) · `docs/design/mockups/` (the per-surface artifacts, §8).
 > **Precedence:** SPEC.1/SPEC.2 > ADRs > this canon > per-surface history. The **v1.0 integration shell** (`DESIGN_integration-shell_v1_0.html`, **PK-only — deliberately not committed**) remains the visual ground truth the canon describes.
 > **Data residency:** mockup-phase design artifacts are PK-primary; DC.3 commits the canon set + the per-surface mockups listed in §8. Build scripts stay PK (archival — §9).
 
@@ -169,6 +169,9 @@ Carry these into the CD prompt sheet + sessions; none blocks DC or the handover.
 1. **Side-chip shape inconsistency** — curved-rectangle (4px, card-scoped) vs pill chips still on reply cards + the `+` popover. Consolidated as-is; unify visually in CD.
 2. **Dead download icon** — the headzone download icon on Profile + Bookmark is visual-only ("later: download profile as a card"). W2.13 revived the *post/reply* share card but the profile-card JPEG **stays cut** — CD either wires the icon to a defined action or removes it; ledger as post-launch UI if kept.
 3. **v0.19 polish carry** — `+` box size · the ±1 px no-shift gap on the post-card image · footer separator `|` vs `·`. Pure visual polish from the Market-Detail close-out.
+4. **R-2 · W2.4 countdown timer** (branding sessions, values-log §1/§5) — micro-format is digits-only `45:06:15` inside the 2×8 chessboard grid — unit labels and the `TO FREEZE` caption removed; the chessboard alternation carries the meaning. Supersedes the mockup's labeled format.
+5. **R-5 · Slot-header geometry** (branding sessions, values-log §1 item 6) — the CD-final slot-header geometry supersedes the mockup px; geometry rows read through values-log §1 item 6 until DESIGN.SPEC derives finals.
+6. **R-3 · W2.13 share card** (branding sessions) — the share-card lockup may shorten (mark + wordmark tightening); re-check at the share-card build.
 
 *(Rule: any further pure-polish inconsistency noticed downstream → append here; never absorb into a build task.)*
 
@@ -184,7 +187,7 @@ Carry these into the CD prompt sheet + sessions; none blocks DC or the handover.
 | W2.9 market-media tab still | MEDIA.2 kickoff (design precedes build, per ADR-0026) | see §1/§8 |
 | W2.12 feature-guide re-scope | a later sweep | UI.18 keeps the missing-input note |
 | Source reconciliation | operator-side, optional | §9 |
-| `.dark` block fate + `--destructive` red + off-ramp greys | token contract §3.4 / B-track | code-side, not CD |
+| .dark block fate + --destructive red + off-ramp greys | CLOSED at BRIDGE (2026-07-14): .dark descoped-inert, its two chromatic strays neutralized; --destructive → var(--color-n6) in both blocks; :root off-ramp greys superseded by the tier-2 var() re-point | contract §3.4 records the closures |
 
 ---
 
@@ -199,6 +202,7 @@ Reply-as-bet; mandatory argument on every buy; **selling is the only comment-fre
 **This canon supersedes (delete-after-verify from PK once DC.3 lands):** `DESIGN-phase-record.md` · `DESIGN-motion-consolidated.md` · `DESIGN-spec-changes-consolidated.md` · `DESIGN-copy-register-consolidated.md` · `DESIGN-PK-consolidation-manifest.md` (its program is complete). **Kept, standalone:** design-language v0.5 · design-token-contract v0.2 · the living guides · the mockups (§8) · the W2 close-outs (historical per-task records; canon is the current-state source).
 
 > **Changelog.**
+> **v1.1-draft (2026-07-14, BRIDGE):** canonical-set line → token contract v0.4 (branded dark values; monochrome era closed) + design-language v0.7; §11 `.dark`/`--destructive`/off-ramp row CLOSED (bridge swap); §10 gains three branding-session records (R-2 W2.4 digits-only timer · R-5 slot-header geometry supersession · R-3 W2.13 lockup note). Source: values-log v0_3 (committed alongside) + docs/plans/BRIDGE.md.
 > **v1.0-draft (2026-07-02, DC.1):** initial consolidation — absorbed the phase record + the three by-type consolidations; folded the five DC rulings (bookmark semantics · slippage/Option A · partial-sell-native · Discovery nav-identity · radio R2); reconciled Wave-2 done-state (**W2.9 OPEN**, **W2.12 descoped**, W2.7/W2.10 closed by ruling); recorded the design-language v0.5 fork-merge + token-contract v0.2 as canon members; built the per-surface mockup index + DC.3 commit list; seeded the CD fine-tune log (3 entries); homed every residual open item.
 
-*End design canon v1.0-draft. Committed at DC.3; branding (B1→B3) fills the token contract; DESIGN.SPEC derives the final value-filled `design.md`; DESIGN.HANDOVER consumes §8.*
+*End design canon v1.1-draft. Committed at DC.3; branding (B1→B3) fills the token contract; DESIGN.SPEC derives the final value-filled `design.md`; DESIGN.HANDOVER consumes §8.*

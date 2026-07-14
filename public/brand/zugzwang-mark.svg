@@ -1,0 +1,6 @@
+<svg id="zugzwang-logo-dark-transparent" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <polygon id="frame-top" fill="#FFFFFF" points="780.3,82.0 285.7,166.1 498.2,499.4 391.2,302.9 325.5,186.7 701.6,139.3 605.3,306.0 501.3,501.7 518.9,533.8 607.6,391.6 662.6,299.1 711.5,212.7"/>
+  <polygon id="sand-top" fill="#FFFFFF" points="435.6,358.7 500.5,471.1 564.7,358.7"/>
+  <polygon id="frame-bottom" fill="#FFFFFF" points="757.4,929.8 525.8,550.6 720.7,908.4 318.6,899.2 400.4,757.8 518.1,537.6 499.8,506.3 377.5,705.0 243.7,942.0"/>
+  <polygon id="sand-bottom" fill="#FFFFFF" points="684.8,887.7 593.0,728.7 392.0,792.2 336.9,888.5"/>
+</svg>

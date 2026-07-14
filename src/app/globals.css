@@ -47,39 +47,43 @@
 	--radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/* shadcn semantic slots — BRIDGE: re-pointed to the tier-2 brand primitives
+ * (the @theme block below; var() resolution is order-independent). */
 :root {
-	--background: oklch(1 0 0);
-	--foreground: oklch(0.145 0 0);
-	--card: oklch(1 0 0);
-	--card-foreground: oklch(0.145 0 0);
-	--popover: oklch(1 0 0);
-	--popover-foreground: oklch(0.145 0 0);
-	--primary: oklch(0.205 0 0);
-	--primary-foreground: oklch(0.985 0 0);
-	--secondary: oklch(0.97 0 0);
-	--secondary-foreground: oklch(0.205 0 0);
-	--muted: oklch(0.97 0 0);
-	--muted-foreground: oklch(0.556 0 0);
-	--accent: oklch(0.97 0 0);
-	--accent-foreground: oklch(0.205 0 0);
-	--destructive: oklch(0.577 0.245 27.325);
-	--border: oklch(0.922 0 0);
-	--input: oklch(0.922 0 0);
-	--ring: oklch(0.708 0 0);
-	--chart-1: oklch(0.87 0 0);
-	--chart-2: oklch(0.556 0 0);
-	--chart-3: oklch(0.439 0 0);
-	--chart-4: oklch(0.371 0 0);
-	--chart-5: oklch(0.269 0 0);
+	--background: var(--color-ground);
+	--foreground: var(--color-ink);
+	--card: var(--color-n0);
+	--card-foreground: var(--color-ink);
+	--popover: var(--color-n0);
+	--popover-foreground: var(--color-ink);
+	--primary: var(--color-n7);
+	--primary-foreground: var(--color-ground);
+	--secondary: var(--color-n1);
+	--secondary-foreground: var(--color-n7);
+	--muted: var(--color-n1);
+	--muted-foreground: var(--color-n5);
+	/* neutral wash, NOT a brand accent */
+	--accent: var(--color-n1);
+	--accent-foreground: var(--color-n7);
+	--destructive: var(--color-n6); /* neutralized (WI-11) */
+	--border: var(--color-n2);
+	--input: var(--color-n2);
+	--ring: var(--color-n4);
+	--chart-1: var(--color-n7);
+	--chart-2: var(--color-n5);
+	--chart-3: var(--color-n4);
+	--chart-4: var(--color-n3);
+	--chart-5: var(--color-n2);
 	--radius: 0.625rem;
-	--sidebar: oklch(0.985 0 0);
-	--sidebar-foreground: oklch(0.145 0 0);
-	--sidebar-primary: oklch(0.205 0 0);
-	--sidebar-primary-foreground: oklch(0.985 0 0);
-	--sidebar-accent: oklch(0.97 0 0);
-	--sidebar-accent-foreground: oklch(0.205 0 0);
-	--sidebar-border: oklch(0.922 0 0);
-	--sidebar-ring: oklch(0.708 0 0);
+	/* --sidebar-*: mechanical mirror of the corresponding --X slots (OQ-8) */
+	--sidebar: var(--color-n0);
+	--sidebar-foreground: var(--color-ink);
+	--sidebar-primary: var(--color-n7);
+	--sidebar-primary-foreground: var(--color-ground);
+	--sidebar-accent: var(--color-n1);
+	--sidebar-accent-foreground: var(--color-n7);
+	--sidebar-border: var(--color-n2);
+	--sidebar-ring: var(--color-n4);
 }
 
 .dark {
@@ -97,7 +101,7 @@
 	--muted-foreground: oklch(0.708 0 0);
 	--accent: oklch(0.269 0 0);
 	--accent-foreground: oklch(0.985 0 0);
-	--destructive: oklch(0.704 0.191 22.216);
+	--destructive: var(--color-n6);
 	--border: oklch(1 0 0 / 10%);
 	--input: oklch(1 0 0 / 15%);
 	--ring: oklch(0.556 0 0);
@@ -108,7 +112,7 @@
 	--chart-5: oklch(0.269 0 0);
 	--sidebar: oklch(0.205 0 0);
 	--sidebar-foreground: oklch(0.985 0 0);
-	--sidebar-primary: oklch(0.488 0.243 264.376);
+	--sidebar-primary: var(--color-n7);
 	--sidebar-primary-foreground: oklch(0.985 0 0);
 	--sidebar-accent: oklch(0.269 0 0);
 	--sidebar-accent-foreground: oklch(0.985 0 0);
@@ -117,45 +121,93 @@
 }
 
 /*
- * Zugzwang monochrome design tokens — minted at SHELL/UI.0 (the DESIGN.7
- * token mint). The locked v1.0 system (design-language §1.2/§2.1) is
- * monochrome: a true-neutral grey ramp (chroma 0) + the two side poles.
- * OKLCH only (AGENTS.md §8). These are the real design-system values, not a
- * placeholder. Provenance: docs/design/design-language.md §2.1.
+ * Zugzwang branded dark tokens — the BRIDGE swap (values-log v0_3 §3 mirrored
+ * into the frozen contract slots; ratified 2026-07-14). Single dark theme on a
+ * near-black ground; still strictly monochrome (achromatic, R == G == B). Hex
+ * is authoritative in @theme (AGENTS.md §8); oklch may appear in comments
+ * only. Provenance: docs/design/ZUGZWANG-BRAND_agenda-and-values-log_v0_3.md
+ * §3 + docs/design/design-token-contract.md.
  */
 @theme {
-	/* Neutral ramp — Tailwind-neutral OKLCH equivalents of the design-language
-	 * hex (deterministic conversion; pure greys -> chroma 0). Generates the
-	 * bg-n, text-n, border-n utilities. The shadcn semantic :root ramp below
-	 * already resolves to these same greys (intentional duplication: --color-n*
-	 * is the design-system vocabulary, the semantic tokens the shadcn one). */
-	--color-n0: oklch(1 0 0);
-	--color-n1: oklch(0.971 0 0);
-	--color-n2: oklch(0.922 0 0);
-	--color-n3: oklch(0.871 0 0);
-	--color-n4: oklch(0.708 0 0);
-	--color-n5: oklch(0.556 0 0);
-	--color-n6: oklch(0.371 0 0);
-	--color-n7: oklch(0.205 0 0);
-	--color-ink: oklch(0.145 0 0);
-	/* YES side = black — frozen post-side; NOT Support (design-language §1.3/§2.1) */
-	--color-yes: oklch(0.145 0 0);
-	/* NO side = white */
-	--color-no: oklch(1 0 0);
+	/* Page ground — outside the census alternation; generates bg-ground. */
+	--color-ground: #181818;
+	/* Neutral ramp — true-neutral dark greys, transcribed verbatim from the
+	 * values-log (never derived from the retired light ramp: the ramp is
+	 * inverted — n0 is now the darkest card surface, n7 the brightest
+	 * emphasis). Generates the bg-n, text-n, border-n utilities. The shadcn
+	 * semantic :root block above aliases these same primitives. */
+	--color-n0: #212121;
+	--color-n1: #2a2a2a;
+	--color-n2: #404040;
+	--color-n3: #545454;
+	--color-n4: #747474;
+	--color-n5: #989898;
+	--color-n6: #bdbdbd;
+	--color-n7: #e4e4e4;
+	--color-ink: #fafafa;
+	/* Side poles — YES = black, NO = white, locked to the SIDE and frozen
+	 * post-side; NOT Support (design-language §1.3/§2.1). Value retune only
+	 * (R-1): the binding is untouched by the BRIDGE re-value. */
+	--color-yes: #181818;
+	--color-no: #fafafa;
+	/* Geist ratified FINAL (values-log item 2 / WI-13) */
 	--font-sans: var(--font-geist-sans);
 	--font-mono: var(--font-geist-mono);
 }
 
 /*
- * SHELL/UI.0 raw custom properties — NOT utility-generating; consumed directly
- * via var() by participant surfaces. The --color-n* ramp above is emitted to
- * :root by @theme, so var(--color-n2) resolves here. This block does NOT edit
- * the shadcn semantic :root ramp above.
+ * Raw custom properties — NOT utility-generating; consumed directly via var()
+ * by participant surfaces (SHELL/UI.0 mint, extended by the BRIDGE swap:
+ * applied semantics, interaction states, elevation, radii). The --color-*
+ * primitives above are emitted to :root by @theme, so var(--color-n2)
+ * resolves here. This block does NOT edit the shadcn semantic :root ramp.
  */
 :root {
 	--hairline: 1px solid var(--color-n2);
 	--imgmax: 160px; /* tunable — comment-image max (consumed by DEBATE.4) */
-	--imgr: 6px; /* image corner radius — CD-DEFERRED placeholder; finalized at the branding pass */
+	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, avatars, media, graph panels) */
+	/* Applied surfaces */
+	--surface-page: var(--color-ground);
+	--surface-inset: var(--color-n1);
+	--btn-fill: var(--color-ground);
+	/* Text roles */
+	--text-primary: var(--color-ink);
+	--text-body: var(--color-n6);
+	--text-meta: var(--color-n5);
+	--text-faint: var(--color-n4);
+	/* Borders + overlay — --border-strong kept as an alias; the old
+	 * ink-emphasis treatment is retired */
+	--border-strong: var(--color-n2);
+	--overlay: rgb(10 10 10 / 0.6);
+	/* Graph series — the two-line debate graph; YES is a deliberately off-ramp
+	 * grey (the black pole cannot render on the dark ground). */
+	--graph-yes: #737373;
+	--graph-no: #fafafa;
+	/* Interaction states */
+	--state-hover-fill: var(--color-n1);
+	--state-pressed-fill: #333333; /* minted mid-step n1→n2 */
+	--state-hover-border: var(--color-n3);
+	--state-focus-ring: 0 0 0 2px rgb(255 255 255 / 0.32);
+	--state-focus-ring-pole:
+		0 0 0 2px var(--color-n0), 0 0 0 4px rgb(255 255 255 / 0.32);
+	--state-hover-glow-pole: 0 0 8px 0 rgb(255 255 255 / 0.22);
+	--state-pressed-glow-pole: 0 0 8px 2px rgb(255 255 255 / 0.34);
+	--state-disabled-opacity: 0.5;
+	/* Elevation — dark treatment: inner top-light + layered drop shadows */
+	--elev-0: none;
+	--elev-1: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.4);
+	--elev-2:
+		inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.4),
+		0 6px 16px rgb(0 0 0 / 0.5);
+	--elev-3:
+		inset 0 1px 0 rgb(255 255 255 / 0.08), 0 4px 12px rgb(0 0 0 / 0.45),
+		0 16px 40px rgb(0 0 0 / 0.6);
+	/* Radii + interaction timing (values-log §3 item 2) */
+	--r: 8px;
+	--r-chip: 4px;
+	--r-dot: 3px;
+	--avatar-ring: 1px solid var(--color-n2); /* ≡ dump literal 1px solid #404040 — var-alias form ratified (OQ-6) */
+	--dur-hover: 0.12s ease; /* ratified (OQ-5) */
 }
 
 @layer base {
