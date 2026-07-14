@@ -338,3 +338,15 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** HARDEN.* pre-launch security pass (fires together with the SCAFFOLD.3-FOLLOWUP-1 SURPRISE-1 row), OR first observed abuse pattern hitting a per-IP cap.
 
 **Expected next task.** The same HARDEN task as SURPRISE-1 — a single trusted-IP sweep across all seven leftmost-XFF parse sites; the canonical site list (parser · file:line · what each keys) is the enumeration table in `docs/logs/AUDIT-INV-A12.md`. Severity context there too: AUDIT-INV-A12 confirmed A12 = G3 (Vercel overwrites inbound XFF on this deployment), so the sweep is consistency hardening, not a live spoof fix.
+
+## EXTAUDIT-05 deviation (d) — unused `eq` import warning in moderation-blocked-event test
+
+**Originating task:** EXTAUDIT-05 handover-deck gates (2026-07-14); surfaced by `just check` during the deck PR's verify pass (PR #220).
+
+**Deferred work.** `tests/server/moderation/moderation-blocked-event.test.ts:1` imports `eq` from `drizzle-orm` unused — Biome `lint/correctness/noUnusedImports`, warning severity, FIXABLE. One-line deletion.
+
+**Why deferred.** Pre-existing (AUDIT-FIX-B5 era, PR #205 lane); EXTAUDIT-05 is a docs-only lane (§5.3 surgical-changes — no adjacent code edits). Warning does not fail `biome check` or CI (ci green on #220).
+
+**Conditional trigger.** Next code-adjacent sweep or any task already touching `tests/server/moderation/`.
+
+**Expected next task.** Any SWEEP.* / HARDEN.* touching test hygiene — a `biome check --write` on the one file closes it.
