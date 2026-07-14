@@ -200,7 +200,7 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 **Decision log** (`DECIDE` = a settled call this file encodes; newest first):
 
-- Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v15` is planning/sequencing only.
+- Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v16` is planning/sequencing only.
 - Doc authorship: AGENTS.md is descriptive (CC-authored from the live repo); CLAUDE.md is the contract (web-drafted invariants + CC-verified file-map refs).
 - Market media (ADR-0026): admin-set per-market pool — new `market_media` table (Bucket C, no `user_id`); third R2 bucket arm `market-media` (`m/<marketId>/`); reference-model pick-from-pool via `comments.market_media_id` + not-both-set CHECK; `markets.media_video_url` outbound YouTube (new tab); admin-context upload moderation, pick path pre-vetted. Spec lane only (SPEC.1 1.0.11 / SPEC.2 1.0.12); display + admin-upload + composer-pick are three ritual-gated build tasks (new migration 0018→0019 at execute).
 - Debate `.md` export (ADR-0025): on-demand read-only `GET /m/[slug]/export`; masking inherited from `loadDebateView` (removed content never exported); text-only single file with a version-pinned `zugzwang.md` context block prepended. Amends SPEC.1 §21.3.
