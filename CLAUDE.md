@@ -15,7 +15,7 @@
 The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
-- **Source of truth:** `SPEC.1` (product, 1.0.14) + `SPEC.2` (technical) + `docs/adr/0003–0031` are canonical. `tracker_v15.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
+- **Source of truth:** `SPEC.1` (product, 1.0.14) + `SPEC.2` (technical) + `docs/adr/0003–0031` are canonical. `tracker_v16.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
 - **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
@@ -215,7 +215,7 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 - IDs are UUIDv7 (ADR-0016); no raw UUIDs in participant-facing URLs.
 - Two-instrument architecture: Dharma is soulbound (this repo); Artha is transferable and arrives at testnet — not in the web2 experiment.
 - Conclusion freeze is 2026-11-05 23:59 UTC; the public dataset (the only place K_eff is derived) is dated 2026-11-06.
-- Moderation runs **outside** the bet transaction and fails closed on terminal errors (ADR-0014); CSAM via PhotoDNA + image classifier.
+- Moderation runs **outside** the bet transaction and fails closed on terminal errors (ADR-0014); the built gate is the OpenAI omni-moderation pre-commit check, with a Sentry CSAM escalation seam (`csam_auto_report_pending`); PhotoDNA/NCMEC integration is parked (`docs/parked.md`).
 - RLS out of scope for the experiment (ADR-0019).
 - Same-commit doctrine: fixes to guardrail mechanisms are absorbed in-session, never deferred.
 - CC on Claude Opus 4.8, pin `claude-opus-4-8` (reverts the 2026-06-10 Fable 5 pin; Fable currently unavailable); subagents pin `model: claude-opus-4-8` / `effort: max`; effort default `max` (highest always); `ultracode` / dynamic workflows default for low-stakes reversible work, **never** critical paths or DDL; `CLAUDE_CODE_EFFORT_LEVEL` retired.
