@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.14 (semver; bump major on invariant changes)
-- **Last updated:** 2026-07-07
+- **Version:** 1.0.15 (semver; bump major on invariant changes)
+- **Last updated:** 2026-07-15
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -76,7 +76,7 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 | **Review queue** | Admin queue surface for Track B flagged comments and AI-generated brand-account posts. | `/admin/moderation`, `/admin/social-queue` |
 | **CPMM** | Constant-product market maker. The pricing rule for share trades. Standard form: `x · y = k`. | `src/server/cpmm/` |
 | **Stake** | The Dharma amount committed to a bet. Bought back on sell; settled on resolution. | `bets.stake` |
-| **Slippage** | The price impact of a single trade against thin liquidity. | computed pre-confirm |
+| **Slippage** | The internal price impact of a single trade against thin liquidity (\|p1 − p0\|, absolute probability points). | Internal quantity; shown in the non-blocking bet preview — not a confirmation gate (warning retired, §7). |
 | **Ranking model** | Open-source, deterministic, universal model ordering posts and replies in the debate view. Posts: the **Top** multi-lane composite (default) or a single-axis filter mode (Most Debated, Highest Stakes, Contested, Newest; Surging deferred to v1.x). Replies: stake-descending within side. Reads four per-side reply-bet aggregates (`support_count`, `counter_count`, `support_dharma`, `counter_dharma`) plus author stake and age — every input requires committing Dharma to generate. Read-time-computed; auditable from the public dataset; not an audit event. Locked by **ADR-0017** (supersedes ADR-0009); math lives in `RANKING.md`. | `RANKING.md`, `src/lib/ranking.ts`, `src/lib/ranking.config.ts` |
 | **Single-side rule** | Per-market constraint: a user holds a position on at most one side at a time. Enforced at the `(user_id, market_id)` position layer. To switch sides, exit fully then re-enter via a fresh commented bet. | enforced in `src/server/bets/place.ts` |
 | **Post floor / Reply floor** | The two asymmetric minimum-bet floors (ADR-0018). **Post floor** (low, ranged) is the minimum stake on a top-level bet; **reply floor** (pinned at 50 Dharma) is the higher minimum stake on a reply-bet. Reply floor > post floor by design — it is the lever on ADR-0017's conceded reply-level C > n. | `BET_MIN_STAKE_POST`, `BET_MIN_STAKE_REPLY` (§16.1) |
@@ -271,7 +271,7 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 
 **Single-side rule.** A user holds a position on at most one side of a market at any moment. The entry bet (F-BET-1) commits the user to that side for the duration of their participation in that market. Subsequent buys must be on the same side (F-BET-2). The opposite side cannot be bought while a position is held; to switch sides, the user must first sell their entire position to zero (F-BET-3) and then re-enter with a fresh commented bet. This is a spec-level rule, not an invariant — enforced structurally by the partial unique index `positions_one_held_side_idx` on `positions (user_id, market_id) WHERE quantity > 0` (at most one *held* position row per user-market), with the pre-condition checks on F-BET-1 and F-BET-2 and the F-BET-10 opposite-side rejection as the application-layer frontstop. Rationale: a stake is an argument, and a user cannot meaningfully argue both sides of a contested question simultaneously.
 
-**Every buy is a commented bet (v1.9.0 reply-as-bet model, per ADR-0017 / ADR-0018).** There is no comment-free buy and no comment without a stake (INV-1). A buy whose comment has no `parent_comment_id` is a **post** (top-level argument; clears the **post floor**, `BET_MIN_STAKE_POST`). A buy whose comment carries a `parent_comment_id` is a **reply** (a Support/Counter reply-bet under a parent; clears the higher **reply floor**, `BET_MIN_STAKE_REPLY` = 50). Both are bets: both move the CPMM price, buy shares on the user's held side, and append to the ledger. The post/reply distinction governs only the floor and the `parent_comment_id`. Selling (F-BET-3) is the sole exception — it is a position unwind, not an argument, and carries no comment.
+**Every buy is a commented bet (v1.9.0 reply-as-bet model, per ADR-0017 / ADR-0018).** There is no comment-free buy and no comment without a stake (INV-1). A buy whose comment has no `parent_comment_id` is a **post** (top-level argument; clears the **post floor**, `BET_MIN_STAKE_POST`). A buy whose comment carries a `parent_comment_id` is a **reply** (a Support/Counter reply-bet under a parent; clears the higher **reply floor**, `BET_MIN_STAKE_REPLY` = 50). Both are bets: both move the CPMM price, buy shares on the user's held side, and append to the ledger. The post/reply distinction governs only the floor and the `parent_comment_id`. Buy/add stake is clamped to `BET_MAX_STAKE` (§16.1); sell is never clamped. Selling (F-BET-3) is the sole exception — it is a position unwind, not an argument, and carries no comment.
 
 ### F-BET-1 — Entry bet+comment (atomic)
 
@@ -333,13 +333,19 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 - **Invariants.** None.
 - **Acceptance.** `tests/server/bets/auth.test.ts::banned-user-rejected`.
 
-### F-BET-9 — Slippage above threshold
+### F-BET-9 — Slippage warning — RETIRED (1.0.15)
 
-- **Pre.** User submits bet whose computed price impact exceeds `SLIPPAGE_WARNING_PCT_THRESHOLD`.
-- **System.** Pre-confirm modal: "Price will move from X to Y — confirm?" (per `G1`). On user confirmation, bet proceeds via F-BET-1 or F-BET-2.
-- **Response.** Modal then bet response.
-- **Invariants.** None special.
-- **Acceptance.** `tests/server/bets/slippage.test.ts::warning-modal-triggered`.
+The pre-confirm slippage-warning modal is removed. Basis: design-canon
+§4 ruling 2 (W2.10 Option A, operator-ratified 2026-06-27). Deep-liquidity
+seeding + the per-bet maximum stake (`BET_MAX_STAKE`, §16.1) keep price
+impact sub-threshold by construction, so no per-trade warning modal is
+built. Overspend protection is the `BET_MAX_STAKE` clamp (buy/add only;
+sell never clamps), not a confirmation gate. The price-impact quantity is
+retained for the non-blocking bet preview (cpmm.md §6.1/§6.3) and remains
+in `computeBuy`/`computeSell` returns (cpmm.md §13). No test asserts a
+warning modal — none was built (the aspirational acceptance path never
+existed). Supersedes the former pre-confirm flow. See §16.1
+(`BET_MAX_STAKE`), §16.2, §19 Q4.
 
 ### F-BET-10 — Opposite-side buy attempt (rejected)
 
@@ -969,7 +975,7 @@ Symbolic only. Specific values → number-tuning pass (target: 2026-09-01).
 | `BET_MIN_STAKE_REPLY` | Minimum stake on a reply-bet. **Pinned at 50** (higher than the post floor; the lever on ADR-0017's reply-level C > n, per ADR-0018). |
 | `COMMENT_MAX_LENGTH` | Maximum comment text length. |
 | `REPLY_DEPTH_MAX` | Maximum reply nesting depth. Pinned to 1 by ADR-0017 (flat replies — a reply cannot itself be replied to). Not deferred to number-tuning pass. |
-| `SLIPPAGE_WARNING_PCT_THRESHOLD` | Threshold above which slippage modal triggers (per `G1`). |
+| `BET_MAX_STAKE` | Maximum Dharma stake accepted per bet. Buy/add stake above this is clamped to `BET_MAX_STAKE` before the CPMM computation; sell is never clamped. The overspend guard replacing the retired slippage warning (§7); the clamped result is surfaced in the non-blocking preview (cpmm.md §6.3). Value TBD at number-tuning (~2026-09-01). |
 | `IN_FLIGHT_BET_TIMEOUT_SEC` | Window during which `Resolving`-state in-flight bets may commit (per `G6`). |
 | `POLL_INTERVAL_MS_DEBATE_VIEW` | Debate-view poll interval (per `C7`). |
 | `OTP_TTL_MIN` | Email-OTP time-to-live (per `K1`). |
@@ -995,7 +1001,6 @@ Each F-flow already names its errors inline. This subsection is a cross-referenc
 | Comment held in admin review (Track B) | "Comment under review" surface on user's *own* profile only. | Hidden from public; queue row written. |
 | User banned mid-session | 403 with notice; session cookie remains but write paths reject. | F-MOD-5. |
 | AI moderation false-positive ban | No appeal in v1. User contacts admin via `foundation@zugzwangworld.com`. Admin can manually reverse via append-only correction event. | Mitigation owned by sample-content testing + threshold tuning. |
-| Slippage above threshold | Confirmation modal with from/to prices. | Per `G1`; transaction proceeds on confirm. |
 | Network failure on bet | Idempotency key prevents duplicate submission. | Client retries on key-aware endpoint. |
 | Erasure-request (banned or active user) | "30-day verification window pending". | Per `H2`; pseudonym scrubbed at window end. |
 | Admin queue overload | Latency on Track B reviews increases. | Mitigation: tighten thresholds, narrow categories — sample-content testing window flags this. |
@@ -1077,7 +1082,6 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `bet-race::closed-mid-bet` | §7 F-BET-5 | — |
 | `bet-race::in-flight-resolving` | §7 F-BET-6 | INV-1 |
 | `bet-auth::banned-user-rejected` | §7 F-BET-7 | — |
-| `bet-slippage::warning-modal` | §7 F-BET-9 | — |
 | `bet-single-side::opposite-side-rejected` | §7 F-BET-10 | — |
 | `bets::concurrency-serializable-isolation-enforced` | ADR-0013 §1 | INV-1 |
 | `bets::concurrency-pool-row-lock-acquired` | ADR-0013 §1 | INV-1 |
@@ -1298,7 +1302,7 @@ Numbered. Each: question, default behaviour shipped now, decider, resolve-by dat
 | Q1 | AI flag thresholds (per category, per track) | Conservative starting values; sample-content tested. | Hrishikesh + sample-content test | 2026-09-01 |
 | Q2 | Image classifier vendor (Rekognition / Sightengine / Hive) | TBD; selected via implementation pass. | Engineering implementation pass | Before launch |
 | Q3 | PhotoDNA / equivalent CSAM hash service onboarded | In progress; weeks-long onboarding initiated. | Hrishikesh | Before launch |
-| Q4 | Specific rate-limit values, slippage threshold, equal initial grant + Daily Credit amounts, post floor (`BET_MIN_STAKE_POST`), seed magnitude, comment length, OTP TTL, poll interval, in-flight timeout, Top lane ratios + activity floors + gravity decay constants (ADR-0017) | All deferred; symbolic constants only in §16.1. **Reply floor `BET_MIN_STAKE_REPLY` (50) and `REPLY_DEPTH_MAX` (1) are pinned, not deferred** (ADR-0018 / ADR-0017). | Number-tuning pass | 2026-09-01 |
+| Q4 | Specific rate-limit values, per-bet stake cap (`BET_MAX_STAKE`), equal initial grant + Daily Credit amounts, post floor (`BET_MIN_STAKE_POST`), seed magnitude, comment length, OTP TTL, poll interval, in-flight timeout, Top lane ratios + activity floors + gravity decay constants (ADR-0017) | All deferred; symbolic constants only in §16.1. **Reply floor `BET_MIN_STAKE_REPLY` (50) and `REPLY_DEPTH_MAX` (1) are pinned, not deferred** (ADR-0018 / ADR-0017). | Number-tuning pass | 2026-09-01 |
 | Q5 | ToS final wording | Drafted; lawyer-review pending. | Lawyer | Mid-July 2026 |
 | Q6 | First market content | TBD; refusal rule — Claude does not invent market content. | Hrishikesh alone (per `J1`) | Before launch |
 | Q7 | Notifications design | No v1 surface; users discover by visiting pages. | Separate notifications workstream | Mid-experiment |
@@ -1350,6 +1354,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-06-30 | 1.0.12 | §0, §8, §15, §20 | **ADR-0027 — admin market-media direct upload (no moderation)** (same-commit with accepted ADR-0027; paired with SPEC.2 → 1.0.13). §15 F-ADMIN-1: admin market-media moderation clause removed — operator-curated trusted content, not routed through the participant UGC moderation pipeline (admin is structurally not a participant per F-AUTH-ADMIN); admin signed-PUT writes the `market_media` row directly; error `media_moderation_blocked` removed. §8 F-COMMENT-3: picked-pool-image fast-path justification reworded 'already moderated / pre-vetted' → 'operator-curated trusted content, outside the UGC moderation model' (behaviour unchanged; only the rationale changes); the F-COMMENT-3 Errors line clarified (own-upload moderation codes vs pick-validation codes). §0 → 1.0.12. Participant image/comment moderation (§8/§10/ADR-0014) unchanged and unaffected. | ADR-0027 supersedes ADR-0026 §D4: the sole uploader is the trusted operator; the moderation pipeline gates untrusted UGC and does not apply to operator curation. CSAM-hash-only-on-admin considered + rejected (no scan-all obligation identified for the experiment phase). | ADR-0027 |
 | 2026-06-30 | 1.0.13 | §15, §20 | MEDIA.1 footprint — §15 F-ADMIN-1 Errors gains `market_id_conflict` (client-supplied UUIDv7 PK collides on the strict insert-only create; never overwrites; impl 9ded789). §0 → 1.0.13. | MEDIA.1 |
 | 2026-07-07 | 1.0.14 | §0; §7 F-BET-1; §20 | **SYNC sweep — §0/§20 metadata catch-up for four rider tasks** (paired with SPEC.2 → 1.0.17; pays the `docs/parked.md` SYNC-sweep entry). Records the already-landed same-commit riders: **A1 §16.5** CSAM-compliance swap-window-closure note (PR #197, `4350406`); **B3 §7 F-BET-3** oversell `insufficient_shares` pre-check + error/acceptance rows + `bet_receipts` durable-backing note (ADR-0031; PR #202, `6244dce`); **B7a §7 F-BET-1** C.length semantics rider (lower bound trimmed / upper raw / stored ≡ moderated; AUDIT.1 A24 ruling — ADR-0015 Patch record, no new ADR; PR #211, `7dabdc9`); **B8 §16.3 H3** admin-null clarifier (admin-surface rows log `user_id` = JSON `null`; AUDIT.1 A17/B8 ruling; PR #216, `f0be380`). B1 and B2 did not touch SPEC.1. **New in this pass (pre-existing enumeration drift):** §7 F-BET-1 **Errors** row gains 400 `comment_requires_bet` — the code has thrown it since DEBATE.1 (cf. the F-BET-1 C.length rider + §8 F-COMMENT-5's response inventory); the row's enumeration simply omitted it. §0 → 1.0.14. | Periodic SYNC reconciliation per CLAUDE.md §7 — rider substance landed same-commit with its tasks; only version/changelog metadata + the one enumeration fix are swept here | — |
+| 2026-07-15 | 1.0.15 | §0; §2; §7; §16.1; §16.2; §17; §19 Q4; §20; Appendix B | **F-BET-9 slippage warning RETIRED** (design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §7 F-BET-9 tombstoned (heading/ID retained; full removal → MAINT.15); §2 glossary Slippage row reframed to the internal quantity (non-blocking preview, no confirmation gate); `SLIPPAGE_WARNING_PCT_THRESHOLD` removed (§16.1, §16.2 failure row, §17 `bet-slippage::warning-modal` test row, §19 Q4, Appendix B); `BET_MAX_STAKE` added as the buy/add-only overspend clamp (§16.1 row + §7 preamble rider; sell is never clamped; value TBD → number-tuning). Price-impact quantity retained for the non-blocking preview (cpmm.md §6 — paired cpmm.md 2.1.0 bump, same commit). Doc-only; no code (buy composer unbuilt). Deferred: SPEC.2 F-BET-9 title drift + flow-inventory arithmetic + `flows/F-BET-9.md` full removal → MAINT.15 (skeleton carries a one-line RETIRED header); SPEC.2 §3.2 vestigial retry-example word → next SYNC sweep. | Spec outranks canon on prescriptive surfaces — SPEC.1 reconciled to the ruled design (W2.10 Option A). No new ADR: the decision is canonical in design-canon §4 ruling 2; a third record would be redundant. | — |
 
 ---
 
@@ -1463,7 +1468,7 @@ MARKET_TITLE_MAX_CHARS = TBD  # admin market title (question) ceiling — SA-L-1
 MARKET_DESCRIPTION_MAX_CHARS = TBD  # admin market description (resolution criterion) ceiling — SA-L-1 (ENGINE.15 R-15-G)
 RESOLUTION_REASON_MAX_CHARS = TBD  # resolution/correction/void reason ceiling — SA-L-1 (ENGINE.15 R-15-G)
 REPLY_DEPTH_MAX = 1  # pinned by ADR-0017 (flat replies; not deferred to tuning pass)
-SLIPPAGE_WARNING_PCT_THRESHOLD = TBD
+BET_MAX_STAKE = TBD
 IN_FLIGHT_BET_TIMEOUT_SEC = TBD
 POLL_INTERVAL_MS_DEBATE_VIEW = TBD
 OTP_TTL_MIN = TBD
