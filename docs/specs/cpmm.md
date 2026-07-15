@@ -5,11 +5,11 @@
 | Field | Value |
 |---|---|
 | **Document** | `cpmm.md` — CPMM math companion (named in SPEC.2 §0 companion files + §1.4 #2) |
-| **Version** | 2.0.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
-| **Date** | 2026-07-07 |
+| **Version** | 2.1.0 (semver; MAJOR on any change to a formula or invariant, MINOR on clarifications) |
+| **Date** | 2026-07-15 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Status** | Authored at ENGINE.1 (web-authored, founder-ratified, CC-committed) |
-| **Gates** | ENGINE.2 (module `src/server/cpmm/`), ENGINE.3 (property tests), DESIGN.4 (slippage modal) |
+| **Gates** | ENGINE.2 (module `src/server/cpmm/`), ENGINE.3 (property tests); the former DESIGN.4 slippage-modal gate is retired — SPEC.1 §7 (1.0.15) |
 | **Authority** | Canonical for every CPMM formula and the numeric policy. SPEC.1 §10 owns the economic *rules*; SPEC.2 §3.2 / §3.6 own the *execution context*. On conflict over a formula, this file wins; on conflict over product behaviour, SPEC.1 wins. |
 | **Lineage** | Derived from Manifold's CPMM (MIT) — see §2 |
 | **License** | AGPL-3.0-or-later (repo-wide, ADR-0001), incorporating MIT-licensed upstream with attribution (§2; full notice in `THIRD_PARTY_NOTICES.md`) |
@@ -19,8 +19,9 @@
 This file defines the exact, deterministic mathematics of the experiment's market
 maker: a **fee-less, admin-seeded, binary (YES/NO) constant-product market maker**,
 one per market. Every Dharma-denominated quantity the engine produces when a bet is
-placed (§4), a position is sold (§5), a slippage warning is computed (§6), a pool is
-seeded (§7), or a market terminates (§8) is defined here and only here. SPEC.2 names
+placed (§4), a position is sold (§5), the price impact is computed for the
+non-blocking bet preview (§6), a pool is seeded (§7), or a market terminates
+(§8) is defined here and only here. SPEC.2 names
 *that* the bet handler computes "CPMM share-payout per `cpmm.md`"; it deliberately
 does not duplicate the math (SPEC.2 §1.4 #2). RANKING.md is this file's sibling: one
 companion spec per published, auditable model.
@@ -52,9 +53,9 @@ pre-launch curation slate of ordinary commented bets moves the price from 0.5 to
 per-market level chosen for the question, under full operator control, before
 public availability (§7.2).
 
-**Numbers.** This file pins **no magnitudes**. Seed sizes, bet floors, and
-`SLIPPAGE_WARNING_PCT_THRESHOLD` remain symbolic constants owned by SPEC.1 §16.1 and
-pin at the number-tuning pass (~2026-09-01).
+**Numbers.** This file pins **no magnitudes**. Seed sizes and bet floors
+remain symbolic constants owned by SPEC.1 §16.1 and pin at the
+number-tuning pass (~2026-09-01).
 
 ## §2 Lineage, license & attribution
 
@@ -189,7 +190,8 @@ side's probability. The §3.3 reading of reserves as a price is literal.
 
 A buy computation returns the bundle **{s, a′, b′, p0, p_eff, p1}** (decimal
 strings, §10). These feed the bet row and ledger delta (W-1), the events
-payload, and the §6 slippage preview. Nothing else about a buy — floors,
+payload, and the §6.1 impact quantity / §6.3 non-blocking preview. Nothing
+else about a buy — floors,
 moderation, idempotency, position bookkeeping — is computed here (§1).
 
 ## §5 Sell
@@ -258,25 +260,12 @@ the trade side. **Impact** is the spot move caused by the trade itself:
 
 For a buy, impact = p1 − p0 > 0; for a sell, p0 − p1 > 0.
 
-### 6.2 Warning trigger (F-BET-9)
-
-The slippage warning modal triggers when, at preview time,
-
-    impact > SLIPPAGE_WARNING_PCT_THRESHOLD        (strict)
-
-The threshold is a symbolic constant owned by SPEC.1 §16.1 (value at
-number-tuning); it is expressed in the same unit as impact: absolute
-probability points (e.g. a threshold of 0.05 fires on any trade that would
-move the displayed price by more than five points). Per SPEC.1 §16.1/F-BET-9
-the modal shows the from/to prices (p0 → p1) and the **transaction proceeds
-on confirm** — there is no tolerance parameter and no auto-abort in v1.
-
-Rationale for points over relative change: the modal's specced content *is*
-the from/to delta; relative impact diverges as p0 → 0 and would fire
-disproportionately on small absolute moves at the tails — penalising
-exactly the low-p conviction bets whose convex payoff the thesis prizes
-(SPEC.1 §10.3); and |Δp_yes| = |Δp_no|, so the definition is independent of
-which side's probability a surface happens to display.
+Impact is measured in **absolute probability points**, not relative
+change: relative impact diverges as p0 → 0 and would overweight small
+absolute moves at the tails — penalising exactly the low-p conviction
+bets whose convex payoff the thesis prizes (SPEC.1 §10.3) — and
+|Δp_yes| = |Δp_no|, so the definition is independent of which side's
+probability a surface happens to display.
 
 ### 6.3 Preview semantics
 
@@ -288,15 +277,19 @@ formulas, possibly different numbers. (Recorded fact, not a defect: v1 has
 no slippage-tolerance abort by SPEC.1's design; revisiting that is a SPEC.1
 product question, out of scope here.)
 
-### 6.4 DESIGN.4 consumable
+### 6.4 Preview consumable
 
-The preview bundle for the modal (and any confirm surface) is:
+The preview bundle for the non-blocking bet preview (the buy/sell composer
+surface) is:
 
-    { side, S | s, shares_or_proceeds, p0, p1, p_eff, impact, threshold }
+    { side, S | s, shares_or_proceeds, p0, p1, p_eff, impact }
 
-DESIGN.4 must render p0 → p1 (mandatory per SPEC.1 §16.1) and may render
-p_eff and the share/proceeds quantity; presentation precision is a display
-concern (§10 fixes stored precision at 18 dp; UI rounding is design.md's).
+The preview renders price (p0 → p1), shares, and cost-or-proceeds — a
+display, not a gate: no modal, no threshold, no confirm step (warning
+retired — SPEC.1 §7, 1.0.15). The caller applies the per-bet stake cap
+(SPEC.1 §16.1) before `computeBuy`, so on a clamped buy these figures
+reflect the clamped stake. Presentation precision is a display concern
+(§10 fixes stored precision at 18 dp; UI rounding is design.md's).
 
 ## §7 Pool seed & opening price
 
@@ -671,9 +664,11 @@ module reads no clock, no environment, no randomness.
 
 Fees of any kind; order books and limit orders; multi-outcome markets;
 curve weights (p ≠ ½) and asymmetric seeds (§7.3 — reopening is an ADR);
-mid-market liquidity operations (SPEC.1 §10.6); slippage tolerance or
-auto-abort (§6.3 — a SPEC.1 product question); numeric magnitudes (seed C,
-floors, threshold — SPEC.1 §16.1, number-tuning); DB column names (SPEC.2
+mid-market liquidity operations (SPEC.1 §10.6); slippage tolerance,
+auto-abort, or per-trade warning — retired by ruling, not open (design-canon
+§4 ruling 2, W2.10 Option A: deep-liquidity seeding + the SPEC.1 §16.1
+per-bet stake cap; SPEC.1 §7, 1.0.15); numeric magnitudes (seed C, floors,
+the per-bet stake cap — SPEC.1 §16.1, number-tuning); DB column names (SPEC.2
 Appendix B.3); UI presentation and display rounding (design.md / DESIGN.4);
 event-type minting (ENGINE.0's vocabulary is closed; §8 uses existing
 types and tables); admin trading (structurally impossible, SPEC.1 §10.1);
@@ -685,3 +680,4 @@ the curation slate's product definition (§7.2 — SPEC.1, debate phase).
 |---|---|---|---|
 | 1.0.0 | 2026-06-04 | HMH | Initial authoring at ENGINE.1. Lineage pinned to `zugzwang-foundation/manifold-reference` @ `d5b55cf9` (tag `ref-2026-04-28-found5`), MIT notice landed in `THIRD_PARTY_NOTICES.md` same-commit. Decimal arithmetic pinned: decimal.js ^10.6, precision 50, 18-dp directional boundary rounding (floor on user-credited quantities; resolves ADR-0008 §8; binds ENGINE.2 + ENGINE.5). Slippage pinned as absolute probability-point impact, strict-> threshold trigger (F-BET-9; gates DESIGN.4). §7.2 pre-launch curation slate recorded as standard launch procedure (product definition deferred to SPEC.1 / debate phase). Worked examples E1–E5 are ENGINE.3 fixed vectors. |
 | 2.0.0 | 2026-07-07 | HMH | **§8.2 + INV-C4 rewritten to the founder-ratified R-9.8 void basis** (AUDIT.1 finding D1; canonical sources: SPEC.1/SPEC.2 v1.0.3 ENGINE.9 riders + shipped `resolution/void.ts`): refund = f × stake per bet, sale proceeds stand, no negative compensating entries, no void-leg `uncollectable`; residual (`poolUnwindAmount`, R-9.5e) = D − Σ `void_refund`, equal to seed only absent realized sale P&L; void auditing is ledger-based, not reserve-alone. §13 contract comment verified current (void stays ledger arithmetic, no curve function — unchanged). MAJOR per §0 semver (formula/invariant change). Also records the previously-unlogged ENGINE.14 amendment (`a29ef7e`, pool-seed payload recording form — no version bump was made at the time). |
+| 2.1.0 | 2026-07-15 | HMH | **Slippage warning trigger retired** (F-BET-9; SPEC.1 1.0.15; basis design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §6.2 trigger removed (threshold, strict->, pre-confirm modal); its probability-points rationale relocated to §6.1 as the impact-unit definition. §6.4 consumable reframed from the pre-confirm modal to the non-blocking preview (price / shares / cost-or-proceeds; `threshold` dropped from the bundle; the caller-side SPEC.1 §16.1 per-bet stake cap is reflected in the preview figures — the cap constant itself deliberately lives only in SPEC.1: app-layer guard, the pure functions stay pure). §0 gates / §1 / §4.4 / §14 warning references scrubbed. MINOR per §0 semver: no change to the §6.1 impact formula, §6.3 preview semantics, §13 returns, or the worked examples — consumer-scope change, not a formula/invariant change. |
