@@ -333,9 +333,8 @@ Numbered flows. Each: Pre / System / Response / Errors / Invariants / Acceptance
 - **Invariants.** None.
 - **Acceptance.** `tests/server/bets/auth.test.ts::banned-user-rejected`.
 
-### F-BET-9 — Slippage above threshold
+### F-BET-9 — Slippage warning — RETIRED (1.0.15)
 
-**F-BET-9 — Slippage warning — RETIRED (1.0.15).**
 The pre-confirm slippage-warning modal is removed. Basis: design-canon
 §4 ruling 2 (W2.10 Option A, operator-ratified 2026-06-27). Deep-liquidity
 seeding + the per-bet maximum stake (`BET_MAX_STAKE`, §16.1) keep price
