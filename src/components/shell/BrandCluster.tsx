@@ -1,6 +1,9 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useState } from "react";
 import { CountdownDigits } from "./CountdownDigits";
+import { formatCountdown } from "./countdown-format";
 
 /**
  * The centre brand cluster (values-log §3 item 5, superseding the mockup's
@@ -14,12 +17,23 @@ import { CountdownDigits } from "./CountdownDigits";
  * link target → `/`. The #FAFAFA cells are ratified header-only CHROME
  * (R-4) — they carry no side meaning and bind no pole token (WI-1 law).
  *
- * The grid content is aria-hidden (per-cell glyphs would read as letter
- * soup); the link carries the accessible name. A richer countdown a11y
- * treatment (e.g. an sr-only remaining-time sentence) needs ruled copy —
- * flagged for web review, not invented here.
+ * Client boundary (leg-2 a11y ruling): the link carries the RULED
+ * remaining-time label — `Zugzwang — home. ${D} days ${H} hours ${M}
+ * minutes until market freeze.` — with values from the SAME formatter as
+ * the visible digits, updating silently with the minute tick (a ticking
+ * attribute cannot live on server markup, so this component owns the one
+ * timer and hands the display string to the presentational cell row). The
+ * grid itself stays aria-hidden; NO aria-live anywhere. The RSC-seeded
+ * `initialDisplay` keeps server and client markup identical (no hydration
+ * mismatch); the post-mount tick recomputes immediately, then every second
+ * — the string (and so the re-render) changes only at minute boundaries.
  */
 const LETTERS = ["Z", "U", "G", "Z", "W", "A", "N", "G"] as const;
+
+function freezeLabel(display: string): string {
+	const [days, hours, minutes] = display.split(":");
+	return `Zugzwang — home. ${days} days ${hours} hours ${minutes} minutes until market freeze.`;
+}
 
 export function BrandCluster({
 	targetMs,
@@ -28,10 +42,19 @@ export function BrandCluster({
 	targetMs: number;
 	initialDisplay: string;
 }) {
+	const [display, setDisplay] = useState(initialDisplay);
+
+	useEffect(() => {
+		const tick = () => setDisplay(formatCountdown(Date.now(), targetMs));
+		tick();
+		const id = setInterval(tick, 1_000);
+		return () => clearInterval(id);
+	}, [targetMs]);
+
 	return (
 		<Link
 			href="/"
-			aria-label="ZUGZWANG"
+			aria-label={freezeLabel(display)}
 			className="flex items-center gap-2.5 outline-none focus-visible:shadow-(--state-focus-ring)"
 		>
 			{/* biome-ignore lint/performance/noImgElement: static 48px brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
@@ -58,7 +81,7 @@ export function BrandCluster({
 						</span>
 					))}
 				</span>
-				<CountdownDigits targetMs={targetMs} initialDisplay={initialDisplay} />
+				<CountdownDigits display={display} />
 			</span>
 		</Link>
 	);

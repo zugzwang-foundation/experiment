@@ -26,7 +26,7 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 		return (
 			<Link
 				href="/sign-in"
-				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase transition-all outline-none select-none hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)"
+				className="flex h-[34px] shrink-0 items-center rounded-(--r) bg-ink px-5 text-xs font-bold tracking-[0.12em] text-ground uppercase outline-none select-none [transition:all_var(--dur-hover)] hover:bg-n7 active:bg-n6 focus-visible:shadow-(--state-focus-ring)"
 			>
 				JOIN
 			</Link>

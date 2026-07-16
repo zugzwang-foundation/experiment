@@ -1,17 +1,9 @@
-"use client";
-
-import { useEffect, useState } from "react";
-
-import { formatCountdown } from "./countdown-format";
-
 /**
- * Chessboard row 2 — the digits-only freeze countdown (values-log R-2/§3
- * item 5). Client leaf of the brand cluster: the RSC seeds `initialDisplay`
- * (computed at request time from the same formatter + target), so server and
- * client markup are identical — no placeholder flash, no hydration mismatch
- * (plan §4.8 v2 mechanism). The post-mount tick recomputes immediately (to
- * correct any request→hydrate minute drift), then every second — the string,
- * and so the re-render, changes only at minute boundaries.
+ * Chessboard row 2 — the digits-only freeze countdown cells (values-log
+ * R-2/§3 item 5). Presentational: `BrandCluster` owns the timer (the leg-2
+ * a11y ruling put the ticking label on the link, so the one tick lives at
+ * that boundary) and hands the display string down; this row just maps it
+ * to cells.
  *
  * Cell count tracks the string (ratified OQ-8): 9 cells while days > 99,
  * 8 after (~Jul 29); chessboard parity continues row 1 (its col 0 is dark,
@@ -19,22 +11,7 @@ import { formatCountdown } from "./countdown-format";
  * These cells are header CHROME (ratified R-4) — the #FAFAFA fills carry no
  * side meaning (WI-1 pole law: nothing here binds bg-yes/bg-no).
  */
-export function CountdownDigits({
-	targetMs,
-	initialDisplay,
-}: {
-	targetMs: number;
-	initialDisplay: string;
-}) {
-	const [display, setDisplay] = useState(initialDisplay);
-
-	useEffect(() => {
-		const tick = () => setDisplay(formatCountdown(Date.now(), targetMs));
-		tick();
-		const id = setInterval(tick, 1_000);
-		return () => clearInterval(id);
-	}, [targetMs]);
-
+export function CountdownDigits({ display }: { display: string }) {
 	return (
 		// -mt-px collapses the two row borders into the single outer hairline
 		// (the ratified 2×8 rect once the counts match at days < 100).

@@ -19,7 +19,7 @@ import { useEffect, useState } from "react";
  * — moot at A1 (no header renders on `/`), kept for A4.
  */
 const ICON_BUTTON =
-	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink transition-all outline-none select-none [border:var(--hairline)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
+	"inline-flex size-[34px] shrink-0 items-center justify-center rounded-(--r) bg-(--btn-fill) text-ink outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) [&_svg]:size-[15px]";
 
 export function HeaderNav() {
 	const router = useRouter();
