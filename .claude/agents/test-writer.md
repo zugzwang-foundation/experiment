@@ -2,7 +2,7 @@
 name: test-writer
 description: MUST BE USED for new business-logic behavior per CLAUDE.md §5.6 — bet placement, Dharma accounting, comment attachment, side assignment, resolution mechanics, moderation, CSAM detection. Writes FAILING tests FIRST against the plan's test plan section before any implementation code lands. Forbidden from editing src/. Returns test files + a list of which scenarios are covered + which invariants each test asserts. Use at Phase 2 START on business-logic tasks, not at the end.
 tools: Read, Write, Edit, Bash, Grep, Glob
-model: claude-opus-4-8
+model: claude-fable-5
 effort: max
 ---
 
