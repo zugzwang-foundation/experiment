@@ -9,6 +9,7 @@
 | **Frame document** | SPEC.2 §8.9 (participant URL contract), §8.4/§8.10 (route topology); ADR-0019 (server-mediated reads); ADR-0016 §6 (slug URLs) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Patch records** | 2026-07-17 · (auth) header mount — see §Patch record (UI.A1 / OQ-1) |
 
 ---
 
@@ -175,3 +176,41 @@ group with a minimal zero-provider server-component shell, the `/m/<slug>`
 resolver-backed scaffold, and the shadcn baseline set. The decision body and the
 URL contract minted in §Decision Outcome are immutable; superseding requires a
 new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-07-17 · Branded header mounts in `(auth)` (UI.A1, ratified OQ-1)
+
+**Decision unchanged; consumer surface grows** (CLAUDE.md §5.12 in-place
+patch — not a supersession). The `(public)/` topology, URL contract, and
+every primitive ratified above stand as written.
+
+**What grows:** the shared branded `GlobalHeader` (UI.A1 — the designed
+header this ADR deferred as "UI.13"; UI-LANE §2 re-sequenced UI.13 into A1)
+now also mounts in the **`(auth)` route group** via a new, **additive**
+`src/app/(auth)/layout.tsx`:
+
+    getSession → <GlobalHeader viewer={…}/> + <main>{children}</main>
+
+**Why here:** the Session-B fork gate (UI-LANE §3) requires the branded
+header live on `/m/[slug]` **and the auth routes**. No `(auth)/layout.tsx`
+existed; mounting via the root layout is rejected by this ADR's own
+Option-2 verdict (root is shared with `(admin)` — participant chrome would
+leak). An additive group layout is the only mechanism consistent with the
+decision body.
+
+**What does not change:**
+- **Zero edits to existing auth files** — `src/app/(auth)/**` pages and
+  `src/server/auth/**` are untouched (A7 critical-path class). This patch
+  adds one file; it edits none.
+- **No auth behavior change** — the layout performs the existing
+  `auth.api.getSession({ headers })` read already used by
+  `(public)/layout.tsx` (an import + call, not an auth-code change). Auth,
+  onboarding, and admin topology remain decided by ADR-0004 / ADR-0010, as
+  the Context section scopes.
+- **Public-read posture** — unchanged; `(auth)` was never proxy-gated and
+  is not now.
+
+**Same-commit law:** this patch record lands in the same commit as
+`src/app/(auth)/layout.tsx` (CLAUDE.md §5.12). Ratification: OQ-1,
+operator-ratified 2026-07-16 (docs/plans/UI-A1.md, Ratification record).
