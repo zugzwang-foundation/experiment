@@ -1,7 +1,7 @@
 # Zugzwang — Design Handoff (how we deliver to Claude Code)
 
 > **Doc:** `docs/design/design-handoff.md`
-> **Status:** v0.2-draft · delivery contract
+> **Status:** v0.6-draft · delivery contract · **realigned to the branding/handoff decision record 2026-07-03**
 > **Phase:** experiment-phase VISUAL stratum
 >
 > **What this is.** The contract for delivering a signed-off surface from Claude Design (CD) to Claude Code (CC) for production build: what the handoff package contains, which route we use, which repo code CC builds against, the build instruction CC receives, the review ritual, the per-surface cadence, and the rule for keeping things in sync afterward.
@@ -11,16 +11,23 @@
 > **Grounding.** The handoff mechanics are distilled from the Claude Design research in PK — primary: `Research_Report_v2.md`; `Research_Report.md` (v1) §d remains valid background. The build ritual follows `CLAUDE.md` and `docs/workflows/plan-then-execute.md`; the stack references follow `AGENTS.md`.
 >
 > **Staging — read first.** Designing a surface and *building* it are separate moments. The VISUAL design bucket runs in parallel with the backend (ENGINE). Most surface builds (the UI / DEBATE tasks each surface maps to) depend on backend that may not exist yet. So a handoff **produces an approved mockup + a handoff package now**; CC **consumes it when the mapped build task is sequenced** and its backend dependencies are met. The design bucket delivers handoff packages, not finished screens.
-
+>
+> **This doc is the one place the two lanes cross.** Upstream of the handoff is the **design lane** (operator + CD, no Claude Code, no plan-then-execute, no PR). Downstream is the **code lane** — the build is a code task and runs the **full CC ritual** (plan-mode → fresh-chat execute → pre-PR audit → PR; §5). The ritual attaches to the **build**, never retroactively to the mockup. web Claude switches lanes here deliberately; it does not blend them.
+>
+> **Realignment (2026-07-03).** Per `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (CANON): branding is set **once at the CD design-system level**, its **values** land in the repo tokens (`globals.css`), and each surface is built by CC from its **locked repo mockup (layout) + branded repo tokens (look)** — the CD **export bundle is a lossy reference, not canon**. Branding **fully precedes** all surface builds (sequential). This updates §1 (handoff unit), §3/§4 (build against the already-branded tokens), and §6 (DESIGN.HANDOVER framing).
 ---
 
-## §1 — What a handoff is (two parts)
+## §1 — What a handoff is (four parts)
 
-A handoff package is two things delivered together:
+A handoff package is four things delivered together:
 
-1. **The CD-native handoff bundle.** Claude Design's **Export → Handoff to Claude Code** packages: the design files as **standalone HTML with inline CSS/JS**, the **design tokens actually used on the canvas**, the **component structure / hierarchy**, a **README** instructing the consuming model how to interpret the designs, and the **chat log** carrying the design intent — not just a screenshot. This carries the *design*. *(The bundle's internal format is research-preview behaviour — version-sensitive, unpublished by Anthropic, and may change before GA. Verify the contents at the first real handoff.)*
+1. **The locked surface source (layout) + the branded repo tokens (look).** Under the 2026-07-03 realignment (`ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md`), the **layout** comes from the surface's **locked repo mockup** (the artifact in `docs/design/mockups/`, per design-canon §8), and the **look** comes from the **branded repo tokens** (`globals.css`, value-swapped from the CD branding session at the bridge stage — decisions 7/8). The Claude Design **export bundle** (standalone HTML + on-canvas tokens + component hierarchy + README + chat log) may be attached as a **lossy visual reference**, but it is **not canon** and is never reproduced verbatim — it applies brand colour too liberally and its format is research-preview. *(The bundle's internal format is version-sensitive, unpublished by Anthropic, and may change before GA — verify at the first real handoff.)* This carries the *design*: locked mockup + branded tokens, reference bundle optional.
 
 2. **The web-authored build brief.** A pin-point instruction to CC (§4) that the generic CD bundle cannot know: our stack, the rule to rebuild against real repo components, the monochrome/desktop/branding-deferred constraints, the plan-first requirement, which subfolders to link, the mapped build task, the invariant-visual obligations, and acceptance. web Claude authors this (prescriptive-doc discipline). This carries the *instructions and guardrails*.
+
+3. **The motion spec** — every motion intent for the surface, with timing, the data behind it, and the implementer; CC implements these at the build task unless an entry is explicitly marked as CD-demoed. *(As of 2026-06-17 this lives in the consolidated `DESIGN-motion-consolidated.md`, not per-screen logs.)*
+
+4. **The design spec-changes** — the design-driven spec changes and read-model requirements the surface depends on, each pointing at the consolidated SPEC.1 amendment / DESIGN.SPEC. *(As of 2026-06-17 this lives in the consolidated `DESIGN-spec-changes-consolidated.md`.)*
 
 The bundle without the brief tends to produce plausible-but-off code (generic components, drifted spacing, accidental colour). The brief is what makes the build land against *our* codebase and *our* rules.
 
@@ -42,7 +49,7 @@ CC builds against the **real** production code. Link **specific subfolders, neve
 Link, for each surface:
 
 - **The component library** — the shadcn/ui components and any shared UI components.
-- **The design-token file** — `globals.css` (carries the monochrome token system; the brand accent is a later token-swap pass).
+- **The design-token file** — `globals.css` (carries the **finalized brand tokens** after the bridge-stage value-swap — monochrome unless an accent was ratified; the swap **fully precedes** surface builds under the sequential realignment).
 - **The surface's feature folder** — the route/feature directory for that surface.
 
 Avoid linking anything containing secrets. **Exact paths are confirmed with CC against the live repo at handoff time** — this doc names the *categories*, not fabricated paths.
@@ -74,10 +81,21 @@ deviation, surface it in the plan for review — never absorb it
 silently.
 
 CONSTRAINTS:
-- Monochrome only — implement in the monochrome token system. The brand
-  accent is a later token-swap pass; do NOT introduce colour.
-- Black = [Support/YES], white = [Counter/NO]; greys carry hierarchy.
+- Build against the tokens in globals.css AS THEY STAND — they carry the
+  finalized brand (monochrome unless an accent was ratified). Use tokens,
+  never hardcode values; introduce NO colour beyond the tokens.
+- Black = YES side, white = NO side (the post's side, frozen at
+  post-time — NOT Support/Counter, which is a separate post-relative
+  relation; design-language §1.3 / §6). Greys carry hierarchy.
 - Desktop only, fixed max-width. NO responsive breakpoints this phase.
+
+MOTION: Implement the surface's motion-log entries (simple cycling /
+carousel timing is build work, not design work). No motion beyond the
+log.
+
+SPEC GATE: Fields introduced by this surface's spec-change log exist
+only once the consolidated SPEC.1 amendment is merged. Do NOT build
+against unmerged fields.
 
 INVARIANT-VISUAL OBLIGATIONS (must hold — per design-language.md §4):
 - Frozen YES/NO side badge on every post/reply; never changes.
@@ -112,16 +130,19 @@ The **debate view** (→ DEBATE.4) is the highest-stakes surface: it renders the
 ## §6 — Per-surface cadence + staging
 
 - **One surface per handoff.** Small, reviewable PRs; each surface isolated. A change to one surface never forces re-handing-off the others.
+- **Produced after batch refine.** Under the two-phase batch model (`design-workflow.md` §2, ratified 2026-06-05), handoff packages are produced per surface at the end of Phase CD's refine — the cadence stays per-surface; only the production moment is batched.
 - **Staged against backend.** Design sign-off produces the handoff package; CC consumes it when the mapped build task is sequenced and its backend dependencies are met. Design runs parallel to ENGINE; builds happen as their tasks come up — not all at once at the end.
 - **Surface → build-task map** (the planner owns the exact sequence; this is the mapping):
 
-| Surface | Build task | Notes |
+> **v1.0-lock update (2026-06-17; realigned 2026-07-03).** The four core surfaces (Discovery · Market Detail · Reply · Profile) + Bookmark are **locked at integration-shell v1.0**. The old per-surface build rows **UI.3 / UI.4 / UI.5 were retired** in tracker v14; the production build of the locked surfaces now routes through **DESIGN.HANDOVER** — under the 2026-07-03 realignment this means **Claude Code builds each surface from its locked mockup + the branded repo tokens**, not a separate CD production build. (Tracker currency: v15/v16 — the sequencer, not this contract.)
+
+| Surface | Build path | Notes |
 |---|---|---|
-| Discovery (market list) | UI.3 | |
-| Market detail + bet flow | UI.4 | |
-| Debate view | DEBATE.4 | Cross-lane; highest-stakes; critical path. |
-| Profile (/me) | UI.5 | |
-| Landing | UI.1 | May build directly from the design language without a CD mockup slot — planner decides. |
+| Discovery · Market Detail · Profile (+ Bookmark) | **DESIGN.HANDOVER** | Locked at v1.0; UI.3/4/5 retired — CC builds from the locked mockup + branded tokens. |
+| Reply / Debate view | **DEBATE.4** | Cross-lane; highest-stakes; critical path. |
+| DESIGN Wave-2 surfaces (sign-in · Dharma graph/tab · compose entry · media tab · system states · feature-guide · downloads · radio) | **DESIGN.HANDOVER** | Designed in Wave-2; built via the handover. |
+| Landing | **UI.1** | Standalone (kept separate); may build from the design language directly. |
+| Folded build rows (admin · ToS/Privacy · AGPL footer · route protection · OG cards · leaderboards) | their own build tasks (UI.6 · UI.10 · UI.11 · UI.12 · UI.8 · UI.7) | Build-side work in the VISUAL phase; IDs kept stable for cross-lane deps. |
 
 ---
 
@@ -145,7 +166,11 @@ The design→code direction is strong; the **code→design direction is awkward*
 ---
 
 > **Changelog.**
+> **v0.6-draft (2026-07-03):** realigned to the branding/handoff decision record. §1 handoff unit = locked repo mockup (layout) + branded repo tokens (look); the CD export bundle demoted to a lossy, optional reference (not canon). §3/§4 updated — surfaces build against `globals.css` **as it stands** (finalized brand; the value-swap precedes builds under sequential ordering), not "monochrome, brand later." §6 DESIGN.HANDOVER reframed to "CC builds each surface from its locked mockup + branded tokens." Header realignment note + pointer added. §2 (local route), §5 (plan-then-execute ritual), §7 (code is source of truth), and the invariant-visual obligations unchanged. Source: CD branding/handoff realignment, 2026-07-03.
+> **v0.5-draft (2026-06-17):** **Lane-crossing note** added to the staging block (this doc is the one place the design lane hands to the code lane; the CC ritual attaches to the build, never back to the mockup) — sharpening the operator's design-vs-code separation. **Axis correction** in the §4 build brief: `Black = [Support/YES]` → `Black = YES side; white = NO side` (side, not Support/Counter; design-language §1.3 / §6). **v1.0-lock + map currency** in §6: core surfaces locked at v1.0; the retired UI.3/4/5 build rows replaced by **DESIGN.HANDOVER**; map redrawn for tracker v14 (core + Wave-2 → handover; Reply/Debate → DEBATE.4; Landing → UI.1; folded build rows → their own tasks). **Consolidation:** §1.3/§1.4 per-screen logs → the consolidated motion / spec-changes docs. Source: v1.0 lock + tracker v14, 2026-06-17.
+> **v0.4-draft (2026-06-05):** log naming aligned to the tracker pattern (`DESIGN.N_<page>_…`). Source: Slot-1 close.
+> **v0.3-draft (2026-06-05):** §1 grows from two to **four parts** — the per-screen **motion log** and **design spec-change log** now travel in every handoff package; §4 build brief gains **MOTION** (implement the log; nothing beyond it) and **SPEC GATE** (no building against fields whose consolidated SPEC.1 amendment is unmerged); §6 notes handoff production after Phase-CD batch refine (cadence per-surface unchanged). Source: Slot-1 lock chat, operator ratification 2026-06-05.
 > **v0.2-draft (2026-06-04):** §1 bundle contents specified per current behaviour (standalone HTML + inline CSS/JS, on-canvas tokens, component structure, README, chat log) and flagged version-sensitive; §4 build brief gains the **PRESERVE THE APPROVED DESIGN** instruction (implement, don't redesign; deviations surfaced in the plan); §7 sharpened (code fixes in CC, never back in CD); grounding → `Research_Report_v2.md`.
 > **v0-draft:** initial authoring (visual-backbone thread).
 
-*End design-handoff v0.2-draft. Handoff mechanics from `Research_Report_v2.md` (verify CD route/bundle specifics if behaviour shifts); build ritual per `CLAUDE.md` + `plan-then-execute.md`; stack per `AGENTS.md`. The §3 production subfolders are distinct from the CD-seed kit in `design-workflow.md` §7.*
+*End design-handoff v0.6-draft. Handoff mechanics from `Research_Report_v2.md` (verify CD route/bundle specifics if behaviour shifts); build ritual per `CLAUDE.md` + `plan-then-execute.md`; stack per `AGENTS.md`. The §3 production subfolders are distinct from the CD-seed kit in `design-workflow.md` §7.*
