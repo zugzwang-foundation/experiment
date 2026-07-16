@@ -14,13 +14,12 @@
 - **zero-diff-then-`-D`** ratified as the house branch-cleanup pattern (`git branch -d`'s ancestry predicate is structurally unmeetable under squash-only merges).
 - **Admin Centre = Session B leaf** (recon: admin consumes no shared branded components).
 - **A1–A8 binding order:** Foundation → Composer substrate (backend) → Composers UI → Discovery → Profile → Bookmarks (ADR first) → Auth skin → MEDIA.2.
-- Relayed at FINISH, recorded as relayed: **deferred-6 KEEP** (no in-session referent — see Open questions) · **branch census "84 definitive"** — measurement disagrees, see the census correction.
+- Relayed at FINISH, referents resolved: **deferred-6 KEEP** — referent: the six sole-copy W2 close-out cards held in PK — W2_1 · W2_2 · W2_4-5-14 · W2_8 · W2_11 · W2_13 — ruled KEEP, standalone, per design-canon §13 ('kept, standalone' — historical per-task records; canon is the current-state source). PK-only by design (canon data-residency), hence not repo-visible. · **"84 definitive"** = the PK card census, a web-side instrument distinct from the local branch census — see the census record.
 
 ## Census correction (measured 2026-07-16, post-cleanup)
-`git branch`: **117 local** = **100 `[gone]`** + 15 non-gone task branches + `main` + `staging`. The recon's "~86 [gone]" (baked into UI-LANE.md §6 as "~86") was an eyeball estimate; the relayed "84 definitive" ≈ 86−2 (the SYNC-LITE deletions) inherits that imprecision. **Correct sweep target: 100 `[gone]`, plus 15 non-gone locals gated individually.** UI-LANE.md §6's "~" wording stays truthful as written; re-ratify the definitive number when the parked sweep executes.
+Census record — two distinct instruments, unrelated: (a) PK card census, web-side instrument: 84 cards, definitive at UI.0 (operator-ruled; the −2 vs the SYNC-LITE 86-projection ruled immaterial). (b) Local branch census, CC-side, measured this sitting: 117 after the two SYNC-LITE -D deletions (was 119) — 100 `[gone]` + 15 non-gone task branches + `main` + `staging` — [gone] sweep parked to post-window hygiene per UI-LANE.md §6, whose '~86' estimate this measurement corrects to 100. No re-ratification pending: the relayed '84' was a PK-card count, never a branch-count claim.
 
 ## Open questions
-- **deferred-6 KEEP** — relayed in the FINISH kickoff without an in-session referent; needs a web-side definition before the parked branch sweep runs.
 - `stash@{0}` (EXTAUDIT-06 `.env.example` R2 quad) — operator ruling pending; untouched all session.
 - W2.11 45-state ledger CSV — operator locate (canon §8 row 12; non-blocking).
 - Bookmarks storage (table vs `user_events` projection) — web-authored ADR due before A6.
