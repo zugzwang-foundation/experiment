@@ -4,7 +4,9 @@ import { formatPercent } from "./format";
  * The market price bar (DEBATE.4 §5 / D1) — Yes%/No% from `getPrices`, pole-
  * coded: the YES proportion is the black (`--color-yes`) segment, the remainder
  * the white (`--color-no`) segment, delineated by a hairline so the bar shape
- * reads on a white ground. The percent is paired with literal text (AGENTS.md
+ * reads on the dark ground (the black YES segment ≡ ground collision is
+ * accepted — adjacency + the track edge carry it, values-log v0_3 §1 item 8).
+ * The percent is paired with literal text (AGENTS.md
  * §8 — never colour alone). `null` pricing (an unpooled market) → a quiet stub.
  */
 export function PriceBar({

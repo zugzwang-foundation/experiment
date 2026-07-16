@@ -9,8 +9,8 @@ import type { Side } from "./types";
 /**
  * One pole column of the two-column arena (DEBATE.4 §4 / D3) — LEFT=YES,
  * RIGHT=NO, the fixed side poles (never a Support/Counter label). The column
- * head carries the side's price tag, the DISABLED Buy trigger (C1 §7 — present
- * but unwired), and the static "No active position" stub (the viewer/auth-
+ * head carries the side's price tag, the DISABLED Đ BET trigger (C1 §7 —
+ * present but unwired), and the static "No active position" stub (the viewer/auth-
  * dependent readout is OUT of DEBATE.4). The body hosts the post-scroller
  * (market-view) or reply-scroller (post-view).
  */
@@ -38,9 +38,9 @@ export function DebateColumn({
 					size="xs"
 					disabled
 					aria-disabled="true"
-					aria-label={`Buy ${side} — sign in to bet`}
+					aria-label={`Đ BET ${side} — sign in to bet`}
 				>
-					Buy {side}
+					Đ BET
 				</Button>
 			</div>
 			<p className="text-xs text-muted-foreground">No active position</p>
