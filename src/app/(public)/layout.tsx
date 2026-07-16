@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import type { ReactNode } from "react";
 
+import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { auth } from "@/server/auth";
 
 /**
@@ -10,10 +10,10 @@ import { auth } from "@/server/auth";
  * middleware-gated (proxy.ts matches `/admin/*` only), so signed-out visitors
  * reach every surface here; reads are server-mediated (ADR-0019).
  *
- * THROWAWAY PLACEHOLDER HEADER. It carries a wordmark + a sign-in/pseudonym
- * affordance ONLY. The designed global header — market radio, conclusion timer,
- * visitor counter, back-nav, social dropdown — is DESIGN.W2.4/.5/.14, landing at
- * UI.13; it SUPERSEDES this. Do NOT grow header chrome here.
+ * Header: the branded `GlobalHeader` (UI.A1) — the designed header ADR-0023
+ * deferred as "UI.13", re-sequenced into A1 by UI-LANE §2 (ADR-0023 §Patch
+ * record). Viewer selection stays server-side in this layout (no client auth
+ * state): the existing `getSession` read, passed down as a plain prop.
  */
 export default async function PublicLayout({
 	children,
@@ -21,29 +21,13 @@ export default async function PublicLayout({
 	children: ReactNode;
 }) {
 	const session = await auth.api.getSession({ headers: await headers() });
-	const pseudonym = session?.user?.pseudonym ?? null;
+	const viewer = session
+		? { pseudonym: session.user?.pseudonym ?? null }
+		: null;
 
 	return (
 		<div className="flex min-h-full flex-col">
-			{/* PLACEHOLDER — superseded by the designed global header at UI.13. */}
-			<header className="flex items-center justify-between border-b px-6 py-3">
-				<Link
-					href="/"
-					className="font-mono text-sm font-semibold tracking-tight"
-				>
-					ZUGZWANG
-				</Link>
-				{pseudonym ? (
-					<span className="text-sm text-muted-foreground">{pseudonym}</span>
-				) : (
-					<Link
-						href="/sign-in"
-						className="text-sm underline underline-offset-4"
-					>
-						Sign in
-					</Link>
-				)}
-			</header>
+			<GlobalHeader viewer={viewer} />
 			<main className="flex-1">{children}</main>
 		</div>
 	);
