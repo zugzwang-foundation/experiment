@@ -1,0 +1,65 @@
+import Link from "next/link";
+
+import { CountdownDigits } from "./CountdownDigits";
+
+/**
+ * The centre brand cluster (values-log §3 item 5, superseding the mockup's
+ * wordmark + `45d : 06h : 15m` format — R-2/R-3): the 48×48 mark, a 10px
+ * gap, then the 2×8 chessboard — row 1 `Z U G Z W A N G` (Geist 13/800,
+ * always 8 cells), row 2 the digits-only countdown (row cell count per the
+ * ratified OQ-8 rule — 9 cells until days < 100, ~Jul 29; centre-aligned
+ * lockup, transient width mismatch accepted and screenshotted for review).
+ * Fills alternate n0/ink in chessboard parity, top-left dark, text inverts
+ * per cell; outer hairline, no internal borders. The whole cluster is ONE
+ * link target → `/`. The #FAFAFA cells are ratified header-only CHROME
+ * (R-4) — they carry no side meaning and bind no pole token (WI-1 law).
+ *
+ * The grid content is aria-hidden (per-cell glyphs would read as letter
+ * soup); the link carries the accessible name. A richer countdown a11y
+ * treatment (e.g. an sr-only remaining-time sentence) needs ruled copy —
+ * flagged for web review, not invented here.
+ */
+const LETTERS = ["Z", "U", "G", "Z", "W", "A", "N", "G"] as const;
+
+export function BrandCluster({
+	targetMs,
+	initialDisplay,
+}: {
+	targetMs: number;
+	initialDisplay: string;
+}) {
+	return (
+		<Link
+			href="/"
+			aria-label="ZUGZWANG"
+			className="flex items-center gap-2.5 outline-none focus-visible:shadow-(--state-focus-ring)"
+		>
+			{/* biome-ignore lint/performance/noImgElement: static 48px brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
+			<img
+				src="/brand/zugzwang-mark.svg"
+				alt=""
+				width={48}
+				height={48}
+				className="size-12"
+			/>
+			<span aria-hidden="true" className="flex flex-col items-center">
+				<span className="flex [border:var(--hairline)]">
+					{LETTERS.map((letter, i) => (
+						<span
+							// biome-ignore lint/suspicious/noArrayIndexKey: fixed 8-letter row — positional cells.
+							key={i}
+							className={
+								i % 2 === 0
+									? "flex size-5 items-center justify-center bg-n0 font-sans text-[13px] font-extrabold text-ink"
+									: "flex size-5 items-center justify-center bg-ink font-sans text-[13px] font-extrabold text-n0"
+							}
+						>
+							{letter}
+						</span>
+					))}
+				</span>
+				<CountdownDigits targetMs={targetMs} initialDisplay={initialDisplay} />
+			</span>
+		</Link>
+	);
+}
