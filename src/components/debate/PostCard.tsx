@@ -16,7 +16,7 @@ import type { DebatePost, PresentPost } from "./types";
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
  * the argprofile · lane badge · title (opens the pop-up) · teaser · image · the
- * disabled write triggers (Buy / Support-Counter, C1 §7) · the aggregate footer
+ * disabled write triggers (Đ BET / Support-Counter, C1 §7) · the aggregate footer
  * · the two-slot reply preview · an "Open debate" focus toggle. A REMOVED post
  * keeps only its structural slot — frozen side badge + the "removed by
  * moderator" placeholder + aggregate + its surviving replies (§6). The post's
@@ -99,9 +99,9 @@ export function PostCard({
 					size="xs"
 					disabled
 					aria-disabled="true"
-					aria-label="Buy — sign in to bet"
+					aria-label="Đ BET — sign in to bet"
 				>
-					Buy
+					Đ BET
 				</Button>
 				<Button
 					variant="outline"

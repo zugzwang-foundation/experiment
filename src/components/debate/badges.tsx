@@ -16,10 +16,11 @@ export function SideBadge({ side }: { side: Side }) {
 		<Badge
 			aria-label={`${side} side`}
 			className={cn(
-				"rounded-sm px-1.5 font-mono text-[10px] tracking-wide",
-				side === "YES"
-					? "bg-yes text-no"
-					: "bg-no text-yes [border:var(--hairline)]",
+				// Pole edges are carried by the standard #404040 border on BOTH
+				// poles (values-log v0_3 §3) — without it the black YES fill is
+				// invisible on the n0 card.
+				"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)]",
+				side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
 			)}
 		>
 			{side}
