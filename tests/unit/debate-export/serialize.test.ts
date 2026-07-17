@@ -110,12 +110,15 @@ function mkPost(o: {
 	entryPrice?: string;
 	imageUrl?: string | null;
 	createdAt?: string;
+	ordinal?: number;
 	aggregate?: DebatePost["aggregate"];
 	replies?: DebatePost["replies"];
 }): DebatePost {
 	return {
 		removed: false,
 		id: o.id ?? `post-${o.pseudonym ?? "x"}`,
+		// UI.A2 additive field — NOT serialized (debate-export.md §10 field set).
+		ordinal: o.ordinal ?? 1,
 		sideAtPostTime: o.side,
 		createdAt: o.createdAt ?? "2026-05-18T07:40:00.000Z",
 		title: o.title ?? "A staked post argument",
@@ -144,12 +147,15 @@ function mkRemovedPost(o: {
 	id?: string;
 	side: Side;
 	createdAt?: string;
+	ordinal?: number;
 	aggregate?: DebatePost["aggregate"];
 	replies?: DebatePost["replies"];
 }): DebatePost {
 	return {
 		removed: true,
 		id: o.id ?? "post-removed",
+		// UI.A2 additive field — NOT serialized (debate-export.md §10 field set).
+		ordinal: o.ordinal ?? 1,
 		sideAtPostTime: o.side,
 		createdAt: o.createdAt ?? "2026-05-26T19:05:00.000Z",
 		aggregate: o.aggregate ?? {
@@ -174,6 +180,8 @@ function mkModel(
 			description: "Resolves YES if the suite is green.",
 			status: "Open",
 			pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
+			// UI.A2 additive header field — NOT serialized (debate-export.md §10).
+			unitToWin: null,
 			totals: {
 				dharmaStaked: "0.000000000000000000",
 				postCount: posts.length,

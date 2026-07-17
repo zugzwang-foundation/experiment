@@ -30,6 +30,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			"Resolves YES if Mumbai Metro Line 3 (Aqua Line, Colaba–SEEPZ) records a 7-day rolling average of at least 1,000,000 daily riders at any point on or before the freeze (2026-11-05 23:59 IST), per MMRC published ridership figures. Resolves NO otherwise. Voids only if MMRC ceases publishing ridership data before resolution.",
 		status: "Open",
 		pricing: { yes: "0.540000000000000000", no: "0.460000000000000000" },
+		// UI.A2 additive header field — NOT serialized (debate-export.md §10 field
+		// set); illustrative values only (NO is the cheap side at p_no = 0.46).
+		unitToWin: { yes: "1.850000000000000000", no: "2.170000000000000000" },
 		totals: {
 			dharmaStaked: "3225.000000000000000000",
 			postCount: 6,
@@ -40,6 +43,10 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: false,
 			id: "cmt-p1",
+			// UI.A2 additive `ordinal` (NOT serialized): (created_at, id)-ascending
+			// rank over the six top-level posts — p3(05-15)=1, p1(05-18)=2,
+			// p2(05-21)=3, p4(05-26)=4, p5(06-02)=5, p6(06-09)=6.
+			ordinal: 2,
 			sideAtPostTime: "YES",
 			createdAt: "2026-05-18T07:40:00.000Z",
 			title: "The corridor is built for this volume",
@@ -107,6 +114,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: false,
 			id: "cmt-p2",
+			ordinal: 3,
 			sideAtPostTime: "NO",
 			createdAt: "2026-05-21T12:30:00.000Z",
 			title: "Anchor on the actual number",
@@ -163,6 +171,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: false,
 			id: "cmt-p3",
+			ordinal: 1,
 			sideAtPostTime: "YES",
 			createdAt: "2026-05-15T06:55:00.000Z",
 			title: "The monsoon case alone gets you most of the way",
@@ -204,6 +213,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: true,
 			id: "cmt-p4",
+			ordinal: 4,
 			sideAtPostTime: "NO",
 			createdAt: "2026-05-26T19:05:00.000Z",
 			aggregate: {
@@ -251,6 +261,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: false,
 			id: "cmt-p5",
+			ordinal: 5,
 			sideAtPostTime: "YES",
 			createdAt: "2026-06-02T08:25:00.000Z",
 			title: "Fare competitiveness is the quiet driver",
@@ -292,6 +303,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 		{
 			removed: false,
 			id: "cmt-p6",
+			ordinal: 6,
 			sideAtPostTime: "NO",
 			createdAt: "2026-06-09T10:05:00.000Z",
 			title: "The feeder rationalization slipped",

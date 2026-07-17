@@ -19,7 +19,7 @@ import type { Marker } from "@/server/positions/compute";
 import { signRead } from "@/server/storage/sign-read";
 
 import { type DebateComment, listMarketComments } from "./list-comments";
-import { getMarketPricing } from "./market-pricing";
+import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
@@ -113,6 +113,8 @@ export type DebatePost =
 
 export type DebateMarketHeader = MarketSummary & {
 	pricing: { yes: string; no: string } | null;
+	/** UI.A2 §3.2 (SG-3 additive) — per-side `computeBuy(stake:"1").shares`, the A3 strip's `TO WIN Đ1 → Đx` substrate; rides the header's one pool read. */
+	unitToWin: { yes: string; no: string } | null;
 	totals: { dharmaStaked: string; postCount: number; replyCount: number };
 };
 
@@ -153,7 +155,10 @@ export async function loadDebateView(
 	const comments = await listMarketComments(client, { marketId });
 	const postSubstrate = await loadRankingSubstrate(client, { marketId });
 	const replyMap = await loadReplySubstrate(client, { marketId });
-	const pricing = await getMarketPricing(client, marketId);
+	const pricingAndUnitToWin = await getMarketPricingAndUnitToWin(
+		client,
+		marketId,
+	);
 	const totals = await getMarketTotals(client, marketId);
 
 	const commentById = new Map(comments.map((c) => [c.id, c]));
@@ -255,7 +260,12 @@ export async function loadDebateView(
 	});
 
 	return {
-		market: { ...args.market, pricing, totals },
+		market: {
+			...args.market,
+			pricing: pricingAndUnitToWin?.pricing ?? null,
+			unitToWin: pricingAndUnitToWin?.unitToWin ?? null,
+			totals,
+		},
 		posts,
 	};
 }

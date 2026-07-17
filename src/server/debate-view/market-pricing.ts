@@ -6,6 +6,8 @@ import type { DbClient, DbTransaction } from "@/db";
 import { pools } from "@/db/schema";
 import { getPrices } from "@/server/cpmm/calculate";
 
+import { deriveUnitToWin } from "./quote";
+
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DebateViewReader = DbClient | DbTransaction;
 
@@ -37,4 +39,39 @@ export async function getMarketPricing(
 		return null;
 	}
 	return getPrices({ yes: pool.yesReserves, no: pool.noReserves });
+}
+
+/**
+ * UI.A2 §3.2 — the header read extended for the A3 strip: the SAME one pool
+ * read now also yields `unitToWin` = per-side `computeBuy(stake: "1").shares`
+ * (`deriveUnitToWin`). `getMarketPricing` above stays untouched (its shape is
+ * pinned by the existing integration suite); this is the debate-view
+ * aggregator's read. Returns `null` when the market has no pool row — the
+ * shared defensive-null path.
+ */
+export async function getMarketPricingAndUnitToWin(
+	client: DebateViewReader,
+	marketId: string,
+): Promise<{
+	pricing: { yes: string; no: string };
+	unitToWin: { yes: string; no: string };
+} | null> {
+	const rows = await client
+		.select({
+			yesReserves: pools.yesReserves,
+			noReserves: pools.noReserves,
+		})
+		.from(pools)
+		.where(eq(pools.marketId, marketId))
+		.limit(1);
+
+	const pool = rows[0];
+	if (!pool) {
+		return null;
+	}
+	const reserves = { yes: pool.yesReserves, no: pool.noReserves };
+	return {
+		pricing: getPrices(reserves),
+		unitToWin: deriveUnitToWin(reserves),
+	};
 }
