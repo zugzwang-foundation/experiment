@@ -1,8 +1,11 @@
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { DebateView } from "@/components/debate/DebateView";
 import { db } from "@/db";
+import { auth } from "@/server/auth";
 import { loadDebateView } from "@/server/debate-view/load-debate-view";
+import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 /**
@@ -30,5 +33,20 @@ export default async function MarketPage({
 	}
 
 	const model = await loadDebateView(db, { market });
-	return <DebateView model={model} />;
+
+	// UI.A2 §3.3 — the viewer-session context, composed BESIDE the masked view
+	// model (the masking gate stays viewer-independent — SG-3). The established
+	// layout `getSession` pattern; pages re-read (layouts cannot pass data to
+	// pages — accepted, plan self-critique #10). Signed-out → null. Banned users
+	// still receive it: ban removes voice, not reads (ADR-0021 posture; the
+	// write path holds the 403). Render-unconsumed at A2 — A3's strip consumes.
+	const session = await auth.api.getSession({ headers: await headers() });
+	const viewer = session?.user?.id
+		? await loadViewerMarketContext(db, {
+				userId: session.user.id,
+				marketId: market.id,
+			})
+		: null;
+
+	return <DebateView model={model} viewer={viewer} />;
 }

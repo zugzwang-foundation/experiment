@@ -21,6 +21,7 @@ export type {
 	ReplyGroups,
 } from "@/server/debate-view/load-debate-view";
 export type { AuthorIdentity } from "@/server/debate-view/resolve-authors";
+export type { ViewerMarketContext } from "@/server/debate-view/viewer-context";
 
 /** The present (non-removed) post/reply variants — content + author available. */
 export type PresentPost = Extract<DebatePost, { removed: false }>;

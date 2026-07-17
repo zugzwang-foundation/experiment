@@ -13,6 +13,7 @@ import type {
 	DebateViewModel,
 	PresentPost,
 	Side,
+	ViewerMarketContext,
 } from "./types";
 
 /** A focused post's replies for one pole column — placed by their OWN side (D3). */
@@ -35,7 +36,19 @@ function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
  * replies (post-scrollers swapped for reply-scrollers). C1: read-only — write
  * triggers render disabled, no composer/auth-gate is rendered.
  */
-export function DebateView({ model }: { model: DebateViewModel }) {
+export function DebateView({
+	model,
+}: {
+	model: DebateViewModel;
+	/**
+	 * UI.A2 §3.3 — the viewer-session context (position + balance +
+	 * spendableToday), serialized through the RSC boundary. Typed + landed but
+	 * RENDER-UNCONSUMED at A2 (deliberate lane verticality — the A3 position
+	 * strip is its consumer), hence accepted in the props type without being
+	 * destructured.
+	 */
+	viewer: ViewerMarketContext | null;
+}) {
 	const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
