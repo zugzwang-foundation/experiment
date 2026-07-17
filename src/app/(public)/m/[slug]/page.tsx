@@ -5,6 +5,7 @@ import { DebateView } from "@/components/debate/DebateView";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadDebateView } from "@/server/debate-view/load-debate-view";
+import { resolvePostParam } from "@/server/debate-view/resolve-post-param";
 import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
@@ -23,8 +24,10 @@ import { getMarketBySlug } from "@/server/markets/get-by-slug";
  */
 export default async function MarketPage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ slug: string }>;
+	searchParams: Promise<{ post?: string | string[] }>;
 }) {
 	const { slug } = await params;
 	const market = await getMarketBySlug(db, slug);
@@ -48,5 +51,29 @@ export default async function MarketPage({
 			})
 		: null;
 
-	return <DebateView model={model} viewer={viewer} />;
+	// UI.A2 §3.4 (ratified OQ-4) — the deep-link `?post=<N>` param: resolved
+	// server-side to a comment id (D6 ordinal — no raw UUID in the URL), seeded
+	// as DebateView's initial focus ONLY when the resolved post exists in the
+	// model AND is not removed. Zero-branch law: absent, malformed (incl. a
+	// repeated param arriving as an array), out-of-range, reply-targeting, or
+	// removed-targeting values ALL render the plain market view — the param can
+	// never 404 or throw.
+	const { post } = await searchParams;
+	let initialPostId: string | null = null;
+	if (typeof post === "string") {
+		const resolved = await resolvePostParam(db, {
+			marketId: market.id,
+			post,
+		});
+		if (resolved !== null) {
+			const target = model.posts.find((p) => p.id === resolved);
+			if (target && !target.removed) {
+				initialPostId = resolved;
+			}
+		}
+	}
+
+	return (
+		<DebateView model={model} viewer={viewer} initialPostId={initialPostId} />
+	);
 }

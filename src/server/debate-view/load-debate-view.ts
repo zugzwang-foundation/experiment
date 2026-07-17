@@ -83,6 +83,8 @@ export type DebatePost =
 	| {
 			removed: true;
 			id: string;
+			/** UI.A2 §3.4 (OQ-5c) — the permanent 1-based deep-link ordinal; carried on BOTH variants (a removed post keeps its slot). */
+			ordinal: number;
 			sideAtPostTime: Side;
 			createdAt: string;
 			aggregate: ReplyAggregate;
@@ -91,6 +93,8 @@ export type DebatePost =
 	| {
 			removed: false;
 			id: string;
+			/** UI.A2 §3.4 (OQ-5c) — the permanent 1-based deep-link ordinal. */
+			ordinal: number;
 			sideAtPostTime: Side;
 			createdAt: string;
 			title: string;
@@ -179,6 +183,23 @@ export async function loadDebateView(
 	// Top order over the WHOLE substrate (removed posts keep their slot/position).
 	const ordered = buildTopList(postSubstrate);
 
+	// UI.A2 §3.4 (ratified OQ-5c) — the deep-link ordinal: 1-based rank by
+	// (created_at, id) ascending over ALL top-level comments, removed INCLUDED
+	// (append-only ⇒ permanent). Mirrors resolve-post-param's query order
+	// exactly — the round-trip integration test pins the two together. uuidv7
+	// text order is byte-order-isomorphic to Postgres uuid comparison.
+	const ordinalById = new Map<string, number>();
+	comments
+		.filter((c) => c.parentCommentId === null)
+		.sort(
+			(a, b) =>
+				a.createdAt.getTime() - b.createdAt.getTime() ||
+				(a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+		)
+		.forEach((c, i) => {
+			ordinalById.set(c.id, i + 1);
+		});
+
 	const posts: DebatePost[] = ordered.map((sub) => {
 		const comment = commentById.get(sub.id);
 		const removed = removedSet.has(sub.id);
@@ -196,10 +217,15 @@ export async function loadDebateView(
 			authorMap,
 		);
 
+		// Defensive 0 only on the unreachable no-comment branch (the substrate
+		// derives from comments+bets, so a substrate post always has its comment).
+		const ordinal = ordinalById.get(sub.id) ?? 0;
+
 		if (removed || !comment) {
 			return {
 				removed: true,
 				id: sub.id,
+				ordinal,
 				sideAtPostTime: sub.parentSide,
 				createdAt: (comment?.createdAt ?? new Date(0)).toISOString(),
 				aggregate,
@@ -211,6 +237,7 @@ export async function loadDebateView(
 		return {
 			removed: false,
 			id: sub.id,
+			ordinal,
 			sideAtPostTime: comment.sideAtPostTime,
 			createdAt: comment.createdAt.toISOString(),
 			title,

@@ -38,6 +38,7 @@ function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
  */
 export function DebateView({
 	model,
+	initialPostId,
 }: {
 	model: DebateViewModel;
 	/**
@@ -48,12 +49,43 @@ export function DebateView({
 	 * destructured.
 	 */
 	viewer: ViewerMarketContext | null;
+	/**
+	 * UI.A2 §3.4 — the server-resolved `?post=` deep-link target (already
+	 * validated + removed-gated by the page). Seeds the initial focus state —
+	 * prop-derived initial render, hydration-safe (server and client agree).
+	 */
+	initialPostId: string | null;
 }) {
-	const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+	const [selectedPostId, setSelectedPostId] = useState<string | null>(
+		initialPostId,
+	);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
 	const { market, posts } = model;
+
+	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
+	// `?post=<ordinal>` via history.replaceState on post enter/exit, making
+	// deep links user-MINTABLE (copy the address bar in post view).
+	// replaceState, never pushState — focus toggling must not pollute history.
+	const syncPostParam = (ordinal: number | null) => {
+		const url = new URL(window.location.href);
+		if (ordinal === null) {
+			url.searchParams.delete("post");
+		} else {
+			url.searchParams.set("post", String(ordinal));
+		}
+		history.replaceState(null, "", url);
+	};
+	const enterPost = (id: string) => {
+		setSelectedPostId(id);
+		const target = posts.find((p) => p.id === id);
+		syncPostParam(target ? target.ordinal : null);
+	};
+	const exitPost = () => {
+		setSelectedPostId(null);
+		syncPostParam(null);
+	};
 	const selectedPost = selectedPostId
 		? (posts.find((p) => p.id === selectedPostId) ?? null)
 		: null;
@@ -69,7 +101,7 @@ export function DebateView({
 				<div className="flex flex-col gap-4">
 					<PostFocusHeader
 						post={selectedPost}
-						onExit={() => setSelectedPostId(null)}
+						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 					/>
 					<div className="flex gap-4">
@@ -93,7 +125,7 @@ export function DebateView({
 						<PostScroller
 							side="YES"
 							posts={yesPosts}
-							onEnter={setSelectedPostId}
+							onEnter={enterPost}
 							onOpenPopup={setPopupPost}
 							onOpenImage={setLightboxUrl}
 						/>
@@ -102,7 +134,7 @@ export function DebateView({
 						<PostScroller
 							side="NO"
 							posts={noPosts}
-							onEnter={setSelectedPostId}
+							onEnter={enterPost}
 							onOpenPopup={setPopupPost}
 							onOpenImage={setLightboxUrl}
 						/>
