@@ -572,7 +572,7 @@ export function BetComposer(props: {
 					}
 				}}
 			>
-				<DialogContent>
+				<DialogContent showCloseButton={false}>
 					<DialogTitle>
 						{suspendedKind === "banned"
 							? SUSPENDED_COPY.banned.title

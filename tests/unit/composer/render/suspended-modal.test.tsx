@@ -64,6 +64,11 @@ describe("BetComposer suspended modal (R-4)", () => {
 				name: SUSPENDED_COPY.trackA.action,
 			}),
 		).toHaveLength(1);
+		// W2.11 / CD-A single-OK anatomy: exactly ONE button TOTAL in the
+		// suspended dialog (the OK affordance) — the shadcn default X-close is
+		// stripped at the call site (showCloseButton={false}), never reachable.
+		expect(within(dialog).getAllByRole("button")).toHaveLength(1);
+		expect(within(dialog).queryByRole("button", { name: /close/i })).toBeNull();
 		expect(
 			within(dialog).queryByRole("button", {
 				name: /retry|try again|resubmit/i,
