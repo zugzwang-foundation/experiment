@@ -61,6 +61,18 @@ export function BetComposer(props: {
 	kind: ComposerKind;
 	viewer: ViewerMarketContext;
 	parentCommentId?: string;
+	/**
+	 * Reply variant (v0.10): header verb `Support/Counter <author>'s argument`
+	 * + the FULL post title beneath (wraps, no ellipsis). A REMOVED parent has
+	 * no author/title at the type level (SG-3 masking) — pass nulls and the
+	 * header falls back to the canon `Place your Đ BET` line (no copy invented,
+	 * nothing leaked).
+	 */
+	replyContext?: {
+		relation: "support" | "counter";
+		authorPseudonym: string | null;
+		postTitle: string | null;
+	};
 	onClose: () => void;
 	/** P2 terminal reached (Track A / banned): the view disables all entry controls. */
 	onSuspended: () => void;
@@ -296,12 +308,30 @@ export function BetComposer(props: {
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
 			className="flex flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
 		>
-			{/* modhead — side chip (the TRUE bet side) · header · × */}
-			<div className="flex items-center gap-2">
+			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
+			    (v0.10): verb line + the full post title; masked parent → canon
+			    fallback header. */}
+			<div className="flex items-start gap-2">
 				<SideBadge side={props.side} />
-				<span className="text-sm font-semibold text-ink">
-					{COMPOSER_COPY.header}
-				</span>
+				{props.replyContext && props.replyContext.authorPseudonym !== null ? (
+					<span className="flex min-w-0 flex-col">
+						<span className="text-[13.5px] leading-snug font-bold text-ink">
+							{props.replyContext.relation === "support"
+								? "Support"
+								: "Counter"}{" "}
+							{props.replyContext.authorPseudonym}'s argument
+						</span>
+						{props.replyContext.postTitle !== null && (
+							<span className="text-xs text-n5">
+								{props.replyContext.postTitle}
+							</span>
+						)}
+					</span>
+				) : (
+					<span className="text-sm font-semibold text-ink">
+						{COMPOSER_COPY.header}
+					</span>
+				)}
 				<button
 					type="button"
 					onClick={props.onClose}

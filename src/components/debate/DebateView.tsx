@@ -38,8 +38,11 @@ function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
  *
  * Market-view: two pole columns (YES/NO), each a post-scroller over that side's
  * posts (Top order). Post-view: the focused post in full + two columns of its
- * replies (post-scrollers swapped for reply-scrollers). C1: read-only — write
- * triggers render disabled, no composer/auth-gate is rendered.
+ * replies (post-scrollers swapped for reply-scrollers). UI.A3: the write
+ * triggers are LIVE — the Đ BET entry (market view) and the focused post's
+ * Support/Counter split-bar triggers (post view) open the composer in the
+ * opposite slot (auth-gate variant when signed out); at most one composer is
+ * open per view.
  */
 export function DebateView({
 	model,
@@ -71,11 +74,17 @@ export function DebateView({
 	// betting side S renders the composer in the OPPOSITE slot; opening the
 	// other side closes the first — the d5 slot model, toggle-to-close).
 	const [openSide, setOpenSide] = useState<Side | null>(null);
+	// UI.A3 slice 3 — the post-view reply composer (v0.10: Support OR Counter
+	// opens in the slot OPPOSITE THE POST; toggle-to-close).
+	const [openReply, setOpenReply] = useState<"support" | "counter" | null>(
+		null,
+	);
 	// P2 terminal (Track A / banned) reached this session: entry controls off.
 	const [suspended, setSuspended] = useState(false);
 
 	const { market, posts } = model;
 	const marketOpen = market.status === "Open";
+	const heldSide = viewer?.position?.side ?? null;
 
 	const toggleEntry = (side: Side) => {
 		setOpenSide((cur) => (cur === side ? null : side));
@@ -118,11 +127,13 @@ export function DebateView({
 	};
 	const enterPost = (id: string) => {
 		setSelectedPostId(id);
+		setOpenReply(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 	};
 	const exitPost = () => {
 		setSelectedPostId(null);
+		setOpenReply(null);
 		syncPostParam(null);
 	};
 	const selectedPost = selectedPostId
@@ -140,22 +151,73 @@ export function DebateView({
 				<div className="flex flex-col gap-4">
 					<PostFocusHeader
 						post={selectedPost}
+						heldSide={heldSide}
+						marketOpen={marketOpen}
+						suspended={suspended}
+						activeRelation={openReply}
+						onToggleRelation={(relation) =>
+							setOpenReply((cur) => (cur === relation ? null : relation))
+						}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 					/>
 					<div className="flex gap-4">
-						<DebateColumn side="YES" pricing={market.pricing}>
-							<ReplyScroller
-								side="YES"
-								replies={repliesForSide(selectedPost, "YES")}
-							/>
-						</DebateColumn>
-						<DebateColumn side="NO" pricing={market.pricing}>
-							<ReplyScroller
-								side="NO"
-								replies={repliesForSide(selectedPost, "NO")}
-							/>
-						</DebateColumn>
+						{(["YES", "NO"] as const).map((side) => {
+							// v0.10: the reply composer — Support OR Counter — opens in
+							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
+							// side (slot ≠ side, permanently — INV-3 narrative).
+							const composerColumn = opposite(selectedPost.sideAtPostTime);
+							const resultingSide =
+								openReply !== null
+									? openReply === "support"
+										? selectedPost.sideAtPostTime
+										: opposite(selectedPost.sideAtPostTime)
+									: null;
+							const hostsComposer =
+								openReply !== null && side === composerColumn;
+							return (
+								<DebateColumn
+									key={side}
+									side={side}
+									pricing={market.pricing}
+									engaged={resultingSide === side && side !== composerColumn}
+								>
+									{hostsComposer && resultingSide !== null ? (
+										viewer === null ? (
+											<AuthGateSlot
+												side={resultingSide}
+												onClose={() => setOpenReply(null)}
+											/>
+										) : (
+											<BetComposer
+												marketId={market.id}
+												slug={market.slug}
+												side={resultingSide}
+												kind="reply"
+												viewer={viewer}
+												parentCommentId={selectedPost.id}
+												replyContext={{
+													relation: openReply,
+													authorPseudonym: selectedPost.removed
+														? null
+														: selectedPost.author.pseudonym,
+													postTitle: selectedPost.removed
+														? null
+														: selectedPost.title,
+												}}
+												onClose={() => setOpenReply(null)}
+												onSuspended={() => setSuspended(true)}
+											/>
+										)
+									) : (
+										<ReplyScroller
+											side={side}
+											replies={repliesForSide(selectedPost, side)}
+										/>
+									)}
+								</DebateColumn>
+							);
+						})}
 					</div>
 				</div>
 			) : (
