@@ -25,7 +25,8 @@ export function floorFor(kind: ComposerKind): string {
 
 const PLAIN_DECIMAL = /^\d+(\.\d+)?$/;
 
-function isPositiveDecimal(value: string): boolean {
+/** A parseable, strictly-positive decimal string (the amount validity gate). */
+export function isPositiveAmount(value: string): boolean {
 	return PLAIN_DECIMAL.test(value) && new ComposerDecimal(value).greaterThan(0);
 }
 
@@ -70,7 +71,7 @@ export function assessAmount(args: {
 	const composerDisabled = new ComposerDecimal(args.spendableToday).lessThan(
 		floor,
 	);
-	if (!isPositiveDecimal(args.amount)) {
+	if (!isPositiveAmount(args.amount)) {
 		return {
 			clampedAmount: args.amount,
 			composerDisabled,
