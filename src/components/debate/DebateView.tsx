@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
+import { deriveReplySide } from "./composer/gating";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
@@ -129,12 +130,14 @@ export function DebateView({
 	const enterPost = (id: string) => {
 		setSelectedPostId(id);
 		setOpenReply(null);
+		setOpenSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 	};
 	const exitPost = () => {
 		setSelectedPostId(null);
 		setOpenReply(null);
+		setOpenSide(null);
 		syncPostParam(null);
 	};
 	const selectedPost = selectedPostId
@@ -166,13 +169,16 @@ export function DebateView({
 						{(["YES", "NO"] as const).map((side) => {
 							// v0.10: the reply composer — Support OR Counter — opens in
 							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
-							// side (slot ≠ side, permanently — INV-3 narrative).
+							// side (slot ≠ side, permanently — INV-3 narrative; the
+							// side derives via the unit-pinned deriveReplySide, never
+							// from the hosting column).
 							const composerColumn = opposite(selectedPost.sideAtPostTime);
 							const resultingSide =
 								openReply !== null
-									? openReply === "support"
-										? selectedPost.sideAtPostTime
-										: opposite(selectedPost.sideAtPostTime)
+									? deriveReplySide({
+											parentSide: selectedPost.sideAtPostTime,
+											relation: openReply,
+										})
 									: null;
 							const hostsComposer =
 								openReply !== null && side === composerColumn;
@@ -191,14 +197,19 @@ export function DebateView({
 										/>
 									}
 								>
-									{hostsComposer && resultingSide !== null ? (
+									{hostsComposer && resultingSide !== null && openReply ? (
 										viewer === null ? (
 											<AuthGateSlot
+												key={openReply}
 												side={resultingSide}
 												onClose={() => setOpenReply(null)}
 											/>
 										) : (
+											// key={openReply} (cascade H-2): a relation flip
+											// REMOUNTS the composer — side is immutable per
+											// instance (INV-3); a live instance can never flip.
 											<BetComposer
+												key={openReply}
 												marketId={market.id}
 												slug={market.slug}
 												side={resultingSide}

@@ -5,10 +5,12 @@ import { formatDharma } from "../format";
  * UI.A3 slice 2 — the composer copy surface (SG-6). Every string here is
  * either (a) canon §6 / d5 / W2.11-kit VERBATIM (curly apostrophes preserved),
  * (b) the operator-ratified embedded copy batch C1/C2/C3 (web-authored
- * 2026-07-17, applied verbatim), or (c) one of the two AUTHORED-AT-EXECUTE
- * strings the design set does not carry — `rateLimited` (the P4 429 banner
- * has no kit/canon string) and `marketClosed` (the kit's race strip covers
- * `market_resolving` only) — both FLAGGED for the Gate C web read.
+ * 2026-07-17, applied verbatim), or (c) an AUTHORED-AT-EXECUTE surface the
+ * design set does not carry — FOUR exist, each marked at its site and
+ * registered in docs/logs/UI-A3.md for the Gate C web read: `rateLimited`
+ * (no P4 429 string) · `marketClosed` (the kit's race strip covers
+ * `market_resolving` only) · `transient` (a composition of two kit-verbatim
+ * fragments) · the image attach-failure strip's no-heading convention.
  * Numeric fragments resolve at render from limits.ts constants / viewer
  * fields, never hardcoded literals (Đ figures grouped per "Max Đ 10,000 per
  * bet"). CC never invents argument-adjacent copy.

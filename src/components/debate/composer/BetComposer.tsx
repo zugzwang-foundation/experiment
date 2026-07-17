@@ -38,6 +38,7 @@ import { initialKeyState, type KeyState, reduceKey } from "./idempotency";
 import { attachImage } from "./image-attach";
 import {
 	composeWireBody,
+	extendedMaxChars,
 	isArgumentSubmittable,
 	TITLE_MAX_CHARS,
 } from "./payload";
@@ -101,6 +102,14 @@ export function BetComposer(props: {
 	});
 	const floorAbove = assess.composerDisabled;
 	const argOk = isArgumentSubmittable(title);
+	// The composed-length belt (cascade H-1): the extended budget SHRINKS when
+	// the title grows after the textarea filled — maxLength never truncates an
+	// existing controlled value, so the composed total can exceed the cap.
+	// Gate here so composeWireBody can never throw past the in-flight lock.
+	const composedOverflow =
+		title.trim().length +
+			(extended.trim().length === 0 ? 0 : extended.length + 2) >
+		COMMENT_MAX_LENGTH;
 
 	// Live To-win preview (§3.1): debounced buy quote on amount/side change;
 	// over-cap input still previews — the route clamps and flags `clamped`.
@@ -147,15 +156,20 @@ export function BetComposer(props: {
 	}, [retryLock]);
 
 	// ESC closes (toggle-to-close family; the entry button + × are the others).
+	// In-flight guarded (cascade L-6): closing mid-request would orphan a
+	// possibly-committing bet behind a fresh-key re-open.
+	const onCloseRef = useRef(props.onClose);
+	onCloseRef.current = props.onClose;
+	const inFlightNow = status.phase === "in_flight";
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key === "Escape") {
-				props.onClose();
+			if (e.key === "Escape" && !inFlightNow) {
+				onCloseRef.current();
 			}
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	});
+	}, [inFlightNow]);
 
 	const inFlight = status.phase === "in_flight";
 	const errorState = status.phase === "error" ? status.state : null;
@@ -170,6 +184,7 @@ export function BetComposer(props: {
 		inFlight ||
 		floorAbove ||
 		!argOk ||
+		composedOverflow ||
 		!assess.submitEnabled ||
 		countdown !== null ||
 		retryLock > 0 ||
@@ -229,9 +244,21 @@ export function BetComposer(props: {
 		if (submitDisabled) {
 			return;
 		}
+		// Build the payload BEFORE taking the in-flight lock (cascade H-1): a
+		// compose throw must land as a state, never a stuck lock.
+		let wireBody: string;
+		try {
+			wireBody = composeWireBody({ title, extended });
+		} catch {
+			setStatus({
+				phase: "error",
+				state: { state: "p3_generic" },
+				code: "compose_gate",
+			});
+			return;
+		}
 		const next = dispatchKey({ type: "SUBMIT" });
 		setStatus({ phase: "in_flight" });
-		const wireBody = composeWireBody({ title, extended });
 		const { url, init } = buildPlaceRequest({
 			body: {
 				marketId: props.marketId,
@@ -310,6 +337,8 @@ export function BetComposer(props: {
 				break;
 			case "p3_gate_down":
 			case "p3_transient_retry":
+			case "p3_wait_in_flight":
+				// M-4: the in-flight 409s carry Retry-After (header) — honor it.
 				setRetryLock(mapped.retryAfterSeconds ?? 0);
 				break;
 			case "auth_gate":
@@ -328,7 +357,7 @@ export function BetComposer(props: {
 		return <AuthGateSlot side={props.side} onClose={props.onClose} />;
 	}
 
-	const extendedMax = COMMENT_MAX_LENGTH - title.trim().length - 2;
+	const extendedMax = extendedMaxChars(title.trim().length);
 	const dimmed = floorAbove ? "opacity-(--state-disabled-opacity)" : undefined;
 	const toWin =
 		quote !== null && quote.kind === "quote"

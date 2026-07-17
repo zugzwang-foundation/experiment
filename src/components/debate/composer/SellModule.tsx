@@ -52,6 +52,7 @@ export function SellModule(props: {
 	const [status, setStatus] = useState<ComposerStatus>({ phase: "idle" });
 	const [quote, setQuote] = useState<QuoteResult | null>(null);
 	const [countdown, setCountdown] = useState<number | null>(null);
+	const [retryLock, setRetryLock] = useState(0);
 	const [sold, setSold] = useState<null | { toZero: boolean }>(null);
 
 	const keyRef = useRef(keyState);
@@ -106,9 +107,47 @@ export function SellModule(props: {
 		return () => clearTimeout(t);
 	}, [countdown, dispatchKey]);
 
+	// Transient lock: submit re-enables after retry_after (held key) — the
+	// 503 family + the in-flight 409s' Retry-After (cascade M-4).
+	useEffect(() => {
+		if (retryLock <= 0) {
+			return;
+		}
+		const t = setTimeout(() => setRetryLock((s) => s - 1), 1000);
+		return () => clearTimeout(t);
+	}, [retryLock]);
+
 	const inFlight = status.phase === "in_flight";
+	const errorState = status.phase === "error" ? status.state : null;
+	// Cascade H-3: a cached-terminal answer locks submit until the next EDIT
+	// re-mints (mirrors BetComposer; the F-2 landing included).
+	const terminalLocked =
+		errorState !== null &&
+		(errorState.state === "p2_terminal_suspended" ||
+			errorState.state === "p6_concluded" ||
+			errorState.state === "p3_market_race" ||
+			errorState.state === "p3_protective_landing" ||
+			errorState.state === "p3_generic");
 	const submitDisabled =
-		inFlight || shares === null || countdown !== null || sold !== null;
+		inFlight ||
+		shares === null ||
+		countdown !== null ||
+		retryLock > 0 ||
+		terminalLocked ||
+		sold !== null;
+
+	/** Every amount change is an EDIT (the §3.2 key law — cascade H-3): after
+	 * a terminal 4xx / the F-2 refresh, the edit re-mints; the strip clears. */
+	const onEditAmount = (value: string) => {
+		if (inFlight) {
+			return;
+		}
+		setDharmaIn(value);
+		dispatchKey({ type: "EDIT" });
+		if (terminalLocked && errorState?.state !== "p2_terminal_suspended") {
+			setStatus({ phase: "idle" });
+		}
+	};
 
 	async function submitSell() {
 		if (submitDisabled || shares === null) {
@@ -176,6 +215,11 @@ export function SellModule(props: {
 			dispatchKey({ type: "REFRESHED" });
 		} else if (mapped.state === "p4_rate_limited") {
 			setCountdown(mapped.retryAfterSeconds ?? 30);
+		} else if (
+			mapped.state === "p3_transient_retry" ||
+			mapped.state === "p3_wait_in_flight"
+		) {
+			setRetryLock(mapped.retryAfterSeconds ?? 0);
 		}
 	}
 
@@ -224,7 +268,7 @@ export function SellModule(props: {
 						inputMode="decimal"
 						disabled={inFlight}
 						aria-label="Amount to sell"
-						onChange={(e) => setDharmaIn(e.target.value)}
+						onChange={(e) => onEditAmount(e.target.value)}
 						className="h-auto w-24 border-none p-0 text-right font-mono text-base font-extrabold tabular-nums shadow-none [border:none]"
 					/>
 				</span>
