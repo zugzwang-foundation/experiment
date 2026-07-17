@@ -71,9 +71,9 @@ export function computeSpendableToday(args: {
 }
 
 /**
- * Compose the viewer's market context in ONE read-only transaction (a
- * consistent snapshot across position / balance / cursor; SELECTs only —
- * zero writes). Reads: `getHeldPosition` (inherits the ≤1-held single-side
+ * Compose the viewer's market context in ONE transaction issuing SELECTs
+ * only — zero writes (default READ COMMITTED; display-grade reads, no
+ * snapshot-consistency claim). Reads: `getHeldPosition` (inherits the ≤1-held single-side
  * assert), `readBalance`, the `users` cursor + the tx clock in one
  * statement (the `accrual.ts` single-clock pattern — `.mapWith` is
  * load-bearing, a bare sql fragment has no runtime Date decoder), and the

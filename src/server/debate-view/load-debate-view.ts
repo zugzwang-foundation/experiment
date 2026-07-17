@@ -190,17 +190,15 @@ export async function loadDebateView(
 
 	// UI.A2 §3.4 (ratified OQ-5c) — the deep-link ordinal: 1-based rank by
 	// (created_at, id) ascending over ALL top-level comments, removed INCLUDED
-	// (append-only ⇒ permanent). Mirrors resolve-post-param's query order
-	// exactly — the round-trip integration test pins the two together. uuidv7
-	// text order is byte-order-isomorphic to Postgres uuid comparison.
+	// (append-only ⇒ permanent). CONGRUENCE BY CONSTRUCTION with
+	// resolve-post-param's ORDER BY: `listMarketComments` returns rows in that
+	// exact Postgres order (`ORDER BY created_at ASC, id ASC` — full µs
+	// precision; a JS re-sort on Date.getTime() would truncate to ms and could
+	// swap sub-millisecond neighbors), and filter preserves order — so the
+	// array index IS the rank. The round-trip integration test pins the two.
 	const ordinalById = new Map<string, number>();
 	comments
 		.filter((c) => c.parentCommentId === null)
-		.sort(
-			(a, b) =>
-				a.createdAt.getTime() - b.createdAt.getTime() ||
-				(a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-		)
 		.forEach((c, i) => {
 			ordinalById.set(c.id, i + 1);
 		});
