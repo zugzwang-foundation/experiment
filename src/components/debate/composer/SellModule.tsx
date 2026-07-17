@@ -286,6 +286,7 @@ export function SellModule(props: {
 						type="button"
 						variant="ghost"
 						size="sm"
+						disabled={inFlight}
 						onClick={props.onClose}
 					>
 						Cancel

@@ -60,7 +60,7 @@ export function createQuoteReader(deps?: {
 			// SG-2 adjacency: the sell preview never sends `stake`.
 			params.set("shares", req.shares);
 		}
-		fetchFn(`/m/${req.slug}/quote?${params.toString()}`, {
+		fetchFn(`/m/${encodeURIComponent(req.slug)}/quote?${params.toString()}`, {
 			signal: own.signal,
 		})
 			.then(async (res) => {

@@ -23,9 +23,13 @@ export type ImageAttachResult =
 	| { kind: "rejected"; reason: "mime" | "oversize"; message: string }
 	| { kind: "failed"; transient: boolean };
 
-/** The route's own display strings (sign/route.ts) — reused locally (T3). */
+/** The route's own display strings (sign/route.ts) — reused locally (T3).
+ * IMAGE_OVERSIZE_MESSAGE is exported for the PLACE-time p3_image arm: the
+ * bets wire carries the raw error-class message there, which is never
+ * rendered (security-audit LOW — internal diagnostics stay internal). */
 const MIME_MESSAGE = "unsupported image type";
-const OVERSIZE_MESSAGE = "image too large";
+export const IMAGE_OVERSIZE_MESSAGE = "image too large";
+const OVERSIZE_MESSAGE = IMAGE_OVERSIZE_MESSAGE;
 
 /**
  * The T3 local bound — the LIVE whitelist + byte cap (SCAFFOLD.15 Q5/Q6;

@@ -83,12 +83,20 @@ export function DebateView({
 	);
 	// P2 terminal (Track A / banned) reached this session: entry controls off.
 	const [suspended, setSuspended] = useState(false);
+	// Security-audit MEDIUM: while a composer request is in flight, every
+	// host path that would unmount it (entry toggles, relation flips, post
+	// enter/exit) no-ops — a mid-request unmount + re-open would mint a
+	// fresh key over a possibly-committing bet.
+	const [composerBusy, setComposerBusy] = useState(false);
 
 	const { market, posts } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
 
 	const toggleEntry = (side: Side) => {
+		if (composerBusy) {
+			return;
+		}
 		setOpenSide((cur) => (cur === side ? null : side));
 	};
 
@@ -108,6 +116,7 @@ export function DebateView({
 					viewer={viewer}
 					onClose={() => setOpenSide(null)}
 					onSuspended={() => setSuspended(true)}
+					onBusyChange={setComposerBusy}
 				/>
 			);
 		}
@@ -128,6 +137,9 @@ export function DebateView({
 		history.replaceState(null, "", url);
 	};
 	const enterPost = (id: string) => {
+		if (composerBusy) {
+			return;
+		}
 		setSelectedPostId(id);
 		setOpenReply(null);
 		setOpenSide(null);
@@ -135,6 +147,9 @@ export function DebateView({
 		syncPostParam(target ? target.ordinal : null);
 	};
 	const exitPost = () => {
+		if (composerBusy) {
+			return;
+		}
 		setSelectedPostId(null);
 		setOpenReply(null);
 		setOpenSide(null);
@@ -159,9 +174,12 @@ export function DebateView({
 						marketOpen={marketOpen}
 						suspended={suspended}
 						activeRelation={openReply}
-						onToggleRelation={(relation) =>
-							setOpenReply((cur) => (cur === relation ? null : relation))
-						}
+						onToggleRelation={(relation) => {
+							if (composerBusy) {
+								return;
+							}
+							setOpenReply((cur) => (cur === relation ? null : relation));
+						}}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 					/>
@@ -227,6 +245,7 @@ export function DebateView({
 												}}
 												onClose={() => setOpenReply(null)}
 												onSuspended={() => setSuspended(true)}
+												onBusyChange={setComposerBusy}
 											/>
 										)
 									) : (

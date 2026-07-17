@@ -35,7 +35,7 @@ import {
 } from "./gating";
 import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import { initialKeyState, type KeyState, reduceKey } from "./idempotency";
-import { attachImage } from "./image-attach";
+import { attachImage, IMAGE_OVERSIZE_MESSAGE } from "./image-attach";
 import {
 	composeWireBody,
 	extendedMaxChars,
@@ -68,6 +68,15 @@ export function BetComposer(props: {
 	onClose: () => void;
 	/** P2 terminal reached (Track A / banned): the view disables all entry controls. */
 	onSuspended: () => void;
+	/**
+	 * In-flight mirror for the HOST's close/toggle paths (security-audit
+	 * MEDIUM): every path that would unmount the composer mid-request —
+	 * entry toggles, relation flips, post enter/exit — must no-op while a
+	 * request is in flight, or a re-open mints a fresh key over a
+	 * possibly-committing bet (the double-execution seam the receipts cannot
+	 * cross). The composer's own ×/ESC are guarded internally.
+	 */
+	onBusyChange?: (busy: boolean) => void;
 }) {
 	const router = useRouter();
 	const [title, setTitle] = useState("");
@@ -161,6 +170,12 @@ export function BetComposer(props: {
 	const onCloseRef = useRef(props.onClose);
 	onCloseRef.current = props.onClose;
 	const inFlightNow = status.phase === "in_flight";
+	const onBusyChangeRef = useRef(props.onBusyChange);
+	onBusyChangeRef.current = props.onBusyChange;
+	useEffect(() => {
+		onBusyChangeRef.current?.(inFlightNow);
+		return () => onBusyChangeRef.current?.(false);
+	}, [inFlightNow]);
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape" && !inFlightNow) {
@@ -179,7 +194,11 @@ export function BetComposer(props: {
 			errorState.state === "p6_concluded" ||
 			errorState.state === "p3_market_race" ||
 			errorState.state === "p3_revise_blocked" ||
-			errorState.state === "p3_protective_landing");
+			errorState.state === "p3_protective_landing" ||
+			// Cached-terminal belts lock until the next edit re-mints (mirrors
+			// SellModule — audit informational reconciled).
+			errorState.state === "p3_generic" ||
+			errorState.state === "p3_image");
 	const submitDisabled =
 		inFlight ||
 		floorAbove ||
@@ -321,10 +340,19 @@ export function BetComposer(props: {
 				setSuspendedKind(outcome.code === "banned_user" ? "banned" : "track_a");
 				break;
 			case "p3_image":
-				// §4: image codes land INLINE on the affordance (the wire's own
-				// display message); the attachment is stale (orphan-swept object /
-				// real-byte oversize) — drop it so the next attempt re-signs.
-				setImage({ phase: "error", message: outcome.message });
+				// §4: image codes land INLINE on the affordance; the attachment is
+				// stale (orphan-swept object / real-byte oversize) — drop it so the
+				// next attempt re-signs. FIXED client copy, never the bets-wire
+				// message (it carries raw error-class diagnostics — audit LOW):
+				// oversize → the sign route's own display string; object-missing →
+				// the no-heading retry-line convention.
+				setImage({
+					phase: "error",
+					message:
+						outcome.code === "error_image_oversize"
+							? IMAGE_OVERSIZE_MESSAGE
+							: "",
+				});
 				break;
 			case "p3_protective_landing":
 				// C1 (F-2): refresh renders the committed bet; fresh key only on
@@ -396,8 +424,9 @@ export function BetComposer(props: {
 				<button
 					type="button"
 					onClick={props.onClose}
+					disabled={inFlight}
 					aria-label="Close"
-					className="ml-auto rounded-(--r-chip) px-1.5 text-base text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+					className="ml-auto rounded-(--r-chip) px-1.5 text-base text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 				>
 					{COMPOSER_COPY.close}
 				</button>
