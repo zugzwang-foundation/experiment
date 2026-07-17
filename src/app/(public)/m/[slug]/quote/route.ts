@@ -51,7 +51,11 @@ export async function GET(
 ): Promise<Response> {
 	const requestId = resolveRequestId(request);
 
-	// 1. Session gate FIRST (ratified OQ-5a).
+	// 1. Session gate FIRST (ratified OQ-5a). Session PRESENCE only — banned/
+	// onboarding are deliberately NOT re-checked: reads survive a ban (ADR-0021
+	// — ban removes voice, not reads; the page/viewer-context share this
+	// posture) and the quote is advisory math derivable from the public
+	// header pricing. The write path (bets endpoint) holds the 403.
 	const session = await auth.api.getSession({ headers: request.headers });
 	if (!session?.user?.id) {
 		return withNoStore(
