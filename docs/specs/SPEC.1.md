@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.16 (semver; bump major on invariant changes)
-- **Last updated:** 2026-07-17
+- **Version:** 1.0.17 (semver; bump major on invariant changes)
+- **Last updated:** 2026-07-18
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -48,7 +48,7 @@ Zugzwang's wager is that this combination — reputation as the staked unit, arg
 |---|---|---|
 | **Market** | A binary YES/NO question with a deadline and a resolution criterion. | `markets` table, `Market` type |
 | **Bet** | An atomic stake on a side of a market, accompanied by a mandatory comment (INV-1). A bet with no parent comment is a **post** (clears the post floor); a bet whose comment has a parent is a **reply** (clears the reply floor). | `bets` table, `Bet` type |
-| **Comment** | The textual / image argument carried by a bet, or by a reply-bet. Every comment is bound to a bet — there is no comment without a stake (INV-1). | `comments` table, `Comment` type |
+| **Comment** | The textual / image argument carried by a bet, or by a reply-bet. Its text is a single `comments.body` field composed as a **title** (leading segment) + an optional **extended body**; the title + a teaser are derived at read-time (`deriveTitleTeaser`) for card / hero / list rendering (SCL-1, §8). Every comment is bound to a bet — there is no comment without a stake (INV-1). | `comments.body`, `Comment` type |
 | **Reply** | A bet whose comment has a non-null `parent_comment_id` — a **Support / Counter reply-bet** placed under a parent post. Carries its own stake (≥ reply floor) on the replier's held side, frozen at post-time. Flat: depth capped at 1 (a reply cannot itself be replied to). | `comments.parent_comment_id`, `bets` |
 | **Side** | YES or NO. The market's two share types. | `comments.side_at_post_time`, `bets.side` |
 | **Position** | A user's net share holding in a market. Computed from the bet ledger. | derived; not a column |
@@ -365,6 +365,8 @@ existed). Supersedes the former pre-confirm flow. See §16.1
 **Every comment rides a bet.** Under the v1.9.0 reply-as-bet model (ADR-0017 / ADR-0018), a comment is never a standalone write — it is the argument carried by a bet (§7). A top-level comment is a **post-bet** (F-BET-1 entry or F-BET-2 subsequent, post floor); a comment with a `parent_comment_id` is a **reply-bet** (F-COMMENT-2, reply floor 50). This section specifies the comment- and reply-facing behaviour of those bets — side-freezing, parent linkage, image attachment, length, and the no-stake-no-voice consequence — while the bet mechanics (price impact, ledger, single-side) live in §7. The two are one atomic action (INV-1). Because a comment is a bet, it can only be written while `market.state = Open`; once a market closes there are no new comments or replies (the debate window is the market-open window).
 
 **Rate-limit posture.** Posts and replies are bets, so their anti-abuse posture is the bet posture (per-IP burst caps via `BET_ATTEMPTS_PER_IP_PER_MIN`, §16.1), not a separate per-market comment/vote budget. Whether reply-bets additionally carry a per-market productive cap distinct from top-level bets is deferred to SPEC.2 §11 + the number-tuning pass; the R2 signed-PUT-URL mint endpoint keeps its own per-IP cap (`IMAGE_PUT_URL_REQUESTS_PER_IP_PER_MIN`). There is no standalone comment or vote rate-limit budget in v1.9.0.
+
+**Argument text = title + body (SCL-1).** A comment's argument is a single `comments.body` text field. By composition convention the `body` carries a **title** (its leading segment) followed by an optional **extended body**; the composer joins them into `body`, and read models derive the title + a teaser back via `deriveTitleTeaser` for card, hero, and list rendering (§9, §22). There is **no separate title column** — the split is a read-time derivation; `COMMENT_MAX_LENGTH` bounds the whole `body`. This reconciles the spec to the shipped composer (the field was previously specified as an undifferentiated argument).
 
 ### F-COMMENT-1 — Additional top-level argument (= a post-bet)
 
@@ -979,6 +981,7 @@ Symbolic only. Specific values → number-tuning pass (target: 2026-09-01).
 | `BET_MAX_STAKE` | Maximum Dharma stake accepted per bet. Buy/add stake above this is clamped to `BET_MAX_STAKE` before the CPMM computation; sell is never clamped. The overspend guard replacing the retired slippage warning (§7); the clamped result is surfaced in the non-blocking preview (cpmm.md §6.3). Value TBD at number-tuning (~2026-09-01). |
 | `IN_FLIGHT_BET_TIMEOUT_SEC` | Window during which `Resolving`-state in-flight bets may commit (per `G6`). |
 | `POLL_INTERVAL_MS_DEBATE_VIEW` | Debate-view poll interval (per `C7`). |
+| `DISCOVERY_GRID_SIZE` | Number of market-card slots on the Discovery front page; the hero rotates through this set (§22 F-DISC-1/2). **Set to 8** by design-canon §2 — a fixed design value, not deferred to number-tuning. |
 | `OTP_TTL_MIN` | Email-OTP time-to-live (per `K1`). |
 | `OTP_REQUESTS_PER_EMAIL_PER_HOUR` | Per-email OTP request cap (anti-spam / anti-bot). |
 | `OTP_REQUESTS_PER_IP_BURST_PER_MIN` | Per-IP OTP request burst cap. |
@@ -1222,6 +1225,14 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `id::uuidv7-no-collision-under-load` | ADR-0016 §1 | — |
 | `id::raw-uuid-not-in-participant-urls` | ADR-0016 §6 | ADR-0011, ADR-0016 |
 | `freeze::nov-5-23-59-utc-no-writes` | §12.1 | — |
+| `discovery::open-markets-only` | §22 F-DISC-1 | — |
+| `discovery::newest-first` | §22 F-DISC-1 | — |
+| `discovery::capped-at-grid-size` | §22 F-DISC-1 | — |
+| `discovery::sparse-no-placeholders` | §22 F-DISC-1 | — |
+| `discovery::zero-markets-empty-state` | §22 F-DISC-1 | — |
+| `discovery::hero-top-post-per-side-by-top-ranking` | §22 F-DISC-2 | — |
+| `discovery::hero-masks-track-b-hidden-from-public` | §22 F-DISC-2 | — |
+| `discovery::hero-single-market-static` | §22 F-DISC-2 | — |
 
 A `pnpm test:invariants` script runs the INV-tagged subset in isolation. CI fails if any INV test fails or is skipped.
 
@@ -1357,6 +1368,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-07-07 | 1.0.14 | §0; §7 F-BET-1; §20 | **SYNC sweep — §0/§20 metadata catch-up for four rider tasks** (paired with SPEC.2 → 1.0.17; pays the `docs/parked.md` SYNC-sweep entry). Records the already-landed same-commit riders: **A1 §16.5** CSAM-compliance swap-window-closure note (PR #197, `4350406`); **B3 §7 F-BET-3** oversell `insufficient_shares` pre-check + error/acceptance rows + `bet_receipts` durable-backing note (ADR-0031; PR #202, `6244dce`); **B7a §7 F-BET-1** C.length semantics rider (lower bound trimmed / upper raw / stored ≡ moderated; AUDIT.1 A24 ruling — ADR-0015 Patch record, no new ADR; PR #211, `7dabdc9`); **B8 §16.3 H3** admin-null clarifier (admin-surface rows log `user_id` = JSON `null`; AUDIT.1 A17/B8 ruling; PR #216, `f0be380`). B1 and B2 did not touch SPEC.1. **New in this pass (pre-existing enumeration drift):** §7 F-BET-1 **Errors** row gains 400 `comment_requires_bet` — the code has thrown it since DEBATE.1 (cf. the F-BET-1 C.length rider + §8 F-COMMENT-5's response inventory); the row's enumeration simply omitted it. §0 → 1.0.14. | Periodic SYNC reconciliation per CLAUDE.md §7 — rider substance landed same-commit with its tasks; only version/changelog metadata + the one enumeration fix are swept here | — |
 | 2026-07-15 | 1.0.15 | §0; §2; §7; §16.1; §16.2; §17; §19 Q4; §20; Appendix B | **F-BET-9 slippage warning RETIRED** (design-canon §4 ruling 2 — W2.10 Option A, operator-ratified 2026-06-27). §7 F-BET-9 tombstoned (heading/ID retained; full removal → MAINT.15); §2 glossary Slippage row reframed to the internal quantity (non-blocking preview, no confirmation gate); `SLIPPAGE_WARNING_PCT_THRESHOLD` removed (§16.1, §16.2 failure row, §17 `bet-slippage::warning-modal` test row, §19 Q4, Appendix B); `BET_MAX_STAKE` added as the buy/add-only overspend clamp (§16.1 row + §7 preamble rider; sell is never clamped; value TBD → number-tuning). Price-impact quantity retained for the non-blocking preview (cpmm.md §6 — paired cpmm.md 2.1.0 bump, same commit). Doc-only; no code (buy composer unbuilt). Deferred: SPEC.2 F-BET-9 title drift + flow-inventory arithmetic + `flows/F-BET-9.md` full removal → MAINT.15 (skeleton carries a one-line RETIRED header); SPEC.2 §3.2 vestigial retry-example word → next SYNC sweep. | Spec outranks canon on prescriptive surfaces — SPEC.1 reconciled to the ruled design (W2.10 Option A). No new ADR: the decision is canonical in design-canon §4 ruling 2; a third record would be redundant. | — |
 | 2026-07-17 | 1.0.16 | §0; §9 F-DEBATE-1; §20 | **UI.A2 deep-link rider (same-commit with the governing code).** §9 F-DEBATE-1 gains the `?post=<N>` deep-link bullet: N = the market's 1-based top-level post ordinal by `(created_at, id)` ascending, removed posts included in the domain (ordinals permanent); server-side resolution; silent fallback to the market view on absent/malformed/out-of-range/removed/reply-targeting values; `history.replaceState` outbound sync makes links user-mintable. Raw comment UUIDs stay out of participant URLs. Plan: `docs/plans/UI-A2.md` (ratified OQ-4/OQ-5c; FI-4 web-authored rider). | ADR-0016 D6's named "natural ordering" mechanism consumed — no new ADR (D6 already sanctions the shape; a second record would be redundant). Same-commit doctrine. | — |
+| 2026-07-18 | 1.0.17 | §0; §2; §8; §16.1; §17; §20; §22 (new); Appendix B | **Discovery surface amendment (UI.A4 blocker; SCL-1/SCL-2/SCL-4/SCL-5 landed).** New **§22 Discovery** appended after §21 (append-don't-renumber per the §21 precedent): the market-list front page at `/` (ADR-0023 `(public)/` shell, displaces the placeholder); **read model (SCL-4)** — open markets → cards (image = `is_default` `market_media` [SCL-2, no new column], question, two-line price sparkline derived from `bet.placed`/`bet.sold` pool replay [no new store], YES/NO bar, `Đ staked · posts · replies`); **featured-set (SCL-5)** = all open markets **newest-first, capped at `DISCOVERY_GRID_SIZE` (8)** — capital-neutral (recency not stake; ADR-0017 Driver 2 applied to the entry surface), no admin featured flag (would need DDL); hero = active-index market + its top-YES/top-NO posts by §9 Top (`RANKING.md`), **Track-B masked from the public** (safety-critical, mirrors §9 F-DEBATE-1); sparse-market rule (fewer than the grid size → available only, no placeholders; one → static; zero → empty state); cached-per-load (SPEC.2 R-2), carousel is client-side motion not a data refresh. **F-DISC-1** (market-card grid) + **F-DISC-2** (hero + top-post selection). **§2/§8 (SCL-1):** a comment's argument is a single `comments.body` composed as title (leading segment) + optional extended body, title/teaser derived at read-time via `deriveTitleTeaser` (no separate title column) — reconciles the spec to the shipped composer. **§16.1** adds `DISCOVERY_GRID_SIZE` (8, design-canon §2, pinned). **§17** adds eight `discovery::*` rows. **Appendix B** adds `DISCOVERY_GRID_SIZE = 8 # pinned by design-canon §2`. **§0** → 1.0.17, last-updated 2026-07-18. Paired with **SPEC.2 → 1.0.18** (same commit): §3.3 Pattern R-2 route `/markets` → `/` in prose, the R-2 table row, and the illustrative page path. | Discovery had no prescriptive spec — locked in design-canon §2/§5 but never in SPEC.1; SCL-4 (read-model) + SCL-5 (featured-set) were deferred to "a SPEC.1 amendment"; SCL-1/SCL-2 likewise unlanded. Authored at UI.A4's plan-phase STEP 0.6 STOP (no-code-before-spec). No new ADR: the selection rule applies ADR-0017 Driver 2 (openness carries the thesis) to a new surface and is recorded here; a separate ADR would be redundant (cf. the F-BET-9 / SCL precedent). | — |
 
 ---
 
@@ -1424,6 +1436,44 @@ The footer whitepaper link remains.
 
 ---
 
+## §22 Discovery
+
+*Thesis relevance: (b) operationally enabling — the entry surface. Its featured-set selection is a light propagation mechanism (which open markets a reader sees first) and is deliberately capital-neutral (recency, not stake), consistent with ADR-0017 Driver 2: openness, not suppression, carries the thesis.*
+
+> **Placement note.** Appended after §21 to avoid renumbering §1–§21 and their cross-references (SPEC.2, ADRs, tracker). SPEC.1's section order is accretion-based, not importance-ranked (§21 ancillary already follows the meta sections). Discovery is a **core** surface; its position here reflects append order, not priority.
+
+**What Discovery is.** The public-by-default front page, served at **`/`** — the participant root inside the ADR-0023 `(public)/` shell, displacing the pre-launch coming-soon placeholder. It is the market-discovery surface: a **hero featured market** above a **grid of market cards**, driven by **one shared carousel index** (design-canon §2). Anonymous and authenticated users see the same surface; header identity differs (Sign in / Sign up logged-out; the nav-identity widget — avatar + pseudonym + balance chip — logged-in, per design-canon §2 ruling 4 + the global header).
+
+**The read model (SCL-4).** Discovery lists **open markets** (`market.state = Open`). Each market renders as a **card** with the locked composition (design-language §3.2): the market **image** + the market **question** + a **two-line price sparkline** + the **YES/NO price bar** + the stat line **`Đ staked · posts · replies`**. Every quantity is a read-model derivation over existing data (pool reserves for price, the bet ledger for `Đ staked`, the comment tree for post/reply counts) — **no new tables, no new event types**. The card **image** is the market's **`is_default` `market_media` row** (ADR-0026); because markets always carry media (the §15 F-ADMIN-1 service invariant), a card image **always exists** — this reconciles **SCL-2** (the deferred "market image field") to the existing `market_media` model, adding **no `markets` column**.
+
+**Price series (no new store).** The two-line price graph (YES/NO, design-language §3.2 — full-size on the hero, sparkline on cards) is a **read-model derivation**: the pool YES-price sampled across the market's `bet.placed` / `bet.sold` events. There is **no materialized price-series table** in v1; the cached-per-load model (below) amortizes the replay across the cache lifetime. A stored series is explicitly out of scope for the experiment (§18-class deferral).
+
+**Featured-set selection (SCL-5).** The surface shows open markets on an **N-slot carousel** (`DISCOVERY_GRID_SIZE` = 8, design-canon §2). The **hero** is a large presentation of the market at the **active carousel index** (the ringed grid card); hero, grid ring, and active dot advance in sync (design-canon §5 — carousel timing is **client-side motion**, canon-owned, not a data refresh). The markets that fill the slots are **all open markets ordered newest-first** (`markets.created_at` descending), **capped at `DISCOVERY_GRID_SIZE`**. The selection orders by **recency — deliberately not by stake, volume, or activity**: the front-door selection is **capital-neutral** (capital must not buy front-page visibility, even though the §9 *ranking* admits a stake lane — the two surfaces answer different questions; ADR-0017 Driver 2 applied to the entry surface). There is **no admin-curated "featured" flag** (it would require a `markets` column — DDL — and is excluded to keep this amendment doc-only). Per §0 (J1) and §18, the spec fixes the **selection rule**, never the markets — market content is the operator's.
+
+**Hero top posts.** The hero displays its market's **top-ranked YES post** and **top-ranked NO post** — the highest-ranked post on each side under the **§9 Top** order (`RANKING.md`), read-time-computed, the same model the debate view uses. No new ranking logic; Discovery **reuses §9**. (The latest-interleave — ADR-0017 P2 — does not affect the hero: it injects at cadence positions below the top slot, so the top-ranked post per side is unaffected.)
+
+**Sparse-market behaviour.** When **fewer than `DISCOVERY_GRID_SIZE` open markets exist**, the surface renders **only the available markets** — the grid shrinks, the carousel index wraps over the available set, and **no placeholder cards are shown** (placeholders would misrepresent an early or sleepy platform). With **exactly one** open market, the carousel has a single position and **does not auto-advance**. With **zero** open markets, the surface renders a plain **empty state** (no hero, no grid; final copy at build/branding). This resolves the design-canon-silent `< DISCOVERY_GRID_SIZE` case.
+
+**Freshness (cached, not polled).** Discovery is served **cached per-load** (SPEC.2 §3.3 Pattern **R-2** — `'use cache'`, unauthenticated slow-changing content) — **not** polled like the debate view (§9 F-DEBATE-4). The **carousel is client-side motion, not a data refresh**: it rotates the already-loaded market set on a timer (design-canon §5) and issues **no re-fetch**. Newly opened or newly closed markets appear on the **next page load**, not mid-session. *(Implementation prerequisite, not a spec constraint: SPEC.2 R-2's `'use cache'` presumes `cacheComponents` in `next.config.ts`, currently disabled — to be enabled for the Discovery build.)*
+
+**Route (SPEC.2 reconciliation).** Discovery is served at **`/`**. SPEC.2 §3.3 Pattern R-2's prior `/markets` reference is **repointed to `/`** in the **same commit** as this amendment (same-commit doctrine) — see the accompanying SPEC.2 delta.
+
+### F-DISC-1 — Render market-card grid
+
+- **Pre.** User (anonymous or authenticated) requests `/`.
+- **System.** The read model selects open markets (`market.state = Open`) ordered by `markets.created_at` **descending**, capped at `DISCOVERY_GRID_SIZE`. Each selected market becomes a **card**: image (the market's `is_default` `market_media` row), question, two-line price sparkline (derived per the price-series rule above), YES/NO price bar (pool-derived), and `Đ staked · posts · replies` (read-model aggregates). Fewer than `DISCOVERY_GRID_SIZE` markets → render only the available cards (no placeholders); zero markets → empty state (no grid). Served **cached per-load** (SPEC.2 R-2); the carousel rotates the loaded set **client-side** (design-canon §5) with no re-fetch. A card click navigates to that market's detail view (`/m/[slug]`, §9).
+- **Response.** The market-card grid in read-model order (open markets, newest-first, capped), or the empty state.
+- **Acceptance.** `tests/server/discovery/list.test.ts::open-markets-only`, `::newest-first`, `::capped-at-grid-size`, `::fewer-than-grid-size-no-placeholders`, `::zero-markets-empty-state`. *(Proposed paths; CC confirms at build.)*
+
+### F-DISC-2 — Hero featured market + top-post selection
+
+- **Pre.** At least one open market exists (else F-DISC-1's empty state renders; no hero).
+- **System.** The hero presents the market at the **active carousel index** (the ringed grid card; index rotates client-side per design-canon §5, in sync with grid ring and dot). For that market the hero renders its **top-ranked YES post** and **top-ranked NO post** — the highest-ranked post on each side under **§9 Top** (`RANKING.md`), read-time-computed. **Moderation masking (safety-critical):** a **Track-B-hidden** post is **not eligible** as a hero top post for anonymous or authenticated non-admin viewers (mirroring §9 F-DEBATE-1 — hidden content is invisible to the public; the next eligible post on that side is used, or the side renders no hero post if none is eligible). A hero post click navigates to that post's **Reply page** (§9 postview); an author pseudonym click navigates to that author's **Profile**. With exactly one open market the carousel does not auto-advance; the hero is static on that market.
+- **Response.** The hero — the active-index market (image · question · two-line graph · price bar · `Đ staked · posts · replies`) with its moderation-masked top-YES and top-NO posts.
+- **Acceptance.** `tests/server/discovery/hero.test.ts::top-post-per-side-by-top-ranking`, `::track-b-hidden-not-surfaced-to-public`, `::single-market-no-auto-advance`. *(Proposed paths; CC confirms at build.)*
+
+---
+
 ## Appendix A — AI moderation category-to-track mapping
 
 Source vendors: OpenAI moderation API (text), PhotoDNA-or-equivalent (image hash for CSAM), general image classifier TBD (adult / violence / weapons).
@@ -1473,6 +1523,7 @@ REPLY_DEPTH_MAX = 1  # pinned by ADR-0017 (flat replies; not deferred to tuning 
 BET_MAX_STAKE = TBD
 IN_FLIGHT_BET_TIMEOUT_SEC = TBD
 POLL_INTERVAL_MS_DEBATE_VIEW = TBD
+DISCOVERY_GRID_SIZE = 8  # pinned by design-canon §2 (Discovery front-page card slots; hero rotates this set; not deferred to tuning)
 OTP_TTL_MIN = TBD
 OTP_REQUESTS_PER_EMAIL_PER_HOUR = TBD
 OTP_REQUESTS_PER_IP_BURST_PER_MIN = TBD
