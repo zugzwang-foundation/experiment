@@ -82,7 +82,12 @@ const accountData = {
 // at the storage layer — and, since 0021, a no-truncate guard; the fixture
 // disables the guards for exactly one teardown transaction. CASCADE clears the
 // FK-dependent auth tables; identity_pool is NOT FK-referenced by users
-// (pseudonym is copied, not referenced) so it is listed explicitly.
+// (pseudonym is copied, not referenced) so it is listed explicitly. `events`
+// is listed too: the signup hook emits `user.pseudonym_assigned` events rows
+// (no FK — CASCADE never reaches them); omitting them leaked 2 rows past this
+// file's teardown into whichever file ran next, breaking any global events
+// count downstream (surfaced at UI.A2 when new test files re-shuffled the
+// duration-sorted file order — order-dependent, pre-existing).
 async function truncateAll(): Promise<void> {
 	await truncateTables(testClient, [
 		"users",
@@ -90,6 +95,7 @@ async function truncateAll(): Promise<void> {
 		"sessions",
 		"identity_pool",
 		"verifications",
+		"events",
 	]);
 }
 

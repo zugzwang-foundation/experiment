@@ -9,7 +9,7 @@ import {
 	CommentTrackBBlockedError,
 	InvalidRequestBodyError,
 } from "@/server/bets/errors";
-import { assertStakeFloor } from "@/server/bets/floors";
+import { assertStakeFloor, clampStakeToMax } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
 import {
 	isDurableIdempotencyConflict,
@@ -119,8 +119,14 @@ export async function POST(request: Request): Promise<Response> {
 			imageR2Key = resolvedImage.r2ObjectKey;
 		}
 
-		// 5d. Stake floor — reply floor when a parent is set, post floor otherwise.
-		assertStakeFloor({ parentCommentId, stake });
+		// 5d. BET_MAX_STAKE clamp (SPEC.1 §16.1 / F-BET-9, buy/add only) THEN the
+		// stake floor on the CLAMPED value — so a misconfigured max < floor rejects
+		// loudly (below_*_floor) instead of executing below floor. The clamped
+		// stake is uniformly the stake for everything downstream (balance check,
+		// CPMM computation, bets.stake, ledger debit, events, receipt); the body
+		// fingerprint was computed at handler entry over the RAW submitted body.
+		const effectiveStake = clampStakeToMax(stake);
+		assertStakeFloor({ parentCommentId, stake: effectiveStake });
 
 		// 6. Pre-commit moderation — OUTSIDE the tx (ADR-0014). Both Track A and
 		// Track B abort the bet — the tx never opens (F-MOD-4 / R2), for replies too.
@@ -191,7 +197,7 @@ export async function POST(request: Request): Promise<Response> {
 					userId: ctx.userId,
 					marketId,
 					side,
-					stake,
+					stake: effectiveStake,
 					body,
 					parentCommentId,
 					idempotencyKey: ctx.idempotencyKey,

@@ -19,7 +19,7 @@ import type { Marker } from "@/server/positions/compute";
 import { signRead } from "@/server/storage/sign-read";
 
 import { type DebateComment, listMarketComments } from "./list-comments";
-import { getMarketPricing } from "./market-pricing";
+import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
@@ -83,6 +83,8 @@ export type DebatePost =
 	| {
 			removed: true;
 			id: string;
+			/** UI.A2 §3.4 (OQ-5c) — the permanent 1-based deep-link ordinal; carried on BOTH variants (a removed post keeps its slot). */
+			ordinal: number;
 			sideAtPostTime: Side;
 			createdAt: string;
 			aggregate: ReplyAggregate;
@@ -91,6 +93,8 @@ export type DebatePost =
 	| {
 			removed: false;
 			id: string;
+			/** UI.A2 §3.4 (OQ-5c) — the permanent 1-based deep-link ordinal. */
+			ordinal: number;
 			sideAtPostTime: Side;
 			createdAt: string;
 			title: string;
@@ -109,6 +113,8 @@ export type DebatePost =
 
 export type DebateMarketHeader = MarketSummary & {
 	pricing: { yes: string; no: string } | null;
+	/** UI.A2 §3.2 (SG-3 additive) — per-side `computeBuy(stake:"1").shares`, the A3 strip's `TO WIN Đ1 → Đx` substrate; rides the header's one pool read. */
+	unitToWin: { yes: string; no: string } | null;
 	totals: { dharmaStaked: string; postCount: number; replyCount: number };
 };
 
@@ -149,7 +155,10 @@ export async function loadDebateView(
 	const comments = await listMarketComments(client, { marketId });
 	const postSubstrate = await loadRankingSubstrate(client, { marketId });
 	const replyMap = await loadReplySubstrate(client, { marketId });
-	const pricing = await getMarketPricing(client, marketId);
+	const pricingAndUnitToWin = await getMarketPricingAndUnitToWin(
+		client,
+		marketId,
+	);
 	const totals = await getMarketTotals(client, marketId);
 
 	const commentById = new Map(comments.map((c) => [c.id, c]));
@@ -179,6 +188,21 @@ export async function loadDebateView(
 	// Top order over the WHOLE substrate (removed posts keep their slot/position).
 	const ordered = buildTopList(postSubstrate);
 
+	// UI.A2 §3.4 (ratified OQ-5c) — the deep-link ordinal: 1-based rank by
+	// (created_at, id) ascending over ALL top-level comments, removed INCLUDED
+	// (append-only ⇒ permanent). CONGRUENCE BY CONSTRUCTION with
+	// resolve-post-param's ORDER BY: `listMarketComments` returns rows in that
+	// exact Postgres order (`ORDER BY created_at ASC, id ASC` — full µs
+	// precision; a JS re-sort on Date.getTime() would truncate to ms and could
+	// swap sub-millisecond neighbors), and filter preserves order — so the
+	// array index IS the rank. The round-trip integration test pins the two.
+	const ordinalById = new Map<string, number>();
+	comments
+		.filter((c) => c.parentCommentId === null)
+		.forEach((c, i) => {
+			ordinalById.set(c.id, i + 1);
+		});
+
 	const posts: DebatePost[] = ordered.map((sub) => {
 		const comment = commentById.get(sub.id);
 		const removed = removedSet.has(sub.id);
@@ -196,10 +220,15 @@ export async function loadDebateView(
 			authorMap,
 		);
 
+		// Defensive 0 only on the unreachable no-comment branch (the substrate
+		// derives from comments+bets, so a substrate post always has its comment).
+		const ordinal = ordinalById.get(sub.id) ?? 0;
+
 		if (removed || !comment) {
 			return {
 				removed: true,
 				id: sub.id,
+				ordinal,
 				sideAtPostTime: sub.parentSide,
 				createdAt: (comment?.createdAt ?? new Date(0)).toISOString(),
 				aggregate,
@@ -211,6 +240,7 @@ export async function loadDebateView(
 		return {
 			removed: false,
 			id: sub.id,
+			ordinal,
 			sideAtPostTime: comment.sideAtPostTime,
 			createdAt: comment.createdAt.toISOString(),
 			title,
@@ -228,7 +258,12 @@ export async function loadDebateView(
 	});
 
 	return {
-		market: { ...args.market, pricing, totals },
+		market: {
+			...args.market,
+			pricing: pricingAndUnitToWin?.pricing ?? null,
+			unitToWin: pricingAndUnitToWin?.unitToWin ?? null,
+			totals,
+		},
 		posts,
 	};
 }
