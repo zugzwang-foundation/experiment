@@ -1,7 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 
+import { AuthGateSlot } from "./composer/AuthGateSlot";
+import { BetComposer } from "./composer/BetComposer";
+import { deriveReplySide } from "./composer/gating";
+import { PositionStrip } from "./composer/PositionStrip";
+import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
 import { ImageLightbox, PostPopup } from "./dialogs";
 import { MarketHeader } from "./MarketHeader";
@@ -15,6 +20,8 @@ import type {
 	Side,
 	ViewerMarketContext,
 } from "./types";
+
+const opposite = (side: Side): Side => (side === "YES" ? "NO" : "YES");
 
 /** A focused post's replies for one pole column — placed by their OWN side (D3). */
 function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
@@ -33,11 +40,15 @@ function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
  *
  * Market-view: two pole columns (YES/NO), each a post-scroller over that side's
  * posts (Top order). Post-view: the focused post in full + two columns of its
- * replies (post-scrollers swapped for reply-scrollers). C1: read-only — write
- * triggers render disabled, no composer/auth-gate is rendered.
+ * replies (post-scrollers swapped for reply-scrollers). UI.A3: the write
+ * triggers are LIVE — the Đ BET entry (market view) and the focused post's
+ * Support/Counter split-bar triggers (post view) open the composer in the
+ * opposite slot (auth-gate variant when signed out); at most one composer is
+ * open per view.
  */
 export function DebateView({
 	model,
+	viewer,
 	initialPostId,
 }: {
 	model: DebateViewModel;
@@ -61,8 +72,56 @@ export function DebateView({
 	);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+	// UI.A3 — the market-view Đ BET composer: at most ONE open (side-slot rule:
+	// betting side S renders the composer in the OPPOSITE slot; opening the
+	// other side closes the first — the d5 slot model, toggle-to-close).
+	const [openSide, setOpenSide] = useState<Side | null>(null);
+	// UI.A3 slice 3 — the post-view reply composer (v0.10: Support OR Counter
+	// opens in the slot OPPOSITE THE POST; toggle-to-close).
+	const [openReply, setOpenReply] = useState<"support" | "counter" | null>(
+		null,
+	);
+	// P2 terminal (Track A / banned) reached this session: entry controls off.
+	const [suspended, setSuspended] = useState(false);
+	// Security-audit MEDIUM: while a composer request is in flight, every
+	// host path that would unmount it (entry toggles, relation flips, post
+	// enter/exit) no-ops — a mid-request unmount + re-open would mint a
+	// fresh key over a possibly-committing bet.
+	const [composerBusy, setComposerBusy] = useState(false);
 
 	const { market, posts } = model;
+	const marketOpen = market.status === "Open";
+	const heldSide = viewer?.position?.side ?? null;
+
+	const toggleEntry = (side: Side) => {
+		if (composerBusy) {
+			return;
+		}
+		setOpenSide((cur) => (cur === side ? null : side));
+	};
+
+	/** The body of one market-view pole column: composer/auth-gate when this
+	 * column is the OPPOSITE slot of the open bet side; the post scroller
+	 * otherwise. */
+	const marketColumnBody = (side: Side, scroller: ReactNode) => {
+		if (openSide !== null && side === opposite(openSide)) {
+			return viewer === null ? (
+				<AuthGateSlot side={openSide} onClose={() => setOpenSide(null)} />
+			) : (
+				<BetComposer
+					marketId={market.id}
+					slug={market.slug}
+					side={openSide}
+					kind="post"
+					viewer={viewer}
+					onClose={() => setOpenSide(null)}
+					onSuspended={() => setSuspended(true)}
+					onBusyChange={setComposerBusy}
+				/>
+			);
+		}
+		return scroller;
+	};
 
 	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
 	// `?post=<ordinal>` via history.replaceState on post enter/exit, making
@@ -78,12 +137,22 @@ export function DebateView({
 		history.replaceState(null, "", url);
 	};
 	const enterPost = (id: string) => {
+		if (composerBusy) {
+			return;
+		}
 		setSelectedPostId(id);
+		setOpenReply(null);
+		setOpenSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 	};
 	const exitPost = () => {
+		if (composerBusy) {
+			return;
+		}
 		setSelectedPostId(null);
+		setOpenReply(null);
+		setOpenSide(null);
 		syncPostParam(null);
 	};
 	const selectedPost = selectedPostId
@@ -101,44 +170,128 @@ export function DebateView({
 				<div className="flex flex-col gap-4">
 					<PostFocusHeader
 						post={selectedPost}
+						heldSide={heldSide}
+						marketOpen={marketOpen}
+						suspended={suspended}
+						activeRelation={openReply}
+						onToggleRelation={(relation) => {
+							if (composerBusy) {
+								return;
+							}
+							setOpenReply((cur) => (cur === relation ? null : relation));
+						}}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 					/>
 					<div className="flex gap-4">
-						<DebateColumn side="YES" pricing={market.pricing}>
-							<ReplyScroller
-								side="YES"
-								replies={repliesForSide(selectedPost, "YES")}
-							/>
-						</DebateColumn>
-						<DebateColumn side="NO" pricing={market.pricing}>
-							<ReplyScroller
-								side="NO"
-								replies={repliesForSide(selectedPost, "NO")}
-							/>
-						</DebateColumn>
+						{(["YES", "NO"] as const).map((side) => {
+							// v0.10: the reply composer — Support OR Counter — opens in
+							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
+							// side (slot ≠ side, permanently — INV-3 narrative; the
+							// side derives via the unit-pinned deriveReplySide, never
+							// from the hosting column).
+							const composerColumn = opposite(selectedPost.sideAtPostTime);
+							const resultingSide =
+								openReply !== null
+									? deriveReplySide({
+											parentSide: selectedPost.sideAtPostTime,
+											relation: openReply,
+										})
+									: null;
+							const hostsComposer =
+								openReply !== null && side === composerColumn;
+							return (
+								<DebateColumn
+									key={side}
+									side={side}
+									pricing={market.pricing}
+									engaged={resultingSide === side && side !== composerColumn}
+									header={
+										<PositionStrip
+											side={side}
+											pricing={market.pricing}
+											unitToWin={market.unitToWin}
+											viewer={viewer}
+										/>
+									}
+								>
+									{hostsComposer && resultingSide !== null && openReply ? (
+										viewer === null ? (
+											<AuthGateSlot
+												key={openReply}
+												side={resultingSide}
+												onClose={() => setOpenReply(null)}
+											/>
+										) : (
+											// key={openReply} (cascade H-2): a relation flip
+											// REMOUNTS the composer — side is immutable per
+											// instance (INV-3); a live instance can never flip.
+											<BetComposer
+												key={openReply}
+												marketId={market.id}
+												slug={market.slug}
+												side={resultingSide}
+												kind="reply"
+												viewer={viewer}
+												parentCommentId={selectedPost.id}
+												replyContext={{
+													relation: openReply,
+													authorPseudonym: selectedPost.removed
+														? null
+														: selectedPost.author.pseudonym,
+													postTitle: selectedPost.removed
+														? null
+														: selectedPost.title,
+												}}
+												onClose={() => setOpenReply(null)}
+												onSuspended={() => setSuspended(true)}
+												onBusyChange={setComposerBusy}
+											/>
+										)
+									) : (
+										<ReplyScroller
+											side={side}
+											replies={repliesForSide(selectedPost, side)}
+										/>
+									)}
+								</DebateColumn>
+							);
+						})}
 					</div>
 				</div>
 			) : (
 				<div className="flex gap-4">
-					<DebateColumn side="YES" pricing={market.pricing}>
-						<PostScroller
-							side="YES"
-							posts={yesPosts}
-							onEnter={enterPost}
-							onOpenPopup={setPopupPost}
-							onOpenImage={setLightboxUrl}
-						/>
-					</DebateColumn>
-					<DebateColumn side="NO" pricing={market.pricing}>
-						<PostScroller
-							side="NO"
-							posts={noPosts}
-							onEnter={enterPost}
-							onOpenPopup={setPopupPost}
-							onOpenImage={setLightboxUrl}
-						/>
-					</DebateColumn>
+					{(["YES", "NO"] as const).map((side) => (
+						<DebateColumn
+							key={side}
+							side={side}
+							pricing={market.pricing}
+							engaged={openSide === side}
+							header={
+								<SlotHeader
+									side={side}
+									pricing={market.pricing}
+									unitToWin={market.unitToWin}
+									viewer={viewer}
+									marketOpen={marketOpen}
+									suspended={suspended}
+									composerOpen={openSide === side}
+									onToggleEntry={() => toggleEntry(side)}
+								/>
+							}
+						>
+							{marketColumnBody(
+								side,
+								<PostScroller
+									side={side}
+									posts={side === "YES" ? yesPosts : noPosts}
+									onEnter={enterPost}
+									onOpenPopup={setPopupPost}
+									onOpenImage={setLightboxUrl}
+								/>,
+							)}
+						</DebateColumn>
+					))}
 				</div>
 			)}
 

@@ -5,26 +5,39 @@ import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
+import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { RemovedPlaceholder } from "./placeholders";
-import type { DebatePost } from "./types";
+import type { DebatePost, Side } from "./types";
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
- * full: argprofile · lane badge · title · image · FULL body · aggregate, with a
- * "Back to market" toggle (exitPost). The arena's two columns below render this
- * post's replies. A REMOVED focused post shows only its frozen side + the
- * placeholder + aggregate (its replies still render below — thread intact, §6).
+ * full: argprofile · lane badge · title · image · FULL body, with a "Back to
+ * market" toggle (exitPost). The arena's two columns below render this post's
+ * replies. UI.A3 slice 3: the footer is the designed SPLIT BAR carrying the
+ * F-3-gated Support/Counter trigger pills (market-view cards keep the plain
+ * `AggregateFooter` — plan §8 scope). A REMOVED focused post shows only its
+ * frozen side + the placeholder + the split bar (replies + triggers stay
+ * live — thread intact, §6 edge).
  */
 export function PostFocusHeader({
 	post,
+	heldSide,
+	marketOpen,
+	suspended,
+	activeRelation,
+	onToggleRelation,
 	onExit,
 	onOpenImage,
 }: {
 	post: DebatePost;
+	heldSide: Side | null;
+	marketOpen: boolean;
+	suspended: boolean;
+	activeRelation: "support" | "counter" | null;
+	onToggleRelation: (relation: "support" | "counter") => void;
 	onExit: () => void;
 	onOpenImage: (url: string) => void;
 }) {
@@ -68,7 +81,15 @@ export function PostFocusHeader({
 				</>
 			)}
 
-			<AggregateFooter aggregate={post.aggregate} />
+			<ReplySplitBar
+				postSide={post.sideAtPostTime}
+				aggregate={post.aggregate}
+				heldSide={heldSide}
+				marketOpen={marketOpen}
+				suspended={suspended}
+				activeRelation={activeRelation}
+				onToggleRelation={onToggleRelation}
+			/>
 		</Card>
 	);
 }
