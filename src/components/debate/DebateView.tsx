@@ -4,6 +4,7 @@ import { type ReactNode, useState } from "react";
 
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
+import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
 import { ImageLightbox, PostPopup } from "./dialogs";
@@ -181,6 +182,14 @@ export function DebateView({
 									side={side}
 									pricing={market.pricing}
 									engaged={resultingSide === side && side !== composerColumn}
+									header={
+										<PositionStrip
+											side={side}
+											pricing={market.pricing}
+											unitToWin={market.unitToWin}
+											viewer={viewer}
+										/>
+									}
 								>
 									{hostsComposer && resultingSide !== null ? (
 										viewer === null ? (

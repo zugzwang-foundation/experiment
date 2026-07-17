@@ -51,3 +51,28 @@ export function buildPlaceRequest(args: {
 		},
 	};
 }
+
+/**
+ * `POST /api/bets/sell` (SPEC.1 F-BET-3). Comment-free by design (canon §3.4:
+ * selling is the only comment-free action); the body is exactly
+ * `{marketId, shares}` — no stake key exists on the sell wire (SG-2).
+ */
+export function buildSellRequest(args: {
+	body: { marketId: string; shares: string };
+	idempotencyKey: string;
+}): { url: string; init: RequestInit } {
+	return {
+		url: "/api/bets/sell",
+		init: {
+			method: "POST",
+			headers: {
+				"content-type": "application/json",
+				[IDEMPOTENCY_HEADER_NAME]: args.idempotencyKey,
+			},
+			body: JSON.stringify({
+				marketId: args.body.marketId,
+				shares: args.body.shares,
+			}),
+		},
+	};
+}
