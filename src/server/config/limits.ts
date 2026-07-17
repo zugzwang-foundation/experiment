@@ -106,6 +106,18 @@ export const BET_MIN_STAKE_POST = "10";
 /** Reply-bet minimum stake — PINNED at 50 (higher than the post floor) per ADR-0018; NOT a HARDEN.5 placeholder. Decimal string. Exercised by DEBATE.2's reply route; ENGINE.8 ships the tested validator. */
 export const BET_MIN_STAKE_REPLY = "50";
 
+/** Per-bet maximum stake (SPEC.1 §16.1 / F-BET-9 clamp rider — UI.A2). Buy/add
+ * stake strictly above this CLAMPS to it before the CPMM computation (clamp ≠
+ * reject; no error code); sell is NEVER clamped. Enforced by `clampStakeToMax`
+ * (src/server/bets/floors.ts) at the place route's step 5d ONLY — the constant
+ * never enters src/server/cpmm/ (cpmm.md 2.1.0 §13: app-layer guard, the pure
+ * functions stay pure). PLACEHOLDER VALUE ("10000", ratified UI-A2 OQ-1 — 10×
+ * the initial grant, economically inert by design) — tuned by HARDEN.5 per
+ * SPEC.1 §16.1 (number-tuning, ~2026-09-01). Decimal string — never a JS float
+ * (CLAUDE.md §2). Coherence (max > reply floor > post floor > 0) is pinned by
+ * tests/unit/bets/clamp.test.ts. */
+export const BET_MAX_STAKE = "10000";
+
 /** Comment body max length (characters). PLACEHOLDER VALUE — tuned by HARDEN.5 per SPEC.1 §10.9 / §16.1. Step-5 body validation maps length > this to `comment_too_long`. */
 export const COMMENT_MAX_LENGTH = 5000;
 
