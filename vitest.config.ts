@@ -44,7 +44,7 @@ export default defineConfig({
 		coverage: {
 			enabled: false,
 		},
-		include: ["tests/**/*.{test,spec}.ts"],
+		include: ["tests/**/*.{test,spec}.{ts,tsx}"],
 		// ENGINE.10 Q-2: the correctness-at-scale battery (`tests/scale/`) is a
 		// SEPARATE, gated `test:scale` CI step (vitest.scale.config.ts) — a named
 		// required gate component, NOT part of the fast default `vitest run`,
