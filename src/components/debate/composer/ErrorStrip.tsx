@@ -19,9 +19,12 @@ export function ErrorStrip({ status }: { status: ComposerStatus }) {
 		state === "p2_terminal_suspended" ||
 		state === "p4_rate_limited" ||
 		state === "auth_gate" ||
-		state === "route_onboarding"
+		state === "route_onboarding" ||
+		state === "p3_image"
 	) {
-		return null; // rendered elsewhere (modal / banner / swap / route)
+		// Rendered elsewhere: modal / banner / swap / route / the image
+		// affordance (§4: image codes land INLINE on the affordance).
+		return null;
 	}
 	let title: string;
 	let body: string;

@@ -33,7 +33,9 @@ import {
 	floorFor,
 	isPositiveAmount,
 } from "./gating";
+import { ImageAttach, type ImageAttachState } from "./ImageAttach";
 import { initialKeyState, type KeyState, reduceKey } from "./idempotency";
+import { attachImage } from "./image-attach";
 import {
 	composeWireBody,
 	isArgumentSubmittable,
@@ -79,6 +81,8 @@ export function BetComposer(props: {
 		"track_a" | "banned" | null
 	>(null);
 	const [authGate, setAuthGate] = useState(false);
+	// Slice 5 — the optional image (sign → PUT → id in the payload).
+	const [image, setImage] = useState<ImageAttachState>({ phase: "none" });
 
 	const keyRef = useRef(keyState);
 	keyRef.current = keyState;
@@ -171,6 +175,36 @@ export function BetComposer(props: {
 		retryLock > 0 ||
 		terminalLocked;
 
+	/** Attach/remove changes the wire body (fingerprint!) — an EDIT by law. */
+	const onPickImage = async (file: File) => {
+		if (inFlight) {
+			return;
+		}
+		onEdit();
+		setImage({ phase: "attaching", name: file.name });
+		const result = await attachImage({ file });
+		if (result.kind === "attached") {
+			setImage({
+				phase: "attached",
+				uploadId: result.uploadId,
+				name: file.name,
+			});
+		} else if (result.kind === "rejected") {
+			setImage({ phase: "error", message: result.message });
+		} else {
+			// No design-set heading exists for an attach failure — the affordance
+			// renders the kit retry line alone (empty message skips the heading).
+			setImage({ phase: "error", message: "" });
+		}
+	};
+	const onRemoveImage = () => {
+		if (inFlight) {
+			return;
+		}
+		onEdit();
+		setImage({ phase: "none" });
+	};
+
 	/** Every input change is an EDIT (key law) and clears a revise-class strip. */
 	const onEdit = () => {
 		if (inFlight) {
@@ -206,6 +240,9 @@ export function BetComposer(props: {
 				body: wireBody,
 				...(props.parentCommentId !== undefined
 					? { parentCommentId: props.parentCommentId }
+					: {}),
+				...(image.phase === "attached"
+					? { imageUploadsId: image.uploadId }
 					: {}),
 			},
 			idempotencyKey: next.key,
@@ -255,6 +292,12 @@ export function BetComposer(props: {
 		switch (mapped.state) {
 			case "p2_terminal_suspended":
 				setSuspendedKind(outcome.code === "banned_user" ? "banned" : "track_a");
+				break;
+			case "p3_image":
+				// §4: image codes land INLINE on the affordance (the wire's own
+				// display message); the attachment is stale (orphan-swept object /
+				// real-byte oversize) — drop it so the next attempt re-signs.
+				setImage({ phase: "error", message: outcome.message });
 				break;
 			case "p3_protective_landing":
 				// C1 (F-2): refresh renders the committed bet; fresh key only on
@@ -391,6 +434,12 @@ export function BetComposer(props: {
 							{COMPOSER_COPY.optionalSuffix}
 						</div>
 					</div>
+					<ImageAttach
+						state={image}
+						disabled={floorAbove || inFlight}
+						onPick={onPickImage}
+						onRemove={onRemoveImage}
+					/>
 				</div>
 			</div>
 
