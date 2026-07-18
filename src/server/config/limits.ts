@@ -188,3 +188,13 @@ export const REDIS_RETRY_BACKOFF_MS = 200;
 
 /** Upstash per-command abort ceiling (ms) — `signal: () => AbortSignal.timeout(...)`, minted once per command and covering the vendor's whole internal retry loop. Per ADR-0015 Patch 2026-07-06 + SPEC.2 §11; B7a OD-2 ratified value. HARDEN-tunable. */
 export const REDIS_COMMAND_TIMEOUT_MS = 2000;
+
+// === UI.A4: Discovery surface (SPEC.1 §22) =================================
+
+/** Discovery featured-set slot count — the carousel/grid cap. PINNED at 8 per
+ * design-canon §2 + SPEC.1 §16.1/§22/Appendix B (`DISCOVERY_GRID_SIZE = 8 #
+ * pinned by design-canon §2`); NOT a HARDEN-tuned placeholder. Selection is
+ * all Open markets newest-first, capped here — capital-neutral (SCL-5,
+ * ADR-0017 Driver 2 applied to the entry surface). Integer (a count, not
+ * Dharma). */
+export const DISCOVERY_GRID_SIZE = 8;
