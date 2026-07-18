@@ -198,3 +198,10 @@ export const REDIS_COMMAND_TIMEOUT_MS = 2000;
  * ADR-0017 Driver 2 applied to the entry surface). Integer (a count, not
  * Dharma). */
 export const DISCOVERY_GRID_SIZE = 8;
+
+/** Discovery price-series downsample bound (plan F-4) — `loadPriceSeries`
+ * thins the replayed series server-side to at most this many points (first +
+ * last always kept), bounding the DTO payload regardless of a market's bet
+ * count. An IMPLEMENTATION constant, NOT a spec constant (~64 ratified at
+ * UI-A4 §16 F-4); HARDEN-tunable. Integer (a point count, not Dharma). */
+export const DISCOVERY_SERIES_MAX_POINTS = 64;
