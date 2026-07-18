@@ -47,25 +47,38 @@ describe("UI.A4 §5 — surface states (OQ-6 copy verbatim)", () => {
 	});
 
 	it("render::error-state-copy-and-reload", () => {
-		const onReload = vi.fn();
-		const withHandler = render(<ErrorState onReload={onReload} />);
-		expect(screen.getByTestId("discovery-error")).toBeTruthy();
-		expect(screen.getByText(ERROR_COPY.title).textContent).toBe(
-			ERROR_COPY.title,
-		);
-		expect(screen.getByText(ERROR_COPY.body).textContent).toBe(ERROR_COPY.body);
-		// The reload button's ACCESSIBLE NAME is the action copy…
-		const button = screen.getByRole("button", { name: ERROR_COPY.action });
-		// …and clicking it fires the wired handler exactly once.
-		fireEvent.click(button);
-		expect(onReload).toHaveBeenCalledTimes(1);
-		withHandler.unmount();
-
-		// `onReload` is optional — the state renders without it (no throw).
-		render(<ErrorState />);
-		expect(screen.getByTestId("discovery-error")).toBeTruthy();
-		expect(
-			screen.getByRole("button", { name: ERROR_COPY.action }),
-		).toBeTruthy();
+		// R4 (post-run web ruling, 2026-07-18): the action is LIVE — the
+		// handler-less render (exactly how the page RSC mounts it) must
+		// reload the page on click; the inert-button residual is discharged.
+		// Observation seam: `window.location` AND its `reload` are
+		// [LegacyUnforgeable] in jsdom (own, non-configurable — probed; no
+		// spy can attach), so the pin observes the REAL call end-to-end:
+		// jsdom's virtual console emits "Not implemented: navigation …" to
+		// console.error when reload() actually fires. An inert button emits
+		// nothing — the assertion discriminates.
+		const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+		try {
+			render(<ErrorState />);
+			expect(screen.getByTestId("discovery-error")).toBeTruthy();
+			expect(screen.getByText(ERROR_COPY.title).textContent).toBe(
+				ERROR_COPY.title,
+			);
+			expect(screen.getByText(ERROR_COPY.body).textContent).toBe(
+				ERROR_COPY.body,
+			);
+			// The reload button's ACCESSIBLE NAME is the action copy…
+			const button = screen.getByRole("button", { name: ERROR_COPY.action });
+			// …no navigation attempt before the click…
+			const navAttempts = () =>
+				errorSpy.mock.calls.filter((args) =>
+					args.some((a) => String(a).includes("Not implemented: navigation")),
+				).length;
+			expect(navAttempts()).toBe(0);
+			// …and clicking it invokes the real window.location.reload().
+			fireEvent.click(button);
+			expect(navAttempts()).toBe(1);
+		} finally {
+			errorSpy.mockRestore();
+		}
 	});
 });

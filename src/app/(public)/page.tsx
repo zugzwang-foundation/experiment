@@ -64,9 +64,9 @@ export async function DiscoveryContent() {
 			views.push({ card, series, topPosts });
 		}
 	} catch {
-		// Whole-surface fail-closed. The reload affordance is the OQ-6 button
-		// (inert v1 — an RSC cannot pass a handler; the client error-boundary
-		// wiring is a flagged residual, see the session log).
+		// Whole-surface fail-closed. The OQ-6 reload button is LIVE —
+		// ErrorState is a "use client" leaf calling window.location.reload()
+		// (R4 ruling, 2026-07-18), so the handler-less RSC render is complete.
 		return <ErrorState />;
 	}
 
