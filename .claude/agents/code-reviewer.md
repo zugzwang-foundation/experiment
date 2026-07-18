@@ -2,7 +2,7 @@
 name: code-reviewer
 description: MUST BE USED after any new file written under src/server/, or after any diff modifies src/server/. Reviews the diff for thesis-invariant violations (CLAUDE.md §2), missing error handling, refusal-trigger crossings (CLAUDE.md §3), and stack-pattern adherence (AGENTS.md). Returns findings ranked CRITICAL / HIGH / MEDIUM / LOW with file:line references. Use proactively when src/server/ files are added or modified.
 tools: Read, Grep, Glob, Bash
-model: claude-fable-5
+model: claude-opus-4-8
 effort: max
 ---
 

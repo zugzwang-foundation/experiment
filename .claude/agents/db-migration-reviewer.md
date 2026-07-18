@@ -2,7 +2,7 @@
 name: db-migration-reviewer
 description: MUST BE USED after any change in src/db/schema/ or drizzle/migrations/. Reviews Drizzle schema declarations against SPEC.2 §5 inventory and Appendix B per-column shapes, verifies FK lambda forms per ADR-0008, indexes per AGENTS.md §6, Bucket A/B/C classifications, append-only trigger SQL, partition DDL, and same-commit SPEC amendments. Returns PASS / FAIL / SURPRISE per table or migration. Use proactively when schema or migration files are added or modified.
 tools: Read, Grep, Glob, Bash
-model: claude-fable-5
+model: claude-opus-4-8
 effort: max
 ---
 
