@@ -225,3 +225,6 @@ Rulings received: **R1** topOrder RATIFIED (spec-normative; discriminating fixtu
 - **Subagent verdict:** `@code-reviewer`: **"PASS with one MEDIUM (stale page.tsx:67-69 comment — surface to the invoking session for a scope call) and one informational LOW."** The MEDIUM folded in-session (the comment correction above); the LOW is the jsdom-message-text coupling (verified against jsdom 29's actual emission; failure direction is loud `0 !== 1`, never a silent pass — tracker note against future jsdom majors). Boundary verified sound (server page → client leaf; zero imports in the file; the only non-test importer is the page); prop removal grep-clean; copy byte-identical.
 - **Deviations:** none (the comment fold is the MEDIUM's own remediation, reviewer-surfaced).
 
+### GATE C condition — §17 naming amendment (web-ruled 2026-07-18)
+
+- The 8 registry `it()` strings renamed to the FULL verbatim §17 tokens — `discovery::` prefixed (5 in `list.test.ts`, 3 in `hero.test.ts`); the plan-kept extras and all `wiring::`/`render::` names stay bare; the two file-header naming comments adjusted to state the token shape. Nothing else moved. Suite re-green; commit stamped in git.

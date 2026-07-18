@@ -11,9 +11,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // lands the selector (+ the OQ-3 B extraction of `loadRemovedSet` /
 // `deriveTitleTeaser` from load-debate-view.ts).
 //
-// The five it() names are the SPEC.1 §17-registry `discovery::*` F-DISC-2
-// rows VERBATIM (3 registry rows) plus the two plan-kept extras (plan §11
-// F-3): `next-eligible-when-top-removed`, `side-empty-when-none-eligible`.
+// The five it() names: the 3 SPEC.1 §17-registry F-DISC-2 rows as FULL
+// `discovery::<row>` tokens (the GATE C naming amendment, web-ruled
+// 2026-07-18; plan F-3) plus the two plan-kept extras, which stay BARE:
+// `next-eligible-when-top-removed`, `side-empty-when-none-eligible`.
 // No extra blocks.
 //
 // Contract pins (plan §3 + kickoff):
@@ -207,7 +208,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		vi.clearAllMocks();
 	});
 
-	it("hero-top-post-per-side-by-top-ranking", async () => {
+	it("discovery::hero-top-post-per-side-by-top-ranking", async () => {
 		const marketId = await seedMarket("hero-top-per-side");
 		const yesAuthor = await seedUser("hero-yes-author");
 		const noAuthor = await seedUser("hero-no-author");
@@ -418,7 +419,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(requirePost(hero2.yes).id).not.toBe(builtFirstYes);
 	});
 
-	it("hero-masks-track-b-hidden-from-public", async () => {
+	it("discovery::hero-masks-track-b-hidden-from-public", async () => {
 		const marketId = await seedMarket("hero-track-b-mask");
 		// A DISTINCTIVE author pseudonym for the removed post (a second user)
 		// + a DISTINCTIVE body marker, planted in BOTH the title line and the
@@ -646,7 +647,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(empty).toStrictEqual({ yes: null, no: null });
 	});
 
-	it("hero-single-market-static", async () => {
+	it("discovery::hero-single-market-static", async () => {
 		// Exactly ONE Open market in the DB (afterEach truncated), with posts
 		// on both sides and a pool row so the Slice-1 card pricing is real.
 		const marketId = await seedMarket("hero-solo");

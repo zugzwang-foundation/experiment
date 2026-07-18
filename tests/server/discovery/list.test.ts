@@ -16,8 +16,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 // import until Slice 1's implement phase lands both.
 //
 // The five it() names are the SPEC.1 §17-registry `discovery::*` rows
-// VERBATIM (plan F-3; the §22 prose variant `fewer-than-grid-size-no-
-// placeholders` is superseded by the registry's `sparse-no-placeholders`).
+// VERBATIM — the FULL `discovery::<row>` tokens (the GATE C naming
+// amendment, web-ruled 2026-07-18; plan F-3; the §22 prose variant
+// `fewer-than-grid-size-no-placeholders` is superseded by the registry's
+// `sparse-no-placeholders`).
 // Card-aggregate/composition assertions are FOLDED into the five names —
 // no extra blocks.
 //
@@ -167,7 +169,7 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		vi.clearAllMocks();
 	});
 
-	it("open-markets-only", async () => {
+	it("discovery::open-markets-only", async () => {
 		const u = await seedUser("disc-a");
 
 		// One market in EACH of the 7 lifecycle statuses — only the Open one
@@ -240,7 +242,7 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		}
 	});
 
-	it("newest-first", async () => {
+	it("discovery::newest-first", async () => {
 		// Insertion order deliberately ≠ recency order — the returned order
 		// must come from the created_at DESC query, not insert sequence.
 		await seedMarket({
@@ -277,7 +279,7 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		expect(vi.mocked(mintReadUrl)).not.toHaveBeenCalled();
 	});
 
-	it("capped-at-grid-size", async () => {
+	it("discovery::capped-at-grid-size", async () => {
 		// The design-canon §2 pinned value (SPEC.1 §16.1/§22 + Appendix B).
 		expect(DISCOVERY_GRID_SIZE).toBe(8);
 
@@ -303,7 +305,7 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		expect(cards.map((c) => c.slug)).toEqual(slugs.slice(2).reverse());
 	});
 
-	it("sparse-no-placeholders", async () => {
+	it("discovery::sparse-no-placeholders", async () => {
 		// 3 (< DISCOVERY_GRID_SIZE) Open markets → exactly 3 real cards.
 		const ids = [
 			await seedMarket({
@@ -347,7 +349,7 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		expect(new Set(cards.map((c) => c.id)).size).toBe(3);
 	});
 
-	it("zero-markets-empty-state", async () => {
+	it("discovery::zero-markets-empty-state", async () => {
 		// No markets seeded at all → the empty array (the surface renders the
 		// empty state from []; the read-model never fabricates entries).
 		const cards = await listOpenMarkets(testDb);
