@@ -273,8 +273,12 @@ export async function loadDebateView(
 /**
  * The removed-comment id set — `content_removed` mod-actions over THIS market's
  * comments. The ONLY masking input (ADR-0021 §4: ban ≠ content removal).
+ *
+ * EXPORTED (UI.A4 OQ-3 B): Discovery's `selectHeroTopPosts` masks its hero
+ * picks through this SAME primitive — the F-DISC-2 safety-critical rule rides
+ * the audited F-DEBATE-1 code path, never a re-implementation.
  */
-async function loadRemovedSet(
+export async function loadRemovedSet(
 	client: DebateViewReader,
 	commentIds: string[],
 ): Promise<Set<string>> {
@@ -345,8 +349,15 @@ async function mintImageUrls(
  * column: title = the first line (≤125 chars); teaser = the next paragraph; the
  * full body rides on the `body` field (the pop-up). Coupling point if the write
  * slice ever adds a `comments.title` column (plan §1 D6 flag).
+ *
+ * EXPORTED (UI.A4 OQ-3 B): Discovery's hero panels derive their post
+ * title/teaser through this SAME function (SPEC.1 §22 / §2 SCL-1 — one
+ * derivation, never re-implemented).
  */
-function deriveTitleTeaser(body: string): { title: string; teaser: string } {
+export function deriveTitleTeaser(body: string): {
+	title: string;
+	teaser: string;
+} {
 	const firstLine = body.split("\n", 1)[0] ?? "";
 	const title = firstLine.slice(0, 125);
 	const paragraphs = body.split(/\n\s*\n/);
