@@ -2,6 +2,7 @@ export * from "./_enums";
 export * from "./audit";
 export * from "./auth";
 export * from "./bets";
+export * from "./bookmarks";
 export * from "./comments";
 export * from "./dharma";
 export * from "./events";

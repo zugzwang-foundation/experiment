@@ -169,6 +169,13 @@
       "when": 1783366835710,
       "tag": "0023_positions_market_id_idx",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1784579785405,
+      "tag": "0024_bookmarks",
+      "breakpoints": true
     }
   ]
 }
