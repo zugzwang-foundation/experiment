@@ -205,3 +205,23 @@ export const DISCOVERY_GRID_SIZE = 8;
  * count. An IMPLEMENTATION constant, NOT a spec constant (~64 ratified at
  * UI-A4 §16 F-4); HARDEN-tunable. Integer (a point count, not Dharma). */
 export const DISCOVERY_SERIES_MAX_POINTS = 64;
+
+// === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
+
+/** Profile graph-series downsample bound (UI-A5 §7 S2, OQ-4 B) — every served
+ * profile line (free-Dharma, net-worth, each per-market value segment) is
+ * thinned server-side to at most this many points (first + last always kept),
+ * bounding the RSC payload regardless of a user's activity. A NEW
+ * IMPLEMENTATION constant kept SEPARATE from `DISCOVERY_SERIES_MAX_POINTS` so
+ * the two surfaces stay independently tunable (OQ-4 B, declined the spec-side
+ * bound); NOT a spec constant (~64). HARDEN-tunable. Integer (a point count,
+ * not Dharma). */
+export const PROFILE_SERIES_MAX_POINTS = 64;
+
+/** Fixed Y-axis ceiling of the §23 cumulative Dharma graph (net-worth +
+ * free-Dharma lines; no autoscale). MIRRORS the SPEC constant
+ * `PROFILE_GRAPH_Y_MAX` (SPEC.1 §16.1 + Appendix B, landed at #248) — set to
+ * 10,000 by the W2.6 design record; a design pin, not a HARDEN-tuned value.
+ * This plan mints NO new Appendix B row (UI-A5 §7 S2) — code mirrors the spec.
+ * Integer (a Đ ceiling rendered as an axis bound). */
+export const PROFILE_GRAPH_Y_MAX = 10000;

@@ -74,6 +74,11 @@ export default async function MarketPage({
 	}
 
 	return (
-		<DebateView model={model} viewer={viewer} initialPostId={initialPostId} />
+		<DebateView
+			model={model}
+			viewer={viewer}
+			initialPostId={initialPostId}
+			ownPseudonym={session?.user?.pseudonym ?? null}
+		/>
 	);
 }

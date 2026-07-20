@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { formatPercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { COMPOSER_COPY, formatDharmaGrouped, formatMultiplier } from "./copy";
@@ -22,11 +24,17 @@ export function PositionStrip({
 	pricing,
 	unitToWin,
 	viewer,
+	ownPseudonym,
+	slug,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
 	unitToWin: { yes: string; no: string } | null;
 	viewer: ViewerMarketContext | null;
+	/** W2.10-C — the viewer's own pseudonym (null = signed-out → no link). */
+	ownPseudonym: string | null;
+	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
+	slug: string;
 }) {
 	const pct = pricing
 		? formatPercent(side === "YES" ? pricing.yes : pricing.no)
@@ -49,15 +57,30 @@ export function PositionStrip({
 				<b className="font-extrabold">{pct}</b>
 			</span>
 
-			{/* W2.10-C click-through target — NON-INTERACTIVE until A5 (F-4). */}
+			{/* W2.10-C click-through target — activated at A5 (F-4): the held
+			    readout links to the viewer's own profile, market-filter
+			    preselected (OQ-5 B). Signed-out → non-interactive. */}
 			<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				{held && viewer?.position ? (
-					<>
-						<span>Your position</span>
-						<span className="font-mono text-xs tracking-normal text-ink normal-case">
-							Đ {formatDharmaGrouped(viewer.position.currentValue)}
-						</span>
-					</>
+					ownPseudonym !== null ? (
+						<Link
+							data-testid="w210c-sell-link"
+							href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
+							className="flex items-center gap-1 hover:text-ink"
+						>
+							<span>Your position</span>
+							<span className="font-mono text-xs tracking-normal text-ink normal-case">
+								Đ {formatDharmaGrouped(viewer.position.currentValue)}
+							</span>
+						</Link>
+					) : (
+						<>
+							<span>Your position</span>
+							<span className="font-mono text-xs tracking-normal text-ink normal-case">
+								Đ {formatDharmaGrouped(viewer.position.currentValue)}
+							</span>
+						</>
+					)
 				) : (
 					<span className="text-n4">{COMPOSER_COPY.noPosition}</span>
 				)}

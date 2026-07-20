@@ -1,6 +1,13 @@
 import type { Side } from "./types";
 
 /**
+ * The canonical `content_removed` stub copy — the ONE masking-variant string,
+ * reused across every removal surface (the debate view here + the A5 profile
+ * positions table / argument list; plan §6 "same constant, not re-authored").
+ */
+export const REMOVED_STUB_TEXT = "Removed by moderator";
+
+/**
  * The "removed by moderator" placeholder (ADR-0020/0021 / DEBATE.4 §6) —
  * rendered where a `content_removed` comment's body/title/image/author were
  * withheld SERVER-SIDE. The structural slot (frozen side + reply aggregate +
@@ -8,7 +15,7 @@ import type { Side } from "./types";
  */
 export function RemovedPlaceholder() {
 	return (
-		<p className="text-xs text-muted-foreground italic">Removed by moderator</p>
+		<p className="text-xs text-muted-foreground italic">{REMOVED_STUB_TEXT}</p>
 	);
 }
 

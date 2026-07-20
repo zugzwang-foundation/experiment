@@ -27,8 +27,9 @@ export const HERO_SIDE_EMPTY = {
  * (image + question · two-line graph · price bar · stat line) · top-NO
  * post** — consuming the Slice-3 lean `HeroTopPosts` DTO. A hero-post click
  * deep-links `/m/[slug]?post=N` (the built A2 ordinal link, OQ-4 A); the
- * author pseudonym is NON-linked v1 (OQ-4 A — Profile is a later surface).
- * A null side renders the OQ-6 empty copy, never a placeholder post.
+ * author pseudonym links to their profile (`/u/[pseudonym]`, activated at
+ * UI.A5 — the A4 follow-up #2). A null side renders the OQ-6 empty copy, never
+ * a placeholder post.
  */
 export function HeroPanels({
 	card,
@@ -114,8 +115,15 @@ function HeroPostPanel({
 						{post.author.pseudonym.slice(0, 2).toUpperCase()}
 					</AvatarFallback>
 				</Avatar>
-				{/* NON-linked v1 (OQ-4 A) — plain text, no anchor ancestor. */}
-				<span className="font-mono text-xs">{post.author.pseudonym}</span>
+				{/* A4 follow-up #2 (UI.A5) — the author pseudonym links to their
+				    profile. A SIBLING of the card-body deep-link below, not nested. */}
+				<Link
+					data-testid={`hero-author-link-${side}`}
+					href={`/u/${encodeURIComponent(post.author.pseudonym)}`}
+					className="font-mono text-xs hover:underline"
+				>
+					{post.author.pseudonym}
+				</Link>
 				<SideBadge side={post.side} />
 				<span className="font-mono text-[11px] text-muted-foreground">
 					Đ {formatDharma(post.authorStake)}

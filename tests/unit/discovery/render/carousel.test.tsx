@@ -31,7 +31,8 @@ import { EXTENDED, TITLE } from "../../composer/render/_harness";
  * active dot ALONE carries the `dot-fill` countdown element; `:has()` is
  * BANNED (canon §3.10) — JS-toggled classes/attrs only. Sparse sets shrink
  * with NO placeholders, and the Slice-4 carried LOW folds in here as the
- * anchor census (n whole-card links + market 1's 2 hero-post deep-links).
+ * anchor census (n whole-card links + market 1's 2 hero-post deep-links + its
+ * 2 hero-author profile links, UI.A5 A4 follow-up #2).
  * Fixture labels are the shipped scaffold style ("Discovery Market N" /
  * `fixture-market-N`); hero prose reuses the composer-harness strings —
  * never invented market content (CLAUDE.md §3). Fake timers per test;
@@ -267,10 +268,11 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expect(screen.getByTestId("discovery-grid")).toBeTruthy();
 		expect(screen.getAllByTestId("market-card")).toHaveLength(3);
 		expect(screen.getAllByTestId("carousel-dot")).toHaveLength(3);
-		// The Slice-4 carried LOW, folded here: total anchors = n + 2 — the
-		// n whole-card links + market 1's TWO hero-post deep-links (the hero
-		// market panel and the side-empty panels carry ZERO anchors).
-		expect(container.querySelectorAll("a")).toHaveLength(5);
+		// Anchor census: n whole-card links + market 1's TWO hero-post
+		// deep-links + market 1's TWO hero-author profile links (UI.A5 A4
+		// follow-up #2); the hero market panel + side-empty panels carry ZERO.
+		// n=3 → 3 + 2 + 2 = 7.
+		expect(container.querySelectorAll("a")).toHaveLength(7);
 	});
 
 	it("render::empty-views-render-nothing", () => {

@@ -127,6 +127,8 @@ describe("BetComposer suspended modal (R-4)", () => {
 				suspended={true}
 				composerOpen={false}
 				onToggleEntry={onToggleEntry}
+				ownPseudonym={null}
+				slug="m-test"
 			/>,
 		);
 		const entry = screen.getByRole("button", { name: "Đ BET YES" });
@@ -146,6 +148,8 @@ describe("BetComposer suspended modal (R-4)", () => {
 				suspended={false}
 				composerOpen={false}
 				onToggleEntry={onToggleEntry}
+				ownPseudonym={null}
+				slug="m-test"
 			/>,
 		);
 		expect(

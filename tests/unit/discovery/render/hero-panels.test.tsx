@@ -20,7 +20,8 @@ import {
  * panels in DOM order `top-YES post | market | top-NO post`. The market panel
  * is the card composition at hero size; a post panel deep-links its title +
  * teaser to `/m/[slug]?post=N` (the built A2 deep-link, OQ-4 A) while the
- * author pseudonym stays PLAIN TEXT — non-linked in v1 (OQ-4 A). A null side
+ * author pseudonym links to its profile (`/u/[pseudonym]`, activated at UI.A5
+ * — the A4 follow-up #2; a SIBLING of the card-body deep-link). A null side
  * renders the OQ-6 empty copy VERBATIM via the exported `HERO_SIDE_EMPTY`
  * const (imported here, never re-typed) — identical whatever the reason the
  * side is empty, so it can never hint hidden content exists. Fixture prose
@@ -118,11 +119,17 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(post.textContent ?? "").toContain("Đ 40");
 	});
 
-	it("render::author-pseudonym-not-linked", () => {
+	it("render::author-links-to-own-profile", () => {
+		// UI.A5 A4-follow-up #2: the author pseudonym now links to its profile
+		// (`/u/[pseudonym]`) — a SIBLING of the card-body deep-link, not the same
+		// anchor (supersedes the OQ-4-A "plain text in v1" behaviour).
 		renderHero({ yes: heroPost("YES"), no: null });
-		// OQ-4 A: the author pseudonym is PLAIN TEXT in v1 — no ancestor <a>.
 		const pseudonym = screen.getByText(/hero-yes-author/);
-		expect(pseudonym.closest("a")).toBeNull();
+		const authorLink = pseudonym.closest("a");
+		expect(authorLink).not.toBeNull();
+		expect(authorLink?.getAttribute("href")).toMatch(/^\/u\//);
+		// It is the PROFILE link, never the `?post=` card-body deep-link.
+		expect(authorLink?.getAttribute("href") ?? "").not.toContain("?post=");
 	});
 
 	it("render::side-empty-copy-verbatim", () => {
