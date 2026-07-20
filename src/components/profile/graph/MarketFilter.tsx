@@ -25,10 +25,8 @@ export function MarketFilter({
 
 	return (
 		<select
-			// The control name ("filter by market") is a web-owned OQ-7 gap
-			// (graph-overlay labels beyond the axis endpoints) — surfaced for Gate
-			// C; the visible option text carries the meaning in the interim.
 			data-testid="market-filter"
+			aria-label={GRAPH_COPY.aria.filterMarket}
 			value={value}
 			onChange={(e) => onChange(e.target.value)}
 			className="rounded-[var(--r-chip)] bg-n1 px-2 py-1 text-sm text-ink"

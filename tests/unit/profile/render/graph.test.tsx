@@ -257,6 +257,22 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(byPrefix(document.body, `segment-${M1}-`)).toHaveLength(2);
 	});
 
+	it("segment-stroke-by-side", () => {
+		// Gate C ruling 3: each SideEpisode segment strokes by its OWN side —
+		// M1 episode 0 = YES (→ --graph-yes token), episode 1 = NO (→ --graph-no).
+		render(<ProfileChart series={FULL} selection={M1} mode="expanded" />);
+		const yesSeg = screen.getByTestId(`segment-${M1}-0`);
+		const noSeg = screen.getByTestId(`segment-${M1}-1`);
+		expect(yesSeg.getAttribute("data-side")).toBe("YES");
+		expect(yesSeg.getAttribute("class") ?? "").toContain(
+			"stroke-[var(--graph-yes)]",
+		);
+		expect(noSeg.getAttribute("data-side")).toBe("NO");
+		expect(noSeg.getAttribute("class") ?? "").toContain(
+			"stroke-[var(--graph-no)]",
+		);
+	});
+
 	it("node-on-line-placement", () => {
 		// Expanded cumulative: one node per series.nodes entry, positioned,
 		// inside the chart svg.

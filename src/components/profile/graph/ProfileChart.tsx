@@ -168,13 +168,20 @@ function Segment({
 	endMs: number;
 	yMax: number;
 }): React.JSX.Element {
+	// Ruling 3 — the per-market value segment strokes by its OWN frozen side:
+	// YES → `--graph-yes`, NO → `--graph-no` (the cumulative-view line mapping is
+	// unchanged). Token classes, never hex (AGENTS.md §8).
 	return (
 		<polyline
 			data-testid={`segment-${seg.marketId}-${seg.episodeIndex}`}
 			data-side={seg.side}
 			points={pointsAttr(seg.points, startMs, endMs, yMax)}
 			fill="none"
-			stroke="var(--graph-no)"
+			className={
+				seg.side === "YES"
+					? "stroke-[var(--graph-yes)]"
+					: "stroke-[var(--graph-no)]"
+			}
 			strokeWidth="1.75"
 			strokeLinejoin="round"
 			strokeLinecap="round"

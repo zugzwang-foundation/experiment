@@ -45,10 +45,9 @@ export function ProfileGraphOverlay({
 			data-testid="profile-graph-overlay"
 			role="dialog"
 			aria-modal="true"
-			// The legend (cumulative view) names the dialog; per-market has no
-			// legend, and its control name is a web-owned OQ-7 gap (surfaced for
-			// Gate C — "graph-overlay labels beyond the axis endpoints").
-			aria-labelledby={cumulative ? "profile-graph-legend" : undefined}
+			// The fullscreen dialog's accessible name — stable in BOTH modes (Gate
+			// C OQ-7). The legend still labels the two cumulative lines visually.
+			aria-label={GRAPH_COPY.aria.overlay}
 			className="fixed inset-0 z-50 flex items-center justify-center"
 		>
 			{/* Backdrop — a click here closes; the panel below is a higher-z sibling. */}
@@ -76,10 +75,9 @@ export function ProfileGraphOverlay({
 						✕
 					</button>
 				</div>
-				{/* Legend — the two cumulative lines (cumulative view only); also the
-				    dialog's accessible name via aria-labelledby. */}
+				{/* Legend — labels the two cumulative lines (cumulative view only). */}
 				{cumulative && (
-					<ul id="profile-graph-legend" className="flex gap-4 text-xs text-n5">
+					<ul className="flex gap-4 text-xs text-n5">
 						<li className="flex items-center gap-1.5">
 							<span
 								aria-hidden="true"

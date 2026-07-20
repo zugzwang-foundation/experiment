@@ -33,6 +33,9 @@ export const GRAPH_COPY = {
 	aria: {
 		expand: "Expand Dharma graph",
 		close: "Close graph",
+		// Gate C OQ-7 batch additions (verbatim): the graph-overlay control names.
+		filterMarket: "Filter by market",
+		overlay: "Dharma graph",
 	},
 	filter: {
 		cumulative: "Cumulative",
