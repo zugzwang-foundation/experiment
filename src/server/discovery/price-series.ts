@@ -24,6 +24,13 @@ type DiscoveryReader = DbClient | DbTransaction;
  * ISO instant. */
 export type PricePoint = { at: string; yes: string };
 
+/** One step of the market's CPMM reserve walk — the pool reserves as of an
+ * instant (a step function; reserves change only at a bet event). The additive
+ * seam (UI-A5 OQ-2 B): the profile graph reads `reserves(t)` from this SAME
+ * §22 replay to price its per-market position-value lines, so both surfaces
+ * share ONE replay authority (no second reserve walk to drift). */
+export type ReservePoint = { at: Date; reserves: Reserves };
+
 /** 18-dp canonical form for the F-1 reserve comparison — collapses any
  * formatting difference between the replayed strings and the NUMERIC(38,18)
  * wire text of the live pool row. */
@@ -32,31 +39,22 @@ function canonical18(value: string): string {
 }
 
 /**
- * The Discovery price-series replay (SPEC.1 §22 "Price series (no new
- * store)"; plan §3 / OQ-2 = A): a pure events-replay derivation — the
- * `market.opened` seed (`seedPool(payload.seedAmount)`, first point exactly
- * 0.5) walked across the market's `bet.placed` / `bet.sold` events in
- * `created_at` ASC order via the pure CPMM `computeBuy`/`computeSell`, one
- * `getPrices` point per step. Sells write NO bets row (plan §1d) — the
- * events table is the only faithful source; there is NO materialized series.
- * Served by `events_aggregate_idx`. Returns `[]` when the market has no
- * `market.opened` event (defensive — an Open market always has one).
- *
- * **F-1 (soft consistency check):** the replayed final reserves are compared
- * against the live `pools` row; on mismatch this WARNs
- * (`discovery_price_series_drift`) and ALWAYS serves the computed series —
- * never throw/500. A concurrent bet landing between the events scan and the
- * pool read is a legal race, not a logic bug (§16 OQ-2 ruling).
- *
- * **F-4 (downsample):** the series is thinned server-side to at most
- * `DISCOVERY_SERIES_MAX_POINTS` points — a uniform-stride SUBSET of the walk
- * (never interpolated), first (seed) and last (final) points always kept,
- * order preserved — bounding the DTO regardless of bet count.
+ * The pure §22 reserve walk (UI-A5 OQ-2 B additive export): the `market.opened`
+ * seed (`seedPool(payload.seedAmount)`) walked across the market's
+ * `bet.placed` / `bet.sold` events in `created_at` ASC order via the pure CPMM
+ * `computeBuy`/`computeSell`, one reserve step per event. NO downsampling, NO
+ * drift check, NO pool read — the raw walk, so a consumer can read `reserves(t)`
+ * at any instant (the step in effect at t is the latest with `at <= t`). Sells
+ * write NO bets row (plan §1d), so the events table is the only faithful source;
+ * served by `events_aggregate_idx`. `loadPriceSeries` (Discovery) and the
+ * profile graph (`graph-series.ts`) both consume this — one replay authority.
+ * Returns `[]` when the market has no `market.opened` event (defensive — an
+ * Open market always has one).
  */
-export async function loadPriceSeries(
+export async function replayReserveSeries(
 	client: DiscoveryReader,
 	marketId: string,
-): Promise<PricePoint[]> {
+): Promise<ReservePoint[]> {
 	const openedRows = await client
 		.select({ payload: events.payload, createdAt: events.createdAt })
 		.from(events)
@@ -79,9 +77,7 @@ export async function loadPriceSeries(
 	);
 
 	let reserves: Reserves = seedPool(openedPayload.seedAmount);
-	const series: PricePoint[] = [
-		{ at: opened.createdAt.toISOString(), yes: getPrices(reserves).yes },
-	];
+	const walk: ReservePoint[] = [{ at: opened.createdAt, reserves }];
 
 	// The emitter↔replay aggregate contract: `bet.placed` rides the BET
 	// aggregate — `(aggregate_type 'bet', aggregate_id = bets.id)`
@@ -139,13 +135,46 @@ export async function loadPriceSeries(
 				shares: p.sharesSold,
 			}).reserves;
 		}
-		series.push({
-			at: ev.createdAt.toISOString(),
-			yes: getPrices(reserves).yes,
-		});
+		walk.push({ at: ev.createdAt, reserves });
 	}
 
-	// F-1 soft check — WARN + always serve, never throw (OQ-2 ruling).
+	return walk;
+}
+
+/**
+ * The Discovery price-series (SPEC.1 §22 "Price series (no new store)"): the
+ * §22 reserve walk (`replayReserveSeries`) mapped to one `getPrices` YES-spot
+ * point per step (first point exactly 0.5 for a symmetric seed). There is NO
+ * materialized series. Returns `[]` when the market has no `market.opened`.
+ *
+ * **F-1 (soft consistency check):** the walk's final reserves are compared
+ * against the live `pools` row; on mismatch this WARNs
+ * (`discovery_price_series_drift`) and ALWAYS serves the computed series —
+ * never throw/500. A concurrent bet landing between the events scan and the
+ * pool read is a legal race, not a logic bug (§16 OQ-2 ruling).
+ *
+ * **F-4 (downsample):** the series is thinned server-side to at most
+ * `DISCOVERY_SERIES_MAX_POINTS` points — a uniform-stride SUBSET of the walk
+ * (never interpolated), first (seed) and last (final) points always kept,
+ * order preserved — bounding the DTO regardless of bet count.
+ */
+export async function loadPriceSeries(
+	client: DiscoveryReader,
+	marketId: string,
+): Promise<PricePoint[]> {
+	const walk = await replayReserveSeries(client, marketId);
+	if (walk.length === 0) {
+		return [];
+	}
+
+	const series: PricePoint[] = walk.map((step) => ({
+		at: step.at.toISOString(),
+		yes: getPrices(step.reserves).yes,
+	}));
+
+	// F-1 soft check — WARN + always serve, never throw (OQ-2 ruling). The walk's
+	// LAST step is the replayed final reserves.
+	const finalReserves = walk[walk.length - 1].reserves;
 	const poolRows = await client
 		.select({ yesReserves: pools.yesReserves, noReserves: pools.noReserves })
 		.from(pools)
@@ -154,15 +183,15 @@ export async function loadPriceSeries(
 	const pool = poolRows[0];
 	if (
 		pool &&
-		(canonical18(pool.yesReserves) !== canonical18(reserves.yes) ||
-			canonical18(pool.noReserves) !== canonical18(reserves.no))
+		(canonical18(pool.yesReserves) !== canonical18(finalReserves.yes) ||
+			canonical18(pool.noReserves) !== canonical18(finalReserves.no))
 	) {
 		safeCaptureMessage("discovery_price_series_drift", {
 			level: "warning",
 			tags: { marketId },
 			extra: {
-				replayedYes: reserves.yes,
-				replayedNo: reserves.no,
+				replayedYes: finalReserves.yes,
+				replayedNo: finalReserves.no,
 				poolYes: pool.yesReserves,
 				poolNo: pool.noReserves,
 				points: series.length,
