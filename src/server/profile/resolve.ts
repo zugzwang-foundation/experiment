@@ -14,6 +14,13 @@ type ProfileReader = DbClient | DbTransaction;
  * scrubbed row (`pseudonym` = the placeholder, `pfp_filename` NULL) resolves
  * normally under the placeholder name — scrub is DATA to this surface (plan
  * §1a).
+ *
+ * SCRUB CONTRACT (for the future H2 scrub writer): a scrubbed pseudonym is a
+ * BRACKETED placeholder — `[scrubbed_user_N]` / `[removed_user_N]` (SPEC.1 §23
+ * L700/L1024) — never a pool `<Colour><Animal><Number>` name (L658). The
+ * profile identity card detects scrub by the leading `[`; if the H2 writer ever
+ * picks an unbracketed placeholder, add a `scrubbed` flag here and reconcile
+ * that one site (the failure mode is cosmetic — the scrubbed badge only).
  */
 export type ProfileUser = {
 	id: string;
