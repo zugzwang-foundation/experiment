@@ -340,7 +340,12 @@ export async function loadProfileArguments(
 	});
 }
 
-type MarketMeta = { id: string; slug: string; title: string };
+// Exported for cross-author reuse by the bookmarks read model (UI-A6 steer 1):
+// the pure builders below take `heldByMarket` per-call, so the bookmark read
+// passes a per-item single-entry map keyed to the ITEM'S AUTHOR (not the
+// viewer). No behaviour change — masking stays single-sourced through the
+// unchanged `ProfileArgumentItem` union + `loadRemovedSet`.
+export type MarketMeta = { id: string; slug: string; title: string };
 
 function aggregateOf(post: PostSubstrate): ProfileArgumentAggregate {
 	return {
@@ -351,7 +356,7 @@ function aggregateOf(post: PostSubstrate): ProfileArgumentAggregate {
 	};
 }
 
-function buildPostItem(args: {
+export function buildPostItem(args: {
 	post: PostSubstrate;
 	meta: { marketId: string; body: string; createdAt: Date } | undefined;
 	marketById: Map<string, MarketMeta>;
@@ -402,7 +407,7 @@ function buildPostItem(args: {
 	};
 }
 
-function buildReplyItem(args: {
+export function buildReplyItem(args: {
 	reply: ReplySubstrate;
 	meta:
 		| {
