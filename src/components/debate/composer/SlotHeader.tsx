@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { formatPercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
@@ -65,6 +67,8 @@ export function SlotHeader({
 	suspended,
 	composerOpen,
 	onToggleEntry,
+	ownPseudonym,
+	slug,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
@@ -75,6 +79,10 @@ export function SlotHeader({
 	suspended: boolean;
 	composerOpen: boolean;
 	onToggleEntry: () => void;
+	/** W2.10-C — the viewer's own pseudonym (null = signed-out → no link). */
+	ownPseudonym: string | null;
+	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
+	slug: string;
 }) {
 	const pct = pricing
 		? formatPercent(side === "YES" ? pricing.yes : pricing.no)
@@ -130,13 +138,25 @@ export function SlotHeader({
 								Đ {formatDharmaGrouped(viewer.position.currentValue)}
 							</span>
 						</span>
-						{/* W2.10-C: a LINK per exhibit E — non-interactive until A5 (F-4). */}
-						<span
-							aria-disabled="true"
-							className="cursor-default text-n4 select-none"
-						>
-							{COMPOSER_COPY.sell} ↗
-						</span>
+						{/* W2.10-C (activated at A5, F-4): the click-through to the
+						    viewer's own profile, market-filter preselected (OQ-5 B).
+						    Signed-out (`ownPseudonym === null`) → non-interactive. */}
+						{ownPseudonym !== null ? (
+							<Link
+								data-testid="w210c-sell-link"
+								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
+								className="text-n4 hover:text-ink"
+							>
+								{COMPOSER_COPY.sell} ↗
+							</Link>
+						) : (
+							<span
+								aria-disabled="true"
+								className="cursor-default text-n4 select-none"
+							>
+								{COMPOSER_COPY.sell} ↗
+							</span>
+						)}
 					</>
 				) : (
 					<span className="text-n4">{COMPOSER_COPY.noPosition}</span>

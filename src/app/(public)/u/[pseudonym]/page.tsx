@@ -10,6 +10,7 @@ import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadProfileArguments } from "@/server/profile/arguments";
 import { loadProfileGraphSeries } from "@/server/profile/graph-series";
+import { buildPositionsPayload } from "@/server/profile/owner-view";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { resolveProfileUser } from "@/server/profile/resolve";
 import { loadProfileTiles } from "@/server/profile/tiles";
@@ -26,16 +27,19 @@ import { loadProfileTiles } from "@/server/profile/tiles";
  * `loadProfilePositions` before any DTO crosses to the client) — and the
  * identity band's owner/visitor chip.
  *
- * Owner detection is `session.user.id === profileUser.id` — the sole viewer
- * delta at this slice is the chip (the Sell mount lands at Slice 7). Public-read
- * (not middleware-gated); UNCACHED / dynamic v1 (§7 S1 — `cacheComponents` is
- * absent; the retrofit rides the named foundational follow-up). `params` is a
- * Promise (Next 16).
+ * Owner detection is `session.user.id === profileUser.id` — the owner deltas
+ * are the identity chip + the owner-only Sell mount (F-PROF-3, via the
+ * `buildPositionsPayload` owner arm). Public-read (not middleware-gated);
+ * UNCACHED / dynamic v1 (§7 S1 — `cacheComponents` is absent; the retrofit
+ * rides the named foundational follow-up). `params`/`searchParams` are Promises
+ * (Next 16).
  */
 export default async function ProfilePage({
 	params,
+	searchParams,
 }: {
 	params: Promise<{ pseudonym: string }>;
+	searchParams: Promise<{ market?: string | string[] }>;
 }) {
 	const { pseudonym } = await params;
 	// A malformed percent-encoding is an UNKNOWN pseudonym → 404 (never a 500):
@@ -68,12 +72,25 @@ export default async function ProfilePage({
 	const session = await auth.api.getSession({ headers: await headers() });
 	const owner = session?.user?.id === profileUser.id;
 
+	// F-PROF-3: the Sell affordance exists ONLY on the owner payload arm; the
+	// visitor arm carries no `sellEligible` field (the DTO boundary).
+	const positionsPayload = buildPositionsPayload(positions, owner);
+
+	// OQ-5 B — the W2.10-C click-through preselects the positions market filter
+	// via `?market=<slug>` (a slug, matched against the rows in PositionsTable;
+	// an unknown/repeated value falls back to "all", never rendered raw).
+	const { market } = await searchParams;
+	const initialMarketSlug = typeof market === "string" ? market : undefined;
+
 	return (
 		<main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
 			<IdentityCard user={profileUser} owner={owner} />
 			<ProfileTiles tiles={tiles} />
 			<ProfileGraph series={graph} />
-			<PositionsTable rows={positions} owner={owner} />
+			<PositionsTable
+				payload={positionsPayload}
+				initialMarketSlug={initialMarketSlug}
+			/>
 			<ArgumentList items={argumentItems} owner={owner} />
 		</main>
 	);

@@ -204,7 +204,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			<>
 				<IdentityCard user={USER} owner={false} />
 				<ProfileTiles tiles={TILES} />
-				<PositionsTable rows={ROWS} owner={false} />
+				<PositionsTable payload={{ owner: false, rows: ROWS }} />
 				<ArgumentList items={ITEMS} owner={false} />
 			</>,
 		);
@@ -327,7 +327,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		list.unmount();
 
 		// Positions table: a row whose argument cell is the removed variant.
-		render(<PositionsTable rows={[ROW_SETTLED]} owner={false} />);
+		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
 		const cell = screen.getByTestId(`position-arg-removed-${M2}`);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
@@ -344,7 +344,18 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			render(
 				<>
 					<ProfileTiles tiles={TILES} />
-					<PositionsTable rows={ROWS} owner={owner} />
+					{/* Slice 7 payload migration: the owner arm decorates rows with
+					    sellEligible:false — the body-identity law asserts sell-free. */}
+					<PositionsTable
+						payload={
+							owner
+								? {
+										owner: true,
+										rows: ROWS.map((r) => ({ ...r, sellEligible: false })),
+									}
+								: { owner: false, rows: ROWS }
+						}
+					/>
 					<ArgumentList items={ITEMS} owner={owner} />
 				</>,
 			);
@@ -384,7 +395,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("empty-states", () => {
 		// Positions — owner copy.
-		const a = render(<PositionsTable rows={[]} owner={true} />);
+		const a = render(<PositionsTable payload={{ owner: true, rows: [] }} />);
 		expect(screen.queryByTestId("positions-table")).toBeNull();
 		expect(text(screen.getByTestId("positions-empty"))).toBe(
 			PROFILE_COPY.empty.positionsOwner,
@@ -392,7 +403,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		a.unmount();
 
 		// Positions — visitor copy.
-		const b = render(<PositionsTable rows={[]} owner={false} />);
+		const b = render(<PositionsTable payload={{ owner: false, rows: [] }} />);
 		expect(text(screen.getByTestId("positions-empty"))).toBe(
 			PROFILE_COPY.empty.positionsVisitor,
 		);
@@ -425,7 +436,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 	});
 
 	it("positions-filters", () => {
-		const first = render(<PositionsTable rows={ROWS} owner={false} />);
+		const first = render(
+			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
+		);
 		const statusFilter = screen.getByTestId<HTMLSelectElement>(
 			"positions-status-filter",
 		);
@@ -446,7 +459,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		first.unmount();
 
 		// Fresh mount: the market filter isolates one market's rows.
-		render(<PositionsTable rows={ROWS} owner={false} />);
+		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
 		fireEvent.change(
 			screen.getByTestId<HTMLSelectElement>("positions-market-filter"),
 			{ target: { value: M1 } },

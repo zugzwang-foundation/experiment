@@ -50,6 +50,7 @@ export function DebateView({
 	model,
 	viewer,
 	initialPostId,
+	ownPseudonym,
 }: {
 	model: DebateViewModel;
 	/**
@@ -66,6 +67,13 @@ export function DebateView({
 	 * prop-derived initial render, hydration-safe (server and client agree).
 	 */
 	initialPostId: string | null;
+	/**
+	 * UI.A5 W2.10-C — the viewer's own pseudonym (from the session), threaded to
+	 * the position-strip / slot-header click-throughs so their `Sell ↗` /
+	 * `Your position` readout links to `/u/<own>?market=<slug>` (OQ-5 B). Null
+	 * when signed out → the affordance stays non-interactive.
+	 */
+	ownPseudonym: string | null;
 }) {
 	const [selectedPostId, setSelectedPostId] = useState<string | null>(
 		initialPostId,
@@ -212,6 +220,8 @@ export function DebateView({
 											pricing={market.pricing}
 											unitToWin={market.unitToWin}
 											viewer={viewer}
+											ownPseudonym={ownPseudonym}
+											slug={market.slug}
 										/>
 									}
 								>
@@ -277,6 +287,8 @@ export function DebateView({
 									suspended={suspended}
 									composerOpen={openSide === side}
 									onToggleEntry={() => toggleEntry(side)}
+									ownPseudonym={ownPseudonym}
+									slug={market.slug}
 								/>
 							}
 						>

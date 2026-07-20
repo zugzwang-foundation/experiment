@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 
+import { SellModule } from "@/components/debate/composer/SellModule";
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import type {
+	ProfilePositionsPayload,
+	SellablePositionRow,
+} from "@/server/profile/owner-view";
 import type {
 	ProfileArgumentCell,
 	ProfilePositionRow,
@@ -20,18 +26,39 @@ import { PROFILE_COPY } from "./copy";
  * the episode-opening argument (N-1a); a `content_removed` opener renders the
  * stub with no title (compile-level no-leak — the removed cell variant carries
  * no title field). The status cell shows `statusLabel` (Open/Closed by market
- * state); the Sell affordance mounts at Slice 7. Empty → the OQ-7 copy
- * (owner/visitor). Đ values are `formatDharma`-trimmed, never float math.
+ * state).
+ *
+ * The owner-only Sell mount (F-PROF-3): a `sellEligible` row (owner arm, market
+ * Open ∧ held) carries a Sell trigger that slides the shipped `SellModule` into
+ * a row expansion (canon §5 — JS-toggled, `:has()` banned; sell is never
+ * clamped, SG-2). The VISITOR payload arm carries no `sellEligible` field, so no
+ * trigger can render. Empty → the OQ-7 copy (owner/visitor). Đ values are
+ * `formatDharma`-trimmed, never float math.
  */
 export function PositionsTable({
-	rows,
-	owner,
+	payload,
+	initialMarketSlug,
 }: {
-	rows: ProfilePositionRow[];
-	owner: boolean;
+	payload: ProfilePositionsPayload;
+	/** OQ-5 B — the W2.10-C `?market=<slug>` preselect; matched against the
+	 * rows' `marketSlug` (unknown → "all"; the raw param is never rendered). */
+	initialMarketSlug?: string;
 }): React.JSX.Element {
-	const [market, setMarket] = useState("all");
+	const owner = payload.owner;
+	const rows = payload.rows;
+	const [market, setMarket] = useState(
+		() =>
+			rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all",
+	);
 	const [status, setStatus] = useState("all");
+	// The single open Sell expansion (one at a time — canon §5 slide).
+	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
+
+	// `sellEligible` exists only on the owner arm's `SellablePositionRow`.
+	const sellEligibleOf = (row: ProfilePositionRow): boolean =>
+		owner && "sellEligible" in row
+			? (row as SellablePositionRow).sellEligible
+			: false;
 
 	const marketOptions = useMemo(() => {
 		const seen = new Map<string, string>();
@@ -101,28 +128,71 @@ export function PositionsTable({
 					</tr>
 				</thead>
 				<tbody>
-					{visible.map((row) => (
-						<tr key={row.marketId} data-testid={`position-row-${row.marketId}`}>
-							<td className="p-2 text-ink">{row.marketTitle}</td>
-							<td className="p-2">
-								<ArgumentCell cell={row.argument} marketId={row.marketId} />
-							</td>
-							<td className="p-2 tabular-nums text-ink">
-								{formatDharma(row.staked)}
-							</td>
-							<td className="p-2 tabular-nums text-ink">
-								{formatDharma(row.current)}
-							</td>
-							<td className="p-2">
-								<Badge
-									data-testid={`position-status-${row.marketId}`}
-									variant={row.statusLabel === "Open" ? "secondary" : "outline"}
-								>
-									{row.statusLabel}
-								</Badge>
-							</td>
-						</tr>
-					))}
+					{visible.map((row) => {
+						const sellable = sellEligibleOf(row);
+						const sellOpen = sellMarketId === row.marketId;
+						return (
+							<Fragment key={row.marketId}>
+								<tr data-testid={`position-row-${row.marketId}`}>
+									<td className="p-2 text-ink">{row.marketTitle}</td>
+									<td className="p-2">
+										<ArgumentCell cell={row.argument} marketId={row.marketId} />
+									</td>
+									<td className="p-2 tabular-nums text-ink">
+										{formatDharma(row.staked)}
+									</td>
+									<td className="p-2 tabular-nums text-ink">
+										{formatDharma(row.current)}
+									</td>
+									<td className="flex items-center gap-2 p-2">
+										<Badge
+											data-testid={`position-status-${row.marketId}`}
+											variant={
+												row.statusLabel === "Open" ? "secondary" : "outline"
+											}
+										>
+											{row.statusLabel}
+										</Badge>
+										{sellable && (
+											<Button
+												type="button"
+												size="xs"
+												variant="outline"
+												data-testid={`sell-trigger-${row.marketId}`}
+												aria-expanded={sellOpen}
+												onClick={() =>
+													setSellMarketId(sellOpen ? null : row.marketId)
+												}
+											>
+												Sell
+											</Button>
+										)}
+									</td>
+								</tr>
+								{sellable && sellOpen && (
+									<tr data-testid={`sell-row-${row.marketId}`}>
+										<td colSpan={5} className="p-2">
+											{/* Canon §5 slide — the module replaces the fixed-height
+											    footer (JS-toggled; never reflows the table above). */}
+											<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
+												<SellModule
+													marketId={row.marketId}
+													slug={row.marketSlug}
+													position={{
+														side: row.side,
+														quantity: row.quantity,
+														currentValue: row.current,
+													}}
+													onClose={() => setSellMarketId(null)}
+													onSuspended={() => setSellMarketId(null)}
+												/>
+											</div>
+										</td>
+									</tr>
+								)}
+							</Fragment>
+						);
+					})}
 				</tbody>
 			</table>
 		</div>
