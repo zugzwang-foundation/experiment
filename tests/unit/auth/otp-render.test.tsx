@@ -1,6 +1,12 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // UI-A7 — Auth skin (§9 TEST PLAN, surface 2). Tests-FIRST driver for the
@@ -21,6 +27,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
 	push: vi.fn(),
 	emailOtp: vi.fn(),
+	sendVerificationOtp: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -31,6 +38,10 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/auth-client", () => ({
 	authClient: {
 		signIn: { emailOtp: mocks.emailOtp },
+		// Fix (b)'s Resend affordance calls a DIFFERENT method than Verify —
+		// `authClient.emailOtp.sendVerificationOtp(...)`, the same send the
+		// sign-in page uses (NOT signIn.emailOtp, which VERIFIES a code).
+		emailOtp: { sendVerificationOtp: mocks.sendVerificationOtp },
 	},
 }));
 
@@ -38,6 +49,7 @@ import OtpPage from "@/app/(auth)/sign-in/otp/page";
 
 beforeEach(() => {
 	mocks.emailOtp.mockResolvedValue({ error: null });
+	mocks.sendVerificationOtp.mockResolvedValue({ error: null });
 });
 
 afterEach(() => {
@@ -103,5 +115,73 @@ describe("UI-A7 otp skin — branded presentation (DRIVER, RED pre-skin)", () =>
 
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toContain("otp_invalid");
+	});
+});
+
+describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pre-impl)", () => {
+	// The /sign-in/otp page pre-impl is verify-only (no resend, no back link).
+	// Better Auth structurally swallows the sender's throw → the OTP-request
+	// endpoint always returns 200, so a delivery failure is invisible to the
+	// client (plan §2). Fix (b) is defense-in-depth: a Resend control + a
+	// "Back to sign in" link give the stranded user AGENCY — the resend
+	// re-triggers the send; it can NOT confirm delivery. Neither control renders
+	// today → behavior-missing RED until the affordance lands.
+
+	it("otp-resend::renders-the-resend-control", () => {
+		render(<OtpPage />);
+		// A button whose accessible name matches /resend/i (distinct from Verify).
+		expect(screen.getByRole("button", { name: /resend/i })).toBeTruthy();
+	});
+
+	it("otp-resend::renders-the-back-to-sign-in-link", () => {
+		render(<OtpPage />);
+		const link = screen.getByRole("link", { name: /back to sign in/i });
+		expect(link.getAttribute("href")).toBe("/sign-in");
+	});
+
+	it("otp-resend::clicking-resend-calls-send-verification-otp-with-turnstile-header", async () => {
+		render(<OtpPage />);
+		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
+
+		await waitFor(() =>
+			expect(mocks.sendVerificationOtp).toHaveBeenCalledTimes(1),
+		);
+		// First arg: the { email, type } body (email from ?email= via
+		// useSearchParams). Second arg: FetchOptions carrying the x-turnstile-token
+		// header (the OTP gate rejects a missing token) — the same non-empty
+		// placeholder the sign-in page sends until Turnstile is wired.
+		const [body, opts] = mocks.sendVerificationOtp.mock.calls[0] as [
+			{ email: string; type: string },
+			{ headers?: Record<string, string> },
+		];
+		expect(body).toEqual({ email: "you@example.com", type: "sign-in" });
+		const token = opts.headers?.["x-turnstile-token"];
+		expect(typeof token).toBe("string");
+		expect((token ?? "").length).toBeGreaterThan(0);
+	});
+
+	it("otp-resend::resend-error-renders-in-the-shared-alert", async () => {
+		// A resend that returns { error } surfaces in the EXISTING role="alert"
+		// slot (no new error branch). Turnstile/validation only — NOT delivery
+		// (which the plugin swallows to 200, per §2).
+		mocks.sendVerificationOtp.mockResolvedValue({
+			error: { message: "rate_limited" },
+		});
+		render(<OtpPage />);
+		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
+
+		const alert = await screen.findByRole("alert");
+		expect(alert.textContent).toContain("rate_limited");
+	});
+
+	it("otp-resend::successful-resend-confirms-via-status-not-a-second-alert", async () => {
+		// beforeEach sets sendVerificationOtp → { error: null }. A success
+		// confirmation must be role="status" (NOT a second role="alert"), so the
+		// invalid-OTP findByRole("alert") test above stays unambiguous.
+		render(<OtpPage />);
+		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
+
+		expect(await screen.findByRole("status")).toBeTruthy();
+		expect(screen.queryByRole("alert")).toBeNull();
 	});
 });

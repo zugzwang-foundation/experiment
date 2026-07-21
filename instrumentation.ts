@@ -12,6 +12,8 @@
 // downstream throw inside getRedisKey() (the second line of defense per
 // LD-10) or a mis-routed Sentry event.
 
+import { isSandboxFrom } from "@/server/auth/resend-from";
+
 const VALID_ENVS = ["prod", "staging", "preview"] as const;
 
 export async function register(): Promise<void> {
@@ -42,20 +44,24 @@ export async function register(): Promise<void> {
 		);
 	}
 
-	// AUDIT-FIX-B7b A35: RESEND_FROM_EMAIL presence gate, PROD ONLY. The
-	// email-otp sender silently falls back to Resend's sandbox
-	// `onboarding@resend.dev`, which delivers only to the operator inbox — in
-	// prod that breaks every participant OTP sign-in, so absence fails the
-	// staged deploy at cold boot (same posture as the gates above; the
-	// pre-promote /api/health gate catches it before traffic). `staging` is
-	// deliberately EXEMPT — its sandbox sender is the documented state until
-	// the parked SCAFFOLD.12 §10.b Resend domain-verification/sender flip;
-	// preview/local/CI have no delivery expectations. Send-time backstop in
-	// src/server/auth/email-otp.ts (LD-10 two-lines-of-defense).
-	if (env === "prod" && !process.env.RESEND_FROM_EMAIL) {
-		throw new Error(
-			'instrumentation.register: RESEND_FROM_EMAIL is required when ZUGZWANG_ENV="prod" — the sandbox fallback sender delivers only to the operator inbox (SCAFFOLD.14 caveat)',
-		);
+	// AUDIT-FIX-B7b A35 + AUTH-OTP-DELIVERY (ADR-0033): RESEND_FROM_EMAIL gate
+	// for the delivery-expecting envs. The email-otp sender otherwise falls back
+	// to Resend's sandbox `onboarding@resend.dev`, which delivers only to the
+	// operator inbox — so an UNSET *or* sandbox (`resend.dev`) from-address breaks
+	// every participant OTP sign-in. Fail the staged deploy at cold boot (same
+	// posture as the gates above; the pre-promote /api/health gate catches it
+	// before traffic). Scope = prod AND staging (OQ-1 S2): staging now carries a
+	// real verified sender and is the acceptance-rehearsal env, so it enforces too
+	// — no longer EXEMPT. `preview` (and local dev + CI, which run as preview) stay
+	// exempt: the sandbox stays usable locally, no delivery expectations. Send-time
+	// backstop in src/server/auth/email-otp.ts (LD-10 two-lines-of-defense).
+	if (env === "prod" || env === "staging") {
+		const from = process.env.RESEND_FROM_EMAIL;
+		if (!from || isSandboxFrom(from)) {
+			throw new Error(
+				`instrumentation.register: RESEND_FROM_EMAIL must be a real verified sender when ZUGZWANG_ENV="${env}" — an unset or Resend-sandbox (resend.dev) sender delivers only to the operator inbox (AUTH-OTP-DELIVERY / ADR-0033)`,
+			);
+		}
 	}
 
 	if (process.env.NEXT_RUNTIME === "nodejs") {
