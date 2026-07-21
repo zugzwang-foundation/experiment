@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { cookies } from "next/headers";
 import Image from "next/image";
 import { redirect } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/db";
 import { users } from "@/db/schema/auth";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
@@ -64,73 +65,103 @@ export default async function OnboardingPage(): Promise<React.ReactElement> {
 	]);
 
 	return (
-		<main>
+		// Pure RSC skin (plan §2 V3 — no new client boundary): Card + tokens
+		// only. The two buttons are styled with the branded button tokens inline
+		// rather than the ui/button primitive, so nothing pulls a client
+		// (radix Slot) module into this server component. Top-aligns + scrolls
+		// (no `my-auto`) — the content is tall (plan §2 V0).
+		<Card className="w-full">
 			{/* (i) Pseudonym + PFP labelled permanent */}
-			<section>
-				<h1>Your Zugzwang identity</h1>
+			<CardHeader className="justify-items-center text-center">
 				<Image
 					src="/pfp-placeholder.svg"
 					alt={user.pseudonym}
 					width={128}
 					height={128}
+					className="rounded-(--imgr) [border:var(--avatar-ring)]"
 				/>
-				<p>
-					<strong>{user.pseudonym}</strong>
+				<CardTitle className="mt-3 text-lg">Your Zugzwang identity</CardTitle>
+				<p className="text-xl font-semibold text-ink">{user.pseudonym}</p>
+				<p className="text-sm text-n5">
+					Permanent. You can't change this — your pseudonym and picture are
+					bound to your account for the experiment.
 				</p>
-				<p>
-					<em>
-						Permanent. You can't change this — your pseudonym and picture are
-						bound to your account for the experiment.
-					</em>
-				</p>
-			</section>
-
-			{/* (ii) Emphasised re-id warning — SPEC.1 line 684 verbatim */}
-			<section role="alert" style={{ border: "2px solid", padding: "1rem" }}>
-				<strong>Re-identification risk</strong>
-				<p>{REID_WARNING_TEXT}</p>
-			</section>
-
-			{/* (iii) ToS body — scrollable region */}
-			<section>
-				<h2>Terms of Service</h2>
-				<div style={{ maxHeight: "300px", overflowY: "scroll" }}>
-					<pre style={{ whiteSpace: "pre-wrap" }}>{tosBody}</pre>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{/* (ii) Emphasised re-id warning — SPEC.1 line 684 verbatim */}
+				<div
+					role="alert"
+					className="rounded-(--r) bg-n1 p-4 [border:var(--hairline)]"
+				>
+					<strong className="text-sm text-ink">Re-identification risk</strong>
+					<p className="mt-1 text-sm text-n6">{REID_WARNING_TEXT}</p>
 				</div>
-			</section>
 
-			{/* (iv) Privacy body — scrollable region */}
-			<section>
-				<h2>Privacy Policy</h2>
-				<div style={{ maxHeight: "300px", overflowY: "scroll" }}>
-					<pre style={{ whiteSpace: "pre-wrap" }}>{privacyBody}</pre>
-				</div>
-			</section>
+				{/* (iii) ToS body — scrollable region */}
+				<section>
+					<h2 className="mb-2 text-sm font-medium text-ink">
+						Terms of Service
+					</h2>
+					<div className="max-h-64 overflow-y-auto rounded-(--r) bg-n1 p-3 [border:var(--hairline)]">
+						<pre className="font-sans text-xs whitespace-pre-wrap text-n6">
+							{tosBody}
+						</pre>
+					</div>
+				</section>
 
-			{/* (v) + (vi) Single checkbox + Continue / Cancel.
-			    Inline Server Action wrapper discards the `{ ok: false,
-			    code: 'tos_acceptance_required' }` return so the form's
-			    action prop type is satisfied (Next.js form actions are
-			    typed `(formData) => Promise<void>`). The accept-tos
-			    action's side effects (UPDATE + cookie clear + redirect)
-			    are the user-facing signal. */}
-			<form action={submitTosAcceptance}>
-				<label>
-					<input type="checkbox" name="accepted" value="true" required />I have
-					read and agree to the Terms of Service and Privacy Policy.
-				</label>
-				<div>
-					<button type="submit">Continue</button>
-					<a href="/">Cancel</a>
-				</div>
-			</form>
+				{/* (iv) Privacy body — scrollable region */}
+				<section>
+					<h2 className="mb-2 text-sm font-medium text-ink">Privacy Policy</h2>
+					<div className="max-h-64 overflow-y-auto rounded-(--r) bg-n1 p-3 [border:var(--hairline)]">
+						<pre className="font-sans text-xs whitespace-pre-wrap text-n6">
+							{privacyBody}
+						</pre>
+					</div>
+				</section>
+
+				{/* (v) + (vi) Single checkbox + Continue / Cancel.
+				    Inline Server Action wrapper discards the `{ ok: false,
+				    code: 'tos_acceptance_required' }` return so the form's
+				    action prop type is satisfied (Next.js form actions are
+				    typed `(formData) => Promise<void>`). The accept-tos
+				    action's side effects (UPDATE + cookie clear + redirect)
+				    are the user-facing signal. */}
+				<form action={submitTosAcceptance} className="flex flex-col gap-3">
+					<label className="flex items-start gap-2 text-sm text-n6">
+						<input
+							type="checkbox"
+							name="accepted"
+							value="true"
+							required
+							className="mt-0.5 size-4 accent-ink"
+						/>
+						<span>
+							I have read and agree to the Terms of Service and Privacy Policy.
+						</span>
+					</label>
+					<div className="flex gap-3">
+						<button
+							type="submit"
+							className="inline-flex h-8 flex-1 items-center justify-center rounded-(--r) bg-(--btn-fill) px-2.5 text-sm font-medium text-ink transition-all outline-none [border:var(--hairline)] hover:bg-(--state-hover-fill) focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
+						>
+							Continue
+						</button>
+						<a
+							href="/"
+							className="inline-flex h-8 items-center justify-center rounded-(--r) border border-transparent px-2.5 text-sm font-medium text-n5 transition-all outline-none hover:bg-(--state-hover-fill) hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+						>
+							Cancel
+						</a>
+					</div>
+				</form>
+			</CardContent>
 
 			{/* (vii) Footer with version hashes */}
-			<footer>
-				<small>
+			<footer className="px-(--card-spacing) pb-1 text-center">
+				<small className="text-xs text-n5">
 					ToS {TOS_VERSION_HASH} · Privacy {PRIVACY_VERSION_HASH}
 				</small>
 			</footer>
-		</main>
+		</Card>
 	);
 }

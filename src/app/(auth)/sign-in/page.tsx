@@ -1,7 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type FormEvent, type ReactElement, useState } from "react";
+import {
+	type FormEvent,
+	type ReactElement,
+	type ReactNode,
+	useState,
+} from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/auth-client";
 
 // F-AUTH-1 + F-AUTH-2 sign-in landing per plan §4 page inventory.
@@ -74,44 +83,70 @@ export default function SignInPage(): ReactElement {
 	}
 
 	return (
-		<main>
-			<h1>Sign in to Zugzwang</h1>
-
-			{/* F-AUTH-1 — Google OAuth. */}
-			<section>
-				<h2>Sign in with Google</h2>
+		<Card className="my-auto w-full">
+			<CardHeader className="text-center">
+				<CardTitle className="text-lg">Sign in to Zugzwang</CardTitle>
+			</CardHeader>
+			<CardContent className="flex flex-col gap-4">
+				{/* F-AUTH-1 — Google OAuth. */}
 				<form onSubmit={handleGoogle}>
-					<button type="submit" disabled={googleLoading}>
+					<Button type="submit" disabled={googleLoading} className="w-full">
 						{googleLoading ? "Redirecting…" : "Continue with Google"}
-					</button>
-					{googleError ? <p>{googleError}</p> : null}
+					</Button>
+					{googleError ? <AuthError>{googleError}</AuthError> : null}
 				</form>
-			</section>
 
-			{/* F-AUTH-2 — Email + OTP. Hidden `turnstileToken` input retained
-			    per Plan-Q7 sub-verdict (anchor for future Cloudflare Turnstile
-			    widget mount once DESIGN.* lands). The onSubmit handler reads
-			    it from form data and passes the value as the
-			    `x-turnstile-token` HEADER on the SDK call. */}
-			<section>
-				<h2>Sign in with email</h2>
-				<form onSubmit={handleEmailOtp}>
-					<label>
-						Email:
-						<input type="email" name="email" required />
-					</label>
+				{/* "or"-divider (W2.1 .ordiv) — the word flanked by two hairline
+				    rules; the rules are the branded Separator (bg-border ≡ the
+				    --hairline neutral, WI-1: never the mockup's raw var(--n2)). */}
+				<div className="flex items-center gap-3">
+					<Separator className="flex-1" />
+					<span className="text-xs font-medium tracking-wider text-n5">or</span>
+					<Separator className="flex-1" />
+				</div>
+
+				{/* F-AUTH-2 — Email + OTP. Hidden `turnstileToken` input retained
+				    per Plan-Q7 sub-verdict (anchor for future Cloudflare Turnstile
+				    widget mount once DESIGN.* lands). The onSubmit handler reads
+				    it from form data and passes the value as the
+				    `x-turnstile-token` HEADER on the SDK call. */}
+				<form onSubmit={handleEmailOtp} className="flex flex-col gap-3">
+					<Input
+						type="email"
+						name="email"
+						required
+						placeholder="Email address"
+						aria-label="Email address"
+					/>
 					{/* TODO(DESIGN.*): Cloudflare Turnstile widget client-side. */}
 					<input
 						type="hidden"
 						name="turnstileToken"
 						value="placeholder-token"
 					/>
-					<button type="submit" disabled={emailLoading}>
+					<Button type="submit" disabled={emailLoading} className="w-full">
 						{emailLoading ? "Sending…" : "Send code"}
-					</button>
-					{emailError ? <p>{emailError}</p> : null}
+					</Button>
+					{emailError ? <AuthError>{emailError}</AuthError> : null}
 				</form>
-			</section>
-		</main>
+			</CardContent>
+		</Card>
+	);
+}
+
+/**
+ * The W2.11 error-callout treatment for the inline error slots (§5) — a
+ * monochrome hairline callout in a `role="alert"` region. Presentation only:
+ * the message flows through unchanged from the existing handlers; no
+ * code→copy branching, no new error path.
+ */
+function AuthError({ children }: { children: ReactNode }): ReactElement {
+	return (
+		<p
+			role="alert"
+			className="mt-3 rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]"
+		>
+			{children}
+		</p>
 	);
 }
