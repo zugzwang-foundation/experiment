@@ -7,6 +7,19 @@
 
 ---
 
+## 0·R. Ratified rulings (execute baseline — web review complete, operator ratified)
+
+These supersede the "recommend"/OQ language below; execute builds to *these*.
+
+- **Fix (b) = UX affordance (Resend + Back).** Inline/synchronous surfacing is **confirmed INFEASIBLE** (the structural swallow in `runInBackgroundOrAwait`, §2). Do **NOT** await/rethrow to reclaim a client error.
+- **OQ-1 = S2.** Enforce (`unset || sandbox → throw`) when `ZUGZWANG_ENV ∈ {prod, staging}`; **`preview` EXEMPT** (local dev + CI ride `preview` → sandbox stays usable locally). **No new env var** — key on the existing `ZUGZWANG_ENV`.
+- **OQ-2 = YES.** `Sentry.captureException` in the sender.
+- **OQ-3 / ADR-0033 = YES.** Web-authored rider text lands **SAME-COMMIT** as the governing code; **do NOT draft it** (execute pauses at commit for it). Re-`ls docs/adr/` at commit; renumber if 0033 moved.
+- **OQ-4 = robust form.** Sandbox iff the from-address domain, **lowercased**, `=== "resend.dev"` **OR** `endsWith(".resend.dev")`. Additional correctness folded into the helper + truth-table: (i) case-insensitive (`Resend.Dev` matches); (ii) malformed input with no parseable `@`-domain → **FALSE** (non-sandbox), never throws — it fails at send, not boot; (iii) no misfire on lookalikes (`notresend.dev` → false).
+- **OQ-5 = correct-forward, empty guard-location set** (grep confirmed no descriptive doc names the wrong location). Do **NOT** rewrite the A7 close-out. The **only** doc-touch is correcting the stale "staging EXEMPT" **comments on the exact code lines fix (a) edits** (accurate commenting of edited code, in this PR). `docs/parked.md` + `docs/runbooks/staging-provisioning.md` stay **UNTOUCHED** here — they ride the operator's close-out doc pass.
+
+---
+
 ## 0. Preflight + live-state results
 
 | Check | Expected | Actual | ✓ |
