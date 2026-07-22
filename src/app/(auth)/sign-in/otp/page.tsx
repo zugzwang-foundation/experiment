@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactElement, Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -38,12 +39,15 @@ function OtpForm(): ReactElement {
 	const [email, setEmail] = useState(initialEmail);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	const [resendLoading, setResendLoading] = useState(false);
+	const [resent, setResent] = useState(false);
 
 	async function handleSubmit(
 		event: FormEvent<HTMLFormElement>,
 	): Promise<void> {
 		event.preventDefault();
 		setError(null);
+		setResent(false);
 		setLoading(true);
 		const formData = new FormData(event.currentTarget);
 		const otp = String(formData.get("otp") ?? "");
@@ -78,6 +82,35 @@ function OtpForm(): ReactElement {
 			setError(err instanceof Error ? err.message : "otp_invalid");
 		} finally {
 			setLoading(false);
+		}
+	}
+
+	// AUTH-OTP-DELIVERY fix (b): resend recourse for the optimistic-navigation
+	// gap — Better Auth returns 200 even when delivery fails (ADR-0033), so a
+	// stranded user needs a way to retry / go back. Replicates the sign-in page's
+	// send call verbatim, incl. the placeholder Turnstile token (real widget:
+	// AUTH-TURNSTILE-WIRE). Any returned {error} (rate_limited, turnstile_*) reuses
+	// the shared error surface below — no new error branch; humanized copy deferred
+	// to AUTH-ERROR-COPY.
+	async function handleResend(): Promise<void> {
+		setError(null);
+		setResent(false);
+		setResendLoading(true);
+		try {
+			const { error: sendError } =
+				await authClient.emailOtp.sendVerificationOtp(
+					{ email, type: "sign-in" },
+					{ headers: { "x-turnstile-token": "placeholder-token" } },
+				);
+			if (sendError) {
+				setError(sendError.message ?? "resend_failed");
+				return;
+			}
+			setResent(true);
+		} catch (err) {
+			setError(err instanceof Error ? err.message : "resend_failed");
+		} finally {
+			setResendLoading(false);
 		}
 	}
 
@@ -122,6 +155,31 @@ function OtpForm(): ReactElement {
 						</p>
 					) : null}
 				</form>
+				{/* AUTH-OTP-DELIVERY fix (b): resend + back recourse. The resend
+				    reuses the shared `error` alert above; success shows a role="status"
+				    note (never a second alert). */}
+				<div className="mt-4 flex flex-col items-center gap-1">
+					<Button
+						type="button"
+						variant="ghost"
+						size="sm"
+						onClick={handleResend}
+						disabled={resendLoading}
+					>
+						{resendLoading ? "Resending…" : "Resend code"}
+					</Button>
+					{resent ? (
+						<p role="status" className="text-xs text-n5">
+							Code re-sent.
+						</p>
+					) : null}
+					<Link
+						href="/sign-in"
+						className="text-xs text-n5 underline-offset-4 hover:text-ink hover:underline"
+					>
+						Back to sign in
+					</Link>
+				</div>
 			</CardContent>
 			<CardFooter className="justify-center">
 				{/* Phishing-safety note (W2.1 .otp-safety, design-source copy). The

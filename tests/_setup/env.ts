@@ -12,7 +12,10 @@ process.env.GOOGLE_CLIENT_ID ??=
 	"test-google-client-id.apps.googleusercontent.com";
 process.env.GOOGLE_CLIENT_SECRET ??= "test-google-client-secret";
 process.env.RESEND_API_KEY ??= "re_test_resend_api_key_placeholder";
-process.env.RESEND_FROM_EMAIL ??= "onboarding@resend.dev";
+// AUTH-OTP-DELIVERY: must be NON-SANDBOX. The extended fix-(a) guard rejects a
+// resend.dev sender when ZUGZWANG_ENV ∈ {prod, staging} (the suite default env
+// below is "prod"), so a sandbox default would throw across the whole suite.
+process.env.RESEND_FROM_EMAIL ??= "no-reply@zugzwang.world";
 process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ??= "1x00000000000000000000AA";
 process.env.TURNSTILE_SECRET_KEY ??= "1x0000000000000000000000000000000AA";
 process.env.ADMIN_PASSWORD ??=

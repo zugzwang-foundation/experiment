@@ -89,26 +89,31 @@ describe("AUDIT-FIX-B1 A18-DSN — instrumentation.register DSN presence gate", 
 	});
 });
 
-// AUDIT-FIX-B7b A35 (RED-first) — register() gains a SECOND boot-time env gate:
-// throw when ZUGZWANG_ENV === "prod" AND RESEND_FROM_EMAIL is unset/empty (the
-// sandbox `onboarding@resend.dev` fallback only delivers to the operator inbox,
-// so every real participant OTP sign-in would silently fail in prod). Scope is
-// prod-ONLY — staging's sandbox sender is the documented deliberate state until
-// the parked SCAFFOLD.12 §10.b sender flip; preview/local/CI carry no delivery
-// expectations. Mirrors the existing A18-DSN gate's posture (boot-throw → the
-// pre-promote /api/health gate catches absence before any traffic).
+// AUTH-OTP-DELIVERY fix (a) — register()'s SECOND boot-time env gate, EXTENDED
+// from the AUDIT-FIX-B7b A35 prod+unset gate to the ratified S2 rule (§0·R
+// OQ-1 = S2): boot-throw when ZUGZWANG_ENV ∈ {prod, staging} AND
+// RESEND_FROM_EMAIL is unset/empty OR the Resend SANDBOX sender
+// (`onboarding@resend.dev` / a *.resend.dev subdomain, in bare or "Name <addr>"
+// form). The sandbox sender delivers only to the operator inbox, so in
+// prod/staging it silently breaks every participant OTP sign-in. `preview`
+// stays EXEMPT (local builds + CI). Same posture as the A18-DSN gate above: the
+// boot-throw 500s /api/health, so the deploy-pipeline health gates catch the
+// misconfig at rehearsal (now including staging), never first at prod.
 //
-// CRITICAL setup: the prod cases MUST set NEXT_PUBLIC_SENTRY_DSN, else the
-// EXISTING DSN gate throws FIRST and a bare `rejects` would go green for the
-// wrong reason — the throws are message-matched on /RESEND_FROM_EMAIL/ to isolate
-// this gate. Local RESEND_FROM_EMAIL save/restore (env.ts defaults it to the
-// sandbox literal) so the existing block above is undisturbed.
+// CRITICAL setup: every prod/staging case MUST set NEXT_PUBLIC_SENTRY_DSN, else
+// the EXISTING A18-DSN gate throws FIRST and a bare `rejects` would go green for
+// the wrong reason — the throws are message-matched on /RESEND_FROM_EMAIL/ to
+// isolate this gate. Local RESEND_FROM_EMAIL save/restore leaves the block above
+// undisturbed.
 //
-// RED reason (ASSERTION-RED): pre-impl register() does not check
-// RESEND_FROM_EMAIL, so prod + unset/empty RESOLVE (no throw) → the two `rejects`
-// assertions fail. prod+set, staging+unset, preview+unset are GREEN control cases
-// (green pre- and post-impl).
-describe("AUDIT-FIX-B7b A35 — RESEND_FROM_EMAIL prod presence gate", () => {
+// RED reasons (ASSERTION-RED): pre-impl register() only rejects prod+unset, so
+//   · prod + SANDBOX (bare + angle) RESOLVE (from is set) → the `rejects` fail;
+//   · staging + SANDBOX and staging + UNSET RESOLVE (staging not in scope) →
+//     the staging `rejects` fail (staging-without-from FLIPPED to throw).
+// GREEN control cases (green pre- and post-impl): prod + unset/empty throws;
+// prod + REAL (bare + angle — the angle-form real address is the misfire canary)
+// resolves; staging + REAL resolves; preview + unset resolves.
+describe("AUTH-OTP-DELIVERY fix (a) — RESEND_FROM_EMAIL sandbox-rejection gate (S2)", () => {
 	const SAVED_FROM = process.env.RESEND_FROM_EMAIL;
 
 	function restoreFrom(): void {
@@ -135,6 +140,41 @@ describe("AUDIT-FIX-B7b A35 — RESEND_FROM_EMAIL prod presence gate", () => {
 		await expect(register()).rejects.toThrow(/RESEND_FROM_EMAIL/);
 	});
 
+	it("instrumentation-resend-from::prod-with-sandbox-from-boot-throws", async () => {
+		// RED: prod + the bare sandbox sender. DSN set so A18-DSN doesn't throw
+		// first; message-matched to isolate this gate.
+		process.env.ZUGZWANG_ENV = "prod";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL = "onboarding@resend.dev";
+		await expect(register()).rejects.toThrow(/RESEND_FROM_EMAIL/);
+	});
+
+	it("instrumentation-resend-from::prod-with-sandbox-angle-from-boot-throws", async () => {
+		// RED: prod + the sandbox sender in "Name <addr>" form.
+		process.env.ZUGZWANG_ENV = "prod";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL = "Zugzwang <onboarding@resend.dev>";
+		await expect(register()).rejects.toThrow(/RESEND_FROM_EMAIL/);
+	});
+
+	it("instrumentation-resend-from::prod-with-real-bare-from-resolves", async () => {
+		// GREEN control: prod + the real verified sender (bare).
+		process.env.ZUGZWANG_ENV = "prod";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL = "no-reply@mail.zugzwangworld.com";
+		await expect(register()).resolves.toBeUndefined();
+	});
+
+	it("instrumentation-resend-from::prod-with-real-angle-from-resolves", async () => {
+		// GREEN control (angle-misfire canary): the real sender in "Name <addr>"
+		// form must NOT be read as sandbox.
+		process.env.ZUGZWANG_ENV = "prod";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL =
+			"Zugzwang <no-reply@mail.zugzwangworld.com>";
+		await expect(register()).resolves.toBeUndefined();
+	});
+
 	it("instrumentation-resend-from::prod-with-from-resolves", async () => {
 		process.env.ZUGZWANG_ENV = "prod";
 		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
@@ -142,13 +182,30 @@ describe("AUDIT-FIX-B7b A35 — RESEND_FROM_EMAIL prod presence gate", () => {
 		await expect(register()).resolves.toBeUndefined();
 	});
 
-	it("instrumentation-resend-from::staging-without-from-resolves", async () => {
-		// Staging is deliberately EXEMPT (parked SCAFFOLD.12 §10.b). DSN set so the
-		// A18-DSN gate (prod+staging scope) does not throw.
+	it("instrumentation-resend-from::staging-with-sandbox-from-boot-throws", async () => {
+		// RED: under S2 staging is IN scope — the sandbox sender boot-throws.
+		process.env.ZUGZWANG_ENV = "staging";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL = "onboarding@resend.dev";
+		await expect(register()).rejects.toThrow(/RESEND_FROM_EMAIL/);
+	});
+
+	it("instrumentation-resend-from::staging-with-real-from-resolves", async () => {
+		// GREEN control: staging + the real verified sender resolves.
+		process.env.ZUGZWANG_ENV = "staging";
+		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
+		process.env.RESEND_FROM_EMAIL = "no-reply@mail.zugzwangworld.com";
+		await expect(register()).resolves.toBeUndefined();
+	});
+
+	it("instrumentation-resend-from::staging-without-from-throws", async () => {
+		// FLIPPED (was staging-without-from-resolves): under S2 staging is IN scope,
+		// so an unset sender now boot-throws (the acceptance-env fail-fast
+		// rehearsal — the operator can trip the boot guard on staging, not prod).
 		process.env.ZUGZWANG_ENV = "staging";
 		process.env.NEXT_PUBLIC_SENTRY_DSN = DSN;
 		delete process.env.RESEND_FROM_EMAIL;
-		await expect(register()).resolves.toBeUndefined();
+		await expect(register()).rejects.toThrow(/RESEND_FROM_EMAIL/);
 	});
 
 	it("instrumentation-resend-from::preview-without-from-resolves", async () => {
