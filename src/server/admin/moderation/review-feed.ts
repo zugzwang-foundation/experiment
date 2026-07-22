@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import type { CategoryScore } from "@/server/admin/moderation/audit-view";
 import { READ_URL_TTL_SECONDS_MODERATION } from "@/server/config/limits";
+import { loadRemovedSet } from "@/server/debate-view/load-debate-view";
 import { signRead } from "@/server/storage/sign-read";
 
 // UI.6 S3(a) — the live-content review-feed reader (F-ADMIN-4 partial;
@@ -38,11 +39,26 @@ export const REVIEW_FEED_CAP = 200;
 /** Max characters of a reply's collapsed parent-body snippet. */
 const PARENT_SNIPPET_MAX = 140;
 
+/**
+ * A reply's parent reference. `null` = a post (no parent) — a DISTINCT fact from
+ * a reply whose parent is `content_removed`. The `{ removed: true }` variant
+ * carries NO snippet field, so a removed parent's body is un-renderable BY
+ * CONSTRUCTION: masking is a property of every body read, not just of rows.
+ */
+export type ReviewFeedParent =
+	| null
+	| { removed: true }
+	| { removed: false; snippet: string };
+
 export interface ReviewFeedRow {
 	id: string;
 	kind: "post" | "reply";
-	/** For replies: a collapsed snippet of the parent's body; null for posts. */
-	parentSnippet: string | null;
+	/**
+	 * For replies: the parent reference. A `content_removed` parent yields
+	 * `{ removed: true }` (placeholder, no body); a live parent yields its
+	 * snippet; a post yields `null`.
+	 */
+	parent: ReviewFeedParent;
 	marketId: string;
 	marketSlug: string;
 	marketTitle: string;
@@ -195,7 +211,11 @@ export async function loadReviewFeed(
 		);
 	}
 
-	// PARENT SNIPPET: a reply carries a collapsed snippet of its parent's body.
+	// PARENT SNIPPET: a reply carries a collapsed snippet of its parent's body —
+	// but a `content_removed` parent must yield NO body. Intersect the parent
+	// lookup with the SAME `content_removed` masking the main query anti-joins,
+	// via the shared `loadRemovedSet` predicate; a removed parent's body is never
+	// even read from the DB (only LIVE parent ids are fetched).
 	const parentIds = [
 		...new Set(
 			page
@@ -203,12 +223,17 @@ export async function loadReviewFeed(
 				.filter((id): id is string => id !== null),
 		),
 	];
+	const removedParents =
+		parentIds.length > 0
+			? await loadRemovedSet(db, parentIds)
+			: new Set<string>();
 	const snippetByParent = new Map<string, string>();
-	if (parentIds.length > 0) {
+	const liveParentIds = parentIds.filter((id) => !removedParents.has(id));
+	if (liveParentIds.length > 0) {
 		const parents = await db
 			.select({ id: comments.id, body: comments.body })
 			.from(comments)
-			.where(inArray(comments.id, parentIds));
+			.where(inArray(comments.id, liveParentIds));
 		for (const p of parents) {
 			snippetByParent.set(p.id, p.body.slice(0, PARENT_SNIPPET_MAX));
 		}
@@ -251,10 +276,15 @@ export async function loadReviewFeed(
 	const rows: ReviewFeedRow[] = page.map((r) => ({
 		id: r.id,
 		kind: r.parentCommentId !== null ? "reply" : "post",
-		parentSnippet:
-			r.parentCommentId !== null
-				? (snippetByParent.get(r.parentCommentId) ?? null)
-				: null,
+		parent:
+			r.parentCommentId === null
+				? null
+				: removedParents.has(r.parentCommentId)
+					? { removed: true }
+					: {
+							removed: false,
+							snippet: snippetByParent.get(r.parentCommentId) ?? "",
+						},
 		marketId: r.marketId,
 		marketSlug: r.marketSlug,
 		marketTitle: r.marketTitle,
