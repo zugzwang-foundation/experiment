@@ -1,72 +1,44 @@
+import { and, eq } from "drizzle-orm";
+import { v7 as uuidv7 } from "uuid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// SPEC.1 §17 row `f-admin-4::pass-verdict-removal` per SCAFFOLD.16 plan §F
-// sub-edit 15e (F-γ-thin extension to SPEC.1 §15 F-ADMIN-4 contract).
+// UI-6 slice S3(b) — RED-first DB-backed spec for the reactive Remove/Ban
+// Server Action `moderateComment` (`src/server/admin/moderation/act.ts`, which
+// is ABSENT: this file fails to RESOLVE that import, the documented
+// pre-implementation red state per CLAUDE.md §5.6 tests-first).
 //
-// F-γ-thin (per plan §3.7 SURPRISE 7c + §F sub-edits 15a–15e) extends
-// F-ADMIN-4 with one narrow capability: inline admin removal of pass-verdict
-// comments. Mitigates the v1 image-input gap (image-borne harm content
-// `omni-moderation-2024-09-26` cannot classify: 6 non-CSAM text-only
-// categories on image inputs, weapons-imagery).
+// This REWRITES the superseded SCAFFOLD.16 scaffold WHOLESALE (plan §2.S3b
+// R1/R2/R3 + §4 D-5). The prior file encoded an `approve`/`block`/
+// `remove_pass_verdict` verdict model that mutated `comments.hidden_at` via
+// `UPDATE comments`; ADR-0021 (held-queue removed) + ADR-0020 (Remove/Ban
+// decoupled) supersede it, so NONE of that vocabulary survives here. The
+// specified contract:
+//   - `moderateComment({ commentId, action })`, action `'remove' | 'ban'`
+//     (NO `remove_and_ban` — two independent axes, two audit rows, ADR-0020);
+//   - Remove appends EXACTLY ONE `content_removed` mod_actions row (verdict
+//     null) and writes NOTHING to `comments` (masking is read-side via
+//     loadRemovedSet — Bucket-A append-only forbids a comments write);
+//   - Ban appends ONE `user_banned` row + sets `users.banned_at` ONLY where it
+//     was NULL, touching NO position / bet / ledger / comment (ADR-0021 —
+//     "ban removes voice, not balance"; INV-1/2/3);
+//   - NO events row, `EVENT_TYPES` stays 24 (plan D-6/R3);
+//   - admin-session gate first (zero writes on reject).
 //
-// Contract per plan §F sub-edit 15a "System" bullet "Remove pass-verdict
-// comment" + sub-edit 15d "Pre (Remove pass-verdict path)":
-//   - Pre: any comment with `outcome === 'pass'` exists on a market the admin
-//     is viewing.
-//   - Effect: comment hidden from public view.
-//   - Effect: an append-only audit row is written recording the removal
-//     (exact `mod_actions` row shape — verdict-enum value, action column, or
-//     metadata field — determined by caller-side stratum per LD-5; DEBATE.2
-//     owns INSERT semantics). Encoding-agnostic per H-γ phrasing.
-//   - Non-effect: `users.banned_at` NOT set (admin escalates via separate
-//     Block user action if user-level enforcement needed).
-//
-// SCAFFOLD.16 boundaries (per LD-5 + LD-6 + plan §B B12): SCAFFOLD.16 does
-// NOT ship the F-ADMIN-4 admin Server Action implementation. The Server
-// Action target `moderateComment(input)` at `src/server/admin/moderation/
-// act.ts` (SPEC.2 §4 line 371 per plan §F Edit 17) is DEBATE.2-owned. This
-// test is therefore WRITTEN-FAILING per CLAUDE.md §5.6 tests-first rule;
-// the expected red state is a module-resolution error on the dynamic import
-// below — DEBATE.2 stratum lands the implementation and turns this green.
-//
-// Mock pattern follows the `vi.hoisted` + `vi.mock` discipline used by
-// the rest of the suite (e.g., `tests/integration/precommit-moderate.
-// integration.test.ts`, `tests/server/auth/admin-login.test.ts`).
+// DB-BACKED against local Postgres :54322 (NOT `vi.mock("@/db")`). The
+// admin-session mock recipe mirrors tests/server/admin/markets.test.ts: the
+// real `requireAdminSession()` reads cookie `zugzwang_admin_session` via the
+// mocked `next/headers`, then SELECTs a real `admin_sessions` row that
+// `withAdminSession()` seeds through testClient.
 
-const { mockDb } = vi.hoisted(() => {
-	const tx = {
-		execute: vi.fn(),
-		select: vi.fn(),
-		insert: vi.fn(),
-		update: vi.fn(),
-		delete: vi.fn(),
-	};
-	return {
-		mockDb: {
-			transaction: vi.fn(),
-			execute: vi.fn(),
-			select: vi.fn(),
-			insert: vi.fn(),
-			update: vi.fn(),
-			_tx: tx,
-		},
-	};
-});
-
-vi.mock("@/db/index", () => ({
-	db: mockDb,
+vi.mock("@sentry/nextjs", () => ({
+	captureMessage: vi.fn(),
+	addBreadcrumb: vi.fn(),
+	captureException: vi.fn(),
 }));
 
-const { mockValidateAdminSession } = vi.hoisted(() => ({
-	mockValidateAdminSession: vi.fn(),
-}));
-
-vi.mock("@/server/auth/admin/validate", () => ({
-	validateAdminSession: mockValidateAdminSession,
-}));
-
-const { mockCookiesGet } = vi.hoisted(() => ({
+const { mockCookiesGet, mockHeadersGet } = vi.hoisted(() => ({
 	mockCookiesGet: vi.fn(),
+	mockHeadersGet: vi.fn(),
 }));
 
 vi.mock("next/headers", () => ({
@@ -75,139 +47,467 @@ vi.mock("next/headers", () => ({
 		set: vi.fn(),
 		delete: vi.fn(),
 	}),
+	headers: () => ({
+		get: mockHeadersGet,
+	}),
 }));
 
-beforeEach(() => {
-	mockDb.transaction.mockReset();
-	mockDb.execute.mockReset();
-	mockDb._tx.execute.mockReset();
-	mockDb._tx.select.mockReset();
-	mockDb._tx.insert.mockReset();
-	mockDb._tx.update.mockReset();
-	mockDb._tx.delete.mockReset();
-	mockValidateAdminSession.mockReset();
-	mockCookiesGet.mockReset();
-	mockDb.transaction.mockImplementation(
-		(cb: (t: typeof mockDb._tx) => unknown) => cb(mockDb._tx),
+vi.mock("next/cache", () => ({
+	revalidatePath: vi.fn(),
+}));
+
+import {
+	bets,
+	comments,
+	dharmaLedger,
+	events,
+	markets,
+	modActions,
+	positions,
+	users,
+} from "@/db/schema";
+import { moderateComment } from "@/server/admin/moderation/act";
+import { loadRemovedSet } from "@/server/debate-view/load-debate-view";
+import { EVENT_TYPES } from "@/server/events/schemas";
+
+import { testClient, testDb } from "../../../db/_fixtures/db";
+import { truncateTables } from "../../../db/_fixtures/truncate";
+
+const ADMIN_COOKIE_NAME = "zugzwang_admin_session";
+
+/** Seed an admin_sessions row + point the cookie mock at it (valid session). */
+async function withAdminSession(): Promise<string> {
+	const sessionId = uuidv7();
+	await testClient.unsafe(
+		`INSERT INTO admin_sessions (session_id, issued_at, last_seen_at) VALUES ($1, now(), now())`,
+		[sessionId],
 	);
-	// Default admin session: validator returns an admin-bearing session row.
-	mockValidateAdminSession.mockResolvedValue({
-		session_id: "00000000-0000-0000-0000-0000000000ad",
+	mockCookiesGet.mockReturnValue({ name: ADMIN_COOKIE_NAME, value: sessionId });
+	return sessionId;
+}
+
+/** No admin cookie present → the session gate must reject (no DB row). */
+function withoutAdminSession(): void {
+	mockCookiesGet.mockReturnValue(undefined);
+}
+
+let userSeq = 0;
+
+/** Seed a participant author (unique pseudonym/email); banned_at optional. */
+async function seedAuthor(opts?: { bannedAt?: Date }): Promise<string> {
+	userSeq += 1;
+	const [user] = await testDb
+		.insert(users)
+		.values({
+			name: "UI6 S3 Author",
+			email: `ui6-s3-${userSeq}-${Date.now()}@example.com`,
+			pseudonym: `Ui6S3Author${userSeq}`,
+			tosAcceptedAt: new Date("2026-01-01T00:00:00Z"),
+			bannedAt: opts?.bannedAt ?? null,
+		})
+		.returning({ id: users.id });
+	return user?.id ?? "";
+}
+
+async function seedMarket(slug: string): Promise<string> {
+	const [market] = await testDb
+		.insert(markets)
+		.values({
+			slug,
+			title: "UI6 S3 Market",
+			status: "Open",
+			resolutionDeadline: new Date("2027-01-01T00:00:00Z"),
+		})
+		.returning({ id: markets.id });
+	return market?.id ?? "";
+}
+
+/** A bare comment (bet_id OMITTED — nullable; INV-1 is a W-1-tx concern). */
+async function seedComment(args: {
+	userId: string;
+	marketId: string;
+	body?: string;
+}): Promise<string> {
+	const [comment] = await testDb
+		.insert(comments)
+		.values({
+			userId: args.userId,
+			marketId: args.marketId,
+			body: args.body ?? "argued commentary",
+			sideAtPostTime: "YES",
+		})
+		.returning({ id: comments.id });
+	return comment?.id ?? "";
+}
+
+/**
+ * Read `users.banned_at` through the RAW postgres-js client (testClient), which
+ * — unlike the Drizzle-wrapped testDb — preserves timestamptz→Date parsing, so
+ * the "did not move" comparison is Date-vs-Date, not identity-string-vs-string.
+ */
+async function readBannedAt(userId: string): Promise<Date | null> {
+	const rows = await testClient.unsafe<{ banned_at: Date | null }[]>(
+		`SELECT banned_at FROM users WHERE id = $1`,
+		[userId],
+	);
+	return rows[0]?.banned_at ?? null;
+}
+
+describe("UI-6 S3 moderateComment — reactive Remove/Ban (ADR-0020/0021)", () => {
+	beforeEach(() => {
+		mockCookiesGet.mockReset();
+		mockHeadersGet.mockReset();
 	});
-});
 
-afterEach(() => {
-	vi.clearAllMocks();
-});
+	afterEach(async () => {
+		await truncateTables(testClient, [
+			"mod_actions",
+			"dharma_ledger",
+			"positions",
+			"bets",
+			"comments",
+			"events",
+			"admin_sessions",
+			"markets",
+			"users",
+		]);
+		vi.clearAllMocks();
+	});
 
-describe("admin moderateComment Server Action (F-ADMIN-4 per SCAFFOLD.16 F-γ-thin)", () => {
-	// `.skip` until DEBATE.2 lands `src/server/admin/moderation/act.ts` per plan
-	// §B B12 + LD-5 (caller-side discipline; SCAFFOLD.16 ships the §15 F-ADMIN-4
-	// contract amendment + §17 row mint; DEBATE.2 ships the implementation).
-	// DEBATE.2 handoff: remove `.skip` to enable the test; the `@ts-expect-error`
-	// directive below will then become an unused-directive error if act.ts ships
-	// with the expected signature, signalling the test has moved past the
-	// "blocked on DEBATE.2 implementation" state.
-	it.skip("f-admin-4::pass-verdict-removal", async () => {
-		// Plan §F sub-edit 15e SPEC.1 §17 row mint: `f-admin-4::pass-verdict-
-		// removal`. Plan §F sub-edit 15a contract:
-		//
-		//   - Admin invokes inline Remove on a pass-verdict comment.
-		//   - Append-only audit row is written (encoding-agnostic).
-		//   - `users.banned_at` NOT set.
-		//   - Comment hidden from public view.
-		//
-		// Caller-side `mod_actions` INSERT semantics are DEBATE.2-owned per
-		// LD-5 (verdict-enum value vs action column vs metadata field —
-		// encoding deferred). This test asserts the encoding-agnostic
-		// observable effects only: at least one INSERT against `mod_actions`
-		// occurred, NO UPDATE against `users.banned_at` occurred, and the
-		// comment row was flipped to a hidden state. The shape of the
-		// `mod_actions` INSERT (column values) is intentionally NOT asserted
-		// here — that's DEBATE.2's resolution surface per plan §3.7 H-γ
-		// citation chain.
-		//
-		// Note: this Server Action does NOT exist yet (`src/server/admin/
-		// moderation/act.ts` is DEBATE.2-owned per plan §B B12 + SPEC.2 §4
-		// line 371). The dynamic import below will throw a module-resolution
-		// error until DEBATE.2 lands the implementation. That's the expected
-		// red state per CLAUDE.md §5.6 tests-first rule.
+	// (1) Remove → EXACTLY ONE content_removed row, verdict null.
+	it("moderate-comment::remove-appends-exactly-one-content-removed-row", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-remove-one");
+		const commentId = await seedComment({ userId: authorId, marketId });
 
-		// Stub the dependent reads:
-		//   - Pre-check: comment exists with `outcome === 'pass'`.
-		//   - Inside the transaction: comment update + mod_actions insert.
-		mockDb._tx.execute
-			// 1. SELECT pass-verdict comment (Pre per sub-edit 15d).
-			.mockResolvedValueOnce([
-				{
-					comment_id: "comment-pass-1",
-					market_id: "market-1",
-					user_id: "user-author-1",
-					outcome: "pass",
-					hidden_at: null,
-				},
-			])
-			// 2. UPDATE comments SET hidden_at = now() WHERE comment_id = ?
-			.mockResolvedValueOnce([{ comment_id: "comment-pass-1" }])
-			// 3. INSERT INTO mod_actions (...) RETURNING audit_id
-			.mockResolvedValueOnce([
-				{ audit_id: "00000000-0000-0000-0000-0000000000a1" },
-			]);
+		const result = await moderateComment({ commentId, action: "remove" });
 
-		// Dynamic import: blows up with module-resolution error until DEBATE.2
-		// lands `src/server/admin/moderation/act.ts`. This is the documented
-		// pre-implementation red state per CLAUDE.md §5.6. The
-		// `@ts-expect-error` directive declares the missing-module type
-		// error explicitly — once DEBATE.2 lands the implementation, this
-		// directive itself becomes a TS error, signalling that the test has
-		// moved past the "blocked on DEBATE.2 implementation" state and the
-		// assertion-level failures (if any) are now the legitimate red
-		// surface. Directive must sit immediately above the offending line
-		// per TS contract (no separating comments).
-		const { moderateComment } = (await import(
-			// @ts-expect-error — `src/server/admin/moderation/act.ts` is DEBATE.2-owned per plan §B B12 + SPEC.2 §4 line 371; missing module is the expected pre-implementation state.
-			"@/server/admin/moderation/act"
-		)) as {
-			moderateComment: (input: {
-				commentId: string;
-				action: "approve" | "block" | "remove_pass_verdict";
-			}) => Promise<{ ok: true } | { ok: false; code: string }>;
-		};
+		expect(result.ok).toBe(true);
+		if (!result.ok) throw new Error("unreachable — asserted ok above");
+		expect(result.data.action).toBe("remove");
 
-		const result = await moderateComment({
-			commentId: "comment-pass-1",
-			action: "remove_pass_verdict",
+		const rows = await testDb
+			.select({
+				id: modActions.id,
+				reason: modActions.reason,
+				verdict: modActions.verdict,
+				targetCommentId: modActions.targetCommentId,
+				targetMarketId: modActions.targetMarketId,
+				categories: modActions.categories,
+				actorId: modActions.actorId,
+			})
+			.from(modActions);
+
+		expect(rows.length).toBe(1);
+		expect(rows[0]?.reason).toBe("content_removed");
+		expect(rows[0]?.verdict).toBeNull();
+		expect(rows[0]?.targetCommentId).toBe(commentId);
+		expect(rows[0]?.targetMarketId).toBe(marketId);
+		expect(rows[0]?.categories).toEqual({});
+		expect(rows[0]?.actorId).toBe("admin-singleton");
+		// Semantic pin: the returned id IS the single appended row's id.
+		expect(result.data.modActionId).toBe(rows[0]?.id);
+	});
+
+	// (2) Remove → ZERO writes to `comments` (Bucket-A append-only; the row is
+	// byte-for-byte unchanged, nothing hidden/flipped/updated).
+	it("moderate-comment::remove-writes-nothing-to-comments", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-comments-untouched");
+		const commentId = await seedComment({
+			userId: authorId,
+			marketId,
+			body: "keep me verbatim",
 		});
 
-		// Observable effect 1: action succeeded.
-		expect(result).toEqual({ ok: true });
+		const before = await testDb.select().from(comments);
 
-		// Observable effect 2: a transaction was opened (per F-ADMIN-4
-		// audit-discipline requirement — moderation actions are atomic
-		// {audit row write + comment state flip}).
-		expect(mockDb.transaction).toHaveBeenCalledTimes(1);
+		const result = await moderateComment({ commentId, action: "remove" });
+		expect(result.ok).toBe(true);
 
-		// Observable effect 3: at least one INSERT against `mod_actions`
-		// occurred. The exact column shape (verdict-enum vs action column vs
-		// metadata field) is DEBATE.2-owned per LD-5 — assert presence of
-		// `mod_actions` in the issued SQL, not the column layout.
-		const allTxSql = mockDb._tx.execute.mock.calls
-			.map((c) => JSON.stringify(c[0]))
-			.join(" ");
-		expect(allTxSql).toMatch(/INSERT.*mod_actions/i);
+		const after = await testDb.select().from(comments);
+		expect(after.length).toBe(1);
+		expect(after).toEqual(before);
+		expect(after[0]?.body).toBe("keep me verbatim");
+		expect(after[0]?.id).toBe(commentId);
+	});
 
-		// Observable effect 4: comment was hidden (UPDATE on comments table
-		// flipping it out of the public surface; exact column name —
-		// `hidden_at`, `removed_at`, etc. — is also DEBATE.2-owned, but the
-		// table touch IS contract per sub-edit 15a "comment hidden from
-		// public view").
-		expect(allTxSql).toMatch(/UPDATE.*comments/i);
+	// (3) The removed comment is masked read-side via the EXISTING loadRemovedSet
+	// path (the same gate the debate view uses).
+	it("moderate-comment::remove-masks-comment-via-loadRemovedSet", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-remove-masks");
+		const commentId = await seedComment({ userId: authorId, marketId });
 
-		// Observable effect 5 (CRITICAL — sub-edit 15a explicit non-effect):
-		// `users.banned_at` was NOT updated. Remove pass-verdict does NOT ban
-		// the user; admin escalates via separate Block user action if
-		// user-level enforcement needed.
-		expect(allTxSql).not.toMatch(/UPDATE.*users.*banned_at/i);
-		expect(allTxSql).not.toMatch(/banned_at\s*=/i);
+		const before = await loadRemovedSet(testDb, [commentId]);
+		expect(before.has(commentId)).toBe(false);
+
+		const result = await moderateComment({ commentId, action: "remove" });
+		expect(result.ok).toBe(true);
+
+		const after = await loadRemovedSet(testDb, [commentId]);
+		expect(after.has(commentId)).toBe(true);
+		expect(after.size).toBe(1);
+	});
+
+	// (4) Ban → a user_banned row is appended AND banned_at is set — but ONLY
+	// where it was NULL. A fresh author goes null→set; an already-banned author's
+	// timestamp does NOT move (the WHERE banned_at IS NULL guard no-ops).
+	it("moderate-comment::ban-appends-user-banned-row-and-sets-banned-at-only-where-null", async () => {
+		await withAdminSession();
+		const marketId = await seedMarket("ui6-s3-ban");
+
+		// (i) fresh author — banned_at null → set.
+		const freshAuthor = await seedAuthor();
+		const freshComment = await seedComment({
+			userId: freshAuthor,
+			marketId,
+		});
+
+		expect(await readBannedAt(freshAuthor)).toBeNull();
+
+		const r1 = await moderateComment({
+			commentId: freshComment,
+			action: "ban",
+		});
+		expect(r1.ok).toBe(true);
+		if (!r1.ok) throw new Error("unreachable — asserted ok above");
+		expect(r1.data.action).toBe("ban");
+
+		expect(await readBannedAt(freshAuthor)).toBeInstanceOf(Date);
+
+		const freshRows = await testDb
+			.select({
+				verdict: modActions.verdict,
+				actorId: modActions.actorId,
+				targetUserId: modActions.targetUserId,
+				targetMarketId: modActions.targetMarketId,
+			})
+			.from(modActions)
+			.where(
+				and(
+					eq(modActions.reason, "user_banned"),
+					eq(modActions.targetUserId, freshAuthor),
+				),
+			);
+		expect(freshRows.length).toBe(1);
+		expect(freshRows[0]?.verdict).toBeNull();
+		expect(freshRows[0]?.actorId).toBe("admin-singleton");
+		expect(freshRows[0]?.targetMarketId).toBe(marketId);
+
+		// (ii) already-banned author — banned_at must NOT move.
+		const FIXED_BAN = new Date("2026-06-18T11:00:01.000Z");
+		const bannedAuthor = await seedAuthor({ bannedAt: FIXED_BAN });
+		const bannedComment = await seedComment({
+			userId: bannedAuthor,
+			marketId,
+		});
+
+		const bannedBefore = await readBannedAt(bannedAuthor);
+		expect(bannedBefore).not.toBeNull();
+
+		const r2 = await moderateComment({
+			commentId: bannedComment,
+			action: "ban",
+		});
+		expect(r2.ok).toBe(true);
+
+		const bannedAfter = await readBannedAt(bannedAuthor);
+		expect(bannedAfter?.getTime()).toBe(bannedBefore?.getTime());
+
+		// The audit row is STILL appended (unconditional) even when the UPDATE
+		// no-ops.
+		const bannedRows = await testDb
+			.select({ id: modActions.id })
+			.from(modActions)
+			.where(
+				and(
+					eq(modActions.reason, "user_banned"),
+					eq(modActions.targetUserId, bannedAuthor),
+				),
+			);
+		expect(bannedRows.length).toBe(1);
+	});
+
+	// (5) Ban → the author's PRIOR non-removed content STAYS VISIBLE (ban ≠
+	// removal, ADR-0021): loadRemovedSet is empty for the author's other comment.
+	it("moderate-comment::ban-leaves-prior-content-visible", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-ban-visible");
+		const banThrough = await seedComment({
+			userId: authorId,
+			marketId,
+			body: "ban trigger",
+		});
+		const other = await seedComment({
+			userId: authorId,
+			marketId,
+			body: "prior argument",
+		});
+
+		const result = await moderateComment({
+			commentId: banThrough,
+			action: "ban",
+		});
+		expect(result.ok).toBe(true);
+
+		// NEITHER the comment the ban was issued through NOR the author's other
+		// comment is masked — ban removes voice, not past content.
+		const removed = await loadRemovedSet(testDb, [banThrough, other]);
+		expect(removed.size).toBe(0);
+		expect(removed.has(other)).toBe(false);
+	});
+
+	// (6) Remove and Ban are INDEPENDENTLY invocable — neither implies the other.
+	it("moderate-comment::remove-and-ban-are-independent", async () => {
+		await withAdminSession();
+		const marketId = await seedMarket("ui6-s3-independent");
+
+		// Remove ALONE → no ban, no user_banned row.
+		const authorA = await seedAuthor();
+		const commentA = await seedComment({ userId: authorA, marketId });
+		expect(
+			(await moderateComment({ commentId: commentA, action: "remove" })).ok,
+		).toBe(true);
+
+		expect(await readBannedAt(authorA)).toBeNull();
+		const userBannedForA = await testDb
+			.select({ id: modActions.id })
+			.from(modActions)
+			.where(
+				and(
+					eq(modActions.reason, "user_banned"),
+					eq(modActions.targetUserId, authorA),
+				),
+			);
+		expect(userBannedForA.length).toBe(0);
+
+		// Ban ALONE → no content_removed row, comment NOT masked.
+		const authorB = await seedAuthor();
+		const commentB = await seedComment({ userId: authorB, marketId });
+		expect(
+			(await moderateComment({ commentId: commentB, action: "ban" })).ok,
+		).toBe(true);
+
+		const contentRemovedForB = await testDb
+			.select({ id: modActions.id })
+			.from(modActions)
+			.where(
+				and(
+					eq(modActions.reason, "content_removed"),
+					eq(modActions.targetCommentId, commentB),
+				),
+			);
+		expect(contentRemovedForB.length).toBe(0);
+		expect((await loadRemovedSet(testDb, [commentB])).size).toBe(0);
+	});
+
+	// (7) ZERO writes to positions / bets / dharma_ledger across BOTH remove and
+	// ban (a seeded position + bet + ledger row are untouched — INV-1/2/3).
+	it("moderate-comment::no-writes-to-positions-bets-dharma-ledger", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-no-ledger-writes");
+		const commentId = await seedComment({ userId: authorId, marketId });
+
+		await testDb.insert(positions).values({
+			userId: authorId,
+			marketId,
+			side: "YES",
+			quantity: "7.000000000000000000",
+		});
+		await testDb.insert(dharmaLedger).values({
+			userId: authorId,
+			entryType: "initial_grant",
+			amount: "0",
+			balanceAfter: "500",
+		});
+		await testDb.insert(bets).values({
+			userId: authorId,
+			marketId,
+			side: "YES",
+			stake: "10",
+			shareQuantity: "10",
+			priceAtBet: "0.5",
+			commentId,
+		});
+
+		const snapshot = async () => ({
+			positions: (
+				await testDb.select({ quantity: positions.quantity }).from(positions)
+			).map((p) => p.quantity),
+			bets: (await testDb.select({ id: bets.id }).from(bets)).length,
+			ledger: (
+				await testDb
+					.select({ balanceAfter: dharmaLedger.balanceAfter })
+					.from(dharmaLedger)
+			).map((l) => l.balanceAfter),
+		});
+
+		const before = await snapshot();
+		expect(before.positions.length).toBe(1);
+		expect(before.bets).toBe(1);
+		expect(before.ledger.length).toBe(1);
+
+		expect((await moderateComment({ commentId, action: "remove" })).ok).toBe(
+			true,
+		);
+		expect((await moderateComment({ commentId, action: "ban" })).ok).toBe(true);
+
+		const after = await snapshot();
+		// No insert, no update, no delete on any of the three tables.
+		expect(after).toEqual(before);
+	});
+
+	// (8) The admin-session gate rejects with ZERO writes.
+	it("moderate-comment::admin-session-gate-rejects-with-zero-writes", async () => {
+		withoutAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-no-session");
+		const commentId = await seedComment({ userId: authorId, marketId });
+
+		const rRemove = await moderateComment({ commentId, action: "remove" });
+		expect(rRemove.ok).toBe(false);
+		if (rRemove.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(rRemove.error.code).toBe("admin_session_required");
+
+		const rBan = await moderateComment({ commentId, action: "ban" });
+		expect(rBan.ok).toBe(false);
+		if (rBan.ok) throw new Error("unreachable — asserted not-ok above");
+		expect(rBan.error.code).toBe("admin_session_required");
+
+		// Nothing written on either reject path.
+		expect(
+			(await testDb.select({ id: modActions.id }).from(modActions)).length,
+		).toBe(0);
+		expect(await readBannedAt(authorId)).toBeNull();
+	});
+
+	// (9) `events` is untouched across a remove and a ban, and EVENT_TYPES stays
+	// 24 (reactive Remove/Ban mint NO event and NO new event type — plan D-6/R3).
+	it("moderate-comment::events-untouched-and-event-types-stays-24", async () => {
+		await withAdminSession();
+		const authorId = await seedAuthor();
+		const marketId = await seedMarket("ui6-s3-events-untouched");
+		const commentId = await seedComment({ userId: authorId, marketId });
+
+		const eventsBefore = (
+			await testDb.select({ id: events.eventId }).from(events)
+		).length;
+
+		expect((await moderateComment({ commentId, action: "remove" })).ok).toBe(
+			true,
+		);
+		expect((await moderateComment({ commentId, action: "ban" })).ok).toBe(true);
+
+		const eventsAfter = (
+			await testDb.select({ id: events.eventId }).from(events)
+		).length;
+		expect(eventsAfter).toBe(eventsBefore);
+		expect(EVENT_TYPES.length).toBe(24);
 	});
 });
