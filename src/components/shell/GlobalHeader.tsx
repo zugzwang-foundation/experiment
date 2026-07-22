@@ -5,6 +5,7 @@ import { formatCountdown } from "./countdown-format";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
+import { VisitorCounter } from "./VisitorCounter";
 
 /**
  * The branded global header (UI.A1 — W2.4/.5/.14 mockup v0_2 structure on
@@ -22,9 +23,10 @@ import { RadioSlot } from "./RadioSlot";
  * padding, no responsive breakpoints (design-language §1.7).
  *
  * Left zone order Back · Home · Radio (mockup v0_2); Social/Research/RULES/
- * Đ-info/visitor are ratified omissions (OQ-3/OQ-4 zero-supplied), each a
- * named deviation in the plan. Right zone = JOIN or the identity chip alone
- * (OQ-2 defers the Đ cluster).
+ * Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each a named
+ * deviation in the plan. Right zone = JOIN or the identity chip, then a
+ * hairline divider + the visitor counter at the far right (UI.13; SPEC.1
+ * §21.1); OQ-2 defers the Đ cluster.
  *
  * Countdown (F2): the target is the BUILT `FREEZE_INSTANT_UTC` pin —
  * imported read-only from the markets service (never a duplicate constant)
@@ -47,6 +49,8 @@ export function GlobalHeader({ viewer }: { viewer: HeaderViewer | null }) {
 				</div>
 				<div className="flex items-center justify-self-end">
 					<IdentityCluster viewer={viewer} />
+					<span aria-hidden="true" className="mx-3 h-5 w-px bg-n2" />
+					<VisitorCounter />
 				</div>
 			</div>
 		</header>
