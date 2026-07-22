@@ -350,3 +350,53 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Next code-adjacent sweep or any task already touching `tests/server/moderation/`.
 
 **Expected next task.** Any SWEEP.* / HARDEN.* touching test hygiene — a `biome check --write` on the one file closes it.
+
+## UI-6 Gate C D1 — review-feed prior-flag count is blind to content removals
+
+**Originating task:** UI-6 (PR #262) S3 — `src/server/admin/moderation/review-feed.ts`; surfaced at Gate C (web diff-read).
+
+**Deferred work.** `priorFlagCount` counts `mod_actions` by `target_user_id`, but `content_removed` rows carry `target_comment_id` only (no `target_user_id`) — so an author with N removed comments shows **0** prior flags. Fix = also count removals via a join through `comments` (`mod_actions.target_comment_id → comments.user_id`) and fold that into the per-author tally.
+
+**Why deferred.** Display enrichment; the completeness + masking invariants are unaffected. Repeat-offender detection (the field's purpose) is degraded, not the moderation correctness.
+
+**Conditional trigger.** Before TESTING.0 (repeat-offender detection is load-bearing there).
+
+**Expected next task.** TESTING.0 prep, or any task next touching `review-feed.ts`.
+
+## UI-6 Gate C D2 — moderation image TTL too short for a browsing surface
+
+**Originating task:** UI-6 (PR #262) S3 — `review-feed.ts` image mint (`signRead(key, READ_URL_TTL_SECONDS_MODERATION)`, 60s).
+
+**Deferred work.** 60s was sized for the precommit gate's mint-and-consume path; the review feed is a *browsing* surface, so after 60s every signed URL is dead — and renders as the browser's broken-image, NOT the "image unavailable" fallback (that fires only on a server-side mint failure at render time). DEBATE.4's render path uses 3600s. Needs its own moderation-feed TTL constant (longer), and possibly a client-side re-mint on expiry.
+
+**Why deferred.** UX degradation on a slow browse, not a correctness/leak defect — the short TTL errs safe.
+
+**Conditional trigger.** Before TESTING.0.
+
+**Expected next task.** TESTING.0 prep, or any task next touching `review-feed.ts` / the moderation image path.
+
+## UI-6 Gate C D3 — review-feed innerJoin(users) is a latent STOP #6 (verified safe today)
+
+**Originating task:** UI-6 (PR #262) S3 — `review-feed.ts` completeness query; surfaced at Gate C.
+
+**Verified now (Gate C, read-only):** no `users`-row hard-delete path exists anywhere in `src/`/`scripts/`, and `comments.user_id → users` is `onDelete: restrict`, which structurally BLOCKS deleting a user that has comments. The erasure / pseudonym-scrub path (N-9 / H2) does NOT delete the row — it KEEPS the `users` row and replaces the pseudonym with a bracketed `[scrubbed_user_N]` placeholder — so a scrubbed author's live content still appears in the feed (with the placeholder pseudonym). **The `innerJoin` drops no live row today.**
+
+**Deferred work.** Defensive hardening against a *hypothetical future* users-row-delete path: convert the `innerJoin(users)` to a `leftJoin` with a placeholder pseudonym, so no future erasure path can ever silently drop a live comment from the feed (the STOP #6 failure mode).
+
+**Why deferred.** Verified safe today; the `leftJoin` is future-proofing, not a live fix.
+
+**Conditional trigger.** Verified at Gate C; convert at the next `review-feed.ts` touch.
+
+**Expected next task.** DEBATE.7 (F-ADMIN-4 completion) or TESTING.0 — whichever next edits `review-feed.ts`.
+
+## UI-6 Gate C D4 — no un-ban affordance (founder decision)
+
+**Originating task:** UI-6 (PR #262) S3 — reactive Ban (`moderateComment({ action: 'ban' })`); surfaced at Gate C.
+
+**Deferred work.** A misclicked Ban silences a participant for the remaining window; the only remedy today is a raw SQL write via `BREAK_GLASS`. Needs a **founder decision**: add an un-ban action, add a stronger confirm on Ban, or accept as-is.
+
+**Why deferred.** A product/founder decision, not a UI-6 defect — UI-6 delivered the reactive Ban per the ratified plan; un-ban was never in scope.
+
+**Conditional trigger.** Founder decision.
+
+**Expected next task.** DEBATE.7 (F-ADMIN-4 completion), or a standalone founder ruling.

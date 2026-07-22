@@ -1,9 +1,14 @@
 import Link from "next/link";
+
+import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
 import {
 	type LoadModerationAuditFeedOptions,
 	loadModerationAuditFeed,
+	searchAuditLog,
 } from "@/server/admin/moderation/audit-feed";
 import type {
+	AuditLogRowView,
+	AuditSearchFilters,
 	BlockedReason,
 	CategoryScore,
 	ModerationAuditRowView,
@@ -11,17 +16,13 @@ import type {
 } from "@/server/admin/moderation/audit-view";
 import { requireAdminPage } from "@/server/admin/page-guards";
 
-// UI.6 slice A — F-ADMIN-5 read-only moderation audit viewer (ADR-0021). Server
-// Component, ZERO client JS. Layer-2 admin auth is RE-VALIDATED at render entry
-// (`requireAdminPage`) co-located with the data read — mirroring the ENGINE.15
-// admin pages (an outer `(admin)` layout would loop the in-group login). This
-// surface is READ-ONLY: no action/form/handler of any kind. The only
-// interactivity is read navigation to a market's admin detail page.
-//
-// Styling uses the REAL shadcn semantic tokens (background / card / border /
-// muted / destructive) — NOT the placeholder brand tokens (`--color-yes/no`),
-// which stay frozen until DESIGN.7 (AGENTS.md §8). Blocked rows carry no
-// `side`, so side-binding does not apply here.
+// UI.6 slice A + S4 — F-ADMIN-5 read-only moderation audit viewer (ADR-0021),
+// now nested under the Moderation tab with a searchParams-driven search form
+// over BOTH `admin_events` and `mod_actions` (A3). Server Component, ZERO client
+// JS, Layer-2 admin auth RE-VALIDATED at render entry (`requireAdminPage`)
+// before ANY data read (an outer `(admin)` layout would loop the in-group
+// login). READ-ONLY: no action/handler; the search form is a GET form. Blocked
+// images are withheld (hasBlockedImage boolean) — never rendered, no r2 key.
 export const dynamic = "force-dynamic";
 
 const ROW_LIMIT: NonNullable<LoadModerationAuditFeedOptions["limit"]> = 200;
@@ -229,31 +230,231 @@ function AuditRow({
 	);
 }
 
-export default async function ModerationAuditPage(): Promise<React.ReactElement> {
+// ── S4 search surface ────────────────────────────────────────────────────────
+
+interface SearchParams {
+	from?: string;
+	to?: string;
+	actionType?: string;
+	marketId?: string;
+	userId?: string;
+	pseudonym?: string;
+}
+
+/** Build the AuditSearchFilters from raw search params (invalid dates dropped). */
+function parseFilters(sp: SearchParams): AuditSearchFilters {
+	const filters: AuditSearchFilters = {};
+	const from = sp.from ? new Date(`${sp.from}T00:00:00.000Z`) : null;
+	const to = sp.to ? new Date(`${sp.to}T23:59:59.999Z`) : null;
+	if (from && !Number.isNaN(from.getTime())) filters.from = from;
+	if (to && !Number.isNaN(to.getTime())) filters.to = to;
+	const trim = (v: string | undefined) => {
+		const t = v?.trim();
+		return t && t.length > 0 ? t : undefined;
+	};
+	const actionType = trim(sp.actionType);
+	const marketId = trim(sp.marketId);
+	const userId = trim(sp.userId);
+	const pseudonym = trim(sp.pseudonym);
+	if (actionType) filters.actionType = actionType;
+	if (marketId) filters.marketId = marketId;
+	if (userId) filters.userId = userId;
+	if (pseudonym) filters.pseudonym = pseudonym;
+	return filters;
+}
+
+const SOURCE_LABEL: Record<AuditLogRowView["source"], string> = {
+	mod_action: "moderation",
+	admin_event: "admin event",
+};
+
+function SearchForm({ sp }: { sp: SearchParams }): React.ReactElement {
+	const input =
+		"rounded-md border border-border bg-background px-2 py-1 text-sm";
+	return (
+		<form
+			method="get"
+			className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-3"
+		>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				From
+				<input
+					type="date"
+					name="from"
+					defaultValue={sp.from ?? ""}
+					className={input}
+				/>
+			</label>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				To
+				<input
+					type="date"
+					name="to"
+					defaultValue={sp.to ?? ""}
+					className={input}
+				/>
+			</label>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				Action type
+				<input
+					type="text"
+					name="actionType"
+					placeholder="content_removed · market.resolved …"
+					defaultValue={sp.actionType ?? ""}
+					className={input}
+				/>
+			</label>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				Market id
+				<input
+					type="text"
+					name="marketId"
+					defaultValue={sp.marketId ?? ""}
+					className={input}
+				/>
+			</label>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				User id
+				<input
+					type="text"
+					name="userId"
+					defaultValue={sp.userId ?? ""}
+					className={input}
+				/>
+			</label>
+			<label className="flex flex-col gap-1 text-xs text-muted-foreground">
+				Pseudonym
+				<input
+					type="text"
+					name="pseudonym"
+					defaultValue={sp.pseudonym ?? ""}
+					className={input}
+				/>
+			</label>
+			<div className="flex items-end gap-2 sm:col-span-3">
+				<button
+					type="submit"
+					className="rounded-md border border-border bg-foreground px-4 py-2 text-sm font-medium text-background"
+				>
+					Search
+				</button>
+				<Link
+					href="/admin/moderation/audit"
+					className="rounded-md border border-border px-4 py-2 text-sm font-medium hover:bg-muted"
+				>
+					Clear
+				</Link>
+			</div>
+		</form>
+	);
+}
+
+function SearchResultRow({
+	row,
+}: {
+	row: AuditLogRowView;
+}): React.ReactElement {
+	return (
+		<article className="rounded-lg border border-border bg-card p-4">
+			<header className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
+				<div className="flex flex-wrap items-center gap-2 text-xs">
+					<span className="rounded-full border border-border bg-muted px-2 py-0.5 font-medium uppercase tracking-wide text-muted-foreground">
+						{SOURCE_LABEL[row.source]}
+					</span>
+					<span className="font-mono text-foreground">{row.actionType}</span>
+				</div>
+				<time
+					dateTime={row.createdAt.toISOString()}
+					className="font-mono text-xs text-muted-foreground"
+				>
+					{row.createdAt.toISOString().replace("T", " ").replace(".000Z", "Z")}
+				</time>
+			</header>
+			<dl className="grid grid-cols-1 gap-3 py-3 text-sm sm:grid-cols-3">
+				<Field label="Market">
+					{row.marketId ? (
+						<Link
+							href={`/admin/markets/${row.marketId}`}
+							className="text-foreground underline underline-offset-2 hover:no-underline"
+						>
+							{row.marketSlug ?? row.marketId}
+						</Link>
+					) : (
+						<span className="text-muted-foreground">—</span>
+					)}
+				</Field>
+				<Field label="Author">
+					{row.authorPseudonym ? (
+						<span>
+							{row.authorPseudonym}
+							{row.authorBanned ? (
+								<span className="ml-1 text-destructive">· banned</span>
+							) : null}
+						</span>
+					) : (
+						<span className="text-muted-foreground">—</span>
+					)}
+				</Field>
+				<Field label="Actor">
+					<span className="font-mono text-xs">{row.actorId}</span>
+				</Field>
+			</dl>
+			{row.categoryScores.length > 0 ? (
+				<CategoryChips scores={row.categoryScores} />
+			) : null}
+			{row.hasBlockedImage ? (
+				<div className="mt-2">
+					<ImageWithheld />
+				</div>
+			) : null}
+			{row.blockedText ? (
+				<p className="mt-2 whitespace-pre-wrap break-words rounded-md border border-border bg-muted/40 p-3 text-sm">
+					{row.blockedText}
+				</p>
+			) : null}
+		</article>
+	);
+}
+
+export default async function ModerationAuditPage(props: {
+	searchParams: Promise<SearchParams>;
+}): Promise<React.ReactElement> {
 	await requireAdminPage();
 
-	const rows = await loadModerationAuditFeed({ limit: ROW_LIMIT });
+	const sp = await props.searchParams;
+	const filters = parseFilters(sp);
+	const searching = Object.keys(filters).length > 0;
+
+	// Search mode → the two-source union; default (no filters) → the unchanged
+	// blocked-submissions feed (loadModerationAuditFeed).
+	const searchRows = searching
+		? await searchAuditLog({ limit: ROW_LIMIT, filters })
+		: [];
+	const blockedRows = searching
+		? []
+		: await loadModerationAuditFeed({ limit: ROW_LIMIT });
 
 	return (
 		<main className="min-h-dvh bg-background text-foreground">
 			<div className="mx-auto max-w-5xl px-6 py-10">
-				<nav className="mb-6 text-sm">
-					<Link
-						href="/admin/markets"
-						className="text-muted-foreground underline-offset-2 hover:underline"
-					>
-						← Admin
-					</Link>
-				</nav>
+				<AdminTabs active="moderation" />
 
 				<header className="mb-6">
 					<h1 className="text-2xl font-semibold tracking-tight">
-						Moderation · Blocked submissions
+						Moderation · Audit log
 					</h1>
 					<p className="mt-1 text-sm text-muted-foreground">
-						Read-only audit of gate-blocked submissions (Track A auto-ban, Track
-						B block, and the text-only sexual/minors carve-out). Reactive admin
-						actions are out of scope here. Per ADR-0021.
+						Search across admin events and moderation actions (F-ADMIN-5). With
+						no filters, the gate-blocked submissions feed is shown. Per
+						ADR-0021.
+					</p>
+					<p className="mt-2 text-xs text-muted-foreground">
+						<Link
+							href="/admin/moderation"
+							className="underline underline-offset-2 hover:no-underline"
+						>
+							← Live review feed
+						</Link>
 					</p>
 				</header>
 
@@ -261,12 +462,52 @@ export default async function ModerationAuditPage(): Promise<React.ReactElement>
 					role="note"
 					className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-foreground"
 				>
-					<strong className="font-semibold">Admin-only.</strong> This page shows
-					rejected content for moderation review. It is never exposed to
-					participants, and blocked images are withheld — never rendered.
+					<strong className="font-semibold">Admin-only.</strong> Rejected
+					content is shown for review; it is never exposed to participants, and
+					blocked images are withheld — never rendered.
 				</div>
 
-				{rows.length === 0 ? (
+				<SearchForm sp={sp} />
+
+				{/* admin_events has no writer yet — make its emptiness legible so an
+				    absent admin-event row reads as "not emitted", never "no match". */}
+				<p
+					role="note"
+					className="mb-4 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+				>
+					Admin-event rows are{" "}
+					<strong className="font-semibold">not yet emitted</strong> (no{" "}
+					<span className="font-mono">admin_events</span> writer exists), so
+					results currently cover moderation actions only — an absent
+					admin-event row means "not emitted here yet", not "no such admin
+					action occurred".
+				</p>
+
+				{searching ? (
+					searchRows.length === 0 ? (
+						<div className="rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
+							<p className="text-sm text-muted-foreground">
+								No audit rows match those filters.
+							</p>
+						</div>
+					) : (
+						<>
+							<p className="mb-4 text-xs text-muted-foreground">
+								{searchRows.length} matching row
+								{searchRows.length === 1 ? "" : "s"}
+								{searchRows.length === ROW_LIMIT
+									? ` (capped at ${ROW_LIMIT})`
+									: ""}
+								.
+							</p>
+							<div className="flex flex-col gap-3">
+								{searchRows.map((row) => (
+									<SearchResultRow key={`${row.source}:${row.id}`} row={row} />
+								))}
+							</div>
+						</>
+					)
+				) : blockedRows.length === 0 ? (
 					<div className="rounded-lg border border-dashed border-border bg-card px-6 py-16 text-center">
 						<p className="text-sm text-muted-foreground">
 							No blocked submissions recorded yet.
@@ -275,12 +516,15 @@ export default async function ModerationAuditPage(): Promise<React.ReactElement>
 				) : (
 					<>
 						<p className="mb-4 text-xs text-muted-foreground">
-							Showing the {rows.length} most recent blocked submission
-							{rows.length === 1 ? "" : "s"}
-							{rows.length === ROW_LIMIT ? ` (capped at ${ROW_LIMIT})` : ""}.
+							Showing the {blockedRows.length} most recent blocked submission
+							{blockedRows.length === 1 ? "" : "s"}
+							{blockedRows.length === ROW_LIMIT
+								? ` (capped at ${ROW_LIMIT})`
+								: ""}
+							.
 						</p>
 						<div className="flex flex-col gap-4">
-							{rows.map((row) => (
+							{blockedRows.map((row) => (
 								<AuditRow key={row.id} row={row} />
 							))}
 						</div>

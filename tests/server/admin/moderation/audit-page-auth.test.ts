@@ -37,28 +37,36 @@ vi.mock("next/headers", () => ({
 	cookies: () => ({ get: () => undefined }),
 }));
 
-const { mockLoadFeed } = vi.hoisted(() => ({ mockLoadFeed: vi.fn() }));
+const { mockLoadFeed, mockSearch } = vi.hoisted(() => ({
+	mockLoadFeed: vi.fn(),
+	mockSearch: vi.fn(),
+}));
 
 vi.mock("@/server/admin/moderation/audit-feed", () => ({
 	loadModerationAuditFeed: mockLoadFeed,
+	searchAuditLog: mockSearch,
 }));
 
 import ModerationAuditPage from "@/app/(admin)/admin/moderation/audit/page";
 
 const LOADER_SENTINEL = new Error("LOADER_REACHED");
 
+// No filters → the page's default path is loadModerationAuditFeed (not search).
+const noFilters = () => ({ searchParams: Promise.resolve({}) });
+
 describe("moderation audit page — Layer-2 auth gate (a)", () => {
 	beforeEach(() => {
 		mockRedirect.mockClear();
 		mockValidate.mockReset();
 		mockLoadFeed.mockReset();
+		mockSearch.mockReset();
 	});
 
 	it("audit-page::no-admin-session-redirects-and-never-reads-feed", async () => {
 		mockValidate.mockResolvedValue(null);
 		mockLoadFeed.mockResolvedValue([]);
 
-		await ModerationAuditPage().catch(() => {}); // redirect() throws NEXT_REDIRECT
+		await ModerationAuditPage(noFilters()).catch(() => {}); // redirect() throws NEXT_REDIRECT
 
 		expect(mockRedirect).toHaveBeenCalledWith("/admin/login");
 		// The participant/unauthenticated path must never touch the data layer.
@@ -71,7 +79,9 @@ describe("moderation audit page — Layer-2 auth gate (a)", () => {
 		// reached — without evaluating the page's JSX tail.
 		mockLoadFeed.mockRejectedValue(LOADER_SENTINEL);
 
-		await expect(ModerationAuditPage()).rejects.toBe(LOADER_SENTINEL);
+		await expect(ModerationAuditPage(noFilters())).rejects.toBe(
+			LOADER_SENTINEL,
+		);
 
 		expect(mockRedirect).not.toHaveBeenCalled();
 		expect(mockLoadFeed).toHaveBeenCalledTimes(1);

@@ -1,20 +1,21 @@
 import { eq } from "drizzle-orm";
 import { notFound, redirect } from "next/navigation";
 
+import { AdminTabs } from "@/app/(admin)/admin/_components/AdminTabs";
+import { TerminalActions } from "@/app/(admin)/admin/markets/_components/TerminalActions";
 import { db } from "@/db";
 import { markets, pools } from "@/db/schema";
-import { closeMarketAction } from "@/server/admin/markets/close";
-import { correctResolutionAction } from "@/server/admin/markets/correct";
-import { resolveMarketAction } from "@/server/admin/markets/resolve";
 import { seedPoolAction } from "@/server/admin/markets/seed";
-import { voidMarketAction } from "@/server/admin/markets/void";
 import { requireAdminPage, requireUuidParam } from "@/server/admin/page-guards";
 
-// ENGINE.15 S3 — R-15.1 market detail + state-appropriate forms. Server
-// Component, ZERO client JS (D-15.e). Each form binds an inline wrapper that
-// calls the wire action and surfaces the result via a redirect param. Forms for
-// non-applicable states are NOT rendered; the service + state machine remain
-// the real gate (SPEC.1 §15.1 server-side enforcement posture).
+// UI.6 S2 — market admin detail. The Close / Resolve / Void / Correct terminal
+// actions are now surfaced through the <TerminalActions> client island: each
+// gated action arms only on a typed market-question confirm (D-2), and every
+// ActionResult error renders as human copy client-side — the plain-HTML forms
+// and their raw `?error=<code>` redirect surface are REPLACED, with no ungated
+// parallel path left (R-5). The Draft "Seed" affordance (F-ADMIN-2) is OUT OF
+// SCOPE and untouched — it keeps its inline server-action + `?ok=`/`?error=`
+// redirect surface (the only remaining producer of those params here).
 export const dynamic = "force-dynamic";
 
 export default async function MarketDetailPage(props: {
@@ -35,9 +36,8 @@ export default async function MarketDetailPage(props: {
 		.from(pools)
 		.where(eq(pools.marketId, marketId));
 
-	// Inline wrappers close over `marketId` (a serializable string) and call the
-	// module-scope `redirect` directly — never over a helper function (a Next
-	// server-action closure must capture only serializable values).
+	// Seed (Draft → Open, F-ADMIN-2) is out of scope — its inline wrapper +
+	// redirect surface are left exactly as ENGINE.15 S3 shipped them.
 	async function runSeed(formData: FormData): Promise<void> {
 		"use server";
 		const r = await seedPoolAction(formData);
@@ -45,130 +45,68 @@ export default async function MarketDetailPage(props: {
 			`/admin/markets/${marketId}?${r.ok ? "ok=seeded" : `error=${r.error.code}`}`,
 		);
 	}
-	async function runClose(formData: FormData): Promise<void> {
-		"use server";
-		const r = await closeMarketAction(formData);
-		redirect(
-			`/admin/markets/${marketId}?${r.ok ? "ok=closed" : `error=${r.error.code}`}`,
-		);
-	}
-	async function runResolve(formData: FormData): Promise<void> {
-		"use server";
-		const r = await resolveMarketAction(formData);
-		redirect(
-			`/admin/markets/${marketId}?${r.ok ? "ok=resolved" : `error=${r.error.code}`}`,
-		);
-	}
-	async function runCorrect(formData: FormData): Promise<void> {
-		"use server";
-		const r = await correctResolutionAction(formData);
-		redirect(
-			`/admin/markets/${marketId}?${r.ok ? "ok=corrected" : `error=${r.error.code}`}`,
-		);
-	}
-	async function runVoid(formData: FormData): Promise<void> {
-		"use server";
-		const r = await voidMarketAction(formData);
-		redirect(
-			`/admin/markets/${marketId}?${r.ok ? "ok=voided" : `error=${r.error.code}`}`,
-		);
-	}
-
-	const isResuming = market.status === "Resolving";
 
 	return (
-		<main>
-			<h1>{market.slug}</h1>
-			{ok ? <p>OK: {ok}</p> : null}
-			{error ? <p>Error: {error}</p> : null}
-			<dl>
-				<dt>status</dt>
-				<dd>{market.status}</dd>
-				<dt>title</dt>
-				<dd>{market.title}</dd>
-				<dt>description</dt>
-				<dd>{market.description ?? "—"}</dd>
-				<dt>resolution deadline</dt>
-				<dd>{market.resolutionDeadline.toISOString()}</dd>
-				<dt>outcome</dt>
-				<dd>{market.resolutionOutcome ?? "—"}</dd>
-				{pool ? (
-					<>
-						<dt>reserves</dt>
-						<dd>
-							YES {pool.yesReserves} / NO {pool.noReserves}
-						</dd>
-					</>
+		<main className="min-h-dvh bg-background text-foreground">
+			<div className="mx-auto max-w-3xl px-6 py-10">
+				<AdminTabs active="markets" />
+
+				<h1 className="mb-4 text-2xl font-semibold tracking-tight">
+					{market.slug}
+				</h1>
+
+				{/* Seed-only result surface (F-ADMIN-2, out of scope). */}
+				{ok ? (
+					<p className="mb-4 rounded-md border border-border bg-muted px-3 py-2 text-sm">
+						{ok}
+					</p>
 				) : null}
-			</dl>
+				{error ? (
+					<p className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+						{error}
+					</p>
+				) : null}
 
-			{market.status === "Draft" ? (
-				<form action={runSeed}>
-					<h2>Seed pool (open market)</h2>
-					<input type="hidden" name="marketId" value={marketId} />
-					<label>
-						Seed amount <input name="seedAmount" required />
-					</label>
-					<button type="submit">Seed &amp; open</button>
-				</form>
-			) : null}
+				<dl className="mb-6 grid grid-cols-[8rem_1fr] gap-y-1 text-sm">
+					<dt className="text-muted-foreground">status</dt>
+					<dd>{market.status}</dd>
+					<dt className="text-muted-foreground">title</dt>
+					<dd>{market.title}</dd>
+					<dt className="text-muted-foreground">description</dt>
+					<dd>{market.description ?? "—"}</dd>
+					<dt className="text-muted-foreground">resolution deadline</dt>
+					<dd className="font-mono text-xs">
+						{market.resolutionDeadline.toISOString()}
+					</dd>
+					<dt className="text-muted-foreground">outcome</dt>
+					<dd>{market.resolutionOutcome ?? "—"}</dd>
+					{pool ? (
+						<>
+							<dt className="text-muted-foreground">reserves</dt>
+							<dd className="font-mono text-xs">
+								YES {pool.yesReserves} / NO {pool.noReserves}
+							</dd>
+						</>
+					) : null}
+				</dl>
 
-			{market.status === "Open" ? (
-				<form action={runClose}>
-					<h2>Close market</h2>
-					<input type="hidden" name="marketId" value={marketId} />
-					<button type="submit">Close</button>
-				</form>
-			) : null}
-
-			{market.status === "Closed" || market.status === "Resolving" ? (
-				<form action={runResolve}>
-					<h2>{isResuming ? "Complete settlement" : "Resolve"}</h2>
-					<input type="hidden" name="marketId" value={marketId} />
-					<label>
-						Winning side
-						<select name="winningSide">
-							<option value="YES">YES</option>
-							<option value="NO">NO</option>
-						</select>
-					</label>
-					<label>
-						Reason <textarea name="reason" required />
-					</label>
-					<button type="submit">
-						{isResuming ? "Complete settlement" : "Resolve"}
-					</button>
-				</form>
-			) : null}
-
-			{market.status === "Resolved" ? (
-				<form action={runCorrect}>
-					<h2>Correct resolution</h2>
-					<input type="hidden" name="marketId" value={marketId} />
-					<label>
-						Corrected side
-						<select name="correctedSide">
-							<option value="YES">YES</option>
-							<option value="NO">NO</option>
-						</select>
-					</label>
-					<label>
-						Reason <textarea name="reason" required />
-					</label>
-					<button type="submit">Correct</button>
-				</form>
-			) : null}
-
-			{market.status === "Open" || market.status === "Closed" ? (
-				<form action={runVoid}>
-					<h2>Void market</h2>
-					<input type="hidden" name="marketId" value={marketId} />
-					<label>
-						Reason <textarea name="reason" required />
-					</label>
-					<button type="submit">Void</button>
-				</form>
-			) : null}
+				{market.status === "Draft" ? (
+					<form action={runSeed}>
+						<h2>Seed pool (open market)</h2>
+						<input type="hidden" name="marketId" value={marketId} />
+						<label>
+							Seed amount <input name="seedAmount" required />
+						</label>
+						<button type="submit">Seed &amp; open</button>
+					</form>
+				) : (
+					<TerminalActions
+						marketId={marketId}
+						title={market.title}
+						status={market.status}
+					/>
+				)}
+			</div>
 		</main>
 	);
 }

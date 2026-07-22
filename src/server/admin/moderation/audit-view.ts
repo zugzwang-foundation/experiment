@@ -98,6 +98,47 @@ export function topCategories(scores: unknown, n: number): CategoryScore[] {
 /** Max category chips surfaced per row. */
 const CATEGORY_CHIP_LIMIT = 6;
 
+// ── UI-6 S4 — F-ADMIN-5 audit-log SEARCH (over admin_events + mod_actions) ────
+
+/** The five F-ADMIN-5 search predicates (A3). All optional; AND-combined. */
+export interface AuditSearchFilters {
+	from?: Date;
+	to?: Date;
+	/** Matches `mod_actions.reason` OR `admin_events.event_type`. */
+	actionType?: string;
+	marketId?: string;
+	/** Selects mod_actions only — admin_events carry no participant user. */
+	userId?: string;
+	/** Selects mod_actions only — matched against the target user's pseudonym. */
+	pseudonym?: string;
+}
+
+export type AuditLogSource = "mod_action" | "admin_event";
+
+/**
+ * The unified audit-log row spanning both sources. Source-specific fields
+ * (categories / blockedText / author) are null/empty for `admin_event` rows.
+ * Like `ModerationAuditRowView` it carries `hasBlockedImage` (a boolean) and
+ * NEVER the r2 key — the F-ADMIN-5 leak rail holds across the union.
+ */
+export interface AuditLogRowView {
+	id: string;
+	source: AuditLogSource;
+	createdAt: Date;
+	/** `mod_actions.reason` | `admin_events.event_type`. */
+	actionType: string;
+	actorId: string;
+	marketId: string | null;
+	marketSlug: string | null;
+	marketTitle: string | null;
+	authorUserId: string | null;
+	authorPseudonym: string | null;
+	authorBanned: boolean;
+	categoryScores: CategoryScore[];
+	blockedText: string | null;
+	hasBlockedImage: boolean;
+}
+
 export function toAuditRowView(
 	raw: ModerationAuditRowRaw,
 ): ModerationAuditRowView {
