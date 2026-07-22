@@ -89,6 +89,7 @@ async function seedComment(args: {
 	body: string;
 	createdAt: Date;
 	imageUploadsId?: string;
+	parentCommentId?: string;
 }): Promise<string> {
 	const [comment] = await testDb
 		.insert(comments)
@@ -99,6 +100,7 @@ async function seedComment(args: {
 			sideAtPostTime: "YES",
 			createdAt: args.createdAt,
 			imageUploadsId: args.imageUploadsId ?? null,
+			parentCommentId: args.parentCommentId ?? null,
 		})
 		.returning({ id: comments.id });
 	return comment?.id ?? "";
@@ -382,5 +384,53 @@ describe("UI-6 S3 loadReviewFeed — live-content completeness (ADR-0021)", () =
 		expect(page3.rows.map((r) => r.body)).toEqual(["sub-ms A"]);
 		expect(page3.truncated).toBe(false);
 		expect(page3.nextCursor).toBeNull();
+	});
+
+	// Masking is a property of EVERY body read, not just rows: a LIVE reply under
+	// a content_removed PARENT keeps the reply (thread intact) but must NEVER
+	// surface the removed parent's body via the parent-snippet path. Mirrors
+	// scripts/seed-debate-view-staging.ts:263–282 (the canary that caught it on
+	// staging). RED before the fix: the parent body currently leaks into
+	// `parentSnippet`.
+	it("review-feed::reply-under-removed-parent-masks-body-shows-placeholder", async () => {
+		const author = await seedAuthor();
+		const marketId = await seedMarket(
+			"ui6-feed-removed-parent",
+			"UI6 Feed Removed Parent",
+		);
+		const PARENT_BODY =
+			"PARENT BODY MUST NEVER RENDER — it is content_removed.";
+		const parent = await seedComment({
+			userId: author,
+			marketId,
+			body: PARENT_BODY,
+			createdAt: new Date("2026-06-10T00:00:01Z"),
+		});
+		const reply = await seedComment({
+			userId: author,
+			marketId,
+			body: "Reply under a removed parent — this MUST still render.",
+			createdAt: new Date("2026-06-10T00:00:02Z"),
+			parentCommentId: parent,
+		});
+		await removeComment(parent, marketId);
+
+		const result = await loadReviewFeed();
+		const ids = result.rows.map((r) => r.id);
+
+		// The live reply IS returned (thread intact — the child is live content);
+		// the removed parent is NOT a row.
+		expect(ids).toContain(reply);
+		expect(ids).not.toContain(parent);
+
+		// The reply's parent is flagged REMOVED and carries NO body — the
+		// placeholder is the only renderable (the type has no snippet field here).
+		const replyRow = result.rows.find((r) => r.id === reply);
+		expect(replyRow?.parent).toEqual({ removed: true });
+
+		// The removed parent's body appears NOWHERE in the serialized result
+		// (same shape as the raw-R2-key leak assertion).
+		expect(JSON.stringify(result.rows)).not.toContain(PARENT_BODY);
+		expect(JSON.stringify(result.rows)).not.toContain("MUST NEVER RENDER");
 	});
 });

@@ -73,7 +73,7 @@ export default async function ModerationPage(props: {
 	const rows: ReviewFeedRowView[] = feed.rows.map((r) => ({
 		id: r.id,
 		kind: r.kind,
-		parentSnippet: r.parentSnippet,
+		parent: r.parent,
 		marketSlug: r.marketSlug,
 		marketStatus: r.marketStatus,
 		side: r.side,
