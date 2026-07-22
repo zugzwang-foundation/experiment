@@ -1,10 +1,12 @@
-# UI-6 — Admin Control Centre — Plan (authored 2026-07-22; awaiting web ratification)
+# UI-6 — Admin Control Centre — Plan (RATIFIED — web Claude, 2026-07-22, with corrections A1–A4 folded in)
 
 > **What this builds.** The two-tab Admin Control Centre ratified in SPEC.1 §15 (v1.0.19, `ZUGZWANG-SPEC-ADMIN-CENTRE_amendment_v1_0`, merged in #258): **Moderation** (default landing) + **Markets**. Moderation = a reactive chronological review feed of live content with **Remove / Ban** (F-ADMIN-4) + audit-log search (F-ADMIN-5). Markets = a thin list with a live needs-resolution count + freeze countdown and three terminal actions — **Close / Resolve / Void** (F-ADMIN-3 / F-RESOLVE-3).
 >
+> **⚠️ UI.6 does NOT complete F-ADMIN-4.** It delivers the Track-C live-content review feed + reactive Remove/Ban only. Three F-ADMIN-4 pieces are **deferred to DEBATE.7** (docketed, not forgotten — §2.S3 A2): Track-A auto-actioned informational rows; the LD-3 text-only `sexual/minors` carve-out ban-review surface (**child-safety relevant**); and the inline Remove/Ban affordance on the participant debate view (participant-surface, fenced by the kickoff). CSAM is **never** re-rendered anywhere; Track-A rows are absent from v1 by design.
+>
 > **This plan is executable by a session with ZERO context.** Every path, function, test, and acceptance criterion is explicit. Assume the executor has read nothing but this plan and the repo.
 >
-> **Ground:** `main` @ **`ac466c2`** (SPEC.1 1.0.19 merged). Recon below ran read-only at that HEAD.
+> **Ground:** `main` @ **`ac466c2`** (SPEC.1 1.0.19 merged; plan committed at `26866af`, amended here). Recon below ran read-only at that HEAD.
 >
 > **Ritual:** critical-path build (moderation + resolution). Gated plan→execute + named-reviewer cascade. **NEVER ultracode** on F-ADMIN-3 / F-ADMIN-4. `ultrathink` first word of every execute prompt. `/model opus`, `/effort max`.
 
@@ -23,12 +25,14 @@
 | Admin page gate `requireAdminPage()` (redirects to `/admin/login`) + `requireUuidParam()` | `src/server/admin/page-guards.ts` | **built.** Call at TOP of every admin page except login. **Never** an `(admin)` group layout — it would loop the in-group login page. |
 | Markets list page (thin, unstyled, `force-dynamic`, `requireAdminPage`, reads `markets`, shows status counts + table + New-market link) | `src/app/(admin)/admin/markets/page.tsx` | **built** (ENGINE.15 S3). UI.6 extends it. |
 | Market admin detail page | `src/app/(admin)/admin/markets/[marketId]/page.tsx` | **built.** UI.6 adds the terminal-action affordances here (Markets-tab-only surface). |
-| F-ADMIN-5 audit loader `loadModerationAuditFeed({limit})` → blocked `mod_actions` rows (200 cap), view-model mapped, never raw R2 key | `src/server/admin/moderation/audit-feed.ts` + `audit-view.ts` | **built** (read-only; `audit-feed-leak` guard forbids URL-mint tokens in the file). **No search predicates yet.** |
+| F-ADMIN-5 audit loader `loadModerationAuditFeed({limit})` → blocked `mod_actions` rows (200 cap), view-model mapped, never raw R2 key | `src/server/admin/moderation/audit-feed.ts` + `audit-view.ts` | **built** (read-only; `audit-feed-leak` guard forbids URL-mint tokens in the file). **No search predicates yet; reads `mod_actions` only.** |
 | F-ADMIN-5 audit page (read-only, `force-dynamic`, `requireAdminPage`, REASON_META + category-score render) | `src/app/(admin)/admin/moderation/audit/page.tsx` | **built.** UI.6 adds search + nests it under the Moderation tab. |
-| Precommit gate consequence writer `recordGateBlock()` (writes `mod_actions` + `users.banned_at` on track_a + `moderation.blocked` event; INV-2/3 safe) | `src/server/moderation/consequences.ts` | **built.** Gate-time only; `pass` opens the bet tx with **no** `mod_actions` row. |
+| Precommit gate consequence writer `recordGateBlock()` (writes `mod_actions` + `users.banned_at` on track_a + `moderation.blocked` event; INV-2/3 safe) | `src/server/moderation/consequences.ts` | **built.** Gate-time only; `pass` opens the bet tx with **no** `mod_actions` row (so passed/live comments carry **no** stored OpenAI categories — see A4/OQ-3). |
 | Removal masking `loadRemovedSet(client, ids[])` — the SINGLE masking gate, keyed ONLY on `mod_actions.reason='content_removed'` (`users.banned_at` never masks) | `src/server/debate-view/load-debate-view.ts` | **built.** The reactive-removal read-side already works; UI.6 supplies the write-side (`moderateComment`). |
+| Signed-read image URL `signRead(key, ttlSeconds)` → `mintReadUrl("uploads", key, ttl)`; moderation TTL const `READ_URL_TTL_SECONDS_MODERATION` (60s) | `src/server/storage/sign-read.ts` + `src/server/storage/r2.ts` | **built.** The A1 image-mint seam for the feed (server-side, short-TTL, no raw key). |
 | Freeze reader `isFrozen()` (global `system_state.frozen_at`; admin paths do NOT call it) | `src/server/system/is-frozen.ts` | **built.** Confirms §6.1: admin resolution/close/void are outside the freeze gate. |
 | Transition graph (`Frozen` vestigial-unreachable; only `Resolved|Voided → Frozen`, never written) | `src/server/markets/transitions.ts` | **built.** No code writes `markets.status='Frozen'` (SPEC.1 §6.1, corrected). |
+| `FREEZE_INSTANT_UTC = 2026-11-05T23:59:00Z` (pinned module constant, the deadline ceiling) | `src/server/markets/create.ts` (verify exact export at execute — STOP if not exported, §3 #10) | **built.** Import — never redefine. |
 
 ### 0.2 What is NOT built (UI.6 must build)
 
@@ -41,17 +45,17 @@
 | **Reactive Remove/Ban Server Action `moderateComment`** at `src/server/admin/moderation/act.ts` | `act.ts` absent; `moderateComment` absent from `src/`; `tests/server/admin/moderation/act.test.ts::f-admin-4::pass-verdict-removal` is **`it.skip`** (SCAFFOLD.16 written-failing, labelled "DEBATE.2-owned" — DEBATE.2 did not land it) | S3 |
 | **Terminal-action UI + typed hard confirm** (Close/Resolve/Void wiring) | actions built; no admin UI wires them | S2 |
 | **Live needs-resolution count + freeze countdown** on Markets tab | markets page shows raw status counts only | S1 |
-| **F-ADMIN-5 search predicates** (date range, action type, market, user, pseudonym) | `loadModerationAuditFeed` takes only `{limit}` | S4 |
+| **F-ADMIN-5 search predicates over BOTH `admin_events` AND `mod_actions`** (date range, action type, market, user, pseudonym) | `loadModerationAuditFeed` takes only `{limit}`, reads `mod_actions` only | S4 |
 
 ### 0.3 Tokens (globals.css — the styling surface)
 
-Branded dark monochrome system in `src/app/globals.css` `@theme` + `:root`. Primitives: `--color-ground` (page), `--color-ink`, ramp `--color-n0…n7` (dark→bright), side poles `--color-yes` (`#181818`) / `--color-no` (`#fafafa`). shadcn semantic slots alias primitives (`--background`, `--card`, `--foreground`, `--primary`, `--secondary`, `--muted`, `--muted-foreground`, `--border`, `--destructive`→n6-neutralized). Guarded by `tests/unit/design/tokens-monochrome.test.ts`. **UI.6 adds no tokens** — it consumes existing ones.
+Branded dark monochrome system in `src/app/globals.css` `@theme` + `:root`. Primitives: `--color-ground` (page), `--color-ink`, ramp `--color-n0…n7` (dark→bright), side poles `--color-yes` (`#181818`) / `--color-no` (`#fafafa`). shadcn semantic slots alias primitives (`--background`, `--card`, `--foreground`, `--primary`, `--secondary`, `--muted`, `--muted-foreground`, `--border`, `--destructive`→n6-neutralized). Guarded by `tests/unit/design/tokens-monochrome.test.ts`. **UI.6 adds no tokens** — it consumes existing ones. YES/NO **pole** badges are permitted here (web-ratified — the DESIGN.7 brand-token freeze does not bind side-pole badges).
 
 ---
 
 ## 1 · Approach (one paragraph)
 
-UI.6 assembles the Admin Control Centre almost entirely from parts that already exist. The three terminal market actions are **built and tested**, so F-ADMIN-3 is a UI-wiring slice plus a typed hard-confirm gate. The F-ADMIN-5 audit surface is built, so it needs search predicates and a home under the Moderation tab. The genuinely new engine work is **F-ADMIN-4**: a live-content review-feed reader that provably returns every live row, and the reactive **Remove/Ban** Server Action (`moderateComment`) that writes an append-only `mod_actions` row (`content_removed` / `user_banned`, verdict NULL) + sets `users.banned_at` on ban, touching **no** position and **no** ledger row (ADR-0021). Everything is admin-only, tokens-only, and structurally separate from the participant surface. The build is five slices; the two critical-path slices (F-ADMIN-3, F-ADMIN-4) run the full reviewer cascade, never ultracode, and **HARD STOP at the open PR** for founder merge.
+UI.6 assembles the Admin Control Centre almost entirely from parts that already exist. The three terminal market actions are **built and tested**, so F-ADMIN-3 is a UI-wiring slice plus a typed hard-confirm gate. The F-ADMIN-5 audit surface is built, so it needs search predicates (now over **both** `admin_events` and `mod_actions`, A3) and a home under the Moderation tab. The genuinely new engine work is **F-ADMIN-4 (partial)**: a live-content review-feed reader that provably returns every live row (Track-C only), renders images via a short-TTL admin-gated signed URL, and the reactive **Remove/Ban** Server Action (`moderateComment`) that writes an append-only `mod_actions` row (`content_removed` / `user_banned`, verdict NULL) + sets `users.banned_at` on ban, touching **no** position and **no** ledger row (ADR-0021). Everything is admin-only, tokens-only, and structurally separate from the participant surface. The build is five slices; the two critical-path slices (F-ADMIN-3, F-ADMIN-4) run the full reviewer cascade, never ultracode, and the whole build **HARD STOPs at the open PR** for founder merge.
 
 ---
 
@@ -60,136 +64,148 @@ UI.6 assembles the Admin Control Centre almost entirely from parts that already 
 | # | Slice | Files (created/edited at execute) | Mode | Reviewers |
 |---|---|---|---|---|
 | **S0** | `/admin` redirect + two-tab shell | `src/app/(admin)/admin/page.tsx` (new) · `src/app/(admin)/admin/_components/AdminTabs.tsx` (new, admin-internal chrome) | **[AUTONOMOUS]** | `@code-reviewer` |
-| **S1** | Markets tab: list + live needs-resolution count + freeze countdown | `src/app/(admin)/admin/markets/page.tsx` (edit) · optional `_components/NeedsResolutionCount.tsx` | **[AUTONOMOUS]** | `@code-reviewer` |
+| **S1** | Markets tab: list + live needs-resolution count + freeze countdown | `src/app/(admin)/admin/markets/page.tsx` (edit) · optional `_components/NeedsResolutionCount.tsx` (client, 60s poll) | **[AUTONOMOUS]** | `@code-reviewer` |
 | **S2** | Markets tab: **Close / Resolve / Void** UI + typed hard confirm | `src/app/(admin)/admin/markets/[marketId]/page.tsx` (edit) · `src/app/(admin)/admin/markets/_components/TerminalActions.tsx` (new, client) | **[AUTONOMOUS · NEVER ULTRACODE · @security-auditor MANDATORY · HARD STOP AT OPEN PR]** | `@code-reviewer` → `@security-auditor` |
-| **S3** | Moderation tab: live review feed READER + **Remove/Ban** action + feed UI | `src/server/admin/moderation/review-feed.ts` (new) · `src/server/admin/moderation/act.ts` (new — `moderateComment`) · `src/app/(admin)/admin/moderation/page.tsx` (new) · `_components/ReviewFeed.tsx` (new, client action affordances) | **[AUTONOMOUS · NEVER ULTRACODE · @security-auditor MANDATORY · HARD STOP AT OPEN PR]** | `@code-reviewer` → `@security-auditor` |
-| **S4** | Moderation tab: F-ADMIN-5 audit-log search | `src/server/admin/moderation/audit-feed.ts` (edit — add search predicates) · `src/app/(admin)/admin/moderation/audit/page.tsx` (edit — search form) | **[AUTONOMOUS]** | `@code-reviewer` |
+| **S3** | Moderation tab: live review feed READER (+image mint) + **Remove/Ban** action + feed UI | `src/server/admin/moderation/review-feed.ts` (new) · `src/server/admin/moderation/act.ts` (new — `moderateComment`) · `src/app/(admin)/admin/moderation/page.tsx` (new) · `_components/ReviewFeed.tsx` (new, client action affordances) | **[AUTONOMOUS · NEVER ULTRACODE · @security-auditor MANDATORY (incl. the image-URL mint path) · HARD STOP AT OPEN PR]** | `@code-reviewer` → `@security-auditor` |
+| **S4** | Moderation tab: F-ADMIN-5 audit-log search (over `admin_events` + `mod_actions`) | `src/server/admin/moderation/audit-feed.ts` (edit — add search predicates + `admin_events`) · `src/app/(admin)/admin/moderation/audit/page.tsx` (edit — search form) | **[AUTONOMOUS]** | `@code-reviewer` |
 
-**Slice order:** S0 → S1 → S2 → S3 → S4 (shell first so every later page mounts the tab nav; S2/S3 are the `@security-auditor` gates). **PR structure:** see §8 — the whole build rides ONE feature branch and ONE PR that **HARD STOPS at open** (interdependent shell; the founder ratifies the single final merge, per the kickoff).
+**Slice order:** S0 → S1 → S2 → S3 → S4 (shell first so every later page mounts the tab nav; S2/S3 are the `@security-auditor` gates). **PR structure:** ONE feature branch, ONE PR for all five slices (shared shell ⇒ interdependent), **HARD STOP at open** for the single founder merge (web-ratified, A4).
 
 ---
 
 ### 2.S0 · Shell — `/admin` redirect + two tabs  [AUTONOMOUS]
 
 - **`src/app/(admin)/admin/page.tsx`** (new): a Server Component that calls `requireAdminPage()` (unauth → `/admin/login`) then `redirect("/admin/moderation")` (`next/navigation`). Zero client JS.
-- **`AdminTabs.tsx`** (new, admin-internal presentational component — **not** a participant product component; tokens-only): renders two links, **Moderation** (`/admin/moderation`) and **Markets** (`/admin/markets`), with the active tab derived from the current path. Rendered at the top of **both** the Moderation page and the Markets page. **NOT a route-group layout** — `page-guards.ts` warns an `(admin)` layout loops the in-group login page; each page imports and renders `<AdminTabs active=… />` itself.
+- **`AdminTabs.tsx`** (new, admin-internal presentational component — **permitted** (web-ratified): the "no shared components" ban is on shared **participant** product components; admin-only chrome built fresh, tokens-only, is fine): renders two links, **Moderation** (`/admin/moderation`) and **Markets** (`/admin/markets`), active tab from the current path. Rendered at the top of **both** the Moderation page and the Markets page. **NOT a route-group layout** — `page-guards.ts` warns an `(admin)` layout loops the in-group login page; each page imports and renders `<AdminTabs active=… />` itself.
 - **Files touched:** the two above. No edit to `login/page.tsx`, `markets/new`, or media routes.
-- **Tests FIRST:** `tests/server/admin/admin-index-redirect.test.ts` — (1) authed GET `/admin` → redirect to `/admin/moderation`; (2) unauthed → `/admin/login` (guard runs before redirect). Follow the `page-guards.test.ts` mock pattern (`validateAdminSession` + `cookies` mock; assert the `redirect()` target).
+- **Tests FIRST:** `tests/server/admin/admin-index-redirect.test.ts` — (1) authed GET `/admin` → redirect to `/admin/moderation`; (2) unauthed → `/admin/login` (guard runs before redirect). Follow the `page-guards.test.ts` mock pattern.
 - **Acceptance:** `/admin` never renders content — it redirects; Moderation is the default landing; both tabs reachable; active-state correct; unauth bounces to login.
 
 ### 2.S1 · Markets tab — list + live needs-resolution count + freeze countdown  [AUTONOMOUS]
 
 - **Edit `src/app/(admin)/admin/markets/page.tsx`:** keep `force-dynamic` + `requireAdminPage()`; mount `<AdminTabs active="markets" />`. Add:
   - **Needs-resolution count** = `COUNT(markets WHERE status='Closed')` (the §6.1 pre-freeze obligation is discharged against this). Render prominently.
-  - **Freeze countdown** = `FREEZE_INSTANT_UTC − now`, becoming prominent near 2026-11-05. **Import the existing pinned constant** `FREEZE_INSTANT_UTC` (`2026-11-05T23:59:00Z`) from its module (`src/server/markets/create.ts` or `src/server/config/limits.ts`). **STOP-AND-ASK if it is not exported** — do not redefine the freeze instant (single source of truth).
-  - Keep the thin status table; the list stays deliberately thin (the actions are the surface).
-- **"Live" treatment:** `force-dynamic` server render = fresh-on-view. **See OQ-1** — do NOT mint a websocket. Optional: a client interval re-fetch (poll), if and only if OQ-1 rules it in.
-- **Tests FIRST:** `tests/server/admin/markets-needs-resolution.test.ts` — needs-resolution count = number of `Closed` markets (0, 1, N); freeze-countdown value present and derived from `FREEZE_INSTANT_UTC`. Extend the existing `markets.test.ts` mock pattern.
-- **Acceptance:** count equals the `Closed` cardinality exactly; countdown renders; tab nav present; no participant surface touched.
+  - **Freeze countdown** = `FREEZE_INSTANT_UTC − now`, prominent near 2026-11-05. **Import the existing pinned constant** `FREEZE_INSTANT_UTC` (`2026-11-05T23:59:00Z`). **STOP-AND-ASK if it is not exported** — never redefine the freeze instant (§3 #10).
+  - Keep the thin status table (the actions are the surface).
+- **"Live" treatment (web-ratified, A4/OQ-1): NO websocket.** `force-dynamic` server render (fresh-on-view) + a **60-second client interval re-fetch** for the needs-resolution count + countdown (a small client component, e.g. `NeedsResolutionCount.tsx`, that re-reads via a route/`router.refresh()` on a 60s timer). No second websocket exception is minted.
+- **Tests FIRST:** `tests/server/admin/markets-needs-resolution.test.ts` — needs-resolution count = number of `Closed` markets (0, 1, N); freeze-countdown derived from `FREEZE_INSTANT_UTC`. Extend the existing `markets.test.ts` mock pattern.
+- **Acceptance:** count equals the `Closed` cardinality exactly; countdown renders + refreshes on the 60s interval; tab nav present; no participant surface touched.
 
 ### 2.S2 · Markets tab — Close / Resolve / Void + typed hard confirm  [CRITICAL · NEVER ULTRACODE · @security-auditor MANDATORY · HARD STOP AT OPEN PR]
 
 - **Wire the three BUILT actions** — do not reimplement. `closeMarketAction` / `resolveMarketAction` / `voidMarketAction` (§0.1). Post `FormData` with exactly their fields (`marketId`; Resolve adds `winningSide`+`reason`; Void adds `reason`). Surface `ActionResult` errors (`illegal_edge` → "not legal for the market's current state", `admin_session_required`, `validation_error` field errors, `error_resolution_serialization_exhausted` → "system busy, retry").
-- **Surface = Markets tab only** (SPEC.1 §15 F-ADMIN-3 Surface): the affordances live on `src/app/(admin)/admin/markets/[marketId]/page.tsx` (admin detail). **No inline button on any participant/debate market page**, even when `state=Closed`.
-- **`TerminalActions.tsx`** (new, `"use client"` — needed for the typed-confirm input state):
+- **Surface = Markets tab only** (SPEC.1 §15 F-ADMIN-3 Surface): affordances on `src/app/(admin)/admin/markets/[marketId]/page.tsx` (admin detail). **No inline button on any participant/debate market page**, even when `state=Closed`.
+- **`TerminalActions.tsx`** (new, `"use client"` — the typed-confirm input state):
   - **Close** — single ordinary confirm (reversible in effect, no settlement). Pre: `status='Open'`.
-  - **Resolve** — `winningSide` selector (YES/NO) + mandatory `reason` free-text + **hard confirm: the admin must type the exact market question** to arm submit. Pre: `status ∈ {Closed, Resolving}`.
-  - **Void** — mandatory `reason` free-text + **hard confirm: type the exact market question** to arm submit. Pre: `status ∈ {Open, Closed}`.
-  - Buttons render conditionally by the market's current `status` (matching each action's Pre).
-- **Typed-confirm gate** (SPEC.1 §15 F-ADMIN-3 Confirmation, item 2): submit is disabled until the typed token **exactly** equals the market question (drawn from the market itself; case/whitespace-exact — the plan's default is trimmed exact-string equality; **OQ-2** if a looser match is wanted). Rationale restated: resolution is irreversible (`Resolved→Open` illegal, INV-4); across a Nov-5 sequence a one-click confirm degrades to muscle memory.
-- **No dry-run preview** (SPEC.1 §15 F-ADMIN-3 — struck to optional/deferred). **No F-RESOLVE-2 correction surface** (not in v1).
-- **Tests FIRST** (`tests/server/admin/…` + a component test if the harness supports it — else server-action-integration tests):
-  - typed-confirm gate: Resolve/Void submit disabled until typed question matches; Close needs no typed match.
-  - each affordance posts the correct FormData shape to the correct action (assert field set).
+  - **Resolve** — `winningSide` selector (YES/NO) + mandatory `reason` free-text + **hard confirm: type the market question** to arm submit. Pre: `status ∈ {Closed, Resolving}`.
+  - **Void** — mandatory `reason` free-text + **hard confirm: type the market question** to arm submit. Pre: `status ∈ {Open, Closed}`.
+  - Buttons render conditionally by the market's current `status` (matching each Pre).
+- **Typed-confirm gate (web-ratified, A4/OQ-2):** submit disabled until the typed token equals the market **question** (`markets.title`) under **trimmed, CASE-INSENSITIVE** comparison. Rationale restated: resolution is irreversible (`Resolved→Open` illegal, INV-4); across a Nov-5 sequence a one-click confirm degrades to muscle memory (SPEC.1 §15 F-ADMIN-3, supersedes ideation D6).
+- **No dry-run preview** (struck to optional/deferred). **No F-RESOLVE-2 correction surface** (not in v1).
+- **Tests FIRST** (`tests/server/admin/terminal-actions.test.ts` + a component test if the harness supports it):
+  - typed-confirm gate: Resolve/Void submit disabled until typed question matches (case-insensitive, trimmed); Close needs no typed match.
+  - each affordance posts the correct FormData shape to the correct action.
   - error surfacing: `illegal_edge`, `admin_session_required`, `validation_error` render as user-facing copy, never raw `.message`.
   - conditional render by status (Close only when Open; Resolve when Closed/Resolving; Void when Open/Closed).
-- **Acceptance:** the three built actions are reachable **only** from the Markets tab; typed hard confirm arms Resolve/Void; Close is one-click; every error path shows typed copy; **`@security-auditor` raises no blocking finding**; PR opens and **HARD STOPS**.
+- **Acceptance:** the three built actions reachable **only** from the Markets tab; typed hard confirm (case-insensitive) arms Resolve/Void; Close one-click; every error path shows typed copy; **`@security-auditor` raises no blocking finding**; PR HARD STOPS.
 
-### 2.S3 · Moderation tab — live review feed + Remove/Ban  [CRITICAL · NEVER ULTRACODE · @security-auditor MANDATORY · HARD STOP AT OPEN PR]
+### 2.S3 · Moderation tab — live review feed + Remove/Ban  [CRITICAL · NEVER ULTRACODE · @security-auditor MANDATORY (incl. image-URL mint) · HARD STOP AT OPEN PR]
 
-The only genuinely new engine work. Three parts:
+The genuinely new engine work. **This slice partially delivers F-ADMIN-4 — see the scope boundary below.**
 
-**(a) `review-feed.ts` — the live-content reader.** `loadReviewFeed(options)` → chronological (by `created_at`, then `id`) list of **every live comment**: every `comments` row (a comment persists **only** if it passed the gate — Track A/B never insert one) **minus** the `content_removed` set. **No filter, no market filter, no ranking** (ADR-0021 + SPEC.1 §15 F-ADMIN-4, corrected). Reuse the masking source of truth: intersect against `mod_actions.reason='content_removed'` (same predicate `loadRemovedSet` uses). Each row: content (text + image URL), post-vs-reply (reply carries a collapsed parent snippet), market, side (`side_at_post_time`), author pseudonym, Dharma, prior-flag count, timestamp, state badge, and **category-score annotation where a `mod_actions` record is present** (see **OQ-3**). Map to a DTO — never expose Drizzle row types.
-  - **"Every live row" is load-bearing** (kickoff STOP-AND-ASK). If completeness cannot be **proven** — e.g., a cap/pagination/filter would silently drop live rows — **STOP AND ASK**. If a cap is required for volume, it must be an explicit, newest-first window whose truncation is visible in the UI and asserted in a test, never a silent limit. Default: no cap in v1 (single-operator, 51-day window); confirm at OQ-4.
-  - **Ban does NOT mask** (ADR-0021): a banned author's prior content stays visible; `banned_at` never enters the feed's live/removed predicate.
+**(a) `review-feed.ts` — the live-content reader.** `loadReviewFeed(options)` → chronological (by `created_at`, then `id`) list of **live comments ONLY**: every `comments` row (a comment persists **only** if it passed the gate — Track A/B never insert one) **minus** the `content_removed` set. **No filter, no market filter, no ranking** (ADR-0021 + SPEC.1 §15 F-ADMIN-4, corrected). Reuse the masking source of truth: intersect against `mod_actions.reason='content_removed'` (the predicate `loadRemovedSet` uses). Each row: content (text + image — see IMAGE below), post-vs-reply (reply carries a collapsed parent snippet), market, side (`side_at_post_time`), author pseudonym, Dharma, prior-flag count, timestamp, state badge, and category-score annotation **only where a `mod_actions` record is present** (web-ratified A4/OQ-3 — ordinary live rows carry none; a `pass` writes no `mod_actions` row so its OpenAI categories are discarded). Map to a DTO — never expose Drizzle row types.
 
-**(b) `act.ts` — `moderateComment`, the reactive Remove/Ban Server Action.** Turns the skipped `act.test.ts` green. Contract:
+- **IMAGE RENDERING (A1 — F-ADMIN-4's entire false-negative coverage role; ADR-0021 image-category gap; this is a required capability, not optional).** The feed MUST render each live comment's image. Mint an **admin-viewable image URL server-side** from the comment's R2 key via the existing **`signRead(key, ttlSeconds)`** (`src/server/storage/sign-read.ts`) with a **short moderation-grade TTL** (`READ_URL_TTL_SECONDS_MODERATION` = 60s). The R2 key comes from the comment's `image_uploads` row. Rules, all enforced + reviewed:
+  - short-TTL signed URL, minted **server-side**, **admin-session-gated** (the page/reader runs under `requireAdminPage()`/`requireAdminSession()`);
+  - **NEVER** a raw R2 key in the DTO/DOM; **NEVER** a participant-path mint (`/api/uploads/sign` is participant-session-bound); **NEVER** a durable/long-TTL URL.
+  - **`@security-auditor` reviews the image-URL mint path as a NAMED review item** (§8).
+  - **STOP trigger:** if minting an admin-viewable URL requires new infra, a new bucket policy, or ANY change to the existing leak-guard posture → **STOP AND ASK** (§3 #15).
+
+- **FEED SCOPE — explicit boundary (A2). `loadReviewFeed` returns Track-C live content ONLY.** The following are **DEFERRED to DEBATE.7**, recorded here and in the PR body as named docketed gaps (deferred, not forgotten). **UI.6 does not complete F-ADMIN-4.**
+  1. **Track-A auto-actioned informational rows — DEFERRED to DEBATE.7.** Absent from v1 by design. **CSAM is never re-rendered anywhere.**
+  2. **LD-3 text-only `sexual/minors` carve-out ban-review surface — DEFERRED to DEBATE.7** (which SPEC.1 §15 F-ADMIN-4 Acceptance already names as owner). **CHILD-SAFETY RELEVANT** — this is the one blocked-not-published item type that surfaces for a ban decision; it is explicitly out of UI.6 and owned by DEBATE.7.
+  3. **F-ADMIN-4 inline surface (Remove/Ban on the participant debate view) — DEFERRED.** Touches a participant surface, fenced by the kickoff (§10).
+
+- **"Every live row" is load-bearing** (§3 #6). The feed must provably return every live (Track-C, non-`content_removed`) row. **Cap (web-ratified A4/OQ-4): 200 newest-first, with a VISIBLE truncation indicator and a "load older" control** (pagination is NOT a filter — it never silently drops rows; the operator can always reach older rows). **The 200 cap is asserted in a test.** Ban does **not** mask (ADR-0021): a banned author's prior non-removed content stays visible.
+
+**(b) `act.ts` — `moderateComment`, the reactive Remove/Ban Server Action.** Turns the skipped `act.test.ts` green. **`act.test.ts` is the DRIVER (web-ratified A4/OQ-5) — read it FIRST and match its exact input/`mod_actions`-row contract.** Contract:
   - `requireAdminSession()` first (Layer-2, per-action; null → `adminSessionRequired()` with ZERO writes).
-  - Input (zod): `commentId` (uuid), `action` ∈ {`remove`, `ban`, `remove_and_ban`} (decoupled — Remove and Ban are independent axes, ADR-0020 retained; **OQ-5** on the exact input encoding vs the SCAFFOLD.16 `act.test.ts` shape).
-  - **Remove** → append a `mod_actions` row `{reason:'content_removed', verdict:null, targetCommentId, targetMarketId, categories:{} or the stored gate categories if available, actorId:'admin-singleton'}`. Comment hidden via the existing read-time masking (no `comments` mutation — Bucket-A append-only).
-  - **Ban** → append a `mod_actions` row `{reason:'user_banned', verdict:null, targetUserId, …}` **and** set `users.banned_at` (only where `banned_at IS NULL`, the one-shot Bucket-B-style write on the mutable `users` row). **No position, no ledger, no bet touch** (INV-1/2/3 — ban removes voice, not balance).
-  - Multi-write ⇒ `db.transaction(...)`. Any external (none expected) runs outside the tx.
+  - Input (zod): `commentId` (uuid) + the action selector — **exact encoding taken from `act.test.ts`**; decoupled Remove/Ban (independent axes, ADR-0020 retained). If the test's assumed shape conflicts with the current `mod_actions` schema → STOP (§3 #7).
+  - **Remove** → append a `mod_actions` row `{reason:'content_removed', verdict:null, targetCommentId, targetMarketId, categories, actorId:'admin-singleton'}`. Comment hidden via the existing read-time masking (no `comments` mutation — Bucket-A append-only).
+  - **Ban** → append a `mod_actions` row `{reason:'user_banned', verdict:null, targetUserId, …}` **and** set `users.banned_at` (only where `banned_at IS NULL`). **No position, no ledger, no bet touch** (INV-1/2/3 — ban removes voice, not balance).
+  - Multi-write ⇒ `db.transaction(...)`. **NO events row, NO new event type** (web-ratified A4/OQ-6 — `EVENT_TYPES` stays **24**). If an event seems required → STOP (§3 #2).
   - Returns `ActionResult<…>`; revalidates `/admin/moderation`.
-  - **NO new event type.** If the implementer concludes a `moderation.removed`/`moderation.banned` event is required, that is a **HARD STOP** (kickoff: no new event types) — see OQ-6.
-- **(c) `/admin/moderation/page.tsx` (new) + `ReviewFeed.tsx` (client).** `force-dynamic`, `requireAdminPage()`, mount `<AdminTabs active="moderation" />`, render `loadReviewFeed()` rows with per-row **Remove / Ban** affordances (single, explicit, per-comment — **no bulk/multi-select**, one comment → one decision → one `mod_actions` row). Polled-on-view (no websocket). Category scores annotated where present.
+- **(c) `/admin/moderation/page.tsx` (new) + `ReviewFeed.tsx` (client).** `force-dynamic`, `requireAdminPage()`, mount `<AdminTabs active="moderation" />`, render `loadReviewFeed()` rows with per-row **Remove / Ban** affordances (single, explicit, per-comment — **no bulk/multi-select**). Polled-on-view (no websocket). Category scores annotated where present. Images via the A1 signed URL.
 - **Tests FIRST:**
-  - **un-skip** `tests/server/admin/moderation/act.test.ts::f-admin-4::pass-verdict-removal` and drive `moderateComment`: Remove writes exactly one `content_removed` row, comment absent-from-public via masking, `users.banned_at` NOT set; Ban writes `user_banned` + sets `banned_at`; decoupled paths independent; **assert zero writes to `positions`/`bets`/`dharma_ledger`** (INV-2/3); admin-session gate rejects with zero writes.
-  - `tests/server/admin/moderation/review-feed-completeness.test.ts` (integration, real PG): every live comment appears; a `content_removed` comment is absent; a banned author's non-removed comment still appears; ordering is chronological; **no market filter**.
-  - reason-enum: `content_removed`/`user_banned` used (already in `modReasonEnum` — no migration).
-- **Acceptance:** feed returns provably-every-live-row; Remove hides via masking with an audit row; Ban sets `banned_at` + audit row, positions ride; no ledger/position write; no new event type; no DDL; `@security-auditor` raises no blocking finding; PR opens and **HARD STOPS**.
+  - **un-skip** `tests/server/admin/moderation/act.test.ts::f-admin-4::pass-verdict-removal` and drive `moderateComment`: Remove writes exactly one `content_removed` row + masked; Ban writes `user_banned` + sets `banned_at`; decoupled; **assert zero writes to `positions`/`bets`/`dharma_ledger`** (INV-2/3); admin-session gate rejects with zero writes.
+  - `tests/server/admin/moderation/review-feed-completeness.test.ts` (integration, real PG): every live row returned; a `content_removed` comment absent; a banned author's non-removed comment present; chronological; **no market filter**; **the 200 cap + truncation indicator asserted**.
+  - image-mint: the DTO carries a short-TTL signed URL, never a raw key (a unit assertion on the reader's output shape).
+- **Acceptance:** feed returns provably-every-live-row (Track-C) up to the visible 200 cap; images render via short-TTL admin-gated signed URL, no raw key; Remove hides via masking + audit row; Ban sets `banned_at` + audit row, positions ride; no ledger/position write; no new event type; no DDL; `@security-auditor` (incl. image-mint) raises no blocking finding; PR HARD STOPS.
 
 ### 2.S4 · Moderation tab — F-ADMIN-5 audit-log search  [AUTONOMOUS]
 
-- **Edit `audit-feed.ts`:** add optional search predicates to `loadModerationAuditFeed` — **date range** (`createdAt` between), **action type** (`reason` in set), **market** (`targetMarketId`), **user** (`targetUserId`), **pseudonym** (join `users.pseudonym`). Preserve the leak guard (no R2 URL-mint tokens in this file). **OQ-7:** SPEC.1 §15 F-ADMIN-5 says search spans `admin_events` **and** `mod_actions`; the built loader reads `mod_actions` only — confirm whether `admin_events` search is in v1 scope or deferred.
-- **Edit `audit/page.tsx`:** add a search form (`searchParams`-driven, Server-Component; keeps zero/minimal client JS) nested under `<AdminTabs active="moderation" />`; wire predicates through to the loader.
-- **Tests FIRST:** `tests/server/admin/moderation/audit-search.test.ts` — filter by each predicate independently returns the expected subset; empty filters = current behaviour (most-recent-first, capped).
-- **Acceptance:** each predicate narrows results correctly; no leak-guard regression; audit surface lives under the Moderation tab.
+- **Overruled OQ-7 (web-ratified A3): search spans `admin_events` AND `mod_actions`** (SPEC.1 §15 F-ADMIN-5), both tables, the **same five predicates**: **date range**, **action type**, **market**, **user**, **pseudonym**. Extend `loadModerationAuditFeed` (or add a sibling loader) to union the two sources into one result list; preserve the leak guard (no R2 URL-mint tokens in `audit-feed.ts`). **STOP-AND-ASK if the two tables cannot be sanely unioned into one result list** (§3 #16).
+- **Edit `audit/page.tsx`:** add a `searchParams`-driven search form (Server-Component, minimal client JS) nested under `<AdminTabs active="moderation" />`; wire the five predicates through.
+- **Tests FIRST — use the spec's canonical path (A3):** `tests/server/admin/audit-search.test.ts::query-by-date-action-market-user` (NOT `moderation/audit-search.test.ts`). Filter by each predicate independently over both tables returns the expected subset; empty filters = current behaviour (most-recent-first, capped).
+- **Acceptance:** each of the five predicates narrows results across both `admin_events` and `mod_actions`; no leak-guard regression; audit surface lives under the Moderation tab.
 
 ---
 
 ## 3 · ⚠️ MANDATORY — STOP AND ASK (the unattended run's only safety valve)
 
-**The execute run is unattended. Halting is CHEAP and CORRECT; guessing is not.** STOP (write `claude-progress.md`, open no further work, surface, end the turn) on ANY of the following. This list is deliberately generous — when in doubt, it is on the list.
+**The execute run is unattended. Halting is CHEAP and CORRECT; guessing is not.** STOP (write `claude-progress.md`, advance nothing further, surface, end the turn) on ANY of the following. Deliberately generous — when in doubt, it is on the list.
 
 **Hard architectural triggers (always stop):**
-1. **Any DDL or migration turns out to be needed** — a new column, index, enum value, table, or trigger. UI.6 is `NO DDL`. (Note: `content_removed`/`user_banned` already exist in `modReasonEnum`; if anything *else* is needed → STOP.)
-2. **Any new event type turns out to be needed** — e.g., reactive Remove/Ban seems to require a `moderation.removed`/`moderation.banned` `events` row. UI.6 is `NO new event types`. STOP before extending `EVENT_TYPES`.
+1. **Any DDL or migration turns out to be needed** — new column, index, enum value, table, or trigger. UI.6 is `NO DDL`. (`content_removed`/`user_banned` already exist in `modReasonEnum`; anything *else* → STOP.)
+2. **Any new event type turns out to be needed** — e.g., reactive Remove/Ban seems to require a `moderation.removed`/`moderation.banned` `events` row. `EVENT_TYPES` stays **24**. STOP before extending it.
 3. **Anything requires a shared *participant* product component** — a debate/card/composer/header component, or any import from a participant surface. Admin-internal chrome built fresh is fine; reaching into participant components is a STOP.
 4. **Any need to touch** `(public)/layout.tsx`, the participant header/nav, ANY participant surface, `/admin/markets/new`, the F-ADMIN-1 / F-ADMIN-2 routes, or `src/app/(admin)/admin/markets/media/*`.
-
-**Interface / behavioural triggers:**
-5. **Any interface mismatch** between the plan's assumed `closeMarketAction` / `resolveMarketAction` / `voidMarketAction` signature (§0.1) and the real code at execute time (fields, return shape, error codes). Re-verify before wiring; on drift, STOP.
-6. **Any moderation-feed read path that cannot be PROVEN to return every live row** (§2.S3a). If a cap/pagination/filter would silently drop live content, STOP. A visible, tested, explicit truncation is the only acceptable bound.
-7. **Any ambiguity between the amended SPEC.1 and the code** that changes behaviour — including the OQs below if they turn out to bite. Do not pick a behaviour that could be wrong; STOP and surface the options.
-8. **`moderateComment` needs to write anything to `positions`, `bets`, or `dharma_ledger`** — that violates ADR-0021 / INV-1/2/3. This must be structurally impossible; if the implementation seems to require it, STOP (it is a design error, not a task).
-9. **The typed-confirm token cannot be sourced unambiguously from the market** (e.g., the market has no stable question string to type) → STOP (OQ-2).
+5. **Any interface mismatch** between the plan's assumed `closeMarketAction` / `resolveMarketAction` / `voidMarketAction` signature (§0.1) and the real code at execute time. Re-verify before wiring; on drift, STOP.
+6. **Any moderation-feed read path that cannot be PROVEN to return every live row** (§2.S3a). The 200 cap is an explicit, visible, tested newest-first window with a "load older" control — never a silent limit or filter. If completeness can't be proven, STOP.
+7. **Any ambiguity between the amended SPEC.1 and the code** that changes behaviour — including `act.test.ts`'s assumed contract vs the current `mod_actions` schema (§2.S3b). Do not pick a behaviour that could be wrong; STOP and surface options.
+8. **`moderateComment` needs to write anything to `positions`, `bets`, or `dharma_ledger`** — violates ADR-0021 / INV-1/2/3. Must be structurally impossible; if it seems required, STOP.
+9. **The typed-confirm token cannot be sourced unambiguously from the market** (no stable question string to type) → STOP.
 10. **`FREEZE_INSTANT_UTC` is not exported / not found** where §2.S1 expects it → STOP; do not redefine the freeze instant.
 11. **`@security-auditor` raises ANY blocking (CRITICAL/HIGH) finding** on S2 or S3 → fix in-session if in scope; if the fix needs out-of-scope change → STOP.
-12. **Category-score annotation (OQ-3) turns out to require persisting gate categories on `pass`** — that is new write behaviour and probably a schema change → STOP.
-13. **The reviewer cascade (`@security-auditor`) surfaces a SURPRISE out of scope** → `claude-progress.md` + STOP (do not absorb silently, §5.4).
-14. **Any slice would exceed "wire the built action" into "rebuild settlement/CPMM/ledger math"** → STOP; the engine is out of UI.6 scope.
+12. **Category-score annotation turns out to require persisting gate categories on `pass`** — new write behaviour + probably a schema change → STOP.
+13. **The reviewer cascade surfaces a SURPRISE out of scope** → `claude-progress.md` + STOP (§5.4).
+14. **Any slice would exceed "wire the built action" into "rebuild settlement/CPMM/ledger math"** → STOP.
+15. **(A1) Minting an admin-viewable image URL requires new infra, a new bucket policy, or ANY change to the existing leak-guard posture** → STOP AND ASK. (The expectation is a plain `signRead(key, shortTtl)` reuse; anything more is a STOP.)
+16. **(A3) `admin_events` and `mod_actions` cannot be sanely unioned into one F-ADMIN-5 result list** (irreconcilable shapes/keys) → STOP AND ASK.
 
-**On STOP:** write the finding to `claude-progress.md`, do not open/advance the PR past the stopping point, and end the turn. The next human decision is cheaper than a wrong unattended write to a critical path.
+**On STOP:** write the finding to `claude-progress.md`, do not open/advance the PR past the stopping point, and end the turn.
 
 ---
 
-## 4 · Open questions / assumptions / spec-vs-code ambiguities (surface for web ratification)
+## 4 · Web-ratified decisions (2026-07-22 — the former open questions, now settled; folded into §2 above)
 
-- **OQ-1 — "live" needs-resolution counter.** SPEC.1 §15.2 calls it "the single deliberate websocket exception." **No websocket infra exists**, and the kickoff forbids minting a second one. **Assumption:** "live" = `force-dynamic` fresh-on-view server render (optionally a client interval poll), **not** a websocket. Confirm.
-- **OQ-2 — typed-confirm token.** **Assumption:** the admin types the market **question** (`markets.title`), trimmed exact-string match, to arm Resolve/Void. Confirm the field and the match strictness (exact vs case-insensitive vs a shorter token like the slug).
-- **OQ-3 — category scores on the LIVE feed.** SPEC.1 §15 F-ADMIN-4 says annotate scores "where present on the row's `mod_actions` record" from `mod_actions.categories`. **But passed (live) comments have NO `mod_actions` row** (`recordGateBlock` writes only for track_a/track_b; `pass` opens the bet tx with categories discarded — no `comments` moderation column). **Assumption (literal reading):** show scores only for the rare live row that also carries a `mod_actions` record; for ordinary passed content the annotation is simply absent. If the intent is scores on **all** live rows → that needs gate categories persisted on pass → **DDL/new-write → STOP** (OQ-3 = trigger #12).
-- **OQ-4 — feed cap.** **Assumption:** no cap in v1 (single operator, bounded 51-day content volume) so "every live row" is literally satisfied. If a cap is desired, it must be explicit + visible + tested (never silent). Confirm.
-- **OQ-5 — `moderateComment` input encoding.** The skipped `act.test.ts` (SCAFFOLD.16, "DEBATE.2-owned") pins a `moderateComment(input)` shape. **Execute must read that test first** and match its exact input/`mod_actions`-row contract (it is the tests-first driver). If the test's assumed row encoding conflicts with the current `mod_actions` schema → STOP (OQ-5 = trigger #7).
-- **OQ-6 — does reactive Remove/Ban emit an `events` row?** `recordGateBlock` emits `moderation.blocked`. SPEC.1 §15 F-ADMIN-4 "Response" specifies only a `mod_actions` row + `banned_at` for reactive actions — **no events row named**. **Assumption:** reactive Remove/Ban writes `mod_actions` (+`banned_at`) and **no** `events` row (so no new event type). If an event is deemed required → STOP (trigger #2).
-- **OQ-7 — F-ADMIN-5 `admin_events` search.** SPEC.1 §15 F-ADMIN-5 spans `admin_events` **and** `mod_actions`; the built loader is `mod_actions`-only. **Assumption:** v1 search covers `mod_actions` (extended with predicates); `admin_events` search is deferred unless ratified in. Confirm.
-- **OQ-8 — PR granularity.** **Assumption:** one feature branch, one PR for all five slices (shared shell ⇒ interdependent), HARD STOP at open for the single founder merge. If separate autonomous-vs-critical PRs are wanted, confirm (the critical slices still HARD STOP).
-- **Assumption A1 — admin-internal components are not "shared product components."** The kickoff bans "shared product components"; `AdminTabs`/`TerminalActions`/`ReviewFeed` are admin-only chrome built fresh, tokens-only. Reading this as permitted. If the intent is "zero new components at all" → STOP (that would make the tabs/feed unbuildable).
-- **Ambiguity Am1 — brand-token freeze note.** The built audit page comments "brand tokens `--color-yes/no` stay frozen until DESIGN.7." The kickoff explicitly authorises YES/NO **pole** badges here. Following the kickoff (poles allowed for side badges); flag if DESIGN.7 freeze is meant to still bind.
+- **D-1 (OQ-1) — "live" counter:** no websocket; `force-dynamic` + a **60-second client interval** re-fetch (§2.S1).
+- **D-2 (OQ-2) — typed-confirm token:** the market **question** (`markets.title`), **trimmed, case-insensitive** (§2.S2).
+- **D-3 (OQ-3) — category scores on the live feed:** render **only where a `mod_actions` record is present**; ordinary live rows carry none (a `pass` discards its OpenAI categories). **Same-commit SPEC.1 §15 F-ADMIN-4 rider rides the UI.6 PR** — striking the false claim that scores are "already in `mod_actions.categories`" for feed rows, and naming the real dependency (gate categories discarded on pass; full annotation would need persistence = DDL = out of scope, docketed). **Web Claude supplies the exact rider text — the executor REQUESTS it at the commit point per the same-commit doctrine and does NOT draft spec prose itself** (§6).
+- **D-4 (OQ-4) — feed cap:** 200 newest-first + **visible truncation indicator** + **"load older" control**; the cap is asserted in a test. Pagination is not a filter (§2.S3a).
+- **D-5 (OQ-5) — `moderateComment` input:** `act.test.ts` is the driver — read it first, match its contract (§2.S3b).
+- **D-6 (OQ-6) — reactive Remove/Ban events row:** none. `EVENT_TYPES` stays **24** (§2.S3b).
+- **D-7 (OQ-7 OVERRULED) — F-ADMIN-5 scope:** search spans **`admin_events` AND `mod_actions`**, five predicates, canonical test path `tests/server/admin/audit-search.test.ts::query-by-date-action-market-user` (§2.S4).
+- **D-8 (OQ-8) — PR granularity:** one branch, one PR, HARD STOP at open (§2 table).
+- **D-9 (A1) — admin-internal components permitted:** the "no shared components" ban is on shared **participant** product components; `AdminTabs`/`TerminalActions`/`ReviewFeed`/`NeedsResolutionCount` are admin-only chrome, tokens-only (§2.S0).
+- **D-10 (Am1) — YES/NO pole badges permitted:** the DESIGN.7 brand-token freeze does not bind side-pole badges here (§0.3).
 
 ---
 
 ## 5 · Inherited behaviours (asserted at execute, not rebuilt)
 
 - The three terminal actions' correctness, retry/serialization handling, Resolving-resume, and INV-4 lock-in — **already tested** (`tests/server/admin/{resolution,pool-seed,markets}.test.ts`, `close-due-markets`). UI.6 asserts wiring, not settlement math.
-- Removal masking (`loadRemovedSet`, `content_removed`-keyed) — the read side is built; UI.6 only supplies the write (`moderateComment`).
-- Admin auth (Layer-2 `requireAdminSession`/`requireAdminPage`; the CVE-2025-29927 posture where proxy Layer-1 is UX-only) — every new endpoint and page re-validates a real `admin_sessions` row (SPEC.1 §15.1: inline affordance is UI convenience, never a privilege path).
+- Removal masking (`loadRemovedSet`, `content_removed`-keyed) — read side built; UI.6 supplies the write (`moderateComment`).
+- Admin auth (Layer-2 `requireAdminSession`/`requireAdminPage`; proxy Layer-1 UX-only, CVE-2025-29927 posture) — every new endpoint and page re-validates a real `admin_sessions` row (SPEC.1 §15.1: inline affordance is UI convenience, never a privilege path).
 - INV-2/3 in `recordGateBlock` (banned_at-only, no ledger) — the pattern `moderateComment` mirrors.
+- `signRead` short-TTL signed-read (the SCAFFOLD.15 seam) — reused for the feed image mint (A1), not re-derived.
 
 ---
 
-## 6 · SPEC.2 same-commit obligations (assess at execute)
+## 6 · SPEC.2 / SPEC.1 same-commit obligations (assess at execute)
 
-New primitives may need same-commit SPEC.2 codification (per the middleware/same-commit doctrine): the `review-feed.ts` read model (SPEC.2 §4/§10 read-surface) and `moderateComment` (SPEC.2 §4 Server-Action inventory — the SCAFFOLD.16 test cites "SPEC.2 §4 line 371" as its target home). **If S3 lands `moderateComment`, land the paired SPEC.2 §4 row in the same commit.** No DDL ⇒ no SPEC.2 §5 schema change. Confirm scope at execute; if a SPEC.2 amendment is non-trivial/decision-bearing → treat as a doc gate (surface).
+- **SPEC.1 §15 F-ADMIN-4 rider (D-3/OQ-3) — REQUIRED same-commit in the UI.6 PR.** At the S3 commit point, **REQUEST the exact rider text from web Claude** (it strikes the "already in `mod_actions.categories`" claim for feed rows + names the discard-on-pass dependency). **Do NOT draft spec prose yourself** — if the rider text is not in hand at commit, that is a same-commit-doctrine STOP (request it, hold the PR).
+- **SPEC.2 §4 Server-Action inventory** — `moderateComment` (the SCAFFOLD.16 test cites "SPEC.2 §4 line 371" as its target home) + the `review-feed.ts` read model (SPEC.2 §4/§10). If S3 lands `moderateComment`, land the paired SPEC.2 §4 row in the same commit. **No DDL ⇒ no SPEC.2 §5 schema change.** If a SPEC.2 amendment is non-trivial/decision-bearing → treat as a doc gate (surface).
 
 ---
 
@@ -199,59 +215,66 @@ New primitives may need same-commit SPEC.2 codification (per the middleware/same
 |---|---|---|
 | S0 | `tests/server/admin/admin-index-redirect.test.ts` | `/admin`→`/admin/moderation`; unauth→`/admin/login` |
 | S1 | `tests/server/admin/markets-needs-resolution.test.ts` | needs-resolution = `Closed` count (0/1/N); freeze countdown from `FREEZE_INSTANT_UTC` |
-| S2 | `tests/server/admin/terminal-actions.test.ts` (+ component test if supported) | typed-confirm gate arms Resolve/Void; Close one-click; correct FormData per action; typed error copy; conditional render by status |
+| S2 | `tests/server/admin/terminal-actions.test.ts` (+ component test if supported) | typed-confirm gate (case-insensitive, trimmed) arms Resolve/Void; Close one-click; correct FormData per action; typed error copy; conditional render by status |
 | S3 | `tests/server/admin/moderation/act.test.ts` (un-skip + drive) | Remove→one `content_removed` row + masked; Ban→`user_banned` + `banned_at`; decoupled; **zero** positions/bets/ledger writes; admin gate zero-write reject |
-| S3 | `tests/server/admin/moderation/review-feed-completeness.test.ts` (integration) | every live row returned; `content_removed` absent; banned author's content present; chronological; no market filter |
-| S4 | `tests/server/admin/moderation/audit-search.test.ts` | each predicate narrows correctly; leak-guard intact |
+| S3 | `tests/server/admin/moderation/review-feed-completeness.test.ts` (integration) | every live row returned; `content_removed` absent; banned author's content present; chronological; no market filter; **200-cap + truncation asserted**; DTO carries short-TTL signed URL, never a raw key |
+| S4 | `tests/server/admin/audit-search.test.ts::query-by-date-action-market-user` (canonical spec path, A3) | each of five predicates narrows across **both** `admin_events` + `mod_actions`; leak-guard intact |
 
-Invariant-class assertions to re-affirm (not new invariants): INV-1/2/3 untouched by moderation; INV-4 lock-in on Resolve (inherited).
+Invariant-class assertions re-affirmed (not new invariants): INV-1/2/3 untouched by moderation; INV-4 lock-in on Resolve (inherited); `EVENT_TYPES` stays 24.
 
 ---
 
 ## 8 · Reviewer cascade (§5.11) + gates
 
-`@test-writer` (Phase 2 start on S2 + S3 — failing tests first) → build slice → **`@code-reviewer`** (every slice touching `src/server/` or `src/app/(admin)/`) → **`@security-auditor`** (S2 + S3 — the critical-path gates: terminal actions carry INV-4/refund consequences; the moderation feed + Remove/Ban is the moderation critical path + a masking/leak/exposure surface + an admin-privilege boundary). `@db-migration-reviewer` is **not** invoked — **no DDL** (if a slice tries to add DDL, that's STOP trigger #1, not a reviewer call).
+`@test-writer` (Phase 2 start on S2 + S3 — failing tests first) → build slice → **`@code-reviewer`** (every slice touching `src/server/` or `src/app/(admin)/`) → **`@security-auditor`** (S2 + S3 — the critical-path gates). **On S3, `@security-auditor` MUST specifically review (named items): (i) the image-URL mint path (A1 — short-TTL, admin-gated, no raw key/participant-path/durable URL), and (ii) the admin-privilege boundary (every reader/action re-validates a real `admin_sessions` row).** `@db-migration-reviewer` is **not** invoked — **no DDL** (a slice trying to add DDL is STOP trigger #1, not a reviewer call).
 
 **Pass `@docs/plans/UI-6.md` to every subagent** (they start from zero context).
 
-**HARD STOP AT OPEN PR:** the execute session runs `just verify` + the suites, opens ONE PR for UI.6, and **STOPS** — it does **not** self-merge. The founder ratifies the single final merge (kickoff). If `@security-auditor` blocks, fix in-scope or STOP (trigger #11).
+**HARD STOP AT OPEN PR:** the execute session runs the §9 gate, opens ONE PR for UI.6, and **STOPS** — it does **not** self-merge. The founder ratifies the single final merge. If `@security-auditor` blocks, fix in-scope or STOP (#11).
 
 ---
 
-## 9 · Verification gate (per slice + pre-PR)
+## 9 · Verification gate — the SIX results recorded in the PR body
 
-- **Per slice:** `ZUGZWANG_ENV=preview just verify` (typecheck → biome → build) + the slice's suite green. Critical-path slices (S2/S3) additionally `pnpm test:invariants` + `pnpm test:integration` (or `just test-db`), run **directly** (`pnpm vitest run …`) against local PG `:54322` so `DATABASE_URL` defaults local (never via `just`, which hits the cloud DB in `.env.local`).
-- **Pre-PR (critical slices):** the §5.10 self-audit — schema (none expected; assert "no DDL"), every handler vs the plan's API surface, the INV assertions (S3: zero ledger/position writes; S2: INV-4 lock-in inherited). Full-suite `pnpm vitest run` as the final local gate (catches cross-suite floors, e.g. EVENT_TYPES inventory — which must remain **24**, unchanged).
-- Do not claim done before green; do not pipe gate output to `tail` (swallows failures).
+Run per slice + pre-PR; record these **six** in the PR body:
+1. `ZUGZWANG_ENV=preview just verify` (typecheck → biome → build) — PASS.
+2. `pnpm test:invariants` — PASS.
+3. `pnpm test:integration` — PASS (incl. `review-feed-completeness`).
+4. Full-suite `pnpm vitest run` — PASS (incl. the **un-skipped** `act.test.ts` + all new tests).
+5. `EVENT_TYPES` count = **24** (no new event type) — grep-verified.
+6. **No DDL / no migration:** `git diff main -- drizzle/migrations src/db/schema` is EMPTY.
+
+Run critical-path suites **directly** (`pnpm vitest run …`) against local PG `:54322` so `DATABASE_URL` defaults local (never via `just`, which hits the cloud DB in `.env.local`). Do not pipe gate output to `tail`. Pre-PR: the §5.10 self-audit (assert "no DDL"; every handler vs the plan's API surface; the INV assertions — S3 zero ledger/position writes, S2 INV-4 lock-in inherited).
 
 ---
 
 ## 10 · NOT doing (scope fence)
 
 - ❌ `(public)/layout.tsx`, participant header/nav, any participant surface.
-- ❌ `/admin/markets/new`, F-ADMIN-1 / F-ADMIN-2 routes, `markets/media/*` (functional + unstyled; required September — must not be removed or restyled).
-- ❌ Dry-run consequence preview (struck to optional/deferred, SPEC.1 §15 F-ADMIN-3).
+- ❌ `/admin/markets/new`, F-ADMIN-1 / F-ADMIN-2 routes, `markets/media/*` (functional + unstyled; required September — not removed or restyled).
+- ❌ Dry-run consequence preview (struck to optional/deferred).
 - ❌ F-RESOLVE-2 correction surface (not in v1).
 - ❌ Any DDL, migration, or new event type.
 - ❌ Any Dharma/position/ledger write from moderation (ADR-0021).
 - ❌ Bulk-action / multi-select moderation (one comment, one decision, one row).
 - ❌ Market filter or ranking on the review feed (ADR-0021).
-- ❌ A websocket (the needs-resolution "live" counter is fresh-on-view, OQ-1).
+- ❌ A websocket (the needs-resolution "live" counter is `force-dynamic` + 60s poll, D-1).
 - ❌ Admin `users` row / any participant-shaped admin path (admin has no `users` row).
+- ❌ **The three DEBATE.7-deferred F-ADMIN-4 pieces** (Track-A rows; the LD-3 child-safety carve-out ban-review surface; the inline participant-view Remove/Ban). **UI.6 does not complete F-ADMIN-4.**
 - ❌ Self-merging the UI.6 PR (HARD STOP at open; founder merges).
 
 ---
 
 ## 11 · Self-critique (ranked)
 
-1. **F-ADMIN-4 is bigger than "wire a built action."** The Remove/Ban backend and the live-feed reader are both new critical-path code. *Mitigated:* schema supports it with no DDL (verified §0.2); the reader reuses the `content_removed` masking predicate; `act.test.ts` already pins the contract; `@security-auditor` mandatory; every risk has a STOP trigger.
-2. **Category-scores ambiguity (OQ-3) could hide a DDL requirement.** *Mitigated:* the literal "where present" reading needs no writes; the alternative is an explicit STOP (trigger #12).
-3. **"Every live row" is easy to get subtly wrong** (a stray join/filter drops rows). *Mitigated:* dedicated completeness integration test + STOP trigger #6; default no-cap.
-4. **Typed-confirm UX vs D6 reversal** — a later founder ruling supersedes the ideation's "no ceremony." *Mitigated:* recorded in SPEC.1 §15/§20; plan follows the ratified spec.
-5. **One-PR HARD-STOP vs autonomous sub-slices** — the autonomous slices don't individually merge. *Accepted:* shared shell makes them interdependent; OQ-8 lets the founder split if wanted.
+1. **F-ADMIN-4 is bigger than "wire a built action" — and UI.6 only partially delivers it.** The Remove/Ban backend, the live-feed reader, and the image mint are new critical-path code; Track-A / carve-out / inline are explicitly deferred (A2). *Mitigated:* schema supports the built part with no DDL (§0.2); the reader reuses the `content_removed` masking predicate + `signRead`; `act.test.ts` pins the contract; `@security-auditor` mandatory incl. the image path; every risk has a STOP trigger; deferrals are named + docketed to DEBATE.7 in plan + PR.
+2. **Image-URL mint is a leak surface.** *Mitigated:* short-TTL `signRead` reuse only, admin-gated, no raw key; named `@security-auditor` item; STOP trigger #15 on any infra/policy/leak-guard change.
+3. **"Every live row" is easy to get subtly wrong.** *Mitigated:* completeness integration test + the visible, tested 200-cap-with-load-older + STOP trigger #6.
+4. **F-ADMIN-5 two-table union (A3) could be awkward.** *Mitigated:* canonical test path pins behaviour; STOP trigger #16 if the union is unsane.
+5. **Typed-confirm case-insensitivity** is a deliberate UX softening of the hard confirm. *Accepted:* web-ratified (D-2); the friction is the typed-question requirement itself.
 
 ---
 
-## 12 · Execute preconditions (prompt 2, fresh session)
+## 12 · Execute preconditions (prompt 2 Stage B, fresh session)
 
-`/clear` → fresh chat against `@docs/plans/UI-6.md` → `/model opus`, `/effort max` → `ultrathink` first word. Gated plan→execute. **NEVER ultracode** on S2/S3. Reviewer cascade §8. `@docs/plans/UI-6.md` passed to every subagent. **HARD STOP at the open PR.** This plan chat ends at the plan commit (Stage 4); it does not execute and opens no code branch.
+`/clear` → fresh chat against `@docs/plans/UI-6.md` (amended) → `/model opus`, `/effort max` → `ultrathink` first word. Gated plan→execute. **NEVER ultracode** on S2/S3. Reviewer cascade §8 (S3 image-mint a named `@security-auditor` item). `@docs/plans/UI-6.md` passed to every subagent. **HARD STOP at the open PR.** PR body records: the six §9 verification results, the three named DEBATE.7 gaps (§2.S3 A2), "UI.6 does not complete F-ADMIN-4," and the same-commit SPEC.1 §15 F-ADMIN-4 rider (D-3/§6).
