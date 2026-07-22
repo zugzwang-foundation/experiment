@@ -12,7 +12,7 @@
 |---|---|
 | **Document** | SPEC.2 — Zugzwang Technical Architecture |
 | **Version** | 1.0.20 |
-| **Date** | 2026-07-21 |
+| **Date** | 2026-07-22 |
 | **Owner** | Hrishikesh Manoj Hundekari |
 | **Phase** | Experiment phase only (2026-04-24 → 2026-11-08). Out of scope: testnet, mainnet, on-chain |
 | **Lock gate** | PRECURSOR.4 (Fresh-session lock review, writer/reviewer split per CLAUDE.md) — promotes this doc from `v0.3-draft` → `v1.0` |
