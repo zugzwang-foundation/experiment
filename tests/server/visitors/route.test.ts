@@ -78,10 +78,38 @@ describe("UI.13 POST /api/visits — bot filter, per-IP cap, P5 fallback", () =>
 		expect(hoisted.incrementAndRead).not.toHaveBeenCalled();
 	});
 
-	it("Redis unreachable → { total: null }, 200, never throws", async () => {
+	it("Redis unreachable on the increment path → { total: null }, 200, never throws", async () => {
 		hoisted.incrementAndRead.mockRejectedValue(new Error("redis down"));
 		const res = await POST(req(HUMAN_UA));
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({ total: null });
+	});
+
+	// The "never errors" guarantee holds for a throw from ANY branch, not just
+	// the increment path (code-reviewer LOW): the bot/cap read() and the cap
+	// check itself are inside the same try → the P5 fallback (code-reviewer L1).
+	it("Redis throw on the bot-path read() → { total: null }, 200", async () => {
+		hoisted.read.mockRejectedValue(new Error("redis down"));
+		const res = await POST(
+			req("Googlebot/2.1 (+http://www.google.com/bot.html)"),
+		);
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ total: null });
+	});
+
+	it("Redis throw on the cap-path read() → { total: null }, 200", async () => {
+		hoisted.limit.mockResolvedValue({ success: false, reset: 0 });
+		hoisted.read.mockRejectedValue(new Error("redis down"));
+		const res = await POST(req(HUMAN_UA));
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ total: null });
+	});
+
+	it("Redis throw from the rate-limit check itself → { total: null }, 200", async () => {
+		hoisted.limit.mockRejectedValue(new Error("redis down"));
+		const res = await POST(req(HUMAN_UA));
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ total: null });
+		expect(hoisted.incrementAndRead).not.toHaveBeenCalled();
 	});
 });
