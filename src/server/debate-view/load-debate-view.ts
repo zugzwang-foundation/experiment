@@ -14,13 +14,16 @@ import {
 	type Side,
 	twoSlot,
 } from "@/lib/ranking";
+import type { PricePoint } from "@/server/discovery/price-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
+import { safeCaptureMessage } from "@/server/observability/safe-capture";
 import type { Marker } from "@/server/positions/compute";
 import { signRead } from "@/server/storage/sign-read";
 
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
+import { loadMarketPriceSeries } from "./price-chart";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
 import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
@@ -121,6 +124,15 @@ export type DebateMarketHeader = MarketSummary & {
 export type DebateViewModel = {
 	market: DebateMarketHeader;
 	posts: DebatePost[];
+	/**
+	 * UI.19 §9 / F-DEBATE-5 — the market-detail price chart, a TOP-LEVEL sibling
+	 * of `market` (web Gate-C #5): the reserve-replay YES-price series (terminal
+	 * stamped with `market.pricing.yes`, decision #6), riding the ONE
+	 * `loadDebateView` payload alongside `market.pricing`, never a separate fetch.
+	 * `null` when the series read failed — the header renders unaffected
+	 * (non-fatal, web Gate-C error-state).
+	 */
+	priceChart: { series: PricePoint[] } | null;
 };
 
 /**
@@ -257,6 +269,28 @@ export async function loadDebateView(
 		};
 	});
 
+	// UI.19 §9 / F-DEBATE-5 — the market-detail price series, derived AFTER the
+	// pricing read (its terminal is stamped with `pricing.yes`, decision #6) and
+	// wrapped NON-FATALLY (web Gate-C error-state): a rejection sets
+	// `priceChart = null` + a WARN, and the rest of the header returns intact — a
+	// chart-read failure never 500s the market-detail read (the Discovery F-1
+	// WARN-never-throw posture).
+	let priceChart: DebateViewModel["priceChart"];
+	try {
+		const series = await loadMarketPriceSeries(
+			client,
+			marketId,
+			pricingAndUnitToWin?.pricing.yes ?? null,
+		);
+		priceChart = { series };
+	} catch {
+		priceChart = null;
+		safeCaptureMessage("market_price_series_read_failed", {
+			level: "warning",
+			tags: { marketId },
+		});
+	}
+
 	return {
 		market: {
 			...args.market,
@@ -265,6 +299,7 @@ export async function loadDebateView(
 			totals,
 		},
 		posts,
+		priceChart,
 	};
 }
 

@@ -97,7 +97,7 @@ export function DebateView({
 	// fresh key over a possibly-committing bet.
 	const [composerBusy, setComposerBusy] = useState(false);
 
-	const { market, posts } = model;
+	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
 
@@ -172,7 +172,7 @@ export function DebateView({
 
 	return (
 		<div className="mx-auto flex max-w-5xl flex-col gap-5 px-6 py-8">
-			<MarketHeader market={market} />
+			<MarketHeader market={market} priceChart={priceChart} />
 
 			{selectedPost ? (
 				<div className="flex flex-col gap-4">
