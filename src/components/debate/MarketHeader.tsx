@@ -1,5 +1,7 @@
 import { Badge } from "@/components/ui/badge";
+import type { PricePoint } from "@/server/discovery/price-series";
 
+import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
 import { formatDharma } from "./format";
 import { PriceBar } from "./PriceBar";
 import type { DebateMarketHeader } from "./types";
@@ -32,16 +34,16 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 
 /**
  * Explicit deferred placeholders (D1 / SHELL placeholder discipline) — resolver
- * cards, market media, and the price-graph history are UNBACKED by the current
- * schema and arrive with a future market-content slice / ledger-replay
- * read-model. Rendered as labelled stubs, never invented copy (§3 refusals).
+ * cards and market media are UNBACKED by the current schema and arrive with a
+ * future market-content slice. Rendered as labelled stubs, never invented copy
+ * (§3 refusals). (Price history is now backed — the UI.19 §9 chart mounts above
+ * `PriceBar`; its placeholder line was removed here.)
  */
 function DeferredPlaceholders() {
 	return (
 		<div className="flex flex-col gap-1 rounded-md border border-dashed p-2 text-xs text-muted-foreground">
 			<span>Resolver cards — arrive with the market-content slice</span>
 			<span>Market media — arrive with the market-content slice</span>
-			<span>Price history — arrives with the ledger-replay read-model</span>
 		</div>
 	);
 }
@@ -53,7 +55,13 @@ function DeferredPlaceholders() {
  * placeholders. Composes into the SHELL `(public)/layout.tsx` shell; the
  * placeholder global header is left untouched (superseded at UI.13).
  */
-export function MarketHeader({ market }: { market: DebateMarketHeader }) {
+export function MarketHeader({
+	market,
+	priceChart,
+}: {
+	market: DebateMarketHeader;
+	priceChart: { series: PricePoint[] } | null;
+}) {
 	return (
 		<section className="flex flex-col gap-3">
 			<div className="flex items-start justify-between gap-3">
@@ -75,6 +83,10 @@ export function MarketHeader({ market }: { market: DebateMarketHeader }) {
 			{market.description ? (
 				<p className="text-sm text-muted-foreground">{market.description}</p>
 			) : null}
+			{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
+			    ONLY when non-null: a null series read is non-fatal (web Gate-C
+			    error-state), the rest of the header stands. */}
+			{priceChart ? <MarketPriceChartHost series={priceChart.series} /> : null}
 			<PriceBar pricing={market.pricing} />
 			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 				<span>Đ{formatDharma(market.totals.dharmaStaked)} staked</span>

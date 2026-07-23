@@ -343,6 +343,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			},
 		},
 	],
+	priceChart: null,
 };
 
 export const mumbaiMetroMeta: ExportMarketMeta = {

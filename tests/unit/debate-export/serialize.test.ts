@@ -190,6 +190,7 @@ function mkModel(
 			...market,
 		},
 		posts,
+		priceChart: null,
 	};
 }
 

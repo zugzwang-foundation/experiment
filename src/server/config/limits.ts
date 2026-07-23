@@ -199,12 +199,22 @@ export const REDIS_COMMAND_TIMEOUT_MS = 2000;
  * Dharma). */
 export const DISCOVERY_GRID_SIZE = 8;
 
-/** Discovery price-series downsample bound (plan F-4) — `loadPriceSeries`
- * thins the replayed series server-side to at most this many points (first +
- * last always kept), bounding the DTO payload regardless of a market's bet
- * count. An IMPLEMENTATION constant, NOT a spec constant (~64 ratified at
- * UI-A4 §16 F-4); HARDEN-tunable. Integer (a point count, not Dharma). */
+/** Discovery price-series downsample bound — `loadPriceSeries` thins the
+ * replayed series server-side to at most this many points (first + last always
+ * kept), bounding the DTO payload regardless of a market's bet count. A pinned
+ * design value (SPEC.1 1.0.22 §16.1 + Appendix B) sized for the decorative §22
+ * card/hero sparkline — shipped at UI-A4 and recorded in §16.1/Appendix B at
+ * 1.0.22 to close its omission. Integer (a point count, not Dharma). */
 export const DISCOVERY_SERIES_MAX_POINTS = 64;
+
+/** Market-detail price-chart downsample bound (SPEC.1 1.0.22 §9 / F-DEBATE-5) —
+ * `loadMarketPriceSeries` thins the replayed YES-price series server-side to at
+ * most this many points (first + last always kept), bounding the market-detail
+ * read payload regardless of a market's event count. A pinned design value
+ * (SPEC.1 1.0.22 §16.1 + Appendix B) — set to 256 for the full-size,
+ * axis-bearing chart, deliberately larger than the decorative
+ * `DISCOVERY_SERIES_MAX_POINTS`. Integer (a point count, not Dharma). */
+export const MARKET_SERIES_MAX_POINTS = 256;
 
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
