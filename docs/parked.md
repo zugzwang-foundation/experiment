@@ -400,3 +400,16 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Founder decision.
 
 **Expected next task.** DEBATE.7 (F-ADMIN-4 completion), or a standalone founder ruling.
+
+## STANDING CHECK — masking is a property of every body read, not of rows
+
+**Originating task:** UI-6 follow-up (parent-snippet masking leak, PR after #262); surfaced on staging when a live reply rendered its `content_removed` parent's body via the review-feed snippet path.
+
+**The rule (a standing review check, not a one-off task).** Removal masking is NOT a property of ROWS — it is a property of EVERY code path that reads `comments.body` (or any user argument text/teaser/snippet). The review-feed's main query anti-joined `content_removed` at the ROW level, but a SECOND read path in the same file (the parent-snippet fetch) read the body without the predicate and leaked it. So:
+
+- **Any new/edited read path that touches `comments.body`** (directly, via a JOIN, via a parent/teaser/snippet lookup, or in raw SQL) **MUST intersect `loadRemovedSet` or the equivalent `mod_actions.reason='content_removed'` predicate** before that body can reach a DTO. A removed comment's body must be un-fetchable or un-renderable by construction (prefer a union type where the removed variant carries no body field).
+- **Its test MUST assert the BODY's absence, not just the row's absence** — e.g. `expect(JSON.stringify(rows)).not.toContain(theBody)`, not only `expect(ids).not.toContain(theRow)`. Row-level exclusion assertions do not catch a second body-read path.
+
+**Conditional trigger.** Every PR that adds or edits a read over `comments` on any surface (participant OR admin). Reviewer + `@security-auditor` checklist item.
+
+**Expected next task.** No fix owed — this PR closed the review-feed instance and the audit page was verified clean. This entry is the durable guard so the lesson isn't re-learned.

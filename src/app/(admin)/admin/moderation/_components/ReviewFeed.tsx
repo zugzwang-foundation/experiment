@@ -18,10 +18,20 @@ import { moderateComment } from "@/server/admin/moderation/act";
 // internal user UUID + marketId/marketTitle are resolved server-side and are
 // deliberately NOT shipped to the browser (least-exposure; the ban target is
 // derived from `commentId` in the server action).
+// Admin-owned duplicate of the participant "Removed by moderator" copy — the
+// admin surface shares ZERO product components with the participant tree (that
+// fence is why this lane runs unattended), so the string is duplicated here, NOT
+// imported from src/components/debate/placeholders.tsx.
+const REMOVED_PARENT_PLACEHOLDER = "Removed by moderator";
+
 export interface ReviewFeedRowView {
 	id: string;
 	kind: "post" | "reply";
-	parentSnippet: string | null;
+	/**
+	 * The reply's parent: `null` for a post, `{ removed: true }` for a
+	 * content_removed parent (placeholder — no body), or the parent's snippet.
+	 */
+	parent: null | { removed: true } | { removed: false; snippet: string };
 	marketSlug: string;
 	marketStatus: string;
 	side: "YES" | "NO";
@@ -107,11 +117,15 @@ function Row({ row }: { row: ReviewFeedRowView }): React.ReactElement {
 				</time>
 			</header>
 
-			{row.kind === "reply" && row.parentSnippet ? (
-				<p className="mb-2 border-l-2 border-border pl-3 text-xs italic text-muted-foreground">
-					↳ {row.parentSnippet}
+			{row.parent === null ? null : row.parent.removed ? (
+				<p className="mb-2 border-l-2 border-destructive/40 pl-3 text-xs italic text-muted-foreground">
+					↳ <span className="font-medium">{REMOVED_PARENT_PLACEHOLDER}</span>
 				</p>
-			) : null}
+			) : (
+				<p className="mb-2 border-l-2 border-border pl-3 text-xs italic text-muted-foreground">
+					↳ {row.parent.snippet}
+				</p>
+			)}
 
 			<p className="whitespace-pre-wrap break-words text-sm">{row.body}</p>
 
