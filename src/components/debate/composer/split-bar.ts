@@ -35,6 +35,8 @@ export function computeSplitBar(args: {
  * exact decimals, never a JS float (CLAUDE.md §2). Distinct from
  * `computeSplitBar.totalDharma`, which is the EXACT sum (the bar-fill basis /
  * money-law contract): `round0(137.7) + round0(137.7) = 276`, not `round0(275.4) = 275`.
+ * Both operands arrive pre-rounded (0 dp); `toFixed` pins ROUND_HALF_UP at the
+ * call site so ComposerDecimal's inherited ROUND_HALF_EVEN default can never apply.
  */
 export function displaySplitTotal(
 	supportDharma: string,
@@ -42,5 +44,5 @@ export function displaySplitTotal(
 ): string {
 	return new ComposerDecimal(formatDharma(supportDharma))
 		.plus(formatDharma(counterDharma))
-		.toFixed(0);
+		.toFixed(0, ComposerDecimal.ROUND_HALF_UP);
 }
