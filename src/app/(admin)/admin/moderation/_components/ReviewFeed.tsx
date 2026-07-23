@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { formatDharma } from "@/components/debate/format";
 import { moderateComment } from "@/server/admin/moderation/act";
 
 // UI.6 S3(c) — the reactive review-feed affordances (client). Renders each live
@@ -162,8 +163,8 @@ function Row({ row }: { row: ReviewFeedRowView }): React.ReactElement {
 
 			<footer className="mt-4 flex flex-wrap items-center gap-4 border-t border-border pt-3 text-xs">
 				<span className="text-muted-foreground">
-					{row.authorPseudonym} · Đ{row.authorDharma} · {row.priorFlagCount}{" "}
-					prior flag{row.priorFlagCount === 1 ? "" : "s"}
+					{row.authorPseudonym} · Đ{formatDharma(row.authorDharma)} ·{" "}
+					{row.priorFlagCount} prior flag{row.priorFlagCount === 1 ? "" : "s"}
 				</span>
 				{banned ? (
 					<span className="rounded-full bg-destructive px-2 py-0.5 font-semibold text-background">

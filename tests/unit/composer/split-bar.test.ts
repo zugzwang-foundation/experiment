@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { formatDharmaGrouped } from "@/components/debate/composer/copy";
 import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
-import { computeSplitBar } from "@/components/debate/composer/split-bar";
+import {
+	computeSplitBar,
+	displaySplitTotal,
+} from "@/components/debate/composer/split-bar";
 
 // UI.A3 §5.6 tests-first, slice 3 — the focused-post split-bar math (plan §4
 // post-focus view: `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`,
@@ -99,5 +103,32 @@ describe("computeSplitBar — fill truncation + degenerate bars", () => {
 		});
 		expectDecimalEqual(out.totalDharma, "10000.000000000000000001");
 		expect(out.supportPct).toBe("99%");
+	});
+});
+
+describe("displaySplitTotal — DISPLAYED-space bar consistency (DROUND R2)", () => {
+	it("split-bar::displayed-total-sums-DISPLAYED-parts-not-the-exact-sum", () => {
+		// support=137.7, counter=137.7: the DISPLAYED parts round to 138 + 138.
+		// The exact sum is 275.4 → round0 = 275; the bar must NOT show that, or
+		// 138 / 275 / 138 reads as inconsistent on screen.
+		expect(displaySplitTotal("137.7", "137.7")).toBe("276");
+		expect(displaySplitTotal("137.7", "137.7")).not.toBe("275");
+		// The three rendered figures are then 138 / 276 / 138 — consistent.
+		expect(formatDharmaGrouped("137.7")).toBe("138");
+		expect(formatDharmaGrouped(displaySplitTotal("137.7", "137.7"))).toBe(
+			"276",
+		);
+	});
+
+	it("split-bar::displayed-total-thousands-groups", () => {
+		// round0(6199.6) + round0(3800.4) = 6200 + 3800 = 10000 → "10,000".
+		expect(formatDharmaGrouped(displaySplitTotal("6199.6", "3800.4"))).toBe(
+			"10,000",
+		);
+	});
+
+	it("split-bar::displayed-total-zero-parts-render-0-never-negzero", () => {
+		expect(displaySplitTotal("0", "0")).toBe("0");
+		expect(displaySplitTotal("0.4", "0.4")).toBe("0"); // both round to 0
 	});
 });

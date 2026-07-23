@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 import { SideBadge } from "../badges";
-import { formatDharma } from "../format";
+import { formatDharmaExact } from "../format";
 import type { ViewerMarketContext } from "../types";
 import { COMPOSER_COPY, formatDharmaGrouped, rateLimitedBanner } from "./copy";
 import { type ComposerStatus, ErrorStrip } from "./ErrorStrip";
@@ -45,8 +45,11 @@ export function SellModule(props: {
 	onSuspended: () => void;
 }) {
 	const router = useRouter();
+	// dround-allow: input seed, not a rendered figure. Read back by the
+	// full-exit byte-identity check in sell-convert.ts; a rounded seed would
+	// make "sell all" under-sell and strand dust. SPEC.1 §10.8 named exception.
 	const [dharmaIn, setDharmaIn] = useState(() =>
-		formatDharma(props.position.currentValue),
+		formatDharmaExact(props.position.currentValue),
 	);
 	const [keyState, setKeyState] = useState(() => initialKeyState());
 	const [status, setStatus] = useState<ComposerStatus>({ phase: "idle" });
