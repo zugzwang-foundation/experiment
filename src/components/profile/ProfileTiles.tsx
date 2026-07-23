@@ -1,11 +1,13 @@
-import { formatDharma } from "@/components/debate/format";
+import { displayNetProfitLoss, formatDharma } from "@/components/debate/format";
 import { Card } from "@/components/ui/card";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
 /**
  * The six §23 account tiles (canon §2/§6, 3×2). All values are server-computed
- * strings — `formatDharma` only trims trailing scale zeros for display, never
- * float arithmetic (CLAUDE.md §2). The Arguments tile renders the count as
+ * strings; every Đ figure renders at 0 dp via `formatDharma` (DROUND / SPEC.1
+ * §10.8), and the Net P/L tile is derived in DISPLAYED space by
+ * `displayNetProfitLoss` so the tile identity holds on screen — exact decimal,
+ * never a JS float (CLAUDE.md §2). The Arguments tile renders the count as
  * `N (P Posts | R Replies)` (N-7). Labels are canon §6 verbatim.
  */
 export function ProfileTiles({
@@ -27,7 +29,11 @@ export function ProfileTiles({
 				{formatDharma(tiles.positionsValue)}
 			</Tile>
 			<Tile testid="tile-net-pl" label="Net profit / loss">
-				{formatDharma(tiles.netProfitLoss)}
+				{displayNetProfitLoss(
+					tiles.walletValue,
+					tiles.positionsValue,
+					tiles.netProfitLoss,
+				)}
 			</Tile>
 			<Tile testid="tile-arguments" label="Arguments">
 				<span data-testid="tile-arguments-value">{argumentsValue}</span>

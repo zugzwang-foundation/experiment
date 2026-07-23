@@ -1,4 +1,7 @@
-import { formatDharma, formatPercent } from "@/components/debate/format";
+import {
+	formatDharmaExact as formatDharma,
+	formatPercent,
+} from "@/components/debate/format";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import type {
 	DebatePost,
