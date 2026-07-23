@@ -60,6 +60,13 @@ const SINGLE: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
 ];
 
+// YES winning at every point (yes > 0.5) — the INV-3 GEOMETRY guard: the YES
+// line must sit ABOVE the NO line (a smaller SVG y) at the same x.
+const YES_WINNING: PricePoint[] = [
+	{ at: "2026-09-15T00:00:00.000Z", yes: "0.700000000000000000" },
+	{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+];
+
 const MARKET: DebateMarketHeader = {
 	id: "0190c0de-1111-7000-8000-000000000001",
 	slug: "chart-header-market",
@@ -129,6 +136,28 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		expect(screen.getByTestId("line-no").getAttribute("stroke")).toBe(
 			"var(--graph-no)",
 		);
+
+		// GEOMETRY half of INV-3 (added slice 2, STEP 2). The stroke assertions
+		// above bind COLOUR to side, but a yYesPx/yNoPx swap in the two <polyline>
+		// calls (MarketPriceChart.tsx) would keep the strokes correct while
+		// inverting the LINES themselves — passing every existing assertion and the
+		// token guards. Pin it SEMANTICALLY: with YES winning (yes > 0.5 at every
+		// point), the YES line must sit HIGHER on screen — a SMALLER SVG y — than
+		// the NO line at the SAME x. "When YES is winning, the YES line is higher."
+		cleanup();
+		render(<MarketPriceChart series={YES_WINNING} mode="collapsed" />);
+		const yesPts = parsePoints(
+			screen.getByTestId("line-yes").getAttribute("points") ?? "",
+		);
+		const noPts = parsePoints(
+			screen.getByTestId("line-no").getAttribute("points") ?? "",
+		);
+		expect(yesPts).toHaveLength(noPts.length);
+		expect(yesPts.length).toBeGreaterThan(0);
+		for (let i = 0; i < yesPts.length; i++) {
+			expect(yesPts[i][0]).toBeCloseTo(noPts[i][0], 3); // same x
+			expect(yesPts[i][1]).toBeLessThan(noPts[i][1]); // YES higher (smaller y)
+		}
 	});
 
 	// ── 2. Accessible text summary — sr-only, names opening/current/endpoints;
