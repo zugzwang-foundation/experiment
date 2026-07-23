@@ -1,3 +1,4 @@
+import { formatDharma } from "../format";
 import { ComposerDecimal } from "./sell-convert";
 
 /**
@@ -23,4 +24,23 @@ export function computeSplitBar(args: {
 		.dividedBy(total)
 		.toFixed(0, ComposerDecimal.ROUND_DOWN);
 	return { totalDharma: total.toFixed(), supportPct: `${pct}%` };
+}
+
+/**
+ * The DISPLAYED split-bar total (DROUND R2 / SPEC.1 §10.8): the sum of the
+ * DISPLAYED (0-dp) Support and Counter figures, so the three adjacent numbers
+ * on the bar are always arithmetically consistent on screen — the §23
+ * tile-identity treatment applied to the Support / Total / Counter row. Each
+ * part is rounded through the single shared display formatter, then summed as
+ * exact decimals, never a JS float (CLAUDE.md §2). Distinct from
+ * `computeSplitBar.totalDharma`, which is the EXACT sum (the bar-fill basis /
+ * money-law contract): `round0(137.7) + round0(137.7) = 276`, not `round0(275.4) = 275`.
+ */
+export function displaySplitTotal(
+	supportDharma: string,
+	counterDharma: string,
+): string {
+	return new ComposerDecimal(formatDharma(supportDharma))
+		.plus(formatDharma(counterDharma))
+		.toFixed(0);
 }
