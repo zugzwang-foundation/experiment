@@ -3,7 +3,7 @@
 import type { ReplyAggregate, Side } from "../types";
 import { c3OppositeSide, formatDharmaGrouped } from "./copy";
 import { deriveReplySide, isEntryDisabled } from "./gating";
-import { computeSplitBar } from "./split-bar";
+import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
 /**
  * UI.A3 slice 3 — the focused post's designed split bar (canon §6:
@@ -32,10 +32,16 @@ export function ReplySplitBar({
 	activeRelation: "support" | "counter" | null;
 	onToggleRelation: (relation: "support" | "counter") => void;
 }) {
-	const { totalDharma, supportPct } = computeSplitBar({
+	const { supportPct } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
+	// DROUND R2: the DISPLAYED total sums the DISPLAYED parts, so Support / Total
+	// / Counter are always arithmetically consistent on screen (SPEC.1 §10.8).
+	const displayedTotal = displaySplitTotal(
+		aggregate.supportDharma,
+		aggregate.counterDharma,
+	);
 	return (
 		<div className="flex items-center gap-3 text-xs">
 			<span className="flex items-center gap-1.5">
@@ -61,7 +67,7 @@ export function ReplySplitBar({
 				</span>
 				<span className="text-n5">
 					<b className="text-sm text-ink">
-						Đ {formatDharmaGrouped(totalDharma)}
+						Đ {formatDharmaGrouped(displayedTotal)}
 					</b>{" "}
 					staked
 				</span>

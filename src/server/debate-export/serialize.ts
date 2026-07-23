@@ -1,4 +1,4 @@
-import { formatDharma, formatPercent } from "@/components/debate/format";
+import { formatDharmaExact, formatPercent } from "@/components/debate/format";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import type {
 	DebatePost,
@@ -37,10 +37,12 @@ const FOOTER =
  * Trim a NUMERIC(38,18) value to a human Đ amount AND comma-group the integer
  * part — string-based, no `Number()` on the value (CLAUDE.md §2; NUMERIC-safe).
  * e.g. `"3225.000…" → "3,225"`, `"560.000…" → "560"`, `"1234.560…" → "1,234.56"`.
- * Export-only; the live UI's `formatDharma` (ungrouped) is left untouched.
+ * Export-only; delegates to `formatDharmaExact` deliberately — the ADR-0025
+ * `.md` export renders FULL PRECISION (SPEC.1 §10.8), whereas the view layer's
+ * `formatDharma` rounds to 0 dp.
  */
 export function formatDharmaGrouped(value: string): string {
-	const trimmed = formatDharma(value);
+	const trimmed = formatDharmaExact(value);
 	const neg = trimmed.startsWith("-");
 	const body = neg ? trimmed.slice(1) : trimmed;
 	const [int = "0", frac] = body.split(".");
@@ -119,7 +121,7 @@ function frontMatter(
 	lines.push(
 		`yes_price: ${m.pricing ? price2(m.pricing.yes) : "null"}`,
 		`no_price: ${m.pricing ? price2(m.pricing.no) : "null"}`,
-		`total_stake_dharma: ${formatDharma(meta.totalStakeDharma)}`,
+		`total_stake_dharma: ${formatDharmaExact(meta.totalStakeDharma)}`,
 		`posts: ${model.posts.length}`,
 		`replies: ${replyCount(model)}`,
 		`participants: ${meta.participants}`,
