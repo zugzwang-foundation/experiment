@@ -36,6 +36,11 @@ import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import { MarketPriceChartCard } from "@/components/debate/chart/MarketPriceChartCard";
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
+// UI.19 Slice 2 additive: the expanded-mode post-node type. TYPE-ONLY (erased) —
+// does not exist on the slice-1 price-chart module yet, so it drives no runtime
+// import; the RED below is the node MARKS not rendering (assertion), the RIGHT
+// reason (CLAUDE.md §5.6).
+import type { ChartNode } from "@/server/debate-view/price-chart";
 
 type PricePoint = { at: string; yes: string };
 
@@ -81,6 +86,26 @@ const MARKET: DebateMarketHeader = {
 		replyCount: 5,
 	},
 };
+
+// UI.19 Slice 2 — two expanded-mode post nodes, one per side. Each renders as an
+// SVG element `data-testid="graph-node-<id>"` carrying `data-side` and a
+// side-bound `--graph-yes`/`--graph-no` fill (INV-3 node binding, decision #7 —
+// never the `--color-yes`/`--color-no` slot the profile chart uses, which would
+// make a YES node invisible against the ground). NODES[0] = YES, NODES[1] = NO.
+const NODES: ChartNode[] = [
+	{
+		id: "0190c0de-2222-7000-8000-0000000000a1",
+		side: "YES",
+		at: "2026-09-17T00:00:00.000Z",
+		yYes: "0.640000000000000000",
+	},
+	{
+		id: "0190c0de-2222-7000-8000-0000000000b2",
+		side: "NO",
+		at: "2026-09-19T00:00:00.000Z",
+		yYes: "0.300000000000000000",
+	},
+];
 
 /** Every element under `root` whose data-testid starts with `prefix`. */
 function byPrefix(root: ParentNode, prefix: string): Element[] {
@@ -222,7 +247,54 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		// Positive control — a non-null priceChart DOES mount the collapsed card,
 		// so the null-case absence above is meaningful.
 		cleanup();
-		render(<MarketHeader market={MARKET} priceChart={{ series: SERIES }} />);
+		render(
+			<MarketHeader
+				market={MARKET}
+				priceChart={{ series: SERIES, nodes: [] }}
+			/>,
+		);
 		expect(screen.getByTestId("market-price-chart-card")).toBeTruthy();
+	});
+
+	// ── 5. Slice 2 — EXPANDED renders one node mark per node; COLLAPSED renders
+	//       NONE (nodes are expanded-only; SPEC.1 §9 "Post nodes (expanded mode
+	//       only)"). The existing collapsed test at (1) already pins zero nodes in
+	//       the card; this adds the positive control that they DO render expanded. ─
+	it("expanded-renders-nodes", () => {
+		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+
+		// One graph-node-<id> element per node in EXPANDED mode.
+		expect(byPrefix(document.body, "graph-node-")).toHaveLength(NODES.length);
+		for (const node of NODES) {
+			expect(screen.getByTestId(`graph-node-${node.id}`)).toBeTruthy();
+		}
+
+		// COLLAPSED renders ZERO nodes EVEN WITH nodes provided — expanded-only.
+		cleanup();
+		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="collapsed" />);
+		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
+
+		// The collapsed CARD likewise shows no nodes (it renders the chart collapsed).
+		cleanup();
+		render(<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />);
+		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
+	});
+
+	// ── 6. Node side → token binding (INV-3, no pole inversion). A YES node fills
+	//       `--graph-yes` + data-side "YES"; a NO node fills `--graph-no` +
+	//       data-side "NO". Bound by the semantic token NAME, never inverted and
+	//       never the `--color-*` slot (design decision #7). ─────────────────────
+	it("node-tokens-bind-by-side-inv3", () => {
+		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+
+		const [yesNode, noNode] = NODES; // NODES[0] = YES, NODES[1] = NO.
+
+		const yesEl = screen.getByTestId(`graph-node-${yesNode.id}`);
+		expect(yesEl.getAttribute("data-side")).toBe("YES");
+		expect(yesEl.getAttribute("fill")).toBe("var(--graph-yes)");
+
+		const noEl = screen.getByTestId(`graph-node-${noNode.id}`);
+		expect(noEl.getAttribute("data-side")).toBe("NO");
+		expect(noEl.getAttribute("fill")).toBe("var(--graph-no)");
 	});
 });

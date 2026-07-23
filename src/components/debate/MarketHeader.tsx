@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
@@ -60,7 +61,7 @@ export function MarketHeader({
 	priceChart,
 }: {
 	market: DebateMarketHeader;
-	priceChart: { series: PricePoint[] } | null;
+	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
 }) {
 	return (
 		<section className="flex flex-col gap-3">
@@ -86,7 +87,12 @@ export function MarketHeader({
 			{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
 			    ONLY when non-null: a null series read is non-fatal (web Gate-C
 			    error-state), the rest of the header stands. */}
-			{priceChart ? <MarketPriceChartHost series={priceChart.series} /> : null}
+			{priceChart ? (
+				<MarketPriceChartHost
+					series={priceChart.series}
+					nodes={priceChart.nodes}
+				/>
+			) : null}
 			<PriceBar pricing={market.pricing} />
 			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 				<span>Đ{formatDharma(market.totals.dharmaStaked)} staked</span>

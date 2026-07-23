@@ -23,7 +23,7 @@ import { signRead } from "@/server/storage/sign-read";
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
-import { loadMarketPriceSeries } from "./price-chart";
+import { type ChartNode, deriveMarketPriceChart } from "./price-chart";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
 import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
@@ -126,13 +126,14 @@ export type DebateViewModel = {
 	posts: DebatePost[];
 	/**
 	 * UI.19 §9 / F-DEBATE-5 — the market-detail price chart, a TOP-LEVEL sibling
-	 * of `market` (web Gate-C #5): the reserve-replay YES-price series (terminal
-	 * stamped with `market.pricing.yes`, decision #6), riding the ONE
+	 * of `market` (web Gate-C #5): the reserve-replay YES-price `series` (terminal
+	 * stamped with `market.pricing.yes`, decision #6) + the expanded-mode `nodes`
+	 * (one top post per `(UTC day, side)`, slice 2), both riding the ONE
 	 * `loadDebateView` payload alongside `market.pricing`, never a separate fetch.
-	 * `null` when the series read failed — the header renders unaffected
-	 * (non-fatal, web Gate-C error-state).
+	 * `null` when the derivation failed — the header renders unaffected (non-fatal,
+	 * web Gate-C error-state).
 	 */
-	priceChart: { series: PricePoint[] } | null;
+	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
 };
 
 /**
@@ -269,20 +270,22 @@ export async function loadDebateView(
 		};
 	});
 
-	// UI.19 §9 / F-DEBATE-5 — the market-detail price series, derived AFTER the
-	// pricing read (its terminal is stamped with `pricing.yes`, decision #6) and
-	// wrapped NON-FATALLY (web Gate-C error-state): a rejection sets
-	// `priceChart = null` + a WARN, and the rest of the header returns intact — a
-	// chart-read failure never 500s the market-detail read (the Discovery F-1
-	// WARN-never-throw posture).
+	// UI.19 §9 / F-DEBATE-5 — the market-detail price chart (series + nodes),
+	// derived AFTER the pricing read (its terminal is stamped with `pricing.yes`,
+	// decision #6) over ONE shared reserve walk that also prices the nodes; node
+	// selection reuses the ALREADY-loaded `postSubstrate` + `removedSet` (decision
+	// #2, no second read). Wrapped NON-FATALLY (web Gate-C error-state): a
+	// rejection (series OR node build) sets `priceChart = null` + a WARN, and the
+	// rest of the header returns intact — a chart-read failure never 500s the
+	// market-detail read (the Discovery F-1 WARN-never-throw posture).
 	let priceChart: DebateViewModel["priceChart"];
 	try {
-		const series = await loadMarketPriceSeries(
-			client,
+		priceChart = await deriveMarketPriceChart(client, {
 			marketId,
-			pricingAndUnitToWin?.pricing.yes ?? null,
-		);
-		priceChart = { series };
+			postSubstrate,
+			removedSet,
+			spotYes: pricingAndUnitToWin?.pricing.yes ?? null,
+		});
 	} catch (e) {
 		priceChart = null;
 		safeCaptureMessage("market_price_series_read_failed", {

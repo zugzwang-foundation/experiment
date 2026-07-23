@@ -2,19 +2,23 @@
 
 import { useEffect } from "react";
 
+import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChart } from "./MarketPriceChart";
 
 /** The expanded price chart — a STATE TOGGLE (not a route; the §23 overlay
- * pattern): the same two lines plus the time axis. Closes on the X button, ESC,
- * or a backdrop click; the panel is a higher-z sibling so a panel click never
- * closes. Body scroll is locked while open. Post nodes arrive in Slice 2. */
+ * pattern): the same two lines plus the time axis and the per-(UTC day, side)
+ * post nodes (Slice 2). Closes on the X button, ESC, or a backdrop click; the
+ * panel is a higher-z sibling so a panel click never closes. Body scroll is
+ * locked while open. */
 export function MarketPriceChartOverlay({
 	series,
+	nodes,
 	onClose,
 }: {
 	series: PricePoint[];
+	nodes: ChartNode[];
 	onClose: () => void;
 }): React.JSX.Element {
 	useEffect(() => {
@@ -79,7 +83,7 @@ export function MarketPriceChartOverlay({
 					</button>
 				</div>
 				<div className="aspect-[2/1] w-full">
-					<MarketPriceChart series={series} mode="expanded" />
+					<MarketPriceChart series={series} nodes={nodes} mode="expanded" />
 				</div>
 			</div>
 		</div>
