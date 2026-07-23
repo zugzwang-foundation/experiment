@@ -283,11 +283,12 @@ export async function loadDebateView(
 			pricingAndUnitToWin?.pricing.yes ?? null,
 		);
 		priceChart = { series };
-	} catch {
+	} catch (e) {
 		priceChart = null;
 		safeCaptureMessage("market_price_series_read_failed", {
 			level: "warning",
 			tags: { marketId },
+			extra: { error: String(e) },
 		});
 	}
 
