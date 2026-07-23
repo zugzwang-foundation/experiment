@@ -282,7 +282,13 @@ export async function loadDebateView(
 	try {
 		priceChart = await deriveMarketPriceChart(client, {
 			marketId,
-			postSubstrate,
+			// Fail-CLOSED masking belt (mirrors the posts-array `!comment` mask
+			// below): the `removedSet` was queried over the `comments` read, so a
+			// post is only known-checked if it is in that same read. `postSubstrate`
+			// is a separate READ COMMITTED statement, so a post that raced in after
+			// the comments snapshot would be masked-unchecked — exclude it from
+			// nodes rather than emit it unmasked (@security-auditor LOW, slice 2).
+			postSubstrate: postSubstrate.filter((s) => commentById.has(s.id)),
 			removedSet,
 			spotYes: pricingAndUnitToWin?.pricing.yes ?? null,
 		});
