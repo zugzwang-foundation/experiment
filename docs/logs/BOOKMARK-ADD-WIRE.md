@@ -90,6 +90,74 @@ Two LOW notes, neither actionable here:
   phantom `removeBookmarkAction` against a never-existent row. The only remedy is lifting
   optimistic state to `DebateView`, which is explicitly fenced off — recorded, not fixed.
 
+### C-1 · Citation correction (Gate C, operator-authored)
+
+SPEC.2 cited **ADR-0034 D-4** for own-argument suppression in two places. That citation is
+wrong, and the error originated in the web-authored §4.2 replacement text this session was
+told to paste verbatim — pasting it unchanged was correct; correcting it is a separate,
+legible commit (`68f9408`), **no version bump**, so 1.0.21 is fixed in place before merge.
+
+Verified before editing (verify-don't-trust, and the kickoff made this a HALT condition):
+
+- **ADR-0034 D-4** is *"ID-only, and never a masking input"* — identifiers only, never
+  consulted as a masking input. It says nothing about own-suppression. `grep -c -i
+  "own-argument|own argument|self-bookmark|others-only" docs/adr/0034-*.md` → **0**.
+- **ADR-0032 D-3** *is* *"Others-only guard (self-bookmark prohibition)"* — app-layer, with
+  the UI hiding the affordance as the primary arm and `addBookmarkAction`'s
+  `viewer === author` rejection as defense-in-depth. The replacement citation is correct, so
+  no halt.
+
+Both loci corrected verbatim from the operator's text; repo-wide `grep "ADR-0034 D-4"` → **0**.
+
+### C-3 · `@security-auditor` on Slice 3 — masking-directed
+
+Not in the plan's cascade (an operator omission, corrected at Gate C). Slice 3 is the only
+place in this PR where a safety-critical guarantee rests on branch placement plus one test
+rather than on the type system.
+
+**Verdict: no CRITICAL / HIGH / MEDIUM.** All five directed points answered separately:
+
+- **(a) Can an affordance reach a removed REPLY by any path?** No. `ReplyCard` has exactly
+  two render sites (`scrollers.tsx:130`, `ReplyPreview.tsx:38`) and the cluster is
+  constructed at exactly one place (`ReplyCard.tsx:57`), inside the non-removed branch. The
+  three reply groups are irrelevant: `buildReplyGroups` masks removed replies into the
+  `{removed:true}` variant across **support, counter and twoSlot** alike, before
+  `ReplyGroups` is built, and it is re-checked at the leaf.
+- **(b) Does the guard test bind?** Confirmed **by independent mutation**, not by reading
+  this log: injecting `<CardActions>` into the removed branch failed **exactly one** test —
+  `reply-card::removed-reply-renders-no-cluster` — with the other 22 passing; restored
+  byte-identically (md5 `76fa44ac550e3f77e5391ea5564c99a9` before and after, `git status`
+  clean). It is the **sole** guard suite-wide. The `querySelectorAll("button").length === 0`
+  assertion is the strong one, because `CardActions` renders the Download `<button>`
+  unconditionally even when the bookmark is own-suppressed to `null`.
+- **(c) Does removal cascade to a removed post's live replies?** No, and it should not.
+  `loadRemovedSet` keys on each comment's **own** id; `buildReply` masks iff
+  `removedSet.has(sub.id)`. Parent removal is never an input anywhere in the reply-building
+  path. This is ADR-0021's thread-integrity posture — the parent renders a placeholder, the
+  thread stays intact — so an affordance on a live reply under a removed post is intended,
+  not an inherited leak.
+- **(d) Does Q-B return replies?** **Yes.** `comments` is one self-referencing table
+  (`parent_comment_id` NULL for posts, set for replies), and Q-B filters on `user_id` AND
+  `market_id` **only** — no `parent_comment_id IS NULL` or equivalent. Own-suppression covers
+  replies end-to-end, test-locked by
+  `reply-card::own-reply-renders-no-bookmark-but-keeps-download`. The warned-of defect (an
+  active icon on the viewer's own reply, which the write path would then reject with
+  `self_bookmark_forbidden`) does not materialise.
+- **(e) Can either id set influence CONTENT?** No. Each set has exactly one consumer
+  (`DebateView.tsx:115` / `:116`), feeding two sites in `BookmarkToggle` — the fill seed and
+  the `own.has → null` icon suppression. No content branch reads `bookmarks`. Worst case for
+  a corrupted set is a wrong icon, never a rendered or withheld argument. ADR-0034 D-4 holds.
+
+Two LOW notes, both carried:
+- **The reply removed-branch has no type-level lock** — a standing hazard for the *next*
+  caller, not this tree.
+- **The `querySelectorAll("button")` backstop is element-shaped.** Airtight today because
+  every affordance is a `<button>`. When the ADR-0025 export button is wired — naturally an
+  `<a href download>` — a cluster leaked into a removed branch with an own-suppressed
+  bookmark could render **zero** `<button>` elements and evade the length-0 assertion, and
+  the two `queryByRole` name-checks would miss a relabelled control. **Docketed to the
+  download-wiring task: re-assert the guard with an element-agnostic selector.**
+
 ### R7 · AGENTS.md §9
 
 Docketed, not changed. AGENTS.md §9 reads as "no component-test harness exists", which is
@@ -267,7 +335,8 @@ Sequential, one reviewer touching the DB at a time. Each was passed
 | `@db-migration-reviewer` | — | **NOT INVOKED — reasoned waiver**, zero `src/db/schema/**` and zero `drizzle/migrations/**` diff. Waiver is void if DDL ever appears; none did. |
 | `@code-reviewer` | 2, re-review after the fix | **No CRITICAL/HIGH/MEDIUM.** Both directed questions answered; 2 LOW (L1/L2 above), neither actionable. |
 | `@code-reviewer` | 3 | **No findings at any severity.** All eight directed points pass, including C3 byte-for-byte and the removed-reply masking lock. |
-| `@security-auditor` | 2, 3 | **NOT RUN** — the plan makes it mandatory on **Slice 1 only** (run, zero findings). Slices 2–3 instead discharge its four named forward obligations (below), three now test-locked. Flagged so the omission is visibly deliberate. |
+| `@security-auditor` | 3 (masking-directed, added at Gate C) | **No CRITICAL/HIGH/MEDIUM.** All five directed points answered separately; the removed-reply guard confirmed binding by independent mutation. 2 LOW, both carried. |
+| `@security-auditor` | 2 | **NOT RUN** — the plan makes it mandatory on **Slice 1 only** (run, zero findings). Slice 2's obligations are discharged and test-locked instead. Flagged so the omission is visibly deliberate. |
 
 ### `@security-auditor` forward obligations (Slice 1 → Slices 2/3)
 
@@ -277,12 +346,20 @@ Sequential, one reviewer touching the DB at a time. Each was passed
    `:22-36` non-removed branch, with a render test asserting no bookmark control on a
    removed reply. **DISCHARGED in Slice 3** — the cluster sits strictly in `ReplyCard`'s
    non-removed branch; `reply-card::removed-reply-renders-no-cluster` is the guard, and
-   moving `<CardActions>` into the removed branch fails exactly that case.
+   moving `<CardActions>` into the removed branch fails exactly that case. **Re-confirmed at
+   Gate C** by `@security-auditor`'s own independent mutation probe (restored byte-identically,
+   md5 verified). The auditor carries it forward as a *pattern* obligation: any future surface
+   rendering a reply cluster must repeat both halves, because the compiler will not catch a
+   removed-branch cluster.
 2. **(Slice 2/3)** The own-check must consume `ownCommentIds` (ids), never `ownPseudonym`,
    and must run **before** the saved-check. **Done in Slice 2**, test-locked by
    `bookmark-toggle::own-outranks-saved`.
 3. **(Slice 2/3)** The client `.has(id)` lookups gate **icon state only**, never content
-   visibility. **Held in Slice 2**; re-verify in Slice 3.
+   visibility. **DISCHARGED and re-verified at Gate C** — the C-3 masking audit traced every
+   consumer: each set has exactly one reader (`DebateView.tsx:115`/`:116`) feeding two sites
+   in `BookmarkToggle` (the fill seed and the `own.has → null` icon suppression); no content
+   branch reads `bookmarks`. Worst case for a corrupted set is a wrong icon, never a rendered
+   or withheld argument. ADR-0034 D-4 holds.
 4. **(Slice 2)** Restate the "B1 widens a pre-existing gap" note in the PR body (C5).
    **Done** — it is in the PR body.
 
