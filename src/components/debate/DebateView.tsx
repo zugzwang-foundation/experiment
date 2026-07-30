@@ -2,6 +2,8 @@
 
 import { type ReactNode, useState } from "react";
 
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
+
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { deriveReplySide } from "./composer/gating";
@@ -100,6 +102,19 @@ export function DebateView({
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
+	// BOOKMARK-ADD-WIRE — the two ID-only arrays converted to Sets ONCE here (they
+	// cross the RSC boundary as arrays; a Set does not serialize) and prop-drilled
+	// to the card renders. `null` ⇔ signed out ⇔ the disabled "sign in to use"
+	// icon. These sets gate ICON STATE ONLY — never content visibility: masking is
+	// decided server-side in `loadDebateView` and arrives already applied on the
+	// removed union variants (ADR-0034).
+	const bookmarks: BookmarkAffordance =
+		viewer === null
+			? null
+			: {
+					saved: new Set(viewer.bookmarkedCommentIds),
+					own: new Set(viewer.ownCommentIds),
+				};
 
 	const toggleEntry = (side: Side) => {
 		if (composerBusy) {
@@ -178,6 +193,7 @@ export function DebateView({
 				<div className="flex flex-col gap-4">
 					<PostFocusHeader
 						post={selectedPost}
+						bookmarks={bookmarks}
 						heldSide={heldSide}
 						marketOpen={marketOpen}
 						suspended={suspended}
@@ -297,6 +313,7 @@ export function DebateView({
 								<PostScroller
 									side={side}
 									posts={side === "YES" ? yesPosts : noPosts}
+									bookmarks={bookmarks}
 									onEnter={enterPost}
 									onOpenPopup={setPopupPost}
 									onOpenImage={setLightboxUrl}
