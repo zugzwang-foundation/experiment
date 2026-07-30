@@ -10,6 +10,7 @@ import {
 } from "@/components/bookmarks/BookmarkToggle";
 import { ArgProfile } from "@/components/debate/ArgProfile";
 import { PostCard } from "@/components/debate/PostCard";
+import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { ReplyCard } from "@/components/debate/ReplyCard";
 import { ReplyPreview } from "@/components/debate/ReplyPreview";
 import { PostScroller, ReplyScroller } from "@/components/debate/scrollers";
@@ -430,6 +431,32 @@ function removedReply(id: string) {
 	};
 }
 
+/**
+ * Every way a clickable affordance can present itself in the DOM: native
+ * interactive elements, anchors that actually navigate/download (`a[href]` —
+ * the UI.14 export case), the ARIA interactive roles, editable hosts, and
+ * anything deliberately placed in the tab order. Used by the removed-reply
+ * masking guard, which must assert the PROPERTY ("no interactive affordance")
+ * rather than one element type. Extend this list when a new affordance kind
+ * enters the codebase; never narrow it.
+ */
+const INTERACTIVE_SELECTOR = [
+	"button",
+	"a[href]",
+	"input",
+	"select",
+	"textarea",
+	"summary",
+	"[role='button']",
+	"[role='link']",
+	"[role='checkbox']",
+	"[role='switch']",
+	"[role='menuitem']",
+	"[role='tab']",
+	"[contenteditable='true']",
+	"[tabindex]:not([tabindex='-1'])",
+].join(",");
+
 /** The rendered cluster's markup, located from the bookmark button's parent. */
 function clusterHtml(container: HTMLElement): string {
 	const button = container.querySelector(
@@ -482,17 +509,32 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		// type system (the removed variant carries no author/marker, so ArgProfile
 		// cannot be built); a REPLY's removed variant still carries an `id`, so a
 		// cluster in the removed branch WOULD compile. This test is the only guard.
+		//
+		// THE ASSERTION IS PROPERTY-SHAPED ON PURPOSE — DO NOT "SIMPLIFY" IT BACK TO
+		// COUNTING `<button>`s. The property is "a removed argument renders NO
+		// INTERACTIVE AFFORDANCE", not "renders no button element". Those coincide
+		// only while every affordance happens to be a `<button>`. The moment UI.14
+		// wires the ADR-0025 export as `<a href download>`, a cluster leaked into
+		// this branch for an OWN-argument viewer renders the bookmark as `null` and
+		// the download as an anchor — zero buttons, one anchor. A button count would
+		// pass while masking is broken, and a `queryByRole(… { name })` check misses
+		// it too, because a relabelled control never matches the name. So the sweep
+		// below is by ELEMENT TYPE + ARIA ROLE + FOCUSABILITY, and it is the shape
+		// that survives the next affordance we add.
 		const { container } = render(
 			<ReplyCard reply={removedReply(OTHERS)} bookmarks={SIGNED_IN} />,
 		);
 
-		expect(container.querySelectorAll("button")).toHaveLength(0);
-		expect(
-			screen.queryByRole("button", { name: "Remove bookmark" }),
-		).toBeNull();
-		expect(
-			screen.queryByRole("button", { name: "Download — sign in to use" }),
-		).toBeNull();
+		// Non-vacuity first: prove the removed branch actually rendered, so an
+		// empty sweep can never be mistaken for a pass on a card that rendered
+		// nothing at all.
+		expect(screen.getByText(REMOVED_STUB_TEXT)).toBeTruthy();
+
+		// `.outerHTML` rather than a bare count so a failure names what leaked.
+		const affordances = Array.from(
+			container.querySelectorAll(INTERACTIVE_SELECTOR),
+		).map((el) => el.outerHTML);
+		expect(affordances).toEqual([]);
 	});
 
 	it("reply-scroller::paging-to-an-unsaved-reply-drops-the-filled-icon", () => {
