@@ -141,7 +141,23 @@ export function CardActions({
 }) {
 	return (
 		<div className="ml-auto flex shrink-0 items-center gap-0.5">
-			<BookmarkToggle commentId={commentId} bookmarks={bookmarks} />
+			{/*
+			 * `key={commentId}` is load-bearing (Gate-C remediation, HIGH-1). The
+			 * scrollers page cards by re-rendering the SAME element at the same tree
+			 * position with a new post/reply and no key, so React reconciles to the
+			 * same instance and `BookmarkToggle`'s mount-seeded `useState` would keep
+			 * the PREVIOUS comment's saved state — a filled icon on an unsaved
+			 * argument, which does not self-heal (paging triggers no server render,
+			 * D5). Keying by the target remounts ONLY this stateful leaf on a comment
+			 * change; scroll position, image loads and animation state elsewhere in
+			 * the card are untouched. It covers PostScroller, ReplyScroller and
+			 * ReplyPreview alike, because every card renders its cluster through here.
+			 */}
+			<BookmarkToggle
+				key={commentId}
+				commentId={commentId}
+				bookmarks={bookmarks}
+			/>
 			<Button
 				variant="ghost"
 				size="icon-xs"

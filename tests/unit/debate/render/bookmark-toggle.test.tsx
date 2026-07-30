@@ -10,6 +10,7 @@ import {
 } from "@/components/bookmarks/BookmarkToggle";
 import { ArgProfile } from "@/components/debate/ArgProfile";
 import { PostCard } from "@/components/debate/PostCard";
+import { PostScroller } from "@/components/debate/scrollers";
 import type { DebatePost, ReplyGroups } from "@/components/debate/types";
 
 /**
@@ -331,6 +332,73 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 		).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Download — sign in to use" }),
+		).toBeNull();
+	});
+});
+
+/**
+ * Gate-C remediation (HIGH-1). THE defect class the 15 cases above could not see:
+ * every one of them fresh-`render()`s a toggle, so none exercises the path where a
+ * MOUNTED toggle is handed a DIFFERENT comment.
+ *
+ * `PostScroller` pages posts by mutating its own `index` state, re-rendering the
+ * same `<PostCard>` element at the same tree position with no `key`. React
+ * reconciles that to the SAME instance, so `BookmarkToggle`'s mount-seeded
+ * `useState` never re-runs and the icon keeps the PREVIOUS post's fill — a lie
+ * that does not self-heal (paging triggers no server render; there is
+ * deliberately no `router.refresh()`, D5).
+ *
+ * These two cases must FAIL before the one-line `key={commentId}` fix in
+ * `CardActions` and PASS after. They are deliberately placed at `CardActions`
+ * (the unit that carries the key) and at `PostScroller` (the real user path), NOT
+ * at a bare `BookmarkToggle` — a bare toggle has no key above it, so it would
+ * stay red after the fix and prove nothing.
+ */
+describe("BOOKMARK-ADD-WIRE — icon state follows the comment, not the mount", () => {
+	it("card-actions::rerender-with-new-comment-reflects-new-saved-state", () => {
+		// OTHERS is saved; SECOND is not. Same element, same position, new target.
+		const SECOND = "0199a0c0-0000-7000-8000-00000000000c";
+		const { rerender } = render(
+			<CardActions commentId={OTHERS} bookmarks={SIGNED_IN} />,
+		);
+		expect(
+			screen.getByRole("button", { name: "Remove bookmark" }),
+		).toBeTruthy();
+
+		rerender(<CardActions commentId={SECOND} bookmarks={SIGNED_IN} />);
+
+		// The unsaved comment must render the ADD affordance, not the stale filled one.
+		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
+		).toBeNull();
+	});
+
+	it("post-scroller::paging-to-an-unsaved-post-drops-the-filled-icon", () => {
+		// The real reproduction: two posts on one side, the first bookmarked and the
+		// second not. Paging must not carry the first post's filled icon onto the
+		// second — clicking it there would fire removeBookmarkAction against a row
+		// that never existed.
+		const SECOND = "0199a0c0-0000-7000-8000-00000000000c";
+		render(
+			<PostScroller
+				posts={[presentPost(OTHERS), presentPost(SECOND)]}
+				side="YES"
+				bookmarks={SIGNED_IN}
+				onEnter={() => {}}
+				onOpenPopup={() => {}}
+				onOpenImage={() => {}}
+			/>,
+		);
+		expect(
+			screen.getByRole("button", { name: "Remove bookmark" }),
+		).toBeTruthy();
+
+		fireEvent.click(screen.getByRole("button", { name: "Next post" }));
+
+		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
 		).toBeNull();
 	});
 });
