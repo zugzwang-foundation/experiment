@@ -1,7 +1,16 @@
 import { count, eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it } from "vitest";
-import { dharmaLedger, events, markets, pools, users } from "@/db/schema";
+import {
+	bookmarks,
+	comments,
+	dharmaLedger,
+	events,
+	markets,
+	modActions,
+	pools,
+	users,
+} from "@/db/schema";
 import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
 import { computeSell } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
@@ -110,6 +119,51 @@ async function seedPosition(args: {
 	);
 }
 
+// ── B1 (BOOKMARK-ADD-WIRE Slice 1) seeds ────────────────────────────────────
+// Minimal, per the plan: a comment needs NO bet (`comments.bet_id` is
+// deliberately nullable), and a bookmarked/own comment needs no position — the
+// two new SELECTs read only `bookmarks` + `comments`. Shapes mirror
+// tests/server/bookmarks/{list,masking}.test.ts.
+
+async function seedComment(args: {
+	userId: string;
+	marketId: string;
+	side: "YES" | "NO";
+	body?: string;
+}): Promise<string> {
+	const [row] = await testDb
+		.insert(comments)
+		.values({
+			userId: args.userId,
+			marketId: args.marketId,
+			parentCommentId: null,
+			body: args.body ?? "seeded argument body",
+			sideAtPostTime: args.side,
+		})
+		.returning({ id: comments.id });
+	return row?.id ?? "";
+}
+
+async function seedBookmark(args: {
+	userId: string;
+	commentId: string;
+}): Promise<void> {
+	await testDb
+		.insert(bookmarks)
+		.values({ userId: args.userId, commentId: args.commentId });
+}
+
+// `content_removed` is a `mod_actions` row (Bucket A), NOT a column on comments
+// — the masking.test.ts shape. Removal never deletes the comment or the bookmark.
+async function seedRemoval(commentId: string): Promise<void> {
+	await testDb.insert(modActions).values({
+		targetCommentId: commentId,
+		reason: "content_removed",
+		categories: {},
+		actorId: "admin-singleton",
+	});
+}
+
 async function ledgerCount(userId: string): Promise<number> {
 	const [row] = await testDb
 		.select({ n: count() })
@@ -151,9 +205,17 @@ async function runRealAccrual(userId: string) {
 
 describe("UI.A2 viewer-session context — loadViewerMarketContext (read-only by law)", () => {
 	afterEach(async () => {
+		// B1 extends the list: the new cases write comments / bookmarks /
+		// mod_actions. `truncateTables` disables the ENTIRE guard set and always
+		// CASCADEs, so ordering is readability-only (mirrors the list.test.ts
+		// order). `bookmarks` is Bucket C and is deliberately NOT in
+		// TRUNCATE_GUARDS — the guard count stays unchanged.
 		await truncateTables(testClient, [
+			"bookmarks",
 			"events",
+			"mod_actions",
 			"dharma_ledger",
+			"comments",
 			"positions",
 			"pools",
 			"markets",
@@ -315,5 +377,257 @@ describe("UI.A2 viewer-session context — loadViewerMarketContext (read-only by
 				 ON positions (user_id, market_id) WHERE quantity > 0`,
 			);
 		}
+	});
+
+	// ── BOOKMARK-ADD-WIRE Slice 1 (B1) — the two additive, market-scoped,
+	// ID-only arrays on ViewerMarketContext (plan §3 / §7). RED-FIRST: neither
+	// `bookmarkedCommentIds` nor `ownCommentIds` exists on the DTO yet, so each
+	// case FAILS at runtime on the missing query behaviour (and `tsc` errors on
+	// the two new properties). No write rides these reads — SELECT-only inside
+	// the existing read-only transaction; INV-3 preserved (no side/author column
+	// is read; not a masking input). Arrays, never Sets (RSC→client, §3).
+	describe("BOOKMARK-ADD-WIRE Slice 1 — bookmarked / own comment ids (B1)", () => {
+		it("viewer-context::bookmarked-ids-scoped-to-market", async () => {
+			// D1 — MARKET-scoped: a bookmark on a comment in M2 must NOT appear in
+			// M1's array. A rendered-ID-scoped or market-agnostic query would leak it.
+			const viewer = await seedUser("b1-bmkt-viewer", "b1-bmkt-viewer");
+			const author = await seedUser("b1-bmkt-author", "b1-bmkt-author");
+			const m1 = await seedOpenMarketWithPool("b1-bmkt-m1");
+			const m2 = await seedOpenMarketWithPool("b1-bmkt-m2");
+			await seedGrant(viewer, GRANT);
+
+			const c1 = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "YES",
+			});
+			const c2 = await seedComment({
+				userId: author,
+				marketId: m2,
+				side: "YES",
+			});
+			await seedBookmark({ userId: viewer, commentId: c1 });
+			await seedBookmark({ userId: viewer, commentId: c2 });
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			// Order-insensitive: the contract promises no ORDER BY.
+			expect(new Set(ctx.bookmarkedCommentIds)).toEqual(new Set([c1]));
+			expect(ctx.bookmarkedCommentIds).toHaveLength(1);
+			expect(ctx.bookmarkedCommentIds).not.toContain(c2);
+		});
+
+		it("viewer-context::bookmarked-ids-scoped-to-viewer", async () => {
+			// D1 — VIEWER-scoped: another user's bookmark of a comment in THIS
+			// market must NOT appear. The viewer bookmarks a DIFFERENT comment in the
+			// same market, so a missing `user_id` filter returns BOTH (caught by the
+			// length + set equality), not merely [] → [x].
+			const viewer = await seedUser("b1-bvwr-viewer", "b1-bvwr-viewer");
+			const other = await seedUser("b1-bvwr-other", "b1-bvwr-other");
+			const author = await seedUser("b1-bvwr-author", "b1-bvwr-author");
+			const m1 = await seedOpenMarketWithPool("b1-bvwr-m1");
+			await seedGrant(viewer, GRANT);
+
+			const cOther = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "YES",
+			});
+			const cViewer = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "NO",
+			});
+			await seedBookmark({ userId: other, commentId: cOther }); // NOT the viewer
+			await seedBookmark({ userId: viewer, commentId: cViewer });
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			expect(new Set(ctx.bookmarkedCommentIds)).toEqual(new Set([cViewer]));
+			expect(ctx.bookmarkedCommentIds).toHaveLength(1);
+			expect(ctx.bookmarkedCommentIds).not.toContain(cOther);
+		});
+
+		it("viewer-context::bookmarked-ids-includes-removed", async () => {
+			// The array is ID-ONLY and never gates content, so a bookmarked comment
+			// that was later `content_removed` STILL returns its id (masking is a
+			// SEPARATE concern, keyed on loadRemovedSet inside loadDebateView — never
+			// this array). AND the DTO leaks no content/author field: its key set is
+			// EXACTLY the five contract keys (a byte-for-byte allowlist).
+			const viewer = await seedUser("b1-brm-viewer", "b1-brm-viewer");
+			const author = await seedUser("b1-brm-author", "b1-brm-author");
+			const m1 = await seedOpenMarketWithPool("b1-brm-m1");
+			await seedGrant(viewer, GRANT);
+
+			const c = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "YES",
+				body: "this argument will be content_removed",
+			});
+			await seedRemoval(c);
+			await seedBookmark({ userId: viewer, commentId: c });
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			// The removed comment's id is still present (ID-only, never masked here).
+			expect(new Set(ctx.bookmarkedCommentIds)).toEqual(new Set([c]));
+			expect(ctx.bookmarkedCommentIds).toHaveLength(1);
+
+			// No content / author field on the DTO — assert the exact contract keys.
+			expect(Object.keys(ctx).sort()).toEqual([
+				"balance",
+				"bookmarkedCommentIds",
+				"ownCommentIds",
+				"position",
+				"spendableToday",
+			]);
+		});
+
+		it("viewer-context::own-comment-ids-scoped-to-market", async () => {
+			// D4 — ownCommentIds is MARKET-scoped: the viewer's own comment in M2 is
+			// excluded from M1 (own-suppression must not bleed across markets).
+			const viewer = await seedUser("b1-omkt-viewer", "b1-omkt-viewer");
+			const m1 = await seedOpenMarketWithPool("b1-omkt-m1");
+			const m2 = await seedOpenMarketWithPool("b1-omkt-m2");
+			await seedGrant(viewer, GRANT);
+
+			const own1 = await seedComment({
+				userId: viewer,
+				marketId: m1,
+				side: "YES",
+			});
+			const own2 = await seedComment({
+				userId: viewer,
+				marketId: m2,
+				side: "YES",
+			});
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			expect(new Set(ctx.ownCommentIds)).toEqual(new Set([own1]));
+			expect(ctx.ownCommentIds).toHaveLength(1);
+			expect(ctx.ownCommentIds).not.toContain(own2);
+		});
+
+		it("viewer-context::own-comment-ids-excludes-others", async () => {
+			// D4 — ownCommentIds is keyed on `comments.user_id = $viewer`: another
+			// author's comment in the SAME market is excluded. This is the property
+			// that keeps own-suppression id-based (H2-scrub-safe), not pseudonym-based.
+			const viewer = await seedUser("b1-ooth-viewer", "b1-ooth-viewer");
+			const author = await seedUser("b1-ooth-author", "b1-ooth-author");
+			const m1 = await seedOpenMarketWithPool("b1-ooth-m1");
+			await seedGrant(viewer, GRANT);
+
+			const own1 = await seedComment({
+				userId: viewer,
+				marketId: m1,
+				side: "YES",
+			});
+			const other1 = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "YES",
+			});
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			expect(new Set(ctx.ownCommentIds)).toEqual(new Set([own1]));
+			expect(ctx.ownCommentIds).toHaveLength(1);
+			expect(ctx.ownCommentIds).not.toContain(other1);
+		});
+
+		it("viewer-context::empty-arrays-when-none", async () => {
+			// Both arrays are [] (never null / undefined) when the viewer has neither
+			// bookmarked nor authored anything here — the arrays-not-Sets contract
+			// (§3): the client can `new Set(x)` unconditionally after serialization.
+			const viewer = await seedUser("b1-empty-viewer", "b1-empty-viewer");
+			const m1 = await seedOpenMarketWithPool("b1-empty-m1");
+			await seedGrant(viewer, GRANT);
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			expect(ctx.bookmarkedCommentIds).toEqual([]);
+			expect(ctx.ownCommentIds).toEqual([]);
+			expect(Array.isArray(ctx.bookmarkedCommentIds)).toBe(true);
+			expect(Array.isArray(ctx.ownCommentIds)).toBe(true);
+		});
+
+		it("viewer-context::existing-fields-unchanged", async () => {
+			// Regression belt on the SHARED transaction: adding the two SELECTs must
+			// not perturb position / balance / spendableToday. In the fullest scenario
+			// (held YES position + grant + an own comment + a bookmark of another's),
+			// the three pre-B1 fields stay byte-identical to their oracle while the
+			// two new arrays populate in the SAME read.
+			const viewer = await seedUser("b1-belt-viewer", "b1-belt-viewer");
+			const author = await seedUser("b1-belt-author", "b1-belt-author");
+			const m1 = await seedOpenMarketWithPool("b1-belt-m1");
+			await seedGrant(viewer, GRANT);
+			await seedPosition({
+				userId: viewer,
+				marketId: m1,
+				side: "YES",
+				quantity: HELD_QTY,
+			});
+
+			const ownC = await seedComment({
+				userId: viewer,
+				marketId: m1,
+				side: "YES",
+			});
+			const otherC = await seedComment({
+				userId: author,
+				marketId: m1,
+				side: "YES",
+			});
+			await seedBookmark({ userId: viewer, commentId: otherC });
+
+			const sell = computeSell({
+				reserves: { yes: SEED_RESERVES, no: SEED_RESERVES },
+				side: "yes",
+				shares: HELD_QTY,
+			});
+
+			const ctx = await loadViewerMarketContext(testDb, {
+				userId: viewer,
+				marketId: m1,
+			});
+
+			// Pre-B1 fields — byte-identical to the shape-held-position / read-only
+			// oracles (the belt: the two new SELECTs did not move them).
+			expect(ctx.position).toEqual({
+				side: "YES",
+				quantity: HELD_QTY,
+				currentValue: sell.proceeds,
+			});
+			expect(ctx.balance).toBe(new CpmmDecimal(GRANT).toFixed(18));
+			expect(ctx.spendableToday).toBe(
+				new CpmmDecimal(GRANT).plus(DAILY_CREDIT_DHARMA).toFixed(18),
+			);
+
+			// … and the two new arrays coexist in the same transaction.
+			expect(new Set(ctx.bookmarkedCommentIds)).toEqual(new Set([otherC]));
+			expect(ctx.bookmarkedCommentIds).toHaveLength(1);
+			expect(new Set(ctx.ownCommentIds)).toEqual(new Set([ownC]));
+			expect(ctx.ownCommentIds).toHaveLength(1);
+		});
 	});
 });
