@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 
 import { ReplyCard } from "./ReplyCard";
@@ -16,7 +17,14 @@ import type { ReplyGroups } from "./types";
  * side). This is the "two-slot expand" read affordance (§7); the per-side
  * paged reply-scroller is the post-view surface.
  */
-export function ReplyPreview({ replies }: { replies: ReplyGroups }) {
+export function ReplyPreview({
+	replies,
+	bookmarks,
+}: {
+	replies: ReplyGroups;
+	/** BOOKMARK-ADD-WIRE — pass-through to each listed `ReplyCard`. */
+	bookmarks: BookmarkAffordance;
+}) {
 	const [expanded, setExpanded] = useState(false);
 	const all = [...replies.support, ...replies.counter];
 	if (all.length === 0) {
@@ -27,7 +35,7 @@ export function ReplyPreview({ replies }: { replies: ReplyGroups }) {
 	return (
 		<div className="flex flex-col gap-1.5 border-t pt-2">
 			{shown.map((reply) => (
-				<ReplyCard key={reply.id} reply={reply} />
+				<ReplyCard key={reply.id} reply={reply} bookmarks={bookmarks} />
 			))}
 			{hasMore ? (
 				<Button

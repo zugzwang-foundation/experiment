@@ -1,7 +1,8 @@
-import { Bookmark, Download } from "lucide-react";
-
+import {
+	type BookmarkAffordance,
+	CardActions,
+} from "@/components/bookmarks/BookmarkToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
 
 import { PositionMarker, SideBadge } from "./badges";
 import { formatDharma } from "./format";
@@ -10,27 +11,39 @@ import type { AuthorIdentity, Marker, Side } from "./types";
 /**
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
- * author's own stake `a` · reply count · the DISABLED bookmark/download card
- * actions. The marker chip sits after the side badge, before the stake (D5).
+ * author's own stake `a` · reply count · the bookmark/download card actions.
+ * The marker chip sits after the side badge, before the stake (D5).
  *
- * The bookmark/download triggers render present-but-disabled (C1 / §7) —
- * `disabled` + `aria-disabled`, no handlers wired. DEBATE.4 builds no write
- * path. The `@entry%`/`→now` enrichments are deferred (D7) — just the side and
- * `Đ a`, never `YES @ 27%` or `Đ a → Đ now`.
+ * BOOKMARK-ADD-WIRE: the bookmark trigger is now LIVE — `CardActions` owns the
+ * full icon matrix (signed-out disabled / own-argument absent / active
+ * outline-or-filled). The download trigger stays present-but-disabled (C1 / §7).
+ * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
+ * never `YES @ 27%` or `Đ a → Đ now`.
+ *
+ * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster (bookmark
+ * AND download), so it is deliberately NOT the own-suppression hook — using it
+ * that way would also strip the download trigger from the viewer's own
+ * arguments. Own-suppression is a condition inside `BookmarkToggle`.
  */
 export function ArgProfile({
+	commentId,
 	author,
 	side,
 	marker,
 	authorStake,
 	replyCount,
+	bookmarks,
 	showActions = true,
 }: {
+	/** The comment this header belongs to — the bookmark target (`post.id`). */
+	commentId: string;
 	author: AuthorIdentity;
 	side: Side;
 	marker: Marker;
 	authorStake?: string;
 	replyCount?: number;
+	/** Viewer bookmark state for this market; `null` when signed out. */
+	bookmarks: BookmarkAffordance;
 	showActions?: boolean;
 }) {
 	return (
@@ -62,26 +75,7 @@ export function ArgProfile({
 				</div>
 			</div>
 			{showActions ? (
-				<div className="ml-auto flex shrink-0 items-center gap-0.5">
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						disabled
-						aria-disabled="true"
-						aria-label="Bookmark — sign in to use"
-					>
-						<Bookmark />
-					</Button>
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						disabled
-						aria-disabled="true"
-						aria-label="Download — sign in to use"
-					>
-						<Download />
-					</Button>
-				</div>
+				<CardActions commentId={commentId} bookmarks={bookmarks} />
 			) : null}
 		</div>
 	);

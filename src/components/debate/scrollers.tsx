@@ -3,6 +3,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 
 import { PostCard } from "./PostCard";
@@ -62,12 +63,15 @@ function ScrollerNav({
 export function PostScroller({
 	posts,
 	side,
+	bookmarks,
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
 }: {
 	posts: DebatePost[];
 	side: Side;
+	/** BOOKMARK-ADD-WIRE — pass-through to the paged `PostCard`. */
+	bookmarks: BookmarkAffordance;
 	onEnter: (id: string) => void;
 	onOpenPopup: (post: PresentPost) => void;
 	onOpenImage: (url: string) => void;
@@ -82,6 +86,7 @@ export function PostScroller({
 		<div className="flex flex-col gap-2">
 			<PostCard
 				post={post}
+				bookmarks={bookmarks}
 				onEnter={onEnter}
 				onOpenPopup={onOpenPopup}
 				onOpenImage={onOpenImage}
@@ -107,9 +112,12 @@ export function PostScroller({
 export function ReplyScroller({
 	replies,
 	side,
+	bookmarks,
 }: {
 	replies: DebateReply[];
 	side: Side;
+	/** BOOKMARK-ADD-WIRE — pass-through to the paged `ReplyCard`. */
+	bookmarks: BookmarkAffordance;
 }) {
 	const [index, setIndex] = useState(0);
 	if (replies.length === 0) {
@@ -119,7 +127,7 @@ export function ReplyScroller({
 	const reply = replies[clamped];
 	return (
 		<div className="flex flex-col gap-2">
-			<ReplyCard reply={reply} />
+			<ReplyCard reply={reply} bookmarks={bookmarks} />
 			{replies.length > 1 ? (
 				<ScrollerNav
 					index={clamped}

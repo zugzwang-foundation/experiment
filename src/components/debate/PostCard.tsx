@@ -2,6 +2,7 @@
 
 import { Maximize2, Plus } from "lucide-react";
 
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -25,11 +26,20 @@ import type { DebatePost, PresentPost } from "./types";
  */
 export function PostCard({
 	post,
+	bookmarks,
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
 }: {
 	post: DebatePost;
+	/**
+	 * BOOKMARK-ADD-WIRE — viewer bookmark state for this market; `null` when
+	 * signed out. Consumed only by the present branch's `ArgProfile`: the removed
+	 * branch below constructs no `ArgProfile` (the removed union variant carries
+	 * no `author`/`marker`, so it cannot), which is what makes "a removed argument
+	 * never renders an add affordance" structural rather than a runtime check.
+	 */
+	bookmarks: BookmarkAffordance;
 	onEnter: (id: string) => void;
 	onOpenPopup: (post: PresentPost) => void;
 	onOpenImage: (url: string) => void;
@@ -42,7 +52,9 @@ export function PostCard({
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
 				<AggregateFooter aggregate={post.aggregate} />
-				<ReplyPreview replies={post.replies} />
+				{/* A removed POST keeps its surviving replies (§6 — the thread stays
+				    intact), so its live replies keep their own affordances. */}
+				<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 				<Button
 					variant="ghost"
 					size="xs"
@@ -59,11 +71,13 @@ export function PostCard({
 		<Card className="gap-2.5 p-3">
 			<div className="flex items-start justify-between gap-2">
 				<ArgProfile
+					commentId={post.id}
 					author={post.author}
 					side={post.sideAtPostTime}
 					marker={post.marker}
 					authorStake={post.authorStake}
 					replyCount={replyCount}
+					bookmarks={bookmarks}
 				/>
 				<LaneBadge badge={post.badge} />
 			</div>
@@ -115,7 +129,7 @@ export function PostCard({
 			</div>
 
 			<AggregateFooter aggregate={post.aggregate} />
-			<ReplyPreview replies={post.replies} />
+			<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 
 			<Button
 				variant="ghost"

@@ -33,8 +33,16 @@ export function UnbookmarkButton({
 			disabled={pending}
 			onClick={() =>
 				startTransition(async () => {
-					await removeBookmarkAction(commentId);
-					router.refresh();
+					// BOOKMARK-ADD-WIRE (OQ-6): branch on the typed result. It was
+					// previously discarded, so a returned failure still triggered the
+					// refresh and read as a success. `removeBookmarkAction` returns
+					// failures and never throws, so on `!ok` the row legitimately still
+					// exists — leave it rendered with its filled icon and skip the
+					// wasted RSC re-render. No toast, no new copy (C6).
+					const result = await removeBookmarkAction(commentId);
+					if (result.ok) {
+						router.refresh();
+					}
 				})
 			}
 		>
