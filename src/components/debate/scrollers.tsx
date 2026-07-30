@@ -112,9 +112,12 @@ export function PostScroller({
 export function ReplyScroller({
 	replies,
 	side,
+	bookmarks,
 }: {
 	replies: DebateReply[];
 	side: Side;
+	/** BOOKMARK-ADD-WIRE — pass-through to the paged `ReplyCard`. */
+	bookmarks: BookmarkAffordance;
 }) {
 	const [index, setIndex] = useState(0);
 	if (replies.length === 0) {
@@ -124,7 +127,7 @@ export function ReplyScroller({
 	const reply = replies[clamped];
 	return (
 		<div className="flex flex-col gap-2">
-			<ReplyCard reply={reply} />
+			<ReplyCard reply={reply} bookmarks={bookmarks} />
 			{replies.length > 1 ? (
 				<ScrollerNav
 					index={clamped}

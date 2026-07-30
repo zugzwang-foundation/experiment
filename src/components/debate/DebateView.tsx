@@ -278,6 +278,7 @@ export function DebateView({
 										<ReplyScroller
 											side={side}
 											replies={repliesForSide(selectedPost, side)}
+											bookmarks={bookmarks}
 										/>
 									)}
 								</DebateColumn>

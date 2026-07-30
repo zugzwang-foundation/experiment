@@ -10,7 +10,9 @@ import {
 } from "@/components/bookmarks/BookmarkToggle";
 import { ArgProfile } from "@/components/debate/ArgProfile";
 import { PostCard } from "@/components/debate/PostCard";
-import { PostScroller } from "@/components/debate/scrollers";
+import { ReplyCard } from "@/components/debate/ReplyCard";
+import { ReplyPreview } from "@/components/debate/ReplyPreview";
+import { PostScroller, ReplyScroller } from "@/components/debate/scrollers";
 import type { DebatePost, ReplyGroups } from "@/components/debate/types";
 
 /**
@@ -400,5 +402,153 @@ describe("BOOKMARK-ADD-WIRE — icon state follows the comment, not the mount", 
 		expect(
 			screen.queryByRole("button", { name: "Remove bookmark" }),
 		).toBeNull();
+	});
+});
+
+/** Present (non-removed) reply fixture. */
+function presentReply(id: string) {
+	return {
+		removed: false as const,
+		id,
+		side: "YES" as const,
+		createdAt: "2026-07-30T00:00:00.000Z",
+		body: "Fixture reply body.",
+		marker: "none" as const,
+		author: { pseudonym: "fixture-replier", pfpUrl: "" },
+		stake: "5.000000000000000000",
+		entryPrice: "0.500000000000000000",
+	};
+}
+
+/** Removed reply fixture — no body/author/marker/stake at the type level. */
+function removedReply(id: string) {
+	return {
+		removed: true as const,
+		id,
+		side: "YES" as const,
+		createdAt: "2026-07-30T00:00:00.000Z",
+	};
+}
+
+/** The rendered cluster's markup, located from the bookmark button's parent. */
+function clusterHtml(container: HTMLElement): string {
+	const button = container.querySelector(
+		'button[aria-label="Bookmark"],button[aria-label="Remove bookmark"],button[aria-label="Bookmark — sign in to use"]',
+	);
+	return button?.parentElement?.outerHTML ?? "";
+}
+
+/**
+ * BOOKMARK-ADD-WIRE Slice 3 — the reply card carries the FULL cluster (ratified
+ * correction C3: bookmark active, download disabled with the same aria-label as
+ * ArgProfile, matching byte-for-byte), and the masking rule holds on a branch
+ * that — unlike the post path — has NO type-level lock.
+ */
+describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
+	it("reply-card::present-reply-renders-the-full-cluster", () => {
+		render(<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />);
+
+		expect(
+			screen.getByRole("button", { name: "Remove bookmark" }),
+		).toBeTruthy();
+		const download = screen.getByRole("button", {
+			name: "Download — sign in to use",
+		});
+		expect((download as HTMLButtonElement).disabled).toBe(true);
+		expect(download.getAttribute("aria-disabled")).toBe("true");
+	});
+
+	it("reply-card::cluster-matches-argprofile-byte-for-byte", () => {
+		// C3 asserted structurally, not by copy-paste discipline: both surfaces
+		// render the SAME `CardActions`, so their cluster markup must be identical
+		// character-for-character for the same (commentId, viewer state).
+		const { container: argContainer, unmount } = render(
+			<ArgProfile {...argProfileProps(OTHERS, SIGNED_IN)} />,
+		);
+		const fromArgProfile = clusterHtml(argContainer);
+		unmount();
+
+		const { container: replyContainer } = render(
+			<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />,
+		);
+		const fromReplyCard = clusterHtml(replyContainer);
+
+		expect(fromArgProfile).not.toBe("");
+		expect(fromReplyCard).toBe(fromArgProfile);
+	});
+
+	it("reply-card::removed-reply-renders-no-cluster", () => {
+		// @security-auditor forward obligation 1. The post path is protected by the
+		// type system (the removed variant carries no author/marker, so ArgProfile
+		// cannot be built); a REPLY's removed variant still carries an `id`, so a
+		// cluster in the removed branch WOULD compile. This test is the only guard.
+		const { container } = render(
+			<ReplyCard reply={removedReply(OTHERS)} bookmarks={SIGNED_IN} />,
+		);
+
+		expect(container.querySelectorAll("button")).toHaveLength(0);
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Download — sign in to use" }),
+		).toBeNull();
+	});
+
+	it("reply-scroller::paging-to-an-unsaved-reply-drops-the-filled-icon", () => {
+		// R5 — assert, do not assume, that the CardActions key fix covers the
+		// ReplyScroller path: it renders <ReplyCard> UN-KEYED, exactly like
+		// PostScroller renders <PostCard>.
+		const SECOND = "0199a0c0-0000-7000-8000-00000000000c";
+		render(
+			<ReplyScroller
+				replies={[presentReply(OTHERS), presentReply(SECOND)]}
+				side="YES"
+				bookmarks={SIGNED_IN}
+			/>,
+		);
+		expect(
+			screen.getByRole("button", { name: "Remove bookmark" }),
+		).toBeTruthy();
+
+		fireEvent.click(screen.getByRole("button", { name: "Next reply" }));
+
+		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
+		).toBeNull();
+	});
+
+	it("reply-preview::each-listed-reply-gets-its-own-icon-state", () => {
+		// R5 — the ReplyPreview path. It outer-keys each <ReplyCard key={reply.id}>,
+		// so both cards mount independently: the saved reply renders the filled
+		// remove affordance and the unsaved one renders the add affordance, side by
+		// side in the same list.
+		const SECOND = "0199a0c0-0000-7000-8000-00000000000c";
+		const twoSlot = [presentReply(OTHERS), presentReply(SECOND)];
+		render(
+			<ReplyPreview
+				replies={{ support: twoSlot, counter: [], twoSlot }}
+				bookmarks={SIGNED_IN}
+			/>,
+		);
+
+		expect(
+			screen.getByRole("button", { name: "Remove bookmark" }),
+		).toBeTruthy();
+		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
+	});
+
+	it("reply-card::own-reply-renders-no-bookmark-but-keeps-download", () => {
+		// Own-suppression reaches the reply surface too, and does not strip download.
+		render(<ReplyCard reply={presentReply(MINE)} bookmarks={SIGNED_IN} />);
+
+		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
+		).toBeNull();
+		expect(
+			screen.getByRole("button", { name: "Download — sign in to use" }),
+		).toBeTruthy();
 	});
 });

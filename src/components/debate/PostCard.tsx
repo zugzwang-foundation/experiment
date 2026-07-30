@@ -52,7 +52,9 @@ export function PostCard({
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
 				<AggregateFooter aggregate={post.aggregate} />
-				<ReplyPreview replies={post.replies} />
+				{/* A removed POST keeps its surviving replies (§6 — the thread stays
+				    intact), so its live replies keep their own affordances. */}
+				<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 				<Button
 					variant="ghost"
 					size="xs"
@@ -127,7 +129,7 @@ export function PostCard({
 			</div>
 
 			<AggregateFooter aggregate={post.aggregate} />
-			<ReplyPreview replies={post.replies} />
+			<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 
 			<Button
 				variant="ghost"
