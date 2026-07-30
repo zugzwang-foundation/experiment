@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { formatPercent } from "../format";
+import { formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { COMPOSER_COPY, formatDharmaGrouped, formatMultiplier } from "./copy";
 
@@ -36,9 +36,7 @@ export function PositionStrip({
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
 }) {
-	const pct = pricing
-		? formatPercent(side === "YES" ? pricing.yes : pricing.no)
-		: "—";
+	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
 	const held = viewer?.position && viewer.position.side === side;
 	return (

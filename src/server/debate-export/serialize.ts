@@ -1,4 +1,7 @@
-import { formatDharmaExact, formatPercent } from "@/components/debate/format";
+import {
+	formatDharmaExact,
+	formatPricePercent,
+} from "@/components/debate/format";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import type {
 	DebatePost,
@@ -171,7 +174,7 @@ function summaryOrientation(
 	const m = model.market;
 	const priceWord = isTerminalPrice(m.status) ? "final" : "current";
 	const pricePhrase = m.pricing
-		? `with the ${priceWord} price at ${formatPercent(m.pricing.yes)} YES / ${formatPercent(m.pricing.no)} NO`
+		? `with the ${priceWord} price at ${formatPricePercent(m.pricing, "YES")} YES / ${formatPricePercent(m.pricing, "NO")} NO`
 		: "with no market price yet";
 	return (
 		`This debate asks: ${m.title} It is currently ${statusPhrase(m.status, meta.outcome)}, ${pricePhrase}. ` +
@@ -239,7 +242,7 @@ function marketHeader(model: DebateViewModel, meta: ExportMarketMeta): string {
 	lines.push(
 		`- **Status:** ${inBodyStatus(m.status, meta)}`,
 		m.pricing
-			? `- **${priceLabel}:** ${formatPercent(m.pricing.yes)} YES / ${formatPercent(m.pricing.no)} NO`
+			? `- **${priceLabel}:** ${formatPricePercent(m.pricing, "YES")} YES / ${formatPricePercent(m.pricing, "NO")} NO`
 			: `- **${priceLabel}:** not yet priced`,
 		`- **Total staked:** ${formatDharmaGrouped(meta.totalStakeDharma)} Đ`,
 		`- **Posts:** ${model.posts.length} · **Replies:** ${replyCount(model)} · **Participants:** ${meta.participants}`,
