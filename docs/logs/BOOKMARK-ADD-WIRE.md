@@ -6,12 +6,98 @@
 | **Plan** | `docs/plans/BOOKMARK-ADD-WIRE.md` (committed this session at `3287b6b`) |
 | **Branch** | `feat/bookmark-add-wire`, worktree `/private/tmp/zz-bookmark-add-wire` |
 | **Ground** | `origin/main` @ `b6495af` (PR #272, ADR-0034). `git merge-base --is-ancestor b6495af origin/main` → exit 0 |
-| **Session** | Unattended overnight execute, 2026-07-30. **HALTED at H6** — see below |
-| **State** | Slices 0, 1, 2 landed green. **Slices 3 and 5 NOT run.** DRAFT PR open, nothing merged |
+| **Session** | Two passes, 2026-07-30. **Pass 1:** unattended overnight execute → **HALTED at H6**. **Pass 2:** operator-directed Gate-C remediation (R1–R7) → complete |
+| **State** | Slices 0, 1, 2, 3, 5 landed green; the HIGH remediated. DRAFT PR #273 open, nothing merged, no branch deleted |
 
 ---
 
-## HALT — the reason, stated first
+## Pass 2 — Gate-C remediation (R1–R7)
+
+The operator ratified the HIGH and the fix placement (`key` on the toggle **inside**
+`CardActions`, not on `<PostCard>` in `scrollers.tsx` — it remounts only the stateful leaf
+and leaves scroll position, image loads and animation state alone), then authorised Slices
+3 and 5. The halt doctrine H1–H10 stayed in force; nothing else halted.
+
+### R1 · Hook enumeration — is the narrow fix sufficient?
+
+**Answer: YES.** The `PostCard` + `PostFocusHeader` subtree contains exactly **three** hooks,
+across every component and every `ui/` primitive:
+
+| # | Site | Initial value | Post-dependent? |
+|---|---|---|---|
+| 1 | `BookmarkToggle.tsx:66` — `useState(() => bookmarks?.saved.has(commentId) ?? false)` | derived from `commentId` | **YES — this is HIGH-1** |
+| 2 | `BookmarkToggle.tsx:69` — `useTransition()` | none | no |
+| 3 | `ReplyPreview.tsx:20` — `useState(false)` for `expanded` | the literal `false` | **no** |
+
+Everything else is stateless: `PostCard`, `PostFocusHeader`, `ArgProfile`, `ReplyCard`,
+`badges`, `CommentImage`, `placeholders`, `AggregateFooter`, `format`,
+`composer/ReplySplitBar`, and the `ui/` primitives `button` / `card` / `badge` / `avatar`.
+`ui/avatar` wraps radix, whose `AvatarImage` does hold internal image-loading state — but
+radix keys it off `src` via an effect dependency, so it re-derives on a reused instance
+rather than persisting a stale value. `@code-reviewer` independently reproduced this
+enumeration and agreed it is complete.
+
+**Related finding, reported and deliberately NOT fixed.** `ReplyPreview`'s `expanded` does
+not meet R1's halt criterion (its initial value is a constant), but the same un-keyed
+reconciliation makes the flag *persist* across a post change: expand post #1's replies, page
+to post #2 → #2 renders expanded. It is **pre-existing on `origin/main`** — `ReplyPreview.tsx`
+is 0-diff from `b6495af`, and `git show b6495af:src/components/debate/scrollers.tsx` already
+renders `<PostCard>` un-keyed — and it is cosmetic (post #2 shows *its own* replies, in the
+wrong layout; no wrong data, no wrong server call). `@code-reviewer` verdict: out of scope,
+not this PR's to own, not a halt. **Docketed** for a future keying pass (reset `expanded` on
+a `replies`-prop change, or key `ReplyPreview` by the post id). Widening the fix was not
+authorised and was not done.
+
+### R2 · RED → GREEN → mutation
+
+Two cases were written **before** the fix, both placed where the fix actually applies (a
+bare `<BookmarkToggle>` rerender has no keyed parent above it and would stay red after the
+fix, proving nothing):
+
+- `card-actions::rerender-with-new-comment-reflects-new-saved-state`
+- `post-scroller::paging-to-an-unsaved-post-drops-the-filled-icon` — the real user path,
+  driving the actual `ScrollerNav` "Next post" control.
+
+| Stage | Result |
+|---|---|
+| **RED** (pre-fix HEAD `44502a0`) | `Tests 2 failed \| 15 passed (17)`. Both failed with `Unable to find an accessible element with the role "button" and name "Bookmark"`, and the printed DOM showed the stale `aria-label="Remove bookmark"` / `aria-pressed="true"` — the defect itself, not a typo |
+| **GREEN** (post-fix) | `Tests 17 passed (17)` |
+| **MUTATION** (key removed again) | `Tests 2 failed \| 15 passed (17)` — exactly the two new cases |
+| **RESTORED** | `Tests 17 passed (17)`; source md5 identical before and after |
+
+### R3 · The fix
+
+One line, `bc84851`. `key={commentId}` on the `<BookmarkToggle>` rendered inside
+`CardActions`, plus the comment explaining why it is load-bearing. Optimistic state was
+**not** lifted to `DebateView` — D5 stands.
+
+### R4 · `@code-reviewer` re-review
+
+**No CRITICAL / HIGH / MEDIUM.** Q1 (does the test bind): yes — the key is the *sole*
+remount trigger in the `PostScroller → PostCard → ArgProfile → CardActions → BookmarkToggle`
+chain (every intermediate site is un-keyed and `bookmarks` is a stable reference), the
+`PostScroller` case drives the production interaction rather than faking a remount, and both
+assertions require the fresh state so stale state can satisfy neither. Q2: enumeration
+complete and correct; narrow fix sufficient; `ReplyPreview` out of scope.
+
+Two LOW notes, neither actionable here:
+- **L1** — the `ReplyPreview` `expanded` persistence above (pre-existing, docketed).
+- **L2** — an accepted D5 consequence now made explicit: because the key remounts the toggle
+  on paging, a bookmark toggled *this session* loses its optimistic icon on a paging
+  round-trip (post #1 → Next → Prev re-seeds from the frozen server snapshot). Re-clicking
+  fires an **idempotent** add bounded by `UNIQUE(user_id, comment_id)`, and it self-heals on
+  the next server render. This is strictly better than the pre-fix behaviour, which fired a
+  phantom `removeBookmarkAction` against a never-existent row. The only remedy is lifting
+  optimistic state to `DebateView`, which is explicitly fenced off — recorded, not fixed.
+
+### R7 · AGENTS.md §9
+
+Docketed, not changed. AGENTS.md §9 reads as "no component-test harness exists", which is
+false on disk (see the Pass-1 surprise below). **No line of AGENTS.md was touched.**
+
+---
+
+## HALT (Pass 1) — the reason, stated first
 
 **The run halted on kickoff condition H6: "Any reviewer returning CRITICAL or HIGH."**
 
@@ -23,6 +109,9 @@ authorise working past the finding. The fix is one line, specified below, for th
 operator to rule on at Gate C.
 
 ### HIGH-1 · Stale bookmark-icon state across `PostScroller` paging
+
+> **STATUS: REMEDIATED in Pass 2** (`bc84851`), test-locked RED→GREEN→mutation. The
+> account below is the Pass-1 record, kept verbatim as the root-cause analysis.
 
 - **Where:** `src/components/debate/scrollers.tsx:87` (`<PostCard>` rendered with **no
   `key`**) × `src/components/bookmarks/BookmarkToggle.tsx:66`
@@ -48,7 +137,7 @@ operator to rule on at Gate C.
   interaction on any 2+-post side.
 - **Aggravator:** a `useTransition` request still in flight when the user pages will run
   its revert `setSaved(!next)` against the now-different comment.
-- **Minimal fix (reviewer's, not yet applied):** key the toggle by its target in
+- **Minimal fix (applied in Pass 2 as `bc84851`):** key the toggle by its target in
   `CardActions` — `<BookmarkToggle key={commentId} … />` at `BookmarkToggle.tsx:144`.
   This also pre-empts the identical latent bug when Slice 3 pages the cluster in
   `ReplyScroller`. Alternative: `key={post.id}` on `<PostCard>` at `scrollers.tsx:87`.
@@ -71,7 +160,12 @@ confirmed, no stake/side/rank/Dharma surface, no `src/**/profile/**` reference, 
 | `30ceaad` | `feat(debate): BOOKMARK-ADD-WIRE slice 1 — viewer-scoped bookmarked/own comment ids (ADR-0034)` | `src/server/debate-view/viewer-context.ts` (+70) · `tests/integration/viewer-context.integration.test.ts` (+316) · 2 DTO fixtures (+4 each) |
 | `44502a0` | `feat(debate): BOOKMARK-ADD-WIRE slice 2 — live bookmark toggle on post cards` | `src/components/bookmarks/BookmarkToggle.tsx` (new, +156) · `UnbookmarkButton.tsx` · `ArgProfile.tsx` · `PostCard.tsx` · `PostFocusHeader.tsx` · `scrollers.tsx` · `DebateView.tsx` · `tests/unit/debate/render/bookmark-toggle.test.tsx` (new, +336) |
 
-13 files, +1360 / −35. All three commits SSH-signed (`%G?` = `G`), author **and** committer
+| `878e502` | `chore(debate): log session — BOOKMARK-ADD-WIRE slices 0-2, halted at H6` | `docs/logs/BOOKMARK-ADD-WIRE.md` |
+| `bc84851` | `fix(bookmarks): remount the toggle on comment change (Gate C remediation)` | `BookmarkToggle.tsx` (the key) · the 2 RED-first cases |
+| `9016e1f` | `feat(debate): BOOKMARK-ADD-WIRE slice 3 — full cluster on reply cards` | `ReplyCard.tsx` · `ReplyPreview.tsx` · `scrollers.tsx` · `PostCard.tsx` · `DebateView.tsx` · +6 render cases |
+| `8c5c8c0` | `docs(spec): SPEC.2 1.0.21 — BOOKMARK-ADD-WIRE riders (six amendments)` | `docs/specs/SPEC.2.md` |
+
+All seven commits SSH-signed (`%G?` = `G`, GitHub-verified), author **and** committer
 `Zugzwang/world <zugzwangworld@proton.me>`, subject-only messages, no `Co-authored-by`.
 
 **Slice 0** (re-ground, no code): baseline full suite green at **280 files / 1997 tests**
@@ -90,19 +184,21 @@ ADR-0034. Tests-first via `@test-writer`: RED proven (7 new failing, 6 pre-exist
 `DebateView` derives the two Sets once. **C4** applied: `UnbookmarkButton` now branches on
 the typed `{ ok }` instead of discarding it.
 
-## Slices NOT run
+## Slices — final state
 
-- **Slice 3 (replies)** — not started; the run halted at the Slice-2 reviewer.
+- **Slice 3 (replies)** — **LANDED in Pass 2** (`9016e1f`). The reply card now carries the FULL
+  cluster per C3, rendered from the SAME `CardActions` as `ArgProfile`; `bookmarks` threaded
+  through `ReplyPreview`, `ReplyScroller` and BOTH `PostCard` call sites. `@code-reviewer`:
+  **no findings at any severity**, all eight directed points pass.
 - **Slice 4 (Profile arm)** — **deferred by ratified correction C2**, pending the W2.7 /
   canon §3.11 design ruling. Nothing under `src/components/profile/**` or
   `src/server/profile/**` was created; no `ArgumentList` primitive extracted. Severability
   verified by build, not just by import-graph reading: `git diff b6495af..HEAD -- src/ |
   grep -c "components/profile\|server/profile"` → **0**.
-- **Slice 5 (SPEC.2 amendments)** — **deliberately not landed, and this is load-bearing.**
-  The web-authored §4.2 replacement text asserts the bookmark icon is wired on *reply*
-  cards (`ReplyCard`, via `ReplyPreview` and `ReplyScroller`). Slice 3 did not run, so
-  landing that text verbatim would make SPEC.2 state something false about the tree. The
-  six amendments must land **with** Slice 3, not before it.
+- **Slice 5 (SPEC.2 amendments)** — **LANDED in Pass 2** (`8c5c8c0`), correctly *after*
+  Slice 3: the web-authored §4.2 text asserts the icon is wired on reply cards, which only
+  became true once Slice 3 landed. Withholding it in Pass 1 was the right call, not an
+  omission. SPEC.2 → **1.0.21**.
 
 ## Decisions made
 
@@ -169,7 +265,9 @@ Sequential, one reviewer touching the DB at a time. Each was passed
 | `@security-auditor` | 1 | **Zero findings at every severity.** All six directed points (a)–(f) verified and stated individually. |
 | `@code-reviewer` | 2 | **1 HIGH** (HIGH-1 above → H6 halt), 1 MEDIUM (`CardActions` home), 2 LOW (a11y double-signal: name *and* `aria-pressed` both change; `type="button"` omitted on the two disabled buttons, matching the shipped precedent). Points 1–6, 8, 10 PASS; point 7 FAIL. |
 | `@db-migration-reviewer` | — | **NOT INVOKED — reasoned waiver**, zero `src/db/schema/**` and zero `drizzle/migrations/**` diff. Waiver is void if DDL ever appears; none did. |
-| `@security-auditor` | 2, 3 | **NOT RUN** — the halt fired at the Slice-2 `@code-reviewer`. The plan makes it mandatory on Slice 1 only, but Slices 2–3 carry its four forward obligations (below). |
+| `@code-reviewer` | 2, re-review after the fix | **No CRITICAL/HIGH/MEDIUM.** Both directed questions answered; 2 LOW (L1/L2 above), neither actionable. |
+| `@code-reviewer` | 3 | **No findings at any severity.** All eight directed points pass, including C3 byte-for-byte and the removed-reply masking lock. |
+| `@security-auditor` | 2, 3 | **NOT RUN** — the plan makes it mandatory on **Slice 1 only** (run, zero findings). Slices 2–3 instead discharge its four named forward obligations (below), three now test-locked. Flagged so the omission is visibly deliberate. |
 
 ### `@security-auditor` forward obligations (Slice 1 → Slices 2/3)
 
@@ -177,7 +275,9 @@ Sequential, one reviewer touching the DB at a time. Each was passed
    (protected by `ArgProfile`'s required `author`/`marker`), an icon placed in
    `ReplyCard`'s removed branch (`:14-21`) **would compile**. It must go strictly in the
    `:22-36` non-removed branch, with a render test asserting no bookmark control on a
-   removed reply. **Still owed.**
+   removed reply. **DISCHARGED in Slice 3** — the cluster sits strictly in `ReplyCard`'s
+   non-removed branch; `reply-card::removed-reply-renders-no-cluster` is the guard, and
+   moving `<CardActions>` into the removed branch fails exactly that case.
 2. **(Slice 2/3)** The own-check must consume `ownCommentIds` (ids), never `ownPseudonym`,
    and must run **before** the saved-check. **Done in Slice 2**, test-locked by
    `bookmark-toggle::own-outranks-saved`.
@@ -191,7 +291,8 @@ Sequential, one reviewer touching the DB at a time. Each was passed
 | Gate | Result |
 |---|---|
 | Baseline full suite (0g) | **280 files / 1997 tests** passed, 1 skipped, 4 todo — exit 0 |
-| Full suite at halt | **281 files / 2019 tests** passed, 1 skipped, 4 todo — exit 0 (**+1 file, +22 tests**: 7 integration + 15 render) |
+| Full suite at the Pass-1 halt | **281 files / 2019 tests** passed — exit 0 |
+| **Full suite, final (Pass 2)** | **281 files / 2027 tests** passed, 1 skipped, 4 todo — exit 0 (**+30 tests vs the 1997 baseline**: 7 integration + 23 render) |
 | `ZUGZWANG_ENV=preview just verify` | exit 0 (typecheck → biome → next build) |
 | `pnpm exec tsc --noEmit` | exit 0, unpiped |
 | `pnpm exec biome check .` | exit 0; 1 **pre-existing** warning in `tests/server/moderation/moderation-blocked-event.test.ts` (unused import, present on `origin/main`, untouched — left per §5.3) |
@@ -224,13 +325,21 @@ read at any point.
 
 ## Next session starts at
 
-**Rule on HIGH-1 first.** If the one-line `key={commentId}` fix is approved: apply it at
-`BookmarkToggle.tsx:144`, add the missing `rerender`-with-changed-`commentId` regression
-case to `tests/unit/debate/render/bookmark-toggle.test.tsx`, re-run `@code-reviewer` on
-Slice 2, **then** run Slice 3 (replies — full cluster per C3, strictly in `ReplyCard`'s
-non-removed branch per forward obligation 1, threading `ReplyPreview` from *both*
-`PostCard` call sites at `:45` and `:118` — the removed-post branch keeps its live replies),
-then Slice 5 (the six SPEC.2 amendments), then `@security-auditor` on the cumulative diff.
+**Every slice this task planned is landed and green; the HIGH is remediated.** PR #273 is
+DRAFT and awaits the operator's Gate-C read of the diff. Next actions, in order:
+
+1. Operator reviews PR #273 and marks it ready / merges (squash). **CC must not** — the
+   kickoff forbids merging, marking ready, and branch deletion.
+2. After merge, `TESTING.0` unblocks: ADR-0032 / UI-A6 §11 made B1 a hard pre-testing gate,
+   and the bookmark feature is now end-to-end usable.
+3. **Slice 4 (Profile arm) remains deferred** pending the W2.7 / canon §3.11 design ruling
+   (OQ-1). Severability is proved by build, so it can be cut as its own task with no rework.
+
+**Docketed, deliberately not done here:** the `ReplyPreview` `expanded` paging leak (R1/L1);
+the `CardActions` relocation to `components/debate/` once the ADR-0025 download trigger is
+wired (Slice-2 MEDIUM-2); AGENTS.md §9's stale "no component-test harness" claim (R7);
+ADR-0033's content fold into the SPEC bodies (index row only, ruling G1); OQ-2/4/5 —
+`add.ts` honouring `isFrozen()` is the one `@security-auditor` weighted highest.
 
 ## Context to preserve
 
@@ -254,5 +363,6 @@ then Slice 5 (the six SPEC.2 amendments), then `@security-auditor` on the cumula
 
 ## Time
 
-Single unattended session, 2026-07-30, ~18:05–19:35 local. Halted at H6; nothing merged;
-no branch deleted.
+Two passes on 2026-07-30. Pass 1 (unattended): ~18:05–19:35 local, halted at H6. Pass 2
+(operator-directed Gate-C remediation R1–R7): ~19:50–21:20 local. Nothing merged; no branch
+deleted; PR #273 still DRAFT.
