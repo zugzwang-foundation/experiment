@@ -139,9 +139,12 @@ The rider justifies the derived rule by the engine pinning `|p_yes + p_no − 1|
 
 ## Pre-merge corrections
 
-Both open spec questions were adjudicated **fix-before-merge** by the operator. Two web-authored corrections to `docs/specs/SPEC.1.md`, landed on `fix/pct-round` as **`74aa31b`** — `docs(spec): correct the 1.0.24 rider's cross-reference and scope boundary`.
+Both open spec questions were adjudicated **fix-before-merge** by the operator. **Three** web-authored corrections to `docs/specs/SPEC.1.md`, in two commits on `fix/pct-round`:
 
-Both are edits to the **unmerged** 1.0.24 rider, made **in place** per the DROUND precedent: a rider is corrected while its version is still unmerged. Therefore **no version bump and no new §20 row** — §0 stays `1.0.24` / `2026-07-31`, and §20 keeps exactly one 1.0.24 row. Spec prose only: no code, no tests.
+- **`74aa31b`** — `docs(spec): correct the 1.0.24 rider's cross-reference and scope boundary` (Corrections 1 + 2)
+- **`bcaa3a8`** — `docs(spec): state the ulp tolerance as suite-enforced, not as the engine's guarantee` (Correction 3)
+
+All three are edits to the **unmerged** 1.0.24 rider, made **in place** per the DROUND precedent: a rider is corrected while its version is still unmerged. Therefore **no version bump and no new §20 row** — §0 stays `1.0.24` / `2026-07-31`, and §20 keeps exactly one 1.0.24 row. Spec prose only: no code, no tests.
 
 ### Correction 1 — the wrong cross-reference (resolves unratified choice 5)
 
@@ -153,7 +156,7 @@ This is the instruction's **option 2**, and option 1 was ruled out **empirically
 - cpmm.md's **only** prices-sum statement is **§3.3 Price** (line 118), and it states the *opposite* of what the rider needs:
   > "…equals that side's probability (derived in §4.3). **p_yes + p_no = 1 identically**; there is no fee wedge between the two sides."
   That is the idealised real-number identity — exact equality. Citing it would have made the sentence self-contradictory: *"pins ≤ 1 ulp rather than exact equality (cpmm §3.3, which asserts exact equality)."*
-- The `"line 5"` label in the property test is **not** a cpmm.md section. The test's own header calls it *"charter line 5"*, and the string `charter` appears nowhere in cpmm.md. Its `describe` attributes it to `cpmm.md §11`, but §11's numbered list is `INV-C1..INV-C5` and **INV-C5 is "Frozen determinism"**, not prices-sum. So the `cpmm §11 INV-C*` cite I had suggested for the operator was **also wrong**, and is withdrawn.
+- The `"line 5"` label in the property test is **not** a cpmm.md section. The test's own header calls it *"charter line 5"*, and the string `charter` appears nowhere in cpmm.md. Its `describe` attributes it to `cpmm.md §11`, but §11's numbered list is `INV-C1..INV-C5` and **INV-C5 is "Frozen determinism"**, not prices-sum. So the `cpmm §11 INV-C*` cite I had suggested for the operator was **also wrong**, and is withdrawn. *(A charter document does nonetheless exist — see **F-1** under **Findings — not fixed here**, which corrects the impression that none does: "the charter" is `cpmm.md` itself, so named by `docs/plans/ENGINE.3.md`, and "charter line N" indexes that plan's table. It is simply not self-identified inside cpmm.md.)*
 - The tolerance is stated in exactly one in-repo artifact — `tests/unit/cpmm/invariants.property.test.ts:316`:
   > `it("line 5 — prices sum to 1: |p_yes + p_no − 1| ≤ 1 ulp", …)`
 
@@ -169,15 +172,67 @@ Nothing else in that sentence or paragraph changed; the em-dash continuation abo
 
 **Verified: the 1.0.24 §20 row now reads true against the section.** The row claims it *"Amends §10.8's prior scope boundary, which excluded percentages by name at 1.0.23."* Before this edit that claim was **inaccurate** — the boundary sentence was textually unchanged, so 1.0.24 amended nothing of the sort. The row is now accurate: the boundary is scoped to the 0-dp rule and explicitly excepts market price percentages, and the complement-rule paragraph it points to sits below it in the same section. Machine-checked (three assertions, all PASS).
 
+### Correction 3 — the ulp tolerance is suite-enforced, not a weaker engine guarantee (`bcaa3a8`)
+
+Correction 1 fixed the *pointer* but left the *framing* wrong. The paragraph still read that the rule was "robust to the engine's actual guarantee, **which pins** `|p_yes + p_no − 1| ≤ 1 ulp` … **rather than exact equality**" — i.e. it cast ≤1 ulp as a weaker promise the engine makes *instead of* the identity. That misplaces both facts.
+
+**Source verified before citing.** `docs/specs/cpmm.md` line 118, verbatim:
+
+> `equals that side's probability (derived in §4.3). p_yes + p_no = 1 identically;`
+
+It sits under **`### 3.3 Price`** (line 108), with the next heading `### 3.4 Domain` at line 121 — so line 118 is genuinely inside 3.3, and the section number and wording match what was reported.
+
+The replacement separates definition from enforcement: the identity is **definitional** (cpmm §3.3), while the engine emits two *independently quantised 18-dp strings*, and **≤1 ulp is what the suite enforces on those strings** — not the identity itself. It also states the magnitude honestly: at 10⁻¹⁸ the slack sits fifteen decades below the 0.005 tie granularity, so the slack is **not** the defect; the argument for deriving NO is that a rule reading both strings depends on a property *stronger than the one the tests enforce*.
+
+**No cascade.** The 1.0.24 §20 row does not mention the ulp tolerance at all — machine-checked for `ulp`, `tolerance`, `p_yes`, `10.2`, `invariants.property`, `quantis`, `identically`; all absent. Left unedited.
+
 ### Proofs
 
 | Check | Result |
 |---|---|
-| `git diff origin/main...HEAD -- src/` unchanged by the correction | **byte-identical** — `md5 058cfeca780a0d018a819ba58b714033` before (`bd0ee18`) and after (`74aa31b`) |
+| `git diff origin/main...HEAD -- src/` unchanged across all three corrections | **byte-identical** — `md5 058cfeca780a0d018a819ba58b714033` at `bd0ee18`, `74aa31b` and `bcaa3a8` |
 | `git diff origin/main...HEAD -- src/server/cpmm/calculate.ts` | **`--exit-code` 0, 0 bytes** |
-| Commit contents | `docs/specs/SPEC.1.md` only, 2 insertions / 2 deletions |
+| `git diff origin/main...HEAD -- tests/unit/cpmm/` | **`--exit-code` 0, 0 bytes** — the CPMM test dir stays out of this display-layer PR |
+| Commit contents | `docs/specs/SPEC.1.md` only — 2+/2− (`74aa31b`), 1+/1− (`bcaa3a8`) |
 | Full suite | 284 files / **2059 passed**, 1 skipped, 4 todo, **exit 0** — count unchanged |
 | Version / §20 | `1.0.24` unchanged; **0** new §20 rows |
+
+**One flaked run, worth recording.** The first post-Correction-3 suite run reported `1 failed | 283 passed` / 2057 tests — `tests/server/admin/moderation/audit-page-auth.test.ts` failing as a **Failed *Suite*** (collection), not a failed test: `Error: [vitest-worker]: Timeout calling "fetch" with ".../AdminTabs.tsx"`. Its 2 uncollected tests are exactly the 2059→2057 gap. Cause was machine contention — I ran `git commit` (lefthook → biome) concurrently with the suite; that run took **1435s with `transform 902s`** against a normal **176s with `transform 1.7s`**, an 8× difference. The file passes in isolation (2/2), and a clean re-run with nothing else running is **2059 passed, exit 0**. A docs-only prose diff cannot reach an admin auth test. Lesson repeated from the reviewer-cascade rule: don't run anything else against this tree while the suite is running.
+
+---
+
+## Findings — not fixed here
+
+Docketed for a future row. **Nothing under `tests/unit/cpmm/` or `src/server/cpmm/` was touched** — this is a display-layer PR and that directory stays out of its diff (proven: `git diff origin/main...HEAD -- tests/unit/cpmm/` and `-- src/server/cpmm/` are both empty).
+
+### F-1 — the CPMM property suite's "charter line N" citation is imprecise, and cpmm.md does not carry the tolerance the suite enforces
+
+**What the test file cites.** `tests/unit/cpmm/invariants.property.test.ts` labels its cases "charter line N" and attributes them to cpmm.md §11:
+
+- `:29–30` — `// ENGINE.3 property suite — cross-cutting invariants INV-C1..C5 (cpmm.md §11) + charter line 5 (prices sum to 1; getPrices-vs-p1 cross-consistency).`
+- `:72` — `describe("invariants.property — INV-C1..C5 + line 5 (cpmm.md §11)", …)`
+- `:316` — `it("line 5 — prices sum to 1: |p_yes + p_no − 1| ≤ 1 ulp", …)`
+
+**What is actually at that location.** `cpmm.md` **§11 Invariants** (line 539) lists exactly `INV-C1`…`INV-C5` — Conservation, k non-decreasing, Domain, Solvency/residual identity, and **INV-C5 = "Frozen determinism"**. There is **no "line 5"** in §11 and **no prices-sum entry** anywhere in it. So the `(cpmm.md §11)` attribution on the `line 5` cases points at a section that does not contain them.
+
+**Does a charter exist? YES — and this corrects an earlier reading in this log.** A charter does exist; it is simply not self-identified inside cpmm.md.
+
+- **"The charter" is `docs/specs/cpmm.md` itself**, so named by `docs/plans/ENGINE.3.md:213`: *"`docs/specs/cpmm.md` v1.0.0 — the charter: **§3** (domain/price), **§4.2**, **§5.2**, **§5.3**, **§8.1**, **§10.3**, **§10.4**, **§11** (INV-C1–C5), **§12** (E1–E5), **§13** (API)."*
+- **"Charter line N" indexes a table in the ENGINE.3 plan**, not a section of cpmm.md: `docs/plans/ENGINE.3.md:97–99` opens *"## Test plan (charter → named test)"* with a `| Charter line |` column running `1`, `2.1`–`2.4`, `3.1`–`3.4`, …; and `:48` maps `invariants.property.test.ts` → *"Charter line 4 + line 5"*.
+- The word `charter` appears **nowhere in `docs/specs/cpmm.md`** — it is an ENGINE.3-plan name for that document, never a self-description. That is why grepping cpmm.md for it finds nothing.
+
+**Consequence — narrower than first stated.** The five property tests **can** be checked against a stated list of invariants: `cpmm.md` §11 for `INV-C1..C5`, plus the ENGINE.3 charter-line table for the numbered rows. The real defects are two, and both are citation-level:
+
+1. The `(cpmm.md §11)` attribution on the `line 5` cases is wrong — `line 5` is an ENGINE.3-plan row number, not a §11 entry. A reader following the citation lands on a list that does not mention prices summing.
+2. **`cpmm.md` nowhere states the ≤1 ulp tolerance.** `grep -c -i ulp docs/specs/cpmm.md` → **0**. The spec asserts the exact identity at §3.3 (line 118): *"p_yes + p_no = 1 identically; there is no fee wedge between the two sides."* The tolerance exists only in `docs/plans/ENGINE.3.md:24` — *"asserted **≤1 ulp** after independent half-even rounding (§3.3). In charter (carry-forward assertion)"* — and in the test itself. So the property the suite actually enforces on the emitted 18-dp strings is stated in a **plan** and a **test**, never in the spec that the plan calls the charter.
+
+This is precisely the gap SPEC.1 §10.8 now describes correctly after Correction 3: the identity is definitional (cpmm §3.3), the tolerance is what the suite enforces on the serialised strings.
+
+**Suggested future row (not done here):** either add the ≤1 ulp string-level tolerance to `cpmm.md` §3.3 or §11 as a stated invariant, or re-point the test's `describe`/header citation at `docs/plans/ENGINE.3.md`'s charter-line table. Touching `tests/unit/cpmm/` is out of scope for a display-layer PR.
+
+### F-2 — `docs/plans/PCT-ROUND.md:87` still carries the superseded `cpmm §10.2` cite
+
+The plan's §5 failure-mode table reads *"the CPMM charter pins `|p_yes + p_no − 1| ≤ 1 ulp` (cpmm §10.2; `tests/unit/cpmm/invariants.property.test.ts:316`)"*. `§10.2` is *Configuration*, the same wrong pointer Correction 1 removed from the spec. Left unedited deliberately: the plan is a point-in-time record and sits outside the three corrections' ratified scope. Flagged so it is not mistaken for a live citation.
 
 ---
 
