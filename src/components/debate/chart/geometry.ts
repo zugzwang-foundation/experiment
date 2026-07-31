@@ -41,12 +41,6 @@ export function fmtUtcDay(iso: string): string {
 	return `${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
 }
 
-/** "50%" — a whole-percent probability label for the accessible summary. A
- * DISPLAY read of a canonical price string (never money math). */
-export function fmtPct(yes: string): string {
-	return `${Math.round(Number(yes) * 100)}%`;
-}
-
 /** ISO instant → x pixel over the market lifetime domain, FULL-BLEED:
  * `startMs` → 0, `endMs` → `VIEWBOX_W`. A degenerate domain (`startMs ===
  * endMs`, the single-point unbet market) collapses to the start edge (0) — a

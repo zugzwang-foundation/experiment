@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { formatPercent } from "../format";
+import { formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import {
 	COMPOSER_COPY,
@@ -84,9 +84,7 @@ export function SlotHeader({
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
 }) {
-	const pct = pricing
-		? formatPercent(side === "YES" ? pricing.yes : pricing.no)
-		: "—";
+	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
 	const heldSide = viewer?.position?.side ?? null;
 	const oppositeHeld = isEntryDisabled({ resultingSide: side, heldSide });

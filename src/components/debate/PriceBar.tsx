@@ -1,4 +1,4 @@
-import { formatPercent } from "./format";
+import { formatPricePercent } from "./format";
 
 /**
  * The market price bar (DEBATE.4 §5 / D1) — Yes%/No% from `getPrices`, pole-
@@ -17,8 +17,10 @@ export function PriceBar({
 	if (!pricing) {
 		return <p className="text-xs text-muted-foreground">Pricing unavailable</p>;
 	}
-	const yesPct = formatPercent(pricing.yes);
-	const noPct = formatPercent(pricing.no);
+	// PCT.ROUND: YES canonical, NO derived as 100 − YES — the pair always sums
+	// to exactly 100 (SPEC.1 §10.8). The bar geometry below is unchanged.
+	const yesPct = formatPricePercent(pricing, "YES");
+	const noPct = formatPricePercent(pricing, "NO");
 	return (
 		<div className="flex flex-col gap-1">
 			<div
