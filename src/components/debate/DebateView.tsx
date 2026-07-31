@@ -192,7 +192,12 @@ export function DebateView({
 			    this page's own server read on an interval, suspended while the
 			    document is hidden or a composer is open, stopped once the market
 			    leaves `Open`. Composer-open is derived from the state this host
-			    ALREADY holds — `BetComposer` is untouched. */}
+			    ALREADY holds — `BetComposer` is untouched.
+			    Mount site is LOAD-BEARING: it sits OUTSIDE the market↔post
+			    ternary below, so entering or leaving post view does not remount
+			    the poll. Inside the ternary, that toggle would reset its
+			    `stopped` and `wasSuspended` refs — and "stopped permanently"
+			    would last only until the reader opened a post. */}
 			<DebatePoll
 				marketOpen={marketOpen}
 				composerOpen={openSide !== null || openReply !== null}

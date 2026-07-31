@@ -123,14 +123,14 @@ File placement follows the behaviour under test, per the SPEC.1 1.0.25 Acceptanc
 
 **Honesty about the masking row (RULING E).** Because the mechanism re-invokes the same read, there is *no new masking code to test*. That row is therefore a **structural guard**, and the test file's docblock says so plainly: it proves that no second read path exists and that masking stays single-sourced, and it does **not** re-prove masking behaviour (which the DEBATE.4 suite already owns). It is built so that a future "lighter" poll path — a `fetch` against a new endpoint — turns it RED.
 
-**RED-first.** All five rows are proved RED against `origin/main` @ `54b0b2a` before any implementation lands, with the failure output captured verbatim in `docs/logs/F-DEBATE-4.md`. On a combined PLAN+EXECUTE session that captured output is what substitutes for writer/reviewer independence.
+**RED-first.** All five rows are proved RED against `origin/main` @ `54b0b2a`, with the failure output captured verbatim in `docs/logs/F-DEBATE-4.md`. Precise about the sequence, because it matters: the tests were written and committed RED first (`887da63`), then the structural file's assertions were switched to comment-stripped source during implementation — a negative source-grep that also matches its own documentation is a bad guard — so the RED was **re-captured with the final test files** against a tree with the implementation removed (`git stash push -- src/` plus the new module moved aside). That second capture, not the first, is what the log records. On a combined PLAN+EXECUTE session that captured output is what substitutes for writer/reviewer independence.
 
 **Regression floor.** The full suite must still be green: baseline measured on this tree at `54b0b2a` = **284 files passed / 1 skipped · 2059 passed / 1 skipped / 4 todo · exit 0**.
 
 ## 8. Out of scope
 
 - **No `error.tsx` for `/m/[slug]`** — docketed as a **POLISH.3** input. It would not save the composer (a segment boundary still replaces the subtree); it would replace Next's raw error page with something branded. Ruled a separate task; this build is what makes it urgent.
-- **No fix for Top re-ordering under a reader** — a poll can reorder the column a reader is mid-sentence in, because Top is recomputed server-side every tick. Ruled accept-and-document; **named in the flow file** so it is not discovered by a participant in September.
+- **No fix for the pager swapping the argument under a reader.** Each pole column is a **one-card pager keyed by array position** (`scrollers.tsx:79-84`), not a scrolling list, and `index` survives a poll — so re-ranked Top order silently replaces the whole visible argument with the `N / M` label unchanged. Stronger than "a column reorders", and the flow file now says so accurately. Ruled accept-and-document; the fix (hold the position as a comment id) is **POLISH.3**. *Corrected after `@code-reviewer` HIGH-2 — the first draft of this plan and the flow file both described a scrolling list this surface does not have.*
 - **No fix for the `priceChart` non-fatal read** — under 4×/min polling a flaky reserve replay makes the chart appear and vanish with no explanation. Recorded, not fixed. **POLISH.3** input.
 - **No `BetComposer` change.** Suspension is keyed on composer-**open**, derived from state `DebateView` already holds. No `onDirtyChange` prop, no dirty predicate, no text-length key.
 - **No in-flight guard / request queue** (refreshes coalesce — recon F16).
@@ -139,6 +139,15 @@ File placement follows the behaviour under test, per the SPEC.1 1.0.25 Acceptanc
 - **No poll on any other surface.** `/u/[pseudonym]`, `/bookmarks` and Discovery are untouched; Discovery is explicitly cached-not-polled (SPEC.1 §22).
 - **No HARDEN.6 number tuning.** 15000 is a provisional pin; the tune stays deferred and is a one-line change by construction.
 - **No `FLOWS-BACKFILL`.** Exactly one flow file — `F-DEBATE-4.md` — gains substance. The other 36 skeletons stay skeletons.
+
+### In scope but easy to miss — the contract-file edits
+
+Recorded here because `@code-reviewer` correctly flagged them as untraceable to the plan as first drafted. All four ride this PR:
+
+- **`CLAUDE.md` §6** — one sentence in the Subagents paragraph. **Ratified in the execute kickoff**, whose STEP 4 supplies the text verbatim; the plan's first draft simply failed to list it. It supersedes rather than stacks beside the existing MODEL-REPIN sentence, which stated only the mid-session half of the same rule (CLAUDE.md §7 prunes on supersession).
+- **`AGENTS.md` §9** — a Component/render testing bullet naming the jsdom + `@testing-library/react` harness, and the absence of `jest-dom`. §7 above flags the staleness; this is where it gets fixed. Directly connected: this PR adds a `*.test.tsx` under that harness.
+- **`SPEC.1` Appendix B trailer** — docketed correction (b), precondition verified before applying.
+- **`SPEC.2` §0 banner + Date** — the banner's own version token was left at 1.0.21 by the rider's two enumerated banner edits, which would have re-created exactly the banner↔metadata drift the 1.0.21 change-log row records repairing.
 
 ---
 

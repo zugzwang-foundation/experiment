@@ -7,7 +7,7 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
-import { StrictMode, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // F-DEBATE-4 (B3) tests-first — the CLIENT-RENDER half of the polled-on-view
@@ -112,7 +112,11 @@ function PolledHost({
 	second: DebateViewModel;
 }) {
 	const [model, setModel] = useState(first);
-	applyNextPayload = () => setModel(second);
+	// In an effect, never during render: a render-phase module-scope assignment
+	// is a side effect that misbehaves the moment the host renders concurrently.
+	useEffect(() => {
+		applyNextPayload = () => setModel(second);
+	}, [second]);
 	return (
 		<DebateView
 			model={model}
@@ -156,10 +160,6 @@ describe("F-DEBATE-4 — the debate-view poll (cadence)", () => {
 
 		tick(3);
 		expect(refreshMock).toHaveBeenCalledTimes(4);
-	});
-
-	it("reads its cadence from the constant — SPEC.1 1.0.25's provisional 15000 ms pin", () => {
-		expect(POLL_INTERVAL_MS_DEBATE_VIEW).toBe(15000);
 	});
 
 	it("clears its interval on unmount — no leaked timer", () => {

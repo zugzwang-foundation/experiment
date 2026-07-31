@@ -26,10 +26,19 @@ import { describe, expect, it } from "vitest";
 // What it DOES prove is the STRUCTURAL premise the whole mechanism rests on:
 // that exactly one debate read path exists, that the poll rides it rather than
 // forking it, and that masking stays single-sourced on `loadRemovedSet` inside
-// `loadDebateView` (ADR-0021; ADR-0034 D-4). It is built so a future "lighter"
-// poll — a `fetch` against a new read endpoint — turns it RED, because a second
-// read path is a second place for masking to diverge, and that divergence is
-// the failure this row exists to prevent.
+// `loadDebateView` (ADR-0021; ADR-0034 D-4). A second read path is a second
+// place for masking to diverge, and that divergence is the failure this row
+// exists to prevent.
+//
+// Its reach, stated honestly rather than claimed broadly. It DOES catch: a new
+// Route Handler anywhere under `src/app` (the pinned inventory); a client
+// transport — fetch / SWR / react-query / EventSource / WebSocket / XHR / axios
+// / sendBeacon — appearing anywhere in the debate READ tree; a third
+// `loadDebateView(` call site; a session parameter threaded into the loader; a
+// second `loadRemovedSet` definition. It does NOT catch: an aliased import
+// (`import { loadDebateView as load }`), a masking reimplementation that never
+// names `loadRemovedSet`, or a transport reached through an indirection this
+// regex cannot see. It is a tripwire on the cheap paths, not a proof.
 //
 // RED target: `src/components/debate/DebatePoll.tsx` does not exist yet, so the
 // positive assertions fail against `origin/main`. The negative assertions pass
@@ -84,9 +93,21 @@ const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
 
-/** Any client-side data fetch. A poll that forks the read must use one of these. */
+/**
+ * Any client-side transport a forked poll could reach for. SSE and WebSocket are
+ * named because SPEC.2 §4.3 forbids them by name; the rest cover the ordinary
+ * ways a "lighter" poll gets written.
+ */
 const CLIENT_FETCH =
-	/\bfetch\s*\(|\buseSWR\b|\buseQuery\b|\buseInfiniteQuery\b/;
+	/\bfetch\s*\(|\buseSWR\b|\buseQuery\b|\buseInfiniteQuery\b|\bEventSource\b|\bWebSocket\b|\bXMLHttpRequest\b|\baxios\b|sendBeacon/;
+
+/**
+ * The debate READ tree — every client module that renders the polled payload.
+ * `composer/` is excluded on purpose: the write path legitimately fetches
+ * (`/api/bets/place`, `/api/bets/sell`, the quote read), and this guard is about
+ * the READ never forking, not about the composer.
+ */
+const READ_TREE_EXCLUDES = /\/composer\//;
 
 describe("debate-view::poll-preserves-removal-masking", () => {
 	it("the poll module exists and refreshes by re-invoking the server read", () => {
@@ -100,9 +121,11 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		expect(CLIENT_FETCH.test(code(POLL))).toBe(false);
 	});
 
-	it("the polled surface's client root issues no client-side data fetch", () => {
-		expect(src(HOST)).not.toBeNull();
-		expect(CLIENT_FETCH.test(code(HOST))).toBe(false);
+	it("no module in the debate READ tree issues a client-side data fetch", () => {
+		const offenders = sourcesUnder("src/components/debate")
+			.filter((file) => !READ_TREE_EXCLUDES.test(file))
+			.filter((file) => CLIENT_FETCH.test(code(file)));
+		expect(offenders).toEqual([]);
 	});
 
 	it("adds no read endpoint under /m/[slug] — exactly quote/ and export/", () => {
@@ -112,6 +135,36 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		expect(routes).toEqual([
 			EXPORT_ROUTE,
 			"src/app/(public)/m/[slug]/quote/route.ts",
+		]);
+	});
+
+	it("adds no Route Handler ANYWHERE — the repo-wide route.ts inventory is pinned", () => {
+		// The tightest available encoding of "SPEC.2 §4.3's catalogue is closed at
+		// eleven and F-DEBATE-4 adds no twelfth". A poll endpoint parked outside
+		// `m/[slug]` — say `src/app/api/debate/[id]/route.ts` — is invisible to the
+		// subtree check above but cannot hide from this one. A future handler is
+		// not forbidden; it must be a conscious edit here.
+		// (On-disk 13 vs the §4.3 table's eleven rows is PRE-EXISTING drift, not
+		// this task's: `api/visits`, `api/cron/alarms-drain` and `m/[slug]/quote`
+		// are built but uncatalogued, and `api/dataset/manifest` is catalogued but
+		// pending-build. Surfaced, deliberately not corrected here.)
+		const routes = sourcesUnder("src/app").filter((file) =>
+			file.endsWith("/route.ts"),
+		);
+		expect(routes).toEqual([
+			"src/app/(admin)/admin/markets/media/sign/route.ts",
+			EXPORT_ROUTE,
+			"src/app/(public)/m/[slug]/quote/route.ts",
+			"src/app/api/_smoke-error/route.ts",
+			"src/app/api/auth/[...all]/route.ts",
+			"src/app/api/bets/place/route.ts",
+			"src/app/api/bets/sell/route.ts",
+			"src/app/api/cron/alarms-drain/route.ts",
+			"src/app/api/cron/close-due-markets/route.ts",
+			"src/app/api/cron/r2-orphan-sweep/route.ts",
+			"src/app/api/health/route.ts",
+			"src/app/api/uploads/sign/route.ts",
+			"src/app/api/visits/route.ts",
 		]);
 	});
 

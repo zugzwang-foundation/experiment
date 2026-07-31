@@ -23,11 +23,15 @@ import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
  * Interval setup/teardown follows the `NeedsResolutionCount` precedent (one
  * effect, one interval, a `clearInterval` cleanup) — measured to yield the
  * correct NET fire rate under React's StrictMode double-mount. What it
- * deliberately does NOT copy: no `aria-live` on the polled region (the polled
- * value here is the whole debate view; marking it live would make a screen
- * reader announce the entire page every 15 s), no fusing of a display concern
- * into the poll, and no reliance on the route being dynamic by accident —
- * `/m/[slug]/page.tsx` now carries an explicit `force-dynamic`.
+ * deliberately does NOT copy: this flow ADDS no `aria-live` to the polled
+ * region (the polled value here is the whole debate view; marking it live would
+ * make a screen reader announce the entire page every 15 s), no fusing of a
+ * display concern into the poll, and no reliance on the route being dynamic by
+ * accident — `/m/[slug]/page.tsx` now carries an explicit `force-dynamic`.
+ * Note the polled tree already contains one pre-existing live region — the
+ * pager's `{index + 1} / {total}` counter at `scrollers.tsx:41` — so a poll can
+ * now trigger an announcement without user action; its treatment is docketed,
+ * not decided here (flow file, accepted-behaviour note 2).
  *
  * There is no in-flight guard and no request queue, on purpose: overlapping
  * `router.refresh()` calls coalesce into one applied payload (measured — six
