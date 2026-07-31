@@ -44,6 +44,25 @@ function src(relative: string): string | null {
 	return existsSync(path) ? readFileSync(path, "utf8") : null;
 }
 
+/**
+ * Strip comments before asserting — the `no-raw-hex-view-layer.test.ts` /
+ * `no-raw-dharma-render.test.ts` convention. Load-bearing here: the negative
+ * assertions below forbid the poll from *reading* certain signals, and the
+ * module's docblock necessarily NAMES those signals to explain why it does not
+ * read them. Matching prose would punish the documentation this guard wants.
+ */
+function stripComments(source: string): string {
+	return source
+		.replace(/\/\*[\s\S]*?\*\//g, "")
+		.replace(/^\s*\/\/.*$/gm, "")
+		.replace(/\/\/[^"'`\n]*$/gm, "");
+}
+
+/** A repo-relative file's CODE — comments removed. `""` when absent. */
+function code(relative: string): string {
+	return stripComments(src(relative) ?? "");
+}
+
 /** Repo-relative `.ts`/`.tsx` files under a repo-relative directory. */
 function sourcesUnder(relativeDir: string): string[] {
 	return readdirSync(join(ROOT, relativeDir), {
@@ -71,22 +90,19 @@ const CLIENT_FETCH =
 
 describe("debate-view::poll-preserves-removal-masking", () => {
 	it("the poll module exists and refreshes by re-invoking the server read", () => {
-		const source = src(POLL);
-		expect(source).not.toBeNull();
-		expect(source ?? "").toMatch(/useRouter/);
-		expect(source ?? "").toMatch(/router\.refresh\(\)/);
+		expect(src(POLL)).not.toBeNull();
+		expect(code(POLL)).toMatch(/useRouter/);
+		expect(code(POLL)).toMatch(/router\.refresh\(\)/);
 	});
 
 	it("the poll issues no client-side data fetch of its own", () => {
-		const source = src(POLL);
-		expect(source).not.toBeNull();
-		expect(CLIENT_FETCH.test(source ?? "")).toBe(false);
+		expect(src(POLL)).not.toBeNull();
+		expect(CLIENT_FETCH.test(code(POLL))).toBe(false);
 	});
 
 	it("the polled surface's client root issues no client-side data fetch", () => {
-		const source = src(HOST);
-		expect(source).not.toBeNull();
-		expect(CLIENT_FETCH.test(source ?? "")).toBe(false);
+		expect(src(HOST)).not.toBeNull();
+		expect(CLIENT_FETCH.test(code(HOST))).toBe(false);
 	});
 
 	it("adds no read endpoint under /m/[slug] — exactly quote/ and export/", () => {
@@ -107,12 +123,12 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 			// The loader's own `export async function loadDebateView(` is the
 			// definition, not a call site.
 			.filter((file) => file !== LOADER)
-			.filter((file) => /loadDebateView\s*\(/.test(src(file) ?? ""));
+			.filter((file) => /loadDebateView\s*\(/.test(code(file)));
 		expect(callers).toEqual([EXPORT_ROUTE, PAGE]);
 	});
 
 	it("keeps loadDebateView's viewer-independent signature (ADR-0034 D-1)", () => {
-		const source = src(LOADER) ?? "";
+		const source = code(LOADER);
 		expect(source).toMatch(
 			/export async function loadDebateView\(\s*client: DebateViewReader,\s*args: \{ market: MarketSummary \},\s*\): Promise<DebateViewModel>/,
 		);
@@ -129,33 +145,31 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 	it("keeps masking single-sourced on loadRemovedSet (ADR-0034 D-4)", () => {
 		// Exactly one definition repo-wide; every other masking consumer imports it.
 		const definitions = sourcesUnder("src").filter((file) =>
-			/export async function loadRemovedSet\b/.test(src(file) ?? ""),
+			/export async function loadRemovedSet\b/.test(code(file)),
 		);
 		expect(definitions).toEqual([LOADER]);
 
 		// The poll is never consulted as a masking input.
-		const poll = src(POLL);
-		expect(poll).not.toBeNull();
-		expect(poll ?? "").not.toMatch(/loadRemovedSet|content_removed/);
+		expect(src(POLL)).not.toBeNull();
+		expect(code(POLL)).not.toMatch(/loadRemovedSet|content_removed/);
 	});
 });
 
 describe("debate-view::poll-stops-when-market-leaves-open", () => {
 	it("takes its stop signal from market.status, threaded through the host", () => {
-		const host = src(HOST) ?? "";
+		const host = code(HOST);
 		expect(host).toMatch(/const marketOpen = market\.status === "Open";/);
 		expect(host).toMatch(/<DebatePoll[\s\S]*?marketOpen=\{marketOpen\}/);
 
-		const poll = src(POLL);
-		expect(poll).not.toBeNull();
-		expect(poll ?? "").toMatch(/marketOpen/);
+		expect(src(POLL)).not.toBeNull();
+		expect(code(POLL)).toMatch(/marketOpen/);
 	});
 
 	it("market.status reaches the client on the unchanged read model", () => {
-		expect(src("src/server/markets/get-by-slug.ts") ?? "").toMatch(
+		expect(code("src/server/markets/get-by-slug.ts")).toMatch(
 			/status: MarketStatus;/,
 		);
-		expect(src(LOADER) ?? "").toMatch(
+		expect(code(LOADER)).toMatch(
 			/export type DebateMarketHeader = MarketSummary & \{/,
 		);
 	});
@@ -165,9 +179,8 @@ describe("debate-view::poll-stops-when-market-leaves-open", () => {
 		// `FREEZE_INSTANT_UTC` compared against a client clock is a guess about a
 		// database state flip, not a signal. The stop rule is scoped to
 		// `market.status` alone — deliberately.
-		const poll = src(POLL);
-		expect(poll).not.toBeNull();
-		expect(poll ?? "").not.toMatch(
+		expect(src(POLL)).not.toBeNull();
+		expect(code(POLL)).not.toMatch(
 			/FREEZE_INSTANT_UTC|isFrozen|frozenAt|frozen_at|systemState|system_state/,
 		);
 	});
@@ -176,6 +189,6 @@ describe("debate-view::poll-stops-when-market-leaves-open", () => {
 		// The route was previously dynamic only as a side effect of calling
 		// `headers()` for the session; a poll against an accidentally-static route
 		// would serve a frozen payload indefinitely.
-		expect(src(PAGE) ?? "").toMatch(/export const dynamic = "force-dynamic";/);
+		expect(code(PAGE)).toMatch(/export const dynamic = "force-dynamic";/);
 	});
 });

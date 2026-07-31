@@ -10,6 +10,17 @@ import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 /**
+ * F-DEBATE-4 — the route's dynamism made EXPLICIT. It was previously dynamic
+ * only as a side effect of `page.tsx` calling `headers()` for the session; the
+ * F-DEBATE-4 poll re-invokes this exact read every
+ * `POLL_INTERVAL_MS_DEBATE_VIEW`, and a poll against an accidentally-static
+ * route would serve a frozen payload indefinitely. Removing the `getSession`
+ * call would be enough to cause that, silently. This states the guarantee the
+ * poll depends on instead of inheriting it (SPEC.2 1.0.22 §4.3).
+ */
+export const dynamic = "force-dynamic";
+
+/**
  * The participant debate view (DEBATE.4) — the single-market read surface,
  * composed into the SHELL `(public)/layout.tsx` shell. RSC: resolve the market
  * by its public slug (ADR-0016 — slug, never a raw UUID), `notFound()` on an
