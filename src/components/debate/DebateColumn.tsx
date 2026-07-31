@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 
 import { SideBadge } from "./badges";
-import { formatPercent } from "./format";
+import { formatPricePercent } from "./format";
 import type { Side } from "./types";
 
 /**
@@ -37,9 +37,7 @@ export function DebateColumn({
 	engaged?: boolean;
 	children: ReactNode;
 }) {
-	const pct = pricing
-		? formatPercent(side === "YES" ? pricing.yes : pricing.no)
-		: "—";
+	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	return (
 		<div
 			className={`flex flex-1 flex-col gap-3 ${

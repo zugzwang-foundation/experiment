@@ -1,5 +1,7 @@
 import Decimal from "decimal.js";
 
+import type { Side } from "./types";
+
 /**
  * Display-only formatters for the debate view. All inputs are canonical
  * server-computed values (NUMERIC(38,18) decimal strings / probabilities) —
@@ -96,12 +98,17 @@ export function displayNetProfitLoss(
 }
 
 /**
- * Render a spot price (a probability in [0,1] as a decimal string) as a whole
- * percent. Pure integer digit-extraction — never multiplies the price as a
- * float (CLAUDE.md §2); the canonical price is computed server-side by
- * `getPrices`. e.g. `"0.523…" → "52%"`, `"1.000…" → "100%"`.
+ * A spot price (a probability in [0,1] as a decimal string) as a whole percent
+ * integer, 0..100, ROUND_HALF_UP on the third fractional digit. Pure integer
+ * digit-extraction — never multiplies the price as a float (CLAUDE.md §2); the
+ * canonical price is computed server-side by `getPrices`.
+ *
+ * The shared core of BOTH percent formatters below, so the paired rule and its
+ * single-side escape hatch can never drift apart. The `Math.min` clamp is
+ * unreachable on a valid price (reserves are `requirePositive`, so a price
+ * cannot exceed 1) and is retained only as a defensive belt.
  */
-export function formatPercent(price: string): string {
+function wholePercent(price: string): number {
 	const [intPart = "0", fracPart = ""] = price.split(".");
 	const intPct = intPart === "1" || Number(intPart) >= 1 ? 100 : 0;
 	const firstTwo = `${fracPart}00`.slice(0, 2);
@@ -110,5 +117,51 @@ export function formatPercent(price: string): string {
 	if (Number(third) >= 5) {
 		pct += 1;
 	}
-	return `${Math.min(pct, 100)}%`;
+	return Math.min(pct, 100);
+}
+
+/**
+ * Render ONE SIDE of a market's price pair as a whole percent — the single
+ * formatter for every price-percent surface (PCT.ROUND / SPEC.1 §10.8).
+ *
+ * **YES is canonical; NO is DERIVED as `100 − YES`** and is never rounded
+ * independently. Independent per-side ROUND_HALF_UP renders **101%** at any
+ * exact `.xx5` tie: the two prices are complements, so their fractional
+ * remainders are `r` and `1 − r`, which disagree only at `.xx5` — where half-up
+ * rounds BOTH sides up at once. The pair can overshoot but never undershoot, so
+ * the defect is one-sided and invisible to any test whose fixtures avoid ties.
+ *
+ * Deriving is also the only rule robust to the engine's actual guarantee, which
+ * pins `|p_yes + p_no − 1| ≤ 1 ulp` rather than exact equality — charter line 5,
+ * asserted at `tests/unit/cpmm/invariants.property.test.ts` ("prices sum to 1").
+ * This function NEVER READS `pricing.no`, so engine slack cannot reach a render.
+ * The asymmetry — NO absorbs the rounding error — is deliberate.
+ *
+ * It takes the whole `pricing` object rather than one price string so the rule
+ * is enforced STRUCTURALLY: it is impossible to render a NO percent without the
+ * YES price in hand. e.g. `{yes:"0.525…", no:"0.475…"}` → `"53%"` / `"47%"`.
+ */
+export function formatPricePercent(
+	pricing: { yes: string; no: string },
+	side: Side,
+): string {
+	const yes = wholePercent(pricing.yes);
+	return `${side === "YES" ? yes : 100 - yes}%`;
+}
+
+/**
+ * The single-side escape hatch — a whole percent for a surface that legitimately
+ * renders ONE side alone, never one half of a pair (SPEC.1 §10.8). The only
+ * sanctioned callers are the price chart's OPENING and CURRENT YES readouts,
+ * which are two points in TIME rather than a pair.
+ *
+ * Deliberately awkward name: DROUND tried an import alias for this role and
+ * REVERSED it at the gate, because a reader saw one name silently resolving to
+ * another. A call site must announce that it is unpaired. Every call is
+ * allowlisted by a `pctround-allow:` marker and the count is pinned by
+ * `tests/unit/design/pct-round-render.test.ts` — using this to render a
+ * market's two sides is exactly the bug the paired formatter exists to prevent.
+ */
+export function formatPercentUnpaired(price: string): string {
+	return `${wholePercent(price)}%`;
 }
