@@ -208,6 +208,44 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 	});
 });
 
+// ── What the poll makes LOAD-BEARING (@security-auditor L-5, L-2) ───────────
+// Neither property is new, and neither is this task's to own. Both are pinned
+// here because the poll multiplies the cost of breaking them: a read path that
+// is re-invoked four times a minute per open tab turns "one spurious write per
+// navigation" into "four per minute", and turns a sliding session re-issue into
+// an indefinitely self-renewing cookie for as long as a tab stays open.
+describe("F-DEBATE-4 — properties the poll now depends on", () => {
+	it("the polled read path performs NO write (INV-2-adjacent)", () => {
+		// `viewer-context.ts:22-30` already documents the specific hazard: the
+		// tempting reuse would turn every page load by an unpaid-today user into a
+		// Daily-Credit mint without a commented bet — attendance becoming issuance,
+		// ADR-0018's rejected Option 4. At 4x/min that is not a slow leak.
+		const readPath = [
+			LOADER,
+			"src/server/debate-view/viewer-context.ts",
+			"src/server/debate-view/price-chart.ts",
+			"src/server/debate-view/resolve-authors.ts",
+			"src/server/debate-view/resolve-post-param.ts",
+			"src/server/markets/get-by-slug.ts",
+		];
+		const writers = readPath.filter((file) =>
+			/\.(insert|update|delete)\s*\(/.test(code(file)),
+		);
+		expect(writers).toEqual([]);
+	});
+
+	it("session reads stay pure — `disableSessionRefresh` is on", () => {
+		// Two `auth.api.getSession()` calls fire per tick (the refresh re-executes
+		// the LAYOUT as well as the page), so 8/min per open tab. With this flag
+		// true and no cookie cache, each is a pure read: no `sessions` UPDATE and
+		// no `Set-Cookie`. Flip it to false and every open tab becomes a session
+		// that never expires while the tab lives.
+		expect(code("src/server/auth/index.ts")).toMatch(
+			/disableSessionRefresh:\s*true/,
+		);
+	});
+});
+
 describe("debate-view::poll-stops-when-market-leaves-open", () => {
 	it("takes its stop signal from market.status, threaded through the host", () => {
 		const host = code(HOST);
