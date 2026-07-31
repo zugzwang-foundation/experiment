@@ -175,7 +175,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 - **Category / tab vocabulary** — the taxonomy that groups and filters markets.
 - **Featured / trending rail** — a curated horizontal rail of highlighted markets.
 - **Price chart** — a market's price history.
-- **Debate mode selector** — switches the debate-view ranking mode; echoes the active mode.
+- **Lane-dominance badge** — a read-time label on a post that dominates a lane: **Most Debated** · **Highest Stakes** · **Contested**. At most one per post (its highest-margin lane); posts dominating no lane carry none. **Newest is not a badge.** *(Retires the debate mode selector — v1 renders **Top** order always, with no selector: ADR-0017 P3.)*
 - **Pseudonym / PFP** — a participant's anonymous identity (name + avatar from the identity pool). Renders a permanent placeholder once scrubbed (erasure).
 - **Split bar** *(originated Slot 1)* — the shared two-pole bar: **label — bar — label**, text never inside the bar. Two variants on two different axes: the **market price bar** (`YES n% — bar — NO m%` — a **side** bar; black fill = the YES-side share, anchored to the YES side) and the **reply stake bar** (`SUPPORT Đx — bar — COUNTER Đy`, under a `Replies · count · Đ total` header — a **post-relative** Support/Counter bar, §6). *(The reply stake bar's exact fill mapping follows the locked v1.0 surface.)*
 - Two-line price graph (originated Slot 1) — YES and NO as two always-complementary lines (mirrors crossing at 50%). The pole that matches the ground cannot render on it, so one line is always a grey stand-in — series-bound via tokens, never restyled ad hoc. Current (dark ground, BRIDGE): YES = `--graph-yes` `#737373` (grey stands in for the black pole) · NO = `--graph-no` `#fafafa`. Retired light-era mirror: YES = solid ink, NO = grey standing in for white. Full-size on market panels; sparkline on cards.
@@ -224,7 +224,7 @@ Which primitives each surface composes — the anchor that keeps shared primitiv
 | Top-level post | | ◐ | | ● | ◐ |
 | Reply (depth-1) | | | | ● | |
 | Support/Counter aggregate | | ◐ | | ● | |
-| Debate mode selector | | | | ● | |
+| Lane-dominance badge | | | | ● | |
 | Dharma balance | | | ● | ● | ● |
 | Pseudonym / PFP | | | | ● | ● |
 | Empty-side CTA | | | | ● | |
@@ -241,7 +241,7 @@ The highest-iteration surface. Its structure is locked here so every iteration i
 
 - **Two columns are the two fixed poles: left = YES (black), right = NO (white)** — the **same for every post**, regardless of the post's own side. Replies are routed into a column by their **own** YES/NO side.
 - **Support/Counter is post-relative — never a column.** Whether a reply *supports* or *counters* a post is its stance toward that post (Support = agrees → same side as the post; Counter = disagrees → opposite side); because it flips with the post's side, it is never a column label or a colour. It appears only on the post's **split bar** (`SUPPORT Đx — bar — COUNTER Đy`) and in the **composer**.
-- **Top-level posts are ranked**, default **Top** (a composite), with selectable modes: **Most Debated**, **Highest Stakes**, **Contested**, **Newest**. The active mode is echoed in the UI. (Surging is deferred.)
+- **Top-level posts are ranked in a single fixed order — Top** (the multi-lane composite, with the P2 latest-interleave). **There is no mode selector in v1** (ADR-0017 P3). Lane dominance surfaces instead as a per-post **lane-dominance badge** (§3.2). (Surging is deferred.)
 - **Replies are flat (one level only)**, ranked **by stake descending within their side**, earlier-posted winning ties.
 - **Two-slot default render:** each post surfaces the **top reply in each column** (its top YES reply and its top NO reply); expanding shows that column's full stake-sorted list.
 - **Each post** shows the author's own stake at its header and the **Support/Counter aggregate** (post-relative — stake agreeing vs. disagreeing with *this* post) at its footer — no vote control.
