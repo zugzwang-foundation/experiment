@@ -4,12 +4,13 @@
 
 | | |
 |---|---|
-| **Status** | Authored (web) · **awaiting operator ratification** · execute from a fresh chat off the committed file |
+| **Status** | **Ratified 2026-08-02** · execute from a fresh chat off this committed file |
 | **Ritual class** | Gated plan → ratify → fresh-chat execute → **Gate C before merge**. `@code-reviewer` required. **No `@security-auditor`** — not a CLAUDE.md §1 critical path (auth · bet engine · ledger · commentary/moderation); the one server read added is a display-grade read of an existing indexed row, no write, no engine contact |
 | **Items** | **B4** AGPL source link · **B8** freeze banner · **B10** not-found + global-error · **BALANCE** signed-in Đ cluster |
 | **PR** | One. Four slices, independently green |
 | **Hard gate** | **Slice 4 (B8) does not execute until the SPEC.1 §21.7 rider is merged.** Slices 1–3 are unblocked |
 | **Plan branch** | `chore/shell-complete-plan` · **only this file staged** (F3 staging law) |
+| **Plan PR** | #281 · squash SHA recorded at the SHELL-COMPLETE close-out |
 
 ---
 
