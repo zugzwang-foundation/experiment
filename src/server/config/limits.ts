@@ -248,9 +248,15 @@ export const PROFILE_GRAPH_Y_MAX = 10000;
  * precedes that pass. Sized against the measured shape of one tick: because the
  * refresh re-executes the route's LAYOUT as well as its page, a tick costs
  * twelve to fourteen sequential database round-trips per open tab — including
- * TWO session reads — and nothing throttles it per tab, so the quantity to size
- * against is ticks × concurrent tabs × round-trips, not the interval alone
- * (visibility suspension is the larger lever). Read from this constant at every
+ * TWO session reads — and nothing throttles it per tab. THREE of those
+ * round-trips are NOT constant: `listMarketComments` carries no `LIMIT` and the
+ * price-series replay walks the market's whole event history, so per-tick cost
+ * SCALES WITH THE MARKET and grows monotonically across the live window, most
+ * steeply on the markets carrying the most viewers. The quantity to size
+ * against is therefore ticks × concurrent tabs × round-trips × O(market
+ * events), not the interval alone; visibility suspension is the larger lever,
+ * and a cap or keyset on `listMarketComments` is a HARDEN.6 PREREQUISITE, not
+ * an optimisation. Read from this constant at every
  * call site and never inlined, so the HARDEN.6 tune is a one-line change.
  * Integer (milliseconds, not Dharma). */
 export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
