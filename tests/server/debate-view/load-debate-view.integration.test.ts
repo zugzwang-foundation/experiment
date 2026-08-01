@@ -276,6 +276,65 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		);
 	});
 
+	// ── 1b. Masking is STABLE across repeated invocation (F-DEBATE-4) ──────────
+	// The polled refresh re-invokes THIS loader on an interval rather than
+	// fetching a separate read endpoint (SPEC.1 1.0.25 §9 F-DEBATE-4), so the
+	// question "does masking survive a poll?" reduces to "is masking a pure
+	// function of the same inputs?". Extended here rather than minted in a new
+	// file: one masking gate, one masking suite (ADR-0034 D-4). Supports SPEC.1
+	// §17 `debate-view::poll-preserves-removal-masking`; the structural half —
+	// that no second read path exists to diverge from this one — lives in
+	// `tests/server/debate-view/poll-contract.test.ts`.
+	it("masks identically across repeated invocation (the polled read's shape)", async () => {
+		const market = await seedMarket("masking-repeat");
+		const u1 = await seedUser({ tag: "repeat-author-1" });
+		const u2 = await seedUser({ tag: "repeat-author-2" });
+
+		const removed = await seedCommentWithBet({
+			userId: u1,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Removed argument — must stay masked on every poll.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		await seedCommentWithBet({
+			userId: u2,
+			marketId: market.id,
+			side: "NO",
+			stake: "80.000000000000000000",
+			body: "Present argument — survives every poll.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:02Z"),
+		});
+		await removeComment(removed);
+
+		// Four consecutive reads — the shape a 15 s poll produces.
+		const runs = [
+			await loadDebateView(testDb, { market }),
+			await loadDebateView(testDb, { market }),
+			await loadDebateView(testDb, { market }),
+			await loadDebateView(testDb, { market }),
+		];
+
+		for (const vm of runs) {
+			const entry = findPost(vm, removed);
+			expect(entry.removed).toBe(true);
+			for (const k of CONTENT_KEYS) {
+				expect(entry).not.toHaveProperty(k);
+			}
+			walkAssertNoLeak(vm);
+			expect(JSON.stringify(vm)).not.toContain(
+				"Removed argument — must stay masked on every poll.",
+			);
+		}
+
+		// Byte-identical across polls: no viewer state, no per-invocation drift.
+		const serialized = runs.map((vm) => JSON.stringify(vm));
+		expect(new Set(serialized).size).toBe(1);
+	});
+
 	// ── 2. Thread intact under a removed parent ────────────────────────────────
 	it("a removed parent keeps its replies (other users' arguments survive)", async () => {
 		const market = await seedMarket("masking-thread");

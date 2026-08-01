@@ -235,3 +235,28 @@ export const PROFILE_SERIES_MAX_POINTS = 64;
  * This plan mints NO new Appendix B row (UI-A5 §7 S2) — code mirrors the spec.
  * Integer (a Đ ceiling rendered as an axis bound). */
 export const PROFILE_GRAPH_Y_MAX = 10000;
+
+// === F-DEBATE-4: Debate-view polled refresh (SPEC.1 §9) ====================
+
+/** Debate-view poll interval in milliseconds (SPEC.1 1.0.25 §16.1 + Appendix B
+ * + §9 F-DEBATE-4, per `C7`) — the cadence at which `/m/[slug]` re-invokes its
+ * own server read via `router.refresh()` (`src/components/debate/DebatePoll.tsx`),
+ * NOT a fetch against a read endpoint. **PROVISIONAL PIN at 15000.** Unlike the
+ * pinned design constants above, this one **remains deferred to the
+ * number-tuning pass** — SPEC.2 §4.3 assigns the tune to HARDEN.6; the pin
+ * exists only because the flow is unbuildable without a value and go-live
+ * precedes that pass. Sized against the measured shape of one tick: because the
+ * refresh re-executes the route's LAYOUT as well as its page, a tick costs
+ * twelve to fourteen sequential database round-trips per open tab — including
+ * TWO session reads — and nothing throttles it per tab. THREE of those
+ * round-trips are NOT constant: `listMarketComments` carries no `LIMIT` and the
+ * price-series replay walks the market's whole event history, so per-tick cost
+ * SCALES WITH THE MARKET and grows monotonically across the live window, most
+ * steeply on the markets carrying the most viewers. The quantity to size
+ * against is therefore ticks × concurrent tabs × round-trips × O(market
+ * events), not the interval alone; visibility suspension is the larger lever,
+ * and a cap or keyset on `listMarketComments` is a HARDEN.6 PREREQUISITE, not
+ * an optimisation. Read from this constant at every
+ * call site and never inlined, so the HARDEN.6 tune is a one-line change.
+ * Integer (milliseconds, not Dharma). */
+export const POLL_INTERVAL_MS_DEBATE_VIEW = 15000;
