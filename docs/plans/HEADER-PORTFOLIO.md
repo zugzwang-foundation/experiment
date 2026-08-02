@@ -53,7 +53,7 @@ The cluster becomes what the locked mockup specifies: one bordered box, one `Đ`
 
 ## §3 · SPEC.1 §21.8 — the rider (web-authored, verbatim)
 
-Insert as a new `### 21.8` at the tail of §21, after 21.6, **leaving 21.7 reserved for the freeze-banner rider** (B8's gate is written as "the SPEC.1 §21.7 rider" in merged plan text; reusing the number would contradict it). Amend §21's preamble count. Version `1.0.26 → 1.0.27`. Add the §20 change-log row.
+Insert as a new `### 21.8` at the tail of §21, after 21.6, **leaving 21.7 reserved for the freeze-banner rider** (B8's gate is written as "the SPEC.1 §21.7 rider" in merged plan text; reusing the number would contradict it). Amend §21's preamble count at `:1484` — "Five are in scope for v1" → "Six". Version `1.0.26 → 1.0.27`. Add the §20 change-log row.
 
 **CC does not draft this text.** It arrives from web at the rider commit. This section names its coverage only:
 
@@ -105,7 +105,7 @@ Locked by **T3** (§7). If T3 cannot be made to pass, the read is wrong — do n
 | **SG6** | **The divider is a named untouchable.** It carries no `data-testid` and must not gain one. It is the `w-px` hairline |
 | **SG7** | **`(auth)` is out of scope.** That layout passes neither prop. Signed-out by definition; onboarding may have no ledger row |
 | **SG8** | **The DROUND guard.** `portfolio` (and any other new Đ-bearing identifier) MUST be added to `MONEY_IDS` in `tests/unit/design/no-raw-dharma-render.test.ts`. The guard is an allow-list of names, not a detector — **a missing identifier passes silently.** RED must be ATTRIBUTED: with the old set restored and the violation injected, the suite passes; with the new set, it fails |
-| **SG9** | **SPDX on every new file** — `// SPDX-License-Identifier: AGPL-3.0-or-later` as line 1. Two new files this task (the read module; no other new `src/` file if the cluster is renamed via `git mv`) |
+| **SG9** | **SPDX on every new `src/` file** — `// SPDX-License-Identifier: AGPL-3.0-or-later` as line 1. **Exactly ONE this task**: `src/server/dharma/header-portfolio.ts`. `DharmaCluster.tsx` is a `git mv` and carries its SPDX line already — do not duplicate it. Test files take no SPDX (repo convention: all five SPDX lines in the tree sit on `src/` files). |
 | **SG10** | **No new runtime dependency.** `decimal.js` via `CpmmDecimal` is the only arithmetic — never a JS float on a Đ value (CLAUDE.md §2) |
 | **SG11** | **Token slots only.** Zero raw hex, zero Tailwind palette classes (`no-raw-hex-view-layer.test.ts` + the R15 gap). `globals.css` untouched |
 | **SG12** | **No responsive work, no accessibility work.** Desktop-only 1440 (G1); a11y → A11Y.0 |
@@ -152,12 +152,12 @@ export async function getHeaderPortfolio(
 
 **Returns:** a canonical 18-dp `NUMERIC(38,18)` string via `toFixed18`, or `null` on read failure only. **`"0"` when the viewer holds no open positions — never `null` for emptiness (R9).**
 
-**Three statements, in this order, mirroring `loadProfilePositions` statements 1·2·4 byte-for-byte in table, columns, and predicate (R3):**
+**Three statements — S1, S2, S3 below — in this order, mirroring `loadProfilePositions` statements 1·2·4 byte-for-byte in table, columns, and predicate (R3). The early return between S1 and S2 is a control step, not a statement.**
 
-1. `positions` — `WHERE user_id = $1`, columns `marketId, side, quantity`. Mirrors `positions.ts:139–146`.
-2. **Early return `toFixed18(0)` if no rows** — statements 2 and 3 never issue. Mirrors `positions.ts:156–158`, returning `"0"` rather than `[]`.
-3. `payout_events` — `WHERE user_id = $1 AND market_id IN (…)`, columns `market_id, amount`. Mirrors `positions.ts:163–171`. **Existence per `market_id` is the settled discriminant (R5); amount is read but never used as the discriminant.**
-4. `pools` — `inArray(pools.marketId, marketIdList)`, columns `market_id, yes_reserves, no_reserves`. Mirrors `positions.ts:189–196`. **Restrict the id list to UNSETTLED markets** — a settled market needs no pool read.
+- **S1 · `positions`** — `WHERE user_id = $1`, columns `marketId, side, quantity`. Mirrors `positions.ts:139–146`.
+- **Early return** — `toFixed18(0)` if S1 returns no rows; S2 and S3 never issue. Mirrors `positions.ts:156–158`, returning `"0"` rather than `[]`.
+- **S2 · `payout_events`** — `WHERE user_id = $1 AND market_id IN (…)`, columns `market_id, amount`. Mirrors `positions.ts:163–171`. **Existence per `market_id` is the settled discriminant (R5); amount is read but never used as the discriminant.**
+- **S3 · `pools`** — `inArray(pools.marketId, marketIdList)` over the **FULL** id list from S1, columns `market_id, yes_reserves, no_reserves`. Mirrors `positions.ts:189–196` exactly. **Do NOT narrow the list to unsettled markets.** Narrowing is a predicate divergence from the mirror and would surface as a false positive in R3's sourcing diff; and if every held market is settled the narrowed list is empty, making `inArray(x, [])` a latent edge case. Pool rows for settled markets are read and discarded in memory at zero statement cost.
 
 **In memory, zero further statements:**
 - Drop every market that has ≥1 `payout_events` row for this user (settled — its value is already in the ledger, and counting it would double-count against Balance).
