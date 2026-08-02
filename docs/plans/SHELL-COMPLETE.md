@@ -2,6 +2,11 @@
 
 > **r3** — folds RECON-4 (SPEC.1's live footer commitment · BALANCE's spec-level corroboration · the Q6 label settled from the live repo). Supersedes r2 and r1; neither was committed.
 
+> **r5 · 2026-08-02 — superseded in part. Read this before the body.**
+> **Slice 2 (B4, the AGPL footer) is WITHDRAWN, not deferred.** Founder ruling `e085d29`: the product ships no page-level footer on any surface — not reduced, not AGPL-only, none. SPEC.1 1.0.26 (#282, `8e84edc`) amends §16.5, §18 and §21.6 accordingly; the AGPL-3.0 §13 obligation survives and moves to the Terms of Service body. **Every footer reference below is void** — Q1, Q1b, SG7, the `SiteFooter.tsx` row in §4, the four footer rows in §5, S2 in §6, and T3 in §7. The wrapper `flex-1` went out with the revert and now belongs to POLISH.1 as V7.
+> **Slice 4 (B8, the freeze banner) is FORKED** to its own task, gated on a SPEC.1 §21.7 rider at 1.0.27. Its ratified decisions — Q4 as revised below, Q4b, Q5 — carry to that task unchanged.
+> **This PR ships S1 + S3 only.** The plan is closed; nothing further builds from it.
+
 | | |
 |---|---|
 | **Status** | **Ratified 2026-08-02** · execute from a fresh chat off this committed file |
@@ -117,15 +122,25 @@ It replaces the root layout, so it inherits nothing — including fonts. Next re
 
 The two existing route boundaries (`bookmarks/error.tsx`, `u/[pseudonym]/error.tsx`) are **untouched**.
 
-### Q4 — Freeze banner trigger · **server-evaluated constant**
+### Q4 — Freeze banner trigger · **constant gates, database confirms** *(r4)*
 
-**`FreezeBanner` is a server component that compares `Date.now()` to `FREEZE_INSTANT_UTC`. It performs no database read.**
+**`FreezeBanner` is a server component. It short-circuits on the constant, then confirms against the database.**
 
-`isFrozen()` (`src/server/system/is-frozen.ts:14`) imports `server-only` and issues a `db.query`; mounting it in both layouts would add a **third layout-level DB read on all seven routes, permanently, to evaluate a boolean that is `false` for the entire pre-launch and live window and flips exactly once.** Wrong trade for an informational chrome strip. `GlobalHeader.tsx:1,37` already establishes the constant-in-a-server-component pattern; `FreezeBanner` reuses it.
+```ts
+if (Date.now() < FREEZE_INSTANT_UTC.getTime()) return null;
+try { if (!(await isFrozen())) return null; } catch { return null; }
+return <banner/>;
+```
 
-**The scheduled-vs-actual gap is accepted and named.** SPEC.2 §20.2 makes the flip dual-path (`pg_cron` Path A, manual `psql` Path B as backstop *because Path A can fail*). A constant-driven banner announces conclusion at 23:59:00 whether or not writes have actually stopped. **Recorded in the rider:** the banner is informational; `endpoint.ts` remains authoritative for write rejection, and its 410 envelope is what a participant attempting to bet actually receives.
+The constant is a **cheap gate**; `system_state.frozen_at` is the **truth claim**. `isFrozen()` is never called before 2026-11-05 23:59 UTC, so the read cost is **zero for the entire pre-launch and live window**.
 
-**Accepted limitation:** the banner appears on the next server render. An idle tab shows it on next navigation. The header countdown ticking to zero is the live signal at the instant. *(It may also appear automatically on `/m/[slug]` depending on the F-DEBATE-4 poll's refresh mechanism — verify at execute, do not assume.)*
+**Why not the constant alone.** SPEC.1 §9 F-DEBATE-4 (line 472, added at 1.0.25) states that `FREEZE_INSTANT_UTC` compared against a clock is *a guess about a database state flip, not a signal*, and §12.1:654 makes `system_state.frozen_at` **the definition** of the freeze. SPEC.2 §20.2's dual-path flip (`pg_cron` Path A, manual `psql` Path B *because Path A can fail*) makes the divergence window real, and it would land on Devcon-morning dataset-release traffic.
+
+**Why not `isFrozen()` alone.** A third layout-level DB read on all seven routes, permanently, to evaluate a boolean false for the whole experiment.
+
+**Fail-safe.** A layout that throws breaks every route it wraps. `isFrozen()` is wrapped; any error returns `null`. If we cannot confirm the freeze, we do not claim it.
+
+**Accepted:** the banner appears on the next server render after the flip. `endpoint.ts` remains authoritative for write rejection (§12.1:658).
 
 ### Q4b — Copy reuse · **import, never duplicate**
 
