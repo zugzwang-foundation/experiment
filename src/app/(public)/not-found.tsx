@@ -4,7 +4,8 @@ import Link from "next/link";
 
 /**
  * The `(public)` 404 — BRANDED: it renders inside the route-group layout and so
- * inherits `GlobalHeader` (and, from S2, `SiteFooter`). Catches the three
+ * inherits `GlobalHeader`. (There is no footer to inherit — the page-level
+ * footer is retired by founder ruling 2026-08-02.) Catches the three
  * participant page `notFound()` throws (`u/[pseudonym]/page.tsx:52,56` ·
  * `m/[slug]/page.tsx:46`), the last being ADR-0023's ratified "unknown or
  * `Draft` slug → `notFound()`" — so a Draft market is indistinguishable from a

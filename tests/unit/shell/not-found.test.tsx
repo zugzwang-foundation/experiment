@@ -20,14 +20,21 @@ import RootNotFound from "@/app/not-found";
  * renders a `<header>` element, so asserting its absence catches exactly the
  * regression of someone mounting it.
  *
- * The `(public)` variant's "renders header and footer" property is INHERITANCE
- * from the route-group layout, not anything in `not-found.tsx` itself — the
- * page renders bare content and the layout supplies the chrome. Asserting that
- * by rendering `PublicLayout` would drag `GlobalHeader` →
- * `@/server/markets/create` → `@/db/schema` → drizzle into jsdom for a
- * presentation claim. So it is asserted at the source level (the same shape T2
- * uses for its no-server-import claim): the `(public)` layout mounts the chrome,
- * the root layout mounts none.
+ * The `(public)` variant's branded property is INHERITANCE from the route-group
+ * layout, not anything in `not-found.tsx` itself — the page renders bare content
+ * and the layout supplies the chrome. Asserting that by rendering `PublicLayout`
+ * would drag `GlobalHeader` → `@/server/markets/create` → `@/db/schema` →
+ * drizzle into jsdom for a presentation claim. So it is asserted at the source
+ * level (the same shape T2 uses for its no-server-import claim): the `(public)`
+ * layout mounts the header, the root layout mounts none.
+ *
+ * NO FOOTER — founder ruling 2026-08-02. The product ships no page-level footer
+ * on ANY surface: not reduced, not AGPL-only, none. `SiteFooter` and its T3
+ * allow-list suite were reverted with B4. The AGPL §13 source offer relocates to
+ * the ToS body at LEGAL.1 and the DPDPA grievance contact to the Privacy Policy;
+ * neither is a footer item any more. The `SiteFooter` assertions below are
+ * therefore no longer descriptive — they are a REGRESSION GUARD asserting the
+ * footer does not come back, across all three layouts.
  */
 
 afterEach(cleanup);
@@ -78,17 +85,30 @@ describe("T1 — not-found boundaries", () => {
 		expect(container.querySelector("footer")).toBeNull();
 	});
 
-	it("public-group-layout-supplies-the-chrome-root-layout-does-not", () => {
+	it("public-group-layout-supplies-the-header-root-layout-does-not", () => {
 		const publicLayout = read("src/app/(public)/layout.tsx");
 		const rootLayout = read("src/app/layout.tsx");
 
-		// The inheritance the branded 404 relies on — header AND footer.
+		// The inheritance the branded 404 relies on.
 		expect(publicLayout).toContain("<GlobalHeader");
-		expect(publicLayout).toContain("<SiteFooter");
 
 		// ADR-0023 Option-2: the root layout is shared with `(admin)` and mounts
 		// no participant chrome, which is what keeps the root 404 neutral.
 		expect(rootLayout).not.toContain("GlobalHeader");
-		expect(rootLayout).not.toContain("SiteFooter");
+	});
+
+	it("no-layout-mounts-a-footer", () => {
+		// Founder ruling 2026-08-02: the footer is RETIRED — no page-level footer
+		// on any surface. This is the guard against it returning. All three
+		// layouts, not just root: B4 had mounted it in BOTH group layouts, so a
+		// root-only assertion would miss the regression it is written to catch.
+		for (const rel of [
+			"src/app/layout.tsx",
+			"src/app/(public)/layout.tsx",
+			"src/app/(auth)/layout.tsx",
+		]) {
+			expect(read(rel)).not.toContain("SiteFooter");
+			expect(read(rel)).not.toContain("<footer");
+		}
 	});
 });
