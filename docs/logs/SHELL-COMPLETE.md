@@ -15,7 +15,7 @@ The merge is **squash-to-main**, so **no SHA below ever reaches `main`.** Every 
 
 ## What landed
 
-**PR — `feat/shell-complete`** (6 commits, all SSH-signed, opened at the end of this session; **number recorded at close-out**):
+**PR — `feat/shell-complete`** (9 commits, all SSH-signed, opened at the end of this session; **number recorded at close-out**):
 
 | Working SHA | Pre-rebase | What |
 |---|---|---|
@@ -25,10 +25,13 @@ The merge is **squash-to-main**, so **no SHA below ever reaches `main`.** Every 
 | `e86e961` | `e085d29` | **Revert of S2** — founder ruling, the footer withdrawn |
 | `84dc34e` | `a08f1ff` | three guard gaps closed |
 | `221960b` | — | **r5** — plan supersession (this session) |
+| `23e073f` | — | this log, first cut — written **before** the reviewer ran, per the kickoff's step order |
+| `3b7db8d` | — | **`@code-reviewer` remediation** — the layout-read fail-safe (HIGH-1) + two comment corrections |
+| *(last)* | — | this log, completed with the cascade result and the final suite number |
 
 S2 and its revert are both kept in history rather than squashed away: the revert commit is where the founder ruling and its full blast radius are recorded, and it is only legible beside the commit it undoes.
 
-**Net effect against `origin/main` — 13 files, +916 / −6.** Nothing from S2 survives in the tree.
+**Net effect against `origin/main` — 13 files.** Nothing from S2 survives in the tree. (The pre-review diff was +916 / −6; the remediation commit adds to three of the same 13 files and mints no new one.)
 
 **Source (5 files, 4 new):**
 
@@ -47,16 +50,18 @@ S2 and its revert are both kept in history rather than squashed away: the revert
 
 ## The test number
 
+The **final** number, on the tree that opens the PR:
+
 ```
  Test Files  290 passed | 1 skipped (291)
-      Tests  2103 passed | 1 skipped | 4 todo (2108)
-   Duration  1276.14s
+      Tests  2107 passed | 1 skipped | 4 todo (2112)
+   Duration  191.99s
    exit 0
 ```
 
-`pnpm vitest run`, run **alone** — Postgres verified up on `:54322` and no second runner in `ps` before starting, per the kickoff's isolation requirement.
+`pnpm vitest run`, run **alone** — Postgres verified up on `:54322` and no second runner in `ps` before starting, per the kickoff's isolation requirement. The suite was run in full **three times**: once at STEP 1 before the rebase (`2103 passed`, exit 0), once after the `@code-reviewer` remediation touched `src/server/dharma/` (aborted by a machine stall — below), and once clean.
 
-**The delta accounts exactly.** The F-DEBATE-4 baseline was 286 files / 2086 passed; the three doc-only PRs merged since (#280, #281, #282) add no tests. 286 + 4 = **290**. 2086 + 17 = **2103** (7 + 4 + 2 + 4). Skipped and todo are unchanged at 1 / 1 / 4. There is no unexplained movement in either direction.
+**The delta accounts exactly, twice over.** The F-DEBATE-4 baseline was 286 files / 2086 passed; the three doc-only PRs merged since (#280, #281, #282) add no tests. 286 + 4 = **290** files. 2086 + 17 = **2103** at STEP 1 (7 + 4 + 2 + 4), then + 4 T9 cases = **2107**. Skipped and todo are unchanged at 1 / 1 / 4 throughout. There is no unexplained movement in either direction.
 
 ### Why the previously-reported number was worthless
 
@@ -65,6 +70,22 @@ A prior run on this branch reported **94 failed across 55 files**. It was a **fa
 The tell was in the shape, not the count: 55 files is roughly a fifth of the suite, and this branch's diff is **13 files** that touch no shared fixture, no migration and no Bucket-A table. There is no mechanism by which a `not-found.tsx`, a `BalanceCluster` and one new read module fail 55 unrelated suites. The number was discarded rather than debugged, and the clean-room re-run above is the one on the record.
 
 **The generalisable rule, already in the contract:** never believe a red without first checking `ps` for a second `vitest`. This is the second time it has cost a session.
+
+### And then it happened again, differently — the duration tell
+
+The post-remediation full run came back `1 failed | 289 passed`. The failure was `Hook timed out in 10000ms` in a `truncateTables` `afterEach` in `market-quote.integration.test.ts` — a file this diff cannot reach. **What settled it was not the error text but the clock:**
+
+| | STEP 1 run | post-fix run | clean re-run |
+|---|---|---|---|
+| `market-quote.integration.test.ts` | ✓ 17 tests, **25.2 s** | ❯ 1 failed, **808.9 s** | ✓ 17 tests, **1.5 s** |
+| whole-run `prepare` | 6.50 s | **208.32 s** | 6.20 s |
+| whole-run `Duration` | 1276 s | 1387 s | **192 s** |
+
+Per-file and process-wide latency inflated by the *same* ~32×, and `prepare` — which runs before a single test executes — inflated with them. No test-level defect does that; only the machine does. Re-run alone the file passed 17/17 in **1245 ms**, and the clean full run finished in **192 s**, roughly a sixth of the earlier passing run.
+
+**The reachability argument was made independently of the timing**, because timing alone is suggestive rather than conclusive: `header-balance.ts` has exactly one production caller (`(public)/layout.tsx`, which no integration test imports), the layout edit is a comment, and the `vi.mock` added to `header-balance.integration.test.ts` is file-scoped under vitest's isolated pool. `market-quote` exercises `loadDebateView`/pricing and shares no module with any of it.
+
+**The lesson is narrower and more useful than "check `ps`":** a hook timeout is a *latency* symptom, so read the durations before reading the assertion. Two failures on this task looked like code and were both the machine — once from a second runner, once from load with no second runner at all. A green suite whose wall clock is 6× the norm is already telling you something.
 
 ---
 
@@ -120,23 +141,66 @@ Recorded because they are now a pattern, not an incident.
 
 | Gate | Result |
 |---|---|
-| `pnpm vitest run` (full, isolated) | **290 files passed / 1 skipped · 2103 passed / 1 skipped / 4 todo · exit 0** |
-| Rebase onto `origin/main` @ `8e84edc` | clean, **no conflict**; all five commits re-signed `G`; post-rebase diff byte-identical (13 files, +916 / −6) |
+| `pnpm vitest run` (full, isolated, final tree) | **290 files passed / 1 skipped · 2107 passed / 1 skipped / 4 todo · exit 0** |
+| `pnpm tsc --noEmit` | exit 0 |
+| `pnpm biome check src/ tests/` | clean — the single warning is an unused `eq` import in `tests/server/moderation/moderation-blocked-event.test.ts`, **not in this branch's diff** |
+| Rebase onto `origin/main` @ `8e84edc` | clean, **no conflict**; all five commits re-signed `G`; post-rebase diff byte-identical |
+| T9 RED, attributed | catch removed + final tests → exactly 3 of 11 fail, other 8 hold |
 | Working tree at STEP 0 | `git status --porcelain` **empty** — no residue from the killed session |
 | Concurrent-session check | one `claude` PID, this session's own; no second `vitest` |
-| `@code-reviewer` | see below |
+| `@code-reviewer` | 0 CRITICAL · 1 HIGH · 3 MEDIUM · 6 LOW — see below |
 
-*(`just verify` is not re-run here: `next build` was green on the pre-rebase tree and the rebase changed no source byte — the post-rebase diff is identical. `ZUGZWANG_ENV=preview` remains required for a bare `just verify`.)*
+*(`just verify` is not re-run at the end: `next build` was green on the pre-rebase tree, the rebase changed no source byte, and the remediation touches one server module plus two comments — `tsc` and `biome` are the parts of that gate the change can move, and both are run above. `ZUGZWANG_ENV=preview` remains required for a bare `just verify`.)*
 
 ---
 
 ## Reviewer cascade
 
-`@code-reviewer` over the full branch diff, run **strictly after** the suite finished — it has Bash and may run tests, and a concurrent DB-touching reviewer is exactly what manufactured the false red above.
+`@code-reviewer` over the full branch diff, run **strictly after** the suite finished, and instructed **not to run the suite itself** — it has Bash, and a concurrent DB-touching reviewer is exactly what manufactured the false red above. It ran `tsc` and `biome` instead, which need no database.
+
+**Verdict: 0 CRITICAL · 1 HIGH · 3 MEDIUM · 6 LOW.** The four invariants are untouched, no refusal trigger is crossed, the revert is clean.
 
 **`@security-auditor` was NOT run, by ratified scope.** The plan's §10 Ritual-class row states it explicitly: *"No `@security-auditor` — not a CLAUDE.md §1 critical path … the one server read added is a display-grade read of an existing indexed row, no write, no engine contact."* The kickoff named only `@code-reviewer`, consistent with that. Recorded so the omission reads as a decision rather than a lapse. `@db-migration-reviewer` is inapplicable — no schema or migration file is touched.
 
-Findings and their disposition are in the PR body.
+### Fixed in-session (`3b7db8d`)
+
+**HIGH-1 — the layout read could take down every participant route.** The module's two `return null`s covered only missing rows; a thrown `postgres` error propagated straight out of `PublicLayout`. There is no `(public)/error.tsx`, and a same-segment `error.tsx` cannot catch its own layout's throw anyway, so it landed on `global-error.tsx` — all four `(public)` pages plus the branded 404 replaced with "Something broke." for a value that is pure chrome. **The module already claimed this behaviour** at its `users`-row branch (*"degrading to render nothing is strictly better than 500-ing every page"*) and implemented it for the unreachable failure mode rather than the likely one. And **r5's Q4, committed one commit earlier in this same session, ratifies the shape**: *"A layout that throws breaks every route it wraps … any error returns `null`."* Wrapped; any throw returns `null`.
+
+*This is the finding worth keeping.* It is the exact failure the plan reasoned about for `FreezeBanner` — a component that was never built — while the read that actually shipped into the same layout went unguarded. The doctrine was written and then not applied to the code beside it.
+
+**MEDIUM-1 — the statement order is a correctness constraint and nothing said so.** Balance first, cursor second: an accrual committing between the two snapshots can only UNDERSTATE by one credit. Reverse them and it OVERSTATES by exactly `DAILY_CREDIT_DHARMA` — the header promising capacity the composer will reject, which is the inversion the file's own docblock says it exists to prevent. A transaction would not substitute (READ COMMITTED is still two snapshots; `loadViewerMarketContext` has the same property inside one). Comment only.
+
+**MEDIUM-2 — the read-cost comment was wrong.** It budgeted "twice per request". But `router.refresh()` re-executes the **layout** as well as the page, so on `/m/[slug]` a signed-in viewer holding the tab open costs 2 reads / 15 s / tab. **Verified against `docs/logs/F-DEBATE-4.md:213`, which measured it and says so in those words** — not taken from the review on trust.
+
+### One judgment beyond the review
+
+The reviewer's fix was a bare `try/catch → null`. The catch **also reports**, via `safeCaptureException`. A chrome figure silently vanishing for every signed-in participant is precisely the outage that should not be invisible, and the wrapper is itself fail-open (SPEC.2 §17.5), so observing a failure cannot cause one. It is **not deduped or sampled**: `DebatePoll` re-runs this layout every 15 s per open `/m/[slug]` tab, so a deterministic DB failure emits at 4/min/tab — the same amplification shape as F-DEBATE-4 docket item 10, and it belongs to that HARDEN pass. Named in the code and recorded here as a choice, not an omission.
+
+### The RED, attributed
+
+T9's four cases were proved against a tree with the catch removed and the **final** test files in place — exactly 3 of 11 fail, the other 8 hold:
+
+```
+AssertionError: promise rejected "Error: simulated postgres failure" instead of resolving
+ ❯ tests/integration/header-balance.integration.test.ts:289:3
+```
+
+The **second** case is the load-bearing one: a `try` around only the first statement passes case 1 and still takes the app down. The **fourth** is a negative — the ordinary no-ledger-row `null` must NOT report, or every pre-grant page load emits a Sentry event; it passes with and without the fix, by design.
+
+### Recorded, deliberately NOT fixed
+
+Each is judgment-shaped or out of scope. Nothing here is a defect in shipped behaviour.
+
+1. **MEDIUM-3 — header and composer can disagree within one painted frame.** The layout's read and `loadViewerMarketContext`'s happen at different instants; if the credit accrues between them the header shows `B` and the composer `B+10`. Transient, display-only, self-healing on the next render. Recorded so it is never mistaken for a ledger defect.
+2. **LOW-1 — `IdentityCluster.tsx:13–15`'s comment is now false.** It says the chip "stands alone in the signed-in right zone"; the Balance half now ships. Plan §4 names that file **explicitly untouched**, so correcting it is a scope decision for Gate C, not something to absorb silently.
+3. **LOW-2 — `spendable` shipped optional (`spendable?:`), Q6b specified required.** Deliberate: it is what lets the `(auth)` layout mount the header without a balance fetch. The cost is a lost compile-time forcing function — a future group layout renders no balance instead of failing to typecheck. The reviewer explicitly did not ask for a change.
+4. **LOW-3 — the DOM-order deviation needs explicit Gate C acknowledgement.** Decision 6 above; the code did what the plan *meant* and not what one of its sentences *said*.
+5. **LOW-4 — the footer regression guard is narrower than the ruling.** It greps three layout files for `SiteFooter` and `<footer`. A footer re-added under another component name, or mounted in a page or nested layout, is not caught — so *"a hand-rolled replacement is caught too"* holds only within those three files. A `no-page-footer.test.ts` globbing `src/app/**/layout.tsx` would be the real enforcement.
+6. **LOW-5 — test-fixture nits.** `const userId = user?.id ?? ""` turns a fixture failure into a confusing downstream assertion; the backdated rows are deliberately chain-inconsistent (`amount: "0"` with a changing `balance_after`) and must never be reused as a ledger-chain fixture.
+7. **LOW-6 — `SCAN_FILES` still omits `src/app/layout.tsx`**, the file whose `<html>`/`<body>` shell `global-error.tsx` mirrors. **Pre-existing**, made more visible by this edit; left per §5.3.
+8. **§7 soft deviation** — the plan says *"existing suites pass untouched"* and `84dc34e` edits two existing guard files. Both **widen** coverage; the reviewer read this as correctly handled. Flagged for Gate C rather than passed over.
+
+**Independently confirmed by the review, worth keeping:** the `"use client"` directive in `global-error.tsx` is **not** defeated by the SPDX comment above it — verified against the build output (`registerClientReference` for that module in `.next/server/chunks/ssr/`), not argued. It is the only file in `src/` with a comment above the directive, so no precedent existed. Also: the `MONEY_IDS` regex was replayed against all 112 scanned files with and without the new `spendable` entry — offender list `[]` both ways, so **zero false positives** were introduced.
 
 ---
 
@@ -172,8 +236,11 @@ After Gate C clears and the squash merge lands:
 - **T5a is the only guard on the replicated ADR-0029 read**, and it was vacuous until this session. If it is ever simplified — particularly if the backdated `created_at` SQL expressions are turned back into JS `Date`s — it silently stops guarding anything.
 - **`.mapWith()` on a bare `sql` fragment is not optional and `tsc` will not tell you.** Two files now depend on it; the failure is a wire string where a `Date` is expected.
 - **The two-sessions-one-Postgres false red is reproducible and expensive.** `truncateTables` disables the whole Bucket-A guard set per call. Check `ps` before believing any red.
+- **Read the durations before the assertion.** Both false reds on this task were latency, not logic, and only one had a second runner to find. A `Hook timed out` is a *latency* symptom by construction; a file that took 809 s where it takes 25 s, in a run whose `prepare` alone took 208 s, has already told you the answer. A full run here is **~3 minutes** on an unloaded machine — the 21-minute runs earlier in this session were themselves the warning.
 - **The root and `(public)` 404s are deliberately different surfaces**, and the difference is an ADR-0023 Option-2 requirement, not a styling choice. A `GlobalHeader` added to the root variant leaks participant chrome onto the admin `notFound()` throws.
+- **Anything awaited in `(public)/layout.tsx` must be fail-safe, and this is now the second file to prove it.** A throw there has no route-level boundary above it — `global-error.tsx` is the only catcher, so one failed read replaces every participant route. `getHeaderBalance` is wrapped; the pre-existing `auth.api.getSession` call beside it is **not**, and that is a deliberate difference (a session read arguably *should* fail loudly). Any future layout-level read inherits this question and should answer it explicitly.
+- **The statement order inside `getHeaderBalance` is a correctness constraint**, not a style preference, and reversing it inverts an understatement into an overstatement of one Daily Credit. It is now commented; do not reorder on aesthetic grounds.
 
 ## Time
 
-Single session, ~1h wall clock: ground checks + branch/diff read ~10 min · full isolated suite **21 min** (1276 s, the dominant cost) · rebase ~2 min · plan r5 ~8 min · this log ~10 min · reviewer cascade + PR ~15 min.
+Single session, ~2h wall clock. Dominated by the suite, run in full three times — 1276 s + 1387 s + 192 s ≈ 48 min of the total, and the first two figures are inflated by the machine stall described above, not by the suite. Ground checks + branch/diff read ~10 min · rebase ~2 min · plan r5 ~8 min · log ~15 min · reviewer cascade ~10 min · remediation + attributed RED ~15 min · close-out + PR ~10 min.
