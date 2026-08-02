@@ -3,7 +3,7 @@
 > **r3** — folds RECON-4 (SPEC.1's live footer commitment · BALANCE's spec-level corroboration · the Q6 label settled from the live repo). Supersedes r2 and r1; neither was committed.
 
 > **r5 · 2026-08-02 — superseded in part. Read this before the body.**
-> **Slice 2 (B4, the AGPL footer) is WITHDRAWN, not deferred.** Founder ruling `e085d29`: the product ships no page-level footer on any surface — not reduced, not AGPL-only, none. SPEC.1 1.0.26 (#282, `8e84edc`) amends §16.5, §18 and §21.6 accordingly; the AGPL-3.0 §13 obligation survives and moves to the Terms of Service body. **Every footer reference below is void** — Q1, Q1b, SG7, the `SiteFooter.tsx` row in §4, the four footer rows in §5, S2 in §6, and T3 in §7. The wrapper `flex-1` went out with the revert and now belongs to POLISH.1 as V7.
+> **Slice 2 (B4, the AGPL footer) is WITHDRAWN, not deferred.** Founder ruling `acc2e03`: the product ships no page-level footer on any surface — not reduced, not AGPL-only, none. SPEC.1 1.0.26 (#282, `8e84edc`) amends §16.5, §18 and §21.6 accordingly; the AGPL-3.0 §13 obligation survives and moves to the Terms of Service body. **Every footer reference below is void** — Q1, Q1b, SG7, the `SiteFooter.tsx` row in §4, the four footer rows in §5, S2 in §6, and T3 in §7. The wrapper `flex-1` went out with the revert and now belongs to POLISH.1 as V7.
 > **Slice 4 (B8, the freeze banner) is FORKED** to its own task, gated on a SPEC.1 §21.7 rider at 1.0.27. Its ratified decisions — Q4 as revised below, Q4b, Q5 — carry to that task unchanged.
 > **This PR ships S1 + S3 only.** The plan is closed; nothing further builds from it.
 
