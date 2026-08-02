@@ -15,7 +15,7 @@ The merge is **squash-to-main**, so **no SHA below ever reaches `main`.** Every 
 
 ## What landed
 
-**PR — `feat/shell-complete`** (9 commits, all SSH-signed, opened at the end of this session; **number recorded at close-out**):
+**PR #283 — `feat/shell-complete`** (9 commits, all SSH-signed). The **squash-merge SHA is still to be recorded at close-out** — it does not exist yet:
 
 | Working SHA | Pre-rebase | What |
 |---|---|---|
@@ -222,7 +222,7 @@ After Gate C clears and the squash merge lands:
 
 1. `git checkout main && git pull` — **assert `HEAD` is `main` before any `reset --hard`.**
 2. Prove the right tree landed: `git diff <squash-merge-SHA> origin/main` must be **empty**, and grep `getHeaderBalance` on `main`.
-3. Record the squash SHA into this log and the plan's `| **PR** |` row — it is the only durable reference either document will ever carry.
+3. Record the squash SHA into this log and the plan's `| **PR** |` row — it is the only durable reference either document will ever carry. (PR #283 is already recorded above; the SHA is what is missing.)
 4. Check whether the merged branch auto-deleted (`git ls-remote`); delete manually if it survived.
 
 **Then the forked S4 task**, which starts by writing the §21.7 rider — not by writing `FreezeBanner.tsx`.
