@@ -2,7 +2,9 @@ import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
+import { db } from "@/db";
 import { auth } from "@/server/auth";
+import { getHeaderBalance } from "@/server/dharma/header-balance";
 
 /**
  * Participant app shell (SHELL/UI.0) — the reusable server-component shell every
@@ -14,6 +16,28 @@ import { auth } from "@/server/auth";
  * deferred as "UI.13", re-sequenced into A1 by UI-LANE §2 (ADR-0023 §Patch
  * record). Viewer selection stays server-side in this layout (no client auth
  * state): the existing `getSession` read, passed down as a plain prop.
+ *
+ * The Đ balance is fetched HERE and ONLY for a signed-in viewer — one indexed
+ * read, skipped entirely for signed-out visitors. It is a SEPARATE prop from
+ * `viewer`, not a widening of `HeaderViewer` (the Đ cluster is a sibling of the
+ * identity chip, not a child). The `(auth)` layout deliberately does NOT fetch
+ * it: those routes are signed-out by definition and a mid-signup `/onboarding`
+ * user may have no `dharma_ledger` row.
+ *
+ * ACCEPTED, NOT DISCOVERED: on `/m/[slug]` the balance is read TWICE per
+ * request — once here, once inside `loadViewerMarketContext` in the page.
+ * `m/[slug]/page.tsx:53` already documents the cause (layouts cannot pass data
+ * to pages). Both are single-row indexed lookups; not optimised here.
+ *
+ * "PER REQUEST" IS NOT "PER NAVIGATION" ON `/m/[slug]`. `DebatePoll` calls
+ * `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s), and a refresh
+ * re-executes the LAYOUT as well as the page — `docs/logs/F-DEBATE-4.md:213`
+ * measured the tick at 12–14 round-trips "because the refresh re-executes the
+ * layout as well as the page". So for a signed-in viewer holding that tab open
+ * this pair costs 2 reads / 15 s / tab, not 2 per navigation. Still two
+ * single-row indexed lookups and still not optimised here, but HARDEN.6 sizes
+ * against ticks × tabs × round-trips and must count these two
+ * (@code-reviewer, SHELL-COMPLETE).
  */
 export default async function PublicLayout({
 	children,
@@ -24,10 +48,13 @@ export default async function PublicLayout({
 	const viewer = session
 		? { pseudonym: session.user?.pseudonym ?? null }
 		: null;
+	const spendable = session?.user?.id
+		? await getHeaderBalance(db, session.user.id)
+		: null;
 
 	return (
 		<div className="flex min-h-full flex-col">
-			<GlobalHeader viewer={viewer} />
+			<GlobalHeader viewer={viewer} spendable={spendable} />
 			<main className="flex-1">{children}</main>
 		</div>
 	);
