@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
+import { SiteFooter } from "@/components/shell/SiteFooter";
 import { auth } from "@/server/auth";
 
 /**
@@ -26,9 +27,10 @@ export default async function PublicLayout({
 		: null;
 
 	return (
-		<div className="flex min-h-full flex-col">
+		<div className="flex min-h-full flex-1 flex-col">
 			<GlobalHeader viewer={viewer} />
 			<main className="flex-1">{children}</main>
+			<SiteFooter />
 		</div>
 	);
 }

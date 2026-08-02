@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
+import { SiteFooter } from "@/components/shell/SiteFooter";
 import { auth } from "@/server/auth";
 
 /**
@@ -30,7 +31,7 @@ export default async function AuthLayout({
 		: null;
 
 	return (
-		<div className="flex min-h-full flex-col">
+		<div className="flex min-h-full flex-1 flex-col">
 			<GlobalHeader viewer={viewer} />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces
@@ -40,6 +41,7 @@ export default async function AuthLayout({
 			<main className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 py-8">
 				{children}
 			</main>
+			<SiteFooter />
 		</div>
 	);
 }

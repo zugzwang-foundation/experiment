@@ -82,10 +82,9 @@ describe("T1 — not-found boundaries", () => {
 		const publicLayout = read("src/app/(public)/layout.tsx");
 		const rootLayout = read("src/app/layout.tsx");
 
-		// The inheritance the branded 404 relies on. (The `<SiteFooter` half of
-		// this assertion is added by S2, which mints the component and mounts
-		// it — S1 must stay green on its own commit.)
+		// The inheritance the branded 404 relies on — header AND footer.
 		expect(publicLayout).toContain("<GlobalHeader");
+		expect(publicLayout).toContain("<SiteFooter");
 
 		// ADR-0023 Option-2: the root layout is shared with `(admin)` and mounts
 		// no participant chrome, which is what keeps the root 404 neutral.
