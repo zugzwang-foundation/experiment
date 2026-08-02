@@ -33,6 +33,11 @@ const MONEY_IDS = [
 	"balanceAfter",
 	"balance",
 	"spendableToday",
+	// The global-header Đ cluster's prop (SHELL-COMPLETE Q6b). Distinct from
+	// `spendableToday`: it threads a raw NUMERIC(38,18) string through
+	// `(public)/layout.tsx` → `GlobalHeader` → `BalanceCluster`, so an unwrapped
+	// render would put `610.400000000000000000` in the header on every route.
+	"spendable",
 	"staked",
 	"currentValue",
 	"current",

@@ -92,19 +92,40 @@ describe("T5a — ledger sub-read parity with loadProfileTiles", () => {
 		expect(header).toBe("45.500000000000000000");
 	});
 
-	it("reads-the-latest-row-by-seq-not-by-insert-luck", async () => {
-		// The ADR-0029 total order. Three appends; the LAST by seq wins.
+	it("reads-the-latest-row-by-seq-not-by-created-at", async () => {
+		// The ADR-0029 total order, and the fixture is built so the two candidate
+		// orderings DISAGREE. Rows appended in three separate statements get
+		// strictly increasing `created_at`, so `seq DESC` and `created_at DESC`
+		// pick the same row and the guard cannot fail — which is what made an
+		// earlier version of this test vacuous. Here the chain-LATER rows are
+		// backdated, so:
+		//     seq DESC        → the newest chain row  → "20…"  (correct)
+		//     created_at DESC → the initial_grant     → "10…"  (the drift)
+		// Swap `header-balance.ts`'s `desc(dharmaLedger.seq)` for
+		// `desc(dharmaLedger.createdAt)` and this test fails. That is the whole
+		// point: it is the only thing standing between the replicated select and
+		// silent ADR-0029/AUDIT-FIX-B2 drift.
+		//
+		// `created_at` is set from a SQL EXPRESSION, never a JS `Date`. postgres-js
+		// floors a bound `timestamptz` parameter, so a `Date` here would collapse
+		// the sub-second offsets, let the two orderings agree again, and silently
+		// restore the dead guard. Do not "simplify" this back to `new Date(...)`.
 		const userId = await seedUser({
 			emailTag: "hb-order",
 			pseudonym: "HBOrder",
 			balance: "10.000000000000000000",
 		});
-		for (const balance of ["30.000000000000000000", "20.000000000000000000"]) {
+		const backdated: [string, string][] = [
+			["30.000000000000000000", "2 hours"],
+			["20.000000000000000000", "1 hour"],
+		];
+		for (const [balanceAfter, ago] of backdated) {
 			await testDb.insert(dharmaLedger).values({
 				userId,
 				entryType: "bet_stake",
 				amount: "0.000000000000000000",
-				balanceAfter: balance,
+				balanceAfter,
+				createdAt: sql`now() - ${sql.raw(`interval '${ago}'`)}`,
 			});
 		}
 		await setCursor(userId, sql`now()`);
@@ -112,7 +133,10 @@ describe("T5a — ledger sub-read parity with loadProfileTiles", () => {
 		const header = await getHeaderBalance(testDb, userId);
 		const tiles = await loadProfileTiles(testDb, { userId, positions: [] });
 
+		// seq DESC wins: the chain-latest row, despite being the OLDEST by clock.
 		expect(header).toBe("20.000000000000000000");
+		// `loadProfileTiles` orders by seq too, so parity holds under the same
+		// disagreement — pinning both replicas of the ADR-0029 read at once.
 		expect(header).toBe(tiles.walletValue);
 	});
 });

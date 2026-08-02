@@ -18,7 +18,16 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = process.cwd();
 const SCAN_DIRS = ["src/components", "src/app/(public)"];
-const SCAN_FILES = ["src/app/(auth)/layout.tsx"];
+// Participant view files that live OUTSIDE the scanned dirs. The two root-level
+// error boundaries sit at `src/app/` — outside `src/app/(public)` — but are
+// participant surfaces all the same, and `global-error.tsx` in particular
+// replaces the root layout and hand-rolls its own `<html>`/`<body>`, which is
+// exactly where a smuggled literal would hide (SHELL-COMPLETE B10).
+const SCAN_FILES = [
+	"src/app/(auth)/layout.tsx",
+	"src/app/not-found.tsx",
+	"src/app/global-error.tsx",
+];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments
 // (@code-reviewer, UI.A1).
