@@ -1,5 +1,6 @@
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 
+import { BalanceCluster } from "./BalanceCluster";
 import { BrandCluster } from "./BrandCluster";
 import { formatCountdown } from "./countdown-format";
 import { HeaderNav } from "./HeaderNav";
@@ -24,16 +25,40 @@ import { VisitorCounter } from "./VisitorCounter";
  *
  * Left zone order Back · Home · Radio (mockup v0_2); Social/Research/RULES/
  * Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each a named
- * deviation in the plan. Right zone = JOIN or the identity chip, then a
- * hairline divider + the visitor counter at the far right (UI.13; SPEC.1
- * §21.1); OQ-2 defers the Đ cluster.
+ * deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity
+ * chip, then a hairline divider + the visitor counter at the far right (UI.13;
+ * SPEC.1 §21.1).
+ *
+ * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
+ * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
+ * muted register is called out in that file as "load-bearing anti-conflation,
+ * not styling". The spendable figure IS ledger-derived, so it stays LEFT of the
+ * divider; putting a real Đ figure and a vanity page-hit count in the same
+ * visual bucket is exactly what §21.1 forbids, and the failure would be silent.
+ * `BalanceCluster` sits BEFORE the identity chip per the locked W2.4/.5/.14
+ * mockup, whose own annotation states the mechanism: "visitor count held off
+ * the Đ cluster by the identity chip + divider". T4 pins the whole order.
+ *
+ * `spendable` is a SEPARATE prop, not a widening of `HeaderViewer`: the Đ
+ * cluster is a SIBLING of `IdentityCluster`, not a child, and `HeaderViewer` is
+ * `IdentityCluster`'s own exported type — it should not carry data that
+ * component never renders. It is optional because the `(auth)` layout mounts
+ * this header WITHOUT a balance fetch (signed-out by definition; a mid-signup
+ * `/onboarding` user may have no `dharma_ledger` row, and it avoids a read on
+ * every OTP page load).
  *
  * Countdown (F2): the target is the BUILT `FREEZE_INSTANT_UTC` pin —
  * imported read-only from the markets service (never a duplicate constant)
  * — with the initial display computed here at request time so the client
  * leaf hydrates onto identical markup.
  */
-export function GlobalHeader({ viewer }: { viewer: HeaderViewer | null }) {
+export function GlobalHeader({
+	viewer,
+	spendable = null,
+}: {
+	viewer: HeaderViewer | null;
+	spendable?: string | null;
+}) {
 	const targetMs = FREEZE_INSTANT_UTC.getTime();
 	const initialDisplay = formatCountdown(Date.now(), targetMs);
 
@@ -48,6 +73,7 @@ export function GlobalHeader({ viewer }: { viewer: HeaderViewer | null }) {
 					<BrandCluster targetMs={targetMs} initialDisplay={initialDisplay} />
 				</div>
 				<div className="flex items-center justify-self-end">
+					<BalanceCluster spendable={spendable} />
 					<IdentityCluster viewer={viewer} />
 					<span aria-hidden="true" className="mx-3 h-5 w-px bg-n2" />
 					<VisitorCounter />
