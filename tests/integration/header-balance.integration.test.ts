@@ -1,6 +1,7 @@
 import { eq, sql } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
+import type { DbClient } from "@/db";
 import { dharmaLedger, users } from "@/db/schema";
 import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
@@ -30,7 +31,29 @@ import { truncateTables } from "../db/_fixtures/truncate";
  * `tsc` cannot catch that, only a real-DB run can.
  *
  * T6 pins the null path: no `dharma_ledger` row → `null`.
+ *
+ * T9 pins the FAIL-SAFE (@code-reviewer HIGH-1). This read runs in
+ * `(public)/layout.tsx`, so an unhandled throw takes down every participant
+ * route — a same-segment `error.tsx` cannot catch its own layout's throw, so it
+ * lands on `global-error.tsx`. The two `return null`s in the module cover only
+ * missing rows; the DB call itself is the likelier failure. Both statements are
+ * covered, because a `try` around only the first would still let the second one
+ * through — that is exactly what the second case proves.
  */
+
+// The fail-safe reports through `safeCaptureException`; mocked so the test can
+// assert it FIRED. A catch that silently fails to report is the worst of the
+// three outcomes and would otherwise be indistinguishable from one that works.
+// The spy lives in `vi.hoisted` because `vi.mock` factories are hoisted above
+// imports and module-scope consts are in TDZ inside them (the
+// `tests/unit/rate-limit-prefix.test.ts:17-19` note).
+const { captureSpy } = vi.hoisted(() => ({
+	captureSpy: vi.fn(() => true),
+}));
+
+vi.mock("@/server/observability/safe-capture", () => ({
+	safeCaptureException: captureSpy,
+}));
 
 const TABLES = ["dharma_ledger", "users"] as const;
 
@@ -223,5 +246,79 @@ describe("T6 — the null path", () => {
 		});
 
 		expect(await getHeaderBalance(testDb, userId)).toBeNull();
+	});
+});
+
+const BOOM = "simulated postgres failure";
+
+/**
+ * A client whose `nth` `.select()` throws and whose other calls return a
+ * working ledger chain. No DB — the point is the throw, and routing the good
+ * call through `testDb` would make WHICH statement failed depend on fixture
+ * state rather than on the parameter.
+ */
+function clientFailingOnSelect(nth: number): DbClient {
+	let calls = 0;
+	return {
+		select() {
+			calls += 1;
+			if (calls === nth) {
+				throw new Error(BOOM);
+			}
+			return {
+				from: () => ({
+					where: () => ({
+						orderBy: () => ({
+							limit: async () => [{ balanceAfter: "45.000000000000000000" }],
+						}),
+					}),
+				}),
+			};
+		},
+	} as unknown as DbClient;
+}
+
+describe("T9 — the fail-safe (@code-reviewer HIGH-1)", () => {
+	afterEach(() => captureSpy.mockClear());
+
+	it("returns-null-instead-of-throwing-when-the-ledger-read-fails", async () => {
+		// Without the catch this REJECTS, and in `(public)/layout.tsx` a rejection
+		// here replaces every participant route with `global-error.tsx`.
+		await expect(
+			getHeaderBalance(clientFailingOnSelect(1), "any-user-id"),
+		).resolves.toBeNull();
+	});
+
+	it("also-catches-a-failure-in-the-SECOND-statement", async () => {
+		// The load-bearing half: a `try` around only the first statement would
+		// pass the test above and still take the app down here.
+		await expect(
+			getHeaderBalance(clientFailingOnSelect(2), "any-user-id"),
+		).resolves.toBeNull();
+	});
+
+	it("reports-the-failure-rather-than-swallowing-it", async () => {
+		await getHeaderBalance(clientFailingOnSelect(1), "any-user-id");
+
+		expect(captureSpy).toHaveBeenCalledTimes(1);
+		const [err, ctx] = captureSpy.mock.calls[0] as unknown as [
+			Error,
+			{ tags: { kind: string } },
+		];
+		expect(err.message).toBe(BOOM);
+		expect(ctx.tags.kind).toBe("header_balance_read_failed");
+	});
+
+	it("does-not-report-on-the-ordinary-no-ledger-row-path", async () => {
+		// T6's `null` is a legitimate state, not a failure. If the two null paths
+		// were ever collapsed into the catch, every pre-grant page load would
+		// emit a Sentry event.
+		const userId = await seedUser({
+			emailTag: "hb-quiet",
+			pseudonym: "HBQuiet",
+		});
+
+		expect(await getHeaderBalance(testDb, userId)).toBeNull();
+		expect(captureSpy).not.toHaveBeenCalled();
 	});
 });

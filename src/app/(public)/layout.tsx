@@ -28,6 +28,16 @@ import { getHeaderBalance } from "@/server/dharma/header-balance";
  * request — once here, once inside `loadViewerMarketContext` in the page.
  * `m/[slug]/page.tsx:53` already documents the cause (layouts cannot pass data
  * to pages). Both are single-row indexed lookups; not optimised here.
+ *
+ * "PER REQUEST" IS NOT "PER NAVIGATION" ON `/m/[slug]`. `DebatePoll` calls
+ * `router.refresh()` every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s), and a refresh
+ * re-executes the LAYOUT as well as the page — `docs/logs/F-DEBATE-4.md:213`
+ * measured the tick at 12–14 round-trips "because the refresh re-executes the
+ * layout as well as the page". So for a signed-in viewer holding that tab open
+ * this pair costs 2 reads / 15 s / tab, not 2 per navigation. Still two
+ * single-row indexed lookups and still not optimised here, but HARDEN.6 sizes
+ * against ticks × tabs × round-trips and must count these two
+ * (@code-reviewer, SHELL-COMPLETE).
  */
 export default async function PublicLayout({
 	children,
