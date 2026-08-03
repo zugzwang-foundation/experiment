@@ -4,8 +4,8 @@ import { ProfileLoading } from "@/components/profile/states";
  * Shows on client navigation to this uncached dynamic route. */
 export default function Loading() {
 	return (
-		<main className="mx-auto w-full max-w-3xl px-4 py-6">
+		<div className="mx-auto w-full max-w-3xl px-4 py-6">
 			<ProfileLoading />
-		</main>
+		</div>
 	);
 }

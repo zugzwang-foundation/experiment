@@ -4,8 +4,8 @@ import { BookmarksLoading } from "@/components/bookmarks/states";
  * navigation to this uncached dynamic route. */
 export default function Loading(): React.JSX.Element {
 	return (
-		<main className="mx-auto w-full max-w-3xl px-4 py-6">
+		<div className="mx-auto w-full max-w-3xl px-4 py-6">
 			<BookmarksLoading />
-		</main>
+		</div>
 	);
 }

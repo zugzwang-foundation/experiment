@@ -79,7 +79,7 @@ export function GlobalHeader({
 				<div className="flex items-center justify-self-end">
 					<DharmaCluster portfolio={portfolio} spendable={spendable} />
 					<IdentityCluster viewer={viewer} />
-					<span aria-hidden="true" className="mx-3 h-5 w-px bg-n2" />
+					<span aria-hidden="true" className="mx-3 h-[30px] w-px bg-n2" />
 					<VisitorCounter />
 				</div>
 			</div>
