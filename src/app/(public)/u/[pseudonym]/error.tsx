@@ -12,10 +12,10 @@ export default function ProfileRouteError({
 	reset: () => void;
 }) {
 	return (
-		<main className="mx-auto w-full max-w-3xl px-4 py-6">
+		<div className="mx-auto w-full max-w-3xl px-4 py-6">
 			<button type="button" onClick={reset} className="block w-full text-left">
 				<ProfileError />
 			</button>
-		</main>
+		</div>
 	);
 }

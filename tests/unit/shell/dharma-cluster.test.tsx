@@ -71,6 +71,24 @@ const VIEWER = { pseudonym: "RedFox001" };
 const PORTFOLIO_LABEL = "Portfolio";
 const BALANCE_LABEL = "Balance";
 
+/**
+ * DIRECT children of the right zone — and that scoping is LOAD-BEARING, not an
+ * implementation detail (POLISH-1a V10).
+ *
+ * There are now TWO `w-px` elements in the header subtree: this cluster's
+ * decorative `.sep` and the §21.1 register boundary in `GlobalHeader`'s right
+ * zone. SG6 describes the boundary as "the hairline `w-px` rule", which stopped
+ * being a unique description the moment the cluster shipped. The `w-px`
+ * `findIndex` calls below are still unambiguous ONLY because this returns
+ * `.children`: `.sep` is a GRANDCHILD (nested inside the cluster node) and
+ * never enters the array.
+ *
+ * So: do not widen this to `querySelectorAll`, and do not reach for
+ * `clusterElements` below to find a divider — that one IS a
+ * `querySelectorAll("*")` and WOULD match `.sep`. Either change makes the
+ * divider lookup ambiguous SILENTLY, which is the exact failure mode SG6
+ * exists to prevent.
+ */
 function rightZoneChildren(): Element[] {
 	const cluster = screen.getByTestId("dharma-cluster");
 	const zone = cluster.parentElement;

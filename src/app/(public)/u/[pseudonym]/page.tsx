@@ -83,7 +83,7 @@ export default async function ProfilePage({
 	const initialMarketSlug = typeof market === "string" ? market : undefined;
 
 	return (
-		<main className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
 			<IdentityCard user={profileUser} owner={owner} />
 			<ProfileTiles tiles={tiles} />
 			<ProfileGraph series={graph} />
@@ -92,6 +92,6 @@ export default async function ProfilePage({
 				initialMarketSlug={initialMarketSlug}
 			/>
 			<ArgumentList items={argumentItems} owner={owner} />
-		</main>
+		</div>
 	);
 }

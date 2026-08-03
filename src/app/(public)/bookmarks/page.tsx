@@ -32,7 +32,7 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 	const items = await loadBookmarks(db, { viewerId });
 
 	return (
-		<main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+		<div className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
 			<div className="flex flex-wrap items-center gap-2">
 				<h1 className="font-semibold text-ink text-lg">Bookmarks</h1>
 				<Badge variant="outline">Your bookmarks</Badge>
@@ -51,6 +51,6 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 					))}
 				</div>
 			)}
-		</main>
+		</div>
 	);
 }

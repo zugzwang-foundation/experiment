@@ -11,10 +11,10 @@ export default function BookmarksRouteError({
 	reset: () => void;
 }): React.JSX.Element {
 	return (
-		<main className="mx-auto w-full max-w-3xl px-4 py-6">
+		<div className="mx-auto w-full max-w-3xl px-4 py-6">
 			<button type="button" onClick={reset} className="block w-full text-left">
 				<BookmarksError />
 			</button>
-		</main>
+		</div>
 	);
 }
