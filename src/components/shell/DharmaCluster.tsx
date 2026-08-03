@@ -45,6 +45,13 @@ import { formatDharma } from "@/components/debate/format";
  * per R4 — matching the §23 Positions-value tile, which is the same number. The
  * mockup's `Đ 2,480` is tier-4 illustrative; digit grouping is one product-wide
  * ruling routed to POLISH, not settled here.
+ *
+ * SEMANTIC TIER, NOT RAW PRIMITIVE (POLISH-1a V9). `bg-(--btn-fill)` and
+ * `text-muted-foreground` resolve to the SAME literals as the `bg-ground` /
+ * `text-n5` they replace — the change is which tier the cluster binds, matching
+ * the two siblings it sits beside (`IdentityCluster`'s chip already binds
+ * `--btn-fill`; `VisitorCounter`'s label already binds `muted-foreground`).
+ * Do not "simplify" these back to the primitives.
  */
 export function DharmaCluster({
 	portfolio,
@@ -60,7 +67,8 @@ export function DharmaCluster({
 	return (
 		<span
 			data-testid="dharma-cluster"
-			className="mr-3 flex h-11 shrink-0 items-center gap-[13px] rounded-(--r) bg-ground pr-3.5 pl-3 select-none [border:var(--hairline)]"
+			title="Your Dharma — Portfolio (open positions) + Balance (spendable)"
+			className="mr-3.5 flex h-11 shrink-0 items-center gap-[13px] rounded-(--r) bg-(--btn-fill) pr-3.5 pl-3 select-none [border:var(--hairline)]"
 		>
 			<span className="text-[17px] font-bold text-ink">Đ</span>
 			{/* The mockup's `.sep` hairline — decorative, so no testid. It is NOT the
@@ -69,7 +77,7 @@ export function DharmaCluster({
 			<span aria-hidden="true" className="h-[26px] w-px bg-n2" />
 			{portfolio !== null ? (
 				<span className="flex flex-col gap-1 leading-none">
-					<span className="text-[8.5px] font-bold tracking-[0.13em] text-n5 uppercase">
+					<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
 						Portfolio
 					</span>
 					<span className="text-[13px] font-bold text-ink tabular-nums">
@@ -78,7 +86,7 @@ export function DharmaCluster({
 				</span>
 			) : null}
 			<span className="flex flex-col gap-1 leading-none">
-				<span className="text-[8.5px] font-bold tracking-[0.13em] text-n5 uppercase">
+				<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
 					Balance
 				</span>
 				<span className="text-[13px] font-bold text-ink tabular-nums">

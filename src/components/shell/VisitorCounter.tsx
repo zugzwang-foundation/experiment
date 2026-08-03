@@ -8,7 +8,10 @@ import { useEffect, useRef, useState } from "react";
  * The global-header visitor counter (SPEC.1 §21.1, DESIGN.W2.5). A vanity /
  * traction count of TOTAL page visits — repeats counted — labelled plainly
  * "visitors". It is explicitly NOT `n`: it POSTs to `/api/visits` and renders
- * the returned integer; it reads nothing from the ledger / engine.
+ * the returned integer; it reads nothing from the ledger / engine. The `title`
+ * surfaces that distinction to the viewer (POLISH-1a V4) — until now the
+ * anti-conflation rule lived only in this comment, and the bare label
+ * "visitors" reads as a participant count to anyone who never saw it.
  *
  * Client leaf: POST on mount and on every `usePathname()` change — the count
  * refreshes on navigation, NO poll / interval / websocket (§21.1). A ref guards
@@ -68,6 +71,7 @@ export function VisitorCounter() {
 			data-testid="visitor-counter"
 			data-state={dataState}
 			aria-busy={state === "loading"}
+			title="Total page visits — not participants"
 			className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
 		>
 			<Eye aria-hidden="true" className="size-3.5 shrink-0" />
