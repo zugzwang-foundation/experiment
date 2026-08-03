@@ -16,7 +16,7 @@ The merge is **squash-to-main**, so **no SHA below reaches `main`.** Every one i
 
 ## What landed
 
-**PR #TBD — `feat/header-portfolio`** (6 commits, all SSH-signed, author `Zugzwang/world`, no `Co-authored-by`):
+**PR #286 — `feat/header-portfolio`** (7 commits, all SSH-signed, author `Zugzwang/world`, no `Co-authored-by`):
 
 | Working SHA | Slice | What |
 |---|---|---|
@@ -24,8 +24,8 @@ The merge is **squash-to-main**, so **no SHA below reaches `main`.** Every one i
 | `00012ad` | **S2** | `src/server/dharma/header-portfolio.ts` — the read module |
 | `8026cf7` | **S3** | `DharmaCluster` (`git mv` from `BalanceCluster`) + `GlobalHeader` prop |
 | `3178e91` | **S4** | the `Promise.all` wiring + SPEC.1 §21.8 rider + SHELL-COMPLETE §5.1 |
-| *(next)* | **review** | `@code-reviewer` remediation — MEDIUM-1 test + LOW-7 date |
-| *(last)* | **log** | this file |
+| `c06f7a4` | **review** | `@code-reviewer` remediation — MEDIUM-1 test + LOW-7 date |
+| `a79f61c` | **log** | this file, then one follow-up recording PR #286 + the CI run |
 
 **Portfolio** — Σ of the viewer's open-position execution values (Đb) — now renders as the first of two stats in the signed-in global-header Đ cluster, beside the shipped Balance. One number in the header bar. Not a tab, not a page, not a route.
 
@@ -91,7 +91,7 @@ The probe file was restored byte-identical: md5 `1e66a7967c0caa17a106520b9e9e10f
 
 ## Next session starts at
 
-**Gate C — the web diff-read of PR #TBD. Nothing else.** CC does not merge. Read the six open questions above first; OQ-1 and OQ-2 are the two that want a decision before merge, and both are one-clause spec corrections rather than code changes.
+**Gate C — the web diff-read of PR #286. Nothing else.** CC does not merge. Read the six open questions above first; OQ-1 and OQ-2 are the two that want a decision before merge, and both are one-clause spec corrections rather than code changes.
 
 After merge: record the squash-merge SHA on `main` here, `git ls-remote` to check whether the branch auto-deleted, and confirm the tracker rows.
 
