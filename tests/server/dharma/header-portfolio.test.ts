@@ -504,27 +504,20 @@ describe("T2 — semantics (R1 Đb basis · R5 discriminant · R8 fail-safe · R
 		expect(await getHeaderPortfolio(rec.client, USER_ID)).not.toBe(bothMarkets);
 	});
 
-	it("skips-a-held-market-with-no-pool-row-rather-than-throwing", async () => {
-		// THE ONE DELIBERATE DIVERGENCE FROM THE MIRROR, pinned so a later pass
-		// cannot quietly undo it. `positions.ts:416–426` THROWS here; this module
-		// SKIPS, because it runs in `(public)/layout.tsx` where a same-segment
-		// `error.tsx` cannot catch its own layout's throw — the escape lands on
-		// `global-error.tsx` and replaces every participant route. Understating one
-		// holding beats trading four routes plus the branded 404 for a chrome
-		// figure.
-		//
-		// Two failure shapes this catches. Restore the throw for mirror parity, or
-		// drop the `pool === undefined` guard so `computeSell` receives
-		// `undefined.yesReserves`, and either way the OUTER catch fires: Portfolio
-		// goes `null` for every viewer holding that market and a Sentry event is
-		// emitted on every render of every participant route. So the capture
-		// assertion below is the load-bearing half — the return value alone would
-		// pass for an implementation that degraded the whole figure instead of the
-		// one holding.
+	it("fails-closed-on-a-held-market-with-no-pool-row", async () => {
+		// FAIL CLOSED, NOT QUIETLY SHORT. An earlier cut SKIPPED the poolless
+		// holding — which dropped it from the Σ and returned a perfectly
+		// ordinary-looking number. That is a PLAUSIBLE WRONG FIGURE, and DROUND R1
+		// ruled that class strictly worse than an obviously-broken one: a viewer
+		// cannot tell an understated net worth from a true one, and would act on
+		// it. The module therefore throws, the catch converts it to `null`, and
+		// the cluster degrades to Balance-only — Portfolio reads as unavailable
+		// instead of silently wrong. Failing closed also restores parity with the
+		// mirror this read follows, `positions.ts::reservesOf` (`:416–426`).
 		//
 		// Structurally impossible in production (a held position mints only inside
 		// the pool-locked W-1 tx), which is precisely why it needs a test: nothing
-		// else in T1/T2/T3 exercises it (@code-reviewer MEDIUM-1).
+		// else in T1/T2/T3 exercises this branch (@code-reviewer MEDIUM-1).
 		const rec = recordingClient({
 			[getTableName(positions)]: [
 				positionRow(M_OPEN_1, "YES", "30.000000000000000000"),
@@ -537,13 +530,25 @@ describe("T2 — semantics (R1 Đb basis · R5 discriminant · R8 fail-safe · R
 			],
 		});
 
-		// The poolless holding drops out; the sound one still contributes.
-		expect(await getHeaderPortfolio(rec.client, USER_ID)).toBe(
+		const result = await getHeaderPortfolio(rec.client, USER_ID);
+
+		// `null`, never a partial sum. Spelled out against the sound holding's own
+		// value so a regression to the skip is caught by name, not by inference.
+		expect(result).toBeNull();
+		expect(result).not.toBe(
 			toFixed18(db(M_OPEN_1, "YES", "30.000000000000000000")),
 		);
-		// Not the whole-figure degradation, and not a throw.
-		expect(await getHeaderPortfolio(rec.client, USER_ID)).not.toBeNull();
-		expect(captureSpy).not.toHaveBeenCalled();
+
+		// And it REPORTS. The load-bearing half: `null` alone is what an empty
+		// portfolio would look like at the Sentry layer, so without this a
+		// structurally-impossible state could recur forever unobserved.
+		expect(captureSpy).toHaveBeenCalledTimes(1);
+		const [err, ctx] = captureSpy.mock.calls[0] as unknown as [
+			Error,
+			{ tags: { kind: string } },
+		];
+		expect(err.message).toContain("held position with no pool row");
+		expect(ctx.tags.kind).toBe("header_portfolio_read_failed");
 	});
 
 	it("returns-null-and-reports-when-the-first-statement-throws", async () => {

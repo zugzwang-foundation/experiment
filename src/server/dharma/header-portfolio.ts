@@ -48,9 +48,13 @@ import { safeCaptureException } from "@/server/observability/safe-capture";
  * already landed in the ledger, and therefore in Balance, so counting it here
  * would double-count it against the other stat. `resolution/settle.ts:126–137`
  * writes a zero-amount leg per bet, so amount-nonzero would misclassify a real
- * settlement. Settlement never zeroes `positions` (INV-4 — the resolution write
- * path does not touch that table), which is exactly why a `quantity > 0` test
- * alone would `computeSell` against a resolved pool and report a phantom figure.
+ * settlement. Settlement never zeroes `positions`: the resolution write path —
+ * `resolution/{settle,void,correct}.ts` — appends `resolution_events`,
+ * `payout_events` and the ledger chain and flips `markets`, but only ever READS
+ * `positions` (`.from(positions)`, never an insert or update), and
+ * `positions/persist.ts:66` is that table's sole writer in the whole tree. That
+ * is exactly why a `quantity > 0` test alone would `computeSell` against a
+ * resolved pool and report a phantom figure.
  *
  * DELIBERATELY SEPARATE FROM `header-balance.ts`, AND NEVER FUSED WITH IT. The
  * two reads are awaited concurrently in `src/app/(public)/layout.tsx` — the
@@ -138,13 +142,21 @@ export async function getHeaderPortfolio(
 			const held = heldByMarket.get(marketId);
 			const pool = poolByMarket.get(marketId);
 			if (held === undefined || pool === undefined) {
-				// A held position mints only inside the pool-locked W-1 tx, so a
-				// missing pool for a held market is structurally impossible
-				// (`positions.ts:416–426` parity, which throws here). This read is
-				// layout-mounted chrome, so it SKIPS rather than throws: understating
-				// one holding beats replacing every participant route with an error
-				// page. The catch below still covers a genuine read failure.
-				continue;
+				// UNREACHABLE BY CONSTRUCTION — a held position mints only inside the
+				// pool-locked W-1 tx, so a held market always carries a pool row.
+				//
+				// IT THROWS, AND THE THROW IS THE POINT. Skipping the holding would
+				// drop it from the Σ and return a perfectly ordinary-looking number —
+				// a PLAUSIBLE WRONG FIGURE, which DROUND R1 ruled strictly worse than
+				// an obviously-broken one. The catch below converts this to `null`, so
+				// the cluster degrades to Balance-only: the viewer is told Portfolio
+				// is unavailable rather than quietly believing an understated net
+				// worth. Failing closed also restores parity with the mirror this read
+				// follows — `positions.ts::reservesOf` (`:416–426`) throws on exactly
+				// this condition.
+				throw new Error(
+					`getHeaderPortfolio: held position with no pool row (market ${marketId})`,
+				);
 			}
 			sum = sum.plus(
 				computeSell({
