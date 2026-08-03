@@ -25,7 +25,10 @@ import { safeCaptureException } from "@/server/observability/safe-capture";
  *
  * FI-2 — ONE HOLDING, ONE VALUE (SPEC.1 §23 `:1592`). The figure this returns
  * and the §23 Positions-value tile are the SAME quantity, so the only acceptable
- * relation between them is byte-identity. That is achieved by SAME-SOURCE
+ * relation between them, against the same pool state, is byte-identity.
+ * (There is no shared snapshot between the two reads, so a bet committing
+ * between them moves one and not the other — the plan's §8 risk 2.) That
+ * identity is achieved by SAME-SOURCE
  * DERIVATION, not by extraction: the three statements below mirror
  * `loadProfilePositions` statements 1 · 2 · 4 (`profile/positions.ts:139–146`,
  * `:163–171`, `:189–196`) in table, columns and predicate, and the in-memory

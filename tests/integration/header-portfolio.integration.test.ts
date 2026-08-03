@@ -34,8 +34,12 @@ import { truncateTables } from "../db/_fixtures/truncate";
  * SPEC.1 §23 (`:1592`): "Current **is** Đb; one holding never shows two
  * different current values." The header Portfolio figure and the §23
  * Positions-value tile are THE SAME QUANTITY (§23 `:1596`), so the only
- * acceptable relation between them is byte-identity — not "close", not "rounds
- * the same". Plan §4.3 states the contract:
+ * acceptable relation between them, against the same pool state, is
+ * byte-identity — not "close", not "rounds the same". That condition is
+ * load-bearing rather than decorative: the two reads share no snapshot in
+ * production, so a bet committing between them moves one figure and not the
+ * other. This test holds the pool still, which is what makes the equality
+ * assertable at all. Plan §4.3 states the contract:
  *
  *     Σ over open rows of loadProfilePositions(db, {userId}).current
  *       === getHeaderPortfolio(db, userId)
