@@ -1,8 +1,8 @@
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 
-import { BalanceCluster } from "./BalanceCluster";
 import { BrandCluster } from "./BrandCluster";
 import { formatCountdown } from "./countdown-format";
+import { DharmaCluster } from "./DharmaCluster";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
@@ -32,20 +32,22 @@ import { VisitorCounter } from "./VisitorCounter";
  * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
  * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
  * muted register is called out in that file as "load-bearing anti-conflation,
- * not styling". The spendable figure IS ledger-derived, so it stays LEFT of the
- * divider; putting a real Đ figure and a vanity page-hit count in the same
- * visual bucket is exactly what §21.1 forbids, and the failure would be silent.
- * `BalanceCluster` sits BEFORE the identity chip per the locked W2.4/.5/.14
- * mockup, whose own annotation states the mechanism: "visitor count held off
- * the Đ cluster by the identity chip + divider". T4 pins the whole order.
+ * not styling". BOTH Đ figures are engine-derived, so both stay LEFT of the
+ * divider — they live inside the single `DharmaCluster` node, so neither can
+ * drift right of the boundary without leaving the cluster entirely. Putting a
+ * real Đ figure and a vanity page-hit count in the same visual bucket is exactly
+ * what §21.1 forbids, and the failure would be silent. `DharmaCluster` sits
+ * BEFORE the identity chip per the locked W2.4/.5/.14 mockup, whose own
+ * annotation states the mechanism: "visitor count held off the Đ cluster by the
+ * identity chip + divider". T4 pins the whole order. SPEC.1 §21.8 codifies it.
  *
- * `spendable` is a SEPARATE prop, not a widening of `HeaderViewer`: the Đ
- * cluster is a SIBLING of `IdentityCluster`, not a child, and `HeaderViewer` is
- * `IdentityCluster`'s own exported type — it should not carry data that
- * component never renders. It is optional because the `(auth)` layout mounts
- * this header WITHOUT a balance fetch (signed-out by definition; a mid-signup
- * `/onboarding` user may have no `dharma_ledger` row, and it avoids a read on
- * every OTP page load).
+ * `spendable` and `portfolio` are SEPARATE props, not a widening of
+ * `HeaderViewer`: the Đ cluster is a SIBLING of `IdentityCluster`, not a child,
+ * and `HeaderViewer` is `IdentityCluster`'s own exported type — it should not
+ * carry data that component never renders. Both are optional because the
+ * `(auth)` layout mounts this header WITHOUT either fetch (signed-out by
+ * definition; a mid-signup `/onboarding` user may have no `dharma_ledger` row,
+ * and it avoids two reads on every OTP page load).
  *
  * Countdown (F2): the target is the BUILT `FREEZE_INSTANT_UTC` pin —
  * imported read-only from the markets service (never a duplicate constant)
@@ -54,9 +56,11 @@ import { VisitorCounter } from "./VisitorCounter";
  */
 export function GlobalHeader({
 	viewer,
+	portfolio = null,
 	spendable = null,
 }: {
 	viewer: HeaderViewer | null;
+	portfolio?: string | null;
 	spendable?: string | null;
 }) {
 	const targetMs = FREEZE_INSTANT_UTC.getTime();
@@ -73,7 +77,7 @@ export function GlobalHeader({
 					<BrandCluster targetMs={targetMs} initialDisplay={initialDisplay} />
 				</div>
 				<div className="flex items-center justify-self-end">
-					<BalanceCluster spendable={spendable} />
+					<DharmaCluster portfolio={portfolio} spendable={spendable} />
 					<IdentityCluster viewer={viewer} />
 					<span aria-hidden="true" className="mx-3 h-5 w-px bg-n2" />
 					<VisitorCounter />
