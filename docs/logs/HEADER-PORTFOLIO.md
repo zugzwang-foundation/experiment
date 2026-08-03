@@ -75,15 +75,29 @@ The probe file was restored byte-identical: md5 `1e66a7967c0caa17a106520b9e9e10f
 
 ## Open questions — for Gate C
 
+> **Status after the Gate C pass (2026-08-03).** Four discharged — OQ-1, OQ-2, OQ-3, OQ-6 — and two carried: OQ-4 to HARDEN, OQ-5 to the tracker. Each entry now opens with its disposition and the SHA that settled it; the original finding text is kept verbatim beneath, because the reasoning is the record and a resolved question that loses its reasoning has to be re-derived the next time it surfaces.
+
+**OQ-1 — DISCHARGED at Gate C (`b8ae117`).** The clause now reads "Signed-out state is unchanged: no Đ figure is shown to the audience." Original finding below, kept as the record.
+
 **OQ-1 · The rider asserts a `Đ` info doorway that does not exist.** SPEC.1 §21.8 (`:1547`) reads "Signed-out state is unchanged — the audience sees the `Đ` info doorway, never a figure." No such element is in the shipped header: `GlobalHeader.tsx:26–28` records "Social/Research/RULES/Đ-info are **ratified omissions** (OQ-3/OQ-4 zero-supplied)". The signed-out right zone is JOIN → divider → visitor counter. **The rider is web-authored and landed verbatim; CC did not touch its prose.** Gate C decides: a one-clause correction, or an explicit ruling that the doorway is now mandated and gets its own task. *(reviewer MEDIUM-2)*
+
+**OQ-2 — DISCHARGED at Gate C (`b8ae117`, emphasis restored `d46bd69`).** The preamble now enumerates rather than counts: "**Six are in scope for v1** — §§21.1–21.5 and §21.8; the feature-guide page (§21.6) is **deferred**." The §20 row's own description of the edit was corrected in the same pass. Original finding below.
 
 **OQ-2 · The §21 preamble is now self-contradictory.** The ratified `Five` → `Six` swap leaves "**Six are in scope for v1**; the sixth — the feature-guide page (§21.6) — is **deferred**". With §21.8 in the in-scope set, §21.6 is no longer "the sixth". The swap was applied exactly as instructed and the surrounding prose was **not** reworded — spec prose is web-owned. A one-clause fix ("the sixth" → "the feature-guide page") belongs to Gate C. *(reviewer LOW-6; first surfaced in the `3178e91` commit body)*
 
+**OQ-3 — DISCHARGED at Gate C (`ca1a4d7`, D1).** §21.8's final paragraph now states the term-by-term relation — Portfolio is the Σ Đb term, Balance the free-Dharma term plus any unclaimed credit — so the two sum to net worth **plus** that credit, not to net worth. Original finding below.
+
 **OQ-3 · "Together they are the viewer's net worth as §10.8 defines it"** (`:1557`) is a gloss, not a rule. §10.8 net worth = free Dharma + Σ Đb; Balance is spendable-today = free Dharma + unclaimed `DAILY_CREDIT_DHARMA`. So on an unclaimed day the two stats sum to net worth **+ one daily credit**. The rider itself establishes the distinction three paragraphs earlier, so this is self-acknowledged — flagged for completeness. *(reviewer LOW-2)*
+
+**OQ-4 — CARRIED to HARDEN; the spec now RECORDS it (`ca1a4d7`, D2).** §21.8 no longer claims header chrome "never removes a working figure"; it states the asymmetry as accepted and docketed. The fix itself is a change to `getHeaderBalance` — splitting absence from failure — which SG2 puts out of scope for this PR. Original finding below.
 
 **OQ-4 · A Balance read FAILURE hides a working Portfolio.** `getHeaderBalance` returns `null` for both "no ledger row" and "read failed" — three indistinguishable nulls at `header-balance.ts:88`, `:107`, `:136` — and R9 makes Balance's null the cluster's gate. So a transient Balance failure blanks a Portfolio that read fine, which sits awkwardly beside the rider's "header chrome degrades, it never removes a working figure". **Unfixable in this PR: SG2 forbids touching `header-balance.ts`, and R9 ratifies the gate.** Docket for HARDEN — split absence from failure in `getHeaderBalance`. *(reviewer LOW-3)*
 
+**OQ-5 — CARRIED to the tracker; the false premise is CORRECTED (`ca1a4d7`, D4), and it drove D3.** Plan §8 risk 2 no longer claims a shared pool state. Because the race is genuinely reachable, the four unconditioned byte-identity claims (SPEC.1 `:1477` ×2, `header-portfolio.ts:26–30`, the integration test `:34–39`) were conditioned with "against the same pool state" in the same commit. No code change. Original finding below.
+
 **OQ-5 · Plan §8 risk 2 overstates its guarantee.** It reads "Both from the same pool state in one request", but there is no shared transaction or snapshot between the layout read and the page read. On `/u/[pseudonym]` a bet committing during the render window makes the header Portfolio and the §23 tile differ by that bet's price impact. Cosmetic, self-healing, and **not a spec violation** — both §21.8 and plan §4.3 correctly hedge with "against the same pool state". Tracker note, no code change. *(reviewer LOW-1)*
+
+**OQ-6 — DISCHARGED at Gate C (`c07b107`, C4), by removing the skip rather than instrumenting it.** The branch now THROWS; the existing catch converts that to `null` and reports `kind: "header_portfolio_read_failed"`, so the state is both observed and visible to the viewer as an absent Portfolio instead of a silently understated one (DROUND R1: a plausible wrong number is worse than an obvious break). The T2 case was rewritten to assert the fail-closed contract. Original finding below.
 
 **OQ-6 · The missing-pool skip is unobserved.** The branch takes no `safeCaptureException`, so if the structurally-impossible ever occurred the header would understate forever with no telemetry. Deliberately not added: the plan's R8 specifies exactly one capture, and an un-deduped emit in a path `DebatePoll` re-runs at 4/min/tab is the amplification the module docblock already defers to HARDEN. Mitigating fact — `/u/[pseudonym]` throws loudly on the same data, so it is not a total blind spot. Docket for HARDEN. *(reviewer LOW-4)*
 
@@ -91,7 +105,7 @@ The probe file was restored byte-identical: md5 `1e66a7967c0caa17a106520b9e9e10f
 
 ## Next session starts at
 
-**Gate C — the web diff-read of PR #286. Nothing else.** CC does not merge. Read the six open questions above first; OQ-1 and OQ-2 are the two that want a decision before merge, and both are one-clause spec corrections rather than code changes.
+**Gate C — the web diff-read of PR #286. Nothing else.** CC does not merge. The six open questions above have since been worked: four are discharged (`b8ae117`, `d46bd69`, `c07b107`, `ca1a4d7`) and two are carried — OQ-4 to HARDEN (`getHeaderBalance` cannot distinguish absence from failure; SG2 forbids touching it here) and OQ-5 to the tracker (the layout read and the page read share no snapshot). Nothing outstanding blocks the read.
 
 After merge: record the squash-merge SHA on `main` here, `git ls-remote` to check whether the branch auto-deleted, and confirm the tracker rows.
 
