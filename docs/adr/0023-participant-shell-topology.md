@@ -9,7 +9,7 @@
 | **Frame document** | SPEC.2 §8.9 (participant URL contract), §8.4/§8.10 (route topology); ADR-0019 (server-mediated reads); ADR-0016 §6 (slug URLs) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
-| **Patch records** | 2026-07-17 · (auth) header mount — see §Patch record (UI.A1 / OQ-1) |
+| **Patch records** | 2026-07-17 · (auth) header mount — see §Patch record (UI.A1 / OQ-1)<br>2026-08-03 · header scroll behaviour = sticky — see §Patch (POLISH.1b / D3) |
 
 ---
 
@@ -214,3 +214,31 @@ decision body.
 **Same-commit law:** this patch record lands in the same commit as
 `src/app/(auth)/layout.tsx` (CLAUDE.md §5.12). Ratification: OQ-1,
 operator-ratified 2026-07-16 (docs/plans/UI-A1.md, Ratification record).
+
+---
+
+## Patch — 2026-08-03 · header scroll behaviour
+
+**Context.** POLISH.1b's frame pass found the global header static and in
+normal flow: it scrolls out of view on every route. No document in the repo
+speaks to scroll behaviour — the three surface mockups are fixed-viewport
+`overflow:hidden` shells that never scroll, so they cannot answer it. The
+header carries the countdown to the Nov 5 23:59 UTC freeze and the Back
+control, both of which currently disappear on the longest surface.
+
+**Decision.** The global header is **sticky** to the top of the viewport on
+all `(public)` and `(auth)` routes. `(admin)` is unaffected — it has no
+header by design.
+
+**Mechanism.** `position: sticky` on the header within each group layout, not
+`fixed`. Sticky keeps the header in normal flow, so content below needs no
+offset compensation and the existing `min-h` chain is undisturbed.
+
+**Consequences.** The header permanently occupies 60px of viewport height.
+Its `--elev-1` elevation becomes load-bearing — it now separates the bar from
+content passing beneath it. A `z-index` is required, and every existing
+overlay must stack above it.
+
+**Scope.** This does not disturb Option 2. The header still lives in the group
+layouts, never at root; root remains shared with `(admin)` and carries no
+participant chrome.
