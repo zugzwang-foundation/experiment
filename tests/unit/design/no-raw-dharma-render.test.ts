@@ -35,9 +35,16 @@ const MONEY_IDS = [
 	"spendableToday",
 	// The global-header Đ cluster's prop (SHELL-COMPLETE Q6b). Distinct from
 	// `spendableToday`: it threads a raw NUMERIC(38,18) string through
-	// `(public)/layout.tsx` → `GlobalHeader` → `BalanceCluster`, so an unwrapped
+	// `(public)/layout.tsx` → `GlobalHeader` → `DharmaCluster`, so an unwrapped
 	// render would put `610.400000000000000000` in the header on every route.
 	"spendable",
+	// The global-header Đ cluster's OTHER prop (HEADER-PORTFOLIO SG8). Same
+	// shape as `spendable`: a raw NUMERIC(38,18) string threaded through
+	// `(public)/layout.tsx` → `GlobalHeader` → `DharmaCluster`, so an unwrapped
+	// render would put `2480.000000000000000000` in the header on every route.
+	// This array is an ALLOW-LIST of names, not a detector — an identifier that
+	// is absent never enters `RAW_RENDER` and its violation passes silently.
+	"portfolio",
 	"staked",
 	"currentValue",
 	"current",

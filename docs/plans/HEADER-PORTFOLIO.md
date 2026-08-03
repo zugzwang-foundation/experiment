@@ -252,7 +252,7 @@ Skipping step 2 makes the RED unattributed and proves nothing.
 | # | Concern | Disposition |
 |---|---|---|
 | 1 | A second Σ Đb derivation drifts from `positions.ts` | R3 same-source mandate + T3 byte-identity + `@code-reviewer` sourcing diff + Gate C confirmation. Exactly the UI-A6 treatment, which shipped and held |
-| 2 | `/u/[pseudonym]` derives Σ Đb **twice** per request — header and page | Accepted. Both from the same pool state in one request; T3 pins equality. Recon C22 named it. Not optimised here |
+| 2 | `/u/[pseudonym]` derives Σ Đb **twice** per request — header and page | Accepted. Both derive from whatever pool state each read observes — there is no shared transaction or snapshot between the layout read and the page read, so a bet committing inside the render window makes them differ by that bet's price impact (OQ-5); T3 pins equality. Recon C22 named it. Not optimised here |
 | 3 | The mockup shows `Đ 2,480` grouped; we ship ungrouped | Deliberate, R4. Mockup is tier 4. Matches the §23 tile — the same number. Routed to POLISH as class R |
 | 4 | The rename churns a test file | Small — 4 references, one `git mv`. Cheaper than shipping a `BalanceCluster` that renders two stats |
 | 5 | Portfolio could be read as tradeable "holdings" | It is a read-only display of soulbound-economy positions. No transfer affordance exists or is implied. Copy is the ratified `Portfolio` label, nothing more |
