@@ -1482,7 +1482,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 
 *Thesis relevance: (c) peripheral. None of these touches the engine, the ledger, `n`, K_eff, ranking, or resolution.*
 
-This section homes the **TYPE-2** product surfaces confirmed in SYNC.3.5 (refinement logs 01, 03, 04, 06, 07, 08) and folded here at SYNC.7. **Six are in scope for v1**; the sixth — the feature-guide page (§21.6) — is **deferred** (see §21.6). Every surface in this section is **read-only or render-only**: it reads existing state (or curated static seed) and writes nothing back to the engine. None is load-bearing — none touches INV-1/2/3/4, the load-bearing ADRs (0005 / 0013 / 0014 / 0017), or the thesis rules (soulbound Dharma, mandatory commentary, no-stake-no-voice). They are placed at the document tail (after the change log, before the appendices) to keep §0–§20 numbering — and the point-in-time §-citations in the historical change-log — stable.
+This section homes the **TYPE-2** product surfaces confirmed in SYNC.3.5 (refinement logs 01, 03, 04, 06, 07, 08) and folded here at SYNC.7. Six are in scope for v1 — §§21.1–21.5 and §21.8; the feature-guide page (§21.6) is deferred. Every surface in this section is **read-only or render-only**: it reads existing state (or curated static seed) and writes nothing back to the engine. None is load-bearing — none touches INV-1/2/3/4, the load-bearing ADRs (0005 / 0013 / 0014 / 0017), or the thesis rules (soulbound Dharma, mandatory commentary, no-stake-no-voice). They are placed at the document tail (after the change log, before the appendices) to keep §0–§20 numbering — and the point-in-time §-citations in the historical change-log — stable.
 
 Two cross-cutting disciplines apply throughout:
 
@@ -1544,7 +1544,7 @@ An ambient **radio / music-player widget** — a custom-skinned single Play butt
 
 *Thesis relevance: (c) peripheral. Renders two derived figures; touches no engine, ledger, `n`, K_eff, ranking, or resolution.*
 
-For an authenticated participant, the global header's right zone carries a **Dharma cluster**: one `Đ` glyph followed by exactly two stats, **Portfolio** then **Balance**, in that DOM order. Signed-out state is unchanged — the audience sees the `Đ` info doorway, never a figure.
+For an authenticated participant, the global header's right zone carries a **Dharma cluster**: one `Đ` glyph followed by exactly two stats, **Portfolio** then **Balance**, in that DOM order. Signed-out state is unchanged: no Đ figure is shown to the audience.
 
 **Portfolio — Σ Đb over the viewer's open holdings.** The §23 Positions-value quantity on the §10.8 basis, in the header: `computeSell(quantity).proceeds` per holding, summed. A holding is **open** when no `payout_events` row exists for that (user, market); settled holdings are excluded, their value having already landed in the ledger and therefore in Balance. **One holding, one value** — the header figure and the §23 Positions-value tile are byte-identical for the same viewer against the same pool state, and the header derives on the same sources as `loadProfilePositions`. Mark-to-market is not a display basis here or anywhere (§10.8).
 
