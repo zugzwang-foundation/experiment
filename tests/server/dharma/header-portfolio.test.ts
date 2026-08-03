@@ -504,6 +504,48 @@ describe("T2 — semantics (R1 Đb basis · R5 discriminant · R8 fail-safe · R
 		expect(await getHeaderPortfolio(rec.client, USER_ID)).not.toBe(bothMarkets);
 	});
 
+	it("skips-a-held-market-with-no-pool-row-rather-than-throwing", async () => {
+		// THE ONE DELIBERATE DIVERGENCE FROM THE MIRROR, pinned so a later pass
+		// cannot quietly undo it. `positions.ts:416–426` THROWS here; this module
+		// SKIPS, because it runs in `(public)/layout.tsx` where a same-segment
+		// `error.tsx` cannot catch its own layout's throw — the escape lands on
+		// `global-error.tsx` and replaces every participant route. Understating one
+		// holding beats trading four routes plus the branded 404 for a chrome
+		// figure.
+		//
+		// Two failure shapes this catches. Restore the throw for mirror parity, or
+		// drop the `pool === undefined` guard so `computeSell` receives
+		// `undefined.yesReserves`, and either way the OUTER catch fires: Portfolio
+		// goes `null` for every viewer holding that market and a Sentry event is
+		// emitted on every render of every participant route. So the capture
+		// assertion below is the load-bearing half — the return value alone would
+		// pass for an implementation that degraded the whole figure instead of the
+		// one holding.
+		//
+		// Structurally impossible in production (a held position mints only inside
+		// the pool-locked W-1 tx), which is precisely why it needs a test: nothing
+		// else in T1/T2/T3 exercises it (@code-reviewer MEDIUM-1).
+		const rec = recordingClient({
+			[getTableName(positions)]: [
+				positionRow(M_OPEN_1, "YES", "30.000000000000000000"),
+				positionRow(M_OPEN_2, "NO", "25.000000000000000000"),
+			],
+			[getTableName(payoutEvents)]: [],
+			// M_OPEN_2 holds a position with NO pool row.
+			[getTableName(pools)]: [
+				poolRow(M_OPEN_1, "120.000000000000000000", "80.000000000000000000"),
+			],
+		});
+
+		// The poolless holding drops out; the sound one still contributes.
+		expect(await getHeaderPortfolio(rec.client, USER_ID)).toBe(
+			toFixed18(db(M_OPEN_1, "YES", "30.000000000000000000")),
+		);
+		// Not the whole-figure degradation, and not a throw.
+		expect(await getHeaderPortfolio(rec.client, USER_ID)).not.toBeNull();
+		expect(captureSpy).not.toHaveBeenCalled();
+	});
+
 	it("returns-null-and-reports-when-the-first-statement-throws", async () => {
 		// R8. Without the catch this REJECTS, and in `(public)/layout.tsx` a
 		// rejection replaces every participant route with `global-error.tsx` — a
