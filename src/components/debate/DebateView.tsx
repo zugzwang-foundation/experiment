@@ -3,6 +3,7 @@
 import { type ReactNode, useState } from "react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
+import { PageContainer } from "@/components/shell/PageContainer";
 
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
@@ -187,7 +188,7 @@ export function DebateView({
 	const noPosts = posts.filter((p) => p.sideAtPostTime === "NO");
 
 	return (
-		<div className="mx-auto flex max-w-5xl flex-col gap-5 px-6 py-8">
+		<PageContainer preset="debate" className="flex flex-col gap-5">
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the
 			    document is hidden or a composer is open, stopped once the market
@@ -342,6 +343,6 @@ export function DebateView({
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
 			<ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
-		</div>
+		</PageContainer>
 	);
 }

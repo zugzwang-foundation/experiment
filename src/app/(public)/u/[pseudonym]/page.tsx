@@ -6,6 +6,7 @@ import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PositionsTable } from "@/components/profile/PositionsTable";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
+import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadProfileArguments } from "@/server/profile/arguments";
@@ -83,7 +84,7 @@ export default async function ProfilePage({
 	const initialMarketSlug = typeof market === "string" ? market : undefined;
 
 	return (
-		<div className="mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6">
+		<PageContainer preset="reading" className="flex flex-col gap-6">
 			<IdentityCard user={profileUser} owner={owner} />
 			<ProfileTiles tiles={tiles} />
 			<ProfileGraph series={graph} />
@@ -92,6 +93,6 @@ export default async function ProfilePage({
 				initialMarketSlug={initialMarketSlug}
 			/>
 			<ArgumentList items={argumentItems} owner={owner} />
-		</div>
+		</PageContainer>
 	);
 }
