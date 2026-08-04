@@ -72,8 +72,8 @@ experiment/
 │   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
-│   │   └── schema/                 #   12 files: _enums, audit, auth, bets, comments, dharma,
-│   │                               #   events, identity, image-uploads, index, markets, system
+│   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
+│   │                               #   dharma, events, identity, image-uploads, index, markets, system
 │   ├── lib/                        # auth-client, errors, utils, posthog/
 │   └── server/                     # server-side business logic
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
@@ -150,7 +150,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 22 tables live across 10 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
+- **One file may hold several related tables.** 23 tables live across 11 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
 
 ### Reply-as-bet schema reality
 
