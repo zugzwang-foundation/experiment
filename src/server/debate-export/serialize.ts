@@ -40,11 +40,22 @@ const FOOTER =
  * Trim a NUMERIC(38,18) value to a human Đ amount AND comma-group the integer
  * part — string-based, no `Number()` on the value (CLAUDE.md §2; NUMERIC-safe).
  * e.g. `"3225.000…" → "3,225"`, `"560.000…" → "560"`, `"1234.560…" → "1,234.56"`.
- * Export-only; delegates to `formatDharmaExact` deliberately — the ADR-0025
- * `.md` export renders FULL PRECISION (SPEC.1 §10.8), whereas the view layer's
- * `formatDharma` rounds to 0 dp.
+ *
+ * THE TWO-LAYER RULE (SPEC.1 §10.8): grouping is a human-readability treatment
+ * and follows the READER, not the file. This formatter serves the ADR-0025 `.md`
+ * export's PROSE BODY alone — FULL PRECISION *and* grouped, because a person
+ * reads it (delegating to `formatDharmaExact` is what keeps the precision; the
+ * export is exempt from the view layer's 0-dp rule). The MACHINE-READABLE YAML
+ * front matter NEVER groups: `total_stake_dharma` goes straight to
+ * `formatDharmaExact` (`:127`), exact and ungrouped, because a grouped figure is
+ * not a number to a parser. So the same quantity may render `3,225` in the body
+ * and `3225` in the front matter of one file — deliberate, and the same split
+ * §10.8 already ratifies for percentages (prose complement rule vs exact
+ * `yes_price` / `no_price`). Named for its LAYER so neither half is reached for
+ * by mistake, and distinct again from the view layer's `formatDharma`, which
+ * rounds to 0 dp.
  */
-export function formatDharmaGrouped(value: string): string {
+export function formatDharmaExportGrouped(value: string): string {
 	const trimmed = formatDharmaExact(value);
 	const neg = trimmed.startsWith("-");
 	const body = neg ? trimmed.slice(1) : trimmed;
@@ -178,7 +189,7 @@ function summaryOrientation(
 		: "with no market price yet";
 	return (
 		`This debate asks: ${m.title} It is currently ${statusPhrase(m.status, meta.outcome)}, ${pricePhrase}. ` +
-		`${meta.participants} participants have staked ${formatDharmaGrouped(meta.totalStakeDharma)} Đ across ${model.posts.length} posts and ${replyCount(model)} replies.`
+		`${meta.participants} participants have staked ${formatDharmaExportGrouped(meta.totalStakeDharma)} Đ across ${model.posts.length} posts and ${replyCount(model)} replies.`
 	);
 }
 
@@ -196,7 +207,7 @@ function topArgumentSentence(
 	if (top === undefined) {
 		return `The leading ${side} argument was removed by a moderator.`;
 	}
-	return `The most heavily backed ${side} argument is "${top.title}" (${top.author.pseudonym}, ${formatDharmaGrouped(top.authorStake)} Đ).`;
+	return `The most heavily backed ${side} argument is "${top.title}" (${top.author.pseudonym}, ${formatDharmaExportGrouped(top.authorStake)} Đ).`;
 }
 
 function summaryTopArguments(model: DebateViewModel): string {
@@ -210,7 +221,7 @@ function contentsLine(post: DebatePost, rank: number): string {
 	if (post.removed) {
 		return `${head} [removed by moderator]`;
 	}
-	return `${head} "${post.title}" (${post.author.pseudonym}, ${formatDharmaGrouped(post.authorStake)} Đ)`;
+	return `${head} "${post.title}" (${post.author.pseudonym}, ${formatDharmaExportGrouped(post.authorStake)} Đ)`;
 }
 
 // ── Block 4 — Market header (7a) ─────────────────────────────────────────────
@@ -244,7 +255,7 @@ function marketHeader(model: DebateViewModel, meta: ExportMarketMeta): string {
 		m.pricing
 			? `- **${priceLabel}:** ${formatPricePercent(m.pricing, "YES")} YES / ${formatPricePercent(m.pricing, "NO")} NO`
 			: `- **${priceLabel}:** not yet priced`,
-		`- **Total staked:** ${formatDharmaGrouped(meta.totalStakeDharma)} Đ`,
+		`- **Total staked:** ${formatDharmaExportGrouped(meta.totalStakeDharma)} Đ`,
 		`- **Posts:** ${model.posts.length} · **Replies:** ${replyCount(model)} · **Participants:** ${meta.participants}`,
 	);
 	return lines.join("\n");
@@ -255,11 +266,11 @@ function marketHeader(model: DebateViewModel, meta: ExportMarketMeta): string {
 function aggregateLine(agg: ReplyAggregate): string {
 	const support =
 		agg.supportCount > 0
-			? `${agg.supportCount} support (${formatDharmaGrouped(agg.supportDharma)} Đ)`
+			? `${agg.supportCount} support (${formatDharmaExportGrouped(agg.supportDharma)} Đ)`
 			: `${agg.supportCount} support`;
 	const counter =
 		agg.counterCount > 0
-			? `${agg.counterCount} counter (${formatDharmaGrouped(agg.counterDharma)} Đ)`
+			? `${agg.counterCount} counter (${formatDharmaExportGrouped(agg.counterDharma)} Đ)`
 			: `${agg.counterCount} counter`;
 	return `${support} · ${counter}`;
 }
@@ -305,7 +316,7 @@ function replyBlock(
 	const heading = `#### Reply ${parentRank}.${n} — ${relation} (${reply.side}) — ${reply.author.pseudonym}`;
 	const bullets = [
 		...common,
-		`- **Stake:** ${formatDharmaGrouped(reply.stake)} Đ`,
+		`- **Stake:** ${formatDharmaExportGrouped(reply.stake)} Đ`,
 		`- **Entry price:** ${price2(reply.entryPrice)}`,
 		`- **Author status:** ${authorStatus(reply.marker)}`,
 		`- **Time:** ${timeUtc(reply.createdAt)}`,
@@ -333,7 +344,7 @@ function postGroup(post: DebatePost, rank: number, totalPosts: number): string {
 				`- **Rank:** ${rank} of ${totalPosts}`,
 				`- **Side:** ${post.sideAtPostTime}`,
 				`- **Author:** ${post.author.pseudonym}`,
-				`- **Stake:** ${formatDharmaGrouped(post.authorStake)} Đ`,
+				`- **Stake:** ${formatDharmaExportGrouped(post.authorStake)} Đ`,
 				`- **Entry price:** ${price2(post.entryPrice)}`,
 				`- **Support / Counter:** ${aggregateLine(post.aggregate)}`,
 				`- **Author status:** ${authorStatus(post.marker)}`,
