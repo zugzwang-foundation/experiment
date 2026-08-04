@@ -1,7 +1,8 @@
 "use client";
 
+import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
-import { c3OppositeSide, formatDharmaGrouped } from "./copy";
+import { c3OppositeSide } from "./copy";
 import { deriveReplySide, isEntryDisabled } from "./gating";
 import { computeSplitBar, displaySplitTotal } from "./split-bar";
 
@@ -55,7 +56,7 @@ export function ReplySplitBar({
 					onToggle={onToggleRelation}
 				/>
 				<span className="text-n5">
-					Đ {formatDharmaGrouped(aggregate.supportDharma)}
+					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
@@ -66,15 +67,13 @@ export function ReplySplitBar({
 					<span className="block h-full bg-yes" style={{ width: supportPct }} />
 				</span>
 				<span className="text-n5">
-					<b className="text-sm text-ink">
-						Đ {formatDharmaGrouped(displayedTotal)}
-					</b>{" "}
+					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
 					staked
 				</span>
 			</span>
 			<span className="flex items-center gap-1.5">
 				<span className="text-n5">
-					Đ {formatDharmaGrouped(aggregate.counterDharma)}
+					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
 				<TriggerPill
 					relation="counter"

@@ -3,14 +3,9 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { formatPricePercent } from "../format";
+import { formatDharma, formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
-import {
-	COMPOSER_COPY,
-	c3OppositeSide,
-	formatDharmaGrouped,
-	formatMultiplier,
-} from "./copy";
+import { COMPOSER_COPY, c3OppositeSide, formatMultiplier } from "./copy";
 import { isEntryDisabled } from "./gating";
 
 /**
@@ -133,7 +128,7 @@ export function SlotHeader({
 							<span>{COMPOSER_COPY.yourPositionLabel}</span>
 							{/* Đb-ONLY until the Đa staked-basis SPEC.1 line lands (OQ-1 HELD). */}
 							<span className="font-mono text-ink">
-								Đ {formatDharmaGrouped(viewer.position.currentValue)}
+								Đ {formatDharma(viewer.position.currentValue)}
 							</span>
 						</span>
 						{/* W2.10-C (activated at A5, F-4): the click-through to the

@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { formatDharmaGrouped } from "@/components/debate/composer/copy";
 import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
 import {
 	computeSplitBar,
 	displaySplitTotal,
 } from "@/components/debate/composer/split-bar";
+import { formatDharma } from "@/components/debate/format";
 
 // UI.A3 §5.6 tests-first, slice 3 — the focused-post split-bar math (plan §4
 // post-focus view: `SUPPORT Đ 3,800 ─ Đ 10,000 STAKED ─ Đ 6,200 COUNTER`,
@@ -114,17 +114,13 @@ describe("displaySplitTotal — DISPLAYED-space bar consistency (DROUND R2)", ()
 		expect(displaySplitTotal("137.7", "137.7")).toBe("276");
 		expect(displaySplitTotal("137.7", "137.7")).not.toBe("275");
 		// The three rendered figures are then 138 / 276 / 138 — consistent.
-		expect(formatDharmaGrouped("137.7")).toBe("138");
-		expect(formatDharmaGrouped(displaySplitTotal("137.7", "137.7"))).toBe(
-			"276",
-		);
+		expect(formatDharma("137.7")).toBe("138");
+		expect(formatDharma(displaySplitTotal("137.7", "137.7"))).toBe("276");
 	});
 
 	it("split-bar::displayed-total-thousands-groups", () => {
 		// round0(6199.6) + round0(3800.4) = 6200 + 3800 = 10000 → "10,000".
-		expect(formatDharmaGrouped(displaySplitTotal("6199.6", "3800.4"))).toBe(
-			"10,000",
-		);
+		expect(formatDharma(displaySplitTotal("6199.6", "3800.4"))).toBe("10,000");
 	});
 
 	it("split-bar::displayed-total-zero-parts-render-0-never-negzero", () => {

@@ -15,12 +15,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { COMMENT_MAX_LENGTH } from "@/server/config/limits";
 
 import { SideBadge } from "../badges";
+import { formatDharma } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { AuthGateSlot } from "./AuthGateSlot";
 import {
 	COMPOSER_COPY,
 	c2Sentence,
-	formatDharmaGrouped as formatGrouped,
 	overCapStrip,
 	rateLimitedBanner,
 	SUSPENDED_COPY,
@@ -389,7 +389,7 @@ export function BetComposer(props: {
 	const dimmed = floorAbove ? "opacity-(--state-disabled-opacity)" : undefined;
 	const toWin =
 		quote !== null && quote.kind === "quote"
-			? formatGrouped(String(quote.data.shares ?? "—"))
+			? formatDharma(String(quote.data.shares ?? "—"))
 			: null;
 
 	return (
@@ -488,7 +488,7 @@ export function BetComposer(props: {
 							}}
 						/>
 						<div className="mt-0.5 text-right text-[10px] text-n4">
-							{extended.length} / {formatGrouped(String(extendedMax))}
+							{extended.length} / {extendedMax}
 							{COMPOSER_COPY.optionalSuffix}
 						</div>
 					</div>

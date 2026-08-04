@@ -1,11 +1,13 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { formatDharmaGrouped } from "@/components/debate/composer/copy";
 import {
 	formatDharma,
 	formatDharmaExact,
 	formatPercentUnpaired,
 	formatPricePercent,
+	round0Dharma,
 } from "@/components/debate/format";
 
 // DROUND (SPEC.1 §10.8) — every Đ value rendered to a user displays at 0 dp,
@@ -13,6 +15,15 @@ import {
 // never "-0". `formatDharma` is the single shared rounding display formatter;
 // `formatDharmaExact` preserves the legacy trim-only behaviour for the two
 // non-render consumers (the ADR-0025 `.md` export + the sell-module input seed).
+//
+// PRIMITIVES-1 C3 (SPEC.1 §10.8, 1.0.29) — that single shared formatter now
+// GROUPS as well as rounds, product-wide. Grouping is a property of the
+// formatter, not a choice made at a call site: `composer/copy.ts`'s parallel
+// `formatDharmaGrouped` is deleted and its call sites re-pointed here, so no
+// ungrouped display variant survives to be selected by mistake. The rounding
+// primitive `round0Dharma` is exported for DISPLAYED-SPACE ARITHMETIC only
+// (the §10.8 aggregate identities, which must add before they group) and is
+// never itself rendered — guarded by tests/unit/design/no-raw-dharma-render.
 
 describe("formatDharma — 0-dp ROUND_HALF_UP display rounding", () => {
 	it.each([
@@ -24,8 +35,8 @@ describe("formatDharma — 0-dp ROUND_HALF_UP display rounding", () => {
 		["-0.000000000000000001", "0"], // never "-0"
 		["0", "0"],
 		["-9.5", "-10"], // half away from zero
-		["1000", "1000"],
-		["999.999999999999999999", "1000"],
+		["1000", "1,000"], // grouped from four digits up (1.0.29)
+		["999.999999999999999999", "1,000"],
 		// HALF_UP (away from zero) at the .5 boundary, both signs.
 		["0.5", "1"],
 		["2.5", "3"],
@@ -66,15 +77,72 @@ describe("formatDharmaExact — UNCHANGED trim-only behaviour", () => {
 	});
 });
 
-describe("formatDharmaGrouped — inherits rounding, then thousands-groups", () => {
+describe("formatDharma — rounds, THEN thousands-groups (SPEC.1 §10.8, 1.0.29)", () => {
 	it.each([
+		// Moved verbatim off the deleted `composer/copy.ts::formatDharmaGrouped`:
+		// the behaviour did not change, its OWNER did.
 		["1234.6", "1,235"],
 		["14260.000000000000000000", "14,260"],
 		["999.999999999999999999", "1,000"],
 		["20.666666666666666666", "21"],
 		["560.000000000000000000", "560"],
+		// Two groups — the case no surface exercised before.
+		["1234567.000000000000000000", "1,234,567"],
+		// The boundary: grouping starts at four digits, not three.
+		["999", "999"],
+		["1000", "1,000"],
+		// Negatives group on the magnitude and keep the sign.
+		["-1234", "-1,234"],
+		["-1234567.4", "-1,234,567"],
 	])("groups %s -> %s", (input, expected) => {
-		expect(formatDharmaGrouped(input)).toBe(expected);
+		expect(formatDharma(input)).toBe(expected);
+	});
+
+	it("degrades UNGROUPED on a malformed value — a bad value is not dressed up", () => {
+		expect(formatDharma("not-a-number")).toBe("not-a-number");
+		expect(formatDharma("—")).toBe("—");
+	});
+
+	it("uses a LITERAL comma, never a locale-derived separator", () => {
+		// SPEC.1 §10.8: Đ figures render in BOTH the server and client trees, so a
+		// locale-derived separator resolves differently in the two — a hydration
+		// mismatch, and `1.234` for one thousand two hundred and thirty-four Đ
+		// under a de-DE runtime. Asserted against the SOURCE, not the output: an
+		// `en-US`-pinned `toLocaleString` would produce identical strings here and
+		// still be the defect. Comments are stripped first — the docblock NAMES
+		// both forbidden APIs in order to forbid them, which is documentation,
+		// not a call.
+		const source = readFileSync(
+			join(process.cwd(), "src/components/debate/format.ts"),
+			"utf8",
+		)
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/^\s*\/\/.*$/gm, "");
+		expect(source).not.toMatch(/toLocaleString|Intl\./);
+		expect(formatDharma("1234")).toBe("1,234");
+	});
+});
+
+describe("round0Dharma — the UNGROUPED displayed-space arithmetic primitive", () => {
+	it.each([
+		// Identical rounding to `formatDharma`, WITHOUT the grouping: this is what
+		// makes the §10.8 aggregate identities addable. `new Decimal("1,234")` is
+		// a throw and `Number("1,234")` is NaN, so a displayed-space sum must read
+		// back an ungrouped string.
+		["9.5", "10"],
+		["1000", "1000"],
+		["1234.6", "1235"],
+		["14260.000000000000000000", "14260"],
+		["1234567.000000000000000000", "1234567"],
+		["-0.000000000000000001", "0"], // never "-0"
+		["-2.5", "-3"],
+	])("rounds %s -> %s (ungrouped)", (input, expected) => {
+		expect(round0Dharma(input)).toBe(expected);
+	});
+
+	it("is what formatDharma composes over", () => {
+		expect(formatDharma("1234567.6")).toBe("1,234,568");
+		expect(round0Dharma("1234567.6")).toBe("1234568");
 	});
 });
 
