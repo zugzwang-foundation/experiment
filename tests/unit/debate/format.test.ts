@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import {
+	displayNetProfitLoss,
 	formatDharma,
 	formatDharmaExact,
 	formatPercentUnpaired,
@@ -120,6 +121,81 @@ describe("formatDharma — rounds, THEN thousands-groups (SPEC.1 §10.8, 1.0.29)
 			.replace(/^\s*\/\/.*$/gm, "");
 		expect(source).not.toMatch(/toLocaleString|Intl\./);
 		expect(formatDharma("1234")).toBe("1,234");
+	});
+});
+
+describe("displayNetProfitLoss — the SECOND grouping site (SPEC.1 §10.8, 1.0.29)", () => {
+	// THE SECOND GROUPING SITE (SPEC.1 §10.8, 1.0.29). Everywhere else in the
+	// tree groups because `formatDharma` groups — grouping is a property of the
+	// single shared formatter, not a choice made at a call site.
+	// `displayNetProfitLoss` is the ONE place where it IS a call-site choice, and
+	// it has to be: the §23 tile identity must be summed in UNGROUPED displayed
+	// space first (`new Decimal("1,234")` throws and `Number("1,234")` is NaN), so
+	// the function cannot route its result through `formatDharma` and instead
+	// groups itself with a terminal `groupInteger(...)` on its final return. That
+	// wrapper is the only thing standing between the §23 row and
+	// `Đ 14,260` / `Đ 3,225` / `Đ -1234` — Wallet and Positions grouped, Net P/L
+	// not — which is the defect its own docblock names. This test exists because
+	// that wrapper is a call-site choice: nothing else in the suite pins it.
+	//
+	// Every row below is finite and well-formed, so every one lands on that
+	// terminal return. None reaches the two `formatDharma(netProfitLoss)` degrade
+	// exits (the non-finite guard and the catch), which group through the shared
+	// formatter and would still pass with the wrapper deleted.
+	//
+	// A trailing `""` in the last column means "no negative assertion".
+	it.each([
+		// Positive result >= 1000 groups. issuance = 10000 + 4260 - 14260 = 0.
+		["positive >= 1000 groups", "10000", "4260", "14260", "14,260", ""],
+		// Negative result <= -1000 groups AND keeps its sign. Issued 2000, now
+		// holding 766: issuance = 500 + 266 - (-1234) = 2000.
+		[
+			"negative <= -1000 groups and keeps its sign",
+			"500",
+			"266",
+			"-1234",
+			"-1,234",
+			"",
+		],
+		// A zero result renders "0" — the intermediate here is -0.4, so the
+		// `isZero()` guard is what is under test. `toBe("0")` forbids a stray
+		// comma as well; the "-0" pin is stated explicitly because it is the
+		// named rule.
+		["zero renders 0, never -0", "1000", "0", "-0.4", "0", "-0"],
+		// The identity holds WITH grouping on, and the sum is taken BEFORE the
+		// grouping. Both operands sit on a .5 tie, so round-then-sum and
+		// sum-then-round disagree. The two operand rows pin each displayed figure
+		// through the same function, so the §23 row is checked as a ROW: displayed
+		// Wallet 1,001 + displayed Positions 1,001 - issuance 0 = 2,002. Rounding
+		// the EXACT sum (2001.0) would render 2,001 instead — asserting 2,002 and
+		// NOT 2,001 is what proves the addition happened in ungrouped displayed
+		// space and was grouped once at the end.
+		//
+		// THAT ONE ASSERTION CATCHES A SECOND DEFECT, AND ONLY BECAUSE netPL IS
+		// 2001 — do not "simplify" this fixture. Besides sum-then-round, it also
+		// catches GROUP-BEFORE-SUM: group an operand first and the re-read throws
+		// (`new DisplayDecimal("1,001")` is a SyntaxError, the same hazard the
+		// split bar's `ComposerDecimal` carries), which lands on the CATCH exit and
+		// returns `formatDharma(netProfitLoss)` = `formatDharma("2001")` = "2,001"
+		// — the identical string sum-then-round produces. The two failure modes
+		// coincide on "2,001" only at this netPL; change it and `not.toBe("2,001")`
+		// silently stops covering the group-before-sum half.
+		["displayed Wallet operand alone", "1000.5", "0", "1000.5", "1,001", ""],
+		["displayed Positions operand alone", "0", "1000.5", "1000.5", "1,001", ""],
+		[
+			"sum precedes the grouping: 1,001 + 1,001 - 0 = 2,002",
+			"1000.5",
+			"1000.5",
+			"2001",
+			"2,002",
+			"2,001",
+		],
+	])("%s", (_label, wallet, positions, netProfitLoss, expected, neverRenders) => {
+		const actual = displayNetProfitLoss(wallet, positions, netProfitLoss);
+		expect(actual).toBe(expected);
+		if (neverRenders !== "") {
+			expect(actual).not.toBe(neverRenders);
+		}
 	});
 });
 
