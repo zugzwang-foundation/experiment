@@ -3,10 +3,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 // Static regression guard (DROUND / SPEC.1 §10.8): every Đ value rendered to a
-// user goes through the single shared ROUNDING display formatter — `formatDharma`
-// or `formatDharmaGrouped`. This guard fails if a money value is rendered raw in
-// JSX, or if the EXACT (unrounded) `formatDharmaExact` escape hatch is used in a
-// view component anywhere but the ONE dround-allowed sell-module input seed.
+// user goes through the single shared display formatter — `formatDharma`, which
+// rounds AND groups. It is the SOLE sanctioned render formatter (PRIMITIVES-1
+// C3: `composer/copy.ts::formatDharmaGrouped` is deleted, so no ungrouped
+// display variant survives). This guard fails if a money value is rendered raw
+// in JSX, if the EXACT (unrounded) `formatDharmaExact` escape hatch is used in a
+// view component anywhere but the ONE dround-allowed sell-module input seed, or
+// if the UNGROUPED rounding primitive `round0Dharma` is rendered as a
+// `{round0Dharma(…)}` JSX child. That fourth check is scoped to exactly that
+// shape — it does NOT catch a template literal, a ternary, or a `const t =
+// round0Dharma(v)` bound before `{t}`. It closes the one-render-formatter
+// property against the obvious spelling, not against every possible one.
 //
 // Modelled on tests/unit/design/no-raw-hex-view-layer.test.ts, with three
 // deliberate differences: (i) it keys on MONEY IDENTIFIERS, not the Đ glyph —
@@ -55,18 +62,41 @@ const MONEY_IDS = [
 	"dharmaStaked",
 	"proceeds",
 	"authorDharma",
+	// The §23 profile tiles' two aggregate Đ figures (PRIMITIVES-1 R4c). Both
+	// are rendered through `formatDharma` today; neither name was in this list,
+	// so unwrapping either passed silently — proven at P1 / P2.
+	"supportReceived",
+	"counterReceived",
+	// The reply split bar's DISPLAYED staked total (`displaySplitTotal`) — a
+	// displayed-space sum, and the number sitting between Support and Counter on
+	// a money surface. Proven at P3.
+	"displayedTotal",
+	// The composer's ADR-0018 minimum stake. It reaches the C2 strips as a Đ
+	// figure; a bare `{floor}` JSX child would print `10.000000000000000000`.
+	// Proven at P9. (The only textual `{floor}` in the scanned set sits inside a
+	// block comment at composer/copy.ts, which `stripComments` removes.)
+	"floor",
 ];
 
 // A JSX-child interpolation `{ chain.moneyId }` (or bare `{ moneyId }`) whose `{`
 // is NOT an attribute value (`name={…}`) and whose content is a pure member
-// expression ending in a money id — i.e. NOT wrapped in `formatDharma(…)` /
-// `formatDharmaGrouped(…)`, which always introduce a `(` that breaks the run.
+// expression ending in a money id — i.e. NOT wrapped in `formatDharma(…)`, which
+// always introduces a `(` that breaks the run.
 const RAW_RENDER = new RegExp(
 	`(?<!=)\\{\\s*[\\w.]*\\b(?:${MONEY_IDS.join("|")})\\b\\s*\\}`,
 );
 
 const EXACT_CALL = /formatDharmaExact\s*\(/;
 const ALLOW_MARKER = /dround-allow:/;
+
+// `round0Dharma` is a COMPUTATION primitive, not a formatter: it rounds into
+// displayed space so the §10.8 aggregate identities can ADD before they group
+// (a grouped operand cannot be read back — `Number("1,234")` is `NaN`). Rendering
+// it would put an ungrouped `14260` next to a grouped `Đ 1,234` and quietly
+// reintroduce the second display variant C3 exists to delete. So the
+// "exactly one render formatter" property is GUARDED here, not merely
+// conventional. Same `(?<!=)` attribute-value exclusion as RAW_RENDER.
+const ROUND0_RENDER = /(?<!=)\{\s*round0Dharma\s*\(/;
 
 function tsxFilesUnder(dir: string): string[] {
 	return readdirSync(join(ROOT, dir), { recursive: true, withFileTypes: true })
@@ -128,6 +158,20 @@ describe("view layer — no raw Đ render, one allowlisted seed (DROUND)", () =>
 		}
 		// EXACTLY one dround-allow marker exists, and no un-allowlisted Exact call.
 		expect(markers).toHaveLength(1);
+		expect(offenders).toEqual([]);
+	});
+
+	it("never renders round0Dharma — it computes, it does not format", () => {
+		const offenders = files
+			.map((file) => {
+				const match = stripComments(readFileSync(file, "utf8")).match(
+					ROUND0_RENDER,
+				);
+				return match
+					? `${file.replace(`${ROOT}/`, "")} → ${match[0].trim()}`
+					: null;
+			})
+			.filter((hit): hit is string => hit !== null);
 		expect(offenders).toEqual([]);
 	});
 });

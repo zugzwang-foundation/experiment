@@ -27,6 +27,12 @@ const SCAN_FILES = [
 	"src/app/(auth)/layout.tsx",
 	"src/app/not-found.tsx",
 	"src/app/global-error.tsx",
+	// The ROOT layout, enrolled at PRIMITIVES-1 C4(b) — the comment above
+	// already argued for it and the file was not in the list. It hand-rolls the
+	// real `<html>`/`<body>` on EVERY route (participant and admin alike), so a
+	// smuggled literal here is the widest-reach colour bypass in the tree, and
+	// it sat unscanned. Proven by reversal at P4.
+	"src/app/layout.tsx",
 ];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments

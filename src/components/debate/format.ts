@@ -19,16 +19,27 @@ import type { Side } from "./types";
 const DisplayDecimal = Decimal.clone({ precision: 50 });
 
 /**
- * Round a NUMERIC(38,18) Đ value to whole Dharma for DISPLAY — 0 decimal
- * places, ROUND_HALF_UP (round half AWAY FROM ZERO, so gains and losses round
- * symmetrically), never a signed zero. This is the single shared formatter for
- * every Đ value rendered to a user (SPEC.1 §10.8); the ledger, engine, read
- * models, and DTOs keep full precision. Exact decimal arithmetic, never a JS
+ * Round a NUMERIC(38,18) Đ value to whole Dharma — 0 decimal places,
+ * ROUND_HALF_UP (round half AWAY FROM ZERO, so gains and losses round
+ * symmetrically), never a signed zero. Exact decimal arithmetic, never a JS
  * float (CLAUDE.md §2). A non-finite / malformed value degrades to
  * `formatDharmaExact` rather than throwing — a bad value must not crash a
  * render. e.g. `"9.5" → "10"`, `"20.6666…" → "21"`, `"-0.00…01" → "0"`.
+ *
+ * DISPLAYED-SPACE ARITHMETIC ONLY — **NEVER RENDERED.** This is the UNGROUPED
+ * rounding primitive, and it exists for exactly one reason: the SPEC.1 §10.8
+ * displayed-space aggregate identities must ADD BEFORE THEY GROUP. The §23 Net
+ * P/L tile and the reply split bar's staked total each sum values that are
+ * already rounded to what the eye sees, and a grouped operand cannot be read
+ * back — `new Decimal("1,234")` throws and `Number("1,234")` is `NaN`. So the
+ * sum is taken here, ungrouped, and grouping happens once at the render.
+ *
+ * To RENDER a Đ value, call `formatDharma` (below) — the only formatter that
+ * may. That this primitive never reaches JSX is guarded, not merely conventional:
+ * `tests/unit/design/no-raw-dharma-render.test.ts` fails on a `{round0Dharma(…)}`
+ * JSX child.
  */
-export function formatDharma(value: string): string {
+export function round0Dharma(value: string): string {
 	let parsed: Decimal;
 	try {
 		parsed = new DisplayDecimal(value);
@@ -41,6 +52,57 @@ export function formatDharma(value: string): string {
 	const rounded = parsed.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
 	// `isZero()` covers both +0 and −0 — the guard that forbids rendering "-0".
 	return rounded.isZero() ? "0" : rounded.toFixed(0);
+}
+
+/**
+ * Comma-group the INTEGER PART of an already-rounded Đ string, in threes, with
+ * the LITERAL ASCII comma `,` (U+002C) — never `toLocaleString`, never
+ * `Intl.NumberFormat` (SPEC.1 §10.8). Đ figures render in both the server and
+ * the client tree, and a locale-derived separator resolves differently in the
+ * two: a hydration mismatch, and `1.234` for one thousand two hundred and
+ * thirty-four Dharma under a `de-DE` runtime.
+ *
+ * Sign preserved; a fractional part, where one survives, passes through
+ * UNGROUPED (§10.8 groups the integer part alone). Anything that is not a
+ * plain signed integer — i.e. the malformed value `round0Dharma` degraded to
+ * `formatDharmaExact` — is returned UNTOUCHED: a bad value is not dressed up
+ * in thousands separators.
+ */
+function groupInteger(digits: string): string {
+	const neg = digits.startsWith("-");
+	const body = neg ? digits.slice(1) : digits;
+	const [int = "", frac] = body.split(".");
+	if (!/^\d+$/.test(int)) {
+		return digits;
+	}
+	const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+	return `${neg ? "-" : ""}${frac === undefined ? grouped : `${grouped}.${frac}`}`;
+}
+
+/**
+ * The SINGLE shared display formatter for every Đ value rendered to a user
+ * (SPEC.1 §10.8): it rounds to 0 dp AND groups in threes, together. e.g.
+ * `"9.5" → "10"`, `"14260.000…" → "14,260"`, `"1234567" → "1,234,567"`.
+ * The ledger, engine, read models and DTOs keep full precision.
+ *
+ * Grouping is a property of THIS FORMATTER, not a choice made at a call site,
+ * and no ungrouped display variant exists to be selected by mistake — the
+ * parallel `composer/copy.ts::formatDharmaGrouped` is deleted and its call
+ * sites re-pointed here. An opt-in convention that must be remembered at thirty
+ * render sites will be broken at the thirty-first, which is exactly how the
+ * header stats, the §23 Positions-value tile and the discovery staked totals
+ * came to render ungrouped beside composers that grouped.
+ *
+ * A grouped value is TERMINAL: it is not merely a string that should not be
+ * read back but one that cannot be. Displayed-space arithmetic goes through
+ * `round0Dharma`; the sell module's editable amount input keeps seeding from
+ * the exact ungrouped Đb string (the §10.8 named exception, marked at its site
+ * with the `dround-allow` comment token — spelled here WITHOUT its trailing
+ * colon so this prose cannot be counted as a second allowlist marker by
+ * `tests/unit/design/no-raw-dharma-render.test.ts`).
+ */
+export function formatDharma(value: string): string {
+	return groupInteger(round0Dharma(value));
 }
 
 /**
@@ -71,6 +133,11 @@ export function formatDharmaExact(value: string): string {
  * keeping `displayed P/L = displayed Wallet + displayed Positions − issuance`
  * true on the tiles. Never a signed zero; exact decimal, never a JS float
  * (CLAUDE.md §2). Degrades to `formatDharma(netProfitLoss)` on a malformed operand.
+ *
+ * The identity is computed UNGROUPED and grouped once at the end (SPEC.1 §10.8,
+ * 1.0.29) — without that terminal `groupInteger` the §23 tile row would render
+ * `Đ 14,260` / `Đ 3,225` / `Đ -1234` side by side, Wallet and Positions grouped
+ * and Net P/L not.
  */
 export function displayNetProfitLoss(
 	walletValue: string,
@@ -94,7 +161,7 @@ export function displayNetProfitLoss(
 	} catch {
 		return formatDharma(netProfitLoss);
 	}
-	return displayed.isZero() ? "0" : displayed.toFixed(0);
+	return groupInteger(displayed.isZero() ? "0" : displayed.toFixed(0));
 }
 
 /**

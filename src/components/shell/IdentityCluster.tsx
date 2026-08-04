@@ -11,8 +11,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  * UI.A5 — the A4 follow-up #2; a null pseudonym keeps a non-linked chip).
  * Avatar = the D8 placeholder for every author
  * (`/pfp-placeholder.svg`) + the mockup's 1-char fallback. The Đ cluster
- * (Portfolio/Balance) is A2/A3 — ratified OQ-2 defers it; the chip stands
- * alone in the signed-in right zone.
+ * (Portfolio/Balance) SHIPPED and stands beside this chip in the signed-in
+ * right zone — Balance at #283, Σ open-position value at #286 — and both
+ * figures render through the single shared display formatter, rounded and
+ * grouped (SPEC.1 §21.8, §10.8). The OQ-2 deferral this comment used to
+ * claim lapsed at #283.
  *
  * Signed-in/out selection is server-side in the layouts (plan §4.2) — this
  * component just renders the given viewer.
@@ -36,27 +39,13 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 	const chipClass =
 		"flex h-[34px] shrink-0 items-center gap-2 rounded-full bg-(--btn-fill) pr-3 pl-1.5 [border:var(--hairline)]";
 
-	// POLISH-1a V2 — bind the ratified `--avatar-ring` and drop the primitive's
-	// `mix-blend-darken`. The blend is NOT cosmetic: it takes the darker of ring
-	// and backdrop, so against `AvatarFallback`'s `bg-muted` (n1, darker than the
-	// n2 ring) the ring blends away and the chip loses its edge — the path taken
-	// whenever the placeholder image fails. Over the light placeholder both
-	// resolve identically. The primitive's own `after:border`/`after:border-border`
-	// survive twMerge (an arbitrary shorthand is a different group) but resolve to
-	// the same `1px solid n2`, so the outcome is unambiguous whichever wins the
-	// cascade; removing them means editing the shared `ui/avatar.tsx`, which is
-	// its own row. That equality has a precondition: the two reach n2 by DIFFERENT
-	// paths (`--avatar-ring` binds it directly, `border-border` goes via
-	// `--border`), so re-pointing `--border` would split them.
-	const avatarRing = "after:[border:var(--avatar-ring)] after:mix-blend-normal";
-
 	// Post-onboarding pseudonym is NOT NULL; the chip links to the viewer's own
 	// profile (`/u/[pseudonym]`, activated at UI.A5 — the A4 follow-up #2). A
 	// null pseudonym (edge) keeps the non-linked chip (no profile URL exists).
 	if (viewer.pseudonym === null) {
 		return (
 			<span className={`${chipClass} select-none`}>
-				<Avatar size="sm" className={avatarRing}>
+				<Avatar size="sm">
 					<AvatarImage src="/pfp-placeholder.svg" alt="" />
 					<AvatarFallback>{""}</AvatarFallback>
 				</Avatar>
@@ -70,7 +59,7 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 			href={`/u/${encodeURIComponent(viewer.pseudonym)}`}
 			className={`${chipClass} outline-none [transition:all_var(--dur-hover)] hover:bg-n1 focus-visible:shadow-(--state-focus-ring)`}
 		>
-			<Avatar size="sm" className={avatarRing}>
+			<Avatar size="sm">
 				<AvatarImage src="/pfp-placeholder.svg" alt="" />
 				<AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
 			</Avatar>

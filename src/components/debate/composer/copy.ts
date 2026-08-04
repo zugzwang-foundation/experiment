@@ -16,14 +16,6 @@ import { formatDharma } from "../format";
  * bet"). CC never invents argument-adjacent copy.
  */
 
-/** "Đ {n}" with a thousands separator — pure string ops, no float math. */
-export function formatDharmaGrouped(value: string): string {
-	const trimmed = formatDharma(value);
-	const [intPart = "0", fracPart] = trimmed.split(".");
-	const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-	return fracPart === undefined ? grouped : `${grouped}.${fracPart}`;
-}
-
 /**
  * `To win Đ 1 → Đ 2.63x` — the unit-to-win multiplier: truncate the shares
  * string to 2 fractional digits (pure string ops, no rounding, no floats)
@@ -51,7 +43,7 @@ export const COMPOSER_COPY = {
 
 /** W2.10-D — the over-cap strip (ruling 2: "Max Đ N per bet"). */
 export function overCapStrip(): string {
-	return `Max Đ ${formatDharmaGrouped(BET_MAX_STAKE)} per bet`;
+	return `Max Đ ${formatDharma(BET_MAX_STAKE)} per bet`;
 }
 
 /** d5 auth-gate slot variant (verbatim). */
@@ -77,10 +69,10 @@ export const C1_PROTECTIVE_LANDING = {
  * {floor} = the surface's BET_MIN_STAKE_*, {spendable} = viewer.spendableToday).
  */
 export function c2Sentence(args: { floor: string; spendable: string }): string {
-	return `Đ ${formatDharmaGrouped(args.spendable)} spendable today — below the Đ ${formatDharmaGrouped(args.floor)} minimum.`;
+	return `Đ ${formatDharma(args.spendable)} spendable today — below the Đ ${formatDharma(args.floor)} minimum.`;
 }
 export function c2Strip(args: { floor: string; spendable: string }): string {
-	return `Min Đ ${formatDharmaGrouped(args.floor)} — Đ ${formatDharmaGrouped(args.spendable)} spendable today`;
+	return `Min Đ ${formatDharma(args.floor)} — Đ ${formatDharma(args.spendable)} spendable today`;
 }
 
 /**
