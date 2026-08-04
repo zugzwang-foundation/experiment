@@ -23,7 +23,7 @@ no engine contact, not a CLAUDE.md §1 critical path.
 | # | Criterion |
 |---|---|
 | 1 | Every Đ value rendered to a user groups its integer part with a literal ASCII comma |
-| 2 | Exactly ONE display formatter for Đ values exists; no ungrouped display variant remains to be selected by mistake |
+| 2 | Exactly ONE formatter RENDERS a Đ value; the rounding primitive it composes is explicitly non-rendering and CI-guarded |
 | 3 | The `.md` export path is **byte-unchanged** — golden fixture and all three serialize grouping assertions green without regeneration |
 | 4 | The avatar ring is visible on the fallback path at all four `Avatar` render sites, bound to `--avatar-ring` |
 | 5 | SPEC.1 §10.8 carries the grouping rule, landed in the SAME COMMIT as the code it governs |
@@ -43,7 +43,7 @@ no engine contact, not a CLAUDE.md §1 critical path.
 | §10.8 extent | lines **586–597** | next heading §10.9 at `:598` |
 | §10.8 on grouping | **SILENT** — the word "group" does not occur | R5d |
 | §20 last row | `1.0.28` at `:1490` | R5e |
-| Đ display sites | **33** (+2 vs DROUND's 33 baseline: `DharmaCluster.tsx:84`, `:93`) | R3 |
+| Đ display sites | **35** (+2 vs DROUND's 33 baseline: `DharmaCluster.tsx:84`, `:93`) | R3 |
 | Đ export sites | **9**, all in `serialize.ts` | R3 Table 2 |
 | Public-dataset exporter | **DOES NOT EXIST** — §12.2 describes one, unbuilt | R3 |
 | `.dark` applied anywhere in `src/**` | **NEVER** — `dark:after:mix-blend-lighten` is dead CSS | R1c |
@@ -96,6 +96,8 @@ assertions MOVE onto `formatDharma`.
   string is already written verbatim and needs no counsel. **Not this task.**
 - **POLISH.5 rows** — D7's two deferrals.
 
+---
+
 ## §4 · The SPEC.1 rider — VERBATIM, transcribe byte-exact
 
 **Doctrine.** Web-authored, operator-ratified, CC-transcribed. Lands in the **SAME
@@ -146,10 +148,14 @@ one table row and must not be re-wrapped or line-broken during transcription.
 
 ## §5 · Hard guardrails
 
-- **View layer only.** No `src/server/**` change except none at all — see D1.
-- **The export path is BYTE-UNCHANGED.** `serialize.ts` is not edited. The golden
-  fixture `mumbai-metro.expected.md` is **NOT regenerated**. If any change would move a
-  byte of it, **HALT** — that is D1 being violated.
+- **View layer only**, with ONE named exception: `serialize.ts` takes a
+  function rename and a docblock correction in commit 1 (C2). No other
+  `src/server/**` file is touched, and no export BEHAVIOUR changes.
+- **The export OUTPUT is byte-unchanged.** The golden fixture
+  `mumbai-metro.expected.md` is **NOT regenerated** and `serialize.test.ts`'s
+  three grouping assertions keep their pinned values (`3,225` / `1,234,567` /
+  `1,234.56`). If any change would move a byte of the fixture, **HALT** —
+  that is D1 being violated. A rename that moves no output byte is not.
 - **No DDL, no migration, no event type, no ADR, no §16.1 constant, no §17 row.**
 - **No read-model, DTO or schema change.**
 - **decimal.js only** on a Đ value; never a JS float (CLAUDE.md §2).
@@ -210,20 +216,43 @@ C3, D2, D3, D4 **+ the §4 SPEC.1 edits in this same commit.** RED-then-GREEN.
 1. **Tests first (RED).** `format.test.ts` — move `:69-78`'s grouping table onto
    `formatDharma`; add a `1,234,567` case, a `999 → "999"` boundary, a negative
    (`-1,234`), and an explicit **no-locale-call** assertion.
-2. `format.ts:31` — `formatDharma` groups the integer part after rounding. Literal
-   `","`. Regex `\B(?=(\d{3})+(?!\d))` — the shape already proven at both existing
-   groupers. `formatDharmaExact` **untouched**.
+2. **`format.ts` — three functions where there was one.**
+   - **`round0Dharma(value: string): string` — EXPORTED.** The current
+     `formatDharma` body verbatim: `DisplayDecimal`,
+     `toDecimalPlaces(0, ROUND_HALF_UP)`, the `isZero()` −0 guard, malformed →
+     `formatDharmaExact`. **UNGROUPED.** Its docblock must state: displayed-space
+     **arithmetic only, NEVER rendered** — it exists for the §10.8 displayed-space
+     aggregate identities, which must ADD before they group.
+   - **`groupInteger(digits: string): string` — module-private.** Literal `","`,
+     regex `\B(?=(\d{3})+(?!\d))`, integer part only, sign preserved.
+   - **`formatDharma(value: string)` = `groupInteger(round0Dharma(value))`.**
+     The ONLY Đ render formatter. The malformed path still degrades to
+     `formatDharmaExact` — ungrouped, deliberately: a bad value is not dressed up.
+   - **`displayNetProfitLoss` terminates through `groupInteger(...)`.**
+     ⚠ Without this the §23 tile row renders `Đ 14,260` / `Đ 3,225` / `Đ -1234`
+     side by side — Wallet and Positions grouped, Net P/L not.
+   - `formatDharmaExact` UNTOUCHED.
+2a. **`composer/split-bar.ts:45-46` → `round0Dharma`.** ⚠ **BLOCKING, not
+   cosmetic.** `displaySplitTotal` rounds two Đ values and **ADDS them**. Once
+   `formatDharma` groups, that read-back becomes `new Decimal("1,234")` — the
+   exact failure §4.2 paragraph 4 names (`Number("1,234")` is `NaN`) — and the
+   reply split bar's staked total breaks on a money surface. `computeSplitBar`'s
+   `totalDharma` stays the EXACT sum; the bar-fill proportion stays on the exact
+   basis. Only the two rounding calls move.
 3. **Delete `composer/copy.ts:20`.** Re-point its 13 Đ call sites to `formatDharma`
    (`copy.ts:54 :80×2 :83×2`, `ReplySplitBar:58 :70 :77`, `PositionStrip:71 :78`,
    `SlotHeader:136`, `SellModule:231`, `BetComposer:392`). Remove the five importing
    files' now-dead imports, including `BetComposer.tsx:23`'s `formatGrouped` alias.
 4. **D4** — `BetComposer.tsx:491`: `formatGrouped(String(extendedMax))` → plain
    `extendedMax`. A count never touches the Đ formatter.
-5. Invert the two docketed tests, each with a comment citing **SPEC.1 §10.9 (1.0.29)**:
+5. Invert the two docketed tests, each with a comment citing **SPEC.1 §10.8 (1.0.29)**:
    `market-card.test.tsx:65` → `"Đ 14,260 staked"`; `dharma-cluster.test.tsx:260-263`
    → `toContain("2,480")`.
 6. `no-raw-dharma-render.test.ts` — add `supportReceived`, `counterReceived`,
    `displayedTotal`, `floor` to `MONEY_IDS` (R4c).
+   Plus a **fourth check**: `round0Dharma(` must never appear as a JSX child
+   render. It is a computation primitive, not a formatter, and the "one render
+   formatter" property is guarded rather than merely conventional.
 7. **The §4 SPEC.1 edits**, transcribed byte-exact.
 
 **Gate:** `serialize.test.ts` and the golden fixture green **without regeneration** —
@@ -272,6 +301,7 @@ unattributed and proves nothing.
 | **P5** | footer guard — C4(c) **novel name** | Add `<Colophon/>` rendering a page-level footer in a `src/app/**` **page** file | Old three-file loop → **PASS** (it greps two literals in three layouts) | New guard → **FAIL** | md5 |
 | **P6** | footer guard — C4(c) **false-positive check** | No injection. Run the new guard against the tree **as-is** | — | Must be **GREEN** with both nested `<footer>` present. A RED here means the guard bans legitimate markup — fix the guard | — |
 | **P7** | grouping — the behaviour itself | Revert `formatDharma`'s grouping line only | Suite → **RED** at the `format.test.ts` table AND at `dharma-cluster` / `market-card` | — | restore |
+| **P8** | `no-raw-dharma-render` — check 4 | Inject `{round0Dharma(x)}` as a JSX child | Without check 4 → **PASS** | With check 4 → **FAIL** | md5 |
 
 **P6 has no injection and that is the point.** It is the only proof in the set that
 tests the guard's *precision* rather than its *reach*, and it is the check the seed's
