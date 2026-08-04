@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.27 (semver; bump major on invariant changes)
-- **Last updated:** 2026-08-03
+- **Version:** 1.0.28 (semver; bump major on invariant changes)
+- **Last updated:** 2026-08-04
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -794,6 +794,18 @@ The pseudonym and PFP are permanent. On `H2` scrub:
 
 > **UI/UX phase note.** This flow specifies the *structural* requirements: which elements appear, what acceptance evidence is recorded, how edge cases resolve. The visual treatment — typography, spacing, the exact dimensions of the scrollable regions, mobile-vs-desktop layout, microcopy, button colour and placement — is deferred to the UI/UX phase. The structural commitments above (inline-rendered ToS + Privacy Policy on the same screen as the checkbox; H4 warning emphasised; pseudonym + PFP rendered as permanent; single combined checkbox; acceptance evidence captured) are spec-locked and cannot be relaxed by the UI/UX pass without an ADR amending this section.
 
+**2026-08-04 — the W2.1 F-AUTH-4 override has lapsed; §13 stands as written.**
+`DESIGN_W2_1_CLOSE-OUT.md:56–57` recorded an override deleting the acceptance
+screen in favour of implicit acceptance via footer links, and flagged the
+SPEC.1 sync as owed (`:69`, "resolve acceptance-evidence question"). That sync
+was never performed, so §13 F-AUTH-4 was never amended. The footer was
+withdrawn 2026-08-02, removing the override's mechanism. §13 F-AUTH-4
+therefore stands unamended: the inline-scrollable acceptance screen with
+in-page ToS and Privacy text and a single acceptance checkbox is the
+specification. An explicit checkbox is also the stronger answer to the
+acceptance-evidence question W2.1 left open. Whether the build matches is
+POLISH.7a's verification.
+
 ### F-AUTH-ADMIN — Admin sign-in (static-password, route-gated, structurally separate from participants)
 
 The admin (Hrishikesh, single-admin per `E4`) authenticates via a dedicated path that is structurally outside the participant identity system. The admin has no `users` row, no pseudonym, no PFP, no ToS acceptance gate, and cannot reach any participant write surface. This is the structural enforcement of `B5`: admin is not a participant by data-model construction, not by runtime check.
@@ -1539,6 +1551,14 @@ An ambient **radio / music-player widget** — a custom-skinned single Play butt
 ### 21.6 Feature-guide page + "i" deep-link buttons — DESCOPED (deferred from v1)
 
 **Descoped from v1 — founder ruling, 2026-06-29.** The canonical "how it works" / About surface is no longer a dedicated feature-guide page. How-it-works / About content is served by the **onboarding deck** — the six-card deck (DESIGN.W2.2), **re-shown** (skippable) via an "About / Rules" tab (tab name + position finalised at design time). The feature-guide page and its "i" deep-link anchor mechanism are **deferred** — the founder has other plans for the feature guide; this is a descope, not a deletion of the idea. The corresponding design task (DESIGN.W2.12) is removed from the v1 backlog.
+
+### 21.7 Freeze banner / global notice region — RESERVED
+
+Reserved for the freeze-banner rider. Not yet written. **B8 (freeze banner) is
+gated on this section and must not be built before it lands.** The banner is
+W2.11 primitive P4 (*global banner* — persistent, non-blocking; the Nov-5
+freeze read-only state is its one loud participant case). This stub exists so
+§21's numbering carries no unexplained gap.
 
 ### 21.8 The signed-in Dharma cluster (global header)
 
