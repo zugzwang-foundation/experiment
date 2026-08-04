@@ -47,7 +47,7 @@ const FOOTER =
  * reads it (delegating to `formatDharmaExact` is what keeps the precision; the
  * export is exempt from the view layer's 0-dp rule). The MACHINE-READABLE YAML
  * front matter NEVER groups: `total_stake_dharma` goes straight to
- * `formatDharmaExact` (`:127`), exact and ungrouped, because a grouped figure is
+ * `formatDharmaExact` (`:138`), exact and ungrouped, because a grouped figure is
  * not a number to a parser. So the same quantity may render `3,225` in the body
  * and `3225` in the front matter of one file — deliberate, and the same split
  * §10.8 already ratifies for percentages (prose complement rule vs exact

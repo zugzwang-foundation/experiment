@@ -9,7 +9,11 @@ import { describe, expect, it } from "vitest";
 // display variant survives). This guard fails if a money value is rendered raw
 // in JSX, if the EXACT (unrounded) `formatDharmaExact` escape hatch is used in a
 // view component anywhere but the ONE dround-allowed sell-module input seed, or
-// if the UNGROUPED rounding primitive `round0Dharma` reaches a render.
+// if the UNGROUPED rounding primitive `round0Dharma` is rendered as a
+// `{round0Dharma(…)}` JSX child. That fourth check is scoped to exactly that
+// shape — it does NOT catch a template literal, a ternary, or a `const t =
+// round0Dharma(v)` bound before `{t}`. It closes the one-render-formatter
+// property against the obvious spelling, not against every possible one.
 //
 // Modelled on tests/unit/design/no-raw-hex-view-layer.test.ts, with three
 // deliberate differences: (i) it keys on MONEY IDENTIFIERS, not the Đ glyph —

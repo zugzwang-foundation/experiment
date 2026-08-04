@@ -96,7 +96,10 @@ function groupInteger(digits: string): string {
  * A grouped value is TERMINAL: it is not merely a string that should not be
  * read back but one that cannot be. Displayed-space arithmetic goes through
  * `round0Dharma`; the sell module's editable amount input keeps seeding from
- * the exact ungrouped Đb string (the §10.8 named exception, `dround-allow:`).
+ * the exact ungrouped Đb string (the §10.8 named exception, marked at its site
+ * with the `dround-allow` comment token — spelled here WITHOUT its trailing
+ * colon so this prose cannot be counted as a second allowlist marker by
+ * `tests/unit/design/no-raw-dharma-render.test.ts`).
  */
 export function formatDharma(value: string): string {
 	return groupInteger(round0Dharma(value));
