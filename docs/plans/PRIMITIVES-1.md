@@ -316,7 +316,9 @@ empty.** Record all three outcomes per proof in the session log.
 
 **Prod:** `src/components/ui/avatar.tsx` · `src/components/shell/IdentityCluster.tsx` ·
 `src/components/debate/format.ts` · `src/components/debate/composer/copy.ts` (function
-deleted) · `ReplySplitBar.tsx` · `PositionStrip.tsx` · `SlotHeader.tsx` ·
+deleted) · `src/components/debate/composer/split-bar.ts` (the two `round0Dharma`
+rounding calls ONLY — `computeSplitBar` untouched) · `ReplySplitBar.tsx` ·
+`PositionStrip.tsx` · `SlotHeader.tsx` ·
 `SellModule.tsx` · `BetComposer.tsx` · `src/server/debate-export/serialize.ts` (rename +
 docblock ONLY).
 
