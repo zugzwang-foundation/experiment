@@ -72,8 +72,8 @@ experiment/
 │   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
-│   │   └── schema/                 #   12 files: _enums, audit, auth, bets, comments, dharma,
-│   │                               #   events, identity, image-uploads, index, markets, system
+│   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
+│   │                               #   dharma, events, identity, image-uploads, index, markets, system
 │   ├── lib/                        # auth-client, errors, utils, posthog/
 │   └── server/                     # server-side business logic
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
@@ -150,7 +150,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 22 tables live across 10 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
+- **One file may hold several related tables.** 23 tables live across 11 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
 
 ### Reply-as-bet schema reality
 
@@ -168,7 +168,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0023_positions_market_id_idx` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31)).
+- Current head: `0024_bookmarks` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31); 0024 = `bookmarks` (UI-A6 / ADR-0032, PR #254)).
 
 ### Transactions, queries, validation
 

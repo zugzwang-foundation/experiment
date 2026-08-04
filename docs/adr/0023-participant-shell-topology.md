@@ -230,14 +230,16 @@ control, both of which currently disappear on the longest surface.
 all `(public)` and `(auth)` routes. `(admin)` is unaffected — it has no
 header by design.
 
-**Mechanism.** `position: sticky` on the header within each group layout, not
-`fixed`. Sticky keeps the header in normal flow, so content below needs no
-offset compensation and the existing `min-h` chain is undisturbed.
+**Mechanism.** `position: sticky` on the `<header>` element inside
+`GlobalHeader`, which mounts once per group layout — not `fixed`. Sticky keeps
+the header in normal flow, so content below needs no offset compensation and
+the existing `min-h` chain is undisturbed.
 
-**Consequences.** The header permanently occupies 60px of viewport height.
-Its `--elev-1` elevation becomes load-bearing — it now separates the bar from
-content passing beneath it. A `z-index` is required, and every existing
-overlay must stack above it.
+**Consequences.** The header permanently occupies **62px** of viewport height
+— a 60px inner bar plus `border-y`, giving a 62px border-box. Its `--elev-1`
+elevation becomes load-bearing — it now separates the bar from content passing
+beneath it. A `z-index` is required, and every existing overlay must stack
+above it.
 
 **Scope.** This does not disturb Option 2. The header still lives in the group
 layouts, never at root; root remains shared with `(admin)` and carries no

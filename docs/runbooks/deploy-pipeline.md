@@ -16,7 +16,7 @@
 | **Staging** | push to **`staging`** branch | **staging** Supabase (`rwfdoqzsghqhhdapxafg`) | `staging.zugzwangworld.com` | **auto** — `staging-migrate.yml` (GHA) on push to `staging` |
 | **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, first exercised at D6) |
 
-Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0023`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
+Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0024_bookmarks`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
 
 ---
 
@@ -80,6 +80,27 @@ Full reset (only if the sandbox is wedged): drop the staging schema → re-run `
 
 - **Repoint the staging branch (one-time, D3):** Vercel → **Settings → Environments → [Staging custom env] → Branch Tracking** → change the match from `main` to `staging`. (It is a match *rule*; the `staging` branch need not exist yet when you set it.)
 - **Disable Production auto-serve (one-time, D3):** Vercel → **Settings → Environments → Production → Branch Tracking** → toggle **OFF** "Auto-assign Custom Production Domains". Per Vercel's docs this affects only **future** pushes; it does **not** unassign the currently-live deployment's domain. **Do not trust the docs for this — prove it with an R2 before/after `/api/health` curl** (canary unchanged across the toggle; domain still serving).
+
+### 2.5 Advance staging — the standing post-merge step
+
+**No task owns this, which is exactly why it gets missed.** Advancing staging has never appeared in any build task's scope, plan, or kickoff, so skipping it fails nothing and reports nothing. By **2026-08-04** that had let **eight** merged commits accumulate on `main` un-deployed, with `origin/staging` still parked at the F-DEBATE-4 merge. Nothing was broken — staging was simply describing a `main` that no longer existed, which is worse, because it looks healthy. Treat this as a **standing step that runs after every merge to `main`**, owned by whoever merged.
+
+```bash
+# 1. Fast-forward staging to the merged main
+git fetch origin
+git push origin origin/main:staging
+
+# 2. Watch the migrate job (§2.1 reaction 1) → GREEN
+gh run list --workflow=staging-migrate.yml --limit 1
+gh run watch <run-id>
+
+# 3. PRIMARY GATE — health (§1, §2.2)
+curl -s https://staging.zugzwangworld.com/api/health | jq
+```
+
+**Gate on `canary` == the merged SHA.** `canary` is the **bare 40-character commit SHA** — no `sha-` or `g` prefix, no short form, no `v`. Compare it verbatim against `git rev-parse origin/main`. A mismatch means the Vercel build has not finished or has not taken the alias yet: the step is **not** done, poll again. `env` must read `"staging"`; `db` and `migrations` must both read `"ok"`.
+
+**The health endpoint is the authority — not the migrate exit code.** `drizzle-kit migrate` can exit `0` with a migration unapplied (drizzle-orm #5769 — the silent high-water-mark skip), so a green `staging-migrate.yml` run is a **signal, not a verdict**. Only `migrations:"ok"` from `/api/health` proves the DB matches the committed set. This is the same rule §3 enforces at the production promote gate; staging earns no exemption from it for being resettable.
 
 ---
 
