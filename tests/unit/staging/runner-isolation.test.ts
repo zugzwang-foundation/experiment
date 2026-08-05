@@ -44,6 +44,10 @@ describe("vitest.config.ts excludes tests/staging/**", () => {
 
 	it("does not name tests/staging in its include patterns", () => {
 		const include = defaultTest.include as string[];
+		// A for-loop over an EMPTY array asserts nothing and reports green. If
+		// `include` is ever renamed or removed, this test must fail rather than
+		// pass having examined zero patterns (Q-I).
+		expect(include.length).toBeGreaterThan(0);
 		for (const pattern of include) {
 			expect(pattern).not.toMatch(/staging/);
 		}
@@ -56,8 +60,12 @@ describe("vitest.staging.config.ts is the only runner that includes them", () =>
 	});
 
 	it("carries no staging exclusion of its own", () => {
-		const exclude = (stagingTest.exclude ?? []) as string[];
-		expect(exclude.some((p) => p.includes("staging"))).toBe(false);
+		// `?? []` makes this trivially true when `exclude` is absent — which is
+		// the expected state, so assert the shape explicitly rather than let
+		// absence and emptiness be indistinguishable (Q-I).
+		const exclude = stagingTest.exclude as string[] | undefined;
+		expect(exclude === undefined || Array.isArray(exclude)).toBe(true);
+		expect((exclude ?? []).some((p) => p.includes("staging"))).toBe(false);
 	});
 
 	it("runs files sequentially, like the other two configs", () => {
@@ -72,6 +80,8 @@ describe("the two configs partition the tree", () => {
 		const stagingIncludes = stagingTest.include as string[];
 		const defaultExcludes = defaultTest.exclude as string[];
 		// Every staging include pattern must be covered by a default exclude.
+		expect(stagingIncludes.length).toBeGreaterThan(0);
+		expect(defaultExcludes.length).toBeGreaterThan(0);
 		for (const pattern of stagingIncludes) {
 			const root = pattern.split("**")[0] ?? pattern;
 			expect({

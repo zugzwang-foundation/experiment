@@ -423,6 +423,70 @@ behaviour, ordering or evaluation change. Flagged rather than done silently.
 
 ---
 
+### Q-I · Source-matching assertions — audit, and an inherited constraint for Slice B
+
+**The pattern that keeps recurring.** `runner-gating.test.ts` matched a call
+site with a literal `indexOf("verifyPostReset(client")`. A formatter wrapped
+the arguments across lines; the literal stopped matching; the search skipped
+forward and asserted about **the wrong call site** — green throughout. That is
+the second test in this task to pass while blind to what it named, and the
+first to assert about the wrong thing rather than nothing.
+
+**Every source-matching assertion in the PR, audited.** Five shared or
+approached the defect and are fixed; the rest are sound and why is stated.
+
+| Assertion | Matches on | Failure mode | Disposition |
+|---|---|---|---|
+| `runner-gating` · `resetAt` needle | literal `runGuardedReset(client` | With `resetAt === -1`, `find(o => o > -1)` returns the FIRST call site and `source.slice(-1, x)` is near-empty — the `not.toMatch` then passes having examined nothing | **FIXED** — `expect(resetAt).toBeGreaterThan(-1)` at both use sites |
+| `runner-gating` · no-truncate-fixture-import (runners) | `/_fixtures\/truncate/`, `/\btruncateTables\b/` | Pure negatives. A path alias or a fixture rename makes both match nothing and the test reports green **while the forbidden import is present** | **FIXED** — positive control asserts both patterns fire on a known-bad sample first |
+| `runner-gating` · same, for `_lib` | `/import[\s\S]*?_fixtures\/truncate/` | Same, plus a `readdirSync` loop that asserts nothing if the directory is empty | **FIXED** — positive control + non-empty assertion |
+| `runner-gating` · `not.toMatch(/statement_timeout/)` | pure negative | Passes if `mechanism` is an empty read, or if the setting arrives via an interpolated constant | **FIXED** — positive control, plus `expect(mechanism).toMatch(/runGuardedReset/)` to prove the file was actually read |
+| `runner-gating` · `not.toMatch(/SET lock_timeout/)` | pure negative | Same class | **FIXED** — positive control |
+| `runner-isolation` · include-pattern loop | `for (…of include) expect(p).not.toMatch(/staging/)` | A `for` over an **empty** array asserts nothing and reports green — so a renamed or removed `include` key passes | **FIXED** — `expect(include.length).toBeGreaterThan(0)` |
+| `runner-isolation` · staging config `exclude` | `(stagingTest.exclude ?? [])` | `?? []` makes absence and emptiness indistinguishable | **FIXED** — shape asserted explicitly |
+| `guard-list-parity` · `parseDroppedTables` | `/DROP TABLE\s+"?(\w+)"?/` | Captured the literal `IF` from `DROP TABLE IF EXISTS "x"`, and only the first name of `DROP TABLE a, b`. Fails **loudly** (the table stays in `LIVE_TRIGGERS`), but for the wrong reason, sending the reader after the wrong thing | **FIXED** — handles `IF EXISTS`, comma lists, schema qualifiers; seven positive-control cases |
+| `guard-list-parity` · `parseCreateTriggers` | `/CREATE TRIGGER\s+(\S+)\s+BEFORE\s+\w+\s+ON\s+"?(\w+)"?/` | Matching nothing would empty `LIVE_TRIGGERS` and make every downstream comparison vacuous | **SOUND, control added** — the six-families assertion already fails on an empty parse; a direct shape test now pins the parser too. (`CREATE OR REPLACE TRIGGER` remains unmatched — O-8, fails closed) |
+| `runner-gating` · `finally … client.end(` / `reEnableGuards(` | bounded `[\s\S]{0,200}` / `{0,400}` windows | Growth past the window fails **loudly** | **SOUND** |
+| `runner-gating` · `verifyOffsets` | whitespace-tolerant regex | — | **SOUND** (this was the fix) |
+| `reset-guard` · ref-appears-once | `guardSource.split(REF).length - 1` | String split, no regex; cannot mis-anchor | **SOUND** |
+| `reset-guard` · every `result.reason` match | the predicate's **return value**, not source text | Behavioural, not source-matching | **SOUND — not in this class** |
+| `runner-isolation` · config `include`/`exclude` reads | the **resolved config object** | Behavioural | **SOUND — not in this class** |
+
+**The general rule this produces, and it is the one to carry forward: a
+negative source assertion needs a positive control.** `not.toMatch` passes when
+the pattern matches nothing, and "matches nothing" is exactly what a rename, a
+path-alias change, or a reformat produces. Every negative in this PR now proves
+its matcher fires on a known-bad sample before concluding the real source is
+clean.
+
+**⚠ INHERITED CONSTRAINT FOR SLICE B — do not repeat this pattern.**
+ADR-0036 primitive 4 requires a source-level assertion that the generator
+writes no rows directly (`no INSERT INTO`, no `.insert(` against the eleven
+named tables). Ratification Record §5 W-G is explicit that this assertion is
+what keeps gate 1 non-vacuous: *"A verification satisfiable by the thing it
+verifies is not a verification."*
+
+That assertion is **a pure negative over source text** — structurally the same
+shape as the two defects above, and load-bearing in a way neither of those was.
+If it matches nothing, gate 1 silently becomes vacuous and the whole
+engine-driven-generation guarantee evaporates while every check reports green.
+So Slice B's version **must** carry, at minimum:
+
+1. a **positive control** per pattern — each must be proven to fire on a
+   known-bad sample (`INSERT INTO bets …`, `db.insert(bets)`, `tx.insert(events)`);
+2. a **non-empty file-set assertion** — the glob must be proven to have found
+   files, so an empty sweep cannot read as "clean";
+3. **whitespace and formatting tolerance** — regex, never `indexOf` on a
+   literal call shape;
+4. a **mutation control at authoring time** — add a real direct insert, watch
+   the assertion go red, revert. The same discipline that proved the atomicity
+   test and the gating test in this slice.
+
+Written here rather than only in the Slice B plan because Slice B is a
+different session, and this is the lesson that session will not otherwise have.
+
+---
+
 ## Open questions / findings for a ruling
 
 **O-1 · Three public tables are in neither the truncate set nor the

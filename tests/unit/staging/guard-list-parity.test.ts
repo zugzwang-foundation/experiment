@@ -44,12 +44,29 @@ function parseCreateTriggers(sql: string): Trigger[] {
 	return out;
 }
 
-/** Every `DROP TABLE "<name>"` in the given SQL. */
+/**
+ * Every table named by a `DROP TABLE` in the given SQL.
+ *
+ * Handles `IF EXISTS` and comma-separated lists. The naive
+ * `/DROP TABLE\s+"?(\w+)"?/` captured the literal `IF` from
+ * `DROP TABLE IF EXISTS "x"`, and saw only the first name of `DROP TABLE a, b`
+ * — in both cases the real table stays in LIVE_TRIGGERS and the parity
+ * assertion fails LOUDLY rather than silently, but it fails for the wrong
+ * reason and sends the reader after the wrong thing (Q-I).
+ */
 function parseDroppedTables(sql: string): string[] {
 	const out: string[] = [];
-	for (const m of sql.matchAll(/DROP TABLE\s+"?(\w+)"?/g)) {
-		const table = m[1];
-		if (table) out.push(table);
+	for (const m of sql.matchAll(/DROP TABLE\s+(?:IF\s+EXISTS\s+)?([^;]+)/gi)) {
+		const list = m[1];
+		if (!list) continue;
+		for (const raw of list.split(",")) {
+			// Strip ALL quotes BEFORE the schema qualifier: doing it the other
+			// way round leaves `"a` from `"public"."a"`, because the inner
+			// quotes are not anchored (Q-I — caught by the parser's own
+			// positive-control case).
+			const name = raw.trim().replace(/"/g, "").replace(/^.*\./, "");
+			if (/^\w+$/.test(name)) out.push(name);
+		}
 	}
 	return out;
 }
@@ -98,6 +115,31 @@ describe("migration parsing — the authority is readable", () => {
 			"bucket_b_no_truncate",
 			"bucket_b_update_check",
 		]);
+	});
+
+	it("parses DROP TABLE in every shape it could legally take", () => {
+		// The parser is the only thing standing between a dropped table and a
+		// false parity failure. Prove it on shapes the repo does not use YET
+		// — a future migration is free to write any of them (Q-I).
+		expect(parseDroppedTables('DROP TABLE "a";')).toEqual(["a"]);
+		expect(parseDroppedTables("DROP TABLE a;")).toEqual(["a"]);
+		expect(parseDroppedTables('DROP TABLE IF EXISTS "a";')).toEqual(["a"]);
+		expect(parseDroppedTables("DROP TABLE IF EXISTS a;")).toEqual(["a"]);
+		expect(parseDroppedTables('DROP TABLE "a", "b";')).toEqual(["a", "b"]);
+		expect(parseDroppedTables('DROP TABLE "public"."a";')).toEqual(["a"]);
+		expect(parseDroppedTables("-- nothing here")).toEqual([]);
+	});
+
+	it("parses CREATE TRIGGER, and fails loudly rather than silently on none", () => {
+		// parseCreateTriggers matching nothing would empty LIVE_TRIGGERS and
+		// make every downstream comparison vacuous. The families assertion
+		// above is the control; this pins the parser's own shape.
+		expect(
+			parseCreateTriggers(
+				"CREATE TRIGGER t BEFORE TRUNCATE ON x FOR EACH STATEMENT EXECUTE FUNCTION f();",
+			),
+		).toEqual([{ table: "x", trigger: "t" }]);
+		expect(parseCreateTriggers("-- nothing")).toEqual([]);
 	});
 
 	it("drops friendly_fire_events' guards, re-derived from the DROP TABLE", () => {

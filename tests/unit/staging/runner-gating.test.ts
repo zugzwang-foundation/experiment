@@ -154,6 +154,7 @@ describe("the destructive step is gated and self-verifying", () => {
 
 	it("calls runGuardedReset only after every guard construct", () => {
 		const resetAt = offsetOf(source, "runGuardedReset(client");
+		expect(resetAt).toBeGreaterThan(-1);
 		for (const guard of [
 			"resolveStagingTarget(process.env)",
 			"assertLiveConnection(",
@@ -170,6 +171,10 @@ describe("the destructive step is gated and self-verifying", () => {
 		// If G-4 lived in its own it(), a reordering — or a failure in the
 		// truncate block — could separate the wipe from its verification.
 		const resetAt = offsetOf(source, "runGuardedReset(client");
+		// Guard the needle itself. With resetAt === -1, `find(o => o > -1)`
+		// returns the FIRST call site and `source.slice(-1, x)` is near-empty,
+		// so the not.toMatch below would pass having examined nothing (Q-I).
+		expect(resetAt).toBeGreaterThan(-1);
 		const verifyAfterReset = verifyOffsets.find((o) => o > resetAt) ?? -1;
 		expect(verifyAfterReset).toBeGreaterThan(resetAt);
 
@@ -233,6 +238,16 @@ describe("every operational runner, present and future", () => {
 		});
 
 		it(`${file} · does not import the test-only truncate fixture`, () => {
+			// POSITIVE CONTROL FIRST. Both patterns below are negative
+			// assertions, and a negative assertion passes when its pattern
+			// matches nothing — which is exactly what a path-alias change or a
+			// fixture rename produces. Prove the matchers fire before trusting
+			// that they did not (Q-I).
+			const KNOWN_BAD =
+				'import { truncateTables } from "../db/_fixtures/truncate";';
+			expect(KNOWN_BAD).toMatch(/_fixtures\/truncate/);
+			expect(KNOWN_BAD).toMatch(/\btruncateTables\b/);
+
 			// ADR-0035 primitive 7 keeps the reset and
 			// tests/db/_fixtures/truncate.ts as two separate artifacts — and that
 			// fixture's TRUNCATE_GUARDS INCLUDES system_state's truncate guard.
@@ -246,7 +261,15 @@ describe("every operational runner, present and future", () => {
 	}
 
 	it("_lib modules do not import the test-only truncate fixture either", () => {
-		for (const file of readdirSync(`${STAGING_DIR}_lib`)) {
+		const FORBIDDEN = /import[\s\S]*?_fixtures\/truncate/;
+		// Positive control — see the note above (Q-I).
+		expect(
+			'import { truncateTables } from "../../db/_fixtures/truncate";',
+		).toMatch(FORBIDDEN);
+
+		const files = readdirSync(`${STAGING_DIR}_lib`);
+		expect(files.length).toBeGreaterThan(0);
+		for (const file of files) {
 			const body = readFileSync(`${STAGING_DIR}_lib/${file}`, "utf8");
 			expect({
 				file,
@@ -287,6 +310,8 @@ describe("the batch bounds lock wait (ruling 2)", () => {
 		// Session-scoped would leak into the pooled connection and silently
 		// apply to every later query on it.
 		expect(mechanism).toMatch(/SET LOCAL lock_timeout = '\$\{LOCK_TIMEOUT\}'/);
+		// Positive control for the negative below (Q-I).
+		expect("SET lock_timeout = '15s';").toMatch(/SET lock_timeout/);
 		expect(mechanism).not.toMatch(/SET lock_timeout/);
 	});
 
@@ -299,6 +324,10 @@ describe("the batch bounds lock wait (ruling 2)", () => {
 	});
 
 	it("sets no statement_timeout — execution is deliberately unbounded", () => {
+		// Positive control for the negative (Q-I): prove the matcher fires, and
+		// prove `mechanism` is the real file rather than an empty read.
+		expect("SET LOCAL statement_timeout = '60s';").toMatch(/statement_timeout/);
+		expect(mechanism).toMatch(/runGuardedReset/);
 		expect(mechanism).not.toMatch(/statement_timeout/);
 	});
 });
