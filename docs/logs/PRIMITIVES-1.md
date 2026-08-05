@@ -49,7 +49,7 @@ Both sat on the **test/comment surface**, which is the through-line of this sess
 
 **Gate C's own error, recorded at its instruction.** Gate C inferred *"no coverage exists"* from a diff, which a diff cannot establish. `tests/unit/profile/tile-identity.test.ts` existed — a dedicated `describe` for the function, six tests — and was **fixture-blind**: every assertion sub-thousand (`0`, `-30`, `0`, `1`, `0`, plus a malformed case landing on the catch exit), so none could observe grouping. **The finding survived; the reasoning did not.** Proven at P10: with the wrapper deleted, `tile-identity.test.ts` and `profile/render/surface.test.tsx` both stay **GREEN**, and only the new rows go red.
 
-**G1 — the recon-template amendment: SEVEN requirements, replacing the render census with a consumer census.** ⚠ **TEXT NOT RECEIVED.** The full text lives in the Gate C verdict doc, which has not reached this session and is not on disk (see §7). Recorded here as a pointer only — the seven requirements are **deliberately not paraphrased or reconstructed**, per the standing rule against authoring web-owned decision text. This log must be amended with the verbatim text before the amendment is treated as landed.
+**G1 — the recon-template amendment: SEVEN requirements, replacing the render census with a consumer census.** The text is **web-authored and belongs in the recon template, not here** — prescriptive text buried in a descriptive session log is text nobody reads when it matters. It is **out of scope for this task by ruling**, and lands via its own docs task against `docs/maintenance.md` and the recon template. This log records only *why* it exists: the render census enumerated production call sites exhaustively and test assertions not at all, which is how six defects of one genus reached execute (§4, §9).
 
 ---
 
@@ -113,9 +113,9 @@ Cause: **pre-existing staging fixture data.** 37 of 39 `bets` rows carry `share_
 
 ## 7 · Open questions
 
-- **G1's seven requirements — TEXT NOT RECEIVED.** The Gate C verdict doc has not reached this session. Blocking for the recon-template amendment; nothing else depends on it.
-- **The five POLISH.5 rows — TEXT NOT RECEIVED.** Same doc, same block. Not reconstructed.
-- **The two Gate C docs are not on disk** and could not be staged (§9).
+- **G1's seven requirements** land in the recon template via their own docs task against `docs/maintenance.md` — ruled out of this task's scope, not pending here.
+- **The five POLISH.5 rows** belong to the **POLISH register** (`POLISH-register.md`, PK-primary, web-authored, not committed to this repo), section **POLISH.5 · Profile**. Still awaiting the Gate C verdict doc; the other six rows are minted and paste-ready (§9).
+- **The Gate C verdict doc has still not arrived** — not in `~/Desktop`, not in `~/Downloads`, no attachment in-session. It is the sole blocker on those five rows.
 - **F2** — the `format.ts:35-38` / `ROUND0_RENDER` overclaim: docketed to L-2/L-3, not scoped.
 - **`tile-identity.test.ts` still has no four-digit case of its own.** Commit 7's rows live in `format.test.ts` because the one-file constraint held; a reader working only in `tile-identity.test.ts` will not see the grouping pin. Candidate fold-in when a later task legitimately opens that file.
 - **Doubled describe prefix** — resolved in commit 7 (template dropped to `"%s"`), noted only so the nit is not re-raised.
@@ -132,9 +132,11 @@ Cause: **pre-existing staging fixture data.** 37 of 39 `bets` rows carry `share_
 | **POLISH** | — | Portfolio / Balance read as **nested** by a reader. §21.8's labels carry load-bearing work and may not be sufficient. |
 | **POLISH** | — | **`Đ10 staked`** on `/m/[slug]` vs **`Đ 100 staked`** on discovery — verify the spacing inconsistency before docketing. |
 | **POLISH** | — | **"1 posts"** — no pluralisation, market page and discovery cards. |
-| **POLISH.5** | — | **Five rows in the Gate C verdict doc — TEXT NOT RECEIVED**, not reconstructed. |
+| **POLISH.5** | — | Five rows from the Gate C verdict doc — owed to **POLISH.5 · Profile**, pending that doc's arrival. Not reconstructed. |
 
 SP-3 is the one to read twice: the guard is right, and the correct fix is upstream of it.
+
+**Where these live.** The register is `POLISH-register.md` — **PK-primary, web-authored, not committed to this repo** — so the rows are delivered paste-ready at `~/Desktop/zz-pk-refresh-PRIMITIVES-1/POLISH-register-ADDITIONS.md` in the `POLISH-0.md` §4 schema, rather than written into a repo file or into the six-day-stale local copy. `PD-` ids are marked PROPOSED: allocation must come from the live register's high-water mark. The `Đ10` vs `Đ 100` spacing row was flagged as screenshot-read and is now **verified in source** — `MarketHeader.tsx:98` has no space, `StatLine.tsx:31` has one, for the same market staked total.
 
 ---
 
