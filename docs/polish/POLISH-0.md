@@ -1,6 +1,6 @@
 # POLISH.0 — The Method
 
-> **Doc:** `POLISH-0.md` · **PK-primary**, web-authored, operator-ratified. Committed 2026-08-05. GitHub is canonical; PK is the mirror.
+> **Doc:** `POLISH-0.md` · web-authored, operator-ratified. Committed 2026-08-05. GitHub is canonical; PK is the mirror.
 > **Status:** v1.0-draft · authored 2026-07-30 IST at POLISH.0
 > **Supersedes:** `POLISH-0_surface-inventory.md` (standalone, same day) — its content is §3 here, with corrections applied. **Discard the standalone.**
 > **Companions:** `POLISH-register.md` (the defect record) · `POLISH-0_ruling-register_r2.md` (the open rulings) · `POLISH-RECON-report.md` (the evidence base, operator-local)
@@ -250,7 +250,7 @@ Order follows the ratified P6 sequence. **Tier-1 entries marked ⟐ are candidat
 
 ## §4 · The defect record
 
-**Home:** `POLISH-register.md`, standalone, **PK-primary**, web-authored (P3). Committed 2026-08-05. GitHub is canonical; PK is the mirror. The tracker sequences phases, not defects; eight surfaces × N defects would drown it. GitHub issues fragment a lane that runs without CC. The register emits **batched** rows into the tracker at each surface close.
+**Home:** `POLISH-register.md`, standalone, web-authored (P3). Committed 2026-08-05. GitHub is canonical; PK is the mirror. The tracker sequences phases, not defects; eight surfaces × N defects would drown it. GitHub issues fragment a lane that runs without CC. The register emits **batched** rows into the tracker at each surface close.
 
 **ID:** `PD-<surface>-<nn>` — e.g. `PD-3-07`. Stable forever; never renumbered, never reused.
 

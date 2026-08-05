@@ -3,6 +3,8 @@
 > **Paste-ready.** Rows in the exact `POLISH-register.md` schema (`POLISH-0.md` §4).
 > **Not applied in place.** `POLISH-register.md` self-describes as *"PK-primary, web-authored from operator captures. **Not committed to the repo.**"* — and the only local copy (`~/Downloads/POLISH-register.md`, **mtime Jul 30 21:56**) still reads *"No surface has been inspected"* with **zero** allocated `PD-` rows, six days after POLISH.1a/1b/DOCS shipped. Editing that copy would fork a stale PK-primary doc, so the rows are delivered additively instead. Apply against the **live** register.
 >
+> ⚠ **The quoted header above is SUPERSEDED (2026-08-06).** `POLISH-register.md` was committed at R1 and its header now reads *"Committed 2026-08-05. GitHub is canonical; PK is the mirror."* — the opposite of the "Not committed to the repo" claim quoted here. The quote is preserved as the plan-time record of why these rows were delivered additively; it is **not** a description of the current state, and it must not be used again to route a row away from the repo. It already did that once: STAGING-PARITY Slice A routed a docket row to its session log on the strength of this header, and the row belonged in `docs/parked.md`.
+>
 > **IDs are PROPOSED.** `PD-<surface>-<nn>` must be allocated against the live register's high-water mark, which the stale copy cannot supply. Renumber on apply; the scheme is *never renumbered, never reused* once set.
 >
 > **Thirteen rows: six (§A — P5-e split, see below) + three (§B) + three (§C) + one (§D).**

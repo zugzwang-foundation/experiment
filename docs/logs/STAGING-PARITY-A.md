@@ -330,14 +330,18 @@ test *IS* the liveness check. It is not. What it actually proves:
 not detect rotation either (both copies would go stale together), and it would
 cost the single-constant property the docblock depends on.
 
-**Rotation is a PROCESS control, not a test.** Docket row to mint, runbook-owned,
-own task:
+**Rotation is a PROCESS control, not a test.** The docket row is filed in
+**`docs/parked.md`** — *"STAGING-PARITY Slice A — `PRODUCTION_PROJECT_REF`
+liveness"* — alongside AUDIT-FIX-B2 OQ-2's parked role split, which is the same
+family: both are the owner-privilege reality ADR-0035 builds on rather than
+closes. `parked.md` is the tracking; this section is the reasoning, and they
+cross-reference rather than duplicate.
 
-> **Supabase project restore or ref change → update `PRODUCTION_PROJECT_REF`
-> (`tests/staging/_lib/guards.ts`) and re-verify the guard.** Class R.
-> The constant is the single code copy of the production ref; nothing detects
-> that it has gone stale. Trigger: any Supabase project restore, migration, or
-> ref change on either project.
+*(It was first routed to this log instead. That was wrong, and the cause was a
+stale header: `POLISH-register.md` still claimed **PK-primary … Not committed to
+the repo**, which R1 had already inverted — the file IS committed and GitHub IS
+canonical. The contradiction is struck at three sites and the superseded
+quotation annotated; see the R1 header note below.)*
 
 **And the name-based refusal is the SECOND net regardless.** G-1's *positive*
 fragment match is the primary protection: the reset only proceeds when the URL
@@ -346,6 +350,42 @@ at all. The production-ref check exists to make the wrong-target case *report
 itself correctly* — "this is PRODUCTION" rather than "wrong fragment" — not to
 be the thing that stops it. A stale production constant degrades the error
 message, not the refusal.
+
+### Finding · The POLISH register header contradicted itself (my defect)
+
+`docs/polish/POLISH-register.md:3` asserted **both** *"PK-primary"* **and**
+*"GitHub is canonical; PK is the mirror."* Those are opposites. "PK-primary" is
+a status assertion that **R1 inverted** when the file was committed on
+2026-08-05; it is not a descriptive claim and should have been struck then,
+exactly as *"Not committed to the repo"* was.
+
+**Consequence, and why it is worth recording rather than quietly fixing.** I
+read that header, believed the repo copy was non-authoritative, and routed the
+Q-A docket row into this session log instead of `docs/parked.md`. A stale status
+line in a governance doc produced a real misfiling one day later. That is the
+failure mode the "stale docs are worse than none" rule in CLAUDE.md §7 names.
+
+**Struck at three sites**, all the same `PK-primary … GitHub is canonical`
+contradiction:
+
+| File | Line | Was |
+|---|---|---|
+| `docs/polish/POLISH-register.md` | 3 | `· **PK-primary**, web-authored from operator captures.` |
+| `docs/polish/POLISH-0.md` | 3 | `· **PK-primary**, web-authored, operator-ratified.` |
+| `docs/polish/POLISH-0.md` | 253 | `standalone, **PK-primary**, web-authored (P3).` |
+
+Everything else on each line is kept, including `GitHub is canonical; PK is the
+mirror`, which is the surviving true half.
+
+**A fourth site is a QUOTATION and was annotated, not edited.**
+`docs/polish/POLISH-register-ADDITIONS.md:4` quotes the old header verbatim
+(*"PK-primary … Not committed to the repo"*) as the stated reason those rows
+were delivered additively. Editing inside the quote would misrepresent what was
+quoted, so the quotation is preserved and a superseded-notice appended beneath
+it, naming this misfiling as the concrete harm so it is not used to route a row
+away from the repo again.
+
+`docs/polish/POLISH-0_data-manifest.md` carries no such claim.
 
 ### Finding · `safeHost` could not identify the target it logged
 

@@ -413,3 +413,23 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Every PR that adds or edits a read over `comments` on any surface (participant OR admin). Reviewer + `@security-auditor` checklist item.
 
 **Expected next task.** No fix owed — this PR closed the review-feed instance and the audit page was verified clean. This entry is the durable guard so the lesson isn't re-learned.
+
+## STAGING-PARITY Slice A — `PRODUCTION_PROJECT_REF` liveness (rotation is a process control)
+
+**Originating task:** STAGING-PARITY Slice A Gate C, Q-A ruling (2026-08-06). Sits alongside **AUDIT-FIX-B2 OQ-2** above — same family: both are the owner-privilege reality that the guarded reset (ADR-0035) is built on top of rather than closing.
+
+**The row, as ruled:**
+
+> Supabase project restore or ref change → update `PRODUCTION_PROJECT_REF`
+> (`tests/staging/_lib/guards.ts`) and re-verify the guard. Class R.
+> The constant is the single code copy of the production ref; nothing
+> detects that it has gone stale. Trigger: any Supabase project restore,
+> migration, or ref change on either project.
+
+**Why a test cannot own this.** `reset-guard.test.ts` builds its synthetic production URL by INTERPOLATING the constant, so it is satisfied by whatever value the constant holds — a stale one included. It proves the refusal PATH works and (via a `/^[a-z0-9]{20}$/` shape assertion) catches a blanked, truncated or placeholder constant. It cannot detect rotation. Hardcoding the literal a second time was considered and rejected: both copies would go stale together, and it would cost the single-code-constant property.
+
+**Blast radius if it does go stale — smaller than it first looks.** G-1's **positive** fragment match is the primary protection: the reset proceeds only when the URL carries the **staging** ref, which does not depend on knowing production's name at all. The name-based production refusal is the SECOND net, and its job is to make the wrong-target case *report itself correctly* — "this is PRODUCTION" rather than "wrong fragment". A stale constant therefore degrades the error message, not the refusal.
+
+**Conditional trigger.** Any Supabase project restore, project migration, or ref change on either the staging or the production project.
+
+**Expected next task.** Runbook-owned — a step in `docs/runbooks/deploy-pipeline.md`'s project-identity procedure, or its own HARDEN row. Full reasoning is in `docs/logs/STAGING-PARITY-A.md` under *Q-A*; this entry is the tracking, that one is the argument.
