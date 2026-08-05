@@ -1,6 +1,6 @@
 # POLISH — Defect Register
 
-> **Doc:** `POLISH-register.md` · web-authored from operator captures. Committed 2026-08-05. GitHub is canonical; PK is the mirror.
+> **Doc:** `POLISH-register.md` · **PK-primary**, web-authored from operator captures. Not committed to the repo. Committed 2026-08-05. GitHub is canonical; PK is the mirror.
 > **Status:** scaffolded 2026-07-30 IST at POLISH.0. **No surface has been inspected.**
 > **Governed by:** `POLISH-0.md` §4 (schema) and §5 (routing). Read those first.
 
