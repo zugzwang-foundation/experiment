@@ -123,7 +123,7 @@ beforeAll(async () => {
 	migrationsBefore = await countMigrations(client);
 
 	console.log(
-		`[staging:reset] target ${describeTarget(target.url)} · db=${live.database} · user=${live.user} · guards=${catalog.length} all enabled · migrations=${migrationsBefore}`,
+		`[staging:reset] target ${describeTarget(target.url, target.fragment)} · db=${live.database} · user=${live.user} · guards=${catalog.length} all enabled · migrations=${migrationsBefore}`,
 	);
 });
 

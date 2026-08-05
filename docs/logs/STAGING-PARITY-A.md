@@ -308,6 +308,61 @@ the ref is ever rotated and the constant is not updated with it, these tests
 still pass against the synthetic value. At rotation time the test's own fixture
 is the thing to re-check alongside the constant.
 
+### Q-A · What the production-ref test proves — corrected framing
+
+**The question:** does `reset-guard.test.ts` build its synthetic production URL
+by interpolating `PRODUCTION_PROJECT_REF`, or by hardcoding the literal
+separately? **Answer: it interpolates.** So the test is circular with respect to
+the constant's *value* — it is satisfied by whatever the constant holds,
+including a stale value left by a project restore.
+
+**The earlier framing was an overstatement and is corrected.** Both the
+`PRODUCTION_PROJECT_REF` docblock and the test's own describe block said the
+test *IS* the liveness check. It is not. What it actually proves:
+
+| | |
+|---|---|
+| **DOES prove** | the refusal PATH works — a production-shaped URL is refused in both the session-pooler and direct-host shapes, and refused even when every other setting is correct |
+| **DOES prove** | the constant is not blanked, truncated or placeholder text — via a shape assertion, `/^[a-z0-9]{20}$/` |
+| **DOES NOT prove** | that the constant still names the live production project. Rotation is undetectable this way |
+
+**Hardcoding the literal a second time was considered and rejected** — it would
+not detect rotation either (both copies would go stale together), and it would
+cost the single-constant property the docblock depends on.
+
+**Rotation is a PROCESS control, not a test.** Docket row to mint, runbook-owned,
+own task:
+
+> **Supabase project restore or ref change → update `PRODUCTION_PROJECT_REF`
+> (`tests/staging/_lib/guards.ts`) and re-verify the guard.** Class R.
+> The constant is the single code copy of the production ref; nothing detects
+> that it has gone stale. Trigger: any Supabase project restore, migration, or
+> ref change on either project.
+
+**And the name-based refusal is the SECOND net regardless.** G-1's *positive*
+fragment match is the primary protection: the reset only proceeds when the URL
+carries the **staging** ref, which does not depend on knowing production's name
+at all. The production-ref check exists to make the wrong-target case *report
+itself correctly* — "this is PRODUCTION" rather than "wrong fragment" — not to
+be the thing that stops it. A stale production constant degrades the error
+message, not the refusal.
+
+### Finding · `safeHost` could not identify the target it logged
+
+`describeTarget` returned `new URL(url).host`, which on the session pooler is
+`aws-1-ap-south-1.pooler.supabase.com:5432` — **the same string for every
+Supabase project in the region, staging and production alike**, because the
+project ref lives in the USERNAME and `new URL()` drops it. The run log could
+therefore not tell a reader which database had just been wiped, which is the
+one question a destructive run's log exists to answer.
+
+Fixed: the log line now carries **host plus the validated fragment**
+(`… target aws-1-ap-south-1.pooler.supabase.com:5432 · ref=<staging-ref> …`).
+The fragment is safe to print — it is known-good by that point (G-1 matched it,
+G-3 matched it against the live connection), it is a project ref rather than a
+credential, and it is already committed in ten documents. **The password and
+the raw URL are never logged**, and `safeHost` still strips both.
+
 ### Ruling 5 · The addendum, and the G-0 → G-5 rename
 
 `docs/adr/0035-guarded-staging-reset.md` gains `## Addendum — 2026-08-06`,

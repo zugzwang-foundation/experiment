@@ -36,10 +36,18 @@
  * make the guard refuse EVERY url, or — had the check been written the other
  * way — refuse none. `resolveStagingTarget` asserts it is non-empty, and
  * `reset-guard.test.ts` feeds a synthetic production URL and asserts refusal.
- * That test IS the liveness check: if the ref is ever rotated and this constant
- * is not updated with it, the test still passes against the synthetic value,
- * so the test's own fixture is the thing to re-check at rotation time. Recorded
- * plainly rather than implied.
+ *
+ * WHAT THAT TEST DOES AND DOES NOT PROVE (Q-A, 2026-08-06 — an earlier version
+ * of this docblock called it "the liveness check", which overstated it): it
+ * proves the refusal PATH works, and it catches a blanked, truncated or
+ * placeholder constant via a shape assertion. It does NOT detect ROTATION,
+ * because the synthetic URL INTERPOLATES this constant and is therefore
+ * satisfied by whatever value it holds, stale included.
+ *
+ * Rotation is a PROCESS control, not a test — a runbook docket row owns it.
+ * And this name-based refusal is the SECOND net in any case: G-1's positive
+ * fragment match is the primary protection, and it does not depend on knowing
+ * production's name.
  */
 export const PRODUCTION_PROJECT_REF = "zbvprdcyxhlguxbostdj";
 

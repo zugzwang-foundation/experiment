@@ -317,16 +317,29 @@ describe("isAllowedStagingHost", () => {
 	});
 });
 
-describe("PRODUCTION_PROJECT_REF — the liveness check (ruling 3)", () => {
-	// There is no way to verify the ref from inside a module that never
-	// connects. What IS checkable is that the deny list is populated and that
-	// it actually refuses a production-shaped connection. THIS TEST is the
-	// liveness check: at ref-rotation time, the fixture below is the thing to
-	// re-check alongside the constant.
+describe("PRODUCTION_PROJECT_REF — the refusal path (ruling 3)", () => {
+	// WHAT THESE TESTS PROVE, precisely — the earlier framing called this "the
+	// liveness check", which overstated it (Q-A, 2026-08-06):
+	//
+	//   THEY DO prove the refusal PATH works, and they catch a constant that
+	//   has been blanked, truncated, or replaced with placeholder text.
+	//   THEY DO NOT detect ROTATION. The synthetic URLs below INTERPOLATE
+	//   PRODUCTION_PROJECT_REF, so they are satisfied by whatever value the
+	//   constant holds — including a stale one left behind by a Supabase
+	//   project restore. A test cannot close that gap without a second copy of
+	//   the literal, which would not detect rotation either and would cost the
+	//   single-constant property the docblock relies on.
+	//
+	// Rotation is a PROCESS control, not a test: the runbook docket row
+	// "Supabase project restore or ref change -> update PRODUCTION_PROJECT_REF
+	// and re-verify the guard" owns it. And the name-based refusal is the
+	// SECOND net regardless — G-1's positive fragment match is the primary
+	// protection, and it is not name-based.
 
-	it("is a non-empty 20-character Supabase project ref", () => {
-		expect(PRODUCTION_PROJECT_REF).toBeTruthy();
-		expect(PRODUCTION_PROJECT_REF).toMatch(/^[a-z]{20}$/);
+	it("has the shape of a Supabase project ref", () => {
+		// Catches blanking, truncation and placeholder text without duplicating
+		// the value.
+		expect(PRODUCTION_PROJECT_REF).toMatch(/^[a-z0-9]{20}$/);
 	});
 
 	it("is the SINGLE code constant — the guard interpolates it, never a literal", () => {

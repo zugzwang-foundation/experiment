@@ -322,7 +322,22 @@ export async function verifyPostReset(
 	}
 }
 
-/** One-line target summary. Host only — never the credentials. */
-export function describeTarget(url: string): string {
-	return safeHost(url);
+/**
+ * One-line target summary for the run log.
+ *
+ * HOST ALONE IS NOT IDENTIFYING. On the session pooler `new URL(url).host` is
+ * `aws-1-ap-south-1.pooler.supabase.com:5432` — the same string for every
+ * Supabase project in the region, staging and production alike — because the
+ * project ref lives in the USERNAME, which `new URL()` drops. A log line
+ * carrying only the host cannot tell a reader which database was wiped, which
+ * is precisely the question the log exists to answer. So the validated
+ * fragment is printed alongside it.
+ *
+ * The fragment is safe to log: it is known-good by the time this is called
+ * (G-1 matched it, G-3 matched it against the live connection), it is a
+ * project ref rather than a credential, and it is already committed in ten
+ * documents. The password and the raw URL are NEVER logged. Ruling, 2026-08-06.
+ */
+export function describeTarget(url: string, fragment: string): string {
+	return `${safeHost(url)} · ref=${fragment}`;
 }
