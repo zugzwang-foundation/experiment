@@ -124,7 +124,20 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-	await client.end({ timeout: 10 });
+	// G-4 ALSO runs here, because the in-`it` call at the end of the batch is
+	// skipped on exactly the path it exists for: if runGuardedReset throws, the
+	// `finally` belt runs and the exception re-throws, so the verification
+	// below the batch never executes. A split-batch regression only strands a
+	// guard OFF when it fails mid-way — the very case that would have skipped
+	// the check. afterAll always runs. @security-auditor, Slice A.
+	try {
+		await verifyPostReset(client, migrationsBefore || undefined);
+	} catch (err) {
+		console.error(`[staging:reset] G-4 FAILED after the run:\n${String(err)}`);
+		throw err;
+	} finally {
+		await client.end({ timeout: 10 });
+	}
 });
 
 describe("guarded staging reset", () => {

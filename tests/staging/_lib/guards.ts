@@ -22,6 +22,47 @@
 export const PRODUCTION_PROJECT_REF = "zbvprdcyxhlguxbostdj";
 
 /**
+ * The intent token `pnpm staging:reset` sets and nothing else does.
+ *
+ * G-1..G-4 are all ENVIRONMENTAL — they prove WHERE you are, never that you
+ * MEANT it. Through Slices B–D the operator lives in `doppler run --config
+ * stg` shells, where a bare `vitest --config vitest.staging.config.ts` (watch
+ * mode) would wipe staging once and then re-wipe on every file save, and — once
+ * Slice B adds generator/gate runners under the same include glob — a
+ * positional-less run would sweep the reset in with them. This token is the
+ * one guard that asks "did you mean this run?". @security-auditor, Slice A.
+ */
+export const RESET_INTENT_ENV = "ZUGZWANG_STAGING_RESET_ACK";
+export const RESET_INTENT_VALUE = "wipe-staging-i-mean-it";
+
+/**
+ * Minimum length for STAGING_PROJECT_REF_FRAGMENT.
+ *
+ * A free-substring match is only as strong as the substring. A fragment of
+ * `postgres` makes BOTH the G-1 URL match and the G-3 connection match
+ * vacuously true for every Postgres DSN in existence — the scheme itself
+ * contains it — leaving the hard-coded production ref as the only
+ * discriminator. That is a reachable mistake, not a hypothetical: an operator
+ * whose fragment refuses will naturally shorten it until it passes. Supabase
+ * project refs are 20 lowercase letters; requiring 16+ alphanumerics rejects
+ * every generic host/scheme substring while accepting any real ref.
+ */
+export const MIN_FRAGMENT_LENGTH = 16;
+
+/** Hosts a staging connection may legitimately dial. */
+const ALLOWED_HOST_SUFFIXES = [".supabase.com", ".supabase.co"] as const;
+
+/**
+ * True when `host` is a Supabase host. G-3 asserts this so that a fragment
+ * supplied against a NON-Supabase target — e.g. a localhost DSN carrying the
+ * staging ref in its username — cannot satisfy the contract.
+ */
+export function isAllowedStagingHost(host: string): boolean {
+	const bare = host.split(":")[0]?.toLowerCase() ?? "";
+	return ALLOWED_HOST_SUFFIXES.some((suffix) => bare.endsWith(suffix));
+}
+
+/**
  * The `_no_truncate` guards the reset disables, for exactly one transaction.
  *
  * ADR-0035 primitive 3: `bucket_a_no_update`, `bucket_a_no_delete`,
@@ -234,6 +275,12 @@ export function resolveStagingTarget(
 				"STAGING_PROJECT_REF_FRAGMENT is not set; cannot verify the URL is staging",
 		};
 	}
+	if (fragment.length < MIN_FRAGMENT_LENGTH || !/^[a-z0-9]+$/.test(fragment)) {
+		return {
+			ok: false,
+			reason: `STAGING_PROJECT_REF_FRAGMENT must be at least ${MIN_FRAGMENT_LENGTH} lowercase alphanumeric characters (a Supabase project ref). A short or generic fragment matches every Postgres DSN and makes the target guard a no-op; refusing.`,
+		};
+	}
 	if (!url.includes(fragment)) {
 		return {
 			ok: false,
@@ -247,6 +294,15 @@ export function resolveStagingTarget(
 		return {
 			ok: false,
 			reason: `ZUGZWANG_ENV must equal "staging" (saw ${zugzwangEnv === undefined ? "unset" : `"${zugzwangEnv}"`}); refusing`,
+		};
+	}
+
+	// G-0 · intent. Every guard above proves WHERE the connection goes; none
+	// proves the operator meant to run a destructive wipe right now.
+	if (env[RESET_INTENT_ENV] !== RESET_INTENT_VALUE) {
+		return {
+			ok: false,
+			reason: `${RESET_INTENT_ENV} is not set to the acknowledgement value. This run wipes the staging database. Invoke it as: pnpm staging:reset`,
 		};
 	}
 

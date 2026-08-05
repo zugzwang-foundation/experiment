@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+	isAllowedStagingHost,
+	MIN_FRAGMENT_LENGTH,
 	PRODUCTION_PROJECT_REF,
+	RESET_INTENT_ENV,
+	RESET_INTENT_VALUE,
 	resolveStagingTarget,
 } from "../../staging/_lib/guards";
 
@@ -37,6 +41,7 @@ function stagingEnv(
 		DATABASE_URL_STAGING: STAGING_URL,
 		STAGING_PROJECT_REF_FRAGMENT: STAGING_FRAGMENT,
 		ZUGZWANG_ENV: "staging",
+		[RESET_INTENT_ENV]: RESET_INTENT_VALUE,
 		...overrides,
 	};
 }
@@ -112,6 +117,7 @@ describe("resolveStagingTarget — G-1 target", () => {
 		// misleading reason is a wrong-target run the operator retries.
 		const result = resolveStagingTarget({
 			DATABASE_URL_STAGING: `postgresql://postgres:pw@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres`,
+			[RESET_INTENT_ENV]: RESET_INTENT_VALUE,
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.reason).toMatch(/production/i);
@@ -177,6 +183,7 @@ describe("resolveStagingTarget — never falls back to DATABASE_URL", () => {
 			DATABASE_URL: STAGING_URL,
 			STAGING_PROJECT_REF_FRAGMENT: STAGING_FRAGMENT,
 			ZUGZWANG_ENV: "staging",
+			[RESET_INTENT_ENV]: RESET_INTENT_VALUE,
 		});
 		expect(result.ok).toBe(false);
 		if (!result.ok) expect(result.reason).toMatch(/DATABASE_URL_STAGING/);
@@ -200,5 +207,110 @@ describe("resolveStagingTarget — never falls back to DATABASE_URL", () => {
 			}),
 		);
 		expect(result.ok).toBe(false);
+	});
+});
+
+describe("resolveStagingTarget — fragment shape (anti-vacuity)", () => {
+	// A free-substring match is only as strong as the substring. The natural
+	// operator remedy for a refusing fragment is to SHORTEN it until it passes,
+	// which walks straight to a guard that matches everything.
+	// @security-auditor, Slice A.
+
+	it('refuses "postgres" — true of every Postgres DSN ever written', () => {
+		const result = resolveStagingTarget(
+			stagingEnv({ STAGING_PROJECT_REF_FRAGMENT: "postgres" }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(/fragment/i);
+	});
+
+	it('refuses "supabase"', () => {
+		const result = resolveStagingTarget(
+			stagingEnv({ STAGING_PROJECT_REF_FRAGMENT: "supabase" }),
+		);
+		expect(result.ok).toBe(false);
+	});
+
+	it("refuses anything shorter than the minimum", () => {
+		const short = "a".repeat(MIN_FRAGMENT_LENGTH - 1);
+		const result = resolveStagingTarget({
+			...stagingEnv({ STAGING_PROJECT_REF_FRAGMENT: short }),
+			DATABASE_URL_STAGING: `postgresql://postgres.${short}:pw@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`,
+		});
+		expect(result.ok).toBe(false);
+	});
+
+	it("refuses a hostname-shaped fragment — the shape .env.example used to document", () => {
+		// "<ref>.supabase.co" cannot appear in a pooler DSN at all, so an
+		// operator following the old example got a refusal and would then
+		// shorten it. Rejected on the dot.
+		const result = resolveStagingTarget(
+			stagingEnv({
+				STAGING_PROJECT_REF_FRAGMENT: `${STAGING_FRAGMENT}.supabase.co`,
+			}),
+		);
+		expect(result.ok).toBe(false);
+	});
+
+	it("accepts a real 20-character project ref", () => {
+		expect(STAGING_FRAGMENT).toHaveLength(20);
+		expect(resolveStagingTarget(stagingEnv()).ok).toBe(true);
+	});
+});
+
+describe("resolveStagingTarget — G-0 intent", () => {
+	// Every other guard proves WHERE the connection goes; none proves the
+	// operator meant to run a destructive wipe right now. In a doppler stg
+	// shell — where the operator lives for Slices B-D — a bare
+	// `vitest --config vitest.staging.config.ts` is watch mode: wipe, then
+	// re-wipe on every file save.
+
+	it("refuses when the acknowledgement is unset", () => {
+		const result = resolveStagingTarget(
+			stagingEnv({ [RESET_INTENT_ENV]: undefined }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(new RegExp(RESET_INTENT_ENV));
+	});
+
+	it("refuses a wrong acknowledgement value", () => {
+		const result = resolveStagingTarget(
+			stagingEnv({ [RESET_INTENT_ENV]: "yes" }),
+		);
+		expect(result.ok).toBe(false);
+	});
+
+	it("accepts only the exact value", () => {
+		expect(resolveStagingTarget(stagingEnv()).ok).toBe(true);
+	});
+});
+
+describe("isAllowedStagingHost", () => {
+	// The fragment lives in the USERNAME on the pooler, so it constrains the
+	// user, not the destination: a localhost DSN carrying the staging ref as
+	// its user satisfies the fragment match. G-3 constrains the host too.
+
+	it("accepts the session pooler and the direct host", () => {
+		expect(isAllowedStagingHost("aws-1-ap-south-1.pooler.supabase.com")).toBe(
+			true,
+		);
+		expect(isAllowedStagingHost(`db.${STAGING_FRAGMENT}.supabase.co`)).toBe(
+			true,
+		);
+	});
+
+	it("refuses loopback and arbitrary hosts", () => {
+		for (const host of [
+			"localhost",
+			"127.0.0.1",
+			"::1",
+			"evil.example.com",
+			"supabase.co.attacker.net",
+		]) {
+			expect({ host, allowed: isAllowedStagingHost(host) }).toEqual({
+				host,
+				allowed: false,
+			});
+		}
 	});
 });

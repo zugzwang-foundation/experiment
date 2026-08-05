@@ -2,6 +2,7 @@ import type postgres from "postgres";
 import {
 	DISABLED_TRUNCATE_GUARDS,
 	EXPECTED_GUARD_CATALOG_ROWS,
+	isAllowedStagingHost,
 	safeHost,
 } from "./guards";
 
@@ -86,9 +87,21 @@ export async function assertLiveConnection(
 			`G-3 failed: the live connection does not carry the staging ref fragment "${fragment}" (dialling ${host}); refusing`,
 		);
 	}
+	// The fragment lives in the USERNAME on the pooler, so on its own it says
+	// nothing about where we dial: a localhost DSN carrying the staging ref as
+	// its user satisfies the match. Constrain the host too.
+	if (!isAllowedStagingHost(host)) {
+		throw new Error(
+			`G-3 failed: the live connection dials "${host}", which is not a Supabase host; refusing`,
+		);
+	}
 
-	const [row] = await client<{ database: string; user: string }[]>`
-		SELECT current_database() AS database, current_user AS user
+	const [row] = await client<
+		{ database: string; user: string; replication: string }[]
+	>`
+		SELECT current_database()                        AS database,
+		       current_user                              AS user,
+		       current_setting('session_replication_role') AS replication
 	`;
 	if (!row) {
 		throw new Error("G-3 failed: the connection returned no row");
@@ -98,8 +111,34 @@ export async function assertLiveConnection(
 			`G-3 failed: current_database() is "${row.database}", expected "${EXPECTED_DATABASE}"; refusing`,
 		);
 	}
+	// ADR-0030:48 scopes this whole pattern as "owner-privilege only (no
+	// session_replication_role, no production escape-hatch GUC)". Under
+	// `replica` NO trigger fires — including the four never-disabled guards —
+	// while G-4's catalog check still reads a clean 78/all-enabled, because
+	// tgenabled is unchanged. That combination would silently void the entire
+	// append-only contract while every check reported green, and it is
+	// reachable through a `?options=-c session_replication_role=replica`
+	// query parameter in the connection string. @security-auditor, Slice A.
+	if (row.replication !== "origin") {
+		throw new Error(
+			`G-3 failed: session_replication_role is "${row.replication}", expected "origin". Under any other value the append-only triggers do not fire at all, while the catalog still reports them enabled; refusing.`,
+		);
+	}
 
 	return { database: row.database, user: row.user, target };
+}
+
+/** Postgres identifiers this module is willing to interpolate into raw SQL. */
+const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
+
+function assertSafeIdentifiers(names: readonly string[], what: string): void {
+	for (const name of names) {
+		if (!SAFE_IDENTIFIER.test(name)) {
+			throw new Error(
+				`refusing to build SQL with an unsafe ${what}: ${JSON.stringify(name)}`,
+			);
+		}
+	}
 }
 
 /**
@@ -136,6 +175,18 @@ export async function runGuardedReset(
 	if (tables.length === 0) {
 		throw new Error("runGuardedReset: empty truncate set");
 	}
+	// `tables` is a PARAMETER, and the batch below is raw string-built SQL. All
+	// shipped call sites pass module constants, but a caller passing
+	// `users; ALTER TABLE dharma_ledger DISABLE TRIGGER bucket_a_no_update; --`
+	// would disable a NEVER-disabled guard and COMMIT it, since the whole batch
+	// would then succeed. That is the single path by which a _no_update /
+	// _no_delete guard could be left off. @security-auditor, Slice A.
+	assertSafeIdentifiers(tables, "table name");
+
+	assertSafeIdentifiers(
+		DISABLED_TRUNCATE_GUARDS.flatMap(([table, trigger]) => [table, trigger]),
+		"guard identifier",
+	);
 
 	const disable = DISABLED_TRUNCATE_GUARDS.map(
 		([table, trigger]) => `ALTER TABLE ${table} DISABLE TRIGGER ${trigger};`,

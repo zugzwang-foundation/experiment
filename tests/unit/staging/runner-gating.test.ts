@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
@@ -21,9 +21,18 @@ import { describe, expect, it } from "vitest";
 // construct each guard lives in — and no runtime probe of a file that wipes a
 // database is available to a unit test.
 
-const RUNNER = fileURLToPath(
-	new URL("../../staging/reset.staging.test.ts", import.meta.url),
-);
+const STAGING_DIR = fileURLToPath(new URL("../../staging/", import.meta.url));
+
+/**
+ * EVERY operational runner, not just the reset by name. Slices B–D add
+ * generator and gate runners under the same config, reading the same env, and
+ * would otherwise inherit no gating assertion at all (@security-auditor).
+ */
+const RUNNERS = readdirSync(STAGING_DIR)
+	.filter((f) => f.endsWith(".staging.test.ts"))
+	.sort();
+
+const RUNNER = `${STAGING_DIR}reset.staging.test.ts`;
 const raw = readFileSync(RUNNER, "utf8");
 
 /**
@@ -149,21 +158,95 @@ describe("the destructive step is gated and self-verifying", () => {
 		// If G-4 lived in its own it(), a reordering — or a failure in the
 		// truncate block — could separate the wipe from its verification.
 		const resetAt = offsetOf(source, "runGuardedReset(client");
-		const verifyAt = offsetOf(source, "verifyPostReset(client");
-		expect(verifyAt).toBeGreaterThan(resetAt);
+		const verifyAfterReset = source.indexOf("verifyPostReset(client", resetAt);
+		expect(verifyAfterReset).toBeGreaterThan(resetAt);
 
-		const between = source.slice(resetAt, verifyAt);
+		const between = source.slice(resetAt, verifyAfterReset);
 		expect(between).not.toMatch(/\bit(?:\.\w+)*\s*\(/);
+	});
+
+	it("ALSO verifies G-4 in afterAll, which runs on the failure path", () => {
+		// The in-it call is skipped in exactly the case it exists for: if
+		// runGuardedReset throws, the belt's finally runs and the exception
+		// re-throws, so nothing below the batch executes. A split-batch
+		// regression only strands a guard off when it fails mid-way.
+		// @security-auditor, Slice A.
+		const afterAllAt = offsetOf(source, "afterAll(");
+		expect(afterAllAt).toBeGreaterThan(-1);
+		const verifyInAfterAll = source.indexOf(
+			"verifyPostReset(client",
+			afterAllAt,
+		);
+		expect(verifyInAfterAll).toBeGreaterThan(afterAllAt);
+		// ...and before the destructive it(), i.e. it really is in the hook.
+		expect(verifyInAfterAll).toBeLessThan(firstItOffset(source));
+
+		// Two call sites, not one.
+		expect(source.match(/verifyPostReset\(client/g) ?? []).toHaveLength(2);
+	});
+
+	it("closes the client even when G-4 throws in afterAll", () => {
+		const afterAllAt = offsetOf(source, "afterAll(");
+		const tail = source.slice(afterAllAt, firstItOffset(source));
+		expect(tail).toMatch(/finally\s*\{[\s\S]{0,200}client\.end\(/);
 	});
 
 	it("passes the migration baseline into G-4", () => {
 		// ADR-0035 G-4 requires the ledger to RETAIN its row count; a bare
 		// non-empty check passes a partial deletion.
-		expect(source).toMatch(/verifyPostReset\(client,\s*migrationsBefore\)/);
+		expect(source).toMatch(/verifyPostReset\(client,\s*migrationsBefore/);
 	});
 
 	it("keeps the belt re-enable in a finally around the batch", () => {
 		expect(source).toMatch(/finally\s*\{[\s\S]{0,400}reEnableGuards\(/);
+	});
+});
+
+describe("every operational runner, present and future", () => {
+	it("finds at least the reset runner", () => {
+		expect(RUNNERS).toContain("reset.staging.test.ts");
+	});
+
+	for (const file of RUNNERS) {
+		const body = stripComments(readFileSync(`${STAGING_DIR}${file}`, "utf8"));
+
+		it(`${file} · evaluates the target guard at module scope`, () => {
+			const at = body.indexOf("resolveStagingTarget(process.env)");
+			expect(at).toBeGreaterThan(-1);
+			const itAt = firstItOffset(body);
+			if (itAt > -1) expect(at).toBeLessThan(itAt);
+		});
+
+		it(`${file} · refuses by throwing, not by a failing assertion`, () => {
+			const itAt = firstItOffset(body);
+			const preamble = itAt === -1 ? body : body.slice(0, itAt);
+			expect(preamble).toMatch(/throw new Error/);
+		});
+
+		it(`${file} · does not import the test-only truncate fixture`, () => {
+			// ADR-0035 primitive 7 keeps the reset and
+			// tests/db/_fixtures/truncate.ts as two separate artifacts — and that
+			// fixture's TRUNCATE_GUARDS INCLUDES system_state's truncate guard.
+			// A staging runner reaching for truncateTables() for teardown would
+			// disable the freeze sentinel's guard ON STAGING, destroying the
+			// "active defense" the exclusion design depends on. The ADR states
+			// this; a comment is not a control. @security-auditor, Slice A.
+			expect(body).not.toMatch(/_fixtures\/truncate/);
+			expect(body).not.toMatch(/\btruncateTables\b/);
+		});
+	}
+
+	it("_lib modules do not import the test-only truncate fixture either", () => {
+		for (const file of readdirSync(`${STAGING_DIR}_lib`)) {
+			const body = readFileSync(`${STAGING_DIR}_lib/${file}`, "utf8");
+			expect({
+				file,
+				imports: /import[\s\S]*?_fixtures\/truncate/.test(body),
+			}).toEqual({
+				file,
+				imports: false,
+			});
+		}
 	});
 });
 

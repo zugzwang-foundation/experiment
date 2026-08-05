@@ -30,6 +30,38 @@ import {
 // This file truncates the whole fixture surface, as every teardown in the repo
 // already does. fileParallelism: false keeps the catalog-level trigger toggle
 // race-free.
+//
+// ── WHY THIS FILE CARRIES ITS OWN TARGET REFUSAL ────────────────────────────
+// It runs under the DEFAULT config, so `pnpm vitest run`, `pnpm
+// test:integration`, CI and any subagent collect it — and it connects through
+// `testClient`, which reads ambient DATABASE_URL with no target check. It then
+// performs, unguarded, exactly what ADR-0035's four guards exist to gate: the
+// full 21-relation wipe, and (in the G-4 negative cases) a disabled
+// _no_delete guard over a deleted freeze sentinel.
+//
+// The attack needs no attacker. Through Slices B–D the operator lives in
+// `doppler run --project zugzwang-experiment --config stg -- …` shells, where
+// DATABASE_URL IS staging and `tests/_setup/env.ts` only `??=`-defaults it, so
+// the ambient value wins. One `doppler run --config stg -- pnpm vitest run`
+// while debugging a staging runner would wipe staging with zero guards, no
+// pre-flight, no G-4 and no production refusal. "The guard exists in the file
+// next door" is not a control. @security-auditor, Slice A.
+const DB_URL = process.env.DATABASE_URL ?? "";
+const DB_HOST = (() => {
+	try {
+		return new URL(DB_URL).hostname.toLowerCase();
+	} catch {
+		return "";
+	}
+})();
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", "db"]);
+
+if (!LOOPBACK.has(DB_HOST)) {
+	throw new Error(
+		`REFUSED — staging-reset-mechanism runs its wipe against DATABASE_URL, which must be a LOCAL Postgres. ` +
+			`Saw host "${DB_HOST || "(unparseable)"}". This suite is destructive and carries none of ADR-0035's four guards.`,
+	);
+}
 
 async function guardStates(): Promise<Map<string, string>> {
 	const rows = await readGuardCatalog(testClient);
