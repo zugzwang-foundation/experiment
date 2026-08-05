@@ -9,6 +9,7 @@ import {
 } from "../staging/_lib/guards";
 import {
 	countMigrations,
+	NO_MIGRATION_BASELINE,
 	readGuardCatalog,
 	runGuardedReset,
 	verifyPostReset,
@@ -273,7 +274,9 @@ describe("atomicity — a failed truncate leaves every guard ENABLED", () => {
 describe("verifyPostReset — G-4", () => {
 	it("passes on a healthy database", async () => {
 		await runGuardedReset(testClient, TRUNCATE_SET);
-		await expect(verifyPostReset(testClient)).resolves.toBeUndefined();
+		await expect(
+			verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+		).resolves.toBeUndefined();
 	});
 
 	// The three negative cases below each need a guard temporarily off, which is
@@ -292,9 +295,9 @@ describe("verifyPostReset — G-4", () => {
 			);
 			// [\s\S] rather than the /s dotAll flag — tsconfig targets ES2017,
 			// where /s is a TS1501 error.
-			await expect(verifyPostReset(testClient)).rejects.toThrow(
-				/bets[\s\S]*bucket_a_no_truncate/,
-			);
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.toThrow(/bets[\s\S]*bucket_a_no_truncate/);
 		} finally {
 			await testClient.unsafe("ROLLBACK");
 		}
@@ -313,13 +316,15 @@ describe("verifyPostReset — G-4", () => {
 				"ALTER TABLE system_state DISABLE TRIGGER bucket_b_no_delete",
 			);
 			await testClient`DELETE FROM system_state`;
-			await expect(verifyPostReset(testClient)).rejects.toThrow(
-				/system_state/i,
-			);
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.toThrow(/system_state/i);
 		} finally {
 			await testClient.unsafe("ROLLBACK");
 		}
-		await expect(verifyPostReset(testClient)).resolves.toBeUndefined();
+		await expect(
+			verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+		).resolves.toBeUndefined();
 		expect(await allGuardsEnabled()).toBe(true);
 	});
 
@@ -329,9 +334,9 @@ describe("verifyPostReset — G-4", () => {
 		await testClient.unsafe("BEGIN");
 		try {
 			await testClient.unsafe("DELETE FROM drizzle.__drizzle_migrations");
-			await expect(verifyPostReset(testClient)).rejects.toThrow(
-				/__drizzle_migrations/,
-			);
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.toThrow(/__drizzle_migrations/);
 		} finally {
 			await testClient.unsafe("ROLLBACK");
 		}
@@ -359,6 +364,41 @@ describe("verifyPostReset — G-4", () => {
 			await testClient.unsafe("ROLLBACK");
 		}
 		expect(await migrationRowCount()).toBe(before);
+	});
+
+	it("ANNOUNCES the degrade when no baseline is supplied (Q-H)", async () => {
+		// The weak path must never be reachable by silence. It is now a compile
+		// error to omit the argument, so a caller has to write the sentinel —
+		// and when it does, the run says so.
+		const warnings: string[] = [];
+		const original = console.warn;
+		console.warn = (...args: unknown[]) => {
+			warnings.push(args.map(String).join(" "));
+		};
+		try {
+			await runGuardedReset(testClient, TRUNCATE_SET);
+			await verifyPostReset(testClient, NO_MIGRATION_BASELINE);
+		} finally {
+			console.warn = original;
+		}
+		expect(warnings.join("\n")).toMatch(/DEGRADED/);
+		expect(warnings.join("\n")).toMatch(/NON-EMPTY/);
+	});
+
+	it("does NOT announce a degrade when a baseline is supplied", async () => {
+		const warnings: string[] = [];
+		const original = console.warn;
+		console.warn = (...args: unknown[]) => {
+			warnings.push(args.map(String).join(" "));
+		};
+		try {
+			const before = await migrationRowCount();
+			await runGuardedReset(testClient, TRUNCATE_SET);
+			await verifyPostReset(testClient, before);
+		} finally {
+			console.warn = original;
+		}
+		expect(warnings.join("\n")).not.toMatch(/DEGRADED/);
 	});
 
 	it("passes when the baseline matches", async () => {

@@ -75,6 +75,18 @@ function offsetOf(text: string, needle: string): number {
 	return text.indexOf(needle);
 }
 
+/**
+ * Offsets of every `verifyPostReset(<ws> client` call, whitespace-tolerant.
+ *
+ * A literal `indexOf("verifyPostReset(client")` silently missed the call once
+ * a formatter wrapped its arguments across lines — and "missed" meant the
+ * search skipped forward to the NEXT call site and reasoned about the wrong
+ * one. Match on a regex so formatting cannot move what this file concludes.
+ */
+const verifyOffsets = [...source.matchAll(/verifyPostReset\(\s*client/g)].map(
+	(m) => m.index,
+);
+
 describe("the runner file exists and is parseable", () => {
 	it("is non-empty", () => {
 		expect(raw.length).toBeGreaterThan(0);
@@ -158,7 +170,7 @@ describe("the destructive step is gated and self-verifying", () => {
 		// If G-4 lived in its own it(), a reordering — or a failure in the
 		// truncate block — could separate the wipe from its verification.
 		const resetAt = offsetOf(source, "runGuardedReset(client");
-		const verifyAfterReset = source.indexOf("verifyPostReset(client", resetAt);
+		const verifyAfterReset = verifyOffsets.find((o) => o > resetAt) ?? -1;
 		expect(verifyAfterReset).toBeGreaterThan(resetAt);
 
 		const between = source.slice(resetAt, verifyAfterReset);
@@ -173,16 +185,13 @@ describe("the destructive step is gated and self-verifying", () => {
 		// @security-auditor, Slice A.
 		const afterAllAt = offsetOf(source, "afterAll(");
 		expect(afterAllAt).toBeGreaterThan(-1);
-		const verifyInAfterAll = source.indexOf(
-			"verifyPostReset(client",
-			afterAllAt,
-		);
+		const verifyInAfterAll = verifyOffsets.find((o) => o > afterAllAt) ?? -1;
 		expect(verifyInAfterAll).toBeGreaterThan(afterAllAt);
 		// ...and before the destructive it(), i.e. it really is in the hook.
 		expect(verifyInAfterAll).toBeLessThan(firstItOffset(source));
 
 		// Two call sites, not one.
-		expect(source.match(/verifyPostReset\(client/g) ?? []).toHaveLength(2);
+		expect(verifyOffsets).toHaveLength(2);
 	});
 
 	it("closes the client even when G-4 throws in afterAll", () => {
@@ -194,7 +203,7 @@ describe("the destructive step is gated and self-verifying", () => {
 	it("passes the migration baseline into G-4", () => {
 		// ADR-0035 G-4 requires the ledger to RETAIN its row count; a bare
 		// non-empty check passes a partial deletion.
-		expect(source).toMatch(/verifyPostReset\(client,\s*migrationsBefore/);
+		expect(source).toMatch(/verifyPostReset\(\s*client,\s*migrationsBefore/);
 	});
 
 	it("keeps the belt re-enable in a finally around the batch", () => {

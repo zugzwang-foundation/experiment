@@ -10,6 +10,7 @@ import {
 	assertLiveConnection,
 	countMigrations,
 	describeTarget,
+	NO_MIGRATION_BASELINE,
 	readGuardCatalog,
 	reEnableGuards,
 	runGuardedReset,
@@ -135,7 +136,12 @@ afterAll(async () => {
 	// guard OFF when it fails mid-way — the very case that would have skipped
 	// the check. afterAll always runs. @security-auditor, Slice A.
 	try {
-		await verifyPostReset(client, migrationsBefore || undefined);
+		await verifyPostReset(
+			client,
+			// The pre-flight may have thrown before capturing a baseline; say so
+			// explicitly rather than letting the check quietly weaken (Q-H).
+			migrationsBefore > 0 ? migrationsBefore : NO_MIGRATION_BASELINE,
+		);
 	} catch (err) {
 		console.error(`[staging:reset] G-4 FAILED after the run:\n${String(err)}`);
 		throw err;

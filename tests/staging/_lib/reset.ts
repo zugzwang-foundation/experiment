@@ -257,18 +257,47 @@ export async function countMigrations(client: postgres.Sql): Promise<number> {
 	return row?.n ?? 0;
 }
 
+/**
+ * Explicit "no baseline was captured" — the only way to get G-4's WEAKER
+ * ledger check.
+ *
+ * The parameter used to be optional, which meant a caller could get the weak
+ * check by simply forgetting it, and the run still reported green. That is the
+ * same silent-weakening shape as a blanked deny list: the check degrades, and
+ * nothing says so. Six call sites were taking the weak path by omission.
+ *
+ * Required-with-a-sentinel instead of optional-plus-a-warning, deliberately: a
+ * `console.warn` is not a control — it lands in the middle of a destructive
+ * run's output, which is exactly where a warning gets missed — whereas
+ * omitting a required argument is a COMPILE error. Same principle as ADR-0036
+ * primitive 2: make it structural, not procedural. A caller that genuinely has
+ * no baseline must now say so in the source, and the degrade is announced at
+ * runtime as well. Q-H, 2026-08-06.
+ */
+export const NO_MIGRATION_BASELINE = "no-baseline";
+
 export async function verifyPostReset(
 	client: postgres.Sql,
 	/**
-	 * The `drizzle.__drizzle_migrations` row count read BEFORE the batch.
+	 * The `drizzle.__drizzle_migrations` row count read BEFORE the batch, or
+	 * `NO_MIGRATION_BASELINE` to state explicitly that none was captured.
+	 *
 	 * ADR-0035 G-4 requires the ledger to RETAIN its row count — a
 	 * merely-non-empty check passes a partial deletion, and G-4 is the layer
-	 * whose whole job is verification rather than assumption. Optional only so
-	 * the check degrades to non-empty when no baseline was captured.
+	 * whose whole job is verification rather than assumption.
 	 */
-	migrationsBefore?: number,
+	migrationsBefore: number | typeof NO_MIGRATION_BASELINE,
 ): Promise<void> {
 	const failures: string[] = [];
+
+	if (migrationsBefore === NO_MIGRATION_BASELINE) {
+		// Announce the degrade. This is the belt; the type is the control.
+		console.warn(
+			"[G-4] DEGRADED: no pre-batch migration baseline was captured, so the " +
+				"drizzle.__drizzle_migrations check can only prove the ledger is NON-EMPTY. " +
+				"A partial deletion would pass. Pass the pre-batch count to check retention.",
+		);
+	}
 
 	// 1 · every bucket_% guard present and enabled.
 	const catalog = await readGuardCatalog(client);
@@ -307,7 +336,7 @@ export async function verifyPostReset(
 			`drizzle.__drizzle_migrations is empty — drizzle-kit would re-run 0000 onward against a populated schema and /api/health would report drift`,
 		);
 	} else if (
-		migrationsBefore !== undefined &&
+		migrationsBefore !== NO_MIGRATION_BASELINE &&
 		migrationsAfter !== migrationsBefore
 	) {
 		failures.push(
