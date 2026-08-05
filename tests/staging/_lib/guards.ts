@@ -175,7 +175,7 @@ export const TRUNCATE_EXCLUSIONS: readonly string[] = ["system_state"];
  * Public tables that are in neither TRUNCATE_SET nor TRUNCATE_EXCLUSIONS.
  *
  * They survive a reset. STAGING-PARITY Q3's truncate set is reproduced
- * verbatim in TRUNCATE_SET and is silent on these three, so they are recorded
+ * verbatim in TRUNCATE_SET and is silent on these three, so they were recorded
  * here rather than added — the set is a ratified decision, and widening it is
  * a ruling, not an implementation detail. Named so a reader can tell
  * "deliberate" from "forgotten" (@code-reviewer, Slice A).
@@ -183,14 +183,22 @@ export const TRUNCATE_EXCLUSIONS: readonly string[] = ["system_state"];
  * Verified: none carries an outbound FK, so `TRUNCATE … CASCADE` cannot reach
  * them either — they survive structurally, not by omission from a list.
  *
- * What survives, and why it is defensible: `admin_sessions` holds the admin's
- * live login (truncating it would log the operator out mid-run); `cron_alarms`
- * and `watermark_state` hold operational cron/drift state rather than fixture
- * data. The cost of leaving them is stale alarm rows keyed to market ids that
- * no longer exist, and a drift watermark for a deleted population — both
- * consumed by /api/cron/alarms-drain and the nightly drift job, neither of
- * which runs on staging today (STAGING-PARITY-ENV). Flagged for a ruling
- * before Slice B rather than decided here.
+ * RULED 2026-08-06 (ruling 1):
+ *
+ * - `admin_sessions` — **RULED: PERMANENT.** Not a deferral. Admin is not a
+ *   participant and carries no FK dependency on `users`, so the asymmetry with
+ *   the truncated `sessions` table is the structural separation showing
+ *   through, not an oversight. Do not "fix" it by adding it to TRUNCATE_SET.
+ * - `cron_alarms`, `watermark_state` — **LEAVE, revisit at
+ *   STAGING-PARITY-ENV**, when the consuming jobs (`/api/cron/alarms-drain`,
+ *   the nightly drift job) begin running on staging. Cost today is zero: stale
+ *   alarm rows keyed to market ids that no longer exist, and a drift watermark
+ *   for a deleted population, neither of which anything reads on staging.
+ *
+ * ⚠ If STAGING-PARITY-ENV does decide to widen TRUNCATE_SET, note that
+ * widening it widens a PERMITTED SET — which the ADR-0035 Addendum's amendment
+ * rule puts outside what an addendum may do. That needs a SUPERSEDING ADR, not
+ * an addendum, and STAGING-PARITY-ENV must budget for one.
  */
 export const NOT_TRUNCATED_UNRATIFIED: readonly string[] = [
 	"admin_sessions",

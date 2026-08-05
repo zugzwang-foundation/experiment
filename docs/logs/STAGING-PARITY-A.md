@@ -210,11 +210,45 @@ here; the PR was **not** merged.
 
 | # | Ruling | Disposition |
 |---|---|---|
-| **1** | The three unratified tables (`admin_sessions`, `cron_alarms`, `watermark_state`) | **RECORDED, NOT APPLIED.** They stay outside the truncate set. `TRUNCATE_SET` remains an exact reproduction of Q3's ratified list; the three are named in `NOT_TRUNCATED_UNRATIFIED` with their reasoning, and a test accounts for every public base table across the three lists so a future table cannot be silently forgotten. No code behaviour changed. |
+| **1** | The three unratified tables (`admin_sessions`, `cron_alarms`, `watermark_state`) | **ANSWERED — see below.** All three stay outside the truncate set; `admin_sessions` **permanently**, the other two pending STAGING-PARITY-ENV. `TRUNCATE_SET` remains an exact reproduction of Q3's ratified list. No code behaviour changed. |
 | **2** | `lock_timeout` | **APPLIED.** `SET LOCAL lock_timeout = '15s'` is now the first statement **inside** the single batch, ahead of the disable. |
 | **3** | Production-ref liveness | **APPLIED.** Non-empty assertion at guard time + a unit test that feeds a synthetic production URL and asserts refusal. |
 | **4** | The production ref published in a public repo | **DOCKET ROW, OWN TASK.** Not addressed in this PR. |
 | **5** | ADR-0035 addendum for G-5 | **APPLIED.** Appended as `## Addendum — 2026-08-06`; primitives 1–7 untouched. |
+
+### Ruling 1 · The three untruncated tables — answered
+
+**`admin_sessions` — RULED PERMANENT. Not a deferral, and not to be revisited.**
+Admin is not a participant and carries no FK dependency on `users`. The
+asymmetry that makes it look like an oversight — participant `sessions` is
+truncated, `admin_sessions` is not — **is the structural separation showing
+through**, not a gap. CLAUDE.md §3 makes admin a separate auth path with no
+`users` row; a reset that empties the participant surface has no business
+touching the admin's live login, and doing so would log the operator out
+mid-run. The constant's comment now reads *"RULED: PERMANENT"* for this entry
+rather than *"flagged for a ruling"*, so a later reader does not re-open it.
+
+**`cron_alarms` and `watermark_state` — LEAVE, revisit at STAGING-PARITY-ENV.**
+Their consuming jobs (`/api/cron/alarms-drain`, the nightly drift job) do not
+run on staging today, so the cost of leaving them is exactly zero: stale alarm
+rows keyed to market ids that no longer exist, and a drift watermark for a
+population that was deleted. Nothing reads either. When STAGING-PARITY-ENV
+turns those jobs on, the question becomes live and should be re-asked then.
+
+**⚠ The governance consequence, recorded now so STAGING-PARITY-ENV budgets for
+it.** Adding a table to `TRUNCATE_SET` **widens a permitted set**. The
+ADR-0035 Addendum's amendment rule reads: *"An addendum to an accepted ADR may
+ADD a refusal condition. It may never remove one, widen a permitted set, or
+change a mechanism. Those three require a superseding ADR."* Widening the
+truncate set is squarely the second of those three. So if STAGING-PARITY-ENV
+decides to truncate `cron_alarms` or `watermark_state`, it needs a
+**SUPERSEDING ADR** — not an addendum, and not a quiet edit to the constant.
+That is a full ADR cycle with a same-commit SPEC.2 update, and it must be
+priced into that task rather than discovered inside it.
+
+This is also the first live exercise of the amendment rule, and it cuts the
+way the rule intends: G-5 could be added by addendum because it is a refusal;
+widening the truncate set cannot, because it is a permission.
 
 ### Ruling 2 · `lock_timeout` — what it does and does not bound
 
@@ -308,7 +342,9 @@ them either. Cost of leaving them: stale alarm rows keyed to market ids that no
 longer exist, and a drift watermark for a deleted population — both consumed by
 jobs that do not run on staging today. A new test now accounts for **every**
 public base table across the three lists, so a future table cannot be silently
-forgotten. **Wanted before Slice B.**
+forgotten. **RULED 2026-08-06 — see *Ruling 1* above: `admin_sessions`
+permanent, the other two revisited at STAGING-PARITY-ENV, and widening the set
+needs a superseding ADR rather than an addendum.**
 
 **O-2 · G-3 is not an independent oracle, and cannot be.** The pooler exposes no
 project-discriminating server-side fact — `current_database()` and
