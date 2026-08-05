@@ -90,6 +90,21 @@ const client = postgres(target.url, { max: 1, prepare: false });
 /** Captured pre-batch so G-4 can prove the ledger RETAINED its rows. */
 let migrationsBefore = 0;
 
+/**
+ * Set the instant `runGuardedReset` RESOLVES — i.e. the implicit transaction
+ * committed and staging is wiped. Read only by `afterAll`, to say which of two
+ * very different things a G-4 failure means.
+ *
+ * F2, 2026-08-06. `afterAll` runs even when `beforeAll` throws, and it reported
+ * "G-4 FAILED after the run" either way. On a destructive artifact that reads
+ * as "staging was wiped, then verification failed" — the worst news this runner
+ * can deliver — when the truth may be that every guard refused and nothing ran.
+ * An operator reading that at 2am reaches for BREAK_GLASS.md for a database
+ * that was never touched. The two states are distinguishable, so distinguish
+ * them.
+ */
+let batchCommitted = false;
+
 beforeAll(async () => {
 	// G-3 — the live connection. Throwing here aborts the suite without
 	// running a single test, so the destructive step below is unreachable.
@@ -143,7 +158,16 @@ afterAll(async () => {
 			migrationsBefore > 0 ? migrationsBefore : NO_MIGRATION_BASELINE,
 		);
 	} catch (err) {
-		console.error(`[staging:reset] G-4 FAILED after the run:\n${String(err)}`);
+		console.error(
+			batchCommitted
+				? "[staging:reset] G-4 FAILED AFTER THE DESTRUCTIVE BATCH COMMITTED. " +
+						"Staging WAS wiped and post-run verification did not pass — the " +
+						`database needs attention:\n${String(err)}`
+				: "[staging:reset] G-4 failed, but THE DESTRUCTIVE BATCH NEVER RAN — " +
+						"the run was refused before it started, so this run did NOT wipe " +
+						"staging. What follows describes the database as it already was, " +
+						`not damage this run caused:\n${String(err)}`,
+		);
 		throw err;
 	} finally {
 		await client.end({ timeout: 10 });
@@ -154,6 +178,9 @@ describe("guarded staging reset", () => {
 	it("truncates the fixture surface in one transaction, then verifies (G-4)", async () => {
 		try {
 			await runGuardedReset(client, TRUNCATE_SET);
+			// It RESOLVED, so the implicit transaction committed and staging is
+			// wiped. This is the only place that fact is knowable (F2).
+			batchCommitted = true;
 		} finally {
 			// BELT — the weaker mechanism, retained and demoted (ADR-0035
 			// primitive 2). It does not run on SIGKILL, OOM, or a dropped

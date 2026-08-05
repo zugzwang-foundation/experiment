@@ -148,8 +148,20 @@ export async function assertLiveConnection(
  * legitimate `TRUNCATE … CASCADE` over 21 relations has no principled upper
  * bound — capping it would abort correct work and turn a slow reset into a
  * failed one. Lock WAIT is the contended resource; execution is not.
+ *
+ * F1, 2026-08-06 — THE ASSUMPTION THIS RESTS ON, NOW MEASURED. `SET LOCAL`
+ * outside a transaction block emits `WARNING 25P01 "SET LOCAL can only be used
+ * in transaction blocks"` and NO-OPS. Nothing asserted that a multi-statement
+ * simple-query implicit transaction counts as a transaction block for that
+ * purpose, so the bound was unverified. Probed against local Postgres 17:
+ * issued ALONE the statement warns and `current_setting('lock_timeout')` reads
+ * `"0"`; issued as the first statement of the batch below it reads `"15s"` with
+ * no notice, and reverts to `"0"` on the next round-trip. Pinned by
+ * tests/integration/staging-reset-mechanism — which builds the REAL batch via
+ * `buildResetBatch` rather than a lookalike, so a driver bump that unbinds it
+ * fails loudly here instead of silently removing the bound.
  */
-const LOCK_TIMEOUT = "15s";
+export const LOCK_TIMEOUT = "15s";
 const LOCK_TIMEOUT_STATEMENT = `SET LOCAL lock_timeout = '${LOCK_TIMEOUT}';`;
 
 /** Postgres identifiers this module is willing to interpolate into raw SQL. */
@@ -196,6 +208,22 @@ export async function runGuardedReset(
 	client: postgres.Sql,
 	tables: readonly string[],
 ): Promise<void> {
+	await client.unsafe(buildResetBatch(tables));
+}
+
+/**
+ * The batch text, built and validated but not sent.
+ *
+ * Split out for ONE reason (F1, 2026-08-06): the `SET LOCAL lock_timeout` bound
+ * is only real if it binds inside THIS string, and a test that reassembles a
+ * lookalike proves nothing about the shipped one. The integration suite builds
+ * the real batch here, appends a `current_setting('lock_timeout')` read, and
+ * asserts the value — so the assertion moves with the mechanism.
+ *
+ * Every refusal lives here rather than in `runGuardedReset`, so it fires for
+ * the test path too and nothing can build an unvalidated batch.
+ */
+export function buildResetBatch(tables: readonly string[]): string {
 	if (tables.length === 0) {
 		throw new Error("runGuardedReset: empty truncate set");
 	}
@@ -219,9 +247,7 @@ export async function runGuardedReset(
 		([table, trigger]) => `ALTER TABLE ${table} ENABLE TRIGGER ${trigger};`,
 	).join("\n");
 
-	await client.unsafe(
-		`${LOCK_TIMEOUT_STATEMENT}\n${disable}\nTRUNCATE ${tables.join(", ")} CASCADE;\n${enable}`,
-	);
+	return `${LOCK_TIMEOUT_STATEMENT}\n${disable}\nTRUNCATE ${tables.join(", ")} CASCADE;\n${enable}`;
 }
 
 /**

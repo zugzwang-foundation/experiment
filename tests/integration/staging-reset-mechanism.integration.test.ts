@@ -8,7 +8,9 @@ import {
 	TRUNCATE_SET,
 } from "../staging/_lib/guards";
 import {
+	buildResetBatch,
 	countMigrations,
+	LOCK_TIMEOUT,
 	NO_MIGRATION_BASELINE,
 	readGuardCatalog,
 	runGuardedReset,
@@ -217,6 +219,109 @@ describe("runGuardedReset — the disable → truncate → enable loop", () => {
 				])})
 		`;
 		expect(rows[0]?.n).toBe(0);
+	});
+});
+
+describe("F1 — the batch really is one implicit transaction", () => {
+	// THE ASSUMPTION ADR-0035 ruling 2 RESTED ON, UNASSERTED UNTIL NOW.
+	//
+	// `SET LOCAL` outside a transaction block emits `WARNING 25P01 "SET LOCAL
+	// can only be used in transaction blocks"` and NO-OPS — silently. Nothing
+	// established that a multi-statement simple-query implicit transaction
+	// counts as a transaction block for that purpose, so the lock bound could
+	// have been decorative from the day it landed, and a driver bump that
+	// stopped batching could remove it with every test still green.
+	//
+	// Two facts are pinned here, both measured rather than read off a doc:
+	//   1. postgres-js routes a PARAMETERLESS `unsafe()` over the SIMPLE query
+	//      protocol — the only protocol that can carry multiple commands.
+	//   2. `SET LOCAL` binds for the rest of THAT batch, and only that batch.
+
+	/** postgres-js returns row-arrays per statement for a multi-command batch. */
+	function findSetting(result: unknown): string | undefined {
+		const rows = (result as unknown[]).flat() as Array<{ v?: string }>;
+		return rows.find((r) => r && typeof r === "object" && "v" in r)?.v;
+	}
+
+	it("routes a parameterless unsafe() over the SIMPLE query protocol", async () => {
+		// The driver's own flag...
+		const parameterless = testClient.unsafe("SELECT 1 AS x");
+		const parameterised = testClient.unsafe("SELECT $1::int AS x", [1]);
+		expect(
+			(parameterless as unknown as { options: { simple: boolean } }).options
+				.simple,
+		).toBe(true);
+		expect(
+			(parameterised as unknown as { options: { simple: boolean } }).options
+				.simple,
+		).toBe(false);
+		await parameterless;
+		await parameterised;
+
+		// ...and the server-side consequence, which is what actually matters.
+		// The EXTENDED protocol cannot carry two commands in one string — the
+		// server rejects it with 42601 — while the simple one can. Selecting
+		// between them is exactly `simple: args.length === 0`, so passing one
+		// parameter is enough to send the same shape down the other path. A
+		// driver bump that stopped batching fails one of these two.
+		await expect(
+			testClient.unsafe("SELECT 1 AS a; SELECT $1::int AS b;", [2]),
+		).rejects.toMatchObject({ code: "42601" });
+		const multi = await testClient.unsafe("SELECT 1 AS a; SELECT 2 AS b;");
+		expect((multi as unknown[]).length).toBe(2);
+	});
+
+	it("NEGATIVE CONTROL — the same statement ALONE no-ops", async () => {
+		// Without this, the positive case below proves nothing: a `lock_timeout`
+		// that was already 15s session-wide would satisfy it. Issued as its own
+		// round-trip the statement is outside any transaction block, so Postgres
+		// warns and discards it.
+		await testClient.unsafe(`SET LOCAL lock_timeout = '${LOCK_TIMEOUT}';`);
+		const [after] = await testClient<{ v: string }[]>`
+			SELECT current_setting('lock_timeout') AS v
+		`;
+		expect(after?.v).toBe("0");
+	});
+
+	it("binds lock_timeout inside the REAL batch buildResetBatch produces", async () => {
+		// The real batch text, not a lookalike — so the assertion moves with the
+		// mechanism. One read appended; everything before it is what ships.
+		const batch = buildResetBatch(TRUNCATE_SET);
+		expect(
+			batch.startsWith(`SET LOCAL lock_timeout = '${LOCK_TIMEOUT}';`),
+		).toBe(true);
+
+		const result = await testClient.unsafe(
+			`${batch}\nSELECT current_setting('lock_timeout') AS v;`,
+		);
+		expect(findSetting(result)).toBe(LOCK_TIMEOUT);
+	});
+
+	it("releases it again the moment the batch ends", async () => {
+		// Transaction-scoped, so it cannot leak into the pooled session — the
+		// property that makes `SET LOCAL` rather than `SET` the right choice on
+		// the Supabase session pooler, where the connection is REUSED.
+		await runGuardedReset(testClient, TRUNCATE_SET);
+		const [after] = await testClient<{ v: string }[]>`
+			SELECT current_setting('lock_timeout') AS v
+		`;
+		expect(after?.v).toBe("0");
+	});
+
+	it("rolls DDL back when a later statement in the batch aborts", async () => {
+		// The implicit transaction is what ADR-0035 primitive 2 rests on, stated
+		// at its smallest: a DISABLE followed by a failure leaves the trigger ON.
+		// The atomicity block below proves it through the shipped path; this
+		// proves the Postgres-level property itself, so a failure there can be
+		// told apart from a failure here.
+		const before = await guardStates();
+		await expect(
+			testClient.unsafe(
+				"ALTER TABLE bets DISABLE TRIGGER bucket_a_no_truncate;\nSELECT 1/0;",
+			),
+		).rejects.toThrow(/division by zero/i);
+		expect(await guardStates()).toEqual(before);
+		expect(await allGuardsEnabled()).toBe(true);
 	});
 });
 

@@ -199,6 +199,26 @@ describe("the destructive step is gated and self-verifying", () => {
 		expect(verifyOffsets).toHaveLength(2);
 	});
 
+	it("tells a pre-batch refusal apart from a post-wipe G-4 failure (F2)", () => {
+		// afterAll runs even when beforeAll throws. Reporting "G-4 FAILED after
+		// the run" on that path reads, on a DESTRUCTIVE artifact, as "staging was
+		// wiped, then verification failed" — when in fact nothing ran. The flag
+		// is set only where the batch is known to have committed, and the catch
+		// must branch on it.
+		const resetAt = offsetOf(source, "runGuardedReset(client");
+		const flagAt = offsetOf(source, "batchCommitted = true");
+		expect(resetAt).toBeGreaterThan(-1);
+		expect(flagAt).toBeGreaterThan(resetAt);
+
+		const afterAllAt = offsetOf(source, "afterAll(");
+		const hook = source.slice(afterAllAt, firstItOffset(source));
+		expect(hook).toMatch(/batchCommitted/);
+		// Both arms must exist, and the non-destructive one must SAY so.
+		expect(hook).toMatch(/NEVER RAN/);
+		expect(hook).toMatch(/did NOT wipe/);
+		expect(hook).toMatch(/COMMITTED/);
+	});
+
 	it("closes the client even when G-4 throws in afterAll", () => {
 		const afterAllAt = offsetOf(source, "afterAll(");
 		const tail = source.slice(afterAllAt, firstItOffset(source));
@@ -317,10 +337,23 @@ describe("the batch bounds lock wait (ruling 2)", () => {
 
 	it("places the timeout INSIDE the batch, before the disable", () => {
 		// Outside the batch it would be its own transaction and revert
-		// immediately, bounding nothing.
+		// immediately, bounding nothing. F1 measured that it DOES bind inside a
+		// multi-statement simple-query batch; this pins that it stays there.
 		expect(mechanism).toMatch(
-			/client\.unsafe\(\s*`\$\{LOCK_TIMEOUT_STATEMENT\}\\n\$\{disable\}/,
+			/return\s*`\$\{LOCK_TIMEOUT_STATEMENT\}\\n\$\{disable\}/,
 		);
+	});
+
+	it("sends the whole batch as exactly ONE client.unsafe round-trip", () => {
+		// ADR-0035 primitive 2's PRIMARY mechanism. Split into separate
+		// round-trips, each statement commits on its own and a crash between them
+		// strands the guards disabled. The integration suite proves the rollback
+		// behaviourally; this pins the shape, so a split is caught at the unit
+		// layer too rather than only by a database that happens to be reachable.
+		const sends = mechanism.match(/client\.unsafe\(/g) ?? [];
+		// Two, and only two: the batch, and the belt's re-enable.
+		expect(sends).toHaveLength(2);
+		expect(mechanism).toMatch(/client\.unsafe\(buildResetBatch\(tables\)\)/);
 	});
 
 	it("sets no statement_timeout — execution is deliberately unbounded", () => {
