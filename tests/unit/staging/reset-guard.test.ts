@@ -260,7 +260,7 @@ describe("resolveStagingTarget — fragment shape (anti-vacuity)", () => {
 	});
 });
 
-describe("resolveStagingTarget — G-0 intent", () => {
+describe("resolveStagingTarget — G-5 intent / watch-mode refusal", () => {
 	// Every other guard proves WHERE the connection goes; none proves the
 	// operator meant to run a destructive wipe right now. In a doppler stg
 	// shell — where the operator lives for Slices B-D — a bare

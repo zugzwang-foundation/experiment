@@ -37,8 +37,11 @@ Files:
 - `.env.example` — the fragment's real shape (see finding S-2).
 - `AGENTS.md` — §3 tree, §9 inventory, new operational-runners bullet.
 
-**Gates:** `just verify` green. Full suite **301 files / 2284 tests** green, no
+**Gates:** `just verify` green. Full suite **301 files / 2294 tests** green, no
 regressions. The runner exits non-zero with no staging env.
+
+A fourth commit, `1224bd4`, carries the pre-Gate-C amendments (rulings 2, 3, 5)
+and touches `docs/adr/0035-guarded-staging-reset.md` besides the files above.
 
 ---
 
@@ -161,7 +164,7 @@ fails mid-way, which is precisely the skipped case. G-4 now also runs in
 where you are, never that you meant it. In a doppler `stg` shell a bare
 `vitest --config vitest.staging.config.ts` is **watch mode**: wipe, then re-wipe
 on every file save; and once Slice B adds runners under the same include glob, a
-positional-less run sweeps the reset in with them. Added **G-0**, an
+positional-less run sweeps the reset in with them. Added **G-5**, an
 acknowledgement token that `pnpm staging:reset` sets and nothing else does.
 Adding a refusal cannot cause data loss; omitting it can — so it was added
 rather than deferred to a ruling, and it relaxes nothing.
@@ -320,9 +323,11 @@ is not mistaken for a stronger guarantee than it is.**
 `PRODUCTION_PROJECT_REF` is a hard-coded literal. A Supabase project restore or
 migration mints a **new** ref, at which point the literal silently stops
 protecting and the fragment becomes the only barrier. A deny-list of one, never
-re-verified, guarding an irreversible operation. *Candidate answer:* assert it
-in `env-audit.yml` against the live project list, or derive it from Doppler
-`prd` rather than hard-coding.
+re-verified, guarding an irreversible operation. **Disposition:** a non-empty
+assertion at guard time plus synthetic-production-URL refusal tests now ship —
+see *Ruling 3* above for what that does and does not prove. **Still open as a
+future hardening:** asserting the ref in `env-audit.yml` against the live
+project list, or deriving it from Doppler `prd` rather than hard-coding.
 
 **O-4 · SURPRISE, pre-existing, out of scope.** — **RULED, ruling 4: docket row, own task.** The production project ref is
 committed in **10 files** of this **public** repo — ADR-0024, the deploy
@@ -338,8 +343,9 @@ reachable, given ADR-0019 puts RLS out of scope.
 relations. A reset that blocks behind live staging traffic holds write-blocking
 locks on every append-only table indefinitely, and can deadlock an in-flight bet
 transaction. Safe (the abort rolls back) but a self-inflicted staging outage of
-unbounded duration. Not changed: the batch string is what ADR-0035 primitive 2
-pins, and adding a timeout introduces a new failure mode. **Wanted as a ruling.**
+unbounded duration. **Disposition:** ruled and applied — `SET LOCAL lock_timeout
+= '15s'` is now the first statement inside the batch. See *Ruling 2* above for
+why lock WAIT is bounded and execution deliberately is not.
 
 **O-6 · `pnpm staging:rebuild` will seed twice.** Plan §3 defines it as
 `staging:reset && db:seed:staging && …`, and `staging:reset` now chains the seed
