@@ -71,6 +71,13 @@ describe("resolveStagingTarget — G-1 target", () => {
 			stagingEnv({ DATABASE_URL_STAGING: "" }),
 		);
 		expect(result.ok).toBe(false);
+		// MUTATION-DERIVED (G1-a, 2026-08-06). Asserting only `ok === false` let
+		// this pass with the `!url` refusal deleted: an empty string reaches the
+		// fragment check and is refused as "does not contain" instead. A true
+		// verdict for the wrong reason is the silent-weakening shape Q-I closed
+		// everywhere else. Pin the reason, so the empty case is owned by the
+		// check that names it.
+		if (!result.ok) expect(result.reason).toMatch(/is not set/);
 	});
 
 	it("refuses when STAGING_PROJECT_REF_FRAGMENT is unset", () => {
@@ -89,6 +96,10 @@ describe("resolveStagingTarget — G-1 target", () => {
 			stagingEnv({ STAGING_PROJECT_REF_FRAGMENT: "" }),
 		);
 		expect(result.ok).toBe(false);
+		// MUTATION-DERIVED (G1-b): with the `!fragment` refusal deleted, "" is
+		// refused by the length check instead — same verdict, different owner.
+		// Both reasons name the variable, so match the phrase, not the name.
+		if (!result.ok) expect(result.reason).toMatch(/is not set/);
 	});
 
 	it("refuses a URL that does not contain the fragment", () => {
@@ -252,6 +263,31 @@ describe("resolveStagingTarget — fragment shape (anti-vacuity)", () => {
 			}),
 		);
 		expect(result.ok).toBe(false);
+	});
+
+	// MUTATION-DERIVED (G1-f, 2026-08-06). Deleting `/^[a-z0-9]+$/` from the
+	// guard left all 32 cases in this file GREEN — the alphanumeric half of the
+	// shape check was asserted by NOTHING.
+	//
+	// Why the case above did not catch it: `<ref>.supabase.co` is not a
+	// substring of a pooler DSN, so with the regex gone it is still refused, by
+	// `url.includes(fragment)` instead. Every existing non-alphanumeric fixture
+	// had that same property. To reach the regex, the fragment must be
+	// long enough, non-alphanumeric, AND genuinely present in the URL — which is
+	// exactly what an operator produces by pasting a chunk of the DSN.
+	it.each([
+		["a DSN slice carrying the user prefix", `postgres.${STAGING_FRAGMENT}`],
+		["the pooler hostname itself", "aws-1-ap-south-1.pooler.supabase.com"],
+	])("refuses a non-alphanumeric fragment that IS present in the URL — %s", (_label, fragment) => {
+		// Precondition: only the alphanumeric rule can refuse these.
+		expect(fragment.length).toBeGreaterThanOrEqual(MIN_FRAGMENT_LENGTH);
+		expect(STAGING_URL).toContain(fragment);
+
+		const result = resolveStagingTarget(
+			stagingEnv({ STAGING_PROJECT_REF_FRAGMENT: fragment }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(/alphanumeric/i);
 	});
 
 	it("accepts a real 20-character project ref", () => {

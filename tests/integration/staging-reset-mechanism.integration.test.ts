@@ -1,3 +1,4 @@
+import postgres from "postgres";
 import { describe, expect, it } from "vitest";
 import { testClient } from "../db/_fixtures/db";
 import {
@@ -8,6 +9,7 @@ import {
 	TRUNCATE_SET,
 } from "../staging/_lib/guards";
 import {
+	assertLiveConnection,
 	buildResetBatch,
 	countMigrations,
 	LOCK_TIMEOUT,
@@ -358,6 +360,179 @@ describe("F1 — the batch really is one implicit transaction", () => {
 	});
 });
 
+describe("assertLiveConnection — G-3", () => {
+	// MUTATION-DERIVED (G3-probe, 2026-08-06), and the largest gap the sweep
+	// found. Deleting G-3's `session_replication_role` refusal — the escape
+	// hatch @security-auditor flagged, the one that voids the entire append-only
+	// contract while every other check reports green — left the ENTIRE staging
+	// surface GREEN. Nothing at any level called `assertLiveConnection`.
+	//
+	// tests/unit/staging/reset-guard.test.ts said in its header that "G-3 (live
+	// connection) and G-4 (post-run verification) need a socket and are
+	// exercised by tests/integration/staging-reset-mechanism". G-4 was. G-3 was
+	// not: `runner-gating` asserts only that the CALL appears in beforeAll ahead
+	// of the destructive it(), which is a statement about lexical position, not
+	// about what the function does. Five refusals shipped unasserted.
+	//
+	// LOCALHOST IS THE RIGHT FIXTURE for three of them. The real client dials
+	// `postgres@localhost`, which is precisely what G-3 exists to refuse, so the
+	// refusals can be driven with no double at all. The two that need a
+	// Supabase-shaped host to be reached (`current_database()`,
+	// `session_replication_role`) are driven through a proxy that overrides ONLY
+	// `options` and passes every query to the real local server — so the answers
+	// are the server's, not a fixture's.
+
+	/**
+	 * The real client with different driver-resolved `options`.
+	 *
+	 * `assertLiveConnection` reads exactly two things: `client.options` and one
+	 * tagged-template query. The Proxy substitutes the first and forwards the
+	 * second, which keeps every SQL answer genuine. The cast is a test-double
+	 * boundary — `postgres.Sql` is a callable with ~40 members, none of the rest
+	 * reachable from the function under test.
+	 */
+	function withOptions(
+		client: typeof testClient,
+		options: { host?: string[]; user?: string },
+	): typeof testClient {
+		return new Proxy(client, {
+			get(target, prop, receiver) {
+				if (prop === "options") return options;
+				return Reflect.get(target, prop, receiver);
+			},
+		});
+	}
+
+	const SUPABASE_OPTS = {
+		host: ["aws-1-ap-south-1.pooler.supabase.com"],
+		user: "postgres.abcdefghijklmnopqrst",
+	};
+	const REF = "abcdefghijklmnopqrst";
+
+	it("refuses when the driver-resolved parameters cannot be read", async () => {
+		// FAILS CLOSED. postgres-js does not type `.options` as public surface,
+		// so a driver bump that renames it must refuse rather than read `""` and
+		// carry on — `"".includes(fragment)` is false, but `!host || !user` is
+		// what makes the intent explicit and the message accurate.
+		await expect(
+			assertLiveConnection(withOptions(testClient, {}), REF),
+		).rejects.toThrow(/could not read the driver-resolved connection/i);
+
+		await expect(
+			assertLiveConnection(withOptions(testClient, { host: ["h"] }), REF),
+		).rejects.toThrow(/could not read the driver-resolved connection/i);
+
+		await expect(
+			assertLiveConnection(withOptions(testClient, { user: "u" }), REF),
+		).rejects.toThrow(/could not read the driver-resolved connection/i);
+	});
+
+	it("refuses when the fragment is absent from user@host", async () => {
+		// The REAL local connection, no double: it dials postgres@localhost, and
+		// a staging ref is not in it.
+		await expect(assertLiveConnection(testClient, REF)).rejects.toThrow(
+			/does not carry the staging ref fragment/i,
+		);
+	});
+
+	it("matches the fragment against user@host, not host alone", async () => {
+		// The pooler carries the ref in the USERNAME. A host-only check would
+		// refuse every legitimate run — the defect @code-reviewer caught at
+		// Slice A. Proven by a fragment that exists ONLY in the user.
+		await expect(
+			assertLiveConnection(withOptions(testClient, SUPABASE_OPTS), REF),
+		).resolves.toMatchObject({ database: "postgres" });
+		expect(SUPABASE_OPTS.host[0]).not.toContain(REF);
+		expect(SUPABASE_OPTS.user).toContain(REF);
+	});
+
+	it("refuses a non-Supabase host even when the fragment matches", async () => {
+		// A localhost DSN carrying the staging ref as its username satisfies the
+		// fragment match on its own. The host allow-list is what stops it. The
+		// real local target IS that shape: `postgres@localhost` contains
+		// "postgres", so the fragment check passes and only the host check can
+		// refuse.
+		await expect(assertLiveConnection(testClient, "postgres")).rejects.toThrow(
+			/is not a Supabase host/i,
+		);
+	});
+
+	it("refuses a host that merely ends in a Supabase-looking label", async () => {
+		await expect(
+			assertLiveConnection(
+				withOptions(testClient, {
+					host: ["supabase.co.attacker.net"],
+					user: `postgres.${REF}`,
+				}),
+				REF,
+			),
+		).rejects.toThrow(/is not a Supabase host/i);
+	});
+
+	it("refuses when current_database() is not the expected database", async () => {
+		// Every Supabase project reports `postgres`. A connection landing
+		// somewhere else is not a Supabase database, whatever the DSN said. The
+		// local cluster ships a second database, so this is a REAL server answer
+		// rather than a stubbed row.
+		const other = postgres(
+			"postgresql://postgres:postgres@localhost:54322/_supabase",
+			{ max: 1, prepare: false },
+		);
+		try {
+			await expect(
+				assertLiveConnection(withOptions(other, SUPABASE_OPTS), REF),
+			).rejects.toThrow(/current_database\(\) is "_supabase"/);
+		} finally {
+			await other.end({ timeout: 5 });
+		}
+	});
+
+	it("refuses session_replication_role = replica", async () => {
+		// THE ONE THAT MATTERS MOST. Under `replica` NO trigger fires — including
+		// the four never-disabled guards — while G-4's catalog check still reads
+		// a clean 78/all-enabled, because tgenabled is unchanged. Every check
+		// reports green while the entire append-only contract is void, and it is
+		// reachable through `?options=-c session_replication_role=replica` in the
+		// connection string. @security-auditor, Slice A.
+		//
+		// A dedicated client, so a throw cannot strand the setting on the shared
+		// testClient session.
+		const replica = postgres(
+			"postgresql://postgres:postgres@localhost:54322/postgres",
+			{ max: 1, prepare: false },
+		);
+		try {
+			await replica.unsafe("SET session_replication_role = replica");
+			// Precondition — the server really is in the dangerous state.
+			const [row] = await replica<{ v: string }[]>`
+				SELECT current_setting('session_replication_role') AS v
+			`;
+			expect(row?.v).toBe("replica");
+
+			await expect(
+				assertLiveConnection(withOptions(replica, SUPABASE_OPTS), REF),
+			).rejects.toThrow(/session_replication_role is "replica"/);
+		} finally {
+			await replica.end({ timeout: 5 });
+		}
+		// The shared client was never touched.
+		const [after] = await testClient<{ v: string }[]>`
+			SELECT current_setting('session_replication_role') AS v
+		`;
+		expect(after?.v).toBe("origin");
+	});
+
+	it("returns the target it validated, for the run log", async () => {
+		await expect(
+			assertLiveConnection(withOptions(testClient, SUPABASE_OPTS), REF),
+		).resolves.toEqual({
+			database: "postgres",
+			user: "postgres",
+			target: `${SUPABASE_OPTS.user}@${SUPABASE_OPTS.host[0]}`,
+		});
+	});
+});
+
 describe("atomicity — a failed truncate leaves every guard ENABLED", () => {
 	// ADR-0035 primitive 2: "The guards cannot be left off, because they are
 	// never committed off." This is the most important assertion in the slice.
@@ -464,6 +639,72 @@ describe("verifyPostReset — G-4", () => {
 			verifyPostReset(testClient, NO_MIGRATION_BASELINE),
 		).resolves.toBeUndefined();
 		expect(await allGuardsEnabled()).toBe(true);
+	});
+
+	it("fails when system_state.frozen_at is set", async () => {
+		// MUTATION-DERIVED (G4-c, 2026-08-06): verifyPostReset checks this and
+		// nothing tested it. The freeze is a ONE-SHOT Bucket-B transition — once
+		// frozen_at is non-NULL the trigger refuses to move it back, so a staging
+		// database that acquires one is read-only FOREVER and cannot be reset
+		// again. G-4 is the only thing between that and a green run report.
+		//
+		// LOCAL ONLY, inside BEGIN/ROLLBACK on the max:1 pinned client. This
+		// value is NEVER written to staging or production, under any
+		// circumstance (CLAUDE.md §3, conclusion-freeze tampering).
+		await testClient.unsafe("BEGIN");
+		try {
+			await testClient`UPDATE system_state SET frozen_at = now()`;
+			const [check] = await testClient<{ frozen_at: Date | null }[]>`
+				SELECT frozen_at FROM system_state
+			`;
+			expect(check?.frozen_at).not.toBeNull();
+
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.toThrow(/frozen_at is not NULL/);
+		} finally {
+			await testClient.unsafe("ROLLBACK");
+		}
+		const [after] = await testClient<{ frozen_at: Date | null }[]>`
+			SELECT frozen_at FROM system_state
+		`;
+		expect(after?.frozen_at).toBeNull();
+	});
+
+	it("fails when the guard catalog is off by one", async () => {
+		// MUTATION-DERIVED (G4-e, 2026-08-06): the count check had no negative
+		// case, so EXPECTED_GUARD_CATALOG_ROWS could stop matching reality with
+		// nothing noticing until an operator was already pointed at the live
+		// database. ADR-0030 carries a standing forward obligation — a new
+		// protected relation or events partition moves this number — and this is
+		// the assertion that makes drift fail loudly.
+		//
+		// An EXTRA `bucket_%` trigger, not a missing one: adding is transactional
+		// and reversible; dropping one would have to be rolled back too, and a
+		// failure between the two would leave the local database unguarded.
+		await testClient.unsafe("BEGIN");
+		try {
+			await testClient.unsafe(
+				"CREATE TRIGGER bucket_probe_extra BEFORE TRUNCATE ON bookmarks " +
+					"FOR EACH STATEMENT EXECUTE FUNCTION enforce_bucket_a_no_truncate()",
+			);
+			const catalog = await readGuardCatalog(testClient);
+			expect(catalog).toHaveLength(EXPECTED_GUARD_CATALOG_ROWS + 1);
+			// Every guard is still ENABLED, so only the COUNT can refuse — the
+			// other arm of the check cannot be what fires.
+			expect(catalog.every((r) => r.enabled === "O")).toBe(true);
+
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.toThrow(
+				new RegExp(`returned ${EXPECTED_GUARD_CATALOG_ROWS + 1} rows`),
+			);
+		} finally {
+			await testClient.unsafe("ROLLBACK");
+		}
+		expect(await readGuardCatalog(testClient)).toHaveLength(
+			EXPECTED_GUARD_CATALOG_ROWS,
+		);
 	});
 
 	it("fails when the migrations ledger has been emptied", async () => {
