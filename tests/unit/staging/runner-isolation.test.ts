@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { configDefaults } from "vitest/config";
@@ -73,20 +73,27 @@ describe("the two configs partition the tree", () => {
 		const defaultExcludes = defaultTest.exclude as string[];
 		// Every staging include pattern must be covered by a default exclude.
 		for (const pattern of stagingIncludes) {
-			const root = pattern.split("/")[0] ? pattern.split("**")[0] : pattern;
-			expect(defaultExcludes.some((ex) => ex.startsWith(root ?? ""))).toBe(
-				true,
-			);
+			const root = pattern.split("**")[0] ?? pattern;
+			expect({
+				pattern,
+				covered: defaultExcludes.some((ex) => ex.startsWith(root)),
+			}).toEqual({
+				pattern,
+				covered: true,
+			});
 		}
 	});
 
 	it("the reset runner file sits under the excluded path", () => {
-		// Source-text check, deliberately: the point is WHERE the file lives on
-		// disk, which no resolved-config object can tell us.
+		// On-disk check, deliberately: the point is WHERE the file lives, which
+		// no resolved-config object can report.
 		const runner = fileURLToPath(
 			new URL("../../staging/reset.staging.test.ts", import.meta.url),
 		);
-		const source = readFileSync(runner, "utf8");
-		expect(source.length).toBeGreaterThan(0);
+		expect(existsSync(runner)).toBe(true);
+		expect(runner).toMatch(/\/tests\/staging\//);
+		// And it is a *.staging.test.ts, so the staging config's include picks
+		// it up while the default config's exclude drops it.
+		expect(runner.endsWith(".staging.test.ts")).toBe(true);
 	});
 });

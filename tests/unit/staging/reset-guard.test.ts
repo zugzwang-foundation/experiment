@@ -18,8 +18,17 @@ import {
 // The predicate takes an env RECORD rather than reading process.env, so every
 // case below is a pure call with no global mutation and no cleanup ordering.
 
-const STAGING_FRAGMENT = "stgref123.supabase.co";
-const STAGING_URL = `postgresql://postgres:pw@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?host=stgref123.supabase.co`;
+// The REAL staging shape: a Supabase SESSION POOLER DSN. The project ref is a
+// bare 20-character string that appears in the USERNAME (`postgres.<ref>`) and
+// NOT in the pooler hostname — verified read-only against the live staging
+// target on 2026-08-05. An earlier fixture here used a `?host=<ref>.supabase.co`
+// query parameter, which postgres-js ignores entirely (it takes the host from
+// `url.hostname`); that fixture made a host-only G-3 check look satisfiable
+// when against the real target it would have refused every legitimate run.
+// @code-reviewer flagged it at Slice A. Keep unit fixtures and the live target
+// in the same shape.
+const STAGING_FRAGMENT = "abcdefghijklmnopqrst";
+const STAGING_URL = `postgresql://postgres.${STAGING_FRAGMENT}:pw@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`;
 
 function stagingEnv(
 	overrides: Record<string, string | undefined> = {},

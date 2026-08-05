@@ -3,10 +3,12 @@ import { testClient } from "../db/_fixtures/db";
 import {
 	DISABLED_TRUNCATE_GUARDS,
 	EXPECTED_GUARD_CATALOG_ROWS,
+	NOT_TRUNCATED_UNRATIFIED,
 	TRUNCATE_EXCLUSIONS,
 	TRUNCATE_SET,
 } from "../staging/_lib/guards";
 import {
+	countMigrations,
 	readGuardCatalog,
 	runGuardedReset,
 	verifyPostReset,
@@ -40,10 +42,7 @@ async function allGuardsEnabled(): Promise<boolean> {
 }
 
 async function migrationRowCount(): Promise<number> {
-	const [row] = await testClient<{ n: number }[]>`
-		SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations
-	`;
-	return row?.n ?? 0;
+	return countMigrations(testClient);
 }
 
 describe("guard catalog — the shape the reset verifies against", () => {
@@ -118,6 +117,43 @@ describe("runGuardedReset — the disable → truncate → enable loop", () => {
 			expect(TRUNCATE_SET).not.toContain(excluded);
 		}
 	});
+
+	it("accounts for every public base table — truncated, excluded, or recorded", async () => {
+		// A table that is in none of the three lists is FORGOTTEN, not
+		// deliberate. This turns "we listed 21 tables" into "we know where all
+		// 25 went", so a future migration adding a table fails here rather than
+		// silently surviving every reset.
+		const rows = await testClient<{ tablename: string }[]>`
+			SELECT tablename FROM pg_tables
+			WHERE schemaname = 'public' AND tablename NOT LIKE 'events\\_%'
+			ORDER BY tablename
+		`;
+		const accounted = new Set([
+			...TRUNCATE_SET,
+			...TRUNCATE_EXCLUSIONS,
+			...NOT_TRUNCATED_UNRATIFIED,
+		]);
+		const unaccounted = rows
+			.map((r) => r.tablename)
+			.filter((t) => !accounted.has(t));
+		expect(unaccounted).toEqual([]);
+	});
+
+	it("confirms the unratified survivors are unreachable by CASCADE", async () => {
+		// They survive structurally, not merely by absence from a list: a table
+		// with an outbound FK into the truncate set would be emptied by CASCADE
+		// regardless of what any constant says.
+		const rows = await testClient<{ n: number }[]>`
+			SELECT count(*)::int AS n
+			FROM pg_constraint
+			WHERE contype = 'f'
+			  AND conrelid::regclass::text = ANY(${testClient.array([
+					...NOT_TRUNCATED_UNRATIFIED,
+					...TRUNCATE_EXCLUSIONS,
+				])})
+		`;
+		expect(rows[0]?.n).toBe(0);
+	});
 });
 
 describe("atomicity — a failed truncate leaves every guard ENABLED", () => {
@@ -177,20 +213,27 @@ describe("verifyPostReset — G-4", () => {
 		await expect(verifyPostReset(testClient)).resolves.toBeUndefined();
 	});
 
+	// The three negative cases below each need a guard temporarily off, which is
+	// the one shape ADR-0035 primitive 3 forbids for the reset itself. They run
+	// inside an explicit BEGIN/ROLLBACK on the `max: 1` pinned client, so the
+	// DISABLE is transactional DDL that is never committed — the same property
+	// the reset relies on. A sequential disable → mutate → re-enable would leave
+	// a window where a throw or a process kill strands a guard OFF in the local
+	// database; @code-reviewer flagged exactly that at Slice A.
+
 	it("fails, naming the offending rows, when a guard is left disabled", async () => {
-		await testClient.unsafe(
-			"ALTER TABLE bets DISABLE TRIGGER bucket_a_no_truncate",
-		);
+		await testClient.unsafe("BEGIN");
 		try {
+			await testClient.unsafe(
+				"ALTER TABLE bets DISABLE TRIGGER bucket_a_no_truncate",
+			);
 			// [\s\S] rather than the /s dotAll flag — tsconfig targets ES2017,
 			// where /s is a TS1501 error.
 			await expect(verifyPostReset(testClient)).rejects.toThrow(
 				/bets[\s\S]*bucket_a_no_truncate/,
 			);
 		} finally {
-			await testClient.unsafe(
-				"ALTER TABLE bets ENABLE TRIGGER bucket_a_no_truncate",
-			);
+			await testClient.unsafe("ROLLBACK");
 		}
 		expect(await allGuardsEnabled()).toBe(true);
 	});
@@ -198,30 +241,26 @@ describe("verifyPostReset — G-4", () => {
 	it("fails when system_state's singleton row is missing", async () => {
 		// The silent fail-open ADR-0035 primitive 4 exists to catch: isFrozen()
 		// reads `row?.frozenAt != null`, so a missing row reports "not frozen"
-		// with nothing reporting the absence. Removing the row needs BOTH the
-		// delete and truncate guards down, which is itself the proof that the
-		// reset cannot reach this state.
-		await testClient.unsafe(
-			"ALTER TABLE system_state DISABLE TRIGGER bucket_b_no_delete",
-		);
+		// with nothing reporting the absence. Removing the row needs the delete
+		// guard down, which is itself the proof that the reset cannot reach
+		// this state — the reset never disables a _no_delete guard.
+		await testClient.unsafe("BEGIN");
 		try {
+			await testClient.unsafe(
+				"ALTER TABLE system_state DISABLE TRIGGER bucket_b_no_delete",
+			);
 			await testClient`DELETE FROM system_state`;
 			await expect(verifyPostReset(testClient)).rejects.toThrow(
 				/system_state/i,
 			);
 		} finally {
-			await testClient`
-				INSERT INTO system_state (id) VALUES ('system')
-				ON CONFLICT (id) DO NOTHING
-			`;
-			await testClient.unsafe(
-				"ALTER TABLE system_state ENABLE TRIGGER bucket_b_no_delete",
-			);
+			await testClient.unsafe("ROLLBACK");
 		}
 		await expect(verifyPostReset(testClient)).resolves.toBeUndefined();
+		expect(await allGuardsEnabled()).toBe(true);
 	});
 
-	it("fails when the migrations table has been emptied", async () => {
+	it("fails when the migrations ledger has been emptied", async () => {
 		// __drizzle_migrations is in no guard list, so nothing at the storage
 		// layer stops this — the post-run check is the only thing that notices.
 		await testClient.unsafe("BEGIN");
@@ -234,5 +273,34 @@ describe("verifyPostReset — G-4", () => {
 			await testClient.unsafe("ROLLBACK");
 		}
 		expect(await migrationRowCount()).toBeGreaterThan(0);
+	});
+
+	it("fails when the ledger loses SOME rows, not just all of them", async () => {
+		// ADR-0035 G-4 requires the ledger to RETAIN its row count. A bare
+		// non-empty check passes a partial deletion, which is the realistic
+		// corruption — @code-reviewer flagged the weaker form at Slice A.
+		const before = await migrationRowCount();
+		expect(before).toBeGreaterThan(1);
+
+		await testClient.unsafe("BEGIN");
+		try {
+			await testClient.unsafe(
+				"DELETE FROM drizzle.__drizzle_migrations WHERE id IN (SELECT id FROM drizzle.__drizzle_migrations LIMIT 1)",
+			);
+			// Non-empty, so the old check would have passed.
+			expect(await migrationRowCount()).toBe(before - 1);
+			await expect(verifyPostReset(testClient, before)).rejects.toThrow(
+				/__drizzle_migrations/,
+			);
+		} finally {
+			await testClient.unsafe("ROLLBACK");
+		}
+		expect(await migrationRowCount()).toBe(before);
+	});
+
+	it("passes when the baseline matches", async () => {
+		const before = await migrationRowCount();
+		await runGuardedReset(testClient, TRUNCATE_SET);
+		await expect(verifyPostReset(testClient, before)).resolves.toBeUndefined();
 	});
 });

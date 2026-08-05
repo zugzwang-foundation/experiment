@@ -109,6 +109,33 @@ export const NEVER_DISABLED_GUARD_NAMES: readonly string[] = [
 export const TRUNCATE_EXCLUSIONS: readonly string[] = ["system_state"];
 
 /**
+ * Public tables that are in neither TRUNCATE_SET nor TRUNCATE_EXCLUSIONS.
+ *
+ * They survive a reset. STAGING-PARITY Q3's truncate set is reproduced
+ * verbatim in TRUNCATE_SET and is silent on these three, so they are recorded
+ * here rather than added — the set is a ratified decision, and widening it is
+ * a ruling, not an implementation detail. Named so a reader can tell
+ * "deliberate" from "forgotten" (@code-reviewer, Slice A).
+ *
+ * Verified: none carries an outbound FK, so `TRUNCATE … CASCADE` cannot reach
+ * them either — they survive structurally, not by omission from a list.
+ *
+ * What survives, and why it is defensible: `admin_sessions` holds the admin's
+ * live login (truncating it would log the operator out mid-run); `cron_alarms`
+ * and `watermark_state` hold operational cron/drift state rather than fixture
+ * data. The cost of leaving them is stale alarm rows keyed to market ids that
+ * no longer exist, and a drift watermark for a deleted population — both
+ * consumed by /api/cron/alarms-drain and the nightly drift job, neither of
+ * which runs on staging today (STAGING-PARITY-ENV). Flagged for a ruling
+ * before Slice B rather than decided here.
+ */
+export const NOT_TRUNCATED_UNRATIFIED: readonly string[] = [
+	"admin_sessions",
+	"cron_alarms",
+	"watermark_state",
+];
+
+/**
  * The tables the reset empties — the ratified set from STAGING-PARITY Q3.
  *
  * `events` covers its 13 partitions (TRUNCATE on the partitioned parent

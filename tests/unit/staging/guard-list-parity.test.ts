@@ -1,8 +1,9 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
 	DISABLED_TRUNCATE_GUARDS,
+	EXPECTED_GUARD_CATALOG_ROWS,
 	NEVER_DISABLED_GUARD_NAMES,
 	TRUNCATE_EXCLUSIONS,
 } from "../../staging/_lib/guards";
@@ -53,24 +54,41 @@ function parseDroppedTables(sql: string): string[] {
 	return out;
 }
 
-const ALL_TRIGGER_SQL = [
-	read("0003_append_only_triggers.sql"),
-	read("0021_truncate_guards.sql"),
-	read("0022_bet_receipts.sql"),
-].join("\n");
+// EVERY migration is read, not a hard-coded three-file list. ADR-0030 carries
+// a standing forward obligation — any migration that adds a protected relation
+// or an `events` partition must add the matching triggers — and a migration
+// named 0025+ would be invisible to a fixed list, leaving this test green
+// while DISABLED_TRUNCATE_GUARDS was incomplete. Detection would then fall to
+// the run-time catalog count, i.e. after the operator is already pointed at
+// the live database. @code-reviewer flagged the fixed list at Slice A.
+const MIGRATION_FILES = readdirSync(MIGRATIONS)
+	.filter((f) => f.endsWith(".sql"))
+	.sort();
 
-const DROPPED = new Set(
-	parseDroppedTables(read("0018_drop_friendly_fire_events.sql")),
-);
+const ALL_MIGRATION_SQL = MIGRATION_FILES.map(read).join("\n");
 
-const LIVE_TRIGGERS = parseCreateTriggers(ALL_TRIGGER_SQL).filter(
+const DROPPED = new Set(parseDroppedTables(ALL_MIGRATION_SQL));
+
+const LIVE_TRIGGERS = parseCreateTriggers(ALL_MIGRATION_SQL).filter(
 	(t) => !DROPPED.has(t.table),
 );
 
 const key = (t: Trigger) => `${t.table}.${t.trigger}`;
 
 describe("migration parsing — the authority is readable", () => {
-	it("finds the three guard families across 0003 + 0021 + 0022", () => {
+	it("reads every migration on disk, not a fixed list", () => {
+		expect(MIGRATION_FILES.length).toBeGreaterThanOrEqual(25);
+		// The three that actually carry guards today must be among them.
+		for (const f of [
+			"0003_append_only_triggers.sql",
+			"0021_truncate_guards.sql",
+			"0022_bet_receipts.sql",
+		]) {
+			expect(MIGRATION_FILES).toContain(f);
+		}
+	});
+
+	it("finds the six guard families across the migration set", () => {
 		const names = new Set(LIVE_TRIGGERS.map((t) => t.trigger));
 		expect([...names].sort()).toEqual([
 			"bucket_a_no_delete",
@@ -82,7 +100,7 @@ describe("migration parsing — the authority is readable", () => {
 		]);
 	});
 
-	it("drops friendly_fire_events' guards via 0018", () => {
+	it("drops friendly_fire_events' guards, re-derived from the DROP TABLE", () => {
 		expect(DROPPED.has("friendly_fire_events")).toBe(true);
 		expect(
 			LIVE_TRIGGERS.filter((t) => t.table === "friendly_fire_events"),
@@ -90,10 +108,39 @@ describe("migration parsing — the authority is readable", () => {
 		// It IS present before the drop is applied — proves the filter is doing
 		// work rather than matching nothing.
 		expect(
-			parseCreateTriggers(ALL_TRIGGER_SQL).filter(
+			parseCreateTriggers(ALL_MIGRATION_SQL).filter(
 				(t) => t.table === "friendly_fire_events",
 			).length,
 		).toBeGreaterThan(0);
+	});
+});
+
+describe("EXPECTED_GUARD_CATALOG_ROWS is derived, not guessed", () => {
+	// The catalog count is what bounds G-4's coverage, and it lived in the same
+	// hand-maintained file as the guard list — outside this test's reach
+	// (@code-reviewer, Slice A). Derive it from the parsed migrations plus the
+	// one term the SQL cannot show: PostgreSQL CLONES row-level triggers to
+	// partitions, but NOT statement-level ones (ADR-0030). So each ROW-level
+	// Bucket-A family on `events` appears on all 13 partitions too, while the
+	// statement-level `_no_truncate` family had to be written out per partition
+	// and is therefore already in the SQL.
+	const EVENTS_PARTITIONS = 13;
+
+	it("matches the parsed migrations plus the partition-clone term", () => {
+		const rowLevelOnEvents = LIVE_TRIGGERS.filter(
+			(t) => t.table === "events" && !t.trigger.endsWith("_no_truncate"),
+		).length;
+		const clones = rowLevelOnEvents * EVENTS_PARTITIONS;
+		expect(LIVE_TRIGGERS.length + clones).toBe(EXPECTED_GUARD_CATALOG_ROWS);
+	});
+
+	it("counts 13 events partitions in the truncate guards", () => {
+		// Cross-check the clone multiplier against the SQL rather than trusting
+		// the constant: the statement-level family names every partition.
+		const partitions = LIVE_TRIGGERS.filter(
+			(t) => t.trigger.endsWith("_no_truncate") && /^events_/.test(t.table),
+		);
+		expect(partitions).toHaveLength(EVENTS_PARTITIONS);
 	});
 });
 

@@ -1,5 +1,5 @@
 import postgres from "postgres";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
 	EXPECTED_GUARD_CATALOG_ROWS,
 	resolveStagingTarget,
@@ -8,6 +8,7 @@ import {
 } from "./_lib/guards";
 import {
 	assertLiveConnection,
+	countMigrations,
 	describeTarget,
 	readGuardCatalog,
 	reEnableGuards,
@@ -35,17 +36,30 @@ import {
 //   (which is `doppler run --project zugzwang-experiment --config stg -- …`,
 //    then re-seeds identity_pool — see package.json)
 //
+// ── WHY THE GUARDS ARE NOT `it()` BLOCKS ────────────────────────────────────
+// Vitest does not stop a file when a test fails, and no `bail` is set. A guard
+// written as an `it()` would therefore REFUSE and then be followed by the
+// destructive step anyway — the runner would report the refusal and wipe the
+// database in the same run. G-1/G-2 evaluate at MODULE SCOPE (before a client
+// exists) and G-3 plus the pre-flight run in `beforeAll`, because a throwing
+// `beforeAll` fails every test in the suite WITHOUT executing any of them.
+// The destructive batch and its G-4 verification are ONE `it`, so no ordering
+// change can separate the wipe from the check that follows it.
+// Caught by @code-reviewer at Slice A; the gating property is itself asserted
+// by tests/unit/staging/runner-gating.test.ts.
+//
 // THE GUARD CONTRACT (ADR-0035 primitive 6, hardened by Ratification Record
 // §5 W-B):
 //   G-1 target      — DATABASE_URL_STAGING set AND containing
 //                     STAGING_PROJECT_REF_FRAGMENT AND not the production ref.
 //                     Fails closed on absence. NEVER falls back to DATABASE_URL.
 //   G-2 environment — ZUGZWANG_ENV must EQUAL "staging". Positive match.
-//   G-3 connection  — current_database() and the ref fragment asserted from
-//                     the SOCKET, not from config.
+//   G-3 connection  — the fragment matched against the DRIVER-RESOLVED
+//                     `user@host` (the session pooler carries the ref in the
+//                     USERNAME, not the host), plus current_database().
 //   G-4 post-run    — every bucket_% guard back at tgenabled='O';
 //                     system_state's singleton row present with frozen_at
-//                     NULL; drizzle.__drizzle_migrations non-empty.
+//                     NULL; drizzle.__drizzle_migrations RETAINS its row count.
 //
 // NEVER DISABLED: bucket_a_no_update · bucket_a_no_delete · bucket_b_no_delete
 // · bucket_b_update_check. Only the *_no_truncate guards, only for the one
@@ -55,12 +69,11 @@ import {
 // NEVER TRUNCATED: drizzle.__drizzle_migrations · system_state.
 // ═══════════════════════════════════════════════════════════════════════════
 
+// G-1 + G-2 — at module scope, before any client exists. A failure here throws
+// during collection: there is no path from here to a connection.
 const target = resolveStagingTarget(process.env);
 
 if (!target.ok) {
-	// Fail closed, loudly, before a client is ever constructed. Throwing at
-	// module scope makes the whole file fail collection — there is no path
-	// from here to a connection.
 	throw new Error(
 		`REFUSED — the staging reset guard did not pass.\n  ${target.reason}\n\n` +
 			"Run it as: pnpm staging:reset",
@@ -69,35 +82,53 @@ if (!target.ok) {
 
 const client = postgres(target.url, { max: 1, prepare: false });
 
+/** Captured pre-batch so G-4 can prove the ledger RETAINED its rows. */
+let migrationsBefore = 0;
+
+beforeAll(async () => {
+	// G-3 — the live connection. Throwing here aborts the suite without
+	// running a single test, so the destructive step below is unreachable.
+	const live = await assertLiveConnection(client, target.fragment);
+
+	// Pre-flight — if a previous run left a guard off, that is the news.
+	// Surface it BEFORE a destructive batch, not after it in G-4.
+	const catalog = await readGuardCatalog(client);
+	const off = catalog.filter((r) => r.enabled !== "O");
+	if (off.length > 0) {
+		throw new Error(
+			`REFUSED — guards are already disabled before we started:\n${off
+				.map((r) => `  (${r.table}, ${r.trigger}, tgenabled=${r.enabled})`)
+				.join("\n")}`,
+		);
+	}
+	if (catalog.length !== EXPECTED_GUARD_CATALOG_ROWS) {
+		throw new Error(
+			`REFUSED — guard catalog returned ${catalog.length} rows, expected ${EXPECTED_GUARD_CATALOG_ROWS}. A protected relation may have been added without its triggers (ADR-0030 forward obligation), which would leave it un-truncatable or unguarded.`,
+		);
+	}
+
+	// The shipped truncate set must never name an excluded table.
+	for (const excluded of TRUNCATE_EXCLUSIONS) {
+		if (TRUNCATE_SET.includes(excluded)) {
+			throw new Error(
+				`REFUSED — TRUNCATE_SET names the excluded table "${excluded}"`,
+			);
+		}
+	}
+
+	migrationsBefore = await countMigrations(client);
+
+	console.log(
+		`[staging:reset] target ${describeTarget(target.url)} · db=${live.database} · user=${live.user} · guards=${catalog.length} all enabled · migrations=${migrationsBefore}`,
+	);
+});
+
 afterAll(async () => {
 	await client.end({ timeout: 10 });
 });
 
 describe("guarded staging reset", () => {
-	it("G-3 · the live connection is the staging database", async () => {
-		const live = await assertLiveConnection(client, target.fragment);
-		console.log(
-			`[staging:reset] target ${describeTarget(target.url)} · db=${live.database} · user=${live.user}`,
-		);
-		expect(live.database).toBeTruthy();
-	});
-
-	it("every guard is enabled before we start", async () => {
-		// If a previous run left a guard off, that is the news — surface it
-		// here rather than discovering it in G-4 after a destructive batch.
-		const catalog = await readGuardCatalog(client);
-		const off = catalog.filter((r) => r.enabled !== "O");
-		expect(off).toEqual([]);
-		expect(catalog).toHaveLength(EXPECTED_GUARD_CATALOG_ROWS);
-	});
-
-	it("the truncate set names no excluded table", () => {
-		for (const excluded of TRUNCATE_EXCLUSIONS) {
-			expect(TRUNCATE_SET).not.toContain(excluded);
-		}
-	});
-
-	it("truncates the fixture surface in one transaction", async () => {
+	it("truncates the fixture surface in one transaction, then verifies (G-4)", async () => {
 		try {
 			await runGuardedReset(client, TRUNCATE_SET);
 		} finally {
@@ -117,21 +148,15 @@ describe("guarded staging reset", () => {
 			`;
 			expect({ table, rows: row?.n }).toEqual({ table, rows: 0 });
 		}
-	});
 
-	it("G-4 · post-run verification", async () => {
-		await verifyPostReset(client);
-	});
+		// G-4 runs in the SAME `it` as the batch it verifies — no ordering
+		// change can separate them.
+		await verifyPostReset(client, migrationsBefore);
 
-	it("reports what the operator must do next", async () => {
 		// identity_pool was truncated and MUST be re-seeded before anything
 		// consumes a tuple (ADR-0035 primitive 5). `pnpm staging:reset` chains
-		// db:seed:staging immediately after this file, so the operator only
-		// sees this if they ran the config directly.
-		const [pool] = await client<{ n: number }[]>`
-			SELECT count(*)::int AS n FROM identity_pool
-		`;
-		expect(pool?.n).toBe(0);
+		// db:seed:staging on success. If this run failed ANYWHERE after the
+		// batch committed, that chain does not fire — re-seed by hand.
 		console.log(
 			"[staging:reset] done. identity_pool is EMPTY — re-seed before generating:\n" +
 				"  doppler run --project zugzwang-experiment --config stg -- pnpm db:seed:staging",

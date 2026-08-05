@@ -36,37 +36,70 @@ export async function readGuardCatalog(
 	`;
 }
 
+/** The database name every Supabase project reports. Asserted by G-3. */
+export const EXPECTED_DATABASE = "postgres";
+
 /**
- * G-3 · live connection. Asserts against the SOCKET about to be used, not the
- * config that produced it — a config can say staging while the connection says
- * otherwise. Returns the connection facts for logging.
+ * G-3 · live connection. Asserts against the connection the DRIVER actually
+ * resolved and dialled, plus a live round-trip — not against the env string
+ * G-1 already read. A config can say staging while the connection says
+ * otherwise (a `?host=` override, an ambient PGHOST/PGUSER, a pooler
+ * redirect): those all move the driver-resolved options, which is what this
+ * reads.
+ *
+ * THE FRAGMENT IS MATCHED AGAINST `user@host`, NOT host alone. Staging connects
+ * through the Supabase SESSION POOLER, whose hostname carries no project ref —
+ * the ref lives in the USERNAME (`postgres.<ref>@aws-1-ap-south-1.pooler…`).
+ * Verified read-only against the live staging target on 2026-08-05: the bare
+ * 20-character ref is present in `options.user` and absent from `options.host`.
+ * A host-only check would therefore refuse every legitimate run.
+ *
+ * STATED LIMITATION — the pooler exposes NO project-discriminating server-side
+ * fact: `current_database()` and `current_user` both read `postgres` on every
+ * Supabase project, staging and production alike (same read-only probe). So
+ * G-3 is an assertion about the connection the driver opened, not an
+ * independent oracle proving that connection is staging. The target
+ * discriminators are G-1's fragment match and its hard PRODUCTION_PROJECT_REF
+ * refusal. Recorded rather than papered over.
  */
 export async function assertLiveConnection(
 	client: postgres.Sql,
 	fragment: string,
-): Promise<{ database: string; user: string; host: string }> {
+): Promise<{ database: string; user: string; target: string }> {
+	// Driver-resolved connection parameters. postgres-js does not type
+	// `.options` as public surface, so this is read defensively: on a driver
+	// bump that renames it, `target` is empty and G-3 FAILS CLOSED below.
+	const options = (
+		client as unknown as { options?: { host?: string[]; user?: string } }
+	).options;
+	const host = options?.host?.join(",") ?? "";
+	const user = options?.user ?? "";
+	if (!host || !user) {
+		throw new Error(
+			"G-3 failed: could not read the driver-resolved connection parameters; refusing",
+		);
+	}
+
+	const target = `${user}@${host}`;
+	if (!target.includes(fragment)) {
+		throw new Error(
+			`G-3 failed: the live connection does not carry the staging ref fragment "${fragment}" (dialling ${host}); refusing`,
+		);
+	}
+
 	const [row] = await client<{ database: string; user: string }[]>`
 		SELECT current_database() AS database, current_user AS user
 	`;
 	if (!row) {
 		throw new Error("G-3 failed: the connection returned no row");
 	}
-
-	// The host as the DRIVER resolved it for this connection, not as the env
-	// string spelled it.
-	const options = (client as unknown as { options?: { host?: string[] } })
-		.options;
-	const host = options?.host?.join(",") ?? "";
-	if (!host) {
-		throw new Error("G-3 failed: could not read the live connection host");
-	}
-	if (!host.includes(fragment)) {
+	if (row.database !== EXPECTED_DATABASE) {
 		throw new Error(
-			`G-3 failed: the live connection host does not contain the staging ref fragment "${fragment}" (connected to ${host}); refusing`,
+			`G-3 failed: current_database() is "${row.database}", expected "${EXPECTED_DATABASE}"; refusing`,
 		);
 	}
 
-	return { database: row.database, user: row.user, host };
+	return { database: row.database, user: row.user, target };
 }
 
 /**
@@ -142,7 +175,24 @@ export async function reEnableGuards(client: postgres.Sql): Promise<void> {
  *
  * Throws with the offending rows named. Callers exit non-zero.
  */
-export async function verifyPostReset(client: postgres.Sql): Promise<void> {
+export async function countMigrations(client: postgres.Sql): Promise<number> {
+	const [row] = await client<{ n: number }[]>`
+		SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations
+	`;
+	return row?.n ?? 0;
+}
+
+export async function verifyPostReset(
+	client: postgres.Sql,
+	/**
+	 * The `drizzle.__drizzle_migrations` row count read BEFORE the batch.
+	 * ADR-0035 G-4 requires the ledger to RETAIN its row count — a
+	 * merely-non-empty check passes a partial deletion, and G-4 is the layer
+	 * whose whole job is verification rather than assumption. Optional only so
+	 * the check degrades to non-empty when no baseline was captured.
+	 */
+	migrationsBefore?: number,
+): Promise<void> {
 	const failures: string[] = [];
 
 	// 1 · every bucket_% guard present and enabled.
@@ -175,13 +225,18 @@ export async function verifyPostReset(client: postgres.Sql): Promise<void> {
 		);
 	}
 
-	// 3 · the migration ledger survives.
-	const [migrations] = await client<{ n: number }[]>`
-		SELECT count(*)::int AS n FROM drizzle.__drizzle_migrations
-	`;
-	if (!migrations || migrations.n === 0) {
+	// 3 · the migration ledger RETAINS its row count.
+	const migrationsAfter = await countMigrations(client);
+	if (migrationsAfter === 0) {
 		failures.push(
 			`drizzle.__drizzle_migrations is empty — drizzle-kit would re-run 0000 onward against a populated schema and /api/health would report drift`,
+		);
+	} else if (
+		migrationsBefore !== undefined &&
+		migrationsAfter !== migrationsBefore
+	) {
+		failures.push(
+			`drizzle.__drizzle_migrations holds ${migrationsAfter} rows, expected ${migrationsBefore} — the ledger lost rows and /api/health would report drift`,
 		);
 	}
 
