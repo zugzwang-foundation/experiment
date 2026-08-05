@@ -100,8 +100,41 @@ describe("guard catalog — the shape the reset verifies against", () => {
 	});
 });
 
+/**
+ * Two dependency-free rows, one Bucket-B and one on the auth surface, so the
+ * emptying assertion has something to empty.
+ *
+ * MUTATION-DERIVED (M2, 2026-08-06). Removing the TRUNCATE from the batch left
+ * "empties the truncate set" GREEN: the file's own earlier cases leave the
+ * database empty, so counting zero proved nothing. A pre-state of zero makes a
+ * post-state of zero unfalsifiable — the control read as coverage while
+ * asserting nothing about the statement it is named for.
+ */
+async function seedTwoRows(): Promise<void> {
+	await testClient`
+		INSERT INTO identity_pool (colour, animal, number, pseudonym, pfp_filename)
+		VALUES ('Teal', 'Heron', 314, 'TealHeron314', 'tealheron314.webp')
+		ON CONFLICT DO NOTHING
+	`;
+	await testClient`
+		INSERT INTO verifications (identifier, value, expires_at)
+		VALUES ('mutation-probe', 'v', now() + interval '1 day')
+	`;
+	for (const table of ["identity_pool", "verifications"]) {
+		const [row] = await testClient<{ n: number }[]>`
+			SELECT count(*)::int AS n FROM ${testClient(table)}
+		`;
+		expect({ table, seeded: (row?.n ?? 0) > 0 }).toEqual({
+			table,
+			seeded: true,
+		});
+	}
+}
+
 describe("runGuardedReset — the disable → truncate → enable loop", () => {
 	it("empties the truncate set and leaves every guard enabled", async () => {
+		await seedTwoRows();
+
 		await runGuardedReset(testClient, TRUNCATE_SET);
 
 		expect(await allGuardsEnabled()).toBe(true);
