@@ -1,6 +1,6 @@
 # STAGING-PARITY — Rebuild the staging fixture set by driving the real engine
 
-> **Status:** drafted
+> **Status:** ratified
 > **Date:** 2026-08-05
 > **Author:** Hrishikesh + Claude Code (Phase 1 tab)
 > **Critical-path?** **no** for the generator; **yes-adjacent** for the reset script — it disables the Bucket-A/B append-only guards on 26 relations, which is the enforcement layer behind INV-2 and INV-4. Treated as critical-path for ritual purposes (§5.6 tests-first · §5.7 invariant gate · §5.10 self-audit · §5.11 `@code-reviewer` + `@security-auditor` + `@db-migration-reviewer`).
@@ -457,8 +457,6 @@ Stated explicitly so execute cannot absorb them.
 
 ---
 
----
-
 # DECISIONS — Q1 … Q8
 
 ## Q1 · Execution context
@@ -856,3 +854,272 @@ Adversarial pass, 2026-08-05. Findings retained after resolution.
 > **NEVER run `scripts/seed-debate-view-staging.ts`.** It is the source of the corruption this task exists to remove, and it is deleted by this task.
 
 *Plan authored 2026-08-05 against `origin/main` @ `731be431`. Template: `docs/plans/_template.md`.*
+
+---
+
+# RATIFICATION RECORD
+
+> **Authored by:** web Claude (orchestrator), 2026-08-05 IST.
+> **Status of the plan:** RATIFIED, subject to the amendments in §5 and the
+> execute gates in §6.
+> **Authority:** this record supersedes the plan body wherever they conflict.
+> The body is preserved unedited as the plan-time record — what was believed,
+> and what was checkable, on 2026-08-05. Three entries are superseded here
+> rather than rewritten there (§4).
+
+---
+
+## 1 · Disposition
+
+The plan is ratified as written. It is better than the manifest it was built
+from: it corrected the manifest twice on mechanism (§1.9's rollback ordering,
+§0 A4's execution context) and once on cost (§2.2's participant-creation
+framing), and each correction came from reading the mechanism rather than
+following the instruction. That is the behaviour the plan-then-execute split
+exists to produce.
+
+Two design choices are recorded as improvements on their instructions:
+
+- **Q4's literal fixture table over the manifest's seeded RNG.** Strictly more
+  deterministic — no seed to lose, no generator version to reproduce.
+- **Q3's single-implicit-transaction batch over the manifest's `try/finally`.**
+  `finally` does not run on SIGKILL, OOM, or a dropped socket. Transactional DDL
+  does. See §5 W-A.
+
+---
+
+## 2 · Rulings folded
+
+| # | Ruling | Disposition |
+|---|---|---|
+| R1 | Commit the four PK-only POLISH documents before planning | **DONE** — PR #295 merged at `c5467f1e`; the build target is on `main` |
+| R2 | Wipe via owner-privilege `DISABLE TRIGGER` → `TRUNCATE CASCADE` → `ENABLE`, not schema drop, not additive | Ratified. Implemented at Q3 |
+| R2a | Three guards: target+env, re-enable, verified-not-assumed | Ratified and **strengthened** — see §5 W-B |
+| R3 | Spike the `server-only` premise before choosing an execution context | **DISCHARGED.** S1 tested it. Three blockers found, not one; Vitest clears all three. Route handler rejected |
+| R3a | Drive the real ENGINE, skip only the HTTP and cookie SHELL | Ratified. Per-surface table at Q1 satisfies the "state precisely which layers" condition |
+| R4 | M9 Frozen is `data-blocked`; staging is never frozen | Ratified. Three reinforcements in the plan is correct, not excessive |
+| R5 | Graph x-domain → GRAPH-WINDOW-OVERRIDE, own task, SPEC.1 §23 rider first | Ratified. Out of scope here |
+| R6 | Delete `seed-debate-view-staging.ts`; strip the write path from `verify-ranking-staging.ts`, keep the reads | Ratified. Promoting the surviving half to the C3 calibration instrument was not asked for and is the right call |
+| R7 | File the DRIFT-1 register row | Ratified. Applies at the register's next pass, not here |
+| P-1 | `system_state` never truncated; its absence must fail loud, not silent | Ratified. Q3's exclusion + R.3 satisfies it |
+| P-2 | Broaden gate 1 beyond `bets ↔ bet.placed` to all state-mutating flows | Ratified. G1.1–G1.5 satisfies it |
+| P-3 | X4 audit-feed pagination | **WITHDRAWN** — see OQ-2 |
+| P-4 | Accept ranking-constant rework, but as a named row, not a hope | Ratified — see OQ-4 |
+
+---
+
+## 3 · Open question dispositions
+
+**OQ-1 · C7 image attachment — STANDS as posed.** Resolve empirically at Slice D.
+The candidate is correct: drive the real path. If the presign or PUT is blocked
+by the known `smoke:staging` r2-scope failure, C7 is `data-blocked` with the R2
+triage named as its dependency. **Do not hand-INSERT an `image_uploads` row to
+fake it** — that is the exact class of counterfeit this task exists to remove.
+Downstream: POLISH.3 loses its image criteria if C7 blocks. Flag it at Slice C's
+close-out, not at Slice D's, so POLISH.3 is not surprised.
+
+**OQ-2 · X4 audit-feed pagination — WITHDRAWN. `data-blocked`, recorded as a
+PRODUCT gap, not a data gap.**
+
+The plan's candidate is superseded by evidence found after the commit:
+`loadAuditFeed` does not exist (the real exports are `loadModerationAuditFeed`
+and `searchAuditLog`), and although the server functions accept `limit`, the
+page hard-codes `ROW_LIMIT` at `audit/page.tsx:29` with no wiring to reach it.
+**There is no pagination in the audit surface at all.**
+
+So the choice was never cheap-or-expensive; it is withdraw-or-build-a-feature.
+Withdrawn, for three reasons: generating >200 removals, each needing its own
+comment, costs a session to exercise a paginator that does not exist; building
+pagination is a UI feature outside a data task's scope and needs its own
+POLISH.8 ruling on whether the feed should paginate; and the cursor path,
+wherever it exists, is integration-testable without 200 rows of staging content.
+
+The estimate does **not** gain a session.
+
+**OQ-3 · PR #295 ordering — RESOLVED.** Merged this session at `c5467f1e`; the
+manifest is on `main` and staging is advanced to it. The Tracker-context and
+References entries reading "arriving via PR #295" are superseded (§4).
+
+**OQ-4 · Ranking constants pin 2026-09-01 — ACCEPT THE REWORK, as a tracker row.**
+Accepting rework is only reasonable because the generator is clean-recreate: a
+re-run, not a rebuild. That makes it schedulable rather than hopeful.
+**Action: add a row to the HARDEN.5 number-tuning task — "re-run
+`staging:rebuild` and re-calibrate M2/M3 after the pin."** Waiting for 2026-09-01
+would block all eight POLISH surfaces for four weeks and is rejected.
+
+**OQ-5 · `settleMarket` and `positions.quantity` — CORRECTLY DEFERRED.** Read
+`settle.ts`'s write set at Slice B. Do not pre-answer it here; the candidate is
+plausible and unverified, and G6.3 already disambiguates either outcome.
+
+**OQ-6 · `seedAmount` and `pool_seed` — CORRECTLY DEFERRED.** Gate 2 is the
+arbiter, as the plan states. If gate 2 fails on a generously-seeded M7, the
+finding is about the identity, not a licence to add a ledger row.
+
+---
+
+## 4 · Superseded entries in the plan body
+
+Preserved unedited above; corrected here by reference.
+
+| Location | Says | Correct as of ratification |
+|---|---|---|
+| Tracker context, dependency 1; References | Manifest "NOT on origin/main… PR #295 OPEN" | Merged at `c5467f1e`. On `main` |
+| OQ-2 candidate | "expose the limit… `loadAuditFeed` already accepts `options.limit`" | Function name wrong; page hard-codes `ROW_LIMIT`; no pagination exists. X4 withdrawn |
+| Lines 458–460 | Duplicated `---` | Deleted at ratification — the only body edit authorised |
+
+---
+## 5 · Web findings
+
+**W-A · The §1.9 correction is accepted and flows back to the manifest.**
+Atomicity is the primary mechanism; `finally` is demoted to a belt. Manifest
+§1.9 is amended at v1.2, and ADR-0035 ratifies the ordering. Guard 4's catalog
+verification remains load-bearing precisely because it is what notices if a
+future edit splits the batch into separate round-trips.
+
+**W-B · The reset's env guard needs hardening beyond the plan's §5 row.**
+Three additions, all binding on Slice A:
+
+1. **Fail closed on absence.** If `DATABASE_URL_STAGING` or
+   `STAGING_PROJECT_REF_FRAGMENT` is unset, refuse. Never fall back to
+   `DATABASE_URL` — the reset must not be able to inherit a connection string
+   from ambient environment.
+2. **Assert positively against the live connection**, not only the config:
+   `current_database()` and the ref fragment, read from the socket about to be
+   used. A config can say staging while the connection says otherwise.
+3. **Assert `system_state`'s singleton row exists and `frozen_at IS NULL` after
+   the run**, exiting non-zero on either failure. R.3 covers this; it is named
+   here so it cannot be dropped as a nice-to-have.
+
+The wrong-target case deserves the same weight as the guard-list constant: a
+unit-tested predicate with its own assertions, not one row in a failure table.
+
+**W-C · ToS evidence columns need a stated content rule.**
+`acceptTosAction` writes `tos_acceptance_ip` and `tos_acceptance_user_agent`
+from mocked `headers()`. The plan traces the transaction precisely and never
+says what goes in them. They land in a database that is published on 2026-11-06.
+
+**Rule: fixed, obviously-synthetic literals** — unmistakably generated on sight.
+Never a plausible IP, never a real user-agent string. Manifest §1.7 governs;
+this is the one place the plan brushes it without naming it. Binding on Slice B.
+
+**W-D · G5.1/G5.2's carriers are mis-assigned, and the seam will produce a false
+defect at POLISH.5.**
+
+`accrueDailyCredit` fires inside `place()`. A user who never bets never accrues.
+**P-empty's balance is therefore exactly 1000, not 1010** — the plan's "P-empty
+and P-visitor-target both open their first betting day at 1010" is counterfactual
+for a role defined by never betting.
+
+Both criteria still pass (1000 is four-digit; grouping is observable). Correct
+the carriers: **G5.1 → P-empty at exactly 1000. G5.2 → a participant that
+actually bets.**
+
+The consequence matters more than the wording. The SHELL-COMPLETE close-out
+records that `header-balance` and `loadProfileTiles` **differ by
+`DAILY_CREDIT_DHARMA` on any unclaimed day** — a near-miss caught when a test
+pinned them equal. On staging, the same user can legitimately render a 10 Đ
+difference across those two surfaces. An inspector will file it as a defect.
+
+**Action: pre-record it in `POLISH-register.md` as `superseded` before POLISH.5
+runs**, citing the SHELL-COMPLETE note. Otherwise it costs a founder review-hour
+on known-correct behaviour.
+
+**W-E · Rebuilds orphan R2 objects permanently.** `image_uploads` is truncated;
+the objects behind `r2_object_key` are not, and the orphan-sweep cron does not
+fire on staging (STAGING-PARITY-ENV). Every rebuild leaks one placeholder PNG.
+Trivial across a 90-day asset. **Recorded so it is not discovered as a surprise.
+No work.**
+
+**W-F · `canonicalize@3.0.0` is a latent trap for non-Vitest tooling.** ESM-only,
+single importer at `src/server/idempotency/cache.ts:2`, reached by every bet,
+lifecycle and resolution path. Not a defect today. **Close-out record, no chase.**
+
+**W-G · The lint-level generator guard is endorsed and must be named as
+load-bearing.** §1's second critical-path failure mode identifies the
+circularity exactly: if the generator ever writes a `bets` or `events` row
+directly, gate 1 passes *because the generator wrote both halves*. A
+verification satisfiable by the thing it verifies is not a verification. The
+source-level assertion is what makes gate 1 non-vacuous — the same shape as
+ENGINE.10's two-derivation conservation check. **It is not a lint nicety and
+must not be simplified away in review.**
+
+---
+## 6 · Execute gates
+
+**Slice A is gated on BOTH ADRs, not one.**
+
+The plan says execute gates on ADR-0035. But `vitest.staging.config.ts` is a
+Slice A deliverable, and **ADR-0036 is the decision about whether a Vitest
+context is an acceptable vehicle for operational work.** Building the config
+before the ADR that sanctions it inverts spec-first. Both land first; both are
+small; the serialization point does not move.
+
+| Gate | Owner | Blocks |
+|---|---|---|
+| ADR-0035 — guarded staging reset | web-authored | Slice A |
+| ADR-0036 — Vitest-context operational runners | web-authored | Slice A |
+| Manifest v1.2 | web-authored | Slice B (not A) |
+| W-B guard hardening | Slice A scope | Slice A merge |
+| W-C literal rule | Slice B scope | Slice B merge |
+| W-D carrier correction | Slice C scope | gate 5 |
+
+ADR numbers `0035` / `0036` are proposed against a ceiling of 0034 and **must be
+re-verified with `ls docs/adr/` at authoring time.** Nothing here mints or
+reserves them.
+
+Slice A's ritual is confirmed as the plan states: tests-first, then
+`@code-reviewer` → `@security-auditor` **sequentially**, then the §5.10
+self-audit, then **Gate C**. Slice A is the only artifact in this task whose job
+is to switch off the enforcement that makes the ledger credible, and it earns
+every pass. Keeping it in its own slice — so a security review does not land on
+a diff that is 90% fixture data — is correct.
+
+---
+
+## 7 · Deviation record
+
+**Ratified deviation (R3a):** the generator drives the real engine functions —
+`createOAuthUser`, `acceptTosAction`, `createMarket`, `openMarket`, `place`,
+`sell`, `closeMarket`, `triggerResolution`, `settleMarket`, `voidMarket`,
+`moderateComment`, `addBookmarkAction` — and skips only the HTTP and cookie
+shell. The per-surface enumeration at Q1 is the record of what is skipped.
+
+**What the deviation does not permit:** a second event-writing implementation.
+Zero rows are written directly. §7's source assertion is the enforcement, and
+W-G records why it must survive review.
+
+**Mockable layers, fixed:** `next/headers`, `next/navigation`, `next/cache`,
+`requireAdminSession`, `auth.api.getSession`, `verifyOnboardingRef`.
+**Never mockable:** anything that writes a row or moves Dharma. ADR-0036 makes
+this a stated rule rather than a convention.
+
+---
+
+## 8 · Manifest v1.2 amendments owed
+
+Web-authored, before Slice B:
+
+1. **§1.9** — atomicity primary, `finally` demoted to a belt (W-A).
+2. **§4 gate 1** — broadened to all state-mutating flows; G1.5's third
+   corruption class named (`Resolved` with zero `resolution_events`).
+3. **§2.5 X4** — moved from the fixture set to §3 unreachable, reason recorded
+   as a product gap.
+4. **§1.3** — "seeded RNG" amended to permit a literal fixture table, noted as
+   the stronger form.
+5. **§1.7** — W-C's synthetic-literal rule made explicit.
+6. **§0 A4** — retired; recorded as empirically disproven by S1, with the three
+   blockers named.
+
+---
+
+## 9 · What this record does not change
+
+M9's prohibition. The append-only invariants. The six gates. The slice
+boundaries. The four-session estimate. `episodes.ts:168` — SP-3 stands: the
+guard is correct, this task removes the bad rows and does not soften the code
+that refuses them.
+
+---
+
+*Ratification Record appended 2026-08-05 IST against `origin/main` @ `c5467f1e`.
+Plan body preserved unedited except the duplicated rule at 458–460.*
