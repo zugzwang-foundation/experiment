@@ -264,3 +264,32 @@ describe("no guard is written as a failable it()", () => {
 		expect(itBlocks).toHaveLength(1);
 	});
 });
+
+describe("the batch bounds lock wait (ruling 2)", () => {
+	// Comments stripped: reset.ts DISCUSSES statement_timeout at length to
+	// explain why it is deliberately absent, so a raw scan finds the prose and
+	// asserts against the wrong thing — the same trap the runner's own header
+	// set for the it()-block scan above.
+	const mechanism = stripComments(
+		readFileSync(`${STAGING_DIR}_lib/reset.ts`, "utf8"),
+	);
+
+	it("issues SET LOCAL lock_timeout, not a session-scoped SET", () => {
+		// Session-scoped would leak into the pooled connection and silently
+		// apply to every later query on it.
+		expect(mechanism).toMatch(/SET LOCAL lock_timeout = '\$\{LOCK_TIMEOUT\}'/);
+		expect(mechanism).not.toMatch(/SET lock_timeout/);
+	});
+
+	it("places the timeout INSIDE the batch, before the disable", () => {
+		// Outside the batch it would be its own transaction and revert
+		// immediately, bounding nothing.
+		expect(mechanism).toMatch(
+			/client\.unsafe\(\s*`\$\{LOCK_TIMEOUT_STATEMENT\}\\n\$\{disable\}/,
+		);
+	});
+
+	it("sets no statement_timeout — execution is deliberately unbounded", () => {
+		expect(mechanism).not.toMatch(/statement_timeout/);
+	});
+});

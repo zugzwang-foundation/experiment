@@ -128,6 +128,30 @@ export async function assertLiveConnection(
 	return { database: row.database, user: row.user, target };
 }
 
+/**
+ * Bounds how long the batch will WAIT for a lock — not how long it may run.
+ *
+ * The batch takes `ACCESS EXCLUSIVE` on the truncate set and
+ * `SHARE ROW EXCLUSIVE` on every guarded relation. Without a timeout, a reset
+ * issued while staging serves traffic queues behind the open transaction and
+ * holds write-blocking locks on every append-only table for as long as that
+ * takes — and, because a lock request queues ahead of later readers, it stalls
+ * the application too. Bounded, the batch instead fails fast with `55P03`, and
+ * the whole thing rolls back under primitive 2. A self-inflicted staging
+ * outage becomes a retry. Ruling 2, 2026-08-06.
+ *
+ * `SET LOCAL` — transaction-scoped, so it reverts when the implicit
+ * transaction ends and cannot leak into the pooled session. That matters on
+ * the Supabase session pooler, where the connection is reused.
+ *
+ * DELIBERATELY NOT `statement_timeout`. That would bound EXECUTION, and a
+ * legitimate `TRUNCATE … CASCADE` over 21 relations has no principled upper
+ * bound — capping it would abort correct work and turn a slow reset into a
+ * failed one. Lock WAIT is the contended resource; execution is not.
+ */
+const LOCK_TIMEOUT = "15s";
+const LOCK_TIMEOUT_STATEMENT = `SET LOCAL lock_timeout = '${LOCK_TIMEOUT}';`;
+
 /** Postgres identifiers this module is willing to interpolate into raw SQL. */
 const SAFE_IDENTIFIER = /^[a-z_][a-z0-9_]*$/;
 
@@ -196,7 +220,7 @@ export async function runGuardedReset(
 	).join("\n");
 
 	await client.unsafe(
-		`${disable}\nTRUNCATE ${tables.join(", ")} CASCADE;\n${enable}`,
+		`${LOCK_TIMEOUT_STATEMENT}\n${disable}\nTRUNCATE ${tables.join(", ")} CASCADE;\n${enable}`,
 	);
 }
 

@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
 	isAllowedStagingHost,
@@ -312,5 +314,63 @@ describe("isAllowedStagingHost", () => {
 				allowed: false,
 			});
 		}
+	});
+});
+
+describe("PRODUCTION_PROJECT_REF — the liveness check (ruling 3)", () => {
+	// There is no way to verify the ref from inside a module that never
+	// connects. What IS checkable is that the deny list is populated and that
+	// it actually refuses a production-shaped connection. THIS TEST is the
+	// liveness check: at ref-rotation time, the fixture below is the thing to
+	// re-check alongside the constant.
+
+	it("is a non-empty 20-character Supabase project ref", () => {
+		expect(PRODUCTION_PROJECT_REF).toBeTruthy();
+		expect(PRODUCTION_PROJECT_REF).toMatch(/^[a-z]{20}$/);
+	});
+
+	it("is the SINGLE code constant — the guard interpolates it, never a literal", () => {
+		// If a second copy of the ref were ever pasted into the guard, rotating
+		// the constant would leave the copy behind, silently un-protecting.
+		const guardSource = readFileSync(
+			fileURLToPath(new URL("../../staging/_lib/guards.ts", import.meta.url)),
+			"utf8",
+		);
+		const occurrences = guardSource.split(PRODUCTION_PROJECT_REF).length - 1;
+		expect(occurrences).toBe(1);
+	});
+
+	it("refuses a synthetic PRODUCTION session-pooler URL", () => {
+		// The real shape a mis-set Doppler config would produce: `prd` instead
+		// of `stg`, so the pooler username carries the PRODUCTION ref.
+		const prodUrl = `postgresql://postgres.${PRODUCTION_PROJECT_REF}:pw@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`;
+		const result = resolveStagingTarget(
+			stagingEnv({ DATABASE_URL_STAGING: prodUrl }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(/production/i);
+	});
+
+	it("refuses a synthetic PRODUCTION direct-host URL", () => {
+		const prodUrl = `postgresql://postgres:pw@db.${PRODUCTION_PROJECT_REF}.supabase.co:5432/postgres`;
+		const result = resolveStagingTarget(
+			stagingEnv({ DATABASE_URL_STAGING: prodUrl }),
+		);
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(/production/i);
+	});
+
+	it("refuses the production URL even with a valid staging fragment configured", () => {
+		// The wrong-target case that matters most: everything else is correct,
+		// only the URL is prod.
+		const prodUrl = `postgresql://postgres.${PRODUCTION_PROJECT_REF}:pw@aws-1-ap-south-1.pooler.supabase.com:5432/postgres`;
+		const result = resolveStagingTarget({
+			DATABASE_URL_STAGING: prodUrl,
+			STAGING_PROJECT_REF_FRAGMENT: STAGING_FRAGMENT,
+			ZUGZWANG_ENV: "staging",
+			[RESET_INTENT_ENV]: RESET_INTENT_VALUE,
+		});
+		expect(result.ok).toBe(false);
+		if (!result.ok) expect(result.reason).toMatch(/production/i);
 	});
 });

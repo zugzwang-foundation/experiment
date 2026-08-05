@@ -141,6 +141,37 @@ describe("runGuardedReset — the disable → truncate → enable loop", () => {
 		expect(await allGuardsEnabled()).toBe(true);
 	});
 
+	it("sets a transaction-scoped lock_timeout that does not leak (ruling 2)", async () => {
+		// SET LOCAL is transaction-scoped, so it must revert when the implicit
+		// transaction ends. That matters on the Supabase session pooler, where
+		// the connection is REUSED — a leaked lock_timeout would silently apply
+		// to every later query on that session.
+		const [before] = await testClient<{ v: string }[]>`
+			SELECT current_setting('lock_timeout') AS v
+		`;
+
+		await runGuardedReset(testClient, TRUNCATE_SET);
+
+		const [after] = await testClient<{ v: string }[]>`
+			SELECT current_setting('lock_timeout') AS v
+		`;
+		expect(after?.v).toBe(before?.v);
+	});
+
+	it("bounds lock WAIT, not execution — no statement_timeout is set", async () => {
+		// Deliberate: a legitimate TRUNCATE ... CASCADE over 21 relations has no
+		// principled upper bound, so capping EXECUTION would abort correct work.
+		// Lock wait is the contended resource; execution is not.
+		const [before] = await testClient<{ v: string }[]>`
+			SELECT current_setting('statement_timeout') AS v
+		`;
+		await runGuardedReset(testClient, TRUNCATE_SET);
+		const [after] = await testClient<{ v: string }[]>`
+			SELECT current_setting('statement_timeout') AS v
+		`;
+		expect(after?.v).toBe(before?.v);
+	});
+
 	it("names no excluded table in the shipped truncate set", () => {
 		// A property of the constant, asserted rather than enforced at runtime:
 		// runGuardedReset deliberately has no exclusion bypass to test around,

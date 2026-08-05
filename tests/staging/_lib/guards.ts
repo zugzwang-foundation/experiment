@@ -18,11 +18,33 @@
 /**
  * The production Supabase project ref. Present only so the target guard can
  * refuse it by name — this file never connects anywhere.
+ *
+ * THIS IS THE SINGLE CODE CONSTANT for the production ref. The literal also
+ * appears in ten committed documents (ADR-0024, the deploy runbook, two
+ * handover decks, an incident log, three plans, the STAGING-PARITY plan), but
+ * those are prose, not importable values — there is no other constant to point
+ * at, and this one is not a duplicate of any of them. Anything in code needing
+ * the production ref must import THIS, so the refusal has exactly one place to
+ * be corrected. Ruling 3, 2026-08-06.
+ *
+ * LIVENESS: a Supabase project restore or migration mints a NEW ref, at which
+ * point this literal silently stops protecting anything and the fragment check
+ * becomes the only barrier. There is no way to verify the value from inside
+ * this module — it never connects. What IS enforceable here is that the deny
+ * list is not EMPTY, which is the failure mode a careless edit produces:
+ * blanking the string turns `url.includes("")` into a vacuous true and would
+ * make the guard refuse EVERY url, or — had the check been written the other
+ * way — refuse none. `resolveStagingTarget` asserts it is non-empty, and
+ * `reset-guard.test.ts` feeds a synthetic production URL and asserts refusal.
+ * That test IS the liveness check: if the ref is ever rotated and this constant
+ * is not updated with it, the test still passes against the synthetic value,
+ * so the test's own fixture is the thing to re-check at rotation time. Recorded
+ * plainly rather than implied.
  */
 export const PRODUCTION_PROJECT_REF = "zbvprdcyxhlguxbostdj";
 
 /**
- * The intent token `pnpm staging:reset` sets and nothing else does.
+ * G-5 — the intent token `pnpm staging:reset` sets and nothing else does.
  *
  * G-1..G-4 are all ENVIRONMENTAL — they prove WHERE you are, never that you
  * MEANT it. Through Slices B–D the operator lives in `doppler run --config
@@ -247,6 +269,19 @@ export function resolveStagingTarget(
 	const fragment = env.STAGING_PROJECT_REF_FRAGMENT;
 	const zugzwangEnv = env.ZUGZWANG_ENV;
 
+	// The deny list must not be empty. A blanked PRODUCTION_PROJECT_REF makes
+	// `url.includes(ref)` vacuously TRUE for every URL, so the reset would
+	// refuse everything and the operator's fix would be to delete the check —
+	// removing the only hard target discriminator. Refuse loudly instead.
+	// Ruling 3, 2026-08-06.
+	if (!PRODUCTION_PROJECT_REF) {
+		return {
+			ok: false,
+			reason:
+				"PRODUCTION_PROJECT_REF is empty; the production deny list is not configured and the target guard cannot discriminate. Refusing.",
+		};
+	}
+
 	// G-1 · target.
 	if (!url) {
 		return {
@@ -297,8 +332,10 @@ export function resolveStagingTarget(
 		};
 	}
 
-	// G-0 · intent. Every guard above proves WHERE the connection goes; none
-	// proves the operator meant to run a destructive wipe right now.
+	// G-5 · intent / watch-mode refusal. Every guard above proves WHERE the
+	// connection goes; none proves the operator meant to run a destructive wipe
+	// right now. Additive to ADR-0035 primitive 6's four guards, never a
+	// relaxation of them — see the ADR-0035 Addendum, 2026-08-06.
 	if (env[RESET_INTENT_ENV] !== RESET_INTENT_VALUE) {
 		return {
 			ok: false,

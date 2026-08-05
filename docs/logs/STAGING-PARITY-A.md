@@ -77,8 +77,9 @@ file is circular. The kickoff's named sequence — `@code-reviewer` then
 `drizzle/migrations/` file is touched (the migrations are only *read*, by the
 parity assertion).
 
-**D-6 · A fifth guard (G-0, intent) was added.** Additive to ADR-0035
-primitive 6, never a relaxation of it. Rationale under finding S-4.
+**D-6 · A fifth guard (G-5, intent / watch-mode refusal) was added.** Additive
+to ADR-0035 primitive 6, never a relaxation of it. Rationale under finding S-4;
+ratified and named G-5 by the ADR-0035 Addendum (2026-08-06).
 
 ---
 
@@ -199,10 +200,101 @@ landmine and it is avoided.
 
 ---
 
+## Rulings — dispositions (2026-08-06, pre-Gate-C)
+
+Five rulings were returned on the findings below. All are applied or recorded
+here; the PR was **not** merged.
+
+| # | Ruling | Disposition |
+|---|---|---|
+| **1** | The three unratified tables (`admin_sessions`, `cron_alarms`, `watermark_state`) | **RECORDED, NOT APPLIED.** They stay outside the truncate set. `TRUNCATE_SET` remains an exact reproduction of Q3's ratified list; the three are named in `NOT_TRUNCATED_UNRATIFIED` with their reasoning, and a test accounts for every public base table across the three lists so a future table cannot be silently forgotten. No code behaviour changed. |
+| **2** | `lock_timeout` | **APPLIED.** `SET LOCAL lock_timeout = '15s'` is now the first statement **inside** the single batch, ahead of the disable. |
+| **3** | Production-ref liveness | **APPLIED.** Non-empty assertion at guard time + a unit test that feeds a synthetic production URL and asserts refusal. |
+| **4** | The production ref published in a public repo | **DOCKET ROW, OWN TASK.** Not addressed in this PR. |
+| **5** | ADR-0035 addendum for G-5 | **APPLIED.** Appended as `## Addendum — 2026-08-06`; primitives 1–7 untouched. |
+
+### Ruling 2 · `lock_timeout` — what it does and does not bound
+
+`SET LOCAL lock_timeout = '15s'` bounds how long the batch will **wait for a
+lock**, not how long it may **run**.
+
+The batch takes `ACCESS EXCLUSIVE` on the truncate set and
+`SHARE ROW EXCLUSIVE` on every guarded relation. Unbounded, a reset issued
+while staging serves traffic queues behind whatever transaction holds the
+conflicting lock — and because a pending lock request queues *ahead* of later
+readers, it stalls the application behind it too. Bounded, the batch fails fast
+with `55P03` and the whole thing rolls back under primitive 2. A self-inflicted
+staging outage of unbounded duration becomes a retry.
+
+`SET LOCAL` is **transaction-scoped**, so it reverts when the implicit
+transaction ends and cannot leak into the pooled session. That is load-bearing
+on the Supabase session pooler, where the connection is reused — a
+session-scoped `SET` would silently apply to every later query on it. Asserted
+both ways: a unit assertion that the statement is `SET LOCAL` and sits inside
+the batch, and an integration assertion that `lock_timeout` reads the same
+before and after a real run.
+
+**`statement_timeout` was deliberately NOT added.** That would bound
+*execution*, and a legitimate `TRUNCATE … CASCADE` over 21 relations has no
+principled upper bound — capping it would abort correct work and turn a slow
+reset into a failed one. Lock **wait** is the contended resource; execution is
+not. An integration assertion pins its absence.
+
+### Ruling 3 · Production-ref liveness — and where the single constant lives
+
+`PRODUCTION_PROJECT_REF` in `tests/staging/_lib/guards.ts` is **the only code
+occurrence of the production ref in the repository** — verified by grep across
+every `.ts`/`.tsx`/`.js`/`.json`/`.yml`. The other ten occurrences are **prose
+in markdown/HTML documents** (ADR-0024, the deploy runbook, two handover decks,
+an incident log, three plans, the STAGING-PARITY plan), not importable values.
+
+So the guard did **not** introduce an 11th *copy of a constant*: there was no
+existing constant to point at, and this one is now the single one. **It is left
+where it is**, with its docblock stating that anything in code needing the
+production ref must import it, so the refusal has exactly one place to be
+corrected. A unit test asserts the ref appears exactly **once** in `guards.ts`,
+so a pasted second copy — which would survive a rotation of the constant and
+silently un-protect — fails immediately.
+
+What is now enforced: `resolveStagingTarget` refuses if the constant is empty
+or unset. That is the failure mode a careless edit produces — blanking the
+string makes `url.includes("")` vacuously true, and the operator's natural fix
+would be to delete the check, removing the only hard target discriminator.
+
+**The unit test is the liveness check**, as directed: it feeds a synthetic
+production connection URL — in both the session-pooler shape
+(`postgres.<prodref>@…pooler.supabase.com`, which is what a `prd`-instead-of-`stg`
+Doppler slip actually produces) and the direct-host shape — and asserts the
+guard refuses each, including the case where every other setting is correct and
+only the URL is production. **Honest limit, recorded rather than implied:** if
+the ref is ever rotated and the constant is not updated with it, these tests
+still pass against the synthetic value. At rotation time the test's own fixture
+is the thing to re-check alongside the constant.
+
+### Ruling 5 · The addendum, and the G-0 → G-5 rename
+
+`docs/adr/0035-guarded-staging-reset.md` gains `## Addendum — 2026-08-06`,
+placed after `## More Information` and **before** the closing italic line.
+Append-only, verified: `git diff origin/main` on that file shows **zero
+deletions**; 182 → 208 lines. Primitives 1–7 are byte-identical.
+
+It carries (a) G-5, the watch-mode refusal — what it does, why it exists, and
+that it is additive to primitive 6's four guards — and (b) the amendment rule
+verbatim: *"An addendum to an accepted ADR may ADD a refusal condition. It may
+never remove one, widen a permitted set, or change a mechanism. Those three
+require a superseding ADR."*
+
+**Naming reconciled.** The guard shipped in the Slice A code as **G-0**; the
+ruling names it **G-5**. The code, the runner's header block and the log now
+all say **G-5**, so the ADR and the implementation agree. Label only — no
+behaviour, ordering or evaluation change. Flagged rather than done silently.
+
+---
+
 ## Open questions / findings for a ruling
 
 **O-1 · Three public tables are in neither the truncate set nor the
-exclusions.** `admin_sessions`, `cron_alarms`, `watermark_state`. Q3's ratified
+exclusions.** — **RULED, ruling 1: recorded, not applied.** `admin_sessions`, `cron_alarms`, `watermark_state`. Q3's ratified
 set is reproduced verbatim and is silent on them, so they are **recorded** in
 `NOT_TRUNCATED_UNRATIFIED` with the reasoning and flagged here rather than
 added — widening a ratified set is a ruling, not an implementation detail.
@@ -224,7 +316,7 @@ are G-1's fragment match and the hard production-ref refusal. Stated at the
 function rather than papered over. **No action believed needed; recorded so it
 is not mistaken for a stronger guarantee than it is.**
 
-**O-3 · The production-ref refusal has no liveness check.**
+**O-3 · The production-ref refusal has no liveness check.** — **RESOLVED, ruling 3.**
 `PRODUCTION_PROJECT_REF` is a hard-coded literal. A Supabase project restore or
 migration mints a **new** ref, at which point the literal silently stops
 protecting and the fragment becomes the only barrier. A deny-list of one, never
@@ -232,7 +324,7 @@ re-verified, guarding an irreversible operation. *Candidate answer:* assert it
 in `env-audit.yml` against the live project list, or derive it from Doppler
 `prd` rather than hard-coding.
 
-**O-4 · SURPRISE, pre-existing, out of scope.** The production project ref is
+**O-4 · SURPRISE, pre-existing, out of scope.** — **RULED, ruling 4: docket row, own task.** The production project ref is
 committed in **10 files** of this **public** repo — ADR-0024, the deploy
 runbook, two handover decks, an incident log, three plans, and now `guards.ts`.
 That discloses the production DB hostname, the pooler username, and the project
@@ -242,7 +334,7 @@ ref was already on `main` — so it is not a reason to block. Deserves its own
 docket row; the sharper question is whether the anon/PostgREST surface is
 reachable, given ADR-0019 puts RLS out of scope.
 
-**O-5 · The batch sets no `lock_timeout`.** It takes `ACCESS EXCLUSIVE` on 21
+**O-5 · The batch sets no `lock_timeout`.** — **RESOLVED, ruling 2 (applied).** It takes `ACCESS EXCLUSIVE` on 21
 relations. A reset that blocks behind live staging traffic holds write-blocking
 locks on every append-only table indefinitely, and can deadlock an in-flight bet
 transaction. Safe (the abort rolls back) but a self-inflicted staging outage of

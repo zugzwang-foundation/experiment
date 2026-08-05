@@ -30,7 +30,8 @@ import {
 //   - it lives under tests/staging/, which vitest.config.ts EXCLUDES, so no
 //     bare `vitest run` — local, CI, or a subagent's — can reach it;
 //   - it runs only through vitest.staging.config.ts;
-//   - it refuses to run at all unless four guards pass.
+//   - it refuses to run at all unless FIVE guards pass (primitive 6's four,
+//     plus the G-5 intent token added by the ADR-0035 Addendum).
 //
 // Invocation:  pnpm staging:reset
 //   (which is `doppler run --project zugzwang-experiment --config stg -- …`,
@@ -50,6 +51,9 @@ import {
 //
 // THE GUARD CONTRACT (ADR-0035 primitive 6, hardened by Ratification Record
 // §5 W-B):
+//   G-5 intent      — the ZUGZWANG_STAGING_RESET_ACK token that `pnpm
+//                     staging:reset` sets and nothing else does. Additive to
+//                     primitive 6's four guards (ADR-0035 Addendum).
 //   G-1 target      — DATABASE_URL_STAGING set AND containing
 //                     STAGING_PROJECT_REF_FRAGMENT AND not the production ref.
 //                     Fails closed on absence. NEVER falls back to DATABASE_URL.
