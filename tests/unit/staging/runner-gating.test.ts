@@ -121,6 +121,21 @@ describe("guards run before any test body", () => {
 		expect(throwAt).toBeGreaterThan(-1);
 		expect(clientAt).toBeGreaterThan(-1);
 		expect(throwAt).toBeLessThan(clientAt);
+
+		// MUTATION-DERIVED (M-f2, 2026-08-06). The three assertions above ALL
+		// hold when the module-scope refusal is downgraded from `throw` to
+		// `console.error`: the message stays where it was, only the construct
+		// that stops the run changes. The file-wide `/throw new Error/` checks
+		// below are satisfied by the beforeAll throws, so nothing noticed —
+		// while the runner would go on to build a client from an undefined URL
+		// and let postgres-js pick a target out of ambient environment.
+		//
+		// `tsc` DOES catch it (StagingTarget is discriminated, so `target.url`
+		// stops narrowing) — but the typecheck is a different gate, and this
+		// file is the one whose entire job is the gating property. Bind the
+		// message to the construct.
+		const window = source.slice(Math.max(0, throwAt - 60), throwAt);
+		expect(window).toMatch(/throw new Error\(/);
 	});
 
 	it("runs G-3 in beforeAll, not in an it()", () => {
@@ -255,6 +270,18 @@ describe("every operational runner, present and future", () => {
 			const itAt = firstItOffset(body);
 			const preamble = itAt === -1 ? body : body.slice(0, itAt);
 			expect(preamble).toMatch(/throw new Error/);
+
+			// MUTATION-DERIVED (M-f2): a preamble-wide `/throw new Error/` is
+			// satisfied by ANY throw in the preamble — including one belonging to
+			// a different guard entirely. Tie the throw to the TARGET GUARD's own
+			// result, which is the refusal that must stop the run before a client
+			// exists. Generic across the generator/gate runners Slices B–D add,
+			// since they read the same predicate.
+			const guardAt = body.indexOf("resolveStagingTarget(process.env)");
+			expect(guardAt).toBeGreaterThan(-1);
+			expect(preamble.slice(guardAt)).toMatch(
+				/\.ok\)[\s\S]{0,120}throw new Error/,
+			);
 		});
 
 		it(`${file} · does not import the test-only truncate fixture`, () => {
