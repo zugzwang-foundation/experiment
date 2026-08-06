@@ -39,6 +39,7 @@
 // `INSERT INTO` as raw SQL has no handle to travel on — that half is
 // structural, not asserted.
 
+import { fileURLToPath } from "node:url";
 import { getTableName, is, Table } from "drizzle-orm";
 
 /** The verbs that can write. `execute` is included: `insertEvent` writes via a
@@ -81,25 +82,47 @@ export interface WriteRecord {
 	readonly caller: string;
 }
 
-/** Absolute path of this module, used to skip its own frames. */
-const SELF_MARKER = "write-guard";
+/** Absolute path of a V8 frame, `file://` scheme stripped. */
+function framePath(line: string): string | null {
+	// Node/V8 frames: "    at fn (/abs/path.ts:12:3)" or "    at /abs/path.ts:12:3".
+	const match = line.match(/\(?((?:\/|file:)[^\s()]+?):\d+:\d+\)?\s*$/);
+	const raw = match?.[1];
+	if (!raw) return null;
+	return raw.startsWith("file://")
+		? fileURLToPath(raw.split("?")[0] ?? raw)
+		: raw;
+}
 
 /**
  * The first stack frame that is not inside this module — the immediate caller
  * of the intercepted verb. `null` when no frame can be read.
+ *
+ * ⚠ THE SELF-SKIP IS MATCHED ON AN EXACT PATH PREFIX, NOT A SUBSTRING.
+ *
+ * It was a substring — `line.includes("write-guard")` — and that was a real
+ * defect, caught by `tests/unit/staging/write-guard.test.ts` on its first run.
+ * The test file is named `write-guard.test.ts`, so the marker matched ITS
+ * frames too: the loop skipped straight past the actual caller and landed on
+ * `@vitest/runner`'s frame, which is under `node_modules/` and therefore
+ * ALLOWED. The guard silently permitted the exact write it exists to refuse.
+ *
+ * That is worth more than the fix. A substring self-marker is a guess about
+ * what else might be named similarly, and the first file named similarly was
+ * the guard's own test. `import.meta.url` cannot be wrong about which file this
+ * is.
  */
+const SELF_PATH = fileURLToPath(import.meta.url);
+
 function immediateCaller(): string | null {
 	const stack = new Error().stack;
 	if (typeof stack !== "string") return null;
-	const lines = stack.split("\n").slice(1);
-	for (const line of lines) {
-		if (line.includes(SELF_MARKER)) continue;
-		// Node/V8 frames: "    at fn (/abs/path.ts:12:3)" or "    at /abs/path.ts:12:3".
-		const match = line.match(/\(?((?:\/|file:)[^\s()]+?):\d+:\d+\)?\s*$/);
-		if (match?.[1]) return match[1];
-		// A frame we cannot parse is not silently skipped — it is the caller and
-		// we could not read it, which is the fail-closed case.
-		return null;
+	for (const line of stack.split("\n").slice(1)) {
+		const path = framePath(line);
+		// An unparseable frame is NOT skipped. It is the caller, we could not
+		// read it, and this guard fails closed.
+		if (path === null) return null;
+		if (path.startsWith(SELF_PATH)) continue;
+		return path;
 	}
 	return null;
 }
@@ -121,7 +144,7 @@ function immediateCaller(): string | null {
  * `/tests/` is refused explicitly and first, so a runner file living under a
  * path that also matches one of the above cannot slip through.
  */
-function isEngineCaller(caller: string): boolean {
+export function isEngineCaller(caller: string): boolean {
 	const normalized = caller.replace(/\\/g, "/");
 	if (normalized.includes("/tests/")) return false;
 	return normalized.includes("/src/") || normalized.includes("/node_modules/");

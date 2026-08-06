@@ -137,6 +137,7 @@ import {
 	readOnly,
 	writeLog,
 } from "./_lib/client";
+import { resolveRunnerTarget } from "./_lib/target";
 import { DirectWriteForbiddenError } from "./_lib/write-guard";
 import {
 	MARKETS,
@@ -150,6 +151,31 @@ import {
 	syntheticEmail,
 	VOID_REASON,
 } from "./fixtures";
+
+// ── THE TARGET GUARD, AT MODULE SCOPE, AHEAD OF EVERY it() ──────────────────
+//
+// `_lib/client.ts` already resolves the same predicate at ITS module scope, and
+// because ESM hoists imports that resolution is the one that actually runs
+// first — it throws before a client exists, which is the fail-closed guarantee.
+//
+// This call is therefore deliberately redundant, and it is here for two
+// reasons. The refusal belongs where an operator reads it: a runner that can
+// write to a live database should say so in its own file, not delegate the
+// decision to a helper. And Slice A's `runner-gating.test.ts` asserts the
+// property structurally for EVERY present and future runner — it is the control
+// that would notice if a later edit moved the guard behind an `it()`.
+//
+// The predicate is PURE and both call sites pass the same env and options, so
+// two evaluations cannot disagree.
+const runnerTarget = resolveRunnerTarget(process.env, {
+	requireWriteIntent: true,
+});
+if (!runnerTarget.ok) {
+	throw new Error(
+		`REFUSED — the staging generator target guard did not pass.\n  ${runnerTarget.reason}\n\n` +
+			"Run it as: pnpm staging:generate",
+	);
+}
 
 /** Resolved participant ids, keyed by role. Populated by the generation step. */
 const participantIds = new Map<ParticipantRole, string>();
@@ -507,15 +533,15 @@ describe("staging fixture generation", () => {
 		).toEqual([]);
 	});
 
-	it("refuses a direct write from this file (the guard's positive control)", async () => {
-		// A negative assertion needs a positive control (manifest §5): the check
-		// above passes when nothing matched, which is also what a BROKEN guard
-		// produces. This proves the guard actually fires.
-		const { db } = await import("@/db");
-		expect(() =>
-			(db as { insert: (t: unknown) => unknown }).insert(bets),
-		).toThrow(DirectWriteForbiddenError);
-	});
+	// THE POSITIVE CONTROL FOR THE ASSERTION ABOVE lives in
+	// tests/unit/staging/write-guard.test.ts, not here. It was here first, and
+	// the source tripwire flagged it on the very first run — correctly. The
+	// control has to attempt a real direct write to prove the guard fires, and
+	// an attempted direct write is textually indistinguishable from the defect.
+	// That collision is manifest §5's "a source match false-alarms on correct
+	// code", encountered live. Moving the control to a unit test resolves it
+	// without an exemption, which would have blunted the tripwire for every
+	// future file. The unit test needs no database and covers more.
 
 	// ── STEP 2c · PARTICIPANT VERIFICATION ──────────────────────────────────
 	it("created 10 participants, each pool-named, ToS-accepted, granted, unbanned", async () => {
