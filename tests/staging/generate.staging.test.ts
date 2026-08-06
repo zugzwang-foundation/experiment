@@ -179,7 +179,6 @@ import {
 	writeLog,
 } from "./_lib/client";
 import { resolveRunnerTarget } from "./_lib/target";
-import { DirectWriteForbiddenError } from "./_lib/write-guard";
 import {
 	BOOKMARKS,
 	FIXTURE_IMAGE_BASE64,
