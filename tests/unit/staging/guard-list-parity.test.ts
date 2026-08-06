@@ -60,10 +60,19 @@ function parseDroppedTables(sql: string): string[] {
 		const list = m[1];
 		if (!list) continue;
 		for (const raw of list.split(",")) {
-			// Strip ALL quotes BEFORE the schema qualifier: doing it the other
-			// way round leaves `"a` from `"public"."a"`, because the inner
-			// quotes are not anchored (Q-I — caught by the parser's own
-			// positive-control case).
+			// Strip quotes, then the schema qualifier.
+			//
+			// CORRECTED 2026-08-06 (mutation QI-5c). This comment used to claim
+			// the other order "leaves `"a` from `"public"."a"`, because the inner
+			// quotes are not anchored". That is FALSE: `/^.*\./` is greedy, so it
+			// consumes through the LAST dot — quotes included — and both orders
+			// return `a` for every shape this parser accepts. Swapping them was
+			// mutated and the suite stayed green, correctly: the swap is not a
+			// defect. The order is stylistic, and saying otherwise sends a reader
+			// after a bug that is not there — the exact failure Q-I was written
+			// to prevent. What IS load-bearing is the `/^\w+$/` filter below,
+			// which is what rejects anything the two replaces did not reduce to a
+			// bare identifier.
 			const name = raw.trim().replace(/"/g, "").replace(/^.*\./, "");
 			if (/^\w+$/.test(name)) out.push(name);
 		}
