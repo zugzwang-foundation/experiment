@@ -360,6 +360,61 @@ describe("F1 — the batch really is one implicit transaction", () => {
 	});
 });
 
+describe("the injection prohibition — assertSafeIdentifiers", () => {
+	// MUTATION-DERIVED (M-c, 2026-08-06): `assertSafeIdentifiers` had NO test.
+	// Its own comment calls it "the single path by which a _no_update /
+	// _no_delete guard could be left off" (@security-auditor, Slice A) — the one
+	// prohibition ADR-0035 primitive 3 rests on that is enforced in code rather
+	// than by the storage layer — and nothing exercised it.
+	//
+	// Why it is load-bearing: `tables` is a PARAMETER interpolated into raw SQL.
+	// A caller passing a payload that appends its own `ALTER TABLE … DISABLE
+	// TRIGGER bucket_a_no_update` would disable a NEVER-disabled guard and
+	// COMMIT it, because the whole batch would then SUCCEED — the atomicity that
+	// protects every other failure mode is precisely what makes this one stick.
+
+	it("refuses the payload that would leave a never-disabled guard off", async () => {
+		const payload =
+			"users; ALTER TABLE dharma_ledger DISABLE TRIGGER bucket_a_no_update; --";
+		await expect(runGuardedReset(testClient, [payload])).rejects.toThrow(
+			/refusing to build SQL with an unsafe table name/,
+		);
+		// And the batch never reached the server: the guard it targeted is on.
+		const states = await guardStates();
+		expect(states.get("dharma_ledger.bucket_a_no_update")).toBe("O");
+		expect(await allGuardsEnabled()).toBe(true);
+	});
+
+	it("refuses before building, not after sending", () => {
+		// buildResetBatch validates; runGuardedReset only sends what it returns.
+		// So the refusal is unreachable-by-construction rather than caught late.
+		expect(() => buildResetBatch(["users; DROP TABLE x"])).toThrow(
+			/unsafe table name/,
+		);
+	});
+
+	it.each([
+		["a quoted identifier", '"users"'],
+		["a schema qualifier", "public.users"],
+		["uppercase", "Users"],
+		["a leading digit", "1users"],
+		["trailing whitespace", "users "],
+		["a comment opener", "users--"],
+		["the empty string", ""],
+	])("refuses %s", (_label, name) => {
+		expect(() => buildResetBatch([name])).toThrow(/unsafe table name/);
+	});
+
+	it("POSITIVE CONTROL — the shipped set builds without complaint", () => {
+		// Without this, every case above passes if the matcher were broken or the
+		// predicate rejected everything (Q-I).
+		expect(() => buildResetBatch(TRUNCATE_SET)).not.toThrow();
+		expect(buildResetBatch(TRUNCATE_SET)).toContain(
+			`TRUNCATE ${TRUNCATE_SET.join(", ")} CASCADE;`,
+		);
+	});
+});
+
 describe("assertLiveConnection — G-3", () => {
 	// MUTATION-DERIVED (G3-probe, 2026-08-06), and the largest gap the sweep
 	// found. Deleting G-3's `session_replication_role` refusal — the escape
