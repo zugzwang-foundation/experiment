@@ -686,6 +686,49 @@ the premise it must not inherit wrongly.
 
 ---
 
+## Decisions taken on your behalf
+
+Class-1 decide-and-record. Each was made without a ruling, is reversible, and is
+recorded here with what it changed and how it was proven.
+
+**Q-K · a behavioural assertion on what `runGuardedReset` SENDS** (Gate C,
+2026-08-06). The answer to "does anything assert it?" was **no** — only a source
+match, and in item 4 rather than item 3. Decided: add a `Proxy` spy over
+`testClient` that records every `unsafe()` payload and delegates to the real
+client, asserting exactly one round-trip and a payload equal to
+`buildResetBatch(TRUNCATE_SET)` character for character. No source matching.
+
+Mutation-verified three ways, because the value of the decision is in the
+comparison:
+
+- **QK** — inline a lookalike batch (no `SET LOCAL`) into `runGuardedReset`:
+  **RED, 1 failed / 48 passed.** The one failure is the spy. The builder-side
+  `lock_timeout` case, **both** atomicity cases and every G-4 case stayed green,
+  which is the exposure exactly as described.
+- **QK-b** — same inline, `runner-gating` only: **RED (1).** The source match
+  does catch it, so it is retained as a cheap structural tripwire.
+- **QK-c** — *correct* code, the identical call wrapped across lines: **RED (1),
+  a false alarm.** The source match fires on a pure reformat; the spy and 74
+  other assertions stay green.
+
+Reverted clean, re-ran green. Full detail: mutation audit, *Addendum · Q-K*.
+
+**Cosmetic, folded into the same edit, never committed alone.**
+`buildResetBatch`'s empty-set refusal threw `"runGuardedReset: empty truncate
+set"` — the wrong function name, left behind by the F1 split. Grepped before
+changing: the owning case asserts `rejects.toThrow()` with no pattern, so nothing
+depended on the string.
+
+**Earlier Class-1 calls from the overnight sweep**, each already recorded in full
+in the mutation audit rather than restated here: the four blind-control fixes
+(the emptying control's missing seed; G-3's absent behavioural coverage;
+`assertSafeIdentifiers`' absent test; the target refusal not bound to a `throw`),
+the two absent G-4 sub-checks (`frozen_at` set, catalog off by one), and the
+QI-5c **comment correction** — which was deliberately *not* turned into a test,
+because the mutation proved the claimed defect does not exist.
+
+---
+
 ## THE LESSON OF SLICE A
 
 > **A test that reassembles a lookalike proves nothing about the shipped one.**
