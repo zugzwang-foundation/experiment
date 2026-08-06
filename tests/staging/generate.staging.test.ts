@@ -254,11 +254,24 @@ function adminMetadata(flowId: string) {
 	};
 }
 
-/** The §3.7 metadata block for a participant bet. */
-function betMetadata(userId: string) {
+/**
+ * The §3.7 metadata block for a participant bet.
+ *
+ * ⚠ `flow_id` IS PER-OPERATION, AND IT WAS HARD-CODED TO `F-BET-1`
+ * (@code-reviewer, Slice C). Every generated event — replies and sells
+ * included — carried the top-level-post flow, which is provenance metadata the
+ * PRODUCT would never write. This whole task exists because staging carried
+ * data the product could not have produced, so persisted metadata that diverges
+ * from the wire is exactly the thing not to leave in.
+ *
+ * The values mirror the two route files BY REFERENCE:
+ *   `api/bets/place/route.ts:173` — `parentCommentId !== null ? "F-COMMENT-2" : "F-BET-1"`
+ *   `api/bets/sell/route.ts:43`   — `"F-BET-3"`
+ */
+function betMetadata(userId: string, flowId: string) {
 	return {
 		request_id: "staging-parity-generate",
-		flow_id: "F-BET-1",
+		flow_id: flowId,
 		user_id: userId,
 		actor_id: userId,
 		idempotency_key: null,
@@ -388,7 +401,8 @@ async function uploadFixtureImage(userId: string): Promise<{
 			contentType: FIXTURE_IMAGE_CONTENT_TYPE,
 			byteSize: bytes.byteLength,
 			eventId: uuidv7(),
-			metadata: betMetadata(userId),
+			// The wire signs an upload from the F-COMMENT-3 image-attach flow.
+			metadata: betMetadata(userId, "F-COMMENT-3"),
 		}),
 	);
 
@@ -409,6 +423,10 @@ async function uploadFixtureImage(userId: string): Promise<{
 			"Content-Type": FIXTURE_IMAGE_CONTENT_TYPE,
 			"If-None-Match": "*",
 		},
+		// A hung PUT would otherwise block until the 600 s `it` timeout with no
+		// diagnostic at all (@code-reviewer, Slice C). The presigned URL's own TTL
+		// is 60 s, so waiting longer than that cannot succeed anyway.
+		signal: AbortSignal.timeout(PUT_URL_TTL_SECONDS * 1000),
 	});
 	if (!put.ok) {
 		throw new Error(
@@ -448,11 +466,12 @@ async function placeComment(args: {
 		stake: args.stake,
 	});
 	const image = args.image ? await uploadFixtureImage(args.userId) : null;
+	// `api/bets/place/route.ts:173` — the SAME expression, for both the retry
+	// tag and the persisted `metadata.flow_id`. A reply is F-COMMENT-2 on the
+	// wire, not F-BET-2 (which was only ever a Sentry tag here).
+	const flow = args.parentCommentId !== null ? "F-COMMENT-2" : "F-BET-1";
 	const result = await runBetTransaction(
-		{
-			marketId: args.marketId,
-			flow: args.parentCommentId === null ? "F-BET-1" : "F-BET-2",
-		},
+		{ marketId: args.marketId, flow },
 		(ctx) =>
 			place(ctx, {
 				userId: args.userId,
@@ -467,7 +486,7 @@ async function placeComment(args: {
 				commentEventId: uuidv7(),
 				creditEventId: uuidv7(),
 				image,
-				metadata: betMetadata(args.userId),
+				metadata: betMetadata(args.userId, flow),
 			}),
 	);
 	commentIds.set(args.key, result.commentId);
@@ -546,7 +565,8 @@ async function sellAll(userId: string, marketId: string): Promise<string> {
 			syntheticBetId: uuidv7(),
 			idempotencyKey: uuidv7(),
 			bodyFingerprint: uuidv7(),
-			metadata: betMetadata(userId),
+			// `api/bets/sell/route.ts:43` — a sell is F-BET-3 on the wire.
+			metadata: betMetadata(userId, "F-BET-3"),
 		}),
 	);
 	return shares;

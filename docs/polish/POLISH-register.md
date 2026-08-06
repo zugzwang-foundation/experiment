@@ -204,4 +204,4 @@ Do **not** open register rows for these. They are being fixed before their surfa
 
 ---
 
-*Scaffolded by web Claude, 2026-07-30 IST. Sixteen pre-recorded rows, none from an inspection. Rows marked "pending Rn" resolve when `POLISH-0_ruling-register_r2.md` is ratified. Extended at STAGING-PARITY Slice C/D (2026-08-06): PD-0-17 and PD-0-18 pre-recorded as `superseded` so POLISH.5 does not spend a founder review-hour re-deriving two known-correct behaviours, plus the standing staging coverage reference above.*
+*Scaffolded by web Claude, 2026-07-30 IST. **Eighteen** pre-recorded rows, none from an inspection. Rows marked "pending Rn" resolve when `POLISH-0_ruling-register_r2.md` is ratified. Extended at STAGING-PARITY Slice C/D (2026-08-06): PD-0-17 and PD-0-18 pre-recorded as `superseded` so POLISH.5 does not spend a founder review-hour re-deriving two known-correct behaviours, plus the standing staging coverage reference above.*

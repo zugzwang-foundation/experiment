@@ -296,7 +296,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%attracts the most replies on M2%'",
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT p.id\n\t\t\t\tFROM comments p\n\t\t\t\tJOIN markets m ON m.id = p.market_id\n\t\t\t\tJOIN comments rc ON rc.parent_comment_id = p.id\n\t\t\t\tJOIN bets rb ON rb.comment_id = rc.id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL\n\t\t\t\tGROUP BY p.id\n\t\t\t\tHAVING count(rb.id) >= 5 OR SUM(rb.stake) >= 2000\n\t\t\t) dominant HAVING count(*) >= 2",
 			"look": "three badges, one per lane: M2-P2 Most Debated, M2-P3 Highest Stakes, M2-P4 Contested"
 		},
 		{
@@ -306,7 +306,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%dominate no lane at all%'",
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT p.id\n\t\t\t\tFROM comments p\n\t\t\t\tJOIN markets m ON m.id = p.market_id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL\n\t\t\t\t  AND (SELECT count(*) FROM comments r WHERE r.parent_comment_id = p.id) < 5\n\t\t\t) quiet HAVING count(*) > 6",
 			"look": "9 of the 12 posts carry NO badge — that is the criterion, not an omission"
 		},
 		{
@@ -316,7 +316,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%attracts the most replies on M2%'",
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT p.id\n\t\t\t\tFROM comments p\n\t\t\t\tJOIN markets m ON m.id = p.market_id\n\t\t\t\tJOIN comments rc ON rc.parent_comment_id = p.id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL\n\t\t\t\tGROUP BY p.id, p.side_at_post_time\n\t\t\t\tHAVING count(*) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time) >= 2\n\t\t\t\t   AND count(*) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time) >= 1\n\t\t\t) split",
 			"look": "M2-P2 — ReplySplitBar, the expand affordance, and stake ordering within each side"
 		},
 		{
@@ -386,7 +386,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/u/RedWolf001",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status = 'Open'",
+			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status = 'Open'\n\t\t\t   AND p.user_id = (SELECT id FROM users WHERE pseudonym = 'RedWolf001')",
 			"look": "the Sell affordance renders on an Open market's holding"
 		},
 		{
@@ -396,7 +396,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/u/RedStoat008",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status IN ('Closed','Resolving','Resolved','Voided')",
+			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status IN ('Closed','Resolving','Resolved','Voided')\n\t\t\t   AND p.user_id = (SELECT id FROM users WHERE pseudonym = 'RedStoat008')",
 			"look": "Sell is HIDDEN, not disabled — M5 is Closed"
 		},
 		{
@@ -406,7 +406,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/u/RedFox000",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM payout_events",
+			"probe": "SELECT count(*)::int AS n FROM payout_events pe\n\t\t\t JOIN markets m ON m.id = pe.market_id\n\t\t\t WHERE m.slug = 'sp-m7-resolved' AND pe.user_id = (SELECT id FROM users WHERE pseudonym = 'RedFox000')",
 			"look": "P-owner's M7 row — net P/L on the winning side"
 		},
 		{
@@ -436,7 +436,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/bookmarks",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM bookmarks",
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT 1 FROM bookmarks b\n\t\t\t\tJOIN comments c ON c.id = b.comment_id\n\t\t\t\tWHERE b.user_id = (SELECT id FROM users WHERE pseudonym = 'RedFox000') AND c.user_id <> b.user_id\n\t\t\t\tHAVING count(*) FILTER (WHERE c.parent_comment_id IS NULL) > 0\n\t\t\t\t   AND count(*) FILTER (WHERE c.parent_comment_id IS NOT NULL) > 0\n\t\t\t) arms",
 			"look": "signed in AS RedFox000 — Staked/Current are the BOOKMARKED author's figures"
 		},
 		{
@@ -456,7 +456,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM mod_actions WHERE reason = 'content_removed'",
+			"probe": "SELECT count(*)::int AS n FROM mod_actions ma\n\t\t\t\t\t   JOIN comments c ON c.id = ma.target_comment_id\n\t\t\t\t\t   WHERE ma.reason = 'content_removed'\n\t\t\t\t\t     AND c.parent_comment_id IS NULL",
 			"look": "the masked card on the debate view, and the row in the audit feed"
 		},
 		{
@@ -466,7 +466,7 @@
 			"status": "reachable",
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
-			"probe": "SELECT count(*)::int AS n FROM mod_actions WHERE reason = 'content_removed'",
+			"probe": "SELECT count(*)::int AS n FROM mod_actions ma\n\t\t\t\t\t   JOIN comments c ON c.id = ma.target_comment_id\n\t\t\t\t\t   WHERE ma.reason = 'content_removed'\n\t\t\t\t\t     AND c.parent_comment_id IS NOT NULL",
 			"look": "the masked card on the debate view, and the row in the audit feed"
 		},
 		{
