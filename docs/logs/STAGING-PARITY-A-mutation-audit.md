@@ -332,7 +332,7 @@ Each Q-I fix re-verified by reintroducing the defect it was written to catch.
 | QI-5d | `parseCreateTriggers` matches nothing | **RED** (8) | `guard-list-parity` |
 
 **QI-5c is NOT a coverage gap — the comment was wrong.** It claimed the other
-order "leaves `\"a` from `\"public\".\"a\"`, because the inner quotes are not
+order "leaves `"a` from `"public"."a"`, because the inner quotes are not
 anchored". It does not: `/^.*\./` is **greedy**, so it consumes through the last
 dot, quotes included. Checked across eight `DROP TABLE` shapes — **zero differ**.
 The swap is not a defect, so no assertion could or should have caught it.
@@ -428,3 +428,45 @@ of the three lists.)
 **10 · The unratified survivors' "cost is zero today"** (`cron_alarms`,
 `watermark_state`). A ruling about what staging currently runs, revisited at
 STAGING-PARITY-ENV. Not a property any assertion can hold.
+
+---
+
+## STEP 5 · Close
+
+| Gate | Result |
+|---|---|
+| Working tree carries **zero mutations** | `git diff` over `tests/`, `src/`, both vitest configs, `package.json`, `.env.example`, `AGENTS.md` — **empty** |
+| Full suite (`pnpm vitest run`) | **301 files passed, 1 skipped (302)** · **2327 tests passed, 1 skipped, 4 todo (2332)** · exit **0** · zero `FAIL` |
+| Staging runners collected by the default config | **0** — the ADR-0036 primitive 2 exclusion, demonstrated rather than asserted |
+| `ZUGZWANG_ENV=preview just verify` | typecheck → `biome check` → `next build` · exit **0** · *All checks passed* |
+| PR #298 | **OPEN**. Nothing merged. Slice B not opened. |
+| Staging database | contacted **once**, read-only, at STEP 0. No `TRUNCATE`, `DELETE`, `DISABLE TRIGGER`, DDL or `frozen_at` write ever reached it. |
+
+**Totals: 52 mutations · 47 RED · 5 GREEN · 0 reverts that failed to go green.**
+Of the five GREEN: four were blind controls, each fixed and re-fired RED; the
+fifth (QI-5c) was a false claim in a comment, corrected rather than papered over
+with a test for a non-defect.
+
+### Commits
+
+| SHA | What |
+|---|---|
+| `b8da3f4` | F1 — measure the `SET LOCAL` bound; F2 — say whether the batch ran |
+| `0e87ad9` | GROUP 1 — mutation-verify atomicity; the emptying control was blind |
+| `439f67f` | GROUP 2 — G-3 had NO behavioural coverage; three blind controls |
+| `8cd3983` | G4-b — name the failure, don't match `/system_state/i` |
+| `591b2d6` | M-c — `assertSafeIdentifiers` had no test at all |
+| `0d4f112` | M-f2 — bind the target-guard refusal to the construct that stops the run |
+| `ddecf3f` | QI-5c — correct a false claim about `parseDroppedTables` |
+| `15e7e29` | this audit, GROUPS 2–5 |
+
+### What Gate C should read first
+
+1. **G-3** — eight new cases in `staging-reset-mechanism` (item 3). The largest
+   gap the sweep found, and the one whose absence was actively masked by a
+   header claiming coverage that did not exist.
+2. **The injection block** — ten cases (item 3). A prohibition that had no test.
+3. **`runner-gating`'s two new bindings** (item 4) — the one-round-trip shape,
+   and the target refusal tied to `throw new Error(`.
+4. **GROUP 5**, above. What is *not* proven matters as much as what is, and the
+   headline is that **the staging runner has never been run and cannot be.**

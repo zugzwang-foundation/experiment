@@ -43,6 +43,11 @@ regressions. The runner exits non-zero with no staging env.
 A fourth commit, `1224bd4`, carries the pre-Gate-C amendments (rulings 2, 3, 5)
 and touches `docs/adr/0035-guarded-staging-reset.md` besides the files above.
 
+**A second overnight session (2026-08-06) added eight more commits** — F1, F2,
+and the mutation sweep. See *Overnight mutation sweep* below and the full
+evidence at **`docs/logs/STAGING-PARITY-A-mutation-audit.md`**, which is what
+Gate C reads for items 3–6.
+
 ---
 
 ## Decisions made
@@ -598,10 +603,66 @@ mode `0600`, never committed and never printed. Working tree verified clean.
 
 ---
 
+## Overnight mutation sweep (2026-08-06) — F1, F2, and 52 mutations
+
+Second unattended session on the same branch. PR #298 stayed **OPEN**; nothing
+merged; Slice B was not opened. Full evidence, one row per control:
+**`docs/logs/STAGING-PARITY-A-mutation-audit.md`**.
+
+**F1 — the unverified assumption, now measured.** `SET LOCAL` outside a
+transaction block emits `WARNING 25P01` and **no-ops**, and nothing asserted that
+a multi-statement simple-query implicit transaction counts as a transaction block
+for that purpose. Both halves hold. Issued **alone**, the statement warns and
+`current_setting('lock_timeout')` reads `"0"`; issued as the first statement of
+the real batch it reads **`"15s"`** with no notice, and reverts to `"0"` on the
+next round-trip. The protocol is simple query — `postgres@3.4.9` sets
+`simple: args.length === 0` and emits the `'Q'` frontend message, and empirically
+the extended path refuses two commands (`42601`) where the parameterless one
+returns two result sets. Pinned by assertions built on the **real** batch, via a
+`buildResetBatch` split, so a driver bump fails loud.
+
+**F2 — the misleading message.** `afterAll` runs even when `beforeAll` throws,
+and reported "G-4 FAILED after the run" either way — which on a destructive
+artifact reads as *staging was wiped, then verification failed* when in fact
+nothing ran. A `batchCommitted` flag, set only where the batch is known to have
+committed, now selects between two messages; the non-destructive one says the run
+never started.
+
+**The sweep: 52 mutations · 47 RED · 5 GREEN.** Every revert re-ran green. The
+five that stayed green:
+
+| Blind control | What it missed | Disposition |
+|---|---|---|
+| `it("empties the truncate set…")` | seeded nothing, so counting zero after a reset that never truncated still read as zero | seeds two rows first; re-fired RED |
+| **G-3 entirely** | `assertLiveConnection` was called by nothing. Five refusals — including the `session_replication_role=replica` escape hatch that voids every trigger while the catalog still reads 78/enabled — shipped unasserted. `reset-guard`'s header *claimed* the integration suite exercised it; it did not | eight cases added; all five sub-checks re-fired RED |
+| `assertSafeIdentifiers` | no test at all — the one primitive-3 prohibition enforced in code rather than by the storage layer | ten cases; re-fired RED on nine |
+| the module-scope target refusal | downgrading `throw` → `console.error` left `runner-gating` green; the assertions checked the message's POSITION, not the construct. `tsc` catches it, the test suite did not | the refusal is now bound to `throw new Error(`; re-fired RED |
+| `parseDroppedTables` quote-strip order | **not a coverage gap** — the comment claimed a defect that does not exist (`/^.*\./` is greedy and eats the quote). Checked across eight shapes: zero differ | comment corrected |
+
+Two further G-4 sub-checks were checked by `verifyPostReset` and tested by
+nothing — `system_state.frozen_at` set, and the guard catalog off by one. Both
+now have cases; both re-fired RED. And `G4-b` passed for the **wrong reason**:
+`/system_state/i` matched the *frozen* message when the row was *absent*, two
+unrelated operational states.
+
+**GROUP 5** names ten controls no mutation can prove. The one that matters most
+for reading this slice: **the staging runner has never been run and cannot be**,
+so every assertion about it is source-structural. *"`runner-gating` is green"
+is not "the runner has been run."*
+
+**Staging was contacted once, read-only, at STEP 0** — 39 bets, 16 users, 200
+identity_pool, `system_state` 1 row with `frozen_at NULL`, 78 guards 0 disabled,
+25 migrations, `session_replication_role = origin`. Read under
+`PGOPTIONS=-c default_transaction_read_only=on`. Nothing was written.
+
+---
+
 ## Next session starts at
 
 **Slice B — the skeleton.** Gate C on PR #298 (human diff-read) is owed first,
 and the rulings at O-1 and O-5 are wanted before the first real staging run.
+Gate C now reads the mutation audit alongside items 3–6; the item 3–6 diff
+chunks are staged at `~/Desktop/zz-gatec/` (21 files, ≤120 lines each).
 
 Exact next action, once #298 merges: **run the reset against staging for the
 first time** — `pnpm staging:reset` — and confirm the four guards pass, the 37
