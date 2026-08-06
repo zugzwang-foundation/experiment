@@ -105,6 +105,23 @@ vi.mock("next/cache", () => ({
 	revalidateTag: vi.fn(),
 }));
 
+// `requireAdminSession` is ADR-0036 primitive 3's MAY-be-mocked list, and the
+// plan's Q1 table names it exactly: for moderation, the only shell skipped is
+// this gate plus `revalidatePath`. Everything after the gate — the `mod_actions`
+// append and the `users.banned_at` set — is the shipped code.
+//
+// ⚠ A PARTIAL MOCK, DELIBERATELY. `canonicalizeAmount18` lives in the same
+// module and is a REAL dependency of the market-open step (Q1: "the generator
+// must canonicalize seedAmount itself"). A whole-module factory would replace it
+// with `undefined` and every pool would open on a bad amount.
+const { mockRequireAdminSession } = vi.hoisted(() => ({
+	mockRequireAdminSession: vi.fn(),
+}));
+vi.mock("@/server/admin/wire", async (importOriginal) => {
+	const actual = await importOriginal<typeof import("@/server/admin/wire")>();
+	return { ...actual, requireAdminSession: mockRequireAdminSession };
+});
+
 // THE LOAD-BEARING MOCK. `@/db` is replaced by the WRITE-GUARDED client, so
 // every engine write is attributed. It is not a bypass — it is the same drizzle
 // client behind a proxy that refuses a write whose immediate caller is this
@@ -120,24 +137,35 @@ vi.mock("@/db/index", async () => {
 
 import {
 	bets,
+	bookmarks,
 	comments,
 	dharmaLedger,
 	identityPool,
+	imageUploads,
 	markets,
+	modActions,
+	positions,
 	users,
 } from "@/db/schema";
+import { moderateComment } from "@/server/admin/moderation/act";
 import { canonicalizeAmount18 } from "@/server/admin/wire";
 import { auth } from "@/server/auth/index";
 import { acceptTosAction } from "@/server/auth/tos-accept";
 import { assertStakeFloor } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
+import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
+import { addBookmarkAction } from "@/server/bookmarks/add";
+import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
 import { closeMarket } from "@/server/markets/close";
 import { createMarket } from "@/server/markets/create";
 import { openMarket } from "@/server/markets/open";
 import { settleMarket } from "@/server/resolution/settle";
 import { triggerResolution } from "@/server/resolution/trigger";
 import { voidMarket } from "@/server/resolution/void";
+import { mintPutUrl } from "@/server/storage/r2";
+import { signUploadAndInsert } from "@/server/storage/sign-upload";
+import { verifyUploadedObject } from "@/server/storage/verify-object";
 
 import { loadCapturedIdentities } from "./_lib/captured-identities";
 import {
@@ -145,6 +173,7 @@ import {
 	closeRunnerConnection,
 	describeRunnerTarget,
 	forbiddenTableWrites,
+	guardedDb,
 	RUNNER_MODE,
 	readOnly,
 	writeLog,
@@ -152,12 +181,19 @@ import {
 import { resolveRunnerTarget } from "./_lib/target";
 import { DirectWriteForbiddenError } from "./_lib/write-guard";
 import {
+	BOOKMARKS,
+	FIXTURE_IMAGE_BASE64,
+	FIXTURE_IMAGE_CONTENT_TYPE,
+	type FixturePhase,
 	MARKETS,
 	type MarketKey,
+	MODERATION,
 	PARTICIPANTS,
 	type ParticipantRole,
 	POSTS,
+	REPLIES,
 	RESOLVE_REASON,
+	SELLS,
 	SYNTHETIC_TOS_IP,
 	SYNTHETIC_TOS_USER_AGENT,
 	syntheticEmail,
@@ -188,6 +224,18 @@ if (!runnerTarget.ok) {
 			"Run it as: pnpm staging:generate",
 	);
 }
+
+/**
+ * `addBookmarkAction` resolves its viewer through `auth.api.getSession` — the
+ * one shell layer between it and the write. It is on ADR-0036 primitive 3's
+ * MAY-be-mocked list.
+ *
+ * A SPY rather than a module factory: the generator needs `auth.$context` REAL
+ * (it is the Better Auth create-path every participant is minted through), and
+ * `@/server/bookmarks/add` imports the same `auth` singleton, so replacing one
+ * method reaches it without touching the rest of the object.
+ */
+const getSessionSpy = vi.spyOn(auth.api, "getSession");
 
 /** Resolved participant ids, keyed by role. Populated by the generation step. */
 const participantIds = new Map<ParticipantRole, string>();
@@ -301,34 +349,208 @@ async function createParticipant(args: {
 	return userId;
 }
 
-/** One comment-bearing bet through the real W-1 spine. */
-async function placePost(args: {
+/**
+ * Fixture key -> the engine-minted `comments.id`. Replies, bookmarks and
+ * moderation all name their target by KEY, because UUIDv7 ids differ every run
+ * (Q4) and a literal key is the only cross-reference that survives a rebuild.
+ */
+const commentIds = new Map<string, string>();
+
+function requireComment(key: string): string {
+	const id = commentIds.get(key);
+	if (!id) throw new Error(`comment ${key} was not placed`);
+	return id;
+}
+
+/**
+ * C7 — the participant image chain, end to end, exactly as the wire runs it.
+ *
+ * ⚠ NOT A HAND-WRITTEN `image_uploads` ROW. P-2/P-3 forbid it, and the row is
+ * only half the artifact anyway: the `image_upload.sign_requested` event, the
+ * write-once arming, the real bytes in R2 and the HeadObject-verified size all
+ * come from driving the shipped path. Slice B's STEP 8b probe proved every hop
+ * works against staging's credentials.
+ *
+ * ORDER IS ADR-0014's, not ours: the DB transaction commits FIRST, then the
+ * presign and the PUT run OUTSIDE it. `mintPutUrl` is HTTP, and HTTP inside
+ * `db.transaction(...)` is a CLAUDE.md §3 refusal trigger.
+ */
+async function uploadFixtureImage(userId: string): Promise<{
+	uploadId: string;
+	r2ObjectKey: string;
+	committedEventId: string;
+	etag: string | null;
+	byteSizeActual: number;
+}> {
+	const bytes = Buffer.from(FIXTURE_IMAGE_BASE64, "base64");
+	const { uploadId, key } = await guardedDb.transaction((tx) =>
+		signUploadAndInsert(tx, {
+			userId,
+			contentType: FIXTURE_IMAGE_CONTENT_TYPE,
+			byteSize: bytes.byteLength,
+			eventId: uuidv7(),
+			metadata: betMetadata(userId),
+		}),
+	);
+
+	const putUrl = await mintPutUrl(
+		"uploads",
+		key,
+		FIXTURE_IMAGE_CONTENT_TYPE,
+		PUT_URL_TTL_SECONDS,
+		{ ifNoneMatch: true },
+	);
+	// The `If-None-Match` header is SigV4-SIGNED (AUDIT-FIX-A1 write-once), so
+	// omitting it fails signature validation rather than merely losing the
+	// guarantee. The client contract is not optional.
+	const put = await fetch(putUrl, {
+		method: "PUT",
+		body: bytes,
+		headers: {
+			"Content-Type": FIXTURE_IMAGE_CONTENT_TYPE,
+			"If-None-Match": "*",
+		},
+	});
+	if (!put.ok) {
+		throw new Error(
+			`C7 image PUT failed: HTTP ${put.status} ${put.statusText} for ${key}`,
+		);
+	}
+
+	const verified = await verifyUploadedObject(key);
+	return {
+		uploadId,
+		r2ObjectKey: key,
+		committedEventId: uuidv7(),
+		etag: verified.etag ?? null,
+		byteSizeActual: verified.byteSize,
+	};
+}
+
+/** One comment-bearing bet through the real W-1 spine. Posts AND replies. */
+async function placeComment(args: {
+	key: string;
 	userId: string;
 	marketId: string;
 	side: "YES" | "NO";
 	stake: string;
 	body: string;
+	parentCommentId: string | null;
+	image?: true;
 }): Promise<void> {
 	// The two-floor validator is a SHELL layer (it lives in the endpoint), so
 	// the generator calls it explicitly rather than letting a fixture stake
-	// drift below the shipped floor unnoticed. It writes nothing.
-	assertStakeFloor({ parentCommentId: null, stake: args.stake });
-	await runBetTransaction({ marketId: args.marketId, flow: "F-BET-1" }, (ctx) =>
-		place(ctx, {
-			userId: args.userId,
+	// drift below the shipped floor unnoticed. It writes nothing. Passing the
+	// real `parentCommentId` is what selects BET_MIN_STAKE_REPLY over
+	// BET_MIN_STAKE_POST — a reply checked against the post floor would let a
+	// sub-50 reply through silently.
+	assertStakeFloor({
+		parentCommentId: args.parentCommentId,
+		stake: args.stake,
+	});
+	const image = args.image ? await uploadFixtureImage(args.userId) : null;
+	const result = await runBetTransaction(
+		{
 			marketId: args.marketId,
-			side: args.side,
-			stake: args.stake,
-			body: args.body,
+			flow: args.parentCommentId === null ? "F-BET-1" : "F-BET-2",
+		},
+		(ctx) =>
+			place(ctx, {
+				userId: args.userId,
+				marketId: args.marketId,
+				side: args.side,
+				stake: args.stake,
+				body: args.body,
+				parentCommentId: args.parentCommentId,
+				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
+				betEventId: uuidv7(),
+				commentEventId: uuidv7(),
+				creditEventId: uuidv7(),
+				image,
+				metadata: betMetadata(args.userId),
+			}),
+	);
+	commentIds.set(args.key, result.commentId);
+}
+
+/** Every post + reply of one phase, in fixture-table order. */
+async function runCommentPhase(phase: FixturePhase): Promise<number> {
+	let placed = 0;
+	for (const post of POSTS) {
+		if (post.phase !== phase) continue;
+		await placeComment({
+			key: post.key,
+			userId: requireParticipant(post.author),
+			marketId: requireMarket(post.market),
+			side: post.side,
+			stake: post.stake,
+			body: post.body,
 			parentCommentId: null,
+			...(post.image ? { image: post.image } : {}),
+		});
+		placed += 1;
+	}
+	for (const reply of REPLIES) {
+		if (reply.phase !== phase) continue;
+		const parent = POSTS.find((p) => p.key === reply.parent);
+		if (!parent) throw new Error(`reply ${reply.key} has no parent post`);
+		await placeComment({
+			key: reply.key,
+			userId: requireParticipant(reply.author),
+			marketId: requireMarket(parent.market),
+			side: reply.side,
+			stake: reply.stake,
+			body: reply.body,
+			parentCommentId: requireComment(reply.parent),
+		});
+		placed += 1;
+	}
+	// A phase that silently produced nothing would leave the DAG looking green
+	// while a whole §2 shape went missing.
+	if (placed === 0) {
+		throw new Error(
+			`phase ${phase} placed no comments — the fixture table lost its rows`,
+		);
+	}
+	return placed;
+}
+
+/**
+ * Unwind a holding IN FULL through the real `sell`.
+ *
+ * The share count is READ from `positions`, never computed here: shares are the
+ * engine's output of the CPMM buy, and re-deriving them would be a second
+ * implementation of the thing being verified. A PARTIAL sell followed by an
+ * opposite-side buy raises `OppositeSideHeldError`, which is why "all" is the
+ * only mode the fixture table offers.
+ */
+async function sellAll(userId: string, marketId: string): Promise<string> {
+	const [held] = await readOnly
+		.select({ quantity: positions.quantity })
+		.from(positions)
+		.where(
+			sql`${positions.userId} = ${userId} AND ${positions.marketId} = ${marketId} AND ${positions.quantity} > 0`,
+		);
+	const shares = held?.quantity;
+	if (!shares) {
+		throw new Error(
+			`sellAll: user ${userId} holds nothing on market ${marketId} — the buy step did not run`,
+		);
+	}
+	await runBetTransaction({ marketId, flow: "F-BET-3" }, (ctx) =>
+		sell(ctx, {
+			userId,
+			marketId,
+			shares,
+			sellEventId: uuidv7(),
+			syntheticBetId: uuidv7(),
 			idempotencyKey: uuidv7(),
 			bodyFingerprint: uuidv7(),
-			betEventId: uuidv7(),
-			commentEventId: uuidv7(),
-			creditEventId: uuidv7(),
-			metadata: betMetadata(args.userId),
+			metadata: betMetadata(userId),
 		}),
 	);
+	return shares;
 }
 
 let generationError: unknown = null;
@@ -448,17 +670,61 @@ describe("staging fixture generation", () => {
 				});
 			}
 
-			// ── 5 · POSTS — one per open market except M4 ───────────────────
+			// ── 5-7 · POSTS + REPLIES + PRICE MOVEMENT (phase: main) ────────
 			// Order is the fixture table's order and it is load-bearing: see the
 			// POSTS docblock (the daily-credit window, and Q4's YES-on-M2 rule).
-			for (const post of POSTS) {
-				await placePost({
-					userId: requireParticipant(post.author),
-					marketId: requireMarket(post.market),
-					side: post.side,
-					stake: post.stake,
-					body: post.body,
+			// C11's multi-point chart falls out of the sequential place() calls —
+			// each one moves the pool, so each writes a distinct price.
+			await runCommentPhase("main");
+
+			// ── 8-9 · SELLS — P-exited's exit and P-flipped's unwind ────────
+			// Buy strictly before sell (the DAG's own rule), and the flip's NO
+			// half is a SEPARATE phase because it is illegal until this commits.
+			for (const s of SELLS) {
+				await sellAll(requireParticipant(s.seller), requireMarket(s.market));
+			}
+
+			// ── 9b · THE NO HALF OF THE FLIP (phase: after-flip) ────────────
+			// INV-3's proof lands here: P-flipped's earlier YES comment keeps
+			// `side_at_post_time = 'YES'` even though its author now holds NO.
+			// The gates assert it; this is what produces it.
+			await runCommentPhase("after-flip");
+
+			// ── 10 · BOOKMARKS ──────────────────────────────────────────────
+			// `addBookmarkAction` reads the viewer from `auth.api.getSession`, so
+			// the session is stubbed per call to the acting viewer. Everything
+			// after the auth gate — the self-bookmark refusal included — is the
+			// shipped code.
+			for (const b of BOOKMARKS) {
+				const viewerId = requireParticipant(b.viewer);
+				getSessionSpy.mockResolvedValue({
+					user: { id: viewerId },
+				} as never);
+				const result = await addBookmarkAction(requireComment(b.target));
+				if (!result.ok) {
+					throw new Error(
+						`bookmark ${b.viewer} -> ${b.target} refused: ${result.code}`,
+					);
+				}
+			}
+
+			// ── 11 · MODERATION ─────────────────────────────────────────────
+			// AFTER all content exists. ADR-0021: a ban removes voice, not past
+			// content — a claim that is only demonstrable if there is past content
+			// to survive it, so ordering is the fixture, not a detail.
+			mockRequireAdminSession.mockResolvedValue({
+				sessionId: "staging-fixture-admin-session",
+			});
+			for (const m of MODERATION) {
+				const result = await moderateComment({
+					commentId: requireComment(m.target),
+					action: m.action,
 				});
+				if (!result.ok) {
+					throw new Error(
+						`moderation ${m.key} (${m.action} ${m.target}) refused: ${result.error.code}`,
+					);
+				}
 			}
 
 			// ── 12 · LIFECYCLE TERMINALS ────────────────────────────────────
@@ -523,6 +789,13 @@ describe("staging fixture generation", () => {
 					metadata: adminMetadata("F-RESOLVE-3"),
 				});
 			}
+
+			// ── 13 · AFTER THE SETTLEMENT (phase: after-settlement) ─────────
+			// P-owner sits at 0 Đ from the moment its 1000 Đ M7 post lands until
+			// M7 settles YES. The Dharma funding this reply does not EXIST before
+			// the step above — which is the whole reason gate 5's G5.5 carrier
+			// (an OPEN four-digit holding) has to be placed here and nowhere else.
+			await runCommentPhase("after-settlement");
 		} catch (err) {
 			generationError = err;
 			throw err;
@@ -587,13 +860,19 @@ describe("staging fixture generation", () => {
 			.from(users);
 
 		expect(rows.length).toBe(PARTICIPANTS.length);
+		// ⚠ SLICE C MOVED THIS. Slice B asserted `banned: null` for EVERY
+		// participant, which was correct then and is false now: §2.5 X3 bans
+		// P-banned on purpose. The assertion is narrowed to the ROLE rather than
+		// dropped — "nobody is banned" and "only the intended one is" are different
+		// claims, and the second is the one worth holding.
+		const bannedId = requireParticipant("P-banned");
 		for (const row of rows) {
 			expect({
 				id: row.id,
 				pseudonym: (row.pseudonym ?? "").length > 0,
 				pfp: (row.pfpFilename ?? "").length > 0,
 				tos: row.tosAcceptedAt !== null,
-				banned: row.bannedAt,
+				banned: row.bannedAt !== null,
 				ip: row.tosIp,
 				ua: row.tosUa,
 			}).toEqual({
@@ -601,7 +880,7 @@ describe("staging fixture generation", () => {
 				pseudonym: true,
 				pfp: true,
 				tos: true,
-				banned: null,
+				banned: row.id === bannedId,
 				// manifest §1.7 (B5) — asserted, not merely intended.
 				ip: SYNTHETIC_TOS_IP,
 				ua: SYNTHETIC_TOS_USER_AGENT,
@@ -670,18 +949,30 @@ describe("staging fixture generation", () => {
 		).toBeGreaterThanOrEqual(9);
 	});
 
-	it("placed one post per open market except M4, each riding a real bet", async () => {
+	it("placed every post and reply, each riding a real bet", async () => {
+		const expected = POSTS.length + REPLIES.length;
 		const betRows = await readOnly
 			.select({ id: bets.id, commentId: bets.commentId })
 			.from(bets);
-		expect(betRows.length).toBe(POSTS.length);
+		// A sell writes NO bets row (`bets.comment_id` NOT NULL forbids a
+		// comment-free bet), so the count is comments, not comments + sells.
+		expect(betRows.length).toBe(expected);
 		// INV-1's built half: no bet without its comment.
 		expect(betRows.filter((b) => b.commentId === null)).toEqual([]);
 
 		const commentRows = await readOnly
-			.select({ id: comments.id })
+			.select({ id: comments.id, parentId: comments.parentCommentId })
 			.from(comments);
-		expect(commentRows.length).toBe(POSTS.length);
+		expect(commentRows.length).toBe(expected);
+		// Replies are flat — REPLY_DEPTH_MAX = 1. Every reply's parent is a
+		// top-level comment, so no comment with a parent is itself a parent.
+		const parentIds = new Set(
+			commentRows.map((c) => c.parentId).filter((p): p is string => p !== null),
+		);
+		expect(parentIds.size).toBe(new Set(REPLIES.map((r) => r.parent)).size);
+		expect(
+			commentRows.filter((c) => c.parentId !== null && parentIds.has(c.id)),
+		).toEqual([]);
 
 		// M4 carries no post, by manifest design — assert the exception rather
 		// than leaving it implicit.
@@ -691,6 +982,150 @@ describe("staging fixture generation", () => {
 			.from(bets)
 			.where(eq(bets.marketId, m4));
 		expect(m4Bets).toEqual([]);
+	});
+
+	// ── SLICE C · §2.3 CONTENT, §2.4 POSITIONS/BOOKMARKS, §2.5 MODERATION ───
+
+	it("C7 · attached a REAL R2 object to its post, through the shipped chain", async () => {
+		const imaged = POSTS.filter((p) => p.image);
+		expect(imaged.length).toBeGreaterThan(0);
+		for (const post of imaged) {
+			const [row] = await readOnly
+				.select({
+					id: comments.id,
+					uploadId: comments.imageUploadsId,
+				})
+				.from(comments)
+				.where(eq(comments.id, requireComment(post.key)));
+			expect({ key: post.key, linked: row?.uploadId !== null }).toEqual({
+				key: post.key,
+				linked: true,
+			});
+			const [upload] = await readOnly
+				.select({
+					key: imageUploads.r2ObjectKey,
+					bytes: imageUploads.byteSize,
+					terminal: imageUploads.terminalState,
+				})
+				.from(imageUploads)
+				.where(eq(imageUploads.id, row?.uploadId as string));
+			// The bytes were HeadObject-verified by `verifyUploadedObject`, so a
+			// non-zero size here is evidence the PUT actually landed rather than
+			// evidence a row was written.
+			expect({
+				committed: upload?.terminal,
+				positiveBytes: (upload?.bytes ?? 0) > 0,
+				participantKey: (upload?.key ?? "").startsWith("u/"),
+			}).toEqual({
+				committed: "committed",
+				positiveBytes: true,
+				participantKey: true,
+			});
+		}
+	});
+
+	it("Q4/INV-3 · the flip moved the holding and left the prior comment's side alone", async () => {
+		const flippedId = requireParticipant("P-flipped");
+		const m2 = requireMarket("M2");
+		const held = await readOnly
+			.select({ side: positions.side, quantity: positions.quantity })
+			.from(positions)
+			.where(
+				sql`${positions.userId} = ${flippedId} AND ${positions.marketId} = ${m2} AND ${positions.quantity} > 0`,
+			);
+		// One held side, and it is NO — the flip completed.
+		expect(held.map((h) => h.side)).toEqual(["NO"]);
+
+		// THE INV-3 PROOF. The YES comment posted before the flip still carries
+		// `side_at_post_time = 'YES'`. Selling out and re-entering the other side
+		// never moves prior comments.
+		const [prior] = await readOnly
+			.select({ side: comments.sideAtPostTime })
+			.from(comments)
+			.where(eq(comments.id, requireComment("M2-P10")));
+		expect(prior?.side).toBe("YES");
+		const [after] = await readOnly
+			.select({ side: comments.sideAtPostTime })
+			.from(comments)
+			.where(eq(comments.id, requireComment("M2-P11")));
+		expect(after?.side).toBe("NO");
+	});
+
+	it("G6.3 substrate · P-exited holds nothing, and wrote no zero-share bet", async () => {
+		const exitedId = requireParticipant("P-exited");
+		const rows = await readOnly
+			.select({ quantity: positions.quantity })
+			.from(positions)
+			.where(eq(positions.userId, exitedId));
+		// A fully-exited position legitimately reaches quantity 0 in `positions`
+		// (Bucket C). That is the distinction G6.3 exists to hold apart from a
+		// counterfeit `bets.share_quantity = 0` row.
+		expect(rows.length).toBeGreaterThan(0);
+		expect(rows.every((r) => Number(r.quantity) === 0)).toBe(true);
+	});
+
+	it("B1/B2 · bookmarked others' work, never its own; P-empty has none", async () => {
+		const rows = await readOnly
+			.select({ userId: bookmarks.userId, commentId: bookmarks.commentId })
+			.from(bookmarks);
+		expect(rows.length).toBe(BOOKMARKS.length);
+		for (const row of rows) {
+			const [target] = await readOnly
+				.select({ author: comments.userId })
+				.from(comments)
+				.where(eq(comments.id, row.commentId));
+			// `addBookmarkAction` refuses a self-bookmark, so this also proves the
+			// fixture did not quietly no-op.
+			expect(target?.author).not.toBe(row.userId);
+		}
+		// B1 needs BOTH arms — a post and a reply.
+		const replyKeys = new Set(REPLIES.map((r) => requireComment(r.key)));
+		expect(rows.some((r) => replyKeys.has(r.commentId))).toBe(true);
+		expect(rows.some((r) => !replyKeys.has(r.commentId))).toBe(true);
+		// B2 — P-empty holds none.
+		expect(
+			rows.filter((r) => r.userId === requireParticipant("P-empty")),
+		).toEqual([]);
+	});
+
+	it("X1-X3 · removals landed and the ban left past content standing", async () => {
+		const rows = await readOnly
+			.select({
+				reason: modActions.reason,
+				commentId: modActions.targetCommentId,
+			})
+			.from(modActions);
+		expect(rows.length).toBe(MODERATION.length);
+		const removals = rows.filter((r) => r.reason === "content_removed");
+		expect(removals.length).toBe(
+			MODERATION.filter((m) => m.action === "remove").length,
+		);
+
+		// ADR-0021 — the ban removes VOICE, not past content.
+		const bannedId = requireParticipant("P-banned");
+		const [banned] = await readOnly
+			.select({ bannedAt: users.bannedAt })
+			.from(users)
+			.where(eq(users.id, bannedId));
+		expect(banned?.bannedAt).not.toBeNull();
+
+		// The banned author's comments are all still present, and none of them
+		// carries a `content_removed` row — that is the distinction, asserted.
+		const authored = await readOnly
+			.select({ id: comments.id })
+			.from(comments)
+			.where(eq(comments.userId, bannedId));
+		expect(authored.length).toBeGreaterThan(0);
+		const removedIds = new Set(removals.map((r) => r.commentId));
+		expect(authored.filter((c) => removedIds.has(c.id))).toEqual([]);
+
+		// And exactly one participant is banned — a ban that leaked to the whole
+		// set would satisfy every assertion above.
+		const allBanned = await readOnly
+			.select({ id: users.id })
+			.from(users)
+			.where(sql`${users.bannedAt} IS NOT NULL`);
+		expect(allBanned.map((u) => u.id)).toEqual([bannedId]);
 	});
 
 	it("reports what it produced", async () => {

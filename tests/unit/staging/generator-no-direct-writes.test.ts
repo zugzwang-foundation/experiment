@@ -269,14 +269,41 @@ const RATIFIED_SERVER_IMPORTS = new Set([
 	"@/server/resolution/void", // voidMarket
 	"@/server/admin/moderation/act", // moderateComment
 	"@/server/bookmarks/add", // addBookmarkAction
+	// ── C7, THE PARTICIPANT IMAGE CHAIN — added at Slice C ──────────────────
+	// Ratification Record §7 enumerates the engine functions as they stood when
+	// C7 was still flagged "most expensive shape, see OQ-1". Slice B's STEP 8b
+	// probe resolved OQ-1 (the whole R2 chain works on staging), and the Slice C
+	// kickoff names these three explicitly: "signUploadAndInsert -> real PUT ->
+	// verifyUploadedObject -> place({ image })". So this is an operator-ruled
+	// widening, recorded here rather than an edit made in passing.
+	//
+	// They are the SAME functions `app/api/uploads/sign/route.ts` orchestrates,
+	// in the same order. The generator adds no write of its own — the
+	// `image_uploads` row and the `image_upload.sign_requested` event are both
+	// `signUploadAndInsert`'s.
+	"@/server/storage/sign-upload", // signUploadAndInsert
+	"@/server/storage/verify-object", // verifyUploadedObject
+	"@/server/storage/r2", // mintPutUrl (HTTP, outside the tx — ADR-0014)
 	// Pure, write-free, and required by Q1's shell-skip table.
 	"@/server/bets/floors", // assertStakeFloor
-	"@/server/admin/wire", // canonicalizeAmount18
+	"@/server/admin/wire", // canonicalizeAmount18 + the mocked requireAdminSession
+	"@/server/config/limits", // PUT_URL_TTL_SECONDS — a constant, not a writer
 	// Pure value/verification helpers the GATES use. No writes.
 	"@/server/dharma/conservation",
 	"@/server/dharma/tags",
 	"@/server/bets/replay",
 	"@/server/cpmm/decimal",
+	// ── GATE 5's SHIPPED READERS — added at Slice C ─────────────────────────
+	// Every one is READ-ONLY (a `select` chain and in-memory arithmetic; none
+	// carries an insert/update/delete), and gate 5 calls them rather than
+	// restating their identities in SQL. Đb is `computeSell(quantity).proceeds`
+	// and `netProfitLoss` is `wallet + Σ Đb(open) − Σ issuance`; a SQL
+	// re-derivation of either would be a second implementation of the thing
+	// being verified — the error gate 2's header exists to warn about.
+	"@/server/dharma/header-balance", // getHeaderBalance
+	"@/server/dharma/header-portfolio", // getHeaderPortfolio
+	"@/server/profile/positions", // loadProfilePositions
+	"@/server/profile/tiles", // loadProfileTiles
 ]);
 
 /** Every `@/server/...` module specifier a file imports. */

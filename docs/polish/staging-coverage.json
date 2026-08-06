@@ -1,0 +1,493 @@
+{
+	"generatedFor": "local · localhost:54322",
+	"origin": "https://staging.zugzwangworld.com",
+	"sourceCounts": {
+		"markets": 15,
+		"participants": 10,
+		"bookmarks": 2,
+		"moderation": 3,
+		"posts": 26
+	},
+	"entries": [
+		{
+			"id": "M1",
+			"section": "§2.1",
+			"shape": "Draft — admin surface; /m/sp-m1-draft must 404 for participants",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m1-draft",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m1-draft' AND status = 'Draft'",
+			"look": "must 404 for a participant — Draft is admin-only"
+		},
+		{
+			"id": "M2",
+			"section": "§2.1",
+			"shape": "Open, heavily active — the primary POLISH.3 subject; carries all of §2.3",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m2-active' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M3",
+			"section": "§2.1",
+			"shape": "Open, lightly active — no post clears k_lane, so NO badges render and Top falls back to closest-to-landslide",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m3-light",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m3-light' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M4",
+			"section": "§2.1",
+			"shape": "Open, brand new — ZERO posts, both EmptySideCTA slots",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m4-new",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m4-new' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M5",
+			"section": "§2.1",
+			"shape": "Closed — read-only; write affordances gated",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m5-closed",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m5-closed' AND status = 'Closed'",
+			"look": "renders in Closed"
+		},
+		{
+			"id": "M6",
+			"section": "§2.1",
+			"shape": "Resolving — read-only; distinct badge",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m6-resolving",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m6-resolving' AND status = 'Resolving'",
+			"look": "renders in Resolving"
+		},
+		{
+			"id": "M7",
+			"section": "§2.1",
+			"shape": "Resolved (YES) — settled positions on the Profile side; the gate-5 four-digit P/L carrier",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m7-resolved",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m7-resolved' AND status = 'Resolved'",
+			"look": "renders in Resolved"
+		},
+		{
+			"id": "M8",
+			"section": "§2.1",
+			"shape": "Voided — the void path differs from resolve (void_refund refunds)",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m8-voided",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m8-voided' AND status = 'Voided'",
+			"look": "renders in Voided"
+		},
+		{
+			"id": "M10",
+			"section": "§2.1",
+			"shape": "Open filler — Discovery hero + full grid (DISCOVERY_GRID_SIZE + 1)",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m10-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m10-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M11",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m11-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m11-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M12",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m12-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m12-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M13",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m13-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m13-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M14",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m14-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m14-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M15",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m15-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m15-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M16",
+			"section": "§2.1",
+			"shape": "Open filler",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m16-fill",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM markets WHERE slug = 'sp-m16-fill' AND status = 'Open'",
+			"look": "renders in Open"
+		},
+		{
+			"id": "M9",
+			"section": "§2.1",
+			"shape": "Frozen",
+			"status": "unreachable",
+			"url": null,
+			"reason": "Frozen market — no freeze write path exists in src/; the transition is one-shot and trigger-enforced, and setting it bricks staging permanently (manifest §1.8 / §3)",
+			"probe": null,
+			"look": "capture on a throwaway database, once. NEVER on staging"
+		},
+		{
+			"id": "P-owner",
+			"section": "§2.2",
+			"shape": "owner arm of Profile / positions / bookmarks; Q4 holds YES on M2",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedFox000",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedFox000'",
+			"look": "P-owner — owner arm of Profile / positions / bookmarks; Q4 holds YES on M2"
+		},
+		{
+			"id": "P-visitor-target",
+			"section": "§2.2",
+			"shape": "a well-populated profile viewed as a VISITOR — proves the DTO split",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedWolf001",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedWolf001'",
+			"look": "P-visitor-target — a well-populated profile viewed as a VISITOR — proves the DTO split"
+		},
+		{
+			"id": "P-empty",
+			"section": "§2.2",
+			"shape": "zero posts / replies / positions / bookmarks — every empty state at once. NEVER BETS, so its balance stays exactly 1000 (manifest §0 B7)",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedOtter002",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedOtter002'",
+			"look": "P-empty — zero posts / replies / positions / bookmarks — every empty state at once. NEVER BETS, so its balance stays exactly 1000 (manifest §0 B7)"
+		},
+		{
+			"id": "P-flipped",
+			"section": "§2.2",
+			"shape": "Slice C: buy YES -> sell ALL YES -> buy NO (the Flipped marker)",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedBadger003",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedBadger003'",
+			"look": "P-flipped — Slice C: buy YES -> sell ALL YES -> buy NO (the Flipped marker)"
+		},
+		{
+			"id": "P-exited",
+			"section": "§2.2",
+			"shape": "Slice C: fully sold out (the Exited marker); must not re-enter",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedLynx004",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedLynx004'",
+			"look": "P-exited — Slice C: fully sold out (the Exited marker); must not re-enter"
+		},
+		{
+			"id": "P-removed",
+			"section": "§2.2",
+			"shape": "Slice C: one removed comment and one surviving — masking without a ban",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedHare005",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedHare005'",
+			"look": "P-removed — Slice C: one removed comment and one surviving — masking without a ban"
+		},
+		{
+			"id": "P-banned",
+			"section": "§2.2",
+			"shape": "Slice C: banned AFTER content exists — ADR-0021, ban removes voice, not past content",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedOwl006",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedOwl006'",
+			"look": "P-banned — Slice C: banned AFTER content exists — ADR-0021, ban removes voice, not past content"
+		},
+		{
+			"id": "P-crowd-1",
+			"section": "§2.2",
+			"shape": "volume for lane dominance, reply counts and the interleave",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedHawk007",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedHawk007'",
+			"look": "P-crowd-1 — volume for lane dominance, reply counts and the interleave"
+		},
+		{
+			"id": "P-crowd-2",
+			"section": "§2.2",
+			"shape": "volume for lane dominance, reply counts and the interleave",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedStoat008",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedStoat008'",
+			"look": "P-crowd-2 — volume for lane dominance, reply counts and the interleave"
+		},
+		{
+			"id": "P-crowd-3",
+			"section": "§2.2",
+			"shape": "volume for lane dominance, reply counts and the interleave",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedPine009",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE pseudonym = 'RedPine009'",
+			"look": "P-crowd-3 — volume for lane dominance, reply counts and the interleave"
+		},
+		{
+			"id": "C1",
+			"section": "§2.3",
+			"shape": "posts on BOTH sides, both slots populated",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT side_at_post_time FROM comments c JOIN markets m ON m.id = c.market_id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND c.parent_comment_id IS NULL\n\t\t\t\tGROUP BY side_at_post_time HAVING count(*) > 0\n\t\t\t) s HAVING count(*) = 2",
+			"look": "both YES and NO columns carry posts"
+		},
+		{
+			"id": "C2",
+			"section": "§2.3",
+			"shape": "LATEST_INTERLEAVE_INTERVAL + 2 posts — the interleave fires twice",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments c JOIN markets m ON m.id = c.market_id\n\t\t\t WHERE m.slug = 'sp-m2-active' AND c.parent_comment_id IS NULL",
+			"look": "scroll the post list — a newest-post injection lands after every 10 ranked"
+		},
+		{
+			"id": "C3",
+			"section": "§2.3",
+			"shape": "one post dominating EACH of Most Debated / Highest Stakes / Contested",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%attracts the most replies on M2%'",
+			"look": "three badges, one per lane: M2-P2 Most Debated, M2-P3 Highest Stakes, M2-P4 Contested"
+		},
+		{
+			"id": "C4",
+			"section": "§2.3",
+			"shape": "most posts dominating no lane",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%dominate no lane at all%'",
+			"look": "9 of the 12 posts carry NO badge — that is the criterion, not an omission"
+		},
+		{
+			"id": "C5",
+			"section": "§2.3",
+			"shape": "a post with many replies on both sides",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%attracts the most replies on M2%'",
+			"look": "M2-P2 — ReplySplitBar, the expand affordance, and stake ordering within each side"
+		},
+		{
+			"id": "C6",
+			"section": "§2.3",
+			"shape": "a post with zero replies",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE body LIKE '%nobody replies to%'",
+			"look": "M2-P5 — the empty reply state inside a populated market"
+		},
+		{
+			"id": "C7",
+			"section": "§2.3",
+			"shape": "a post with an attached image",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE image_uploads_id IS NOT NULL",
+			"look": "M2-P6 — the in-card clip, then click for the whole-render pop-up"
+		},
+		{
+			"id": "C8",
+			"section": "§2.3",
+			"shape": "a post long enough to truncate",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM comments WHERE length(body) > 800",
+			"look": "M2-P7 — the Read more affordance"
+		},
+		{
+			"id": "C9",
+			"section": "§2.3",
+			"shape": "a removed post with SURVIVING replies",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM mod_actions ma\n\t\t\t JOIN comments c ON c.id = ma.target_comment_id\n\t\t\t WHERE ma.reason = 'content_removed' AND c.parent_comment_id IS NULL",
+			"look": "M2-P8 — the post body is masked; its two replies are still readable"
+		},
+		{
+			"id": "C10",
+			"section": "§2.3",
+			"shape": "a removed reply under a present post",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM mod_actions ma\n\t\t\t JOIN comments c ON c.id = ma.target_comment_id\n\t\t\t WHERE ma.reason = 'content_removed' AND c.parent_comment_id IS NOT NULL",
+			"look": "M2-P9's reply — the reply-level masked variant, parent untouched"
+		},
+		{
+			"id": "C11",
+			"section": "§2.3",
+			"shape": "enough price movement for a multi-point chart with post nodes",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT DISTINCT b.price_at_bet FROM bets b JOIN markets m ON m.id = b.market_id\n\t\t\t\tWHERE m.slug = 'sp-m2-active'\n\t\t\t) p HAVING count(*) > 4",
+			"look": "the market chart carries multiple points with post nodes on it"
+		},
+		{
+			"id": "Q1",
+			"section": "§2.4",
+			"shape": "an open sellable position",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedWolf001",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status = 'Open'",
+			"look": "the Sell affordance renders on an Open market's holding"
+		},
+		{
+			"id": "Q2",
+			"section": "§2.4",
+			"shape": "a position on a TERMINAL market",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedStoat008",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM positions p JOIN markets m ON m.id = p.market_id\n\t\t\t WHERE p.quantity > 0 AND m.status IN ('Closed','Resolving','Resolved','Voided')",
+			"look": "Sell is HIDDEN, not disabled — M5 is Closed"
+		},
+		{
+			"id": "Q3",
+			"section": "§2.4",
+			"shape": "a settled position post-resolution",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedFox000",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM payout_events",
+			"look": "P-owner's M7 row — net P/L on the winning side"
+		},
+		{
+			"id": "Q4",
+			"section": "§2.4",
+			"shape": "a viewer holding YES on M2 — the opposite-slot rule",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM positions p\n\t\t\t JOIN markets m ON m.id = p.market_id\n\t\t\t JOIN users u ON u.id = p.user_id\n\t\t\t WHERE m.slug = 'sp-m2-active' AND p.side = 'YES' AND p.quantity > 0\n\t\t\t   AND u.pseudonym = 'RedFox000'",
+			"look": "signed in AS P-owner, the NO composer renders oppositeHeld-disabled"
+		},
+		{
+			"id": "Q5",
+			"section": "§2.4",
+			"shape": "zero positions",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/u/RedOtter002",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users u\n\t\t\t WHERE u.pseudonym = 'RedOtter002'\n\t\t\t   AND NOT EXISTS (SELECT 1 FROM positions p WHERE p.user_id = u.id)",
+			"look": "empty PositionsTable — owner and visitor copy"
+		},
+		{
+			"id": "B1",
+			"section": "§2.4",
+			"shape": "bookmarks on OTHERS' posts and replies",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/bookmarks",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM bookmarks",
+			"look": "signed in AS RedFox000 — Staked/Current are the BOOKMARKED author's figures"
+		},
+		{
+			"id": "B2",
+			"section": "§2.4",
+			"shape": "zero bookmarks",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/bookmarks",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users u\n\t\t\t WHERE u.pseudonym = 'RedOtter002'\n\t\t\t   AND NOT EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = u.id)",
+			"look": "signed in AS RedOtter002 — the empty Bookmarks page"
+		},
+		{
+			"id": "X1",
+			"section": "§2.5",
+			"shape": "X1 — one content_removed on a POST; feeds C9 and the audit surface",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM mod_actions WHERE reason = 'content_removed'",
+			"look": "the masked card on the debate view, and the row in the audit feed"
+		},
+		{
+			"id": "X2",
+			"section": "§2.5",
+			"shape": "X2 — one content_removed on a REPLY; feeds C10",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM mod_actions WHERE reason = 'content_removed'",
+			"look": "the masked card on the debate view, and the row in the audit feed"
+		},
+		{
+			"id": "X3",
+			"section": "§2.5",
+			"shape": "X3 — bans P-banned AFTER its content exists; the content survives (ADR-0021)",
+			"status": "reachable",
+			"url": "https://staging.zugzwangworld.com/admin/moderation/audit",
+			"reason": null,
+			"probe": "SELECT count(*)::int AS n FROM users WHERE banned_at IS NOT NULL",
+			"look": "the ban appears in the audit feed; the author's PAST CONTENT is still on /m/sp-m2-active (ADR-0021)"
+		},
+		{
+			"id": "X4",
+			"section": "§2.5",
+			"shape": "audit feed paginates",
+			"status": "unreachable",
+			"url": null,
+			"reason": "Audit-feed pagination — AUDIT_FEED_DEFAULT_LIMIT = 200 and the page hard-codes its own ROW_LIMIT with no wiring to reach it. A PRODUCT gap, not a data gap (manifest §3, v1.2 B3)",
+			"probe": null,
+			"look": "needs a POLISH.8 ruling on whether the feed should paginate at all"
+		}
+	]
+}
