@@ -434,6 +434,25 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** Runbook-owned — a step in `docs/runbooks/deploy-pipeline.md`'s project-identity procedure, or its own HARDEN row. Full reasoning is in `docs/logs/STAGING-PARITY-A.md` under *Q-A*; this entry is the tracking, that one is the argument.
 
+## STAGING-PARITY Slice B — ADR-0031's `bet_receipts` derivability claim is unverified
+
+**Originating task:** STAGING-PARITY Slice B → manifest v1.3 (2026-08-06). Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a claim a slice can record but must not discharge.
+
+**The row, as ruled:**
+
+> ADR-0031 excludes `bet_receipts` from the 2026-11-06 dataset on the
+> grounds that its content is "fully derivable from `events` + `pools`".
+> Nothing verifies that claim. Class R, owned by the DATASET RELEASE task,
+> NOT by STAGING-PARITY: verifying derivability means implementing the
+> derivation, which is a second implementation of what the engine does and
+> is forbidden by manifest §1.1. Trigger: dataset release scoping.
+
+**Why STAGING-PARITY cannot own it.** Manifest §1 constraint 1 forbids a second event-writing implementation precisely because it becomes a divergent source of truth. Verifying "derivable from `events` + `pools`" requires writing that derivation — reconstructing `newPrice` and the response body from the log — which is the same prohibited shape pointed the other way. The v1.3 C1 amendment is the adjacent finding: `loadDurableReplay` stores `newPrice` rather than re-deriving it *because* re-derivation was judged not worth doing, and that judgement is exactly what the exclusion claim leans on.
+
+**Conditional trigger.** Dataset release scoping — the point at which the 2026-11-06 table set is fixed and each exclusion must justify itself.
+
+**Expected next task.** DATASET RELEASE. Full context is manifest §0 v1.3 C1 and ADR-0031; this entry is the tracking.
+
 ## STAGING-PARITY Slice A — an `events` partition added without its truncate guard is invisible
 
 **Originating task:** STAGING-PARITY Slice A, overnight mutation sweep (2026-08-06), GROUP 5 item 9. Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a control that no assertion in the slice can hold, recorded rather than left silently unproven.
