@@ -629,9 +629,19 @@ describe("verifyPostReset — G-4", () => {
 				"ALTER TABLE system_state DISABLE TRIGGER bucket_b_no_delete",
 			);
 			await testClient`DELETE FROM system_state`;
+			// MUTATION-DERIVED (G4-b, 2026-08-06). `/system_state/i` was satisfied
+			// by the WRONG failure: delete the row-count branch and the `else if`
+			// becomes the only branch, so `systemState[0]?.frozen_at` is
+			// `undefined`, `undefined !== null` is true, and G-4 reports the
+			// sentinel as FROZEN when it is ABSENT. Two unrelated operational
+			// states — one needs a re-seed, the other is unrecoverable — and the
+			// assertion could not tell them apart. Name the failure.
 			await expect(
 				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
-			).rejects.toThrow(/system_state/i);
+			).rejects.toThrow(/system_state must hold exactly 1 row, saw 0/);
+			await expect(
+				verifyPostReset(testClient, NO_MIGRATION_BASELINE),
+			).rejects.not.toThrow(/frozen_at is not NULL/);
 		} finally {
 			await testClient.unsafe("ROLLBACK");
 		}
