@@ -388,10 +388,12 @@ describe("UI-6 S3 loadReviewFeed — live-content completeness (ADR-0021)", () =
 
 	// Masking is a property of EVERY body read, not just rows: a LIVE reply under
 	// a content_removed PARENT keeps the reply (thread intact) but must NEVER
-	// surface the removed parent's body via the parent-snippet path. Mirrors
-	// scripts/seed-debate-view-staging.ts:263–282 (the canary that caught it on
-	// staging). RED before the fix: the parent body currently leaks into
-	// `parentSnippet`.
+	// surface the removed parent's body via the parent-snippet path. The canary
+	// that originally caught this on staging was a raw-INSERT seeder,
+	// scripts/seed-debate-view-staging.ts, DELETED at STAGING-PARITY Slice B as
+	// a producer of event-less fixture rows — the reference is kept as history,
+	// not as a pointer to a live file. RED before the fix: the parent body
+	// leaked into `parentSnippet`.
 	it("review-feed::reply-under-removed-parent-masks-body-shows-placeholder", async () => {
 		const author = await seedAuthor();
 		const marketId = await seedMarket(

@@ -1,29 +1,41 @@
 /**
- * DEBATE.8 live verification — proves the read-time ranking model works against
- * the STAGING database after migration 0017 (the `comments.stake_at_post_time`
- * drop). This is the stratum's "done" bar: the four per-side aggregates compute,
- * and `ranking.ts` produces a Top order + lane-dominance badges against real
- * staging rows — not merely CI green.
+ * Live ranking verification — READ-ONLY.
+ *
+ * Proves the read-time ranking model works against the STAGING database: the
+ * four per-side aggregates compute, and `ranking.ts` produces a Top order plus
+ * lane-dominance badges against real staging rows.
  *
  * Operator usage:
- *   doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts
+ *   doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts <market-slug>
+ *   doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts sp-m2-active
+ *
+ * ── ITS WRITE PATH WAS DELETED AT STAGING-PARITY SLICE B (D.2) ──────────────
+ *
+ * This script used to SEED its own demo market before verifying it: raw
+ * `INSERT INTO markets / comments / bets` with `share_quantity = '0'` and
+ * `price_at_bet = '0.5'`, bypassing the engine entirely. That step was the
+ * direct producer of the `debate8-ranking-demo-*` markets (23 comments) on
+ * staging, of 37 bets with no `bet.placed` event, and of the
+ * `episodes.ts:168` throw that made every event-sourced read model return
+ * empty there. It wrote both a `bets` row and no event, which is precisely the
+ * corruption STAGING-PARITY exists to remove (manifest §1.1).
+ *
+ * Steps 1, 3 and 4 were never the problem — they are genuine read-only
+ * verification — so they are kept, and the script now takes the market to
+ * verify AS AN ARGUMENT instead of manufacturing one. Fixture data comes from
+ * `pnpm staging:generate`, which drives the real engine.
+ *
+ * This makes it the CALIBRATION INSTRUMENT for the C3 lane-dominance shapes:
+ * point it at a generated market, read the aggregates and badges it prints, and
+ * tune the fixture stakes until each of the three lanes has a dominant post.
+ * Calibration by measurement rather than by guesswork.
  *
  * It runs an INLINE `postgres()` client (NOT the `@/db` → `server-only` chain,
- * per the staging-seed/smoke convention) and imports the PURE `ranking.ts`
- * (no IO, no `server-only`, importable from tsx). It refuses to run unless
- * `DATABASE_URL_STAGING` contains `STAGING_PROJECT_REF_FRAGMENT` (the same guard
- * `migrate-staging.ts` uses).
- *
- * Steps: (1) schema check — the column is gone, `comments_ranking_idx` survives;
- * (2) seed a fresh, clearly-labelled demo market with posts + two-sided
- * reply-bets engineered so one post dominates the contestation badge lane;
- * (3) run the SAME aggregate query as `src/server/debate-view/ranking-substrate.ts`;
- * (4) feed the substrate to `ranking.ts` and print the four aggregates + the Top
- * order + the per-post badge. Seeded rows are INSERT-only (Bucket-A append-only),
- * attributed to an existing staging user, under a `debate8-ranking-demo-*` slug.
+ * per the staging-seed/smoke convention) and imports the PURE `ranking.ts` (no
+ * IO, no `server-only`, importable from tsx). It refuses to run unless
+ * `DATABASE_URL_STAGING` contains `STAGING_PROJECT_REF_FRAGMENT` (the same
+ * guard `migrate-staging.ts` uses).
  */
-
-import { randomUUID } from "node:crypto";
 
 import postgres from "postgres";
 
@@ -31,10 +43,11 @@ import { badgeFor, buildTopList, type PostSubstrate } from "../src/lib/ranking";
 
 const DBURL = process.env.DATABASE_URL_STAGING;
 const FRAG = process.env.STAGING_PROJECT_REF_FRAGMENT;
+const SLUG = process.argv[2];
 
 if (!DBURL) {
 	console.error(
-		"[verify-ranking] DATABASE_URL_STAGING not set. Run: doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts",
+		"[verify-ranking] DATABASE_URL_STAGING not set. Run: doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts <market-slug>",
 	);
 	process.exit(1);
 }
@@ -44,39 +57,16 @@ if (!FRAG || !DBURL.includes(FRAG)) {
 	);
 	process.exit(1);
 }
+if (!SLUG) {
+	console.error(
+		"[verify-ranking] a market slug is required. Usage:\n" +
+			"  doppler run --config stg -- pnpm tsx scripts/verify-ranking-staging.ts <market-slug>\n" +
+			"This script no longer seeds its own market — generate one with `pnpm staging:generate`.",
+	);
+	process.exit(1);
+}
 
 const sql = postgres(DBURL, { max: 2 });
-
-// The demo fixture (placeholder constants n≥5, D≥200, n^b≥3, k_lane=3,
-// floor_split=6): P1 is big-and-even → its n^b (=8) is the SOLE contestation
-// floor-clearer → SENTINEL → P1 earns the **Contested** badge; P2/P3 are
-// lopsided (n^b ≈ 1.43 < 3) and earn no badge.
-const FIXTURE = [
-	{
-		key: "P1",
-		side: "YES",
-		authorStake: "300",
-		support: 4,
-		counter: 4,
-		replyStake: "60",
-	},
-	{
-		key: "P2",
-		side: "YES",
-		authorStake: "240",
-		support: 1,
-		counter: 5,
-		replyStake: "50",
-	},
-	{
-		key: "P3",
-		side: "NO",
-		authorStake: "180",
-		support: 5,
-		counter: 1,
-		replyStake: "55",
-	},
-] as const;
 
 async function main(): Promise<void> {
 	// 1 — schema check.
@@ -96,47 +86,19 @@ async function main(): Promise<void> {
 	);
 	if (!colGone || !idxKept) throw new Error("staging schema check failed");
 
-	// 2 — seed a fresh demo market (reuse an existing user as the FK target).
-	const [user] = await sql`SELECT id FROM users LIMIT 1`;
-	if (!user)
-		throw new Error("no users on staging to attribute the demo fixture");
-	const userId = user.id as string;
-
-	const tag = randomUUID().slice(0, 8);
+	// 2 — resolve the market BY SLUG. (This step used to seed one. See the
+	// header: that write path is what corrupted staging, and it is gone.)
 	const [market] = await sql`
-		INSERT INTO markets (slug, title, resolution_deadline)
-		VALUES (${`debate8-ranking-demo-${tag}`}, ${`DEBATE.8 ranking demo ${tag}`},
-			now() + interval '30 days')
-		RETURNING id`;
-	const marketId = market?.id as string;
-
-	const keyById = new Map<string, string>();
-	for (const p of FIXTURE) {
-		const [post] = await sql`
-			INSERT INTO comments (user_id, market_id, side_at_post_time, body)
-			VALUES (${userId}, ${marketId}, ${p.side}, ${`${p.key} post`})
-			RETURNING id`;
-		const postId = post?.id as string;
-		keyById.set(postId, p.key);
-		// The post's own entry bet → author stake `a`.
-		await sql`
-			INSERT INTO bets (user_id, market_id, side, stake, share_quantity, price_at_bet, comment_id)
-			VALUES (${userId}, ${marketId}, ${p.side}, ${p.authorStake}, '0', '0.5', ${postId})`;
-		const oppSide = p.side === "YES" ? "NO" : "YES";
-		const replySides = [
-			...Array(p.support).fill(p.side), // Support = same side as the post
-			...Array(p.counter).fill(oppSide), // Counter = opposing side
-		] as ("YES" | "NO")[];
-		for (const side of replySides) {
-			const [reply] = await sql`
-				INSERT INTO comments (user_id, market_id, side_at_post_time, body, parent_comment_id)
-				VALUES (${userId}, ${marketId}, ${side}, ${`${p.key} reply`}, ${postId})
-				RETURNING id`;
-			await sql`
-				INSERT INTO bets (user_id, market_id, side, stake, share_quantity, price_at_bet, comment_id)
-				VALUES (${userId}, ${marketId}, ${side}, ${p.replyStake}, '0', '0.5', ${reply?.id})`;
-		}
+		SELECT id, title, status FROM markets WHERE slug = ${SLUG}`;
+	if (!market) {
+		throw new Error(
+			`no market with slug ${JSON.stringify(SLUG)} on staging — generate the fixture set first (pnpm staging:generate)`,
+		);
 	}
+	const marketId = market.id as string;
+	console.log(
+		`\n[market] ${SLUG} — ${market.title} (${market.status}) ${marketId}`,
+	);
 
 	// 3 — the SAME aggregate query as ranking-substrate.ts (join via bets.comment_id).
 	const rows = await sql`
@@ -175,13 +137,24 @@ async function main(): Promise<void> {
 		priceAtBet: r.price_at_bet as string,
 	}));
 
+	if (substrate.length === 0) {
+		// Said plainly rather than reported as a pass: an empty substrate produces
+		// an empty Top order and zero badges, which reads identical to "the model
+		// ran and nothing dominated".
+		console.log(
+			`\n[aggregates] market ${marketId} has NO top-level posts — nothing to rank.`,
+		);
+		await sql.end();
+		return;
+	}
+
 	// 4 — compute + print.
 	console.log(
-		`\n[aggregates] market ${marketId} — ${substrate.length} posts (the four per-side signals):`,
+		`\n[aggregates] ${substrate.length} post(s) — the four per-side signals:`,
 	);
 	for (const s of substrate) {
 		console.log(
-			`  ${keyById.get(s.id)} (${s.id.slice(0, 8)}) side=${s.parentSide}  ` +
+			`  ${s.id.slice(0, 8)} side=${s.parentSide}  ` +
 				`support=${s.supportCount}/Đ${s.supportDharma}  counter=${s.counterCount}/Đ${s.counterDharma}  a=Đ${s.authorStake}`,
 		);
 	}
@@ -191,13 +164,13 @@ async function main(): Promise<void> {
 	ordered.forEach((p, i) => {
 		const badge = badgeFor(p, substrate);
 		console.log(
-			`  ${i + 1}. ${keyById.get(p.id)} (${p.id.slice(0, 8)}) side=${p.parentSide}  badge=${badge ?? "—"}`,
+			`  ${i + 1}. ${p.id.slice(0, 8)} side=${p.parentSide}  badge=${badge ?? "—"}`,
 		);
 	});
 
 	const badged = ordered.filter((p) => badgeFor(p, substrate) !== null).length;
 	console.log(
-		`\n✓ DEBATE.8 staging verification PASSED: ${substrate.length} posts' four aggregates computed live, ` +
+		`\n✓ ranking verification complete: ${substrate.length} post(s)' four aggregates computed live, ` +
 			`Top order produced, ${badged} badge(s) fired.`,
 	);
 	await sql.end();
