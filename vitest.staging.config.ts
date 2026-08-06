@@ -42,6 +42,23 @@ export default defineConfig({
 	},
 	test: {
 		globals: false,
+		// NEVER WATCH A DESTRUCTIVE RUNNER (Q-D, 2026-08-06).
+		//
+		// Vitest defaults `watch` to `!process.env.CI`, so a bare
+		// `vitest --config vitest.staging.config.ts` in an operator's shell is
+		// WATCH MODE: wipe staging once, then re-wipe on every file save.
+		//
+		// ADR-0035 Addendum A.1 names that as the first of three plausible
+		// keystrokes and defends it with G-5 — an ENV VAR. That defence decays by
+		// use: an operator running dozens of Slice B–D cycles will export the
+		// token once to stop retyping it, and watch mode comes straight back.
+		// A config key does not decay. Structural beats procedural (L-3), the
+		// same principle as ADR-0036 primitive 2's exclusion.
+		//
+		// Costs nothing: these runners are never watched, and
+		// `staging:reset:exec` already invokes `vitest run` with a positional
+		// filter. Asserted by tests/unit/staging/runner-isolation.test.ts.
+		watch: false,
 		// Operational runs cross the public internet to Supabase ap-south-1 and
 		// truncate ~21 relations in one transaction; the generator in Slice B
 		// will drive ~150 engine calls. Generous, still bounded.

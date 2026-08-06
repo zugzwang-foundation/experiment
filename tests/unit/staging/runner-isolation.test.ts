@@ -68,6 +68,15 @@ describe("vitest.staging.config.ts is the only runner that includes them", () =>
 		expect((exclude ?? []).some((p) => p.includes("staging"))).toBe(false);
 	});
 
+	it("never watches — the runners are destructive (Q-D)", () => {
+		// Vitest defaults `watch` to `!process.env.CI`, so a bare
+		// `vitest --config vitest.staging.config.ts` is watch mode: wipe, then
+		// re-wipe on every file save. G-5's env token defends that keystroke, but
+		// an env var decays by use — an operator running Slice B–D cycles will
+		// export it once and stop retyping. A config key does not decay (L-3).
+		expect(stagingTest.watch).toBe(false);
+	});
+
 	it("runs files sequentially, like the other two configs", () => {
 		// The reset toggles triggers at the catalog level, which is global to
 		// the database. Cross-file parallelism would race it.
