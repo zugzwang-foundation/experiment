@@ -655,6 +655,35 @@ identity_pool, `system_state` 1 row with `frozen_at NULL`, 78 guards 0 disabled,
 25 migrations, `session_replication_role = origin`. Read under
 `PGOPTIONS=-c default_transaction_read_only=on`. Nothing was written.
 
+### RULED (Gate C, 2026-08-06) — the runner is unexercisable outside staging, and that is accepted
+
+**The staging runner has never been executed and cannot be, locally.** G-3
+requires a Supabase host — `isAllowedStagingHost` refuses loopback and every
+non-`.supabase.com`/`.supabase.co` target — so **the guard that makes the runner
+safe is the guard that makes it unexercisable outside staging.** That is not a
+defect in the guard; it is the guard working. There is no local rehearsal, and
+there was never going to be one.
+
+**Accepted as a named risk, not mitigated.** Its first execution is **Slice B's
+opening act**, against a disposable environment already scheduled for
+destruction. Weakening G-3 to permit a local rehearsal would trade a real guard
+for a rehearsal — the guard protects every future run; the rehearsal would
+protect one.
+
+**What Slice B must therefore do.** Treat the first reset as **the runner's
+first run** — not as a re-run of something already proven — and **read its
+output** rather than assuming it. Everything asserted about the runner today is
+source-structural (`tests/unit/staging/runner-gating.test.ts` reads the file);
+"`runner-gating` is green" is **not** "the runner has been run". Specifically
+unproven until that first execution: the pre-flight guards-already-disabled
+refusal, the pre-flight catalog-count refusal, the
+`TRUNCATE_EXCLUSIONS` ∩ `TRUNCATE_SET` refusal, the belt's `.catch()` path, the
+**F2** message as actually rendered on a real refusal, and the closing re-seed
+instruction. Full list at *GROUP 5 · item 5* of the mutation audit.
+
+No code change. Recorded here because Slice B is a different session and this is
+the premise it must not inherit wrongly.
+
 ---
 
 ## Next session starts at

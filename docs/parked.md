@@ -433,3 +433,23 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Any Supabase project restore, project migration, or ref change on either the staging or the production project.
 
 **Expected next task.** Runbook-owned — a step in `docs/runbooks/deploy-pipeline.md`'s project-identity procedure, or its own HARDEN row. Full reasoning is in `docs/logs/STAGING-PARITY-A.md` under *Q-A*; this entry is the tracking, that one is the argument.
+
+## STAGING-PARITY Slice A — an `events` partition added without its truncate guard is invisible
+
+**Originating task:** STAGING-PARITY Slice A, overnight mutation sweep (2026-08-06), GROUP 5 item 9. Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a control that no assertion in the slice can hold, recorded rather than left silently unproven.
+
+**The row, as ruled:**
+
+> A new `events` partition added without its `bucket_a_no_truncate` guard is
+> invisible to every assertion in Slice A, because guard-list parity derives
+> from the same migration SQL that would be missing the guard. Class R.
+> Trigger: any migration adding an `events` partition or a protected table.
+> Cross-reference ADR-0030's forward obligation.
+
+**Why no assertion can catch it.** `tests/unit/staging/guard-list-parity.test.ts` is deliberately built so that *the migrations are the authority* — it parses every `.sql` on disk and derives the expected guard set from them. That is the right design for detecting drift **between the constant and the migrations**, and it is exactly why it cannot detect a migration that is **itself** wrong: both sides move together and agree. `EXPECTED_GUARD_CATALOG_ROWS` is derived the same way, so it moves too. And the integration suite's "accounts for every public base table" query — the assertion that *does* catch a new **non-partition** protected table appearing in none of the three lists — explicitly excludes `events\_%`, so a partition is outside its reach as well.
+
+**Blast radius.** A reset would then truncate the partition **because** it is unguarded — the `TRUNCATE … CASCADE` succeeds where a guarded partition would abort the batch — and nothing reports the omission. The row loss is not the concern (partitions are in the truncate set by design); the concern is that the partition sits **outside the Bucket-A append-only contract** in normal operation, where `UPDATE`/`DELETE` on it would also be unguarded. Statement-level triggers do **not** clone to partitions (ADR-0030, verified via `tgparentid`), which is the whole reason each partition must carry its own by name.
+
+**Conditional trigger.** Any migration that adds an `events` partition, or that adds a protected table. This is ADR-0030's standing forward obligation, restated as a docket row because the mutation sweep established that no test enforces it for the partition case.
+
+**Expected next task.** Process-owned, not code — a checklist line in the partition-migration procedure and a `@db-migration-reviewer` check. Evidence is in `docs/logs/STAGING-PARITY-A-mutation-audit.md` under *GROUP 5 · item 9*; this entry is the tracking, that one is the argument.
