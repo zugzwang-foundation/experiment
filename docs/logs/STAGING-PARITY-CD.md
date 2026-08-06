@@ -9,10 +9,11 @@
 
 **Headline.** Staging carries the complete manifest §2 fixture set, produced
 entirely by the real engine. **All six gates are green from a cold rebuild,
-twice**, and the coverage list is **byte-identical** across the two runs
-(md5 `4bf42fb27b5f130b46e9c6faf18042fc`). Gates 4 and 5, G1.6 and G6.3 replaced
-the last four scaffolds; each of the three new controls was proved to DETECT
-before it was trusted.
+twice with the final artifacts**, and the coverage list is **byte-identical**
+across the two runs (md5 `2b6b0bc408acf425df16937ca270e7aa`) — a property gate 4
+now ASSERTS rather than one I diffed by hand. Gates 4 and 5, G1.6, G1.7 and G6.3
+replaced the last four scaffolds; each new control was proved to DETECT before
+it was trusted.
 
 ---
 
@@ -21,6 +22,22 @@ before it was trusted.
 | Commit | Scope |
 |---|---|
 | `7219c4a` | Manifest **v1.3** (C1 gate-3 rename, C2 G1.6) + the `bet_receipts` derivability docket row in `docs/parked.md` |
+| `c8ddf11` | `@code-reviewer` findings — 2 HIGH + 5 MEDIUM + 6 LOW, all fixed in-session |
+
+⚠ **PROVENANCE OF MANIFEST v1.3 — relayed, NOT CC-authored** (`@code-reviewer`,
+HIGH-2). The manifest header reads *"web-authored"*, and Ratification Record §8
+lists manifest amendments as web-owned. v1.3's C2 **mints G1.6**, which commit
+`d9c718e` then implements — so if CC had authored that text, the gate would have
+authorised its own acceptance bar, a circularity of exactly the family this task
+exists to remove. It did not: **all three edits are the Slice C/D kickoff's
+verbatim text**, applied in place under its own instruction ("This is a web
+ruling"), as is the `docs/parked.md` docket row. Verified the way Slice B
+verified v1.2 — by marker-grep on the distinctive phrases (*"Seventh instance of
+a document describing a control…"*, *"Correcting C1 alone would silently shrink
+the exit bar"*, *"NOT event-log state reconstruction"*, *"Existence is G1.1;
+agreement is G1.6"*, *"fully derivable from `events` + `pools`"*, each present
+exactly once), plus line count **188** and `md5 ab1c65a4`. CC wrote no
+amendment text and no acceptance criterion.
 | `d9c718e` | The §2 fixture set: §2.3 C1–C11, §2.4 Q1–Q5 + B1–B2, §2.5 X1–X3, the gate-5 carriers · gates 4 and 5 · G1.6 · G6.3 · `_lib/coverage.ts` · `tests/unit/staging/fixture-table.test.ts` · `pnpm staging:rebuild` |
 | *(this commit)* | The coverage list captured into `POLISH-register.md`, PD-0-17/PD-0-18 pre-recorded as `superseded`, and `docs/polish/staging-coverage.json` |
 
@@ -233,11 +250,18 @@ G5.7 live bets: max_stake=1500, four_digit_stakes=2
 
 ## STEP 5 · D.3 — the cold rebuild, and reproducibility
 
-Two full `pnpm staging:rebuild` runs (reset → re-seed → generate → gates), the
-second from cold. **Reproducibility confirmed, three ways:**
+**Four** full `pnpm staging:rebuild` runs in total — two before the reviewer
+pass and two after it, each pair a cold reset → re-seed → generate → gates. The
+pair that counts is the **final** one, run against the artifacts that actually
+ship. **Reproducibility confirmed, three ways:**
 
 - **The coverage list is byte-identical** — `diff` empty, same md5
-  `4bf42fb27b5f130b46e9c6faf18042fc`, 493 lines.
+  `2b6b0bc408acf425df16937ca270e7aa`, 493 lines. ⚠ This is no longer a claim I
+  verified by hand: gate 4 now compares the emitted list against the committed
+  one and **fails RED on drift**, so the final rebuild's green IS the assertion.
+  (Demonstrated live in the intervening run: the reviewer fixes changed the probe
+  SQL, and the rebuild drift-failed with *"every id and URL is UNCHANGED — the
+  difference is in probe SQL"* before the new artifact was committed.)
 - **Pseudonyms identical** and unchanged from Slice B — `RedFox000` P-owner ·
   `RedWolf001` P-visitor-target · `RedOtter002` P-empty · `RedBadger003`
   P-flipped · `RedLynx004` P-exited · `RedHare005` P-removed · `RedOwl006`
@@ -302,6 +326,122 @@ verified byte size. STEP 8b's probe was accurate.
 **5 · Gate 2 and G1.4 caught NC-2 and NC-3 alongside their intended gates.**
 Not designed for; recorded because independent detection of the same corruption
 is the property that makes the gate set worth more than its parts.
+
+---
+
+## `@code-reviewer` — findings and what was done
+
+Verdict: **no CRITICAL**. No invariant weakened, no refusal trigger crossed, no
+`src/` change, no migration. **Every HIGH and MEDIUM was fixed in-session before
+the PR opened**, per §5.11. `@security-auditor` was waived at kickoff ("no
+enforcement disabled, no engine code") — honoured, not skipped.
+
+The reviewer independently re-derived two of my claims from source and both
+held: `getHeaderPortfolio`'s settled-market exclusion (`:116-125` builds
+`settledMarkets`, `:142-144` `continue`s on it), and the CPMM bound
+`shares = S·(1 + seed/(seed+S)) < 2S`. It also reproduced M2's 3420 total and
+the 2126.89 → 1125 chain from the fixture literals alone.
+
+### HIGH · both real
+
+**H1 — four gate-4 probes were not targeted at the subject whose URL they
+certify.** Q1's URL is `/u/RedWolf001` but its probe asked *"does anyone hold an
+open position"* — satisfied by P-owner, by any crowd member, by anyone. Q2, Q3
+and B1 had the same shape; Q4, Q5 and B2 were correctly scoped, which made the
+four look like omissions rather than a design choice. **This is the Slice B
+gate-2 carrier defect one layer up** ("proves markets EXISTED, not that any was
+CHECKED"), and gate 4 is the artifact eight POLISH surfaces navigate from — a
+green gate could hand an inspector a URL that renders an empty profile.
+**Fixed:** all four scoped by pseudonym; B1 additionally checks BOTH arms it
+claims (a post AND a reply, by the acting viewer, on another's content).
+⚠ Worth recording: **none of my three negative controls would have caught this**
+— they were all magnitude corruptions, and these probes fail only when a
+specific user's row is missing while another's survives.
+
+**H2 — manifest v1.3's provenance was not recorded.** Covered above in *What
+landed*. A logging gap, not a substantive one, but the reviewer was right that
+"most likely relayed" is not a verification.
+
+### MEDIUM · all five fixed
+
+- **`expectedCoverageIds()` was independent for C/Q/B/X but NOT for markets and
+  participants** — it mapped the same arrays `buildCoverage` iterates, so a
+  deleted market or participant vanished from both sides and gate 4 reported
+  full coverage. Deleting M1 (Draft) left all six gates green. Every id is now a
+  literal; the manifest is their source, exactly as the docblock already argued
+  for the other sections.
+- **G5.3 asserted a proxy.** It summed `bets.stake`; the §23 "Staked" column is
+  **Đa — the final SideEpisode's `stakedBasis`**, episode-scoped and reduced by
+  partial sells. They coincided only because P-owner has one M7 trade and no
+  sell — right by accident, the same class as the G5.5 carrier error. Now reads
+  `loadProfilePositions`.
+- **G5.7 did not check what G5.7 says.** It asserted a fact about the DATABASE
+  (a four-digit stake exists), so rewriting G5.1–G5.6 as fabricated-object
+  assertions would have left it green — manifest §5's own *"asserting that a call
+  exists is not asserting what it does"*, landing on the one criterion whose job
+  is to prevent structural blindness. Now a source tripwire over the gate-5
+  block with a positive AND negative control; the live-data half survives as
+  **G5.7b** under its true name.
+- **Every event carried `flow_id = "F-BET-1"`, replies and sells included.** The
+  wire sets it per operation (`place/route.ts:173`, `sell/route.ts:43`).
+  Persisted metadata the product would never write, in the task that exists
+  because staging carried data the product could not have produced. Now mirrors
+  the two route files by reference, and **new gate G1.7** asserts it with a
+  carrier per arm so it cannot regress silently.
+- **The gates runner overwrote a tracked file unconditionally.** The documented
+  local proving loop runs that same file, so a local run rewrote the committed
+  staging artifact with `"generatedFor": "local · 127.0.0.1:54322"` and local
+  pseudonyms. Now staging-mode only — **and it compares against the committed
+  file and fails RED on drift**, which converts the hand-verified "byte-identical
+  across two cold rebuilds" into an assertion that runs on every rebuild.
+
+### LOW · six fixed, four recorded
+
+Fixed: G5.6's sign pinned (`.abs() >= 1000` alone stayed green on a four-digit
+LOSS, and NC-3 landed at −382.89 — inside that window, so the control never
+exercised it) · G5.1/G5.2's labels were crossed, and both figures are now
+asserted and named · pseudonyms and slugs shape-checked before interpolation ·
+G1.6 gained the `betId` and comment-event pairings · X1/X2 and C3/C5 no longer
+share non-discriminating probes · the R2 PUT gained a timeout · the register
+footer count.
+
+Recorded, not fixed: the allowlist is module-granular (`storage/r2` grants
+`deleteObject` too — inherent to a module allowlist, and R2 is not the DB) ·
+`bodyFingerprint` is synthetic (plan §6: the generator is not a replay test) ·
+a terminal market briefly carries a future `resolution_deadline` after a rebuild
+(self-heals within a minute, nothing persisted falsely).
+
+### Two bugs in my own fixes, caught by the local proving run
+
+**`both` is a reserved word in Postgres** (`trim(both …)`), so B1's new subquery
+alias was a syntax error. And **the G5.7 tripwire's block boundary ran past gate
+5 into gate 6**, whose bodies reach the database through the `scalar()` helper
+and therefore carry no literal handle — three false positives on the assertion's
+very first run. The tripwire caught its own author, which is the argument for
+having written it.
+
+---
+
+## Deviations recorded, not absorbed
+
+**Plan Q4 says the coverage list is "emitted as a build artifact per run, **not**
+committed as a fixed file".** `docs/polish/staging-coverage.json` IS committed.
+Surfaced rather than buried, with the reason: Q4's stated rationale is that
+"UUIDv7 primary keys and all timestamps" are non-deterministic — and **the
+emitted artifact contains neither**. It carries ids, slugs, pseudonyms, probe
+SQL and prose, all of which are stable by construction, which is why two cold
+rebuilds produced it byte-for-byte. Committing it is what lets gate 4 fail RED
+on drift instead of merely reporting a number, and the plan's own DELIVERABLES
+§7 asks for it to become "the standing reference". If web prefers Q4's letter,
+the fix is one line (gitignore it and drop the comparison) and the register
+table survives either way.
+
+**Manifest §4 gate 5's "executed as SQL" is implemented as a split** — see
+decision 7. The reviewer examined this specifically and did not ask for it to be
+reversed, on the grounds that restating Đb or `netProfitLoss` in SQL would
+satisfy gate 5's letter by violating gate 2's *"do not re-derive the identity"*.
+Recorded because it is an interpretation of a ratified document, and unlike the
+gate-3 correction it was **not** routed into a manifest amendment.
 
 ---
 

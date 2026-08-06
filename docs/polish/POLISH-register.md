@@ -131,7 +131,7 @@ These were found by recon, not by a polish pass. **If an inspection re-discovers
 
 ## Staging fixture coverage — the standing reference
 
-> **Emitted by gate 4**, per rebuild, to `docs/polish/staging-coverage.json`. That file is the machine-readable copy and carries the SQL probe behind every row; this table is the human one. **Regenerate with `pnpm staging:rebuild`** — the list is byte-identical across cold rebuilds (verified twice, md5 `4bf42fb2`), so a diff here means the fixture set moved, not that the run was noisy.
+> **Emitted by gate 4**, per rebuild, to `docs/polish/staging-coverage.json`. That file is the machine-readable copy and carries the SQL probe behind every row; this table is the human one. **Regenerate with `pnpm staging:rebuild`** — the list is byte-identical across cold rebuilds (md5 `2b6b0bc4`), and gate 4 **fails RED** if a rebuild emits anything different, so a change here is always a deliberate fixture change rather than run-to-run noise.
 >
 > **48 entries · 46 reachable · 2 unreachable.** Every reachable entry was confirmed present by a targeted query at emit time; every unreachable one names a manifest §3 reason. Pseudonyms are pool-allocated FIFO and stable across rebuilds, so these URLs do not rot.
 
