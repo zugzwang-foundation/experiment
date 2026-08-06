@@ -270,10 +270,14 @@ pool_assigned=10  guards_disabled=0  migrations=25  frozen_at_null=true
 | Gate | Verdict |
 |---|---|
 | **1 · event parity** (G1.1–G1.5) | **GREEN** |
-| **2 · conservation** (G2.1, G2.3, G2.4) | **GREEN** — `checkMarketConservation` iterated over all 15 markets |
+| **2 · conservation** (G2.1, G2.2, G2.3, G2.4) | **GREEN** — `checkMarketConservation` iterated over all 15 markets |
 | **3 · durable replay** (G3.1, G3.1b, G3.2) | **GREEN** |
-| **6 · zero-share** (G6.1–G6.3) | **GREEN** |
-| 4 · coverage · 5 · magnitudes | explicitly skipped, naming Slice C |
+| **6 · zero-share** (G6.1, G6.2) | **GREEN** |
+| 4 · coverage · 5 · magnitudes · G6.3 | explicitly skipped, each naming Slice C |
+
+Final counts after the review fixes: **13 passed, 3 skipped**. (The first run
+read 14/2; G6.3 became a skip when it was found to be a verbatim duplicate of
+G6.1 — see the review section.)
 
 Markets, all in their fixture states:
 `sp-m1-draft=Draft · sp-m2-active=Open · sp-m3-light=Open · sp-m4-new=Open ·
