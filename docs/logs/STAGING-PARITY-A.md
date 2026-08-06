@@ -1,9 +1,12 @@
 # STAGING-PARITY Slice A — the guarded staging reset
 
-> **Session:** 2026-08-05 → 2026-08-06 IST, overnight/unattended.
-> **Branch:** `slice/staging-parity-a` · **Base:** `cd467f1` (post-ADR main).
-> **State at close:** PR OPEN, **NOT merged**. Gate C (human diff-read) is owed.
-> **The reset has NEVER been run against staging.** Local Postgres only.
+> **Sessions:** 2026-08-05 → 2026-08-06 IST — build, overnight mutation sweep,
+> Gate C (A.9), merge and close-out (A.10). Unattended throughout.
+> **Branch:** `slice/staging-parity-a` (deleted) · **Base:** `cd467f1`.
+> **State at close:** **MERGED** — squash SHA **`504053b`**. Gate C **PASS**.
+> `staging` advanced to the same SHA.
+> **The reset has NEVER been run against staging.** Local Postgres only. Its
+> first execution is Slice B's opening act — see the ruling below.
 
 ---
 
@@ -47,6 +50,21 @@ and touches `docs/adr/0035-guarded-staging-reset.md` besides the files above.
 and the mutation sweep. See *Overnight mutation sweep* below and the full
 evidence at **`docs/logs/STAGING-PARITY-A-mutation-audit.md`**, which is what
 Gate C reads for items 3–6.
+
+**Gate C (A.9) and merge (A.10) added five more**, on top of those: the Q-K
+behavioural send-assertion, the `parked.md` partition-guard docket row and the
+unexercisable-runner ruling, the Slice-A lesson, the **CI fix** (the G-3 cases
+hardcoded a local Supabase DSN — see *Surprise caught at A.9*), and **Q-D**
+(`watch: false`).
+
+**PR #298 MERGED 2026-08-06** — squash SHA **`504053b`**, branch deleted. The
+merged tree was proven identical to the reviewed SHA `188f257` before the
+tracker moved (`git diff 188f257 origin/main` empty), and both guard lines were
+grepped on `main` afterwards. CI green on `188f257`.
+
+**Final gates:** `ZUGZWANG_ENV=preview just verify` green · full suite
+**301 files / 2327 tests** green · **CI green** — the third gate, and the one
+this slice learned to check (L-7).
 
 ---
 
@@ -725,6 +743,19 @@ sees an environment other than this laptop. Check it before reporting a close.
 Class-1 decide-and-record. Each was made without a ruling, is reversible, and is
 recorded here with what it changed and how it was proven.
 
+**Q-D · `watch: false` on `vitest.staging.config.ts`** (A.10, 2026-08-06).
+Vitest defaults `watch` to `!process.env.CI`, so a bare
+`vitest --config vitest.staging.config.ts` is watch mode: wipe staging once,
+then re-wipe on every file save. ADR-0035 Addendum A.1 names that keystroke and
+defends it with **G-5 — an env var**. Decided: settle it in the config instead,
+because an env-var defence **decays by use** — an operator running dozens of
+Slice B–D cycles will export the token once to stop retyping it, and watch mode
+comes straight back. A config key does not decay (L-3, the same principle as
+ADR-0036 primitive 2's exclusion). Costs nothing: these runners are never
+watched, and `staging:reset:exec` already invokes `vitest run` with a positional
+filter. Asserted by `runner-isolation`.
+**Mutation-verified:** remove the key → **RED (1)**; restore → **GREEN**.
+
 **Q-K · a behavioural assertion on what `runGuardedReset` SENDS** (Gate C,
 2026-08-06). The answer to "does anything assert it?" was **no** — only a source
 match, and in item 4 rather than item 3. Decided: add a `Proxy` spy over
@@ -760,6 +791,96 @@ in the mutation audit rather than restated here: the four blind-control fixes
 the two absent G-4 sub-checks (`frozen_at` set, catalog off by one), and the
 QI-5c **comment correction** — which was deliberately *not* turned into a test,
 because the mutation proved the claimed defect does not exist.
+
+---
+
+## GATE C — verdict
+
+**PASS**, 2026-08-06.
+
+**What it covered.** Items **1, 2** (`tests/staging/_lib/{guards,reset}.ts`,
+`reset.staging.test.ts`) read at or after `d75d368`, plus the **delta** on items
+1–2 from `1fc06e6` (the `buildResetBatch` split, the `LOCK_TIMEOUT` export,
+`batchCommitted`); item **3** (`staging-reset-mechanism.integration.test.ts`);
+item **4** (both vitest configs + `runner-isolation` + `runner-gating`); item
+**6** (`.env.example`, `AGENTS.md`, the ADR-0035 addendum, `package.json`); and
+the **mutation audit** in full.
+
+**Item 5 was EXCLUDED from the read** — `reset-guard.test.ts` +
+`guard-list-parity.test.ts` — by ruling: *"47-of-52 RED with five blind controls
+found and fixed is better evidence than my reading it."* **Mutation evidence was
+substituted for a human diff-read.** Recorded because it is a deliberate
+substitution of one kind of assurance for another, not a gap: those two files
+carry 14 of the sweep's mutations (G1-a…i, G2-a…c, G5-a/b, M-a, M-e, QI-5a…d),
+all RED.
+
+**Delivered as 24 chunk files ≤120 lines**, every set verified to reassemble
+byte-exact against `HEAD` after the last change — a stale chunk is itself a
+lookalike (L-1).
+
+### The four blind controls, and what each would have cost
+
+Found by the sweep, not by review. Each stayed **GREEN** under a mutation that
+removed the thing it was named for.
+
+| Blind control | What it would have cost |
+|---|---|
+| `it("empties the truncate set…")` seeded nothing | A reset that **silently stopped truncating** would have shipped green. The suite's own earlier cases leave the database empty, so counting zero proved nothing — and the first symptom would have been Slice B generating onto a dirty staging fixture set. |
+| **G-3 had no behavioural coverage at all** | The **largest**. `assertLiveConnection` was called by nothing; all five refusals shipped unasserted — including `session_replication_role = replica`, under which **no trigger fires** while G-4's catalog still reads a clean 78/all-enabled. Every check reports green while the entire append-only contract is void. Worse, `reset-guard`'s header *claimed* the integration suite covered it, so the gap read as coverage. |
+| `assertSafeIdentifiers` had **no test** | The one ADR-0035 primitive-3 prohibition enforced in code rather than by the storage layer. A `tables` payload appending its own `ALTER TABLE … DISABLE TRIGGER bucket_a_no_update` would have **committed** a never-disabled guard OFF — the atomicity that protects every other failure mode is exactly what would have made this one stick. |
+| the module-scope target refusal was not bound to a `throw` | Downgrade it to `console.error` and `runner-gating` stayed green; the runner would have built a client from an `undefined` URL and let postgres-js resolve a target **out of ambient environment**. `tsc` catches it, the test suite did not. |
+
+Plus two G-4 sub-checks that `verifyPostReset` performed and **nothing tested** —
+`system_state.frozen_at` set (a staging database that acquires a freeze is
+read-only **forever**) and the guard catalog off by one — and `G4-b`, which
+passed for the *wrong reason*: `/system_state/i` matched the **frozen** message
+when the row was **absent**.
+
+### What remains unprovable
+
+**GROUP 5 of the mutation audit**, ten items, by reference rather than restated.
+The two to carry forward: **the runner has never been executed and cannot be
+locally** (ruled above), and **a new `events` partition added without its
+`bucket_a_no_truncate` guard is invisible to every assertion in this slice** —
+now a `docs/parked.md` docket row, Class R.
+
+---
+
+## A.10 — merged, staging advanced, verified
+
+| Step | Result |
+|---|---|
+| CI on `188f257` | **success** (run `31086099002`) |
+| PR #298 | **MERGED**, squash **`504053b`**, branch deleted |
+| Tree-content proof | `git diff 188f257 origin/main` **empty** — the reviewed tree is the tree that landed; `watch: false` and the Q-K assertion grepped on `main` afterwards |
+| `staging` advance | pinned push of `504053b` → `refs/heads/staging`, no force. `c5467f1..504053b`, picking up `cd467f1` + `33c2be3` + the squash |
+| `git diff main..staging` | **empty** |
+| `staging-migrate.yml` | run `31086535018`, **success**. Zero per-migration apply lines in the run; the only notice is drizzle's routine `relation "__drizzle_migrations" already exists, skipping` |
+| Migrations applied | **none** — confirmed from the RUN and from the ledger: **25 before, 25 after**. Slice A adds no migration, and that is now an observation rather than a prediction |
+| `/api/health` | `status=ok · env=staging · db=ok · migrations=ok · canary=504053bfb51bf1b4cecba60fe1d45359f0ee85c2` — canary **equals** the pushed SHA, no drift |
+
+**Staging was never written to.** Read-only after the advance:
+`bets 39 · users 16 · identity_pool 200 · system_state 1 row, frozen_at NULL ·
+78 guards, 0 disabled`. Identical to the STEP 0 reading taken before the
+overnight sweep began. Slice A never wrote to staging and A.10 did not either.
+
+---
+
+## L-7 — local gates are not "the gates" once a branch has an open PR
+
+**Standing lesson, promoted from the A.9 surprise above.**
+
+`just verify` green and `vitest run` green are statements about **the working
+tree**. **CI is the statement about the branch.** They are not the same claim,
+and they can disagree for the most ordinary reason: the working tree is one
+machine, and CI is a different environment. In this slice the disagreement was a
+hardcoded local Supabase DSN — correct here, wrong on CI's plain `postgres:17` —
+which kept CI red across four commits while both local gates reported green.
+
+**Check CI status before reporting a slice complete.** CI is `pull_request`-gated
+here, so it runs on every push once a PR is open; there is no excuse of "it
+hasn't run". Read the verdict from `gh run view <id> --json status,conclusion`,
+not from `gh pr checks`, which lags.
 
 ---
 
@@ -806,13 +927,35 @@ RED, spy GREEN, 74 others green). It gives false alarms and it reads text about 
 file rather than what the file does. Keep it as a cheap structural tripwire;
 never let it be the only control.
 
-### Slice B inherits this
+### Slice B inherits this — the carried constraint (§5 W-G)
 
-**ADR-0036 primitive 4's no-direct-writes assertion must run against the SHIPPED
-generator source, not a reconstruction of it.** The generator writes through the
-engine (`openMarket`/`place`) and must never emit its own `market.opened` /
-`bet.placed` — and the assertion proving that has exactly the failure mode above
-available to it. Write it against what the generator actually executes.
+**ADR-0036 primitive 4's no-direct-writes assertion is LOAD-BEARING.** The
+generator must write through the engine (`openMarket` / `place`) and must never
+emit its own `market.opened` / `bet.placed` — the founder ruling that produced
+the whole STAGING-PARITY line. The assertion that proves it has every failure
+mode catalogued above available to it, so it ships with all four of these or it
+is not done:
+
+1. **A positive control per pattern.** Every negative assertion gets a
+   known-bad string proven to match first. A negative passes when its pattern
+   matches nothing, which is exactly what a rename or a path-alias change
+   produces (Q-I, and QI-2a/QI-2b confirmed both arms detect their own decay).
+2. **A non-empty file-set assertion.** A loop over an empty array asserts
+   nothing and reports green. Assert the set has members before iterating it
+   (QI-4a: removing `include` from a config made exactly this pass vacuously).
+3. **Whitespace and formatting tolerance.** Regex, never `indexOf` on a literal
+   call shape — QI-1 showed a needle that stops matching does not fail, it
+   silently skips to the next call site and reasons about the wrong one.
+4. **A mutation control at authoring time.** Add a real direct insert, watch the
+   assertion go red, revert. Not optional: four of this slice's controls looked
+   fine and were blind, and every one was found this way rather than by review.
+
+**And a source match is the WEAK form.** `runner-gating`'s
+`/client\.unsafe\(buildResetBatch\(tables\)\)/` does catch an inlined batch
+(QK-b) — but **QK-c proved it false-alarms on a pure reformat**, and it reads
+text about a file rather than what the file does. Keep source matching as a
+cheap structural tripwire; make the load-bearing assertion behavioural — a spy,
+a wire read, or the shipped artifact's own execution.
 
 The same applies to every other Slice B–D control: prefer a spy, a wire read, or
 the real artifact's own text over anything hand-assembled beside it.
@@ -826,11 +969,22 @@ and the rulings at O-1 and O-5 are wanted before the first real staging run.
 Gate C now reads the mutation audit alongside items 3–6; the item 3–6 diff
 chunks are staged at `~/Desktop/zz-gatec/` (21 files, ≤120 lines each).
 
-Exact next action, once #298 merges: **run the reset against staging for the
-first time** — `pnpm staging:reset` — and confirm the four guards pass, the 37
-counterfeit `bets` rows are gone, `system_state` survives with `frozen_at NULL`,
-`__drizzle_migrations` retains 25 rows, and `identity_pool` is re-seeded to 200.
-Then `fixtures.ts` + participant creation ×10.
+**#298 has merged (`504053b`) and `staging` is advanced to it, so the exact next
+action is unblocked:** **run the reset against staging for the first time** —
+`pnpm staging:reset` — and confirm the **five** guards pass (primitive 6's four
+plus G-5), the 37 counterfeit `bets` rows are gone, `system_state` survives with
+`frozen_at NULL`, `__drizzle_migrations` retains **25** rows, and `identity_pool`
+is re-seeded to 200. Then `fixtures.ts` + participant creation ×10.
+
+**Treat that as the runner's FIRST RUN and read its output** — it has never been
+executed and could not be locally (the ruling above). Everything asserted about
+it today is source-structural. In particular, watch for the pre-flight refusals,
+the belt's `.catch()` path, and the **F2** message as actually rendered — none of
+which any test has exercised.
+
+Baseline to compare against, read read-only at A.10 close:
+`bets 39 · users 16 · identity_pool 200 · system_state 1/NULL · 78 guards, 0
+disabled · 25 migrations`.
 
 Slice B is also owed: manifest **v1.2** (web-authored, gates Slice B), and the
 W-C synthetic-literal rule for `tos_acceptance_ip` / `tos_acceptance_user_agent`.
