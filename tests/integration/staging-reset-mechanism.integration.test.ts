@@ -61,6 +61,16 @@ const DB_HOST = (() => {
 })();
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", "db"]);
 
+/**
+ * A database that is NOT `postgres`, for G-3's `current_database()` case.
+ *
+ * `template1` rather than Supabase's `_supabase`: it exists in every PostgreSQL
+ * cluster, so the case runs identically against local Supabase (:54322) and
+ * CI's plain `postgres:17` service (:5432). Connections to it are allowed and
+ * read-only here.
+ */
+const OTHER_DATABASE = "template1";
+
 if (!LOOPBACK.has(DB_HOST)) {
 	throw new Error(
 		`REFUSED — staging-reset-mechanism runs its wipe against DATABASE_URL, which must be a LOCAL Postgres. ` +
@@ -575,17 +585,32 @@ describe("assertLiveConnection — G-3", () => {
 
 	it("refuses when current_database() is not the expected database", async () => {
 		// Every Supabase project reports `postgres`. A connection landing
-		// somewhere else is not a Supabase database, whatever the DSN said. The
-		// local cluster ships a second database, so this is a REAL server answer
-		// rather than a stubbed row.
-		const other = postgres(
-			"postgresql://postgres:postgres@localhost:54322/_supabase",
-			{ max: 1, prepare: false },
-		);
+		// somewhere else is not a Supabase database, whatever the DSN said. This
+		// is a REAL server answer, not a stubbed row.
+		//
+		// `template1`, and the URL DERIVED from DATABASE_URL — not a literal.
+		// The first cut hardcoded the local Supabase DSN and its `_supabase`
+		// database; CI runs a plain `postgres:17` on :5432 with neither, so the
+		// connection failed and the assertion saw the wrong error. Every cluster
+		// has `template1`, and deriving the URL means the test follows the
+		// harness instead of guessing at it. (L-1, on myself: a hardcoded DSN is
+		// a lookalike of the one the suite actually connects with.)
+		const otherUrl = (() => {
+			const u = new URL(DB_URL);
+			u.pathname = `/${OTHER_DATABASE}`;
+			return u.toString();
+		})();
+		// Precondition — it really is a different database, and still loopback.
+		expect(new URL(otherUrl).pathname).not.toBe(new URL(DB_URL).pathname);
+		expect(LOOPBACK.has(new URL(otherUrl).hostname.toLowerCase())).toBe(true);
+
+		const other = postgres(otherUrl, { max: 1, prepare: false });
 		try {
 			await expect(
 				assertLiveConnection(withOptions(other, SUPABASE_OPTS), REF),
-			).rejects.toThrow(/current_database\(\) is "_supabase"/);
+			).rejects.toThrow(
+				new RegExp(`current_database\\(\\) is "${OTHER_DATABASE}"`),
+			);
 		} finally {
 			await other.end({ timeout: 5 });
 		}
@@ -600,11 +625,9 @@ describe("assertLiveConnection — G-3", () => {
 		// connection string. @security-auditor, Slice A.
 		//
 		// A dedicated client, so a throw cannot strand the setting on the shared
-		// testClient session.
-		const replica = postgres(
-			"postgresql://postgres:postgres@localhost:54322/postgres",
-			{ max: 1, prepare: false },
-		);
+		// testClient session. Built from DATABASE_URL, never a literal — see the
+		// note on the current_database() case above.
+		const replica = postgres(DB_URL, { max: 1, prepare: false });
 		try {
 			await replica.unsafe("SET session_replication_role = replica");
 			// Precondition — the server really is in the dangerous state.
