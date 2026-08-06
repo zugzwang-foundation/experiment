@@ -378,6 +378,15 @@ about the runtime rather than about this code. The property that actually matter
 — the DISABLE is never committed, so those failures cannot strand a guard off —
 is proven three times over by server-side aborts (M1, M2, M3).
 
+*Reconciled 2026-08-06:* the first Slice A session's `@security-auditor` pass
+did probe this ad hoc, and recorded that the guards read `'O'` after a runtime
+abort, **a dropped socket, and a `pg_terminate_backend` fired mid-batch from a
+second session** (`docs/logs/STAGING-PARITY-A.md`, *Surprises caught*). That
+strengthens the rollback claim and is worth knowing. It does **not** move this
+row: those were one-off probes, not committed assertions, and the specific
+unprovable thing here is that the **`finally` belt does not run** on SIGKILL —
+a different statement from "the transaction rolled back".
+
 **5 · The staging runner has never been RUN, and cannot be.** Executing
 `tests/staging/reset.staging.test.ts` wipes the live staging database. Every
 assertion about it is therefore **source-structural** — `runner-gating` reads the

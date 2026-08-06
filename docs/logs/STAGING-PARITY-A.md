@@ -686,6 +686,40 @@ the premise it must not inherit wrongly.
 
 ---
 
+## Surprise caught at A.9 — CI was red and I had not looked
+
+**My defect, and the one thing in this slice that local gates could not have
+caught.** Both new G-3 cases built their own client from a **literal**
+`postgresql://postgres:postgres@localhost:54322/...` — the local Supabase shape,
+including its `_supabase` database. CI runs a plain `postgres:17` on `:5432`
+with neither. So `current_database()` connected nowhere and asserted against the
+wrong error, and `session_replication_role` could not connect at all.
+
+**How it hid.** The full suite was green (2327 tests) and `just verify` was green
+— both true, both local, and the literal happened to be correct *on this
+machine*. I reported those two gates as the close and did not check CI. CI is
+`pull_request`-gated, so it had in fact run on every push and had been **red
+since the first commit of the overnight session** (`b8da3f4`), through `930a6c8`,
+`bff1aac` and `8486ac5`. `1fc06e6` — the last commit before my work — was green.
+It surfaced only because A.9 STEP 4 asked for the CI state.
+
+**Fix.** Derive both URLs from `DATABASE_URL`, the same source `testClient` uses,
+and use `template1` — present in *every* PostgreSQL cluster — instead of
+Supabase-specific `_supabase`. Preconditions assert the derived URL is a
+different database and still loopback, so the file-level target refusal still
+covers it. No `postgresql://` literal remains in the file.
+
+**This is L-1 turned on its author.** A hardcoded DSN is a lookalike of the
+connection string the suite actually connects with — the same failure the slice
+spent the night cataloguing, committed by me while cataloguing it.
+
+**The process correction, which matters more than the fix:** *"full suite green"
+plus "`just verify` green" is not "the gates are green"* when the branch has an
+open PR. CI is a third gate, it runs on every push, and it is the only one that
+sees an environment other than this laptop. Check it before reporting a close.
+
+---
+
 ## Decisions taken on your behalf
 
 Class-1 decide-and-record. Each was made without a ruling, is reversible, and is
