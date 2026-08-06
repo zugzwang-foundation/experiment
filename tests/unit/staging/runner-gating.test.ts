@@ -256,11 +256,69 @@ describe("every operational runner, present and future", () => {
 		expect(RUNNERS).toContain("reset.staging.test.ts");
 	});
 
+	/**
+	 * The CLOSED set of target predicates a runner may gate on.
+	 *
+	 * Slice A had one runner and one predicate, and this block hard-coded
+	 * `resolveStagingTarget`. Slice B's generator and gates runners have TWO
+	 * legal targets — staging, and the local Postgres they must be proved
+	 * against before staging is ever touched — so they gate on
+	 * `resolveRunnerTarget`, which the reset deliberately does not use:
+	 * teaching the reset's guard about localhost would weaken the one artifact
+	 * whose whole job is refusing every target but one.
+	 *
+	 * THIS LIST IS A CLOSED SET, NOT A RELAXATION. Both predicates are pure,
+	 * fail closed on absence, refuse the production ref first and
+	 * unconditionally, and carry their own exhaustive unit suite
+	 * (`reset-guard.test.ts`, `runner-target.test.ts`). A runner gating on
+	 * anything NOT named here still fails, which is the property the block
+	 * exists to hold. Adding a third name is a decision, not an edit.
+	 */
+	const TARGET_PREDICATES = [
+		"resolveStagingTarget(process.env)",
+		"resolveRunnerTarget(process.env",
+	] as const;
+
+	/** Offset of whichever predicate this runner gates on; -1 if none. */
+	function guardOffset(body: string): number {
+		for (const predicate of TARGET_PREDICATES) {
+			const at = body.indexOf(predicate);
+			if (at > -1) return at;
+		}
+		return -1;
+	}
+
+	it("pins the WRITE-capable runner to the write-intent variant", () => {
+		// The predicate needle is deliberately unterminated, so it accepts both
+		// `{ requireWriteIntent: true }` and `false`. A future write-capable runner
+		// that gated with the READ-ONLY variant would satisfy every assertion in
+		// this block while skipping the G-5 analogue entirely (@code-reviewer).
+		// The generator writes ~440 rows; pin it explicitly.
+		const generator = stripComments(
+			readFileSync(`${STAGING_DIR}generate.staging.test.ts`, "utf8"),
+		);
+		expect(generator).toMatch(
+			/resolveRunnerTarget\(process\.env,\s*\{\s*requireWriteIntent:\s*true/,
+		);
+	});
+
+	it("recognises a guarded module-scope call and nothing else", () => {
+		// POSITIVE + NEGATIVE CONTROL for `guardOffset` itself. Every per-runner
+		// assertion below is built on it, so a matcher that silently stopped
+		// matching would turn the whole block green while asserting nothing.
+		for (const predicate of TARGET_PREDICATES) {
+			expect(guardOffset(`const t = ${predicate}, {});`)).toBeGreaterThan(-1);
+		}
+		expect(guardOffset("const t = resolveSomethingElse(process.env);")).toBe(
+			-1,
+		);
+	});
+
 	for (const file of RUNNERS) {
 		const body = stripComments(readFileSync(`${STAGING_DIR}${file}`, "utf8"));
 
 		it(`${file} · evaluates the target guard at module scope`, () => {
-			const at = body.indexOf("resolveStagingTarget(process.env)");
+			const at = guardOffset(body);
 			expect(at).toBeGreaterThan(-1);
 			const itAt = firstItOffset(body);
 			if (itAt > -1) expect(at).toBeLessThan(itAt);
@@ -276,8 +334,14 @@ describe("every operational runner, present and future", () => {
 			// a different guard entirely. Tie the throw to the TARGET GUARD's own
 			// result, which is the refusal that must stop the run before a client
 			// exists. Generic across the generator/gate runners Slices B–D add,
-			// since they read the same predicate.
-			const guardAt = body.indexOf("resolveStagingTarget(process.env)");
+			// since they read one of the same two predicates.
+			//
+			// The window stays at the Slice A budget of 120 characters. It was
+			// briefly widened to 200 during Slice B with no reason given; the actual
+			// `.ok)` -> `throw new Error` gap is 8 characters on all three runners,
+			// so 120 was never tight and widening a mutation-derived bound without
+			// cause is how such bounds stop biting (@code-reviewer).
+			const guardAt = guardOffset(body);
 			expect(guardAt).toBeGreaterThan(-1);
 			expect(preamble.slice(guardAt)).toMatch(
 				/\.ok\)[\s\S]{0,120}throw new Error/,

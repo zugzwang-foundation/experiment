@@ -21,6 +21,10 @@
 		"verify:ranking:staging": "tsx scripts/verify-ranking-staging.ts",
 		"staging:reset": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:reset:exec",
 		"staging:reset:exec": "ZUGZWANG_STAGING_RESET_ACK=wipe-staging-i-mean-it vitest run --config vitest.staging.config.ts tests/staging/reset.staging.test.ts && pnpm run db:seed:staging",
+		"staging:generate": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:generate:exec",
+		"staging:generate:exec": "ZUGZWANG_STAGING_TARGET=staging ZUGZWANG_STAGING_WRITE_ACK=generate-staging-fixtures vitest run --config vitest.staging.config.ts tests/staging/generate.staging.test.ts",
+		"staging:gates": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:gates:exec",
+		"staging:gates:exec": "ZUGZWANG_STAGING_TARGET=staging vitest run --config vitest.staging.config.ts tests/staging/gates.staging.test.ts",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/",
 		"test:scale": "vitest run --config vitest.scale.config.ts"
