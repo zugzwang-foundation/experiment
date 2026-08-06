@@ -90,8 +90,14 @@ export function loadCapturedIdentities(
 	try {
 		parsedJson = JSON.parse(raw);
 	} catch (err) {
+		// NEVER `String(err)` here. Node's JSON.parse error message QUOTES the
+		// surrounding source text, so a malformed capture file would print a real
+		// e-mail address into the run log — the one path in this module that can
+		// leak one (@code-reviewer, Slice B). The error NAME is enough to act on.
 		throw new Error(
-			`REFUSED — the captured-identity file at ${path} is not valid JSON (${String(err)})`,
+			`REFUSED — the captured-identity file at ${path} is not valid JSON (${
+				err instanceof Error ? err.name : "parse error"
+			})`,
 		);
 	}
 	const result = captureSchema.safeParse(parsedJson);

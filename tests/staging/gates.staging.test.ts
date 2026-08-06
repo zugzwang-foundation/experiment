@@ -48,10 +48,14 @@ import {
 	loadDurableReplay,
 } from "@/server/bets/replay";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
-import { checkMarketConservation } from "@/server/dharma/conservation";
+import {
+	checkCorrectedMarketConservation,
+	checkMarketConservation,
+} from "@/server/dharma/conservation";
 import type { DharmaEntryType } from "@/server/dharma/tags";
 import { FLOW_TAGS } from "@/server/dharma/tags";
 import {
+	assertGatesLiveConnection,
 	closeGatesConnection,
 	describeGatesTarget,
 	gatesClient,
@@ -82,6 +86,11 @@ async function scalar(sqlText: string): Promise<number> {
 }
 
 beforeAll(async () => {
+	// G-3 — assert the live socket before reading a single gate. A gate run that
+	// silently verified the WRONG database would report four greens for a
+	// fixture set nobody built.
+	await assertGatesLiveConnection();
+
 	const [row] = await gatesClient<{ n: number }[]>`
 		SELECT count(*)::int AS n FROM markets
 	`;
@@ -124,6 +133,10 @@ describe("gate 1 · event parity", () => {
 					WHERE e.aggregate_id = c.id AND e.event_type = 'comment.placed'
 				)`),
 		).toBe(0);
+		// Carrier: zero comments satisfies the count above perfectly.
+		expect(
+			await scalar(`SELECT count(*)::int AS n FROM comments`),
+		).toBeGreaterThan(0);
 	});
 
 	it("G1.3 · every bets row carries a comment_id (INV-1)", async () => {
@@ -146,12 +159,29 @@ describe("gate 1 · event parity", () => {
 				)`),
 		).toBe(0);
 
+		// Carrier: a run in which every lifecycle call silently no-oped would
+		// leave every market at Draft and satisfy both loops with nothing.
+		expect(
+			await scalar(
+				`SELECT count(*)::int AS n FROM markets WHERE status <> 'Draft'`,
+			),
+		).toBeGreaterThan(0);
+
 		for (const [status, eventType] of [
 			["Closed", "market.closed"],
 			["Resolving", "market.resolving"],
 			["Resolved", "market.resolved"],
 			["Voided", "market.voided"],
 		] as const) {
+			// Per-status carrier: each of these four states must actually be
+			// occupied, or its NOT EXISTS check counts zero rows and passes blind.
+			expect({
+				status,
+				present:
+					(await scalar(
+						`SELECT count(*)::int AS n FROM markets WHERE status = '${status}'`,
+					)) > 0,
+			}).toEqual({ status, present: true });
 			// A Resolved market passed through Closed and Resolving, so its
 			// terminal event is the one that discriminates; the intermediate ones
 			// are asserted for the markets that STOP there.
@@ -247,6 +277,12 @@ describe("gate 2 · conservation", () => {
 		expect(markets.length).toBeGreaterThan(0);
 
 		const failures: unknown[] = [];
+		// @code-reviewer, Slice B: `markets.length > 0` proves markets EXIST, not
+		// that any was CHECKED. Draft markets `continue` below, and a market with
+		// no bets conserves trivially (injection 0, flows []). All 15 could be
+		// skipped or empty and this gate would report green. Count the markets
+		// that reached the checker with actual Dharma flowing.
+		let checkedWithFlows = 0;
 		for (const market of markets) {
 			// The per-market SEED, read from the market.opened payload rather than
 			// a single constant — the fixture table uses different seeds per market
@@ -293,13 +329,56 @@ describe("gate 2 · conservation", () => {
 			}
 
 			// The SHIPPED checker. The identity is not restated here.
-			const result = checkMarketConservation({
-				ledgerFlows: flows,
-				netAdminPoolInjection: injection,
-			});
+			//
+			// A market carrying a `correct` resolution row needs the CORRECTION
+			// variant (identity (ii)); the plain (★) would fail on it. Zero are
+			// expected in Slice B — no correction path is driven — but the branch
+			// exists so a corrected market is checked rather than silently
+			// mis-checked, and it branches on `resolution_events.event_kind` the way
+			// the ratified scale harness does (@code-reviewer, G2.2).
+			const correctionRows = await gatesClient<{ kind: string }[]>`
+				SELECT event_kind AS kind FROM resolution_events
+				WHERE market_id = ${market.id} AND event_kind = 'correct'
+			`;
+			let result: ReturnType<typeof checkMarketConservation>;
+			if (correctionRows.length > 0) {
+				const legs = await gatesClient<{ type: string; amount: string }[]>`
+					SELECT payout_type AS type, amount FROM payout_events
+					WHERE market_id = ${market.id}
+				`;
+				const sumOf = (type: string) =>
+					legs
+						.filter((l) => l.type === type)
+						.reduce(
+							(acc, l) => acc.plus(new CpmmDecimal(l.amount).abs()),
+							new CpmmDecimal(0),
+						)
+						.toFixed(18);
+				const uncollectable = await gatesClient<{ total: string }[]>`
+					SELECT COALESCE(SUM(ABS(amount)), 0)::text AS total
+					FROM dharma_ledger WHERE entry_type = 'uncollectable'
+				`;
+				result = checkCorrectedMarketConservation({
+					ledgerFlows: flows,
+					netAdminPoolInjection: injection,
+					reverseRecordedTotal: sumOf("correction_reverse"),
+					applyRecordedTotal: sumOf("correction_apply"),
+					uncollectableTotal: uncollectable[0]?.total ?? "0",
+				});
+			} else {
+				result = checkMarketConservation({
+					ledgerFlows: flows,
+					netAdminPoolInjection: injection,
+				});
+			}
+			if (flows.length > 0) checkedWithFlows += 1;
 			if (!result.ok) failures.push({ marketId: market.id, ...result });
 		}
 		expect(failures).toEqual([]);
+		// THE REAL CARRIER: at least one market was checked with Dharma actually
+		// flowing through it. Without this the gate is satisfiable by a database
+		// containing nothing but empty markets.
+		expect(checkedWithFlows).toBeGreaterThan(0);
 	});
 
 	it("G2.3 · no ledger row has a negative balance (INV-2)", async () => {
@@ -308,6 +387,10 @@ describe("gate 2 · conservation", () => {
 				`SELECT count(*)::int AS n FROM dharma_ledger WHERE balance_after < 0`,
 			),
 		).toBe(0);
+		// Carrier: an empty ledger has no negative rows either.
+		expect(
+			await scalar(`SELECT count(*)::int AS n FROM dharma_ledger`),
+		).toBeGreaterThan(0);
 	});
 
 	it("G2.4 · every user's latest balance equals the running sum by seq", async () => {
@@ -323,6 +406,10 @@ describe("gate 2 · conservation", () => {
 				)
 				SELECT count(*)::int AS n FROM walked WHERE balance_after <> running`),
 		).toBe(0);
+		// Carrier: the window function over an empty ledger returns no rows.
+		expect(
+			await scalar(`SELECT count(*)::int AS n FROM dharma_ledger`),
+		).toBeGreaterThan(0);
 	});
 });
 
@@ -452,18 +539,21 @@ describe("gate 6 · zero-share", () => {
 				`SELECT count(*)::int AS n FROM positions WHERE quantity < 0`,
 			),
 		).toBe(0);
+		// Carrier: an empty positions table has no negative rows either.
+		expect(
+			await scalar(`SELECT count(*)::int AS n FROM positions`),
+		).toBeGreaterThan(0);
 	});
 
-	it("G6.3 · a fully-exited position at quantity 0 is NOT a zero-share bet", async () => {
-		// SP-2's future CHECK constrains `bets`, not `positions`. A fully-exited
-		// position legitimately reaches quantity = 0 (Bucket C, mutable), and
-		// conflating the two would either block a legal sell-to-zero or let a
-		// counterfeit bets row through. Stated as its own assertion so the
-		// distinction survives Slice C's flip/exit sequences.
-		expect(
-			await scalar(
-				`SELECT count(*)::int AS n FROM bets WHERE share_quantity = 0`,
-			),
-		).toBe(0);
+	it.skip("G6.3 · re-assert G6.1 AFTER the P-exited full sell — SLICE C", () => {
+		// SP-2's future CHECK constrains `bets`, not `positions`: a fully-exited
+		// position legitimately reaches quantity = 0 (Bucket C, mutable) and must
+		// not be confused with a counterfeit `bets.share_quantity = 0` row.
+		//
+		// Slice B drives NO sells, so the distinction has nothing to discriminate
+		// yet — re-running G6.1's query here would assert exactly what G6.1
+		// already asserts and read as coverage that does not exist
+		// (@code-reviewer, Slice B). It becomes real when Slice C adds P-exited's
+		// sell-to-zero and P-flipped's sell-all sequences.
 	});
 });

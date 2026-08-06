@@ -20,6 +20,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
+import { assertLiveConnection } from "./reset";
 import { resolveRunnerTarget } from "./target";
 
 const target = resolveRunnerTarget(process.env, { requireWriteIntent: false });
@@ -40,6 +41,27 @@ export const gatesDb = drizzle(client, { schema });
 
 /** Raw handle, for the SQL the gates are specified as (manifest §4). */
 export const gatesClient = client;
+
+/**
+ * G-3 for the GATES — the same live-socket assertion the reset and the
+ * generator use, reusing the reset's own function so the three cannot drift
+ * (@code-reviewer, Slice B). Staging mode only.
+ *
+ * The gates only read, so a wrong target here misreports rather than
+ * mis-writes — but a gate run that silently verified the WRONG database would
+ * report four greens for a fixture set nobody built, which is a worse failure
+ * than a refusal.
+ */
+export async function assertGatesLiveConnection(): Promise<void> {
+	if (GATES_MODE !== "staging") return;
+	const fragment = process.env.STAGING_PROJECT_REF_FRAGMENT;
+	if (!fragment) {
+		throw new Error(
+			"G-3 failed: STAGING_PROJECT_REF_FRAGMENT is unset at connection time; refusing",
+		);
+	}
+	await assertLiveConnection(client, fragment);
+}
 
 export async function closeGatesConnection(): Promise<void> {
 	await client.end({ timeout: 10 });

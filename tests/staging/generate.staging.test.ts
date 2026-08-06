@@ -55,7 +55,18 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 // ── SHELL MOCKS ─────────────────────────────────────────────────────────────
 // `@sentry/nextjs` is stubbed for the same reason every other suite stubs it:
 // it is telemetry, it is not a writer, and a real client would post fixture
-// noise to the project's issue stream.
+// noise to the project's issue stream. It is not on ADR-0036 primitive 3's
+// MAY-be-mocked list, but it does not write a row or move Dharma, so the
+// MUST-NEVER rule is not touched.
+//
+// ⚠ THE STUB IS ASSERTED, NOT JUST INSTALLED (@code-reviewer, Slice B).
+// Stubbing Sentry to bare `vi.fn()`s makes the engine's FAIL-OPEN channels dark
+// for the whole run: `insertEvent` continues past an ON-CONFLICT payload
+// divergence via `safeCaptureException("event_id_reuse_payload_mismatch")`, and
+// `runBetTransaction` reports retry exhaustion through `captureMessage`. A
+// generation that silently tripped either would look perfectly green. The
+// post-run assertion below reads these back and fails if anything was captured,
+// which turns the mock from silence into evidence.
 vi.mock("@sentry/nextjs", () => ({
 	captureMessage: vi.fn(),
 	captureException: vi.fn(),
@@ -130,6 +141,7 @@ import { voidMarket } from "@/server/resolution/void";
 
 import { loadCapturedIdentities } from "./_lib/captured-identities";
 import {
+	assertRunnerLiveConnection,
 	closeRunnerConnection,
 	describeRunnerTarget,
 	forbiddenTableWrites,
@@ -322,6 +334,11 @@ async function placePost(args: {
 let generationError: unknown = null;
 
 beforeAll(async () => {
+	// G-3 — the LIVE SOCKET, before anything else. A config can say staging
+	// while the connection says otherwise, and this runner writes ~440 rows.
+	// Throwing here fails every test in the suite WITHOUT executing any of them.
+	await assertRunnerLiveConnection();
+
 	// Pre-flight. Surface a blocked run BEFORE writing half a fixture set.
 	const [poolRow] = await readOnly
 		.select({
@@ -531,6 +548,18 @@ describe("staging fixture generation", () => {
 		expect(
 			forbidden.filter((w) => w.caller.replace(/\\/g, "/").includes("/tests/")),
 		).toEqual([]);
+	});
+
+	it("tripped no Sentry fail-open during generation", async () => {
+		// The engine's fail-open paths report through Sentry and then CONTINUE, so
+		// a stubbed client that nobody reads back is a blind spot for the entire
+		// run rather than mere noise suppression.
+		const Sentry = await import("@sentry/nextjs");
+		const captured = [
+			...vi.mocked(Sentry.captureException).mock.calls.map((c) => String(c[0])),
+			...vi.mocked(Sentry.captureMessage).mock.calls.map((c) => String(c[0])),
+		];
+		expect(captured).toEqual([]);
 	});
 
 	// THE POSITIVE CONTROL FOR THE ASSERTION ABOVE lives in

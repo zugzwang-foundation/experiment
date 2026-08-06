@@ -150,7 +150,62 @@ export function isEngineCaller(caller: string): boolean {
 	return normalized.includes("/src/") || normalized.includes("/node_modules/");
 }
 
-/** Best-effort table name for the argument a write verb was handed. */
+/**
+ * Properties that hand out an UNPROXIED write-capable handle, and are therefore
+ * refused outright.
+ *
+ * @code-reviewer, Slice B — `_lib/client.ts` claimed "the generator has no
+ * handle a direct INSERT INTO could travel on", and that claim was FALSE:
+ * drizzle-orm 0.45 exposes the raw postgres-js client as `db.$client`, so
+ * ``guardedDb.$client`INSERT INTO bets …` `` executed completely unguarded, and
+ * `db._.session.execute(…)` reached the same place. The proxy's fall-through
+ * handed both straight back. Refusing them is what makes the structural claim
+ * true rather than aspirational.
+ *
+ * Nothing in `src/` reaches for these off the injected `db` — the engine uses
+ * the query builder and `tx.execute` — so refusing them costs the engine
+ * nothing.
+ */
+const FORBIDDEN_ESCAPE_HATCHES = new Set(["$client", "_", "session"]);
+
+/**
+ * Verbs that RETURN a write-capable builder rather than performing the write.
+ *
+ * `db.with(cte).insert(bets)` reaches `insert` on a fresh builder object that
+ * never passed through this proxy (@code-reviewer). Routing `with` through the
+ * same attribution closes it, and the returned builder is proxied too so the
+ * verb it yields is attributed as well.
+ */
+const BUILDER_VERBS = ["with"] as const;
+
+/** The table named by a raw `INSERT INTO <table>` / `UPDATE <table>` statement. */
+function tableFromSqlText(arg: unknown): string | null {
+	// Drizzle's `sql` template exposes its chunks; the statement keyword and the
+	// table name are always in the same literal chunk.
+	const chunks = (arg as { queryChunks?: unknown[] } | null)?.queryChunks;
+	const text = Array.isArray(chunks)
+		? chunks
+				.map((c) =>
+					Array.isArray((c as { value?: unknown })?.value)
+						? ((c as { value: unknown[] }).value as unknown[]).join("")
+						: "",
+				)
+				.join(" ")
+		: "";
+	const match = text.match(
+		/\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+"?(\w+)"?/i,
+	);
+	return match?.[1] ?? null;
+}
+
+/**
+ * Best-effort table name for the argument a write verb was handed.
+ *
+ * The raw-SQL branch matters more than it looks: EVERY `events` row is written
+ * through `tx.execute(sql\`INSERT INTO events …\`)` (`insertEvent`), so a
+ * blanket `"(raw-sql)"` meant `events` — the single highest-value table — never
+ * appeared in `forbiddenTableWrites()` at all (@code-reviewer, Slice B).
+ */
 function tableNameOf(arg: unknown): string {
 	if (is(arg, Table)) {
 		try {
@@ -159,10 +214,7 @@ function tableNameOf(arg: unknown): string {
 			return "(unnamed-table)";
 		}
 	}
-	// `execute(sql\`…\`)` carries no table object. The SQL text is inspected by
-	// the caller-attribution rule instead; the table is reported as raw so a
-	// violation still names what happened.
-	return "(raw-sql)";
+	return tableFromSqlText(arg) ?? "(raw-sql)";
 }
 
 export interface WriteGuard<TDb> {
@@ -192,7 +244,42 @@ export function createWriteGuard<TDb extends object>(db: TDb): WriteGuard<TDb> {
 				// carry `#private` fields, and reading one through a Proxy receiver
 				// throws a brand-check TypeError. Defaulting the receiver to `target`
 				// keeps getters bound to the real object.
+				// ESCAPE HATCHES, refused before anything else. These do not write —
+				// they hand back an UNPROXIED handle that can, which is worse,
+				// because nothing downstream is attributed at all.
+				if (typeof prop === "string" && FORBIDDEN_ESCAPE_HATCHES.has(prop)) {
+					throw new DirectWriteForbiddenError(
+						`REFUSED — \`${prop}\` hands out an unguarded write-capable handle. ` +
+							"ADR-0036 primitive 4: the generator has no handle a direct write can travel on. " +
+							"Use the engine's own entrypoints.",
+					);
+				}
+
 				const value = Reflect.get(target, prop);
+
+				if (
+					typeof value === "function" &&
+					(BUILDER_VERBS as readonly string[]).includes(prop as string)
+				) {
+					// Returns a BUILDER carrying insert/update/delete. Attribute the
+					// call, then proxy what it yields so the verb is attributed too.
+					return (...args: unknown[]): unknown => {
+						const caller = immediateCaller();
+						if (caller === null || !isEngineCaller(caller)) {
+							throw new DirectWriteForbiddenError(
+								`DIRECT WRITE REFUSED — \`${String(prop)}\` builder issued from ${caller ?? "(unattributable)"}. ` +
+									"ADR-0036 primitive 4.",
+							);
+						}
+						const built = (value as (...a: unknown[]) => unknown).apply(
+							target,
+							args,
+						);
+						return typeof built === "object" && built !== null
+							? guard(built as object)
+							: built;
+					};
+				}
 
 				if (prop === "transaction" && typeof value === "function") {
 					return (

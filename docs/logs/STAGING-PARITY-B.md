@@ -23,6 +23,7 @@ live staging database.
 | `4cbba51` | STEP 4 — the no-direct-writes assertion in both forms + `runner-target` + `write-guard` unit suites |
 | `df6cf19` | STEP 5 — `gates.staging.test.ts`, `_lib/read-client.ts`, the two package scripts |
 | `eb7cbb9` | STEP 9 — `seed-debate-view-staging.ts` deleted; `verify-ranking-staging.ts` write path stripped |
+| *(this commit)* | `@code-reviewer` findings — 3 HIGH + 7 MEDIUM + 4 LOW, all fixed in-session |
 
 **Zero `src/` changes. Zero migrations. Zero DDL.** Verified by
 `git diff --name-only 4f9a5ce..HEAD -- src/ drizzle/ src/db/` returning empty.
@@ -289,10 +290,15 @@ RedHawk007 RedStoat008 RedPine009`.
 A counterfeit `bets` row was INSERTed directly against local Postgres (no
 `bet.placed` event, `share_quantity = 0`), reproducing exactly the corruption
 staging carried. **G1.1, G6.1 and G6.3 all went RED.** After a reset and an
-engine-driven regeneration: 14 passed, 2 skipped. Each count-equals-zero gate
-additionally carries a carrier assertion (`markets > 0`, Resolved-or-Voided
-`> 0`, `bet_receipts > 0`, `bets > 0`), because a count over an empty table is
-also zero.
+engine-driven regeneration, green again.
+
+Because a count over an empty table is also zero, every count-equals-zero gate
+carries a carrier assertion. ⚠ **When first written, five did not** — the claim
+that they all did was wrong, and `@code-reviewer` caught it. G1.2, G1.4 (plus a
+per-status carrier), G2.3, G2.4 and G6.2 gained theirs before the PR, and gate
+2's carrier was replaced outright: `markets > 0` proved markets *existed*, not
+that any was *checked*, so it now counts markets that reached
+`checkMarketConservation` with non-empty flows.
 
 ---
 
@@ -418,6 +424,109 @@ cited `seed-debate-view-staging.ts:263-282` as the canary that caught a masking
 defect. Re-worded to keep the history and stop pointing at a deleted file.
 
 ---
+
+## `@code-reviewer` — findings and what was done
+
+Verdict: **no CRITICAL**. No invariant weakened, no refusal trigger crossed, no
+`src/` change, `_lib/guards.ts` byte-identical to `main`. **Every HIGH and
+MEDIUM was fixed in-session before the PR opened**, per §5.11.
+
+### HIGH · all three were real gaps in the load-bearing assertion
+
+**H1 — primitive 4 was bypassable through an `src/` write helper.** Caller
+attribution allows any `/src/` frame, and `src/` contains thin helpers that
+perform a write on the caller's behalf: `insertEvent(tx, …)` runs
+`tx.execute(sql\`INSERT INTO events …\`)`, `appendLedgerRow(tx, …)` runs
+`tx.insert(dharmaLedger)`. The generator legitimately holds a `tx`, so
+`insertEvent(tx, { eventType: "bet.placed", … })` would have passed **all three
+controls** — sanctioned handle, `src/` frame, and text containing neither
+forbidden pattern. **Exactly the W-G circularity.** The shipped generator never
+did it, but Slice C adds ~10 more call sites to the same file.
+**Fixed:** an **import allowlist** — the runners may import from `@/server/**`
+only the entrypoints Ratification Record §7 ratifies. Adding a name is a
+decision, not an edit. `@/server/events/insert` and `@/server/dharma/persist`
+are pinned as *not* ratified, as the allowlist's own positive control.
+
+**H2 — the structural claim was false: `guardedDb.$client` handed out the raw
+`postgres` client.** `_lib/client.ts` asserted "the generator has no handle a
+direct `INSERT INTO` could travel on"; drizzle 0.45 exposes `db.$client`, and
+the proxy's fall-through returned it. `db._.session.execute(…)` and
+`db.with(cte).insert(bets)` were the same shape.
+**Fixed:** `$client`, `_` and `session` now throw `DirectWriteForbiddenError`;
+`with` routes through caller attribution and its returned builder is proxied.
+The header's claim is now true rather than aspirational.
+
+**H3 — neither write-capable runner had a G-3 analogue.** The reset asserts
+against the **live socket** (`assertLiveConnection`) precisely because W-B item 2
+says a config can say staging while the connection says otherwise. The generator
+— which writes ~440 rows — did only string matching on the env var.
+**Fixed:** both runners now call **the reset's own `assertLiveConnection`** in
+`beforeAll` (staging mode), so the three cannot drift and a hardening of G-3
+reaches all of them; and `resolveRunnerTarget`'s staging branch gained the
+`isAllowedStagingHost` config-level belt it already applied in local mode.
+
+### MEDIUM · all fixed
+
+- **Gate 2's carrier did not cover the vacuity mode it named.** `markets > 0`
+  proves markets exist, not that any was *checked* — Drafts `continue`, and an
+  empty market conserves trivially. Now counts markets that reached the checker
+  **with non-empty flows** and asserts that count > 0.
+- **G2.2 was silently absent** (the plan requires
+  `checkCorrectedMarketConservation` to run "anyway"). Now branches on
+  `resolution_events.event_kind` the way the ratified scale harness does, so a
+  `correct` row gets identity (ii) instead of being mis-checked with (★).
+- **Five count-equals-zero gates had no carrier** (G1.2, G1.4 including
+  per-status, G2.3, G2.4, G6.2) — the log's claim that each one had a carrier
+  was **wrong**. Added.
+- **`runner-gating.test.ts`'s M-f2 window had been widened 120 → 200 with no
+  reason given.** The real gap is 8 characters. Reverted to 120, with the
+  reason recorded.
+- **The closed predicate set did not pin `requireWriteIntent`** — a future
+  write-capable runner gating with the read-only variant would have passed every
+  assertion while skipping the G-5 analogue. The generator is now pinned to
+  `true` explicitly.
+- **The `@sentry/nextjs` stub silenced fail-open channels.** `insertEvent`
+  continues past an ON-CONFLICT payload divergence via `safeCaptureException`,
+  and `runBetTransaction` reports retry exhaustion via `captureMessage`; with
+  both stubbed and never read back, a run that tripped either looked green. Now
+  **asserted** post-run — the mock is evidence, not silence.
+- **The production refusal was not actually first**, contrary to `target.ts`'s
+  own comment: mode and intent were checked ahead of it, so a prod URL with an
+  unset ack token reported "the acknowledgement value is not set". Hoisted above
+  both, and it now checks `DATABASE_URL` and `DATABASE_URL_STAGING` together —
+  the refusal must not depend on getting the mode right.
+
+### LOW · fixed or recorded
+
+- **`events` never appeared in `forbiddenTableWrites()`.** Every event row is
+  written through `tx.execute`, and `tableNameOf` returned a blanket
+  `"(raw-sql)"` — so the highest-value table was invisible to the log while a
+  comment claimed otherwise. The table is now parsed out of the SQL text.
+- **G6.3 was a verbatim duplicate of G6.1.** Slice B drives no sells, so the
+  bets-vs-positions distinction has nothing to discriminate yet. Converted to an
+  `it.skip` naming Slice C, like gates 4 and 5.
+- **`String(err)` on a JSON parse failure echoes surrounding file content** —
+  the one path in `captured-identities.ts` that could print a real address into
+  a log. Now reports the error *name* only.
+- **`.insert(schema.bets)` and import aliases defeat the source patterns.**
+  Inherent to a source match; recorded in the docblock so a later reader does
+  not over-trust the tripwire. The behavioural guard catches all three forms.
+- **Provenance, confirmed for the record:** manifest v1.2 was relayed, not
+  CC-authored — copied from the operator's delivered file and verified by line
+  count (181), closing-line prefix, and `md5` against the source. ADR-0035
+  Addendum A.3 is the kickoff's verbatim text, appended after A.2 with primitives
+  1–7, A.1 and A.2 untouched (the diff is purely additive).
+- **Three captured identities rather than the plan's one** is operator-directed:
+  the kickoff states "two other Google-linked accounts carrying the same hazard
+  — use all three."
+
+### Re-verified after the fixes
+
+Local: 419 unit tests, generator 8/8, gates 13 passed + 3 skipped.
+**Then the full cycle re-run against real staging with the final artifacts** —
+`pnpm staging:reset` → `pnpm staging:generate` → `pnpm staging:gates`, all exit
+0, `orphan_bets=0 zero_share_bets=0`, guards 78/0 disabled, migrations 25,
+`frozen_at` NULL, P-owner 1833.33 Đ, P-empty exactly 1000 Đ.
 
 ## Open questions
 

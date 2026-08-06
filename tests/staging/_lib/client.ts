@@ -24,6 +24,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as schema from "@/db/schema";
+import { assertLiveConnection } from "./reset";
 import { resolveRunnerTarget } from "./target";
 import { createWriteGuard, type WriteRecord } from "./write-guard";
 
@@ -83,6 +84,35 @@ export const readOnly = {
 	select: rawDb.select.bind(rawDb),
 	query: rawDb.query,
 } as const;
+
+/**
+ * G-3 for the GENERATOR — assert against the LIVE SOCKET, not the config.
+ *
+ * @code-reviewer, Slice B: the reset does this (`_lib/reset.ts`
+ * `assertLiveConnection`) precisely because "a config can say staging while the
+ * connection says otherwise" (Ratification Record §5 W-B item 2) — a `?host=`
+ * override, an ambient PGHOST/PGUSER, a pooler redirect all move the
+ * driver-resolved options without touching the env string G-1 read. This runner
+ * writes ~440 rows and had no equivalent.
+ *
+ * It reuses the RESET'S OWN function rather than a lookalike, so the two cannot
+ * drift and a hardening of G-3 reaches both. Staging mode only: local mode's
+ * loopback positive-match is its own discriminator, and `assertLiveConnection`
+ * would (correctly) refuse a non-Supabase host.
+ *
+ * Called from the runner's `beforeAll`, so a failure aborts the suite WITHOUT
+ * executing any of it.
+ */
+export async function assertRunnerLiveConnection(): Promise<void> {
+	if (RUNNER_MODE !== "staging") return;
+	const fragment = process.env.STAGING_PROJECT_REF_FRAGMENT;
+	if (!fragment) {
+		throw new Error(
+			"G-3 failed: STAGING_PROJECT_REF_FRAGMENT is unset at connection time; refusing",
+		);
+	}
+	await assertLiveConnection(client, fragment);
+}
 
 export async function closeRunnerConnection(): Promise<void> {
 	await client.end({ timeout: 10 });

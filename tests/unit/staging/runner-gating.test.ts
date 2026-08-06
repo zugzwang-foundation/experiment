@@ -288,6 +288,20 @@ describe("every operational runner, present and future", () => {
 		return -1;
 	}
 
+	it("pins the WRITE-capable runner to the write-intent variant", () => {
+		// The predicate needle is deliberately unterminated, so it accepts both
+		// `{ requireWriteIntent: true }` and `false`. A future write-capable runner
+		// that gated with the READ-ONLY variant would satisfy every assertion in
+		// this block while skipping the G-5 analogue entirely (@code-reviewer).
+		// The generator writes ~440 rows; pin it explicitly.
+		const generator = stripComments(
+			readFileSync(`${STAGING_DIR}generate.staging.test.ts`, "utf8"),
+		);
+		expect(generator).toMatch(
+			/resolveRunnerTarget\(process\.env,\s*\{\s*requireWriteIntent:\s*true/,
+		);
+	});
+
 	it("recognises a guarded module-scope call and nothing else", () => {
 		// POSITIVE + NEGATIVE CONTROL for `guardOffset` itself. Every per-runner
 		// assertion below is built on it, so a matcher that silently stopped
@@ -321,10 +335,16 @@ describe("every operational runner, present and future", () => {
 			// result, which is the refusal that must stop the run before a client
 			// exists. Generic across the generator/gate runners Slices B–D add,
 			// since they read one of the same two predicates.
+			//
+			// The window stays at the Slice A budget of 120 characters. It was
+			// briefly widened to 200 during Slice B with no reason given; the actual
+			// `.ok)` -> `throw new Error` gap is 8 characters on all three runners,
+			// so 120 was never tight and widening a mutation-derived bound without
+			// cause is how such bounds stop biting (@code-reviewer).
 			const guardAt = guardOffset(body);
 			expect(guardAt).toBeGreaterThan(-1);
 			expect(preamble.slice(guardAt)).toMatch(
-				/\.ok\)[\s\S]{0,200}throw new Error/,
+				/\.ok\)[\s\S]{0,120}throw new Error/,
 			);
 		});
 

@@ -100,6 +100,15 @@ function camel(table: string): string {
  * `.insert(\n\t\tbets,\n\t)` on a reformat — and a literal `indexOf(".insert(bets)")`
  * would then match nothing and report clean. `\s*` everywhere a formatter can
  * insert a break, and a trailing-comma allowance.
+ *
+ * ⚠ WHAT THESE PATTERNS DO NOT CATCH, so a later reader does not over-trust
+ * them (@code-reviewer, Slice B): `.insert(schema.bets)` and an import alias
+ * (`bets as betsTable`) both defeat the binding match, and a table name built
+ * by string concatenation defeats the SQL match. That is inherent to a source
+ * match and is why it is the WEAK form. The BEHAVIOURAL guard catches all three
+ * — it reads the table off the object drizzle was actually handed — and the
+ * import allowlist below closes the remaining route. Defence in depth; this
+ * layer is the cheap tripwire, not the control.
  */
 function patternsFor(table: string): { label: string; re: RegExp }[] {
 	const binding = camel(table);
@@ -208,6 +217,117 @@ describe("the comment stripper does work", () => {
 		// the stripper is doing work rather than matching nothing.
 		expect(raw).toMatch(/^\s*\/\/.*INSERT INTO/m);
 		expect(stripComments(raw)).not.toMatch(/^\s*\/\/.*INSERT INTO/m);
+	});
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// THE IMPORT ALLOWLIST — the hole the two patterns above cannot see
+//
+// @code-reviewer, Slice B. Caller attribution allows any `/src/` frame, and
+// `src/` contains THIN WRITE HELPERS that perform an insert on the caller's
+// behalf: `insertEvent(tx, …)` runs `tx.execute(sql\`INSERT INTO events …\`)`,
+// and `appendLedgerRow(tx, …)` runs `tx.insert(dharmaLedger)`. The generator
+// legitimately holds a `tx`. So:
+//
+//     await guardedDb.transaction(async (tx) => {
+//       await insertEvent(tx, { eventType: "bet.placed", aggregateId: someBetId, … });
+//     });
+//
+// …passes ALL THREE controls — the handle is the sanctioned one, the attributed
+// frame is `src/server/events/insert.ts`, and the text contains neither
+// `INSERT INTO events` nor `.insert(events)`. That is EXACTLY the circularity
+// W-G names: the generator emitting a `bet.placed` for a row it also caused,
+// making gate 1 pass because the generator wrote both halves.
+//
+// The shipped generator does not do it. But the ADR says primitive 4 is
+// "enforced rather than promised", and Slice C adds roughly ten more call sites
+// to the same file. So the ENTRYPOINTS are pinned: the generator may import
+// from `@/server/**` only what the Ratification Record §7 deviation ratifies.
+// Adding a name here is a decision, not an edit — the same shape as
+// `runner-gating.test.ts`'s closed predicate set.
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * The engine entrypoints Ratification Record §7 ratifies, plus the two PURE
+ * shell helpers Q1 requires the generator to call itself (`assertStakeFloor`,
+ * because the two-floor validator lives in the endpoint; `canonicalizeAmount18`,
+ * because "the generator must canonicalize seedAmount itself since that step
+ * lived in the wire"). Neither writes a row.
+ */
+const RATIFIED_SERVER_IMPORTS = new Set([
+	// Ratification Record §7 — the real engine functions.
+	"@/server/auth/index", // auth.$context.internalAdapter.createOAuthUser
+	"@/server/auth/tos-accept", // acceptTosAction
+	"@/server/markets/create", // createMarket
+	"@/server/markets/open", // openMarket
+	"@/server/markets/close", // closeMarket
+	"@/server/bets/place", // place
+	"@/server/bets/sell", // sell
+	"@/server/bets/transaction", // runBetTransaction — the W-1 spine
+	"@/server/resolution/trigger", // triggerResolution
+	"@/server/resolution/settle", // settleMarket
+	"@/server/resolution/void", // voidMarket
+	"@/server/admin/moderation/act", // moderateComment
+	"@/server/bookmarks/add", // addBookmarkAction
+	// Pure, write-free, and required by Q1's shell-skip table.
+	"@/server/bets/floors", // assertStakeFloor
+	"@/server/admin/wire", // canonicalizeAmount18
+	// Pure value/verification helpers the GATES use. No writes.
+	"@/server/dharma/conservation",
+	"@/server/dharma/tags",
+	"@/server/bets/replay",
+	"@/server/cpmm/decimal",
+]);
+
+/** Every `@/server/...` module specifier a file imports. */
+function serverImportsOf(body: string): string[] {
+	return [...body.matchAll(/from\s+["'](@\/server\/[^"']+)["']/g)].map(
+		(m) => m[1] as string,
+	);
+}
+
+describe("the generator imports only ratified engine entrypoints", () => {
+	it("recognises a server import (positive + negative control)", () => {
+		expect(
+			serverImportsOf('import { x } from "@/server/events/insert";'),
+		).toEqual(["@/server/events/insert"]);
+		// Whitespace tolerance, matching the rest of this file.
+		expect(
+			serverImportsOf('import {\n\tx,\n} from\n\t"@/server/dharma/persist";'),
+		).toEqual(["@/server/dharma/persist"]);
+		expect(serverImportsOf('import { x } from "./local";')).toEqual([]);
+	});
+
+	it("pins the two known write helpers as NOT ratified", () => {
+		// The positive control for the allowlist itself: these are exactly the
+		// modules the bypass would import, and they must not be permitted.
+		expect(RATIFIED_SERVER_IMPORTS.has("@/server/events/insert")).toBe(false);
+		expect(RATIFIED_SERVER_IMPORTS.has("@/server/dharma/persist")).toBe(false);
+		expect(RATIFIED_SERVER_IMPORTS.has("@/server/positions/persist")).toBe(
+			false,
+		);
+	});
+
+	for (const file of FILES) {
+		const relative = file.slice(STAGING_DIR.length);
+		const body = stripComments(readFileSync(file, "utf8"));
+		const imports = serverImportsOf(body);
+		const unratified = imports.filter((i) => !RATIFIED_SERVER_IMPORTS.has(i));
+
+		it(`${relative} · imports no unratified @/server module`, () => {
+			expect({ file: relative, unratified }).toEqual({
+				file: relative,
+				unratified: [],
+			});
+		});
+	}
+
+	it("the runners actually import SOMETHING from @/server", () => {
+		// Non-empty control: an allowlist over zero imports permits everything.
+		const total = FILES.flatMap((f) =>
+			serverImportsOf(stripComments(readFileSync(f, "utf8"))),
+		);
+		expect(total.length).toBeGreaterThan(0);
 	});
 });
 

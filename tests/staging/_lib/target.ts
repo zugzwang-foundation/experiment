@@ -81,6 +81,27 @@ export function resolveRunnerTarget(
 		};
 	}
 
+	// ── THE PRODUCTION REFUSAL, FIRST AND UNCONDITIONALLY ────────────────────
+	//
+	// Hoisted above the mode and intent checks (@code-reviewer, Slice B). It was
+	// below them, which meant a production URL sitting in DATABASE_URL_STAGING
+	// with an unset acknowledgement token was reported as "the acknowledgement
+	// value is not set" — a true refusal with a misleading reason, on the single
+	// input that matters most. ADR-0035 driver 4: a failed staging run costs an
+	// afternoon; a wrong-target run costs the experiment, and the operator must
+	// be told WHICH it was. `resolveStagingTarget` orders it the same way.
+	//
+	// Both variables are checked, because the mode has not been resolved yet —
+	// which is the point: the refusal must not depend on getting the mode right.
+	for (const name of ["DATABASE_URL", "DATABASE_URL_STAGING"] as const) {
+		if (env[name]?.includes(PRODUCTION_PROJECT_REF)) {
+			return {
+				ok: false,
+				reason: `${name} contains the PRODUCTION project ref; refusing. This is the wrong-target case — check the Doppler config (stg, never prd).`,
+			};
+		}
+	}
+
 	const mode = env[TARGET_MODE_ENV];
 	if (mode !== "local" && mode !== "staging") {
 		return {
@@ -156,11 +177,23 @@ export function resolveRunnerTarget(
 				"DATABASE_URL_STAGING is not set. Run under: doppler run --project zugzwang-experiment --config stg -- …",
 		};
 	}
-	if (url.includes(PRODUCTION_PROJECT_REF)) {
+	// The host must be Supabase. The fragment lives in the USERNAME on the
+	// session pooler, so on its own it says nothing about WHERE we dial: a
+	// localhost DSN — or an SSH tunnel to a third database — carrying the
+	// staging ref as its user satisfies the match. `_lib/reset.ts` constrains
+	// the host for exactly this reason at G-3; this is the config-level belt
+	// (@code-reviewer, Slice B).
+	const stagingHost = hostOf(url);
+	if (stagingHost === null) {
 		return {
 			ok: false,
-			reason:
-				"DATABASE_URL_STAGING contains the PRODUCTION project ref; refusing. Check the Doppler config (stg, never prd).",
+			reason: "DATABASE_URL_STAGING is not a parseable URL; refusing",
+		};
+	}
+	if (!isAllowedStagingHost(stagingHost)) {
+		return {
+			ok: false,
+			reason: `DATABASE_URL_STAGING dials ${JSON.stringify(stagingHost)}, which is not a Supabase host; refusing`,
 		};
 	}
 	if (!fragment) {
