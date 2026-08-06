@@ -413,3 +413,43 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Every PR that adds or edits a read over `comments` on any surface (participant OR admin). Reviewer + `@security-auditor` checklist item.
 
 **Expected next task.** No fix owed — this PR closed the review-feed instance and the audit page was verified clean. This entry is the durable guard so the lesson isn't re-learned.
+
+## STAGING-PARITY Slice A — `PRODUCTION_PROJECT_REF` liveness (rotation is a process control)
+
+**Originating task:** STAGING-PARITY Slice A Gate C, Q-A ruling (2026-08-06). Sits alongside **AUDIT-FIX-B2 OQ-2** above — same family: both are the owner-privilege reality that the guarded reset (ADR-0035) is built on top of rather than closing.
+
+**The row, as ruled:**
+
+> Supabase project restore or ref change → update `PRODUCTION_PROJECT_REF`
+> (`tests/staging/_lib/guards.ts`) and re-verify the guard. Class R.
+> The constant is the single code copy of the production ref; nothing
+> detects that it has gone stale. Trigger: any Supabase project restore,
+> migration, or ref change on either project.
+
+**Why a test cannot own this.** `reset-guard.test.ts` builds its synthetic production URL by INTERPOLATING the constant, so it is satisfied by whatever value the constant holds — a stale one included. It proves the refusal PATH works and (via a `/^[a-z0-9]{20}$/` shape assertion) catches a blanked, truncated or placeholder constant. It cannot detect rotation. Hardcoding the literal a second time was considered and rejected: both copies would go stale together, and it would cost the single-code-constant property.
+
+**Blast radius if it does go stale — smaller than it first looks.** G-1's **positive** fragment match is the primary protection: the reset proceeds only when the URL carries the **staging** ref, which does not depend on knowing production's name at all. The name-based production refusal is the SECOND net, and its job is to make the wrong-target case *report itself correctly* — "this is PRODUCTION" rather than "wrong fragment". A stale constant therefore degrades the error message, not the refusal.
+
+**Conditional trigger.** Any Supabase project restore, project migration, or ref change on either the staging or the production project.
+
+**Expected next task.** Runbook-owned — a step in `docs/runbooks/deploy-pipeline.md`'s project-identity procedure, or its own HARDEN row. Full reasoning is in `docs/logs/STAGING-PARITY-A.md` under *Q-A*; this entry is the tracking, that one is the argument.
+
+## STAGING-PARITY Slice A — an `events` partition added without its truncate guard is invisible
+
+**Originating task:** STAGING-PARITY Slice A, overnight mutation sweep (2026-08-06), GROUP 5 item 9. Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a control that no assertion in the slice can hold, recorded rather than left silently unproven.
+
+**The row, as ruled:**
+
+> A new `events` partition added without its `bucket_a_no_truncate` guard is
+> invisible to every assertion in Slice A, because guard-list parity derives
+> from the same migration SQL that would be missing the guard. Class R.
+> Trigger: any migration adding an `events` partition or a protected table.
+> Cross-reference ADR-0030's forward obligation.
+
+**Why no assertion can catch it.** `tests/unit/staging/guard-list-parity.test.ts` is deliberately built so that *the migrations are the authority* — it parses every `.sql` on disk and derives the expected guard set from them. That is the right design for detecting drift **between the constant and the migrations**, and it is exactly why it cannot detect a migration that is **itself** wrong: both sides move together and agree. `EXPECTED_GUARD_CATALOG_ROWS` is derived the same way, so it moves too. And the integration suite's "accounts for every public base table" query — the assertion that *does* catch a new **non-partition** protected table appearing in none of the three lists — explicitly excludes `events\_%`, so a partition is outside its reach as well.
+
+**Blast radius.** A reset would then truncate the partition **because** it is unguarded — the `TRUNCATE … CASCADE` succeeds where a guarded partition would abort the batch — and nothing reports the omission. The row loss is not the concern (partitions are in the truncate set by design); the concern is that the partition sits **outside the Bucket-A append-only contract** in normal operation, where `UPDATE`/`DELETE` on it would also be unguarded. Statement-level triggers do **not** clone to partitions (ADR-0030, verified via `tgparentid`), which is the whole reason each partition must carry its own by name.
+
+**Conditional trigger.** Any migration that adds an `events` partition, or that adds a protected table. This is ADR-0030's standing forward obligation, restated as a docket row because the mutation sweep established that no test enforces it for the partition case.
+
+**Expected next task.** Process-owned, not code — a checklist line in the partition-migration procedure and a `@db-migration-reviewer` check. Evidence is in `docs/logs/STAGING-PARITY-A-mutation-audit.md` under *GROUP 5 · item 9*; this entry is the tracking, that one is the argument.
