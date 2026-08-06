@@ -470,3 +470,46 @@ with a test for a non-defect.
    and the target refusal tied to `throw new Error(`.
 4. **GROUP 5**, above. What is *not* proven matters as much as what is, and the
    headline is that **the staging runner has never been run and cannot be.**
+
+---
+
+## Addendum · Q-K (Gate C, 2026-08-06) — what the runner SENDS
+
+Raised at Gate C after the sweep closed, and it was a live gap.
+
+**The question.** The `lock_timeout` assertion runs through the **builder**; the
+atomicity assertions run through the **runner**. Nothing observed the string the
+runner actually puts on the wire. So an edit that inlines a different batch into
+`runGuardedReset` should leave both families green while the shipped path loses
+its bound.
+
+**Measured — the diagnosis was exactly right.**
+
+| # | Mutation | Suite | Verdict |
+|---|---|---|---|
+| **QK** | inline a lookalike batch (no `SET LOCAL`) into `runGuardedReset` | `staging-reset-mechanism` | **RED — 1 failed, 48 passed.** The single failure is the new spy. The F1 builder case, both atomicity cases, and every G-4 case stayed **green**. |
+| **QK-b** | same inline | `runner-gating` only | **RED (1)** — the source match `/client\.unsafe\(buildResetBatch\(tables\)\)/` does catch it |
+| **QK-c** | **correct code**: the identical call wrapped across lines | both | **RED (1) — a FALSE ALARM.** `runner-gating`'s source match fires on a pure reformat; the spy and 74 other assertions stay green. |
+
+**Fix.** A behavioural spy in item 3: a `Proxy` over `testClient` that records
+every `unsafe()` payload and delegates to the real client. It asserts exactly one
+round-trip and that the payload is `buildResetBatch(TRUNCATE_SET)` character for
+character, plus a belt naming the `SET LOCAL` prefix so a failure reads as *the
+bound is gone* rather than only *strings differ*.
+
+**What QK-b and QK-c establish together.** The source match is not useless — it
+caught the inline — but it is the **weak form**: it reads text about the file
+rather than what the file does, and it raises a false alarm on correct code. Kept
+as a cheap structural tripwire; the spy is the control.
+
+**Running total: 55 mutations · 50 RED · 5 GREEN.** (QK-c's RED is a *correct*
+detection of a change, but a false alarm about a defect — counted as RED, flagged
+here so the number is not read as five clean catches.)
+
+### Cosmetic, folded in
+
+`buildResetBatch`'s empty-set refusal threw `"runGuardedReset: empty truncate
+set"` — the wrong function name, left behind by the F1 split. No separate commit,
+per the Gate C instruction; folded into the Q-K edit. The owning case asserts
+`rejects.toThrow()` with no pattern, so nothing depended on the old string
+(verified by grep before changing it).

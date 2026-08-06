@@ -686,6 +686,62 @@ the premise it must not inherit wrongly.
 
 ---
 
+## THE LESSON OF SLICE A
+
+> **A test that reassembles a lookalike proves nothing about the shipped one.**
+
+Ruled at Gate C, 2026-08-06. Four instances in one slice, which is why it is
+recorded as *the* lesson rather than as four findings:
+
+1. **tile-identity** asserted on **hand-built objects** — not the objects the
+   product constructs.
+2. **`runner-gating`** matched a **needle that stopped matching the real call**
+   (QI-1: wrap `runGuardedReset(client, …)` across lines and the search silently
+   skipped to the next call site and reasoned about the wrong one).
+3. **`reset-guard`'s header claimed coverage of G-3 that did not exist** — "G-3
+   … exercised by `tests/integration/staging-reset-mechanism`". It was not.
+   Five refusals shipped unasserted, and the claim is what made the gap
+   invisible.
+4. **Q-K, the same shape INVERTED.** The `lock_timeout` assertion ran through the
+   BUILDER and the atomicity assertions ran through the RUNNER, so nothing
+   observed the string actually sent. Inlining a different batch into
+   `runGuardedReset` left **both families green** — measured: **1 failed, 48
+   passed**, and the one failure was the new spy. Here the test was not asserting
+   against a reconstruction; **the shipped artifact had quietly stopped being the
+   thing the tests build.**
+
+All four are controls aimed at a **lookalike of what they name**. The fix is
+always the same: assert against the shipped artifact, or against the wire.
+
+**How to tell the two forms apart** — worth naming, because they need different
+fixes:
+
+- *Test-side lookalike* (1, 2, 3): the assertion targets a reconstruction.
+  Fix by pointing it at the real thing.
+- *Source-side drift* (4): the assertion targets the real thing, but the real
+  thing changed underneath. Fix by observing behaviour, not text.
+
+**Source matching is the weak form of both**, and Slice A now has the numbers.
+`runner-gating`'s `/client\.unsafe\(buildResetBatch\(tables\)\)/` **does** catch
+an inlined batch (QK-b, RED) — but it also goes **RED on correct code** that is
+merely reformatted (QK-c: the identical call wrapped across lines → source match
+RED, spy GREEN, 74 others green). It gives false alarms and it reads text about a
+file rather than what the file does. Keep it as a cheap structural tripwire;
+never let it be the only control.
+
+### Slice B inherits this
+
+**ADR-0036 primitive 4's no-direct-writes assertion must run against the SHIPPED
+generator source, not a reconstruction of it.** The generator writes through the
+engine (`openMarket`/`place`) and must never emit its own `market.opened` /
+`bet.placed` — and the assertion proving that has exactly the failure mode above
+available to it. Write it against what the generator actually executes.
+
+The same applies to every other Slice B–D control: prefer a spy, a wire read, or
+the real artifact's own text over anything hand-assembled beside it.
+
+---
+
 ## Next session starts at
 
 **Slice B — the skeleton.** Gate C on PR #298 (human diff-read) is owed first,
