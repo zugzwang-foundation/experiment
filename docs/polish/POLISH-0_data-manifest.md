@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.2** — 2026-08-06 IST. Supersedes v1.1 (2026-08-05).
+> **Status:** **v1.3** — 2026-08-06 IST. Supersedes v1.2 (2026-08-06).
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
@@ -12,6 +12,13 @@
 ---
 
 ## §0 · Amendment record
+
+### v1.3 — 2026-08-06 · from Slice B
+
+| # | Amendment | Detail |
+|---|---|---|
+| **C1** | **Gate 3 renamed to what it verifies** | v1.0–v1.2 described `loadDurableReplay` as reproducing state from the event log. It does not. Per ADR-0031 it is the **durable idempotency backstop**: it reads `bet_receipts` and answers a retried request with the original response, because `newPrice` is persisted nowhere and must be stored rather than re-derived. The gate always asserted what the function does; the description was wrong. Seventh instance of a document describing a control as doing something other than what it does |
+| **C2** | **G1.6 added — event/row CONTENT parity** | Correcting C1 alone would silently shrink the exit bar. Gate 1 proves an event **exists** per row; G1.6 proves it **agrees** with the row. Co-existence is not agreement |
 
 ### v1.2 — 2026-08-06 · from the Ratification Record §8 and Slice A
 
@@ -155,9 +162,9 @@ STAGING-PARITY is not done until **all six** pass from a cold rebuild.
 
 | # | Gate | Check |
 |---|---|---|
-| **1** | ⚠ **Event parity across ALL state-mutating flows** (broadened v1.2, B2) | Every `bets` row has a `bet.placed`; every `comments` row a `comment.placed`; every `bets` row a non-null `comment_id`; every non-Draft market its lifecycle event; **every Resolved or Voided market ≥1 `resolution_events` row** — the third corruption class, and the one v1.1's gate would have passed |
+| **1** | ⚠ **Event parity across ALL state-mutating flows** (broadened v1.2, B2) | Every `bets` row has a `bet.placed`; every `comments` row a `comment.placed`; every `bets` row a non-null `comment_id`; every non-Draft market its lifecycle event; **every Resolved or Voided market ≥1 `resolution_events` row** — the third corruption class, and the one v1.1's gate would have passed. ⚠ **G1.6 — content parity:** for every `bets` row, its `bet.placed` event payload AGREES with the row on stake, side, share quantity and price. Existence is G1.1; agreement is G1.6 |
 | **2** | **Conservation** | `checkMarketConservation` **iterated over every market, not sampled** — a market with no bets conserves trivially. Plus ledger-level checks that do not depend on market activity. **Do not re-derive the identity in the test:** CPMM conservation is measured against pool cash |
-| **3** | **Replay** | `loadDurableReplay` reproduces current state from the event log |
+| **3** | **Durable receipt integrity** | `loadDurableReplay` and `isDurableIdempotencyConflict` behave correctly against the generated receipt set. ⚠ **v1.3 (C1):** this is ADR-0031's idempotency backstop, NOT event-log state reconstruction — it reads `bet_receipts`. The wider property, that state derives from the log, is covered by gate 1's G1.6 |
 | **4** | **Coverage** | Every §2 row exists and is reachable by URL. Entries marked unreachable name their reason and match §3 exactly — no silent omissions |
 | **5** | **Magnitudes** — ≥1 four-digit Đ figure on **every** Đ-rendering surface class: profile §23 tiles, positions table, discovery staked totals, composer amounts, header Portfolio and Balance | **Executed as SQL against the generated data, never as unit assertions over hand-built objects** — a unit-level restatement reproduces exactly the blindness this gate exists to catch. Each criterion names its carrier fixture, so it cannot pass by accident on some other row |
 | **6** | **Zero `share_quantity = 0` rows** | So SP-2's future `CHECK` migration meets no violating rows. Note: a fully-exited **position** legitimately reaches `quantity = 0`; SP-2 constrains `bets`, not `positions` |
@@ -178,4 +185,4 @@ Slice A found **six** controls that passed while blind to what they named. These
 
 ---
 
-*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A. Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
+*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B. Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*

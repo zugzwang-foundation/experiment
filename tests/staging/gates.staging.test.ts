@@ -43,6 +43,9 @@ vi.mock("@/db/index", async () => {
 	return { db: gatesDb };
 });
 
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import {
 	isDurableIdempotencyConflict,
 	loadDurableReplay,
@@ -52,8 +55,19 @@ import {
 	checkCorrectedMarketConservation,
 	checkMarketConservation,
 } from "@/server/dharma/conservation";
+import { getHeaderBalance } from "@/server/dharma/header-balance";
+import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
 import type { DharmaEntryType } from "@/server/dharma/tags";
 import { FLOW_TAGS } from "@/server/dharma/tags";
+import { loadProfilePositions } from "@/server/profile/positions";
+import { loadProfileTiles } from "@/server/profile/tiles";
+import {
+	buildCoverage,
+	coverageSourceCounts,
+	expectedCoverageIds,
+	STAGING_ORIGIN,
+	UNREACHABLE_REASONS,
+} from "./_lib/coverage";
 import {
 	assertGatesLiveConnection,
 	closeGatesConnection,
@@ -62,6 +76,15 @@ import {
 	gatesDb,
 } from "./_lib/read-client";
 import { resolveRunnerTarget } from "./_lib/target";
+
+/**
+ * The gate-4 deliverable. Committed, because POLISH.1–.8 read it as the
+ * standing reference and an artifact that only exists on the machine that
+ * generated it is not a reference.
+ */
+const COVERAGE_PATH = fileURLToPath(
+	new URL("../../docs/polish/staging-coverage.json", import.meta.url),
+);
 
 // ── THE TARGET GUARD, AT MODULE SCOPE, AHEAD OF EVERY it() ──────────────────
 // The same structural rule Slice A's `runner-gating.test.ts` holds every
@@ -77,6 +100,9 @@ if (!runnerTarget.ok) {
 			"Run it as: pnpm staging:gates",
 	);
 }
+
+/** Which database this run is reading. Gate 4 writes its artifact only on staging. */
+const GATES_MODE = runnerTarget.mode;
 
 const FLOW_SET = new Set<DharmaEntryType>(FLOW_TAGS);
 
@@ -217,6 +243,111 @@ describe("gate 1 · event parity", () => {
 				`SELECT count(*)::int AS n FROM markets WHERE status IN ('Resolved','Voided')`,
 			),
 		).toBeGreaterThan(0);
+	});
+
+	// ── G1.6 · CONTENT PARITY — manifest v1.3 (C2) ──────────────────────────
+	//
+	// G1.1 proves a `bet.placed` EXISTS for every `bets` row. It does not prove
+	// the two AGREE. Co-existence is not agreement: a generator that wrote a row
+	// and an event describing a different bet would satisfy G1.1 completely, and
+	// so would an engine change that stopped threading a field into its payload.
+	//
+	// This is the amendment that keeps correcting gate 3's wording (C1) from
+	// silently SHRINKING the exit bar — the wider property gate 3 was believed to
+	// cover, that state derives from the log, lives here now.
+	//
+	// Compared as NUMERIC, not as text: both sides are NUMERIC(38,18) but the
+	// payload round-trips through JSON, and a text compare would fail on a
+	// trailing-zero difference that is not a defect.
+	it("G1.6 · every bet.placed payload AGREES with its bets row", async () => {
+		expect(
+			await scalar(`
+				SELECT count(*)::int AS n
+				FROM bets b
+				JOIN events e
+				  ON e.aggregate_id = b.id AND e.event_type = 'bet.placed'
+				WHERE (e.payload->>'side')            IS DISTINCT FROM b.side::text
+				   OR (e.payload->>'stake')::numeric  IS DISTINCT FROM b.stake
+				   OR (e.payload->>'shares')::numeric IS DISTINCT FROM b.share_quantity
+				   OR (e.payload->>'price')::numeric  IS DISTINCT FROM b.price_at_bet
+				   OR (e.payload->>'marketId')::uuid  IS DISTINCT FROM b.market_id
+				   OR (e.payload->>'userId')::uuid    IS DISTINCT FROM b.user_id
+				   OR (e.payload->>'betId')::uuid     IS DISTINCT FROM b.id`),
+		).toBe(0);
+
+		// INV-1's pairing, in the EVENT LOG rather than only in the row. The
+		// manifest names four fields; `betId ↔ aggregate_id` and the comment link
+		// are the two worth having beyond them, because INV-1 is the headline
+		// invariant and G1.3 only checks the column is non-null
+		// (@code-reviewer, Slice C).
+		expect(
+			await scalar(`
+				SELECT count(*)::int AS n
+				FROM bets b
+				JOIN events be ON be.aggregate_id = b.id AND be.event_type = 'bet.placed'
+				WHERE NOT EXISTS (
+					SELECT 1 FROM events ce
+					WHERE ce.aggregate_id = b.comment_id
+					  AND ce.event_type = 'comment.placed'
+				)`),
+		).toBe(0);
+
+		// THE CARRIER, and it is doing more work than the usual non-empty check:
+		// the JOIN above yields nothing when no bet has an event, so a database
+		// with the G1.1 corruption would pass G1.6 vacuously. Count the PAIRS
+		// actually compared, and require every bet to be one of them.
+		const pairs = await scalar(`
+			SELECT count(*)::int AS n
+			FROM bets b
+			JOIN events e
+			  ON e.aggregate_id = b.id AND e.event_type = 'bet.placed'`);
+		const betRows = await scalar(`SELECT count(*)::int AS n FROM bets`);
+		expect(betRows).toBeGreaterThan(0);
+		expect(pairs).toBe(betRows);
+	});
+
+	it("G1.7 · persisted metadata.flow_id matches what the WIRE would write", async () => {
+		// @code-reviewer, Slice C (MEDIUM-4). The generator hard-coded `F-BET-1`
+		// on every bet, so replies and sells carried a flow the product would
+		// never write — and this task exists precisely because staging carried
+		// data the product could not have produced. Nothing asserted it, so it
+		// would not have self-corrected.
+		//
+		// The wire's own expressions (`api/bets/place/route.ts:173`,
+		// `api/bets/sell/route.ts:43`) restated as a data assertion:
+		//   top-level post -> F-BET-1 · reply -> F-COMMENT-2 · sell -> F-BET-3
+		expect(
+			await scalar(`
+				SELECT count(*)::int AS n
+				FROM events e
+				JOIN bets b ON b.id = e.aggregate_id
+				JOIN comments c ON c.id = b.comment_id
+				WHERE e.event_type = 'bet.placed'
+				  AND (e.metadata->>'flow_id') IS DISTINCT FROM
+				      (CASE WHEN c.parent_comment_id IS NULL
+				            THEN 'F-BET-1' ELSE 'F-COMMENT-2' END)`),
+		).toBe(0);
+		expect(
+			await scalar(`
+				SELECT count(*)::int AS n FROM events
+				WHERE event_type = 'bet.sold'
+				  AND (metadata->>'flow_id') IS DISTINCT FROM 'F-BET-3'`),
+		).toBe(0);
+
+		// Carriers: BOTH arms of the post/reply split must actually be occupied,
+		// and at least one sell must exist — otherwise each check above counts
+		// zero rows and passes having examined nothing.
+		const byFlow = await gatesClient<{ flow: string; n: number }[]>`
+			SELECT (metadata->>'flow_id') AS flow, count(*)::int AS n
+			FROM events WHERE event_type IN ('bet.placed','bet.sold')
+			GROUP BY 1 ORDER BY 1
+		`;
+		const seen = new Map(byFlow.map((r) => [r.flow, r.n]));
+		expect({
+			post: (seen.get("F-BET-1") ?? 0) > 0,
+			reply: (seen.get("F-COMMENT-2") ?? 0) > 0,
+			sell: (seen.get("F-BET-3") ?? 0) > 0,
+		}).toEqual({ post: true, reply: true, sell: true });
 	});
 });
 
@@ -492,27 +623,408 @@ describe("gate 3 · durable replay", () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// GATES 4 AND 5 · SLICE C / SLICE D
+// GATE 4 · COVERAGE — one entry per §2 row, every URL backed by a real row
+//
+// The list is the deliverable; the PROBES are what make it a verification. A
+// coverage list is judged by what it contains, so its failure mode is a missing
+// row nobody notices — which is why `expectedCoverageIds()` enumerates the §2
+// rows INDEPENDENTLY of the builder rather than being derived from it.
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe("gate 4 · coverage", () => {
-	it.skip("G4.1-G4.3 · staging-coverage.json — SLICE C", () => {
-		// Needs the full §2 fixture set: replies, the C1–C11 content shapes on M2,
-		// bookmarks, moderation, and the flip/exit sequences. Slice B produces
-		// participants, markets, one post per active market and the four
-		// lifecycle terminals — a coverage list emitted now would be a partial
-		// list presented as a complete one.
+	it("G4.1-G4.3 · emits staging-coverage.json, every entry verified", async () => {
+		// Roles resolve to pool-assigned pseudonyms, which are the ENGINE's — so
+		// the URLs can only be built at run time, against the generated rows.
+		const userRows = await gatesClient<{ name: string; pseudonym: string }[]>`
+			SELECT name, pseudonym FROM users
+		`;
+		const byName = new Map(userRows.map((u) => [u.name, u.pseudonym]));
+		const pseudonymOf = (displayName: string): string => {
+			const p = byName.get(displayName);
+			if (!p) {
+				throw new Error(
+					`coverage: no user named ${JSON.stringify(displayName)} — the fixture set is incomplete`,
+				);
+			}
+			return p;
+		};
+
+		const entries = buildCoverage(pseudonymOf);
+
+		// ── G4.1 · ONE ENTRY PER §2 ROW ──────────────────────────────────────
+		const expected = expectedCoverageIds();
+		const got = entries.map((e) => e.id);
+		expect(new Set(got).size).toBe(got.length); // no duplicates
+		expect(got.slice().sort()).toEqual(expected.slice().sort());
+
+		// ── G4.2 · EVERY REACHABLE ENTRY HAS A URL, AND THE ROW EXISTS ───────
+		const reachable = entries.filter((e) => e.status === "reachable");
+		expect(reachable.length).toBeGreaterThan(0);
+		const missing: string[] = [];
+		for (const entry of reachable) {
+			if (!entry.url || !entry.probe) {
+				missing.push(`${entry.id}: reachable but carries no url/probe`);
+				continue;
+			}
+			// Absolute, so it can be pasted into a browser without assembly.
+			if (!entry.url.startsWith(STAGING_ORIGIN)) {
+				missing.push(`${entry.id}: url is not an absolute staging URL`);
+				continue;
+			}
+			const rows = await gatesClient.unsafe<{ n: number }[]>(entry.probe);
+			// A HAVING-shaped probe returns zero ROWS when it fails, which is a
+			// different failure from returning n = 0. Both are "not found".
+			const n = rows[0]?.n ?? 0;
+			if (n <= 0) missing.push(`${entry.id}: probe found no row`);
+		}
+		expect(missing).toEqual([]);
+
+		// ── G4.3 · UNREACHABLE ENTRIES NAME A §3 REASON, AND NO URL ──────────
+		const unreachable = entries.filter((e) => e.status === "unreachable");
+		// Non-vacuous: manifest §3 has entries, so a list with none is wrong.
+		expect(unreachable.length).toBeGreaterThan(0);
+		for (const entry of unreachable) {
+			expect({
+				id: entry.id,
+				url: entry.url,
+				reasonInManifest: UNREACHABLE_REASONS.includes(entry.reason ?? ""),
+			}).toEqual({ id: entry.id, url: null, reasonInManifest: true });
+		}
+		// And every §3 reason is USED — a reason nobody claims means a state was
+		// silently dropped from the list rather than recorded as unreachable.
+		for (const reason of UNREACHABLE_REASONS) {
+			expect({
+				reason: reason.slice(0, 40),
+				claimed: unreachable.some((e) => e.reason === reason),
+			}).toEqual({ reason: reason.slice(0, 40), claimed: true });
+		}
+
+		// ── THE DELIVERABLE ──────────────────────────────────────────────────
+		//
+		// ⚠ STAGING MODE ONLY, AND IT WAS NOT (@code-reviewer, Slice C).
+		// `COVERAGE_PATH` is a TRACKED repo file, and the local proving loop runs
+		// this very file against local Postgres. On success it rewrote the
+		// committed artifact with `"generatedFor": "local · 127.0.0.1:54322"` and
+		// local pseudonyms — which an operator mid-slice could easily commit. The
+		// deliverable describes STAGING; a local run has nothing to say about it.
+		if (GATES_MODE !== "staging") {
+			console.log(
+				`[staging:gates] coverage NOT written — mode is ${GATES_MODE}, and the committed artifact describes staging`,
+			);
+			return;
+		}
+
+		const payload = `${JSON.stringify(
+			{
+				generatedFor: describeGatesTarget(),
+				origin: STAGING_ORIGIN,
+				sourceCounts: coverageSourceCounts(),
+				entries,
+			},
+			null,
+			"\t",
+		)}\n`;
+
+		// DRIFT IS A GATE FAILURE, NOT A SILENT DIFF. Constraint 3's
+		// re-runnability was verified by hand at Slice C/D — two cold rebuilds,
+		// byte-identical, md5 4bf42fb2 — and a property verified by hand once
+		// decays. Comparing against the committed file turns it into an assertion
+		// that runs on every rebuild.
+		//
+		// The new file IS written before the failure, so the fix for a DELIBERATE
+		// fixture change is simply to re-run: the second run is green and the
+		// change shows up in the PR diff, where it belongs. No update flag, and
+		// therefore no flag to leave permanently exported.
+		const previous = existsSync(COVERAGE_PATH)
+			? readFileSync(COVERAGE_PATH, "utf8")
+			: null;
+		writeFileSync(COVERAGE_PATH, payload);
+		console.log(
+			`[staging:gates] coverage → ${COVERAGE_PATH} · ${entries.length} entries (${reachable.length} reachable, ${unreachable.length} unreachable)`,
+		);
+		if (previous !== null && previous !== payload) {
+			const before = new Set(
+				(
+					JSON.parse(previous) as {
+						entries: { id: string; url: string | null }[];
+					}
+				).entries.map((e) => `${e.id}=${e.url ?? "-"}`),
+			);
+			const after = entries.map((e) => `${e.id}=${e.url ?? "-"}`);
+			const changed = after.filter((line) => !before.has(line));
+			throw new Error(
+				"COVERAGE DRIFT — the emitted list differs from the committed one.\n" +
+					(changed.length > 0
+						? `  changed/new id=url entries: ${changed.join(", ")}\n`
+						: "  every id and URL is UNCHANGED — the difference is in probe SQL, shape text, or run metadata\n") +
+					"  The new file has been written. If the change was DELIBERATE, commit it and re-run.\n" +
+					"  If it was not, the fixture set moved without anyone deciding to move it.",
+			);
+		}
 	});
 });
 
+// ═══════════════════════════════════════════════════════════════════════════
+// GATE 5 · MAGNITUDES — at least one four-digit Đ per surface class
+//
+// ⚠ THIS GATE EXISTS BECAUSE A PASSING SUITE WAS STRUCTURALLY BLIND.
+// `tile-identity.test.ts` had six tests, a dedicated describe for
+// `displayNetProfitLoss`, and EVERY assertion sub-thousand — it stayed green
+// with the comma-grouping wrapper deleted. Staging's fixtures repeated that one
+// layer up: `max(stake)` was 300 and `four_digit_stakes` was 0.
+//
+// ── WHAT "AGAINST THE GENERATED DATA" MEANS HERE (manifest §4, G5.7) ────────
+// Two shapes, and the distinction is deliberate:
+//
+//   AGGREGATE criteria (G5.1, G5.3, G5.4) run as RAW SQL over the generated
+//     rows. There is nothing to derive — a balance is a column, a staked total
+//     is a SUM.
+//
+//   DERIVED criteria (G5.2, G5.5, G5.6) call the SHIPPED READER against the
+//     live database. Đb is `computeSell(quantity).proceeds` — impact-inclusive
+//     (SPEC.1 §10.8 rejects mark-to-market outright), and `netProfitLoss` is
+//     `wallet + Σ Đb(open) − Σ issuance`. Restating either in SQL would be a
+//     SECOND IMPLEMENTATION of the identity, which is precisely the error gate
+//     2's header warns about ("do NOT re-derive the identity in the test").
+//
+// Neither shape is a hand-built object, which is what G5.7 forbids. The
+// prohibition is on assertions over fabricated inputs, not on calling the
+// shipped code — calling it is STRONGER, because it is the code the operator
+// will be looking at.
+//
+// EVERY CRITERION NAMES ITS CARRIER, so it cannot pass by accident on some
+// other row.
+// ═══════════════════════════════════════════════════════════════════════════
+
+const FOUR_DIGITS = new CpmmDecimal("1000");
+
+/** Resolve a fixture role to its user id, via the display name. */
+async function userIdOf(displayName: string): Promise<string> {
+	const [row] = await gatesClient<{ id: string }[]>`
+		SELECT id FROM users WHERE name = ${displayName}
+	`;
+	if (!row) {
+		throw new Error(`gate 5: no user named ${JSON.stringify(displayName)}`);
+	}
+	return row.id;
+}
+
 describe("gate 5 · magnitudes", () => {
-	it.skip("G5.1-G5.7 · four-digit Đ per surface class — SLICE C", () => {
-		// Slice B places the one carrier it MUST: P-owner's 1000 Đ YES post on M7,
-		// which settles to a four-digit realised P/L. M7 terminates in this slice,
-		// so that magnitude was placeable only here. The remaining criteria —
-		// header Portfolio, discovery staked totals, composer amounts — depend on
-		// fixtures Slice C adds, and W-D's carrier correction (G5.1 -> P-empty at
-		// exactly 1000; G5.2 -> a participant that actually bets) lands with them.
+	// ⚠ THE TWO LABELS BELOW WERE CROSSED (@code-reviewer, Slice C). The HEADER
+	// renders `getHeaderBalance` — the SPENDABLE figure, which includes an
+	// unclaimed daily credit — while the raw ledger row is the composer-side
+	// floor. Both figures are four-digit either way, so the manifest's
+	// surface-class requirement held regardless; but an auditor reading the
+	// labels got the wrong answer about which surface was checked, so each
+	// criterion now asserts BOTH numbers against its own carrier and names which
+	// is which. (The 10 Đ gap between them is correct, and pre-recorded as
+	// PD-0-17 so POLISH.5 does not file it.)
+
+	it("G5.1 · Header Balance — carrier P-empty, whose ledger sits at EXACTLY 1000", async () => {
+		// ⚠ manifest §0 B7 / Ratification Record W-D. The plan originally put
+		// P-empty at 1010; `accrueDailyCredit` fires INSIDE `place()`, so a role
+		// defined by never betting never accrues. Exactly 1000 — asserted as an
+		// equality, not a threshold, because the whole point of this carrier is
+		// that it does not move.
+		const id = await userIdOf("Staging Fixture Empty");
+		const [row] = await gatesClient<{ balance: string }[]>`
+			SELECT balance_after AS balance FROM dharma_ledger
+			WHERE user_id = ${id} ORDER BY seq DESC LIMIT 1
+		`;
+		const balance = row?.balance ?? "0";
+		// What the HEADER actually renders for this user — the shipped reader.
+		const rendered = await getHeaderBalance(gatesDb, id);
+		console.log(
+			`[gate5] G5.1 P-empty ledger=${balance} header(getHeaderBalance)=${rendered}`,
+		);
+		expect(new CpmmDecimal(balance).equals(FOUR_DIGITS)).toBe(true);
+		// The rendered figure is the one the surface class is about, and it is
+		// four-digit too (1010 — the unclaimed credit is spendable).
+		expect(rendered).not.toBeNull();
+		expect(
+			new CpmmDecimal(rendered as string).greaterThanOrEqualTo(FOUR_DIGITS),
+		).toBe(true);
+	});
+
+	it("G5.2 · Composer amounts — carrier P-exited, a role that ACTUALLY BETS", async () => {
+		// W-D's second correction. G5.2 must be a participant that BETS, because
+		// the composer's spendable figure is what a bettor sees. P-exited buys 30 Đ
+		// on M12 and sells the position out in full; M12 carries no other bet, so
+		// the fee-less CPMM round trip returns the stake and it rests at ~1010.
+		//
+		// The SHIPPED reader, not a SQL restatement: `getHeaderBalance` pins a
+		// BALANCE-FIRST / CURSOR-SECOND statement order as a correctness
+		// constraint, and a re-derivation here would not carry it.
+		const id = await userIdOf("Staging Fixture Exited");
+		const spendable = await getHeaderBalance(gatesDb, id);
+		console.log(`[gate5] G5.2 composer spendable (P-exited) = ${spendable}`);
+		expect(spendable).not.toBeNull();
+		expect(
+			new CpmmDecimal(spendable as string).greaterThanOrEqualTo(FOUR_DIGITS),
+		).toBe(true);
+	});
+
+	it("G5.3 · Positions table — carrier P-owner's M7 holding, Đa basis", async () => {
+		// ⚠ THIS ASSERTED A PROXY (@code-reviewer, Slice C). It summed
+		// `bets.stake` for (P-owner, M7). The §23 Positions "Staked" column is
+		// **Đa — the final SideEpisode's `stakedBasis`** (`profile/positions.ts:70`
+		// via `profile/episodes.ts`), which is EPISODE-scoped and reduced by
+		// partial sells. The two coincide here only because P-owner has one M7
+		// trade and no sell — so the old assertion was right by accident, which is
+		// exactly the class of error the G5.5 carrier correction caught.
+		//
+		// Đa is a DERIVED figure, so by this file's own aggregate/derived rule it
+		// belongs on the reader side.
+		const id = await userIdOf("Staging Fixture Owner");
+		const rows = await loadProfilePositions(gatesDb, { userId: id });
+		const m7 = rows.find((r) => r.marketSlug === "sp-m7-resolved");
+		console.log(
+			`[gate5] G5.3 positions Đa staked (P-owner / M7) = ${m7?.staked ?? "(no row)"}`,
+		);
+		expect(m7).toBeDefined();
+		expect(
+			new CpmmDecimal(m7?.staked ?? "0").greaterThanOrEqualTo(FOUR_DIGITS),
+		).toBe(true);
+	});
+
+	it("G5.4 · Discovery staked totals — carrier M2", async () => {
+		const [row] = await gatesClient<{ staked: string; slug: string }[]>`
+			SELECT m.slug, COALESCE(SUM(b.stake), 0)::text AS staked
+			FROM markets m JOIN bets b ON b.market_id = m.id
+			WHERE m.slug = 'sp-m2-active'
+			GROUP BY m.slug
+		`;
+		const staked = row?.staked ?? "0";
+		console.log(`[gate5] G5.4 discovery staked total (M2) = ${staked}`);
+		expect(row?.slug).toBe("sp-m2-active");
+		expect(new CpmmDecimal(staked).greaterThanOrEqualTo(FOUR_DIGITS)).toBe(
+			true,
+		);
+	});
+
+	it("G5.5 · Header Portfolio — carrier P-owner's OPEN M2 YES holding", async () => {
+		// ⚠ THE PLAN'S CARRIER FOR THIS CRITERION WAS COUNTERFACTUAL, and it is
+		// the same class of error W-D caught on G5.1/G5.2. The plan named
+		// "P-owner's M7 YES position, bought at 1000 Đ" — but `getHeaderPortfolio`
+		// EXCLUDES any market carrying a `payout_events` row for the viewer
+		// (`header-portfolio.ts:49–60`), because a settled position's value has
+		// already landed in the ledger and counting it again would double-count it
+		// against Balance. M7 settles in this very run, so that carrier contributes
+		// exactly zero.
+		//
+		// The correction: P-owner's OPEN M2 YES holding, funded by the M7 payout —
+		// which is why the fixture table has an `after-settlement` phase at all.
+		const id = await userIdOf("Staging Fixture Owner");
+		const portfolio = await getHeaderPortfolio(gatesDb, id);
+		console.log(`[gate5] G5.5 header portfolio (P-owner) = ${portfolio}`);
+		// `null` is FAILURE, never emptiness — the reader's own contract.
+		expect(portfolio).not.toBeNull();
+		expect(
+			new CpmmDecimal(portfolio as string).greaterThanOrEqualTo(FOUR_DIGITS),
+		).toBe(true);
+	});
+
+	it("G5.6 · Profile §23 tiles — a four-digit net P/L", async () => {
+		// The tile is `netProfitLoss` = (wallet + Σ Đb over OPEN holdings) − Σ
+		// issuance. FOUR-DIGIT MEANS |value| >= 1000: the criterion exists to
+		// exercise `displayNetProfitLoss`'s comma grouping, and a grouped negative
+		// exercises it exactly as a grouped positive does — arguably better, since
+		// the sign arm is the one a positive-only fixture leaves untested.
+		const id = await userIdOf("Staging Fixture Owner");
+		const positions = await loadProfilePositions(gatesDb, { userId: id });
+		const tiles = await loadProfileTiles(gatesDb, { userId: id, positions });
+		console.log(
+			`[gate5] G5.6 profile tiles (P-owner) netPL=${tiles.netProfitLoss} wallet=${tiles.walletValue} positions=${tiles.positionsValue}`,
+		);
+		expect(
+			new CpmmDecimal(tiles.netProfitLoss)
+				.abs()
+				.greaterThanOrEqualTo(FOUR_DIGITS),
+		).toBe(true);
+		// ⚠ THE SIGN IS PINNED (@code-reviewer, Slice C). `.abs() >= 1000` alone
+		// would stay green on a netPL of −1200 — the intended shape (a WINNING
+		// four-digit position) gone, the magnitude criterion still satisfied. NC-3
+		// landed at −382.89, inside the window, so the control never exercised
+		// this. The carrier holds the winning side of M7; if it goes negative, the
+		// fixture broke rather than the threshold.
+		expect(new CpmmDecimal(tiles.netProfitLoss).isPositive()).toBe(true);
+	});
+
+	it("G5.7 · every criterion above touches the LIVE database — source tripwire", () => {
+		// ⚠ THIS DID NOT CHECK WHAT IT SAYS (@code-reviewer, Slice C).
+		//
+		// The criterion is "the assertion set is executed against the generated
+		// data, not against hand-built objects". The old implementation asserted
+		// that `bets` carries a four-digit stake — a fact about the DATABASE. If
+		// someone rewrote G5.1–G5.6 tomorrow as unit assertions over fabricated
+		// objects, it would have stayed green. That is manifest §5's own
+		// "asserting that a call exists is not asserting what it does", landing on
+		// the one criterion whose whole job is to prevent structural blindness.
+		//
+		// It is now a SOURCE TRIPWIRE over this file's own gate-5 block, in the
+		// shape `generator-no-direct-writes.test.ts` established: every `it` body
+		// in the block must reference a live handle (`gatesClient` or `gatesDb`).
+		// A source match is the WEAK form (manifest §5) — so it carries a positive
+		// AND a negative control below, and the live-data half is retained as the
+		// separate assertion it always was.
+		const source = readFileSync(fileURLToPath(import.meta.url), "utf8");
+		// ⚠ BOUND THE BLOCK AT THE NEXT TOP-LEVEL `describe(`. Slicing to the end
+		// of the file swept in gate 6, whose bodies reach the database through the
+		// `scalar()` helper and therefore carry no literal handle — three false
+		// positives on the first run of this assertion, which is the tripwire
+		// catching its own author.
+		const start = source.indexOf('describe("gate 5 · magnitudes"');
+		const end = source.indexOf("\ndescribe(", start + 1);
+		const block = source.slice(start, end === -1 ? undefined : end);
+
+		// One array, split once: chunk `i` IS criterion `i`, so the two cannot
+		// drift out of alignment the way two separate regex passes did.
+		const chunks = block.split(/\n\tit\(/).slice(1);
+		const named = chunks.map((chunk) => ({
+			criterion: chunk.match(/^["'`]([^"'`]+)/)?.[1] ?? "(unnamed)",
+			chunk,
+		}));
+		// Non-empty: a split that matched nothing would pass the filter perfectly.
+		expect(named.length).toBeGreaterThanOrEqual(7);
+		expect(named.every((c) => c.criterion.startsWith("G5."))).toBe(true);
+
+		const blind = named
+			// EXEMPT BY WHAT IT DOES, not by its name: a criterion that reads its
+			// own SOURCE is the tripwire, and requiring it to also hold a database
+			// handle would be incoherent. Keying on `import.meta.url` cannot drift
+			// on a rename the way a name prefix could.
+			.filter((c) => !/import\.meta\.url/.test(c.chunk))
+			.filter((c) => !/gatesClient|gatesDb/.test(c.chunk))
+			.map((c) => c.criterion);
+		expect(blind).toEqual([]);
+
+		// POSITIVE + NEGATIVE CONTROL for the detector itself. Without these the
+		// assertion above passes when the regex matches nothing, which is exactly
+		// what a rename or a reformat produces (manifest §5).
+		const detects = (src: string) => /gatesClient|gatesDb/.test(src);
+		expect(detects("const x = await gatesClient`SELECT 1`;")).toBe(true);
+		expect(detects("await getHeaderPortfolio(gatesDb, id);")).toBe(true);
+		expect(
+			detects("expect(new CpmmDecimal('1000').isPositive()).toBe(true);"),
+		).toBe(false);
+	});
+
+	it("G5.7b · the generated set carries four-digit stakes at all", async () => {
+		// The live-data half of the old G5.7, kept as its own criterion under the
+		// name of what it actually checks. Before STAGING-PARITY, `max(stake)` on
+		// staging was 300 and `four_digit_stakes` was 0 — gate 5 had never had a
+		// chance to be true.
+		const [row] = await gatesClient<
+			{ max_stake: string; four_digit: number }[]
+		>`
+			SELECT COALESCE(MAX(stake), 0)::text AS max_stake,
+			       count(*) FILTER (WHERE stake >= 1000)::int AS four_digit
+			FROM bets
+		`;
+		console.log(
+			`[gate5] G5.7b live bets: max_stake=${row?.max_stake} four_digit_stakes=${row?.four_digit}`,
+		);
+		expect(row?.four_digit ?? 0).toBeGreaterThan(0);
 	});
 });
 
@@ -545,15 +1057,35 @@ describe("gate 6 · zero-share", () => {
 		).toBeGreaterThan(0);
 	});
 
-	it.skip("G6.3 · re-assert G6.1 AFTER the P-exited full sell — SLICE C", () => {
-		// SP-2's future CHECK constrains `bets`, not `positions`: a fully-exited
-		// position legitimately reaches quantity = 0 (Bucket C, mutable) and must
-		// not be confused with a counterfeit `bets.share_quantity = 0` row.
-		//
-		// Slice B drives NO sells, so the distinction has nothing to discriminate
-		// yet — re-running G6.1's query here would assert exactly what G6.1
-		// already asserts and read as coverage that does not exist
-		// (@code-reviewer, Slice B). It becomes real when Slice C adds P-exited's
-		// sell-to-zero and P-flipped's sell-all sequences.
+	it("G6.3 · a fully-exited POSITION reaches zero; no bets row ever does", async () => {
+		// SP-2's future CHECK constrains `bets`, not `positions`. Slice B could
+		// not run this — it drove no sells, so re-running G6.1's query here would
+		// have asserted exactly what G6.1 asserts and read as coverage that did
+		// not exist (@code-reviewer, Slice B). Slice C's two sell sequences give
+		// it something to discriminate.
+
+		// THE DISCRIMINATOR, and it must be non-zero or this gate is G6.1 again:
+		// at least one `positions` row sits at exactly zero, legitimately.
+		const exitedPositions = await scalar(
+			`SELECT count(*)::int AS n FROM positions WHERE quantity = 0`,
+		);
+		expect(exitedPositions).toBeGreaterThan(0);
+
+		// And with those rows present, `bets` still carries no zero-share row.
+		expect(
+			await scalar(
+				`SELECT count(*)::int AS n FROM bets WHERE share_quantity = 0`,
+			),
+		).toBe(0);
+
+		// A sell writes NO bets row at all (`bets.comment_id` NOT NULL forbids a
+		// comment-free bet) — it reports through `bet.sold`. Asserted, because
+		// "the sells produced no zero-share bets" is trivially true if the sells
+		// never ran, and this is what proves they did.
+		expect(
+			await scalar(
+				`SELECT count(*)::int AS n FROM events WHERE event_type = 'bet.sold'`,
+			),
+		).toBeGreaterThan(0);
 	});
 });

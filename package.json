@@ -25,6 +25,7 @@
 		"staging:generate:exec": "ZUGZWANG_STAGING_TARGET=staging ZUGZWANG_STAGING_WRITE_ACK=generate-staging-fixtures vitest run --config vitest.staging.config.ts tests/staging/generate.staging.test.ts",
 		"staging:gates": "doppler run --project zugzwang-experiment --config stg -- pnpm run staging:gates:exec",
 		"staging:gates:exec": "ZUGZWANG_STAGING_TARGET=staging vitest run --config vitest.staging.config.ts tests/staging/gates.staging.test.ts",
+		"staging:rebuild": "pnpm run staging:reset && pnpm run staging:generate && pnpm run staging:gates",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/",
 		"test:scale": "vitest run --config vitest.scale.config.ts"
