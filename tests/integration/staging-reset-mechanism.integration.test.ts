@@ -332,6 +332,55 @@ describe("F1 — the batch really is one implicit transaction", () => {
 		expect(findSetting(result)).toBe(LOCK_TIMEOUT);
 	});
 
+	it("SENDS exactly buildResetBatch(tables) — no inlined lookalike (Q-K)", async () => {
+		// THE JOINT THE TWO ASSERTION FAMILIES LEAVE OPEN, closed behaviourally.
+		//
+		// The case above runs through the BUILDER; the atomicity cases below run
+		// through the RUNNER. Neither observes the string the runner actually
+		// puts on the wire. An edit that inlines a different batch into
+		// runGuardedReset — one without the `SET LOCAL`, say — leaves BOTH
+		// families green while the shipped path silently loses its bound: the
+		// builder still returns a correct batch nobody sends, and an inlined
+		// batch still aborts correctly on system_state.
+		//
+		// This is the lookalike problem INVERTED. Elsewhere the risk was a test
+		// asserting against a reconstruction of the shipped artifact; here it is
+		// the shipped artifact quietly ceasing to be the thing the tests build.
+		// Same fix either way: assert against what actually happens.
+		//
+		// A spy, not a source match. `runner-gating` does carry
+		// `/client\.unsafe\(buildResetBatch\(tables\)\)/`, but that is text about
+		// the file — and QI-1 showed a needle like that stops matching the moment
+		// a formatter wraps the call. This reads the wire. @Gate C, Q-K.
+		const sent: string[] = [];
+		const spy = new Proxy(testClient, {
+			get(target, prop, receiver) {
+				if (prop === "unsafe") {
+					return (sql: string, ...rest: unknown[]) => {
+						sent.push(sql);
+						return (target.unsafe as (...a: unknown[]) => unknown)(
+							sql,
+							...rest,
+						);
+					};
+				}
+				return Reflect.get(target, prop, receiver);
+			},
+		});
+
+		await runGuardedReset(spy, TRUNCATE_SET);
+
+		// Exactly one round-trip — the atomicity guarantee — and its payload is
+		// the builder's output, character for character.
+		expect(sent).toHaveLength(1);
+		expect(sent[0]).toBe(buildResetBatch(TRUNCATE_SET));
+		// Belt: name the property that a lookalike would drop, so a failure here
+		// reads as "the bound is gone" rather than only "strings differ".
+		expect(
+			sent[0]?.startsWith(`SET LOCAL lock_timeout = '${LOCK_TIMEOUT}';`),
+		).toBe(true);
+	});
+
 	it("releases it again the moment the batch ends", async () => {
 		// Transaction-scoped, so it cannot leak into the pooled session — the
 		// property that makes `SET LOCAL` rather than `SET` the right choice on

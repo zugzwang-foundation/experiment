@@ -225,7 +225,7 @@ export async function runGuardedReset(
  */
 export function buildResetBatch(tables: readonly string[]): string {
 	if (tables.length === 0) {
-		throw new Error("runGuardedReset: empty truncate set");
+		throw new Error("buildResetBatch: empty truncate set");
 	}
 	// `tables` is a PARAMETER, and the batch below is raw string-built SQL. All
 	// shipped call sites pass module constants, but a caller passing
