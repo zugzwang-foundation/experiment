@@ -3,9 +3,10 @@
  * `aria-disabled`, STATIC bars (no fake "On Air" liveness — a named
  * deviation from the mockup's animated synth-wave). Server component, zero
  * client JS. The real YouTube-backed player + final look are W2.14 —
- * Session B, SPEC-FIRST (§21.5 amendment + ADR before ANY build). Title is
- * the mockup's verbatim string (flagged at the log for web review — it
- * describes the ON depiction this inert skin never shows).
+ * Session B, SPEC-FIRST (§21.5 amendment + ADR before ANY build). Title
+ * states the slot's actual condition (POLISH-1a V1): the mockup's verbatim
+ * string described the ON depiction this inert skin never shows, so it
+ * promised liveness the build cannot deliver.
  */
 const BAR = "w-[3px] rounded-[1px] bg-ink";
 
@@ -16,7 +17,7 @@ export function RadioSlot() {
 			disabled
 			aria-disabled="true"
 			aria-label="Radio"
-			title="Radio — depicts live music when ON (placeholder skin; built in W2.14)"
+			title="Radio — not yet live"
 			className="flex h-[34px] shrink-0 items-center gap-2 rounded-(--r) bg-(--btn-fill) px-3 opacity-(--state-disabled-opacity) select-none [border:var(--hairline)]"
 		>
 			<span aria-hidden="true" className="flex h-4 items-end gap-[2.5px]">

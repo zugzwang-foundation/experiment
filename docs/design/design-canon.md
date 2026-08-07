@@ -175,6 +175,25 @@ Carry these into the CD prompt sheet + sessions; none blocks DC or the handover.
 
 *(Rule: any further pure-polish inconsistency noticed downstream → append here; never absorb into a build task.)*
 
+**Đ cluster (global header) — state authority.** The W2.11 state kit defines
+P1–P6 and places 19 states; none is the Đ cluster. P5 (*silent fallback*) is
+defined with exactly one host — the visitor counter's dash/hide — so it was
+never available to the Đ cluster, and the build does not violate it by
+refusing a dash.
+
+The four built states are ratified as the cluster's own authority:
+
+| State | Treatment |
+|---|---|
+| Both stats present | Portfolio then Balance, one shared glyph, one `.sep` hairline |
+| Portfolio `Đ 0` | **Renders.** Never blank, never a dash — `Đ 0` is true and informative for a viewer holding no open positions. This is data *available*, not data missing, so no fallback primitive applies |
+| Balance-only | A failed Portfolio read degrades the cluster rather than blanking it |
+| Cluster absent | No `dharma_ledger` row hides the whole cluster. Silent, no message, no error surface |
+
+Balance-only and cluster-absent are P5-*shaped* — silent, never an error
+surface — but P5's dash treatment does not extend to them. Ratified
+2026-08-04 from POLISH-1-D.
+
 ---
 
 ## §11 — Residual open items (properly homed — nothing floating)

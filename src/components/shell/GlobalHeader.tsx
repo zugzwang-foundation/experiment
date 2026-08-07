@@ -49,6 +49,26 @@ import { VisitorCounter } from "./VisitorCounter";
  * definition; a mid-signup `/onboarding` user may have no `dharma_ledger` row,
  * and it avoids two reads on every OTP page load).
  *
+ * STICKY, NOT FIXED (POLISH-1b B3; ADR-0023 §Patch 2026-08-03, D3 ruled). The
+ * header was static and in normal flow, so it scrolled away on every route —
+ * taking the freeze countdown and Back with it. `sticky top-0` keeps it in
+ * FLOW, so nothing below needs offset compensation and the `min-h` chain is
+ * undisturbed; `fixed` would have required both. Mounted here rather than in
+ * each layout because this component owns the `<header>` element and its only
+ * two consumers ARE the two group layouts. `(admin)` has no header by design.
+ *
+ * `z-40` IS THE HEADER'S RESERVED TIER. Every overlay in the app sits at
+ * `z-50` — `MarketPriceChartOverlay`, `ProfileGraphOverlay`, and the shadcn
+ * `Dialog` overlay/content — so all of them stack ABOVE the header, which is
+ * the ADR's stated consequence. Tiers 20 and 30 are deliberately left FREE.
+ * Do not raise this to 50: it would tie the header with the overlays and let
+ * DOM order decide, which is exactly the silent failure this pins.
+ * `tests/unit/shell/sticky-header.test.ts` enforces the ordering.
+ *
+ * The `bg-n0` fill is now load-bearing, not decoration: it is fully opaque
+ * (#212121 over the #181818 ground), so content scrolling beneath cannot show
+ * through, and `--elev-1` separates the bar from that content.
+ *
  * Countdown (F2): the target is the BUILT `FREEZE_INSTANT_UTC` pin —
  * imported read-only from the markets service (never a duplicate constant)
  * — with the initial display computed here at request time so the client
@@ -67,7 +87,7 @@ export function GlobalHeader({
 	const initialDisplay = formatCountdown(Date.now(), targetMs);
 
 	return (
-		<header className="border-y bg-n0 shadow-(--elev-1)">
+		<header className="sticky top-0 z-40 border-y bg-n0 shadow-(--elev-1)">
 			<div className="mx-auto grid h-[60px] w-full max-w-[1440px] grid-cols-[1fr_auto_1fr] items-center gap-[18px] px-6">
 				<div className="flex items-center gap-2 justify-self-start">
 					<HeaderNav />
@@ -79,7 +99,7 @@ export function GlobalHeader({
 				<div className="flex items-center justify-self-end">
 					<DharmaCluster portfolio={portfolio} spendable={spendable} />
 					<IdentityCluster viewer={viewer} />
-					<span aria-hidden="true" className="mx-3 h-5 w-px bg-n2" />
+					<span aria-hidden="true" className="mx-3 h-[30px] w-px bg-n2" />
 					<VisitorCounter />
 				</div>
 			</div>

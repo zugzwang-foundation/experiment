@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 
+import { PageContainer } from "@/components/shell/PageContainer";
+
 /**
  * The `(public)` 404 — BRANDED: it renders inside the route-group layout and so
  * inherits `GlobalHeader`. (There is no footer to inherit — the page-level
@@ -21,9 +23,10 @@ import Link from "next/link";
  */
 export default function PublicNotFound(): React.JSX.Element {
 	return (
-		<div
+		<PageContainer
+			preset="notice"
 			data-testid="public-not-found"
-			className="mx-auto w-full max-w-3xl px-4 py-24 text-center"
+			className="text-center"
 		>
 			<h1 className="font-medium text-ink text-lg">Not found.</h1>
 			<p className="mt-2 text-n5 text-sm">
@@ -35,6 +38,6 @@ export default function PublicNotFound(): React.JSX.Element {
 			>
 				Back to markets
 			</Link>
-		</div>
+		</PageContainer>
 	);
 }

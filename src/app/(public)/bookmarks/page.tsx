@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
+import { PageContainer } from "@/components/shell/PageContainer";
 import { Badge } from "@/components/ui/badge";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
@@ -32,7 +33,7 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 	const items = await loadBookmarks(db, { viewerId });
 
 	return (
-		<main className="mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6">
+		<PageContainer preset="reading" className="flex flex-col gap-4">
 			<div className="flex flex-wrap items-center gap-2">
 				<h1 className="font-semibold text-ink text-lg">Bookmarks</h1>
 				<Badge variant="outline">Your bookmarks</Badge>
@@ -51,6 +52,6 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 					))}
 				</div>
 			)}
-		</main>
+		</PageContainer>
 	);
 }

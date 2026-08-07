@@ -16,7 +16,7 @@
 | **Staging** | push to **`staging`** branch | **staging** Supabase (`rwfdoqzsghqhhdapxafg`) | `staging.zugzwangworld.com` | **auto** — `staging-migrate.yml` (GHA) on push to `staging` |
 | **Production** | merge to **`main`** | **production** Supabase (`zbvprdcyxhlguxbostdj`) | `zugzwangworld.com` | **manual gate** — `db:migrate:prod` then promote (see §3, first exercised at D6) |
 
-Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0023`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
+Both DBs run the **same committed** `drizzle/migrations/` set (head currently `0024_bookmarks`). Migrations **never** run in the Vercel `buildCommand` — `buildCommand` stays plain `next build`.
 
 ---
 
@@ -80,6 +80,62 @@ Full reset (only if the sandbox is wedged): drop the staging schema → re-run `
 
 - **Repoint the staging branch (one-time, D3):** Vercel → **Settings → Environments → [Staging custom env] → Branch Tracking** → change the match from `main` to `staging`. (It is a match *rule*; the `staging` branch need not exist yet when you set it.)
 - **Disable Production auto-serve (one-time, D3):** Vercel → **Settings → Environments → Production → Branch Tracking** → toggle **OFF** "Auto-assign Custom Production Domains". Per Vercel's docs this affects only **future** pushes; it does **not** unassign the currently-live deployment's domain. **Do not trust the docs for this — prove it with an R2 before/after `/api/health` curl** (canary unchanged across the toggle; domain still serving).
+
+### 2.5 Advance staging — the standing post-merge step
+
+**No task owns this, which is exactly why it gets missed.** Advancing staging has never appeared in any build task's scope, plan, or kickoff, so skipping it fails nothing and reports nothing. By **2026-08-04** that had let **eight** merged commits accumulate on `main` un-deployed, with `origin/staging` still parked at the F-DEBATE-4 merge. Nothing was broken — staging was simply describing a `main` that no longer existed, which is worse, because it looks healthy. Treat this as a **standing step that runs after every merge to `main`**, owned by whoever merged.
+
+**Preconditions — prove all three before you push.** Each answers a question the push itself cannot, and (c) decides whether this section applies at all.
+
+```bash
+git fetch origin --prune
+
+# a. TREE IDENTITY — the merged tree is the one that passed review
+git diff --stat <reviewed-sha> origin/main                    # → must be EMPTY
+
+# b. FAST-FORWARDABILITY — staging holds nothing main lacks
+git log --oneline origin/main..origin/staging                 # → must be EMPTY
+
+# c. MIGRATION DELTA — is this a §2.5 advance or a §3 sequenced deploy?
+git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
+```
+
+- **(a) Tree identity.** EMPTY proves the squash-merged tree is byte-identical to the branch that was reviewed. A squash merge can land a tree that is *not* the reviewed one — an un-pushed local commit on the source branch is enough to do it — and staging is the wrong place to discover that. Cheap to check, and it also confirms the merge you think you are advancing is the merge that happened.
+- **(b) Fast-forwardability.** EMPTY means staging carries no commit `main` lacks. If it is not empty the push below is **rejected as a non-fast-forward**, which reads like a tooling failure when it is a **branch-state** problem — staging diverged, and something put a commit there that never went through `main`. Prove this first and that rejection never happens; if it fires anyway, find out why staging diverged before touching anything.
+- **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
+
+**The advance sequence.**
+
+```bash
+# 1. Fast-forward staging to the merged main
+git push origin origin/main:staging
+
+# 2. Watch the migrate job (§2.1 reaction 1) → GREEN
+gh run list --workflow=staging-migrate.yml --limit 1 \
+  --json databaseId,status,conclusion,headSha
+#    ↳ CONFIRM headSha == the SHA you just pushed, BEFORE trusting the verdict
+gh run watch <run-id>
+
+# 3. PRIMARY GATE — health (§1, §2.2)
+curl -s https://staging.zugzwangworld.com/api/health | jq
+```
+
+**`--limit 1` can hand you a stale run.** It returns the most recent run of that workflow, which is not necessarily *yours* — a run still queueing, a concurrent push, or a re-run of an older commit all put a different run at the top. Confirm the run's `headSha` equals the SHA you just pushed before reading its conclusion as your verdict. The `canary` gate catches this class of mistake at the **health** layer; nothing catches it at the **run** layer except this check.
+
+**Gate on `canary` == the merged SHA.** `canary` is the **bare 40-character commit SHA** — no `sha-` or `g` prefix, no short form, no `v`. Compare it verbatim against `git rev-parse origin/main`. A mismatch means the Vercel build has not finished or has not taken the alias yet: the step is **not** done, poll again. `env` must read `"staging"`; `db` and `migrations` must both read `"ok"`.
+
+**What green looks like — a no-op and an applied migration are nearly indistinguishable.** Both end in `[✓] migrations applied successfully!` and both mark the job green. The log does not announce "nothing to do". **Precondition (c) is what tells you which one to expect, and it only tells you beforehand** — read it as the expectation, then read the log against it.
+
+On a **fast-forward with no migration delta**, the *Migrate staging DB* step emits exactly two idempotent NOTICEs and **no DDL**:
+
+```
+code: '42P06',  message: 'schema "drizzle" already exists, skipping'
+code: '42P07',  message: 'relation "__drizzle_migrations" already exists, skipping'
+```
+
+**These are expected output, not errors.** They are Postgres reporting that `CREATE SCHEMA IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` found their objects already present — drizzle's own bookkeeping, re-run against an already-initialised database. A first read mistakes them for failures because they arrive as structured error-shaped objects with a `severity` field; `severity: 'NOTICE'` is the tell. If you see these two and nothing else, the run was a **no-op** and precondition (c) should have been EMPTY. Anything beyond them — `CREATE TABLE`, `ALTER TABLE`, a new `__drizzle_migrations` row — means DDL ran, and (c) should have been NOT EMPTY. **A mismatch between the two is the signal to stop and reconcile**, not to proceed to the health curl.
+
+**The health endpoint is the authority — not the migrate exit code.** `drizzle-kit migrate` can exit `0` with a migration unapplied (drizzle-orm #5769 — the silent high-water-mark skip), so a green `staging-migrate.yml` run is a **signal, not a verdict**. Only `migrations:"ok"` from `/api/health` proves the DB matches the committed set. This is the same rule §3 enforces at the production promote gate; staging earns no exemption from it for being resettable.
 
 ---
 
@@ -150,4 +206,4 @@ The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale 
 
 ---
 
-*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored section, finalized + first-exercised at D6 (2026-06-28). Maintained per `docs/maintenance.md`.*
+*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored section, finalized + first-exercised at D6 (2026-06-28). §2.5 (staging advance) was added at POLISH-1-DOCS and **first exercised 2026-08-04**; that run supplied its preconditions block, the run-selection check and the no-op-green note. Maintained per `docs/maintenance.md`.*

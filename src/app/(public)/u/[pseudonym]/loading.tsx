@@ -1,11 +1,12 @@
 import { ProfileLoading } from "@/components/profile/states";
+import { PageContainer } from "@/components/shell/PageContainer";
 
 /** The profile route's Suspense fallback — the W2.11 skeleton kit (§5 matrix).
  * Shows on client navigation to this uncached dynamic route. */
 export default function Loading() {
 	return (
-		<main className="mx-auto w-full max-w-3xl px-4 py-6">
+		<PageContainer preset="reading">
 			<ProfileLoading />
-		</main>
+		</PageContainer>
 	);
 }

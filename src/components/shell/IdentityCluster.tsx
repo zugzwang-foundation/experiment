@@ -11,8 +11,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  * UI.A5 — the A4 follow-up #2; a null pseudonym keeps a non-linked chip).
  * Avatar = the D8 placeholder for every author
  * (`/pfp-placeholder.svg`) + the mockup's 1-char fallback. The Đ cluster
- * (Portfolio/Balance) is A2/A3 — ratified OQ-2 defers it; the chip stands
- * alone in the signed-in right zone.
+ * (Portfolio/Balance) SHIPPED and stands beside this chip in the signed-in
+ * right zone — Balance at #283, Σ open-position value at #286 — and both
+ * figures render through the single shared display formatter, rounded and
+ * grouped (SPEC.1 §21.8, §10.8). The OQ-2 deferral this comment used to
+ * claim lapsed at #283.
  *
  * Signed-in/out selection is server-side in the layouts (plan §4.2) — this
  * component just renders the given viewer.

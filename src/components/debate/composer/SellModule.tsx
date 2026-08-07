@@ -7,9 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 import { SideBadge } from "../badges";
-import { formatDharmaExact } from "../format";
+import { formatDharma, formatDharmaExact } from "../format";
 import type { ViewerMarketContext } from "../types";
-import { COMPOSER_COPY, formatDharmaGrouped, rateLimitedBanner } from "./copy";
+import { COMPOSER_COPY, rateLimitedBanner } from "./copy";
 import { type ComposerStatus, ErrorStrip } from "./ErrorStrip";
 import { parseWireResponse } from "./envelope";
 import { isPositiveAmount } from "./gating";
@@ -228,7 +228,7 @@ export function SellModule(props: {
 
 	const receive =
 		quote !== null && quote.kind === "quote" && quote.data.kind === "sell"
-			? formatDharmaGrouped(String(quote.data.proceeds ?? "—"))
+			? formatDharma(String(quote.data.proceeds ?? "—"))
 			: null;
 
 	if (sold !== null) {

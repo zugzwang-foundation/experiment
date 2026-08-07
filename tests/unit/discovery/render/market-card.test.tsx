@@ -59,10 +59,14 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		expect(img.getAttribute("src")).toBe(IMAGE_URL);
 		// The question.
 		expect(screen.getByText(MARKET_TITLE).textContent).toBe(MARKET_TITLE);
-		// Stat line — formatDharma REUSED (no thousands separators in v1).
+		// Stat line — formatDharma REUSED, and it GROUPS: every Đ value rendered
+		// to a user groups its integer part in threes with a literal ASCII comma
+		// (SPEC.1 §10.8, 1.0.29 — the same-commit rider). The pre-ruling `Đ 14260`
+		// this line used to pin was a docket, not a baseline: discovery staked
+		// totals rendered ungrouped beside composers that grouped.
 		const statLine = screen.getByTestId("stat-line");
 		const statText = statLine.textContent ?? "";
-		expect(statText).toContain("Đ 14260 staked");
+		expect(statText).toContain("Đ 14,260 staked");
 		expect(statText).toContain("28 posts");
 		expect(statText).toContain("68 replies");
 		// Sparkline in card size.

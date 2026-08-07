@@ -47,7 +47,9 @@ just db-reset         # supabase db reset
 just test-db          # vitest run tests/db/ tests/invariants/
 ```
 
-Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/invariants/`), `pnpm test:integration` (`vitest run tests/integration/`), plus identity-pool seed/verify and staging migrate/seed/smoke scripts. There is **no `just db:up`** and **no all-in-one test recipe** — run `just test-db` and the `pnpm test:*` scripts as needed.
+Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/invariants/`), `pnpm test:integration` (`vitest run tests/integration/`), `pnpm test:scale` (opt-in, its own config), plus identity-pool seed/verify and staging migrate/seed/smoke scripts. There is **no `just db:up`** and **no all-in-one test recipe** — run `just test-db` and the `pnpm test:*` scripts as needed.
+
+**Staging operational scripts** — these point at the LIVE staging database and are **not tests** (§9, ADR-0036): `pnpm staging:reset` (guarded truncate, then re-seeds `identity_pool`) · `pnpm staging:generate` (the engine-driven fixture generator) · `pnpm staging:gates` (the six verification gates) · **`pnpm staging:rebuild`** (the composite: reset → seed → generate → gates). Each wraps `vitest.staging.config.ts` in `doppler run --config stg`; the write-capable ones additionally require an intent token in the environment.
 
 **Before claiming a change is done:** `just verify`. Critical-path work additionally runs the test suites above (CLAUDE.md §5.7).
 
@@ -72,8 +74,8 @@ experiment/
 │   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
-│   │   └── schema/                 #   12 files: _enums, audit, auth, bets, comments, dharma,
-│   │                               #   events, identity, image-uploads, index, markets, system
+│   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
+│   │                               #   dharma, events, identity, image-uploads, index, markets, system
 │   ├── lib/                        # auth-client, errors, utils, posthog/
 │   └── server/                     # server-side business logic
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
@@ -88,7 +90,8 @@ experiment/
 ├── scripts/                        # tsx operational scripts (seed, verify, migrate-staging, smoke)
 ├── supabase/                       # branch/snippet scratch only — NO migrations dir (RLS out of scope, ADR-0019)
 ├── biome.json, drizzle.config.ts, lefthook.yml, mise.toml, justfile,
-├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vitest.scale.config.ts, vercel.json
+├── next.config.ts, postcss.config.mjs, tsconfig.json, vitest.config.ts, vitest.scale.config.ts,
+│   vitest.staging.config.ts, vercel.json
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
@@ -150,7 +153,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 22 tables live across 10 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
+- **One file may hold several related tables.** 23 tables live across 11 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
 
 ### Reply-as-bet schema reality
 
@@ -168,7 +171,7 @@ const placeBetSchema = z.object({
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0023_positions_market_id_idx` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31)).
+- Current head: `0024_bookmarks` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31); 0024 = `bookmarks` (UI-A6 / ADR-0032, PR #254)).
 
 ### Transactions, queries, validation
 
@@ -213,14 +216,23 @@ tests/
 ├── integration/   20 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, debate-export, dharma-chain-drift-drain, dharma-ledger, email-otp-send, idempotency-cache — the former idempotency suite, renamed — market-by-slug, migration-drift, nightly-drift-resolution, onboarded-login-session, orphan-sweep, positions, precommit-moderate, rate-limit, resolution-conservation, sign-read, sign-upload, signup-create-path, upstash-lock)
 ├── invariants/    10 specs — see the Invariant-tests bullet below
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
+├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
 ├── server/        auth/ (incl. _probe-* + admin-login-result + email-otp-from-guard, AUDIT-FIX-B7b), bets/ (atomicity, concurrency, daily-credit, events-idempotency, idempotency-replay, moderation-outside-transaction, sell, subsequent-buy, validation + AUDIT-FIX-B3: sell-oversell, place-replay-durable, sell-replay-durable, release-failure, double-sell-chain), cron/ (close-due-markets — ENGINE.15, the first route-handler test convention), events/, identity/, middleware/, moderation/, resolution/ (happy-path, pro-rata, correction, void, concurrency, actor-assert), storage/ (incl. sign-route-envelope, AUDIT-FIX-B7b), admin/ (moderation/ + markets, pool-seed, resolution — each carries its ENGINE.15 wire-action blocks; + markets-media-sign-envelope, AUDIT-FIX-B7b), dharma/ (non-transferable)
-└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction)
+└── unit/          body-fingerprint, rate-limit-prefix, upstash-keys, upstash-redis-config (AUDIT-FIX-B7a — the A14 transport-bound config pins), idempotency-release (AUDIT-FIX-B3), bets/ (errors, floors, wire-envelope), cpmm/ (calculate + validate + vectors.test.ts + *.property.test.ts + _arbitraries.ts), markets/ (transitions.test.ts), positions/ (compute.test.ts), resolution/ (basis + basis.property), dharma/ (accrual, canonical, _probe-decimal-negzero, ledger, conservation, conservation-correction), staging/ (8 files — the guards that constrain the tests/staging/ runners WITHOUT touching a database: generator-no-direct-writes incl. the import allowlist, write-guard, runner-target, runner-gating, runner-isolation, reset-guard, guard-list-parity, fixture-table)
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
 - **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — 26 `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Scale** (opt-in, real test Postgres): `tests/scale/` is the correctness-at-scale battery (collision storms, hot-row contention, determinism under load — ENGINE.10 Q-2). It runs **only** via `pnpm test:scale` with its own `vitest.scale.config.ts`; the default config **excludes `tests/scale/**`** (`vitest.config.ts`), so a bare `vitest run` — local or CI — never picks it up.
+- **Operational runners** (opt-in, the LIVE staging database): `tests/staging/` holds non-test operational artifacts that borrow the Vitest harness for module resolution — ADR-0036. **THREE runners are on disk, not one:**
+  - `reset.staging.test.ts` — the guarded staging reset (ADR-0035). `pnpm staging:reset` (which `&&`-chains `db:seed:staging`, because the reset leaves `identity_pool` empty).
+  - `generate.staging.test.ts` — the **engine-driven fixture generator**. Drives `createOAuthUser` · `acceptTosAction` · `createMarket` · `openMarket` · `place` · `sell` · `closeMarket` · `triggerResolution` · `settleMarket` · `voidMarket` · `moderateComment` · `addBookmarkAction` · the R2 image chain, and writes **NOTHING** itself. `pnpm staging:generate`.
+  - `gates.staging.test.ts` — the **six verification gates** (event parity incl. G1.6 content parity and G1.7 flow-id parity · conservation · durable receipt integrity · coverage · magnitudes · zero-share). Emits `docs/polish/staging-coverage.json` and fails RED if it drifts from the committed copy. `pnpm staging:gates`.
+  - `fixtures.ts` — the literal fixture table (no RNG). `_lib/` holds the target resolver, the write-guarded and read-only clients, the guard predicates, the reset mechanism, and the gate-4 coverage inventory.
+  - **`pnpm staging:rebuild`** is the composite: reset → seed → generate → gates.
+- **Never mocked in a runner:** anything that writes a row or moves Dharma (ADR-0036 primitive 3). Only the HTTP/cookie shell may be — `next/headers`, `next/navigation`, `next/cache`, `verifyOnboardingRef`, `requireAdminSession`, `auth.api.getSession`. **`tests/unit/staging/generator-no-direct-writes.test.ts` pins an ALLOWLIST of the `@/server/**` entrypoints a runner may import**; adding a name to it is a decision, not an edit, and `@/server/events/insert` + `@/server/dharma/persist` are pinned as *not* ratified as its own positive control.
+- The default config **excludes `tests/staging/**`** exactly as it excludes `tests/scale/**`, so no bare `vitest run` — local, CI, or a subagent's — can reach a live database. Each runner additionally refuses to start unless the FIVE-guard contract passes (intent · target · environment · live connection · post-run verification — the G-5 intent token is the ADR-0035 Addendum's addition to primitive 6's four); the **write-capable** runners require the intent token, the read-only gates deliberately do not. Isolation is asserted by `tests/unit/staging/runner-isolation.test.ts`; the runners' gating shape by `runner-gating.test.ts`; the no-direct-writes rule behaviourally by `_lib/write-guard.ts` and textually by `generator-no-direct-writes.test.ts`; and the fixture table's own consistency — including the C3/C4 lane calibration, computed with the shipped pure `badgeFor` — by `fixture-table.test.ts`.
 - **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 10 on disk:
   - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
   - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).

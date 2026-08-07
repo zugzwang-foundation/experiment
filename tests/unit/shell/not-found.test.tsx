@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, render } from "@testing-library/react";
@@ -40,6 +40,14 @@ import RootNotFound from "@/app/not-found";
 afterEach(cleanup);
 
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
+
+/** Prose ABOUT a footer is documentation, not a footer (the established shape
+ * from tests/unit/design/no-raw-hex-view-layer.test.ts). */
+const stripComments = (source: string) =>
+	source
+		.replace(/\/\*[\s\S]*?\*\//g, "")
+		.replace(/^\s*\/\/.*$/gm, "")
+		.replace(/\/\/[^"'`\n]*$/gm, "");
 
 describe("T1 — not-found boundaries", () => {
 	it("root-variant-renders-no-global-header", () => {
@@ -97,18 +105,64 @@ describe("T1 — not-found boundaries", () => {
 		expect(rootLayout).not.toContain("GlobalHeader");
 	});
 
-	it("no-layout-mounts-a-footer", () => {
-		// Founder ruling 2026-08-02: the footer is RETIRED — no page-level footer
-		// on any surface. This is the guard against it returning. All three
-		// layouts, not just root: B4 had mounted it in BOTH group layouts, so a
-		// root-only assertion would miss the regression it is written to catch.
-		for (const rel of [
-			"src/app/layout.tsx",
-			"src/app/(public)/layout.tsx",
-			"src/app/(auth)/layout.tsx",
-		]) {
-			expect(read(rel)).not.toContain("SiteFooter");
-			expect(read(rel)).not.toContain("<footer");
+	it("no-surface-mounts-a-page-level-footer", () => {
+		// Founder ruling 2026-08-02: the footer is RETIRED — no PAGE-LEVEL footer
+		// on any surface. PRIMITIVES-1 C4(c) / ruling D8 replaces the predecessor's
+		// three-file literal loop with a glob over every layout and page under
+		// src/app/**, judging POSITION IN THE TREE rather than element name.
+		//
+		// Why not simply ban `<footer>`: two legitimate NESTED footers exist today
+		// — `(auth)/onboarding/page.tsx` inside its `<Card>`, and ReviewFeed's
+		// inside an `<article>` — so a name ban turns RED on correct markup the
+		// moment it lands. And why not depth: the onboarding footer is a DIRECT
+		// CHILD of the page's root element, so depth alone cannot separate it from
+		// a page-level one. ANCESTRY can, and that is the judgment made here.
+		//
+		// The predecessor proved almost nothing — it grepped two literals in three
+		// LAYOUTS, so a page-level footer under a novel component name in a PAGE
+		// file passed it (verified: P5's pass-before half). This version reddens on
+		// exactly that (P5) while staying green on the onboarding nested footer
+		// (P6, the precision half — a RED there means the guard is wrong, not the
+		// code).
+		const files = readdirSync(join(process.cwd(), "src/app"), {
+			recursive: true,
+			withFileTypes: true,
+		})
+			.filter(
+				(e) => e.isFile() && (e.name === "layout.tsx" || e.name === "page.tsx"),
+			)
+			.map((e) => join(e.parentPath, e.name));
+
+		// Alive check: 17 today (3 layouts + 14 pages). A glob that silently
+		// matched nothing would pass vacuously — the POLISH.1 z-index failure.
+		expect(files.length).toBeGreaterThanOrEqual(17);
+
+		// A footer inside any of these is CONTENT chrome, not page chrome.
+		const CONTAINERS = ["Card", "article", "section", "aside", "dialog", "li"];
+		const offenders: string[] = [];
+
+		for (const file of files) {
+			const source = stripComments(readFileSync(file, "utf8"));
+			for (const m of source.matchAll(/<footer\b/g)) {
+				const before = source.slice(0, m.index);
+				const nested = CONTAINERS.some((tag) => {
+					// `(?![\w-])` so `<Card` does not match `<CardHeader`, nor `<li`
+					// match `<link`.
+					const opens = before.match(new RegExp(`<${tag}(?![\\w-])`, "g"));
+					const closes = before.match(new RegExp(`</${tag}(?![\\w-])`, "g"));
+					return (opens?.length ?? 0) > (closes?.length ?? 0);
+				});
+				if (!nested) {
+					offenders.push(file.replace(`${process.cwd()}/`, ""));
+				}
+			}
+		}
+		expect(offenders).toEqual([]);
+
+		// Belt, retained from the predecessor and widened 3 → all 17 files: the
+		// retired component itself never returns, under its own name.
+		for (const file of files) {
+			expect(readFileSync(file, "utf8")).not.toContain("SiteFooter");
 		}
 	});
 });

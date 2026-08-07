@@ -1,4 +1,4 @@
-import { formatDharma } from "../format";
+import { round0Dharma } from "../format";
 import { ComposerDecimal } from "./sell-convert";
 
 /**
@@ -31,18 +31,24 @@ export function computeSplitBar(args: {
  * DISPLAYED (0-dp) Support and Counter figures, so the three adjacent numbers
  * on the bar are always arithmetically consistent on screen — the §23
  * tile-identity treatment applied to the Support / Total / Counter row. Each
- * part is rounded through the single shared display formatter, then summed as
- * exact decimals, never a JS float (CLAUDE.md §2). Distinct from
- * `computeSplitBar.totalDharma`, which is the EXACT sum (the bar-fill basis /
- * money-law contract): `round0(137.7) + round0(137.7) = 276`, not `round0(275.4) = 275`.
- * Both operands arrive pre-rounded (0 dp); `toFixed` pins ROUND_HALF_UP at the
- * call site so ComposerDecimal's inherited ROUND_HALF_EVEN default can never apply.
+ * part is rounded through `round0Dharma` — the UNGROUPED displayed-space
+ * primitive, NOT the render formatter — then summed as exact decimals, never a
+ * JS float (CLAUDE.md §2). That distinction is load-bearing since SPEC.1 §10.8
+ * (1.0.29): `formatDharma` now groups, and reading a grouped operand back is
+ * `new ComposerDecimal("1,234")`, which throws. Displayed-space identities must
+ * ADD BEFORE THEY GROUP; the caller groups the result at the render.
+ *
+ * Distinct from `computeSplitBar.totalDharma`, which is the EXACT sum (the
+ * bar-fill basis / money-law contract): `round0(137.7) + round0(137.7) = 276`,
+ * not `round0(275.4) = 275`. Both operands arrive pre-rounded (0 dp); `toFixed`
+ * pins ROUND_HALF_UP at the call site so ComposerDecimal's inherited
+ * ROUND_HALF_EVEN default can never apply.
  */
 export function displaySplitTotal(
 	supportDharma: string,
 	counterDharma: string,
 ): string {
-	return new ComposerDecimal(formatDharma(supportDharma))
-		.plus(formatDharma(counterDharma))
+	return new ComposerDecimal(round0Dharma(supportDharma))
+		.plus(round0Dharma(counterDharma))
 		.toFixed(0, ComposerDecimal.ROUND_HALF_UP);
 }

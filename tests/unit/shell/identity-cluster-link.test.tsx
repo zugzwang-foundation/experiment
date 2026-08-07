@@ -41,6 +41,24 @@ describe("UI.A5 §2 row 8 — identity chip → own /u/[pseudonym] (A4 follow-up
 		expect(container.querySelector('[aria-disabled="true"]')).toBeNull();
 	});
 
+	it("chip-avatar-ring-binds-the-token-and-drops-the-blend", () => {
+		// POLISH-1a V2. The ring lives on the Avatar ROOT's `::after`, so it is
+		// present on the image AND the fallback path — and the fallback is exactly
+		// where it used to vanish: `mix-blend-darken` takes the DARKER of ring and
+		// backdrop, and `AvatarFallback`'s `bg-muted` (n1) is darker than the n2
+		// ring, so the chip silently lost its edge whenever the placeholder image
+		// failed. jsdom cannot compute `::after`, so the class binding IS the
+		// assertion (AGENTS.md §9 — no jest-dom, plain DOM only).
+		const { container } = render(
+			<IdentityCluster viewer={{ pseudonym: PSEUDONYM }} />,
+		);
+		const avatar = container.querySelector('[data-slot="avatar"]');
+		expect(avatar).not.toBeNull();
+		const cls = avatar?.getAttribute("class") ?? "";
+		expect(cls).toContain("after:[border:var(--avatar-ring)]");
+		expect(cls).not.toContain("mix-blend-darken");
+	});
+
 	it("signed-out-renders-join", () => {
 		const { container } = render(<IdentityCluster viewer={null} />);
 		// The existing JOIN entry, UNCHANGED by the activation.

@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 
-import { formatPricePercent } from "../format";
+import { formatDharma, formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
-import { COMPOSER_COPY, formatDharmaGrouped, formatMultiplier } from "./copy";
+import { COMPOSER_COPY, formatMultiplier } from "./copy";
 
 /**
  * UI.A3 slice 4 — the post-view (reply page) column header: the ruling-1
@@ -68,14 +68,14 @@ export function PositionStrip({
 						>
 							<span>Your position</span>
 							<span className="font-mono text-xs tracking-normal text-ink normal-case">
-								Đ {formatDharmaGrouped(viewer.position.currentValue)}
+								Đ {formatDharma(viewer.position.currentValue)}
 							</span>
 						</Link>
 					) : (
 						<>
 							<span>Your position</span>
 							<span className="font-mono text-xs tracking-normal text-ink normal-case">
-								Đ {formatDharmaGrouped(viewer.position.currentValue)}
+								Đ {formatDharma(viewer.position.currentValue)}
 							</span>
 						</>
 					)

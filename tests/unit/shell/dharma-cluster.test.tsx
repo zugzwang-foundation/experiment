@@ -71,6 +71,24 @@ const VIEWER = { pseudonym: "RedFox001" };
 const PORTFOLIO_LABEL = "Portfolio";
 const BALANCE_LABEL = "Balance";
 
+/**
+ * DIRECT children of the right zone — and that scoping is LOAD-BEARING, not an
+ * implementation detail (POLISH-1a V10).
+ *
+ * There are now TWO `w-px` elements in the header subtree: this cluster's
+ * decorative `.sep` and the §21.1 register boundary in `GlobalHeader`'s right
+ * zone. SG6 describes the boundary as "the hairline `w-px` rule", which stopped
+ * being a unique description the moment the cluster shipped. The `w-px`
+ * `findIndex` calls below are still unambiguous ONLY because this returns
+ * `.children`: `.sep` is a GRANDCHILD (nested inside the cluster node) and
+ * never enters the array.
+ *
+ * So: do not widen this to `querySelectorAll`, and do not reach for
+ * `clusterElements` below to find a divider — that one IS a
+ * `querySelectorAll("*")` and WOULD match `.sep`. Either change makes the
+ * divider lookup ambiguous SILENTLY, which is the exact failure mode SG6
+ * exists to prevent.
+ */
 function rightZoneChildren(): Element[] {
 	const cluster = screen.getByTestId("dharma-cluster");
 	const zone = cluster.parentElement;
@@ -232,17 +250,20 @@ describe("T5 — two stats, Portfolio before Balance, one cluster glyph", () => 
 		// §10.8) and BOTH figures go through it — a raw NUMERIC(38,18) string in
 		// the header would read `2480.400000000000000000`.
 		const portfolio = statBlock(cluster, PORTFOLIO_LABEL);
-		expect(portfolio?.textContent).toContain("2480");
+		expect(portfolio?.textContent).toContain("2,480");
 		expect(portfolio?.textContent).not.toContain("2480.4");
 
 		const balance = statBlock(cluster, BALANCE_LABEL);
 		expect(balance?.textContent).toContain("610");
 		expect(balance?.textContent).not.toContain("610.4");
 
-		// R4 — UNGROUPED, matching the §23 Positions-value tile and the shipped
-		// Balance. The mockup's `Đ 2,480` is tier-4 illustrative; grouping is
-		// class R, routed to POLISH.
-		expect(cluster.textContent).not.toContain("2,480");
+		// GROUPED — SPEC.1 §10.8 (1.0.29), landed in the same commit as the code
+		// it governs. This line previously pinned the UNGROUPED render and said so
+		// in its own comment ("grouping is class R, routed to POLISH"): a docket
+		// against a pre-ruling state, not a baseline. The rule now exists, so the
+		// mockup's `Đ 2,480` is what the header renders — grouping is a property
+		// of the single shared display formatter, not a per-surface choice.
+		expect(cluster.textContent).toContain("2,480");
 	});
 
 	it("carries-exactly-one-standalone-cluster-glyph", () => {

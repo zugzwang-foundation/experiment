@@ -1,0 +1,1 @@
+POLISH lane canon — the method (`POLISH-0.md`), its data manifest (`POLISH-0_data-manifest.md`, STAGING-PARITY's build target), the defect register (`POLISH-register.md`), and the rows staged for apply against it (`POLISH-register-ADDITIONS.md`). Committed 2026-08-05; GitHub is canonical, PK is the mirror.

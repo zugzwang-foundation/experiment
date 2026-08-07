@@ -100,7 +100,13 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// Market panel carries question + stat line + the reused PriceBar.
 		expect(screen.getByText(MARKET_TITLE).textContent).toBe(MARKET_TITLE);
 		const statText = screen.getByTestId("stat-line").textContent ?? "";
-		expect(statText).toContain("Đ 14260 staked");
+		// The SAME shared `StatLine` the card renders, so it GROUPS here too:
+		// every Đ value rendered to a user groups its integer part in threes with
+		// a literal ASCII comma (SPEC.1 §10.8, 1.0.29 — the same-commit rider).
+		// The pre-ruling `Đ 14260` this line used to pin was a docket, not a
+		// baseline: discovery staked totals rendered ungrouped beside composers
+		// that grouped. Inverted with market-card.test.tsx:65 (ruling R-K).
+		expect(statText).toContain("Đ 14,260 staked");
 		expect(screen.getByRole("img", { name: "YES 38%, NO 62%" })).toBeTruthy();
 	});
 

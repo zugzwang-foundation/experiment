@@ -413,3 +413,175 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Every PR that adds or edits a read over `comments` on any surface (participant OR admin). Reviewer + `@security-auditor` checklist item.
 
 **Expected next task.** No fix owed — this PR closed the review-feed instance and the audit page was verified clean. This entry is the durable guard so the lesson isn't re-learned.
+
+## STAGING-PARITY Slice A — `PRODUCTION_PROJECT_REF` liveness (rotation is a process control)
+
+**Originating task:** STAGING-PARITY Slice A Gate C, Q-A ruling (2026-08-06). Sits alongside **AUDIT-FIX-B2 OQ-2** above — same family: both are the owner-privilege reality that the guarded reset (ADR-0035) is built on top of rather than closing.
+
+**The row, as ruled:**
+
+> Supabase project restore or ref change → update `PRODUCTION_PROJECT_REF`
+> (`tests/staging/_lib/guards.ts`) and re-verify the guard. Class R.
+> The constant is the single code copy of the production ref; nothing
+> detects that it has gone stale. Trigger: any Supabase project restore,
+> migration, or ref change on either project.
+
+**Why a test cannot own this.** `reset-guard.test.ts` builds its synthetic production URL by INTERPOLATING the constant, so it is satisfied by whatever value the constant holds — a stale one included. It proves the refusal PATH works and (via a `/^[a-z0-9]{20}$/` shape assertion) catches a blanked, truncated or placeholder constant. It cannot detect rotation. Hardcoding the literal a second time was considered and rejected: both copies would go stale together, and it would cost the single-code-constant property.
+
+**Blast radius if it does go stale — smaller than it first looks.** G-1's **positive** fragment match is the primary protection: the reset proceeds only when the URL carries the **staging** ref, which does not depend on knowing production's name at all. The name-based production refusal is the SECOND net, and its job is to make the wrong-target case *report itself correctly* — "this is PRODUCTION" rather than "wrong fragment". A stale constant therefore degrades the error message, not the refusal.
+
+**Conditional trigger.** Any Supabase project restore, project migration, or ref change on either the staging or the production project.
+
+**Expected next task.** Runbook-owned — a step in `docs/runbooks/deploy-pipeline.md`'s project-identity procedure, or its own HARDEN row. Full reasoning is in `docs/logs/STAGING-PARITY-A.md` under *Q-A*; this entry is the tracking, that one is the argument.
+
+## STAGING-PARITY Slice B — ADR-0031's `bet_receipts` derivability claim is unverified
+
+**Originating task:** STAGING-PARITY Slice B → manifest v1.3 (2026-08-06). Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a claim a slice can record but must not discharge.
+
+**The row, as ruled:**
+
+> ADR-0031 excludes `bet_receipts` from the 2026-11-06 dataset on the
+> grounds that its content is "fully derivable from `events` + `pools`".
+> Nothing verifies that claim. Class R, owned by the DATASET RELEASE task,
+> NOT by STAGING-PARITY: verifying derivability means implementing the
+> derivation, which is a second implementation of what the engine does and
+> is forbidden by manifest §1.1. Trigger: dataset release scoping.
+
+**Why STAGING-PARITY cannot own it.** Manifest §1 constraint 1 forbids a second event-writing implementation precisely because it becomes a divergent source of truth. Verifying "derivable from `events` + `pools`" requires writing that derivation — reconstructing `newPrice` and the response body from the log — which is the same prohibited shape pointed the other way. The v1.3 C1 amendment is the adjacent finding: `loadDurableReplay` stores `newPrice` rather than re-deriving it *because* re-derivation was judged not worth doing, and that judgement is exactly what the exclusion claim leans on.
+
+**Conditional trigger.** Dataset release scoping — the point at which the 2026-11-06 table set is fixed and each exclusion must justify itself.
+
+**Expected next task.** DATASET RELEASE. Full context is manifest §0 v1.3 C1 and ADR-0031; this entry is the tracking.
+
+## STAGING-PARITY Slice C/D — `identity_pool` FIFO consume has no tiebreak
+
+**Originating task:** STAGING-PARITY Slices C+D (2026-08-06), open question 1. Third in the family above — a control that holds today for a reason no assertion states.
+
+**The row, as ruled:**
+
+> `consumeIdentityPoolTuple` orders by `created_at ASC` with **no tiebreak**
+> (`src/server/identity-pool/consume.ts:32`). It is deterministic only because
+> `scripts/seed-staging.ts` inserts its 200 tuples **serially**, one statement
+> per row, so every `created_at` differs. A batched or parallelised seed can
+> produce ties, making consume order nondeterministic — which silently breaks
+> pseudonym reproducibility and therefore the coverage list, with nothing
+> reporting it. Class R. Trigger: any change to the seed's insert strategy.
+
+**Why nothing catches it.** The property is not "the pool is seeded" — it is "the pool's rows have distinct `created_at`", and no test asserts that. `staging:rebuild`'s reproducibility check (gate 4's drift comparison) would go RED *after* the fact, but it cannot say why: a shuffled pseudonym assignment reads as a coverage-list change, not as a seed-ordering defect. The failure is also **intermittent by nature** — ties only sometimes reorder — so a single green rebuild proves nothing.
+
+**Blast radius.** Every `/u/<pseudonym>` URL in `docs/polish/staging-coverage.json` and in `POLISH-register.md`'s standing reference is keyed to a role→pseudonym mapping that FIFO order fixes. Lose the order and the whole coverage list points at the wrong profiles — silently, because each URL still resolves to *a* real user. Slice C/D verified the current state (200 rows, **200 distinct `created_at`**), so this is a forward obligation, not a present defect.
+
+**Conditional trigger.** Any change to `scripts/seed-staging.ts`'s insert strategy — batching, a multi-row `VALUES`, `COPY`, or parallelism. Also any new seed path that populates `identity_pool`.
+
+**Expected next task.** Either a tiebreak in `consume.ts` (`ORDER BY created_at ASC, id ASC` — `id` is UUIDv7, so it is already monotonic and costs nothing), or an assertion that the seeded pool carries distinct timestamps. The first is strictly better: it makes the ordering total regardless of how the pool was filled. Evidence is in `docs/logs/STAGING-PARITY-CD.md` under *Open questions*; this entry is the tracking.
+
+## STAGING-PARITY Slice A — an `events` partition added without its truncate guard is invisible
+
+**Originating task:** STAGING-PARITY Slice A, overnight mutation sweep (2026-08-06), GROUP 5 item 9. Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a control that no assertion in the slice can hold, recorded rather than left silently unproven.
+
+**The row, as ruled:**
+
+> A new `events` partition added without its `bucket_a_no_truncate` guard is
+> invisible to every assertion in Slice A, because guard-list parity derives
+> from the same migration SQL that would be missing the guard. Class R.
+> Trigger: any migration adding an `events` partition or a protected table.
+> Cross-reference ADR-0030's forward obligation.
+
+**Why no assertion can catch it.** `tests/unit/staging/guard-list-parity.test.ts` is deliberately built so that *the migrations are the authority* — it parses every `.sql` on disk and derives the expected guard set from them. That is the right design for detecting drift **between the constant and the migrations**, and it is exactly why it cannot detect a migration that is **itself** wrong: both sides move together and agree. `EXPECTED_GUARD_CATALOG_ROWS` is derived the same way, so it moves too. And the integration suite's "accounts for every public base table" query — the assertion that *does* catch a new **non-partition** protected table appearing in none of the three lists — explicitly excludes `events\_%`, so a partition is outside its reach as well.
+
+**Blast radius.** A reset would then truncate the partition **because** it is unguarded — the `TRUNCATE … CASCADE` succeeds where a guarded partition would abort the batch — and nothing reports the omission. The row loss is not the concern (partitions are in the truncate set by design); the concern is that the partition sits **outside the Bucket-A append-only contract** in normal operation, where `UPDATE`/`DELETE` on it would also be unguarded. Statement-level triggers do **not** clone to partitions (ADR-0030, verified via `tgparentid`), which is the whole reason each partition must carry its own by name.
+
+**Conditional trigger.** Any migration that adds an `events` partition, or that adds a protected table. This is ADR-0030's standing forward obligation, restated as a docket row because the mutation sweep established that no test enforces it for the partition case.
+
+**Expected next task.** Process-owned, not code — a checklist line in the partition-migration procedure and a `@db-migration-reviewer` check. Evidence is in `docs/logs/STAGING-PARITY-A-mutation-audit.md` under *GROUP 5 · item 9*; this entry is the tracking, that one is the argument.
+
+## POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`
+
+**Originating task:** POOL-2 (2026-08-08), STEP 1a. Surfaced while trying to obtain a real staging session cookie for the authenticated reproduction probe; the probe could not be completed because of it.
+
+**The row, as ruled:**
+
+> The one live staging session (`RedFox000`) cannot be resolved by a cookie
+> signed with `BETTER_AUTH_SECRET` as read from Doppler `stg`. Signing was done
+> with Better Auth's own `createHMAC("SHA-256","base64urlnopad")` and verified
+> byte-identical to a Node `createHmac(...).digest("base64url")`, so the
+> algorithm is not in question. `GET /api/auth/get-session` returns `null` for
+> every cookie form tried. Class R. Trigger: before DP.2's production promote.
+
+**Why this is the same family as the Sentry drift.** `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG` and `SENTRY_PROJECT` are present in the Vercel `staging` environment and **absent from Doppler `stg`**. That is proven drift in one direction. `BETTER_AUTH_SECRET` is present in both, so if the *values* differ this is drift of a second, worse kind — one that no name-level parity check can see. `scripts/vercel-env-audit.ts` and `env-audit.yml` compare presence, not values.
+
+**⚠ The consequence, stated explicitly.** If Doppler→Vercel sync is unreliable for one variable, **DP.2's production promotion inherits that risk on every variable.** A prod promote assumes the Doppler `prd` config is what the deployment actually runs. Nothing today proves that for any single secret, and `BETTER_AUTH_SECRET` is the one whose divergence is silent: the app boots, serves, and issues cookies normally — it simply cannot validate sessions signed against the other value. **This must be verified BEFORE the prod promote, not during it.** A promote that discovers it afterwards has already signed out every production participant.
+
+**Why it cannot be settled from here.** Vercel environment values are write-only once set (`vercel env ls` / `inspect` surface metadata only), so the two values cannot be compared directly by any read available to a CC session. Verification has to be functional — mint a session through the deployed app itself and check that a Doppler-signed cookie validates — or operator-side in the dashboard.
+
+**Conditional trigger.** Before DP.2's production promote; also on any change to the Doppler↔Vercel sync configuration.
+
+**Expected next task.** A value-level parity check for the secrets that cannot fail loudly (`BETTER_AUTH_SECRET` first), or a functional assertion in the deploy gate that a freshly-issued session cookie validates. Evidence is in `docs/logs/POOL-1.md` §2.1; this entry is the tracking.
+
+## POOL-2 — the Sentry routing smoke check is a lookalike, three times over
+
+**Originating task:** POOL-1 (2026-08-07), STEP 1a. Three independent defects in a single control, each alone sufficient to make it a V-3 lookalike — a gate that reports success while asserting nothing.
+
+**The row, as ruled:**
+
+> `scripts/smoke-staging.ts` item 9 (`sentry-routing`) cannot pass for three
+> independent reasons: (1) the route it triggers, `/api/_smoke-error`, can
+> never route — the `_` prefix makes `src/app/api/_smoke-error/` a Next.js App
+> Router *private folder*, excluded from routing; (2) the item skips whenever
+> `SENTRY_ORG` is unset, and `SENTRY_ORG` is absent from Doppler `stg`, so it
+> has always skipped; (3) it asserts against the project `zugzwang-prod`, which
+> does not exist — the org `zugzwang-foundation` contains only
+> `zugzwang-staging` and `zugzwang-experiment`. Class R, scripts-only fix.
+
+**Why each alone is sufficient.** Fix the skip and it fails on a 404 that is not an error signal. Fix the route and it still queries a project that does not exist. Fix the project slug and it still skips. **Three defects, one control, and any single one of them makes the gate a lookalike** — which is why this is recorded as one row rather than three: the lesson is about the control, not the lines.
+
+**Evidence, each verified.** `curl https://staging.zugzwangworld.com/api/_smoke-error` returns Next's own `/404` (`x-matched-path: /404`, the branded `data-testid="root-not-found"` body), and the build manifest `.next/server/app/api/` lists `auth bets cron health uploads visits` with no `_smoke-error`. The skip is `scripts/smoke-staging.ts:259`. The project list came from the Sentry API with the `stg` token.
+
+**Blast radius.** `docs/runbooks/deploy-pipeline.md` §3 treats the staging smoke as a promote gate. For Sentry routing specifically that gate has never asserted anything, which is why the server-side SDK's delivery status is still unknown after two sessions — nothing was ever positioned to notice.
+
+**Conditional trigger.** Before relying on the staging smoke as a Sentry gate; or whenever the server-side SDK delivery question (`docs/logs/POOL-1.md` §5.1) is taken up.
+
+**Expected next task.** Scripts-only: correct the project slug, add `SENTRY_ORG` to Doppler `stg`, and replace the `_smoke-error` assertion with one that asserts real delivery. The route rename is **not** enough on its own and should not be done alone. Evidence is in `docs/logs/POOL-1.md` §5; this entry is the tracking.
+
+## PERF-1 — Discovery serves in ~35 s · **GO-LIVE BLOCKER**
+
+**Originating task:** POOL-1 / POOL-2 (2026-08-08). Opened by founder ruling at the POOL-1 close. **Go-live is 2026-09-15 — 38 days out.** POOL-1 closes as DIAGNOSED, NOT FIXED; **this row is the remedy**, and `POLISH.1` is sequenced *below* it.
+
+**The row, as ruled:**
+
+> Discovery (`/`) serves in **~35 s at concurrency 1**, reproduced four times
+> (35.09 / 35.33 / 35.15 / 37.28 s). **41 sequential DB round-trips across two
+> nested loops** — `listOpenMarkets` issues 1 + 3N (`src/server/discovery/list.ts:48–63`)
+> and `DiscoveryContent` a further 2N over the same cards
+> (`src/app/(public)/page.tsx:59–65`); at `DISCOVERY_GRID_SIZE = 8` that is
+> 1 + 24 + 16. **Only the first query is genuinely ordered** — it supplies the
+> ids; everything after is per-market and independent, and the source says so
+> itself ("grouped-query batching is the OQ-1 C follow-up's optimization").
+> `force-dynamic` (`page.tsx:19`) **stands in for a deferred cache policy, not
+> for correctness.** Profile (`/u/[pseudonym]`) is the *good* shape and still
+> takes 6.2 s — parallelism at the wrong granularity: three concurrent chains
+> (`page.tsx:63`), each internally serial (`positions.ts` alone is 8 sequential
+> statements). Class R.
+
+### ⚠ Carry this open thread verbatim — do not begin by assuming batching fixes it
+
+> **41 round-trips do not account for 35 seconds.** They account for the *warm*
+> figure — under concurrency the same route serves p50 ≈ 1.1 s, which is
+> consistent with 41 sequential trips at ~27 ms each. The cold figure implies
+> ~857 ms per trip, which is not. **A large one-time cold cost sits underneath
+> the sequential structure and the trace does not explain it.** PERF-1 must
+> **not** begin assuming batching alone fixes it — find the cold cost first, or
+> the batching work will land and the page will still be slow on the path that
+> matters.
+
+### ⚠ And: slot-seconds, not peak count, is what exhausts the pool
+
+Batching **RAISES peak concurrent connections** and **COLLAPSES hold time**. Discovery goes from **1 slot × ~35 s** to roughly **2–3 slots × well under 1 s**; profile from ~19 slot-seconds to ~4. That is **worse on the axis POOL-2 was measuring and ~12× better on the axis that actually matters** against a 15-slot pooler.
+
+**State this wherever PERF-1's result is judged.** A reviewer holding POOL-2's framing will see peak connections go up and read it as a regression. It is not. The pooler exhausts on slot-**seconds**; a single discovery load holding one slot for 35 s costs the pool more than five loads holding five slots for one second.
+
+**Why it is a go-live blocker and not an optimisation.** It is the mechanism behind the POOL-1 incident, not a separate performance concern — `docs/logs/POOL-1.md` §4.1 shows five overlapping discovery renders holding five slots simultaneously during ordinary walkthrough navigation, which is what exhausted the pool. It also **blocks POLISH.1–.8**, which inspect surfaces through a browser: a 35-second front page makes visual inspection impractical and any timing observation meaningless. And the founder has ruled **against** upsizing compute to raise the ceiling, precisely because that would mask this until production.
+
+**Conditional trigger.** Now — it is sequenced above POLISH.1.
+
+**Expected next task.** PERF-1 as its own ratified task. Evidence and the full findings table are in `docs/logs/POOL-1.md` §6; this entry is the tracking.

@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import type { Side } from "@/lib/ranking";
 import type { ExportMarketMeta } from "@/server/debate-export/market-meta";
 import {
-	formatDharmaGrouped,
+	formatDharmaExportGrouped,
 	serializeDebateExport,
 } from "@/server/debate-export/serialize";
 import type {
@@ -23,7 +23,7 @@ import {
 
 // EXPORT.1 §5.6 tests-first — the serializer is the identity-non-leak boundary
 // (debate-export.md §10, SAFETY-CRITICAL). VALUE imports `serializeDebateExport`
-// + `formatDharmaGrouped` resolve against the GREENFIELD `@/server/debate-export/
+// + `formatDharmaExportGrouped` resolve against the GREENFIELD `@/server/debate-export/
 // serialize` (not built until the writer lands it) → RED at collection on the
 // missing module, NOT on a fixture typo. PURE: no DB, no clock, no IO (the
 // serializer takes `exportedAt` injected) — runnable as a unit test.
@@ -638,18 +638,20 @@ describe("serializeDebateExport — market with no pool", () => {
 	});
 });
 
-// ── 9. Formatter units — `formatDharmaGrouped` (string-based, NUMERIC-safe) ───
+// ── 9. Formatter units — `formatDharmaExportGrouped` (string-based, NUMERIC-safe) ───
 
-describe("formatDharmaGrouped — export-only thousands grouping", () => {
+describe("formatDharmaExportGrouped — export-only thousands grouping", () => {
 	it("debate-export-formatter::groups-integer-thousands", () => {
-		expect(formatDharmaGrouped("3225.000000000000000000")).toBe("3,225");
-		expect(formatDharmaGrouped("560.000000000000000000")).toBe("560");
-		expect(formatDharmaGrouped("1234567.000000000000000000")).toBe("1,234,567");
+		expect(formatDharmaExportGrouped("3225.000000000000000000")).toBe("3,225");
+		expect(formatDharmaExportGrouped("560.000000000000000000")).toBe("560");
+		expect(formatDharmaExportGrouped("1234567.000000000000000000")).toBe(
+			"1,234,567",
+		);
 	});
 
 	it("debate-export-formatter::sub-thousand-unchanged", () => {
-		expect(formatDharmaGrouped("0.000000000000000000")).toBe("0");
-		expect(formatDharmaGrouped("999.000000000000000000")).toBe("999");
+		expect(formatDharmaExportGrouped("0.000000000000000000")).toBe("0");
+		expect(formatDharmaExportGrouped("999.000000000000000000")).toBe("999");
 	});
 
 	it("debate-export-formatter::keeps-trimmed-fractional-remainder", () => {
@@ -657,6 +659,8 @@ describe("formatDharmaGrouped — export-only thousands grouping", () => {
 		// `format.ts::formatDharma`, but with comma grouping). See @test-writer
 		// return: the fractional contract was UNDERSPECIFIED in the plan — this
 		// asserts the formatDharma-consistent interpretation; confirm at review.
-		expect(formatDharmaGrouped("1234.560000000000000000")).toBe("1,234.56");
+		expect(formatDharmaExportGrouped("1234.560000000000000000")).toBe(
+			"1,234.56",
+		);
 	});
 });

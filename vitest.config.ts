@@ -50,6 +50,14 @@ export default defineConfig({
 		// required gate component, NOT part of the fast default `vitest run`,
 		// `test:invariants`, or `test:integration` sweeps. Exclude it here so those
 		// runs never pick up the heavy `*.scale.test.ts` collision storms.
-		exclude: [...configDefaults.exclude, "tests/scale/**"],
+		//
+		// STAGING-PARITY Slice A / ADR-0036 primitive 2: `tests/staging/` holds
+		// OPERATIONAL RUNNERS pointed at the LIVE STAGING DATABASE — the reset
+		// truncates every fixture table. They run only via
+		// vitest.staging.config.ts. This exclusion is the structural control
+		// that keeps a bare `vitest run` — local, CI, or a subagent's — from
+		// ever reaching a live database; it is asserted by
+		// tests/unit/staging/runner-isolation.test.ts. Do not remove it.
+		exclude: [...configDefaults.exclude, "tests/scale/**", "tests/staging/**"],
 	},
 });
