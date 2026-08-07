@@ -1,13 +1,19 @@
 # STAGING-PARITY — close-out DRAFT
 
-> ⚠ **THIS IS NOT THE CLOSE-OUT.** D.5 records the D.4 walkthrough's OUTCOME,
-> and the walkthrough has not been run. This file is the holding document for
-> rulings made *before* it, so they are not carried in a chat that ends.
+> ✅ **PROMOTED — this draft is SUPERSEDED. The close-out is
+> [`STAGING-PARITY-closeout.md`](./STAGING-PARITY-closeout.md) (D.5, 2026-08-08).**
 >
-> **Do not promote this to `STAGING-PARITY-closeout.md` until D.4 reports.**
+> D.4's walkthrough ran and its outcome is recorded there: **6 of 10 routes
+> failed**, diagnosed as POOL-1 / PERF-1 and **ruled application defects the
+> fixture set surfaced**, not fixture defects.
 >
-> **Status:** accumulating. Opened 2026-08-07 IST, after Slices C+D merged
-> (`5547727`, PR #301) and before D.4.
+> **Kept, not deleted.** The four rulings below are the primary record of
+> decisions made *before* the walkthrough reported, and the close-out cites
+> them rather than restating them — L-8's full text in particular lives here.
+> Read this for the arguments; read the close-out for the state.
+>
+> **Status:** closed. Opened 2026-08-07 IST after Slices C+D merged (`5547727`,
+> PR #301); promoted 2026-08-08.
 
 ---
 

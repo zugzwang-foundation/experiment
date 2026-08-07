@@ -542,3 +542,46 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Before relying on the staging smoke as a Sentry gate; or whenever the server-side SDK delivery question (`docs/logs/POOL-1.md` §5.1) is taken up.
 
 **Expected next task.** Scripts-only: correct the project slug, add `SENTRY_ORG` to Doppler `stg`, and replace the `_smoke-error` assertion with one that asserts real delivery. The route rename is **not** enough on its own and should not be done alone. Evidence is in `docs/logs/POOL-1.md` §5; this entry is the tracking.
+
+## PERF-1 — Discovery serves in ~35 s · **GO-LIVE BLOCKER**
+
+**Originating task:** POOL-1 / POOL-2 (2026-08-08). Opened by founder ruling at the POOL-1 close. **Go-live is 2026-09-15 — 38 days out.** POOL-1 closes as DIAGNOSED, NOT FIXED; **this row is the remedy**, and `POLISH.1` is sequenced *below* it.
+
+**The row, as ruled:**
+
+> Discovery (`/`) serves in **~35 s at concurrency 1**, reproduced four times
+> (35.09 / 35.33 / 35.15 / 37.28 s). **41 sequential DB round-trips across two
+> nested loops** — `listOpenMarkets` issues 1 + 3N (`src/server/discovery/list.ts:48–63`)
+> and `DiscoveryContent` a further 2N over the same cards
+> (`src/app/(public)/page.tsx:59–65`); at `DISCOVERY_GRID_SIZE = 8` that is
+> 1 + 24 + 16. **Only the first query is genuinely ordered** — it supplies the
+> ids; everything after is per-market and independent, and the source says so
+> itself ("grouped-query batching is the OQ-1 C follow-up's optimization").
+> `force-dynamic` (`page.tsx:19`) **stands in for a deferred cache policy, not
+> for correctness.** Profile (`/u/[pseudonym]`) is the *good* shape and still
+> takes 6.2 s — parallelism at the wrong granularity: three concurrent chains
+> (`page.tsx:63`), each internally serial (`positions.ts` alone is 8 sequential
+> statements). Class R.
+
+### ⚠ Carry this open thread verbatim — do not begin by assuming batching fixes it
+
+> **41 round-trips do not account for 35 seconds.** They account for the *warm*
+> figure — under concurrency the same route serves p50 ≈ 1.1 s, which is
+> consistent with 41 sequential trips at ~27 ms each. The cold figure implies
+> ~857 ms per trip, which is not. **A large one-time cold cost sits underneath
+> the sequential structure and the trace does not explain it.** PERF-1 must
+> **not** begin assuming batching alone fixes it — find the cold cost first, or
+> the batching work will land and the page will still be slow on the path that
+> matters.
+
+### ⚠ And: slot-seconds, not peak count, is what exhausts the pool
+
+Batching **RAISES peak concurrent connections** and **COLLAPSES hold time**. Discovery goes from **1 slot × ~35 s** to roughly **2–3 slots × well under 1 s**; profile from ~19 slot-seconds to ~4. That is **worse on the axis POOL-2 was measuring and ~12× better on the axis that actually matters** against a 15-slot pooler.
+
+**State this wherever PERF-1's result is judged.** A reviewer holding POOL-2's framing will see peak connections go up and read it as a regression. It is not. The pooler exhausts on slot-**seconds**; a single discovery load holding one slot for 35 s costs the pool more than five loads holding five slots for one second.
+
+**Why it is a go-live blocker and not an optimisation.** It is the mechanism behind the POOL-1 incident, not a separate performance concern — `docs/logs/POOL-1.md` §4.1 shows five overlapping discovery renders holding five slots simultaneously during ordinary walkthrough navigation, which is what exhausted the pool. It also **blocks POLISH.1–.8**, which inspect surfaces through a browser: a 35-second front page makes visual inspection impractical and any timing observation meaningless. And the founder has ruled **against** upsizing compute to raise the ceiling, precisely because that would mask this until production.
+
+**Conditional trigger.** Now — it is sequenced above POLISH.1.
+
+**Expected next task.** PERF-1 as its own ratified task. Evidence and the full findings table are in `docs/logs/POOL-1.md` §6; this entry is the tracking.
