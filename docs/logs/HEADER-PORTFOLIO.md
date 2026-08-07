@@ -5,18 +5,21 @@
 > **Plan:** `docs/plans/HEADER-PORTFOLIO.md`, PR #284, merged `a86d614`, ratified 2026-08-02
 > **Spec gate:** SPEC.1 **1.0.26 → 1.0.27** — §21.8 minted in this PR, the same-commit rider
 > **Model:** `claude-opus-5[1m]`, effort `max`. Subagent pins verified `claude-opus-5` / `max` in this worktree before dispatch.
+> **Status: CLOSED.** PR #286 squash-merged to `main` at **`d19ea6f`**, 2026-08-03T12:25:16Z. Gate C PASSED.
 
 ---
 
 ## A note on SHAs in this log
 
-The merge is **squash-to-main**, so **no SHA below reaches `main`.** Every one is a branch-local working SHA. **The durable reference is the squash-merge SHA on `main`, recorded at close-out — not here.**
+The merge is **squash-to-main**, so **no working SHA below reaches `main`.** Every one in the table is branch-local and now unreachable — the branch is deleted. **The durable reference is the squash SHA `d19ea6f`.**
+
+`git log --format=%G?` on `d19ea6f` reports **`N`** with `cannot run gpg`. That is NOT an unsigned commit: GitHub signs squash merges with its own GPG web-flow key, while this repo's git is configured `gpg.format=ssh`, so the local verifier cannot read a GPG signature at all. Every commit authored on the branch was SSH-signed **`G`**. A format mismatch in the verifier, not a signing gap — do not "fix" it, and do not read a future `N` on a squash commit as a problem.
 
 ---
 
 ## What landed
 
-**PR #286 — `feat/header-portfolio`** (7 commits, all SSH-signed, author `Zugzwang/world`, no `Co-authored-by`):
+**PR #286 — `feat/header-portfolio` → squashed to `main` as `d19ea6f`.** 13 commits, all SSH-signed `G`, author `Zugzwang/world`, no `Co-authored-by`:
 
 | Working SHA | Slice | What |
 |---|---|---|
@@ -25,11 +28,20 @@ The merge is **squash-to-main**, so **no SHA below reaches `main`.** Every one i
 | `8026cf7` | **S3** | `DharmaCluster` (`git mv` from `BalanceCluster`) + `GlobalHeader` prop |
 | `3178e91` | **S4** | the `Promise.all` wiring + SPEC.1 §21.8 rider + SHELL-COMPLETE §5.1 |
 | `c06f7a4` | **review** | `@code-reviewer` remediation — MEDIUM-1 test + LOW-7 date |
-| `a79f61c` | **log** | this file, then one follow-up recording PR #286 + the CI run |
+| `a79f61c` | **log** | this file, first cut |
+| `f445730` | **log** | records PR #286 |
+| `b8ae117` | **Gate C** | A1/A2 — the phantom Đ doorway clause; the self-contradictory §21 preamble |
+| `d46bd69` | **Gate C** | A4/A5 — preamble emphasis restored; the §20 row's own description corrected |
+| `c07b107` | **Gate C** | C4/C5 — fail closed on a missing pool; the INV-4 misattribution |
+| `ca1a4d7` | **Gate C** | D1–D4 — net-worth relation, degradation asymmetry, byte-identity condition ×4 |
+| `085d141` | **Gate C** | the six OQ dispositions |
+| `ba0516b` | **Gate C** | E1/E2 — the §17 omission recorded; §21.8's provenance separated |
 
 **Portfolio** — Σ of the viewer's open-position execution values (Đb) — now renders as the first of two stats in the signed-in global-header Đ cluster, beside the shipped Balance. One number in the header bar. Not a tab, not a page, not a route.
 
-Ceilings unmoved, as required: migration head `0024_bookmarks` · `EVENT_TYPES` 24 · next free ADR `0035`. Zero DDL, zero writes, zero new runtime dependency, zero read-model fields.
+Ceilings unmoved, verified ON `main` after the merge: migration head `0024_bookmarks` · `EVENT_TYPES` **24** · next free ADR `0035`. SPEC.1 **1.0.26 → 1.0.27**. Zero DDL, zero writes, zero new runtime dependency, zero read-model fields — `git diff 07a1daa d19ea6f` touches no `drizzle/`, `src/db/`, `docs/adr/` or `events/schemas` path. 14 files, +2008/−210.
+
+**Post-merge full suite on `main`** (the first since the merge): **292 files passed / 1 skipped (293) · 2135 tests passed / 1 skipped / 4 todo (2140) · exit 0**, 386 s. Nothing else was running vitest.
 
 ---
 
@@ -73,7 +85,29 @@ The probe file was restored byte-identical: md5 `1e66a7967c0caa17a106520b9e9e10f
 
 ---
 
-## Open questions — for Gate C
+## Gate C — PASSED
+
+**Verdict: PASSED**, 2026-08-03. The read was scoped by ruling rather than exhaustive: the production code (`src/`), SPEC.1's full diff, and T3's real-DB assertions were read **in full**. **B3 parts 2 and 3 were WAIVED** — `tests/unit/shell/dharma-cluster.test.tsx` (340 diff lines) and `tests/server/dharma/header-portfolio.test.ts` (602) were not paginated to web. The waiver is sound because both are *guards over* code that was read directly, and T3 — the one test whose failure would mean the READ is wrong rather than the test — was read.
+
+Gate C did not merely approve. It found and settled **eight** defects across six commits, four of them in text CC had drafted and two in the web-authored rider:
+
+| Fix | Commit | What it caught |
+|---|---|---|
+| A1 | `b8ae117` | §21.8 asserted a `Đ` info doorway that does not exist — SPEC.1 stating a false fact about a live surface |
+| A2 | `b8ae117` | the ratified `Five` → `Six` swap left "Six are in scope; **the sixth** is deferred" |
+| A4/A5 | `d46bd69` | emphasis lost when web-supplied plain text replaced a bolded clause; the §20 row still describing a one-word swap after the clause was rewritten |
+| C4 | `c07b107` | the missing-pool branch SKIPPED, returning a plausible wrong figure — DROUND R1's worst class |
+| C5 | `c07b107` | an INV-4 misattribution: INV-4 is the W2.11 non-Open disable rider and makes no claim about the resolution write path |
+| D1 | `ca1a4d7` | "together they are net worth" — false; they sum to net worth **plus** an unclaimed daily credit |
+| D2 | `ca1a4d7` | "never removes a working figure" — contradicted by Balance's own null-conflation |
+| D3 | `ca1a4d7` | four unconditioned byte-identity claims, all CC-drafted, promising more than the snapshot-free reads deliver |
+| E1/E2 | `ba0516b` | the §17 omission unrecorded; §21.8's provenance absorbed into SYNC.7's |
+
+**The pattern worth keeping:** every *hedged* byte-identity claim in the tree was web-authored; every *unhedged* one was CC's. Precision about a guarantee's preconditions is exactly what erodes when the same author both states the property and implements it.
+
+---
+
+## Open questions — dispositions
 
 > **Status after the Gate C pass (2026-08-03).** Four discharged — OQ-1, OQ-2, OQ-3, OQ-6 — and two carried: OQ-4 to HARDEN, OQ-5 to the tracker. Each entry now opens with its disposition and the SHA that settled it; the original finding text is kept verbatim beneath, because the reasoning is the record and a resolved question that loses its reasoning has to be re-derived the next time it surfaces.
 
@@ -105,9 +139,14 @@ The probe file was restored byte-identical: md5 `1e66a7967c0caa17a106520b9e9e10f
 
 ## Next session starts at
 
-**Gate C — the web diff-read of PR #286. Nothing else.** CC does not merge. The six open questions above have since been worked: four are discharged (`b8ae117`, `d46bd69`, `c07b107`, `ca1a4d7`) and two are carried — OQ-4 to HARDEN (`getHeaderBalance` cannot distinguish absence from failure; SG2 forbids touching it here) and OQ-5 to the tracker (the layout read and the page read share no snapshot). Nothing outstanding blocks the read.
+**Nothing in this task. It is closed.** PR #286 is merged at `d19ea6f`, the branch is deleted on both sides, `main` is green on a full suite, and the ceilings are verified unmoved. This log's own PR is the last artefact and does not gate anything.
 
-After merge: record the squash-merge SHA on `main` here, `git ls-remote` to check whether the branch auto-deleted, and confirm the tracker rows.
+Two carries leave the task, both already docketed and neither blocking:
+
+- **OQ-4 → HARDEN.** `getHeaderBalance` returns an indistinguishable `null` for "no ledger row" and "read failed" (`header-balance.ts:88`, `:107`, `:136`), and R9 makes that null the cluster's gate — so a transient Balance failure hides a Portfolio that read fine. SPEC.1 §21.8 now records the asymmetry rather than denying it. The fix is a change to the Balance read, which SG2 kept out of this PR.
+- **OQ-5 → tracker.** The layout read and the page read share no snapshot, so on `/u/[pseudonym]` a bet committing inside the render window makes the header figure and the §23 tile differ by that bet's price impact. Cosmetic and self-healing; the spec and the plan are both correctly hedged now.
+
+Whatever runs next: **POLISH.1 was held behind this task precisely so the header would be final before its V-batch measures it.** That hold is now released.
 
 ---
 
@@ -125,4 +164,4 @@ After merge: record the squash-merge SHA on `main` here, `git ls-remote` to chec
 
 ## Time
 
-~13:56 → ~14:45 IST, 2026-08-03. Roughly 50 minutes: S1 (incl. the `@test-writer` dispatch and the §7.1 probe) ~22 min, S2 ~5, S3 ~4, S4 ~8, full suite 2.6, `@code-reviewer` ~10 min, remediation + log ~8.
+~13:56 → ~14:45 IST for the execute run (S1 ~22 min incl. the `@test-writer` dispatch and the §7.1 probe, S2 ~5, S3 ~4, S4 ~8, full suite 2.6, `@code-reviewer` ~10, remediation + log ~8). The Gate C pass ran on top of that across six further commits and a second full suite.
