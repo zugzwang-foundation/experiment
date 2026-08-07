@@ -453,6 +453,28 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** DATASET RELEASE. Full context is manifest §0 v1.3 C1 and ADR-0031; this entry is the tracking.
 
+## STAGING-PARITY Slice C/D — `identity_pool` FIFO consume has no tiebreak
+
+**Originating task:** STAGING-PARITY Slices C+D (2026-08-06), open question 1. Third in the family above — a control that holds today for a reason no assertion states.
+
+**The row, as ruled:**
+
+> `consumeIdentityPoolTuple` orders by `created_at ASC` with **no tiebreak**
+> (`src/server/identity-pool/consume.ts:32`). It is deterministic only because
+> `scripts/seed-staging.ts` inserts its 200 tuples **serially**, one statement
+> per row, so every `created_at` differs. A batched or parallelised seed can
+> produce ties, making consume order nondeterministic — which silently breaks
+> pseudonym reproducibility and therefore the coverage list, with nothing
+> reporting it. Class R. Trigger: any change to the seed's insert strategy.
+
+**Why nothing catches it.** The property is not "the pool is seeded" — it is "the pool's rows have distinct `created_at`", and no test asserts that. `staging:rebuild`'s reproducibility check (gate 4's drift comparison) would go RED *after* the fact, but it cannot say why: a shuffled pseudonym assignment reads as a coverage-list change, not as a seed-ordering defect. The failure is also **intermittent by nature** — ties only sometimes reorder — so a single green rebuild proves nothing.
+
+**Blast radius.** Every `/u/<pseudonym>` URL in `docs/polish/staging-coverage.json` and in `POLISH-register.md`'s standing reference is keyed to a role→pseudonym mapping that FIFO order fixes. Lose the order and the whole coverage list points at the wrong profiles — silently, because each URL still resolves to *a* real user. Slice C/D verified the current state (200 rows, **200 distinct `created_at`**), so this is a forward obligation, not a present defect.
+
+**Conditional trigger.** Any change to `scripts/seed-staging.ts`'s insert strategy — batching, a multi-row `VALUES`, `COPY`, or parallelism. Also any new seed path that populates `identity_pool`.
+
+**Expected next task.** Either a tiebreak in `consume.ts` (`ORDER BY created_at ASC, id ASC` — `id` is UUIDv7, so it is already monotonic and costs nothing), or an assertion that the seeded pool carries distinct timestamps. The first is strictly better: it makes the ordering total regardless of how the pool was filled. Evidence is in `docs/logs/STAGING-PARITY-CD.md` under *Open questions*; this entry is the tracking.
+
 ## STAGING-PARITY Slice A — an `events` partition added without its truncate guard is invisible
 
 **Originating task:** STAGING-PARITY Slice A, overnight mutation sweep (2026-08-06), GROUP 5 item 9. Sits directly beside the `PRODUCTION_PROJECT_REF` row above — same family: a control that no assertion in the slice can hold, recorded rather than left silently unproven.
