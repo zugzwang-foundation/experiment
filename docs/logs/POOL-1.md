@@ -1,10 +1,46 @@
 # POOL-1 / POOL-2 — the connection ceiling: an incident that did not reproduce
 
-**State: CLOSED as investigation.** `max` stays at **10** — ruled, and both
-reasons for it hold independently. Transaction mode is viable and is recorded,
-not built; it needs an ADR. PERF-1 opens from §6 below.
+**State: CLOSED as DIAGNOSED, NOT FIXED.** The remedy is PERF-1's — see §0 and
+§6. `max` stays at **10**. Transaction mode stays parked; it needs an ADR when
+PERF-1 lands.
 
 Branch `fix/pool-connection-ceiling`. Docs-only. 2026-08-07 → 2026-08-08.
+
+---
+
+## 0 · The dashboard answers, and the four rulings
+
+Both dashboard readings came back, and they close the questions §12 left open.
+
+**`pool_size = 15` — CONFIRMED at the dashboard.** Compute size **Micro**; the
+15 is that tier's default. **Max client connections 200, fixed** — so the 200 is
+not the binding limit and never was. The binding limit is the tier default, and
+it is the number the pooler names in its own error text (§2).
+
+### RULED · do NOT upsize compute
+
+Raising the tier raises the ceiling **without shortening a 35-second page**.
+That masks PERF-1 until production — where load is higher and the same defect
+surfaces at the worst possible moment. **Fix duration; the ceiling stops binding
+on its own.**
+
+### RULED · `max` stays at 10 — now for the correct reason
+
+Not because 10 is tuned, and not because no safe value exists: because the
+profile worst case is **5 concurrent against 15** (§5), and exhaustion is
+**duration-driven**. **Lowering `max` shortens no request.** It would trade a
+deadlock surface for nothing. The count was never the problem.
+
+### RULED · transaction mode stays parked, and is now LESS urgent
+
+It multiplexes, which would have addressed **churn** — and churn is falsified
+(§4). It does not shorten a 35-second render, so it does not touch the mechanism
+that actually exhausted the pool. ADR when PERF-1 lands.
+
+### RULED · POOL-1 closes as DIAGNOSED, NOT FIXED
+
+The remedy belongs to PERF-1. Nothing in `src/` changed here and nothing should
+have.
 
 ---
 
