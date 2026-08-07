@@ -87,6 +87,42 @@ concentrate on `/u/[pseudonym]` — the authenticated, heaviest route — and bu
 2 is exclusively that route. This is per-request slot-holding under
 authenticated load, which is exactly what §6 describes.
 
+### 4.1 The mechanism, observed
+
+Runtime logs for 17:30–17:33 are retained and settle it. Two things they show:
+
+**One deployment served all staging traffic in the window.** Every staging line
+carries `dep=dpl_HkgAgKBJUThRgycEDieHnFKtLUbS`; no second staging deployment
+appears at all. There was no old-drain / new-warm overlap *at the deployment
+level* to churn. (One `main` deployment appears — `dpl_7oyjVmD7…` serving
+`/api/cron/close-due-markets` at 17:32:28 — but that is the production target on
+its own `DATABASE_URL` and consumes no staging slot.)
+
+**The request pattern is the exhaustion.** Requests arrive in bursts of three to
+four at *identical* timestamps, every few seconds, all `cache=MISS`:
+
+```
+17:31:53  GET /        17:31:54  GET /  + GET /u/RedFox000 ×2
+17:32:06  GET / + GET /u/RedFox000 ×2 + GET /m/sp-m2-active
+17:32:11  GET / + GET /u/RedFox000 ×2 + GET /m/sp-m2-active
+17:32:14  GET / + GET /u/RedFox000 ×2 + GET /m/sp-m2-active
+17:32:34  GET / + GET /u/RedFox000 + GET /m/sp-m4-new
+```
+
+That is multiple tabs open, plus `DebatePoll`'s 15-second `router.refresh()`,
+each refresh re-executing the layout as well as the page.
+
+**Now apply the durations.** A `/` render holds its slot for ~35 s (§6). The
+loads at 17:31:53, 17:32:06, 17:32:11, 17:32:14 and 17:32:34 are therefore *all
+still in flight simultaneously* — **five concurrent discovery renders holding
+five slots**, against a pool of 15. Add the `/u/RedFox000` views at **5 slots
+each** signed-in (§5) and the pool is gone. The burst window and the 35-second
+hold are the same event seen from two angles.
+
+**This is the whole incident.** Not churn, not steady-state volume, not an
+undersized `max`: a slow page holding slots long enough that ordinary
+walkthrough navigation overlapped itself into the ceiling.
+
 ---
 
 ## 5. The concurrent floor — measured, and code-confirmed
