@@ -1,183 +1,190 @@
-# POOL-1 / POOL-2 — connection ceiling: measure, fix, verify
+# POOL-1 / POOL-2 — the connection ceiling: an incident that did not reproduce
 
-**State: HALTED at STEP 1d (POOL-2 sequencing).** The incident does not
-reproduce. No `max` change shipped — the number that would size it is measured,
-but the failure it is meant to prevent could not be provoked, and a fix that
-cannot be verified is not a fix.
+**State: CLOSED as investigation.** `max` stays at **10** — ruled, and both
+reasons for it hold independently. Transaction mode is viable and is recorded,
+not built; it needs an ADR. PERF-1 opens from §6 below.
 
-Branch `fix/pool-connection-ceiling`. Time: 2026-08-07 → 2026-08-08.
+Branch `fix/pool-connection-ceiling`. Docs-only. 2026-08-07 → 2026-08-08.
 
 ---
 
 ## 1. What landed
 
-Nothing in `src/`. This log is the deliverable. `src/db/index.ts` `max` stays
-at **10**, unchanged and deliberately so (§4).
+Nothing in `src/`. This log and two `docs/parked.md` docket rows are the
+deliverable.
 
 ---
 
-## 2. The reproduction — WILL NOT REPRODUCE
+## 2. The falsified premise — and a correction I owe the record
 
-**Method.** An escalating-concurrency probe against
-`https://staging.zugzwangworld.com`, sampling `pg_stat_activity` on the staging
-database every 60 ms for the duration of each batch. Read-only throughout; no
-writes, no regenerate, no production contact.
+POOL-2 concluded from `pg_stat_activity` that "the pooler sustained 18
+concurrent connections without error, which is above `pool_size = 15`", and
+carried that forward as grounds to doubt the pool size. **That conclusion was
+wrong, and the reasoning behind it was wrong.**
 
-| Concurrency | Routes | Fail | TTFB min / p50 / max | Peak in-flight backends |
-|---|---|---|---|---|
-| 1 | `/u/[pseudonym]` | 0/1 | 6262 / 6262 / 6262 ms | 3 |
-| 2 | 3× profile | 0/2 | 6291 / 11143 / 11143 ms | 3 |
-| 4 | 3× profile | 0/4 | 6256 / 7367 / 9800 ms | 6 |
-| 6 | 3× profile | 0/6 | 2872 / 6331 / 7401 ms | 12 |
-| 8 | 3× profile | 0/8 | 1114 / 2919 / 7421 ms | 14 |
-| 10 | 3× profile | 0/10 | 1011 / 1106 / 6283 ms | 14 |
-| 12 | 3× profile | 0/12 | 671 / 1041 / 2707 ms | 9 |
-| 16 | 3× profile + `/bookmarks` | 0/16 | 324 / 1043 / 2708 ms | 7 |
-| 20 | 3× profile + `/bookmarks` | 0/20 | 274 / 1035 / 7407 ms | 11 |
-| 25 | 3× profile + `/bookmarks` | 0/25 | 288 / 1035 / 1717 ms | 8 |
-| 30 | 3× profile + `/bookmarks` | 0/30 | 269 / 1005 / 1405 ms | 10 |
-| 1 | `/` (heaviest) | 0/1 | 35148 ms | 5 |
-| 8 | `/` | 0/8 | 655 / 1117 / 35015 ms | 6 |
-| 16 | `/` | 0/16 | 638 / 1205 / 37276 ms | 8 |
+The Vercel runtime errors carry the pooler's own words:
 
-**~180 requests, five route mixes, concurrency 1 → 30. Zero 5xx. Zero
-`EMAXCONNSESSION`.**
+> `(EMAXCONNSESSION) max clients reached in session mode — max clients are
+> limited to pool_size: 15`
 
-**Why it will not reproduce.** Total client backends **plateau at 18 and stop**
-— the count grew 7 → 10 → 16 → 18 across escalation and never moved again, at
-any concurrency. Postgres itself is nowhere near a limit: `max_connections` 60,
-`superuser_reserved_connections` 3, 19 backends in use. The pooler sustained
-**18 concurrent client connections without error**, which is materially above
-the `pool_size = 15` the POOL-1 diagnosis rested on. Either that figure is no
-longer current or it was not the binding constraint. **This is the finding that
-invalidates the planned remedy**: the `max: 10 × 2 warm instances = 20 > 15`
-arithmetic does not describe the system as it behaves today.
+`pool_size: 15` is **current and confirmed**. The error is emitted by Supavisor
+and names its own limit.
 
-Load also made the system *faster*, not slower — p50 fell from 6.2 s at
-concurrency 1 to ~1.0 s at concurrency 30 as Vercel warmed additional instances.
-More instances means more pools, but also more spread; the ceiling never bound.
+**Where the reasoning failed.** `pg_stat_activity` counts *Postgres backends*,
+not *Supavisor client slots*. The 18 backends observed include Supavisor's
+server-side connections, the sampler's own psql sessions, and the `pg_net`
+worker — none of which consume a client slot in the pool the app dials.
+Counting backends to infer pooler capacity conflates two different things, and
+the number it produced happened to sit just above 15, which made a wrong
+conclusion look like a finding. **The instrument was measuring the wrong side of
+the pooler.**
 
-### 2.1 The authenticated probe — BLOCKED, and worked around
-
-STEP 1a could not be completed. Exactly one live session exists on staging
-(`RedFox000`, created 2026-08-07 17:29, expires 2027-09-11 — the walkthrough's
-own session). Its token was read from `sessions`, and the cookie was signed with
-**Better Auth's own** `createHMAC("SHA-256","base64urlnopad")` against
-`BETTER_AUTH_SECRET` from Doppler `stg` (verified byte-identical to a Node
-`createHmac(...).digest("base64url")`). `GET /api/auth/get-session` returns
-`null` for every form tried — signed, unsigned, `zugzwang.session_token`,
-`__Secure-` prefixed.
-
-The most likely cause is **Doppler↔Vercel secret drift on
-`BETTER_AUTH_SECRET`** — the same drift class already proven in this project,
-where `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG` and `SENTRY_PROJECT` live in Vercel
-but are absent from Doppler `stg`. It cannot be confirmed from here: Vercel env
-values are write-only once set. **If the secrets differ, every session cookie
-issued by the deployment is unverifiable by anything holding the Doppler value —
-worth a separate look, and it is a decision, not an edit.**
-
-Worked around by driving anonymous concurrency instead. That is a weaker probe
-by exactly one connection (the session lookup, sequential — see §3), and the
-ceiling did not bind even so.
+The practical effect: POOL-2's §2 "either that figure is no longer current or it
+was not the binding constraint" should be read as withdrawn. The figure is
+current. What follows is built on the corrected premise.
 
 ---
 
-## 3. The concurrent floor — MEASURED
+## 3. The reconciled timeline
+
+| Time (UTC, 2026-08-07) | Event |
+|---|---|
+| 17:18:06 | `dpl_8BzP4K3U7Mgk1AyaNmbDdoQX` created — `main` → production |
+| 17:18:28 | `dpl_HkgAgKBJUThRgycEDieHnFKtLUbS` created — `staging` branch, the deployment that serves staging today |
+| 17:28:58 | Better Auth OAuth `state_mismatch` (one event, `/api/auth/[...all]`) |
+| **17:31:06 – 17:31:40** | **Burst 1.** `findSession` EMAXCONNSESSION ×11 + `APIError: Failed to get session` ×11. Routes: `/`, `/bookmarks`, `/u/[pseudonym]`, `/m/[slug]`, `/m/[slug].rsc` |
+| 17:31:14 | Profile argument-substrate query begins failing, same signature |
+| **19:03:58 – 19:05:03** | **Burst 2.** `users`-by-pseudonym EMAXCONNSESSION **×68**, `dharma_ledger` ×18, profile substrate continuing. Routes: `/u/[pseudonym]` only |
+
+Both bursts carry `lastDeployment=dpl_HkgAgKBJUThRgycEDieHnFKtLUbS`. **No
+deployment was created between 17:18:28 and the time of writing** — the next
+entry in the deployment list is 2026-08-06.
+
+---
+
+## 4. STEP 1 — the deploy-churn hypothesis: **FALSIFIED**
+
+**a. Instances in the 17:31:00–17:32:00 window.** Not enumerable from the tools
+available — Vercel's runtime-log API exposes no per-instance identifier, so this
+sub-question is recorded as unanswered rather than guessed. What *is* established
+is the deployment state: the staging deployment was created at 17:18:28, roughly
+**12.6 minutes before** burst 1 began, and was `READY` and serving by then.
+
+**b. Correlation with a deployment event.** Burst 1 sits 12.6 min after a
+deployment was created — close enough to be *consistent* with warming, not close
+enough to be evidence for it. **Burst 2 is decisive against the hypothesis**: it
+is 1 h 45 min after that deployment, with **no deploy in flight**, on a
+deployment that was already hours old and is still live now. And burst 2 is the
+*larger* event by six-fold — 68 events against 11.
+
+**c. Other occurrences.** Yes: the signature appears at **two** distinct times
+in retained logs, both on 2026-08-07, on the same deployment. Only the first is
+anywhere near a deploy.
+
+**Conclusion.** The mechanism is **not** instance churn. A larger burst occurred
+in steady state, so the remedy does not lie in deploy sequencing. Both bursts
+concentrate on `/u/[pseudonym]` — the authenticated, heaviest route — and burst
+2 is exclusively that route. This is per-request slot-holding under
+authenticated load, which is exactly what §6 describes.
+
+---
+
+## 5. The concurrent floor — measured, and code-confirmed
 
 **Method.** `pg_stat_activity` sampled at 60 ms while a single request was in
-flight, counting `state = 'active'` client backends (`backend_type = 'client
-backend'`, sampler's own pid excluded). Counting *total* backends is the wrong
-instrument and was discarded: the postgres-js pool holds warm idle connections,
-so total does not move when a request runs — only `state` flips.
+flight, counting `state = 'active'` client backends. Counting *total* backends is
+the wrong instrument and was discarded: the postgres-js pool holds warm idle
+connections, so total does not move during a request — only `state` flips.
 
-| Route | Peak in-flight | Sustained (histogram) |
+**The profile measurement lands exactly on the code.** Measured peak in-flight
+for an anonymous `/u/[pseudonym]` view: **3**, reproduced across two runs. The
+page issues `Promise.all([loadProfilePositions, loadProfileArguments,
+loadProfileGraphSeries])` at `src/app/(public)/u/[pseudonym]/page.tsx:63` —
+three, concurrent, and nothing else concurrent anywhere in the request. The
+measurement and the source agree without adjustment.
+
+Itemised, signed-in worst case:
+
+**1.** `resolveProfileUser` — `page.tsx:55`. One, sequential. Does not raise the peak.
+**2–4.** The `Promise.all` at `page.tsx:63` — **3 concurrent**.
+**5.** `loadProfileTiles` — `page.tsx:68`, sequential after the `Promise.all`.
+**6.** `auth.api.getSession` — `page.tsx:73` and `(public)/layout.tsx:67`. Sequential.
+**7–8.** Header balance + portfolio — `layout.tsx:71–76`, a `Promise.all` of two. **+2 concurrent, and these are the two an anonymous probe never issues** (`session?.user?.id` falsy → `[null, null]`, zero statements).
+
+**Signed-in worst case = 5** (3 + 2), assuming RSC overlaps the layout's awaits
+with the page's — the conservative reading.
+
+**The discovery figure of 5 reported in POOL-2 is withdrawn as contaminated.**
+`/` is strictly sequential in source (§6), so it holds **one** connection at a
+time; the sampler was picking up unrelated baseline traffic. The corrected
+reading for `/` is **1 slot, held for 35 seconds** — which is the finding that
+matters.
+
+**Does any path hold a connection while awaiting a second? No.** All three
+transaction wrappers — `bets/transaction.ts:117`, `resolution/transaction.ts:128`,
+`markets/transaction.ts:105` — thread the `tx` handle through every inner call.
+A sweep of every module referencing `DbTransaction` found no
+`db.select/insert/update/query/execute/transaction` inside a held transaction;
+the only `db.` call sites are the three `db.transaction(` entry points. **No
+deadlock risk, so nothing constrains the margin from below.**
+
+**Why `max: 10` is right.** The floor is 5. Ten sits comfortably above it with
+room for the sequential tail, and below it lies a deadlock surface for no
+demonstrated benefit. **The count was never the problem** — 15 ÷ 5 is three
+concurrent signed-in profile views, which is not a load anyone hit. The
+*duration* each slot is held is the problem.
+
+---
+
+## 6. PERF-1 — the 35 seconds, and why it is the same defect
+
+A request holding a connection for 35 s holds a **pool slot** for 35 s.
+Exhaustion of 15 slots does not require concurrency when each request is that
+slow — a handful of overlapping loads suffices. **Diagnosis only; no fix here.**
+
+### 6a–6c · Discovery (`/`) — 41 sequential round-trips, doubly nested
+
+| # | Finding | Evidence |
 |---|---|---|
-| `/u/[pseudonym]` (profile, anonymous) | **3** | 3 held ≈ 0.7–1.0 s, reproduced across two runs |
-| `/` (discovery, anonymous) | **5** | 3–4 sustained across 456 samples; 5 at the tail |
+| 1 | `listOpenMarkets` issues **1 + 3N** queries: one market list, then `getMarketPricing`, `getMarketTotals`, `getDefaultMarketMediaUrl` **sequentially per market** | `src/server/discovery/list.ts:48–63` |
+| 2 | `DiscoveryContent` then runs a **second** sequential loop over the same cards: `loadPriceSeries` + `selectHeroTopPosts` — **2N** more | `src/app/(public)/page.tsx:59–65` |
+| 3 | Total at `DISCOVERY_GRID_SIZE = 8`: **1 + 24 + 16 = 41 sequential round-trips**, zero parallelism anywhere | both loops above |
+| 4 | Genuinely sequential: **only #1's first query** (the market list supplies the ids). Everything after it is per-market and **independent** — sequential only because nobody parallelised it. The source says so itself: "grouped-query batching is the OQ-1 C follow-up's optimization" | `list.ts:40–43` docblock |
+| 5 | The two loops are **separately** unnecessary: the second loop re-iterates cards the first already produced, so `loadPriceSeries` / `selectHeroTopPosts` could ride the first pass or a single batched pass | `page.tsx:59–65` |
+| 6 | `force-dynamic` costs the **entire** 41-round-trip composition on every request, uncached. It is required only in the narrow sense that the page reads no dynamic API and would otherwise static-prerender at build — the docblock says exactly this. It is **not** required for correctness; it is standing in for a cache policy that was deferred | `page.tsx:19` + docblock `:12–18` |
+| 7 | Measured: **35.1 s** at concurrency 1, four independent runs (35.09 / 35.33 / 35.15 / 37.28 s). Under concurrency the same route serves **p50 ≈ 1.1 s** with a 35 s tail | POOL-2 probe |
+| 8 | Implied per-round-trip: **~857 ms cold, ~27 ms warm**. The warm figure is consistent with 41 sequential trips; the cold figure is not, so **a large one-time cold cost sits underneath the sequential structure and this trace does not explain it**. Recorded as open, not guessed at | derived from #3 and #7 |
 
-**Itemised, signed-in worst case:**
+### 6d · Profile (`/u/[pseudonym]`) — 6.2 s warm, already partly parallel
 
-**1.** Session lookup — `(public)/layout.tsx:67`, `auth.api.getSession`. One
-connection, sequential, ahead of everything else. Does not raise the peak.
-**2–3.** Header balance + header portfolio — `layout.tsx:71–76`, a
-`Promise.all` of two independent reads. **+2 concurrent, and these are the two
-an anonymous probe never issues** (`session?.user?.id` falsy → `[null, null]`,
-zero statements).
-**4.** Page data — measured above: 3 for a profile, 5 for discovery.
+| # | Finding | Evidence |
+|---|---|---|
+| 9 | The three heavy loaders **are** parallelised — `Promise.all` of positions / arguments / graph | `page.tsx:63` |
+| 10 | `loadProfilePositions` is nonetheless **8 sequential statements** internally, with no loop-issued queries | `positions.ts:139, 163, 178, 189, 200, 221, 254, 306` |
+| 11 | Four more sequential awaits bracket the `Promise.all`: `resolveProfileUser`, `loadProfileTiles`, `getSession`, `searchParams` | `page.tsx:55, 68, 73, 83` |
+| 12 | So the profile is the **good** shape and still takes 6.2 s: the parallelism is at the wrong granularity — three concurrent chains, each internally serial | #9 + #10 |
+| 13 | Both bursts concentrate here, and burst 2 is **exclusively** here. This is the route that exhausted the pool | §3 |
 
-So the **measured anonymous floor is 5** (discovery) and the **signed-in worst
-case is 7**, assuming RSC overlaps the layout's awaits with the page's — which
-is the conservative assumption and the one to size against.
+### 6e · Estimate if the sequential reads were batched
 
-### 3.1 Does any path hold a connection while awaiting a second?
+| Route | Today | If batched / parallelised |
+|---|---|---|
+| `/` discovery | **1 slot × ~35 s** cold, 41 round-trips | ~2–3 slots × well under 1 s. Peak connections *rise*; slot-seconds fall by more than an order of magnitude |
+| `/u/[pseudonym]` | 3 slots × ~6.2 s ≈ 19 slot-seconds | ~3–5 slots × ~1 s ≈ 4 slot-seconds |
 
-**No.** All three transaction wrappers — `bets/transaction.ts:117`,
-`resolution/transaction.ts:128`, `markets/transaction.ts:105` — open
-`db.transaction(...)` and thread the `tx` handle through every inner call
-(`applyTxTimeouts(tx)`, `lockPool(tx, …)`, `lockMarket(tx, …)`,
-`callback({ tx, … })`). A sweep of every module referencing `DbTransaction`
-found no `db.select/insert/update/query/execute/transaction` inside a held
-transaction — the only `db.` call sites are the three `db.transaction(` entry
-points themselves. **No deadlock risk found, so the margin is not constrained by
-one.**
-
----
-
-## 4. What `max` became, and why — UNCHANGED at 10
-
-Not changed. Two independent reasons:
-
-**1. The gate in STEP 4 fires on the measured number.** Floor 7 (signed-in
-worst case) + 2 margin = 9; 9 × 2 warm instances = **18 > 15**. On the stated
-pool size, no safe value exists and the remedy is a pooler resize or transaction
-mode — both decisions, neither an edit.
-
-**2. The premise the gate rests on is contradicted by measurement.** The pooler
-sustained 18 concurrent connections without error (§2). If the limit is not 15,
-the arithmetic above is sizing against a number that is not real, and lowering
-`max` from 10 to a smaller value would be a change with no demonstrated failure
-to prevent and a real deadlock surface to introduce.
-
-Reducing `max` below the measured floor of 7 — and 10 is already only 3 above it
-— would make a request that needs a second connection queue behind itself. That
-is strictly worse than the current behaviour, which is the exact failure STEP 2
-exists to prevent.
-
-**The binding open question is the pooler's actual `pool_size`.** That is a
-dashboard read (Class-3) and it decides everything downstream.
+**The trade is the point, and it is favourable.** Batching *raises* peak
+concurrent connections per request and *collapses* how long each is held. Against
+a 15-slot pooler, slot-**seconds** is the quantity that exhausts, not peak count:
+one discovery load holding a single slot for 35 s costs the pool more than five
+loads holding five slots for one second. **This is why PERF-1 and the pool
+incident are the same defect, and why raising or lowering `max` addresses
+neither.**
 
 ---
 
-## 5. Sentry — the three smoke defects (parked, all verified)
+## 7. Transaction-mode viability — VIABLE, no blocker found
 
-Established at POOL-1, unchanged here:
-
-**1.** `/api/_smoke-error` **has never routed.** The `_` prefix makes
-`src/app/api/_smoke-error/` a Next.js App Router *private folder*, excluded from
-routing. Proof: `curl` returns Next's own `/404` (`x-matched-path: /404`), and
-the build manifest `.next/server/app/api/` lists `auth bets cron health uploads
-visits` — no `_smoke-error`.
-**2.** The `sentry-routing` smoke item **has always skipped** —
-`scripts/smoke-staging.ts:259` requires `SENTRY_ORG`, which is absent from
-Doppler `stg` (it exists only in Vercel).
-**3.** The script **asserts against a project that does not exist**. It queries
-`zugzwang-prod`; the org `zugzwang-foundation` contains only `zugzwang-staging`
-and `zugzwang-experiment`.
-
-### 5.1 STEP 1c — NOT DETERMINED
-
-The free Sentry test was contingent on reproducing a server-side 500. **No 500
-was ever produced**, so there is nothing whose arrival could be checked. It is
-neither ARRIVED nor DID NOT ARRIVE. `zugzwang-staging` still carries exactly one
-issue in 24 h and in 14 d — the 2026-07-21 client-side capture. Recorded as
-undetermined rather than forced into a bucket; STEP 5 was skipped accordingly,
-per its own condition.
-
----
-
-## 6. Transaction-mode viability — VIABLE, no blocker found
-
-Read-only audit. Nothing changed.
+Read-only audit; nothing changed. Recorded, not built — it needs an ADR.
 
 | Surface | Finding | Survives transaction mode |
 |---|---|---|
@@ -188,77 +195,117 @@ Read-only audit. Nothing changed.
 | `runBetTransaction` / `lockPool` / SERIALIZABLE retry | `SELECT … FOR NO KEY UPDATE` and the isolation level are all *inside* `db.transaction(...)`; a transaction-mode pooler pins one server connection for the transaction's life | ✅ |
 | Idempotency layer | Redis-backed (Upstash), no Postgres session state | ✅ |
 
-No session-scoped dependency found. The decision remains the founder's.
+No session-scoped dependency found.
 
 ---
 
-## 7. STEP 6 verdicts — NOT RUN
+## 8. The reproduction — will not reproduce, and now we know why
 
-All five skipped. 6a requires a reproduction to move from fail to pass; there is
-no failing state to move. Running 6b–6e would verify a change that was not made.
+~180 requests, five route mixes, concurrency 1 → 30, anonymous. Zero 5xx, zero
+`EMAXCONNSESSION`. Full per-level TTFB table was in the POOL-2 draft; the
+finding that survives is the explanation:
 
----
+**1.** The probe was **anonymous**, so it never issued the layout's
+`Promise.all` — 2 of the 5 concurrent connections a real signed-in view holds,
+and precisely the ones failing in burst 1 (`findSession`, then the header reads).
+**2.** The probe hit routes **warm**, where discovery costs ~1.1 s instead of
+35 s — so it never reproduced the slot-holding that is the actual mechanism.
+**3.** Escalating concurrency made Vercel **scale out**, spreading load across
+more instances rather than concentrating it on few — the opposite of the
+incident's shape.
 
-## 8. TTFB — recorded, not chased
+The probe was therefore not a null result about the ceiling; it was a
+measurement of a different regime.
 
-Separate finding, per the kickoff.
+### 8.1 The authenticated probe — blocked, and why it was not forced
 
-- `/api/health`: 2.39 s cold, then **0.66 s** warm.
-- `/u/[pseudonym]`: **6.2 s** cold and reproducible at concurrency 1.
-- `/` (discovery): **35.1 s** at concurrency 1, reproducible across four
-  independent single-request runs (35.09 / 35.33 / 35.15 / 37.28 s). Under
-  concurrency the *same* route serves p50 ≈ 1.1 s with a 35 s tail — so the 35 s
-  is a cold-path cost, not a per-request cost.
-
-35 s is an order of magnitude worse than the 5.4 s the kickoff carried. The
-page's own docblock names the likely cause: "Sequential per-market reads (the
-bounded ≤8 × ~5-read cost the plan accepts uncached)" — up to ~40 sequential
-round-trips, `force-dynamic`, no cache (`(public)/page.tsx:19,42–47`). Recorded
-only. **Not chased, and it is not what this task was about.**
-
----
-
-## 9. Decisions taken on your behalf
-
-**1. Sampled `state = 'active'` rather than total backends.** Total is the
-wrong instrument — the pool holds warm idle connections, so it does not move
-during a request. Reported both; the histogram is included so the reading can be
-re-derived.
-**2. Substituted anonymous concurrency for the authenticated probe** when the
-session cookie would not resolve, rather than halting at STEP 1a. It is weaker
-by one sequential connection and the ceiling did not bind even so. The
-authenticated probe remains genuinely un-run.
-**3. Did not forge a session row on staging** to get around the cookie. It
-would have been a write to a live database outside the STAGING-PARITY intent-
-token contract, to manufacture a probe rather than to fix the incident.
-**4. Did not change `max`,** including not applying `floor + 2`. The gate fires
-on the measured number, and the premise behind the gate is contradicted by
-measurement. Both point the same way: this is a decision, not an edit.
-**5. Recorded STEP 1c as NOT DETERMINED** rather than resolving it to either
-branch. No 500 was produced, so the test never ran.
+Exactly one live session exists on staging (`RedFox000`, created 2026-08-07
+17:29 — the walkthrough's own; note it is **two minutes before burst 1**). Its
+token was read from `sessions` and signed with Better Auth's own
+`createHMAC("SHA-256","base64urlnopad")`, verified byte-identical to a Node
+`createHmac(...).digest("base64url")`. `GET /api/auth/get-session` returns
+`null` for every cookie form tried — signed, unsigned,
+`zugzwang.session_token`, `__Secure-` prefixed. Most likely
+`BETTER_AUTH_SECRET` drift between Doppler `stg` and Vercel; docketed, and it
+cannot be settled from a CC session because Vercel values are write-only.
 
 ---
 
-## 10. Open questions
+## 9. Sentry — parked, three verified defects
 
-**1. What is the Supavisor `pool_size` actually set to?** Measurement shows 18
-concurrent connections sustained without error. If it is not 15, the entire
-POOL-1 remedy is sized against a number that is not real. Dashboard read,
-Class-3, yours.
-**2. Does `BETTER_AUTH_SECRET` match between Doppler `stg` and the Vercel
-`staging` environment?** If not, every session cookie the deployment issues is
-unverifiable against the Doppler value, and it would explain §2.1 exactly. Same
-drift class as the three Sentry vars.
-**3. Was the original `EMAXCONNSESSION` a cold-path artefact?** The 35 s
-discovery render holds connections for the whole window. Two warm instances
-during a signed-in walkthrough, each holding several for 35 s, is a far more
-plausible exhaustion shape than steady-state traffic — and it would explain why
-sustained concurrency at 30 cannot reproduce it.
-**4. Is the server-side Sentry SDK delivering at all?** Still unanswered, and
-still requires a deploy. Yours.
+**1.** `/api/_smoke-error` **has never routed** — the `_` prefix makes it a
+Next.js App Router *private folder*. `curl` returns Next's own `/404`
+(`x-matched-path: /404`); the build manifest `.next/server/app/api/` lists
+`auth bets cron health uploads visits`.
+**2.** The `sentry-routing` item **has always skipped** —
+`scripts/smoke-staging.ts:259` requires `SENTRY_ORG`, absent from Doppler `stg`.
+**3.** It asserts against **`zugzwang-prod`, which does not exist** — the org
+`zugzwang-foundation` holds only `zugzwang-staging` and `zugzwang-experiment`.
 
-## 11. Next session starts at
+Each alone is sufficient to make the control a lookalike. Docketed as one row
+in `docs/parked.md`.
 
-Answer OQ 1 (pooler `pool_size`, dashboard). Everything downstream — whether a
-safe `max` exists, whether transaction mode is needed, whether there is an
-incident at all — is gated on that one number.
+### 9.1 STEP 1c — NOT DETERMINED
+
+The free Sentry test was contingent on reproducing a server-side 500. No 500 was
+produced, so nothing's arrival could be checked. It is neither ARRIVED nor DID
+NOT ARRIVE. `zugzwang-staging` still carries exactly one issue in 24 h and in
+14 d — the 2026-07-21 client-side capture. **Note what §3 adds**: dozens of
+genuine server-side EMAXCONNSESSION 500s occurred on 2026-08-07 and appear in
+Vercel's runtime errors with full stacks, while Sentry recorded none of them.
+That is stronger evidence than POOL-1 had that the server SDK is not delivering
+— but it is still not proof, and the deploy that would settle it is the
+founder's call.
+
+---
+
+## 10. Incidental finding, unrelated to the pool
+
+`ProfileTradeStreamError: non-positive shares on buy` — 17 events across three
+distinct bet ids, 2026-07-30 → 2026-08-04, route `/u/[pseudonym]`, on two
+earlier deployments. Not connection-related and not investigated here. Flagged
+because it surfaced in the same error listing and nothing else is tracking it.
+
+---
+
+## 11. Decisions taken on your behalf
+
+**1. Corrected POOL-2's own conclusion rather than carrying it forward.** The
+"18 > 15" inference was wrong: `pg_stat_activity` counts Postgres backends, not
+Supavisor client slots. §2 records the correction and what the wrong instrument
+was.
+**2. Sampled `state = 'active'` rather than total backends.** Total does not
+move during a request — the pool holds warm idle connections.
+**3. Withdrew the discovery floor of 5 as contaminated.** The source is strictly
+sequential, so the honest figure is 1 slot held 35 s. The measurement that
+*survives* is the profile's 3, which lands exactly on `page.tsx:63`.
+**4. Substituted anonymous concurrency for the authenticated probe** when the
+cookie would not resolve, rather than halting. §8 records why that changed the
+regime under test, which is the reason it did not reproduce.
+**5. Declined to forge a session row on staging** to manufacture the
+authenticated probe. It would have been a write to a live database, outside the
+STAGING-PARITY intent-token contract, to make a probe work rather than to fix
+the incident. The authenticated probe remains genuinely un-run, and that is the
+honest state.
+**6. Recorded STEP 1c as NOT DETERMINED** rather than resolving it to either
+branch.
+**7. Recorded STEP 1a (instance enumeration) as unanswered** rather than
+inferring instance counts from request timing.
+
+---
+
+## 12. Open questions
+
+**1. What is the large one-time cold cost on `/`?** 41 sequential round-trips
+explain the warm 1.1 s, not the cold 35 s (§6a #8). PERF-1 should not begin by
+assuming batching alone fixes it.
+**2. Does `BETTER_AUTH_SECRET` match across Doppler `stg` and Vercel
+`staging`?** Docketed. **Must be settled before DP.2's prod promote** — the
+same sync path carries every production secret.
+**3. Is the server-side Sentry SDK delivering at all?** §9.1. Requires a deploy.
+Founder's call.
+
+## 13. Next session starts at
+
+PERF-1, from §6's findings table — the fix is a separate, ratified task. The
+transaction-mode ADR and the D.5 ruling are the founder's and come first.

@@ -494,3 +494,51 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** Any migration that adds an `events` partition, or that adds a protected table. This is ADR-0030's standing forward obligation, restated as a docket row because the mutation sweep established that no test enforces it for the partition case.
 
 **Expected next task.** Process-owned, not code — a checklist line in the partition-migration procedure and a `@db-migration-reviewer` check. Evidence is in `docs/logs/STAGING-PARITY-A-mutation-audit.md` under *GROUP 5 · item 9*; this entry is the tracking, that one is the argument.
+
+## POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`
+
+**Originating task:** POOL-2 (2026-08-08), STEP 1a. Surfaced while trying to obtain a real staging session cookie for the authenticated reproduction probe; the probe could not be completed because of it.
+
+**The row, as ruled:**
+
+> The one live staging session (`RedFox000`) cannot be resolved by a cookie
+> signed with `BETTER_AUTH_SECRET` as read from Doppler `stg`. Signing was done
+> with Better Auth's own `createHMAC("SHA-256","base64urlnopad")` and verified
+> byte-identical to a Node `createHmac(...).digest("base64url")`, so the
+> algorithm is not in question. `GET /api/auth/get-session` returns `null` for
+> every cookie form tried. Class R. Trigger: before DP.2's production promote.
+
+**Why this is the same family as the Sentry drift.** `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_ORG` and `SENTRY_PROJECT` are present in the Vercel `staging` environment and **absent from Doppler `stg`**. That is proven drift in one direction. `BETTER_AUTH_SECRET` is present in both, so if the *values* differ this is drift of a second, worse kind — one that no name-level parity check can see. `scripts/vercel-env-audit.ts` and `env-audit.yml` compare presence, not values.
+
+**⚠ The consequence, stated explicitly.** If Doppler→Vercel sync is unreliable for one variable, **DP.2's production promotion inherits that risk on every variable.** A prod promote assumes the Doppler `prd` config is what the deployment actually runs. Nothing today proves that for any single secret, and `BETTER_AUTH_SECRET` is the one whose divergence is silent: the app boots, serves, and issues cookies normally — it simply cannot validate sessions signed against the other value. **This must be verified BEFORE the prod promote, not during it.** A promote that discovers it afterwards has already signed out every production participant.
+
+**Why it cannot be settled from here.** Vercel environment values are write-only once set (`vercel env ls` / `inspect` surface metadata only), so the two values cannot be compared directly by any read available to a CC session. Verification has to be functional — mint a session through the deployed app itself and check that a Doppler-signed cookie validates — or operator-side in the dashboard.
+
+**Conditional trigger.** Before DP.2's production promote; also on any change to the Doppler↔Vercel sync configuration.
+
+**Expected next task.** A value-level parity check for the secrets that cannot fail loudly (`BETTER_AUTH_SECRET` first), or a functional assertion in the deploy gate that a freshly-issued session cookie validates. Evidence is in `docs/logs/POOL-1.md` §2.1; this entry is the tracking.
+
+## POOL-2 — the Sentry routing smoke check is a lookalike, three times over
+
+**Originating task:** POOL-1 (2026-08-07), STEP 1a. Three independent defects in a single control, each alone sufficient to make it a V-3 lookalike — a gate that reports success while asserting nothing.
+
+**The row, as ruled:**
+
+> `scripts/smoke-staging.ts` item 9 (`sentry-routing`) cannot pass for three
+> independent reasons: (1) the route it triggers, `/api/_smoke-error`, can
+> never route — the `_` prefix makes `src/app/api/_smoke-error/` a Next.js App
+> Router *private folder*, excluded from routing; (2) the item skips whenever
+> `SENTRY_ORG` is unset, and `SENTRY_ORG` is absent from Doppler `stg`, so it
+> has always skipped; (3) it asserts against the project `zugzwang-prod`, which
+> does not exist — the org `zugzwang-foundation` contains only
+> `zugzwang-staging` and `zugzwang-experiment`. Class R, scripts-only fix.
+
+**Why each alone is sufficient.** Fix the skip and it fails on a 404 that is not an error signal. Fix the route and it still queries a project that does not exist. Fix the project slug and it still skips. **Three defects, one control, and any single one of them makes the gate a lookalike** — which is why this is recorded as one row rather than three: the lesson is about the control, not the lines.
+
+**Evidence, each verified.** `curl https://staging.zugzwangworld.com/api/_smoke-error` returns Next's own `/404` (`x-matched-path: /404`, the branded `data-testid="root-not-found"` body), and the build manifest `.next/server/app/api/` lists `auth bets cron health uploads visits` with no `_smoke-error`. The skip is `scripts/smoke-staging.ts:259`. The project list came from the Sentry API with the `stg` token.
+
+**Blast radius.** `docs/runbooks/deploy-pipeline.md` §3 treats the staging smoke as a promote gate. For Sentry routing specifically that gate has never asserted anything, which is why the server-side SDK's delivery status is still unknown after two sessions — nothing was ever positioned to notice.
+
+**Conditional trigger.** Before relying on the staging smoke as a Sentry gate; or whenever the server-side SDK delivery question (`docs/logs/POOL-1.md` §5.1) is taken up.
+
+**Expected next task.** Scripts-only: correct the project slug, add `SENTRY_ORG` to Doppler `stg`, and replace the `_smoke-error` assertion with one that asserts real delivery. The route rename is **not** enough on its own and should not be done alone. Evidence is in `docs/logs/POOL-1.md` §5; this entry is the tracking.
