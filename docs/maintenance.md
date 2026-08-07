@@ -16,9 +16,9 @@ This doc encodes the feedback loop. The audit is light, repeatable, and triggere
 | `AGENTS.md` | Framework conventions evolve (Next.js, Drizzle, Tailwind), new SAST findings change rules, ADRs change defaults |
 | `docs/workflows/plan-then-execute.md` | Workflow misfires reported in task logs, new failure modes discovered |
 | `docs/plans/_template.md` | Plans repeatedly miss something the template should prompt for |
-| `docs/logs/_template.md` | Log entries repeatedly fail to capture what was needed |
-| `zugzwang_experiment_tracker_v9.html` | Task completion (continuous); occasional reorgs |
-| `.claude/agents/*`, `.claude/commands/*`, `.claude/hooks/*` | When the subagent/command/hook itself changes |
+| `.claude/agents/*` | When a subagent briefing or its model/effort pin changes |
+
+*Three rows were removed at SYNC-1 (2026-08-08) because they named files that do not exist. **`zugzwang_experiment_tracker_vN.html`** — the tracker is **operator-maintained external HTML held in project knowledge; it is not and has never been a repo file**, so it cannot be audited from here (the row also still said `v9`, ten versions stale). **`docs/logs/_template.md`** — has never existed on any commit; log shape is set by CLAUDE.md §5.9's six fields. **`.claude/commands/*` and `.claude/hooks/*`** — neither directory exists, as CLAUDE.md §6 states plainly. Each appeared twice, here and in the cadence table below. A maintenance schedule that lists non-existent files is the failure mode this document exists to prevent.*
 
 ---
 
@@ -148,12 +148,10 @@ The discipline is *asking the question*, not necessarily changing anything.
 | `AGENTS.md` | ADRs, framework updates, new conventions | Phase boundaries + bi-weekly |
 | `docs/workflows/plan-then-execute.md` | Workflow misfires reported in task logs | Phase boundaries |
 | `docs/plans/_template.md` | Plans repeatedly missing something | Quarterly |
-| `docs/logs/_template.md` | Log entries failing to capture what's needed | Quarterly |
-| `zugzwang_experiment_tracker_v9.html` | Task completion (continuous); reorgs (rare) | Continuous (per task close) |
-| `.claude/agents/*`, `.claude/commands/*`, `.claude/hooks/*` | When the underlying file changes | As needed |
+| `.claude/agents/*` | When a briefing or its model/effort pin changes | As needed |
 | This file (`docs/maintenance.md`) | Audit process itself misfires | Quarterly |
 
-Yes, this file gets audited too. The loop checks itself.
+Yes, this file gets audited too. The loop checks itself — and at SYNC-1 it did not: three of this table's eight rows named files that do not exist (see the note under *What's in scope*). The tracker is external and operator-maintained; audit it in the tracker chat, not from here.
 
 ---
 
@@ -165,6 +163,9 @@ Yes, this file gets audited too. The loop checks itself.
 - **2026-07-18 — Fable-5 window closed early; subagents re-pinned to Opus 4.8 (OQ-7).** The window closed ahead of its ~Jul 19 end; all four subagents return to `model: claude-opus-4-8` / `effort: max` and CLAUDE.md §6's window-stale text was reconciled in the same PR (PR #245, branch `chore/oq7-opus-repin`). Discharged the UI.0 revert obligation. *(Backfilled 2026-07-31 at MODEL-REPIN from the CLAUDE.md §6 pin history + `docs/logs/OQ7-REPIN.md`; the event was never logged here at the time.)*
 - **2026-07-31 — CC harness → Claude Opus 5 (MODEL-REPIN).** Executor pin moves to `claude-opus-5` (the 2026-06-28 Opus 4.8 pin above is superseded); all four subagents repin `model: claude-opus-5` / `effort: max`. The pin was proven empirically before it landed: agent definitions are **not hot-reloaded**, so a mid-session edit cannot test itself — the probe ran a fresh headless session (`claude -p`) rooted in the repinned worktree, which loaded the on-disk definition (a temporary in-body marker fired) and returned `tool_uses: 1`, i.e. the model resolved and the tool loop ran. `effort: max` was accepted unchanged. Two doc corrections ride along: `/effort` is **session-scoped** (the harness reports "this session only"), so the prior "persists via user settings" claim in `docs/workflows/plan-then-execute.md` was wrong and is fixed — only `/model` persists; and dynamic workflows / `ultracode` flip from "default for low-stakes reversible work" to **default FORBIDDEN**, PERMITTED only when web Claude says so at kickoff and all four D4 conditions hold (CLAUDE.md §6). `CLAUDE_CODE_EFFORT_LEVEL` stays retired.
 
+- **2026-08-08 — pin doctrine corrected: agent definitions load from the session's WORKING DIRECTORY (SYNC-1, backfilled from F-DEBATE-4).** MODEL-REPIN recorded only half the rule — that a **mid-session** edit to `.claude/agents/*.md` does not take effect. The other half is that definitions load **from the working directory the session was launched in**, so a session started in a tree whose branch **predates a repin runs the OLD pins**, and a newer `main` does not help. F-DEBATE-4 hit exactly this: a session launched in the primary tree on `chore/commit-cd-a` loaded the pre-repin `claude-opus-4-8` pins. **Operating rule: launch any reviewer-bearing session from a worktree at `origin/main`**; the named fallback is a per-`Agent`-call `model` override. Landed in CLAUDE.md §6 at F-DEBATE-4 and never logged here — recorded now so the pin history is complete.
+- **2026-08-08 — register split ratified and committed (SYNC-1).** Three registers had been using the bare form `L-n` at once, each with its own `L-2`. Split and homed: **O-space** (operating disciplines) → `CLAUDE.md` §8 · **V-space** (verification lessons V-1…V-5) → `docs/polish/POLISH-0_data-manifest.md` §5 · **L-space** (PRIMITIVES-1 Gate C reviewer LOWs) → `docs/polish/POLISH-register-ADDITIONS.md` · task-scoped `@security-auditor` LOWs carry their task name. Executes the STAGING-PARITY **D.4 (2026-08-07)** ruling, which had landed as a routing sentence without the renumbering. **Root cause worth keeping: the predecessor register lived only in project knowledge**, so `main` could neither define nor adjudicate its own numbering.
+
 ---
 
-*Last revised 2026-07-31 — CC harness → Opus 5 (MODEL-REPIN); `/effort` session-scoped correction; dynamic-workflow default flipped to FORBIDDEN; 2026-07-16 / 2026-07-18 pin events backfilled. Previous: 2026-06-28 revert to Opus 4.8; 2026-06-10 Fable 5 harness pin; SCAFFOLD.13-B (May 20, 2026), §5.11 routing extension.*
+*Last revised 2026-08-08 — SYNC-1: three non-existent files removed from both audit tables; the F-DEBATE-4 working-directory pin correction backfilled; the O/V/L register split recorded. Previous: 2026-07-31 CC harness → Opus 5 (MODEL-REPIN), `/effort` session-scoped correction, dynamic-workflow default flipped to FORBIDDEN, 2026-07-16 / 2026-07-18 pin events backfilled; 2026-06-28 revert to Opus 4.8; 2026-06-10 Fable 5 harness pin; SCAFFOLD.13-B (May 20, 2026), §5.11 routing extension.*

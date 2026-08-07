@@ -74,7 +74,7 @@ doppler run --config stg -- pnpm db:seed:staging
 
 Full reset (only if the sandbox is wedged): drop the staging schema → re-run `db:migrate:staging` → re-run `db:seed:staging`. The DB is disposable; never break-glass a sandbox.
 
-> **Doppler config is `stg` (never `staging`).** Some script headers still say `--config staging` — that string is **stale** (tracked chore; see §4). Always use `stg`.
+> **Doppler config is `stg` (never `staging`).** *(The "some script headers still say `--config staging`" warning that stood here is removed at SYNC-1 — the defect was fixed and §4 has recorded it **✅ RESOLVED** since D3. Verified: `scripts/migrate-staging.ts:8` and `:42` both read `stg`. The warning had outlived its defect and contradicted §4 in the same file.)*
 
 ### 2.4 Operator toggle navigation  *(Vercel UI, web-confirmed 2026-06-26)*
 
@@ -143,6 +143,17 @@ code: '42P07',  message: 'relation "__drizzle_migrations" already exists, skippi
 
 > **STATUS: ACTIVE.** First exercised 2026-06-28 UTC at 61abb0485e5ec7b251426932704aabd09f367abf (D6). This is the live migrate-before-serve promote path; every production promote follows this sequence. Production is gated — `autoAssignCustomDomains` is OFF, so a `main` merge produces a **staged** build that does not serve `zugzwangworld.com` until this sequence completes and the build is manually promoted. **Governed by ADR-0024 item 5; do not weaken.**
 
+### 3.0 What the staging smoke actually certifies — read before treating it as a gate
+
+`pnpm smoke:staging` is used below as a promote gate. **State its reach honestly, because one of its items is a known lookalike — a control that reports success while asserting nothing (V-3).**
+
+- ✅ **Reaches, and is trustworthy:** the `/api/health` canary assertions (bare 40-char SHA, optional `EXPECTED_SHA` exact match), `env`, `db`, and the per-hash `migrations` verdict. **This is the load-bearing part of the gate and it is sound** — it is what tells you the right SHA is serving against a migrated database.
+- ❌ **Does NOT reach — item 9, `sentry-routing`.** This item **has never asserted anything**, for three independent reasons, each alone sufficient: (1) the route it triggers, `/api/_smoke-error`, **can never route** — the `_` prefix makes `src/app/api/_smoke-error/` a Next.js App Router *private folder*, excluded from routing, so the request 404s; (2) the item **skips** whenever `SENTRY_ORG` is unset, and `SENTRY_ORG` is absent from Doppler `stg`, so it has always skipped; (3) it asserts against the Sentry project `zugzwang-prod`, which **does not exist** — the org `zugzwang-foundation` contains only `zugzwang-staging` and `zugzwang-experiment`. Fixing any one leaves the other two.
+- ⚠ **The consequence for this section:** **a green `smoke:staging` is not evidence that Sentry is ingesting events.** The server-side SDK's delivery status is still unverified. Do not read a green smoke as clearing that question, and do not promote on the assumption that an error in production would raise an alarm.
+- **Do not "fix" this by loosening the gate.** The remedy is a real delivery assertion plus `SENTRY_ORG` in Doppler `stg` and the correct project slug — tracked in `docs/parked.md` (**POOL-2 — the Sentry routing smoke check is a lookalike, three times over**) and sequenced to HARDEN. The route rename alone is **not** sufficient and should not be done alone.
+
+*Recorded at SYNC-1 (2026-08-08). §4 previously asserted the smoke was "once again a valid staging gate" without qualification, while `docs/parked.md` had already ruled item 9 vacuous and named this section's reliance on it as the blast radius. Two documents on the same `main`, disagreeing about whether a promote gate worked.*
+
 ### Why this exists (the load-bearing reason — read before executing)
 
 The ledger is append-only and frozen-at-resolution. Production must **never** serve new code against an un-migrated database — there is no acceptable window where the app writes the ledger through a schema the DB hasn't applied. So production is **migrate-before-serve**: the database is migrated and *objectively verified* **before** the new build is allowed to take the `zugzwangworld.com` alias. The `drizzle-kit migrate` exit code is **not trusted** (drizzle-orm #5769 — a silent high-water-mark skip can exit `0` with a migration unapplied); the **per-hash `/api/health` result on the staged build is the only promote authority**. No `migrations:"ok"`, no promote.
@@ -197,7 +208,7 @@ The ledger is append-only and frozen-at-resolution. Production must **never** se
 
 ## 4. Known stale references
 
-The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale assertions/comments. The focused post-D3 canary chore fixed the load-bearing ones; **`pnpm smoke:staging` is once again a valid staging gate.**
+The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale assertions/comments. The focused post-D3 canary chore fixed the load-bearing ones — **the canary assertions are sound and `pnpm smoke:staging` is a valid gate for what §3.0 says it reaches. It is NOT a Sentry gate.** See §3.0 before using it as one.
 
 - **✅ RESOLVED — `scripts/smoke-staging.ts` (was SURPRISE-1, load-bearing):** the canary assertions (`:185` staging, `:202` preview) now validate a bare 40-char git SHA via `assertCanarySha`, with an optional `EXPECTED_SHA` exact-match (the "canary == pushed SHA" gate; full 40-char SHA only). The `health-preview` `env` assertion (`:199`) was also corrected `"preview" → "staging"` — Preview is `stg`-sourced post-D1, so staging-vs-preview is told apart by which URL is curled, not by env/canary.
 - **✅ RESOLVED — `scripts/migrate-staging.ts:8` / `:42`** `--config staging` → `stg` (header comment + the runtime error message).
@@ -206,4 +217,4 @@ The deploy tooling predated ADR-0024 item 7's bare-SHA canary and carried stale 
 
 ---
 
-*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored section, finalized + first-exercised at D6 (2026-06-28). §2.5 (staging advance) was added at POLISH-1-DOCS and **first exercised 2026-08-04**; that run supplied its preconditions block, the run-selection check and the no-op-green note. Maintained per `docs/maintenance.md`.*
+*Created at D3 (2026-06-26) per ADR-0024 item 2/3/7 (staging sandbox + canary) — §2 + §4 CC-authored from the live repo. §3 (prod-promote) is a web-authored section, finalized + first-exercised at D6 (2026-06-28). §2.5 (staging advance) was added at POLISH-1-DOCS and **first exercised 2026-08-04**; that run supplied its preconditions block, the run-selection check and the no-op-green note. §3.0 (what the staging smoke certifies) was added at **SYNC-1 (2026-08-08)**, reconciling §4's unqualified "valid staging gate" claim against the POOL-2 docket ruling; the §2.3 `--config staging` warning was removed in the same pass as resolved-since-D3. Maintained per `docs/maintenance.md`.*

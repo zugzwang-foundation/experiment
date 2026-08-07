@@ -224,7 +224,7 @@ Grows additively as surfaces build. Rule: **every new component token aliases a 
 | Slot (CSS) | Contract name | Value (current) | Notes |
 |---|---|---|---|
 | `--imgmax` | `component.comment-media.max` | `160px` | tunable; consumed by the debate render (DEBATE.4) |
-| `--imgr` | `component.comment-media.radius` | `6px` | **CD-DEFERRED placeholder** per the in-code comment — value open, name frozen |
+| `--imgr` | `component.comment-media.radius` | `6px` | **RATIFIED** at BRIDGE (values-log v0_3 §3 item 2) — images, avatars, media, graph panels. *(This row said "CD-DEFERRED placeholder — value open" until SYNC-1, contradicting both the code and AGENTS.md: `globals.css:168` reads `--imgr: 6px; /* image corner radius — ratified … */` and AGENTS.md §8 says ratified. The contract was the stale one of the three.)* |
 
 ---
 

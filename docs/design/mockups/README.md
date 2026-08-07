@@ -1,7 +1,12 @@
 # Build files at v1.0 — what these are, and the one mistake to avoid
 
-These accompany `DESIGN_integration-shell_v1.0.html`. Read this before touching the build env
-or deleting anything. Full context: `DESIGN-phase-record.md` §9 (Source-Drift).
+These accompany `DESIGN_integration-shell_v1.0.html` — **held in project knowledge, not in this
+repo** (PK-only by rule; `design-canon.md` §8 row 16). Read this before touching the build env
+or deleting anything.
+
+*(SYNC-1, 2026-08-08: the "Full context: `DESIGN-phase-record.md` §9 (Source-Drift)" pointer that
+stood here is struck — that file does not exist anywhere, in the repo or as a maintained PK doc:
+`design-canon.md` **absorbed and superseded** it. Read `design-canon.md` instead.)*
 
 ## ⚠️ The critical distinction — built surfaces are NOT source mockups
 
@@ -43,7 +48,8 @@ These were never available to the web lane, so they could not be regenerated her
 
 ## Note on v1.0 being self-contained
 
-`DESIGN_integration-shell_v1.0.html` embeds these three surfaces as blobs and is **frozen and
+`DESIGN_integration-shell_v1.0.html` (**PK-held, not in this repo**) embeds these three surfaces
+as blobs and is **frozen and
 self-contained** — it does not need the build env to run or be maintained. The build env only
 matters if/when you want to **iterate or regenerate** from source (e.g. the eventual production
 / Claude Design handoff). For simply *holding* v1.0 as the locked truth, the build env is

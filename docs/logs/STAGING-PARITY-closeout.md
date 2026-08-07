@@ -79,39 +79,39 @@ against an import allowlist.
 
 ## 3 · V-1 … V-5
 
-⚠ **The canonical text of V-1…V-5 lives in
-`STAGING-PARITY_operating-plan_v1_0.md`, which is web-side and not in the
-repo.** A grep of `docs/` finds no V-numbered definitions. **They are carried
-here by number with the in-repo evidence attached; the definitions must be
-pasted in by whoever holds the operating plan.** They are not reconstructed
-here — inventing the text of a verification taxonomy would make this document
-look authoritative about something it cannot see.
+**Canonical text, pasted in at SYNC-1 (2026-08-08).** These were carried here
+by number only, because the register lived in `STAGING-PARITY_operating-plan_v1_0.md`
+— web-side, not on `main`. **D.4 (2026-08-07) ruled the renumber out of L-space
+and the ruling landed as a routing sentence; the renumbering never executed.**
+SYNC-1 executes it. **The canonical home of V-1…V-5 is now
+`docs/polish/POLISH-0_data-manifest.md` §5**, on `main`; the text below is a
+copy for this log's evidence table, and §5 wins on any divergence.
 
 | ID | Canonical text | Evidence this task produced |
 |---|---|---|
-| **V-1** | *(web-side — paste in)* | — |
-| **V-2** | *(web-side — paste in)* | — |
-| **V-3** | *(web-side — paste in)*. Used by the founder at POOL-2 close as **the lookalike class**: a control that reports success while asserting nothing | Three independent defects in the Sentry routing smoke item, each alone sufficient to make it a lookalike — `docs/parked.md`, POOL-2 row |
-| **V-4** | *(web-side — paste in)* | — |
-| **V-5** | *(web-side — paste in)* | — |
+| **V-1** | A test that reassembles a lookalike proves nothing about the shipped one | — |
+| **V-2** | A negative assertion needs a positive control — `not.toMatch` passes when its pattern matches nothing, and "matches nothing" is exactly what a rename or a reformat produces | — |
+| **V-3** | Asserting that a call exists is not asserting what it does. Used by the founder at POOL-2 close as **the lookalike class**: a control that reports success while asserting nothing | Three independent defects in the Sentry routing smoke item, each alone sufficient to make it a lookalike — `docs/parked.md`, POOL-2 row |
+| **V-4** | A source match is the weak form: it reads text ABOUT a file, and it false-alarms on correct code | — |
+| **V-5** | Negative controls must SPAN failure classes, not accumulate within one | The V-5 block below — three magnitude-corruption controls, all green, none able to reach a scoping error |
 
-**L-space belongs to `docs/polish/POLISH-register-ADDITIONS.md`**, not here.
-L-1…L-9 are allocated there and the succession is documented there. The one
-L-item this task minted is **L-8** (below), whose text is in the draft this
-document promotes.
+**Routing — three registers, three namespaces.** **V-space** is the
+*verification* lessons and lives in `docs/polish/POLISH-0_data-manifest.md` §5.
+**L-space belongs to `docs/polish/POLISH-register-ADDITIONS.md`** — the
+PRIMITIVES-1 Gate C reviewer LOWs — not here. **Task-scoped
+`@security-auditor` LOWs are a third space** and must carry their task name
+(`F-DEBATE-4 L-2`, `SA-L-1`), never a bare `L-n`. The one verification lesson
+this task minted is **V-5** (below); it was carried as "L-8" until the
+SYNC-1 renumber.
 
-> **L-8 · Negative controls must SPAN failure classes, not accumulate within
-> one.** Successor to L-1 and L-2. Three controls were run against the new
+> **V-5 · Negative controls must SPAN failure classes, not accumulate within
+> one.** Successor to V-1 and V-2. Three controls were run against the new
 > gates and all three passed — but all three were **magnitude corruptions**, so
 > the set was three samples of one failure class wearing three gate names, and
 > none could have caught a scoping error. `@code-reviewer` found exactly that in
 > four gate-4 probes (HIGH-1) *after* all three reported green. The controls
 > were not weak individually; the **set** was, and its weakness was invisible
 > from inside it.
-
-⚠ **L-2's text is not carried anywhere in-repo** — it is cited by number only.
-Someone holding the canonical lesson register should confirm the L-8 succession
-reads correctly.
 
 ---
 

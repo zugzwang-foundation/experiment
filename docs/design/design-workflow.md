@@ -10,7 +10,7 @@
 >
 > **Grounding.** Procedures and gotchas are distilled from the Claude Design research in PK — primary: `Research_Report_v2.md` (high-fidelity operation); `Research_Report.md` (v1) remains background where v2 is silent, but is wireframe-framed — do not take fidelity-mode advice from it. Where a number is time-sensitive (usage metering), verify in the live dashboard before relying on it.
 >
-> **Realignment (2026-07-03).** The branding phase is defined by `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (CANON): brand the **existing published system** in CD (not a second system), land the **values** in the repo tokens, and have **CC build each surface from its locked mockup + branded tokens** (no separate CD production build). This updates §7 (seeding now historical; §7.4 branding path). Operating guide: `ZUGZWANG-CD_design-system-editing-manual_v1_0.md`.
+> **Realignment (2026-07-03).** The branding phase is defined by `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (CANON): brand the **existing published system** in CD (not a second system), land the **values** in the repo tokens, and have **CC build each surface from its locked mockup + branded tokens** (no separate CD production build). This updates §7 (seeding now historical; §7.4 branding path). Operating guide: `ZUGZWANG-CD_design-system-editing-manual_v1_0.md` (**held in project knowledge, not in this repo** — see `docs/parked.md` N1).
 
 ---
 
@@ -240,7 +240,7 @@ Claude Design usage is steep, and the reset is **weekly**, not daily — running
 
 Claude Design produces its best, most consistent output when it extracts a **published design system** from real code — "code beats specs." We use this to lock the monochrome look across surfaces. The ordering below is deliberate and was a planning decision: **the kit is built *from* the approved first surface, not before it.**
 
-> **State (2026-07-03).** The published monochrome system described here **exists** ("Zugzwang Design System" in CD, built from the repo per DC.3). §7 is now **historical** — the seeding is done. The **current** work is *branding* that system per `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md`, operated via `ZUGZWANG-CD_design-system-editing-manual_v1_0.md`.
+> **State (2026-07-03).** The published monochrome system described here **exists** ("Zugzwang Design System" in CD, built from the repo per DC.3). §7 is now **historical** — the seeding is done. The **current** work is *branding* that system per `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (in-repo, `docs/design/`), operated via `ZUGZWANG-CD_design-system-editing-manual_v1_0.md` (**PK-held, not in this repo** — `docs/parked.md` N1).
 
 ### §7.1 Why after Slot 1, not before
 

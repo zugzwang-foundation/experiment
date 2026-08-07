@@ -45,6 +45,7 @@ just db-generate name # drizzle-kit generate --name <name>
 just db-migrate       # drizzle-kit migrate
 just db-reset         # supabase db reset
 just test-db          # vitest run tests/db/ tests/invariants/
+just test-scale       # pnpm test:scale — the ENGINE.10 Q-2 battery (opt-in, own config)
 ```
 
 Test scripts (in `package.json`): `pnpm test:invariants` (`vitest run tests/invariants/`), `pnpm test:integration` (`vitest run tests/integration/`), `pnpm test:scale` (opt-in, its own config), plus identity-pool seed/verify and staging migrate/seed/smoke scripts. There is **no `just db:up`** and **no all-in-one test recipe** — run `just test-db` and the `pnpm test:*` scripts as needed.
@@ -68,22 +69,30 @@ experiment/
 │   ├── app/                        # Next.js App Router
 │   │   ├── (admin)/admin/          # login (separate from Better Auth) + markets, markets/new, markets/[marketId] (ENGINE.15 market-admin pages) + markets/media/sign route (MEDIA.1) + moderation/audit page
 │   │   ├── (auth)/                 # onboarding, sign-in, sign-in/otp
-│   │   ├── (public)/               # participant shell (SHELL/UI.0): layout.tsx placeholder shell + m/[slug] market scaffold + m/[slug]/export route (debate .md export, ADR-0025)
-│   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign
+│   │   ├── (public)/               # the participant surface — layout.tsx + not-found.tsx (shell, SHELL/UI.0)
+│   │   │                           #   page.tsx                     — DISCOVERY, the market list (UI-A4). LIVE.
+│   │   │                           #   m/[slug]/page.tsx            — the debate view
+│   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
+│   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
+│   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
+│   │   │                           #   bookmarks/{page,loading,error}.tsx     — BOOKMARKS (UI-A6, ADR-0032)
+│   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
 │   │   ├── globals.css, layout.tsx, page.tsx
-│   ├── components/ui/              # shadcn primitives: button, card, badge, avatar, separator, skeleton (SHELL/UI.0 baseline)
+│   ├── components/                 # bookmarks/ debate/ discovery/ profile/ shell/ ui/
+│   │   └── ui/                     #   shadcn primitives: avatar, badge, button, card, dialog, input, separator, skeleton, textarea
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
 │   │                               #   dharma, events, identity, image-uploads, index, markets, system
-│   ├── lib/                        # auth-client, errors, utils, posthog/
-│   └── server/                     # server-side business logic
+│   ├── lib/                        # auth-client, errors, utils, ranking{,.config,-decimal}, posthog/
+│   └── server/                     # server-side business logic — 26 dirs
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ health/ idempotency/ identity-pool/
+│       ├── bets/ bookmarks/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ health/ idempotency/ identity-pool/
+│       ├── discovery/              # ← list.ts is the Discovery read model. THE PERF-1 SURFACE (docs/parked.md, GO-LIVE BLOCKER)
 │       ├── markets/                # transitions, errors + ENGINE.14: transaction (W-4), create, open, close (incl. the closeDueMarkets sweep)
-│       ├── middleware/ moderation/ observability/ positions/ resolution/ storage/ system/ upstash/
+│       ├── middleware/ moderation/ observability/ positions/ profile/ resolution/ storage/ system/ upstash/ visitors/
 ├── tests/                          # dedicated dir (NOT colocated) — see §9
 ├── docs/{adr,specs,logs,plans,…}
 ├── drizzle/migrations/             # generated + hand-written; append-only — DO NOT EDIT
@@ -95,7 +104,18 @@ experiment/
 └── instrumentation.ts, instrumentation-client.ts, sentry.{server,edge}.config.ts, proxy.ts
 ```
 
-**Greenfield — implied by the specs but NOT yet on disk:** none currently — the former `src/server/identity/` entry was reconciled away at AUDIT-FIX-A22 (SPEC.2 §3.5/§3-SSOT/Appendix A now name the built `identity-pool/consume.ts` path; nothing implies a separate `identity/` dir anymore). The `src/app/(public)/` participant route group now EXISTS — its shell (`layout.tsx`) + the `/m/[slug]` market scaffold landed at SHELL/UI.0; the market-list surface under it is still to come (DESIGN.* / UI.*). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
+**Greenfield — implied by the specs but NOT yet on disk: none.** The `src/app/(public)/` participant route group is **built, not pending**, and every surface under it is live:
+
+| Surface | Route | Read model | Landed |
+|---|---|---|---|
+| **Discovery** (the market list) | `(public)/page.tsx` | `src/server/discovery/list.ts` | UI-A4 |
+| Debate view | `(public)/m/[slug]/page.tsx` | `src/server/debate-view/` | DEBATE.4 · ADR-0034 |
+| Profile | `(public)/u/[pseudonym]/page.tsx` | `src/server/profile/` | UI-A5 |
+| Bookmarks | `(public)/bookmarks/page.tsx` | `src/server/bookmarks/` | UI-A6 · ADR-0032 |
+
+> ⚠ **Discovery is not "still to come" — it is the PERF-1 GO-LIVE BLOCKER.** Through 2026-08-08 this paragraph read *"the market-list surface under it is still to come (DESIGN.\* / UI.\*)"*, which was false from UI-A4 onward. `docs/parked.md`'s only row labelled **GO-LIVE BLOCKER** is about this exact surface serving in **~35 s** — `listOpenMarkets` issues 1 + 3N queries (`src/server/discovery/list.ts:48–63`) and `DiscoveryContent` a further 2N (`src/app/(public)/page.tsx:59–65`). A session opening PERF-1 must not be told its target does not exist. Corrected at SYNC-1.
+
+The former `src/server/identity/` entry was reconciled away at AUDIT-FIX-A22 (SPEC.2 §3.5/§3-SSOT/Appendix A now name the built `identity-pool/consume.ts` path; nothing implies a separate `identity/` dir anymore). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
 
 Server-side logic lives under `src/server/`. **Never import from `src/server/**` into a client (`"use client"`) component** — Next.js will catch it, but catch it in review first. The schema/client live at `src/db/` (path alias `@/db`), confirmed by `drizzle.config.ts` (`schema: "./src/db/schema"`).
 
@@ -200,7 +220,7 @@ const placeBetSchema = z.object({
 - **CSS-first config** in `src/app/globals.css`: `@import "tailwindcss"`, `tw-animate-css`, `shadcn/tailwind.css`, then `@custom-variant dark`. **`postcss.config.mjs`** loads `@tailwindcss/postcss` (Next.js needs it).
 - **Hex authoritative in `@theme`** (BRIDGE / OQ-2): colour tokens land as 6-digit **lowercase** hex (Biome's CSS formatter normalizes case — uppercase is a format error); **oklch may appear in comments only**. The census achromatic rule is **R == G == B** on the hex. Defining `--color-yes` auto-generates `bg-yes`, `text-yes`, etc. *(Supersedes the SHELL/UI.0-era "OKLCH only" rule.)*
 - **Tokens are BRANDED (dark, values-log v0_3 §3).** The `@theme` block in `globals.css` carries the branded dark system landed at BRIDGE onto the frozen contract slots: page ground `--color-ground` `#181818` (generates `bg-ground`; outside the 11-token census), the true-neutral ramp `--color-n0 … --color-n7` + `--color-ink` — achromatic, running **dark → bright** (`n0 #212121` darkest card surface … `n7 #e4e4e4` brightest emphasis, `ink #fafafa`; **inverted vs the retired light ramp — never copy by lightness**) — and the side poles `--color-yes` = `#181818` (YES side = black) / `--color-no` = `#fafafa` (NO side = white). The poles name the **SIDE** (YES/NO), never the Support/Counter relation. Single dark theme lives in `:root`/`@theme`; the `.dark` block is **descoped-inert** (never applied; its two chromatic strays neutralized). `--destructive` is neutralized to `var(--color-n6)`. The shadcn semantic `:root` slots alias the same primitives via `var()` chains (tier-2; `--sidebar-*` mirrors its `--X` — OQ-8). The raw-props `:root` block adds the applied-semantic / state / elevation / radius tokens (`--surface-*`, `--text-*`, `--graph-yes/no`, `--state-*` ×8, `--elev-0..3`, `--r`/`--r-chip`/`--r-dot`, `--avatar-ring`, `--dur-hover`, `--overlay`, `--btn-fill`, `--border-strong`). No accent: nothing named `--color-brand` exists (true-neutral ratified; contract §2.2 stays reserved-empty). `--font-sans/mono` → Geist, **ratified FINAL** (WI-13; Lucide FINAL alongside). `--imgr` is **ratified** (6px — images, avatars, media, graph panels; values-log §3 item 2). Guarded by `tests/unit/design/tokens-monochrome.test.ts` — exact hex pins, 11-count census, ground/graph/destructive pins, string bans.
-- shadcn primitives carry `data-slot`; use the current variant, don't mix older styles; `Sonner` for toasts.
+- shadcn primitives carry `data-slot`; use the current variant, don't mix older styles. **No toast library is installed** — `sonner` is in neither `package.json` nor `src/`. (Through 2026-08-08 this line said "`Sonner` for toasts", which was an instruction to reach for an uninstalled dependency, against §11's *ask first* on adding one. Corrected at SYNC-1; adding a toast library remains a §11 ask-first decision, not a default.)
 - **Accessibility:** `aria-label` on icon-only buttons and YES/NO toggles; Tab-reachable; focus-trap via shadcn `Dialog`; `aria-live="polite"` for price/status; pair colour with icon/text. *(No axe/Playwright accessibility project is installed yet — manual review for now.)*
 
 ---
@@ -213,7 +233,13 @@ const placeBetSchema = z.object({
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
 ├── db/            _fixtures/, identity-pool/, indexes/ (positions-market-id pg_indexes assert — the catalog-assertion mint, AUDIT-FIX-B7b), triggers/ (13 append-only specs, one per protected table — +bet-receipts-append-only, AUDIT-FIX-B3 — plus truncate-rejected.spec)
-├── integration/   20 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, debate-export, dharma-chain-drift-drain, dharma-ledger, email-otp-send, idempotency-cache — the former idempotency suite, renamed — market-by-slug, migration-drift, nightly-drift-resolution, onboarded-login-session, orphan-sweep, positions, precommit-moderate, rate-limit, resolution-conservation, sign-read, sign-upload, signup-create-path, upstash-lock)
+├── integration/   30 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, composer-image,
+│                  composer-place, composer-reply, composer-sell, debate-export, dharma-chain-drift-drain,
+│                  dharma-ledger, email-otp-send, header-balance, header-portfolio, idempotency-cache — the
+│                  former idempotency suite, renamed — market-by-slug, market-quote, migration-drift,
+│                  nightly-drift-resolution, onboarded-login-session, orphan-sweep, positions, post-param,
+│                  precommit-moderate, rate-limit, resolution-conservation, sign-read, sign-upload,
+│                  signup-create-path, staging-reset-mechanism, upstash-lock, viewer-context)
 ├── invariants/    10 specs — see the Invariant-tests bullet below
 ├── scale/         8 *.scale.test.ts (the ENGINE.10 Q-2 correctness-at-scale battery) + _fixtures/, _harness/ — opt-in only, see the Scale bullet below
 ├── staging/       OPERATIONAL RUNNERS, not tests — THREE runners (reset.staging.test.ts · generate.staging.test.ts · gates.staging.test.ts) + fixtures.ts (the literal fixture table) + _lib/ (target, client, read-client, write-guard, guards, reset, coverage, captured-identities). ADR-0035/0036, STAGING-PARITY Slices A–D. Points at the LIVE staging DB; opt-in only, see the Operational-runners bullet below
@@ -222,7 +248,7 @@ tests/
 ```
 
 - **Unit** (no IO): pure functions in `src/lib/` and `src/server/<domain>/`. Happy path + ≥2 edges + the relevant invariant.
-- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — 26 `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
+- **Component / render** (jsdom, no IO): `jsdom` + `@testing-library/react`, enabled **per file** by a `// @vitest-environment jsdom` docblock on line 1 — **30** `*.test.tsx` files, mostly under `tests/unit/**/render/` plus `tests/server/admin/*.component.test.tsx`. **There is no `jest-dom`**, so `toBeInTheDocument()` / `toBeDisabled()` and that whole matcher set are UNAVAILABLE — assert against plain DOM (`getAttribute`, `textContent`, `querySelector`). Fake timers + `act()` for interval/effect behaviour; page visibility is exercised by stubbing `document.hidden` and dispatching `visibilitychange` (F-DEBATE-4). *Recorded at F-DEBATE-4 because this harness has existed since UI.0 and §9 never named it, so successive plans inherited a false "the UI cannot be tested" premise.*
 - **Integration** (real test Postgres): any service-layer function that writes. Mandatory scenarios as the ENGINE lands — bet atomicity, Dharma reconciliation, side-freeze on comment, payout math, append-only enforcement.
 - **Scale** (opt-in, real test Postgres): `tests/scale/` is the correctness-at-scale battery (collision storms, hot-row contention, determinism under load — ENGINE.10 Q-2). It runs **only** via `pnpm test:scale` with its own `vitest.scale.config.ts`; the default config **excludes `tests/scale/**`** (`vitest.config.ts`), so a bare `vitest run` — local or CI — never picks it up.
 - **Operational runners** (opt-in, the LIVE staging database): `tests/staging/` holds non-test operational artifacts that borrow the Vitest harness for module resolution — ADR-0036. **THREE runners are on disk, not one:**
@@ -290,4 +316,4 @@ tests/
 
 ---
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026) — SPEC.1 1.0.14, SPEC.2 1.0.17; SPEC.1 cite refreshed to 1.0.15 at SYNC-LITE (Jul 16, 2026). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*

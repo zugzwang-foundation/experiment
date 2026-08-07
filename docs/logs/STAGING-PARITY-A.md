@@ -7,6 +7,17 @@
 > `staging` advanced to the same SHA.
 > **The reset has NEVER been run against staging.** Local Postgres only. Its
 > first execution is Slice B's opening act — see the ruling below.
+> *(Discharged: Slice B executed it. Retained as the record of what was true
+> at close.)*
+
+> ⚠ **Numbering note, added at SYNC-1 (2026-08-08). The `L-n` citations in this
+> log are slice-local and predate the V/O/L split.** They are **not** renumbered
+> here — this is a historical record. Read them as: **`L-1` → `V-1`** (a test
+> that reassembles a lookalike proves nothing about the shipped one) · **`L-3` →
+> `O-1`** (structural beats procedural; a config key does not decay) · **`L-7`**
+> is slice-local and was never promoted to either register. Canonical V-space is
+> `docs/polish/POLISH-0_data-manifest.md` §5; canonical O-space is `CLAUDE.md`
+> §8; `POLISH-register-ADDITIONS.md` holds the unrelated PRIMITIVES-1 L-space.
 
 ---
 

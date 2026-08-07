@@ -9,7 +9,8 @@
 >
 > **Kept, not deleted.** The four rulings below are the primary record of
 > decisions made *before* the walkthrough reported, and the close-out cites
-> them rather than restating them — L-8's full text in particular lives here.
+> them rather than restating them — V-5's full argument in particular lives here
+> (it was numbered "L-8" at the time; see §1).
 > Read this for the arguments; read the close-out for the state.
 >
 > **Status:** closed. Opened 2026-08-07 IST after Slices C+D merged (`5547727`,
@@ -19,9 +20,11 @@
 
 ## Ratified at D.4 prep — four items
 
-### 1 · L-8 · negative controls must SPAN failure classes, not accumulate within one
+### 1 · V-5 · negative controls must SPAN failure classes, not accumulate within one
 
-**Standing lesson. Successor to L-1 and L-2.**
+**Standing verification lesson. Successor to V-1 and V-2.** *(Carried as "L-8"
+when this draft was written; renumbered into V-space at SYNC-1, 2026-08-08, per
+the D.4 ruling. Canonical text: `docs/polish/POLISH-0_data-manifest.md` §5.)*
 
 > Negative controls must **span failure classes**, not accumulate within one.
 
@@ -53,14 +56,12 @@ wrong count · stale read · right answer for the wrong reason — and check the
 spans them. *Three green controls* is a statement about how many were run, not
 about what they reach.
 
-**Why it succeeds L-1 and L-2.** L-1 (a test that reassembles a lookalike proves
+**Why it succeeds V-1 and V-2.** V-1 (a test that reassembles a lookalike proves
 nothing about the shipped one — used twice in `STAGING-PARITY-A.md`, once
-against its own author) and L-2 are both about a control being weaker than it
-looks. L-8 is the same failure at the level of the SET rather than the
-individual control: every member sound, the collection still blind.
-⚠ **L-2's text is not carried anywhere in-repo** — it is cited here by number,
-as the D.4-prep ruling cited it. Someone holding the canonical lesson register
-should confirm the succession reads correctly before this is promoted.
+against its own author) and V-2 (a negative assertion needs a positive control)
+are both about a control being weaker than it looks. V-5 is the same failure at
+the level of the SET rather than the individual control: every member sound, the
+collection still blind.
 
 ---
 

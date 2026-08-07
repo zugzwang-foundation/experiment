@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.3** — 2026-08-06 IST. Supersedes v1.2 (2026-08-06).
+> **Status:** **v1.4** — 2026-08-08 IST. Supersedes v1.3 (2026-08-06).
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
@@ -12,6 +12,15 @@
 ---
 
 ## §0 · Amendment record
+
+### v1.4 — 2026-08-08 · from SYNC-1 (the D.4 V-renumber, executed)
+
+| # | Amendment | Detail |
+|---|---|---|
+| **D1** | **§5's lessons are numbered, and the numbering is V-space** | STAGING-PARITY **D.4 (2026-08-07) ruled the renumber out of L-space**; the ruling landed as a routing sentence and **the renumbering itself never executed**. This amendment executes it. §5's four unnumbered bullets become **V-1…V-4 in place**, in the order they already stood, and §5 is declared their canonical home. |
+| **D2** | **The L-space collision that forced it** | Three registers were all using the bare form `L-n` at once: the verification lessons (here), the PRIMITIVES-1 Gate C reviewer LOWs (`POLISH-register-ADDITIONS.md`), and task-scoped `@security-auditor` LOWs (F-DEBATE-4). Each held a distinct **L-2**, so `L-2` resolved to nothing — which is why it read as *missing* rather than as *ambiguous*. Only the `SA-L-n` set had disambiguated itself with a prefix. |
+| **D3** | **V-5 added** — negative controls must SPAN failure classes | Promoted from the STAGING-PARITY close-out, where it was carried as "L-8, successor to L-1 and L-2". It is now **V-5, successor to V-1 and V-2**, and its text lands here rather than only in a session log. |
+| **D4** | **Root cause: the register lived only in a PK document** | V-1…V-5 were numbered against `STAGING-PARITY_operating-plan_v1_0.md`, which is **project-knowledge only and not on `main`**. A repo-side reader could see every citation and no definition, so nothing on `main` could adjudicate a collision or detect a gap. The register is committed here for that reason. Same failure class as the `L-8` succession note and the five `V-1…V-5` "(web-side — paste in)" placeholders in `STAGING-PARITY-closeout.md` §3, both closed in the same commit. |
 
 ### v1.3 — 2026-08-06 · from Slice B
 
@@ -173,16 +182,19 @@ STAGING-PARITY is not done until **all six** pass from a cold rebuild.
 
 ---
 
-## §5 · Inherited verification discipline
+## §5 · Inherited verification discipline — the **V-space** register
 
-Slice A found **six** controls that passed while blind to what they named. These constraints are carried into every remaining slice.
+**This section is the canonical home of V-1…V-5.** They are the *verification* lessons: what makes a control weaker than it looks. They are **not** L-space — L-numbers belong to `POLISH-register-ADDITIONS.md` (the PRIMITIVES-1 Gate C reviewer LOWs) and to task-scoped `@security-auditor` LOWs, which carry their task name. Cite a verification lesson as **V-n**, never as L-n.
 
-- **A test that reassembles a lookalike proves nothing about the shipped one.** Assert against the shipped artifact, or against what actually happens on the wire.
-- **A negative assertion needs a positive control.** `not.toMatch` passes when its pattern matches nothing — which is exactly what a rename or a reformat produces.
-- **Asserting that a call exists is not asserting what it does.** An entire guard surface shipped unasserted because a test checked the call's lexical position and a comment claimed coverage that did not exist.
-- **A source match is the weak form.** It reads text about a file rather than what the file does, and it false-alarms on correct code. Keep it as a cheap tripwire; make the behavioural assertion the control.
+V-1…V-4 came from Slice A, which found **six** controls that passed while blind to what they named; V-5 came from Slice C/D. These constraints are carried into every remaining slice.
+
+- **V-1 · A test that reassembles a lookalike proves nothing about the shipped one.** Assert against the shipped artifact, or against what actually happens on the wire.
+- **V-2 · A negative assertion needs a positive control** — `not.toMatch` passes when its pattern matches nothing, and "matches nothing" is exactly what a rename or a reformat produces.
+- **V-3 · Asserting that a call exists is not asserting what it does.** An entire guard surface shipped unasserted because a test checked the call's lexical position and a comment claimed coverage that did not exist.
+- **V-4 · A source match is the weak form: it reads text ABOUT a file, and it false-alarms on correct code.** Keep it as a cheap tripwire; make the behavioural assertion the control.
+- **V-5 · Negative controls must SPAN failure classes, not accumulate within one.** Gate 4's three probes were all magnitude corruptions, so none could detect a scoping error — four gate-4 probes were not scoped to the user whose URL they certify, and no control in the set could have caught it. Each control was sound; the set was still blind, and invisibly so from inside it. A fourth magnitude corruption would have raised confidence without raising coverage.
 - ⚠ **Load-bearing for Slice B:** ADR-0036 primitive 4's **no-direct-writes assertion** is what keeps gate 1 non-vacuous — if the generator could write both a `bets` row and its event, gate 1 would pass *because the generator wrote both halves*. It gets a **positive control per pattern**, a **non-empty file-set assertion**, **whitespace tolerance**, and a **mutation control at authoring time**.
 
 ---
 
-*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B. Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
+*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
