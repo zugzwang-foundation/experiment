@@ -15,7 +15,7 @@
 The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
-- **Source of truth:** `SPEC.1` (product, 1.0.15) + `SPEC.2` (technical) + `docs/adr/` **0001–0034** (33 files; 0002 and 0012 unused — never count files to find the ceiling, read the highest number; next free **0035**; always verify with `ls docs/adr/` on the live repo) are canonical. `tracker_v17.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block.
+- **Source of truth:** `SPEC.1` (product, 1.0.29) + `SPEC.2` (technical, 1.0.22) + `docs/adr/` **0001–0036** (34 files; 0002 and 0012 unused — never count files to find the ceiling, read the highest number; next free **0037**; always verify with `ls docs/adr/` on the live repo) are canonical. `tracker_v20.html` is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block. *(Corrected at SYNC-1: this sentence taught "read the highest number, never count" and was itself three numbers stale — 0034/33/0035. The discipline was never applied to the sentence stating it. That is O-2, §8.)*
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
 - **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
@@ -153,6 +153,11 @@ One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md`, in the **same c
 ### 5.13 Commit & git hygiene
 Branches `feat/` · `fix/` · `chore/` · `refactor/`. **Squash-merge only; PRs required; signed commits (SSH, ED25519)** — enforced by GitHub branch protection (server-side), *not* a local hook. Multi-line commit messages: write `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt` — never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB; split multi-command pastes into single commands). Commit identity: `Zugzwang/world <zugzwangworld@proton.me>` (git username `Chrollo`).
 
+### 5.14 Standing review checks
+Per-PR reviewer items that fire on *any* PR matching their trigger — critical-path or not. Unlike §5.10 (which is the execute surface's own critical-path audit), these are checklist lines for the reviewer and for `@code-reviewer` / `@security-auditor`.
+
+- **SC-1 · Masking is a property of every body read, not of rows.** Removal masking is **not** a property of ROWS — it is a property of **every code path that reads `comments.body`** (or any user argument text / teaser / snippet). **Fires on any PR that adds or edits a read over `comments`, on any surface, participant or admin.** Two obligations: (1) the read **must** intersect `loadRemovedSet` or the equivalent `mod_actions.reason='content_removed'` predicate before a body can reach a DTO — prefer a union type whose removed variant carries no body field, so it is un-renderable by construction; (2) its test **must assert the BODY's absence, not the row's** (`expect(JSON.stringify(rows)).not.toContain(theBody)`, not only `expect(ids).not.toContain(theRow)`) — row-level exclusion assertions do not catch a second body-read path. *Minted from a live leak: the review-feed's main query anti-joined `content_removed` at row level, and a second read path in the same file (the parent-snippet fetch) read the body without the predicate and leaked a removed parent's body onto staging. Promoted here from `docs/parked.md` at SYNC-1 — a standing check filed in the docket is a standing check nobody reads, and one that is never read never fires.*
+
 ### Gotchas
 - `events.event_type` is `text`, not a pgEnum — extend the `EVENT_TYPES` const **and** its Zod payload schema in the **same commit**.
 - The `events` table is hand-partitioned (`PARTITION BY RANGE`) and **excluded from drizzle-kit** (`tablesFilter: ["!events"]`) — write its DDL as raw SQL in a migration.
@@ -179,6 +184,8 @@ First word of every coding prompt. Mandatory for CPMM math, Dharma accounting, p
 - `security-auditor` — auth, transaction handlers, moderation, admin surfaces for INV-1/2/3/4 gaps + exploitability.
 - `test-writer` — failing tests first against the plan; **never edits `src/`**.
 
+**`tests/staging/` is ADR-governed — read both before touching it.** **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) are the decisions behind everything under `tests/staging/`: the three runners are **operational artifacts, not tests**, they point at the **live staging database**, they are excluded from the default `vitest run`, and each refuses to start unless the five-guard contract passes (intent · target · environment · live connection · post-run verification). AGENTS.md §2/§9 describes the mechanism; these two ADRs are why it is shaped that way. *(Named here at SYNC-1 — the contract file had never mentioned either, while the descriptive file leaned on both.)*
+
 **Hooks / skills — NOT installed.** No committed `.claude/settings.json`, no `.claude/hooks/`, no `.claude/skills/`. The only local config is a gitignored `.claude/settings.local.json` (a tool allow-list — **no `permissions.deny`, no hooks**). So "blocked main commits / blocked destructive commands / commit linting" are **enforced nowhere** — discipline only until installed. The prioritized set to install (hooks at `.claude/hooks/`, registered via a committed `.claude/settings.json`; hard blocks in `permissions.deny`):
 
 - **`block-main-commits`** (PreToolUse) — reject any `git commit`/`push` targeting `main` directly.
@@ -200,7 +207,9 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 **Decision log** (`DECIDE` = a settled call this file encodes; newest first):
 
-- Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v17` is planning/sequencing only.
+- Register split (SYNC-1): **O-space** = operating disciplines, §8, committed here · **V-space** = verification lessons, `POLISH-0_data-manifest.md` §5 · **L-space** = PRIMITIVES-1 Gate C LOWs, `POLISH-register-ADDITIONS.md` · task-scoped auditor LOWs carry their task name. Executes the STAGING-PARITY D.4 renumber ruling, which had landed as a routing sentence only.
+- Masking is a standing per-PR review check (§5.14 SC-1), promoted out of `docs/parked.md` at SYNC-1.
+- Source of truth: SPEC.1 / SPEC.2 / ADRs are canonical; `tracker_v20` is planning/sequencing only.
 - Doc authorship: AGENTS.md is descriptive (CC-authored from the live repo); CLAUDE.md is the contract (web-drafted invariants + CC-verified file-map refs).
 - Market media (ADR-0026): admin-set per-market pool — new `market_media` table (Bucket C, no `user_id`); third R2 bucket arm `market-media` (`m/<marketId>/`); reference-model pick-from-pool via `comments.market_media_id` + not-both-set CHECK; `markets.media_video_url` outbound YouTube (new tab); admin-context upload moderation, pick path pre-vetted. Spec lane only (SPEC.1 1.0.11 / SPEC.2 1.0.12); display + admin-upload + composer-pick are three ritual-gated build tasks (new migration 0018→0019 at execute).
 - Debate `.md` export (ADR-0025): on-demand read-only `GET /m/[slug]/export`; masking inherited from `loadDebateView` (removed content never exported); text-only single file with a version-pinned `zugzwang.md` context block prepended. Amends SPEC.1 §21.3.
@@ -225,8 +234,22 @@ Stale docs are worse than none — the ongoing burden is **pruning**, not adding
 
 ---
 
-## 8. Closing rule
+## 8. Standing disciplines — **O-space**
 
-**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). If anything here is wrong, fix it before fixing the code.**
+Operating lessons, ruled durable and numbered. **O-space is the *operating* register: how to work.** It is deliberately distinct from **V-space** — the *verification* register (V-1…V-5, what makes a control weaker than it looks), whose canonical home is `docs/polish/POLISH-0_data-manifest.md` §5 — and from **L-space**, the PRIMITIVES-1 Gate C reviewer LOWs in `docs/polish/POLISH-register-ADDITIONS.md`. Task-scoped `@security-auditor` LOWs are a fourth space and **must carry their task name** (`F-DEBATE-4 L-2`, `SA-L-1`), never a bare `L-n`.
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031 (**the range as it stood on that date — a SYNC.8 snapshot, not a current fact; §1 carries the live ceiling**); descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026) — SPEC.1 1.0.14, SPEC.2 1.0.17; SPEC.1 cite refreshed to 1.0.15 at SYNC-LITE (Jul 16, 2026). Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, CC → Opus 4.8. Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*
+**O-space is committed here, in the repo, precisely because its predecessor register was not.** V-1…V-5 were numbered against a project-knowledge-only document (`STAGING-PARITY_operating-plan_v1_0.md`), never on `main`. Three registers then used the bare form `L-n` simultaneously, each with its own `L-2`, so a repo-side reader found every citation and no definition — the collision was undetectable from `main` because the adjudicating document was not on `main`. A register that lives only in PK cannot arbitrate its own numbering. These live here.
+
+- **O-1 · Structural beats procedural.** A `console.warn` lands mid-run where warnings are missed; a missing required argument is a compile error. Config exclusion beats "remember not to run these in CI."
+- **O-2 · Verify against the live repo — never against memory, PK, or a summary.** The ADR ceiling was understated by memory, the tracker and CLAUDE.md simultaneously. Read the highest number; never count files.
+- **O-3 · Diagnosis quality is a safety property.** A true refusal reported with a misleading cause is a defect.
+
+**Retired, not numbered:** *"the staging runner has never been executed and cannot be locally."* **DISCHARGED** — STAGING-PARITY Slice B.3 executed it against the live staging database. Recorded here so it is not re-derived as a live constraint.
+
+---
+
+## 9. Closing rule
+
+**Refuse to weaken the four invariants (§2). Refuse the project triggers (§3). Push back before agreeing (§4). Stay in scope, simplify, log every session, audit before PR (§5). Hold the standing disciplines (§8). If anything here is wrong, fix it before fixing the code.**
+
+*Rebuilt at SYNC.8 (Jun 2, 2026) against live repo `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031 (**the range as it stood on that date — a SYNC.8 snapshot, not a current fact; §1 carries the live ceiling**); descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then at SYNC-LITE (Jul 16), and again at **SYNC-1 (Aug 8, 2026) — SPEC.1 1.0.29, SPEC.2 1.0.22, the live values; §1 carries them**. Folded: reply-as-bet, ranking → 0017, two-floor economy → 0018, RLS → 0019, **CC → Opus 4.8** (**likewise a SYNC.8 snapshot, not a current fact — the live pin is Opus 5, §6, repinned at MODEL-REPIN 2026-07-31**). Corrected against recon: hooks/skills/`settings.json` not installed; critical-path naming; schema at `src/db/`. SYNC-1 (Aug 8, 2026) added §5.14 standing review checks and §8 O-space, and executed the D.4 V-renumber. Advisory, not enforcement. Maintained per `docs/maintenance.md`.*

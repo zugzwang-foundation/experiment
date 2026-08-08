@@ -15,7 +15,7 @@
 >
 > **Living.** The primitive vocabulary (§3) grows additively as each surface is designed, per the placeholder convention in the planner. Additions never silently rewrite a locked constraint (§1) or a state-shape rule (§4); those change only by explicit decision.
 >
-> **v1.0 lock (2026-06-17).** The four core surfaces (Discovery · Market Detail · Reply · Profile) + the Bookmark page are now **LOCKED at integration-shell v1.0**. This design language is the constraint set they embody and the reference the **DESIGN Wave-2** surfaces and the **Claude Design handover** are built against. The locked detail lives in the consolidated design PK (`DESIGN-phase-record`, motion / spec / copy consolidated); the final value-filled spec is derived at **DESIGN.SPEC**.
+> **v1.0 lock (2026-06-17).** The four core surfaces (Discovery · Market Detail · Reply · Profile) + the Bookmark page are now **LOCKED at integration-shell v1.0**. This design language is the constraint set they embody and the reference the **DESIGN Wave-2** surfaces and the **Claude Design handover** are built against. The locked detail lives in the consolidated design PK (`DESIGN-phase-record`, motion / spec / copy consolidated); the final value-filled spec is derived at **DESIGN.SPEC**. *(SYNC-1: `DESIGN-phase-record` and its three by-type consolidations were **absorbed and superseded by `design-canon.md`**, which is in the repo — see `design-canon.md` §7. Read the canon; this pointer is kept only as lineage.)*
 
 ---
 

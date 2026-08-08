@@ -9,6 +9,25 @@ and the conditional trigger (when it becomes load-bearing).
 
 ---
 
+## SEQUENCE — the triggered set, in order (SYNC-1, 2026-08-08)
+
+Rows whose stated trigger is **met today**. Everything else in this file is
+waiting on an event that has not happened. Go-live is **2026-09-15**.
+
+| # | Row | Owner / gate | Why here |
+|---|---|---|---|
+| **1** | **PERF-1 — Discovery serves in ~35 s** | **next task** | The only **GO-LIVE BLOCKER**. Also blocks POLISH.1–.8 — a 35-second front page makes visual inspection impractical and any timing observation meaningless. ⚠ Do **not** open it assuming batching is the fix; read its two carry-verbatim threads first. |
+| **2** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
+| **3** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
+| **4** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
+| **5** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
+
+*Ordering rule: go-live blocker → operator-owned pre-promote → known-vacuous
+gate → dated pre-launch hardening → armed-on-touch. A row leaves this table only
+when it closes; a row enters it when its trigger fires.*
+
+---
+
 ## SCAFFOLD.12 §10.b — Resend domain verification + `RESEND_FROM_EMAIL` flip
 
 **Originating task:** SCAFFOLD.12 §10.b (per Q3 resolved at
@@ -125,7 +144,24 @@ not this PR's.
 
 ---
 
-## SCAFFOLD.3-FOLLOWUP-1 §0.2 S3 — ADR backfill (0002 through 0017 missing from disk)
+## SCAFFOLD.3-FOLLOWUP-1 §0.2 S3 — ADR backfill — ✅ **CLOSED 2026-08-08 (SYNC-1)**
+
+> **CLOSED — discharged by PR #59 (`7a53341`, 2026-06-02), "docs(adr): backfill
+> ADRs 0003-0019 and ADR template".** Verified at SYNC-1 against `ls docs/adr/`
+> on `origin/main` `fecbaf3`: **14 of the 16 ADRs this row named as missing now
+> exist** (0003, 0004, 0005, 0006, 0007, 0008, 0009, 0010, 0011, 0013, 0014,
+> 0015, 0016, 0017). The remaining two — **0002 and 0012 — are not gaps to
+> fill**: CLAUDE.md §1 and SPEC.2 §22.1 both record them as permanently unused
+> numbers (0002's topic lives in `TRADEMARK.md` + the repo structure; 0012 is
+> the design.md in-flight carve-out). The live inventory is **0001–0036, 34
+> files**, so this row's premise — *"On disk: `0001-license-choice.md` only"* —
+> has been false for **two months**. **Nothing is owed.** Retained as the
+> closure record, not as work.
+>
+> *Why it survived: its trigger was "next task that touches a domain governed by
+> a missing ADR", which is a condition nobody evaluates as a checklist item —
+> so the row was never re-read, and the backfill that discharged it never
+> closed it.*
 
 **Originating task:** SCAFFOLD.3-FOLLOWUP-1 §0 step-1 audit;
 re-confirmed at execute-phase Phase 0.2 `find` (empty output for
@@ -271,9 +307,20 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Why deferred.** ENGINE.4 reads `markets`/`pools` as built with no SPEC/ADR edits; consolidating the market-status wording sweep into PRECURSOR.5 beats scattering tiny SPEC/ADR riders across execute PRs. Drift is noted in-code, not fixed here.
 
-**Conditional trigger.** PRECURSOR.5 (the SPEC.2 market-status listing reconciliation) runs.
+**⚠ RE-TRIGGERED 2026-08-08 (SYNC-1) — new owner needed. The fixes never landed, and the trigger was already in the past when this row was written.**
 
-**Expected next task.** PRECURSOR.5.
+**The content check, run at SYNC-1 against `origin/main` `fecbaf3`:**
+
+- `docs/specs/SPEC.1.md:69` — the §2 glossary row still reads **"Open / Closed / Resolving / Resolved / Voided / Frozen | The **six** market lifecycle states"** with the column named **`markets.state`**. All three prescribed fixes are un-made: `Draft` is still absent, it still says *six* not *seven*, and the column is still `markets.state`. It is also **self-contradicted 168 lines later** — `SPEC.1.md:237` writes `markets.status` for the same column.
+- `docs/adr/0013-concurrency-bet-transaction.md:318, :320, :321` — still reads `markets.state` (3 sites) and `markets.resolving_at` (3 sites). Un-fixed.
+
+**Why it went stale rather than firing: the trigger was un-fireable from birth.** The row was written at the ENGINE.4 OQ-F ruling on **2026-06-05** with the sole trigger *"PRECURSOR.5 runs"* — but `docs/logs/PRECURSOR.5.md` is dated **2026-05-14**, three weeks *earlier*. PRECURSOR.5 had already run. A trigger that points at a completed event never fires, and nothing detects that. **Any row whose trigger names a task must be checked against that task's log at filing time.**
+
+**Why SYNC-1 did not simply fix it.** Both halves were deliberately left: the SPEC.1 half is a **normative** glossary edit, and the ADR-0013 half cannot be a plain body edit — ADRs are immutable (SPEC.2 §22.4), so it needs an in-place **Patch record** per CLAUDE.md §5.12, which is an ADR-lane action outside a documentation truth-pass. Landing only the SPEC.1 half would re-create the same half-fixed state this row already records. **They must land together, in one commit, under an owner who can take the ADR action.**
+
+**Conditional trigger.** **NOW** — the trigger is met and the row is unowned. Fires again on any task touching SPEC.1 §2, ADR-0013, or the market-status vocabulary.
+
+**Expected next task.** A dedicated editorial task, or absorption by the next task that opens ADR-0013 for its own reasons (it can carry the Patch record at no extra cost). **Not** PRECURSOR.5 — that ran on 2026-05-14 and is closed.
 
 ## AUDIT-FIX-B1 A7 — invalid-but-present Sentry DSN residual → HARDEN canary probe
 
@@ -289,7 +336,7 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 ## SYNC-sweep — PAID (PR #218, 2026-07-07)
 
-**Debt paid in full at PR #218 (branch `docs/sync-sweep`, 2026-07-07)** — one doc-only sweep PR covering the seven originating tasks (A1 #197 · B1 #199 · B2 #201 · B3 #202 · B7-A26 #209 · B7a #211 · B8 #216). Scope, one line: SPEC.2 §0 → **1.0.17** (+ §0.1 row · §19.3 `market_media`/`bet_receipts` enumeration · §22 rows ADR-0029/0030/0031 + counts — 30 ADRs = 29 files + 0012 in-flight, 27 accepted, range `0003–0031`) · SPEC.1 §0 → **1.0.14** (+ §20 row · F-BET-1 Errors + `comment_requires_bet`) · CLAUDE.md/AGENTS.md ADR-range + spec-version cites → 1.0.14/1.0.17 · deploy-pipeline.md §0 head `0023` + the §4 seed-staging OPEN note closed (strings already fixed pre-sweep at `b724094`). **Do not re-pay** — any future §0 bump starts from 1.0.14 / 1.0.17; the next sweep opens a fresh entry.
+**Debt paid in full at PR #218 (branch `docs/sync-sweep`, 2026-07-07)** — one doc-only sweep PR covering the seven originating tasks (A1 #197 · B1 #199 · B2 #201 · B3 #202 · B7-A26 #209 · B7a #211 · B8 #216). Scope, one line: SPEC.2 §0 → **1.0.17** (+ §0.1 row · §19.3 `market_media`/`bet_receipts` enumeration · §22 rows ADR-0029/0030/0031 + counts — 30 ADRs = 29 files + 0012 in-flight, 27 accepted, range `0003–0031`) · SPEC.1 §0 → **1.0.14** (+ §20 row · F-BET-1 Errors + `comment_requires_bet`) · CLAUDE.md/AGENTS.md ADR-range + spec-version cites → 1.0.14/1.0.17 · deploy-pipeline.md §0 head `0023` + the §4 seed-staging OPEN note closed (strings already fixed pre-sweep at `b724094`). **Do not re-pay** — the debt is settled and the seven originating tasks stay closed. ⚠ **Version anchors refreshed at SYNC-1 (2026-08-08): the "1.0.14 / 1.0.17" figures above are the values *as of PR #218* and are historical.** The live versions are **SPEC.1 1.0.29 · SPEC.2 1.0.22 · cpmm 2.1.0**; a future §0 bump starts from those, read off the files, never from this row. The next sweep opens a fresh entry.
 
 ## AUDIT-FIX-B2 OQ-2 — app-as-owner role split (the only COMPLETE TRUNCATE fix)
 
@@ -319,13 +366,17 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Originating task:** AUDIT-FIX-A22 (PR #207, squash `b15a7f5`, 2026-07-06) — operator-ruled close-out filing; body verbatim from the close-out kickoff.
 
-The identity-pool tuple is consumed in Better Auth's `user.create.before` hook (`identity-pool/consume.ts`, its own tx) and Better Auth's adapter INSERTs the `users` row separately — not one atomic transaction. A `users` INSERT that fails after the tuple is consumed leaves it marked `assigned_at` with no owning user: a burned pseudonym. Pre-existing property of the built architecture; recorded as an observation in SPEC.2 §3.5. A22 added audit-log completeness, not atomicity. Options at pickup: (i) move pool consumption into a we-own-it transaction that also inserts the user (the §3.5-original single-tx shape — larger refactor); (ii) a reconciliation pass reclaiming ownerless tuples; (iii) accept-for-experiment (bounded: finite pool, low INSERT-failure rate, 5% low-watermark alarm) and revisit at mainnet. Not scheduled; no live consequence unless the pool depletes.
+The identity-pool tuple is consumed in Better Auth's `user.create.before` hook (`identity-pool/consume.ts`, its own tx) and Better Auth's adapter INSERTs the `users` row separately — not one atomic transaction. A `users` INSERT that fails after the tuple is consumed leaves it marked `assigned_at` with no owning user: a burned pseudonym. Pre-existing property of the built architecture; recorded as an observation in SPEC.2 §3.5. A22 added audit-log completeness, not atomicity. Options at pickup: (i) move pool consumption into a we-own-it transaction that also inserts the user (the §3.5-original single-tx shape — larger refactor); (ii) a reconciliation pass reclaiming ownerless tuples; (iii) accept-for-experiment (bounded: finite pool, low INSERT-failure rate, 5% low-watermark alarm) and revisit at mainnet.
+
+**Conditional trigger** *(added at SYNC-1 — this row had none, against the promise at the head of this file)*: the identity-pool **5% low-watermark alarm** fires, OR any observed `unable_to_create_user` / signup-failure cluster, OR any task that reopens `identity-pool/consume.ts` or the Better Auth `user.create.before` hook. Until then: accepted for the experiment, no live consequence unless the pool depletes.
 
 ## AUDIT-FIX-A22 [FU-2] — default-vs-SERIALIZABLE isolation on the two auth transactions
 
 **Originating task:** AUDIT-FIX-A22 (PR #207, squash `b15a7f5`, 2026-07-06) — operator-ruled close-out filing; body verbatim from the close-out kickoff.
 
-F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open plain `db.transaction(...)` at default isolation, not the SERIALIZABLE the spec previously claimed (reconciled to default in SPEC.2 §3.5/§16 at A22). The double-assignment guard is the `FOR UPDATE SKIP LOCKED` row-lock, which holds at default isolation. Open correctness question: confirm default is sufficient for both flows (vs promoting to SERIALIZABLE), in particular any read-modify-write in the ToS-acceptance/grant path. Distinct from the W-1/W-3 bet/resolution wrappers, which are correctly SERIALIZABLE per ADR-0013 and out of scope here. Not scheduled.
+F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open plain `db.transaction(...)` at default isolation, not the SERIALIZABLE the spec previously claimed (reconciled to default in SPEC.2 §3.5/§16 at A22). The double-assignment guard is the `FOR UPDATE SKIP LOCKED` row-lock, which holds at default isolation. Open correctness question: confirm default is sufficient for both flows (vs promoting to SERIALIZABLE), in particular any read-modify-write in the ToS-acceptance/grant path. Distinct from the W-1/W-3 bet/resolution wrappers, which are correctly SERIALIZABLE per ADR-0013 and out of scope here.
+
+**Conditional trigger** *(added at SYNC-1 — this row had none, against the promise at the head of this file)*: HARDEN.\* pre-launch correctness pass, OR any task that reopens `identity-pool/consume.ts` or `auth/tos-accept.ts` (it rides that diff at near-zero cost), OR any observed double-assignment or ToS-grant anomaly.
 
 ## AUDIT-FIX-B7b security-auditor SURPRISE — XFF-spoofable `extractIp()` (rate-limit key + `events.metadata.ip`)
 
@@ -401,18 +452,20 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** DEBATE.7 (F-ADMIN-4 completion), or a standalone founder ruling.
 
-## STANDING CHECK — masking is a property of every body read, not of rows
+## STANDING CHECK — masking — ➡ **MOVED 2026-08-08 (SYNC-1) to `CLAUDE.md` §5.14 SC-1**
 
-**Originating task:** UI-6 follow-up (parent-snippet masking leak, PR after #262); surfaced on staging when a live reply rendered its `content_removed` parent's body via the review-feed snippet path.
-
-**The rule (a standing review check, not a one-off task).** Removal masking is NOT a property of ROWS — it is a property of EVERY code path that reads `comments.body` (or any user argument text/teaser/snippet). The review-feed's main query anti-joined `content_removed` at the ROW level, but a SECOND read path in the same file (the parent-snippet fetch) read the body without the predicate and leaked it. So:
-
-- **Any new/edited read path that touches `comments.body`** (directly, via a JOIN, via a parent/teaser/snippet lookup, or in raw SQL) **MUST intersect `loadRemovedSet` or the equivalent `mod_actions.reason='content_removed'` predicate** before that body can reach a DTO. A removed comment's body must be un-fetchable or un-renderable by construction (prefer a union type where the removed variant carries no body field).
-- **Its test MUST assert the BODY's absence, not just the row's absence** — e.g. `expect(JSON.stringify(rows)).not.toContain(theBody)`, not only `expect(ids).not.toContain(theRow)`. Row-level exclusion assertions do not catch a second body-read path.
-
-**Conditional trigger.** Every PR that adds or edits a read over `comments` on any surface (participant OR admin). Reviewer + `@security-auditor` checklist item.
-
-**Expected next task.** No fix owed — this PR closed the review-feed instance and the audit page was verified clean. This entry is the durable guard so the lesson isn't re-learned.
+> **Not closed — promoted.** *"Masking is a property of every body read, not of
+> rows"* is now **CLAUDE.md §5.14 SC-1**, a standing per-PR review check, with
+> its two obligations (intersect `loadRemovedSet` before a body reaches a DTO;
+> assert the BODY's absence, not the row's) and its origin (the review-feed
+> parent-snippet leak on staging) carried across verbatim.
+>
+> **Why it moved.** Its trigger is *"every PR that adds or edits a read over
+> `comments`"* — a per-PR reviewer obligation, not deferred work. `docs/parked.md`
+> is *"out-of-scope follow-up tasks … parked until a real task picks them up"*
+> (§ header), and nothing here is read at PR time. **A standing check filed in
+> the docket is a standing check nobody reads, and one that is never read never
+> fires.** It belongs in the file every session loads.
 
 ## STAGING-PARITY Slice A — `PRODUCTION_PROJECT_REF` liveness (rotation is a process control)
 
@@ -585,3 +638,82 @@ Batching **RAISES peak concurrent connections** and **COLLAPSES hold time**. Dis
 **Conditional trigger.** Now — it is sequenced above POLISH.1.
 
 **Expected next task.** PERF-1 as its own ratified task. Evidence and the full findings table are in `docs/logs/POOL-1.md` §6; this entry is the tracking.
+
+## N1 — Commit the two PK-only artifacts that committed docs depend on
+
+**Originating task:** SYNC-1 (2026-08-08), STEP 2.6 — the dangling-reference sweep.
+
+**Deferred work.** Commit **`DESIGN_integration-shell_v1_0.html`** (282,719 B) and **`ZUGZWANG-CD_design-system-editing-manual_v1_0.md`** (11,780 B) to `docs/design/`. Both are held in project knowledge only. Committed repo docs point at them: the integration shell from `docs/design/mockups/README.md` (twice) and `design-canon.md` §8 row 16; the editing manual from `design-workflow.md` (twice) and `ZUGZWANG-CD_branding-handoff-decision-record_v1_0.md` (twice). **PK is currently the sole holder of an artifact `main` depends on, which inverts "GitHub is canonical."** Every one of those references was annotated *"held in project knowledge, not in this repo"* at SYNC-1 so no reader is misled in the interim — the annotation is the mitigation, not the fix.
+
+**⚠ This row is in tension with a standing rule and cannot simply be executed.** `design-canon.md` §8 row 16 currently rules the integration shell **"🔒 v1.0 — PK-only by rule · ✕ stays PK"**, and `mockups/README.md` explains the reasoning (it is a frozen, self-contained build artifact, and its source mockups live on an operator machine). So N1 is **two decisions, not one**:
+
+1. **The editing manual** — no rule opposes committing it. Straightforward.
+2. **The integration shell** — committing it **reverses a documented canon rule**. That needs a founder ruling and a same-commit `design-canon.md` §8 amendment, or the row scopes down to the editing manual alone and the shell's PK-only status is instead *restated* as deliberate (which the annotations already do).
+
+**Why deferred.** SYNC-1 is a documentation truth pass; committing a 282 KB binary-ish artifact and amending the design canon are both out of its scope, and the second needs a ruling it cannot take.
+
+**Conditional trigger.** Before the next design-doc edit, or at DESIGN lane close — whichever comes first.
+
+**Expected next task.** A DESIGN-lane task that can take the canon ruling. Evidence: `~/Desktop/SYNC-1-recon.md` R2 (the eviction analysis that surfaced it).
+
+## N2 — Write `docs/logs/UI-phase-record.md`
+
+**Originating task:** SYNC-1 (2026-08-08), PK eviction.
+
+**Deferred work.** Write `docs/logs/UI-phase-record.md` — the analogue of the existing `docs/logs/ENGINE-phase-record.md`: a per-task SHA spine for the UI lane (task → PR # → squash SHA on `main` → what landed → gate outcome). **15 UI close-outs were evicted from project knowledge at SYNC-1 with only a raw archive as insurance.** The repo holds per-task logs and plans, but nothing that reads as one lane-level spine, so reconstructing "what the UI lane did, in order" currently means opening fifteen files and trusting their cross-references.
+
+**Why deferred.** It is a writing task over ~15 close-outs plus their PRs, not a truth-pass edit; and it is most useful written *once* at lane close rather than incrementally.
+
+**Conditional trigger.** **Before POLISH closes.** (POLISH is itself sequenced below PERF-1 — see the SEQUENCE table.)
+
+**Expected next task.** A UI-lane or POLISH close-out task. Model: `docs/logs/ENGINE-phase-record.md`.
+
+## N3 — Task-scope the bare `L-n` citations that live outside `docs/`
+
+**Originating task:** SYNC-1 (2026-08-08), STEP 1 — the V-renumber.
+
+**Deferred work.** SYNC-1 split three colliding registers — **O-space** (`CLAUDE.md` §8), **V-space** (`POLISH-0_data-manifest.md` §5), **L-space** (`POLISH-register-ADDITIONS.md`) — and established that task-scoped `@security-auditor` LOWs must carry their task name. Every citation **inside `docs/`** was reconciled. **Five citation sites sit outside the SYNC-1 scope boundary (`src/`, `tests/`, root config) and were deliberately not touched:**
+
+| Site | Current text | Should read |
+|---|---|---|
+| `tests/server/debate-view/poll-contract.test.ts:211` | `(@security-auditor L-5, L-2)` | `(F-DEBATE-4 L-5, L-2)` |
+| `tests/integration/staging-reset-mechanism.integration.test.ts:596` | `(L-1, on myself: a hardcoded DSN is …)` | `(V-1, on myself: …)` |
+| `tests/unit/staging/runner-isolation.test.ts:76` | `A config key does not decay (L-3).` | `… (O-1).` |
+| `vitest.staging.config.ts:55` | `Structural beats procedural (L-3), the …` | `… (O-1), the …` |
+| `src/components/debate/composer/BetComposer.tsx:168` | `In-flight guarded (cascade L-6)` | task-scope it — `L-6` here is a UI-A3 reviewer LOW, a fourth distinct L-space |
+
+**Comment-only edits, zero behaviour.** They are listed together because fixing one and leaving four reproduces exactly the ambiguity the renumber removed.
+
+**Why deferred.** SYNC-1's scope boundary is `docs/**` + `CLAUDE.md` + `AGENTS.md`, absolute. Touching `src/`, `tests/` or root config would have broken it for a comment.
+
+**Conditional trigger.** Next touch of each file — or one sweep, whichever comes first. No urgency; nothing executes on these strings.
+
+**Expected next task.** Any task already editing one of the five, or a dedicated comment sweep. Canonical mapping: `CLAUDE.md` §8 and `POLISH-0_data-manifest.md` §5.
+
+## N4 — `visual_precursor_planner.md` — authority between the PK copy and the repo copy is undetermined
+
+**Originating task:** SYNC-1 (2026-08-08), PK drift sweep (recon R1, row 107).
+
+**Deferred work.** Decide which copy of `docs/design/visual_precursor_planner.md` is authoritative, then reconcile. **The PK copy is 22,334 B; the repo copy is 15,655 B — the PK copy is 6,679 bytes LARGER.** This is the **only** artifact in the 229-file PK sweep where PK holds *more* than `main`; every other drift row is the repo moving ahead. The repo file has been touched exactly **twice, both in June 2026** (`5b19a13` #68, `2e26b52` #70) and not since, and the PK copy's md5 matches **no commit in that file's history** — so the extra content was never on `main` in any revision.
+
+**Why this is not a normal drift row.** For every other stale PK mirror the remedy is obvious (re-stage from `main`). Here, re-staging would **destroy 6.7 KB of planner content** that exists nowhere else. Nothing establishes whether that content is a superseded draft, an unlanded expansion, or an editing accident.
+
+**Mitigation in place.** The PK copy is preserved on the operator's disk and was **not** overwritten by the SYNC-1 PK refresh — `visual_precursor_planner.md` is deliberately absent from the staged replacement set for exactly this reason.
+
+**Conditional trigger.** **Before any edit to either copy**, in either direction. Also before any future PK re-stage that would include this file.
+
+**Expected next task.** An operator/founder read of the two copies side by side. Evidence: `~/Desktop/SYNC-1-recon.md` R1 row 107.
+
+## N5 — SPEC.2 §22 does not know ADR-0035 or ADR-0036
+
+**Originating task:** SYNC-1 (2026-08-08), STEP 2.7 — surfaced while correcting SPEC.2 §0, **not** in the original work order.
+
+**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0036 — 34 files.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
+
+**Why deferred, and why §0 was only annotated.** SYNC-1's work order authorised **SPEC.2 §0 metadata only** and instructed a STOP if the correction required a normative edit. It does: §22.1 is normative and §22.5 designates the ADR files as the single source of truth, so rewriting §0's range while §22.1 still says 33/0003–0034 would leave SPEC.2 **contradicting itself inside one document** — strictly worse than the present state. §0 therefore carries a truthful annotation naming the real ceiling and pointing here, and no number was changed.
+
+**⚠ Note the second-order finding.** SPEC.2 §22's arithmetic is deliberately built so the index matches the files on disk (the ADR-0033 index-row-only ruling at BOOKMARK-ADD-WIRE exists *precisely* to keep that property). **That property is currently broken** — two ADR files on `main` appear in no SPEC.2 index row.
+
+**Conditional trigger.** The next SPEC.2 amendment of any kind — it is a §22 count reconciliation, the same shape as the one BOOKMARK-ADD-WIRE performed, and rides that commit at near-zero cost. Also fires if a task needs SPEC.2's ADR index to be authoritative.
+
+**Expected next task.** Any task already amending SPEC.2. Evidence: `docs/specs/SPEC.2.md` §0 banner annotation + §22.1 `:2253`.

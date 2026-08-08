@@ -1,7 +1,7 @@
 # Zugzwang — Claude Design Branding & Handoff: Decision Record
 
 > **v1.0** · decision record · 2026-07-03
-> **Status: CANON.** Supersedes the **B1→B2→B3** branding phasing and `ZUGZWANG-CD-GUIDE_B-series_v1_0.md`. Companion to `ZUGZWANG-CD_design-system-editing-manual_v1_0.md`.
+> **Status: CANON.** Supersedes the **B1→B2→B3** branding phasing and `ZUGZWANG-CD-GUIDE_B-series_v1_0.md`. Companion to `ZUGZWANG-CD_design-system-editing-manual_v1_0.md` (**held in project knowledge, not in this repo** — annotated at SYNC-1; commit tracked as `docs/parked.md` N1).
 > **Authorship:** web Claude (orchestrator) · ratified by operator (Hrishikesh) · **to be committed to the repo by Claude Code at/before the build-lane open** (edits made for PK/CD now must not be left PK-only).
 > **Precedence:** SPEC.1/SPEC.2 > ADRs > `design-canon.md` > this record. This record governs the **CD→CC pipeline** (workflow), not the design *language*.
 
@@ -59,7 +59,7 @@ The B-series (B1 identity → B2 assets → B3 token swap) phased branding as an
 
 ## Pointers
 
-- **Operating the branding:** `ZUGZWANG-CD_design-system-editing-manual_v1_0.md`.
+- **Operating the branding:** `ZUGZWANG-CD_design-system-editing-manual_v1_0.md` (**PK-held, not in this repo**).
 - **Design canon / locked surfaces + decisions:** `design-canon.md`.
 - **Language + tokens:** `design-language.md` v0.5 · `design-token-contract.md` v0.2.
 - **Handoff mechanics (being reconciled to this record):** `design-handoff.md` · `design-workflow.md`.
