@@ -125,6 +125,32 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(post.textContent ?? "").toContain("Đ 40");
 	});
 
+	it("render::whole-panel-is-the-post-click-target", () => {
+		// POLISH.2 V18 — the mockup's handler is bound to the WHOLE
+		// `.argbody[data-post]`, excluding `.pseud`
+		// (surface_discovery_v1_0.html:402-407). The build reaches that with a
+		// stretched link rather than by wrapping the panel, because the author
+		// link must stay a separate target and anchors cannot nest.
+		//
+		// Both halves are asserted. Without the `after:inset-0` half the click
+		// target silently shrinks back to the title+teaser box and NOTHING else
+		// on disk would notice; without `relative` on the panel the ::after
+		// escapes to the nearest positioned ancestor and covers the wrong box.
+		const { container } = renderHero({ yes: heroPost("YES"), no: null });
+
+		const panel = screen.getByTestId("hero-post");
+		expect(panel.className).toContain("relative");
+
+		const link = container.querySelector(`a[href="/m/${SLUG}?post=3"]`);
+		expect(link?.className ?? "").toContain("after:absolute");
+		expect(link?.className ?? "").toContain("after:inset-0");
+
+		// The author link sits ABOVE that overlay, or it becomes unclickable.
+		const authorLink = screen.getByTestId("hero-author-link-YES");
+		expect(authorLink.className).toContain("relative");
+		expect(authorLink.className).toContain("z-10");
+	});
+
 	it("render::author-links-to-own-profile", () => {
 		// UI.A5 A4-follow-up #2: the author pseudonym now links to its profile
 		// (`/u/[pseudonym]`) — a SIBLING of the card-body deep-link, not the same

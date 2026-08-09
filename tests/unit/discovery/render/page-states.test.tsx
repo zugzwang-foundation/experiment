@@ -239,14 +239,27 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 
 	it("render::loading-fallback-is-skeleton", () => {
 		// Element INTROSPECTION only — the async child is never rendered here.
-		// DiscoveryPage is SYNC by contract: it returns the Suspense boundary
-		// immediately (an async page would return a Promise, failing el.type).
+		// DiscoveryPage is SYNC by contract: an async page would return a
+		// Promise. That contract is asserted DIRECTLY now rather than inferred
+		// from `el.type`, because POLISH.2 V2 put the page inset on a wrapper
+		// element and the boundary is no longer the literal root.
 		const el = DiscoveryPage();
-		expect(el.type).toBe(Suspense);
+		expect(el).not.toBeInstanceOf(Promise);
+
+		// V2 — the mockup's `.content` inset (16px 28px 12px,
+		// surface_discovery_v1_0.html:67-68), pinned so it cannot silently
+		// regress. Re-tuning these at D2b is a deliberate edit, not a drift.
+		expect(el.type).toBe("div");
+		expect(el.props.className).toBe("px-7 pt-4 pb-3");
+
+		// The inset wraps BOTH states, so the skeleton and the loaded surface
+		// sit on the same inset and the page does not jump on hydration.
+		const boundary = el.props.children;
+		expect(boundary.type).toBe(Suspense);
 		// The fallback is the Slice-5 LoadingSkeleton — by component REFERENCE.
-		expect(el.props.fallback.type).toBe(LoadingSkeleton);
+		expect(boundary.props.fallback.type).toBe(LoadingSkeleton);
 		// The suspended child is the exported async body itself.
-		expect(el.props.children.type).toBe(DiscoveryContent);
+		expect(boundary.props.children.type).toBe(DiscoveryContent);
 
 		// OQ-1 A pin: Discovery ships UNCACHED/dynamic v1 — the route segment
 		// opts out of static prerender via the `dynamic` export; no 'use cache'.
