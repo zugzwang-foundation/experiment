@@ -196,6 +196,64 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(0);
 	});
 
+	it("render::arrow-keys-advance-and-reset", () => {
+		// POLISH.2 V37 — design-canon §5 Discovery: "`‹ ›` / Left-Right advance
+		// immediately and RESET the timer". The build had no keyboard handler at
+		// all. This is canon, not an a11y-deferred item, so it does not wait on
+		// R16. The mockup binds the same two keys at :477-479.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		expectActive(0);
+
+		// Mid-countdown, ArrowRight advances IMMEDIATELY…
+		act(() => {
+			vi.advanceTimersByTime(7_000);
+		});
+		fireEvent.keyDown(document, { key: "ArrowRight" });
+		expectActive(1);
+
+		// …and RESETS, exactly as the arrows do: the discarded countdown would
+		// have fired 3s from now, so 9,999ms must not advance…
+		act(() => {
+			vi.advanceTimersByTime(9_999);
+		});
+		expectActive(1);
+		act(() => {
+			vi.advanceTimersByTime(1);
+		});
+		expectActive(2);
+
+		// ArrowLeft steps back and wraps 0 → 2.
+		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		expectActive(1);
+		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		expectActive(0);
+		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		expectActive(2);
+	});
+
+	it("render::arrow-keys-ignored-while-typing-and-when-static", () => {
+		// Two boundaries, both of which would be silent defects.
+		//
+		// 1. A viewer typing in a field must keep their caret. Nothing on `/`
+		//    has an input today, which is exactly why this is pinned now — the
+		//    handler is on the DOCUMENT and the first input added to this
+		//    surface would otherwise inherit a stolen ArrowLeft.
+		const { unmount } = render(<DiscoveryCarousel markets={views(3)} />);
+		const input = document.createElement("input");
+		document.body.appendChild(input);
+		fireEvent.keyDown(input, { key: "ArrowRight" });
+		expectActive(0);
+		input.remove();
+		unmount();
+
+		// 2. One market ⇒ static (§22 F-DISC-2). No timer, no arrows, and no
+		//    key handler either — a keypress must not move a single-position
+		//    carousel.
+		render(<DiscoveryCarousel markets={views(1)} />);
+		fireEvent.keyDown(document, { key: "ArrowRight" });
+		expectActive(0);
+	});
+
 	it("render::straight-eight-wrap", () => {
 		render(<DiscoveryCarousel markets={views(8)} />);
 		expect(screen.getAllByTestId("carousel-dot")).toHaveLength(8);

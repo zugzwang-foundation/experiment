@@ -56,46 +56,95 @@ export function DiscoveryCarousel({
 		return () => clearTimeout(timer);
 	}, [n, active]);
 
+	// V37 — ArrowLeft / ArrowRight step the carousel (canon §5: "`‹ ›` /
+	// Left-Right advance immediately and reset the timer"; the mockup binds the
+	// same two keys at :477-479). This is CANON, not an a11y-deferred nicety,
+	// which is why it lands here rather than waiting on R16.
+	//
+	// The reset half is free: `setActive` changes `active`, and the countdown
+	// effect above is keyed on `active`, so re-arming is structural rather than
+	// a second timer call that could drift from it.
+	//
+	// Bound to the DOCUMENT, matching the mockup, because the carousel has no
+	// single focusable host — the dots are spans and the arrows disappear at
+	// n <= 1. `preventDefault` stops the page scrolling under the key.
+	useEffect(() => {
+		if (n <= 1) {
+			return;
+		}
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
+				return;
+			}
+			// Never steal the arrows from a field the viewer is typing in.
+			const el = e.target as HTMLElement | null;
+			const tag = el?.tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) {
+				return;
+			}
+			e.preventDefault();
+			setActive((i) => (i + (e.key === "ArrowLeft" ? -1 : 1) + n) % n);
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [n]);
+
 	if (n === 0) {
 		return null;
 	}
 	const view = markets[active];
 
 	return (
-		<div data-testid="discovery-carousel" className="flex flex-col gap-5">
+		// V4 — the mockup's rhythm is hero → 9px → an 18px dot rail → 8px →
+		// grid (`.sliderwrap{margin:9px 0 8px}`, :138-139), not a uniform stack
+		// gap. The rail owns its own margins so the two gaps can differ.
+		<div data-testid="discovery-carousel" className="flex flex-col">
 			<HeroPanels
 				card={view.card}
 				series={view.series}
 				topPosts={view.topPosts}
 			/>
 
-			<div className="flex items-center justify-center gap-2">
+			<div className="mt-[9px] mb-2 flex h-[18px] items-center justify-center gap-[7px]">
 				{n > 1 && (
 					<button
 						type="button"
 						aria-label="Previous market"
 						onClick={() => setActive((i) => (i - 1 + n) % n)}
-						className="px-2 font-mono text-lg text-muted-foreground hover:text-ink"
+						className="px-[9px] font-mono text-base text-n4 hover:text-ink"
 					>
 						‹
 					</button>
 				)}
-				{markets.map((m, i) => (
-					<span
-						key={m.card.id}
-						data-testid="carousel-dot"
-						{...(i === active ? { "data-active": "true" } : {})}
-						className="relative h-1.5 w-6 overflow-hidden rounded-[var(--r-dot)] bg-n2"
-					>
-						{i === active && <DotFill key={`fill-${active}`} />}
-					</span>
-				))}
+				{markets.map((m, i) => {
+					const on = i === active;
+					return (
+						<span
+							key={m.card.id}
+							data-testid="carousel-dot"
+							{...(on ? { "data-active": "true" } : {})}
+							// V33 — the two dot states are different SHAPES, not one
+							// shape in two fills: a 6px ring-outlined circle at rest
+							// (`.sdot`), a 22px filled pill when active (`.sdot.on`,
+							// :142-143). Every dot was previously the active pill, so
+							// the rail read as eight identical bars and the active
+							// position was carried by the fill overlay alone.
+							className={
+								on
+									? "relative h-1.5 w-[22px] overflow-hidden rounded-[var(--r-dot)] bg-n2"
+									: "h-1.5 w-1.5 rounded-full [border:var(--hairline)]"
+							}
+						>
+							{on && <DotFill key={`fill-${active}`} />}
+						</span>
+					);
+				})}
 				{n > 1 && (
 					<button
 						type="button"
 						aria-label="Next market"
 						onClick={() => setActive((i) => (i + 1) % n)}
-						className="px-2 font-mono text-lg text-muted-foreground hover:text-ink"
+						className="px-[9px] font-mono text-base text-n4 hover:text-ink"
 					>
 						›
 					</button>
