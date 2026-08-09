@@ -24,10 +24,12 @@ export function ErrorState() {
 	return (
 		<div
 			data-testid="discovery-error"
-			className="flex flex-col items-center gap-2 rounded-[var(--r)] bg-n0 p-10 text-center [border:var(--hairline)]"
+			className="flex min-h-[148px] flex-col items-center justify-center gap-[10px] rounded-[var(--r)] bg-n0 p-6 text-center [border:var(--hairline)]"
 		>
-			<h2 className="text-sm font-medium">{ERROR_COPY.title}</h2>
-			<p className="text-xs text-muted-foreground">{ERROR_COPY.body}</p>
+			<h2 className="max-w-[320px] text-[13.5px] text-n6">
+				{ERROR_COPY.title}
+			</h2>
+			<p className="text-[12px] text-n4">{ERROR_COPY.body}</p>
 			{/* V47 — the interaction states name their ratified slots
 			    (globals.css:187-210) in the house form, matching
 			    `(auth)/onboarding/page.tsx:145`, the closest bordered-button
@@ -37,10 +39,15 @@ export function ErrorState() {
 			    `--dur-hover` is a COMPOUND value (`0.12s ease`), so it rides
 			    `[transition:all_var(--dur-hover)]` — a `duration-*` utility would
 			    emit an invalid `transition-duration`. */}
+			{/* R9 — P1's optional single CTA: 12px/600, `bg-n0`, a 1px ink-role
+			    border, `--r-chip`, 14px/8px padding (state-kit mockup :85-86). The
+			    border is ported by NAME, which is correct here because `--ink`
+			    encodes EMPHASIS, not a side — it is the high-contrast outline in
+			    both ramps (AGENTS.md §8 "copy by name/index"). */}
 			<button
 				type="button"
 				onClick={() => window.location.reload()}
-				className="mt-2 rounded-(--r-chip) px-3 py-1 font-mono text-xs outline-none [transition:all_var(--dur-hover)] [border:var(--hairline)] hover:bg-(--state-hover-fill) hover:text-ink focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
+				className="rounded-(--r-chip) bg-n0 px-[14px] py-2 text-[12px] font-semibold text-ink outline-none [transition:all_var(--dur-hover)] [border:1px_solid_var(--color-ink)] hover:bg-(--state-hover-fill) focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
 			>
 				{ERROR_COPY.action}
 			</button>
