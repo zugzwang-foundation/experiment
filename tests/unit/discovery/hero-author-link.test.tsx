@@ -51,6 +51,7 @@ const YES_POST: HeroPost = {
 	replyDharma: "10000.000000000000000000",
 	supportDharma: "3800.000000000000000000",
 	counterDharma: "6200.000000000000000000",
+	imageUrl: null,
 	createdAt: "2026-07-01T00:00:00.000Z",
 };
 

@@ -58,7 +58,15 @@ vi.mock("@/server/storage/r2", () => ({
 	),
 }));
 
-import { bets, comments, markets, modActions, pools, users } from "@/db/schema";
+import {
+	bets,
+	comments,
+	imageUploads,
+	markets,
+	modActions,
+	pools,
+	users,
+} from "@/db/schema";
 import { buildTopList, topOrder } from "@/lib/ranking";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 // RED import: the greenfield Slice-3 selector under test (fails collection).
@@ -119,6 +127,8 @@ async function seedCommentWithBet(args: {
 	 * (bets/place.ts:162 → cpmm/calculate.ts:97). Defaulted so existing callers
 	 * are unchanged; overridden where a DISTINCTIVE value is needed. */
 	priceAtBet?: string;
+	/** V15 — attach an already-seeded `image_uploads` row to this comment. */
+	imageUploadsId?: string;
 }): Promise<string> {
 	const [c] = await testDb
 		.insert(comments)
@@ -129,6 +139,7 @@ async function seedCommentWithBet(args: {
 			sideAtPostTime: args.side,
 			parentCommentId: args.parentCommentId,
 			betId: null,
+			imageUploadsId: args.imageUploadsId ?? null,
 			createdAt: args.createdAt,
 		})
 		.returning({ id: comments.id });
@@ -173,6 +184,25 @@ async function seedSupportReplies(args: {
 	}
 }
 
+/** Seed an `image_uploads` row and return its id. The R2 key is the string the
+ * mocked `mintReadUrl` echoes into the signed URL, so a DISTINCTIVE key makes
+ * both the positive assertion and the never-echo sweep exact. */
+async function seedImageUpload(args: {
+	userId: string;
+	r2ObjectKey: string;
+}): Promise<string> {
+	const [row] = await testDb
+		.insert(imageUploads)
+		.values({
+			userId: args.userId,
+			r2ObjectKey: args.r2ObjectKey,
+			contentType: "image/webp",
+			byteSize: 1024,
+		})
+		.returning({ id: imageUploads.id });
+	return row?.id ?? "";
+}
+
 /** Record a `content_removed` mod_action against a target comment (the
  * Track-B-hidden masking input — the load-debate-view fixture precedent). */
 async function removeComment(commentId: string): Promise<void> {
@@ -207,6 +237,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			"market_media",
 			"markets",
 			"mod_actions",
+			// V15 — comments reference image_uploads, so it must be truncated in
+			// the same call (the helper disables the guard set per call).
+			"image_uploads",
 			"users",
 		]);
 		vi.clearAllMocks();
@@ -435,6 +468,16 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		const maskedMarker = "TRACK-B-MASKED-MARKER-9f2c";
 		const maskedBody = `${maskedMarker} removed YES title line\n\n${maskedMarker} removed YES teaser paragraph.`;
 
+		// V15 — the removed post carries an IMAGE with a distinctive R2 key. This
+		// is the load-bearing SC-1 fixture for C7: if the LEFT JOIN ever escaped
+		// `pickedIds`, this key would be selected and a presigned URL for a
+		// Track-B-hidden post's attachment would reach the public DTO.
+		const maskedImageKey = "u/masked/TRACK-B-MASKED-IMAGE-KEY-9f2c.webp";
+		const maskedImage = await seedImageUpload({
+			userId: maskedAuthor,
+			r2ObjectKey: maskedImageKey,
+		});
+
 		const postA = await seedCommentWithBet({
 			userId: maskedAuthor,
 			marketId,
@@ -443,6 +486,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			body: maskedBody,
 			parentCommentId: null,
 			createdAt: at(1),
+			imageUploadsId: maskedImage,
 			// DISTINCTIVE entry price for the removed post, so the never-echo sweep
 			// below can assert the V10 field specifically (it would otherwise share
 			// B's default 0.5 and the assertion would be vacuous).
@@ -506,6 +550,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// absent as its body.
 		expect(json).not.toContain("0.610000000000000000"); // A's entryPrice (V10)
 		expect(json).not.toContain("250.000000000000000000"); // A's replyDharma (V16)
+		// V15 — neither the raw R2 key nor any presigned URL derived from it.
+		expect(json).not.toContain(maskedImageKey);
+		expect(json).not.toContain("TRACK-B-MASKED-IMAGE-KEY");
 
 		// Positive half — the SURVIVING pick's own values, so the assertions above
 		// cannot pass merely because nothing was serialized at all.
@@ -514,6 +561,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yes.replyDharma).toBe("0.000000000000000000");
 		expect(yes.supportDharma).toBe("0.000000000000000000");
 		expect(yes.counterDharma).toBe("0.000000000000000000");
+		// B has no attachment of its own, so the field is null — and crucially it
+		// is NOT A's URL.
+		expect(yes.imageUrl).toBeNull();
 
 		// A `user_banned` mod_action against B does NOT mask B — ban removes
 		// voice, not past content (ADR-0021 §4). The row deliberately targets
@@ -601,6 +651,37 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		// The author's own stake stays post-scoped and untouched.
 		expect(no.authorStake).toBe("40.000000000000000000");
+
+		// V15 — no attachment on this post, so no URL is minted.
+		expect(no.imageUrl).toBeNull();
+	});
+
+	it("discovery::hero-mints-an-image-url-for-a-picked-post", async () => {
+		// DISCOVERY-COMPLETE C7 — V15. The positive control for the masking
+		// assertion in `hero-masks-track-b-hidden-from-public`: proves the join
+		// and the presign DO work, so that test's absence assertions are about
+		// masking rather than about the feature being inert.
+		const marketId = await seedMarket("hero-image-attachment");
+		const author = await seedUser("hero-image-author");
+
+		const key = "u/hero-image-author/HERO-VISIBLE-IMAGE-KEY.webp";
+		const image = await seedImageUpload({ userId: author, r2ObjectKey: key });
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "YES argument — carries an image attachment.",
+			parentCommentId: null,
+			createdAt: at(1),
+			imageUploadsId: image,
+		});
+
+		const yes = requirePost((await selectHeroTopPosts(testDb, marketId)).yes);
+		expect(yes.id).toBe(post);
+		// `signRead` hardcodes the "uploads" bucket; TTL is the 3600s D9 render
+		// seam. The mocked `mintReadUrl` echoes both back.
+		expect(yes.imageUrl).toBe(`https://signed.test/uploads/${key}?ttl=3600`);
 	});
 
 	it("next-eligible-when-top-removed", async () => {

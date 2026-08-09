@@ -79,6 +79,7 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 		replyDharma: "10000.000000000000000000",
 		supportDharma: "3800.000000000000000000",
 		counterDharma: "6200.000000000000000000",
+		imageUrl: null,
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -348,6 +349,38 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(bar.querySelector<HTMLElement>(".bg-yes")?.style.width).toBe("50%");
 		// Đ 0 is data AVAILABLE — both figures still render.
 		expect(bar.getAttribute("aria-label")).toBe("Support Đ 0, Counter Đ 0");
+	});
+
+	// DISCOVERY-COMPLETE C7 — V15, the post image attachment.
+	it("render::v15-image-renders-when-present", () => {
+		const withImage = {
+			...heroPost("YES"),
+			imageUrl: "https://signed.test/uploads/u/x/arg.webp",
+		};
+		renderHero({ yes: withImage, no: null });
+		const img = screen.getByTestId("hero-post-image-YES");
+		expect(img.getAttribute("src")).toBe(
+			"https://signed.test/uploads/u/x/arg.webp",
+		);
+		// Decorative: the argument text carries the meaning and the title is
+		// adjacent (WCAG 1.1.1).
+		expect(img.getAttribute("alt")).toBe("");
+		const cls = img.getAttribute("class") ?? "";
+		expect(cls).toContain("object-cover");
+		expect(cls).toContain("rounded-[var(--imgr)]");
+		expect(cls).toContain("min-h-[40px]");
+		// No placeholder alongside it.
+		expect(screen.queryByTestId("hero-post-image-empty-YES")).toBeNull();
+	});
+
+	it("render::v15-null-image-renders-the-placeholder-not-a-broken-img", () => {
+		// `null` covers BOTH "no attachment" and "R2 was momentarily unavailable"
+		// — the read degrades rather than throwing, so the panel always serves.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const placeholder = screen.getByTestId("hero-post-image-empty-YES");
+		expect(placeholder.textContent).toBe("IMG");
+		expect(placeholder.getAttribute("aria-hidden")).toBe("true");
+		expect(screen.queryByTestId("hero-post-image-YES")).toBeNull();
 	});
 
 	it("render::v17-poles-are-never-ported-by-neutral-token-name", () => {

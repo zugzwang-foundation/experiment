@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
-import { comments } from "@/db/schema";
+import { comments, imageUploads } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
@@ -15,6 +15,10 @@ import {
 	type AuthorIdentity,
 	resolveAuthors,
 } from "@/server/debate-view/resolve-authors";
+import { signRead } from "@/server/storage/sign-read";
+
+/** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). */
+const READ_URL_TTL_SECONDS = 3600;
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -81,6 +85,14 @@ export type HeroPost = {
 	 */
 	supportDharma: string;
 	counterDharma: string;
+	/**
+	 * V15 — a short-TTL presigned R2 GET for the post's image attachment, or
+	 * `null` when the post has none OR the object is momentarily unavailable.
+	 * The key rides the EXISTING picked-posts select as a LEFT JOIN column, so
+	 * this costs ZERO new round-trips, and `signRead` is a local HMAC
+	 * (`getSignedUrl` from s3-request-presigner) — no network call, no DB hit.
+	 */
+	imageUrl: string | null;
 	createdAt: string;
 };
 
@@ -130,16 +142,44 @@ export async function selectHeroTopPosts(
 	const pickedIds = [yesPick, noPick]
 		.filter((p): p is PostSubstrate => p !== null)
 		.map((p) => p.id);
+	// V15 — the image key rides THIS select as a LEFT JOIN column rather than a
+	// second read. `load-debate-view.ts` batches a separate key read
+	// (`mintImageUrls`) because it mints for MANY comments; the hero mints for
+	// ≤2 KNOWN ids, so the key travels on the same `WHERE id IN (…)` as the body.
+	// `mintImageUrls` is module-private and MUST stay that way — exporting it
+	// would put a diff on `load-debate-view.ts` and break the ADR-0034 guard.
 	const rows = await client
 		.select({
 			id: comments.id,
 			userId: comments.userId,
 			body: comments.body,
 			createdAt: comments.createdAt,
+			imageKey: imageUploads.r2ObjectKey,
 		})
 		.from(comments)
+		.leftJoin(imageUploads, eq(imageUploads.id, comments.imageUploadsId))
 		.where(inArray(comments.id, pickedIds));
 	const rowById = new Map(rows.map((r) => [r.id, r]));
+
+	// SC-1: this mints ONLY for `pickedIds`, which `pick()` already filtered
+	// against `removedSet` — a removed post's key is never selected, so its URL
+	// can never be minted. Presigning is a local HMAC (no network, no DB), so
+	// this adds no round-trip either.
+	const urlById = new Map<string, string>();
+	await Promise.all(
+		rows.map(async (r) => {
+			if (r.imageKey === null) {
+				return;
+			}
+			try {
+				urlById.set(r.id, await signRead(r.imageKey, READ_URL_TTL_SECONDS));
+			} catch {
+				// R2 unavailable for this object → degrade to no image (the
+				// `mintImageUrls` / `getDefaultMarketMediaUrl` resilience posture).
+				// One unavailable object must never 500 the public render.
+			}
+		}),
+	);
 	const authorMap = await resolveAuthors(
 		client,
 		rows.map((r) => r.userId),
@@ -190,6 +230,7 @@ export async function selectHeroTopPosts(
 			// trap that only appears on posts with no replies.
 			supportDharma: toFixed18(new CpmmDecimal(p.supportDharma)),
 			counterDharma: toFixed18(new CpmmDecimal(p.counterDharma)),
+			imageUrl: urlById.get(p.id) ?? null,
 			createdAt: row.createdAt.toISOString(),
 		};
 	};
