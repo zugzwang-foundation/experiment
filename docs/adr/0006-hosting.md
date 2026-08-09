@@ -422,7 +422,20 @@ requires Pro"*, which is one of the three reasons Pro was chosen).
 
 **The proof obligation, stated so it is not skipped.** The config file is not the
 evidence. **`x-vercel-id` must read `bom1::bom1`** on a deployed response; until it
-does, this patch is a claim and not a fact.
+does, this patch is a claim and not a fact. ✅ **DISCHARGED** — `bom1::bom1`
+observed on the branch's preview deploy and again on staging after merge (PERF-1
+close-out).
+
+**⚠ The Vercel DASHBOARD will keep showing the project-level region, and it is
+not the authority.** Settings → Functions → Function Regions reads the *project*
+setting (`serverlessFunctionRegion`), which this patch does not change and which
+may continue to display **`iad1`** indefinitely. `vercel.json`'s `regions` key is
+applied per deployment and **overrides it**. **A dashboard reading `iad1` is NOT
+drift and must not be "fixed".** The only authority is `x-vercel-id` on a
+deployed response — `<ingress>::<compute>` — and `/api/health`'s `region` field
+(added at PERF-1 close-out), which reports the region the function is *actually
+executing in*. This note exists because the next person to open that settings
+page would otherwise re-open a closed question.
 
 **Scope warning — this moves production.** One Vercel project serves staging and
 production via branch deploys (`docs/runbooks/deploy-pipeline.md` §0). A
@@ -431,11 +444,20 @@ project-level `regions` key applies to **both**. Production is gated
 rather than serves — but the next production promote carries this region change
 with it, and that is intended: it is what ADR-0006 ratified.
 
-**Not decided here.** Whether ~332–362 ms per round-trip is *entirely* network is
+~~**Not decided here.** Whether ~332–362 ms per round-trip is *entirely* network is
 unproven. If a post-move measurement leaves ~140 ms per trip, the residue is the
 Supavisor session-pooler hop plus query execution, and Discovery's 97 sequential
-statements still need batching. Region is the first fix, not necessarily the only
-one. PERF-1 owns that follow-up; no batching lands in this change.
+statements still need batching.~~
+
+**RESOLVED by measurement (PERF-1 close-out), struck rather than deleted so the
+open question and its answer stay together.** It was **entirely** network. Post-move
+the two-point derivation gives **5.34 ms per round-trip** against 361.6 ms before —
+a **68×** reduction with **no residue**. The feared ~140 ms of pooler hop plus query
+execution does not exist. Batching is therefore **not** required: Discovery serves
+**0.584 s p50** against a 2.0 s exit criterion, and batching 97 statements to ~12
+would save ~0.45 s on a page already clearing the bar by 3.4×. Reconsider it only on
+evidence — a growing trip count or measured concurrency behaviour — never
+reflexively. No batching lands in this change.
 
 ---
 
