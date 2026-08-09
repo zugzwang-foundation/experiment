@@ -43,16 +43,16 @@ export function HeroPanels({
 	return (
 		<div
 			data-testid="hero-panels"
-			className="grid gap-4 md:grid-cols-[1fr_1.2fr_1fr]"
+			className="grid gap-[14px] md:grid-cols-[1fr_1.9fr_1fr]"
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 
-			<div className="flex flex-col gap-3 rounded-[var(--r)] bg-n0 p-4 [border:var(--hairline)]">
-				<div className="flex items-start gap-3">
+			<div className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:1px_solid_var(--color-n3)]">
+				<div className="flex items-center gap-3">
 					{card.imageUrl === null ? (
 						<div
 							aria-hidden="true"
-							className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[10px] text-muted-foreground"
+							className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
 						>
 							IMG
 						</div>
@@ -61,18 +61,22 @@ export function HeroPanels({
 						<img
 							src={card.imageUrl}
 							alt={card.title}
-							className="h-16 w-16 shrink-0 rounded-[var(--imgr)] object-cover"
+							className="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover"
 						/>
 					)}
 					<div className="flex min-w-0 flex-col gap-1">
-						<h2 className="text-base font-medium leading-snug">{card.title}</h2>
-						<StatLine totals={card.totals} />
+						<h2 className="truncate text-[16.5px] leading-[1.3] font-bold">
+							{card.title}
+						</h2>
+						<StatLine totals={card.totals} size="hero" />
 					</div>
 				</div>
-				<div className="h-24">
+				<div className="mt-[11px] h-24 rounded-[var(--r)] [border:var(--hairline)]">
 					<PriceSparkline series={series} size="hero" />
 				</div>
-				<PriceBar pricing={card.pricing} />
+				<div className="mt-[9px]">
+					<PriceBar pricing={card.pricing} />
+				</div>
 			</div>
 
 			<HeroPostPanel side="NO" post={topPosts.no} slug={card.slug} />
@@ -95,7 +99,7 @@ function HeroPostPanel({
 			<div
 				data-testid="hero-side-empty"
 				data-side={side}
-				className="flex items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--hairline)]"
+				className="flex items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:1px_solid_var(--color-n3)]"
 			>
 				{HERO_SIDE_EMPTY[side]}
 			</div>
@@ -103,12 +107,13 @@ function HeroPostPanel({
 	}
 
 	return (
+		// `relative` is load-bearing for V18's stretched link below.
 		<div
 			data-testid="hero-post"
 			data-side={side}
-			className="flex flex-col gap-2 rounded-[var(--r)] bg-n0 p-4 [border:var(--hairline)]"
+			className="relative flex flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:1px_solid_var(--color-n3)]"
 		>
-			<div className="flex flex-wrap items-center gap-1.5">
+			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
 				<Avatar size="sm">
 					<AvatarImage src={post.author.pfpUrl} alt="" />
 					<AvatarFallback>
@@ -116,26 +121,37 @@ function HeroPostPanel({
 					</AvatarFallback>
 				</Avatar>
 				{/* A4 follow-up #2 (UI.A5) — the author pseudonym links to their
-				    profile. A SIBLING of the card-body deep-link below, not nested. */}
+				    profile. A SIBLING of the card-body deep-link below, NEVER nested
+				    (nested <a> is invalid HTML). `relative z-10` lifts it above the
+				    sibling's stretched ::after so it stays independently clickable —
+				    the mockup's harness excludes `.pseud` from the body click the
+				    same way (surface_discovery_v1_0.html:404). */}
 				<Link
 					data-testid={`hero-author-link-${side}`}
 					href={`/u/${encodeURIComponent(post.author.pseudonym)}`}
-					className="font-mono text-xs hover:underline"
+					className="relative z-10 font-[650] hover:underline"
 				>
 					{post.author.pseudonym}
 				</Link>
 				<SideBadge side={post.side} />
-				<span className="font-mono text-[11px] text-muted-foreground">
+				<span className="font-mono text-n6">
 					Đ {formatDharma(post.authorStake)}
 				</span>
 			</div>
+			{/* V18 — the WHOLE panel is the post's click target, matching the
+			    mockup's `.argbody[data-post]` handler. Implemented as a stretched
+			    link (`after:inset-0` against the panel's `relative`) rather than by
+			    wrapping the panel, because the author link above must remain a
+			    separate target and anchors cannot nest. */}
 			<Link
 				href={`/m/${slug}?post=${post.ordinal}`}
-				className="flex flex-col gap-1"
+				className="mt-2 flex flex-col gap-1 after:absolute after:inset-0"
 			>
-				<h3 className="text-sm font-medium leading-snug">{post.title}</h3>
+				<h3 className="line-clamp-2 text-sm leading-snug font-medium">
+					{post.title}
+				</h3>
 				{post.teaser !== "" && (
-					<p className="text-xs leading-snug text-muted-foreground">
+					<p className="line-clamp-3 text-xs leading-snug text-muted-foreground">
 						{post.teaser}
 					</p>
 				)}

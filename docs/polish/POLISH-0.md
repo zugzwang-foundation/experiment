@@ -135,7 +135,7 @@ Order follows the ratified P6 sequence. **Tier-1 entries marked ⟐ are candidat
 | | |
 |---|---|
 | **Surface** | `/` — server, `force-dynamic`, in-page `<Suspense>` (deliberately **no** route-group `loading.tsx`, so it doesn't blanket `/m/[slug]` — `page.tsx:28-30`) |
-| **Components** | `DiscoveryCarousel` · `DiscoveryGrid` · `HeroPanels` · `MarketCard` · `PriceSparkline` · `scrollers` · `EmptyState` · `ErrorState` · `LoadingSkeleton` |
+| **Components** | `DiscoveryCarousel` · `DiscoveryGrid` · `HeroPanels` · `MarketCard` · `PriceSparkline` · `StatLine` · `EmptyState` · `ErrorState` · `LoadingSkeleton` — *corrected at POLISH.2: `StatLine` was missing and carries six of the surface's deltas; **`scrollers` belongs to the debate surface, not Discovery — mis-copied into this row.** It is real (`src/components/debate/scrollers.tsx`, exporting `PostScroller` / `ReplyScroller`) and correctly listed on POLISH.3's row, which is unchanged* |
 | **Build row** | UI.A4 · UI.19 |
 | **Tier 4** | `surface_discovery_v1_0.html` |
 | **Tier 3** | `docs/plans/UI-A4.md` + close-out |
@@ -345,7 +345,9 @@ Then verify the gates in §6 are actually closed — *a listed dependency is not
 
 ## §9 · What POLISH does not do
 
-No code · no `src/` change · no CC session · no PR · no DDL, migration, event type or ADR · no SPEC edit · no rewriting `design-handoff.md` or `design-workflow.md`.
+No code · no `src/` change · ~~no CC session~~ · no PR · no DDL, migration, event type or ADR · no SPEC edit · no rewriting `design-handoff.md` or `design-workflow.md`.
+
+> **Amended at POLISH.2 (2026-08-09).** A **CC machine pass** — read the tier-4 mockup against the build, emit a classified delta list, ship the class-A deltas under a standing disposition — **is part of the method**, and runs *before* the founder's visual inspection rather than instead of it. Precedent: the `POLISH-1-D` delta recon behind POLISH-1a (`docs/logs/POLISH-1a.md:6`). The exclusions above describe the **founder's inspection**; `no CC session` was already falsified by POLISH-1a (#288) and POLISH-1b (#289) when it was committed here, and is struck.
 
 Not re-litigated: W2.7 bookmark semantics · W2.10 slippage Option A · the brand accent (ratified **OUT**, true-neutral) · Social/Research (accepted divergence, founder-deferred) · G1 desktop-only.
 
