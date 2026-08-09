@@ -28,10 +28,19 @@ export function ErrorState() {
 		>
 			<h2 className="text-sm font-medium">{ERROR_COPY.title}</h2>
 			<p className="text-xs text-muted-foreground">{ERROR_COPY.body}</p>
+			{/* V47 — the interaction states name their ratified slots
+			    (globals.css:187-210) in the house form, matching
+			    `(auth)/onboarding/page.tsx:145`, the closest bordered-button
+			    precedent. The button previously carried a bare `hover:text-ink`
+			    and no fill, pressed or focus treatment, so the only keyboard-
+			    reachable control on this surface had no focus ring at all.
+			    `--dur-hover` is a COMPOUND value (`0.12s ease`), so it rides
+			    `[transition:all_var(--dur-hover)]` — a `duration-*` utility would
+			    emit an invalid `transition-duration`. */}
 			<button
 				type="button"
 				onClick={() => window.location.reload()}
-				className="mt-2 rounded-[var(--r-chip)] px-3 py-1 font-mono text-xs [border:var(--hairline)] hover:text-ink"
+				className="mt-2 rounded-(--r-chip) px-3 py-1 font-mono text-xs outline-none [transition:all_var(--dur-hover)] [border:var(--hairline)] hover:bg-(--state-hover-fill) hover:text-ink focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
 			>
 				{ERROR_COPY.action}
 			</button>
