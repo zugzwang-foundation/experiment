@@ -32,13 +32,17 @@ export function MarketCard({
 			href={`/m/${card.slug}`}
 			data-testid="market-card"
 			{...(active ? { "data-active": "true" } : {})}
-			className="flex flex-col gap-3 rounded-[var(--r)] bg-n0 p-4 [border:var(--hairline)]"
+			// V40 — `.mcard` is 13px padding with `justify-content:space-between`
+			// (:150-151): the price bar is pinned to the card floor so a 1-line
+			// and a 2-line title produce the same card, rather than floating up
+			// behind a short title.
+			className="flex flex-col justify-between rounded-[var(--r)] bg-n0 p-[13px] [border:var(--hairline)]"
 		>
 			<div className="flex items-start gap-3">
 				{card.imageUrl === null ? (
 					<div
 						aria-hidden="true"
-						className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[10px] text-muted-foreground"
+						className="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
 					>
 						IMG
 					</div>
@@ -47,18 +51,22 @@ export function MarketCard({
 					<img
 						src={card.imageUrl}
 						alt={card.title}
-						className="h-12 w-12 shrink-0 rounded-[var(--imgr)] object-cover"
+						className="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover"
 					/>
 				)}
 				<div className="flex min-w-0 flex-col gap-1">
-					<h3 className="text-sm font-medium leading-snug">{card.title}</h3>
-					<StatLine totals={card.totals} />
+					<h3 className="line-clamp-2 text-[13.5px] leading-[1.32] font-semibold">
+						{card.title}
+					</h3>
+					<StatLine totals={card.totals} size="card" />
 				</div>
 			</div>
-			<div className="h-10">
+			<div className="mt-[9px] h-10 rounded-[var(--imgr)] [border:var(--hairline)]">
 				<PriceSparkline series={series} size="card" />
 			</div>
-			<PriceBar pricing={card.pricing} />
+			<div className="mt-[9px]">
+				<PriceBar pricing={card.pricing} />
+			</div>
 		</Link>
 	);
 }
