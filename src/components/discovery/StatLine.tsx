@@ -21,18 +21,53 @@ import { formatDharma } from "@/components/debate/format";
  * totals rendering ungrouped beside composers that grouped is the exact defect
  * that rule closes.
  */
+/**
+ * V28 — the mockup sizes this line per surface: `.attrs` is 11.5px with 6px
+ * separator margins on the hero (`:133`, `:135`), `.meta` is 11px with 5px on
+ * the card (`:157`, `:159`). One component, two presets — the alternative was
+ * unifying on one value, which is a divergence from a ratified baseline and
+ * only the founder may accept those (POLISH-0 §5, P12).
+ */
+const SIZE = {
+	hero: { text: "text-[11.5px]", sep: "mx-1.5" },
+	card: { text: "text-[11px]", sep: "mx-[5px]" },
+} as const;
+
+/** V48 — the count and its noun agree. `1 post`, not `1 posts`. Returns the
+ * NOUN only: the mockup bolds the value and leaves the noun plain
+ * (`<b>28</b> posts`, `:212`), so the two cannot share one element. */
+const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
 export function StatLine({
 	totals,
+	size = "card",
 }: {
 	totals: { dharmaStaked: string; postCount: number; replyCount: number };
+	size?: keyof typeof SIZE;
 }) {
+	const s = SIZE[size];
 	return (
-		<p data-testid="stat-line" className="text-xs text-muted-foreground">
-			<b>Đ {formatDharma(totals.dharmaStaked)}</b> staked
-			<span className="mx-1.5 opacity-50">|</span>
-			<b>{totals.postCount}</b> posts
-			<span className="mx-1.5 opacity-50">|</span>
-			<b>{totals.replyCount}</b> replies
+		<p
+			data-testid="stat-line"
+			data-size={size}
+			className={`${s.text} tracking-[0.01em] text-n5`}
+		>
+			{/* V26 — the emphasis tier is n6/650. Inheriting `text-muted-foreground`
+			    (n5) and the UA's default 700 made the emphasised value DIMMER than
+			    the label it emphasises. */}
+			<b className="font-[650] text-n6">
+				Đ {formatDharma(totals.dharmaStaked)}
+			</b>{" "}
+			staked
+			{/* V27 — an explicit n3 separator. `opacity-50` dimmed whatever colour
+			    happened to be inherited, so the separator's value drifted with its
+			    parent instead of naming a slot. */}
+			<span className={`${s.sep} text-n3`}>|</span>
+			<b className="font-[650] text-n6">{totals.postCount}</b>{" "}
+			{noun(totals.postCount, "post", "posts")}
+			<span className={`${s.sep} text-n3`}>|</span>
+			<b className="font-[650] text-n6">{totals.replyCount}</b>{" "}
+			{noun(totals.replyCount, "reply", "replies")}
 		</p>
 	);
 }
