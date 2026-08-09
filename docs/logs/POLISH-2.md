@@ -127,7 +127,7 @@ The alternative structures were both worse and are recorded so they are not retr
 - **Colour never transferred from the mockup.** Its `:root` is the light era and the shipped ramp is dark **and inverted** (V1 / values-log v0.3 §2 R-1). Every value in this PR was read from `globals.css`. `src/components/discovery/` still contains **zero** raw hex and zero Tailwind palette classes.
 - **`LoadingSkeleton.tsx` is untouched.** R8 is unruled (W2.11 T1 ratified no loading primitive; `POLISH-0.md:321`). HALT SET 3. Its non-`DISCOVERY_GRID_SIZE` shape is recorded as PD-2-28 and changed nothing.
 - **`POLISH-0.md` §9's "no CC session" was struck**, not softened — it was false when committed, POLISH-1a and 1b having already shipped `src/` changes.
-- **`scrollers` does not exist.** `POLISH-0` §3 listed it and omitted `StatLine`; corrected (PD-2-29). Do not go looking for it.
+- **`scrollers` belongs to the debate surface, not Discovery.** `POLISH-0` §3's POLISH.2 row listed it and omitted `StatLine`; corrected (PD-2-29). It is real — `src/components/debate/scrollers.tsx`, exporting `PostScroller` / `ReplyScroller`, mounted at `DebateView.tsx:294,330` — and correctly listed on POLISH.3's row, which is unchanged. ⚠ **This log first said "`scrollers` does not exist", which was false**: asserted from a `src/components/discovery/`-scoped grep and stated as a repo-wide negative. Caught at Gate C. **O-2 — a directory-scoped negative is not a tree-wide one.**
 - **Gate B2 re-verified this session:** `a27f2bf` (PR #276) is an ancestor of `origin/main` and `formatPricePercent` (`format.ts:211`) is the single percent path, with six call sites. POLISH.2's gate is met.
 
 ---

@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { existsSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -235,6 +238,27 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		expect(screen.queryByTestId("discovery-carousel")).toBeNull();
 		expect(screen.queryByTestId("hero-panels")).toBeNull();
 		expect(screen.queryAllByTestId("market-card")).toHaveLength(0);
+	});
+
+	it("render::no-route-group-loading-boundary", () => {
+		// The contract `page.tsx:28-30` states in prose and NOTHING guarded: the
+		// Suspense boundary is scoped to THIS page precisely so a route-group
+		// `loading.tsx` does not blanket `/m/[slug]` too (POLISH-0 §3).
+		//
+		// This assertion is FILESYSTEM, not element-tree, and that is the whole
+		// point. Every element assertion in the cell below introspects what
+		// `DiscoveryPage()` returns; adding a sibling `loading.tsx` changes
+		// Next's ROUTING and not that return value, so all of them stay green.
+		// Proven at POLISH.2 Gate C: with the file present the ENTIRE suite —
+		// 306 files, 2706 tests — passed. The contract had been unguarded since
+		// UI.A4 and a comment is not a guard (V-3: asserting a call exists is
+		// not asserting what it does).
+		//
+		// Same shape as `tests/unit/shell/not-found.test.tsx:165`, the footer
+		// regression belt: read the real tree, assert the absence.
+		expect(
+			existsSync(join(process.cwd(), "src/app/(public)/loading.tsx")),
+		).toBe(false);
 	});
 
 	it("render::loading-fallback-is-skeleton", () => {
