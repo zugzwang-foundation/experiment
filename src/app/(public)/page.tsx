@@ -28,12 +28,23 @@ export const dynamic = "force-dynamic";
  * The sync shell mounts the streaming boundary: `LoadingSkeleton` is the
  * §4.10 load state (Suspense fallback — no route-group `loading.tsx`, which
  * would blanket `/m/[slug]` too; the boundary is scoped HERE).
+ *
+ * INSET, NOT A CONTAINER (POLISH.2 V2). The mockup's `.content` carries
+ * `padding:16px 28px 12px` inside a full-width screen — no max-width, no
+ * centering. That is exactly what this is: `PageContainer`'s note that
+ * "DISCOVERY (`/`) TAKES NO CONTAINER. Full-bleed is deliberate" still holds
+ * and is NOT weakened here — full-bleed means no max-width and no `mx-auto`,
+ * both still absent. The inset lives on the page rather than in a preset
+ * because no other route wants a container-less inset, and `PageContainer` is
+ * shell-owned (out of POLISH.2's scope).
  */
 export default function DiscoveryPage() {
 	return (
-		<Suspense fallback={<LoadingSkeleton />}>
-			<DiscoveryContent />
-		</Suspense>
+		<div className="px-7 pt-4 pb-3">
+			<Suspense fallback={<LoadingSkeleton />}>
+				<DiscoveryContent />
+			</Suspense>
+		</div>
 	);
 }
 
