@@ -214,18 +214,51 @@ A request holding a connection for 35 s holds a **pool slot** for 35 s.
 Exhaustion of 15 slots does not require concurrency when each request is that
 slow — a handful of overlapping loads suffices. **Diagnosis only; no fix here.**
 
-### 6a–6c · Discovery (`/`) — 41 sequential round-trips, doubly nested
+### 6a–6c · Discovery (`/`) — ~~41 sequential round-trips~~ **97**, doubly nested
+
+> ### ⛔ STRUCK AT PERF-1 CLOSE-OUT (2026-08-10) — two numbers in this table were wrong
+>
+> Left visible rather than rewritten, because the reasoning built on them ran
+> through three documents and a reader needs to see which step failed.
+>
+> **1. "41 round-trips" counts function CALLS, not SQL statements. The true count
+> is 97.** `loadPriceSeries` issues **4** statements (`price-series.ts:58, 90, 110,
+> 178`) and `selectHeroTopPosts` **5** (`hero.ts:73, 78, 96, 106, 115`), so row 2's
+> second loop is **9N, not 2N**. Total = 1 + 3N + 9N = **1 + 24 + 72 = 97** at
+> `DISCOVERY_GRID_SIZE = 8`.
+>
+> **2. "warm p50 ≈ 1.1 s" — THERE IS NO WARM REGIME.** Re-probed at PERF-1: seven
+> runs, six after the first, **spread 0.29 s around a flat 35 s floor**, gaps to
+> 150 s, **no decay**. The route had exactly one regime. The 1.1 s was almost
+> certainly **TTFB**: the Suspense boundary flushes the shell and `LoadingSkeleton`
+> immediately, so any time-to-first-byte measure reads ~1 s on a 35 s request
+> (measured TTFB at PERF-1: 0.28–2.15 s against 35 s totals). POOL-1 records no
+> cache header for the probe, so HIT-vs-MISS cannot be settled from this log — but
+> `/` is `force-dynamic` and 17/17 PERF-1 requests were MISS, so a cache HIT is
+> close to impossible. **The metric, not the cache state, is the artifact.**
+>
+> **Row 8 is therefore void in both halves.** There was no unexplained cold cost:
+> at the corrected count and the measured cross-region latency (**361.6 ms/trip**,
+> functions in `iad1` against a Mumbai DB), the round-trips account for the whole
+> 35 s. **Cause: ADR-0006 ratified `bom1` and it was never applied.** Fixed at
+> PERF-1 — **5.34 ms/trip**, Discovery **0.584 s p50**. See `docs/parked.md`
+> PERF-1 and the ADR-0006 patch record.
+>
+> **The lesson for reading tables like this one:** row 8 was correct arithmetic on
+> two wrong inputs, and it *reported itself as an open question* rather than a
+> conclusion — which is why it survived review three times. A derived row is only
+> as good as the rows it cites.
 
 | # | Finding | Evidence |
 |---|---|---|
 | 1 | `listOpenMarkets` issues **1 + 3N** queries: one market list, then `getMarketPricing`, `getMarketTotals`, `getDefaultMarketMediaUrl` **sequentially per market** | `src/server/discovery/list.ts:48–63` |
 | 2 | `DiscoveryContent` then runs a **second** sequential loop over the same cards: `loadPriceSeries` + `selectHeroTopPosts` — **2N** more | `src/app/(public)/page.tsx:59–65` |
-| 3 | Total at `DISCOVERY_GRID_SIZE = 8`: **1 + 24 + 16 = 41 sequential round-trips**, zero parallelism anywhere | both loops above |
+| 3 | ~~Total at `DISCOVERY_GRID_SIZE = 8`: **1 + 24 + 16 = 41 sequential round-trips**~~ → **STRUCK: 1 + 24 + 72 = 97.** Zero parallelism anywhere (that half stands) | both loops above |
 | 4 | Genuinely sequential: **only #1's first query** (the market list supplies the ids). Everything after it is per-market and **independent** — sequential only because nobody parallelised it. The source says so itself: "grouped-query batching is the OQ-1 C follow-up's optimization" | `list.ts:40–43` docblock |
 | 5 | The two loops are **separately** unnecessary: the second loop re-iterates cards the first already produced, so `loadPriceSeries` / `selectHeroTopPosts` could ride the first pass or a single batched pass | `page.tsx:59–65` |
-| 6 | `force-dynamic` costs the **entire** 41-round-trip composition on every request, uncached. It is required only in the narrow sense that the page reads no dynamic API and would otherwise static-prerender at build — the docblock says exactly this. It is **not** required for correctness; it is standing in for a cache policy that was deferred | `page.tsx:19` + docblock `:12–18` |
-| 7 | Measured: **35.1 s** at concurrency 1, four independent runs (35.09 / 35.33 / 35.15 / 37.28 s). Under concurrency the same route serves **p50 ≈ 1.1 s** with a 35 s tail | POOL-2 probe |
-| 8 | Implied per-round-trip: **~857 ms cold, ~27 ms warm**. The warm figure is consistent with 41 sequential trips; the cold figure is not, so **a large one-time cold cost sits underneath the sequential structure and this trace does not explain it**. Recorded as open, not guessed at | derived from #3 and #7 |
+| 6 | `force-dynamic` costs the **entire** ~~41~~ **97**-round-trip composition on every request, uncached. It is required only in the narrow sense that the page reads no dynamic API and would otherwise static-prerender at build — the docblock says exactly this. It is **not** required for correctness; it is standing in for a cache policy that was deferred | `page.tsx:19` + docblock `:12–18` |
+| 7 | Measured: **35.1 s** at concurrency 1, four independent runs (35.09 / 35.33 / 35.15 / 37.28 s). ~~Under concurrency the same route serves **p50 ≈ 1.1 s** with a 35 s tail~~ → **STRUCK: no warm regime exists** (PERF-1, seven runs, flat 35 s floor, no decay). The 1.1 s was almost certainly **TTFB**, not total | POOL-2 probe |
+| 8 | ~~Implied per-round-trip: **~857 ms cold, ~27 ms warm** … a large one-time cold cost sits underneath~~ → **VOID IN BOTH HALVES.** Correct arithmetic on two wrong inputs (see the banner above). Actual: **361.6 ms/trip**, cross-region — functions in `iad1` against a Mumbai DB. **There was no unexplained cold cost.** Fixed at PERF-1 → **5.34 ms/trip** | derived from #3 and #7, both struck |
 
 ### 6d · Profile (`/u/[pseudonym]`) — 6.2 s warm, already partly parallel
 
@@ -241,7 +274,7 @@ slow — a handful of overlapping loads suffices. **Diagnosis only; no fix here.
 
 | Route | Today | If batched / parallelised |
 |---|---|---|
-| `/` discovery | **1 slot × ~35 s** cold, 41 round-trips | ~2–3 slots × well under 1 s. Peak connections *rise*; slot-seconds fall by more than an order of magnitude |
+| `/` discovery | **1 slot × ~35 s** cold, ~~41~~ **97** round-trips | ~2–3 slots × well under 1 s. Peak connections *rise*; slot-seconds fall by more than an order of magnitude |
 | `/u/[pseudonym]` | 3 slots × ~6.2 s ≈ 19 slot-seconds | ~3–5 slots × ~1 s ≈ 4 slot-seconds |
 
 **The trade is the point, and it is favourable.** Batching *raises* peak
@@ -280,8 +313,8 @@ finding that survives is the explanation:
 **1.** The probe was **anonymous**, so it never issued the layout's
 `Promise.all` — 2 of the 5 concurrent connections a real signed-in view holds,
 and precisely the ones failing in burst 1 (`findSession`, then the header reads).
-**2.** The probe hit routes **warm**, where discovery costs ~1.1 s instead of
-35 s — so it never reproduced the slot-holding that is the actual mechanism.
+**2.** ~~The probe hit routes **warm**, where discovery costs ~1.1 s instead of
+35 s~~ — **STRUCK (PERF-1): there is no warm regime**; the 1.1 s was TTFB, not total. The point that survives is that the probe never reproduced the slot-holding — so it never reproduced the slot-holding that is the actual mechanism.
 **3.** Escalating concurrency made Vercel **scale out**, spreading load across
 more instances rather than concentrating it on few — the opposite of the
 incident's shape.
@@ -368,9 +401,20 @@ inferring instance counts from request timing.
 
 ## 12. Open questions
 
-**1. What is the large one-time cold cost on `/`?** 41 sequential round-trips
+~~**1. What is the large one-time cold cost on `/`?** 41 sequential round-trips
 explain the warm 1.1 s, not the cold 35 s (§6a #8). PERF-1 should not begin by
-assuming batching alone fixes it.
+assuming batching alone fixes it.~~
+
+**1. ANSWERED AND STRUCK (PERF-1, 2026-08-10): there was no large one-time cold
+cost, and the question was unanswerable as posed** — it rested on two wrong
+numbers (41 trips, and a "warm 1.1 s" regime that does not exist; see §6a). At
+the true count of **97** and the measured **361.6 ms** cross-region round-trip,
+the trips account for the entire 35 s. **Cause: ADR-0006 ratified Vercel region
+`bom1` on 2026-05-05 and it was never applied — functions ran in `iad1`,
+~12,000 km from a Mumbai database.** Fixed by applying it: **5.34 ms/trip**,
+Discovery **35.07 → 0.584 s p50**, Profile **6.2 → 0.189 s p50**. The warning
+not to assume batching was right for the wrong reason — batching was never the
+fix, but not because a cold cost hid beneath it.
 **2. Does `BETTER_AUTH_SECRET` match across Doppler `stg` and Vercel
 `staging`?** Docketed. **Must be settled before DP.2's prod promote** — the
 same sync path carries every production secret.
