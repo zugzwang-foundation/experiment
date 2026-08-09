@@ -44,6 +44,15 @@ export type HeroPost = {
 	teaser: string;
 	author: AuthorIdentity;
 	authorStake: string;
+	/**
+	 * V10 — the post's own entry-bet `price_at_bet`: the canonical market YES
+	 * probability at the instant the bet executed (decimal string, 0–1). Already
+	 * loaded on `PostSubstrate` (ranking.ts:50, selected by
+	 * ranking-substrate.ts:74) and discarded until now, so this costs ZERO new
+	 * queries. Passed through verbatim, exactly as `load-debate-view.ts:267`
+	 * does — the view layer derives the side's own percent (PCT.ROUND).
+	 */
+	entryPrice: string;
 	createdAt: string;
 };
 
@@ -140,6 +149,7 @@ export async function selectHeroTopPosts(
 			teaser,
 			author: authorMap.get(row.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: p.authorStake,
+			entryPrice: p.priceAtBet,
 			createdAt: row.createdAt.toISOString(),
 		};
 	};

@@ -46,6 +46,7 @@ const YES_POST: HeroPost = {
 	teaser: "",
 	author: { pseudonym: AUTHOR_PSEUDONYM, pfpUrl: "/pfp-placeholder.svg" },
 	authorStake: "40.000000000000000000",
+	entryPrice: "0.270000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 };
 

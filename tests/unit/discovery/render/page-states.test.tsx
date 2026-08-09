@@ -83,6 +83,7 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		teaser: EXTENDED,
 		author: { pseudonym: "hero-yes-author", pfpUrl: "/pfp-placeholder.svg" },
 		authorStake: "40.000000000000000000",
+		entryPrice: "0.270000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	},
 	no: {
@@ -93,6 +94,7 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		teaser: EXTENDED,
 		author: { pseudonym: "hero-no-author", pfpUrl: "/pfp-placeholder.svg" },
 		authorStake: "35.000000000000000000",
+		entryPrice: "0.270000000000000000",
 		createdAt: "2026-07-01T00:01:00.000Z",
 	},
 };

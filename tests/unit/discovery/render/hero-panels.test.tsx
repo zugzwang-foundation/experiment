@@ -67,6 +67,7 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 			pfpUrl: "/pfp-placeholder.svg",
 		},
 		authorStake: "40.000000000000000000",
+		entryPrice: "0.270000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -195,5 +196,39 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(
 			bothEmpty.getByTestId("price-sparkline").getAttribute("data-size"),
 		).toBe("hero");
+	});
+
+	// DISCOVERY-COMPLETE C1/C3 — the hero wiring for the shared-primitive
+	// presets. The presets themselves are proven in
+	// tests/unit/debate/render/side-badge.test.tsx and
+	// tests/unit/discovery/render/price-bar-presets.test.tsx; these assert that
+	// the hero is the surface actually asking for them.
+	it("render::hero-asks-for-the-hero-presets", () => {
+		const { container } = renderHero({
+			yes: heroPost("YES"),
+			no: heroPost("NO"),
+		});
+
+		// V29 — the 22px bar, labels outside.
+		expect(container.querySelector('[data-size="hero"]')).not.toBeNull();
+
+		// V50 — the 16px hero-head avatar.
+		const avatars = container.querySelectorAll('[data-slot="avatar"]');
+		expect(avatars.length).toBe(2);
+		for (const avatar of avatars) {
+			expect(avatar.getAttribute("data-size")).toBe("xs");
+		}
+
+		// V10/V11 — the chip carries the author's OWN entry price at the hero
+		// geometry. The fixture's `price_at_bet` is 0.27, so the YES panel reads
+		// 27% and the NO panel the derived complement, 73%.
+		const yesPanel = container.querySelector(
+			'[data-testid="hero-post"][data-side="YES"]',
+		);
+		expect(yesPanel?.textContent).toContain("YES @ 27%");
+		const noPanel = container.querySelector(
+			'[data-testid="hero-post"][data-side="NO"]',
+		);
+		expect(noPanel?.textContent).toContain("NO @ 73%");
 	});
 });

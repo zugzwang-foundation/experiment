@@ -133,7 +133,7 @@ function HeroPostPanel({
 				>
 					{post.author.pseudonym}
 				</Link>
-				<SideBadge side={post.side} />
+				<SideBadge side={post.side} size="hero" price={post.entryPrice} />
 				<span className="font-mono text-n6">
 					Đ {formatDharma(post.authorStake)}
 				</span>
