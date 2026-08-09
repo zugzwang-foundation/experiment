@@ -16,7 +16,7 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 
 | # | Row | Owner / gate | Why here |
 |---|---|---|---|
-| ~~**1**~~ | ~~**PERF-1 — Discovery serves in ~35 s**~~ **— CLOSED 2026-08-10** | — | **No longer a blocker.** Functions were in `iad1` against a Mumbai DB; ADR-0006's ratified `bom1` was never applied. Fixed: **361.6 → 5.34 ms/trip**, Discovery **35.07 → 0.584 s p50**. **POLISH.1–.8 are unblocked.** Kept one cycle as a strike so the reordering below is legible, then delete. |
+| ~~**1**~~ | ~~**PERF-1 — Discovery serves in ~35 s**~~ **— CLOSED 2026-08-10** | — | **No longer a blocker.** Functions were in `iad1` against a Mumbai DB; ADR-0006's ratified `bom1` was never applied. Fixed: **361.6 → 5.34 ms/trip**, Discovery **35.07 → 0.692 s p50** (staging-verified). **POLISH.1–.8 are unblocked.** Kept one cycle as a strike so the reordering below is legible, then delete. |
 | **1** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
 | **2** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
 | **3** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
@@ -610,15 +610,26 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 ### The result
 
-| | before | after | |
-|---|---|---|---|
-| **per DB round-trip** | 361.6 ms | **5.34 ms** | **68×** |
-| **Discovery `/` p50** | 35.07 s | **0.584 s** | **60×** |
-| **Profile `/u/…` p50** | 6.2 s | **0.189 s** | **33×** |
-| `/api/health` (2 trips) | 0.719 s | **0.070 s** | 10× |
+Measured on **staging** (`staging.zugzwangworld.com`, `cc776bf`) — the serving
+environment and the authoritative figure. Preview is shown alongside because the
+fix was first proved there and the two agreeing is itself evidence.
 
-Exit criterion was **Discovery p50 cold ≤ 2.0 s**: met with **3.4× headroom**; the
-worst of seven runs (0.924 s) is still inside it.
+| | before | **after (STAGING)** | | after (preview) |
+|---|---|---|---|---|
+| **Discovery `/` p50** | 35.07 s | **0.692 s** | **51×** | 0.584 s |
+| **Profile `/u/…` p50** | 6.2 s | **0.190 s** | **33×** | 0.189 s |
+| per DB round-trip | 361.6 ms | **5.34 ms** | 68× | 5.34 ms |
+| `/api/health` (2 trips) | 0.719 s | 0.070 s | 10× | 0.070 s |
+
+Exit criterion was **Discovery p50 cold ≤ 2.0 s on staging**: met with **2.9×
+headroom**; the worst of three staging runs (0.874 s) is still inside it. Staging
+runs: 0.692 / 0.874 / 0.570 s, all `x-vercel-cache: MISS`, all
+`x-vercel-id: bom1::bom1`. Profile: 0.335 / 0.184 / 0.190 s.
+
+**Staging is ~0.11 s slower than preview on Discovery and identical on Profile.**
+Both are the same code against the same database; the delta is ordinary
+instance-to-instance variance at this scale, not a divergence — and it is recorded
+rather than smoothed over so nobody later reads 0.584 s as the staging number.
 
 **Cause.** Vercel functions executed in **`iad1`** (Washington D.C.) against a
 Supabase database in **`ap-south-1`** (Mumbai) — every statement paid a
@@ -630,8 +641,8 @@ applied: the project carried Vercel's `iad1` default and `vercel.json` had no
 `regions` key at all. One line. See the ADR-0006 patch record.
 
 **Batching is NOT required and was not done.** At 5.34 ms/trip the 97 statements
-cost ~0.52 s of the 0.58 s; batching to ~12 would save ~0.45 s on a page already
-clearing the bar by 3.4×. **Reconsider only on evidence** — a growing trip count
+cost ~0.52 s of the 0.69 s; batching to ~12 would save ~0.45 s on a page already
+clearing the bar by 2.9×. **Reconsider only on evidence** — a growing trip count
 or measured concurrency behaviour — **never reflexively.** The POOL-1 connection
 pressure also dissolves: Discovery held one slot for 35 s, now ~0.5 s — **~60×
 fewer slot-seconds**, which is the axis that exhausts the pooler.
@@ -688,8 +699,19 @@ regression had a fixed-overhead intercept of ≈ 0 ms; the `bom1` one is ≈ 60 
 Nothing regressed — DB latency used to swamp the fixed cost and now does not.
 
 **Evidence.** ADR-0006 §Patch record 2026-08-09 · `docs/logs/POOL-1.md` §6a (struck
-in place) · PR #307 (`vercel.json` + patch record) · the PERF-1 close-out PR
-(`/api/health` region, this row, the POOL-1 strikes).
+in place) · PR #307 (`vercel.json` + patch record, merged `cc776bf`) · the PERF-1
+close-out PR (`/api/health` region, this row, the POOL-1 strikes) · **staging
+verified 2026-08-10 at `cc776bf`: `x-vercel-id: bom1::bom1`, health
+`canary == cc776bf`, `db: ok`, `migrations: ok`.**
+
+**⚠ One proof is still outstanding, and it is ordered, not failed.** The Layer-2
+cross-check — health's `region` field against the compute half of `x-vercel-id` on
+the same response — **cannot run yet**: the `region` field ships in *this* PR, not
+in #307, so staging does not serve it. Until it runs, `bom1::bom1` (edge-generated,
+independent of the function) is the sole authority for the region, and it agrees on
+every request measured. **Run the cross-check on the next staging advance after
+this PR merges**; it validates the new health field, not the performance fix, and
+nothing about PERF-1's result depends on it.
 
 ## N1 — Commit the two PK-only artifacts that committed docs depend on
 
