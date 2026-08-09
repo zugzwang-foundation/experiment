@@ -86,6 +86,8 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		entryPrice: "0.270000000000000000",
 		replyCount: 24,
 		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	},
 	no: {
@@ -99,6 +101,8 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		entryPrice: "0.270000000000000000",
 		replyCount: 24,
 		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
 		createdAt: "2026-07-01T00:01:00.000Z",
 	},
 };

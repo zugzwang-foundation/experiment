@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { SideBadge } from "@/components/debate/badges";
+import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -169,6 +170,79 @@ function HeroPostPanel({
 				</span>
 				<span>Đ {formatDharma(post.replyDharma)} staked</span>
 			</div>
+			<SupportCounterBar
+				side={side}
+				supportDharma={post.supportDharma}
+				counterDharma={post.counterDharma}
+			/>
+		</div>
+	);
+}
+
+/**
+ * V17 — the `.barrow.r` Support/Counter split bar (mockup :99-113, markup
+ * :195-199): stacked LABEL — BAR — stacked LABEL, no text inside the bar.
+ *
+ * ⚠ DISPLAY-ONLY, and that is an INVARIANT, not a style choice. Support and
+ * Counter are read-time AGGREGATES over reply-bets (ADR-0017/0018); there is no
+ * standalone friendly-fire vote and `friendly_fire_events` was dropped at
+ * DEBATE.9. The mockup contains no `<button>`, no `<a>`, no handler and no
+ * `cursor:pointer` here, and neither does this. It renders a `<div
+ * role="img">` whose `aria-label` carries BOTH figures — the `PriceBar`
+ * precedent. A test asserts the absence of any interactive element.
+ *
+ * ⚠ The mockup's `.fill{background:var(--ink)}` and `.bar{background:var(--n0)}`
+ * are NOT ported by name — light-theme tokens, inverted here (plan pushback §3).
+ * The fixed `bg-yes` fill over a `bg-no` track is the shipped proportion-bar
+ * idiom (`composer/ReplySplitBar.tsx:64,67`). No SIDE VALUE selects either, so
+ * this cannot invert a pole and it is not C0's subject.
+ */
+function SupportCounterBar({
+	side,
+	supportDharma,
+	counterDharma,
+}: {
+	side: "YES" | "NO";
+	supportDharma: string;
+	counterDharma: string;
+}) {
+	// Reuses the SHIPPED split-bar primitive — exact decimals via
+	// `ComposerDecimal`, integer-TRUNCATED so a full bar means literally zero
+	// counter Dharma. No new formatter (SPEC.1 §10.8 mandates one).
+	const { totalDharma, supportPct } = computeSplitBar({
+		supportDharma,
+		counterDharma,
+	});
+	// Both zero → an even bar, per the mockup's `tot ? … : 50` (:458).
+	// `computeSplitBar` returns "0%" for an empty total, which is the right
+	// answer inside a composer and the wrong one on a resting hero panel.
+	const fillPct = totalDharma === "0" ? "50%" : supportPct;
+	return (
+		<div
+			data-testid={`hero-split-bar-${side}`}
+			className="mt-[9px] flex items-center gap-[9px]"
+			role="img"
+			aria-label={`Support Đ ${formatDharma(supportDharma)}, Counter Đ ${formatDharma(counterDharma)}`}
+		>
+			<span className="flex shrink-0 flex-col gap-[1px]">
+				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">
+					SUPPORT
+				</span>
+				<span className="text-[9.5px] font-bold tracking-[0.02em] text-n6">
+					Đ {formatDharma(supportDharma)}
+				</span>
+			</span>
+			<span className="h-[16px] flex-1 overflow-hidden rounded-[var(--r)] bg-no [border:var(--hairline)]">
+				<span className="block h-full bg-yes" style={{ width: fillPct }} />
+			</span>
+			<span className="flex shrink-0 flex-col items-end gap-[1px]">
+				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">
+					COUNTER
+				</span>
+				<span className="text-[9.5px] font-bold tracking-[0.02em] text-n6">
+					Đ {formatDharma(counterDharma)}
+				</span>
+			</span>
 		</div>
 	);
 }

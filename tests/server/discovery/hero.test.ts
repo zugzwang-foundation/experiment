@@ -512,6 +512,8 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yes.entryPrice).toBe("0.500000000000000000");
 		expect(yes.replyCount).toBe(0);
 		expect(yes.replyDharma).toBe("0.000000000000000000");
+		expect(yes.supportDharma).toBe("0.000000000000000000");
+		expect(yes.counterDharma).toBe("0.000000000000000000");
 
 		// A `user_banned` mod_action against B does NOT mask B — ban removes
 		// voice, not past content (ADR-0021 §4). The row deliberately targets
@@ -590,6 +592,12 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// V16 — the two already-loaded substrate aggregates, summed in DECIMAL.
 		expect(no.replyCount).toBe(5);
 		expect(no.replyDharma).toBe("250.000000000000000000");
+
+		// V17 — the split halves, VERBATIM. All five replies are Support (same
+		// side as the parent), so Counter is exactly zero and the sum above is
+		// reproduced by the two halves.
+		expect(no.supportDharma).toBe("250.000000000000000000");
+		expect(no.counterDharma).toBe("0.000000000000000000");
 
 		// The author's own stake stays post-scoped and untouched.
 		expect(no.authorStake).toBe("40.000000000000000000");

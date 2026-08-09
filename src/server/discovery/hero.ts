@@ -71,6 +71,16 @@ export type HeroPost = {
 	 * Summed with `CpmmDecimal`, NEVER JS `+` on the strings (CLAUDE.md §2).
 	 */
 	replyDharma: string;
+	/**
+	 * V17 — the Support/Counter split, carried from the substrate (no arithmetic
+	 * — the view derives the bar fill; the two are only normalised to 18 dp so
+	 * the DTO's Đ fields share one shape). Support/Counter are
+	 * read-time aggregates over reply-bets (ADR-0017/0018) — there is no
+	 * standalone friendly-fire vote, and `friendly_fire_events` was dropped at
+	 * DEBATE.9. Display-only: see §3c, the bar is never an affordance.
+	 */
+	supportDharma: string;
+	counterDharma: string;
 	createdAt: string;
 };
 
@@ -172,6 +182,14 @@ export async function selectHeroTopPosts(
 			replyDharma: toFixed18(
 				new CpmmDecimal(p.supportDharma).plus(p.counterDharma),
 			),
+			// Value-preserving NORMALISATION, not arithmetic. The substrate's
+			// aggregates are SQL sums, so an empty one arrives as the unpadded
+			// "0" while a non-empty one arrives 18-dp. Emitting both raw would
+			// make this DTO internally inconsistent — `replyDharma` above is
+			// always 18-dp — and hand any consumer doing a string comparison a
+			// trap that only appears on posts with no replies.
+			supportDharma: toFixed18(new CpmmDecimal(p.supportDharma)),
+			counterDharma: toFixed18(new CpmmDecimal(p.counterDharma)),
 			createdAt: row.createdAt.toISOString(),
 		};
 	};

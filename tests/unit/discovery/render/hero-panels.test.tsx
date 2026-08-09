@@ -77,6 +77,8 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 			side === "YES" ? "0.270000000000000000" : "0.550000000000000000",
 		replyCount: 24,
 		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -280,5 +282,82 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		const head = screen.getByTestId("hero-reply-head-YES");
 		expect(head.textContent).toContain("Replies · 0");
 		expect(head.textContent).toContain("Đ 0 staked");
+	});
+
+	// DISCOVERY-COMPLETE C6 — V17, the Support/Counter split bar.
+	it("render::v17-split-bar-geometry-and-figures", () => {
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+
+		// `.barrow.r` — one flex row, gap 9px, 16px bar.
+		expect(bar.getAttribute("class")).toContain("flex items-center gap-[9px]");
+		const track = bar.querySelector(".bg-no");
+		expect(track?.getAttribute("class")).toContain("h-[16px]");
+
+		// Both figures render, grouped by the shared formatter.
+		expect(bar.textContent).toContain("SUPPORT");
+		expect(bar.textContent).toContain("Đ 3,800");
+		expect(bar.textContent).toContain("COUNTER");
+		expect(bar.textContent).toContain("Đ 6,200");
+
+		// Fill = support / (support + counter) = 3800/10000 = 38%, integer-
+		// truncated by the shipped `computeSplitBar`.
+		const fill = bar.querySelector<HTMLElement>(".bg-yes");
+		expect(fill?.style.width).toBe("38%");
+
+		// No text inside the bar itself — the mockup puts the labels outside.
+		expect(track?.textContent).toBe("");
+	});
+
+	it("render::v17-bar-is-DISPLAY-ONLY-never-an-affordance", () => {
+		// §3c, and it is an INVARIANT not a style choice. Support/Counter are
+		// read-time aggregates over reply-bets (ADR-0017/0018) — there is no
+		// standalone friendly-fire vote, and `friendly_fire_events` was dropped at
+		// DEBATE.9. The mockup has no <button>, no <a>, no handler, no
+		// cursor:pointer here.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+
+		expect(
+			bar.querySelectorAll("button, a, input, [role='button']").length,
+		).toBe(0);
+		expect(bar.getAttribute("onclick")).toBeNull();
+		expect(bar.getAttribute("class")).not.toContain("cursor-pointer");
+		expect(bar.getAttribute("class")).not.toContain("hover:");
+
+		// It announces itself as an image, carrying BOTH figures in one utterance
+		// (the PriceBar precedent).
+		expect(bar.getAttribute("role")).toBe("img");
+		expect(bar.getAttribute("aria-label")).toBe(
+			"Support Đ 3,800, Counter Đ 6,200",
+		);
+	});
+
+	it("render::v17-both-zero-renders-an-even-bar", () => {
+		// The mockup's `tot ? … : 50` (:458). `computeSplitBar` returns "0%" for an
+		// empty total — right inside a composer, wrong on a resting hero panel.
+		const empty = {
+			...heroPost("YES"),
+			replyCount: 0,
+			replyDharma: "0.000000000000000000",
+			supportDharma: "0.000000000000000000",
+			counterDharma: "0.000000000000000000",
+		};
+		renderHero({ yes: empty, no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+		expect(bar.querySelector<HTMLElement>(".bg-yes")?.style.width).toBe("50%");
+		// Đ 0 is data AVAILABLE — both figures still render.
+		expect(bar.getAttribute("aria-label")).toBe("Support Đ 0, Counter Đ 0");
+	});
+
+	it("render::v17-poles-are-never-ported-by-neutral-token-name", () => {
+		// The fill is the mockup's `background:var(--ink)` and the track its
+		// `background:var(--n0)` — both light-theme tokens that would invert here.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+		expect(bar.querySelector(".bg-yes")).not.toBeNull();
+		expect(bar.querySelector(".bg-no")).not.toBeNull();
+		expect(bar.innerHTML).not.toContain("bg-ink");
+		expect(bar.innerHTML).not.toContain("bg-n0");
 	});
 });
