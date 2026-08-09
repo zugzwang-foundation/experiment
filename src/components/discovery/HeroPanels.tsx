@@ -114,7 +114,7 @@ function HeroPostPanel({
 			className="relative flex flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:1px_solid_var(--color-n3)]"
 		>
 			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
-				<Avatar size="sm">
+				<Avatar size="xs">
 					<AvatarImage src={post.author.pfpUrl} alt="" />
 					<AvatarFallback>
 						{post.author.pseudonym.slice(0, 2).toUpperCase()}
