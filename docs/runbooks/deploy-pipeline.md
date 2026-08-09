@@ -104,6 +104,10 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 - **(b) Fast-forwardability.** EMPTY means staging carries no commit `main` lacks. If it is not empty the push below is **rejected as a non-fast-forward**, which reads like a tooling failure when it is a **branch-state** problem — staging diverged, and something put a commit there that never went through `main`. Prove this first and that rejection never happens; if it fires anyway, find out why staging diverged before touching anything.
 - **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
 
+> **An EMPTY result from (a), (b) or (c) is a REAL result — none of them can fail open.** Worth stating because the question comes up: if a ref does not resolve, `git log`/`git diff` **abort loudly** (`fatal: bad revision`, `fatal: ambiguous argument … unknown revision`) and print nothing to stdout. They cannot silently report "no commits" against a ref that is missing. The `git fetch origin --prune` above is what keeps the refs current; the checks themselves are safe.
+>
+> ⚠ **Do not "confirm the refs resolve" with `git rev-parse --short A B` — it takes ONE revision and fails on two VALID ones.** `git rev-parse --short HEAD HEAD` returns `fatal: Needed a single revision`. Read as a missing remote-tracking ref, that message will send you fetching, re-checking, and doubting three preconditions that were correct all along. **Verified at PERF-1 (2026-08-10), where exactly that happened and the advance was briefly reported as running on vacuous checks — it was not.** Use one rev per call, or drop `--short`.
+
 **The advance sequence.**
 
 ```bash
