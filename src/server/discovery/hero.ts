@@ -45,12 +45,17 @@ export type HeroPost = {
 	author: AuthorIdentity;
 	authorStake: string;
 	/**
-	 * V10 — the post's own entry-bet `price_at_bet`: the canonical market YES
-	 * probability at the instant the bet executed (decimal string, 0–1). Already
-	 * loaded on `PostSubstrate` (ranking.ts:50, selected by
+	 * V10 — the post's own entry-bet `price_at_bet`: the effective price of THE
+	 * SIDE THE AUTHOR BOUGHT at the instant the bet executed (decimal string,
+	 * 0–1). ⚠ NOT the YES probability — `bets/place.ts:162` stores
+	 * `computeBuy(...).pEff`, computed at `cpmm/calculate.ts:73-97` as
+	 * `stake ÷ shares` where `a = reserves[side]` is the BOUGHT side, so a NO bet
+	 * stores the NO price. The view layer renders it RAW; deriving a complement
+	 * would print the wrong number on every NO chip.
+	 *
+	 * Already loaded on `PostSubstrate` (ranking.ts:50, selected by
 	 * ranking-substrate.ts:74) and discarded until now, so this costs ZERO new
-	 * queries. Passed through verbatim, exactly as `load-debate-view.ts:267`
-	 * does — the view layer derives the side's own percent (PCT.ROUND).
+	 * queries. Passed through verbatim, exactly as `load-debate-view.ts:267` does.
 	 */
 	entryPrice: string;
 	createdAt: string;

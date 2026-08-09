@@ -2,7 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { Badge as BadgeKind } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 
-import { formatPricePercent } from "./format";
+import { formatPercentUnpaired } from "./format";
 import type { Marker, Side } from "./types";
 
 /**
@@ -54,26 +54,25 @@ export function SideBadge({
 	size,
 }: {
 	side: Side;
-	/** The bet's `price_at_bet` — the canonical YES probability at execution. */
+	/**
+	 * The bet's `price_at_bet` — the effective price of THE SIDE THE AUTHOR
+	 * BOUGHT, already side-scoped by the engine. ⚠ NOT the YES probability:
+	 * `bets/place.ts:162` stores `computeBuy(...).pEff`, computed at
+	 * `cpmm/calculate.ts:73-97` as `stake ÷ shares` where `a = reserves[side]` is
+	 * the BOUGHT side (and `p0 = b/(a+b)`, matching `getPrices`' per-side
+	 * orientation) — so a NO bet stores the NO price.
+	 *
+	 * Rendered RAW. Deriving `100 − x` would print `NO @ 45%` for an author who
+	 * entered NO at 55%, and would disagree with the shipped `.md` export, which
+	 * renders the same field unmodified (debate-export/serialize.ts:320, :348).
+	 */
 	price?: string;
 	size?: "hero";
 }) {
-	// PCT.ROUND (SPEC.1 §10.8): `price_at_bet` is the canonical YES probability,
-	// so the author's OWN entry price is YES → that value, NO → 100 − it. That is
-	// exactly `formatPricePercent`'s paired rule — YES canonical, NO derived —
-	// so the entry price rides the PAIRED formatter and needs no
-	// `formatPercentUnpaired` hatch. The `no` field is never read (format.ts:204
-	// documents this); the YES price alone determines both sides.
-	//
-	// Deriving matters here: the d5 fixtures give the YES post `entry:27` and the
-	// NO post `entry:55` (surface_d5_v1_0.html:1496, :1512), i.e. the price of
-	// the side the author BOUGHT. Rendering the raw YES probability instead would
-	// print `NO @ 27%` when the NO price was 73% — a wrong number sitting beside
-	// the literal side, which is the pole-adjacent defect class of this whole PR.
-	const pct =
-		price === undefined
-			? null
-			: formatPricePercent({ yes: price, no: price }, side);
+	// pctround-allow: a single HISTORICAL value for ONE bet — a point in time,
+	// not one half of a live pair (SPEC.1 §10.8). Rendered RAW because the stored
+	// value is ALREADY the bought side's price; see the `price` prop above.
+	const pct = price === undefined ? null : formatPercentUnpaired(price);
 	return (
 		<Badge
 			aria-label={

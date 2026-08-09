@@ -67,7 +67,14 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 			pfpUrl: "/pfp-placeholder.svg",
 		},
 		authorStake: "40.000000000000000000",
-		entryPrice: "0.270000000000000000",
+		// DISTINCT per side, deliberately. `price_at_bet` is already the price of
+		// the side BOUGHT (bets/place.ts:162 -> cpmm/calculate.ts:97), so a shared
+		// value would make the NO expectation purely a function of whatever
+		// transform the component applies — which is precisely how a complement
+		// bug hides. The d5 fixtures use the same shape: a YES post at 27, a NO
+		// post at 55 (surface_d5_v1_0.html:1496, :1512).
+		entryPrice:
+			side === "YES" ? "0.270000000000000000" : "0.550000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -209,8 +216,12 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			no: heroPost("NO"),
 		});
 
-		// V29 — the 22px bar, labels outside.
-		expect(container.querySelector('[data-size="hero"]')).not.toBeNull();
+		// V29 — the 22px bar, labels outside. Scoped to the BAR: `PriceSparkline`
+		// also stamps `data-size="hero"`, so a bare `[data-size="hero"]` selector
+		// passes without PriceBar having received the preset at all.
+		const bar = container.querySelector('[data-size="hero"] [role="img"]');
+		expect(bar).not.toBeNull();
+		expect(bar?.getAttribute("class")).toContain("h-[22px]");
 
 		// V50 — the 16px hero-head avatar.
 		const avatars = container.querySelectorAll('[data-slot="avatar"]');
@@ -219,9 +230,10 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			expect(avatar.getAttribute("data-size")).toBe("xs");
 		}
 
-		// V10/V11 — the chip carries the author's OWN entry price at the hero
-		// geometry. The fixture's `price_at_bet` is 0.27, so the YES panel reads
-		// 27% and the NO panel the derived complement, 73%.
+		// V10/V11 — the chip carries the author's own entry price at the hero
+		// geometry, rendered RAW. The fixtures store 0.27 on the YES post and 0.55
+		// on the NO post, because `price_at_bet` is already the price of the side
+		// bought. Each panel reads back its OWN stored value; neither is derived.
 		const yesPanel = container.querySelector(
 			'[data-testid="hero-post"][data-side="YES"]',
 		);
@@ -229,6 +241,9 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		const noPanel = container.querySelector(
 			'[data-testid="hero-post"][data-side="NO"]',
 		);
-		expect(noPanel?.textContent).toContain("NO @ 73%");
+		expect(noPanel?.textContent).toContain("NO @ 55%");
+		// Neither panel shows the other's complement — the bug this pins.
+		expect(noPanel?.textContent).not.toContain("45%");
+		expect(yesPanel?.textContent).not.toContain("73%");
 	});
 });

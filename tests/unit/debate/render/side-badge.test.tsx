@@ -94,34 +94,38 @@ describe("SideBadge — INV-3, the side stays pole-bound whatever else is added"
 });
 
 describe("SideBadge — V10, the entry price", () => {
-	it("yes-renders-its-own-entry-price", () => {
-		// `price_at_bet` is the canonical YES probability, so a YES author's own
-		// entry price IS that value.
+	it("yes-renders-its-entry-price-raw", () => {
 		const { container } = render(
 			<SideBadge side="YES" price="0.270000000000000000" />,
 		);
 		expect(container.firstElementChild?.textContent).toBe("YES @ 27%");
 	});
 
-	it("no-renders-the-DERIVED-complement-not-the-raw-yes-probability", () => {
-		// The load-bearing assertion of V10. A NO author who bought at YES=27%
-		// entered NO at 73%. Rendering the raw 27% beside the literal "NO" would
-		// print a wrong number next to a pole — the defect class of this PR.
+	it("no-renders-its-entry-price-RAW-never-a-derived-complement", () => {
+		// The load-bearing assertion of V10, and it points the OPPOSITE way to the
+		// first draft of this file. `bets.price_at_bet` stores
+		// `computeBuy(...).pEff` for the side BOUGHT (bets/place.ts:162 ->
+		// cpmm/calculate.ts:73-97, `a = reserves[side]`), so a NO bet ALREADY
+		// stores the NO price. Deriving `100 - x` here would print `NO @ 73%` for
+		// an author who entered NO at 27% — a factually false figure attributed to
+		// a named pseudonym on a public surface, and one that disagrees with the
+		// .md export rendering the same field raw (debate-export/serialize.ts:320).
 		const { container } = render(
 			<SideBadge side="NO" price="0.270000000000000000" />,
 		);
-		expect(container.firstElementChild?.textContent).toBe("NO @ 73%");
+		expect(container.firstElementChild?.textContent).toBe("NO @ 27%");
 	});
 
-	it("the-pair-sums-to-100-at-an-exact-tie", () => {
-		// PCT.ROUND (SPEC.1 §10.8): independent per-side half-up rounding renders
-		// 101% at any exact .xx5 tie. Deriving NO from YES cannot.
-		const TIE = "0.525000000000000000";
-		const { container: yes } = render(<SideBadge side="YES" price={TIE} />);
+	it("both-poles-render-the-same-stored-value-identically", () => {
+		// The side selects the POLE COLOUR, never the number. Two bets that
+		// executed at the same effective price read the same, whichever side they
+		// were on.
+		const P = "0.525000000000000000";
+		const { container: yes } = render(<SideBadge side="YES" price={P} />);
 		expect(yes.firstElementChild?.textContent).toBe("YES @ 53%");
 		cleanup();
-		const { container: no } = render(<SideBadge side="NO" price={TIE} />);
-		expect(no.firstElementChild?.textContent).toBe("NO @ 47%");
+		const { container: no } = render(<SideBadge side="NO" price={P} />);
+		expect(no.firstElementChild?.textContent).toBe("NO @ 53%");
 	});
 
 	it("aria-label-carries-the-side-and-the-price", () => {
