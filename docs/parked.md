@@ -16,15 +16,19 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 
 | # | Row | Owner / gate | Why here |
 |---|---|---|---|
-| **1** | **PERF-1 — Discovery serves in ~35 s** | **next task** | The only **GO-LIVE BLOCKER**. Also blocks POLISH.1–.8 — a 35-second front page makes visual inspection impractical and any timing observation meaningless. ⚠ Do **not** open it assuming batching is the fix; read its two carry-verbatim threads first. |
-| **2** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
-| **3** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
-| **4** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
-| **5** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
+| ~~**1**~~ | ~~**PERF-1 — Discovery serves in ~35 s**~~ **— CLOSED 2026-08-10** | — | **No longer a blocker.** Functions were in `iad1` against a Mumbai DB; ADR-0006's ratified `bom1` was never applied. Fixed: **361.6 → 5.34 ms/trip**, Discovery **35.07 → 0.584 s p50**. **POLISH.1–.8 are unblocked.** Kept one cycle as a strike so the reordering below is legible, then delete. |
+| **1** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
+| **2** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
+| **3** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
+| **4** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
 
 *Ordering rule: go-live blocker → operator-owned pre-promote → known-vacuous
 gate → dated pre-launch hardening → armed-on-touch. A row leaves this table only
 when it closes; a row enters it when its trigger fires.*
+
+*PERF-1 closed 2026-08-10 and **there is no GO-LIVE BLOCKER row left** — the
+operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue. Its
+strike stays one cycle so the renumbering is traceable, then it goes.*
 
 ---
 
@@ -596,48 +600,96 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** Scripts-only: correct the project slug, add `SENTRY_ORG` to Doppler `stg`, and replace the `_smoke-error` assertion with one that asserts real delivery. The route rename is **not** enough on its own and should not be done alone. Evidence is in `docs/logs/POOL-1.md` §5; this entry is the tracking.
 
-## PERF-1 — Discovery serves in ~35 s · **GO-LIVE BLOCKER**
+## ~~PERF-1 — Discovery serves in ~35 s · **GO-LIVE BLOCKER**~~ → **CLOSED 2026-08-10**
 
-**Originating task:** POOL-1 / POOL-2 (2026-08-08). Opened by founder ruling at the POOL-1 close. **Go-live is 2026-09-15 — 38 days out.** POOL-1 closes as DIAGNOSED, NOT FIXED; **this row is the remedy**, and `POLISH.1` is sequenced *below* it.
+> **CLOSED — FIXED AND VERIFIED.** No longer a go-live blocker; POLISH.1–.8 are
+> unblocked. Struck rather than deleted: two numbers this row carried were wrong,
+> and the correction is worth more than the row.
 
-**The row, as ruled:**
+**Originating task:** POOL-1 / POOL-2 (2026-08-08). **Closed by PERF-1 (2026-08-10)**, PR #307 + the close-out PR.
 
-> Discovery (`/`) serves in **~35 s at concurrency 1**, reproduced four times
-> (35.09 / 35.33 / 35.15 / 37.28 s). **41 sequential DB round-trips across two
-> nested loops** — `listOpenMarkets` issues 1 + 3N (`src/server/discovery/list.ts:48–63`)
-> and `DiscoveryContent` a further 2N over the same cards
-> (`src/app/(public)/page.tsx:59–65`); at `DISCOVERY_GRID_SIZE = 8` that is
-> 1 + 24 + 16. **Only the first query is genuinely ordered** — it supplies the
-> ids; everything after is per-market and independent, and the source says so
-> itself ("grouped-query batching is the OQ-1 C follow-up's optimization").
-> `force-dynamic` (`page.tsx:19`) **stands in for a deferred cache policy, not
-> for correctness.** Profile (`/u/[pseudonym]`) is the *good* shape and still
-> takes 6.2 s — parallelism at the wrong granularity: three concurrent chains
-> (`page.tsx:63`), each internally serial (`positions.ts` alone is 8 sequential
-> statements). Class R.
+### The result
 
-### ⚠ Carry this open thread verbatim — do not begin by assuming batching fixes it
+| | before | after | |
+|---|---|---|---|
+| **per DB round-trip** | 361.6 ms | **5.34 ms** | **68×** |
+| **Discovery `/` p50** | 35.07 s | **0.584 s** | **60×** |
+| **Profile `/u/…` p50** | 6.2 s | **0.189 s** | **33×** |
+| `/api/health` (2 trips) | 0.719 s | **0.070 s** | 10× |
 
-> **41 round-trips do not account for 35 seconds.** They account for the *warm*
-> figure — under concurrency the same route serves p50 ≈ 1.1 s, which is
-> consistent with 41 sequential trips at ~27 ms each. The cold figure implies
-> ~857 ms per trip, which is not. **A large one-time cold cost sits underneath
-> the sequential structure and the trace does not explain it.** PERF-1 must
-> **not** begin assuming batching alone fixes it — find the cold cost first, or
-> the batching work will land and the page will still be slow on the path that
-> matters.
+Exit criterion was **Discovery p50 cold ≤ 2.0 s**: met with **3.4× headroom**; the
+worst of seven runs (0.924 s) is still inside it.
 
-### ⚠ And: slot-seconds, not peak count, is what exhausts the pool
+**Cause.** Vercel functions executed in **`iad1`** (Washington D.C.) against a
+Supabase database in **`ap-south-1`** (Mumbai) — every statement paid a
+cross-region round trip. `x-vercel-id` read `bom1::iad1` on 17 of 17 requests.
 
-Batching **RAISES peak concurrent connections** and **COLLAPSES hold time**. Discovery goes from **1 slot × ~35 s** to roughly **2–3 slots × well under 1 s**; profile from ~19 slot-seconds to ~4. That is **worse on the axis POOL-2 was measuring and ~12× better on the axis that actually matters** against a 15-slot pooler.
+**Fix.** **ADR-0006's ratified `bom1`, finally implemented.** The region was
+ratified 2026-05-05 (§1 Web tier: *"primary region `bom1` (Mumbai)"*) and never
+applied: the project carried Vercel's `iad1` default and `vercel.json` had no
+`regions` key at all. One line. See the ADR-0006 patch record.
 
-**State this wherever PERF-1's result is judged.** A reviewer holding POOL-2's framing will see peak connections go up and read it as a regression. It is not. The pooler exhausts on slot-**seconds**; a single discovery load holding one slot for 35 s costs the pool more than five loads holding five slots for one second.
+**Batching is NOT required and was not done.** At 5.34 ms/trip the 97 statements
+cost ~0.52 s of the 0.58 s; batching to ~12 would save ~0.45 s on a page already
+clearing the bar by 3.4×. **Reconsider only on evidence** — a growing trip count
+or measured concurrency behaviour — **never reflexively.** The POOL-1 connection
+pressure also dissolves: Discovery held one slot for 35 s, now ~0.5 s — **~60×
+fewer slot-seconds**, which is the axis that exhausts the pooler.
 
-**Why it is a go-live blocker and not an optimisation.** It is the mechanism behind the POOL-1 incident, not a separate performance concern — `docs/logs/POOL-1.md` §4.1 shows five overlapping discovery renders holding five slots simultaneously during ordinary walkthrough navigation, which is what exhausted the pool. It also **blocks POLISH.1–.8**, which inspect surfaces through a browser: a 35-second front page makes visual inspection impractical and any timing observation meaningless. And the founder has ruled **against** upsizing compute to raise the ceiling, precisely because that would mask this until production.
+### ⛔ Two numbers this row carried were WRONG — struck, with the reason
 
-**Conditional trigger.** Now — it is sequenced above POLISH.1.
+**1. ~~"41 sequential DB round-trips"~~ → 97.** It counted function CALLS, not SQL
+statements. `loadPriceSeries` issues **4** (`price-series.ts:58, 90, 110, 178`),
+`selectHeroTopPosts` **5** (`hero.ts:73, 78, 96, 106, 115`) — so the second loop is
+**9N, not 2N**. Total `1 + 3N + 9N = 97` at `DISCOVERY_GRID_SIZE = 8`.
 
-**Expected next task.** PERF-1 as its own ratified task. Evidence and the full findings table are in `docs/logs/POOL-1.md` §6; this entry is the tracking.
+**2. ~~"warm p50 ≈ 1.1 s"~~ → THERE IS NO WARM REGIME.** Seven runs, six after the
+first, **spread 0.29 s around a flat 35 s floor**, gaps to 150 s, **no decay**. The
+1.1 s was almost certainly **TTFB**: the Suspense boundary flushes the shell and
+`LoadingSkeleton` immediately, so any time-to-first-byte measure reads ~1 s on a
+35 s request (measured TTFB at PERF-1: 0.28–2.15 s against 35 s totals).
+
+**Consequently the whole carry-verbatim thread is void.** It read: *"41 round-trips
+do not account for 35 seconds… a large one-time cold cost sits underneath and the
+trace does not explain it."* Correct arithmetic on two wrong inputs. At 97 trips ×
+361.6 ms the round-trips account for the entire 35 s; **there was no cold cost.**
+The instruction it carried — *do not assume batching is the fix* — was right, but
+for the wrong reason: batching was never the fix because the per-trip cost was.
+
+### The durable lesson — this is the part worth keeping
+
+**A ratified ADR can go unimplemented indefinitely when the config surface is
+SILENT rather than wrong.** `vercel.json` did not contain a bad region; it
+contained **no region key at all**, and an absent key is indistinguishable from a
+correct one in every diff, every CI run and every code review. Nothing failed.
+Nothing looked odd.
+
+**Every control this project has watches for CHANGE. Nothing watched for a
+decision that never landed.** CI diffs commits; `db:check-drift` compares schema
+to migrations; `/api/health` reported env, db and migration drift. All of them
+answer *"did something move?"*. None answers *"did what we ratified ever get
+built?"* — and a decision that was never implemented never moves, so it is
+invisible to all of them, permanently.
+
+It survived **three months and roughly forty PRs**, and was found only because a
+performance number was implausible enough to trace to its cause — not by any
+review, and not by any gate.
+
+**The generalisation, for any future ratified-but-unbuilt decision:** a decision
+is not implemented until something reads the *deployed reality* back and compares
+it to the *decision*. Config-as-code is necessary and nowhere near sufficient —
+`vercel.json` was config-as-code and it was silent. **Closing control:**
+`/api/health` now returns `region`, so the deployed region is readable at any time
+and against any environment; its truthfulness is pinned against `x-vercel-id`
+rather than against itself (V-2).
+
+**Second-order note, recorded so it is not misread later.** The `iad1` two-point
+regression had a fixed-overhead intercept of ≈ 0 ms; the `bom1` one is ≈ 60 ms.
+Nothing regressed — DB latency used to swamp the fixed cost and now does not.
+
+**Evidence.** ADR-0006 §Patch record 2026-08-09 · `docs/logs/POOL-1.md` §6a (struck
+in place) · PR #307 (`vercel.json` + patch record) · the PERF-1 close-out PR
+(`/api/health` region, this row, the POOL-1 strikes).
 
 ## N1 — Commit the two PK-only artifacts that committed docs depend on
 
@@ -664,7 +716,7 @@ Batching **RAISES peak concurrent connections** and **COLLAPSES hold time**. Dis
 
 **Why deferred.** It is a writing task over ~15 close-outs plus their PRs, not a truth-pass edit; and it is most useful written *once* at lane close rather than incrementally.
 
-**Conditional trigger.** **Before POLISH closes.** (POLISH is itself sequenced below PERF-1 — see the SEQUENCE table.)
+**Conditional trigger.** **Before POLISH closes.** ~~(POLISH is itself sequenced below PERF-1 — see the SEQUENCE table.)~~ **PERF-1 closed 2026-08-10; POLISH is no longer gated behind it.**
 
 **Expected next task.** A UI-lane or POLISH close-out task. Model: `docs/logs/ENGINE-phase-record.md`.
 
