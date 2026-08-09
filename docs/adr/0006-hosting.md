@@ -9,6 +9,7 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §23 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
+| **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1) |
 
 ---
 
@@ -368,6 +369,95 @@ The two write paths that hard-fail on Redis outage (idempotency and pre-commit m
 - CLAUDE.md rows 316 (Postgres 17), 318 (Supabase), 325 (Cloudflare R2), 328 (Upstash), 329 (Vercel) — unchanged in content; this ADR is the ratification
 - SPEC.1 §13 (vendor lock), §16.1 (operational floor), §16.4 (audit log + PITR), §3 G3 post-amendment (K_eff dataset-derivability)
 - SPEC.2 §1.4 #5 (delegation), §4 (System Context — back-pressure pending), §22 (Operational Runbook Pointers — back-pressure pending), §23 (ADR Index — status flip)
+
+---
+
+## Patch record — 2026-08-09 · the ratified `bom1` region was never applied (PERF-1)
+
+**This patch changes no decision.** ADR-0006's region choice was correct and is
+untouched. It records that the choice was **never implemented**, how that was
+detected, and what now enforces it.
+
+**What was ratified.** §Decision Outcome option 1 and §1 (Web tier): *"Vercel Pro
+plan, single project, primary region `bom1` (Mumbai)."* §Configuration surfaces
+assigns the setting a home: *"Vercel project configuration (region, runtime
+overrides per route, cron registry) → `vercel.json`."* §Consequences: *"All four
+vendors land in Mumbai."*
+
+**What was live.** From provisioning until this patch, the Vercel project
+`experiment` (`prj_5krm0VEQQ9TleA2rjUBIL3oLJpiI`) carried
+`serverlessFunctionRegion: iad1` — Washington, D.C. — and `vercel.json` carried
+**no `regions` key at all**. `iad1` is Vercel's default for all new projects, so
+this is not a change anyone made; it is a default that was never overridden. The
+single-region topology this ADR rests on did not exist: the web tier ran ~12,000 km
+from a database, cache and object store that were all correctly in Mumbai.
+
+**How it was found — by measurement, not by review.** PERF-1's probe of
+Discovery (`/`) on staging:
+
+- Seven runs, six after the first, **spread 0.29 s around a flat 35 s floor** with
+  gaps to 150 s and no decay ⇒ the cost is **per-request**, not per-instance, which
+  eliminated module init, S3Client construction and connection establishment.
+- **TTFB 0.28 s against a 35 s total** ⇒ the cost is in the streamed body, not boot.
+- `x-vercel-id: bom1::iad1` on 17 of 17 requests ⇒ **ingress Mumbai, compute
+  Washington D.C.**
+- `/api/health` — exactly two DB round-trips (`SELECT 1`,
+  `src/app/api/health/route.ts`; the drift `select`,
+  `src/server/health/migration-drift.ts`) — median **0.719 s** over 10.
+- Two independent derivations put one DB round-trip at **~332–362 ms**, against a
+  same-region expectation of ~5–15 ms. The two-point regression's intercept is
+  ≈ 0 s: essentially *all* of both timings is round-trip latency.
+
+**Why review never caught it.** Nothing reads a deployed region back and compares
+it to this ADR. `vercel.json` was *silent* rather than wrong, and a silent config
+file looks identical to a correct one in every diff, every CI run and every code
+review. `/api/health` reports env, db and migration drift — **not region**. The
+control that would have caught this did not exist in any lane.
+
+**What changed here.** `vercel.json` gains `"regions": ["bom1"]`. Per Vercel's
+documentation this sets the project's default function region at deploy time,
+which is the surface §Configuration surfaces already assigned. Pro permits up to 5
+regions, so a single `bom1` is within plan (§1 already states *"`bom1` deployment
+requires Pro"*, which is one of the three reasons Pro was chosen).
+
+**The proof obligation, stated so it is not skipped.** The config file is not the
+evidence. **`x-vercel-id` must read `bom1::bom1`** on a deployed response; until it
+does, this patch is a claim and not a fact. ✅ **DISCHARGED** — `bom1::bom1`
+observed on the branch's preview deploy and again on staging after merge (PERF-1
+close-out).
+
+**⚠ The Vercel DASHBOARD will keep showing the project-level region, and it is
+not the authority.** Settings → Functions → Function Regions reads the *project*
+setting (`serverlessFunctionRegion`), which this patch does not change and which
+may continue to display **`iad1`** indefinitely. `vercel.json`'s `regions` key is
+applied per deployment and **overrides it**. **A dashboard reading `iad1` is NOT
+drift and must not be "fixed".** The only authority is `x-vercel-id` on a
+deployed response — `<ingress>::<compute>` — and `/api/health`'s `region` field
+(added at PERF-1 close-out), which reports the region the function is *actually
+executing in*. This note exists because the next person to open that settings
+page would otherwise re-open a closed question.
+
+**Scope warning — this moves production.** One Vercel project serves staging and
+production via branch deploys (`docs/runbooks/deploy-pipeline.md` §0). A
+project-level `regions` key applies to **both**. Production is gated
+(`autoAssignCustomDomains` OFF, §3 promote sequence), so a `main` merge stages
+rather than serves — but the next production promote carries this region change
+with it, and that is intended: it is what ADR-0006 ratified.
+
+~~**Not decided here.** Whether ~332–362 ms per round-trip is *entirely* network is
+unproven. If a post-move measurement leaves ~140 ms per trip, the residue is the
+Supavisor session-pooler hop plus query execution, and Discovery's 97 sequential
+statements still need batching.~~
+
+**RESOLVED by measurement (PERF-1 close-out), struck rather than deleted so the
+open question and its answer stay together.** It was **entirely** network. Post-move
+the two-point derivation gives **5.34 ms per round-trip** against 361.6 ms before —
+a **68×** reduction with **no residue**. The feared ~140 ms of pooler hop plus query
+execution does not exist. Batching is therefore **not** required: Discovery serves
+**0.584 s p50** against a 2.0 s exit criterion, and batching 97 statements to ~12
+would save ~0.45 s on a page already clearing the bar by 3.4×. Reconsider it only on
+evidence — a growing trip count or measured concurrency behaviour — never
+reflexively. No batching lands in this change.
 
 ---
 
