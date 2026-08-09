@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import type { DbClient, DbTransaction } from "@/db";
 import { markets } from "@/db/schema";
 import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
-import { getMarketPricing } from "@/server/debate-view/market-pricing";
+import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 
 import { getDefaultMarketMediaUrl } from "./media";
@@ -32,6 +32,22 @@ export type DiscoveryCard = {
 };
 
 /**
+ * DISCOVERY-COMPLETE C8 (V13) — a card PLUS its pool reserves.
+ *
+ * ⚠ The reserves are deliberately a SIBLING of the card, never a field ON it.
+ * `DiscoveryCard` is carried into `DiscoveryCarousel`, a `"use client"`
+ * component, so anything on that type is serialized to the browser. Reserves
+ * are a server-internal row value (AGENTS.md §6 — never expose an internal row
+ * shape in a DTO), and they exist here only to be threaded into
+ * `selectHeroTopPosts` inside the server component. Keeping them off the card
+ * makes that structural rather than a rule someone has to remember.
+ */
+export type DiscoveryListing = {
+	card: DiscoveryCard;
+	reserves: { yes: string; no: string } | null;
+};
+
+/**
  * The Discovery featured-set read model (SPEC.1 §22 SCL-4/SCL-5): all Open
  * markets ordered `created_at` DESCENDING — newest-first, deliberately
  * capital-neutral (recency, never stake/volume; ADR-0017 Driver 2 applied to
@@ -44,7 +60,7 @@ export type DiscoveryCard = {
  */
 export async function listOpenMarkets(
 	client: DiscoveryReader,
-): Promise<DiscoveryCard[]> {
+): Promise<DiscoveryListing[]> {
 	const rows = await client
 		.select({
 			id: markets.id,
@@ -56,19 +72,25 @@ export async function listOpenMarkets(
 		.orderBy(desc(markets.createdAt))
 		.limit(DISCOVERY_GRID_SIZE);
 
-	const cards: DiscoveryCard[] = [];
+	const listings: DiscoveryListing[] = [];
 	for (const m of rows) {
-		const pricing = await getMarketPricing(client, m.id);
+		// C8: the SAME single pool read now also yields the raw reserves — one
+		// more return field on one existing read, the shipped
+		// `getMarketPricingAndUnitToWin` precedent. +0 round-trips.
+		const priced = await getMarketPricingAndReserves(client, m.id);
 		const totals = await getMarketTotals(client, m.id);
 		const imageUrl = await getDefaultMarketMediaUrl(client, m.id);
-		cards.push({
-			id: m.id,
-			slug: m.slug,
-			title: m.title,
-			pricing,
-			totals,
-			imageUrl,
+		listings.push({
+			card: {
+				id: m.id,
+				slug: m.slug,
+				title: m.title,
+				pricing: priced?.pricing ?? null,
+				totals,
+				imageUrl,
+			},
+			reserves: priced?.reserves ?? null,
 		});
 	}
-	return cards;
+	return listings;
 }

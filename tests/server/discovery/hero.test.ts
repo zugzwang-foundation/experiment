@@ -58,6 +58,8 @@ vi.mock("@/server/storage/r2", () => ({
 	),
 }));
 
+import { and, eq } from "drizzle-orm";
+
 import {
 	bets,
 	comments,
@@ -65,9 +67,11 @@ import {
 	markets,
 	modActions,
 	pools,
+	positions,
 	users,
 } from "@/db/schema";
 import { buildTopList, topOrder } from "@/lib/ranking";
+import { computeSell } from "@/server/cpmm/calculate";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 // RED import: the greenfield Slice-3 selector under test (fails collection).
 import { selectHeroTopPosts } from "@/server/discovery/hero";
@@ -77,6 +81,14 @@ import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const POOL_SEED = "100.000000000000000000";
+
+/**
+ * DISCOVERY-COMPLETE C8 — the pool reserves threaded into `selectHeroTopPosts`
+ * for the V13 progression figure. Matches what `seedPool` writes, so any test
+ * that ALSO seeds a `positions` row gets a real `computeSell` result; the rest
+ * get `currentValue: null` because no holding exists.
+ */
+const RESERVES = { yes: POOL_SEED, no: POOL_SEED };
 
 /** Deterministic distinct timestamps — i seconds past a fixed UTC base. */
 function at(i: number): Date {
@@ -359,7 +371,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yesOrder).toEqual([yesTop, yesNewest, yesFirst]);
 		expect(noOrder).toEqual([noTop, noNewest, noFirst]);
 
-		const hero = await selectHeroTopPosts(testDb, marketId);
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yes = requirePost(hero.yes);
 		const no = requirePost(hero.no);
 
@@ -451,7 +463,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(rankedFirstYes).toBe(divYesTop);
 		expect(builtFirstYes).toBe(divYesNewest);
 
-		const hero2 = await selectHeroTopPosts(testDb, market2);
+		const hero2 = await selectHeroTopPosts(testDb, market2, RESERVES);
 		expect(requirePost(hero2.yes).id).toBe(divYesTop);
 		expect(requirePost(hero2.yes).id).not.toBe(builtFirstYes);
 	});
@@ -521,7 +533,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		await removeComment(postA);
 
-		const hero = await selectHeroTopPosts(testDb, marketId);
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yes = requirePost(hero.yes);
 		// The Track-B-hidden post is NOT eligible — the next eligible post on
 		// the side surfaces (F-DISC-2 safety-critical rule).
@@ -578,7 +590,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			actorId: "admin-singleton",
 		});
 
-		const heroAfterBan = await selectHeroTopPosts(testDb, marketId);
+		const heroAfterBan = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yesAfterBan = requirePost(heroAfterBan.yes);
 		// B still returned, content intact (title derived from its body;
 		// single-line body → "" teaser per the contract).
@@ -632,7 +644,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			firstAt: 10,
 		});
 
-		const no = requirePost((await selectHeroTopPosts(testDb, marketId)).no);
+		const no = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).no,
+		);
 		expect(no.id).toBe(post);
 
 		// V10 — raw passthrough of `price_at_bet`. NOT the complement.
@@ -656,6 +670,105 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(no.imageUrl).toBeNull();
 	});
 
+	it("discovery::hero-current-value-is-the-authors-held-side-only", async () => {
+		// DISCOVERY-COMPLETE C8 — V13, founder ruling OD-1 = Option B.
+		//
+		// Discovery lists OPEN markets only, so settlement cannot have occurred:
+		// Đb collapses to ONE pure `computeSell` call, no episode walk. Four cases
+		// share one market — held-on-side, exited (quantity 0), flipped (holding on
+		// the OPPOSITE side), and no row at all — because only the first may
+		// produce a figure.
+		const marketId = await seedMarket("hero-v13-current-value");
+		await seedPool(marketId);
+		const holder = await seedUser("hero-v13-holder");
+		const flipped = await seedUser("hero-v13-flipped");
+		const replier = await seedUser("hero-v13-replier");
+
+		const heldPost = await seedCommentWithBet({
+			userId: holder,
+			marketId,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "YES argument — author still holds this side.",
+			parentCommentId: null,
+			createdAt: at(1),
+		});
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: heldPost,
+			side: "YES",
+			count: 5,
+			firstAt: 10,
+		});
+
+		// The author of the NO post holds YES — i.e. they FLIPPED off the side
+		// they argued. The join's side predicate must not match it.
+		const flippedPost = await seedCommentWithBet({
+			userId: flipped,
+			marketId,
+			side: "NO",
+			stake: "30.000000000000000000",
+			body: "NO argument — author has since flipped to YES.",
+			parentCommentId: null,
+			createdAt: at(2),
+		});
+		await testDb.insert(positions).values([
+			{
+				userId: holder,
+				marketId,
+				side: "YES",
+				quantity: "50.000000000000000000",
+			},
+			{
+				userId: flipped,
+				marketId,
+				side: "YES",
+				quantity: "20.000000000000000000",
+			},
+		]);
+
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const yes = requirePost(hero.yes);
+		const no = requirePost(hero.no);
+		expect(yes.id).toBe(heldPost);
+		expect(no.id).toBe(flippedPost);
+
+		// HELD on the argued side → the exact `computeSell` proceeds, no
+		// re-derivation in the test's own arithmetic.
+		const expected = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "50.000000000000000000",
+		}).proceeds;
+		expect(yes.currentValue).toBe(expected);
+		// Post-ANCHORED: the left figure is untouched and stays this post's own bet.
+		expect(yes.authorStake).toBe("40.000000000000000000");
+
+		// FLIPPED — a holding exists, but on the opposite side. No figure.
+		expect(no.currentValue).toBeNull();
+
+		// EXITED — the row survives at quantity 0 (positions is Bucket C), and a
+		// zero quantity would make `computeSell` throw `requirePositive`. It must
+		// be guarded to null, never allowed to reach the whole-surface catch.
+		await testDb
+			.update(positions)
+			.set({ quantity: "0.000000000000000000" })
+			.where(
+				and(eq(positions.userId, holder), eq(positions.marketId, marketId)),
+			);
+		const exited = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(exited.currentValue).toBeNull();
+
+		// NO POOL ROW — reserves null ⇒ null, never a throw.
+		const unpriced = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, null)).yes,
+		);
+		expect(unpriced.currentValue).toBeNull();
+	});
+
 	it("discovery::hero-mints-an-image-url-for-a-picked-post", async () => {
 		// DISCOVERY-COMPLETE C7 — V15. The positive control for the masking
 		// assertion in `hero-masks-track-b-hidden-from-public`: proves the join
@@ -677,7 +790,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			imageUploadsId: image,
 		});
 
-		const yes = requirePost((await selectHeroTopPosts(testDb, marketId)).yes);
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
 		expect(yes.id).toBe(post);
 		// `signRead` hardcodes the "uploads" bucket; TTL is the 3600s D9 render
 		// seam. The mocked `mintReadUrl` echoes both back.
@@ -744,12 +859,12 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yesOrder).toEqual([p1, p2, p3]);
 
 		// Baseline — nothing removed: the Top pick surfaces.
-		const baseline = await selectHeroTopPosts(testDb, marketId);
+		const baseline = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(requirePost(baseline.yes).id).toBe(yesOrder[0]);
 
 		// Remove the Top pick → the SECOND-in-Top-order surfaces.
 		await removeComment(p1);
-		const afterFirst = await selectHeroTopPosts(testDb, marketId);
+		const afterFirst = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const firstFallback = requirePost(afterFirst.yes);
 		expect(firstFallback.id).toBe(yesOrder[1]);
 		// Removed p1 keeps ordinal slot 1 (removed-INCLUDED domain).
@@ -757,7 +872,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		// Remove that too → the THIRD surfaces on the next call.
 		await removeComment(p2);
-		const afterSecond = await selectHeroTopPosts(testDb, marketId);
+		const afterSecond = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const secondFallback = requirePost(afterSecond.yes);
 		expect(secondFallback.id).toBe(yesOrder[2]);
 		expect(secondFallback.ordinal).toBe(3);
@@ -792,7 +907,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(
 			ranked.filter((p) => p.parentSide === "YES").map((p) => p.id),
 		).toEqual([yesA, yesB]);
-		const before = await selectHeroTopPosts(testDb, marketId);
+		const before = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(before.no).toBeNull();
 		expect(requirePost(before.yes).id).toBe(yesA);
 
@@ -800,12 +915,12 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// post — never a placeholder object).
 		await removeComment(yesA);
 		await removeComment(yesB);
-		const after = await selectHeroTopPosts(testDb, marketId);
+		const after = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(after).toStrictEqual({ yes: null, no: null });
 
 		// Fold: a market with ZERO posts → both sides null.
 		const emptyMarketId = await seedMarket("hero-zero-posts");
-		const empty = await selectHeroTopPosts(testDb, emptyMarketId);
+		const empty = await selectHeroTopPosts(testDb, emptyMarketId, RESERVES);
 		expect(empty).toStrictEqual({ yes: null, no: null });
 	});
 
@@ -836,7 +951,8 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		// Slice 1's list authority sees exactly this one market — the whole
 		// carousel rotation domain is a single index.
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 		expect(cards).toHaveLength(1);
 		const card = cards[0];
 		expect(card.id).toBe(marketId);
@@ -847,8 +963,8 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// client no-auto-advance assertion for this same §17 registry row
 		// lands at Slice 5 (render layer, fake timers); this is the server
 		// half.
-		const first = await selectHeroTopPosts(testDb, marketId);
-		const second = await selectHeroTopPosts(testDb, marketId);
+		const first = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const second = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(second).toStrictEqual(first);
 		expect(requirePost(first.yes).id).toBe(yesPost);
 		expect(requirePost(first.no).id).toBe(noPost);

@@ -80,6 +80,7 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 		supportDharma: "3800.000000000000000000",
 		counterDharma: "6200.000000000000000000",
 		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -381,6 +382,31 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(placeholder.textContent).toBe("IMG");
 		expect(placeholder.getAttribute("aria-hidden")).toBe("true");
 		expect(screen.queryByTestId("hero-post-image-YES")).toBeNull();
+	});
+
+	// DISCOVERY-COMPLETE C8 — V13, the argstake progression (OD-1 = Option B).
+	it("render::v13-progression-renders-both-figures-with-an-arrow", () => {
+		const held = {
+			...heroPost("YES"),
+			currentValue: "1407.000000000000000000",
+			authorStake: "1000.000000000000000000",
+		};
+		renderHero({ yes: held, no: null });
+		const panel = screen.getByTestId("hero-post");
+		expect(panel.textContent).toContain("Đ 1,000");
+		expect(panel.textContent).toContain("→");
+		expect(panel.textContent).toContain("Đ 1,407");
+	});
+
+	it("render::v13-null-current-value-renders-ONE-figure-and-no-arrow", () => {
+		// The honest degradation, and the COMMON case for an older post: the
+		// author exited, flipped, or the market has no pool row. There is no such
+		// state in the mockup, so this is a build decision — never a fabricated
+		// second number.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const panel = screen.getByTestId("hero-post");
+		expect(panel.textContent).toContain("Đ 40");
+		expect(panel.textContent).not.toContain("→");
 	});
 
 	it("render::v17-poles-are-never-ported-by-neutral-token-name", () => {

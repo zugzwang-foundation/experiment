@@ -67,11 +67,16 @@ export default function DiscoveryPage() {
 export async function DiscoveryContent() {
 	let views: DiscoveryMarketView[];
 	try {
-		const cards = await listOpenMarkets(db);
+		const listings = await listOpenMarkets(db);
 		views = [];
-		for (const card of cards) {
+		for (const { card, reserves } of listings) {
 			const series = await loadPriceSeries(db, card.id);
-			const topPosts = await selectHeroTopPosts(db, card.id);
+			// C8/V13: `reserves` stays a SERVER-LOCAL binding. It is threaded into
+			// the hero read and then dropped — it is deliberately NOT pushed onto
+			// `card`, because `DiscoveryMarketView` crosses into `DiscoveryCarousel`
+			// (`"use client"`) and would serialize an internal pool row to the
+			// browser.
+			const topPosts = await selectHeroTopPosts(db, card.id, reserves);
 			views.push({ card, series, topPosts });
 		}
 	} catch {

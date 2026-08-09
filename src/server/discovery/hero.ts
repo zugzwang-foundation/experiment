@@ -3,8 +3,9 @@ import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
-import { comments, imageUploads } from "@/db/schema";
+import { comments, imageUploads, positions } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
+import { computeSell, type Reserves } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
 	deriveTitleTeaser,
@@ -93,6 +94,24 @@ export type HeroPost = {
 	 * (`getSignedUrl` from s3-request-presigner) — no network call, no DB hit.
 	 */
 	imageUrl: string | null;
+	/**
+	 * V13 — the CURRENT value of the author's held position on the side they
+	 * argued, or `null` when there is nothing to show. Founder ruling OD-1 =
+	 * Option B, POST-ANCHORED: the left figure stays `authorStake` (this post's
+	 * own entry bet) and this is the right one.
+	 *
+	 * ⚠ The two are commensurable only for a single-bet author: `authorStake` is
+	 * POST-scoped and this is MARKET-scoped (the author's whole holding on that
+	 * side, which may span several bets across several posts). That asymmetry is
+	 * the ruled, accepted cost of +0 queries — `BookmarkCard` takes both numbers
+	 * episode-scoped instead, which costs 5 reads per (author, market).
+	 *
+	 * `null` whenever a value cannot be honestly computed: no pool row, no held
+	 * row, a non-positive quantity, or a holding on the OPPOSITE side (author
+	 * exited or flipped). The panel then renders the single figure with no
+	 * arrow — the honest degradation, and the common case for an older post.
+	 */
+	currentValue: string | null;
 	createdAt: string;
 };
 
@@ -118,6 +137,13 @@ export type HeroTopPosts = { yes: HeroPost | null; no: HeroPost | null };
 export async function selectHeroTopPosts(
 	client: DiscoveryReader,
 	marketId: string,
+	/**
+	 * V13 — the market's pool reserves, threaded from the read
+	 * `listOpenMarkets` already performs. REQUIRED and explicitly nullable: a
+	 * missing required argument is a compile error, a defaulted one silently
+	 * drops the progression figure (O-1). `null` ⇒ every `currentValue` is null.
+	 */
+	reserves: Reserves | null,
 ): Promise<HeroTopPosts> {
 	const substrate = await loadRankingSubstrate(client, { marketId });
 	if (substrate.length === 0) {
@@ -155,9 +181,22 @@ export async function selectHeroTopPosts(
 			body: comments.body,
 			createdAt: comments.createdAt,
 			imageKey: imageUploads.r2ObjectKey,
+			// V13 — the author's held quantity ON THE SIDE THEY ARGUED. The side
+			// predicate is part of the JOIN, so a holding on the opposite side
+			// (author flipped) simply does not match and arrives null — the same
+			// answer as "exited", which is what we want.
+			heldQuantity: positions.quantity,
 		})
 		.from(comments)
 		.leftJoin(imageUploads, eq(imageUploads.id, comments.imageUploadsId))
+		.leftJoin(
+			positions,
+			and(
+				eq(positions.userId, comments.userId),
+				eq(positions.marketId, comments.marketId),
+				eq(positions.side, comments.sideAtPostTime),
+			),
+		)
 		.where(inArray(comments.id, pickedIds));
 	const rowById = new Map(rows.map((r) => [r.id, r]));
 
@@ -198,6 +237,42 @@ export async function selectHeroTopPosts(
 		.orderBy(asc(comments.createdAt), asc(comments.id));
 	const ordinalById = new Map(ordinalRows.map((r, i) => [r.id, i + 1]));
 
+	/**
+	 * V13 — the author's current position value on the side they argued.
+	 *
+	 * Discovery lists OPEN markets only (`list.ts`), so settlement cannot have
+	 * occurred: the settled branch of `computeBookmarkFigures` is unreachable
+	 * here and Đb collapses to ONE pure `computeSell` call — no episode walk, no
+	 * `payout_events`, no `bets`, no `events`. That is why this is +0 queries
+	 * rather than the 5N the register's L sizing assumed.
+	 *
+	 * Every guard below returns null rather than throwing. `computeSell` calls
+	 * `requirePositive` on both shares and reserves, and a throw here would
+	 * escape into `DiscoveryContent`'s ONE whole-surface catch and flip the
+	 * ENTIRE page to `ErrorState` over a single author's missing position row.
+	 * Deliberately NOT the `figures.ts:130` posture, which throws because it
+	 * runs under a held-position precondition this does not have.
+	 */
+	const currentValueFor = (
+		side: Side,
+		heldQuantity: string | null,
+	): string | null => {
+		if (reserves === null || heldQuantity === null) {
+			return null;
+		}
+		if (!new CpmmDecimal(heldQuantity).greaterThan(0)) {
+			// Exited: the row survives at quantity 0 (positions is Bucket C).
+			return null;
+		}
+		return computeSell({
+			reserves,
+			// The CPMM's own side literals are lowercase (calculate.ts), the
+			// schema enum's are upper — the `bets/place.ts:123` conversion.
+			side: side === "YES" ? "yes" : "no",
+			shares: heldQuantity,
+		}).proceeds;
+	};
+
 	const toHeroPost = (p: PostSubstrate | null): HeroPost | null => {
 		if (!p) {
 			return null;
@@ -231,6 +306,7 @@ export async function selectHeroTopPosts(
 			supportDharma: toFixed18(new CpmmDecimal(p.supportDharma)),
 			counterDharma: toFixed18(new CpmmDecimal(p.counterDharma)),
 			imageUrl: urlById.get(p.id) ?? null,
+			currentValue: currentValueFor(p.parentSide, row.heldQuantity),
 			createdAt: row.createdAt.toISOString(),
 		};
 	};

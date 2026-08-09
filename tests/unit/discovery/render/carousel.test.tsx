@@ -69,6 +69,7 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		supportDharma: "3800.000000000000000000",
 		counterDharma: "6200.000000000000000000",
 		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:00:00.000Z",
 	},
 	no: {
@@ -85,6 +86,7 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		supportDharma: "3800.000000000000000000",
 		counterDharma: "6200.000000000000000000",
 		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:01:00.000Z",
 	},
 };

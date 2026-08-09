@@ -135,8 +135,19 @@ function HeroPostPanel({
 					{post.author.pseudonym}
 				</Link>
 				<SideBadge side={post.side} size="hero" price={post.entryPrice} />
-				<span className="font-mono text-n6">
+				{/* V13 — `.argstake` (mockup :86-88, markup :190). The progression is
+				    POST-ANCHORED (founder ruling OD-1 = Option B): the left figure is
+				    THIS post's own entry bet, the right the author's current value on
+				    the side they argued. `null` — no pool, no holding, exited, or
+				    flipped — renders the single figure with NO arrow. */}
+				<span className="font-mono font-bold text-n6">
 					Đ {formatDharma(post.authorStake)}
+					{post.currentValue !== null && (
+						<>
+							<span className="mx-[2px] font-normal text-n4">→</span>Đ{" "}
+							{formatDharma(post.currentValue)}
+						</>
+					)}
 				</span>
 			</div>
 			{/* V18 — the WHOLE panel is the post's click target, matching the
