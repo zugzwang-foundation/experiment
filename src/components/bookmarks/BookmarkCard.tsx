@@ -1,8 +1,8 @@
 import Link from "next/link";
 
+import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { BookmarkItem } from "@/server/bookmarks/list";
 
@@ -29,7 +29,7 @@ export function BookmarkCard({
 			<Card data-testid={`bookmark-removed-${item.id}`} className="gap-2 p-3">
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex flex-wrap items-center gap-2">
-						<SideChip side={item.side} />
+						<SideBadge side={item.side} />
 						<AuthorHead pseudonym={item.authorPseudonym} />
 					</div>
 					<UnbookmarkButton commentId={item.id} />
@@ -43,10 +43,12 @@ export function BookmarkCard({
 		<Card data-testid={`bookmark-${item.id}`} className="gap-2 p-3">
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2">
-					<SideChip side={item.side} />
-					{item.marker !== "none" && (
-						<Badge variant="outline">{item.marker}</Badge>
-					)}
+					<SideBadge side={item.side} />
+					{/* `PositionMarker` returns null for "none" itself, so the call
+					    site no longer carries that condition. It also supplies the
+					    `aria-label="Author Flipped"` the hand-roll lacked — the PD-0-10
+					    root cause was primitive duplication, not styling. */}
+					<PositionMarker marker={item.marker} />
 					<AuthorHead pseudonym={item.authorPseudonym} />
 				</div>
 				<UnbookmarkButton commentId={item.id} />
@@ -84,10 +86,4 @@ export function BookmarkCard({
 
 function AuthorHead({ pseudonym }: { pseudonym: string }): React.JSX.Element {
 	return <span className="text-n5 text-xs">by {pseudonym}</span>;
-}
-
-function SideChip({ side }: { side: "YES" | "NO" }): React.JSX.Element {
-	return (
-		<Badge variant={side === "YES" ? "default" : "secondary"}>{side}</Badge>
-	);
 }

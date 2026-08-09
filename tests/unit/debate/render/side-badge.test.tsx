@@ -78,9 +78,15 @@ describe("SideBadge — INV-3, the side stays pole-bound whatever else is added"
 				const cls = container.firstElementChild?.getAttribute("class") ?? "";
 				expect(cls).toContain(expected);
 				// The C0 defect class: a side must never resolve through a shadcn
-				// semantic variant or a neutral-ramp token.
-				expect(cls).not.toContain("bg-secondary");
-				expect(cls).not.toContain("bg-ink");
+				// semantic variant or a neutral-ramp token. Matched on EXACT class
+				// tokens — `badgeVariants` ships `[a]:hover:bg-primary/80`, which
+				// contains the substring "bg-primary" while being a different rule,
+				// so a substring assertion here would report a defect that is not
+				// there (O-3).
+				const tokens = cls.split(/\s+/).filter(Boolean);
+				expect(tokens).not.toContain("bg-primary");
+				expect(tokens).not.toContain("bg-secondary");
+				expect(tokens).not.toContain("bg-ink");
 				cleanup();
 			}
 		}
