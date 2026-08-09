@@ -65,7 +65,7 @@ export function MarketCard({
 				<PriceSparkline series={series} size="card" />
 			</div>
 			<div className="mt-[9px]">
-				<PriceBar pricing={card.pricing} />
+				<PriceBar pricing={card.pricing} size="card" />
 			</div>
 		</Link>
 	);

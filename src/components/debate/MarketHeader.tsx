@@ -93,7 +93,7 @@ export function MarketHeader({
 					nodes={priceChart.nodes}
 				/>
 			) : null}
-			<PriceBar pricing={market.pricing} />
+			<PriceBar pricing={market.pricing} size="detail" />
 			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
 				<span>Đ{formatDharma(market.totals.dharmaStaked)} staked</span>
 				<span>{market.totals.postCount} posts</span>

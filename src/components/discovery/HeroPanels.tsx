@@ -75,7 +75,7 @@ export function HeroPanels({
 					<PriceSparkline series={series} size="hero" />
 				</div>
 				<div className="mt-[9px]">
-					<PriceBar pricing={card.pricing} />
+					<PriceBar pricing={card.pricing} size="hero" />
 				</div>
 			</div>
 
