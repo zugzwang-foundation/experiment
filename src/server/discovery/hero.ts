@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { DbClient, DbTransaction } from "@/db";
 import { comments } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
+import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import {
 	deriveTitleTeaser,
 	loadRemovedSet,
@@ -58,6 +59,18 @@ export type HeroPost = {
 	 * queries. Passed through verbatim, exactly as `load-debate-view.ts:267` does.
 	 */
 	entryPrice: string;
+	/**
+	 * V16 — every reply-bet on this post, support and counter together. Both
+	 * halves are already on `PostSubstrate` (ranking.ts:31-34) and were discarded
+	 * until now, so this costs ZERO new queries. A plain integer sum: these are
+	 * COUNTS, not money.
+	 */
+	replyCount: number;
+	/**
+	 * V16 — total Dharma staked across those reply-bets, 18-dp decimal string.
+	 * Summed with `CpmmDecimal`, NEVER JS `+` on the strings (CLAUDE.md §2).
+	 */
+	replyDharma: string;
 	createdAt: string;
 };
 
@@ -155,6 +168,10 @@ export async function selectHeroTopPosts(
 			author: authorMap.get(row.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: p.authorStake,
 			entryPrice: p.priceAtBet,
+			replyCount: p.supportCount + p.counterCount,
+			replyDharma: toFixed18(
+				new CpmmDecimal(p.supportDharma).plus(p.counterDharma),
+			),
 			createdAt: row.createdAt.toISOString(),
 		};
 	};

@@ -75,6 +75,8 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 		// post at 55 (surface_d5_v1_0.html:1496, :1512).
 		entryPrice:
 			side === "YES" ? "0.270000000000000000" : "0.550000000000000000",
+		replyCount: 24,
+		replyDharma: "10000.000000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -245,5 +247,38 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// Neither panel shows the other's complement — the bug this pins.
 		expect(noPanel?.textContent).not.toContain("45%");
 		expect(yesPanel?.textContent).not.toContain("73%");
+	});
+
+	// DISCOVERY-COMPLETE C5 — V16, the reply head.
+	it("render::v16-reply-head-carries-count-and-total-staked", () => {
+		renderHero({ yes: heroPost("YES"), no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		expect(head.textContent).toContain("Replies · 24");
+		// Grouped by the SHARED formatter — every Đ value rendered to a user
+		// groups its integer part in threes (SPEC.1 §10.8).
+		expect(head.textContent).toContain("Đ 10,000 staked");
+	});
+
+	it("render::v16-count-and-noun-agree-v48", () => {
+		const one = { ...heroPost("YES"), replyCount: 1 };
+		renderHero({ yes: one, no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		// `Reply · 1`, never `Replies · 1`.
+		expect(head.textContent).toContain("Reply · 1");
+		expect(head.textContent).not.toContain("Replies · 1");
+	});
+
+	it("render::v16-zero-replies-renders-zero-never-hides", () => {
+		// `Đ 0` is data AVAILABLE, not data missing — the canon's ratified Đ-cluster
+		// rule (design-canon.md:186). Never hidden.
+		const none = {
+			...heroPost("YES"),
+			replyCount: 0,
+			replyDharma: "0.000000000000000000",
+		};
+		renderHero({ yes: none, no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		expect(head.textContent).toContain("Replies · 0");
+		expect(head.textContent).toContain("Đ 0 staked");
 	});
 });

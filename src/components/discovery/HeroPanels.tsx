@@ -156,6 +156,19 @@ function HeroPostPanel({
 					</p>
 				)}
 			</Link>
+			{/* V16 — `.replyhead` (mockup :97-98, markup :194). Display-only, and a
+			    SIBLING of the stretched link above, so a click anywhere on it still
+			    opens the post (the mockup's whole-`.argbody` handler). */}
+			<div
+				data-testid={`hero-reply-head-${side}`}
+				className="mt-[9px] flex justify-between pt-[8px] text-[9.5px] font-bold tracking-[0.12em] text-n4 uppercase [border-top:var(--hairline)]"
+			>
+				{/* V48 — the count and its noun agree: `Reply · 1`, never `Replies · 1`. */}
+				<span>
+					{post.replyCount === 1 ? "Reply" : "Replies"} · {post.replyCount}
+				</span>
+				<span>Đ {formatDharma(post.replyDharma)} staked</span>
+			</div>
 		</div>
 	);
 }

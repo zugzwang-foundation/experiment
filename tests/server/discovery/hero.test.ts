@@ -115,6 +115,10 @@ async function seedCommentWithBet(args: {
 	body: string;
 	parentCommentId: string | null;
 	createdAt: Date;
+	/** The bet's effective entry price — already the BOUGHT side's price
+	 * (bets/place.ts:162 → cpmm/calculate.ts:97). Defaulted so existing callers
+	 * are unchanged; overridden where a DISTINCTIVE value is needed. */
+	priceAtBet?: string;
 }): Promise<string> {
 	const [c] = await testDb
 		.insert(comments)
@@ -135,7 +139,7 @@ async function seedCommentWithBet(args: {
 		side: args.side,
 		stake: args.stake,
 		shareQuantity: "0",
-		priceAtBet: "0.5",
+		priceAtBet: args.priceAtBet ?? "0.5",
 		commentId,
 		createdAt: args.createdAt,
 	});
@@ -439,6 +443,10 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			body: maskedBody,
 			parentCommentId: null,
 			createdAt: at(1),
+			// DISTINCTIVE entry price for the removed post, so the never-echo sweep
+			// below can assert the V10 field specifically (it would otherwise share
+			// B's default 0.5 and the assertion would be vacuous).
+			priceAtBet: "0.610000000000000000",
 		});
 		const postB = await seedCommentWithBet({
 			userId: visibleAuthor,
@@ -491,6 +499,20 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(json).not.toContain("60.000000000000000000");
 		expect(yes.authorStake).toBe("20.000000000000000000");
 
+		// SC-1, EXTENDED TO EVERY DISCOVERY-COMPLETE FIELD. The rule is that
+		// masking is a property of every BODY READ, not of rows — so each new
+		// field on `HeroPost` gets its own never-echo assertion, not a row-level
+		// one. A removed post's entry price and reply aggregates must be as
+		// absent as its body.
+		expect(json).not.toContain("0.610000000000000000"); // A's entryPrice (V10)
+		expect(json).not.toContain("250.000000000000000000"); // A's replyDharma (V16)
+
+		// Positive half — the SURVIVING pick's own values, so the assertions above
+		// cannot pass merely because nothing was serialized at all.
+		expect(yes.entryPrice).toBe("0.500000000000000000");
+		expect(yes.replyCount).toBe(0);
+		expect(yes.replyDharma).toBe("0.000000000000000000");
+
 		// A `user_banned` mod_action against B does NOT mask B — ban removes
 		// voice, not past content (ADR-0021 §4). The row deliberately targets
 		// B's COMMENT so a reason-blind masker would wrongly hide it; masking
@@ -520,6 +542,57 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(jsonAfterBan).not.toContain("masked-track-b-pseudonym");
 		expect(jsonAfterBan).not.toContain(postA);
 		expect(jsonAfterBan).not.toContain("60.000000000000000000");
+		// The extended sweep holds after the ban row too — masking keys on
+		// `content_removed` ONLY, and a ban must not change which fields leak.
+		expect(jsonAfterBan).not.toContain("0.610000000000000000");
+		expect(jsonAfterBan).not.toContain("250.000000000000000000");
+	});
+
+	it("discovery::hero-fields-carry-their-seeded-provenance", async () => {
+		// DISCOVERY-COMPLETE C3/C5 — the fields are PASSED THROUGH, never derived.
+		// This is the assertion that would have caught the C3 complement defect at
+		// the server layer: `bets.price_at_bet` is already the BOUGHT side's price
+		// (bets/place.ts:162 → cpmm/calculate.ts:73-97), so a NO post must read
+		// back its own stored value, not 1 − it.
+		const marketId = await seedMarket("hero-field-provenance");
+		const author = await seedUser("hero-provenance-author");
+		const replier = await seedUser("hero-provenance-replier");
+
+		// A NO post whose stored entry price is deliberately NOT 0.5, so a
+		// complement (0.37) is distinguishable from the true value (0.63).
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "NO",
+			stake: "40.000000000000000000",
+			body: "NO argument — the provenance fixture.",
+			parentCommentId: null,
+			createdAt: at(1),
+			priceAtBet: "0.630000000000000000",
+		});
+		// 5 Support reply-bets × Đ50 → replyCount 5, replyDharma Đ250.
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: post,
+			side: "NO",
+			count: 5,
+			firstAt: 10,
+		});
+
+		const no = requirePost((await selectHeroTopPosts(testDb, marketId)).no);
+		expect(no.id).toBe(post);
+
+		// V10 — raw passthrough of `price_at_bet`. NOT the complement.
+		expect(no.entryPrice).toBe("0.630000000000000000");
+		expect(no.entryPrice).not.toBe("0.370000000000000000");
+
+		// V16 — the two already-loaded substrate aggregates, summed in DECIMAL.
+		expect(no.replyCount).toBe(5);
+		expect(no.replyDharma).toBe("250.000000000000000000");
+
+		// The author's own stake stays post-scoped and untouched.
+		expect(no.authorStake).toBe("40.000000000000000000");
 	});
 
 	it("next-eligible-when-top-removed", async () => {
