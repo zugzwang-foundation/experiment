@@ -98,6 +98,8 @@ Cloudflare R2, account-level jurisdiction set to `APAC`. Two buckets:
 - `zugzwang-uploads` — image attachments per F-COMMENT-3 (per SCAFFOLD.15)
 - `zugzwang-pfp` — identity-pool PFPs per F-AUTH-3 (per SCAFFOLD.15)
 
+> **Amended 2026-08-10 (post-PERF-1 audit): "Two buckets" is now THREE.** **ADR-0026** added a third arm, `market-media` (admin-set per-market media, `m/<marketId>/`, its own isolated `R2_*_MARKET_MEDIA` credentials to preserve per-bucket compromise isolation). The live set is declared at `src/server/storage/r2.ts:32` — `type R2Bucket = "uploads" | "pfp" | "market-media"`. ADR-0026 never back-referenced here, so this section read as canon while being one bucket stale. Recorded because the PERF-1 audit found it, and an ADR that is quietly stale is the same failure class as a config surface that is quietly silent.
+
 Direct-to-R2 upload pattern: server endpoint mints time-bounded signed-PUT URLs scoped per upload; browser uploads directly to R2 (server bypassed for file bytes per CLAUDE.md row 325 and K3). Bucket-policy specifics (CORS rules, signed URL TTL values, object-key conventions) are SCAFFOLD.15's territory and are not pinned here.
 
 R2 egress is free (Cloudflare's flat pricing model). Storage cost at experiment scale is dominated by the identity-pool PFPs (5,000–10,000 images per SCAFFOLD.17) at low single-digit GB total — well under the cost ceiling.
