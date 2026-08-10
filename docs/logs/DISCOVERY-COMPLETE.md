@@ -277,9 +277,17 @@ mandated (adopt, never patch) and it is what delivered the missing
 as a known delta.** Recorded so POLISH.5/.6 inspect the CONSOLIDATED state
 rather than re-filing it as a fresh finding.
 
-**RR-3 · `composer/ReplySplitBar.tsx:64,67` — the SAME pole defect, PRE-EXISTING,
-live on `/m/[slug]`. VERIFIED, not fixed.** Founder-directed check; the answer is
-**yes**, and the file carries BOTH shapes at once:
+**RR-3 · `composer/ReplySplitBar.tsx:64,67` — LIVE POLE INVERSION on `/m/[slug]`.
+Class **F (functional)**, **INV-3**, owner **POLISH.3/.4**. VERIFIED, not fixed.**
+
+⚠ **Founder-ruled classification: this is NOT a styling item.** It gets the same
+treatment `BookmarkCard` and `ArgumentList` got — a live INV-3 defect on a
+participant surface, filed as functional, not visual. The only differences from
+C4/C4b are that it predates this PR and that `/m/[slug]` belongs to another task;
+neither makes it cosmetic. It is the V17 defect, shipping.
+
+Founder-directed check; the answer is **yes**, and the file carries BOTH shapes
+at once:
 
 - **A correct side-keyed pole** at `:118-122` — `resultingSide === "YES" ?
   "bg-yes text-no…" : "bg-no text-yes…"` (the TriggerPill). This is why the file
@@ -324,6 +332,33 @@ whether it leaked or not); and the round-trip guard's first fixture measured
 `1 + 9N` because it seeded no events, and would have pinned 19 while claiming 25.
 An absent assertion is visible in a coverage read; a vacuous one is invisible and
 carries a false receipt.
+
+---
+
+## The FOUR routes to a wrong pole — one place, for POLISH.3/.4/.5/.6
+
+Every one of those tasks ports from the same light-theme mockups into the same
+inverted build ramp. Four distinct routes have now each produced a real inversion
+in this repo. **C0 catches routes 1 and 2 only.**
+
+| # | Route | Mechanism | Caught by | Instance |
+|---|---|---|---|---|
+| **1** | **Semantic indirection** | `side === "YES" ? "default" : "secondary"` → `bg-primary` → `--color-n7` `#e4e4e4`. The call site names no colour, so the inversion is invisible where it is written. | **C0** | `BookmarkCard.tsx:91`, `ArgumentList.tsx:96` (C4/C4b) |
+| **2** | **Name-porting across the inverted ramp** | `.sidechip.yes{background:var(--ink)}` is BLACK in a light mockup; `bg-ink` here is `#fafafa` — WHITE. Porting by token NAME flips the pole. | **C0** | Avoided by construction in C1/C3/C6 (plan pushback §3) |
+| **3** | **Fixed pole on a per-side element** | No side value appears in the colour expression at all. The pole is hard-coded while the QUANTITY it measures flips meaning with the side. | **NOTHING** — known gap, see RR-4 | `HeroPanels.tsx` V17; `ReplySplitBar.tsx:64,67` (RR-3, still live) |
+| **4** | **Porting the fill colour WITHOUT the anchor rule** | The mockup encodes the binding across THREE properties — track colour, fill colour, and `.fill.right{inset:0 0 0 auto}` at width `100−sup` (`:250`, `:459`). Read only the fill and the port looks faithful while the mapping is lost. | **NOTHING** | `HeroPanels.tsx` V17 — this is *how* route 3 got written |
+
+**Route 4 is the one that produced V17**, and it is worth stating separately from
+route 3 because they are different mistakes: route 3 is *the shape the code ends
+up in*; route 4 is *the misreading that gets you there*. The mockup was CORRECT.
+I read `.fill{background:var(--ink)}`, saw black, and ported a black fill —
+without reading eleven lines further to `.fill.right`, or the `isYes ? sup :
+(100-sup)` at `:459`. A faithful-looking port of one property out of three.
+
+**The porting rule that follows:** when a mockup expresses a binding through
+POSITION or ANCHORING as well as colour, port the BINDING, never the property.
+And assert BOTH poles — a YES-only render test passes on an inverted NO panel,
+which is exactly how V17 survived a full PR with tests.
 
 ---
 

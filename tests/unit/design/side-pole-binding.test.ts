@@ -69,6 +69,19 @@ import { describe, expect, it } from "vitest";
  * tests (assert BOTH a YES and a NO instance — a YES-only test passes on an
  * inverted NO panel), not by this file.
  *
+ *   Route 4 — PORTING THE FILL COLOUR WITHOUT THE ANCHOR RULE. Also uncaught,
+ *   and it is HOW route 3 gets written. The Discovery mockup encodes the pole
+ *   binding across THREE properties: track colour, fill colour, and
+ *   `.fill.right{inset:0 0 0 auto}` at width `100−sup` (`:250`, `:459`). Reading
+ *   only `.fill{background:var(--ink)}` yields a black fill that looks like a
+ *   faithful port while the mapping is gone. That is precisely how V17 was
+ *   written. When a mockup expresses a binding through POSITION or ANCHORING as
+ *   well as colour, port the BINDING, never the property.
+ *
+ * All four routes are tabulated together in `docs/logs/DISCOVERY-COMPLETE.md`
+ * ("The FOUR routes to a wrong pole"), because POLISH.3/.4/.5/.6 all port from
+ * these same light-theme mockups. THIS FILE CATCHES ROUTES 1 AND 2 ONLY.
+ *
  * NOTE — THERE IS NO ALLOWLIST, SUPPRESSION LIST OR DATED EXCEPTION FOR
  * `bookmarks/BookmarkCard.tsx` OR `profile/ArgumentList.tsx`. Both carry the
  * live inversion today; this guard reddens on them BY CONSTRUCTION and C4 / C4b
