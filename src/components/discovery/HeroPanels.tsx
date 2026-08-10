@@ -224,11 +224,28 @@ function HeroPostPanel({
  * role="img">` whose `aria-label` carries BOTH figures — the `PriceBar`
  * precedent. A test asserts the absence of any interactive element.
  *
- * ⚠ The mockup's `.fill{background:var(--ink)}` and `.bar{background:var(--n0)}`
- * are NOT ported by name — light-theme tokens, inverted here (plan pushback §3).
- * The fixed `bg-yes` fill over a `bg-no` track is the shipped proportion-bar
- * idiom (`composer/ReplySplitBar.tsx:64,67`). No SIDE VALUE selects either, so
- * this cannot invert a pole and it is not C0's subject.
+ * ⚠ THE SEGMENTS ARE SIDE-KEYED, and the first build of this component got that
+ * wrong. Canon (values-log v0_3 §3): *"stake-bar segments — left = Support share
+ * in the SUPPORT SIDE'S POLE COLOUR, right = Counter's"*, and *"Support inherits
+ * the post's side, Counter the opposite."* So:
+ *
+ *   YES post → Support = YES = `bg-yes` (black) · Counter = NO = `bg-no`
+ *   NO  post → Support = NO  = `bg-no` (white) · Counter = YES = `bg-yes`
+ *
+ * The original copied the shipped `composer/ReplySplitBar.tsx:64,67` idiom — a
+ * FIXED `bg-yes` fill over a FIXED `bg-no` track — and asserted immunity on the
+ * grounds that "no SIDE VALUE selects either, so this cannot invert a pole."
+ * That reasoning was exactly backwards: the pole was fixed while the QUANTITY it
+ * measures flips meaning with the post's side, so the NO panel painted the
+ * NO-side share in the YES pole. Absence of a side value was the mechanism, not
+ * the defence.
+ *
+ * The ratified mockup is CORRECT and was misread, not wrong: its `.bar`
+ * background is `--n0` (WHITE in light theme) and `.fill` is `--ink` (BLACK),
+ * and the NO panel's fill carries `.fill.right{inset:0 0 0 auto}` at width
+ * `100−sup` (`:250`, `:459`). That paints white-left/black-right on a NO post —
+ * i.e. Support in the NO pole — which is canon. Tokens are still not ported by
+ * NAME (the ramps are inverted, plan pushback §3); only the binding is.
  */
 function SupportCounterBar({
 	side,
@@ -250,6 +267,12 @@ function SupportCounterBar({
 	// `computeSplitBar` returns "0%" for an empty total, which is the right
 	// answer inside a composer and the wrong one on a resting hero panel.
 	const fillPct = totalDharma === "0" ? "50%" : supportPct;
+	// The pole binding. Support inherits the POST's side; Counter takes the
+	// opposite. Written as one side-keyed expression per segment so C0's guard
+	// SEES it — `HeroPanels.tsx` is the seventh entry in that guard's pinned
+	// inventory, added deliberately when this fix landed.
+	const supportPole = side === "YES" ? "bg-yes" : "bg-no";
+	const counterPole = side === "YES" ? "bg-no" : "bg-yes";
 	return (
 		<div
 			data-testid={`hero-split-bar-${side}`}
@@ -265,8 +288,15 @@ function SupportCounterBar({
 					Đ {formatDharma(supportDharma)}
 				</span>
 			</span>
-			<span className="h-[16px] flex-1 overflow-hidden rounded-[var(--r)] bg-no [border:var(--hairline)]">
-				<span className="block h-full bg-yes" style={{ width: fillPct }} />
+			{/* The track carries the COUNTER share (the remainder); the fill is the
+			    SUPPORT share, left-anchored, in the post's own pole. */}
+			<span
+				className={`h-[16px] flex-1 overflow-hidden rounded-[var(--r)] ${counterPole} [border:var(--hairline)]`}
+			>
+				<span
+					className={`block h-full ${supportPole}`}
+					style={{ width: fillPct }}
+				/>
 			</span>
 			<span className="flex shrink-0 flex-col items-end gap-[1px]">
 				<span className="text-[8.5px] font-extrabold tracking-[0.12em] text-ink">

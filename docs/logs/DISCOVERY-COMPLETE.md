@@ -29,6 +29,7 @@ below rather than folded silently.
 | C10 | `e5827dc` | P7 loading primitive **+ canon amendment, one commit** (R8, T1 superseded) |
 | — | `79e0477` | **correction** — SideBadge's counted inventory to the PR-head truth |
 | — | `83da6ba` | **GATE C BLOCKER FIX** — V13 `currentValue` is POST-scoped, as OD-1 actually ruled |
+| — | *(this commit)* | **GATE C BLOCKER FIX 2** — V17 split-bar segments are SIDE-KEYED; C0 gains its seventh entry |
 
 Founder rulings executed as stated: **OD-1 = B** (C8 built, post-anchored),
 **OD-2 = yes** (`detail` pinned, zero delta), **OD-3** (`@test-writer` wrote C0),
@@ -159,8 +160,8 @@ boundary + the SC-1 image join. The code review returned a **CRITICAL** (OQ-5
 below) plus two HIGHs. Three of the four subagent passes this task ran have now
 found a real defect each — the cascade is the highest-yield control in the task.
 
-**OQ-5 · ⚠ NEW CRITICAL, UNFIXED, AWAITING A RULING — V17's split bar inverts
-the pole on the NO hero panel.** The build paints `bg-yes` (black = YES pole) at
+**OQ-5 · ⚠ CRITICAL — V17's split bar inverted the pole on the NO hero panel.
+RULED AND FIXED.** The build paints `bg-yes` (black = YES pole) at
 `supportPct`, left-anchored, on BOTH panels. The ratified mockup does not:
 `surface_discovery_v1_0.html:459` sets `width = (isYes ? sup : (100-sup))` and
 the NO panel's fill carries the static `right` class (`:250`, `.fill.right{inset:
@@ -275,6 +276,54 @@ mandated (adopt, never patch) and it is what delivered the missing
 `aria-label="Author Flipped"` — PD-0-10's actual root cause. **Founder-accepted
 as a known delta.** Recorded so POLISH.5/.6 inspect the CONSOLIDATED state
 rather than re-filing it as a fresh finding.
+
+**RR-3 · `composer/ReplySplitBar.tsx:64,67` — the SAME pole defect, PRE-EXISTING,
+live on `/m/[slug]`. VERIFIED, not fixed.** Founder-directed check; the answer is
+**yes**, and the file carries BOTH shapes at once:
+
+- **A correct side-keyed pole** at `:118-122` — `resultingSide === "YES" ?
+  "bg-yes text-no…" : "bg-no text-yes…"` (the TriggerPill). This is why the file
+  is in C0's `PERMITTED_FILES`, and it is what makes C0 read the file as clean.
+- **A separate FIXED pair** at `:64` (`bg-no` track) and `:67` (`bg-yes` fill,
+  `width: supportPct`) rendering the post's Support/Counter split with **no side
+  keying at all**, while `postSide` is a prop of the very same component.
+
+So on a NO post the Support share renders black where canon says white — the
+identical inversion `SupportCounterBar` copied from it. **Owner: POLISH.3/.4**
+(the `/m/[slug]` composer surface). Not touched here: pre-existing, out of
+scope, and the fix is theirs to sequence against their own visual pass.
+
+⚠ This file is also the reason C0 cannot be extended to catch route 3 by a
+component-level rule — see below.
+
+**RR-4 · C0's THIRD ROUTE — recorded as a KNOWN GAP in the guard's own
+docstring, because the proposed check is not sound.** C0 catches (1) semantic
+indirection and (2) mockup name-porting. It **cannot** catch (3) *a fixed pole
+colour on a per-side element*: there is no side-keyed expression to match, so
+nothing can match it. V17 lived in that hole for the length of this PR while the
+guard stayed green.
+
+The candidate check — *"flag a component that receives a `side` prop, renders a
+pole-family colour, and never keys on it"* — was **evaluated and rejected**, and
+the rejection is recorded so it is not re-proposed as new. It **false-negatives
+on RR-3**, the single most important instance: `ReplySplitBar` *does* key on side
+(at `:118`), so a component-level rule clears the file and never reaches the
+fixed pair at `:64,:67`. A segment-level version would have to decide which DOM
+node a given quantity belongs to, which is not a static property of the source.
+
+So route 3 is closed by **review and by per-pole render tests** — assert BOTH a
+YES and a NO instance — not by C0. The guard's docstring now says this in full,
+so **a green C0 cannot be read as completeness**.
+
+**V-REGISTER CANDIDATE (founder to rule at the template task).** *A promised
+assertion delivered VACUOUSLY is worse than an absent one, because it reads as
+discharged.* Two instances in this task alone: the plan named the `currentValue`
+never-echo assertion **by name**, and it shipped satisfying the letter while
+proving nothing (the removed post had no `positions` row, so the field was null
+whether it leaked or not); and the round-trip guard's first fixture measured
+`1 + 9N` because it seeded no events, and would have pinned 19 while claiming 25.
+An absent assertion is visible in a coverage read; a vacuous one is invisible and
+carries a false receipt.
 
 ---
 

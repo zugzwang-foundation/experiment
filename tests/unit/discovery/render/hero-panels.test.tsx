@@ -409,6 +409,43 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(panel.textContent).not.toContain("→");
 	});
 
+	it("render::v17-fill-is-SIDE-KEYED-both-poles-asserted", () => {
+		// THE TEST WHOSE ABSENCE LET THE DEFECT SHIP. Every other V17 case renders
+		// `no: null`, so the NO panel's bar was asserted nowhere and a fixed
+		// `bg-yes` fill passed for the length of the PR.
+		//
+		// Canon (values-log v0_3 §3): "left = Support share in the SUPPORT SIDE'S
+		// POLE COLOUR, right = Counter's"; "Support inherits the post's side,
+		// Counter the opposite." So the fill's pole must DIFFER between panels.
+		renderHero({ yes: heroPost("YES"), no: heroPost("NO") });
+
+		const yesBar = screen.getByTestId("hero-split-bar-YES");
+		const noBar = screen.getByTestId("hero-split-bar-NO");
+		// The bar is LABEL — BAR — LABEL (mockup :195-199, asserted as three
+		// children elsewhere in this file), so the track is child 1 and the fill is
+		// its only child. Positional rather than class-matching: a class selector
+		// for `h-[16px]` needs bracket escaping and would silently match nothing.
+		const trackOf = (bar: HTMLElement) => bar.children[1] as HTMLElement;
+		const fillOf = (bar: HTMLElement) =>
+			trackOf(bar).firstElementChild?.getAttribute("class") ?? "";
+		const trackClassOf = (bar: HTMLElement) =>
+			trackOf(bar).getAttribute("class") ?? "";
+
+		// YES post: Support = YES = black fill, Counter = NO = white track.
+		expect(fillOf(yesBar)).toContain("bg-yes");
+		expect(trackClassOf(yesBar)).toContain("bg-no");
+
+		// NO post: the poles SWAP. Support = NO = white fill, Counter = YES.
+		expect(fillOf(noBar)).toContain("bg-no");
+		expect(trackClassOf(noBar)).toContain("bg-yes");
+
+		// The load-bearing assertion, stated as a difference rather than as two
+		// independent facts: a fixed-pole regression makes these equal, and any
+		// test that checked only one panel would not notice.
+		expect(fillOf(yesBar)).not.toBe(fillOf(noBar));
+		expect(trackClassOf(yesBar)).not.toBe(trackClassOf(noBar));
+	});
+
 	it("render::v17-poles-are-never-ported-by-neutral-token-name", () => {
 		// The fill is the mockup's `background:var(--ink)` and the track its
 		// `background:var(--n0)` — both light-theme tokens that would invert here.

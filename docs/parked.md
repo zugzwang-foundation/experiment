@@ -816,3 +816,40 @@ curl -sS -D /tmp/h.txt https://staging.zugzwangworld.com/api/health
 
 **⚠ If it disagrees, do not "fix" the field to match.** Two sources disagreeing about the executing region is a finding about the platform contract, not a formatting problem — investigate before changing either side, and treat `x-vercel-id` as the authority because it is generated outside the function.
 
+
+
+---
+
+## R2-KEY-OPACITY — the R2 object key embeds `users.id`, emitted anonymously — **DUE 2026-09-05** (hard date, not a trigger)
+
+**Found by** `@security-auditor` at DISCOVERY-COMPLETE Gate C (#311), MEDIUM. **Root cause predates that PR.**
+
+`src/server/storage/sign-upload.ts:72` mints the object key as ``u/${userId}/${uploadId}.${ext}``. The presigned READ URL therefore carries the author's **raw `users.id` in its path**, and that URL is emitted into anonymous HTML on **two** surfaces: `/m/[slug]` (pre-existing, `src/server/debate-view/load-debate-view.ts:382`) and now `/` (DISCOVERY-COMPLETE C7).
+
+**Why it matters, precisely.** `users.id` is **UUIDv7** — its first 48 bits are the account-creation unix-ms. An anonymous scraper harvests `pseudonym → users.id` pairs plus a signup timestamp to the millisecond, with no login. The key is **trigger-immutable** (Bucket-B `image_uploads`), so the identifier **survives a pseudonym scrub**: a pre-scrub scrape re-links a scrubbed identity to its old pseudonym and content — which is exactly what **SPEC.1 §16.5 erasure exists to sever**.
+
+**The codebase already knows this key is PII-bearing.** `src/server/events/schemas.ts:298` excludes the raw `imageR2Key` from the `moderation.blocked` payload with the reason stated inline: *"(it embeds the userId → its own strip)"*. The event layer strips it; the render layer publishes it.
+
+**Two fix shapes, both needing a MIGRATION + BACKFILL** (every existing key embeds an id):
+1. **Opaque key namespace** — write new objects at ``o/${uploadId}``, backfill by copy-then-repoint, and drop the `u/${userId}/` prefix. Simplest read path (still a direct presign) but touches R2 object storage, not just Postgres.
+2. **Proxy read route** — keep the keys, serve images through an app route that presigns server-side and never exposes the key. No object migration, but adds a request hop on a hot render path and needs its own authz + rate story.
+
+⚠ **`precommitModerate` asserts `key.startsWith("u/${userId}/")`** (`src/server/moderation/precommit.ts:97-111`) — an ownership check that shape 1 removes. Whatever replaces it must not weaken that assertion; it is what stops a caller attaching another user's upload.
+
+**NOT a DISCOVERY-COMPLETE fix.** C7 added a second emission site for data already published; expanding #311 to a storage migration was explicitly rejected at Gate C.
+
+---
+
+## RATE-GUARD-PUBLIC — the participant RSC surfaces have no request-rate limit — **DUE 2026-09-05** (hard date, not a trigger)
+
+**Found by** `@security-auditor` at DISCOVERY-COMPLETE Gate C (#311), MEDIUM. **Pre-existing; #311 adds zero queries.**
+
+`proxy.ts:41` sets the edge matcher to `["/admin/:path*"]` **only**, and `src/server/middleware/rate-limit.ts` is applied inside **route handlers**, not around RSC page renders. So `/` — `force-dynamic`, uncached, **~97 sequential DB round-trips** per render (`1 + 12N` at `N = DISCOVERY_GRID_SIZE = 8`) — is reachable by an unauthenticated client **at any rate**, against a Supabase session pooler with a bounded connection budget.
+
+**Why now.** PERF-1 has just bought this surface back from **35.07 s → 0.692 s p50** and closed the only GO-LIVE BLOCKER. Nothing prevents an attacker from spending that headroom again, and the failure mode is pooler exhaustion, which takes down more than Discovery.
+
+**#311 is not the cause and does not worsen it** — its query count is now mechanically pinned at `1 + 12N` by `tests/server/discovery/round-trip-budget.test.ts`. It is recorded here because the audit surfaced it while reading that surface.
+
+**Upstash is already in the stack** (`@upstash/ratelimit`, ADR-0015), so the primitive exists; what is missing is a limiter on the RSC path. ⚠ Note the ADR-0015 posture — rate-limit fails **OPEN** — so a limiter added here does not become a new availability dependency.
+
+**Scope note.** Applies to every anonymous participant RSC surface, not just `/`: `/m/[slug]`, `/u/[pseudonym]` and the `.md` export are all uncached reads. Size the row across all of them.

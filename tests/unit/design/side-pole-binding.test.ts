@@ -37,6 +37,38 @@ import { describe, expect, it } from "vitest";
  * ban's own comment names in tests/unit/shell/not-found.test.tsx. A guard that
  * reddens on correct code gets suppressed within a week.
  *
+ * ⚠⚠ KNOWN GAP — ROUTE 3, WHICH THIS GUARD CANNOT CATCH. A GREEN RUN HERE IS
+ * NOT A CLAIM OF COMPLETENESS.
+ *
+ * The two routes above both put a side value INSIDE the colour expression, so a
+ * matcher can find them. There is a third:
+ *
+ *   Route 3 — A FIXED pole colour on a PER-SIDE element. No side value appears
+ *   in the expression at all; the pole is hard-coded while the QUANTITY it
+ *   measures flips meaning with the side. Nothing here can match it, because
+ *   there is no side-keyed expression to match.
+ *
+ * V17's Support/Counter split bar lived in exactly this hole for the length of
+ * this PR: a fixed `bg-yes` fill over a fixed `bg-no` track, rendering a share
+ * whose side depends on the post. It rendered the NO-side share in the YES pole
+ * on every NO hero panel, and this file stayed green throughout. The component's
+ * own docstring even cited the "no side value → cannot invert" reasoning as its
+ * defence, which was the mechanism stated backwards.
+ *
+ * A REJECTED candidate check, recorded so it is not re-proposed as new: "flag a
+ * component that RECEIVES a side prop, renders a pole-family colour, and never
+ * keys on it." It fails on the single most important instance —
+ * `composer/ReplySplitBar.tsx` has BOTH a correct side-keyed pole (`:118-122`,
+ * why it is in the inventory above) AND a separate fixed pair (`:64`, `:67`)
+ * carrying the same defect on `/m/[slug]`. A component-level check sees the
+ * correct expression and clears the file, so the rule would FALSE-NEGATIVE on
+ * the exact case that most needs catching. A segment-level version would need to
+ * decide which DOM node a quantity belongs to, which is not a static property.
+ *
+ * Route 3 therefore stays a KNOWN GAP, closed by review and by per-pole render
+ * tests (assert BOTH a YES and a NO instance — a YES-only test passes on an
+ * inverted NO panel), not by this file.
+ *
  * NOTE — THERE IS NO ALLOWLIST, SUPPRESSION LIST OR DATED EXCEPTION FOR
  * `bookmarks/BookmarkCard.tsx` OR `profile/ArgumentList.tsx`. Both carry the
  * live inversion today; this guard reddens on them BY CONSTRUCTION and C4 / C4b
@@ -253,6 +285,17 @@ const PERMITTED_FILES = [
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
 	"src/components/debate/composer/SlotHeader.tsx",
+	// SEVENTH ENTRY, added deliberately at the V17 fix — the guard's own
+	// documented mechanism, exercised rather than worked around. V17's
+	// Support/Counter split bar originally used a FIXED `bg-yes` fill over a
+	// FIXED `bg-no` track, which inverted the pole on the NO hero panel (route 3
+	// below). The fix made the segments side-keyed:
+	//   supportPole = side === "YES" ? "bg-yes" : "bg-no"
+	//   counterPole = side === "YES" ? "bg-no"  : "bg-yes"
+	// which is correct AND newly visible to this guard, so the file enters the
+	// inventory. The predicate was NOT relaxed to avoid the churn — relaxing it
+	// is the one thing this file must never do to stay green.
+	"src/components/discovery/HeroPanels.tsx",
 	"src/components/profile/graph/ProfileChart.tsx",
 ];
 
