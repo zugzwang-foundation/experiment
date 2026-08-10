@@ -1,5 +1,7 @@
+"use client";
+
 import type { ImgHTMLAttributes, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * PRIMITIVES-2 D2 — the ONE owner of the `null · error · loaded` state machine
@@ -42,24 +44,50 @@ import { useState } from "react";
  * again on the same `onError`. That costs one wasted request per lap and stays
  * correct, which is the cheaper trade against remembering every URL forever.
  *
- * ⚠ **KNOWN GAP — the pre-hydration window.** `onError` is a React synthetic
- * handler, and for `<img>` React attaches `error` as a NON-delegated listener
- * bound at hydrate/commit time. Discovery is `force-dynamic` and SSRs these
- * images, so the browser starts the R2 GET at HTML-parse time; a 404 is one of
- * the fastest possible responses, and if it lands before hydration the event is
- * lost — the DOM `error` event fires exactly once — and the broken `<img>`
- * stays mounted with no placeholder. Every client-side path (carousel advance,
- * client navigation) is fully covered because the listener is attached before
- * the new `src` is assigned. Closing the first-paint window needs a ref plus an
- * `img.complete && img.naturalWidth === 0` check, which is mechanism beyond
- * what D2 ratified — surfaced at PR-A review, NOT absorbed here.
+ * **D2-P1 — THE MOUNT-TIME TRANSITION, and why `onError` alone was not enough.**
+ * `onError` is a React *synthetic* handler, and for `<img>` React binds `error`
+ * as a NON-delegated listener at hydrate time
+ * (`react-dom-client.development.js:5274-5278`). Discovery is `force-dynamic`
+ * and server-renders these images, so the browser starts the R2 GET at
+ * HTML-parse time. The DOM `error` event fires exactly ONCE — if it lands
+ * before hydration attaches the listener it is lost permanently, and the broken
+ * glyph persists forever. **PERF-1 made that the common case rather than the
+ * edge:** Discovery went 35.07 s → 0.692 s p50 at the `bom1` flip
+ * (`docs/parked.md:25`, closed 2026-08-10), and a faster response arrives
+ * EARLIER relative to hydration, which widens the lost-event window.
  *
- * **No `"use client"` of its own, deliberately.** All three consumers already
- * sit inside the single client boundary at `DiscoveryCarousel.tsx:1`, exactly
- * as `HeroPanels`, `DiscoveryGrid` and `MarketCard` do, so `useState` and
- * `onError` are available here with no new directive. ⚠ This component uses
- * state: a future **server** component importing it would need to add
- * `"use client"` here (or wrap it in a client leaf). Recorded, not built for.
+ * So the mount effect below re-asks the element directly:
+ *
+ *   - `complete === false` → the load is still in flight. Do nothing; falling
+ *     back here would blank a good image mid-load.
+ *   - `complete === true` alone is NOT failure — it is equally true of a
+ *     **cached success**. It only means the browser has finished.
+ *   - `naturalWidth === 0` is what separates a finished-and-FAILED decode from
+ *     a finished-and-succeeded one.
+ *
+ * Both mechanisms are kept and both are needed: `onError` catches the
+ * post-hydration failure (including every carousel `src` swap), the mount check
+ * catches the pre-hydration one. The effect re-runs on `src` CHANGE, not only
+ * on first mount, because `DiscoveryCarousel.tsx:102` swaps `card` on the same
+ * mounted node every 10s — a mount-only check would cover the first market and
+ * nothing after it.
+ *
+ * ⚠ An SVG with no intrinsic dimensions reports `naturalWidth === 0` on some
+ * engines even when it decoded fine, which would false-positive into the
+ * fallback. Market media and post attachments are raster objects in R2, so this
+ * cannot fire today. Recorded, not built for.
+ *
+ * ⚠ It is `useEffect`, not `useLayoutEffect`: Next.js server-renders client
+ * components and `useLayoutEffect` warns there. The cost is that a broken image
+ * may paint for one frame after hydration before the fallback replaces it —
+ * which is the whole defect reduced to a single frame, not left permanent.
+ *
+ * **It carries its own `"use client"` (D2-P1).** It uses hooks, so the
+ * directive states that requirement at the file that has it rather than
+ * relying on every consumer to already be inside a boundary. A no-op for
+ * today's graph — all three consumers already sit inside
+ * `DiscoveryCarousel.tsx:1` — and it removes the future-server-consumer
+ * footgun this docblock previously only warned about.
  *
  * The `biome-ignore` for `noImgElement` lives on this file's single `<img>` —
  * three suppressions across two files collapse to one. The reason is unchanged
@@ -100,6 +128,20 @@ export function MarketThumb({
 	...passthrough
 }: MarketThumbProps) {
 	const [failedSrc, setFailedSrc] = useState<string | null>(null);
+	const imgRef = useRef<HTMLImageElement>(null);
+
+	// D2-P1 — the pre-hydration catch. Runs after commit, and again whenever
+	// `src` changes, because the carousel swaps markets on this same node.
+	useEffect(() => {
+		const img = imgRef.current;
+		// null whenever the fallback arm is rendered — nothing to interrogate.
+		if (img === null) {
+			return;
+		}
+		if (img.complete && img.naturalWidth === 0) {
+			setFailedSrc(src);
+		}
+	}, [src]);
 
 	if (src === null || src === failedSrc) {
 		return <>{fallback}</>;
@@ -119,6 +161,7 @@ export function MarketThumb({
 		// biome-ignore lint/performance/noImgElement: presigned R2 GET URLs are short-lived and per-load — next/image optimization would re-fetch through the loader and break the signed query (the CommentImage precedent).
 		<img
 			{...passthrough}
+			ref={imgRef}
 			src={src}
 			alt={alt}
 			className={className}

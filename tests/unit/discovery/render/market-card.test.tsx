@@ -61,7 +61,10 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		// a broken load. This line previously read `screen.getByAltText(
 		// MARKET_TITLE)`, pinning the superseded OQ-6 dynamic-alt rule; it is the
 		// only assertion in the suite that D4 invalidates.
-		const img = container.querySelector("img");
+		// Scoped to the thumb SLOT rather than "the first <img> in the card", so
+		// adding a second image to this composition later (an author avatar, a
+		// media badge) cannot silently retarget these two assertions (L5).
+		const img = container.querySelector(".items-start.gap-3 > img");
 		expect(img?.getAttribute("alt")).toBe("");
 		expect(img?.getAttribute("src")).toBe(IMAGE_URL);
 		// The question.

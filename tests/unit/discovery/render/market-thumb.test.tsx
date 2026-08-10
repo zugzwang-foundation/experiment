@@ -137,7 +137,7 @@ function topPosts(postImageUrl: string | null): HeroTopPosts {
  */
 const SITES = [
 	{
-		name: "card-thumb · MarketCard.tsx:51-55 (52×52, items-start)",
+		name: "card-thumb · MarketCard.tsx:51-55 @ f51a9dd (52×52, items-start)",
 		imgCount: 1,
 		renderNull: () =>
 			render(<MarketCard card={cardFixture(null)} series={SERIES} />),
@@ -146,7 +146,7 @@ const SITES = [
 		selector: `img[src="${CARD_IMAGE_URL}"]`,
 	},
 	{
-		name: "hero-thumb · HeroPanels.tsx:62-66 (54×54, items-center)",
+		name: "hero-thumb · HeroPanels.tsx:62-66 @ f51a9dd (54×54, items-center)",
 		imgCount: 1,
 		renderNull: () =>
 			render(
@@ -168,7 +168,7 @@ const SITES = [
 	},
 	{
 		// TWO images — the YES panel's and the NO panel's. See `imgCount` above.
-		name: "hero-post-image · HeroPanels.tsx:184-191 (flex-1 min-h-[40px], both poles)",
+		name: "hero-post-image · HeroPanels.tsx:184-191 @ f51a9dd (flex-1 min-h-[40px], both poles)",
 		imgCount: 2,
 		renderNull: () =>
 			render(
@@ -438,5 +438,165 @@ describe("§8.1 zero-delta — the hero POST image, at BOTH poles", () => {
 		fireEvent.error(first);
 		expect(postSlot(container, "YES")).toBe(POST_IMAGE_NULL("YES"));
 		expect(postSlot(container, "NO")).toBe(POST_IMAGE_LOADED("NO"));
+	});
+});
+
+/**
+ * D2-P1 — THE PRE-HYDRATION 404, at all three sites. **RED BY CONSTRUCTION.**
+ *
+ * PR-A reviewer finding M1. `onError` is a React *synthetic* handler, and for
+ * `<img>` React binds `error` as a **non-delegated** listener at hydrate time
+ * (`react-dom-client.development.js:5274-5278`). `(public)/page.tsx:18` is
+ * `force-dynamic` with the `<img>` server-rendered, so the browser starts the
+ * R2 GET at HTML-parse time. The DOM `error` event fires exactly ONCE — if it
+ * lands before hydration attaches the listener it is lost permanently, the
+ * broken glyph persists, and the fallback never renders.
+ *
+ * The state to model is therefore: the element mounts with a `src` that has
+ * **already completed and already failed**, so no `error` event will ever fire
+ * at it. `complete === true` distinguishes finished from in-flight, and
+ * `naturalWidth === 0` distinguishes a failed decode from a succeeded one —
+ * `complete` alone is also true for a CACHED SUCCESS.
+ *
+ * ⚠ **THE VACUITY HAZARD, measured in this environment rather than assumed.**
+ * jsdom never decodes, so `naturalWidth` is `0` for EVERY image here, and
+ * `complete` is `false` for every image here. Both defaults are wrong for this
+ * test in opposite directions: the always-0 `naturalWidth` would make a
+ * fallback assertion pass for the wrong reason, and the always-false
+ * `complete` makes the production check *inert* so an unstubbed test measures
+ * nothing at all. Both properties are stubbed explicitly, and N3 positive
+ * controls pin both discriminating axes:
+ *   · `complete: true,  naturalWidth: 200` → must NOT fall back (decoded fine)
+ *   · `complete: false, naturalWidth: 0`   → must NOT fall back (still loading)
+ * Without those two, every assertion below would pass against a component that
+ * falls back on *every* image unconditionally.
+ *
+ * ⚠ **Why the mount path stubs the PROTOTYPE and not the element.** React runs
+ * the mount effect inside `render()`, so an `Object.defineProperty` applied to
+ * the returned element is already too late — it cannot be in place when the
+ * effect reads it, which is exactly the ordering the real browser guarantees
+ * and the test must reproduce. The prototype is the only seam that is live at
+ * mount. The `src`-change path below *does* stub the rendered element directly,
+ * because there the effect re-runs after the element already exists.
+ */
+
+/** Install a decode state on every `<img>` for the duration of `fn`. */
+function withImageState<T>(
+	state: { complete: boolean; naturalWidth: number },
+	fn: () => T,
+): T {
+	const proto = HTMLImageElement.prototype;
+	const priorComplete = Object.getOwnPropertyDescriptor(proto, "complete");
+	const priorNatural = Object.getOwnPropertyDescriptor(proto, "naturalWidth");
+	Object.defineProperty(proto, "complete", {
+		configurable: true,
+		get: () => state.complete,
+	});
+	Object.defineProperty(proto, "naturalWidth", {
+		configurable: true,
+		get: () => state.naturalWidth,
+	});
+	try {
+		return fn();
+	} finally {
+		// Restored in `finally` so a failing assertion cannot leak a fake decode
+		// state into every later test in this file.
+		if (priorComplete !== undefined) {
+			Object.defineProperty(proto, "complete", priorComplete);
+		}
+		if (priorNatural !== undefined) {
+			Object.defineProperty(proto, "naturalWidth", priorNatural);
+		}
+	}
+}
+
+describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => {
+	for (const site of SITES) {
+		it(`${site.name} — already-failed-at-mount degrades to the placeholder`, () => {
+			// The null baseline needs no stub: it renders no <img> at all.
+			const nullRender = site.renderNull();
+			const nullHtml = nullRender.container.innerHTML;
+			nullRender.unmount();
+
+			// N1 alive check, and it CANNOT be made after the failed-decode render:
+			// a correct component has already swapped the images out by the time
+			// `render()` returns, so counting them there measures the fix, not the
+			// fixture. Counting under a DECODED stub proves the fixture really does
+			// mount `imgCount` images, so the equality below is not two empty
+			// renders agreeing with each other.
+			withImageState({ complete: true, naturalWidth: 200 }, () => {
+				const probe = site.renderLoaded();
+				expect(findImgs(probe.container, site.selector)).toHaveLength(
+					site.imgCount,
+				);
+				probe.unmount();
+			});
+
+			withImageState({ complete: true, naturalWidth: 0 }, () => {
+				const loaded = site.renderLoaded();
+				// NO `fireEvent.error` anywhere in this block. That is the whole
+				// point: the event already fired, before anything was listening.
+				expect(findImgs(loaded.container, site.selector)).toHaveLength(0);
+				expect(loaded.container.innerHTML).toBe(nullHtml);
+			});
+		});
+
+		it(`control::${site.name} — a DECODED image does not fall back`, () => {
+			// N3, axis 1. `naturalWidth` is 0 for every image in jsdom, so without
+			// this control a component that falls back unconditionally would pass
+			// the assertion above.
+			withImageState({ complete: true, naturalWidth: 200 }, () => {
+				const loaded = site.renderLoaded();
+				expect(findImgs(loaded.container, site.selector)).toHaveLength(
+					site.imgCount,
+				);
+			});
+		});
+
+		it(`control::${site.name} — a load still IN FLIGHT does not fall back`, () => {
+			// N3, axis 2. `complete === false` means the browser has not finished;
+			// falling back here would blank a good image mid-load.
+			withImageState({ complete: false, naturalWidth: 0 }, () => {
+				const loaded = site.renderLoaded();
+				expect(findImgs(loaded.container, site.selector)).toHaveLength(
+					site.imgCount,
+				);
+			});
+		});
+	}
+
+	it("re-checks on a src CHANGE, not only on first mount", () => {
+		// `DiscoveryCarousel.tsx:102` swaps `card` on the SAME mounted node every
+		// 10s, so a mount-only check would miss every market after the first.
+		// Here the element is stubbed DIRECTLY — legal on this path because the
+		// effect re-runs after the element already exists.
+		const good = "https://signed.test/market-media/m/x/good.webp";
+		const view = render(
+			<MarketCard card={cardFixture(good)} series={SERIES} />,
+		);
+		const img = view.container.querySelector("img");
+		if (img === null) {
+			throw new Error("fixture broken: the loaded arm rendered no <img>");
+		}
+		Object.defineProperty(img, "complete", {
+			configurable: true,
+			get: () => true,
+		});
+		Object.defineProperty(img, "naturalWidth", {
+			configurable: true,
+			get: () => 0,
+		});
+
+		const nullRender = render(
+			<MarketCard card={cardFixture(null)} series={SERIES} />,
+		);
+		const nullHtml = nullRender.container.innerHTML;
+		nullRender.unmount();
+
+		// The carousel advancing to a market whose media is missing.
+		view.rerender(
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+		);
+		expect(view.container.innerHTML).toBe(nullHtml);
 	});
 });
