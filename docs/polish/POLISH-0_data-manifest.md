@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.4** — 2026-08-08 IST. Supersedes v1.3 (2026-08-06).
+> **Status:** **v1.5** — 2026-08-10 IST. Supersedes v1.4 (2026-08-08).
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
@@ -12,6 +12,12 @@
 ---
 
 ## §0 · Amendment record
+
+### v1.5 — 2026-08-10 · from POLISH-TEMPLATE
+
+| # | Amendment | Detail |
+|---|---|---|
+| **E1** | **V-6 added** | Minted at DISCOVERY-COMPLETE Gate C and explicitly deferred to the POLISH-TEMPLATE task by name. Ruled into V-space rather than O-space: it is a statement about what makes a control weaker than it looks, which is §5's definition verbatim. **NOT cross-listed in `CLAUDE.md` §8** — restating a register in a second document is what produced the L-space collision. |
 
 ### v1.4 — 2026-08-08 · from SYNC-1 (the D.4 V-renumber, executed)
 
@@ -193,8 +199,9 @@ V-1…V-4 came from Slice A, which found **six** controls that passed while blin
 - **V-3 · Asserting that a call exists is not asserting what it does.** An entire guard surface shipped unasserted because a test checked the call's lexical position and a comment claimed coverage that did not exist.
 - **V-4 · A source match is the weak form: it reads text ABOUT a file, and it false-alarms on correct code.** Keep it as a cheap tripwire; make the behavioural assertion the control.
 - **V-5 · Negative controls must SPAN failure classes, not accumulate within one.** Gate 4's three probes were all magnitude corruptions, so none could detect a scoping error — four gate-4 probes were not scoped to the user whose URL they certify, and no control in the set could have caught it. Each control was sound; the set was still blind, and invisibly so from inside it. A fourth magnitude corruption would have raised confidence without raising coverage.
+- **V-6 · A promised assertion delivered VACUOUSLY is worse than an absent one, because it reads as discharged.** Two instances in one task: the plan named the `currentValue` never-echo assertion BY NAME and it shipped satisfying the letter while proving nothing — the removed post had no `positions` row, so the field was null whether it leaked or not; and the round-trip guard's first fixture measured `1 + 9N` because it seeded no events, and would have pinned 19 while claiming 25. An absent assertion is visible in a coverage read; a vacuous one is invisible and carries a false receipt.
 - ⚠ **Load-bearing for Slice B:** ADR-0036 primitive 4's **no-direct-writes assertion** is what keeps gate 1 non-vacuous — if the generator could write both a `bets` row and its event, gate 1 would pass *because the generator wrote both halves*. It gets a **positive control per pattern**, a **non-empty file-set assertion**, **whitespace tolerance**, and a **mutation control at authoring time**.
 
 ---
 
-*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
+*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home) · v1.5 2026-08-10 from POLISH-TEMPLATE (V-6 minted). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
