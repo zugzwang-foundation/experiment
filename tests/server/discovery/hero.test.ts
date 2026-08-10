@@ -541,6 +541,11 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			// below can assert the V10 field specifically (it would otherwise share
 			// B's default 0.5 and the assertion would be vacuous).
 			priceAtBet: "0.610000000000000000",
+			// DISTINCTIVE minted shares, paired with the positions row below, so the
+			// V13 never-echo assertion is non-vacuous too — without a held position
+			// the removed post's `currentValue` would be null whether it leaked or
+			// not, and the sweep would prove nothing (@security-auditor LOW).
+			shareQuantity: "777.000000000000000000",
 		});
 		const postB = await seedCommentWithBet({
 			userId: visibleAuthor,
@@ -560,6 +565,15 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			side: "YES",
 			count: 5,
 			firstAt: 10,
+		});
+
+		// The removed author HOLDS the side they argued, so a leak would produce a
+		// real `currentValue` string rather than a null.
+		await testDb.insert(positions).values({
+			userId: maskedAuthor,
+			marketId,
+			side: "YES",
+			quantity: "777.000000000000000000",
 		});
 
 		// Fixture sanity — THE DISCRIMINATING PREMISE: unmasked §9 Top ranks
@@ -603,6 +617,15 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// V15 — neither the raw R2 key nor any presigned URL derived from it.
 		expect(json).not.toContain(maskedImageKey);
 		expect(json).not.toContain("TRACK-B-MASKED-IMAGE-KEY");
+		// V13 — the removed author's position value. Derived through the ENGINE so
+		// the assertion pins the real string the DTO would carry, not a guess.
+		const maskedValue = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "777.000000000000000000",
+		}).proceeds;
+		expect(json).not.toContain(maskedValue);
+		expect(json).not.toContain("777.000000000000000000");
 
 		// Positive half — the SURVIVING pick's own values, so the assertions above
 		// cannot pass merely because nothing was serialized at all.
@@ -614,6 +637,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// B has no attachment of its own, so the field is null — and crucially it
 		// is NOT A's URL.
 		expect(yes.imageUrl).toBeNull();
+		expect(yes.currentValue).toBeNull();
 
 		// A `user_banned` mod_action against B does NOT mask B — ban removes
 		// voice, not past content (ADR-0021 §4). The row deliberately targets

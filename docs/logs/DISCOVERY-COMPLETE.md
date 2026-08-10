@@ -202,6 +202,53 @@ shipped export is numerically correct — the prose is not. **This is the
 misreading I inherited**, and it will mislead the next surface that renders the
 field. Owner: a doc sweep, not this PR.
 
+**OQ-6 · `@security-auditor` — no CRITICAL, no HIGH. Two MEDIUM, both with
+PRE-EXISTING root causes, both correctly OUT of this PR.** Verified each claim
+at source myself before accepting.
+
+- **The R2 object key embeds the raw `users.id`.** `sign-upload.ts:72` mints
+  `u/${userId}/${uploadId}.${ext}`, and C7 now emits a presigned URL over that
+  key into the ANONYMOUS `/` HTML. `users.id` is UUIDv7, so its first 48 bits are
+  the account-creation unix-ms — an anonymous scraper harvests
+  `pseudonym → users.id` plus a signup timestamp, and the identifier is
+  trigger-immutable so it survives a pseudonym scrub (which is what §16.5
+  erasure is meant to sever). **The codebase already knows this key is
+  PII-bearing**: `events/schemas.ts:298` excludes it from the
+  `moderation.blocked` payload *"(it embeds the userId → its own strip)"*.
+  **Root cause predates this PR** — `load-debate-view.ts:382` already mints the
+  identical URL for anonymous viewers of `/m/[slug]`. C7 adds a second emission
+  site for the same data, not a new class. The fix is an opaque key namespace or
+  a proxy read route — a migration plus a backfill, not a Discovery change.
+  **New task, not this PR.**
+- **`/` has no request-rate guard.** `proxy.ts:41` matches `/admin/:path*` only,
+  and rate-limiting lives inside route handlers, not RSC renders. So a
+  `force-dynamic`, uncached, ~97-round-trip page is unauthenticated-reachable at
+  any rate. **This PR adds zero queries** (now machine-pinned), so it is not the
+  cause — but PERF-1 just bought this surface back from 35 s and nothing stops an
+  attacker spending it again. **New task.**
+
+One LOW was in scope and is FIXED in this PR: the never-echo sweep covered
+`entryPrice`, `replyDharma` and the image key but **not `currentValue`**, and it
+would have passed VACUOUSLY — the removed post had no `positions` row, so the
+field was null whether it leaked or not. The removed post now holds a
+distinctive 777-share position and the sweep asserts the engine-derived proceeds
+string absent. Plan §1a had promised that assertion explicitly.
+
+Two LOWs recorded, not fixed: `currentValue` lowers the COST of scraping figures
+already published per-pseudonym (same data, one request instead of N), and
+C7's `signRead` catch is unnarrowed (mirrors the shipped `load-debate-view`
+posture verbatim; cannot swallow a masking failure, which the auditor confirmed
+structurally).
+
+**What the audit confirmed positively**, each checked independently rather than
+assumed: ADR-0034 D-1 holds by construction (nothing under `debate-view/**` or
+`components/debate/**` imports `discovery/hero`); `currentValue` cannot become
+the VIEWER's without adding a parameter and threading a session through three
+files; SC-1 obligation (1) holds in its stronger "never read" form; the whole-
+surface catch was not narrowed; the V13 LATERAL cannot read another user's bet,
+cannot fan out, and `computeSell` is unreachable-by-throw; and INV-3 is
+**strengthened**, not merely untouched.
+
 ---
 
 ## Register rows minted here (no code)
