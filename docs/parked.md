@@ -7,6 +7,12 @@ task, parked until a real task picks them up.
 Each entry names the originating task / section, the deferred work,
 and the conditional trigger (when it becomes load-bearing).
 
+**Standing rule (2026-08-10).** A routing destination named in a committed
+document gets a row here in the SAME commit. Six were named across the POLISH
+corpus with no plan, log, row, owner or date — and two were load-bearing:
+A11Y.0 gated every surface's closing status, and SPEC.CHART was cited as a
+tier-1 source. A phantom prerequisite is worse than a deferred one.
+
 ---
 
 ## SEQUENCE — the triggered set, in order (SYNC-1, 2026-08-08)
@@ -889,3 +895,120 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 **Why it is O1's and not POLISH.2's.** It is not a parity delta — there is no mockup to be out of parity with. It is a launch-shape decision: seed the markets with founder-authored opening posts, stagger the opens, show something else in the hero for an empty market, or accept the empty frame. ⚠ Any option involving posts crosses **CLAUDE.md §3 market-content invention** — the questions, arguments and copy are the founder's, and CC scaffolds the frame only.
 
 **Recorded so it is DECIDED rather than DISCOVERED on 2026-09-15.**
+
+---
+
+## PRIMITIVES-2 — the shared-primitive pass — **RUNS NEXT, no date needed**
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` before today — `POLISH-register.md` CC-9 and `docs/logs/DISCOVERY-COMPLETE.md:268` — **both times routing work *away* from it**, and it had no row, no plan and no owner. It is the successor to PRIMITIVES-1.
+
+**Deferred work.** One pass over the shared primitives, five items:
+
+1. **One shared `MarketThumb` owning three states — null · error · loaded — used by BOTH sites** (PD-2-32). ⚠ **THREE call sites, not two:** `MarketCard.tsx:53` and `HeroPanels.tsx:64` render the market thumb; the **hero POST image** handles `null` but has **no `onError`**, so it carries the same gap. Do not patch the `<img>` tags independently — that is how PD-0-10 happened.
+2. **PD-2-33's `alt` fix, landing WITH it.** Both thumbs carry `alt={card.title}` while the same title renders in the adjacent `<h3>`; `alt=""` matches the hero POST image's ratified treatment and is also what stops the broken-image text overflowing the metadata row. ⚠ Fixing the `alt` alone hides the symptom while PD-2-32's real gap remains.
+3. **The `SideBadge` d5 `.md` and Profile `.sm` presets.** These have **NO register row** and **no preset to receive them** — `badges.tsx:70` is `size?: "hero"`, a **one-member union**. The only committed statement of the requirement is a plan sentence, `docs/plans/DISCOVERY-COMPLETE.md:70`.
+4. **`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers.** POLISH-1a unbound it at the two `IdentityCluster` chip sites; the remaining consumers still carry it.
+5. **The secondary text tier and the emphasis ladder, AS NAMED PRESETS.**
+
+⚠ **BINDING CONDITION, carried verbatim:** *the secondary text tier and the emphasis ladder land as **NAMED PRESETS**, not inline classes. That is what makes deferring the founder's visual pass safe. If they land inline the safety property is gone and the batched pass MUST be revisited.*
+
+⚠ **Every preset defaults to the render that ships today, PROVED per consumer** — a byte-identical baseline per call site, **not asserted**. This is the DISCOVERY-COMPLETE C1 discipline (`detail` pinned byte-identical, 385 bytes) applied to every preset in the pass.
+
+⚠ **PD-2-32 is a PRODUCTION defect, not staging-only.** A minted presigned URL is a local HMAC that never checks existence, so a key pointing at a missing object mints a valid URL and fails only at browser load — and R2 objects can 404 in prod too (deleted, swept, replication lag). **It must land BEFORE `STAGING-FIXTURE-DISCOVERY-SHAPE`: fixing the fixture first would HIDE it** without fixing anything.
+
+**Why deferred.** It is a shared-primitive pass across surfaces POLISH.3/.5/.6 own, and `POLISH-0.md` §5 forbids a V batch spanning surfaces. Absorbing it into any single surface's pass would re-skin the others silently.
+
+**Conditional trigger.** **None — it runs next.** No date is needed because nothing gates it: PD-2-32 and PD-2-33 are open and owned here, and every other item is a primitive that already exists.
+
+**Expected next task.** PRIMITIVES-2 itself. Evidence: `POLISH-register.md` PD-2-32 · PD-2-33 · CC-9 · PD-0-10; `docs/plans/DISCOVERY-COMPLETE.md:70`; `docs/logs/DISCOVERY-COMPLETE.md:268`.
+
+---
+
+## A11Y.0 — the accessibility floor — **DATED, founder to set the date**
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10). **Nine committed references routed work to it and it had no row until today** — `POLISH-0.md:22`, `:326`, `:356` · `docs/plans/PRIMITIVES-1.md:344`, `:348` · `docs/plans/HEADER-PORTFOLIO.md:111` · `docs/plans/SHELL-COMPLETE.md:292` · `docs/logs/POLISH-1a.md:125`, `:146`.
+
+**Deferred work.** The accessibility floor, scope **ratified**: **keyboard reachability · accessible names · visible focus.** **WCAG 2.2 AA is scoped PAST the experiment, deliberately** — the floor is the three properties above, not a conformance claim.
+
+⚠ **It already has a backlog, accumulated before it had a row:**
+
+| Item | Where |
+|---|---|
+| **PD-2-06** — the Reload button had **no focus ring**, and it was the **only keyboard-reachable control on Discovery** | `POLISH-register.md` PD-2-06 (fixed at POLISH.2 C6, but the class it belongs to is this one) |
+| **PD-2-10** — **no keyboard handler at all** on the carousel; ArrowLeft/ArrowRight did nothing, against tier-2 canon §5 (explicitly *not* a11y-deferred) | `POLISH-register.md` PD-2-10 |
+| **PD-2-33's a11y half** — `alt` duplication, WCAG 1.1.1 | `POLISH-register.md` PD-2-33; the overflow half is POLISH.2's |
+| **POLISH-1a's `title`-reach finding** — titles on a `disabled` `<button>` (pointer events suppressed, tooltip never fires) and on role-less `<span>`s (mouse-hover only, no keyboard path, not reliably exposed to AT). The strings are source-of-truth-correct; their **delivery** is this task's | `docs/logs/POLISH-1a.md:125` |
+
+⚠ **Every POLISH surface closes `closed (a11y-deferred)` until this lands** — `POLISH-0.md:326`. **It gates a STATUS, not a build.** No surface's work waits on it; only the qualifier on the word "closed" does. That is why it can be dated rather than sequenced.
+
+**Why deferred.** The floor is a product decision about how much accessibility the experiment commits to, and the scope decision (three properties, AA scoped out) is ratified while the *date* is not. Nothing in POLISH is blocked by its absence.
+
+**Conditional trigger.** **A date, set by the founder.** Not event-triggered — the backlog above only grows as surfaces are inspected, and every surface can close without it.
+
+**Expected next task.** A11Y.0 itself. Evidence: the four backlog items above, each with a register row or a log citation.
+
+---
+
+## SPEC.1 §21.7 rider — the freeze-banner spec — **BEFORE 2026-11-05**
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Tracked across five plan and log files as a **gate on other work** — `docs/plans/SHELL-COMPLETE.md:7`, `:16`, `:73`, `:266` · `docs/logs/SHELL-COMPLETE.md:211`, `:230` · `docs/plans/HEADER-PORTFOLIO.md:56` · `docs/plans/PRIMITIVES-1.md:343` — **and it had no row of its own.**
+
+**Deferred work.** Write SPEC.1 **§21.7**. It is currently a RESERVED stub (`docs/specs/SPEC.1.md:1567-1573`), minted at v1.0.28 to close the §21 numbering gap, and it says so itself:
+
+> *"Reserved for the freeze-banner rider. **Not yet written. B8 (freeze banner) is gated on this section and must not be built before it lands.**"*
+
+⚠ **It is SMALL.** `docs/plans/SHELL-COMPLETE.md:73`: *"The rider is small: the **copy is already ratified and shipped** (`composer/copy.ts:126–129`, wired `endpoint.ts:201` → `state-map.ts:50` → `p6_concluded`). The rider gives that copy a second, visitor-reachable **home**; it does not design new copy."* Web-authored, prescriptive, **no code**. Q4 as revised (r5) is what it must ratify — `FREEZE_INSTANT_UTC` as a cheap short-circuit, `system_state.frozen_at` as the truth claim, `isFrozen()` wrapped so a layout can never throw.
+
+⚠ **It is the SOLE blocker on the freeze banner, and it had no owner.** ⚠ **B8 has been STRUCK from POLISH.1's gate list** — the banner renders **only when frozen**, so it is **not inspectable in the POLISH window** even if it were built. POLISH.1 is not waiting on it and never was.
+
+**Why deferred.** It is a spec edit, and SPEC.1 is web-authored — CC does not draft it. Every task that touched the banner correctly refused to write the rider inside its own scope.
+
+**Conditional trigger.** **Before 2026-11-05** — the conclusion freeze is `system_state.frozen_at` at 2026-11-05 23:59 UTC, and a banner that ships after the freeze it announces is worthless. Not a POLISH gate; a launch-window one.
+
+**Expected next task.** The forked S4 task, which `docs/logs/SHELL-COMPLETE.md:230` already specifies **starts by writing the §21.7 rider — not by writing `FreezeBanner.tsx`.**
+
+---
+
+## MOD-REPORT-PATH — no user-facing report trigger exists
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md:354` and `docs/plans/SHELL-COMPLETE.md:292` — both routing it away, with no row until today.
+
+**Deferred work.** Design and ratify the user-facing report path. **ADR-0021's reactive moderation pipeline needs a user-facing trigger and none is designed.** CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and **no policy decision recorded that user reporting is out of scope.** Verified today: `grep -rni "report" src/components/debate/dialogs.tsx` returns **zero**.
+
+⚠ **Child-safety adjacent with real lead time.** ADR-0021 made moderation *reactive* — an admin reviews live content after the fact. Reactive moderation with no participant-side trigger means the only path to an admin's attention is the admin happening to look.
+
+**Why deferred.** It is a product and policy decision with its own P0 chat, not a POLISH defect. **POLISH.3 inherits a decision; it does not discover a hole** — an inspector who finds no REPORT control on the pop-up is looking at a ratified removal, not a defect, and must not file it.
+
+**Conditional trigger.** Its own chat. ⚠ **Lead time is the trigger, not an event** — a child-safety path that is designed in November is designed too late for a 2026-09-15 go-live.
+
+**Expected next task.** A dedicated P0 chat. Evidence: `docs/adr/0021-reactive-moderation-no-held-queue.md`; `docs/design/DESIGN_popup-redesign_CLOSE-OUT.md` §4 (REPORT stripped, parked).
+
+---
+
+## SPEC.CHART — a tier-1 source that does not exist
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10), the RECON-2 sweep.
+
+**Deferred work.** Resolve the chart's missing baseline. **`POLISH-0.md:158` cites `SPEC.CHART` as a TIER-1 source for POLISH.3.** It is **not in `docs/specs/` and never has been** — that directory holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md`, and nothing else.
+
+⚠ **The consequence is a halt, not an annoyance.** The chart's **expanded-overlay** variant is **built UI with NO baseline at any tier** — values-log branded three renders and four exist. Under `POLISH-0.md` §5 that is class **S**, and class S is a **SPEC-FIRST halt: no build**. So POLISH.3 cannot dispose of that component either way. It is **R13 — the only OPEN ruling** in the index.
+
+**Why deferred.** Writing a chart spec is a spec-lane task, web-authored; and the alternative disposition (`accepted-divergence`) is **founder-only** under P12. Neither is POLISH.3's to take mid-inspection.
+
+**Conditional trigger.** **Before POLISH.3 closes.** Two admissible outcomes, and only two: **write it**, or **record the overlay as permanently unbaselined and accept the divergence** (founder only, P12). A third outcome — POLISH.3 closing with the component undisposed — is what this row exists to prevent.
+
+**Expected next task.** A spec-lane task, or the founder at POLISH.3 kickoff. Evidence: `POLISH-0.md:158`; `POLISH-register.md` PD-0-16 (`R13`); `ls docs/specs/`.
+
+---
+
+## ADR-0006-DISCIPLINE — one known unpushed commit
+
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-register.md` CC-3 and `docs/plans/DISCOVERY-COMPLETE.md:19` (and its halt item 10) — **both times routing work away from it**, with no row until today.
+
+**Deferred work.** Land `1b7f37f docs(adr): ADR-0006 §4 — back-reference ADR-0026's third R2 bucket`, which is **confirmed absent from `main`**. It was written on the local branch `chore/post-perf-1-docket` and never pushed; DISCOVERY-COMPLETE branched from `origin/main` explicitly and `git merge-base --is-ancestor` confirmed it absent, so it was correctly kept out of #311 rather than dragged in.
+
+**Why deferred.** It is a one-line ADR back-reference. Opening a PR for it alone costs more than the change is worth, and every task that noticed it correctly declined to absorb an out-of-scope ADR edit.
+
+**Conditional trigger.** **Opportunistic — fold into the next task that legitimately opens `docs/adr/`.** ⚠ Nothing executes on it and nothing is wrong on `main` without it; the only cost of leaving it is that the commit exists in one place and one place only.
+
+**Expected next task.** Any task already editing an ADR. Evidence: `POLISH-register.md` CC-3; `docs/plans/DISCOVERY-COMPLETE.md:19`.
