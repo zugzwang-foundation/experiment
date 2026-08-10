@@ -39,15 +39,21 @@ import { useEffect, useRef, useState } from "react";
  * A's missing object would blank market B's perfectly good thumb for the rest
  * of the session. Storing *which* `src` failed makes the comparison false again
  * the moment a new URL arrives — no effect, no `key`, no reset dance. It is ONE
- * slot, not a `Set`, deliberately: a carousel that wraps back to a
- * previously-failed market re-requests that object once per lap and degrades
- * again on the same `onError`. That costs one wasted request per lap and stays
- * correct, which is the cheaper trade against remembering every URL forever.
+ * slot, not a `Set`, deliberately, and the cost of that is narrower than it
+ * first looks: the slot is only ever overwritten by *another* failure, so
+ * A(fail) → B(ok) → A still renders the fallback with **no** re-request. Only a
+ * second failure displaces A, and only then does returning to A re-request it
+ * and degrade again. That is the cheap trade against remembering every failed
+ * URL for the session.
  *
  * **D2-P1 — THE MOUNT-TIME TRANSITION, and why `onError` alone was not enough.**
  * `onError` is a React *synthetic* handler, and for `<img>` React binds `error`
- * as a NON-delegated listener at hydrate time
- * (`react-dom-client.development.js:5274-5278`). Discovery is `force-dynamic`
+ * as a NON-delegated listener at hydrate time (`case "img":` →
+ * `listenToNonDelegatedEvent("error", didHydrate)`, at
+ * `node_modules/react-dom/cjs/react-dom-client.development.js:5274-5278` — cite
+ * the react-dom copy specifically; the Next-compiled copy under
+ * `next/dist/compiled/react-dom/` has entirely different line numbering).
+ * Discovery is `force-dynamic`
  * and server-renders these images, so the browser starts the R2 GET at
  * HTML-parse time. The DOM `error` event fires exactly ONCE — if it lands
  * before hydration attaches the listener it is lost permanently, and the broken
@@ -80,7 +86,10 @@ import { useEffect, useRef, useState } from "react";
  * ⚠ It is `useEffect`, not `useLayoutEffect`: Next.js server-renders client
  * components and `useLayoutEffect` warns there. The cost is that a broken image
  * may paint for one frame after hydration before the fallback replaces it —
- * which is the whole defect reduced to a single frame, not left permanent.
+ * the defect reduced to a single frame rather than left permanent. ⚠ Both
+ * mechanisms are client-side, so with JS disabled or a bundle that never loads,
+ * the broken glyph is still permanent. No server-side check is possible: the
+ * presign is a local HMAC and cannot see whether the object exists.
  *
  * **It carries its own `"use client"` (D2-P1).** It uses hooks, so the
  * directive states that requirement at the file that has it rather than
@@ -148,9 +157,9 @@ export function MarketThumb({
 	}
 
 	return (
-		// ⚠ `passthrough` is spread FIRST, and the ORDER is what makes the four
+		// ⚠ `passthrough` is spread FIRST, and the ORDER is what makes the five
 		// named props below authoritative — last write wins, so no spread key can
-		// clobber `src`/`alt`/`className`/`onError`. Moving the spread below them
+		// clobber `ref`/`src`/`alt`/`className`/`onError`. Moving the spread below
 		// would silently disable this component's whole reason to exist, and no
 		// test here would catch it because none passes an `onError`. The type's
 		// `Omit` is a second belt, not the first: TypeScript does NOT excess-

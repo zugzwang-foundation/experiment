@@ -480,7 +480,24 @@ describe("§8.1 zero-delta — the hero POST image, at BOTH poles", () => {
  * because there the effect re-runs after the element already exists.
  */
 
-/** Install a decode state on every `<img>` for the duration of `fn`. */
+/**
+ * Install a decode state on every `<img>` for the duration of `fn`.
+ *
+ * ⚠ **The seam is PROCESS-WIDE, not `MarketThumb`-scoped.** It patches
+ * `HTMLImageElement.prototype`, so it reaches every image in the environment —
+ * including the detached `new window.Image()` radix builds inside
+ * `useImageLoadingStatus` for the hero author avatars, whose predicate is
+ * `complete && naturalWidth > 0 ? "loaded" : "loading"`. Two consequences a
+ * future editor of this block must know:
+ *   1. **Never compare a render made inside a window against one made outside
+ *      it.** Both sides of every equality below are captured inside a window
+ *      for exactly this reason — a radix bump that simplified its predicate to
+ *      `complete` alone would otherwise materialise avatar `<img>`s on one side
+ *      only and redden these assertions for a reason unrelated to `MarketThumb`.
+ *   2. **Never widen `findImgs` to a bare `img` selector.** It is `src`-scoped
+ *      on purpose; the DECODED windows really do materialise radix avatars, and
+ *      a bare selector would count them.
+ */
 function withImageState<T>(
 	state: { complete: boolean; naturalWidth: number },
 	fn: () => T,
@@ -500,12 +517,22 @@ function withImageState<T>(
 		return fn();
 	} finally {
 		// Restored in `finally` so a failing assertion cannot leak a fake decode
-		// state into every later test in this file.
+		// state into every later test in this file. The `else` branches matter:
+		// jsdom defines both as own accessors on the prototype today, but if a
+		// jsdom major ever moved either off it, a conditional-only restore would
+		// leave the stub PERMANENTLY installed and still report green — the
+		// in-flight control would become inexpressible without failing.
+		// `Reflect.deleteProperty` rather than `delete`: both are readonly on the
+		// DOM lib type, which makes `delete` a TS2704 compile error.
 		if (priorComplete !== undefined) {
 			Object.defineProperty(proto, "complete", priorComplete);
+		} else {
+			Reflect.deleteProperty(proto, "complete");
 		}
 		if (priorNatural !== undefined) {
 			Object.defineProperty(proto, "naturalWidth", priorNatural);
+		} else {
+			Reflect.deleteProperty(proto, "naturalWidth");
 		}
 	}
 }
@@ -513,10 +540,19 @@ function withImageState<T>(
 describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => {
 	for (const site of SITES) {
 		it(`${site.name} — already-failed-at-mount degrades to the placeholder`, () => {
-			// The null baseline needs no stub: it renders no <img> at all.
-			const nullRender = site.renderNull();
-			const nullHtml = nullRender.container.innerHTML;
-			nullRender.unmount();
+			// Captured INSIDE a window even though the null arm renders no <img>
+			// of its own — see `withImageState`'s note 1. The state chosen is the
+			// same one the comparison render uses, so both sides see an identical
+			// environment and any future avatar-rendering difference cancels.
+			const nullHtml = withImageState(
+				{ complete: true, naturalWidth: 0 },
+				() => {
+					const nullRender = site.renderNull();
+					const html = nullRender.container.innerHTML;
+					nullRender.unmount();
+					return html;
+				},
+			);
 
 			// N1 alive check, and it CANNOT be made after the failed-decode render:
 			// a correct component has already swapped the images out by the time
@@ -565,38 +601,62 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 		});
 	}
 
-	it("re-checks on a src CHANGE, not only on first mount", () => {
-		// `DiscoveryCarousel.tsx:102` swaps `card` on the SAME mounted node every
-		// 10s, so a mount-only check would miss every market after the first.
-		// Here the element is stubbed DIRECTLY — legal on this path because the
-		// effect re-runs after the element already exists.
+	/**
+	 * The `src`-change path, stubbed on the ELEMENT rather than the prototype —
+	 * legal here, and the more surgical choice, because the effect re-runs after
+	 * the element already exists. `decode` is what the swapped-in image reports.
+	 * Selector is slot-scoped, matching the L5 fix in `market-card.test.tsx`: an
+	 * unscoped `querySelector("img")` would stub the wrong element if a second
+	 * image were ever added ahead of the thumb, and the fixture guard below would
+	 * not fire.
+	 */
+	function renderThenSwap(decode: { complete: boolean; naturalWidth: number }) {
 		const good = "https://signed.test/market-media/m/x/good.webp";
 		const view = render(
 			<MarketCard card={cardFixture(good)} series={SERIES} />,
 		);
-		const img = view.container.querySelector("img");
-		if (img === null) {
-			throw new Error("fixture broken: the loaded arm rendered no <img>");
+		const img = view.container.querySelector(".items-start.gap-3 > img");
+		if (!(img instanceof HTMLImageElement)) {
+			throw new Error("fixture broken: the loaded arm rendered no thumb <img>");
 		}
 		Object.defineProperty(img, "complete", {
 			configurable: true,
-			get: () => true,
+			get: () => decode.complete,
 		});
 		Object.defineProperty(img, "naturalWidth", {
 			configurable: true,
-			get: () => 0,
+			get: () => decode.naturalWidth,
 		});
+		// The carousel advancing to the next market.
+		view.rerender(
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+		);
+		return view;
+	}
 
+	it("re-checks on a src CHANGE, not only on first mount", () => {
+		// `DiscoveryCarousel.tsx:102` swaps `card` on the SAME mounted node every
+		// 10s, so a mount-only check would miss every market after the first.
 		const nullRender = render(
 			<MarketCard card={cardFixture(null)} series={SERIES} />,
 		);
 		const nullHtml = nullRender.container.innerHTML;
 		nullRender.unmount();
 
-		// The carousel advancing to a market whose media is missing.
-		view.rerender(
-			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
-		);
+		const view = renderThenSwap({ complete: true, naturalWidth: 0 });
 		expect(view.container.innerHTML).toBe(nullHtml);
+	});
+
+	it("control::a src CHANGE to a GOOD image does not blank it", () => {
+		// N3 for the swap path, and the one place the new effect could destroy a
+		// healthy image: if the predicate were ever loosened to `complete` alone,
+		// every carousel advance would blank a perfectly good thumb. Without this
+		// control the assertion above passes against exactly that mutation.
+		const view = renderThenSwap({ complete: true, naturalWidth: 200 });
+		const imgs = findImgs(view.container, `img[src="${CARD_IMAGE_URL}"]`);
+		expect(imgs).toHaveLength(1);
+		expect(view.container.querySelector(".items-start.gap-3 > img")).toBe(
+			imgs[0],
+		);
 	});
 });

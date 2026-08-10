@@ -61,10 +61,14 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		// a broken load. This line previously read `screen.getByAltText(
 		// MARKET_TITLE)`, pinning the superseded OQ-6 dynamic-alt rule; it is the
 		// only assertion in the suite that D4 invalidates.
-		// Scoped to the thumb SLOT rather than "the first <img> in the card", so
-		// adding a second image to this composition later (an author avatar, a
-		// media badge) cannot silently retarget these two assertions (L5).
-		const img = container.querySelector(".items-start.gap-3 > img");
+		//
+		// Addressed to the thumb SLOT by POSITION (`firstElementChild`), not by
+		// "the first <img> in the card": an image added anywhere else in this
+		// composition later — an author avatar, a media badge — must not silently
+		// retarget the two assertions below. Matches `thumbSlot()` in
+		// market-thumb.test.tsx.
+		const img =
+			container.querySelector(".items-start.gap-3")?.firstElementChild;
 		expect(img?.getAttribute("alt")).toBe("");
 		expect(img?.getAttribute("src")).toBe(IMAGE_URL);
 		// The question.
