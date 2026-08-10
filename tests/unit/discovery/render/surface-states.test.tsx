@@ -9,6 +9,7 @@ import {
 	LOADING_COPY,
 	LoadingSkeleton,
 } from "@/components/discovery/LoadingSkeleton";
+import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
 
 /**
  * UI.A4 Slice 5 (plan §2 row 5 / §5 table) — the design-language §4.10 rule:
@@ -169,6 +170,30 @@ describe("V46 / R9 — Empty and Error are the same P1 block", () => {
 		// transition-duration.
 		expect(cls).toContain("[transition:all_var(--dur-hover)]");
 		expect(cls).not.toContain("duration-");
+	});
+
+	it("P7-block-count-is-sourced-from-DISCOVERY_GRID_SIZE", () => {
+		// R8 / C10. The count was hard-coded to FOUR while the grid renders up to
+		// EIGHT, so the skeleton was reserving space for a layout that does not
+		// exist. Asserting against the imported constant — never a literal — is
+		// what makes the two impossible to diverge again.
+		const { container } = render(<LoadingSkeleton />);
+		const blocks = container.querySelectorAll("[data-loading-block]");
+		// One hero band + one block per grid slot.
+		expect(blocks.length).toBe(DISCOVERY_GRID_SIZE + 1);
+	});
+
+	it("P7-blocks-keep-the-shadcn-skeleton-marker", () => {
+		// `LoadingBlock` marks itself with `data-loading-block` rather than
+		// overriding `data-slot`. The first draft DID override it, which silently
+		// dropped `[data-slot="skeleton"]` from every block — caught by the
+		// pre-existing assertion above, and pinned here so it cannot come back.
+		const { container } = render(<LoadingSkeleton />);
+		const blocks = [...container.querySelectorAll("[data-loading-block]")];
+		expect(blocks.length).toBeGreaterThan(0);
+		for (const block of blocks) {
+			expect(block.getAttribute("data-slot")).toBe("skeleton");
+		}
 	});
 
 	it("empty-has-NO-cta", () => {

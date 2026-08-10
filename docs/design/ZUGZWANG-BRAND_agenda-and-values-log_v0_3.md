@@ -224,6 +224,8 @@ Reply-view column header: same cluster — PriceTag size 19, thumbSize 16 — ce
 
 Engaged-slot backlight: `0 0 10px 1px rgba(255,255,255,0.2)`, layered over `var(--elev-1)`. Interaction signal only.
 
+P7 loading block (R8, DISCOVERY-COMPLETE): panel radius `--r`, fill `bg-n0`, hairline edge · Discovery hero band 192px (`h-48`) full-width, card block 144px (`h-36`) · grid gap 16px, column stack gap 20px · block count = the surface's own constant (Discovery `DISCOVERY_GRID_SIZE` = 8, plus one hero band), never a literal · copy line 12px `text-n5`, centred, above the blocks. **No new colour token and no new `--*` custom property** — P7 composes existing tokens, so the 11-token census, exact hex pins, ground/graph/destructive pins and string bans in `tests/unit/design/tokens-monochrome.test.ts` stay green untouched.
+
 Support/Counter glows: hover `0 0 8px 1px rgba(255,255,255,0.25)` · pressed `0 0 4px 1px rgba(255,255,255,0.4)`.
 
 Poles: `--color-yes #181818` (BLACK = YES) · `--color-no #FAFAFA` (WHITE = NO), everywhere: side-chip fills (YES black/white text, NO white/black text) · Support/Counter pills coloured by the RESULTING bet side (Support inherits the post's side, Counter the opposite) · stake-bar segments (left = Support share in the Support side's pole colour, right = Counter's; 1px `#404040` frame) · split bar (YES share pole black anchored left, remainder pole white) · graph lines `--graph-yes #737373` (grey stand-in, black can't render on dark) / `--graph-no #FAFAFA` · thumb glyphs (thumb-down filled `#FAFAFA` as the NO marker; thumb-up stroked currentColor).

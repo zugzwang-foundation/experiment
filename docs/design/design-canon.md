@@ -29,7 +29,7 @@
 | W2.8 fresh-post compose entry | 🔒 locked 06-26 (single relabel `Buy` → `Đ BET`) | 1 still (§8) |
 | **W2.9 market-media tab** | **○ OPEN — not designed.** ADR-0026 itself routes the header pixels to a dedicated design-mockup task that must **precede MEDIA.2**; no still or close-out exists. Rides MEDIA.2's kickoff, not a DC blocker. | — |
 | W2.10 sell module + cap clamp | ✅ **resolved by DC rulings 2+3** (§4; Option A ratified 06-27) | delta still (§8) + FINAL spec package |
-| W2.11 state kit (P1–P6 + placement table) | 🔒 locked 06-27 (45 candidate states → 14 build items) | 1 still (§8) + state ledger CSV |
+| W2.11 state kit (**P1–P7** + placement table) | 🔒 locked 06-27 (45 candidate states → 14 build items); **P7 minted at R8, T1 superseded** — §10 | 1 still (§8) + state ledger CSV |
 | **W2.12 feature-guide** | **✕ DESCOPED from Wave-2** (operator ruling 2026-07-02) — re-scoped at a later sweep; UI.18 build row keeps a missing-design-input note | this canon |
 | W2.13 post/reply share-card (X image) | 🔒 locked 06-29 (profile-card JPEG stays cut; debate-`.md` split out → EXPORT.1, shipped) | 1 still (§8) |
 | W2.14 radio | slot 🔒 in the header still; **hosting resolved by DC ruling 5** (R2 self-host; §21.5 amendment lands at DESIGN.SPEC) | header still + decision log |
@@ -143,7 +143,7 @@ All content is **illustrative dummy** — not final product copy (final copy, mi
 | 8 | Global header (incl. back visual, timer, visitor, radio slot) | `DESIGN_W2_4-5-14_global-header_mockup-v0_2.html` | 🔒 (v0_1 superseded — do not commit) | ✅ |
 | 9 | Fresh-post entry (`Đ BET` relabel + states) | `DESIGN_W2_8_entry_mockup-v0_1.html` | 🔒 W2.8 | ✅ |
 | 10 | Sell module + cap clamp (delta) | `DESIGN_W2_10_sell-and-clamp_mockup-v0_1.html` | 🔒 by rulings 2+3 | ✅ |
-| 11 | State kit P1–P6 + placement table | `DESIGN_W2_11_state-kit_mockup-v0_1.html` | 🔒 W2.11 | ✅ |
+| 11 | State kit **P1–P7** + placement table (P7 minted at R8; T1 superseded) | `DESIGN_W2_11_state-kit_mockup-v0_1.html` | 🔒 W2.11 | ✅ |
 | 12 | State ledger (45-state disposition) | `W2.11_state-ledger_reconciled.csv` | named in the W2.11 close-out; **not found in PK — locate before DC.3** | ⚠ pending |
 | 13 | Post/reply share card | `DESIGN_W2_13_post-reply-share-card_mockup-v0_1.html` | 🔒 W2.13 | ✅ |
 | 14 | Dharma graph (profile + market halves) | `DESIGN-W2_6-graph-prototype-record.md` + `DESIGN-W2_6-profile-graph-CLOSE-OUT.md` | 🔒 look locked (prototype off-repo) | ✅ (records) |
@@ -196,6 +196,39 @@ surface — but P5's dash treatment does not extend to them. Ratified
 
 ---
 
+**P7 · Loading block — R8, ratified 2026-08-10 from DISCOVERY-COMPLETE.**
+
+**T1 is SUPERSEDED.** W2.11 ruled *"no first-load skeletons; pages are
+server-rendered (populated HTML)"* (`DESIGN_W2_11_CLOSE-OUT.md:48`; state-kit
+mockup `:15`, `:463`). **That premise does not hold.** Discovery mounts a React
+`Suspense` boundary (`src/app/(public)/page.tsx`) around an async server read,
+so the FIRST PAINT is the fallback, not populated HTML. A ruling that assumed
+populated HTML cannot govern a surface that has none at first paint.
+**Skeletons are correct.**
+
+The kit becomes **P1–P7**. P7 is the loading block:
+
+| Property | Treatment |
+|---|---|
+| What it is | A `Skeleton`-based placeholder **shaped like the content it replaces** — never market-shaped fake content, never a spinner |
+| Count | Sourced from the **surface's own constant** (Discovery: `DISCOVERY_GRID_SIZE`), never a literal. A hard-coded count silently diverges from the layout it reserves space for — Discovery's was pinned at 4 against an 8-slot grid until this ruling |
+| Host | Any surface with a `Suspense` boundary over a server read |
+| Tokens | **Composes existing tokens only.** No new colour token, no new `--*` custom property — the 11-token census stays untouched |
+| Marker | Marks itself `data-loading-block` and **preserves** the shadcn `data-slot="skeleton"`; it does not override it |
+
+Implementation: `src/components/ui/loading-block.tsx`.
+
+**Same ruling, second clause (R9).** W2.11's *Killed by ruling* line also lists
+**empty-Discovery** and **per-surface error panels (T2)** (state-kit mockup
+`:463`). SPEC.1 §22 **mandates** the Discovery empty state and the surface ships
+an error panel, so R9 **reconciles both to the P1 shape** rather than removing
+them. P1's placement table gains **Discovery empty** and **Discovery error**;
+both now render the identical block (148px floor, `--r`, `bg-n0`, hairline,
+gap 10, pad 24; `.msg` 13.5/n6 ≤320px, `.sub` 12/n4), with P1's optional single
+CTA present on Error (`Reload`) and absent on Empty.
+
+---
+
 ## §11 — Residual open items (properly homed — nothing floating)
 
 | Item | Home | Note |
@@ -212,7 +245,7 @@ surface — but P5's dash treatment does not extend to them. Ratified
 
 ## §12 — Forward contract (what every downstream build must honor)
 
-Reply-as-bet; mandatory argument on every buy; **selling is the only comment-free action** · columns are **fixed YES/NO poles**; Support/Counter post-relative (split bar + composer) · composer opens in the opposite slot · carousel/pick is view-only · append-only / frozen-at-resolution (closed positions unsellable) · side binding black=YES / white=NO invariant everywhere · bookmark semantics per ruling 1 · **no slippage UI** + cap-clamp-on-buy per rulings 2+3 · cross-surface nav contract: surfaces request `{type:'nav', page, sub, post}`, the host resolves and returns `{type:'setsub', sub, post}` · plus the W2 additions: history-stack back + global header handler + ESC routing + ×-on-pop-ups; the About tab carries the full invariant set (deck carries the how-to-play subset); state kit P1–P6 placements per W2.11.
+Reply-as-bet; mandatory argument on every buy; **selling is the only comment-free action** · columns are **fixed YES/NO poles**; Support/Counter post-relative (split bar + composer) · composer opens in the opposite slot · carousel/pick is view-only · append-only / frozen-at-resolution (closed positions unsellable) · side binding black=YES / white=NO invariant everywhere · bookmark semantics per ruling 1 · **no slippage UI** + cap-clamp-on-buy per rulings 2+3 · cross-surface nav contract: surfaces request `{type:'nav', page, sub, post}`, the host resolves and returns `{type:'setsub', sub, post}` · plus the W2 additions: history-stack back + global header handler + ESC routing + ×-on-pop-ups; the About tab carries the full invariant set (deck carries the how-to-play subset); state kit **P1–P7** placements per W2.11 (P7 minted at R8; T1 superseded — §10).
 
 ---
 
