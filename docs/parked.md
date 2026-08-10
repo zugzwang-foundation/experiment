@@ -853,3 +853,39 @@ curl -sS -D /tmp/h.txt https://staging.zugzwangworld.com/api/health
 **Upstash is already in the stack** (`@upstash/ratelimit`, ADR-0015), so the primitive exists; what is missing is a limiter on the RSC path. ⚠ Note the ADR-0015 posture — rate-limit fails **OPEN** — so a limiter added here does not become a new availability dependency.
 
 **Scope note.** Applies to every anonymous participant RSC surface, not just `/`: `/m/[slug]`, `/u/[pseudonym]` and the `.md` export are all uncached reads. Size the row across all of them.
+
+
+---
+
+## STAGING-FIXTURE-DISCOVERY-SHAPE — the staging fixture set cannot render what Discovery is for — **DUE 2026-09-05** (hard date, not a trigger)
+
+**Found at the DISCOVERY-COMPLETE post-staging verification, 2026-08-10.** Scoped here, **nothing changed** — the STAGING-PARITY fixture set is **md5-pinned** (`tests/staging/fixtures.ts` + `docs/polish/staging-coverage.json`), so altering it is a **deliberate fixture change with a re-pin**, never an edit. Three defects in the fixture SHAPE, none in the engine.
+
+**1 · No market has BOTH hero sides populated, so the two-pole comparison cannot be rendered on any screen.** Measured across all 8 Discovery markets:
+
+```
+sp-m16 YES   sp-m15 NO    sp-m14 NO    sp-m13 YES
+sp-m12 YES   sp-m11 NO    sp-m10 YES   sp-m4-new (neither)
+```
+
+Seven markets carry a hero post on exactly ONE side; one carries none. **Zero carry both.** That matters beyond convenience: V17's split bar binds its poles to the post's side, so *the whole point of the fix is that a YES panel and a NO panel look different* — and no single screen on staging can show that. The V17 pole defect shipped through a full PR partly because **every** V17 render test passed `no: null`; the fixture set has the identical blind spot. ⚠ **POLISH.3 hits the same wall on `/m/[slug]`, which is exactly where RR-3's LIVE inversion sits.**
+
+**2 · The market that sorts FIRST is the emptiest.** Discovery orders `created_at DESC` and caps at `DISCOVERY_GRID_SIZE`. `sp-m4-new` ("brand new") has **no** hero posts on either side, so a first-time viewer lands on the both-sides-empty hero. *(⚠ Correction to the scoping brief, verified from the served payload: `sp-m4-new` sorts **LAST** of the eight, not first — index 0 is `sp-m16-fill`. The concern is real but the ordering claim was inverted; the emptiest market is at the END of the carousel, not its opening frame.)*
+
+**3 · All 8 `market_media` R2 objects are absent** — every minted URL returns `404 NoSuchKey`. Rows in the DB, objects never uploaded. This is what makes **PD-2-32** (a real production defect: a minted URL that later 404s has no degradation path) visible on staging. Fixing the fixture would HIDE PD-2-32 without fixing it — **land PD-2-32 first, then re-pin the fixtures.**
+
+**What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
+
+---
+
+## O1-KICKOFF-INPUT — Discovery's hero at go-live: every market opens with zero posts — **route to O1's kickoff, DECIDE don't discover**
+
+**Product question, NOT a POLISH defect.** Recorded from the DISCOVERY-COMPLETE staging pass, 2026-08-10.
+
+At go-live on **2026-09-15** all eight markets open **simultaneously, with zero posts**. Discovery's hero renders per side, and a side with no eligible post renders the OQ-6 empty copy (`HERO_SIDE_EMPTY`). So on day one **every market's hero shows the both-sides-empty state**, for as long as it takes participants to post — and the entry surface of the experiment opens on its emptiest frame.
+
+**The mockup never showed this state.** `surface_discovery_v1_0.html` renders populated hero panels throughout; there is no zero-post frame in tier 4 to port. The build's behaviour is correct and deliberate (F-DISC-2: a side with no eligible post is `null`, never a placeholder post, and the copy is identical whether a side has zero posts or masked ones so it can never hint hidden content exists). **Nothing is broken.** The question is whether that is the intended first impression.
+
+**Why it is O1's and not POLISH.2's.** It is not a parity delta — there is no mockup to be out of parity with. It is a launch-shape decision: seed the markets with founder-authored opening posts, stagger the opens, show something else in the hero for an empty market, or accept the empty frame. ⚠ Any option involving posts crosses **CLAUDE.md §3 market-content invention** — the questions, arguments and copy are the founder's, and CC scaffolds the frame only.
+
+**Recorded so it is DECIDED rather than DISCOVERED on 2026-09-15.**
