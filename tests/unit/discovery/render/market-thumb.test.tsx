@@ -230,8 +230,9 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
 
 			// The browser's load failure, delivered exactly as the browser delivers
 			// it, at EVERY image the site renders — both poles for the hero post
-			// image. At this commit nothing is listening, so the DOM does not move
-			// and this assertion is RED.
+			// image. Before `MarketThumb` was adopted nothing listened, the DOM did
+			// not move, and this assertion was RED at all three sites; the captured
+			// output is in commit 1's body.
 			for (const img of imgs) {
 				fireEvent.error(img);
 			}
@@ -242,4 +243,200 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
 			expect(loaded.container.innerHTML).toBe(nullHtml);
 		});
 	}
+});
+
+/**
+ * §8.1 — THE PER-CONSUMER ZERO-DELTA PROOF.
+ *
+ * Every literal below was **captured from the pre-change component at
+ * `origin/main` `f51a9dd`**, by rendering it and dumping `outerHTML`. None is
+ * hand-written. Any diff here is a real pixel regression on a live surface.
+ *
+ * **The assertion is `toBe` — full-string equality, never `.toContain`.** Class
+ * ORDER is caught: a first draft of the `PriceBar` proof once emitted identical
+ * classes in a different order and passed by eye. `PriceBar`'s own suite is the
+ * precedent, and §8.1 forces the shape rather than leaving it to taste —
+ * `MarketThumb` gets full equality (it emits its own node), never `SideBadge`'s
+ * `OWNED_TAIL` suffix pin.
+ *
+ * **The scope is the THUMB NODE, not the whole card, and that is deliberate.**
+ * `MarketThumb` owns exactly this one node; the surrounding card also carries
+ * `SideBadge`, whose shadcn `badgeVariants` base sits outside this component's
+ * control. Pinning the whole subtree would redden this suite on an unrelated
+ * shadcn bump — the precise failure §8.1 warns about — while proving nothing
+ * extra about the primitive.
+ *
+ * Three arms are asserted per consumer: the **null** path, the **loaded** path,
+ * and the **error** path, which must render the null baseline exactly. The
+ * error arm is the one that did not exist before this PR; the other two are the
+ * regression proof that adopting the primitive moved nothing.
+ *
+ * ⚠ The two market-thumb LOADED baselines carry `alt=""`. That is D4's ratified
+ * delta (PD-2-33) and is the ONE intended change in PR-A — these literals were
+ * captured with `alt="Discovery Market"` and the attribute was edited to `""`
+ * by hand, the only hand-edit anywhere in this block. Every other byte is as
+ * captured. The hero POST image's `alt=""` is unchanged and was captured as-is.
+ */
+
+/** `MarketCard`'s 52×52 thumb — first child of the `items-start` row. */
+const CARD_THUMB_LOADED =
+	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" src="https://signed.test/market-media/m/x/card.webp">';
+/** 178 bytes as captured. */
+const CARD_THUMB_NULL =
+	'<div aria-hidden="true" class="flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
+
+/** `HeroPanels`' 54×54 thumb — first child of the `items-center` row. */
+const HERO_THUMB_LOADED =
+	'<img alt="" class="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover" src="https://signed.test/market-media/m/x/card.webp">';
+/** 178 bytes as captured. */
+const HERO_THUMB_NULL =
+	'<div aria-hidden="true" class="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
+
+/**
+ * The hero POST image, per pole. 192/191 bytes loaded, 239/238 null — the
+ * one-byte spread is `YES` vs `NO` in the `data-testid`. Both poles are pinned
+ * because a YES-only proof passes against an inverted NO panel, which is how
+ * the last inversion survived a full PR with tests (plan §3 D14 Q2).
+ */
+const POST_IMAGE_LOADED = (side: "YES" | "NO") =>
+	`<img data-testid="hero-post-image-${side}" alt="" class="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
+const POST_IMAGE_NULL = (side: "YES" | "NO") =>
+	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
+
+/** The thumb slot of a card/hero market panel — the row's first child. */
+function thumbSlot(container: HTMLElement, row: string): string {
+	const node = container.querySelector(row)?.firstElementChild;
+	if (!(node instanceof HTMLElement)) {
+		throw new Error(`no thumb node under "${row}" — the fixture moved`);
+	}
+	return node.outerHTML;
+}
+
+/** The hero post image slot for one pole, in whichever arm is rendered. */
+function postSlot(container: HTMLElement, side: "YES" | "NO"): string {
+	const node =
+		container.querySelector(`[data-testid="hero-post-image-${side}"]`) ??
+		container.querySelector(`[data-testid="hero-post-image-empty-${side}"]`);
+	if (!(node instanceof HTMLElement)) {
+		throw new Error(`no post image node for ${side} — the fixture moved`);
+	}
+	return node.outerHTML;
+}
+
+describe("§8.1 zero-delta — MarketCard's 52×52 thumb", () => {
+	const ROW = ".items-start.gap-3";
+
+	it("null-path-is-byte-identical-to-the-f51a9dd-render", () => {
+		const { container } = render(
+			<MarketCard card={cardFixture(null)} series={SERIES} />,
+		);
+		expect(thumbSlot(container, ROW)).toBe(CARD_THUMB_NULL);
+	});
+
+	it("loaded-path-is-byte-identical-to-the-f51a9dd-render-but-for-D4s-alt", () => {
+		const { container } = render(
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+		);
+		expect(thumbSlot(container, ROW)).toBe(CARD_THUMB_LOADED);
+	});
+
+	it("error-path-renders-the-null-baseline-node", () => {
+		const { container } = render(
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+		);
+		const imgs = findImgs(container, `img[src="${CARD_IMAGE_URL}"]`);
+		expect(imgs).toHaveLength(1);
+		for (const img of imgs) {
+			fireEvent.error(img);
+		}
+		expect(thumbSlot(container, ROW)).toBe(CARD_THUMB_NULL);
+	});
+});
+
+describe("§8.1 zero-delta — HeroPanels' 54×54 thumb", () => {
+	const ROW = ".items-center.gap-3";
+	const renderHero = (imageUrl: string | null) =>
+		render(
+			<HeroPanels
+				card={cardFixture(imageUrl)}
+				series={SERIES}
+				topPosts={topPosts(null)}
+			/>,
+		);
+
+	it("null-path-is-byte-identical-to-the-f51a9dd-render", () => {
+		expect(thumbSlot(renderHero(null).container, ROW)).toBe(HERO_THUMB_NULL);
+	});
+
+	it("loaded-path-is-byte-identical-to-the-f51a9dd-render-but-for-D4s-alt", () => {
+		expect(thumbSlot(renderHero(CARD_IMAGE_URL).container, ROW)).toBe(
+			HERO_THUMB_LOADED,
+		);
+	});
+
+	it("error-path-renders-the-null-baseline-node", () => {
+		const { container } = renderHero(CARD_IMAGE_URL);
+		const imgs = findImgs(container, `img[src="${CARD_IMAGE_URL}"]`);
+		expect(imgs).toHaveLength(1);
+		for (const img of imgs) {
+			fireEvent.error(img);
+		}
+		expect(thumbSlot(container, ROW)).toBe(HERO_THUMB_NULL);
+	});
+});
+
+describe("§8.1 zero-delta — the hero POST image, at BOTH poles", () => {
+	const renderPosts = (imageUrl: string | null) =>
+		render(
+			<HeroPanels
+				card={cardFixture(null)}
+				series={SERIES}
+				topPosts={topPosts(imageUrl)}
+			/>,
+		);
+
+	for (const side of ["YES", "NO"] as const) {
+		it(`${side}::null-path-is-byte-identical-to-the-f51a9dd-render`, () => {
+			expect(postSlot(renderPosts(null).container, side)).toBe(
+				POST_IMAGE_NULL(side),
+			);
+		});
+
+		it(`${side}::loaded-path-is-byte-identical-to-the-f51a9dd-render`, () => {
+			// No `alt` delta here — this site already shipped `alt=""`, and its
+			// two `data-testid`s survive unchanged through the primitive's
+			// passthrough, including their attribute position.
+			expect(postSlot(renderPosts(POST_IMAGE_URL).container, side)).toBe(
+				POST_IMAGE_LOADED(side),
+			);
+		});
+
+		it(`${side}::error-path-renders-the-null-baseline-node`, () => {
+			const { container } = renderPosts(POST_IMAGE_URL);
+			const imgs = findImgs(container, `img[src="${POST_IMAGE_URL}"]`);
+			// Both poles render an image; firing at only the first would leave
+			// this pole's assertion passing for the wrong reason on one side.
+			expect(imgs).toHaveLength(2);
+			for (const img of imgs) {
+				fireEvent.error(img);
+			}
+			expect(postSlot(container, side)).toBe(POST_IMAGE_NULL(side));
+		});
+	}
+
+	it("one-pole-failing-does-not-blank-the-other", () => {
+		// The panels hold INDEPENDENT MarketThumb instances. A shared or hoisted
+		// error flag would degrade both, which would read as a pass on the
+		// assertions above while silently blanking a perfectly good image.
+		const { container } = renderPosts(POST_IMAGE_URL);
+		const imgs = findImgs(container, `img[src="${POST_IMAGE_URL}"]`);
+		expect(imgs).toHaveLength(2);
+		const first = imgs[0];
+		if (first === undefined) {
+			throw new Error("fixture broken: no post image to fail");
+		}
+		fireEvent.error(first);
+		expect(postSlot(container, "YES")).toBe(POST_IMAGE_NULL("YES"));
+		expect(postSlot(container, "NO")).toBe(POST_IMAGE_LOADED("NO"));
+	});
 });
