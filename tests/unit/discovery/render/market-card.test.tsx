@@ -11,8 +11,9 @@ import { MARKET_ID, SLUG } from "../../composer/render/_harness";
 
 /**
  * UI.A4 Slice 4 (plan §2 row 4 / §4) — the design-language §3.2 LOCKED card
- * composition: image thumb (alt = the market question, the OQ-6 dynamic-alt
- * rule; null image → the canon §6 `IMG` placeholder, no img element) ·
+ * composition: image thumb (alt `""` since PRIMITIVES-2 D4, which supersedes
+ * the OQ-6 dynamic-alt rule at this site; null image → the canon §6 `IMG`
+ * placeholder, no img element) ·
  * question · StatLine (the canon attrs grammar over the REUSED formatDharma)
  * · PriceSparkline (card size) · the REUSED debate PriceBar (F-6 — no fresh
  * bar; null pricing → its "Pricing unavailable" stub). One next/link anchor
@@ -54,9 +55,15 @@ describe("UI.A4 §4 — MarketCard (the §3.2 locked composition)", () => {
 		const { container } = render(
 			<MarketCard card={cardFixture()} series={SERIES} />,
 		);
-		// Image thumb — alt is the market QUESTION (OQ-6 dynamic-alt rule).
-		const img = screen.getByAltText(MARKET_TITLE);
-		expect(img.getAttribute("src")).toBe(IMAGE_URL);
+		// Image thumb. ⚠ `alt` is `""` as of PRIMITIVES-2 D4 (PD-2-33) — the same
+		// title renders in the adjacent <h3> below, so the thumb is decorative and
+		// the duplicated announcement was also what overflowed the metadata row on
+		// a broken load. This line previously read `screen.getByAltText(
+		// MARKET_TITLE)`, pinning the superseded OQ-6 dynamic-alt rule; it is the
+		// only assertion in the suite that D4 invalidates.
+		const img = container.querySelector("img");
+		expect(img?.getAttribute("alt")).toBe("");
+		expect(img?.getAttribute("src")).toBe(IMAGE_URL);
 		// The question.
 		expect(screen.getByText(MARKET_TITLE).textContent).toBe(MARKET_TITLE);
 		// Stat line — formatDharma REUSED, and it GROUPS: every Đ value rendered

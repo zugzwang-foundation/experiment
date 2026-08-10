@@ -9,6 +9,7 @@ import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
 
+import { MarketThumb } from "./MarketThumb";
 import { PriceSparkline } from "./PriceSparkline";
 import { StatLine } from "./StatLine";
 
@@ -50,21 +51,25 @@ export function HeroPanels({
 
 			<div className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:1px_solid_var(--color-n3)]">
 				<div className="flex items-center gap-3">
-					{card.imageUrl === null ? (
-						<div
-							aria-hidden="true"
-							className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
-						>
-							IMG
-						</div>
-					) : (
-						// biome-ignore lint/performance/noImgElement: short-TTL presigned R2 GET URL, not a static asset — plain <img> per the CommentImage precedent.
-						<img
-							src={card.imageUrl}
-							alt={card.title}
-							className="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover"
-						/>
-					)}
+					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
+					    error · loaded across all three Discovery image sites. `alt=""`
+					    because the same title renders in the adjacent `<h2>` two lines
+					    below, so the thumb is decorative and a duplicated announcement
+					    is also what overflowed the metadata row on a broken load (D4 /
+					    PD-2-33; the WCAG 1.1.1 half remains A11Y.0's row). */}
+					<MarketThumb
+						src={card.imageUrl}
+						alt=""
+						className="h-[54px] w-[54px] shrink-0 rounded-[var(--imgr)] object-cover"
+						fallback={
+							<div
+								aria-hidden="true"
+								className="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
+							>
+								IMG
+							</div>
+						}
+					/>
 					<div className="flex min-w-0 flex-col gap-1">
 						<h2 className="truncate text-[16.5px] leading-[1.3] font-bold">
 							{card.title}
@@ -171,25 +176,23 @@ function HeroPostPanel({
 			{/* V15 — `.argimg` (mockup :91-93, markup :193). `flex-1` so it absorbs
 			    the panel's spare height and pushes the reply head + bar to the
 			    bottom, exactly as the mockup's `flex:1 1 auto` does. */}
-			{post.imageUrl === null ? (
-				<div
-					data-testid={`hero-post-image-empty-${side}`}
-					aria-hidden="true"
-					className="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
-				>
-					IMG
-				</div>
-			) : (
-				// biome-ignore lint/performance/noImgElement: short-TTL presigned R2 GET URL, not a static asset — plain <img> per the CommentImage precedent.
-				<img
-					data-testid={`hero-post-image-${side}`}
-					src={post.imageUrl}
-					// The argument text carries the meaning and the post title is
-					// adjacent, so the attachment is decorative here (WCAG 1.1.1).
-					alt=""
-					className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]"
-				/>
-			)}
+			<MarketThumb
+				data-testid={`hero-post-image-${side}`}
+				src={post.imageUrl}
+				// The argument text carries the meaning and the post title is
+				// adjacent, so the attachment is decorative here (WCAG 1.1.1).
+				alt=""
+				className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]"
+				fallback={
+					<div
+						data-testid={`hero-post-image-empty-${side}`}
+						aria-hidden="true"
+						className="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
+					>
+						IMG
+					</div>
+				}
+			/>
 			{/* V16 — `.replyhead` (mockup :97-98, markup :194). Display-only, and a
 			    SIBLING of the stretched link above, so a click anywhere on it still
 			    opens the post (the mockup's whole-`.argbody` handler). */}
