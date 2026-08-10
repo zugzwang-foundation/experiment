@@ -7,13 +7,23 @@ import { SideBadge } from "@/components/debate/badges";
 
 /**
  * DISCOVERY-COMPLETE C3 — V10 (entry price on the chip) and V11 (the Discovery
- * hero chip geometry). Both additions are OPT-IN, so the eight call sites that
+ * hero chip geometry). Both additions are OPT-IN, so the call sites that
  * pass neither prop render exactly what they rendered before.
  *
- * `SideBadge` has NINE files in its blast radius (the definition + eight
- * consumers) and exactly ONE of them changes: `discovery/HeroPanels.tsx:136`.
- * The first describe below is the zero-delta proof for the other eight — the
- * bare `<SideBadge side={…} />` render is asserted byte-for-byte.
+ * COUNTED INVENTORY, accurate at PR head. `SideBadge` has THIRTEEN render
+ * sites across TEN consumer files, plus the definition. C3 changes exactly one
+ * of them — `discovery/HeroPanels.tsx:137`, which opts into both new props. Four
+ * more (`bookmarks/BookmarkCard.tsx:32,46`, `profile/ArgumentList.tsx:49,59`)
+ * are NEW call sites minted by C4/C4b, which adopt this primitive to fix the
+ * INV-3 inversion — they are intended changes, not deltas to preserve. The
+ * remaining EIGHT pass neither prop and must render exactly what they rendered
+ * before; the first describe below is their zero-delta proof, asserted on the
+ * class tail this component owns.
+ *
+ * (The plan said "9 files / 8 consumers". That was true when the plan was
+ * written and is stale at PR head BECAUSE C4/C4b adopted the primitive in this
+ * same PR. Corrected here rather than left to drift — counted inventories are
+ * load-bearing in this repo, which is C0's whole point.)
  *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */

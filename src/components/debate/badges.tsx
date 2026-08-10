@@ -8,7 +8,7 @@ import type { Marker, Side } from "./types";
 /**
  * V11 — the Discovery hero chip geometry (`.sidechip.md`,
  * surface_discovery_v1_0.html:115-116). The DEFAULT is today's built render, so
- * the eight other `SideBadge` call sites have a zero pixel delta.
+ * every other `SideBadge` call site has a zero pixel delta.
  *
  * ⚠ NOT primitive-wide, and it cannot be: `.sidechip.md` is 9px on Discovery and
  * 10px on d5 (surface_d5_v1_0.html:540), and Profile specifies `.sm` at 8.5px.
@@ -19,7 +19,7 @@ import type { Marker, Side } from "./types";
  */
 const CHIP = {
 	// Byte-identical to the pre-C3 string, hairline included and in the SAME
-	// position, so the eight call sites that pass no `size` emit the exact class
+	// position, so every call site that passes no `size` emits the exact class
 	// attribute they emitted before — not merely an equivalent one.
 	base: "rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)]",
 	hero: "rounded-[var(--r)] px-[7px] py-[2px] text-[9px] font-extrabold tracking-[0.06em] [border:var(--hairline)]",
