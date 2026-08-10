@@ -84,6 +84,15 @@ describe("V13 reserves never cross the client boundary", () => {
 			"src/components/discovery/DiscoveryGrid.tsx",
 			"src/components/discovery/MarketCard.tsx",
 			"src/components/discovery/HeroPanels.tsx",
+			// FIFTH ENTRY, added at PRIMITIVES-2 PR-A. `MarketThumb` is rendered by
+			// `MarketCard` and `HeroPanels` (both above), so it entered this client
+			// graph when the three image sites adopted it. This list is
+			// hand-maintained, so it stays GREEN while incomplete — a component in
+			// the graph but absent here is a silent coverage hole, not a red test.
+			// Concretely: threading pool reserves into the thumb would serialize an
+			// internal `pools` row shape into the RSC payload with this belt still
+			// passing.
+			"src/components/discovery/MarketThumb.tsx",
 		]) {
 			expect(read(file)).not.toContain("reserves");
 		}
