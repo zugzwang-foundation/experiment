@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
-import { comments, imageUploads, positions } from "@/db/schema";
+import { bets, comments, imageUploads, positions } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { computeSell, type Reserves } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
@@ -95,20 +95,21 @@ export type HeroPost = {
 	 */
 	imageUrl: string | null;
 	/**
-	 * V13 — the CURRENT value of the author's held position on the side they
-	 * argued, or `null` when there is nothing to show. Founder ruling OD-1 =
-	 * Option B, POST-ANCHORED: the left figure stays `authorStake` (this post's
-	 * own entry bet) and this is the right one.
+	 * V13 — the current Đ value of **THIS POST's OWN** stake, or `null` when no
+	 * honest figure exists. Founder ruling OD-1 = Option B, POST-ANCHORED.
 	 *
-	 * ⚠ The two are commensurable only for a single-bet author: `authorStake` is
-	 * POST-scoped and this is MARKET-scoped (the author's whole holding on that
-	 * side, which may span several bets across several posts). That asymmetry is
-	 * the ruled, accepted cost of +0 queries — `BookmarkCard` takes both numbers
-	 * episode-scoped instead, which costs 5 reads per (author, market).
+	 * **Both figures are POST-scoped**: `authorStake` is the Đ this post staked
+	 * and this is what this post's shares are worth now — the same quantity at
+	 * two times, which is what makes the arrow between them mean anything. It is
+	 * NOT the author's whole market holding.
 	 *
-	 * `null` whenever a value cannot be honestly computed: no pool row, no held
-	 * row, a non-positive quantity, or a holding on the OPPOSITE side (author
-	 * exited or flipped). The panel then renders the single figure with no
+	 * The shares are `min(betShares, heldQuantity)` — `positions` is fungible,
+	 * so after a partial sell there is no exact attribution; see
+	 * `currentValueFor` for why that is the honest degradation.
+	 *
+	 * `null` whenever a value cannot be honestly computed: no pool row, no bet
+	 * row, no held row, a non-positive quantity, or a holding on the OPPOSITE
+	 * side (author flipped). The panel then renders the single figure with no
 	 * arrow — the honest degradation, and the common case for an older post.
 	 */
 	currentValue: string | null;
@@ -174,6 +175,31 @@ export async function selectHeroTopPosts(
 	// ≤2 KNOWN ids, so the key travels on the same `WHERE id IN (…)` as the body.
 	// `mintImageUrls` is module-private and MUST stay that way — exporting it
 	// would put a diff on `load-debate-view.ts` and break the ADR-0034 guard.
+	// V13 — THIS POST'S OWN entry bet, as a LATERAL rather than a plain join.
+	//
+	// The ordering is `created_at ASC, id ASC LIMIT 1`, IDENTICAL to the
+	// earliest-bet LATERAL in `ranking-substrate.ts` that supplies
+	// `PostSubstrate.authorStake`. That is the whole point: `authorStake` (the
+	// arrow's LEFT figure) and this `betShares` (which produces the RIGHT one)
+	// then provably come from the SAME bet, rather than incidentally agreeing.
+	//
+	// A plain `LEFT JOIN bets ON bets.comment_id = comments.id` would NOT do.
+	// `bets_comment_id_idx` is a PLAIN index, not a unique one, so nothing at
+	// the storage layer forbids a second bet on a comment; a plain join would
+	// fan the picked-posts result out and pick an arbitrary bet. The shipped
+	// substrate already defends against exactly this with `LIMIT 1`, and this
+	// read must not assume more than the substrate does.
+	const postBet = client
+		.select({
+			commentId: bets.commentId,
+			shareQuantity: bets.shareQuantity,
+		})
+		.from(bets)
+		.where(eq(bets.commentId, comments.id))
+		.orderBy(asc(bets.createdAt), asc(bets.id))
+		.limit(1)
+		.as("post_bet");
+
 	const rows = await client
 		.select({
 			id: comments.id,
@@ -181,14 +207,19 @@ export async function selectHeroTopPosts(
 			body: comments.body,
 			createdAt: comments.createdAt,
 			imageKey: imageUploads.r2ObjectKey,
+			// V13 — the shares THIS POST's bet minted (post-scoped).
+			betShares: postBet.shareQuantity,
 			// V13 — the author's held quantity ON THE SIDE THEY ARGUED. The side
 			// predicate is part of the JOIN, so a holding on the opposite side
 			// (author flipped) simply does not match and arrives null — the same
-			// answer as "exited", which is what we want.
+			// answer as "exited", which is what we want. This join cannot fan out:
+			// `positions_user_market_side_idx` is a UNIQUE index on
+			// (user_id, market_id, side).
 			heldQuantity: positions.quantity,
 		})
 		.from(comments)
 		.leftJoin(imageUploads, eq(imageUploads.id, comments.imageUploadsId))
+		.leftJoinLateral(postBet, sql`true`)
 		.leftJoin(
 			positions,
 			and(
@@ -238,30 +269,53 @@ export async function selectHeroTopPosts(
 	const ordinalById = new Map(ordinalRows.map((r, i) => [r.id, i + 1]));
 
 	/**
-	 * V13 — the author's current position value on the side they argued.
+	 * V13 — the current value of **THIS POST's OWN** stake, POST-SCOPED.
+	 *
+	 * Founder ruling OD-1 = Option B, post-anchored: *two numbers joined by an
+	 * arrow must be the same quantity at two times.* So the left figure is
+	 * `authorStake` (the Đ this post staked) and the right is the Đ **this
+	 * post's shares** are worth now — never the author's whole market holding.
+	 * A market-scoped right figure would show an author with three Đ1,000 posts
+	 * `Đ 1,000 → Đ 4,221` on every panel: a 4× gain on an argument that is
+	 * roughly flat, on a public surface, attributed to a named pseudonym.
 	 *
 	 * Discovery lists OPEN markets only (`list.ts`), so settlement cannot have
 	 * occurred: the settled branch of `computeBookmarkFigures` is unreachable
-	 * here and Đb collapses to ONE pure `computeSell` call — no episode walk, no
-	 * `payout_events`, no `bets`, no `events`. That is why this is +0 queries
-	 * rather than the 5N the register's L sizing assumed.
+	 * here and the value collapses to ONE pure `computeSell` call — no episode
+	 * walk, no `payout_events`, no `events`.
 	 *
-	 * Every guard below returns null rather than throwing. `computeSell` calls
-	 * `requirePositive` on both shares and reserves, and a throw here would
-	 * escape into `DiscoveryContent`'s ONE whole-surface catch and flip the
-	 * ENTIRE page to `ErrorState` over a single author's missing position row.
-	 * Deliberately NOT the `figures.ts:130` posture, which throws because it
-	 * runs under a held-position precondition this does not have.
+	 * **`positions` is FUNGIBLE**, so after a partial sell "this post's shares"
+	 * has no exact answer — there is no FIFO/LIFO ground truth in the data.
+	 * `min(betShares, heldQuantity)` is the ruled degradation: exact whenever
+	 * the holding still covers this post's bet, and otherwise capped at what the
+	 * author actually still holds, so the figure can never over-claim against a
+	 * real position. It CAN over-attribute across several posts by one author
+	 * (three posts sold down to one post's worth show that worth on each), but
+	 * Discovery renders at most one panel per side per market, so no summed view
+	 * of it exists. Pro-rata was rejected: it invents an attribution rule the
+	 * data does not support, and costs another aggregate.
+	 *
+	 * Every guard returns null rather than throwing. `computeSell` calls
+	 * `requirePositive` on shares and reserves, and a throw here would escape
+	 * into `DiscoveryContent`'s ONE whole-surface catch and flip the ENTIRE page
+	 * to `ErrorState` over one author's row. Deliberately NOT the
+	 * `figures.ts:130` posture, which throws under a held-position precondition
+	 * this does not have.
 	 */
 	const currentValueFor = (
 		side: Side,
+		betShares: string | null,
 		heldQuantity: string | null,
 	): string | null => {
-		if (reserves === null || heldQuantity === null) {
+		if (reserves === null || betShares === null || heldQuantity === null) {
 			return null;
 		}
-		if (!new CpmmDecimal(heldQuantity).greaterThan(0)) {
-			// Exited: the row survives at quantity 0 (positions is Bucket C).
+		const held = new CpmmDecimal(heldQuantity);
+		const minted = new CpmmDecimal(betShares);
+		// Exited (the row survives at quantity 0 — positions is Bucket C), or a
+		// bet that minted nothing. Either way there is no honest figure.
+		const shares = held.lessThan(minted) ? held : minted;
+		if (!shares.greaterThan(0)) {
 			return null;
 		}
 		return computeSell({
@@ -269,7 +323,7 @@ export async function selectHeroTopPosts(
 			// The CPMM's own side literals are lowercase (calculate.ts), the
 			// schema enum's are upper — the `bets/place.ts:123` conversion.
 			side: side === "YES" ? "yes" : "no",
-			shares: heldQuantity,
+			shares: toFixed18(shares),
 		}).proceeds;
 	};
 
@@ -306,7 +360,11 @@ export async function selectHeroTopPosts(
 			supportDharma: toFixed18(new CpmmDecimal(p.supportDharma)),
 			counterDharma: toFixed18(new CpmmDecimal(p.counterDharma)),
 			imageUrl: urlById.get(p.id) ?? null,
-			currentValue: currentValueFor(p.parentSide, row.heldQuantity),
+			currentValue: currentValueFor(
+				p.parentSide,
+				row.betShares,
+				row.heldQuantity,
+			),
 			createdAt: row.createdAt.toISOString(),
 		};
 	};

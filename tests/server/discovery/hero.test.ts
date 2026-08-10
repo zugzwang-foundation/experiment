@@ -141,6 +141,14 @@ async function seedCommentWithBet(args: {
 	priceAtBet?: string;
 	/** V15 — attach an already-seeded `image_uploads` row to this comment. */
 	imageUploadsId?: string;
+	/**
+	 * V13 — the shares THIS bet minted. Defaults to "0" (the pre-C8 fixture
+	 * value), which makes `currentValue` null: post-scoped valuation needs a
+	 * bet that actually minted something.
+	 */
+	shareQuantity?: string;
+	/** V13 congruence — override so a second bet on one comment is distinguishable. */
+	betCreatedAt?: Date;
 }): Promise<string> {
 	const [c] = await testDb
 		.insert(comments)
@@ -161,12 +169,42 @@ async function seedCommentWithBet(args: {
 		marketId: args.marketId,
 		side: args.side,
 		stake: args.stake,
-		shareQuantity: "0",
+		shareQuantity: args.shareQuantity ?? "0",
 		priceAtBet: args.priceAtBet ?? "0.5",
 		commentId,
-		createdAt: args.createdAt,
+		createdAt: args.betCreatedAt ?? args.createdAt,
 	});
 	return commentId;
+}
+
+/**
+ * V13 congruence fixture — append a SECOND bet to an existing comment.
+ *
+ * `bets_comment_id_idx` is a PLAIN index, not a unique one, so the storage
+ * layer permits this even though `place.ts` never does it. Both the shipped
+ * `loadRankingSubstrate` and the hero's V13 LATERAL defend with
+ * `ORDER BY created_at ASC, id ASC LIMIT 1`; this seeds the only fixture that
+ * can tell whether those two orderings actually agree.
+ */
+async function seedExtraBetOnComment(args: {
+	userId: string;
+	marketId: string;
+	commentId: string;
+	side: "YES" | "NO";
+	stake: string;
+	shareQuantity: string;
+	createdAt: Date;
+}): Promise<void> {
+	await testDb.insert(bets).values({
+		userId: args.userId,
+		marketId: args.marketId,
+		side: args.side,
+		stake: args.stake,
+		shareQuantity: args.shareQuantity,
+		priceAtBet: "0.5",
+		commentId: args.commentId,
+		createdAt: args.createdAt,
+	});
 }
 
 /**
@@ -670,25 +708,174 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(no.imageUrl).toBeNull();
 	});
 
-	it("discovery::hero-current-value-is-the-authors-held-side-only", async () => {
-		// DISCOVERY-COMPLETE C8 — V13, founder ruling OD-1 = Option B.
+	it("discovery::hero-current-value-is-POST-scoped-not-market-scoped", async () => {
+		// DISCOVERY-COMPLETE C8 + the Gate C V13 fix. Founder ruling OD-1 = Option B,
+		// POST-ANCHORED: two numbers joined by an arrow must be the SAME QUANTITY at
+		// two times.
 		//
-		// Discovery lists OPEN markets only, so settlement cannot have occurred:
-		// Đb collapses to ONE pure `computeSell` call, no episode walk. Four cases
-		// share one market — held-on-side, exited (quantity 0), flipped (holding on
-		// the OPPOSITE side), and no row at all — because only the first may
-		// produce a figure.
-		const marketId = await seedMarket("hero-v13-current-value");
+		// THE REGRESSION THIS PINS. C8 as first built valued the author's WHOLE
+		// market holding, so an author with three Đ1,000 YES posts saw
+		// `Đ 1,000 → Đ <value of 3,000 shares>` on EVERY panel — a 3x gain on an
+		// argument that is roughly flat. Invisible on staging (single-bet authors),
+		// wrong in production, on a public surface, under a named pseudonym. This
+		// test FAILS against that build.
+		const marketId = await seedMarket("hero-v13-post-scoped");
 		await seedPool(marketId);
-		const holder = await seedUser("hero-v13-holder");
-		const flipped = await seedUser("hero-v13-flipped");
+		const multi = await seedUser("hero-v13-multi-bet-author");
 		const replier = await seedUser("hero-v13-replier");
+
+		// ONE author, THREE YES posts, each minting 1,000 shares → 3,000 held.
+		const posts: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const id = await seedCommentWithBet({
+				userId: multi,
+				marketId,
+				side: "YES",
+				stake: "1000.000000000000000000",
+				shareQuantity: "1000.000000000000000000",
+				body: `YES argument ${i + 1} — same author, three separate bets.`,
+				parentCommentId: null,
+				createdAt: at(1 + i),
+			});
+			posts.push(id);
+		}
+		// Lift ONE of them to the top of the §9 Top order so the pick is determinate.
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: posts[0] as string,
+			side: "YES",
+			count: 5,
+			firstAt: 20,
+		});
+		await testDb.insert(positions).values({
+			userId: multi,
+			marketId,
+			side: "YES",
+			quantity: "3000.000000000000000000",
+		});
+
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(yes.id).toBe(posts[0]);
+
+		// POST-SCOPED: this post's OWN 1,000 shares…
+		const postScoped = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "1000.000000000000000000",
+		}).proceeds;
+		expect(yes.currentValue).toBe(postScoped);
+
+		// …and NOT the author's whole 3,000-share holding. Asserted explicitly:
+		// this is the exact number the pre-fix build rendered.
+		const marketScoped = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "3000.000000000000000000",
+		}).proceeds;
+		expect(yes.currentValue).not.toBe(marketScoped);
+		// The left figure is untouched and stays this post's own stake.
+		expect(yes.authorStake).toBe("1000.000000000000000000");
+	});
+
+	it("discovery::hero-current-value-and-stake-come-from-the-SAME-bet", async () => {
+		// The NON-VACUOUS congruence proof. `authorStake` comes from
+		// `ranking-substrate.ts`'s earliest-bet LATERAL; `currentValue` derives from
+		// the hero select's own LATERAL. Both order `created_at ASC, id ASC LIMIT 1`.
+		//
+		// A test asserting the two SOURCE strings match would false-alarm on
+		// reformatting and miss a semantic divergence. This asserts the BEHAVIOUR:
+		// one comment carries TWO bets at distinct timestamps with distinct stakes
+		// AND distinct share quantities, so if the orderings ever diverge the two
+		// figures come from different bets and this goes red.
+		//
+		// `place.ts` never writes a second bet per comment, but
+		// `bets_comment_id_idx` is a PLAIN index so the storage layer permits it —
+		// and the shipped substrate already defends with LIMIT 1, so this read must
+		// not assume more than the substrate does.
+		const marketId = await seedMarket("hero-v13-same-bet-congruence");
+		await seedPool(marketId);
+		const author = await seedUser("hero-v13-congruence-author");
+		const replier = await seedUser("hero-v13-congruence-replier");
+
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			// The EARLIER bet — Đ100 staked, 100 shares minted.
+			stake: "100.000000000000000000",
+			shareQuantity: "100.000000000000000000",
+			body: "YES argument — carries two bets.",
+			parentCommentId: null,
+			createdAt: at(1),
+			betCreatedAt: at(1),
+		});
+		// The LATER bet on the SAME comment — deliberately different on both axes.
+		await seedExtraBetOnComment({
+			userId: author,
+			marketId,
+			commentId: post,
+			side: "YES",
+			stake: "900.000000000000000000",
+			shareQuantity: "900.000000000000000000",
+			createdAt: at(50),
+		});
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			count: 5,
+			firstAt: 60,
+		});
+		await testDb.insert(positions).values({
+			userId: author,
+			marketId,
+			side: "YES",
+			quantity: "1000.000000000000000000",
+		});
+
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		// LEFT figure — the EARLIER bet's stake (substrate LATERAL).
+		expect(yes.authorStake).toBe("100.000000000000000000");
+		// RIGHT figure — the EARLIER bet's 100 shares, NOT the later bet's 900 and
+		// NOT the 1,000 held. If the two orderings diverged, this would be one of
+		// those instead.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "100.000000000000000000",
+			}).proceeds,
+		);
+		for (const wrong of ["900.000000000000000000", "1000.000000000000000000"]) {
+			expect(yes.currentValue).not.toBe(
+				computeSell({ reserves: RESERVES, side: "yes", shares: wrong })
+					.proceeds,
+			);
+		}
+		// And the LATERAL did not fan the row out — one post per side, not two.
+		expect(yes.id).toBe(post);
+	});
+
+	it("discovery::hero-current-value-degrades-honestly", async () => {
+		// The rest of the ruled matrix: partial sell, full exit, flipped, no pool.
+		const marketId = await seedMarket("hero-v13-degradation");
+		await seedPool(marketId);
+		const holder = await seedUser("hero-v13-deg-holder");
+		const flipped = await seedUser("hero-v13-deg-flipped");
+		const replier = await seedUser("hero-v13-deg-replier");
 
 		const heldPost = await seedCommentWithBet({
 			userId: holder,
 			marketId,
 			side: "YES",
-			stake: "40.000000000000000000",
+			stake: "1000.000000000000000000",
+			shareQuantity: "1000.000000000000000000",
 			body: "YES argument — author still holds this side.",
 			parentCommentId: null,
 			createdAt: at(1),
@@ -701,14 +888,13 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			count: 5,
 			firstAt: 10,
 		});
-
-		// The author of the NO post holds YES — i.e. they FLIPPED off the side
-		// they argued. The join's side predicate must not match it.
+		// A NO post whose author holds YES — FLIPPED off the side they argued.
 		const flippedPost = await seedCommentWithBet({
 			userId: flipped,
 			marketId,
 			side: "NO",
-			stake: "30.000000000000000000",
+			stake: "300.000000000000000000",
+			shareQuantity: "300.000000000000000000",
 			body: "NO argument — author has since flipped to YES.",
 			parentCommentId: null,
 			createdAt: at(2),
@@ -718,13 +904,13 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 				userId: holder,
 				marketId,
 				side: "YES",
-				quantity: "50.000000000000000000",
+				quantity: "1000.000000000000000000",
 			},
 			{
 				userId: flipped,
 				marketId,
 				side: "YES",
-				quantity: "20.000000000000000000",
+				quantity: "200.000000000000000000",
 			},
 		]);
 
@@ -734,23 +920,41 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yes.id).toBe(heldPost);
 		expect(no.id).toBe(flippedPost);
 
-		// HELD on the argued side → the exact `computeSell` proceeds, no
-		// re-derivation in the test's own arithmetic.
-		const expected = computeSell({
-			reserves: RESERVES,
-			side: "yes",
-			shares: "50.000000000000000000",
-		}).proceeds;
-		expect(yes.currentValue).toBe(expected);
-		// Post-ANCHORED: the left figure is untouched and stays this post's own bet.
-		expect(yes.authorStake).toBe("40.000000000000000000");
+		// EXACT — the holding fully covers this post's bet.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "1000.000000000000000000",
+			}).proceeds,
+		);
 
-		// FLIPPED — a holding exists, but on the opposite side. No figure.
+		// FLIPPED — the holding is on the OPPOSITE side, so the side-keyed join
+		// does not match it. Null, and emphatically NOT the 200 YES shares.
 		expect(no.currentValue).toBeNull();
 
-		// EXITED — the row survives at quantity 0 (positions is Bucket C), and a
-		// zero quantity would make `computeSell` throw `requirePositive`. It must
-		// be guarded to null, never allowed to reach the whole-surface catch.
+		// PARTIAL SELL — sold 1,000 → 250. `positions` is fungible, so this post's
+		// shares are min(1000, 250) = 250. Never the full 1,000.
+		await testDb
+			.update(positions)
+			.set({ quantity: "250.000000000000000000" })
+			.where(
+				and(eq(positions.userId, holder), eq(positions.marketId, marketId)),
+			);
+		const partial = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(partial.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "250.000000000000000000",
+			}).proceeds,
+		);
+
+		// FULL EXIT — the row survives at quantity 0 (positions is Bucket C), and 0
+		// would make `computeSell` throw `requirePositive`. Guarded to null, never
+		// allowed to reach the whole-surface catch.
 		await testDb
 			.update(positions)
 			.set({ quantity: "0.000000000000000000" })
@@ -767,6 +971,87 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			(await selectHeroTopPosts(testDb, marketId, null)).yes,
 		);
 		expect(unpriced.currentValue).toBeNull();
+	});
+
+	it("discovery::hero-opposite-side-posts-read-their-own-side-only", async () => {
+		// Founder-added case. ONE author with posts on BOTH sides of ONE market,
+		// holding DIFFERENT quantities on each. The positions join keys on side, so
+		// each panel must read its own side's holding and never the other's — a
+		// join that dropped the side predicate would cross them, and with a single
+		// author the ids would still look right.
+		const marketId = await seedMarket("hero-v13-opposite-sides");
+		await seedPool(marketId);
+		const author = await seedUser("hero-v13-both-sides-author");
+		const replier = await seedUser("hero-v13-both-sides-replier");
+
+		const yesPost = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			stake: "100.000000000000000000",
+			shareQuantity: "100.000000000000000000",
+			body: "YES argument — same author as the NO post.",
+			parentCommentId: null,
+			createdAt: at(1),
+		});
+		const noPost = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "NO",
+			stake: "700.000000000000000000",
+			shareQuantity: "700.000000000000000000",
+			body: "NO argument — same author as the YES post.",
+			parentCommentId: null,
+			createdAt: at(2),
+		});
+		for (const [parent, side] of [
+			[yesPost, "YES"],
+			[noPost, "NO"],
+		] as const) {
+			await seedSupportReplies({
+				userId: replier,
+				marketId,
+				parentCommentId: parent,
+				side,
+				count: 5,
+				firstAt: side === "YES" ? 20 : 40,
+			});
+		}
+		// ⚠ The author holds ONE side only, and that is STRUCTURAL, not a fixture
+		// convenience: `positions_one_held_side_idx` is a PARTIAL UNIQUE index on
+		// (user_id, market_id) WHERE quantity > 0 (ENGINE.11 R-5). A first draft of
+		// this test tried to seed 100 YES + 700 NO and the INSERT was rejected by
+		// that index — the impossible state cannot be tested because it cannot
+		// exist.
+		//
+		// The reachable state still discriminates, and sharply: the author holds
+		// YES 100 and nothing on NO. If the positions join ever dropped its side
+		// predicate, the NO panel would pick up the YES holding and render
+		// min(700, 100) = 100 shares' worth instead of null.
+		await testDb.insert(positions).values({
+			userId: author,
+			marketId,
+			side: "YES",
+			quantity: "100.000000000000000000",
+		});
+
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const yes = requirePost(hero.yes);
+		const no = requirePost(hero.no);
+		expect(yes.id).toBe(yesPost);
+		expect(no.id).toBe(noPost);
+
+		// The YES panel reads its OWN side's holding, at its OWN side's price.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "100.000000000000000000",
+			}).proceeds,
+		);
+		// The NO panel, same author, has NO holding on NO → null. A side-blind join
+		// would render the YES holding here instead.
+		expect(no.currentValue).toBeNull();
 	});
 
 	it("discovery::hero-mints-an-image-url-for-a-picked-post", async () => {
