@@ -83,6 +83,13 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		teaser: EXTENDED,
 		author: { pseudonym: "hero-yes-author", pfpUrl: "/pfp-placeholder.svg" },
 		authorStake: "40.000000000000000000",
+		entryPrice: "0.270000000000000000",
+		replyCount: 24,
+		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
+		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:00:00.000Z",
 	},
 	no: {
@@ -93,6 +100,13 @@ const HERO_TOP_POSTS: HeroTopPosts = {
 		teaser: EXTENDED,
 		author: { pseudonym: "hero-no-author", pfpUrl: "/pfp-placeholder.svg" },
 		authorStake: "35.000000000000000000",
+		entryPrice: "0.270000000000000000",
+		replyCount: 24,
+		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
+		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:01:00.000Z",
 	},
 };
@@ -119,10 +133,17 @@ function cards(n: number): DiscoveryCard[] {
 
 /** Prime all three loaders on the happy path: the list resolves n cards;
  * every market gets the 1-point seed series; market 1 alone carries hero
- * posts (topPosts null/null elsewhere — the Slice-5 fixture shape). */
+ * posts (topPosts null/null elsewhere — the Slice-5 fixture shape).
+ *
+ * DISCOVERY-COMPLETE C8: `listOpenMarkets` now returns `DiscoveryListing[]` —
+ * the card PLUS its pool reserves as a SIBLING field, so reserves never ride
+ * `DiscoveryCard` into the `"use client"` carousel. `reserves: null` here
+ * because these page-state tests are about Empty/Error/Loading, not V13. */
 function primeHappyLoaders(n: number): DiscoveryCard[] {
 	const list = cards(n);
-	vi.mocked(listOpenMarkets).mockResolvedValue(list);
+	vi.mocked(listOpenMarkets).mockResolvedValue(
+		list.map((card) => ({ card, reserves: null })),
+	);
 	vi.mocked(loadPriceSeries).mockResolvedValue(SEED_SERIES);
 	vi.mocked(selectHeroTopPosts).mockImplementation(async (_client, marketId) =>
 		marketId === list[0].id ? HERO_TOP_POSTS : { yes: null, no: null },
@@ -164,15 +185,20 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 			list[1].id,
 		);
 		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenCalledTimes(2);
+		// DISCOVERY-COMPLETE C8: the third argument is the market's pool reserves,
+		// threaded from the read `listOpenMarkets` already performs. `null` here
+		// because `primeHappyLoaders` supplies no pool.
 		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenNthCalledWith(
 			1,
 			expect.anything(),
 			list[0].id,
+			null,
 		);
 		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenNthCalledWith(
 			2,
 			expect.anything(),
 			list[1].id,
+			null,
 		);
 
 		// Neither sibling state leaks into the happy path.
@@ -221,7 +247,9 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// render market 1 and default market 2's hero — masking fail-OPEN. The
 		// law: the WHOLE surface fails closed instead.
 		const list = cards(2);
-		vi.mocked(listOpenMarkets).mockResolvedValue(list);
+		vi.mocked(listOpenMarkets).mockResolvedValue(
+			list.map((card) => ({ card, reserves: null })),
+		);
 		vi.mocked(loadPriceSeries).mockResolvedValue(SEED_SERIES);
 		vi.mocked(selectHeroTopPosts)
 			.mockResolvedValueOnce(HERO_TOP_POSTS)

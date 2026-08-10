@@ -1,0 +1,201 @@
+// @vitest-environment jsdom
+
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
+import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
+import type { BookmarkItem } from "@/server/bookmarks/list";
+
+/**
+ * DISCOVERY-COMPLETE C4 — INV-3 on `/bookmarks`. Written and failing FIRST.
+ *
+ * THE DEFECT. `BookmarkCard.tsx:89-93` hand-rolled its own `SideChip` as
+ * `<Badge variant={side === "YES" ? "default" : "secondary"}>`. Resolution
+ * chain, derived at source:
+ *
+ *   YES -> `default`   -> `bg-primary`   -> `--primary: var(--color-n7)`   #e4e4e4  near-WHITE
+ *   NO  -> `secondary` -> `bg-secondary` -> `--secondary: var(--color-n1)` #2a2a2a  near-BLACK
+ *
+ * The ratified binding (globals.css:151-152, pinned by
+ * tests/unit/design/tokens-monochrome.test.ts) is `--color-yes: #181818` (YES =
+ * BLACK) and `--color-no: #fafafa` (NO = WHITE). `/bookmarks` therefore rendered
+ * the EXACT INVERSE on both poles, background and text.
+ *
+ * Nothing rescued it: `SideChip` passed no `className`, no `[data-variant]`
+ * selector exists for badges, and the `.dark` block that redefines `--primary`
+ * is never applied (AGENTS.md §8 "descoped-inert").
+ *
+ * ⚠ HONEST LIMIT. jsdom does not evaluate the `@theme` cascade, so this file
+ * proves the CLASS NAMES, not the pixel. The pixel proof needs a browser, and
+ * `/bookmarks` is auth-gated. `/u/[pseudonym]` is NOT, and renders the identical
+ * chip — see C4b, which is the cheaper pixel proof of the same defect.
+ *
+ * SCOPING NOTE. The `bg-primary` / `bg-secondary` assertions are scoped to the
+ * SIDE CHIP element, not the whole card: `PositionMarker` legitimately renders
+ * `variant="secondary"` for the neutral-grey marker, which is not side-keyed and
+ * is not this defect.
+ *
+ * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
+ */
+
+vi.mock("@/server/bookmarks/remove", () => ({
+	removeBookmarkAction: vi.fn(async () => ({ ok: true })),
+}));
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn() }),
+}));
+
+afterEach(cleanup);
+
+const AGGREGATE = {
+	supportCount: 3,
+	counterCount: 1,
+	supportDharma: "300.000000000000000000",
+	counterDharma: "100.000000000000000000",
+};
+
+const BODY = "ZZ-DISTINCTIVE-BODY-MARKER-c4";
+
+function liveItem(
+	side: "YES" | "NO",
+	marker: "none" | "Flipped" | "Exited" = "none",
+): BookmarkItem {
+	return {
+		removed: false,
+		kind: "post",
+		id: "0190b3a0-9999-7000-8000-00000000000a",
+		side,
+		marketSlug: "will-x-happen",
+		marketTitle: "Will X happen?",
+		ordinal: 4,
+		title: "A bookmarked argument",
+		teaser: "The teaser.",
+		body: BODY,
+		marker,
+		createdAt: "2026-07-01T00:00:00.000Z",
+		aggregate: AGGREGATE,
+		authorPseudonym: "ashen-rook-12",
+		staked: "1000.000000000000000000",
+		current: "1407.000000000000000000",
+	};
+}
+
+const removedItem = (side: "YES" | "NO"): BookmarkItem => ({
+	removed: true,
+	kind: "post",
+	id: "0190b3a0-9999-7000-8000-00000000000b",
+	side,
+	marketSlug: "will-x-happen",
+	marketTitle: "Will X happen?",
+	ordinal: 5,
+	createdAt: "2026-07-01T00:00:00.000Z",
+	aggregate: AGGREGATE,
+	authorPseudonym: "tidal-knight-88",
+});
+
+/** The chip is the badge whose text is exactly the side literal. */
+function sideChip(container: HTMLElement, side: "YES" | "NO"): Element | null {
+	return (
+		[...container.querySelectorAll('[data-slot="badge"]')].find(
+			(el) => el.textContent?.trim() === side,
+		) ?? null
+	);
+}
+
+/**
+ * EXACT class tokens, never a substring match. `badgeVariants` ships
+ * `[a]:hover:bg-primary/80` — an anchor-scoped HOVER variant that CONTAINS the
+ * substring "bg-primary" while being an entirely different rule. A
+ * `.not.toContain("bg-primary")` on the raw string therefore fails even after
+ * twMerge has correctly dropped the base `bg-primary`, reporting a defect that
+ * is not there. O-3: a true finding with a misleading cause is a defect, and so
+ * is a false one.
+ */
+const classTokens = (el: Element | null): string[] =>
+	(el?.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
+
+describe("BookmarkCard — INV-3, the side chip is pole-bound", () => {
+	it("yes-chip-is-black-not-near-white", () => {
+		const { container } = render(<BookmarkCard item={liveItem("YES")} />);
+		const chip = sideChip(container, "YES");
+		expect(chip).not.toBeNull();
+
+		const cls = classTokens(chip);
+		// The ratified binding: YES = `--color-yes` = #181818.
+		expect(cls).toContain("bg-yes");
+		expect(cls).toContain("text-no");
+		// The defect: a side resolved through a shadcn semantic variant.
+		expect(cls).not.toContain("bg-primary");
+		expect(cls).not.toContain("bg-secondary");
+	});
+
+	it("no-chip-is-white-not-near-black", () => {
+		const { container } = render(<BookmarkCard item={liveItem("NO")} />);
+		const chip = sideChip(container, "NO");
+		expect(chip).not.toBeNull();
+
+		const cls = classTokens(chip);
+		expect(cls).toContain("bg-no");
+		expect(cls).toContain("text-yes");
+		expect(cls).not.toContain("bg-primary");
+		expect(cls).not.toContain("bg-secondary");
+	});
+
+	it("the-chip-announces-the-side", () => {
+		// The adopted primitive carries the `aria-label` the hand-roll lacked —
+		// colour paired with literal text (AGENTS.md §8).
+		const { container } = render(<BookmarkCard item={liveItem("YES")} />);
+		expect(sideChip(container, "YES")?.getAttribute("aria-label")).toBe(
+			"YES side",
+		);
+	});
+});
+
+describe("BookmarkCard — PD-0-10, the marker gains its missing aria-label", () => {
+	it("flipped-marker-announces-itself", () => {
+		const { container } = render(
+			<BookmarkCard item={liveItem("YES", "Flipped")} />,
+		);
+		const marker = [...container.querySelectorAll('[data-slot="badge"]')].find(
+			(el) => el.textContent?.trim() === "Flipped",
+		);
+		expect(marker).toBeTruthy();
+		// The hand-rolled `<Badge variant="outline">{marker}</Badge>` had none.
+		expect(marker?.getAttribute("aria-label")).toBe("Author Flipped");
+	});
+
+	it("none-marker-still-renders-nothing", () => {
+		const { container } = render(<BookmarkCard item={liveItem("YES")} />);
+		const labels = [...container.querySelectorAll('[data-slot="badge"]')].map(
+			(el) => el.textContent?.trim(),
+		);
+		expect(labels).not.toContain("none");
+	});
+});
+
+describe("BookmarkCard — the removed variant keeps its slot and leaks no body", () => {
+	it("removed-renders-chip-stub-and-author-but-no-body", () => {
+		const { container } = render(<BookmarkCard item={removedItem("NO")} />);
+
+		// The row keeps its slot: side chip + author head + the active icon.
+		const chip = sideChip(container, "NO");
+		expect(classTokens(chip)).toContain("bg-no");
+		expect(container.textContent).toContain("tidal-knight-88");
+		expect(container.querySelector("button")).not.toBeNull();
+		expect(container.textContent).toContain(REMOVED_STUB_TEXT);
+
+		// SC-1: assert the BODY's absence, not the row's. The removed union
+		// carries no body/title field at all, so this is belt over a
+		// compile-enforced property.
+		expect(container.innerHTML).not.toContain(BODY);
+		expect(container.textContent).not.toContain("A bookmarked argument");
+	});
+
+	it("removed-side-chip-is-pole-bound-too", () => {
+		const { container } = render(<BookmarkCard item={removedItem("YES")} />);
+		const cls = classTokens(sideChip(container, "YES"));
+		expect(cls).toContain("bg-yes");
+		expect(cls).not.toContain("bg-primary");
+	});
+});

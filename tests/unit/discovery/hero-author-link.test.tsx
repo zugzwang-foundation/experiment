@@ -46,6 +46,13 @@ const YES_POST: HeroPost = {
 	teaser: "",
 	author: { pseudonym: AUTHOR_PSEUDONYM, pfpUrl: "/pfp-placeholder.svg" },
 	authorStake: "40.000000000000000000",
+	entryPrice: "0.270000000000000000",
+	replyCount: 24,
+	replyDharma: "10000.000000000000000000",
+	supportDharma: "3800.000000000000000000",
+	counterDharma: "6200.000000000000000000",
+	imageUrl: null,
+	currentValue: null,
 	createdAt: "2026-07-01T00:00:00.000Z",
 };
 

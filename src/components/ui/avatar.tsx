@@ -5,19 +5,33 @@ import type * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * V50 — `xs` (16px) is the Discovery hero-head avatar
+ * (surface_discovery_v1_0.html:84). It has to live HERE, on the primitive,
+ * rather than as a consumer `className="size-4"`: the size rules below are
+ * data-variants, so Tailwind compiles `data-[size=sm]:size-6` to
+ * `&[data-size=sm]` with specificity (0,2,0) against a bare `.size-4`'s
+ * (0,1,0). `size-6` therefore wins REGARDLESS of twMerge ordering — the trap
+ * POLISH-1a item 4 documents and the reason register row PD-2-30 routes to the
+ * primitive instead of the call site.
+ *
+ * The mockup's `.avatar{border-radius:50%; border:1.5px solid var(--ink)}` is
+ * NOT ported by token name — the built `--avatar-ring` already carries the ring,
+ * and `--color-ink` is #fafafa in this build (see C0 / plan pushback §3).
+ */
 function Avatar({
 	className,
 	size = "default",
 	...props
 }: React.ComponentProps<typeof AvatarPrimitive.Root> & {
-	size?: "default" | "sm" | "lg";
+	size?: "default" | "xs" | "sm" | "lg";
 }) {
 	return (
 		<AvatarPrimitive.Root
 			data-slot="avatar"
 			data-size={size}
 			className={cn(
-				"group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:[border:var(--avatar-ring)] data-[size=lg]:size-10 data-[size=sm]:size-6",
+				"group/avatar relative flex size-8 shrink-0 rounded-full select-none after:absolute after:inset-0 after:rounded-full after:[border:var(--avatar-ring)] data-[size=lg]:size-10 data-[size=sm]:size-6 data-[size=xs]:size-4",
 				className,
 			)}
 			{...props}
@@ -49,7 +63,7 @@ function AvatarFallback({
 		<AvatarPrimitive.Fallback
 			data-slot="avatar-fallback"
 			className={cn(
-				"flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs",
+				"flex size-full items-center justify-center rounded-full bg-muted text-sm text-muted-foreground group-data-[size=sm]/avatar:text-xs group-data-[size=xs]/avatar:text-[9px]",
 				className,
 			)}
 			{...props}

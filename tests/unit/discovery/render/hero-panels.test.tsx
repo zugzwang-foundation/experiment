@@ -67,6 +67,20 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 			pfpUrl: "/pfp-placeholder.svg",
 		},
 		authorStake: "40.000000000000000000",
+		// DISTINCT per side, deliberately. `price_at_bet` is already the price of
+		// the side BOUGHT (bets/place.ts:162 -> cpmm/calculate.ts:97), so a shared
+		// value would make the NO expectation purely a function of whatever
+		// transform the component applies — which is precisely how a complement
+		// bug hides. The d5 fixtures use the same shape: a YES post at 27, a NO
+		// post at 55 (surface_d5_v1_0.html:1496, :1512).
+		entryPrice:
+			side === "YES" ? "0.270000000000000000" : "0.550000000000000000",
+		replyCount: 24,
+		replyDharma: "10000.000000000000000000",
+		supportDharma: "3800.000000000000000000",
+		counterDharma: "6200.000000000000000000",
+		imageUrl: null,
+		currentValue: null,
 		createdAt: "2026-07-01T00:00:00.000Z",
 	};
 }
@@ -195,5 +209,251 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(
 			bothEmpty.getByTestId("price-sparkline").getAttribute("data-size"),
 		).toBe("hero");
+	});
+
+	// DISCOVERY-COMPLETE C1/C3 — the hero wiring for the shared-primitive
+	// presets. The presets themselves are proven in
+	// tests/unit/debate/render/side-badge.test.tsx and
+	// tests/unit/discovery/render/price-bar-presets.test.tsx; these assert that
+	// the hero is the surface actually asking for them.
+	it("render::hero-asks-for-the-hero-presets", () => {
+		const { container } = renderHero({
+			yes: heroPost("YES"),
+			no: heroPost("NO"),
+		});
+
+		// V29 — the 22px bar, labels outside. Scoped to the BAR: `PriceSparkline`
+		// also stamps `data-size="hero"`, so a bare `[data-size="hero"]` selector
+		// passes without PriceBar having received the preset at all.
+		const bar = container.querySelector('[data-size="hero"] [role="img"]');
+		expect(bar).not.toBeNull();
+		expect(bar?.getAttribute("class")).toContain("h-[22px]");
+
+		// V50 — the 16px hero-head avatar.
+		const avatars = container.querySelectorAll('[data-slot="avatar"]');
+		expect(avatars.length).toBe(2);
+		for (const avatar of avatars) {
+			expect(avatar.getAttribute("data-size")).toBe("xs");
+		}
+
+		// V10/V11 — the chip carries the author's own entry price at the hero
+		// geometry, rendered RAW. The fixtures store 0.27 on the YES post and 0.55
+		// on the NO post, because `price_at_bet` is already the price of the side
+		// bought. Each panel reads back its OWN stored value; neither is derived.
+		const yesPanel = container.querySelector(
+			'[data-testid="hero-post"][data-side="YES"]',
+		);
+		expect(yesPanel?.textContent).toContain("YES @ 27%");
+		const noPanel = container.querySelector(
+			'[data-testid="hero-post"][data-side="NO"]',
+		);
+		expect(noPanel?.textContent).toContain("NO @ 55%");
+		// Neither panel shows the other's complement — the bug this pins.
+		expect(noPanel?.textContent).not.toContain("45%");
+		expect(yesPanel?.textContent).not.toContain("73%");
+	});
+
+	// DISCOVERY-COMPLETE C5 — V16, the reply head.
+	it("render::v16-reply-head-carries-count-and-total-staked", () => {
+		renderHero({ yes: heroPost("YES"), no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		expect(head.textContent).toContain("Replies · 24");
+		// Grouped by the SHARED formatter — every Đ value rendered to a user
+		// groups its integer part in threes (SPEC.1 §10.8).
+		expect(head.textContent).toContain("Đ 10,000 staked");
+	});
+
+	it("render::v16-count-and-noun-agree-v48", () => {
+		const one = { ...heroPost("YES"), replyCount: 1 };
+		renderHero({ yes: one, no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		// `Reply · 1`, never `Replies · 1`.
+		expect(head.textContent).toContain("Reply · 1");
+		expect(head.textContent).not.toContain("Replies · 1");
+	});
+
+	it("render::v16-zero-replies-renders-zero-never-hides", () => {
+		// `Đ 0` is data AVAILABLE, not data missing — the canon's ratified Đ-cluster
+		// rule (design-canon.md:186). Never hidden.
+		const none = {
+			...heroPost("YES"),
+			replyCount: 0,
+			replyDharma: "0.000000000000000000",
+		};
+		renderHero({ yes: none, no: null });
+		const head = screen.getByTestId("hero-reply-head-YES");
+		expect(head.textContent).toContain("Replies · 0");
+		expect(head.textContent).toContain("Đ 0 staked");
+	});
+
+	// DISCOVERY-COMPLETE C6 — V17, the Support/Counter split bar.
+	it("render::v17-split-bar-geometry-and-figures", () => {
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+
+		// `.barrow.r` — one flex row, gap 9px, 16px bar.
+		expect(bar.getAttribute("class")).toContain("flex items-center gap-[9px]");
+		const track = bar.querySelector(".bg-no");
+		expect(track?.getAttribute("class")).toContain("h-[16px]");
+
+		// Both figures render, grouped by the shared formatter.
+		expect(bar.textContent).toContain("SUPPORT");
+		expect(bar.textContent).toContain("Đ 3,800");
+		expect(bar.textContent).toContain("COUNTER");
+		expect(bar.textContent).toContain("Đ 6,200");
+
+		// Fill = support / (support + counter) = 3800/10000 = 38%, integer-
+		// truncated by the shipped `computeSplitBar`.
+		const fill = bar.querySelector<HTMLElement>(".bg-yes");
+		expect(fill?.style.width).toBe("38%");
+
+		// No text inside the bar itself — the mockup puts the labels outside.
+		expect(track?.textContent).toBe("");
+	});
+
+	it("render::v17-bar-is-DISPLAY-ONLY-never-an-affordance", () => {
+		// §3c, and it is an INVARIANT not a style choice. Support/Counter are
+		// read-time aggregates over reply-bets (ADR-0017/0018) — there is no
+		// standalone friendly-fire vote, and `friendly_fire_events` was dropped at
+		// DEBATE.9. The mockup has no <button>, no <a>, no handler, no
+		// cursor:pointer here.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+
+		expect(
+			bar.querySelectorAll("button, a, input, [role='button']").length,
+		).toBe(0);
+		expect(bar.getAttribute("onclick")).toBeNull();
+		expect(bar.getAttribute("class")).not.toContain("cursor-pointer");
+		expect(bar.getAttribute("class")).not.toContain("hover:");
+
+		// It announces itself as an image, carrying BOTH figures in one utterance
+		// (the PriceBar precedent).
+		expect(bar.getAttribute("role")).toBe("img");
+		expect(bar.getAttribute("aria-label")).toBe(
+			"Support Đ 3,800, Counter Đ 6,200",
+		);
+	});
+
+	it("render::v17-both-zero-renders-an-even-bar", () => {
+		// The mockup's `tot ? … : 50` (:458). `computeSplitBar` returns "0%" for an
+		// empty total — right inside a composer, wrong on a resting hero panel.
+		const empty = {
+			...heroPost("YES"),
+			replyCount: 0,
+			replyDharma: "0.000000000000000000",
+			supportDharma: "0.000000000000000000",
+			counterDharma: "0.000000000000000000",
+		};
+		renderHero({ yes: empty, no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+		expect(bar.querySelector<HTMLElement>(".bg-yes")?.style.width).toBe("50%");
+		// Đ 0 is data AVAILABLE — both figures still render.
+		expect(bar.getAttribute("aria-label")).toBe("Support Đ 0, Counter Đ 0");
+	});
+
+	// DISCOVERY-COMPLETE C7 — V15, the post image attachment.
+	it("render::v15-image-renders-when-present", () => {
+		const withImage = {
+			...heroPost("YES"),
+			imageUrl: "https://signed.test/uploads/u/x/arg.webp",
+		};
+		renderHero({ yes: withImage, no: null });
+		const img = screen.getByTestId("hero-post-image-YES");
+		expect(img.getAttribute("src")).toBe(
+			"https://signed.test/uploads/u/x/arg.webp",
+		);
+		// Decorative: the argument text carries the meaning and the title is
+		// adjacent (WCAG 1.1.1).
+		expect(img.getAttribute("alt")).toBe("");
+		const cls = img.getAttribute("class") ?? "";
+		expect(cls).toContain("object-cover");
+		expect(cls).toContain("rounded-[var(--imgr)]");
+		expect(cls).toContain("min-h-[40px]");
+		// No placeholder alongside it.
+		expect(screen.queryByTestId("hero-post-image-empty-YES")).toBeNull();
+	});
+
+	it("render::v15-null-image-renders-the-placeholder-not-a-broken-img", () => {
+		// `null` covers BOTH "no attachment" and "R2 was momentarily unavailable"
+		// — the read degrades rather than throwing, so the panel always serves.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const placeholder = screen.getByTestId("hero-post-image-empty-YES");
+		expect(placeholder.textContent).toBe("IMG");
+		expect(placeholder.getAttribute("aria-hidden")).toBe("true");
+		expect(screen.queryByTestId("hero-post-image-YES")).toBeNull();
+	});
+
+	// DISCOVERY-COMPLETE C8 — V13, the argstake progression (OD-1 = Option B).
+	it("render::v13-progression-renders-both-figures-with-an-arrow", () => {
+		const held = {
+			...heroPost("YES"),
+			currentValue: "1407.000000000000000000",
+			authorStake: "1000.000000000000000000",
+		};
+		renderHero({ yes: held, no: null });
+		const panel = screen.getByTestId("hero-post");
+		expect(panel.textContent).toContain("Đ 1,000");
+		expect(panel.textContent).toContain("→");
+		expect(panel.textContent).toContain("Đ 1,407");
+	});
+
+	it("render::v13-null-current-value-renders-ONE-figure-and-no-arrow", () => {
+		// The honest degradation, and the COMMON case for an older post: the
+		// author exited, flipped, or the market has no pool row. There is no such
+		// state in the mockup, so this is a build decision — never a fabricated
+		// second number.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const panel = screen.getByTestId("hero-post");
+		expect(panel.textContent).toContain("Đ 40");
+		expect(panel.textContent).not.toContain("→");
+	});
+
+	it("render::v17-fill-is-SIDE-KEYED-both-poles-asserted", () => {
+		// THE TEST WHOSE ABSENCE LET THE DEFECT SHIP. Every other V17 case renders
+		// `no: null`, so the NO panel's bar was asserted nowhere and a fixed
+		// `bg-yes` fill passed for the length of the PR.
+		//
+		// Canon (values-log v0_3 §3): "left = Support share in the SUPPORT SIDE'S
+		// POLE COLOUR, right = Counter's"; "Support inherits the post's side,
+		// Counter the opposite." So the fill's pole must DIFFER between panels.
+		renderHero({ yes: heroPost("YES"), no: heroPost("NO") });
+
+		const yesBar = screen.getByTestId("hero-split-bar-YES");
+		const noBar = screen.getByTestId("hero-split-bar-NO");
+		// The bar is LABEL — BAR — LABEL (mockup :195-199, asserted as three
+		// children elsewhere in this file), so the track is child 1 and the fill is
+		// its only child. Positional rather than class-matching: a class selector
+		// for `h-[16px]` needs bracket escaping and would silently match nothing.
+		const trackOf = (bar: HTMLElement) => bar.children[1] as HTMLElement;
+		const fillOf = (bar: HTMLElement) =>
+			trackOf(bar).firstElementChild?.getAttribute("class") ?? "";
+		const trackClassOf = (bar: HTMLElement) =>
+			trackOf(bar).getAttribute("class") ?? "";
+
+		// YES post: Support = YES = black fill, Counter = NO = white track.
+		expect(fillOf(yesBar)).toContain("bg-yes");
+		expect(trackClassOf(yesBar)).toContain("bg-no");
+
+		// NO post: the poles SWAP. Support = NO = white fill, Counter = YES.
+		expect(fillOf(noBar)).toContain("bg-no");
+		expect(trackClassOf(noBar)).toContain("bg-yes");
+
+		// The load-bearing assertion, stated as a difference rather than as two
+		// independent facts: a fixed-pole regression makes these equal, and any
+		// test that checked only one panel would not notice.
+		expect(fillOf(yesBar)).not.toBe(fillOf(noBar));
+		expect(trackClassOf(yesBar)).not.toBe(trackClassOf(noBar));
+	});
+
+	it("render::v17-poles-are-never-ported-by-neutral-token-name", () => {
+		// The fill is the mockup's `background:var(--ink)` and the track its
+		// `background:var(--n0)` — both light-theme tokens that would invert here.
+		renderHero({ yes: heroPost("YES"), no: null });
+		const bar = screen.getByTestId("hero-split-bar-YES");
+		expect(bar.querySelector(".bg-yes")).not.toBeNull();
+		expect(bar.querySelector(".bg-no")).not.toBeNull();
+		expect(bar.innerHTML).not.toContain("bg-ink");
+		expect(bar.innerHTML).not.toContain("bg-n0");
 	});
 });

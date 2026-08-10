@@ -9,6 +9,7 @@ import {
 	LOADING_COPY,
 	LoadingSkeleton,
 } from "@/components/discovery/LoadingSkeleton";
+import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
 
 /**
  * UI.A4 Slice 5 (plan §2 row 5 / §5 table) — the design-language §4.10 rule:
@@ -80,5 +81,125 @@ describe("UI.A4 §5 — surface states (OQ-6 copy verbatim)", () => {
 		} finally {
 			errorSpy.mockRestore();
 		}
+	});
+});
+
+/**
+ * DISCOVERY-COMPLETE C9 / founder ruling R9 — Empty and Error reconcile to the
+ * W2.11 **P1** block, ONE shape for both
+ * (`DESIGN_W2_11_state-kit_mockup-v0_1.html:80-86`).
+ *
+ * ⚠ Recorded, not silently resolved: W2.11 also lists "empty-Discovery" and
+ * "per-surface error panels (T2)" under *Killed by ruling* (`:463`). SPEC.1 §22
+ * MANDATES the Discovery empty state and the surface ships an error panel, so R9
+ * — which reconciles both TO P1 rather than deleting them — supersedes that line
+ * for Discovery, in the same motion R8 supersedes T1. Stated in the canon
+ * amendment (C10) so the register is not left holding a contradiction.
+ */
+describe("V46 / R9 — Empty and Error are the same P1 block", () => {
+	const P1 = [
+		"min-h-[148px]",
+		"rounded-[var(--r)]",
+		"bg-n0",
+		"gap-[10px]",
+		"p-6",
+		"[border:var(--hairline)]",
+		"items-center",
+		"justify-center",
+		"text-center",
+	];
+
+	it("empty-adopts-the-P1-panel", () => {
+		render(<EmptyState />);
+		const cls =
+			screen.getByTestId("discovery-empty").getAttribute("class") ?? "";
+		for (const token of P1) {
+			expect(cls).toContain(token);
+		}
+	});
+
+	it("error-adopts-the-SAME-P1-panel", () => {
+		render(<ErrorState />);
+		const cls =
+			screen.getByTestId("discovery-error").getAttribute("class") ?? "";
+		for (const token of P1) {
+			expect(cls).toContain(token);
+		}
+	});
+
+	it("both-carry-the-same-msg-and-sub-type-tiers", () => {
+		// `.msg` 13.5px n6 capped at 320px; `.sub` 12px n4.
+		for (const [Comp, copy] of [
+			[EmptyState, EMPTY_COPY],
+			[ErrorState, ERROR_COPY],
+		] as const) {
+			render(<Comp />);
+			const msg = screen.getByText(copy.title);
+			expect(msg.getAttribute("class")).toContain("text-[13.5px]");
+			expect(msg.getAttribute("class")).toContain("text-n6");
+			expect(msg.getAttribute("class")).toContain("max-w-[320px]");
+			const sub = screen.getByText(copy.body);
+			expect(sub.getAttribute("class")).toContain("text-[12px]");
+			expect(sub.getAttribute("class")).toContain("text-n4");
+			cleanup();
+		}
+	});
+
+	it("the-single-CTA-is-P1-shaped-and-keeps-its-V47-state-slots", () => {
+		render(<ErrorState />);
+		const cls =
+			screen
+				.getByRole("button", { name: ERROR_COPY.action })
+				.getAttribute("class") ?? "";
+		// P1's `.cta`.
+		expect(cls).toContain("text-[12px]");
+		expect(cls).toContain("font-semibold");
+		expect(cls).toContain("bg-n0");
+		expect(cls).toContain("rounded-(--r-chip)");
+		expect(cls).toContain("px-[14px]");
+		expect(cls).toContain("py-2");
+		expect(cls).toContain("[border:1px_solid_var(--color-ink)]");
+		// V47's ratified interaction slots survive the reshape — this is the only
+		// keyboard-reachable control on the surface, so losing the focus ring
+		// would be a regression, not a restyle.
+		expect(cls).toContain("hover:bg-(--state-hover-fill)");
+		expect(cls).toContain("focus-visible:shadow-(--state-focus-ring)");
+		expect(cls).toContain("active:bg-(--state-pressed-fill)");
+		// `--dur-hover` is a COMPOUND value, so it must ride the arbitrary
+		// `[transition:…]` form — a `duration-*` utility emits an invalid
+		// transition-duration.
+		expect(cls).toContain("[transition:all_var(--dur-hover)]");
+		expect(cls).not.toContain("duration-");
+	});
+
+	it("P7-block-count-is-sourced-from-DISCOVERY_GRID_SIZE", () => {
+		// R8 / C10. The count was hard-coded to FOUR while the grid renders up to
+		// EIGHT, so the skeleton was reserving space for a layout that does not
+		// exist. Asserting against the imported constant — never a literal — is
+		// what makes the two impossible to diverge again.
+		const { container } = render(<LoadingSkeleton />);
+		const blocks = container.querySelectorAll("[data-loading-block]");
+		// One hero band + one block per grid slot.
+		expect(blocks.length).toBe(DISCOVERY_GRID_SIZE + 1);
+	});
+
+	it("P7-blocks-keep-the-shadcn-skeleton-marker", () => {
+		// `LoadingBlock` marks itself with `data-loading-block` rather than
+		// overriding `data-slot`. The first draft DID override it, which silently
+		// dropped `[data-slot="skeleton"]` from every block — caught by the
+		// pre-existing assertion above, and pinned here so it cannot come back.
+		const { container } = render(<LoadingSkeleton />);
+		const blocks = [...container.querySelectorAll("[data-loading-block]")];
+		expect(blocks.length).toBeGreaterThan(0);
+		for (const block of blocks) {
+			expect(block.getAttribute("data-slot")).toBe("skeleton");
+		}
+	});
+
+	it("empty-has-NO-cta", () => {
+		// P1's CTA is OPTIONAL, and zero open markets gives the visitor nothing
+		// to act on — the copy says markets appear here as they open.
+		const { container } = render(<EmptyState />);
+		expect(container.querySelectorAll("button, a").length).toBe(0);
 	});
 });

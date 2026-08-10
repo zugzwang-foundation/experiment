@@ -1,8 +1,8 @@
 import Link from "next/link";
 
+import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
-import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
 
@@ -46,7 +46,7 @@ export function ArgumentList({
 						data-testid={`argument-removed-${item.id}`}
 						className="gap-2 p-3"
 					>
-						<SideChip side={item.side} />
+						<SideBadge side={item.side} />
 						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
 					</Card>
 				) : (
@@ -56,10 +56,11 @@ export function ArgumentList({
 						className="gap-2 p-3"
 					>
 						<div className="flex flex-wrap items-center gap-2">
-							<SideChip side={item.side} />
-							{item.marker !== "none" && (
-								<Badge variant="outline">{item.marker}</Badge>
-							)}
+							<SideBadge side={item.side} />
+							{/* `PositionMarker` returns null for "none" itself, and
+							    supplies the `aria-label="Author Flipped"` the hand-roll
+							    lacked (PD-0-10's root cause: primitive duplication). */}
+							<PositionMarker marker={item.marker} />
 						</div>
 						<Link
 							data-testid={`argument-title-${item.id}`}
@@ -88,11 +89,5 @@ export function ArgumentList({
 				),
 			)}
 		</div>
-	);
-}
-
-function SideChip({ side }: { side: "YES" | "NO" }): React.JSX.Element {
-	return (
-		<Badge variant={side === "YES" ? "default" : "secondary"}>{side}</Badge>
 	);
 }

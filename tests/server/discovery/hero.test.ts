@@ -58,8 +58,20 @@ vi.mock("@/server/storage/r2", () => ({
 	),
 }));
 
-import { bets, comments, markets, modActions, pools, users } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+
+import {
+	bets,
+	comments,
+	imageUploads,
+	markets,
+	modActions,
+	pools,
+	positions,
+	users,
+} from "@/db/schema";
 import { buildTopList, topOrder } from "@/lib/ranking";
+import { computeSell } from "@/server/cpmm/calculate";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 // RED import: the greenfield Slice-3 selector under test (fails collection).
 import { selectHeroTopPosts } from "@/server/discovery/hero";
@@ -69,6 +81,14 @@ import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const POOL_SEED = "100.000000000000000000";
+
+/**
+ * DISCOVERY-COMPLETE C8 — the pool reserves threaded into `selectHeroTopPosts`
+ * for the V13 progression figure. Matches what `seedPool` writes, so any test
+ * that ALSO seeds a `positions` row gets a real `computeSell` result; the rest
+ * get `currentValue: null` because no holding exists.
+ */
+const RESERVES = { yes: POOL_SEED, no: POOL_SEED };
 
 /** Deterministic distinct timestamps — i seconds past a fixed UTC base. */
 function at(i: number): Date {
@@ -115,6 +135,20 @@ async function seedCommentWithBet(args: {
 	body: string;
 	parentCommentId: string | null;
 	createdAt: Date;
+	/** The bet's effective entry price — already the BOUGHT side's price
+	 * (bets/place.ts:162 → cpmm/calculate.ts:97). Defaulted so existing callers
+	 * are unchanged; overridden where a DISTINCTIVE value is needed. */
+	priceAtBet?: string;
+	/** V15 — attach an already-seeded `image_uploads` row to this comment. */
+	imageUploadsId?: string;
+	/**
+	 * V13 — the shares THIS bet minted. Defaults to "0" (the pre-C8 fixture
+	 * value), which makes `currentValue` null: post-scoped valuation needs a
+	 * bet that actually minted something.
+	 */
+	shareQuantity?: string;
+	/** V13 congruence — override so a second bet on one comment is distinguishable. */
+	betCreatedAt?: Date;
 }): Promise<string> {
 	const [c] = await testDb
 		.insert(comments)
@@ -125,6 +159,7 @@ async function seedCommentWithBet(args: {
 			sideAtPostTime: args.side,
 			parentCommentId: args.parentCommentId,
 			betId: null,
+			imageUploadsId: args.imageUploadsId ?? null,
 			createdAt: args.createdAt,
 		})
 		.returning({ id: comments.id });
@@ -134,12 +169,42 @@ async function seedCommentWithBet(args: {
 		marketId: args.marketId,
 		side: args.side,
 		stake: args.stake,
-		shareQuantity: "0",
-		priceAtBet: "0.5",
+		shareQuantity: args.shareQuantity ?? "0",
+		priceAtBet: args.priceAtBet ?? "0.5",
 		commentId,
-		createdAt: args.createdAt,
+		createdAt: args.betCreatedAt ?? args.createdAt,
 	});
 	return commentId;
+}
+
+/**
+ * V13 congruence fixture — append a SECOND bet to an existing comment.
+ *
+ * `bets_comment_id_idx` is a PLAIN index, not a unique one, so the storage
+ * layer permits this even though `place.ts` never does it. Both the shipped
+ * `loadRankingSubstrate` and the hero's V13 LATERAL defend with
+ * `ORDER BY created_at ASC, id ASC LIMIT 1`; this seeds the only fixture that
+ * can tell whether those two orderings actually agree.
+ */
+async function seedExtraBetOnComment(args: {
+	userId: string;
+	marketId: string;
+	commentId: string;
+	side: "YES" | "NO";
+	stake: string;
+	shareQuantity: string;
+	createdAt: Date;
+}): Promise<void> {
+	await testDb.insert(bets).values({
+		userId: args.userId,
+		marketId: args.marketId,
+		side: args.side,
+		stake: args.stake,
+		shareQuantity: args.shareQuantity,
+		priceAtBet: "0.5",
+		commentId: args.commentId,
+		createdAt: args.createdAt,
+	});
 }
 
 /**
@@ -167,6 +232,25 @@ async function seedSupportReplies(args: {
 			createdAt: at(args.firstAt + i),
 		});
 	}
+}
+
+/** Seed an `image_uploads` row and return its id. The R2 key is the string the
+ * mocked `mintReadUrl` echoes into the signed URL, so a DISTINCTIVE key makes
+ * both the positive assertion and the never-echo sweep exact. */
+async function seedImageUpload(args: {
+	userId: string;
+	r2ObjectKey: string;
+}): Promise<string> {
+	const [row] = await testDb
+		.insert(imageUploads)
+		.values({
+			userId: args.userId,
+			r2ObjectKey: args.r2ObjectKey,
+			contentType: "image/webp",
+			byteSize: 1024,
+		})
+		.returning({ id: imageUploads.id });
+	return row?.id ?? "";
 }
 
 /** Record a `content_removed` mod_action against a target comment (the
@@ -203,6 +287,9 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			"market_media",
 			"markets",
 			"mod_actions",
+			// V15 — comments reference image_uploads, so it must be truncated in
+			// the same call (the helper disables the guard set per call).
+			"image_uploads",
 			"users",
 		]);
 		vi.clearAllMocks();
@@ -322,7 +409,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yesOrder).toEqual([yesTop, yesNewest, yesFirst]);
 		expect(noOrder).toEqual([noTop, noNewest, noFirst]);
 
-		const hero = await selectHeroTopPosts(testDb, marketId);
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yes = requirePost(hero.yes);
 		const no = requirePost(hero.no);
 
@@ -414,7 +501,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(rankedFirstYes).toBe(divYesTop);
 		expect(builtFirstYes).toBe(divYesNewest);
 
-		const hero2 = await selectHeroTopPosts(testDb, market2);
+		const hero2 = await selectHeroTopPosts(testDb, market2, RESERVES);
 		expect(requirePost(hero2.yes).id).toBe(divYesTop);
 		expect(requirePost(hero2.yes).id).not.toBe(builtFirstYes);
 	});
@@ -431,6 +518,16 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		const maskedMarker = "TRACK-B-MASKED-MARKER-9f2c";
 		const maskedBody = `${maskedMarker} removed YES title line\n\n${maskedMarker} removed YES teaser paragraph.`;
 
+		// V15 — the removed post carries an IMAGE with a distinctive R2 key. This
+		// is the load-bearing SC-1 fixture for C7: if the LEFT JOIN ever escaped
+		// `pickedIds`, this key would be selected and a presigned URL for a
+		// Track-B-hidden post's attachment would reach the public DTO.
+		const maskedImageKey = "u/masked/TRACK-B-MASKED-IMAGE-KEY-9f2c.webp";
+		const maskedImage = await seedImageUpload({
+			userId: maskedAuthor,
+			r2ObjectKey: maskedImageKey,
+		});
+
 		const postA = await seedCommentWithBet({
 			userId: maskedAuthor,
 			marketId,
@@ -439,6 +536,16 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			body: maskedBody,
 			parentCommentId: null,
 			createdAt: at(1),
+			imageUploadsId: maskedImage,
+			// DISTINCTIVE entry price for the removed post, so the never-echo sweep
+			// below can assert the V10 field specifically (it would otherwise share
+			// B's default 0.5 and the assertion would be vacuous).
+			priceAtBet: "0.610000000000000000",
+			// DISTINCTIVE minted shares, paired with the positions row below, so the
+			// V13 never-echo assertion is non-vacuous too — without a held position
+			// the removed post's `currentValue` would be null whether it leaked or
+			// not, and the sweep would prove nothing (@security-auditor LOW).
+			shareQuantity: "777.000000000000000000",
 		});
 		const postB = await seedCommentWithBet({
 			userId: visibleAuthor,
@@ -460,6 +567,15 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			firstAt: 10,
 		});
 
+		// The removed author HOLDS the side they argued, so a leak would produce a
+		// real `currentValue` string rather than a null.
+		await testDb.insert(positions).values({
+			userId: maskedAuthor,
+			marketId,
+			side: "YES",
+			quantity: "777.000000000000000000",
+		});
+
 		// Fixture sanity — THE DISCRIMINATING PREMISE: unmasked §9 Top ranks
 		// A first, so a masking failure WOULD surface A.
 		const ranked = topOrder(await loadRankingSubstrate(testDb, { marketId }));
@@ -469,7 +585,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		await removeComment(postA);
 
-		const hero = await selectHeroTopPosts(testDb, marketId);
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yes = requirePost(hero.yes);
 		// The Track-B-hidden post is NOT eligible — the next eligible post on
 		// the side surfaces (F-DISC-2 safety-critical rule).
@@ -491,6 +607,38 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(json).not.toContain("60.000000000000000000");
 		expect(yes.authorStake).toBe("20.000000000000000000");
 
+		// SC-1, EXTENDED TO EVERY DISCOVERY-COMPLETE FIELD. The rule is that
+		// masking is a property of every BODY READ, not of rows — so each new
+		// field on `HeroPost` gets its own never-echo assertion, not a row-level
+		// one. A removed post's entry price and reply aggregates must be as
+		// absent as its body.
+		expect(json).not.toContain("0.610000000000000000"); // A's entryPrice (V10)
+		expect(json).not.toContain("250.000000000000000000"); // A's replyDharma (V16)
+		// V15 — neither the raw R2 key nor any presigned URL derived from it.
+		expect(json).not.toContain(maskedImageKey);
+		expect(json).not.toContain("TRACK-B-MASKED-IMAGE-KEY");
+		// V13 — the removed author's position value. Derived through the ENGINE so
+		// the assertion pins the real string the DTO would carry, not a guess.
+		const maskedValue = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "777.000000000000000000",
+		}).proceeds;
+		expect(json).not.toContain(maskedValue);
+		expect(json).not.toContain("777.000000000000000000");
+
+		// Positive half — the SURVIVING pick's own values, so the assertions above
+		// cannot pass merely because nothing was serialized at all.
+		expect(yes.entryPrice).toBe("0.500000000000000000");
+		expect(yes.replyCount).toBe(0);
+		expect(yes.replyDharma).toBe("0.000000000000000000");
+		expect(yes.supportDharma).toBe("0.000000000000000000");
+		expect(yes.counterDharma).toBe("0.000000000000000000");
+		// B has no attachment of its own, so the field is null — and crucially it
+		// is NOT A's URL.
+		expect(yes.imageUrl).toBeNull();
+		expect(yes.currentValue).toBeNull();
+
 		// A `user_banned` mod_action against B does NOT mask B — ban removes
 		// voice, not past content (ADR-0021 §4). The row deliberately targets
 		// B's COMMENT so a reason-blind masker would wrongly hide it; masking
@@ -504,7 +652,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			actorId: "admin-singleton",
 		});
 
-		const heroAfterBan = await selectHeroTopPosts(testDb, marketId);
+		const heroAfterBan = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const yesAfterBan = requirePost(heroAfterBan.yes);
 		// B still returned, content intact (title derived from its body;
 		// single-line body → "" teaser per the contract).
@@ -520,6 +668,444 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(jsonAfterBan).not.toContain("masked-track-b-pseudonym");
 		expect(jsonAfterBan).not.toContain(postA);
 		expect(jsonAfterBan).not.toContain("60.000000000000000000");
+		// The extended sweep holds after the ban row too — masking keys on
+		// `content_removed` ONLY, and a ban must not change which fields leak.
+		expect(jsonAfterBan).not.toContain("0.610000000000000000");
+		expect(jsonAfterBan).not.toContain("250.000000000000000000");
+	});
+
+	it("discovery::hero-fields-carry-their-seeded-provenance", async () => {
+		// DISCOVERY-COMPLETE C3/C5 — the fields are PASSED THROUGH, never derived.
+		// This is the assertion that would have caught the C3 complement defect at
+		// the server layer: `bets.price_at_bet` is already the BOUGHT side's price
+		// (bets/place.ts:162 → cpmm/calculate.ts:73-97), so a NO post must read
+		// back its own stored value, not 1 − it.
+		const marketId = await seedMarket("hero-field-provenance");
+		const author = await seedUser("hero-provenance-author");
+		const replier = await seedUser("hero-provenance-replier");
+
+		// A NO post whose stored entry price is deliberately NOT 0.5, so a
+		// complement (0.37) is distinguishable from the true value (0.63).
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "NO",
+			stake: "40.000000000000000000",
+			body: "NO argument — the provenance fixture.",
+			parentCommentId: null,
+			createdAt: at(1),
+			priceAtBet: "0.630000000000000000",
+		});
+		// 5 Support reply-bets × Đ50 → replyCount 5, replyDharma Đ250.
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: post,
+			side: "NO",
+			count: 5,
+			firstAt: 10,
+		});
+
+		const no = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).no,
+		);
+		expect(no.id).toBe(post);
+
+		// V10 — raw passthrough of `price_at_bet`. NOT the complement.
+		expect(no.entryPrice).toBe("0.630000000000000000");
+		expect(no.entryPrice).not.toBe("0.370000000000000000");
+
+		// V16 — the two already-loaded substrate aggregates, summed in DECIMAL.
+		expect(no.replyCount).toBe(5);
+		expect(no.replyDharma).toBe("250.000000000000000000");
+
+		// V17 — the split halves, VERBATIM. All five replies are Support (same
+		// side as the parent), so Counter is exactly zero and the sum above is
+		// reproduced by the two halves.
+		expect(no.supportDharma).toBe("250.000000000000000000");
+		expect(no.counterDharma).toBe("0.000000000000000000");
+
+		// The author's own stake stays post-scoped and untouched.
+		expect(no.authorStake).toBe("40.000000000000000000");
+
+		// V15 — no attachment on this post, so no URL is minted.
+		expect(no.imageUrl).toBeNull();
+	});
+
+	it("discovery::hero-current-value-is-POST-scoped-not-market-scoped", async () => {
+		// DISCOVERY-COMPLETE C8 + the Gate C V13 fix. Founder ruling OD-1 = Option B,
+		// POST-ANCHORED: two numbers joined by an arrow must be the SAME QUANTITY at
+		// two times.
+		//
+		// THE REGRESSION THIS PINS. C8 as first built valued the author's WHOLE
+		// market holding, so an author with three Đ1,000 YES posts saw
+		// `Đ 1,000 → Đ <value of 3,000 shares>` on EVERY panel — a 3x gain on an
+		// argument that is roughly flat. Invisible on staging (single-bet authors),
+		// wrong in production, on a public surface, under a named pseudonym. This
+		// test FAILS against that build.
+		const marketId = await seedMarket("hero-v13-post-scoped");
+		await seedPool(marketId);
+		const multi = await seedUser("hero-v13-multi-bet-author");
+		const replier = await seedUser("hero-v13-replier");
+
+		// ONE author, THREE YES posts, each minting 1,000 shares → 3,000 held.
+		const posts: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const id = await seedCommentWithBet({
+				userId: multi,
+				marketId,
+				side: "YES",
+				stake: "1000.000000000000000000",
+				shareQuantity: "1000.000000000000000000",
+				body: `YES argument ${i + 1} — same author, three separate bets.`,
+				parentCommentId: null,
+				createdAt: at(1 + i),
+			});
+			posts.push(id);
+		}
+		// Lift ONE of them to the top of the §9 Top order so the pick is determinate.
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: posts[0] as string,
+			side: "YES",
+			count: 5,
+			firstAt: 20,
+		});
+		await testDb.insert(positions).values({
+			userId: multi,
+			marketId,
+			side: "YES",
+			quantity: "3000.000000000000000000",
+		});
+
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(yes.id).toBe(posts[0]);
+
+		// POST-SCOPED: this post's OWN 1,000 shares…
+		const postScoped = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "1000.000000000000000000",
+		}).proceeds;
+		expect(yes.currentValue).toBe(postScoped);
+
+		// …and NOT the author's whole 3,000-share holding. Asserted explicitly:
+		// this is the exact number the pre-fix build rendered.
+		const marketScoped = computeSell({
+			reserves: RESERVES,
+			side: "yes",
+			shares: "3000.000000000000000000",
+		}).proceeds;
+		expect(yes.currentValue).not.toBe(marketScoped);
+		// The left figure is untouched and stays this post's own stake.
+		expect(yes.authorStake).toBe("1000.000000000000000000");
+	});
+
+	it("discovery::hero-current-value-and-stake-come-from-the-SAME-bet", async () => {
+		// The NON-VACUOUS congruence proof. `authorStake` comes from
+		// `ranking-substrate.ts`'s earliest-bet LATERAL; `currentValue` derives from
+		// the hero select's own LATERAL. Both order `created_at ASC, id ASC LIMIT 1`.
+		//
+		// A test asserting the two SOURCE strings match would false-alarm on
+		// reformatting and miss a semantic divergence. This asserts the BEHAVIOUR:
+		// one comment carries TWO bets at distinct timestamps with distinct stakes
+		// AND distinct share quantities, so if the orderings ever diverge the two
+		// figures come from different bets and this goes red.
+		//
+		// `place.ts` never writes a second bet per comment, but
+		// `bets_comment_id_idx` is a PLAIN index so the storage layer permits it —
+		// and the shipped substrate already defends with LIMIT 1, so this read must
+		// not assume more than the substrate does.
+		const marketId = await seedMarket("hero-v13-same-bet-congruence");
+		await seedPool(marketId);
+		const author = await seedUser("hero-v13-congruence-author");
+		const replier = await seedUser("hero-v13-congruence-replier");
+
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			// The EARLIER bet — Đ100 staked, 100 shares minted.
+			stake: "100.000000000000000000",
+			shareQuantity: "100.000000000000000000",
+			body: "YES argument — carries two bets.",
+			parentCommentId: null,
+			createdAt: at(1),
+			betCreatedAt: at(1),
+		});
+		// The LATER bet on the SAME comment — deliberately different on both axes.
+		await seedExtraBetOnComment({
+			userId: author,
+			marketId,
+			commentId: post,
+			side: "YES",
+			stake: "900.000000000000000000",
+			shareQuantity: "900.000000000000000000",
+			createdAt: at(50),
+		});
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: post,
+			side: "YES",
+			count: 5,
+			firstAt: 60,
+		});
+		await testDb.insert(positions).values({
+			userId: author,
+			marketId,
+			side: "YES",
+			quantity: "1000.000000000000000000",
+		});
+
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		// LEFT figure — the EARLIER bet's stake (substrate LATERAL).
+		expect(yes.authorStake).toBe("100.000000000000000000");
+		// RIGHT figure — the EARLIER bet's 100 shares, NOT the later bet's 900 and
+		// NOT the 1,000 held. If the two orderings diverged, this would be one of
+		// those instead.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "100.000000000000000000",
+			}).proceeds,
+		);
+		for (const wrong of ["900.000000000000000000", "1000.000000000000000000"]) {
+			expect(yes.currentValue).not.toBe(
+				computeSell({ reserves: RESERVES, side: "yes", shares: wrong })
+					.proceeds,
+			);
+		}
+		// And the LATERAL did not fan the row out — one post per side, not two.
+		expect(yes.id).toBe(post);
+	});
+
+	it("discovery::hero-current-value-degrades-honestly", async () => {
+		// The rest of the ruled matrix: partial sell, full exit, flipped, no pool.
+		const marketId = await seedMarket("hero-v13-degradation");
+		await seedPool(marketId);
+		const holder = await seedUser("hero-v13-deg-holder");
+		const flipped = await seedUser("hero-v13-deg-flipped");
+		const replier = await seedUser("hero-v13-deg-replier");
+
+		const heldPost = await seedCommentWithBet({
+			userId: holder,
+			marketId,
+			side: "YES",
+			stake: "1000.000000000000000000",
+			shareQuantity: "1000.000000000000000000",
+			body: "YES argument — author still holds this side.",
+			parentCommentId: null,
+			createdAt: at(1),
+		});
+		await seedSupportReplies({
+			userId: replier,
+			marketId,
+			parentCommentId: heldPost,
+			side: "YES",
+			count: 5,
+			firstAt: 10,
+		});
+		// A NO post whose author holds YES — FLIPPED off the side they argued.
+		const flippedPost = await seedCommentWithBet({
+			userId: flipped,
+			marketId,
+			side: "NO",
+			stake: "300.000000000000000000",
+			shareQuantity: "300.000000000000000000",
+			body: "NO argument — author has since flipped to YES.",
+			parentCommentId: null,
+			createdAt: at(2),
+		});
+		await testDb.insert(positions).values([
+			{
+				userId: holder,
+				marketId,
+				side: "YES",
+				quantity: "1000.000000000000000000",
+			},
+			{
+				userId: flipped,
+				marketId,
+				side: "YES",
+				quantity: "200.000000000000000000",
+			},
+		]);
+
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const yes = requirePost(hero.yes);
+		const no = requirePost(hero.no);
+		expect(yes.id).toBe(heldPost);
+		expect(no.id).toBe(flippedPost);
+
+		// EXACT — the holding fully covers this post's bet.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "1000.000000000000000000",
+			}).proceeds,
+		);
+
+		// FLIPPED — the holding is on the OPPOSITE side, so the side-keyed join
+		// does not match it. Null, and emphatically NOT the 200 YES shares.
+		expect(no.currentValue).toBeNull();
+
+		// PARTIAL SELL — sold 1,000 → 250. `positions` is fungible, so this post's
+		// shares are min(1000, 250) = 250. Never the full 1,000.
+		await testDb
+			.update(positions)
+			.set({ quantity: "250.000000000000000000" })
+			.where(
+				and(eq(positions.userId, holder), eq(positions.marketId, marketId)),
+			);
+		const partial = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(partial.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "250.000000000000000000",
+			}).proceeds,
+		);
+
+		// FULL EXIT — the row survives at quantity 0 (positions is Bucket C), and 0
+		// would make `computeSell` throw `requirePositive`. Guarded to null, never
+		// allowed to reach the whole-surface catch.
+		await testDb
+			.update(positions)
+			.set({ quantity: "0.000000000000000000" })
+			.where(
+				and(eq(positions.userId, holder), eq(positions.marketId, marketId)),
+			);
+		const exited = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(exited.currentValue).toBeNull();
+
+		// NO POOL ROW — reserves null ⇒ null, never a throw.
+		const unpriced = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, null)).yes,
+		);
+		expect(unpriced.currentValue).toBeNull();
+	});
+
+	it("discovery::hero-opposite-side-posts-read-their-own-side-only", async () => {
+		// Founder-added case. ONE author with posts on BOTH sides of ONE market,
+		// holding DIFFERENT quantities on each. The positions join keys on side, so
+		// each panel must read its own side's holding and never the other's — a
+		// join that dropped the side predicate would cross them, and with a single
+		// author the ids would still look right.
+		const marketId = await seedMarket("hero-v13-opposite-sides");
+		await seedPool(marketId);
+		const author = await seedUser("hero-v13-both-sides-author");
+		const replier = await seedUser("hero-v13-both-sides-replier");
+
+		const yesPost = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			stake: "100.000000000000000000",
+			shareQuantity: "100.000000000000000000",
+			body: "YES argument — same author as the NO post.",
+			parentCommentId: null,
+			createdAt: at(1),
+		});
+		const noPost = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "NO",
+			stake: "700.000000000000000000",
+			shareQuantity: "700.000000000000000000",
+			body: "NO argument — same author as the YES post.",
+			parentCommentId: null,
+			createdAt: at(2),
+		});
+		for (const [parent, side] of [
+			[yesPost, "YES"],
+			[noPost, "NO"],
+		] as const) {
+			await seedSupportReplies({
+				userId: replier,
+				marketId,
+				parentCommentId: parent,
+				side,
+				count: 5,
+				firstAt: side === "YES" ? 20 : 40,
+			});
+		}
+		// ⚠ The author holds ONE side only, and that is STRUCTURAL, not a fixture
+		// convenience: `positions_one_held_side_idx` is a PARTIAL UNIQUE index on
+		// (user_id, market_id) WHERE quantity > 0 (ENGINE.11 R-5). A first draft of
+		// this test tried to seed 100 YES + 700 NO and the INSERT was rejected by
+		// that index — the impossible state cannot be tested because it cannot
+		// exist.
+		//
+		// The reachable state still discriminates, and sharply: the author holds
+		// YES 100 and nothing on NO. If the positions join ever dropped its side
+		// predicate, the NO panel would pick up the YES holding and render
+		// min(700, 100) = 100 shares' worth instead of null.
+		await testDb.insert(positions).values({
+			userId: author,
+			marketId,
+			side: "YES",
+			quantity: "100.000000000000000000",
+		});
+
+		const hero = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const yes = requirePost(hero.yes);
+		const no = requirePost(hero.no);
+		expect(yes.id).toBe(yesPost);
+		expect(no.id).toBe(noPost);
+
+		// The YES panel reads its OWN side's holding, at its OWN side's price.
+		expect(yes.currentValue).toBe(
+			computeSell({
+				reserves: RESERVES,
+				side: "yes",
+				shares: "100.000000000000000000",
+			}).proceeds,
+		);
+		// The NO panel, same author, has NO holding on NO → null. A side-blind join
+		// would render the YES holding here instead.
+		expect(no.currentValue).toBeNull();
+	});
+
+	it("discovery::hero-mints-an-image-url-for-a-picked-post", async () => {
+		// DISCOVERY-COMPLETE C7 — V15. The positive control for the masking
+		// assertion in `hero-masks-track-b-hidden-from-public`: proves the join
+		// and the presign DO work, so that test's absence assertions are about
+		// masking rather than about the feature being inert.
+		const marketId = await seedMarket("hero-image-attachment");
+		const author = await seedUser("hero-image-author");
+
+		const key = "u/hero-image-author/HERO-VISIBLE-IMAGE-KEY.webp";
+		const image = await seedImageUpload({ userId: author, r2ObjectKey: key });
+		const post = await seedCommentWithBet({
+			userId: author,
+			marketId,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "YES argument — carries an image attachment.",
+			parentCommentId: null,
+			createdAt: at(1),
+			imageUploadsId: image,
+		});
+
+		const yes = requirePost(
+			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
+		);
+		expect(yes.id).toBe(post);
+		// `signRead` hardcodes the "uploads" bucket; TTL is the 3600s D9 render
+		// seam. The mocked `mintReadUrl` echoes both back.
+		expect(yes.imageUrl).toBe(`https://signed.test/uploads/${key}?ttl=3600`);
 	});
 
 	it("next-eligible-when-top-removed", async () => {
@@ -582,12 +1168,12 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(yesOrder).toEqual([p1, p2, p3]);
 
 		// Baseline — nothing removed: the Top pick surfaces.
-		const baseline = await selectHeroTopPosts(testDb, marketId);
+		const baseline = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(requirePost(baseline.yes).id).toBe(yesOrder[0]);
 
 		// Remove the Top pick → the SECOND-in-Top-order surfaces.
 		await removeComment(p1);
-		const afterFirst = await selectHeroTopPosts(testDb, marketId);
+		const afterFirst = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const firstFallback = requirePost(afterFirst.yes);
 		expect(firstFallback.id).toBe(yesOrder[1]);
 		// Removed p1 keeps ordinal slot 1 (removed-INCLUDED domain).
@@ -595,7 +1181,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		// Remove that too → the THIRD surfaces on the next call.
 		await removeComment(p2);
-		const afterSecond = await selectHeroTopPosts(testDb, marketId);
+		const afterSecond = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		const secondFallback = requirePost(afterSecond.yes);
 		expect(secondFallback.id).toBe(yesOrder[2]);
 		expect(secondFallback.ordinal).toBe(3);
@@ -630,7 +1216,7 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		expect(
 			ranked.filter((p) => p.parentSide === "YES").map((p) => p.id),
 		).toEqual([yesA, yesB]);
-		const before = await selectHeroTopPosts(testDb, marketId);
+		const before = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(before.no).toBeNull();
 		expect(requirePost(before.yes).id).toBe(yesA);
 
@@ -638,12 +1224,12 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// post — never a placeholder object).
 		await removeComment(yesA);
 		await removeComment(yesB);
-		const after = await selectHeroTopPosts(testDb, marketId);
+		const after = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(after).toStrictEqual({ yes: null, no: null });
 
 		// Fold: a market with ZERO posts → both sides null.
 		const emptyMarketId = await seedMarket("hero-zero-posts");
-		const empty = await selectHeroTopPosts(testDb, emptyMarketId);
+		const empty = await selectHeroTopPosts(testDb, emptyMarketId, RESERVES);
 		expect(empty).toStrictEqual({ yes: null, no: null });
 	});
 
@@ -674,7 +1260,8 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 
 		// Slice 1's list authority sees exactly this one market — the whole
 		// carousel rotation domain is a single index.
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 		expect(cards).toHaveLength(1);
 		const card = cards[0];
 		expect(card.id).toBe(marketId);
@@ -685,8 +1272,8 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 		// client no-auto-advance assertion for this same §17 registry row
 		// lands at Slice 5 (render layer, fake timers); this is the server
 		// half.
-		const first = await selectHeroTopPosts(testDb, marketId);
-		const second = await selectHeroTopPosts(testDb, marketId);
+		const first = await selectHeroTopPosts(testDb, marketId, RESERVES);
+		const second = await selectHeroTopPosts(testDb, marketId, RESERVES);
 		expect(second).toStrictEqual(first);
 		expect(requirePost(first.yes).id).toBe(yesPost);
 		expect(requirePost(first.no).id).toBe(noPost);

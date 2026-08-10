@@ -32,13 +32,13 @@ const SIDES = ["YES", "NO"] as const;
 
 describe("PriceBar — the paired price readout", () => {
 	it("announces the pair as one utterance summing to 100", () => {
-		render(<PriceBar pricing={TIE} />);
+		render(<PriceBar pricing={TIE} size="detail" />);
 		const bar = screen.getByRole("img");
 		expect(bar.getAttribute("aria-label")).toBe("YES 53%, NO 47%");
 	});
 
 	it("renders the same pair in the visible labels", () => {
-		const { container } = render(<PriceBar pricing={TIE} />);
+		const { container } = render(<PriceBar pricing={TIE} size="detail" />);
 		const text = container.textContent ?? "";
 		expect(text).toContain("YES 53%");
 		expect(text).toContain("NO 47%");
@@ -47,7 +47,7 @@ describe("PriceBar — the paired price readout", () => {
 	});
 
 	it("gives the YES segment the rounded percent as its CSS width (geometry unchanged)", () => {
-		const { container } = render(<PriceBar pricing={TIE} />);
+		const { container } = render(<PriceBar pricing={TIE} size="detail" />);
 		const yesSegment = container.querySelector<HTMLElement>(".bg-yes");
 		// Unchanged by PCT.ROUND, and now AGREEING with the labels above it: the
 		// bar was already 53/47 while the labels read 53/48.

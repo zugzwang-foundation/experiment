@@ -205,7 +205,8 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 		const objectKey = `m/${openId}/card.webp`;
 		await seedDefaultMedia(openId, objectKey);
 
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 
 		// Only the Open market — none of the other six statuses leak through.
 		expect(cards).toHaveLength(1);
@@ -261,7 +262,8 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 			createdAt: new Date("2026-09-14T00:00:00Z"),
 		});
 
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 
 		// Strict created_at-descending order (F-DISC-1 newest-first).
 		expect(cards.map((c) => c.slug)).toEqual([
@@ -297,7 +299,8 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 			});
 		}
 
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 
 		// Capped at the grid size — and the result set is EXACTLY the 8
 		// newest, newest-first (the 2 oldest never surface).
@@ -334,7 +337,8 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 			new Error("simulated R2 unavailability"),
 		);
 
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 
 		// Available markets only — no padding/placeholder entries of any kind.
 		expect(cards).toHaveLength(3);
@@ -352,7 +356,8 @@ describe("UI.A4 §22 — discovery list read-model (F-DISC-1)", () => {
 	it("discovery::zero-markets-empty-state", async () => {
 		// No markets seeded at all → the empty array (the surface renders the
 		// empty state from []; the read-model never fabricates entries).
-		const cards = await listOpenMarkets(testDb);
+		const listings = await listOpenMarkets(testDb);
+		const cards = listings.map((l) => l.card);
 
 		expect(cards).toEqual([]);
 		expect(cards).toHaveLength(0);

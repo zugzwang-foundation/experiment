@@ -34,10 +34,22 @@ const SCAN_DIRS = [
 // is noise, not a leak.
 const FORMATTER_MODULE = "src/components/debate/format.ts";
 
-// The number of legitimately single-side price readouts in the tree. Both live
-// in `chart/MarketPriceChartCard.tsx`. This is an EXACT count on purpose: a
-// third one must be argued for, not merely added.
-const EXPECTED_ALLOW_MARKERS = 2;
+// The number of legitimately single-side price readouts in the tree. Two live
+// in `chart/MarketPriceChartCard.tsx` (the OPENING and CURRENT YES prices — two
+// points in TIME, not a pair). This is an EXACT count on purpose: a third one
+// must be argued for, not merely added.
+//
+// The THIRD, argued (DISCOVERY-COMPLETE C3): `debate/badges.tsx` renders a
+// post's ENTRY PRICE on the side chip. It qualifies for the hatch on the same
+// grounds as the other two — it is a single historical value for ONE bet, a
+// point in time, not one half of a live pair. It must also be rendered RAW:
+// `bets.price_at_bet` stores `computeBuy(...).pEff` for the side BOUGHT
+// (bets/place.ts:162 -> cpmm/calculate.ts:73-97, where `a = reserves[side]`),
+// so a NO bet already stores the NO price. Routing it through the PAIRED
+// `formatPricePercent` would derive `100 - x` from an already-side-scoped
+// number and print `NO @ 45%` for an author who entered NO at 55%. That is
+// exactly what this guard's exact count exists to force an argument about.
+const EXPECTED_ALLOW_MARKERS = 3;
 
 const UNPAIRED_CALL = /formatPercentUnpaired\s*\(/;
 const ALLOW_MARKER = /pctround-allow:/;
