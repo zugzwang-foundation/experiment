@@ -23,7 +23,8 @@ Six commits on `fix/primitives-2-market-thumb`:
 | 3 | `5a19158` | `fix(discovery): three Discovery image sites adopt MarketThumb` |
 | 4 | `6aa57a1` | `test(discovery): per-consumer zero-delta baselines` |
 | 5 | `db3b72d` | `fix(discovery): address @code-reviewer findings on PR-A` |
-| 6 | *this* | `chore(discovery): log session — PRIMITIVES-2 PR-A` |
+| 6 | `9c39704` | `chore(discovery): log session — PRIMITIVES-2 PR-A` |
+| 7 | `5fa19ab` | `fix(discovery): D2-P1 — MarketThumb catches a pre-hydration 404` |
 
 **Files — six, where the plan's §5 named four.** Both extras are forced
 completeness consequences of ratified rulings, not scope creep; both are
@@ -111,6 +112,30 @@ Reported as "no diff" and redone in Python with `assert count == 1` anchors
 before each replace. A perturbation that does not perturb reads exactly like a
 guard that does not bite.
 
+**S-5 · D2-P1's first alive check was GREEN-IMPOSSIBLE — the same trap as S-1,
+caught the same way.** The mount test's N1 alive check asserted
+`toHaveLength(site.imgCount)` on the loaded render. But a *correct* component
+has already swapped those images for the fallback by the time `render()`
+returns, so the check measures the fix rather than the fixture and fails the
+moment the fix works. It went RED for the right reason before the fix and RED
+for the wrong reason after it.
+
+Caught, again, by reading *which* assertion failed instead of assuming the fix
+was wrong — the failure was `expected [] to have a length of 1`, an empty
+container, which is the fix succeeding. Repaired by splitting the alive check
+into its own DECODED-stub render that proves the fixture mounts `imgCount`
+images, then asserting length 0 under the failed-decode stub. The RED pasted
+into `5fa19ab` is from the corrected shape, re-captured with the fix stashed —
+a RED that does not match its own committed test is worse than none.
+
+**S-6 · The jsdom defaults are wrong in BOTH directions, and only one of them
+is obvious.** The relay warned that `naturalWidth` is 0 for every image in
+jsdom. Probing the environment showed the other half: `complete` is **false**
+for every image too. That second default is the more dangerous one — it makes
+the production check *inert* rather than always-true, so an unstubbed test
+reports a confident green while exercising nothing. Both properties are stubbed,
+and both discriminating axes carry a positive control.
+
 **S-4 · The M2 guard entry proved itself live on arrival.**
 `reserves-server-only.test.ts` scans raw file text with a naive
 `toContain("reserves")`. A first draft of a `MarketThumb` comment used the word
@@ -137,25 +162,40 @@ exists to remove, on first paint.
 
 All client-side paths (carousel advance, client navigation) ARE covered.
 
-**Not fixed here, deliberately.** D2's ratified spec is literally
-`onError fired → fallback`, and that is precisely what was built. Closing the
-first-paint window needs a `ref` plus an `img.complete && img.naturalWidth === 0`
-layout check — new mechanism beyond the ruling, with its own edge cases (SVG
-sources report `naturalWidth === 0`). Extending a ratified design is the plan
-author's call, not the execute surface's. Recorded as a KNOWN GAP in
-`MarketThumb.tsx`'s docblock so it cannot be rediscovered as a surprise.
+**→ RESOLVED at commit `5fa19ab` by plan patch D2-P1** (operator-ratified after
+review). Disposition (b) was taken: D2 was reopened and the mount-time check
+landed in PR-A. It was originally left out on the reasoning that extending a
+ratified design is the plan author's call, not the execute surface's — that
+routing was right, and the ruling came back to build it.
 
-Dispositions for Gate C: **(a)** accept + docket; **(b)** reopen D2 and land the
-hydration check in PR-A; **(c)** route to PERF-1, which already owns this render
-path.
+⚠ **A CORRECTION THIS LOG MUST CARRY, because it was stated twice and it
+mattered.** The paragraph originally here said *"PERF-1 is a GO-LIVE BLOCKER;
+when it lands, this window widens."* **PERF-1 had already landed** —
+`docs/parked.md:25` records it CLOSED 2026-08-10, the day before this session:
+functions were in `iad1` against a Mumbai DB, ADR-0006's ratified `bom1` was
+never applied, and fixing it took Discovery **35.07 s → 0.692 s p50**. That was
+asserted from stale memory instead of being read off the live repo, which is
+exactly the O-2 failure (*verify against the live repo — never against memory*).
 
-⚠ The reviewer's own mitigation — that PERF-1's ~35 s Discovery read makes the
-content chunk arrive long after hydration — is true today but is *a performance
-bug masking a correctness gap*. PERF-1 is a GO-LIVE BLOCKER; when it lands, this
-window widens. It is not a fix.
+It is not a cosmetic slip: the reviewer's mitigation for M1 was *"the slow read
+means the chunk arrives after hydration."* With PERF-1 closed, a **faster**
+response arrives EARLIER relative to hydration, so the lost-event window is
+**wider**, not narrower. **The stale claim made M1 look less urgent than it is.**
+The mitigation was already retired before it was offered.
 
 **OQ-B · Two files beyond §5's four-file fence.** Both flagged, neither silent.
 Gate C should confirm both are acceptable rather than discover them in the diff.
+
+**OQ-C · The §11 plan patch is HELD, not committed.** The web-authored text
+names `tests/unit/design/reserves-server-only.test.ts`. That path does not
+exist; the guard is at `tests/unit/discovery/reserves-server-only.test.ts`
+(`design/` holds `side-pole-binding`, `tokens-monochrome`, `avatar-ring-token`
+and friends). Per the relay's *"if any sentence looks wrong, HALT and quote
+it"*, and because `docs/plans/PRIMITIVES-2.md` is ratified web-owned text that
+must not be normalized in-session, the patch is held for a one-word
+ratification. Everything else in it was verified correct against this repo,
+including the PERF-1 figures. **`docs/plans/PRIMITIVES-2.md` is untouched, so
+the final diff carries 7 file headers, not the 8 the relay expected.**
 
 ---
 
@@ -187,6 +227,8 @@ session log) is this file.
 | `pnpm vitest run` full suite, run 1 (pre-review-fixes) | **317 passed / 1 skipped · 2807 passed / 1 skipped / 4 todo**, exit 0 |
 | `pnpm vitest run` full suite, run 2 (post-review-fixes) | 316 passed / **1 failed** — see the flake note below |
 | `pnpm vitest run` full suite, run 3 | **317 passed / 1 skipped · 2807 passed**, exit 0, zero FAILs |
+| **Post-D2-P1** — `just verify` | **PASS** — "All checks passed" (exit 0) |
+| **Post-D2-P1** — full suite ×3, sequential | **all three green: 317 passed / 1 skipped · 2817 passed / 1 skipped / 4 todo**, exit 0, zero FAILs in any run |
 | `tests/unit/design/side-pole-binding.test.ts` | **GREEN** — exit criterion 7 |
 | `tests/unit/design/tokens-monochrome.test.ts` | **GREEN** — exit criterion 8 |
 | `market-thumb.test.tsx` | 19 tests, all passing |
@@ -208,6 +250,12 @@ reachable from that test's import graph. Run 2 also took 288 s against run 1's
 **Run 3 did not reproduce it** — 317 passed, zero FAILs, exit 0. So: 2 of 3 full
 runs fully green, the third failing only that one unrelated auth assertion,
 which is green in isolation. Confirmed flaky.
+
+**Three further full runs after D2-P1 also did not reproduce it** — all three
+green, zero FAILs in any of them. Final tally across the session: **6 full-suite
+runs, 1 occurrence.** It remains a real latent isolation weakness (a global row
+count in a parallel runner sharing one Postgres), not a regression, and not
+PR-A's to fix.
 
 ⚠ Not silently absorbed. A test that asserts a GLOBAL row count
 (`rows.length === 1` over the whole `events` table) is order-dependent by
