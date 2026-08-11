@@ -1,12 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import {
-	type FormEvent,
-	type ReactElement,
-	type ReactNode,
-	useState,
-} from "react";
+import { type FormEvent, type ReactElement, useState } from "react";
+import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -85,7 +81,11 @@ export default function SignInPage(): ReactElement {
 	return (
 		<Card className="my-auto w-full">
 			<CardHeader className="text-center">
-				<CardTitle className="text-lg">Sign in to Zugzwang</CardTitle>
+				{/* POLISH.7a D01 — the W2.1 `.mhead` copy (mockup `:313`). "Sign in
+				    to Zugzwang" named only one of the two paths this card serves:
+				    the picker is also the SIGN-UP entry, and new-vs-returning is
+				    server-side and silent (`DESIGN_W2_1_CLOSE-OUT.md:55`). */}
+				<CardTitle className="text-lg">Continue to Zugzwang</CardTitle>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
 				{/* F-AUTH-1 — Google OAuth. */}
@@ -93,7 +93,9 @@ export default function SignInPage(): ReactElement {
 					<Button type="submit" disabled={googleLoading} className="w-full">
 						{googleLoading ? "Redirecting…" : "Continue with Google"}
 					</Button>
-					{googleError ? <AuthError>{googleError}</AuthError> : null}
+					{googleError ? (
+						<AuthAlert className="mt-3">{googleError}</AuthAlert>
+					) : null}
 				</form>
 
 				{/* "or"-divider (W2.1 .ordiv) — the word flanked by two hairline
@@ -111,42 +113,43 @@ export default function SignInPage(): ReactElement {
 				    it from form data and passes the value as the
 				    `x-turnstile-token` HEADER on the SDK call. */}
 				<form onSubmit={handleEmailOtp} className="flex flex-col gap-3">
-					<Input
-						type="email"
-						name="email"
-						required
-						placeholder="Email address"
-						aria-label="Email address"
-					/>
+					{/* POLISH.7a D03 — the W2.1 `.emailrow`: the field and its submit
+					    share ONE row (mockup `:318-322`, CSS `:154`
+					    `display:flex;gap:9px`), not the stacked full-width pair this
+					    shipped as. The 9px is a hardcoded LAYOUT value, which
+					    POLISH-SURFACE-TEMPLATE §6 puts in the fair-game half — it is not
+					    a colour and F2/H13 do not reach it. The field takes the slack
+					    (`.email{flex:1 1 auto;min-width:0}`) and the submit stays
+					    intrinsic (`.econt{flex:0 0 auto}`). */}
+					<div className="flex gap-[9px]">
+						<Input
+							type="email"
+							name="email"
+							required
+							placeholder="Email address"
+							aria-label="Email address"
+							className="min-w-0 flex-1"
+						/>
+						<Button type="submit" disabled={emailLoading} className="shrink-0">
+							{emailLoading ? "Sending…" : "Send code"}
+						</Button>
+					</div>
 					{/* TODO(DESIGN.*): Cloudflare Turnstile widget client-side. */}
+					{/* ⚠ SEAM CONTRACT (UI-A7 §3.1): this hidden anchor MUST SURVIVE —
+					    `handleEmailOtp` reads `formData.get("turnstileToken")`. It sits
+					    beside the row rather than in it because a hidden input is not a
+					    flex child worth laying out; it is still inside the same <form>,
+					    which is what `new FormData(event.currentTarget)` reads. */}
 					<input
 						type="hidden"
 						name="turnstileToken"
 						value="placeholder-token"
 					/>
-					<Button type="submit" disabled={emailLoading} className="w-full">
-						{emailLoading ? "Sending…" : "Send code"}
-					</Button>
-					{emailError ? <AuthError>{emailError}</AuthError> : null}
+					{emailError ? (
+						<AuthAlert className="mt-3">{emailError}</AuthAlert>
+					) : null}
 				</form>
 			</CardContent>
 		</Card>
-	);
-}
-
-/**
- * The W2.11 error-callout treatment for the inline error slots (§5) — a
- * monochrome hairline callout in a `role="alert"` region. Presentation only:
- * the message flows through unchanged from the existing handlers; no
- * code→copy branching, no new error path.
- */
-function AuthError({ children }: { children: ReactNode }): ReactElement {
-	return (
-		<p
-			role="alert"
-			className="mt-3 rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]"
-		>
-			{children}
-		</p>
 	);
 }

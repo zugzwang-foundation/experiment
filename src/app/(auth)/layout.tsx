@@ -33,7 +33,38 @@ export default async function AuthLayout({
 		: null;
 
 	return (
-		<div className="flex min-h-full flex-col">
+		/* POLISH.7a D19 — `min-h-full` → `min-h-dvh`. ONE token, ONE node, and the
+		   only line this surface changes outside its three page files.
+
+		   THE DEFECT. `min-height:100%` resolves against the containing block's
+		   SPECIFIED height, and `<body>`'s is `auto` (it sets `min-height`, not
+		   `height`). So this percentage resolved to nothing, the wrapper collapsed
+		   to content height, `<main flex-1>` had no free space to claim, and
+		   `my-auto` on the sign-in and otp Cards computed to ZERO — measured at
+		   1440×900: this wrapper 314.43px inside a 900px viewport, Card top 93.24px
+		   instead of centred. `docs/logs/POLISH-1b.md:92` measured the same collapse
+		   independently and assigned the row here.
+
+		   WHY A VIEWPORT UNIT AND NOT A DEFINITE PARENT HEIGHT. The first attempt
+		   gave `<body>` a definite height instead (`min-h-full` → `h-full` in
+		   `src/app/layout.tsx`, shipped at `5a11b38`, REVERTED at `1a41b0f`). That
+		   works below the fold and is a REGRESSION above it: a definite parent makes
+		   this wrapper a flex item whose explicit `min-height:100%` suppresses the
+		   flex automatic minimum size, so flex-shrink CLAMPS it to one viewport while
+		   its content overflows — and `position:sticky` is bounded by its containing
+		   block, so `GlobalHeader` scrolls away. Measured on a 2000px page: header top
+		   0 / 0 / −62 / −562 / −578 at scrollY 0 / 400 / 900 / 1400 / 2000.
+		   `100dvh` never depended on the percentage chain, so nothing can clamp it,
+		   and `<body>` is left exactly as `origin/main` has it.
+
+		   ⚠ `flex flex-col` IS UNTOUCHED and no `flex-1` anywhere is removed.
+		   Flatten either node to a block context and `margin-block:auto` computes to
+		   zero forever (POLISH-1b.md:94), and the repair needs two fixes instead of
+		   one. `tests/unit/shell/page-container.test.ts` pins the chain by name.
+
+		   ⚠ `dvh` tracks mobile browser chrome. POLISH is desktop-1440-only by G1,
+		   so that is recorded in the log and is not a finding on this surface. */
+		<div className="flex min-h-dvh flex-col">
 			<GlobalHeader viewer={viewer} />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces

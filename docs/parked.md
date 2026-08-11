@@ -1185,3 +1185,206 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** **The next task that opens `tests/_setup/` or a DB fixture** — or the second sighting, whichever comes first.
 
 **Expected next task.** Any task touching the test harness. Evidence: `docs/logs/PRIMITIVES-2-PR-A.md` §6, run 3 of the second PR-A batch.
+
+---
+
+## AUTH-TURNSTILE-WIRE — the Cloudflare Turnstile widget is not mounted
+
+**Originating task:** POLISH.7a (2026-08-11), carrying `PD-0-14` from POLISH.0. Sits beside **RATE-GUARD-PUBLIC** above — same genus (a public-surface abuse control that is specified, sized and unbuilt) and the same date, so they size together.
+
+**Deferred work.** `src/app/(auth)/sign-in/page.tsx:137` is a `TODO(DESIGN.*)` comment and no widget is mounted; `:143-147` is the retained hidden anchor `<input type="hidden" name="turnstileToken" value="placeholder-token" />` (its literal at `:146`), and `otp/page.tsx:105` hard-codes the same placeholder on the resend path. ⚠ **These are HEAD coordinates, re-measured at PR head.** The three this row first carried — `:121`, `:122-126`, `:103` — were the recon SHA's, and **D03's own restructure inside this PR moved them**; `:121` now lands in the middle of D03's explanatory comment. See `docs/plans/POLISH-7a.md` §12 **P-6**. The server half is BUILT and fails closed — `src/server/auth/index.ts:136-142` rejects a missing token and a failed siteverify — so what is missing is the client widget that produces a real token, not the verification.
+
+**What it carries from POLISH.7a's delta table.** `P7a-D06` (the whole Turnstile pane — three ratified states — unbuilt, `data-blocked`) · `P7a-D13` (the OTP screen's *"Secured by Cloudflare Turnstile"* line, deliberately omitted at UI-A7 because restoring it before the widget is real would be a false claim to the user) · `P7a-D04` (the picker's submit reads `Send code`, where the mockup reads `Continue` — the mockup's Continue advanced to the Turnstile pane, so the label's ground returns only when the pane exists).
+
+⚠ **`ADR-0033:25` binds this task.** *"The "Resend" action must carry the same Turnstile token the initial sign-in request sends (today: always-pass placeholder). When AUTH-TURNSTILE-WIRE lands a real widget, the resend path inherits the real token. Keep resend↔sign-in token parity."* Parity holds today — both sites carry `"placeholder-token"` — and a widget wired on one path only would break it silently, because the resend path's failure mode is a 200 with no delivery (ADR-0033 Decision 2).
+
+⚠ **THE TWO TOKEN SITES ARE STRUCTURALLY ASYMMETRIC, and the parity rule above is what that endangers** — `@security-auditor` LOW-2. `sign-in/page.tsx:143-147` carries the token as a hidden `<input>` read out of `FormData`; `otp/page.tsx:105` hard-codes the string literal in the handler. Parity holds today only because both are the same literal. The natural way to mount a real widget replaces the hidden input's `value` — a change that is **invisible** to the resend handler, which has no form field to update. The failure is silent in the worst way: per `ADR-0033` Decision 2 the resend path returns HTTP 200 even when nothing is sent, so a broken resend is indistinguishable from a working one, and nothing on disk goes red. **Wire BOTH sites in one change, and pin the parity with a test.**
+
+**Conditional trigger.** **DUE 2026-09-05**, with RATE-GUARD-PUBLIC. Until it lands, staging runs always-pass test keys and W2.1's three ratified Turnstile states cannot be exercised on any environment — which is why `PD-0-14` is `data-blocked` rather than open.
+
+**Expected next task.** Its own build row; the server contract is already ratified, so it is client-side plus a real key pair. Evidence: `docs/polish/POLISH-register.md` `PD-0-14`, `docs/polish/POLISH-0_data-manifest.md:166`.
+
+---
+
+## AUTH-ERROR-COPY — raw error codes render to participants
+
+**Originating task:** POLISH.7a (2026-08-11), carrying `PD-0-15` from POLISH.0. Tier-1-named at `ADR-0033:29`: *"Humanizing raw error codes (`rate_limited`, etc.) stays deferred to AUTH-ERROR-COPY."*
+
+**Deferred work.** Both auth screens render the SDK's error message unmodified into a `role="alert"` callout. A rate-limited participant reads the literal string **`otp_rate_limited`**.
+
+⚠ **The register's string was wrong and is corrected at POLISH.7a.** The auth code is `otp_rate_limited` (`src/server/auth/index.ts:154,164`), not `rate_limited`. `rate_limited` occurs at six sites in `src/`, **all under `src/components/debate/composer/**` — POLISH.4's surface.** `PD-0-15`'s ID is unchanged; only its title moved.
+
+**Where the strings come from, which is why this is not a copy fix.** The three codes a real user reaches — `turnstile_required`, `turnstile_failed`, `otp_rate_limited` — are produced **inside `src/server/auth/**`**, a CLAUDE.md §1 critical path and template hard floor **F4**. The client fallbacks (`otp_invalid`, `send_failed`, `sign_in_failed`, `resend_failed`) live in the page components. **There is no `code → copy` mapping anywhere on the auth path.** `docs/logs/UI-A7.md:13` records that branching on the error code was deliberately NOT built — *"per-code W2.11 titled blocks … were deliberately NOT built, as branching on the error code is new logic"* — and filed as an open Gate-C question whose outcome is not recorded on `main`. The precedent shape exists one surface over: `src/components/debate/composer/state-map.ts:43` maps a code to a state and `copy.ts` supplies the string.
+
+⚠ **A FOURTH REACHABLE CODE, and it is the one that needs REPLACING rather than humanising — added at POLISH.7a by `@security-auditor` (MEDIUM-1).** **`identity_pool_exhausted`** reaches an anonymous visitor verbatim. Traced hop by hop: `databaseHooks.user.create.before` throws `APIError("SERVICE_UNAVAILABLE", {message:"identity_pool_exhausted"})` (`src/server/auth/index.ts:317-320`) when the pool is dry; `createWithHooks` has no try/catch, so it propagates unwrapped as a 503 JSON body; `[...all]/route.ts:25` intercepts only 403, so it passes through; the `ONBOARDING_REQUIRED` branch at `otp/page.tsx:74` does not match, and `:79` renders it into the shared callout.
+
+**Why it is worse than a cosmetic code.** SPEC.1 §16.4 scopes `identity_pool` depth as *"Not visible to users. Admin-only operational view (pool depth, exhaustion alerting)"*. This publishes its TERMINAL state. An attacker draining the pool with catch-all sub-addressed signups gets a free progress oracle telling them the instant registration is denied to every legitimate participant. The correct copy is therefore GENERIC ("Sign-up is temporarily unavailable"), not a translation of the code. ⚠ **Pre-existing on `main`** — the identical string reached the identical `role="alert"` region through the deleted file-local `AuthError`; POLISH.7a re-homed the render path byte-identically and did not change the exposure.
+
+**Conditional trigger.** Pre-go-live (2026-09-15).
+
+⚠ **CO-EXECUTE with AUTH-OTP-FIDELITY** (POLISH.7a R-F). Both land in `sign-in/otp/page.tsx`; three separate critical-path rituals on one file is three times the ceremony for one diff. This row keeps its own name because ADR-0033 names it.
+
+**Expected next task.** Its own gated task, co-scheduled. Evidence: `docs/polish/POLISH-register.md` `PD-0-15`; `docs/logs/POLISH-7a.md`.
+
+---
+
+## AUTH-OTP-FIDELITY — the OTP screen's two ratified affordances are unbuilt
+
+**Originating task:** POLISH.7a (2026-08-11), ruled at R-F. Carries `P7a-D10` and `P7a-D11`.
+
+**Deferred work, two halves.**
+
+> **6-box segmented code entry.** `DESIGN_W2_1_CLOSE-OUT.md:60` locks *"OTP: ours — 6-box, resend cooldown, invalid/expired/locked"*, and the mockup renders it (`:364`, CSS `:212-216`). The build ships one field with `pattern="[0-9]{6}"` and `tracking-[0.5em]` (`otp/page.tsx:164-173`, head coordinates — `:134-143` was the recon SHA's and now lands inside D07's comment).
+>
+> **Resend cooldown.** The mockup ships `resendBtn` DISABLED at entry plus a `resendTimer` (`:366-370`, CSS `:220-224`); the built control is enabled immediately with no timer.
+
+**Why neither shipped in the machine pass — halt H2, twice.** The 6-box port cannot preserve `UI-A7.md:99`'s byte-for-byte pin (*"preserve `pattern="[0-9]{6}"`, `maxLength={6}`, `inputMode="numeric"`, `name="otp"`"*) without new client submit logic. And a cooldown is not cosmetic: it gates how often `sendVerificationOtp` fires against the server's own per-email and per-IP limiters (`src/server/auth/index.ts:148-166`).
+
+⚠ **The cooldown and AUTH-ERROR-COPY are one user experience.** Without a cooldown, a participant mashing Resend hits `otp_rate_limited` — and reads that string raw, which is `PD-0-15` itself. Fixing either alone leaves the other visible on the same screen.
+
+⚠ **A tier-1/tier-2 tension a reviewer must resolve, not absorb.** `ADR-0033:21` Decision 2 specifies the resend affordance with **no** cooldown clause, and `docs/plans/AUTH-OTP-DELIVERY.md:164` describes the built behaviour as deliberate — *"it gives the user agency, not delivery detection"*. Tier 2 (the W2.1 close-out) says cooldown. Both are quoted in `docs/logs/POLISH-7a.md`; neither was resolved by POLISH.7a.
+
+**Conditional trigger.** Pre-go-live (2026-09-15), co-executed with AUTH-ERROR-COPY.
+
+**Expected next task.** Its own gated task. Evidence: `docs/plans/POLISH-7a.md` §3 rows D10/D11.
+
+---
+
+## AUTH-ONBOARDING-GATE — Continue is not disabled until the checkbox is ticked
+
+**Originating task:** POLISH.7a (2026-08-11), ruled at R-B. Carries `P7a-D16`.
+
+**Deferred work.**
+
+> `SPEC.1.md:777` — *"**Continue button is disabled until the checkbox is ticked.**"* The build gates submission with the native `required` attribute (`onboarding/page.tsx:135`) and leaves the button always enabled (`:143-148`).
+
+⚠ **This is TIER-1 SPEC-LOCKED, not a styling preference.** `SPEC.1.md:805`: the F-AUTH-4 structural commitments *"are spec-locked and cannot be relaxed by the UI/UX pass without an ADR amending this section."* And `SPEC.1.md:817` assigns the conformance check to POLISH.7a by name — *"Whether the build matches is POLISH.7a's verification"* — which is how this was found.
+
+⚠ **NOT UNSAFE TODAY, and the distinction is load-bearing for scheduling.** `required` blocks native form submission, and `acceptTosAction` re-checks server-side and returns `{ ok: false, code: 'tos_acceptance_required' }`. Acceptance evidence (`tos_accepted_at`, both version hashes, IP, user-agent) is sound. This is a fidelity gap against a spec-locked line, dated — not an emergency.
+
+**Why it halted (H2).** The fix needs reactive client state around the acceptance form, and `UI-A7.md:76` ratified *"Card stays RSC (presentational) — no new client boundary"* for that page. Tier 1 wins on precedence and tier 3 was void on this point from the day `:805` landed, but the change is on a submit path and exceeds a cosmetic edit boundary.
+
+**Conditional trigger.** Pre-go-live (2026-09-15).
+
+**Expected next task.** Its own gated task on the auth critical path. Full quotations both sides: `docs/plans/POLISH-7a.md` §3 note (e).
+
+---
+
+## AUTH-GOOGLE-MARK — the Google button carries no mark, and cannot obviously carry one
+
+**Originating task:** POLISH.7a (2026-08-11), §2.1 (1). Carries `P7a-D02`.
+
+**Deferred work.** The W2.1 picker renders a 20px circular `.gmark` "G" before the label (`mockup:314-316`, CSS `:149`); the build renders label text only (`sign-in/page.tsx:92-97`).
+
+**Why it is a founder decision and not a machine-pass fix.** It sits at the intersection of a ratified internal constraint and an unverified external one. Internally, DESIGN.B1 ratified a TRUE-NEUTRAL system with no brand accent, CI-guarded by `tests/unit/design/tokens-monochrome.test.ts` (11-token achromatic census, `--color-brand` banned) — so the official multicolour mark is out by construction. Externally, a monochrome or custom "G" is a *modified* Google mark, which Google's sign-in branding guidelines address and which cannot be adjudicated from inside a POLISH run.
+
+**The three options, so the decision starts from a list rather than a blank page.** (a) the official coloured mark — violates B1 and reddens the token guard; (b) a monochrome or custom G — a modified mark, needs the external check; (c) text only — what ships today, and defensible.
+
+**Conditional trigger.** Founder decision, undated. Not go-live-gating: (c) is a shipping state, not a broken one.
+
+**Expected next task.** A founder ruling, then either nothing or a one-line component change. Evidence: `docs/plans/POLISH-7a.md` §2.1 (1).
+
+---
+
+## AUTH-FIRST-LOGIN — an A7-ledger row with no definition on `main`
+
+**Originating task:** named as a sibling A7-ledger task at `docs/plans/AUTH-OTP-DELIVERY.md:226` and `docs/logs/AUTH-OTP-DELIVERY.md:31`; given a row here at POLISH.7a (2026-08-11) under the standing rule at the top of this file.
+
+**Deferred work — UNDEFINED, and that is the finding.** `git grep AUTH-FIRST-LOGIN` over the whole tree returns exactly three hits: the two list mentions above and `docs/plans/POLISH-7a.md`. **No document on `main` states what the defect is.** The name has been carried in two ledgers since 2026-07-22 with no scope, no owner and no date.
+
+⚠ **A claim about it could not be verified.** `docs/plans/POLISH-7a.md:262` records that *"`AUTH-OTP-DELIVERY` **OBS-3**: the defect may no longer reproduce — a fresh signup landed cleanly on `/onboarding` with a pseudonym assigned"*. **`OBS-3` does not exist in either AUTH-OTP-DELIVERY document** — `grep -n "OBS-3"` over both returns nothing. The observation may be real and recorded off-repo, but it cannot be confirmed from `main`, so it is repeated here as an attribution rather than as a fact.
+
+**Conditional trigger.** **Re-verify before scoping.** The first action is not to fix anything — it is to establish, from a live signup, whether there is a defect at all. If there is not, this row closes.
+
+**Expected next task.** A scoping pass, not a build. Evidence: `docs/logs/POLISH-7a.md`.
+
+---
+
+## AUTH-HARDEN — three auth-path hardening items, one of them load-bearing
+
+**Originating task:** named at `docs/plans/AUTH-OTP-DELIVERY.md:226` and `docs/logs/AUTH-OTP-DELIVERY.md:28,31`; given a row here at POLISH.7a (2026-08-11).
+
+**Deferred work, seven items.**
+
+> **(1) Spoofable XFF.** `src/server/auth/index.ts:109-115` takes the LEFTMOST `x-forwarded-for` element as the client IP, which a client controls. It keys the OTP per-IP burst limiter. The same shape is already parked for `extractIp()` and for `tos_acceptance_ip` (`docs/logs/UI-A7.md:22`) — this is the third site of one defect.
+>
+> **(2) Sentry `beforeSend` scrubber.** Recorded at `docs/logs/AUTH-OTP-DELIVERY.md:28`: no leak today (`sendDefaultPii:false` plus a bounded Resend error shape, both verified by `@security-auditor`), but that PR was the first to route Resend errors into Sentry.
+>
+> **(3) ⚠ THE OTP SENDER'S CAPTURE IS UNFLUSHED.** `src/server/auth/email-otp.ts:60,65` calls `Sentry.captureException` RAW — no flush, no `waitUntil` — while the repo has `safeCaptureException` / `safeFlush` and routes other call sites through them (`src/server/bets/endpoint.ts`, `replay.ts`, `dharma/header-balance.ts`, `header-portfolio.ts`, `api/cron/alarms-drain/route.ts`). On a serverless function that can freeze the instant the response is returned, an unflushed capture is a capture that may never arrive.
+
+> **(4) ⚠ PARTICIPANT EMAIL ADDRESSES EGRESS TO SENTRY IN THE URL QUERY STRING, at 100% trace sampling** — added at POLISH.7a by `@security-auditor` (MEDIUM-2). `sign-in/page.tsx:73` pushes `/sign-in/otp?email=<real address>`; `instrumentation-client.ts:10-16` sets `tracesSampleRate: 1.0`, and `httpContextIntegration` (a Sentry default) sets `event.request.url` from the FULL `location.href` on every event including transactions. `sendDefaultPii:false` governs IP and cookies, **not the URL**, and there is no `beforeSend` anywhere in `src/` or the three `sentry.*.config.ts` files. ⚠ **This is NOT what item (2) already covers** — (2)'s recorded justification (*"no leak today … bounded Resend error shape"*) is scoped to the SERVER-side Resend capture. SPEC.1 §16.3 `H2` lists `email` among the fields wiped on erasure; a DB scrub cannot reach Sentry's 90-day store or Vercel access logs, so the erasure promise is discharged in the database and silently not in the processor — on a project whose premise is that a pseudonym is not linkable to a real identity. **The better fix is to stop putting the address in the query string at all** (it is already in component state and re-editable at `otp/page.tsx:155-163`), which also clears browser history and access logs; a `beforeSend` scrubber is the weaker second option. PostHog is CLEAN on this axis — autocapture, pageview, pageleave and session recording are all off.
+>
+> **(5) THE SITEVERIFY FETCH IS ORDERED AHEAD OF EVERY RATE LIMITER** — `@security-auditor` MEDIUM-3, and it is the consequence item (1) does not state. `src/server/auth/index.ts:139` fires an outbound HTTPS POST to Cloudflare BEFORE the per-email and per-IP limiters at `:148-166`. With the leftmost-XFF spoof from item (1), an unauthenticated attacker evades both the app limiter AND Better Auth's built-in one (which reads the same header) and amplifies each request into a third-party call. If Cloudflare then rate-limits the project secret, `verifyTurnstile` returns false for everyone (`:97-99`) — fail-closed degrades into a **full outage of the email sign-in path**.
+
+**Why (3) is the one that matters.** `ADR-0033` Decision 2 ratifies returning HTTP 200 on a FAILED OTP delivery, and designates that Sentry capture as the **sole** mitigation: *"Failed delivery is handled by (a) a "Resend code" … affordance, and (b) server-side observability (`Sentry.captureException` in the sender)."* If the capture does not reliably land, a deliberate silent-failure design has no observability arm at all. Note also that Sentry delivery on this path is **unverified rather than unwired** — no positive control has been fired on staging.
+
+⚠ **`src/server/auth/**` is a CLAUDE.md §1 CRITICAL PATH.** Full plan→execute ritual with the named-reviewer cascade, in its own chat. Not foldable into a polish pass.
+
+> **(7) `users.name` AND `users.image` ARE CLIENT-WRITABLE AT FIRST EMAIL-OTP SIGNUP** — `@security-auditor` LOW-5, homed here at Gate C. Both are first-class fields on better-auth's `signInEmailOTPBodySchema` (`email-otp/routes.mjs:353-361`) and are written straight through on the create branch (`:404-412`), so a participant can set them to arbitrary strings. The three IDENTITY columns are correctly locked — `pseudonym`, `pfpFilename`, `googleId` carry `input: false` and `parseInputData` **throws** — but `name`/`image` are not in that set. **No render path exists today** (verified: the public face is `pseudonym` + `pfpFilename` everywhere), so there is no stored-XSS sink. **The residual is the 2026-11-06 dataset release** — SPEC.1 §16.4 releases the `users` row, so a wholesale column export would publish attacker-controlled text. ⚠ **It is homed HERE and not in the dataset task because the DEFECT is a writable-field-set question in `src/server/auth/**`; the dataset leak is its CONSEQUENCE. One file, one owner.** ⚠ **The cross-reference asked for at Gate C — `docs/specs/dataset-release.md` — DOES NOT EXIST.** `docs/specs/` holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md` and nothing else, verified at PR head. Writing the citation live would mint the same phantom `SPEC.CHART` already is — `POLISH-0.md` §2's existence rider: *a citation is not an artifact*. The real destination that DOES exist is the **DATASET RELEASE** task, which this file already names as an owner at the STAGING-PARITY Slice B row (`docs/parked.md:508,517`), and the governing spec text is **SPEC.1 §16.4**, which releases the `users` row. **The column allow-list decision belongs to DATASET RELEASE; if it ever gets a spec file, this row's pointer is what should be updated to name it.**
+>
+> ⚠ **(6) NO ERROR BOUNDARY IN THE TREE REPORTS TO SENTRY** — `@security-auditor` LOW-3. `(auth)/error.tsx`, `global-error.tsx`, `bookmarks/error.tsx` and `u/[pseudonym]/error.tsx` all destructure only `reset`. A boundary makes the error HANDLED, so Sentry's global `onerror` never sees it, and CLIENT-side render errors on the signed-out sign-in path go invisible. **A tree-wide decision, not POLISH.7a's** — the new file matches the established family exactly, which is what the plan asked for.
+
+**Conditional trigger.** Pre-go-live (2026-09-15). Item (3) should lead.
+
+**Expected next task.** Its own gated auth task. Evidence: `docs/logs/AUTH-OTP-DELIVERY.md:28`; `docs/logs/POLISH-7a.md`.
+
+---
+
+## AUTH-CONSENT-LINE — ✅ **STRUCK at POLISH.7a (2026-08-11)**
+
+**Originating task:** named once, at `docs/plans/PRIMITIVES-1.md:342`, as *"AUTH-CONSENT-LINE (POLISH.7a verification)"*. Closed at POLISH.7a R-D. This row exists so that reference resolves to a decision instead of to nothing.
+
+**What it was.** `git grep` over the whole tree returns **exactly one occurrence** — the citation above. No definition, no scope, no owner, no date. The only artifact it could plausibly have meant is the W2.1 picker's `.mfoot` *Terms · Privacy* line (`mockup:323-325`, CSS `:164-167`), which POLISH.7a filed as `P7a-D05`.
+
+**Why struck rather than defined — four grounds, each independently sufficient.**
+
+1. **The page-level footer was withdrawn.** Founder ruling 2026-08-02; B4 is VOID, not deferred (`SPEC.1` v1.0.26 `:1498`). `POLISH-0.md:159`: *"The absence of a footer in `src/` is true and correct."*
+2. **The links would be dead.** `/terms` and `/privacy` do not exist as routes. `docs/logs/UI-A7.md:15` records the omission as deliberate and agreed by both reviewers, on exactly this ground.
+3. **A guard would go RED.** `tests/unit/shell/not-found.test.tsx:108-167` bans any `<footer>` under `src/app/**` that is not nested inside a content container, and names `(auth)/onboarding/page.tsx`'s nested footer as the legitimate case.
+4. **Tier 1 replaced the mechanism.** `SPEC.1.md:807-817` records that implicit footer acceptance lapsed and the explicit checkbox stands, calling it *"the stronger answer to the acceptance-evidence question W2.1 left open."*
+
+**Conditional trigger.** None. Closed.
+
+**Expected next task.** None. If a consent line is ever wanted on the picker it is a fresh decision with a new name, not this row reopened.
+
+---
+
+## LEGAL.1 — the ToS and Privacy bodies are placeholder Lorem ipsum — ⚠ **GO-LIVE GATE**
+
+**Originating task:** POLISH.7a (2026-08-11), ruled at R-E. Carries `P7a-D17` and `P7a-D18`, and the pre-recorded content-block on `POLISH-0.md:174`.
+
+⚠ **`HARDEN.6` and `HARDEN.7` ARE ALIASES OF THIS ROW.** The same deliverable is named three ways across the corpus: `LEGAL.1` (`POLISH-0.md:174`), `LEGAL.1 ← HARDEN.6` (`POLISH-0.md:295`), and `HARDEN.7` in the placeholder files themselves. **`LEGAL.1` is canonical.**
+
+**Deferred work.** `public/legal/tos.txt:1` opens *"Zugzwang Experiment — Terms of Service (PLACEHOLDER v0)"* and `:3` says *"This is placeholder Lorem ipsum copy used during SCAFFOLD.3 development."* `public/legal/privacy.txt` is the same shape. Both are 22 lines. Both are rendered IN FULL, in-page, on `/onboarding` — `SPEC.1.md:776` requires exactly that — so a real participant accepts placeholder text on a screen whose entire purpose is recording that acceptance.
+
+**Three things it carries, and the third is easy to lose.**
+
+1. **The bodies** — the actual legal text (`P7a-D18`).
+2. **The version label** (`P7a-D17`). `SPEC.1.md:789` specifies footer text of the form *"ToS v1.0 · `<hash>`"*; the build renders the hashes only, because the hashes ARE the placeholders (`placeholder-tos-v0` / `placeholder-privacy-v0`). Unjudgeable until real versions exist.
+3. ⚠ **The AGPL §13 source offer.** When B4 voided the page-level footer, the obligation did not go away — it RELOCATED INTO THE ToS BODY (`SPEC.1.md:1144`: *"Surfaced in the Terms of Service body … Hard legal requirement"*). It is a licence obligation on a body of text that does not exist yet. *(`PRIMITIVES-1.md:345` records AGPL `I6` as its own row, severed from LEGAL.1 — that severance is about ownership of the check, not about where the text lives.)*
+
+**Why it is a gate and not a polish item.** `SPEC.1` §13 F-AUTH-4 requires acceptance EVIDENCE — `tos_version_hash`, `privacy_version_hash`, IP, user-agent, all written in one transaction — and calls it *"the dispute-resolution record"*. Evidence of accepting Lorem ipsum is not a dispute-resolution record. The mechanism is built and correct; only the content is missing.
+
+**Conditional trigger.** **Before go-live, 2026-09-15.** The placeholder files name *"mid-July 2026"* as the delivery date, which is four weeks past as of this row.
+
+**Expected next task.** Its own chat, alongside MOD-REPORT-PATH — founder-owned, with an external dependency (legal review) and real lead time. Evidence: `docs/plans/POLISH-7a.md` R-E.
+
+---
+
+## NO-RAW-HEX-REACH — **REACH CLOSED, SET-EQUALITY RESIDUAL OPEN** — routed to the quality lane with R15
+
+**Originating task:** POLISH.7a recon (2026-08-11), §5. Closed in the same PR that found it. The row exists to record a false receipt, not to track open work.
+
+**What it was.** `tests/unit/design/no-raw-hex-view-layer.test.ts` claimed *"the participant view layer"* in its docblock (`:5-6`) while its input set reached `src/components` + `src/app/(public)` + four named files. Of the `(auth)` group only the LAYOUT was named; **all three route files were outside the set.**
+
+**Why it is worth a row after being fixed.** `UI-A7.md:213` made this guard an exit criterion for the auth skin, and `docs/logs/UI-A7.md:28` recorded it discharged with *"Design guards … green; zero raw hex."* **The guard could not read any of the three files that skin changed.** The green run was true and blind — a promised assertion delivered vacuously, which reads as discharged and is worse than an absent one (POLISH-SURFACE-TEMPLATE §8.1 N8 / V-6). The receipt is now in the git history and the row is what tells a future reader not to trust it.
+
+**What closed it.** The three route files, plus the two files POLISH.7a added beside them (`AuthAlert.tsx`, `error.tsx`), joined `SCAN_FILES`. RED-first on all three RULE-1 axes, with axis ③ — a `#c0ffee` literal in `onboarding/page.tsx` — measured GREEN before enrolment and RED after.
+
+⚠ **ONE WEAKNESS FOUND AND NOT FIXED, so it is visible rather than discovered later.** RULE-1 axis ② (member REMOVED) leaves the suite **GREEN**. The scanned set is 107 files and the alive check is `toBeGreaterThan(20)` — a FLOOR, not set equality (§8.1 N5). A silently deleted `SCAN_FILES` entry is undetectable by this guard. Changing the alive check's shape is a decision about a guard POLISH.7a does not own and exceeded that PR's edit boundary.
+
+⚠ **A SECOND RESIDUAL, and it is the STRUCTURAL fix** (`@code-reviewer` L-5 / CLAUDE.md **O-1**, *structural beats procedural*). `SCAN_DIRS` is `["src/components", "src/app/(public)"]`. **Adding `"src/app/(auth)"` to it makes all five named `SCAN_FILES` entries redundant AND covers `_components/` — a NEW unscanned directory this PR created.** The named-file shape is what forced two extra enrolments inside this very PR to stay closed. It was not done here because the plan's §5 prescribed the named-file form and `SCAN_DIRS` is out of this surface's edit boundary.
+
+**Conditional trigger.** For BOTH residuals: the next task that legitimately opens `tests/unit/design/`.
+
+**Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, THREE fixes**: R15's palette-class ban, the N5 set-equality floor, and the `SCAN_DIRS` structural fix. Evidence: `docs/logs/POLISH-7a.md` §5.

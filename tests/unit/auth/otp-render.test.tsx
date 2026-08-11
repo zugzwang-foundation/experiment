@@ -115,6 +115,11 @@ describe("UI-A7 otp skin — branded presentation (DRIVER, RED pre-skin)", () =>
 
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toContain("otp_invalid");
+		// POLISH.7a H-1 (@code-reviewer): the call-site pin. This site takes NO
+		// `className`, so it must emit the base string with no leading margin.
+		expect(alert.getAttribute("class")).toBe(
+			"rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]",
+		);
 	});
 });
 
@@ -165,13 +170,19 @@ describe("AUTH-OTP-DELIVERY fix (b) — resend + back affordance (DRIVER, RED pr
 		// slot (no new error branch). Turnstile/validation only — NOT delivery
 		// (which the plugin swallows to 200, per §2).
 		mocks.sendVerificationOtp.mockResolvedValue({
-			error: { message: "rate_limited" },
+			error: { message: "otp_rate_limited" },
 		});
 		render(<OtpPage />);
 		fireEvent.click(screen.getByRole("button", { name: /resend/i }));
 
 		const alert = await screen.findByRole("alert");
-		expect(alert.textContent).toContain("rate_limited");
+		// POLISH.7a Gate C / T1 — S-11's FOURTH site. The relay named the third
+		// (`sign-in-render.test.tsx`); the flag had two test files, not one. Same
+		// defect, one level further out: a remedy scoped from a ROW under-fixes,
+		// and so does one scoped from the remedy. The resend path hits the SAME
+		// server limiter as the send path (`src/server/auth/index.ts:154,164`), so
+		// `otp_rate_limited` is the string this fixture must emit.
+		expect(alert.textContent).toBe("otp_rate_limited");
 	});
 
 	it("otp-resend::successful-resend-confirms-via-status-not-a-second-alert", async () => {

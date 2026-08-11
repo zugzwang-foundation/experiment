@@ -1,8 +1,10 @@
 "use client";
 
+import { Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactElement, Suspense, useState } from "react";
+import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -117,6 +119,34 @@ function OtpForm(): ReactElement {
 	return (
 		<Card className="my-auto w-full">
 			<CardHeader className="text-center">
+				{/* POLISH.7a D14 — POSITION ONLY. The W2.1 `.backlink` sits at the
+				    TOP-LEFT of the pane (mockup `:360`, CSS `:170-174`
+				    `margin-bottom:16px`); this shipped at the bottom of the card,
+				    below Resend. The pane maps to this Card, so it moves inside the
+				    Card rather than above it — a §4.2 B3 call, flagged for Gate C.
+				    ⚠ THE COPY DOES NOT MOVE: it stays "Back to sign in", not the
+				    mockup's "‹ Back". Porting the shorter label would strip the
+				    accessible name down to a glyph and a word, which A11Y.0 would
+				    then have to re-fix. */}
+				<Link
+					href="/sign-in"
+					className="mb-3 justify-self-start text-xs text-n5 underline-offset-4 hover:text-ink hover:underline"
+				>
+					Back to sign in
+				</Link>
+				{/* POLISH.7a D07 — the W2.1 `.otp-icon` ring (mockup `:361`, CSS
+				    `:208`). Geometry is ported: 40×40, `margin:2px auto 14px`,
+				    `border-radius:50%`, centred, 18px glyph. The COLOUR is NOT: the
+				    mockup's `1.5px solid var(--ink)` is a pre-BRIDGE light-theme
+				    reference against an inverted dark ramp, so the ring resolves to
+				    the live separation token instead (UI-A7 §6 WI-1; F2/H13).
+				    ⚠ `--hairline` is 1px where the mockup is 1.5px — the ratified
+				    1.5px rung (`--ring-active`) is Discovery's and borrowing it here
+				    would be a cross-surface primitive reach. Flagged for Gate C.
+				    Decorative: the title beside it carries the meaning. */}
+				<div className="mx-auto mt-0.5 mb-3.5 flex size-10 items-center justify-center rounded-full [border:var(--hairline)]">
+					<Mail aria-hidden className="size-[18px] text-ink" />
+				</div>
 				<CardTitle className="text-lg">Enter your verification code</CardTitle>
 				<CardDescription>Check your email for a 6-digit code.</CardDescription>
 			</CardHeader>
@@ -145,19 +175,19 @@ function OtpForm(): ReactElement {
 						{loading ? "Verifying…" : "Verify"}
 					</Button>
 					{/* W2.11 invalid-OTP / error treatment (§5): the existing `error`
-					    message flows through unchanged into a role="alert" callout. */}
-					{error ? (
-						<p
-							role="alert"
-							className="rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]"
-						>
-							{error}
-						</p>
-					) : null}
+					    message flows through unchanged into a role="alert" callout.
+					    POLISH.7a D21 — the callout is now the ONE colocated `AuthAlert`
+					    both auth screens share, not a second hand-roll of the same class
+					    string (`PD-0-10` root cause: primitive duplication). */}
+					{error ? <AuthAlert>{error}</AuthAlert> : null}
 				</form>
-				{/* AUTH-OTP-DELIVERY fix (b): resend + back recourse. The resend
-				    reuses the shared `error` alert above; success shows a role="status"
-				    note (never a second alert). */}
+				{/* AUTH-OTP-DELIVERY fix (b): the resend half of the resend + back
+				    recourse pair (ADR-0033 Decision 2). The resend reuses the shared
+				    `error` alert above; success shows a role="status" note (never a
+				    second alert). ⚠ Its sibling "Back to sign in" moved to the top of
+				    the card at POLISH.7a D14 — BOTH affordances still exist and both
+				    are still required by ADR-0033; only the back link's position
+				    changed. */}
 				<div className="mt-4 flex flex-col items-center gap-1">
 					<Button
 						type="button"
@@ -173,12 +203,6 @@ function OtpForm(): ReactElement {
 							Code re-sent.
 						</p>
 					) : null}
-					<Link
-						href="/sign-in"
-						className="text-xs text-n5 underline-offset-4 hover:text-ink hover:underline"
-					>
-						Back to sign in
-					</Link>
 				</div>
 			</CardContent>
 			<CardFooter className="justify-center">
@@ -186,8 +210,8 @@ function OtpForm(): ReactElement {
 				    "Secured by Cloudflare Turnstile" line is deliberately omitted —
 				    Turnstile is not wired yet (plan §8; anchor only). */}
 				<p className="text-center text-xs text-n5">
-					Zugzwang will never ask you for this code. If someone does, it's a
-					scam — don't share it.
+					Zugzwang will never ask you for this code. If someone asks you for it,
+					it's a scam — don't share it.
 				</p>
 			</CardFooter>
 		</Card>

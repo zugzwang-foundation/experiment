@@ -33,6 +33,31 @@ const SCAN_FILES = [
 	// smuggled literal here is the widest-reach colour bypass in the tree, and
 	// it sat unscanned. Proven by reversal at P4.
 	"src/app/layout.tsx",
+	// The three `(auth)` ROUTE files, enrolled at POLISH.7a — the same shape of
+	// gap C4(b) closed for the root layout, one directory over. `SCAN_DIRS`
+	// reaches `src/app/(public)` only, so these three sat outside the set while
+	// the docblock above claimed "the participant view layer"; the `(auth)`
+	// LAYOUT was listed and the three PAGES it wraps were not. They are branded
+	// participant surfaces carrying `bg-n1`, `text-ink` and `var(--hairline)`
+	// (UI-A7), and they are the first screen a signed-out visitor sees.
+	//
+	// Not hypothetical: `UI-A7.md:213` made this guard an exit criterion for the
+	// auth skin and `docs/logs/UI-A7.md:28` recorded it discharged with "zero raw
+	// hex" — over a set that could not read any of the three files that skin
+	// changed. A green run that is structurally incapable of failing reads as a
+	// receipt (§8.1 N8). Enrolment proven by reversal on RULE-1 axis ③: a
+	// `#c0ffee` literal in `onboarding/page.tsx` left this suite GREEN at 2/2
+	// before these three lines and RED after.
+	"src/app/(auth)/sign-in/page.tsx",
+	"src/app/(auth)/sign-in/otp/page.tsx",
+	"src/app/(auth)/onboarding/page.tsx",
+	// The colocated `(auth)` components, enrolled in the commit that CREATES
+	// them (POLISH.7a D21/D20). Adding new unscanned view-layer files beside
+	// three that were just enrolled would re-open the blind spot in the same PR
+	// that closed it — the N8 failure committed knowingly. `SCAN_DIRS` does not
+	// reach `src/app/(auth)`, so anything colocated here has to be named.
+	"src/app/(auth)/_components/AuthAlert.tsx",
+	"src/app/(auth)/error.tsx",
 ];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments
