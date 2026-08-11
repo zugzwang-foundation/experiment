@@ -59,8 +59,8 @@ one — HALT.
 | Client boundary | **All three inside it**, via the single directive at `DiscoveryCarousel.tsx:1`. `onError` is available at every site with no new directive | R9 |
 | `getDefaultMarketMediaUrl` | `src/server/discovery/media.ts:40-63`. Returns `null` on a presign throw; **cannot see a missing object** — presigning is a local HMAC | R10 |
 | "Secondary text tier" | **Defined nowhere on `main`.** 6 mentions, all naming it as a thing to build | R11 |
-| Its one held site | `HeroPanels.tsx:198`, `text-n4` — **the only `text-n4` micro-label on the tree** | R11 |
-| Other micro-labels | 13 sites, 6 files, 4 sizes × 4 trackings × 2 weights × 5 tiers, **no shared import** | R11 |
+| Its one held site | `HeroPanels.tsx:198` (**at PR-B head: the `REPLYHEAD_TIER` constant at `HeroPanels.tsx:51-52`, consumed at `:228`** — commit 4 extracted it, so the held site is now a named constant, not an inline class), `text-n4`. ⚠ This row **said** *"the only `text-n4` micro-label on the tree"* — **STRUCK at PR-B commit 4**, measured false: `debate/composer/AuthGateSlot.tsx:49` is a second one (`text-xs font-medium tracking-wide text-n4 uppercase`, rendering the copy constant `AUTH_GATE_COPY.micro`). D8's safety property is unaffected — OQ-2 rules on *the replyhead's* tier and that is still one line — but the uniqueness claim was not true when written | R11 |
+| Other micro-labels | 13 sites, 6 files, 4 sizes × 4 trackings × 2 weights × 5 tiers, **no shared import**. ⚠ PR-B commit 4 re-measured **12 others across 7 files, 4 tiers**, using an `uppercase` + `tracking` predicate. **Neither count is wrong — the census is CLASSIFIER-DEPENDENT** (recon's includes the two `text-ink` Support/Counter labels this predicate does not). The classifier is stated on the `MICRO-LABEL-TIER` docket row so the next reader knows which set is meant | R11 |
 | Ladder rung 1 (n2) | `--hairline` at `globals.css:166` — **45 uses across 31 files** | R12 |
 | Ladder rung 2 (n3) | `[border:1px_solid_var(--color-n3)]` literal — `HeroPanels.tsx:51,103,115`. **3 sites, 1 file, nowhere else in `src/`.** FOUNDER-RULED (PD-2-07) | R12 |
 | Ladder rung 3 (n4) | `[outline:1.5px_solid_var(--color-n4)]` literal — `DiscoveryGrid.tsx:52`. **1 site. Ruling requested, unanswered** | R12, R2 |
@@ -600,3 +600,74 @@ a fence that counted its own minutes would be unsatisfiable.
   `hero-post-image-${side}`. Correct semantically; any E2E selector
   asserting the non-empty testid on a media-bearing market now fails on
   a 404 rather than finding a broken image.
+
+### §8-P1 · RED-first applies to defect guards only (2026-08-11)
+
+**Trigger.** PR-B commit 1. `P2-H7`/`H15` — *"any new guard green on
+first run is a vacuous pass"* — was written against PR-A, whose first
+commit asserted **a defect exists** (a 404ing image had no degradation
+path). PR-B's commit 1 is a **zero-delta proof**. Those are opposite
+obligations, and applying one halt to both is unsatisfiable: a
+zero-delta guard is green on first run **by definition**, so RED-first
+would require the refactor to break something first.
+
+**The scoping, ratified by the operator as RULE-1 and standing for
+every remaining POLISH surface — not a one-off:**
+
+- **RED-first stands ONLY for a guard asserting a DEFECT EXISTS.** Its
+  RED output is captured before any fix is written and pasted into the
+  commit body (H9's single exception).
+- **Zero-delta and census guards are discharged by MUTATION.** Break
+  the thing deliberately, record that it reddened, revert. **Stated
+  with the RED count, never claimed** — N8: a promised assertion
+  delivered vacuously is worse than an absent one, because it reads as
+  discharged.
+- **A census mutation must break on THREE axes, not two.** ① a member
+  **added** · ② a member **removed** · ③ **a member the census never
+  looks at** — mutate a file OUTSIDE the guard's input set that the
+  guard's own comment claims to cover. Axes ① and ② test MEMBERSHIP;
+  only ③ tests REACH, and a guard whose stated reach exceeds its actual
+  input set passes both membership axes while covering nothing.
+
+  ⚠ **This is not theory — axis ③ was added BECAUSE the two-axis form
+  failed here.** PR-B's `the-literals-survive-nowhere-in-src` filtered
+  the ladder literals against `CONSUMERS`' own two files while its
+  comment promised a whole-tree scan catching "a fifth site written
+  tomorrow". Mutations J and K each wrote into a file ALREADY in
+  `CONSUMERS`, so neither exercised the missing direction; the guard
+  passed both and was vacuous. `@code-reviewer` caught it (H-1), the
+  mutations did not. Mutation O is axis ③ and the pre-fix guard passed
+  it. **§8.3 N8: a promised assertion delivered vacuously reads as
+  discharged and is worse than an absent one.**
+
+**The precedent this reads off, rather than inventing.** §5's own
+commit table already made the split: H15 is attached to PR-A's commit 1
+(the defect test) and **not** to its commit 4 (the per-consumer
+zero-delta baselines). The rule was already being followed; it had just
+never been stated, so the next reader met a halt that appeared to fire
+on correct work.
+
+**Applied in PR-B:** fourteen mutations across commits 1–4 — 3 on the
+map lookup and its census, 4 on the two presets and the wiring census,
+4 on the ladder tokens and their consumers, 3 on the replyhead
+extraction. Each is named in its commit body with its RED count.
+
+⚠ **One of them is load-bearing beyond this task.** Mutation I put a
+literal hex in `--ring-active` and **`tokens-monochrome.test.ts` passed
+8/8**. Its census is keyed on a property NAME carrying a hex VALUE, so
+a composite token with a hard-coded colour is invisible to it. That
+blind spot is now covered by `emphasis-ladder-tokens.test.ts`, and the
+V1 analysis that predicted it is the reason D9 was cleared without a
+round-trip.
+
+**Promotion.** The rule belongs in **V-space**
+(`POLISH-0_data-manifest.md` §5) with a V-number. That is a numbering
+decision in a document this task does not own, so it is **routed, not
+taken** — `VACUITY-RULE-TO-V-REGISTER` in `docs/parked.md`.
+
+⚠ **What gets promoted is the THREE-AXIS form above, not the two-axis
+form this record originally carried.** The two-axis version was
+disproved on this branch before the branch closed: it is the version
+that passed a vacuous guard. Promoting it would install the defective
+rule in the register that exists to prevent exactly this. The docket
+row carries the three-axis text.

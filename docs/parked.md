@@ -906,8 +906,8 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 
 1. **One shared `MarketThumb` owning three states — null · error · loaded — used by BOTH sites** (PD-2-32). ⚠ **THREE call sites, not two:** `MarketCard.tsx:53` and `HeroPanels.tsx:64` render the market thumb; the **hero POST image** handles `null` but has **no `onError`**, so it carries the same gap. Do not patch the `<img>` tags independently — that is how PD-0-10 happened.
 2. **PD-2-33's `alt` fix, landing WITH it.** Both thumbs carry `alt={card.title}` while the same title renders in the adjacent `<h3>`; `alt=""` matches the hero POST image's ratified treatment and is also what stops the broken-image text overflowing the metadata row. ⚠ Fixing the `alt` alone hides the symptom while PD-2-32's real gap remains.
-3. **The `SideBadge` d5 `.md` and Profile `.sm` presets.** These have **NO register row** and **no preset to receive them** — `badges.tsx:70` is `size?: "hero"`, a **one-member union**. The only committed statement of the requirement is a plan sentence, `docs/plans/DISCOVERY-COMPLETE.md:70`.
-4. **`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers.** POLISH-1a unbound it at the two `IdentityCluster` chip sites; the remaining consumers still carry it.
+3. ~~**The `SideBadge` d5 `.md` and Profile `.sm` presets.** These have **NO register row** and **no preset to receive them** — `badges.tsx:70` is `size?: "hero"`, a **one-member union**. The only committed statement of the requirement is a plan sentence, `docs/plans/DISCOVERY-COMPLETE.md:70`.~~ **The SEAM half is DELIVERED at PRIMITIVES-2 PR-B commit 2**, and both stated blockers are gone: `CHIP.detail` / `CHIP.profile` exist, the union is three-member, and the register rows are **`PD-3-03`** and **`PD-5-01`**. **The ADOPTION half is deliberately NOT delivered** (D5) — zero call sites are wired, and a guard asserts it stays that way; `/m/[slug]` and `/u/[pseudonym]` adopt at POLISH.3 and POLISH.5 against their own inspections. Struck rather than deleted so the original blocker is still legible.
+4. ~~**`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers.** POLISH-1a unbound it at the two `IdentityCluster` chip sites; the remaining consumers still carry it.~~ **STRUCK — DISCHARGED, not built (PRIMITIVES-2 D1).** This item **said** the two named consumers still carried the blend. They do not, and did not when PRIMITIVES-2 was scoped: **PRIMITIVES-1 D6 removed `after:mix-blend-darken` FROM THE PRIMITIVE** (`997f308`, PR #293), which fixed all three consumers in one edit rather than two of three. `mix-blend` has **zero occurrences anywhere in `src/`** at PRIMITIVES-2 head, and its absence is pinned two independent ways by `tests/unit/design/avatar-ring-token.test.ts:72,83`. The two "unfixed consumers" this row named — `HeroPanels.tsx:112`, `ArgProfile.tsx:51` — are clean (and `:112` is no longer an Avatar mount at all). **Struck rather than deleted so a later reader can see the concern existed and was answered, not that it was never raised.**
 5. **The secondary text tier and the emphasis ladder, AS NAMED PRESETS.**
 
 ⚠ **BINDING CONDITION, carried verbatim:** *the secondary text tier and the emphasis ladder land as **NAMED PRESETS**, not inline classes. That is what makes deferring the founder's visual pass safe. If they land inline the safety property is gone and the batched pass MUST be revisited.*
@@ -921,6 +921,84 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 **Conditional trigger.** **None — it runs next.** No date is needed because nothing gates it: PD-2-32 and PD-2-33 are open and owned here, and every other item is a primitive that already exists.
 
 **Expected next task.** PRIMITIVES-2 itself. Evidence: `POLISH-register.md` PD-2-32 · PD-2-33 · CC-9 · PD-0-10; `docs/plans/DISCOVERY-COMPLETE.md:70`; `docs/logs/DISCOVERY-COMPLETE.md:268`.
+
+---
+
+## MICRO-LABEL-TIER — normalise the uppercase micro-labels — **ROUTED TO POLISH.4**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), ruling **D8**.
+
+**Deferred work.** The participant tree's uppercase micro-labels share no import and no scale. **12 sites across 7 files** outside the one PRIMITIVES-2 touched: `shell/IdentityCluster.tsx:32` · `shell/RadioSlot.tsx:30` · `shell/DharmaCluster.tsx:89,98` · `debate/composer/PositionStrip.tsx:44,61` · `debate/composer/BetComposer.tsx:457,509,537` · `debate/composer/SellModule.tsx:263,278` · `debate/composer/AuthGateSlot.tsx:49`. Between them: **4 sizes × 5 trackings × 2 weights × 4 colour tiers**, no shared constant.
+
+⚠ **STATE THE CLASSIFIER — this census is CLASSIFIER-DEPENDENT and two honest counts disagree.** The set above is *`uppercase` + a `tracking-*` class, participant surfaces only, `src/app/(admin)/**` excluded*. PRIMITIVES-2's recon counted **13 across 6 files with 5 tiers** using a wider predicate that includes the two `text-ink` Support/Counter labels this one excludes. **Neither is wrong.** A future task must say which predicate it means before quoting a number, or it will "correct" a count that was never incorrect.
+
+**Why deferred.** Normalising them re-skins `shell/` and `debate/composer/` — **POLISH.4's uninspected surface** — and `POLISH-0.md` §5 forbids a V batch spanning surfaces. PRIMITIVES-2 D8 is a **recorded departure** from the docket's literal text: it built the seam at the two rungs where it is coherent and proved the one-line safety property, rather than sweeping 14 sites across two surfaces nobody has looked at.
+
+**Conditional trigger.** POLISH.4's inspection. Not before.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §3 D8 + §2's two `R11` rows (both annotated at PR-B commit 4); `src/components/discovery/HeroPanels.tsx` `REPLYHEAD_TIER` — the one site that DID land, named for the replyhead precisely so it claims none of the above.
+
+---
+
+## BORDER-STRONG-ORPHAN — a ratified token with zero consumers — **F3-BLOCKED**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), ruling **D10**.
+
+**Deferred work.** `--border-strong` (`globals.css`, aliased to `var(--color-n2)`) has **zero consumers**. Its only mention in `src/` is the prose at `DiscoveryGrid.tsx:37` explaining why it was *not* used. Decide: retire it, or re-point it at the ladder.
+
+**Why deferred.** Both answers are token-**VALUE** decisions, and token values are F3-blocked and CI-pinned by `tokens-monochrome.test.ts`. PRIMITIVES-2 D9 deliberately did **not** absorb it: the ladder now has real named consumers (`--border-hero`, `--ring-active`), which is what makes the question *answerable* later — answering it then would have been a value change riding a mechanism change.
+
+**Conditional trigger.** Whenever the F3 token-value lane opens.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §3 D10; `tests/unit/design/emphasis-ladder-tokens.test.ts` pins that it still has its alias and no consumer.
+
+---
+
+## RR-4-ID-COLLISION — `RR-4` names two different findings — **NEEDS A RULING, NOT AN EDIT**
+
+**Originating task:** POLISH-TEMPLATE (`docs/logs/POLISH-TEMPLATE.md:88`, S-4). **Rowed at PRIMITIVES-2 PR-B** (2026-08-11), ruling **D13**, in the same commit that moved RR-4's disposition cell.
+
+**Deferred work.** `docs/logs/DISCOVERY-COMPLETE.md` mints RR-1…RR-4. The register files RR-3 and RR-4, renames RR-1 → CC-9, and folds RR-2's content into what it calls RR-4. **Read side by side, `RR-4` names two different findings**: the register's is `PositionMarker` outline → filled (`POLISH-register.md:98`), the log's is C0's third route — the fixed-pole-on-a-per-side-element known gap (`docs/logs/DISCOVERY-COMPLETE.md:307`).
+
+**Why deferred, and why an edit would be wrong.** Renumbering a stable ID scheme is exactly what the register forbids (S-3's ruling on the CC-8 gap), and both IDs are cited from committed documents. **It needs a ruling on which reading is canonical, then a one-time reconciliation — not a silent rename.**
+
+⚠ **PRIMITIVES-2 D13 moved RR-4's `disposition` cell to `accepted-divergence` and moved nothing else.** That edit does **not** touch this collision and must not be read as having resolved it. This row exists so the unresolved half survives the cell edit.
+
+**Conditional trigger.** The next register-maintenance pass, or POLISH.5/.6 hitting the ambiguity during inspection.
+
+**Evidence.** `docs/logs/POLISH-TEMPLATE.md:88` · `docs/polish/POLISH-register.md:98` · `docs/logs/DISCOVERY-COMPLETE.md:307`, `:348` · `docs/plans/PRIMITIVES-2.md` §3 D13 + §9.
+
+---
+
+## G1-RECON-TEMPLATE — the seven recon-template requirements landed nowhere — **DOC-ONLY**
+
+**Originating task:** PRIMITIVES-1 (`docs/logs/PRIMITIVES-1.md:52`, finding **G1**). **Rowed at PRIMITIVES-2 PR-B** (2026-08-11), §9.
+
+**Deferred work.** PRIMITIVES-1 minted **seven recon-template requirements**, the load-bearing one being *replace the render census with a consumer census*. They are **named in that one session log and landed nowhere** — not in the recon template, not in `docs/maintenance.md`, not in `CLAUDE.md`. PRIMITIVES-1 ruled the text out of scope for itself and routed it to "its own docs task", which has never been opened.
+
+**Why it matters, measured rather than argued.** The render census enumerated production call sites exhaustively and test assertions not at all, which is how **six defects of one genus** reached execute at PRIMITIVES-1. At PRIMITIVES-2, **recon R6 performed the consumer census by hand** because the requirement still lives only in a log — and the count it produced was then re-measured a third time at PR-B head. Three manual censuses of the same primitive, because a prescriptive requirement was filed in a descriptive document.
+
+⚠ **This is the CLAUDE.md §7 failure mode by name:** *"same PR, never a follow-up — follow-ups never happen."* It has now not happened across two full tasks.
+
+**Conditional trigger.** The next docs/maintenance task, or the next recon of any kind — whichever comes first.
+
+**Evidence.** `docs/logs/PRIMITIVES-1.md:52`, `:148` · `docs/plans/PRIMITIVES-2.md` §9 · PRIMITIVES-2 recon R6.
+
+---
+
+## VACUITY-RULE-TO-V-REGISTER — promote the RED-first scoping rule — **DOC-ONLY**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), operator ruling **RULE-1**, recorded as `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`.
+
+**Deferred work.** Promote the rule into the **V-space register** (`POLISH-0_data-manifest.md` §5), where verification lessons live, and give it a V-number. The rule: **RED-first is required only of a guard asserting a DEFECT EXISTS. Zero-delta and census guards are green on first run by definition, and are discharged by MUTATION — stated with the RED count, never claimed. A census mutation must break on THREE axes: ① a member added · ② a member removed · ③ a member the census never looks at.** Axes ① and ② test MEMBERSHIP; only ③ tests REACH.
+
+⚠ **Promote the THREE-axis form. An earlier draft of this row and of `§8-P1` said "BOTH directions", and that two-axis version was DISPROVED on the branch that minted it** — it is the version that passed a vacuous guard (`the-literals-survive-nowhere-in-src`, reviewer finding H-1). Installing it in the register that exists to prevent vacuity would be the defect promoting itself.
+
+**Why deferred.** The register edit is a **numbering decision in a document PRIMITIVES-2 does not own**, and CLAUDE.md §8 is explicit that a register cannot arbitrate its own numbering from outside. PRIMITIVES-2 records the rule at its own §11 and routes the promotion rather than allocating a V-number itself.
+
+**Conditional trigger.** The next SYNC sweep, or the next task that touches `POLISH-0_data-manifest.md` §5.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`; applied across four commits in PR-B (commits 1–4; 16 mutations after the reviewer pass).
 
 ---
 

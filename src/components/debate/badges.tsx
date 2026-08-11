@@ -15,7 +15,44 @@ import type { Marker, Side } from "./types";
  * The same class name carries different numbers per surface, so applying one
  * surface's geometry to the shared primitive would import it onto two surfaces
  * that have their own ratified numbers. d5's and Profile's presets are
- * POLISH.3 / POLISH.6 rows.
+ * POLISH.3 / POLISH.5 rows.
+ *
+ * PRIMITIVES-2 D6 — PRESETS ARE NAMED BY SURFACE, NEVER BY MOCKUP CLASS. The
+ * mockup class name is not a stable key: `.sidechip.md` is 9px on Discovery and
+ * 10px on d5, so a preset named `md` would carry d5's number under a name
+ * meaning Discovery's — three lines below `hero`, which already IS Discovery's
+ * `.md`. A stale-name defect minted at birth. `detail` / `profile` name the
+ * SURFACE that ratified the numbers, matching `PriceBar`'s `hero`/`card`/
+ * `detail`.
+ *
+ * ⚠ EACH VALUE IS A FLATTENED CASCADE, not a transcription of its modifier
+ * rule. The mockups are cascading CSS — a `.sidechip` base PLUS a `.md`/`.sm`
+ * modifier — and this component has NO cascade: one preset is one complete
+ * standalone string. Every property the modifier inherits from the base must be
+ * written out explicitly or it falls through to shadcn's `badgeVariants`, whose
+ * base declares `text-xs font-medium` — so an omitted `font-extrabold` lands on
+ * 500, not the mockups' 800. `hero` is the existing precedent: Discovery's base
+ * declares `font-weight:800` and its `.md` does not, and `hero` carries
+ * `font-extrabold` anyway.
+ *
+ * ⚠ ONE PROPERTY IS NOT THE MOCKUP'S AND CANNOT BE: `badgeVariants` sets
+ * `h-5`, and NEITHER mockup declares a height on `.sidechip`, so the chip's box
+ * is 20px regardless of the padding a preset carries. `profile`'s `2px 7px` on
+ * 8.5px text computes to roughly 14px of content, so the rendered box is taller
+ * than the mockup's. This is NOT a dropped property — there is nothing to drop
+ * — and it is identical in kind to the already-ratified `hero`. Recorded
+ * because these presets have no consumer, so nothing measures their box until
+ * POLISH.3 / POLISH.5 look at 1440, and that is where the divergence would
+ * first be seen.
+ *
+ * PRIMITIVES-2 D7 — `base` is a REAL KEY, and the preset is resolved by MAP
+ * LOOKUP (`CHIP[size ?? "base"]`), never by the binary ternary the call site
+ * below previously carried. A ternary resolves every unlisted member to `base`
+ * SILENTLY: correct today only by accident of its shape, and a wrong render the
+ * moment a third preset exists. Through the map, a union member added without a
+ * `CHIP` entry is a COMPILE ERROR (CLAUDE.md §8 O-1 — structural beats
+ * procedural). This commit adds no preset and no value; it changes only how one
+ * is chosen, so every call site's emitted class attribute is unmoved.
  */
 const CHIP = {
 	// Byte-identical to the pre-C3 string, hairline included and in the SAME
@@ -23,6 +60,27 @@ const CHIP = {
 	// attribute they emitted before — not merely an equivalent one.
 	base: "rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)]",
 	hero: "rounded-[var(--r)] px-[7px] py-[2px] text-[9px] font-extrabold tracking-[0.06em] [border:var(--hairline)]",
+	// d5's `.sidechip.md` — surface_d5_v1_0.html:540 (font-size, padding) over
+	// the base at :538 (font-weight, letter-spacing) and the grouped radius rule
+	// at :742. POLISH.3 adopts; NOT wired here (D5 — the seam lands, the call
+	// site is `.3`'s).
+	detail:
+		"rounded-[var(--r)] px-[9px] py-[3px] text-[10px] font-extrabold tracking-[0.1em] [border:var(--hairline)]",
+	// Profile's `.sidechip.sm` — surface_profile_v1_0.html:279 (font-size,
+	// padding, letter-spacing) over the base at :278 (font-weight, radius).
+	// POLISH.5 adopts — `.5`, not `.6`: that mockup is POLISH.5's surface.
+	//
+	// ⚠ DO NOT REUSE THIS FOR d5's `.sm` SITES, even though d5's `.sm` modifier
+	// (`:541`) is BYTE-IDENTICAL to Profile's (`:279`). The equality holds at the
+	// modifier and nowhere else: d5 carries two CONTEXTUAL overrides Profile has
+	// no equivalent of — `.panel.vm .sidechip.sm{border-radius:4px}` (`:882`) and
+	// `.replylist.vp .sidechip.sm{border-radius:4px}` (`:911`). A flattened
+	// preset has no cascade to express them, so wiring `profile` into a d5 `.sm`
+	// site would silently render `var(--r)` where the mockup ratified 4px. Two
+	// independent reasons not to wire it, then: that adoption is POLISH.3's
+	// decision, AND this value is wrong for those sites.
+	profile:
+		"rounded-[var(--r)] px-[7px] py-[2px] text-[8.5px] font-extrabold tracking-[0.08em] [border:var(--hairline)]",
 } as const;
 
 /**
@@ -67,7 +125,26 @@ export function SideBadge({
 	 * renders the same field unmodified (debate-export/serialize.ts:320, :348).
 	 */
 	price?: string;
-	size?: "hero";
+	/**
+	 * OPTIONAL, deliberately — and this is the OPPOSITE call from `PriceBar`'s
+	 * REQUIRED `size` (`PriceBar.tsx:31-33`) on the same primitive class. The
+	 * asymmetry is driven by the call-site census, not by a change of principle:
+	 * TWELVE of `SideBadge`'s thirteen render sites pass no `size` and ride
+	 * `CHIP.base`, so requiring it is a twelve-site edit whose every edit writes
+	 * the same string the `?? "base"` default already resolves to — cost without
+	 * a defect fixed. `PriceBar` has three sites and all three pass one, so
+	 * `required` cost it nothing there.
+	 *
+	 * O-1's structural guarantee is not weakened by that: what turns a missing
+	 * preset into a compile error here is the MAP, not the required-ness. A
+	 * required `size` would only have moved which argument goes missing.
+	 *
+	 * `detail` and `profile` have ZERO call sites by design (D5): the SEAM lands
+	 * at this primitive, the ADOPTION is POLISH.3's and POLISH.5's. Wiring one
+	 * here would re-skin a surface before it has been inspected. Their only
+	 * coverage is therefore the direct render tests, at both poles.
+	 */
+	size?: "hero" | "detail" | "profile";
 }) {
 	// pctround-allow: a single HISTORICAL value for ONE bet — a point in time,
 	// not one half of a live pair (SPEC.1 §10.8). Rendered RAW because the stored
@@ -82,7 +159,7 @@ export function SideBadge({
 				// Pole edges are carried by the standard #404040 border on BOTH
 				// poles (values-log v0_3 §3) — without it the black YES fill is
 				// invisible on the n0 card. Carried inside each preset above.
-				size === "hero" ? CHIP.hero : CHIP.base,
+				CHIP[size ?? "base"],
 				side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
 			)}
 		>

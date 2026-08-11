@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -10,15 +13,28 @@ import { SideBadge } from "@/components/debate/badges";
  * hero chip geometry). Both additions are OPT-IN, so the call sites that
  * pass neither prop render exactly what they rendered before.
  *
- * COUNTED INVENTORY, accurate at PR head. `SideBadge` has THIRTEEN render
- * sites across TEN consumer files, plus the definition. C3 changes exactly one
- * of them — `discovery/HeroPanels.tsx:137`, which opts into both new props. Four
- * more (`bookmarks/BookmarkCard.tsx:32,46`, `profile/ArgumentList.tsx:49,59`)
- * are NEW call sites minted by C4/C4b, which adopt this primitive to fix the
- * INV-3 inversion — they are intended changes, not deltas to preserve. The
- * remaining EIGHT pass neither prop and must render exactly what they rendered
- * before; the first describe below is their zero-delta proof, asserted on the
- * class tail this component owns.
+ * PRIMITIVES-2 commit 1 (D7) re-measured this inventory at ITS head and the
+ * zero-delta subject is TWELVE, not the EIGHT this docblock previously claimed.
+ *
+ * COUNTED INVENTORY, re-measured at PRIMITIVES-2 PR-B HEAD (not at the branch
+ * point). `SideBadge` has THIRTEEN render sites across TEN consumer files, plus
+ * the definition. Exactly ONE — `discovery/HeroPanels.tsx:169` — passes a
+ * `size`; the other TWELVE pass none and therefore ride `CHIP.base`.
+ *
+ * ⚠ That line was `:142` when this paragraph was first written at the branch
+ * point `143380b`, and commit 4's `REPLYHEAD_TIER` block shifted it. Corrected
+ * at PR head rather than left citing a SHA — the census below is keyed by FILE
+ * for exactly this reason, and a docblock that went stale inside its own branch
+ * is the failure this paragraph exists to describe (§8.2).
+ *
+ * ⚠ THE "EIGHT" ABOVE WAS A SUBSET, NOT A COUNT OF THE BASE SITES. It named the
+ * sites that pre-existed C3, and so EXCLUDED the four C4/C4b-minted sites
+ * (`bookmarks/BookmarkCard.tsx:32,46`, `profile/ArgumentList.tsx:49,59`) — which
+ * pass no `size` and DO ride `CHIP.base`. They were "intended changes" only with
+ * respect to C3's own diff; to any LATER change of the base preset they are
+ * ordinary zero-delta subjects. A zero-delta proof scoped to the eight would
+ * have silently exempted four live sites, so the subject is restated as twelve
+ * and made mechanical by the census below rather than left to a prose count.
  *
  * (The plan said "9 files / 8 consumers". That was true when the plan was
  * written and is stale at PR head BECAUSE C4/C4b adopted the primitive in this
@@ -45,7 +61,87 @@ afterEach(cleanup);
 const OWNED_TAIL =
 	"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)] bg-yes text-no";
 
-describe("SideBadge — the eight untouched call sites have a zero delta", () => {
+/**
+ * The census that makes "twelve sites" a MEASUREMENT rather than a claim.
+ *
+ * The two render assertions below exercise the base preset through both poles,
+ * which is the whole of what those twelve sites render — every one of them is
+ * `<SideBadge side={…} />` and nothing else. What that pair cannot show is HOW
+ * MANY sites it speaks for, and a prose count is exactly what went stale above.
+ * So the count is read off the tree here.
+ *
+ * KEYED BY FILE, NOT BY `file:line`, deliberately. A line-keyed inventory
+ * reddens on any unrelated edit that shifts a line in one of these ten files —
+ * and a guard that reddens on correct code gets suppressed within a week
+ * (`side-pole-binding.test.ts:38`, the same reasoning that keeps its own
+ * inventory file-keyed). Per-file COUNTS still catch both directions: a
+ * thirteenth base site and a removed one each break set equality.
+ */
+const ROOT = process.cwd();
+
+const RENDER_SITE = /<SideBadge\b[\s\S]*?\/>/g;
+
+const sideBadgeSites = readdirSync(join(ROOT, "src"), {
+	recursive: true,
+	withFileTypes: true,
+})
+	.filter((entry) => entry.isFile() && entry.name.endsWith(".tsx"))
+	.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""))
+	.flatMap((file) =>
+		[...readFileSync(join(ROOT, file), "utf8").matchAll(RENDER_SITE)].map(
+			(match) => ({
+				file,
+				markup: match[0],
+				sized: /\bsize\s*=/.test(match[0]),
+			}),
+		),
+	);
+
+const countByFile = (sites: ReadonlyArray<{ file: string }>) => {
+	const counts: Record<string, number> = {};
+	for (const { file } of sites) {
+		counts[file] = (counts[file] ?? 0) + 1;
+	}
+	return counts;
+};
+
+describe("SideBadge — the twelve CHIP.base call sites are a measured set", () => {
+	it("census-is-alive", () => {
+		// A glob that silently matched nothing passes vacuously (N1). If this
+		// floor ever trips, the matcher broke — not the inventory.
+		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
+	});
+
+	it("exactly-twelve-sites-pass-no-size-and-ride-CHIP-base", () => {
+		const base = sideBadgeSites.filter((site) => !site.sized);
+		// Set equality, never a bare count (N5) — a count of 12 is also satisfied
+		// by twelve sites in the wrong files.
+		expect(countByFile(base)).toEqual({
+			"src/components/bookmarks/BookmarkCard.tsx": 2,
+			"src/components/debate/ArgProfile.tsx": 1,
+			"src/components/debate/DebateColumn.tsx": 1,
+			"src/components/debate/PostCard.tsx": 1,
+			"src/components/debate/PostFocusHeader.tsx": 1,
+			"src/components/debate/ReplyCard.tsx": 2,
+			"src/components/debate/composer/BetComposer.tsx": 1,
+			"src/components/debate/composer/SellModule.tsx": 1,
+			"src/components/profile/ArgumentList.tsx": 2,
+		});
+		expect(base).toHaveLength(12);
+	});
+
+	it("the-only-sized-site-is-the-discovery-hero", () => {
+		// The positive control beside the assertion above (N3): the classifier
+		// does distinguish the two kinds, so "twelve unsized" is not just "the
+		// matcher never sees a size".
+		const sized = sideBadgeSites.filter((site) => site.sized);
+		expect(countByFile(sized)).toEqual({
+			"src/components/discovery/HeroPanels.tsx": 1,
+		});
+	});
+});
+
+describe("SideBadge — the twelve CHIP.base call sites have a zero delta", () => {
 	it("bare-yes-render-is-unchanged", () => {
 		const { container } = render(<SideBadge side="YES" />);
 		const badge = container.firstElementChild;
@@ -69,6 +165,31 @@ describe("SideBadge — the eight untouched call sites have a zero delta", () =>
 				),
 		).toBe(true);
 	});
+
+	it("an-explicitly-undefined-size-resolves-to-base-not-to-nothing", () => {
+		// D7's one behavioural risk, pinned. `CHIP[size ?? "base"]` differs from
+		// the ternary it replaced in exactly one way: a ternary could not produce
+		// `undefined`, and a map lookup can. The `??` is what closes that. Written
+		// as `CHIP[size as "hero"]` the chip would emit NO geometry classes at
+		// all — and the two assertions above would still pass, because a bare
+		// render's suffix is then the pole pair alone. Asserted at BOTH poles: a
+		// YES-only assertion passes on an inverted NO panel.
+		for (const [side, tail] of [
+			["YES", OWNED_TAIL],
+			[
+				"NO",
+				"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)] bg-no text-yes",
+			],
+		] as const) {
+			const { container } = render(<SideBadge side={side} size={undefined} />);
+			const cls = container.firstElementChild?.getAttribute("class") ?? "";
+			expect(cls.endsWith(tail)).toBe(true);
+			// The geometry is PRESENT, not merely the pole pair — the half the
+			// suffix pin alone cannot distinguish.
+			expect(cls).toContain("text-[10px]");
+			cleanup();
+		}
+	});
 });
 
 describe("SideBadge — INV-3, the side stays pole-bound whatever else is added", () => {
@@ -83,6 +204,10 @@ describe("SideBadge — INV-3, the side stays pole-bound whatever else is added"
 				{ price: "0.270000000000000000" },
 				{ size: "hero" as const },
 				{ size: "hero" as const, price: "0.270000000000000000" },
+				{ size: "detail" as const },
+				{ size: "detail" as const, price: "0.270000000000000000" },
+				{ size: "profile" as const },
+				{ size: "profile" as const, price: "0.270000000000000000" },
 			]) {
 				const { container } = render(<SideBadge side={side} {...props} />);
 				const cls = container.firstElementChild?.getAttribute("class") ?? "";
@@ -187,5 +312,122 @@ describe("SideBadge — V11, the Discovery hero geometry", () => {
 			);
 			cleanup();
 		}
+	});
+});
+
+/**
+ * PRIMITIVES-2 D5/D6 — the two seam presets.
+ *
+ * ⚠ THESE TESTS ARE THE ONLY COVERAGE THESE PRESETS HAVE. Zero call sites wire
+ * them by design: the seam lands at this primitive, the adoption is POLISH.3's
+ * (`detail`) and POLISH.5's (`profile`). No consumer render exercises them, so
+ * nothing else in the suite would notice a wrong value.
+ *
+ * Asserted as the FLATTENED CASCADE, property by property, because that is the
+ * failure mode: the mockups are cascading CSS and this component has none, so a
+ * property the modifier inherits from its base is silently dropped unless it is
+ * written out. `font-extrabold` is the sharp edge — omit it and the chip lands
+ * on shadcn's `font-medium` (500) instead of the mockups' 800, which no
+ * geometry assertion would catch.
+ */
+const PRESETS = [
+	{
+		size: "detail" as const,
+		// surface_d5_v1_0.html — :540 modifier, :538 base, :742 grouped radius.
+		expected: [
+			"rounded-[var(--r)]",
+			"px-[9px]",
+			"py-[3px]",
+			"text-[10px]",
+			"font-extrabold",
+			"tracking-[0.1em]",
+			"[border:var(--hairline)]",
+		],
+	},
+	{
+		size: "profile" as const,
+		// surface_profile_v1_0.html — :279 modifier, :278 base.
+		expected: [
+			"rounded-[var(--r)]",
+			"px-[7px]",
+			"py-[2px]",
+			"text-[8.5px]",
+			"font-extrabold",
+			"tracking-[0.08em]",
+			"[border:var(--hairline)]",
+		],
+	},
+];
+
+describe("SideBadge — the detail and profile seam presets", () => {
+	it("each-preset-emits-its-full-flattened-cascade-at-both-poles", () => {
+		for (const { size, expected } of PRESETS) {
+			// BOTH POLES. A YES-only assertion passes on an inverted NO panel —
+			// the mechanism by which the last inversion survived a full PR.
+			for (const [side, pole] of [
+				["YES", "bg-yes text-no"],
+				["NO", "bg-no text-yes"],
+			] as const) {
+				const { container } = render(<SideBadge side={side} size={size} />);
+				const cls = container.firstElementChild?.getAttribute("class") ?? "";
+				for (const token of expected) {
+					expect(cls).toContain(token);
+				}
+				expect(cls).toContain(pole);
+				cleanup();
+			}
+		}
+	});
+
+	it("neither-preset-inherits-a-shadcn-default-it-was-meant-to-override", () => {
+		// The flattening rule's teeth, asserted as ABSENCE. `badgeVariants` ships
+		// `text-xs font-medium rounded-4xl px-2 py-0.5`; every one of those is a
+		// property the mockup cascade sets, so each must be overridden. Class
+		// ORDER puts the preset last, so a stale shadcn token surviving here means
+		// the preset never declared its own.
+		//
+		// TWO of those five are asserted here, not all five: `text-xs`, `px-2`
+		// and `py-0.5` are already pinned POSITIVELY by the preceding test, which
+		// requires the preset's own `text-[…]`/`px-[…]`/`py-[…]` to be present.
+		// `font-medium` and `rounded-4xl` are the two that `twMerge` does NOT
+		// resolve away on its own, so absence is the only way to catch them.
+		for (const { size } of PRESETS) {
+			const { container } = render(<SideBadge side="YES" size={size} />);
+			const tokens = (
+				container.firstElementChild?.getAttribute("class") ?? ""
+			).split(/\s+/);
+			expect(tokens).not.toContain("font-medium");
+			expect(tokens).not.toContain("rounded-4xl");
+			cleanup();
+		}
+	});
+
+	it("the-two-presets-are-distinct-and-neither-equals-hero-or-base", () => {
+		// D6's stale-name trap, pinned as a property rather than as prose: four
+		// presets that are meant to differ must actually differ. `detail` is d5's
+		// `.md` at 10px and `hero` is Discovery's `.md` at 9px — the same mockup
+		// class name, two different numbers, which is exactly why neither is
+		// named `md`.
+		const emitted = (["base", "hero", "detail", "profile"] as const).map(
+			(size) => {
+				const { container } = render(
+					<SideBadge side="YES" size={size === "base" ? undefined : size} />,
+				);
+				const cls = container.firstElementChild?.getAttribute("class") ?? "";
+				cleanup();
+				return cls;
+			},
+		);
+		expect(new Set(emitted).size).toBe(4);
+	});
+
+	it("no-call-site-wires-detail-or-profile", () => {
+		// D5, asserted rather than trusted. The seam lands here; the adoption is
+		// POLISH.3's and POLISH.5's. If a later PR wires one, this reddens and the
+		// wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`.
+		const wired = sideBadgeSites.filter((site) =>
+			/size\s*=\s*["{]?\s*["']?(?:detail|profile)/.test(site.markup),
+		);
+		expect(wired).toEqual([]);
 	});
 });

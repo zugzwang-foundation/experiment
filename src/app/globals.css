@@ -164,6 +164,18 @@
  */
 :root {
 	--hairline: 1px solid var(--color-n2);
+	/* The EMPHASIS LADDER, rungs 2 and 3 (PRIMITIVES-2 D9). Rung 1 is
+	 * --hairline directly above; these join it in the SAME mechanism rather
+	 * than becoming React presets, so the whole ladder reads as one object in
+	 * one file. Composites over already-ratified ramp tokens — NO new hex and
+	 * NO new colour, exactly like --hairline and --avatar-ring.
+	 *
+	 * ⚠ REFERENCE THE RAMP TOKEN, NEVER A LITERAL HEX. tokens-monochrome's
+	 * census is keyed on the PROPERTY NAME (--color-n0..n7|ink|yes|no) with a
+	 * hex value, so a hard-coded #545454 here would sail past it. The
+	 * constraint is carried by this rule, not by that guard. */
+	--border-hero: 1px solid var(--color-n3); /* rung 2 — FOUNDER-RULED, PD-2-07 */
+	--ring-active: 1.5px solid var(--color-n4); /* rung 3 — ruling OPEN, PD-2-08 */
 	--imgmax: 160px; /* tunable — comment-image max (consumed by DEBATE.4) */
 	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, avatars, media, graph panels) */
 	/* Applied surfaces */
