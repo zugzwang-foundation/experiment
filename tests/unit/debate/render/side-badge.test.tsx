@@ -16,10 +16,16 @@ import { SideBadge } from "@/components/debate/badges";
  * PRIMITIVES-2 commit 1 (D7) re-measured this inventory at ITS head and the
  * zero-delta subject is TWELVE, not the EIGHT this docblock previously claimed.
  *
- * COUNTED INVENTORY, re-measured at PRIMITIVES-2 PR-B head (`143380b`).
- * `SideBadge` has THIRTEEN render sites across TEN consumer files, plus the
- * definition. Exactly ONE — `discovery/HeroPanels.tsx:142` — passes a `size`;
- * the other TWELVE pass none and therefore ride `CHIP.base`.
+ * COUNTED INVENTORY, re-measured at PRIMITIVES-2 PR-B HEAD (not at the branch
+ * point). `SideBadge` has THIRTEEN render sites across TEN consumer files, plus
+ * the definition. Exactly ONE — `discovery/HeroPanels.tsx:169` — passes a
+ * `size`; the other TWELVE pass none and therefore ride `CHIP.base`.
+ *
+ * ⚠ That line was `:142` when this paragraph was first written at the branch
+ * point `143380b`, and commit 4's `REPLYHEAD_TIER` block shifted it. Corrected
+ * at PR head rather than left citing a SHA — the census below is keyed by FILE
+ * for exactly this reason, and a docblock that went stale inside its own branch
+ * is the failure this paragraph exists to describe (§8.2).
  *
  * ⚠ THE "EIGHT" ABOVE WAS A SUBSET, NOT A COUNT OF THE BASE SITES. It named the
  * sites that pre-existed C3, and so EXCLUDED the four C4/C4b-minted sites
@@ -379,6 +385,12 @@ describe("SideBadge — the detail and profile seam presets", () => {
 		// property the mockup cascade sets, so each must be overridden. Class
 		// ORDER puts the preset last, so a stale shadcn token surviving here means
 		// the preset never declared its own.
+		//
+		// TWO of those five are asserted here, not all five: `text-xs`, `px-2`
+		// and `py-0.5` are already pinned POSITIVELY by the preceding test, which
+		// requires the preset's own `text-[…]`/`px-[…]`/`py-[…]` to be present.
+		// `font-medium` and `rounded-4xl` are the two that `twMerge` does NOT
+		// resolve away on its own, so absence is the only way to catch them.
 		for (const { size } of PRESETS) {
 			const { container } = render(<SideBadge side="YES" size={size} />);
 			const tokens = (

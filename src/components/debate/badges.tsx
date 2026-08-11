@@ -35,6 +35,16 @@ import type { Marker, Side } from "./types";
  * declares `font-weight:800` and its `.md` does not, and `hero` carries
  * `font-extrabold` anyway.
  *
+ * ⚠ ONE PROPERTY IS NOT THE MOCKUP'S AND CANNOT BE: `badgeVariants` sets
+ * `h-5`, and NEITHER mockup declares a height on `.sidechip`, so the chip's box
+ * is 20px regardless of the padding a preset carries. `profile`'s `2px 7px` on
+ * 8.5px text computes to roughly 14px of content, so the rendered box is taller
+ * than the mockup's. This is NOT a dropped property — there is nothing to drop
+ * — and it is identical in kind to the already-ratified `hero`. Recorded
+ * because these presets have no consumer, so nothing measures their box until
+ * POLISH.3 / POLISH.5 look at 1440, and that is where the divergence would
+ * first be seen.
+ *
  * PRIMITIVES-2 D7 — `base` is a REAL KEY, and the preset is resolved by MAP
  * LOOKUP (`CHIP[size ?? "base"]`), never by the binary ternary the call site
  * below previously carried. A ternary resolves every unlisted member to `base`

@@ -36,7 +36,7 @@ export const HERO_SIDE_EMPTY = {
  * ⚠ NAMED FOR THE REPLYHEAD, AND DELIBERATELY NOT FOR THE CONCEPT. It is not
  * `MICRO_LABEL` or `SECONDARY_TEXT_TIER`: there are 12 other uppercase
  * micro-labels in the participant tree across `shell/` and `debate/composer/`,
- * with 4 sizes, 4 trackings, 2 weights and 4 colour tiers between them, and
+ * with 4 sizes, 5 trackings, 2 weights and 4 colour tiers between them, and
  * this constant governs NONE of them. A concept name would assert ownership it
  * does not have, and the assertion would be found false by the first person to
  * grep it.

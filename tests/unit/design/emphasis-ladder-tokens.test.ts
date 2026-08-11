@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -60,7 +60,39 @@ const CONSUMERS = [
 const occurrences = (haystack: string, needle: string) =>
 	haystack.split(needle).length - 1;
 
+/** The two literal forms the tokens replaced, as they appear in a className. */
+const LADDER_LITERALS = CONSUMERS.map(({ literal }) => literal);
+
+/**
+ * Every `.ts`/`.tsx` under `src/` — the shape already used by
+ * `side-pole-binding.test.ts:219` and `side-badge.test.tsx`. The whole-tree
+ * scan is what makes the two assertions below catch a literal written into a
+ * file that is NOT in `CONSUMERS`, which is the drift these guards exist for.
+ */
+const viewLayerFiles = readdirSync(join(ROOT, "src"), {
+	recursive: true,
+	withFileTypes: true,
+})
+	.filter(
+		(entry) =>
+			entry.isFile() &&
+			(entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")),
+	)
+	.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""));
+
 describe("emphasis ladder — rungs 2 and 3 are named tokens", () => {
+	it("tree-scan-is-alive", () => {
+		// N1 — a glob that silently matched nothing passes both whole-tree
+		// assertions vacuously, which is the exact failure H-1 was. 262 files
+		// under `src/` at C0 with `(admin)` EXCLUDED; this scan includes admin,
+		// so the floor is conservative and cannot trip on its own diff.
+		expect(viewLayerFiles.length).toBeGreaterThanOrEqual(262);
+		// Positive control: the scan really can see a ladder consumer.
+		expect(viewLayerFiles).toContain(
+			"src/components/discovery/DiscoveryGrid.tsx",
+		);
+	});
+
 	it("both-tokens-are-defined-with-their-exact-ratified-composites", () => {
 		const css = read(TOKENS);
 		expect(css).toContain(`--border-hero: ${RUNG_2_LITERAL};`);
@@ -121,23 +153,40 @@ describe("emphasis ladder — rungs 2 and 3 are named tokens", () => {
 	});
 
 	it("the-literals-survive-nowhere-in-src", () => {
-		// Set equality over the whole view layer, not a per-file check: a fifth
-		// site written tomorrow with the literal form is exactly the drift this
-		// commit exists to prevent, and it would not be in CONSUMERS.
-		const stray = [
-			"[border:1px_solid_var(--color-n3)]",
-			"[outline:1.5px_solid_var(--color-n4)]",
-		].filter((literal) =>
-			CONSUMERS.some(({ file }) => read(file).includes(literal)),
-		);
+		// ⚠ THIS SCANS THE TREE, AND THE FIRST VERSION DID NOT. It filtered the
+		// two literals against CONSUMERS' own two files — so the one scenario its
+		// comment named, "a fifth site written tomorrow with the literal form",
+		// was structurally invisible to it, and it could only fail where the test
+		// directly above already fails. A duplicate wearing the label of the
+		// guard that was not there: §8.3 N8, a promised assertion delivered
+		// vacuously, which reads as discharged and is worse than an absent one.
+		// Caught by @code-reviewer (H-1) on this branch, not by its own mutations
+		// — J and K each wrote into a file already in CONSUMERS, so neither
+		// exercised the direction that was missing.
+		const stray = viewLayerFiles.flatMap((file) => {
+			const source = read(file);
+			return LADDER_LITERALS.filter((literal) => source.includes(literal)).map(
+				(literal) => `${file} :: ${literal}`,
+			);
+		});
 		expect(stray).toEqual([]);
 	});
 
-	it("--border-strong-is-left-alone-with-its-zero-consumers", () => {
+	it("--border-strong-has-no-consumer-and-keeps-its-alias", () => {
 		// D10, pinned so a later reader does not assume D9 absorbed it. It is a
 		// ratified token aliased to n2 whose re-point is a token-VALUE decision
 		// (F3-blocked), deliberately out of this task's scope.
-		const css = read(TOKENS);
-		expect(css).toContain("--border-strong: var(--color-n2);");
+		expect(read(TOKENS)).toContain("--border-strong: var(--color-n2);");
+		// ⚠ THE SECOND HALF IS THE ONE THE DOCKET ROW CITES. `docs/parked.md`'s
+		// BORDER-STRONG-ORPHAN row names this test as the evidence that the token
+		// still has NO CONSUMER — which the definition assertion alone does not
+		// show. Without this, a PR that wires a consumer leaves the guard green
+		// while the docket keeps claiming the token is orphaned. (@code-reviewer
+		// M-1.) `DiscoveryGrid.tsx:37` mentions it in PROSE explaining why it was
+		// not used, so the match is on the `var()` CONSUMPTION form only.
+		const consumers = viewLayerFiles.filter((file) =>
+			read(file).includes("var(--border-strong)"),
+		);
+		expect(consumers).toEqual([]);
 	});
 });
