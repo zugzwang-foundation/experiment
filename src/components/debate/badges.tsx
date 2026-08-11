@@ -16,6 +16,15 @@ import type { Marker, Side } from "./types";
  * surface's geometry to the shared primitive would import it onto two surfaces
  * that have their own ratified numbers. d5's and Profile's presets are
  * POLISH.3 / POLISH.6 rows.
+ *
+ * PRIMITIVES-2 D7 — `base` is a REAL KEY, and the preset is resolved by MAP
+ * LOOKUP (`CHIP[size ?? "base"]`), never by the binary ternary the call site
+ * below previously carried. A ternary resolves every unlisted member to `base`
+ * SILENTLY: correct today only by accident of its shape, and a wrong render the
+ * moment a third preset exists. Through the map, a union member added without a
+ * `CHIP` entry is a COMPILE ERROR (CLAUDE.md §8 O-1 — structural beats
+ * procedural). This commit adds no preset and no value; it changes only how one
+ * is chosen, so every call site's emitted class attribute is unmoved.
  */
 const CHIP = {
 	// Byte-identical to the pre-C3 string, hairline included and in the SAME
@@ -67,6 +76,20 @@ export function SideBadge({
 	 * renders the same field unmodified (debate-export/serialize.ts:320, :348).
 	 */
 	price?: string;
+	/**
+	 * OPTIONAL, deliberately — and this is the OPPOSITE call from `PriceBar`'s
+	 * REQUIRED `size` (`PriceBar.tsx:31-33`) on the same primitive class. The
+	 * asymmetry is driven by the call-site census, not by a change of principle:
+	 * TWELVE of `SideBadge`'s thirteen render sites pass no `size` and ride
+	 * `CHIP.base`, so requiring it is a twelve-site edit whose every edit writes
+	 * the same string the `?? "base"` default already resolves to — cost without
+	 * a defect fixed. `PriceBar` has three sites and all three pass one, so
+	 * `required` cost it nothing there.
+	 *
+	 * O-1's structural guarantee is not weakened by that: what turns a missing
+	 * preset into a compile error here is the MAP, not the required-ness. A
+	 * required `size` would only have moved which argument goes missing.
+	 */
 	size?: "hero";
 }) {
 	// pctround-allow: a single HISTORICAL value for ONE bet — a point in time,
@@ -82,7 +105,7 @@ export function SideBadge({
 				// Pole edges are carried by the standard #404040 border on BOTH
 				// poles (values-log v0_3 §3) — without it the black YES fill is
 				// invisible on the n0 card. Carried inside each preset above.
-				size === "hero" ? CHIP.hero : CHIP.base,
+				CHIP[size ?? "base"],
 				side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
 			)}
 		>
