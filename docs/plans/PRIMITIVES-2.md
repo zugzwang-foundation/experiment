@@ -622,9 +622,23 @@ every remaining POLISH surface — not a one-off:**
   with the RED count, never claimed** — N8: a promised assertion
   delivered vacuously is worse than an absent one, because it reads as
   discharged.
-- **A census mutation must break in BOTH directions.** Set equality
-  fails as hard on a removed member as on an added one; a mutation that
-  only adds proves half the guard.
+- **A census mutation must break on THREE axes, not two.** ① a member
+  **added** · ② a member **removed** · ③ **a member the census never
+  looks at** — mutate a file OUTSIDE the guard's input set that the
+  guard's own comment claims to cover. Axes ① and ② test MEMBERSHIP;
+  only ③ tests REACH, and a guard whose stated reach exceeds its actual
+  input set passes both membership axes while covering nothing.
+
+  ⚠ **This is not theory — axis ③ was added BECAUSE the two-axis form
+  failed here.** PR-B's `the-literals-survive-nowhere-in-src` filtered
+  the ladder literals against `CONSUMERS`' own two files while its
+  comment promised a whole-tree scan catching "a fifth site written
+  tomorrow". Mutations J and K each wrote into a file ALREADY in
+  `CONSUMERS`, so neither exercised the missing direction; the guard
+  passed both and was vacuous. `@code-reviewer` caught it (H-1), the
+  mutations did not. Mutation O is axis ③ and the pre-fix guard passed
+  it. **§8.3 N8: a promised assertion delivered vacuously reads as
+  discharged and is worse than an absent one.**
 
 **The precedent this reads off, rather than inventing.** §5's own
 commit table already made the split: H15 is attached to PR-A's commit 1
@@ -650,3 +664,10 @@ round-trip.
 (`POLISH-0_data-manifest.md` §5) with a V-number. That is a numbering
 decision in a document this task does not own, so it is **routed, not
 taken** — `VACUITY-RULE-TO-V-REGISTER` in `docs/parked.md`.
+
+⚠ **What gets promoted is the THREE-AXIS form above, not the two-axis
+form this record originally carried.** The two-axis version was
+disproved on this branch before the branch closed: it is the version
+that passed a vacuous guard. Promoting it would install the defective
+rule in the register that exists to prevent exactly this. The docket
+row carries the three-axis text.

@@ -22,7 +22,18 @@ counts, and its own §1 went stale inside its own PR.
 
 ## 1 · What landed
 
-**Six** commits on `chore/primitives-2-seam`. **12 files, +723 / −26.**
+**Seven** commits on `chore/primitives-2-seam`. **13 files, +961 / −26** — 2 new
+(`emphasis-ladder-tokens.test.ts`, this log), no renames.
+
+⚠ *This line read "Six commits … 12 files, +723 / −26" until Gate C (GC-5). Both
+figures were measured at `dc91c9d` — **before the commit that adds this very
+file**, so the log counted the tree as it stood when the log did not yet exist
+and could not count itself into its own total. **The fourth counted-claim slip
+in this task**, and the second inside a document whose own header promises the
+counts were re-verified at PR head. The rule was applied to the inventories it
+was written for (13 render sites, 12 `CHIP.base`, 4 ladder consumers — all
+correct) and not to the log's own diffstat. **"Every counted claim" includes the
+ones about the commit you are writing.*
 
 | # | SHA | Commit |
 |---|---|---|
@@ -32,6 +43,14 @@ counts, and its own §1 went stale inside its own PR.
 | 4 | `c23edfa` | `refactor(discovery): the replyhead tier becomes a named constant` |
 | 5 | `6a55b3d` | `docs(polish,parked): three stale mix-blend corrections; two register rows; RR-4` |
 | 6 | `dc91c9d` | `fix(design,docs): address @code-reviewer findings on PR-B` |
+| 7 | `eab1f26` | `chore(design): log session — PRIMITIVES-2 PR-B, the seam pass` |
+| 8 | *(this commit)* | `docs(polish,plans): Gate C findings — §8-P1 three-axis rule; PD-2-32/33 closed` |
+
+*Row 8 carries no SHA because it cannot: a commit's hash is not knowable to
+the file it commits. That is **the same self-reference GC-5 caught** — the
+diffstat above was measured before the log existed. The canonical reference
+for landed work is the **squash-merge SHA on `main`** anyway (CLAUDE.md §5.9),
+which no branch commit could have named.*
 
 **Source (4):** `src/components/debate/badges.tsx` ·
 `src/components/discovery/HeroPanels.tsx` ·
@@ -39,9 +58,10 @@ counts, and its own §1 went stale inside its own PR.
 **Tests (3):** `tests/unit/debate/render/side-badge.test.tsx` ·
 `tests/unit/design/emphasis-ladder-tokens.test.ts` (**new**) ·
 `tests/unit/discovery/render/hero-panels.test.tsx`
-**Docs (5):** `docs/plans/PRIMITIVES-2.md` · `docs/parked.md` ·
+**Docs (6):** `docs/plans/PRIMITIVES-2.md` · `docs/parked.md` ·
 `docs/polish/POLISH-0.md` · `docs/polish/POLISH-TRACKER.md` ·
-`docs/polish/POLISH-register.md`
+`docs/polish/POLISH-register.md` · `docs/logs/PRIMITIVES-2-PR-B.md` (**new**,
+this file — the one the original count omitted)
 
 **Nothing under `src/server/**`.** No DDL, no migration, no `EVENT_TYPES`
 value, no ADR, no SPEC edit, no read-model field, no handler. ADR ceiling stays
@@ -83,9 +103,18 @@ touch.
 **RULE-1, ratified and recorded as §11 `§8-P1`.** RED-first applies **only** to
 a guard asserting a defect exists. Zero-delta and census guards are green on
 first run by definition and are discharged by **mutation**, stated with the RED
-count. A census mutation must break in **both** directions. This reads off §5's
-own commit table, which already attached H15 to PR-A's defect test and not to
-its zero-delta baselines. **Standing for every remaining POLISH surface.**
+count. **A census mutation must break on THREE axes:** ① a member added · ② a
+member removed · ③ **a member the census never looks at.** ① and ② test
+MEMBERSHIP; only ③ tests REACH. This reads off §5's own commit table, which
+already attached H15 to PR-A's defect test and not to its zero-delta baselines.
+**Standing for every remaining POLISH surface.**
+
+⚠ *RULE-1 was ratified mid-session as a TWO-axis rule ("both directions"), and
+this log said so until Gate C. **The two-axis form was disproved before the
+branch closed** — it is the version that passed the vacuous guard in S-3 below.
+Axis ③ was added at Gate C (GC-3) and `§8-P1` now carries the three-axis text.
+A rule that survives its own counter-example unamended is the failure it exists
+to prevent.*
 
 **Sixteen mutations, each RED, each reverted.** 3 on the map lookup and its
 census (A–C) · 4 on the presets and the wiring census (D–G) · 4 on the ladder
@@ -120,11 +149,14 @@ the test above it already failed. **§8.3 N8 verbatim.** Caught by
 `@code-reviewer` (H-1), not by my own mutations — **J and K each wrote into a
 file already in `CONSUMERS`, so neither exercised the missing direction.**
 
-⚠ **The lesson generalises past this file:** RULE-1's both-directions clause is
-about the guard's **input set**, not only about add-vs-remove. A census
-mutation must also test a member the census could fail to *look at*. Mutation O
-(a literal written into a third file) is that direction; the pre-fix guard
-passed it.
+⚠ **The lesson generalises past this file, and it amended RULE-1 itself.** A
+census guard has an **input set** as well as a membership rule, and the
+two-axis form only tested membership. Mutation O — a literal written into a
+**third file, outside `CONSUMERS`** — is the missing axis, and the pre-fix
+guard passed it. Gate C GC-3 promoted this to **axis ③ of a three-axis rule**:
+mutate a file OUTSIDE the guard's input set that the guard's own comment claims
+to cover. **A guard whose stated reach exceeds its actual input set passes both
+membership axes while covering nothing.**
 
 **S-4 · Two of §9's four docket rows were missing.** The execute relay named
 three docket rows; the plan's §9 mints four. **The plan governs and the relay
@@ -171,8 +203,28 @@ Struck in past tense in §2, naming the counter-example.
 
 ## 5 · Next session starts at
 
-**Gate C — a web diff-read of `~/Downloads/PR-B-primitives-2.diff`, before
-merge, non-optional.** Then squash-merge.
+**Gate C returned PASS** on the diff, with three findings — all absorbed in
+commit 8, no reviewer pass (docs + two status cells):
+
+- **GC-3 · `§8-P1` carried the SUPERSEDED two-axis rule.** Replaced with the
+  ratified three-axis form, web-authored and committed verbatim. The
+  `VACUITY-RULE-TO-V-REGISTER` docket row now promotes the three-axis text, so
+  the disproved version cannot reach V-space.
+- **GC-4 · `PD-2-32` and `PD-2-33` still read `open`.** Both were fixed by
+  PR-A (#317, `143380b`), which never touched the register, and PR-B's only
+  other register touches were RR-4 / PD-3-03 / PD-5-01 — so the two rows this
+  whole task exists to close were still open at its LAST register touch. Both
+  now `fixed`, with closing evidence. **PD-2-33's a11y half stays routed and
+  OPEN at A11Y.0** (`OQ-6-ALT-EXCEPTION`); only the overflow half closed.
+- **GC-5 · the diffstat above.** See §1.
+
+**Next action: squash-merge PR #318**, once the operator clears the verbatim
+check on the amended `§8-P1` bullet.
+
+**On close:** staging advance (behind by docs-only commits), PK refresh table,
+and the tracker note that PRIMITIVES-2 is closed and `.7a` is the next machine
+run. New register high-water marks are **`PD-3-03`** and **`PD-5-01`**, so
+REGISTER-APPLY allocates from `PD-3-04` / `PD-5-02`.
 
 **On close:** staging advance (behind by docs-only commits), PK refresh table,
 and the tracker note that PRIMITIVES-2 is closed and `.7a` is the next machine
@@ -235,4 +287,5 @@ REGISTER-APPLY allocates from `PD-3-04` / `PD-5-02`.
 
 One session. Ground and re-count → V1/V2 → commit 1 (stop for ratification) →
 commits 2–5 → full suite ×3 → `@code-reviewer` → commit 6 → final full suite →
-this log. Not pushed until the log landed.
+this log (commit 7) → push → PR #318 → CI green → **Gate C PASS → commit 8**.
+Not pushed until the log landed.

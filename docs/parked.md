@@ -990,7 +990,9 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 
 **Originating task:** PRIMITIVES-2 PR-B (2026-08-11), operator ruling **RULE-1**, recorded as `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`.
 
-**Deferred work.** Promote the rule into the **V-space register** (`POLISH-0_data-manifest.md` §5), where verification lessons live, and give it a V-number. The rule: **RED-first is required only of a guard asserting a DEFECT EXISTS. Zero-delta and census guards are green on first run by definition, and are discharged by MUTATION — stated with the RED count, never claimed. A census mutation must break in BOTH directions.**
+**Deferred work.** Promote the rule into the **V-space register** (`POLISH-0_data-manifest.md` §5), where verification lessons live, and give it a V-number. The rule: **RED-first is required only of a guard asserting a DEFECT EXISTS. Zero-delta and census guards are green on first run by definition, and are discharged by MUTATION — stated with the RED count, never claimed. A census mutation must break on THREE axes: ① a member added · ② a member removed · ③ a member the census never looks at.** Axes ① and ② test MEMBERSHIP; only ③ tests REACH.
+
+⚠ **Promote the THREE-axis form. An earlier draft of this row and of `§8-P1` said "BOTH directions", and that two-axis version was DISPROVED on the branch that minted it** — it is the version that passed a vacuous guard (`the-literals-survive-nowhere-in-src`, reviewer finding H-1). Installing it in the register that exists to prevent vacuity would be the defect promoting itself.
 
 **Why deferred.** The register edit is a **numbering decision in a document PRIMITIVES-2 does not own**, and CLAUDE.md §8 is explicit that a register cannot arbitrate its own numbering from outside. PRIMITIVES-2 records the rule at its own §11 and routes the promotion rather than allocating a V-number itself.
 
