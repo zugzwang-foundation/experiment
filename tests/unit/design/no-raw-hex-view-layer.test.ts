@@ -57,6 +57,7 @@ const SCAN_FILES = [
 	// that closed it — the N8 failure committed knowingly. `SCAN_DIRS` does not
 	// reach `src/app/(auth)`, so anything colocated here has to be named.
 	"src/app/(auth)/AuthAlert.tsx",
+	"src/app/(auth)/error.tsx",
 ];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments
