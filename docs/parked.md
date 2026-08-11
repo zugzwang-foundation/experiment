@@ -898,7 +898,47 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 
 ---
 
-## PRIMITIVES-2 — the shared-primitive pass — **RUNS NEXT, no date needed**
+## PRIMITIVES-2 — the shared-primitive pass — **CLOSED 2026-08-11**
+
+**Closed by two PRs, both squash-merged to `main`:**
+
+| PR | Squash SHA | Scope |
+|---|---|---|
+| **#317** | **`143380b`** | PR-A — `MarketThumb`, the null · error · loaded owner for all three Discovery image sites, plus D4's two `alt=""` |
+| **#318** | **`0ff2733`** | PR-B — the seam pass: `SideBadge`'s map lookup and its two surface presets, the emphasis ladder as named tokens, the replyhead tier as a named constant, the doc/register corrections |
+
+Plan `docs/plans/PRIMITIVES-2.md`; logs `docs/logs/PRIMITIVES-2-PR-A.md` and
+`docs/logs/PRIMITIVES-2-PR-B.md`. **All nine of §1's exit criteria discharged
+with evidence** at the close-out task; criterion 5's two named lines are
+`src/app/globals.css:178` and `src/components/discovery/HeroPanels.tsx:52`.
+
+### ⚠ What did NOT land here, and where it went
+
+**A closed row that does not say what left it is how a later reader re-opens
+settled scope.** Of the five items:
+
+| Item | Outcome | Now owned by |
+|---|---|---|
+| **1** `MarketThumb` | **Built.** All three sites, one owner | — (PD-2-32 `fixed`) |
+| **2** the `alt` fix | **Overflow half built.** ⚠ The **a11y half (WCAG 1.1.1) did NOT close** | **A11Y.0**, plus `OQ-6-ALT-EXCEPTION` |
+| **3** the two presets | **SEAM only.** Both presets exist and are render-tested at both poles; **zero call sites wired, by ruling D5**, and a guard asserts it stays so | **`PD-3-03`** (d5 adopts `detail`) · **`PD-5-01`** (Profile adopts `profile`) |
+| **4** `mix-blend-darken` | **NOT BUILT — already discharged** at PRIMITIVES-1 D6 (`997f308`, PR #293), which fixed it at the primitive. Three stale documents corrected instead | — (closed; absence pinned by `avatar-ring-token.test.ts:72,83`) |
+| **5** text tier + ladder | **REDUCED TO SEAM-ONLY by ruling D8, a recorded departure.** The ladder's rungs 2–3 became `--border-hero` / `--ring-active`; the replyhead tier became `REPLYHEAD_TIER`. **The other 12 micro-label sites were NOT normalised** — they span `shell/` and `debate/composer/`, POLISH.4's uninspected surface | **`MICRO-LABEL-TIER`** (routed to POLISH.4) · **`BORDER-STRONG-ORPHAN`** (D10) |
+
+**The binding condition was met, and the proof is a named line rather than a
+claim.** D8 delivered the *safety property* — a later founder ruling costs one
+line in one place — and explicitly not the literal 14-site scope. That is
+recorded as a departure in plan §4.2, not absorbed as an interpretation.
+
+Also minted here: **`RR-4-ID-COLLISION`** (needs a ruling, not an edit) ·
+**`VACUITY-RULE-TO-V-REGISTER`** (promote §8-P1's three-axis rule) ·
+**`G1-RECON-TEMPLATE`** (PRIMITIVES-1's seven recon requirements, still landed
+nowhere).
+
+---
+
+*Historical record of the row as it stood while open, retained deliberately —
+the strikethroughs inside it are the corrections this task made.*
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` before today — `POLISH-register.md` CC-9 and `docs/logs/DISCOVERY-COMPLETE.md:268` — **both times routing work *away* from it**, and it had no row, no plan and no owner. It is the successor to PRIMITIVES-1.
 
@@ -918,9 +958,9 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 
 **Why deferred.** It is a shared-primitive pass across surfaces POLISH.3/.5/.6 own, and `POLISH-0.md` §5 forbids a V batch spanning surfaces. Absorbing it into any single surface's pass would re-skin the others silently.
 
-**Conditional trigger.** **None — it runs next.** No date is needed because nothing gates it: PD-2-32 and PD-2-33 are open and owned here, and every other item is a primitive that already exists.
+**Conditional trigger.** ~~**None — it runs next.**~~ **DISCHARGED — it ran.** No date was needed because nothing gated it: PD-2-32 and PD-2-33 were open and owned here, and every other item was a primitive that already existed. Both are now `fixed`.
 
-**Expected next task.** PRIMITIVES-2 itself. Evidence: `POLISH-register.md` PD-2-32 · PD-2-33 · CC-9 · PD-0-10; `docs/plans/DISCOVERY-COMPLETE.md:70`; `docs/logs/DISCOVERY-COMPLETE.md:268`.
+**Expected next task.** ~~PRIMITIVES-2 itself.~~ **Ran as PRIMITIVES-2, PRs #317 + #318. The next machine run is `.7a` Auth.** Evidence: `POLISH-register.md` PD-2-32 · PD-2-33 · CC-9 · PD-0-10; `docs/plans/DISCOVERY-COMPLETE.md:70`; `docs/logs/DISCOVERY-COMPLETE.md:268`.
 
 ---
 

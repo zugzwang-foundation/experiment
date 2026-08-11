@@ -651,6 +651,9 @@ on correct work.
 map lookup and its census, 4 on the two presets and the wiring census,
 4 on the ladder tokens and their consumers, 3 on the replyhead
 extraction. Each is named in its commit body with its RED count.
+**Mutations O and P are commit 6's**, after the reviewer pass, and are
+not in that fourteen — O is the axis-③ mutation named in the bullet
+above, P the `--border-strong` consumer check.
 
 ⚠ **One of them is load-bearing beyond this task.** Mutation I put a
 literal hex in `--ring-active` and **`tokens-monochrome.test.ts` passed
@@ -659,6 +662,16 @@ a composite token with a hard-coded colour is invisible to it. That
 blind spot is now covered by `emphasis-ladder-tokens.test.ts`, and the
 V1 analysis that predicted it is the reason D9 was cleared without a
 round-trip.
+
+**⚠ One counted claim is structurally exempt, and diligence cannot fix
+it.** A session log's own diffstat counts a tree in which the log does
+not yet exist, so it is unmeasurable from inside the commit that writes
+it — the same self-reference that leaves a log's own commit row without
+a SHA. PR-B's log reported 12 files / +723 against an actual 13 / +961
+for exactly this reason, having correctly re-verified every other
+inventory it carried. The rule is therefore: **a log's diffstat is
+either measured at PR HEAD and amended, or it declares the exclusion in
+the line itself.** Re-verifying harder does not close it.
 
 **Promotion.** The rule belongs in **V-space**
 (`POLISH-0_data-manifest.md` §5) with a V-number. That is a numbering
