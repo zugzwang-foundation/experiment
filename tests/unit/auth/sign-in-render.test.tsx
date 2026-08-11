@@ -106,7 +106,7 @@ describe("UI-A7 sign-in skin — branded presentation (DRIVER, RED pre-skin)", (
 		// (§5). The skin reframes that slot as a role="alert" callout. The
 		// scaffold renders a bare <p> with no role → findByRole times out → RED.
 		mocks.sendVerificationOtp.mockResolvedValue({
-			error: { message: "rate_limited" },
+			error: { message: "otp_rate_limited" },
 		});
 		const { container } = render(<SignInPage />);
 
@@ -121,7 +121,19 @@ describe("UI-A7 sign-in skin — branded presentation (DRIVER, RED pre-skin)", (
 		fireEvent.submit(form);
 
 		const alert = await screen.findByRole("alert");
-		expect(alert.textContent).toContain("rate_limited");
+		// POLISH.7a Gate C / T1 — S-11's THIRD site. The register row named two
+		// (`POLISH-0.md:174` and PD-0-15's title); the underlying flag had three,
+		// and this fixture was emitting POLISH.4's composer string on an AUTH
+		// surface. The auth code is `otp_rate_limited`
+		// (`src/server/auth/index.ts:154,164`); `rate_limited` occurs six times in
+		// `src/` and every one is under `src/components/debate/composer/**`.
+		// PD-0-13's lesson verbatim: a remedy scoped from a ROW rather than from
+		// the FLAG will under-fix.
+		//
+		// Tightened from `toContain` to `toBe`: `toContain("rate_limited")` also
+		// passes on `otp_rate_limited` — it is a SUBSTRING of it — so the loose
+		// form could not have caught this and cannot catch the reverse either.
+		expect(alert.textContent).toBe("otp_rate_limited");
 		// POLISH.7a H-1 (@code-reviewer). The byte-identity suite renders
 		// `AuthAlert` in ISOLATION and so could not see that this call site had
 		// silently lost its `mt-3` when the file-local component was replaced —

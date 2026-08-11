@@ -1192,7 +1192,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Originating task:** POLISH.7a (2026-08-11), carrying `PD-0-14` from POLISH.0. Sits beside **RATE-GUARD-PUBLIC** above — same genus (a public-surface abuse control that is specified, sized and unbuilt) and the same date, so they size together.
 
-**Deferred work.** `src/app/(auth)/sign-in/page.tsx:121` is a `TODO(DESIGN.*)` comment and no widget is mounted; `:122-126` is the retained hidden anchor `<input type="hidden" name="turnstileToken" value="placeholder-token" />`, and `otp/page.tsx:103` hard-codes the same placeholder on the resend path. The server half is BUILT and fails closed — `src/server/auth/index.ts:136-142` rejects a missing token and a failed siteverify — so what is missing is the client widget that produces a real token, not the verification.
+**Deferred work.** `src/app/(auth)/sign-in/page.tsx:137` is a `TODO(DESIGN.*)` comment and no widget is mounted; `:143-147` is the retained hidden anchor `<input type="hidden" name="turnstileToken" value="placeholder-token" />` (its literal at `:146`), and `otp/page.tsx:105` hard-codes the same placeholder on the resend path. ⚠ **These are HEAD coordinates, re-measured at PR head.** The three this row first carried — `:121`, `:122-126`, `:103` — were the recon SHA's, and **D03's own restructure inside this PR moved them**; `:121` now lands in the middle of D03's explanatory comment. See `docs/plans/POLISH-7a.md` §12 **P-6**. The server half is BUILT and fails closed — `src/server/auth/index.ts:136-142` rejects a missing token and a failed siteverify — so what is missing is the client widget that produces a real token, not the verification.
 
 **What it carries from POLISH.7a's delta table.** `P7a-D06` (the whole Turnstile pane — three ratified states — unbuilt, `data-blocked`) · `P7a-D13` (the OTP screen's *"Secured by Cloudflare Turnstile"* line, deliberately omitted at UI-A7 because restoring it before the widget is real would be a false claim to the user) · `P7a-D04` (the picker's submit reads `Send code`, where the mockup reads `Continue` — the mockup's Continue advanced to the Turnstile pane, so the label's ground returns only when the pane exists).
 
@@ -1234,7 +1234,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Deferred work, two halves.**
 
-> **6-box segmented code entry.** `DESIGN_W2_1_CLOSE-OUT.md:60` locks *"OTP: ours — 6-box, resend cooldown, invalid/expired/locked"*, and the mockup renders it (`:364`, CSS `:212-216`). The build ships one field with `pattern="[0-9]{6}"` and `tracking-[0.5em]` (`otp/page.tsx:134-143`).
+> **6-box segmented code entry.** `DESIGN_W2_1_CLOSE-OUT.md:60` locks *"OTP: ours — 6-box, resend cooldown, invalid/expired/locked"*, and the mockup renders it (`:364`, CSS `:212-216`). The build ships one field with `pattern="[0-9]{6}"` and `tracking-[0.5em]` (`otp/page.tsx:164-173`, head coordinates — `:134-143` was the recon SHA's and now lands inside D07's comment).
 >
 > **Resend cooldown.** The mockup ships `resendBtn` DISABLED at entry plus a `resendTimer` (`:366-370`, CSS `:220-224`); the built control is enabled immediately with no timer.
 
@@ -1304,7 +1304,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Originating task:** named at `docs/plans/AUTH-OTP-DELIVERY.md:226` and `docs/logs/AUTH-OTP-DELIVERY.md:28,31`; given a row here at POLISH.7a (2026-08-11).
 
-**Deferred work, five items.**
+**Deferred work, seven items.**
 
 > **(1) Spoofable XFF.** `src/server/auth/index.ts:109-115` takes the LEFTMOST `x-forwarded-for` element as the client IP, which a client controls. It keys the OTP per-IP burst limiter. The same shape is already parked for `extractIp()` and for `tos_acceptance_ip` (`docs/logs/UI-A7.md:22`) — this is the third site of one defect.
 >
@@ -1320,7 +1320,9 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ⚠ **`src/server/auth/**` is a CLAUDE.md §1 CRITICAL PATH.** Full plan→execute ritual with the named-reviewer cascade, in its own chat. Not foldable into a polish pass.
 
-⚠ **(6) NO ERROR BOUNDARY IN THE TREE REPORTS TO SENTRY** — `@security-auditor` LOW-3. `(auth)/error.tsx`, `global-error.tsx`, `bookmarks/error.tsx` and `u/[pseudonym]/error.tsx` all destructure only `reset`. A boundary makes the error HANDLED, so Sentry's global `onerror` never sees it, and CLIENT-side render errors on the signed-out sign-in path go invisible. **A tree-wide decision, not POLISH.7a's** — the new file matches the established family exactly, which is what the plan asked for.
+> **(7) `users.name` AND `users.image` ARE CLIENT-WRITABLE AT FIRST EMAIL-OTP SIGNUP** — `@security-auditor` LOW-5, homed here at Gate C. Both are first-class fields on better-auth's `signInEmailOTPBodySchema` (`email-otp/routes.mjs:353-361`) and are written straight through on the create branch (`:404-412`), so a participant can set them to arbitrary strings. The three IDENTITY columns are correctly locked — `pseudonym`, `pfpFilename`, `googleId` carry `input: false` and `parseInputData` **throws** — but `name`/`image` are not in that set. **No render path exists today** (verified: the public face is `pseudonym` + `pfpFilename` everywhere), so there is no stored-XSS sink. **The residual is the 2026-11-06 dataset release** — SPEC.1 §16.4 releases the `users` row, so a wholesale column export would publish attacker-controlled text. ⚠ **It is homed HERE and not in the dataset task because the DEFECT is a writable-field-set question in `src/server/auth/**`; the dataset leak is its CONSEQUENCE. One file, one owner.** ⚠ **The cross-reference asked for at Gate C — `docs/specs/dataset-release.md` — DOES NOT EXIST.** `docs/specs/` holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md` and nothing else, verified at PR head. Writing the citation live would mint the same phantom `SPEC.CHART` already is — `POLISH-0.md` §2's existence rider: *a citation is not an artifact*. The real destination that DOES exist is the **DATASET RELEASE** task, which this file already names as an owner at the STAGING-PARITY Slice B row (`docs/parked.md:508,517`), and the governing spec text is **SPEC.1 §16.4**, which releases the `users` row. **The column allow-list decision belongs to DATASET RELEASE; if it ever gets a spec file, this row's pointer is what should be updated to name it.**
+>
+> ⚠ **(6) NO ERROR BOUNDARY IN THE TREE REPORTS TO SENTRY** — `@security-auditor` LOW-3. `(auth)/error.tsx`, `global-error.tsx`, `bookmarks/error.tsx` and `u/[pseudonym]/error.tsx` all destructure only `reset`. A boundary makes the error HANDLED, so Sentry's global `onerror` never sees it, and CLIENT-side render errors on the signed-out sign-in path go invisible. **A tree-wide decision, not POLISH.7a's** — the new file matches the established family exactly, which is what the plan asked for.
 
 **Conditional trigger.** Pre-go-live (2026-09-15). Item (3) should lead.
 
@@ -1369,7 +1371,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ---
 
-## NO-RAW-HEX-REACH — ✅ **CLOSED at POLISH.7a (2026-08-11)**
+## NO-RAW-HEX-REACH — **REACH CLOSED, SET-EQUALITY RESIDUAL OPEN** — routed to the quality lane with R15
 
 **Originating task:** POLISH.7a recon (2026-08-11), §5. Closed in the same PR that found it. The row exists to record a false receipt, not to track open work.
 
@@ -1381,6 +1383,8 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ⚠ **ONE WEAKNESS FOUND AND NOT FIXED, so it is visible rather than discovered later.** RULE-1 axis ② (member REMOVED) leaves the suite **GREEN**. The scanned set is 107 files and the alive check is `toBeGreaterThan(20)` — a FLOOR, not set equality (§8.1 N5). A silently deleted `SCAN_FILES` entry is undetectable by this guard. Changing the alive check's shape is a decision about a guard POLISH.7a does not own and exceeded that PR's edit boundary.
 
-**Conditional trigger.** For the residual N5 gap: the next task that legitimately opens `tests/unit/design/`.
+⚠ **A SECOND RESIDUAL, and it is the STRUCTURAL fix** (`@code-reviewer` L-5 / CLAUDE.md **O-1**, *structural beats procedural*). `SCAN_DIRS` is `["src/components", "src/app/(public)"]`. **Adding `"src/app/(auth)"` to it makes all five named `SCAN_FILES` entries redundant AND covers `_components/` — a NEW unscanned directory this PR created.** The named-file shape is what forced two extra enrolments inside this very PR to stay closed. It was not done here because the plan's §5 prescribed the named-file form and `SCAN_DIRS` is out of this surface's edit boundary.
 
-**Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — one visit, two fixes. Evidence: `docs/logs/POLISH-7a.md` §5.
+**Conditional trigger.** For BOTH residuals: the next task that legitimately opens `tests/unit/design/`.
+
+**Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, THREE fixes**: R15's palette-class ban, the N5 set-equality floor, and the `SCAN_DIRS` structural fix. Evidence: `docs/logs/POLISH-7a.md` §5.
