@@ -72,7 +72,7 @@ function BanIndicator({
 }): React.ReactElement {
 	if (banned) {
 		return (
-			<span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-white">
+			<span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-background">
 				<span aria-hidden>●</span>
 				BANNED
 				{bannedAt ? (
