@@ -222,6 +222,43 @@ describe("B2 — the container primitive moves nothing", () => {
 		}
 	});
 
+	/**
+	 * POLISH.7a D19 — the wrapper's min-height token, pinned by NAME.
+	 *
+	 * The docblock above describes the collapse this repairs and calls the fix
+	 * "NOT happened yet". It has now happened: `min-h-full` -> `min-h-dvh` on the
+	 * `(auth)` wrapper, one token, under a line-scoped exception (POLISH-7a §12
+	 * P-1). Nothing on disk pinned that token — a grep for `min-h-full` across
+	 * `tests/` found exactly one hit and it was a COMMENT. So the repair was
+	 * revertible by a one-word edit with no gate, which is the same shape as the
+	 * `flex-1` deletion the docblock above pins by name for the same reason.
+	 *
+	 * ⚠ WHY A VIEWPORT UNIT AND NOT A PERCENTAGE. `min-height:100%` resolves
+	 * against the containing block's SPECIFIED height, and `<body>`'s is `auto`.
+	 * The first attempt gave `<body>` a definite height instead (shipped `5a11b38`,
+	 * REVERTED `1a41b0f`): that makes this wrapper a flex item whose explicit
+	 * `min-height:100%` suppresses the flex automatic minimum size, so flex-shrink
+	 * CLAMPS it to one viewport while content overflows, and `position:sticky`
+	 * — bounded by its containing block — un-sticks `GlobalHeader`. Measured on a
+	 * 2000px page: header top 0 / -62 / -562 / -578 at scrollY 0 / 900 / 1400 /
+	 * 2000. With `100dvh`: 0 / 0 / 0 / 0. A percentage here is the bug.
+	 */
+	it("site 8 ((auth)) — the wrapper's min-height is a VIEWPORT unit, not a percentage", () => {
+		const wrapper = read("src/app/(auth)/layout.tsx").match(
+			/<div className="(flex min-h-[^"]+)"/,
+		)?.[1];
+		// Alive check: the wrapper node was found at all, so the two assertions
+		// below are not reading `undefined`.
+		expect(wrapper, "(auth) renders a classed flex wrapper").toBeDefined();
+		expect(asSet(wrapper ?? "").has("min-h-dvh")).toBe(true);
+		// The percentage form is the defect, not merely a different spelling.
+		expect(asSet(wrapper ?? "").has("min-h-full")).toBe(false);
+		// The flex chain the docblock above protects is still on this node.
+		for (const c of ["flex", "flex-col"]) {
+			expect(asSet(wrapper ?? "").has(c), `wrapper keeps ${c}`).toBe(true);
+		}
+	});
+
 	it("the auth preset describes a BOX only — no flex participation", () => {
 		// (auth)'s `flex flex-1 flex-col` rides the CALL SITE, never the preset.
 		// A preset is width + inset + padding; baking one caller's layout role
