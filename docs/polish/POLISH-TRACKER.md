@@ -125,7 +125,7 @@ POLISH-TEMPLATE  ─▶  PRIMITIVES-2  ─▶  .7a ─▶ .3 ─▶ .4 ─▶ .5
 
 This is not a style preference. **It is what makes deferring the founder's visual pass safe** — a later ruling becomes one line per preset instead of a six-surface sweep. **If they land inline, that safety property is gone and the batched pass must be revisited.** A ruling with no revert condition is a one-way door.
 
-PRIMITIVES-2's scope, from evidence already on `main`: `MarketThumb` (PD-2-32 + PD-2-33, landing together) · the `SideBadge` d5/Profile presets · `ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers · the secondary text tier and emphasis ladder **as presets**. Every preset defaults to today's render, proved not asserted.
+PRIMITIVES-2's scope, from evidence already on `main`: `MarketThumb` (PD-2-32 + PD-2-33, landing together) · the `SideBadge` d5/Profile presets · ~~`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers~~ (**struck at PRIMITIVES-2 D1 — already discharged at PRIMITIVES-1 D6 / `997f308`, PR #293, which removed the blend AT THE PRIMITIVE; `mix-blend` has zero occurrences in `src/` and `avatar-ring-token.test.ts:72,83` pins the absence**) · the secondary text tier and emphasis ladder **as presets**. Every preset defaults to today's render, proved not asserted.
 
 ---
 

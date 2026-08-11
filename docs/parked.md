@@ -907,7 +907,7 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 1. **One shared `MarketThumb` owning three states — null · error · loaded — used by BOTH sites** (PD-2-32). ⚠ **THREE call sites, not two:** `MarketCard.tsx:53` and `HeroPanels.tsx:64` render the market thumb; the **hero POST image** handles `null` but has **no `onError`**, so it carries the same gap. Do not patch the `<img>` tags independently — that is how PD-0-10 happened.
 2. **PD-2-33's `alt` fix, landing WITH it.** Both thumbs carry `alt={card.title}` while the same title renders in the adjacent `<h3>`; `alt=""` matches the hero POST image's ratified treatment and is also what stops the broken-image text overflowing the metadata row. ⚠ Fixing the `alt` alone hides the symptom while PD-2-32's real gap remains.
 3. **The `SideBadge` d5 `.md` and Profile `.sm` presets.** These have **NO register row** and **no preset to receive them** — `badges.tsx:70` is `size?: "hero"`, a **one-member union**. The only committed statement of the requirement is a plan sentence, `docs/plans/DISCOVERY-COMPLETE.md:70`.
-4. **`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers.** POLISH-1a unbound it at the two `IdentityCluster` chip sites; the remaining consumers still carry it.
+4. ~~**`ui/avatar.tsx`'s `mix-blend-darken` on its two unfixed consumers.** POLISH-1a unbound it at the two `IdentityCluster` chip sites; the remaining consumers still carry it.~~ **STRUCK — DISCHARGED, not built (PRIMITIVES-2 D1).** This item **said** the two named consumers still carried the blend. They do not, and did not when PRIMITIVES-2 was scoped: **PRIMITIVES-1 D6 removed `after:mix-blend-darken` FROM THE PRIMITIVE** (`997f308`, PR #293), which fixed all three consumers in one edit rather than two of three. `mix-blend` has **zero occurrences anywhere in `src/`** at PRIMITIVES-2 head, and its absence is pinned two independent ways by `tests/unit/design/avatar-ring-token.test.ts:72,83`. The two "unfixed consumers" this row named — `HeroPanels.tsx:112`, `ArgProfile.tsx:51` — are clean (and `:112` is no longer an Avatar mount at all). **Struck rather than deleted so a later reader can see the concern existed and was answered, not that it was never raised.**
 5. **The secondary text tier and the emphasis ladder, AS NAMED PRESETS.**
 
 ⚠ **BINDING CONDITION, carried verbatim:** *the secondary text tier and the emphasis ladder land as **NAMED PRESETS**, not inline classes. That is what makes deferring the founder's visual pass safe. If they land inline the safety property is gone and the batched pass MUST be revisited.*
@@ -921,6 +921,50 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 **Conditional trigger.** **None — it runs next.** No date is needed because nothing gates it: PD-2-32 and PD-2-33 are open and owned here, and every other item is a primitive that already exists.
 
 **Expected next task.** PRIMITIVES-2 itself. Evidence: `POLISH-register.md` PD-2-32 · PD-2-33 · CC-9 · PD-0-10; `docs/plans/DISCOVERY-COMPLETE.md:70`; `docs/logs/DISCOVERY-COMPLETE.md:268`.
+
+---
+
+## MICRO-LABEL-TIER — normalise the uppercase micro-labels — **ROUTED TO POLISH.4**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), ruling **D8**.
+
+**Deferred work.** The participant tree's uppercase micro-labels share no import and no scale. **12 sites across 7 files** outside the one PRIMITIVES-2 touched: `shell/IdentityCluster.tsx:32` · `shell/RadioSlot.tsx:30` · `shell/DharmaCluster.tsx:89,98` · `debate/composer/PositionStrip.tsx:44,61` · `debate/composer/BetComposer.tsx:457,509,537` · `debate/composer/SellModule.tsx:263,278` · `debate/composer/AuthGateSlot.tsx:49`. Between them: **4 sizes × 4 trackings × 2 weights × 4 colour tiers**, no shared constant.
+
+⚠ **STATE THE CLASSIFIER — this census is CLASSIFIER-DEPENDENT and two honest counts disagree.** The set above is *`uppercase` + a `tracking-*` class, participant surfaces only, `src/app/(admin)/**` excluded*. PRIMITIVES-2's recon counted **13 across 6 files with 5 tiers** using a wider predicate that includes the two `text-ink` Support/Counter labels this one excludes. **Neither is wrong.** A future task must say which predicate it means before quoting a number, or it will "correct" a count that was never incorrect.
+
+**Why deferred.** Normalising them re-skins `shell/` and `debate/composer/` — **POLISH.4's uninspected surface** — and `POLISH-0.md` §5 forbids a V batch spanning surfaces. PRIMITIVES-2 D8 is a **recorded departure** from the docket's literal text: it built the seam at the two rungs where it is coherent and proved the one-line safety property, rather than sweeping 14 sites across two surfaces nobody has looked at.
+
+**Conditional trigger.** POLISH.4's inspection. Not before.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §3 D8 + §2's two `R11` rows (both annotated at PR-B commit 4); `src/components/discovery/HeroPanels.tsx` `REPLYHEAD_TIER` — the one site that DID land, named for the replyhead precisely so it claims none of the above.
+
+---
+
+## BORDER-STRONG-ORPHAN — a ratified token with zero consumers — **F3-BLOCKED**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), ruling **D10**.
+
+**Deferred work.** `--border-strong` (`globals.css`, aliased to `var(--color-n2)`) has **zero consumers**. Its only mention in `src/` is the prose at `DiscoveryGrid.tsx:37` explaining why it was *not* used. Decide: retire it, or re-point it at the ladder.
+
+**Why deferred.** Both answers are token-**VALUE** decisions, and token values are F3-blocked and CI-pinned by `tokens-monochrome.test.ts`. PRIMITIVES-2 D9 deliberately did **not** absorb it: the ladder now has real named consumers (`--border-hero`, `--ring-active`), which is what makes the question *answerable* later — answering it then would have been a value change riding a mechanism change.
+
+**Conditional trigger.** Whenever the F3 token-value lane opens.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §3 D10; `tests/unit/design/emphasis-ladder-tokens.test.ts` pins that it still has its alias and no consumer.
+
+---
+
+## VACUITY-RULE-TO-V-REGISTER — promote the RED-first scoping rule — **DOC-ONLY**
+
+**Originating task:** PRIMITIVES-2 PR-B (2026-08-11), operator ruling **RULE-1**, recorded as `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`.
+
+**Deferred work.** Promote the rule into the **V-space register** (`POLISH-0_data-manifest.md` §5), where verification lessons live, and give it a V-number. The rule: **RED-first is required only of a guard asserting a DEFECT EXISTS. Zero-delta and census guards are green on first run by definition, and are discharged by MUTATION — stated with the RED count, never claimed. A census mutation must break in BOTH directions.**
+
+**Why deferred.** The register edit is a **numbering decision in a document PRIMITIVES-2 does not own**, and CLAUDE.md §8 is explicit that a register cannot arbitrate its own numbering from outside. PRIMITIVES-2 records the rule at its own §11 and routes the promotion rather than allocating a V-number itself.
+
+**Conditional trigger.** The next SYNC sweep, or the next task that touches `POLISH-0_data-manifest.md` §5.
+
+**Evidence.** `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`; applied five times in PR-B (commits 1–4, 14 mutations).
 
 ---
 

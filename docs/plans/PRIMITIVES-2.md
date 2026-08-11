@@ -600,3 +600,53 @@ a fence that counted its own minutes would be unsatisfiable.
   `hero-post-image-${side}`. Correct semantically; any E2E selector
   asserting the non-empty testid on a media-bearing market now fails on
   a 404 rather than finding a broken image.
+
+### §8-P1 · RED-first applies to defect guards only (2026-08-11)
+
+**Trigger.** PR-B commit 1. `P2-H7`/`H15` — *"any new guard green on
+first run is a vacuous pass"* — was written against PR-A, whose first
+commit asserted **a defect exists** (a 404ing image had no degradation
+path). PR-B's commit 1 is a **zero-delta proof**. Those are opposite
+obligations, and applying one halt to both is unsatisfiable: a
+zero-delta guard is green on first run **by definition**, so RED-first
+would require the refactor to break something first.
+
+**The scoping, ratified by the operator as RULE-1 and standing for
+every remaining POLISH surface — not a one-off:**
+
+- **RED-first stands ONLY for a guard asserting a DEFECT EXISTS.** Its
+  RED output is captured before any fix is written and pasted into the
+  commit body (H9's single exception).
+- **Zero-delta and census guards are discharged by MUTATION.** Break
+  the thing deliberately, record that it reddened, revert. **Stated
+  with the RED count, never claimed** — N8: a promised assertion
+  delivered vacuously is worse than an absent one, because it reads as
+  discharged.
+- **A census mutation must break in BOTH directions.** Set equality
+  fails as hard on a removed member as on an added one; a mutation that
+  only adds proves half the guard.
+
+**The precedent this reads off, rather than inventing.** §5's own
+commit table already made the split: H15 is attached to PR-A's commit 1
+(the defect test) and **not** to its commit 4 (the per-consumer
+zero-delta baselines). The rule was already being followed; it had just
+never been stated, so the next reader met a halt that appeared to fire
+on correct work.
+
+**Applied in PR-B:** fourteen mutations across commits 1–4 — 3 on the
+map lookup and its census, 4 on the two presets and the wiring census,
+4 on the ladder tokens and their consumers, 3 on the replyhead
+extraction. Each is named in its commit body with its RED count.
+
+⚠ **One of them is load-bearing beyond this task.** Mutation I put a
+literal hex in `--ring-active` and **`tokens-monochrome.test.ts` passed
+8/8**. Its census is keyed on a property NAME carrying a hex VALUE, so
+a composite token with a hard-coded colour is invisible to it. That
+blind spot is now covered by `emphasis-ladder-tokens.test.ts`, and the
+V1 analysis that predicted it is the reason D9 was cleared without a
+round-trip.
+
+**Promotion.** The rule belongs in **V-space**
+(`POLISH-0_data-manifest.md` §5) with a V-number. That is a numbering
+decision in a document this task does not own, so it is **routed, not
+taken** — `VACUITY-RULE-TO-V-REGISTER` in `docs/parked.md`.
