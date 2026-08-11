@@ -83,7 +83,11 @@ const sideBadgeSites = readdirSync(join(ROOT, "src"), {
 	.map((entry) => join(entry.parentPath, entry.name).replace(`${ROOT}/`, ""))
 	.flatMap((file) =>
 		[...readFileSync(join(ROOT, file), "utf8").matchAll(RENDER_SITE)].map(
-			(match) => ({ file, sized: /\bsize\s*=/.test(match[0]) }),
+			(match) => ({
+				file,
+				markup: match[0],
+				sized: /\bsize\s*=/.test(match[0]),
+			}),
 		),
 	);
 
@@ -194,6 +198,10 @@ describe("SideBadge — INV-3, the side stays pole-bound whatever else is added"
 				{ price: "0.270000000000000000" },
 				{ size: "hero" as const },
 				{ size: "hero" as const, price: "0.270000000000000000" },
+				{ size: "detail" as const },
+				{ size: "detail" as const, price: "0.270000000000000000" },
+				{ size: "profile" as const },
+				{ size: "profile" as const, price: "0.270000000000000000" },
 			]) {
 				const { container } = render(<SideBadge side={side} {...props} />);
 				const cls = container.firstElementChild?.getAttribute("class") ?? "";
@@ -298,5 +306,116 @@ describe("SideBadge — V11, the Discovery hero geometry", () => {
 			);
 			cleanup();
 		}
+	});
+});
+
+/**
+ * PRIMITIVES-2 D5/D6 — the two seam presets.
+ *
+ * ⚠ THESE TESTS ARE THE ONLY COVERAGE THESE PRESETS HAVE. Zero call sites wire
+ * them by design: the seam lands at this primitive, the adoption is POLISH.3's
+ * (`detail`) and POLISH.5's (`profile`). No consumer render exercises them, so
+ * nothing else in the suite would notice a wrong value.
+ *
+ * Asserted as the FLATTENED CASCADE, property by property, because that is the
+ * failure mode: the mockups are cascading CSS and this component has none, so a
+ * property the modifier inherits from its base is silently dropped unless it is
+ * written out. `font-extrabold` is the sharp edge — omit it and the chip lands
+ * on shadcn's `font-medium` (500) instead of the mockups' 800, which no
+ * geometry assertion would catch.
+ */
+const PRESETS = [
+	{
+		size: "detail" as const,
+		// surface_d5_v1_0.html — :540 modifier, :538 base, :742 grouped radius.
+		expected: [
+			"rounded-[var(--r)]",
+			"px-[9px]",
+			"py-[3px]",
+			"text-[10px]",
+			"font-extrabold",
+			"tracking-[0.1em]",
+			"[border:var(--hairline)]",
+		],
+	},
+	{
+		size: "profile" as const,
+		// surface_profile_v1_0.html — :279 modifier, :278 base.
+		expected: [
+			"rounded-[var(--r)]",
+			"px-[7px]",
+			"py-[2px]",
+			"text-[8.5px]",
+			"font-extrabold",
+			"tracking-[0.08em]",
+			"[border:var(--hairline)]",
+		],
+	},
+];
+
+describe("SideBadge — the detail and profile seam presets", () => {
+	it("each-preset-emits-its-full-flattened-cascade-at-both-poles", () => {
+		for (const { size, expected } of PRESETS) {
+			// BOTH POLES. A YES-only assertion passes on an inverted NO panel —
+			// the mechanism by which the last inversion survived a full PR.
+			for (const [side, pole] of [
+				["YES", "bg-yes text-no"],
+				["NO", "bg-no text-yes"],
+			] as const) {
+				const { container } = render(<SideBadge side={side} size={size} />);
+				const cls = container.firstElementChild?.getAttribute("class") ?? "";
+				for (const token of expected) {
+					expect(cls).toContain(token);
+				}
+				expect(cls).toContain(pole);
+				cleanup();
+			}
+		}
+	});
+
+	it("neither-preset-inherits-a-shadcn-default-it-was-meant-to-override", () => {
+		// The flattening rule's teeth, asserted as ABSENCE. `badgeVariants` ships
+		// `text-xs font-medium rounded-4xl px-2 py-0.5`; every one of those is a
+		// property the mockup cascade sets, so each must be overridden. Class
+		// ORDER puts the preset last, so a stale shadcn token surviving here means
+		// the preset never declared its own.
+		for (const { size } of PRESETS) {
+			const { container } = render(<SideBadge side="YES" size={size} />);
+			const tokens = (
+				container.firstElementChild?.getAttribute("class") ?? ""
+			).split(/\s+/);
+			expect(tokens).not.toContain("font-medium");
+			expect(tokens).not.toContain("rounded-4xl");
+			cleanup();
+		}
+	});
+
+	it("the-two-presets-are-distinct-and-neither-equals-hero-or-base", () => {
+		// D6's stale-name trap, pinned as a property rather than as prose: four
+		// presets that are meant to differ must actually differ. `detail` is d5's
+		// `.md` at 10px and `hero` is Discovery's `.md` at 9px — the same mockup
+		// class name, two different numbers, which is exactly why neither is
+		// named `md`.
+		const emitted = (["base", "hero", "detail", "profile"] as const).map(
+			(size) => {
+				const { container } = render(
+					<SideBadge side="YES" size={size === "base" ? undefined : size} />,
+				);
+				const cls = container.firstElementChild?.getAttribute("class") ?? "";
+				cleanup();
+				return cls;
+			},
+		);
+		expect(new Set(emitted).size).toBe(4);
+	});
+
+	it("no-call-site-wires-detail-or-profile", () => {
+		// D5, asserted rather than trusted. The seam lands here; the adoption is
+		// POLISH.3's and POLISH.5's. If a later PR wires one, this reddens and the
+		// wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`.
+		const wired = sideBadgeSites.filter((site) =>
+			/size\s*=\s*["{]?\s*["']?(?:detail|profile)/.test(site.markup),
+		);
+		expect(wired).toEqual([]);
 	});
 });
