@@ -196,3 +196,58 @@ The following are ratified:
 ---
 
 *ADR-0021 ratifies the reactive moderation model: the OpenAI gate returns block (Track A: block + auto-ban + CSAM report; Track B: block content, no ban, author may revise) or pass (Track C: publishes live); there is no held queue; the admin reviews live content reactively and asynchronously, applying decoupled Remove / Ban; and no moderation action — at the gate or in the reactive path — moves a market position or mutates the append-only ledger (ban removes voice, not balance). Text-only `sexual/minors` (the SCAFFOLD.16 LD-3 carve-out) is blocked immediately and surfaced for reactive human ban-review, preserving child-safety oversight without a held queue. It supersedes ADR-0020's held queue in full while retaining ADR-0020's decoupling principle, and amends ADR-0014's Track B verdict consequence only. The decision body is immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+
+---
+
+## Patch record — 2026-08-12 · No user-facing report trigger, ruled deliberately
+
+**Decision unchanged; a gap in it is closed by ruling rather than by build.**
+The reactive pipeline, the no-held-queue property and the removal mechanism all
+stand exactly as ratified above.
+
+**What was open.** This ADR ratified a *reactive* pipeline — content reviewed
+and removed in response to a signal — and **no participant-facing control could
+produce that signal.** CD-A stripped **REPORT** from the pop-up on 2026-07-14 by
+founder ruling, having entered via an unratified prompt presupposition, and no
+policy decision was ever recorded that user reporting is out of scope. The
+absence was therefore an accident of two correct decisions colliding, and was
+indistinguishable from an oversight to every reader.
+
+**Ruled 2026-08-12: user-facing reporting is OUT OF SCOPE for the experiment
+phase.** Four grounds, each verified against the repo at ruling time:
+
+1. **Moderation is PRE-COMMIT, not post-hoc** (ADR-0014). Content is screened
+   before it becomes public, so the reactive path is a second net beneath a
+   first one — not the primary control. A report path acts only on content that
+   already shipped.
+2. **The screen is a real classifier**, covering the harm categories including
+   sexual content involving minors — not a keyword list.
+3. **The screened artifact is the served artifact** (ADR-0028): byte-identity
+   binding leaves no swap-after-approval window.
+4. **Posting friction is structural.** Every post carries a mandatory Dharma
+   stake and a mandatory argument (INV-1/INV-2), which is orders of magnitude
+   above an open forum, and the removal and ban-author paths are built.
+
+**⚠ THE RESIDUAL, STATED SO THIS IS AN ACCEPTANCE AND NOT AN OVERSIGHT.** A
+classifier sees content; it cannot see context. The class it structurally misses
+is harm that is benign in isolation — an off-platform contact handle, a pattern
+building across several replies, targeted harassment phrased as ordinary
+argument. A participant recognises that immediately; a classifier does not.
+**Today the sole detector for that class is the operator reading the corpus.**
+At experiment scale — invite-scale, 51 days, one operator — that is a real
+detector. **It stops being one if the corpus outgrows one person's reading.**
+
+**Re-open trigger — any one condition.** (a) Post volume exceeds what the
+operator reads daily. (b) The experiment phase extends past 2026-11-05.
+(c) A single observed miss of the contextual class above. Carried at
+`docs/parked.md` · MOD-REPORT-PATH.
+
+**⛔ WHAT THIS RULING DOES NOT DO.** It does not weaken, bypass or make optional
+any part of the moderation pipeline. It declines to ADD a trigger; it removes
+nothing. The pre-commit screen, the removal path, the ban-author capability and
+the audit record all stand unchanged and are not in scope to relax.
+
+**What POLISH.3 and POLISH.4 inherit.** **No report control renders on the
+debate or composer surfaces, and its absence is this ratified scope decision,
+not a defect.** An inspection that rediscovers it files
+`duplicate-of-known` and cites this patch record. It does not open a row.

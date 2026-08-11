@@ -1087,19 +1087,23 @@ the strikethroughs inside it are the corrections this task made.*
 
 ---
 
-## MOD-REPORT-PATH — no user-facing report trigger exists
+## MOD-REPORT-PATH — ✅ **RULED OUT OF SCOPE for the experiment phase (2026-08-12)** — re-open trigger live
 
-**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md` §9 · *Explicitly out* and `docs/plans/SHELL-COMPLETE.md:292` — both routing it away, with no row until today.
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md` §9 · *Explicitly out* and `docs/plans/SHELL-COMPLETE.md` §8 · *Not doing* — both routing it away, with no row until then.
 
-**Deferred work.** Design and ratify the user-facing report path. **ADR-0021's reactive moderation pipeline needs a user-facing trigger and none is designed.** CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and **no policy decision recorded that user reporting is out of scope.** Verified today: `grep -rni "report" src/components/debate/dialogs.tsx` returns **zero**.
+⚠ **The row stays open on this page because the DECISION is findable here, not because work is pending.** Nothing is queued against it. A future reader who arrives at the absent REPORT control lands on a ruling instead of on a silence — which is the whole reason it was not deleted.
 
-⚠ **Child-safety adjacent with real lead time.** ADR-0021 made moderation *reactive* — an admin reviews live content after the fact. Reactive moderation with no participant-side trigger means the only path to an admin's attention is the admin happening to look.
+**What it was.** ADR-0021 ratified a *reactive* pipeline — content reviewed and removed in response to a signal — and no participant-facing control could produce that signal. CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and no policy decision recorded that user reporting was out of scope. The absence was an accident of two correct decisions colliding, indistinguishable from an oversight.
 
-**Why deferred.** It is a product and policy decision with its own P0 chat, not a POLISH defect. **POLISH.3 inherits a decision; it does not discover a hole** — an inspector who finds no REPORT control on the pop-up is looking at a ratified removal, not a defect, and must not file it.
+**Ruled 2026-08-12 — the decision of record is `docs/adr/0021-reactive-moderation-no-held-queue.md` · *Patch record — 2026-08-12 · No user-facing report trigger, ruled deliberately*.** Four grounds, each verified against the live repo at ruling time: pre-commit screening (not post-hoc); a real multimodal classifier covering `sexual/minors`; the ADR-0028 byte-identity binding making the screened artifact the served artifact; and structural posting friction (mandatory stake + mandatory argument) with the removal and ban-author paths built. **The patch record is the citation — this row summarises it and does not restate it.**
 
-**Conditional trigger.** Its own chat. ⚠ **Lead time is the trigger, not an event** — a child-safety path that is designed in November is designed too late for a 2026-09-15 go-live.
+⚠ **The accepted residual.** A classifier sees content, not context. The class it structurally misses is harm benign in isolation — an off-platform contact handle, a pattern building across several replies, harassment phrased as ordinary argument. **Today the sole detector for that class is the operator reading the corpus**, which is a real detector at invite scale over 51 days and stops being one if the corpus outgrows one person's reading.
 
-**Expected next task.** A dedicated P0 chat. Evidence: `docs/adr/0021-reactive-moderation-no-held-queue.md`; `docs/design/DESIGN_popup-redesign_CLOSE-OUT.md` §4 (REPORT stripped, parked).
+⚠ **LEGAL.1 interaction.** A contact address in the ToS body — already an open `LEGAL.1` deliverable — gives the contextual-harm class somewhere to go at **no build cost**, and is the cheapest partial mitigation available before go-live.
+
+**Conditional trigger — RE-OPEN on any one condition.** **(a) Post volume exceeds what the operator reads daily. (b) The experiment phase extends past 2026-11-05. (c) A single observed miss of the contextual class above.** ⚠ Any one is sufficient; they are not cumulative.
+
+**Expected next task.** **HARDEN** — if the trigger fires, the report path is a HARDEN.\* build, not a POLISH surface item and not a re-litigation of the ruling. Until then: **POLISH.3 and POLISH.4 inherit a decision, not a hole** — an inspector who finds no REPORT control files `duplicate-of-known` against the patch record and does **not** open a row. Evidence: `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12; `docs/design/DESIGN_popup-redesign_CLOSE-OUT.md` §4 (REPORT stripped, parked).
 
 ---
 
