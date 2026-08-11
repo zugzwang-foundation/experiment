@@ -273,7 +273,7 @@ Both assertions **tightened from `toContain` to `toBe`** — `toContain("rate_li
 |---|---|---|
 | 1 | Parity by eye at 1440 | ⏳ **THE FOUNDER'S.** The surface does not close on this PR |
 | 2 | Invariant-visual obligations | ✅ PASS by absence — tree-walked, and re-verified by `@security-auditor` |
-| 3 | Affordances functional end-to-end | ✅ PASS — seam intact, suite green, both client pages served and exercised in a browser |
+| 3 | Affordances functional end-to-end | ✅ **PASS — operator smoke on staging at `86a245f`, 2026-08-12, 1440 wide.** Twelve items across `/sign-in` and `/sign-in/otp`, all correct: card centring on **both** routes (D19) · title copy (D01) · the single-row email field (D03) · the mail-ring icon (D07) · back-link position with copy unchanged (D14) · the verbatim phishing line (D12) · both error-callout arms (D21). **End-to-end signup completed** to `/onboarding`; header sticky confirmed on a long page. ⚠ **Recorded here because a verification event that lives only in a chat is not a repo artifact** — `POLISH-0.md` §3 · POLISH.7a warns about exactly that, on this surface, about UI.A7's "all PASS". OTP delivered to a Gmail **inbox**; DMARC's second leg is still absent → `docs/parked.md` · **DMARC-ALIGNMENT**. |
 | 4 | All states per P1–P7 | ✅ `error.tsx` lands. `loading.tsx` deliberately omitted (R-C), **pinned by a test** |
 | 5 | Cross-surface criteria | ✅ PASS by absence, all six |
 | 6 | Token usage, not value | ✅ PASS — and for the first time actually measured on these files |

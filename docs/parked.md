@@ -1087,19 +1087,23 @@ the strikethroughs inside it are the corrections this task made.*
 
 ---
 
-## MOD-REPORT-PATH — no user-facing report trigger exists
+## MOD-REPORT-PATH — ✅ **RULED OUT OF SCOPE for the experiment phase (2026-08-12)** — re-open trigger live
 
-**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md` §9 · *Explicitly out* and `docs/plans/SHELL-COMPLETE.md:292` — both routing it away, with no row until today.
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md` §9 · *Explicitly out* and `docs/plans/SHELL-COMPLETE.md` §8 · *Not doing* — both routing it away, with no row until then.
 
-**Deferred work.** Design and ratify the user-facing report path. **ADR-0021's reactive moderation pipeline needs a user-facing trigger and none is designed.** CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and **no policy decision recorded that user reporting is out of scope.** Verified today: `grep -rni "report" src/components/debate/dialogs.tsx` returns **zero**.
+⚠ **The row stays open on this page because the DECISION is findable here, not because work is pending.** Nothing is queued against it. A future reader who arrives at the absent REPORT control lands on a ruling instead of on a silence — which is the whole reason it was not deleted.
 
-⚠ **Child-safety adjacent with real lead time.** ADR-0021 made moderation *reactive* — an admin reviews live content after the fact. Reactive moderation with no participant-side trigger means the only path to an admin's attention is the admin happening to look.
+**What it was.** ADR-0021 ratified a *reactive* pipeline — content reviewed and removed in response to a signal — and no participant-facing control could produce that signal. CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and no policy decision recorded that user reporting was out of scope. The absence was an accident of two correct decisions colliding, indistinguishable from an oversight.
 
-**Why deferred.** It is a product and policy decision with its own P0 chat, not a POLISH defect. **POLISH.3 inherits a decision; it does not discover a hole** — an inspector who finds no REPORT control on the pop-up is looking at a ratified removal, not a defect, and must not file it.
+**Ruled 2026-08-12 — the decision of record is `docs/adr/0021-reactive-moderation-no-held-queue.md` · *Patch record — 2026-08-12 · No user-facing report trigger, ruled deliberately*.** Four grounds, each verified against the live repo at ruling time: pre-commit screening (not post-hoc); a real multimodal classifier covering `sexual/minors`; the ADR-0028 byte-identity binding making the screened artifact the served artifact; and structural posting friction (mandatory stake + mandatory argument) with the removal and ban-author paths built. **The patch record is the citation — this row summarises it and does not restate it.**
 
-**Conditional trigger.** Its own chat. ⚠ **Lead time is the trigger, not an event** — a child-safety path that is designed in November is designed too late for a 2026-09-15 go-live.
+⚠ **The accepted residual.** A classifier sees content, not context. The class it structurally misses is harm benign in isolation — an off-platform contact handle, a pattern building across several replies, harassment phrased as ordinary argument. **Today the sole detector for that class is the operator reading the corpus**, which is a real detector at invite scale over 51 days and stops being one if the corpus outgrows one person's reading.
 
-**Expected next task.** A dedicated P0 chat. Evidence: `docs/adr/0021-reactive-moderation-no-held-queue.md`; `docs/design/DESIGN_popup-redesign_CLOSE-OUT.md` §4 (REPORT stripped, parked).
+⚠ **LEGAL.1 interaction.** A contact address in the ToS body — already an open `LEGAL.1` deliverable — gives the contextual-harm class somewhere to go at **no build cost**, and is the cheapest partial mitigation available before go-live.
+
+**Conditional trigger — RE-OPEN on any one condition.** **(a) Post volume exceeds what the operator reads daily. (b) The experiment phase extends past 2026-11-05. (c) A single observed miss of the contextual class above.** ⚠ Any one is sufficient; they are not cumulative.
+
+**Expected next task.** **HARDEN** — if the trigger fires, the report path is a HARDEN.\* build, not a POLISH surface item and not a re-litigation of the ruling. Until then: **POLISH.3 and POLISH.4 inherit a decision, not a hole** — an inspector who finds no REPORT control files `duplicate-of-known` against the patch record and does **not** open a row. Evidence: `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12; `docs/design/DESIGN_popup-redesign_CLOSE-OUT.md` §4 (REPORT stripped, parked).
 
 ---
 
@@ -1388,3 +1392,33 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** For BOTH residuals: the next task that legitimately opens `tests/unit/design/`.
 
 **Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, THREE fixes**: R15's palette-class ban, the N5 set-equality floor, and the `SCAN_DIRS` structural fix. Evidence: `docs/logs/POLISH-7a.md` §5.
+
+---
+
+## R2-412-DEPLOY-GATE — ADR-0028's binding is mock-proven, not R2-proven — ⚠ **BLOCKS DP.2**
+
+**Originating task:** MOD-REPORT-PATH (2026-08-12), found while verifying ground 3 of ADR-0021's patch record. ⚠ **The gate itself is older** — `docs/logs/AUDIT-FIX-A1.md` recorded it as a HARD deploy gate and it has lived in a LOG with no docket row ever since, which is exactly the phantom-prerequisite shape the standing rule at the top of this file exists to prevent.
+
+**Deferred work.** Demonstrate a real **412 Precondition Failed** from **real Cloudflare R2** on a second write to an existing key, on staging, and retire the gate. Until then ADR-0028's binding is **wired and mock-proven only**.
+
+⚠ **Why it is not a formality.** The mechanism is a create-once conditional write, so the bytes that were moderated are the bytes that are served. **R2 is S3-COMPATIBLE, NOT S3.** If it accepts the header and silently no-ops rather than returning 412, the write succeeds, the swap-after-approval window is open, and **every test in the suite still passes** — the SDK mock asserts the header is SENT, not that the backend HONOURS it. The lock test says so in its own header: the mock is *necessary but insufficient*. **This is V-6 exactly** — a control that reads as discharged because nothing on disk can fail.
+
+⚠ **Child-safety adjacent.** ADR-0021's 2026-08-12 patch record cites this binding as **ground 3** for ruling user-facing reporting out of scope. **That ruling does not rest on ground 3 alone** — grounds 1, 2 and 4 are independently sufficient — but the property is asserted in a child-safety ADR and is unverified against the real backend.
+
+**Conditional trigger.** ⚠ **BEFORE DP.2.** It is a **third** DP.2 gate and it is **not** in DP.2's recorded blocker list — POOL-2 (resolved 2026-08-11) and `ProfileTradeStreamError` (recorded live, evidence stale since STAGING-PARITY Slices A–D) are the two that are. ⚠ **DP.2's blocker list needs a sweep, not just this row.**
+
+**Expected next task.** A staging exercise, not a build: one deliberate double-write against real R2, the 412 captured, the gate retired in `AUDIT-FIX-A1`'s log and here. Evidence: `docs/logs/AUDIT-FIX-A1.md`; ADR-0028; `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12, ground 3.
+
+---
+
+## DMARC-ALIGNMENT — DMARC stands on DKIM alone — founder decision, pre-go-live
+
+**Originating task:** POLISH.7a's carried findings (2026-08-11); rowed 2026-08-12 on the operator's staging smoke.
+
+**Deferred work.** `_dmarc.zugzwangworld.com` publishes `adkim=s; aspf=s`. SPF **cannot** align strictly — the envelope sender is a subdomain of the header domain — so **DMARC passes on DKIM alone, with no second leg.** Relaxing to `aspf=r` gives it one. Founder decision; one DNS record.
+
+**Status, measured 2026-08-12.** An OTP from the verified domain delivered to a **Gmail INBOX** — the same recipient class that landed in **spam** under the sandbox sender. ⚠ **That is evidence the path works today, not evidence the configuration is sound**: a DKIM-only pass is exactly what a working single leg looks like, and a broken signature or a forwarder that alters the message has nothing to fall back on. **Robustness, not delivery.**
+
+**Conditional trigger.** Before go-live, 2026-09-15. One DNS change, no code, no deploy.
+
+**Expected next task.** A founder ruling and a DNS edit. Evidence: `docs/logs/POLISH-7a.md` §6, criterion 3.
