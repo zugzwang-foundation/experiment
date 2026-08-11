@@ -1107,7 +1107,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10), the RECON-2 sweep.
 
-**Deferred work.** Resolve the chart's missing baseline. **`POLISH-0.md` §3 · POLISH.3 · Tier 1 cites `SPEC.CHART` as a TIER-1 source** (and §2's existence rider names it again).** It is **not in `docs/specs/` and never has been** — that directory holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md`, and nothing else.
+**Deferred work.** Resolve the chart's missing baseline. **`POLISH-0.md` §3 · POLISH.3 · Tier 1 cites `SPEC.CHART` as a TIER-1 source** (and §2's existence rider names it again). It is **not in `docs/specs/` and never has been** — that directory holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md`, and nothing else.
 
 ⚠ **The consequence is a halt, not an annoyance.** The chart's **expanded-overlay** variant is **built UI with NO baseline at any tier** — values-log branded three renders and four exist. Under `POLISH-0.md` §5 that is class **S**, and class S is a **SPEC-FIRST halt: no build**. So POLISH.3 cannot dispose of that component either way. It is **R13 — the only OPEN ruling** in the index.
 

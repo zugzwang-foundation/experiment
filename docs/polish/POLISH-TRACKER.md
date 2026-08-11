@@ -115,23 +115,23 @@ Dated or triggered, none blocking a machine run.
 
 ```
 POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6 ─▶ .8
-     (closed)          (closed 2026-08-11)   ▲
-                                          NEXT
-                                          plan PARALLEL · execute SERIAL
-                                                    │
-                                                    ▼
-                              ONE comprehensive founder visual pass
-                                   (.1 and .2 join here)
-                                                    │
-                                                    ▼
-                                    refinement PRs  ─▶  close-outs
+     (closed)          (closed 2026-08-11)  (#320) ▲
+                                                  NEXT
+                                           plan PARALLEL · execute SERIAL
+                                                   │
+                                                   ▼
+                                 ONE comprehensive founder visual pass
+                                      (.1 · .2 · .7a join here)
+                                                   │
+                                                   ▼
+                                  refinement PRs  ─▶  close-outs
 ```
 
 **Execute serial** means **one machine-phase PR open at a time** — so a regression bisects to a surface and Gate C never queues. Recon and classification for several surfaces may be drafted concurrently.
 
 ⚠ **`.7a` IS DONE (#320, `86a245f`) and `.3` IS NEXT** — the heaviest surface in the set. `.7a` cost **eight** founder-serial touches against a budget of two; see §6.
 
-**`.7a` first**, not `.1`: it is the cheapest surface, gate-free, and `.1`'s machine phase already ran. Shell-first was discharged, not abandoned.
+*Why `.7a` ran first, recorded as the rationale for a decision already executed:* it was the cheapest surface, gate-free, and `.1`'s machine phase had already run. Shell-first was **discharged, not abandoned**. ⚠ **This is the record of a past ordering call, not a live instruction** — `.7a` closed at #320 and the sequencer above now points at `.3`.
 
 ### ⚠ PRIMITIVES-2's binding condition
 
@@ -157,13 +157,14 @@ PRIMITIVES-2's scope, from evidence already on `main`: `MarketThumb` (PD-2-32 + 
 | Stage | Founder-serial sessions |
 |---|---|
 | PRIMITIVES-2 — plan ratify + Gate C | 2 |
-| Six machine runs — 6 ratifications + 6 Gate C | 12 |
-| ⚠ **`.7a` MEASURED** — recon · ratification · execute · correction gate · Gate C · remediation · close-out | **8** |
+| Six machine runs — 6 ratifications + 6 Gate C · ⚠ **ESTIMATE**, 2 per run; **one run is now measured at 8 against it** (below) | 12 |
 | One comprehensive visual pass | 1, long |
 | Refinement PRs | 3–6 |
 | **Total** | **~18–21** |
 
 ⚠ **THE BUDGET NOW HAS ONE MEASURED RUN AGAINST IT, AND THE FIGURE IS FOUR TIMES THE ESTIMATE.**
+
+⚠ **The measurement is stated HERE, in prose, and is deliberately NOT a row in the table above.** It is a measurement *against* the 12, not an addition *to* it — as a sibling row it read as one, and the column then summed to 26–29 while the Total still said ~18–21. `POLISH-SURFACE-TEMPLATE.md` §12 records the near-identical failure — *a stale count in the footer agreeing with a broken parse* — and here the two did not even agree. **The table keeps its five rows and its original Total; the number lives in the sentence.**
 
 The row above budgets **2 founder-serial touches per machine run** (12 for six). **`.7a` — the cheapest surface in the set, gate-free, three routes, nothing under `src/server/**` — cost EIGHT.** Spent on: **recon** · **plan ratification** · **execute** · **a correction gate** (D19's exception had been granted on the wrong file) · **Gate C** · **Gate C remediation** (five blocking items) · **this close-out**. ⚠ **Two of the eight were not in the estimate at all** — the correction gate and the remediation round — and both existed because the RECORD was wrong, not because the code was.
 
