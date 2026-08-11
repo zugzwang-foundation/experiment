@@ -1,7 +1,7 @@
 # POLISH.7a — Auth surfaces — session log (machine phase)
 
 **Stratum:** POLISH.7a, the **first** POLISH surface run under `POLISH-SURFACE-TEMPLATE.md`.
-**State:** built + gated + reviewed; **PR open, HALTED at the merge gate.** Gate C is a web diff-read before merge, on every machine-phase PR, without exception.
+**State:** built + gated + reviewed + **corrected at a founder correction gate before Gate C**; **PR open, HALTED at the merge gate.** Gate C is a web diff-read before merge, on every machine-phase PR, without exception.
 **Class:** a single gated pass per `POLISH-TRACKER.md:20` — but the **reviewer cascade ran anyway**, and it caught a CRITICAL. See §5.
 **Ground:** branch `fix/polish-7a-auth` off `origin/main` @ `903b2a1` (#319).
 
@@ -38,9 +38,9 @@
 
 ---
 
-## 3 · Machine PR — 7 shipped · 5 halted · 6 superseded · 3 data-blocked
+## 3 · Machine PR — 8 shipped · 4 halted · 6 superseded · 3 data-blocked
 
-⚠ **The plan predicted 8 shipped. It is 7. D19 shipped and was REVERTED** after `@code-reviewer` returned a CRITICAL — §5.
+⚠ **D19 shipped, was REVERTED, and then re-landed on a DIFFERENT FILE.** The pair stays in history — `5a11b38` (wrong file) → `1a41b0f` (revert) → `0002ace` (right file). It is the most valuable finding of the run and squashing it would delete the evidence.
 
 | Commit | What |
 |---|---|
@@ -48,15 +48,17 @@
 | `1fdba6a` | the raw-hex guard's reach, RED-first on three axes |
 | `6032ea3` | D01 · D03 · D07 · D12 · D14 · D21 |
 | `6635201` | D20 — the `(auth)` error boundary |
-| ~~`5a11b38`~~ | ~~D19~~ — **REVERTED at `1a41b0f`** |
+| ~~`5a11b38`~~ | ~~D19 on `src/app/layout.tsx`~~ — **REVERTED at `1a41b0f`** |
 | `0a8d762` | class-S corrections (S-01 · S-08 · S-09 · S-10 · S-11a) |
 | `2d006ca` | ten `docs/parked.md` rows |
 | `1a41b0f` | **Revert D19**, with the measurement that condemned it |
 | `3158f59` | the `@code-reviewer` round |
 | `c62b3d2` | the `@security-auditor` round |
+| `0002ace` | **D19, take two** — `(auth)/layout.tsx` wrapper `min-h-full` → `min-h-dvh`, with §7.1a |
+| `8564a08` | the plan's **§12 patch record** (P-1…P-5, and **V-7**) |
 
-**Shipped (7):** D01 · D03 · D07 · D12 · D14 · D20 · D21.
-**Halted and routed (5):** D02 → `AUTH-GOOGLE-MARK` · D10 + D11 → `AUTH-OTP-FIDELITY` · D16 → `AUTH-ONBOARDING-GATE` · **D19 → back to web, undecided**.
+**Shipped (8):** D01 · D03 · D07 · D12 · D14 · **D19** · D20 · D21.
+**Halted and routed (4):** D02 → `AUTH-GOOGLE-MARK` · D10 + D11 → `AUTH-OTP-FIDELITY` · D16 → `AUTH-ONBOARDING-GATE`.
 **Superseded (6):** D04 · D05 · D08 · D09 · D13 · D15. **Data-blocked (3):** D06 · D17 · D18.
 
 **Seam contract (UI-A7 §3)** re-asserted at PR HEAD, and independently re-verified by `@security-auditor` — including the containment question D03's restructure actually raised: the hidden `turnstileToken` anchor is now a **sibling of the flex row and a direct child of the form**, so `new FormData(event.currentTarget)` still enumerates it. `onboarding/page.tsx` is **byte-identical to `origin/main`** (blob `e82ebb1` both ends).
@@ -92,7 +94,7 @@
 | **before** (`min-h-full`) | 0 | 0 | 0 | 0 | 0 |
 | **after** (`h-full`, as shipped) | 0 | 0 | **−62** | **−562** | **−578** |
 
-Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — which `(auth)/layout.tsx:38-42` states is *designed* to be tall. Regresses ADR-0023 Patch 2026-08-03 / POLISH-1b B3. **Disposition: REVERTED at `1a41b0f`; D19 routed back to web** with the measured alternative attached (wrapper `min-h-dvh`: card top 386 on a short page, header top 0 at scrollY 1400 on a tall one — one node, and P3-forbidden).
+Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — which `(auth)/layout.tsx:38-42` states is *designed* to be tall. Regresses ADR-0023 Patch 2026-08-03 / POLISH-1b B3. **Disposition: REVERTED at `1a41b0f`.** Routed to the founder, who ruled at the correction gate (§5a) that the exception had been granted on the **wrong file** — and re-landed it at `0002ace` on the wrapper the source text actually names.
 
 **H-1 · HIGH · a real regression I introduced.** `origin/main` had **two** `<AuthError>` call sites and the component hardcoded `mt-3`, so both emitted it. D21 gave one site `className="mt-3"` and the other nothing — a silent 12px loss. **Fixed**, and the pins moved to where the class is emitted; non-vacuity proven by re-introducing the exact defect.
 
@@ -120,6 +122,105 @@ Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — w
 
 ---
 
+## 5a · The correction gate — the exception was on the wrong file
+
+Between the cascade and Gate C the founder amended **R-A**, and the amendment is a
+patch record on the plan (`docs/plans/POLISH-7a.md` §12, `8564a08`), not an edit to it.
+
+**The ruling.** The exception on `src/app/layout.tsx` is **WITHDRAWN** — the root
+layout is POLISH.1's again and halt **P3** covers it with no exception. A new
+**line-scoped** exception is granted on `src/app/(auth)/layout.tsx`, for `P7a-D19`
+only, limited to the wrapper node's min-height token.
+
+**The ground, and it was on disk the whole time.** `docs/logs/POLISH-1b.md:136`
+says *"repair the **wrapper's** `min-h-full` / body `height:auto` collapse."* The
+wrapper **is** `(auth)/layout.tsx`. The plan mapped *"upstream-only"* to the root
+layout **by inference**, and I executed the inference without checking it against
+the sentence that produced it. Both ends of one collapse are "upstream"; only one
+of them is what the log named.
+
+**What that cost and what it bought.** The wrong end had a blast radius of every
+route in the product and broke sticky above the fold. The right end has a blast
+radius of three routes and is *inert* above the fold. Same defect, same one-token
+shape, opposite risk profile.
+
+### §7.1a · The replacement proof — two heights, and the header asserted
+
+§7.1 is **superseded** (§12 P-3). Its table required *"no geometry change"* per
+route and never required a page **taller than the viewport** — the one condition
+under which a definite height stops being inert. **It could not have failed.**
+
+**Method, stated so it is auditable:** production build served locally; each route
+in a 1440×900 frame; the long case built by appending a fixed-height `<div>`
+**inside `<main>`**, where real content lives, so the box chain under test is the
+real one and only the height is synthetic. Header offset = `getBoundingClientRect().top`
+at scrollY 0 / 900 / 1400 / 2000.
+
+**The discriminating A/B** — same page instance, toggling **only** the wrapper's
+min-height between the base token (`100%`) and the shipped one (`100dvh`):
+
+| `/sign-in` | wrapH | cardTop | header @ 0/900/1400/2000 |
+|---|---|---|---|
+| SHORT base | 314.43 | 93.24 | 0/0/0/0 |
+| SHORT fixed | **900** | **386.03** | 0/0/0/0 |
+| LONG base | 2314.43 | 93.24 | 0/0/0/0 |
+| LONG fixed | **2314.43** | **93.24** | **0/0/0/0** |
+
+| `/sign-in/otp` | wrapH | cardTop | header @ 0/900/1400/2000 |
+|---|---|---|---|
+| SHORT base | 546.98 | 93.24 | 0/0/0/0 |
+| SHORT fixed | **900** | **269.76** | 0/0/0/0 |
+| LONG base | 2546.98 | 93.24 | 0/0/0/0 |
+| LONG fixed | **2546.98** | **93.24** | **0/0/0/0** |
+
+**It centres on a short page and is byte-identical to base on a long one.** That is
+the exact inverse of the reverted attempt, which was inert on short pages and
+destructive on long ones.
+
+**Per route, on the shipped tree** — SHORT `wrapH/cardTop/header` → LONG(+2000):
+
+| Route | SHORT | LONG |
+|---|---|---|
+| `/sign-in` | 900 / 386.03 / 0,0,0,0 | 2314.43 / 93.24 / **0,0,0,0** |
+| `/sign-in/otp` | 900 / 269.76 / 0,0,0,0 | 2546.98 / 93.24 / **0,0,0,0** |
+| `/onboarding` → `/sign-in` | 900 / 386.03 / 0,0,0,0 | 2314.43 / 93.24 / **0,0,0,0** |
+| `/` | 641.21 / — / 0,0,0,0 | 2641.21 / — / **0,0,0,0** |
+| `/m/[slug]` (404 arm) | 354.72 / — / 0,0,0,0 | 2354.72 / — / **0,0,0,0** |
+| `/u/[pseudonym]` (404 arm) | 354.72 / — / 0,0,0,0 | 2354.72 / — / **0,0,0,0** |
+| `/bookmarks` → `/sign-in` | 900 / 386.03 / 0,0,0,0 | 2314.43 / 93.24 / **0,0,0,0** |
+| `/admin/login` | 900 / — / no header | 2047.99 / — / no header |
+| `/admin/markets` → login | 900 / — / no header | 2047.99 / — / no header |
+| root 404 | no `<main>`, no header | n/a |
+
+⚠ **WHAT WAS NOT EXERCISED, named rather than glossed.** The **data-bearing arms**
+of `/m/[slug]` and `/u/[pseudonym]` — the local database is empty (`markets: []`,
+`users: []`), so only the `notFound()` arms render; the chain is arm-invariant
+(wrapper and `<main>` live in `(public)/layout.tsx:79,85`, above every arm) and the
+height variable is controlled directly, but real content was not rendered ·
+`/onboarding`, `/bookmarks`, `/admin/markets` redirect when signed out, so their
+rows measure the redirect target's chain · **`/onboarding`'s own long case**: its two
+legal regions are `max-h-64 overflow-y-auto` (`onboarding/page.tsx:105,115`), so the
+page is **bounded and cannot go tall on its own** — its long row is the injected one
+on the same `(auth)` chain · `global-error.tsx` needs a forced root-layout throw ·
+one viewport, 1440×900 (G1).
+
+**Blast radius, structurally rather than by measurement:** nothing outside
+`src/app/(auth)/` references `(auth)/layout.tsx`; `(public)/layout.tsx:79` still
+carries `min-h-full` and is byte-identical to `origin/main`, as is `src/app/layout.tsx`.
+
+**The token is now pinned, and it was not before.** A grep for `min-h-full` across
+`tests/` found exactly one hit and it was a **comment**. New case in
+`tests/unit/shell/page-container.test.ts`, RED-first: reverting the token →
+**RED, 1 failed | 24 passed (25)**; restored → **25 passed**. ⚠ Site 8's existing
+UNION case did **not** redden, and that is a fact rather than luck — it reads
+`<main>`'s classes and the container preset, never the wrapper `<div>`. **No re-pin
+was needed and none was made** (H14).
+
+⚠ **G1 note, recorded and not filed:** `dvh` tracks mobile browser chrome. POLISH is
+desktop-1440-only, so it cannot surface on this surface.
+
+---
+
 ## 6 · Exit bar — `POLISH-0.md` §7
 
 | # | Item | State |
@@ -133,7 +234,7 @@ Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — w
 | 7 | Pole binding | ✅ **VACUOUS, and stated as vacuous.** No side-keyed element exists here |
 | 8 | G1 desktop-only | ✅ no responsive finding; all measurement at 1440 |
 
-**⚠ D19 leaves criterion 1 with a known defect:** `my-auto` still computes to zero and both Cards still top-align at 93.24px. The founder pass will see it. That is now a *known* open row rather than a surprise.
+**⚠ Criterion 1's known defect is now CLOSED.** D19 was the one live geometry defect on this surface; at `0002ace` the sign-in Card centres at 386.03 and the otp Card at 269.76, measured. The founder pass inherits a centred surface rather than a known-broken one.
 
 ---
 
@@ -147,17 +248,22 @@ Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — w
 
 **4 · H-1 — I introduced a 12px regression under a green byte-identity receipt.** The receipt was real and blind: a component rendered in isolation proves nothing about a call site.
 
+**5 · ⚠ I EXECUTED AN INFERENCE AS IF IT WERE A CITATION.** The plan's R-A granted D19's exception on `src/app/layout.tsx`. Its stated ground was `docs/logs/POLISH-1b.md`, which says *"repair the **wrapper's** `min-h-full` / body `height:auto` collapse"* — and the wrapper is `(auth)/layout.tsx`. Both ends of one collapse are "upstream"; the log named one. I read the plan's file, checked the plan's reasoning, and never re-read the sentence the plan was reasoning **from**. My own recon had quoted that exact line three times. **A cited source is not a read source**, and this is O-2 pointed at a log rather than at a version number.
+
+**6 · The recon artifact was destroyed by the handoff, and the loss is permanent.** `~/Downloads/POLISH-7a-recon.md` was overwritten with a copy of the plan during delivery — the §9.3 filename-collision hazard, firing on the very run whose plan cites that path as its evidence base. The founder ruled it **NOT to be reconstructed** (§12 P-5, and **O-3**: a reconstruction does not merely omit, it can ASSERT). The 19-claim sweep survives in §2 above and in the ratification chat; the artifact does not. **The admit-check that caught it was run on the plan, not on the recon** — nothing in the procedure checks that a handoff has not clobbered a *previous* one.
+
 ---
 
 ## 8 · Open questions — all for Gate C
 
-1. ⚠ **D19 needs a ruling.** Grant the P3 exception for the one-line `(auth)/layout.tsx` change (measured to work on both axes), re-assign D19 to POLISH.1, or leave the collapse open. **The defect is real and still live.**
+1. ✅ **D19 — RULED AND CLOSED at the correction gate.** The exception moved to `(auth)/layout.tsx`, line-scoped; fix landed at `0002ace` with §7.1a. No longer open.
 2. ⚠ **S-11(b) — P8 halt, unresolved.** `PD-0-15` lives in the pre-recorded table, whose header at `POLISH-register.md:162` has eight columns and **no Root-cause cell** (the per-surface tables have one). Web picks a cell. **The paragraph is on disk nowhere** — the plan text is committed, but the correction it prescribes is not applied.
 3. **The register rows are NOT allocated.** No `PD-7a-nn` exists; the `.7a` table is still the placeholder. §9.2's ratified commit sequence has no register-writing commit, and I did not add one. Web's call.
 4. ⚠ **`POLISH-register.md:43` now says `.7a` is *"Not yet inspected"*, which this PR falsifies** — the same staleness S-09 just fixed for `.1`. Not in §6's enumerated list, so not edited.
 5. **D14's placement is a §4.2 B3 call** — the back link moved inside the Card rather than above it, and `--hairline` is 1px where the mockup's ring is 1.5px. Both flagged, both want a ruling.
 6. **`@security-auditor` LOW-5 has no home** — `users.name`/`image` client-writable, residual risk in the 2026-11-06 dataset. I did not mint a destination name for it.
-7. **The recon artifact was overwritten.** `~/Downloads/POLISH-7a-recon.md` now holds a copy of the plan; the plan's own footer cites that path as evidence. Re-request before Gate C if the recon is needed.
+7. ✅ **The recon loss is RULED** — not reconstructed (§12 P-5, O-3). The plan's closing line stays false and the patch record is the correction of record.
+8. ⚠ **`docs/plans/POLISH-7a.md` §3's D19 row and §6 S-01's Components cell still name `src/app/layout.tsx`.** Superseded by §12 P-1 and **deliberately not rewritten** — the patch record is the correction of record, per ADR-0023's and POLISH-0's own pattern. Commit `0a8d762` landed S-01 with that text and **it stands**.
 
 ---
 
@@ -177,13 +283,19 @@ Affects `/`, `/m/[slug]`, `/u/[pseudonym]`, `/bookmarks` and `/onboarding` — w
 
 ---
 
-## 11 · ⚠ Lesson for the next relay: what the machine read missed
+## 11 · ⚠ Lesson for the next relay: **V-7**
 
-**A proof that only exercises the case where the change is inert is not a proof, and naming that limit in the commit body does not discharge it.** §7.1 asked for a per-consumer zero-delta proof of a root-layout change. I built one, caught it being vacuous once, rebuilt it, enumerated nine routes, measured four properties per route — and every route was shorter than the viewport, which is precisely where `body{height:100%}` changes nothing. I wrote *"HONEST LIMITS: no long page was ever exercised"* into the commit body and shipped. The reviewer read that sentence and went and loaded a long page.
+> **V-7 — every proof obligation names its DISCRIMINATING CONDITION, not just its subject.** *"Measure route X"* admits a measurement taken where the defect cannot appear. *"Measure route X on a page taller than the viewport"* does not.
 
-**The next relay should require the proof to include the case that would FAIL** — for a layout change, a page taller than the viewport; for a masking change, a removed row; for a guard, an offender. `POLISH-SURFACE-TEMPLATE.md` §8.1 has nine non-vacuity rules and every one of them is about the assertion. **None is about the fixture.** N1 says "assert the set is non-empty"; nothing says "assert the set contains an instance that would fail." That is the gap, and it is the same shape as N8 one level up.
+Minted at the correction gate and recorded in the plan's §12. It generalises past this surface: for a layout change the condition is a page taller than the viewport; for a masking change, a removed row; for a guard, an offender that exists.
 
-Second, smaller: **a component rendered in isolation proves nothing about its call sites** (H-1). §8.2 says "enumerate every one — never claim it", and I enumerated them in a docstring instead of in assertions.
+**Why it was needed here.** A proof that only exercises the case where the change is inert is not a proof, and naming that limit in the commit body does not discharge it. §7.1 asked for a per-consumer zero-delta proof of a root-layout change. I built one, caught it being vacuous once, rebuilt it, enumerated nine routes, measured four properties per route — and every route was shorter than the viewport, which is precisely where `body{height:100%}` changes nothing. I wrote *"HONEST LIMITS: no long page was ever exercised"* into the commit body and shipped. The reviewer read that sentence and went and loaded a long page.
+
+**The next relay carries V-7, and requires the proof to include the case that would FAIL** — for a layout change, a page taller than the viewport; for a masking change, a removed row; for a guard, an offender. `POLISH-SURFACE-TEMPLATE.md` §8.1 has nine non-vacuity rules and every one of them is about the assertion. **None is about the fixture.** N1 says "assert the set is non-empty"; nothing says "assert the set contains an instance that would fail." That is the gap, and it is the same shape as N8 one level up.
+
+Second: **a component rendered in isolation proves nothing about its call sites** (H-1). §8.2 says *"enumerate every one — never claim it"*, and I enumerated them in a docstring instead of in assertions.
+
+Third, and it is the one I would most want the next surface to inherit: **a cited source is not a read source.** R-A's exception rested on a one-sentence quotation from `POLISH-1b.md`. I verified the plan's *reasoning* and never re-opened the sentence it reasoned *from* — a sentence my own recon had quoted three times. That is O-2 pointed at a log instead of at a version number, and it is what put a root-layout change into a PR that needed a three-route one.
 
 ---
 
