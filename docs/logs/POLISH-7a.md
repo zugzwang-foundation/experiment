@@ -1,7 +1,9 @@
 # POLISH.7a — Auth surfaces — session log (machine phase)
 
 **Stratum:** POLISH.7a, the **first** POLISH surface run under `POLISH-SURFACE-TEMPLATE.md`.
-**State:** built + gated + reviewed + **corrected at a founder correction gate** + **remediated at Gate C**; **PR open, HALTED at the merge gate.** Gate C is a web diff-read before merge, on every machine-phase PR, without exception.
+**State:** ✅ **MERGED.** Gate C cleared; **PR #320 squash-merged to `main` at `86a245fcd956ecd2b6a79a5f175d78fc28aac51c`** (`86a245f`) on 2026-08-11. **That is the canonical reference SHA** per CLAUDE.md §5.9 — the branch SHAs below are ephemeral and the branch is deleted.
+⚠ **This log carries its squash SHA because this PR's own X6 finding is that two others do not.** `docs/logs/UI-A7.md` and `docs/logs/AUTH-OTP-DELIVERY.md` are both frozen at a merge gate their PRs passed, neither recording the SHA §5.9 makes canonical. Recording it here is the fix applied to itself.
+**Surface state:** ⚠ **OPEN, not closed.** The machine phase is complete; **the founder visual pass has not run**, and `POLISH-0.md` §1 closes a surface on neither phase alone.
 **Class:** a single gated pass per `POLISH-TRACKER.md:20` — but the **reviewer cascade ran anyway**, and it caught a CRITICAL. See §5.
 **Ground:** branch `fix/polish-7a-auth` off `origin/main` @ `903b2a1` (#319).
 
@@ -42,7 +44,11 @@
 
 ⚠ **D19 shipped, was REVERTED, and then re-landed on a DIFFERENT FILE.** The pair stays in history — `5a11b38` (wrong file) → `1a41b0f` (revert) → `0002ace` (right file). It is the most valuable finding of the run and squashing it would delete the evidence.
 
-| Commit | What |
+⚠ **THESE ARE PR-BRANCH SHAs, COLLAPSED BY THE SQUASH.** They do not resolve on `main`; they are viewable at the PR's Commits tab and nowhere else. Named here because **two of them carried evidence this log does not reproduce**: `1fdba6a`'s body holds the RULE-1 RED counts axis by axis, and the D19 triple `5a11b38` → `1a41b0f` → `0002ace` holds the revert and the measurement that forced it.
+
+**What survives the squash, and where:** the RED counts are restated at §5b and in `no-raw-hex-view-layer.test.ts`'s own comment; D19's mechanism, both measurements and the rejected alternative are at §5a/§7.1a **and in `(auth)/layout.tsx`'s inline comment**, which is the only one of the three that a reader hits without knowing to look. **The per-axis offender strings and the exact vitest tallies exist only in the PR's commit bodies.** That is a real loss of granularity and it is recorded as one rather than waved past.
+
+| Commit (PR branch — not on `main`) | What |
 |---|---|
 | `aa89353` | the ratified plan, verbatim (md5 `0dffe285…`, 361 L, `diff` empty) |
 | `1fdba6a` | the raw-hex guard's reach, RED-first on three axes |
@@ -309,7 +315,12 @@ Both assertions **tightened from `toContain` to `toBe`** — `toContain("rate_li
 
 ## 9 · Next session starts at
 
-**Gate C: web diff-read of the PR**, with `~/Downloads/POLISH-7a-gateC.diff`. Answer the seven open questions above — **D19 first**, because it is the only one where a defect is live on `main`-bound code either way. Then the operator visual check at 1440. Do **not** merge before both.
+**Gate C has happened. PR #320 is merged at `86a245f`.** Two things follow it, in this order:
+
+1. ⚠ **The comprehensive founder visual pass** — one pass across the whole product, `.1` · `.2` · `.7a` joining it together (`POLISH-0.md` §6, the amended phase shape). **`.7a` does not close until it runs.** Its inherited items: `PD-7a-20` (the icon 4px out — the back link is exactly right), `PD-7a-21` (no copy pins), and the placeholder-only input labelling flagged at `docs/logs/UI-A7.md` §3.
+2. **POLISH.3 kickoff** — the heaviest surface: four gates all closed, three inherited rows, **and R13/SPEC.CHART still halting the chart overlay**, which must be ruled before `.3` can close. Full ritual, named-reviewer cascade. `POLISH-TRACKER.md` §1 now names it RUN NEXT.
+
+**Do not open `.3` and the founder pass concurrently on the founder-serial axis** — §6's measured cost is eight touches for the cheapest surface, and `.3` is the dearest.
 
 ---
 
@@ -329,7 +340,7 @@ Both assertions **tightened from `toContain` to `toBe`** — `toContain("rate_li
 
 Minted at the correction gate and recorded in the plan's §12. It generalises past this surface: for a layout change the condition is a page taller than the viewport; for a masking change, a removed row; for a guard, an offender that exists.
 
-**And the sentence Gate C added to it: a plan's coordinates are PRE-execution and a live docket's must be POST-execution.** A plan authored before the work cites a tree the work then changes — four of this PR's own citations were moved by its own restructure, in rows written after that restructure landed. Every coordinate a plan hands forward to a live docket is re-measured at PR head before the docket row lands.
+**And the sentence Gate C added to it: a plan's coordinates are PRE-execution and a live docket's must be POST-execution.** ⚠ **The close-out then generalised it into `V-8`: cite the SECTION, not the line.** A line number into a living document is not frozen wrong — it is broken by the next edit and stays silently plausible, and this PR produced three distinct instances of that genus, one of them created by its own one-line insertion. A plan authored before the work cites a tree the work then changes — four of this PR's own citations were moved by its own restructure, in rows written after that restructure landed. Every coordinate a plan hands forward to a live docket is re-measured at PR head before the docket row lands.
 
 **Why it was needed here.** A proof that only exercises the case where the change is inert is not a proof, and naming that limit in the commit body does not discharge it. §7.1 asked for a per-consumer zero-delta proof of a root-layout change. I built one, caught it being vacuous once, rebuilt it, enumerated nine routes, measured four properties per route — and every route was shorter than the viewport, which is precisely where `body{height:100%}` changes nothing. I wrote *"HONEST LIMITS: no long page was ever exercised"* into the commit body and shipped. The reviewer read that sentence and went and loaded a long page.
 
@@ -338,6 +349,20 @@ Minted at the correction gate and recorded in the plan's §12. It generalises pa
 Second: **a component rendered in isolation proves nothing about its call sites** (H-1). §8.2 says *"enumerate every one — never claim it"*, and I enumerated them in a docstring instead of in assertions.
 
 Third, and it is the one I would most want the next surface to inherit: **a cited source is not a read source.** R-A's exception rested on a one-sentence quotation from `POLISH-1b.md`. I verified the plan's *reasoning* and never re-opened the sentence it reasoned *from* — a sentence my own recon had quoted three times. That is O-2 pointed at a log instead of at a version number, and it is what put a root-layout change into a PR that needed a three-route one.
+
+---
+
+## 11a · Close-out round — what the close-out itself found
+
+**GC-6.** `NO-RAW-HEX-REACH`'s body still opened *"Closed in the same PR that found it … not to track open work"* while its heading (corrected at Gate C) said a residual was OPEN and the body carried two. **A heading and its own body disagreeing, in the row minted to record a false receipt.** Corrected.
+
+**GC-7 — and it is V-8's worked example.** `S-01` inserted **one line** into `POLISH-0.md` §3, so every line citation into that file below it went off by one **inside the same PR that made them**. Swept the tree rather than working the handed list: **33 citations found · 15 converted to section anchors · 18 left.**
+
+⚠ **Not one of the 15 was still correct** — the +1 shift compounded with drift that predated this PR. `POLISH-register.md`'s `SPEC.CHART` pointer had already been corrected once this round, from `:158` to `:203`, and `:203` was **also wrong**: it lands on POLISH.3's *Tier 2* row while the SPEC.CHART citation is in *Tier 1*. **A line number corrected to another line number bought one round of accuracy.** That is the argument for V-8 in one instance.
+
+The 18 left, with the reason: **10** in `docs/plans/POLISH-7a.md` and **1** in `docs/plans/PRIMITIVES-2.md` — a committed plan is amended by patch record, never edited, and P-6 already covers ours; **7** in session logs (`POLISH-TEMPLATE.md` ×6, `POLISH-2.md` ×1) — those are records of what a past session read at a past SHA, and rewriting them would revise a record rather than repair a pointer.
+
+**V-7 had never reached its own register.** It was minted at the correction gate into `docs/plans/POLISH-7a.md` §12 and this log, and `POLISH-0_data-manifest.md` §5 — **the canonical home of V-space** — did not have it. That is the manifest's own **D4** failure recurring: *"a repo-side reader could see every citation and no definition."* **V-7 and V-8 are both minted there now**, and V-7's entry says so about itself.
 
 ---
 

@@ -17,9 +17,9 @@
 | Surface | Machine phase | Founder pass | Gates | Ritual | Next action |
 |---|---|---|---|---|---|
 | **.1 Shell** | ✅ #288 · #289 · #290 | ❌ | **CLEAR** — B4 void · B8 struck · B10 closed | — | Joins the comprehensive pass |
-| **.7a Auth** | ❌ | ❌ | **none** | single gated pass | ▶ **RUN NEXT** — PRIMITIVES-2 closed 2026-08-11 (#317 · #318), so nothing precedes it |
+| **.7a Auth** | ✅ **#320** `86a245f` | ❌ | **none** | single gated pass (⚠ the reviewer cascade ran anyway, and returned a CRITICAL) | **OPEN, not closed** — joins the comprehensive pass |
 | **.2 Discovery** | ✅ #306 · #311 · #312 · #313 | ❌ | **CLEAR** — B2 closed #276 | — | Joins the comprehensive pass |
-| **.3 Market Detail** | ❌ | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ after .7a. ⚠ 3 inherited rows |
+| **.3 Market Detail** | ❌ | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ **RUN NEXT** — `.7a` closed 2026-08-11 (#320). ⚠ 3 inherited rows · ⚠ R13/SPEC.CHART still halts the chart overlay |
 | **.4 Composers** | ❌ | ❌ | **CLEAR** — B1 closed | **full ritual** | ▶ after .3. Co-owns RR-3 |
 | **.5 Profile** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ⚠ **REGISTER-APPLY first** |
 | **.6 Bookmarks** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ▶ after .5 |
@@ -28,7 +28,7 @@
 
 **Eight of nine are gate-clear.** `POLISH-0.md`'s original gate line implied four blocked surfaces; three of those four blocks had already evaporated when it was written. Only `.7b` is blocked, and its blocker is O1.
 
-**Six machine runs remain** — `.7a · .3 · .4 · .5 · .6 · .8`. `.1` and `.2` have had theirs and join the comprehensive founder pass directly.
+**Five machine runs remain** — `.3 · .4 · .5 · .6 · .8`. `.1`, `.2` and now `.7a` have had theirs and join the comprehensive founder pass directly. ⚠ **A machine phase does not close a surface**: `.7a` is OPEN until the founder pass runs, exactly as `.1` and `.2` are.
 
 ### Gate ledger
 
@@ -97,6 +97,15 @@ Dated or triggered, none blocking a machine run.
 | **MOD-REPORT-PATH** | its own chat | ADR-0021's reactive pipeline has no user-facing trigger. **Child-safety adjacent, real lead time.** `.3` inherits a decision; it does not discover a hole |
 | **SPEC.CHART** | before `.3` closes | R13. Either write it or record the overlay as permanently unbaselined |
 | **ADR-0006-DISCIPLINE** | opportunistic | Holds one known unpushed commit |
+| **AUTH-TURNSTILE-WIRE** | **2026-09-05**, with RATE-GUARD-PUBLIC | ⚠ Opened by `.7a` (#320). The widget is unmounted; the server half is BUILT and fails closed. Carries `PD-0-14`, `PD-7a-16`, `PD-7a-10`, `PD-7a-14`. **`ADR-0033` §Constraints binds it** — resend↔sign-in token parity, and the two sites are structurally asymmetric so a one-sided wiring fails SILENTLY (the resend path 200s regardless) |
+| **AUTH-ERROR-COPY** | **pre-go-live** | ⚠ Opened by `.7a`. Tier-1-named in `ADR-0033` §Scope. Raw codes render to anonymous visitors — `otp_rate_limited` (NOT `rate_limited`, which is POLISH.4's) and **`identity_pool_exhausted`, a pool-drain progress oracle**. ⚠ The three a user reaches are produced INSIDE `src/server/auth/**` — critical path. **Co-execute with AUTH-OTP-FIDELITY**: same file, one ritual |
+| **AUTH-OTP-FIDELITY** | **pre-go-live** | ⚠ Opened by `.7a`. `PD-7a-07` (6-box entry) + `PD-7a-08` (resend cooldown). Without the cooldown, mashing Resend produces the raw code AUTH-ERROR-COPY exists to fix — **one user experience, one task** |
+| **AUTH-ONBOARDING-GATE** | **pre-go-live** | ⚠ Opened by `.7a`. `PD-7a-09`. **Tier-1 SPEC-LOCKED** — SPEC.1 §13 F-AUTH-4 requires Continue disabled until the checkbox is ticked, and §13's UI/UX note forbids relaxing it without an ADR. **NOT unsafe today**: `required` blocks submission and `acceptTosAction` re-checks server-side |
+| **AUTH-GOOGLE-MARK** | **founder decision, undated** | ⚠ Opened by `.7a`. `PD-7a-06`. Sits between DESIGN.B1's CI-guarded TRUE-NEUTRAL system and Google's sign-in branding guidelines. **Not go-live-gating** — text-only is a shipping state |
+| **AUTH-HARDEN** | **pre-go-live** | ⚠ Opened by `.7a`. **Seven items**, and item (3) leads: the OTP sender's `Sentry.captureException` is UNFLUSHED while `ADR-0033` designates it the SOLE mitigation for a ratified HTTP-200-on-failure design. Also XFF spoofability, a `beforeSend` scrubber, **participant emails egressing to Sentry in the URL query string**, the siteverify fetch ordered ahead of both limiters, no boundary reporting to Sentry, and `users.name`/`image` client-writable. ⚠ **`src/server/auth/**` is a CLAUDE.md §1 CRITICAL PATH — its own chat, full ritual** |
+| **LEGAL.1** | ⚠ **GO-LIVE GATE, before 2026-09-15** | ⚠ Opened by `.7a` (absorbing `HARDEN.6`/`HARDEN.7` as aliases — the same deliverable was named three ways). ToS and Privacy bodies are Lorem ipsum and are rendered IN FULL on the acceptance screen, so a participant accepts placeholder text on the screen whose purpose is recording that acceptance. Carries the version label and **the AGPL §13 source offer, which relocated INTO the ToS body when B4 voided the footer**. Its own chat |
+| **AUTH-FIRST-LOGIN** | trigger: **re-verify at kickoff** | ⚠ Opened by `.7a`. An A7-ledger name carried since 2026-07-22 with **no definition anywhere on `main`**. First action is to establish whether a defect exists at all |
+| **NO-RAW-HEX-REACH** | with **R15**, quality lane | ⚠ Opened by `.7a`. Reach CLOSED; **two residuals open** — the alive check is a floor not set equality (N5), and the structural `SCAN_DIRS` fix (O-1) would also cover `_components/`. One visit, three fixes |
 
 > **Standing rule.** A routing destination named in a committed document gets a `docs/parked.md` row **in the same commit**. Six were named across this corpus with none — two of them load-bearing. A phantom prerequisite is worse than a deferred one.
 
@@ -105,7 +114,7 @@ Dated or triggered, none blocking a machine run.
 ## §5 · Sequence
 
 ```
-POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6 ─▶ .8
+POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6 ─▶ .8
      (closed)          (closed 2026-08-11)   ▲
                                           NEXT
                                           plan PARALLEL · execute SERIAL
@@ -119,6 +128,8 @@ POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ─▶ .3 ─▶ .4 ─�
 ```
 
 **Execute serial** means **one machine-phase PR open at a time** — so a regression bisects to a surface and Gate C never queues. Recon and classification for several surfaces may be drafted concurrently.
+
+⚠ **`.7a` IS DONE (#320, `86a245f`) and `.3` IS NEXT** — the heaviest surface in the set. `.7a` cost **eight** founder-serial touches against a budget of two; see §6.
 
 **`.7a` first**, not `.1`: it is the cheapest surface, gate-free, and `.1`'s machine phase already ran. Shell-first was discharged, not abandoned.
 
@@ -147,9 +158,18 @@ PRIMITIVES-2's scope, from evidence already on `main`: `MarketThumb` (PD-2-32 + 
 |---|---|
 | PRIMITIVES-2 — plan ratify + Gate C | 2 |
 | Six machine runs — 6 ratifications + 6 Gate C | 12 |
+| ⚠ **`.7a` MEASURED** — recon · ratification · execute · correction gate · Gate C · remediation · close-out | **8** |
 | One comprehensive visual pass | 1, long |
 | Refinement PRs | 3–6 |
 | **Total** | **~18–21** |
+
+⚠ **THE BUDGET NOW HAS ONE MEASURED RUN AGAINST IT, AND THE FIGURE IS FOUR TIMES THE ESTIMATE.**
+
+The row above budgets **2 founder-serial touches per machine run** (12 for six). **`.7a` — the cheapest surface in the set, gate-free, three routes, nothing under `src/server/**` — cost EIGHT.** Spent on: **recon** · **plan ratification** · **execute** · **a correction gate** (D19's exception had been granted on the wrong file) · **Gate C** · **Gate C remediation** (five blocking items) · **this close-out**. ⚠ **Two of the eight were not in the estimate at all** — the correction gate and the remediation round — and both existed because the RECORD was wrong, not because the code was.
+
+⚠ **This is a MEASUREMENT, not a forecast.** Whether the remaining five cost 2 each, 8 each, or something between is a **founder ruling, not a CC one**: it turns on how much of `.7a`'s cost was first-run overhead on a brand-new template versus recurring, and on whether `.3` and `.4` — **full ritual**, and still needing SPEC.CHART and MOD-REPORT-PATH resolved — run cheaper or dearer than the cheapest surface. **The figure is stated; the re-forecast is left open.**
+
+**R-G's batch lever is PULLED for `.5` · `.6` · `.8`** (POLISH.7a plan §2 R-G): their recon and classification are drafted concurrently and ratified in **one** session. **Execute stays SERIAL — one machine-phase PR open at a time — and Gate C never batches.** Not applicable to `.3` or `.4`.
 
 **The binding constraint is founder-serial capacity, not calendar** — `tracker_v20` §10 holds the project budget and this file does not restate it. Two levers, if it binds:
 
@@ -169,5 +189,7 @@ Surfaces close as **`closed (a11y-deferred)`** until A11Y.0 lands. The qualifier
 At each close: **one batched summary row** into `tracker_v20`. Never row by row.
 
 ---
+
+*Amended 2026-08-11 at the POLISH.7a close-out: §1 `.7a` machine phase ✅ at #320 `86a245f` (surface OPEN — the founder pass has not run) and `.3` promoted to RUN NEXT · §4 gains the nine docket rows `.7a` opened · §5 sequence advanced · **§6 carries the first MEASURED cost against the budget — eight founder-serial touches where two were estimated — with the re-forecast left to the founder.** Every `POLISH-0.md` pointer in this file and in `POLISH-register.md`/`parked.md` converted from line numbers to SECTION ANCHORS per **V-8**.*
 
 *Authored by web Claude, 2026-08-10 IST, at the POLISH-TEMPLATE task. Ground `origin/main` @ `35d041d`; every gate and every carry-forward verified against the repo rather than against a document asserting it. Beside `tracker_v20.md`, which stays canonical for the project.*
