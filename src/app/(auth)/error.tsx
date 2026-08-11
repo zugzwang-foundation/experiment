@@ -35,6 +35,17 @@
  * none of that is the visitor's. The prop is accepted because Next's contract
  * passes it; it is deliberately unused.
  *
+ * ⚠ AND THE ARM THAT PROTECTS IS NOT THE ONE YOU WOULD GUESS (@security-auditor).
+ * In a production build React's Flight client already replaces a SERVER-side
+ * error with a fixed placeholder before it reaches the browser — `resolveErrorProd`,
+ * "the specific message is omitted in production builds". So for server throws
+ * this file has nothing left to leak. What it genuinely guards is the CLIENT arm:
+ * an error thrown by `SignInPage` or `OtpForm` in the browser, or during
+ * hydration, arrives here as the REAL, unsanitized `Error` in production too.
+ * Anyone later "improving" this to show `error.message` will check a server throw,
+ * see a placeholder, conclude production is safe — and be wrong for the arm that
+ * matters. Do not render it.
+ *
  * Copy and treatment follow the established state family — `global-error.tsx`
  * and `(public)/not-found.tsx` — with W2.11's generic-error title vocabulary
  * ("Something went wrong"). Template §11: the states must feel like one family.
