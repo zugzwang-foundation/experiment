@@ -584,6 +584,11 @@ at Gate C rather than absorbed:
   whose `PERMITTED_FILES` IS exact set equality and does redden.)
 - `docs/parked.md` — GC-1 and the two test-lane rows below.
 
+⚠ The PR's diff carries **nine** file headers, not three: `docs/plans/PRIMITIVES-2.md`
+(this patch record) and `docs/logs/PRIMITIVES-2-PR-A.md` (the session log CLAUDE.md
+§5.9 mandates) are the **recording mechanism**, not departures to be ratified —
+a fence that counted its own minutes would be unsatisfiable.
+
 ### Gate C findings on PR-A
 
 - **GC-1 · `OQ-6`'s dynamic-alt rule has an exception at two sites.**

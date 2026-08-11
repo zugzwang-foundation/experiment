@@ -7,14 +7,18 @@ primitive behind Discovery's three image sites, plus D4's two `alt=""` changes.
 **Ritual:** FULL and gated. Not ultracode, not stacked on one.
 **Ground:** `origin/main` = `f51a9dd` (PR #316 merged). Branch
 `fix/primitives-2-market-thumb`.
-**Gate C:** a web diff-read before merge, **non-optional**, still pending at
-time of writing. Diff written to `~/Downloads/PR-A-primitives-2.diff`.
+**Gate C:** a web diff-read before merge, **non-optional**. **Returned PASS**;
+§11 verified verbatim; the code was cleared and this log correction is the last
+commit before merge. Diff written to `~/Downloads/PR-A-primitives-2-final.diff`.
 
 ---
 
 ## 1 · What landed
 
-Six commits on `fix/primitives-2-market-thumb`:
+**Twelve** commits on `fix/primitives-2-market-thumb` — 9 through the D2-P1
+round, then 3 docs-only after Gate C. *(This line read "Six" until the log
+correction: a counted claim going stale inside its own PR, the CC-6 genus, in
+the very document that exists to keep counts honest.)*
 
 | # | SHA | Commit |
 |---|---|---|
@@ -27,10 +31,14 @@ Six commits on `fix/primitives-2-market-thumb`:
 | 7 | `5fa19ab` | `fix(discovery): D2-P1 — MarketThumb catches a pre-hydration 404` |
 | 8 | `fb4e47c` | `chore(discovery): log session — D2-P1 landed, §11 patch HELD` |
 | 9 | `86263ed` | `fix(discovery): address @code-reviewer findings on D2-P1` |
+| 10 | `4c8d016` | `chore(discovery): log session — reviewer pass 2 adopted; final gate recorded` |
+| 11 | `c207d64` | `docs(plans,parked): PRIMITIVES-2 §11 patch records + three docket rows` |
+| 12 | *this commit* | `chore(discovery): correct the PR-A session log` |
 
-**Files — six, where the plan's §5 named four.** Both extras are forced
-completeness consequences of ratified rulings, not scope creep; both are
-flagged in their commit bodies and in the PR body for Gate C.
+**Files — NINE, where the plan's §5 named four.** Five beyond the fence, of
+which **three are ratifiable departures** and **two are the recording mechanism
+itself** — see §11's "Recorded departures". Every departure was flagged in its
+own commit body before Gate C read it, never absorbed.
 
 | File | Why |
 |---|---|
@@ -38,8 +46,11 @@ flagged in their commit bodies and in the PR body for Gate C.
 | `src/components/discovery/MarketCard.tsx` | adoption (§5) |
 | `src/components/discovery/HeroPanels.tsx` | two adoptions (§5) |
 | `tests/unit/discovery/render/market-thumb.test.tsx` | new — RED guard + §8.1 baselines (§5) |
-| `tests/unit/discovery/render/market-card.test.tsx` | **5th** — D4 forced it |
-| `tests/unit/discovery/reserves-server-only.test.ts` | **6th** — M2, client-graph inventory |
+| `tests/unit/discovery/render/market-card.test.tsx` | departure 1 — D4 forced it |
+| `tests/unit/discovery/reserves-server-only.test.ts` | departure 2 — reviewer M2, client-graph inventory |
+| `docs/parked.md` | departure 3 — GC-1 + the two test-lane rows |
+| `docs/plans/PRIMITIVES-2.md` | §11 patch records — the recording mechanism |
+| `docs/logs/PRIMITIVES-2-PR-A.md` | this file — mandated by CLAUDE.md §5.9 |
 
 **The defect fixed.** A presigned R2 GET URL that 404s at the browser had no
 degradation path at any of the three sites. Presigning is a local HMAC over a
@@ -114,6 +125,15 @@ Reported as "no diff" and redone in Python with `assert count == 1` anchors
 before each replace. A perturbation that does not perturb reads exactly like a
 guard that does not bite.
 
+**S-4 · The M2 guard entry proved itself live on arrival.**
+`reserves-server-only.test.ts` scans raw file text with a naive
+`toContain("reserves")`. A first draft of a `MarketThumb` comment used the word
+"**pre**serves" — which contains "reserves" — and the guard went RED the moment
+`MarketThumb.tsx` was added to its list. Then the *explanatory comment about the
+trap* contained the literal string too, and reddened it again. Reworded to
+"keeps" with no meta-commentary. Annoying twice over, but it is a free positive
+control: the new inventory entry is demonstrably not vacuous.
+
 **S-5 · D2-P1's first alive check was GREEN-IMPOSSIBLE — the same trap as S-1,
 caught the same way.** The mount test's N1 alive check asserted
 `toHaveLength(site.imgCount)` on the loaded render. But a *correct* component
@@ -138,14 +158,10 @@ the production check *inert* rather than always-true, so an unstubbed test
 reports a confident green while exercising nothing. Both properties are stubbed,
 and both discriminating axes carry a positive control.
 
-**S-4 · The M2 guard entry proved itself live on arrival.**
-`reserves-server-only.test.ts` scans raw file text with a naive
-`toContain("reserves")`. A first draft of a `MarketThumb` comment used the word
-"**pre**serves" — which contains "reserves" — and the guard went RED the moment
-`MarketThumb.tsx` was added to its list. Then the *explanatory comment about the
-trap* contained the literal string too, and reddened it again. Reworded to
-"keeps" with no meta-commentary. Annoying twice over, but it is a free positive
-control: the new inventory entry is demonstrably not vacuous.
+*(S-1…S-6 now run in order. They previously ran S-1, S-2, S-3, S-5, S-6, S-4 —
+the numbering was chronological but the document order was not. Fixed by MOVING
+S-4 into place rather than renumbering, so no `S-n` citation anywhere changes
+meaning.)*
 
 ---
 
@@ -185,19 +201,44 @@ response arrives EARLIER relative to hydration, so the lost-event window is
 **wider**, not narrower. **The stale claim made M1 look less urgent than it is.**
 The mitigation was already retired before it was offered.
 
-**OQ-B · Two files beyond §5's four-file fence.** Both flagged, neither silent.
-Gate C should confirm both are acceptable rather than discover them in the diff.
+**OQ-B · Files beyond §5's four-file fence — → RESOLVED, ratified at Gate C.**
+**Three** ratifiable departures, each flagged in its own commit body before Gate
+C read the diff: `market-card.test.tsx` (forced by D4), `reserves-server-only.test.ts`
+(reviewer M2), `docs/parked.md` (GC-1 + two test-lane rows). This log and the
+§11 patch record are a fourth and fifth file but are **not** departures — they
+are the recording mechanism, enumerated in §1. *(This entry read "Two files"
+until the log correction; §11 had already been ratified at three.)*
 
-**OQ-C · The §11 plan patch is HELD, not committed.** The web-authored text
-names `tests/unit/design/reserves-server-only.test.ts`. That path does not
-exist; the guard is at `tests/unit/discovery/reserves-server-only.test.ts`
-(`design/` holds `side-pole-binding`, `tokens-monochrome`, `avatar-ring-token`
-and friends). Per the relay's *"if any sentence looks wrong, HALT and quote
-it"*, and because `docs/plans/PRIMITIVES-2.md` is ratified web-owned text that
-must not be normalized in-session, the patch is held for a one-word
-ratification. Everything else in it was verified correct against this repo,
-including the PERF-1 figures. **`docs/plans/PRIMITIVES-2.md` is untouched, so
-the final diff carries 7 file headers, not the 8 the relay expected.**
+**OQ-C · The §11 plan patch — → RESOLVED. It is committed at `c207d64`.**
+
+The patch was **HELD** for one round rather than normalized in-session, and the
+hold was correct: it caught **two** errors in the web-authored text, not one.
+
+1. **The path.** It named `tests/unit/design/reserves-server-only.test.ts`. That
+   file does not exist — the guard is at
+   `tests/unit/discovery/reserves-server-only.test.ts` (`design/` holds
+   `side-pole-binding`, `tokens-monochrome`, `avatar-ring-token` and friends).
+   Corrected.
+2. **An overclaim about the mechanism.** The held text called that file a
+   *guard whose list must name the new file*. It is a **hand-maintained list
+   that stays GREEN while incomplete** — omitting a file is a silent coverage
+   hole, not a red test. The ratified §11 now says so explicitly and contrasts
+   it against `side-pole-binding.test.ts:363`, whose
+   `expect(inventory).toEqual(PERMITTED_FILES)` **is** exact set equality and
+   does redden. That distinction is not cosmetic: it is the difference between
+   "the suite will tell you" and "only discipline will."
+
+**The lesson is the halt itself, and it is worth keeping on record.** The
+instruction was *"if any sentence still looks wrong, HALT and quote it"*, and
+holding a one-word path error looked disproportionate at the time. It was not:
+the second, larger error was only found because the text was being read against
+the live repo rather than pattern-matched as approved. Normalizing quietly would
+have shipped both into a ratified plan document.
+
+Every other claim in §11 was re-verified against the repo before committing —
+`page.tsx:18` is `force-dynamic`; `docs/parked.md:25` carries `35.07 → 0.692 s
+p50`, closed 2026-08-10; the reserves path exists; `side-pole-binding` asserts
+set equality at `:363`. **The final diff carries NINE file headers.**
 
 ---
 
@@ -252,6 +293,13 @@ session log) is this file.
 | **Post-D2-P1** — full suite ×3, sequential | **all three green: 317 passed / 1 skipped · 2817 passed / 1 skipped / 4 todo**, exit 0, zero FAILs in any run |
 | **Post-review-pass-2** — `just verify` | **PASS** — "All checks passed" (exit 0) |
 | **Post-review-pass-2** — full suite ×3, sequential | runs 1 and 2 **green** (317 passed · 2818 passed); run 3 **1 failed** — an infrastructure artifact, below |
+| **Post-§11** — `just verify` | **PASS** — "All checks passed" (exit 0) |
+| `tests/unit/design/side-pole-binding.test.ts` | **GREEN** — exit criterion 7 |
+| `tests/unit/design/tokens-monochrome.test.ts` | **GREEN** — exit criterion 8 |
+| `market-thumb.test.tsx` | 19 tests at commit 4; **30** after D2-P1 |
+
+*(The last three rows sat stranded mid-prose below, splitting this table in two;
+folded back so the exit-criteria evidence reads as one block.)*
 
 **Run 3's failure is not a test failure and not `pseudonym-assigned-event`.**
 `tests/server/bets/daily-credit.test.ts` → `bet-place::credit-funds-the-post-floor [T4]`
@@ -264,13 +312,12 @@ immediately afterwards: **6/6 passing in 569 ms.** Nothing in this PR touches
 `tests/server/bets/`, `src/server/**`, or any DB code.
 
 **`pseudonym-assigned-event.test.ts:91` did NOT recur** in any of these three
-runs — nor in the three before them. Session total: **9 full-suite runs, 1
+runs — nor in the six before them. **Session total: 9 full-suite runs (3 + 3 +
+3 — one batch pre-review-fixes, one post-D2-P1, one post-review-pass-2), 1
 occurrence**, in run 2 of the first batch. It remains a real latent isolation
 weakness (a *global* `events` row-count assertion in a parallel runner sharing
-one Postgres) that wants its own docket row, and it remains not PR-A's.
-| `tests/unit/design/side-pole-binding.test.ts` | **GREEN** — exit criterion 7 |
-| `tests/unit/design/tokens-monochrome.test.ts` | **GREEN** — exit criterion 8 |
-| `market-thumb.test.tsx` | 19 tests, all passing |
+one Postgres) that wants its own docket row, and it remains not PR-A's. Rowed at
+`docs/parked.md` → **TEST-ISOLATION-EVENTS**.
 
 **The run-2 failure is a pre-existing shared-DB isolation flake, not a
 regression — stated with its evidence rather than waved off.**
@@ -291,10 +338,13 @@ runs fully green, the third failing only that one unrelated auth assertion,
 which is green in isolation. Confirmed flaky.
 
 **Three further full runs after D2-P1 also did not reproduce it** — all three
-green, zero FAILs in any of them. Final tally across the session: **6 full-suite
-runs, 1 occurrence.** It remains a real latent isolation weakness (a global row
-count in a parallel runner sharing one Postgres), not a regression, and not
-PR-A's to fix.
+green, zero FAILs in any of them, and three more after review pass 2 likewise.
+**Final tally across the session: 3 + 3 + 3 = 9 full-suite runs, 1 occurrence.**
+*(This line read "6 full-suite runs" until the log correction, contradicting the
+"9" stated above it and the count already committed in `docs/parked.md`'s
+TEST-ISOLATION-EVENTS row — the same CC-6 genus as §1's commit count.)* It
+remains a real latent isolation weakness (a global row count in a parallel
+runner sharing one Postgres), not a regression, and not PR-A's to fix.
 
 ⚠ Not silently absorbed. A test that asserts a GLOBAL row count
 (`rows.length === 1` over the whole `events` table) is order-dependent by
@@ -324,9 +374,10 @@ task mints no ADR; the ceiling stays 0036, next free 0037.
 
 ## 7 · Next session starts at
 
-**Gate C — the web diff-read of PR-A**, carrying the OQ-A (M1) disposition.
-Diff is at `~/Downloads/PR-A-primitives-2.diff` for operator upload; it travels
-as an **uploaded file**, never pasted terminal output.
+**The operator's merge of PR-A.** Gate C returned PASS, §11 was verified
+verbatim, and the code is cleared; this log correction is the last commit.
+The diff is at `~/Downloads/PR-A-primitives-2-final.diff` for operator upload
+— it travels as an **uploaded file**, never pasted terminal output.
 
 After PR-A merges: cut `chore/primitives-2-seam` from the NEW `main` — **serial,
 never parallel** (D11) — and re-verify the branch does not already exist
