@@ -153,6 +153,30 @@ function ActionForm({
 				</label>
 			) : null}
 
+			{/* POLISH.8 S-4 (D12) — SPEC.1 §15 F-ADMIN-3 Confirmation requires the
+			    confirm to restate the winning side and to name the action as
+			    permanent, with corrections available only via an F-RESOLVE-2
+			    clawback. COPY ONLY: every value below is already in props/state —
+			    no new prop, no read-model field, no behaviour change.
+			    ⚠ SIDE-ENCODING COPY, NOT A POLE SITE. The side is stated as TEXT
+			    and is never colourised — INV-3's poles encode side, and keying a
+			    colour off this string would mint a fourth pole surface. */}
+			{gated ? (
+				<p
+					data-testid={`${action}-permanence`}
+					className="mb-3 rounded-md border border-border bg-muted px-3 py-2 text-xs"
+				>
+					{hasSide ? (
+						<span className="font-semibold">
+							{`${action === "resolve" ? "Winning side" : "Corrected side"}: ${side}. `}
+						</span>
+					) : null}
+					This action is permanent — the market cannot be re-opened, edited or
+					un-resolved. Corrections are available only via an F-RESOLVE-2
+					clawback.
+				</p>
+			) : null}
+
 			{gated ? (
 				<label className="mb-3 flex flex-col gap-1 text-sm">
 					<span className="font-medium">
