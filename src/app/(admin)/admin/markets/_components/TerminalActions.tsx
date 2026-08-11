@@ -171,9 +171,9 @@ function ActionForm({
 							{`${action === "resolve" ? "Winning side" : "Corrected side"}: ${side}. `}
 						</span>
 					) : null}
-					This action is permanent — the market cannot be re-opened, edited or
-					un-resolved. Corrections are available only via an F-RESOLVE-2
-					clawback.
+					{hasSide
+						? "This action is permanent — the market cannot be re-opened, edited or un-resolved. Corrections are available only via an F-RESOLVE-2 clawback."
+						: "This action is permanent — a voided market cannot be re-opened, and it has no correction path."}
 				</p>
 			) : null}
 

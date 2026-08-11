@@ -135,6 +135,13 @@ describe("TerminalActions — confirm restates side + names permanence (D12)", (
 		// Void picks no side, so no side label may be invented for it.
 		expect(note.textContent).not.toContain("Winning side");
 		expect(note.textContent).not.toContain("Corrected side");
+		// ⚠ AND IT MUST NOT PROMISE A CLAWBACK. F-RESOLVE-2 requires status
+		// 'Resolved' (src/server/resolution/correct.ts expectedStatus), and
+		// actionsForStatus("Voided") is empty — a voided market has NO correction
+		// path. Claiming one here under-states finality on the one gated action
+		// that is genuinely un-correctable, which is the opposite of what S-4 is
+		// for (@code-reviewer H-1).
+		expect(note.textContent).not.toContain(CLAWBACK);
 	});
 
 	it("renders NO permanence note on Close, which is not a gated action", () => {

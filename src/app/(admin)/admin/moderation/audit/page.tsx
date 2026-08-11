@@ -277,13 +277,17 @@ function parseFilters(sp: SearchParams): AuditSearchFilters {
  * decision `parseFilters` makes, and never alters the query.
  */
 export function invalidDateFields(sp: SearchParams): string[] {
+	// Derived from `parseFilters`' OUTPUT, never from a re-run of its decision.
+	// "supplied but produced no filter" IS "was dropped", definitionally — so the
+	// note cannot drift out of step with the query if either suffix or guard is
+	// ever changed. Re-deriving the Number.isNaN test here agreed today and would
+	// have failed silently in the worst direction: the note going quiet while the
+	// predicate was still being dropped, i.e. the pre-S-6 defect restored.
+	// (@code-reviewer M-2.)
+	const applied = parseFilters(sp);
 	const fields: string[] = [];
-	if (sp.from && Number.isNaN(new Date(`${sp.from}T00:00:00.000Z`).getTime())) {
-		fields.push("From");
-	}
-	if (sp.to && Number.isNaN(new Date(`${sp.to}T23:59:59.999Z`).getTime())) {
-		fields.push("To");
-	}
+	if (sp.from && !applied.from) fields.push("From");
+	if (sp.to && !applied.to) fields.push("To");
 	return fields;
 }
 

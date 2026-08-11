@@ -90,6 +90,11 @@ describe("ReviewFeed side chip — pole binding (D28 / CC-9)", () => {
 		const yesChip = container.querySelector(".bg-yes");
 		expect(yesChip).not.toBeNull();
 		expect(yesChip?.textContent?.trim()).toBe("YES");
+		// The FOREGROUND pole, not only the background. A chip whose text token
+		// matches its own surface renders invisibly — the same defect class S-1
+		// fixed one directory away, and this guard was demonstrated GREEN on it
+		// before this assertion existed (@code-reviewer M-1).
+		expect(yesChip?.className).toContain("text-no");
 
 		// The opposite pole must be ABSENT — this is what fails a chip that
 		// hard-codes one pole for both sides.
@@ -102,6 +107,7 @@ describe("ReviewFeed side chip — pole binding (D28 / CC-9)", () => {
 		const noChip = container.querySelector(".bg-no");
 		expect(noChip).not.toBeNull();
 		expect(noChip?.textContent?.trim()).toBe("NO");
+		expect(noChip?.className).toContain("text-yes");
 
 		expect(container.querySelector(".bg-yes")).toBeNull();
 	});
