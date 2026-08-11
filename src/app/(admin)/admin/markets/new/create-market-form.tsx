@@ -139,7 +139,7 @@ export function CreateMarketForm({
 			</p>
 			<p>
 				<label>
-					Resolution deadline{" "}
+					Resolution deadline (UTC — not your local time){" "}
 					<input type="datetime-local" name="resolutionDeadline" required />
 				</label>
 			</p>

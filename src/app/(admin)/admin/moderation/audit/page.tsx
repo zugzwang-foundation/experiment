@@ -263,6 +263,69 @@ function parseFilters(sp: SearchParams): AuditSearchFilters {
 	return filters;
 }
 
+/**
+ * POLISH.8 S-6 (delta D17) — the supplied-but-unparseable date fields, in form
+ * order.
+ *
+ * `parseFilters` above DROPS a malformed `from`/`to` on purpose: the query must
+ * not throw on a hand-edited URL. The cost of that choice was invisible — the
+ * operator received results UNFILTERED by a date they believed they had
+ * applied, with nothing on screen saying so. This names the dropped fields so
+ * the drop is legible.
+ *
+ * Pure. Parse semantics are UNCHANGED — this re-derives the same `Number.isNaN`
+ * decision `parseFilters` makes, and never alters the query.
+ */
+export function invalidDateFields(sp: SearchParams): string[] {
+	const fields: string[] = [];
+	if (sp.from && Number.isNaN(new Date(`${sp.from}T00:00:00.000Z`).getTime())) {
+		fields.push("From");
+	}
+	if (sp.to && Number.isNaN(new Date(`${sp.to}T23:59:59.999Z`).getTime())) {
+		fields.push("To");
+	}
+	return fields;
+}
+
+/** Renders nothing when every supplied date parsed — absence is the default. */
+export function InvalidDateNote({
+	fields,
+}: {
+	fields: string[];
+}): React.ReactElement | null {
+	if (fields.length === 0) return null;
+	return (
+		<p
+			role="note"
+			data-testid="invalid-date-note"
+			className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-foreground"
+		>
+			<strong className="font-semibold">
+				{fields.join(" and ")} date ignored.
+			</strong>{" "}
+			That value could not be read as a date, so it was NOT applied — the rows
+			below are unfiltered by it.
+		</p>
+	);
+}
+
+/**
+ * POLISH.8 S-8 (delta D06) — action-type examples the operator can ACTUALLY
+ * match today. These are `mod_actions.reason` members: the only POPULATED side
+ * of the F-ADMIN-5 union.
+ *
+ * The prior copy advertised `market.resolved`, which is an `EVENT_TYPES` value
+ * living only in the `events` table — so NEITHER side of this union could ever
+ * match it, and the form was advertising a query that provably returns nothing.
+ *
+ * ⚠ Downstream of D05's unmade ruling. If a writer later lands for the empty
+ * union arm, or the spec repoints F-ADMIN-5 at `events`, this string changes
+ * again. Shipping the currently-true copy is the defensible option meanwhile —
+ * it is consistent with the note rendered below the search form.
+ */
+export const ACTION_TYPE_PLACEHOLDER =
+	"content_removed · user_banned · track_b_blocked";
+
 const SOURCE_LABEL: Record<AuditLogRowView["source"], string> = {
 	mod_action: "moderation",
 	admin_event: "admin event",
@@ -299,7 +362,7 @@ function SearchForm({ sp }: { sp: SearchParams }): React.ReactElement {
 				<input
 					type="text"
 					name="actionType"
-					placeholder="content_removed · market.resolved …"
+					placeholder={`${ACTION_TYPE_PLACEHOLDER} …`}
 					defaultValue={sp.actionType ?? ""}
 					className={input}
 				/>
@@ -468,6 +531,8 @@ export default async function ModerationAuditPage(props: {
 				</div>
 
 				<SearchForm sp={sp} />
+
+				<InvalidDateNote fields={invalidDateFields(sp)} />
 
 				{/* admin_events has no writer yet — make its emptiness legible so an
 				    absent admin-event row reads as "not emitted", never "no match". */}
