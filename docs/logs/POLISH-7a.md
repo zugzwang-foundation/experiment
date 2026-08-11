@@ -1,7 +1,7 @@
 # POLISH.7a — Auth surfaces — session log (machine phase)
 
 **Stratum:** POLISH.7a, the **first** POLISH surface run under `POLISH-SURFACE-TEMPLATE.md`.
-**State:** built + gated + reviewed + **corrected at a founder correction gate before Gate C**; **PR open, HALTED at the merge gate.** Gate C is a web diff-read before merge, on every machine-phase PR, without exception.
+**State:** built + gated + reviewed + **corrected at a founder correction gate** + **remediated at Gate C**; **PR open, HALTED at the merge gate.** Gate C is a web diff-read before merge, on every machine-phase PR, without exception.
 **Class:** a single gated pass per `POLISH-TRACKER.md:20` — but the **reviewer cascade ran anyway**, and it caught a CRITICAL. See §5.
 **Ground:** branch `fix/polish-7a-auth` off `origin/main` @ `903b2a1` (#319).
 
@@ -56,6 +56,8 @@
 | `c62b3d2` | the `@security-auditor` round |
 | `0002ace` | **D19, take two** — `(auth)/layout.tsx` wrapper `min-h-full` → `min-h-dvh`, with §7.1a |
 | `8564a08` | the plan's **§12 patch record** (P-1…P-5, and **V-7**) |
+| `920bfdc` | the log, through the correction gate |
+| `990fe42` | **Gate C remediation** — the coordinate sweep, 21 register rows, S-11(b), two heading/home fixes, S-11's third and fourth sites |
 
 **Shipped (8):** D01 · D03 · D07 · D12 · D14 · **D19** · D20 · D21.
 **Halted and routed (4):** D02 → `AUTH-GOOGLE-MARK` · D10 + D11 → `AUTH-OTP-FIDELITY` · D16 → `AUTH-ONBOARDING-GATE`.
@@ -221,6 +223,44 @@ desktop-1440-only, so it cannot surface on this surface.
 
 ---
 
+## 5b · Gate C — five blocking items, six rulings
+
+Nothing in the shipped code was wrong. **Every failure was in the record**, which is what a diff-read is for.
+
+**B1 · Stale coordinates in a row this PR minted.** `AUTH-TURNSTILE-WIRE` carried **two coordinate sets for the same two sites** — the pre-PR set in its Deferred-work paragraph and the head set in its asymmetry paragraph. Swept all ten rows: **52 citations, 49 unique, every one resolved and read against its file at PR head. FOUR stale, four corrected** — `sign-in/page.tsx:121→:137`, `:122-126→:143-147`, `otp/page.tsx:103→:105`, `otp/page.tsx:134-143→:164-173`.
+
+⚠ **All four were moved by this PR's own D03/D07 restructure**, and I wrote the rows in `2d006ca` — *after* those edits landed — carrying recon coordinates forward without re-measuring. The asymmetry paragraph, written later and measured post-D03, was already correct. **The defect is copying, not the file.** Ruled as **P-6**.
+
+**B2 · The register.** 21 rows, `PD-7a-01…21`, from the live high-water mark. The four presentational deltas sharing one disposition and one commit group into `PD-7a-01`; **every halt, superseded and data-blocked delta gets its own row**, because each carries a routing a later inspector must find rather than rediscover.
+
+**B3 · S-11(b) — ruled.** The cell is the **last column**. Ground checked before writing: `PD-0-16/17/18` all carry long prose there, so it is the *"Routed to / notes"* column in practice. `PD-0-15`'s ID unchanged.
+
+**B4 · A heading that lied.** `NO-RAW-HEX-REACH` read *"✅ CLOSED"* over a body recording an unfixed N5 hole. **This is the row minted to record a false receipt; it must not carry one.** Now *"REACH CLOSED, SET-EQUALITY RESIDUAL OPEN"*, plus a second residual — the structural `SCAN_DIRS` fix (**O-1**) that would also cover `_components/`, a new unscanned directory this PR created.
+
+**B5 · `@security-auditor` L-5 homed** as `AUTH-HARDEN` item (7) — the defect is a writable-field-set question in `src/server/auth/**`; the dataset leak is its consequence.
+
+⚠ **One instruction refused, and the refusal is the point.** Gate C asked for a cross-reference to `docs/specs/dataset-release.md`. **It does not exist** — `docs/specs/` holds six entries and that is not one of them, verified at head. Writing it live would mint the same phantom `SPEC.CHART` already is, against `POLISH-0.md` §2's existence rider (*a citation is not an artifact*). The row names the destination that **does** exist — the DATASET RELEASE task, already an owner at `docs/parked.md:508,517` — and the governing text, `SPEC.1 §16.4`.
+
+### The three rulings that became rows
+
+**GR-1 → `PD-7a-19`, `superseded`.** The `.otp-icon` ring stays `--hairline` (1px) against the mockup's 1.5px. `--ring-active` is the emphasis ladder's rung 3 and means *"active carousel item"* — borrowing it is a cross-surface primitive reach **and** a wrong-semantic-slot error, which is exactly what §7 criterion 6 exists to catch.
+
+**GR-3 → `PD-7a-20`, `routed`.** ⚠ **The back link lands at exactly the mockup's 16px *because of* `CardHeader`'s `gap-1`** (`mb-3` 12px + 4px). **Only the icon is 4px out** — `2px/14px` renders as `6px/18px`. Owner: the comprehensive founder visual pass.
+
+**L-6 → `PD-7a-21`, `routed`.** Neither copy delta has a test pin.
+
+### T1 — S-11's third site, and its fourth
+
+`sign-in-render.test.tsx` fixtured **and** asserted `rate_limited` — POLISH.4's composer string, on an auth surface. ⚠ **And so did `otp-render.test.tsx:173,179`.** The relay named the third; the flag had **two** test files. `PD-0-13`'s lesson recursing one level: *a remedy scoped from a row under-fixes, and so does one scoped from the remedy.*
+
+Both assertions **tightened from `toContain` to `toBe`** — `toContain("rate_limited")` also passes on `otp_rate_limited`, since one is a substring of the other, so the loose form could not have caught this defect and cannot catch its reverse. Mutation-proven: restoring the old fixture gives *expected 'rate_limited' to be 'otp_rate_limited'*, 1 failed → reverted → 6/6.
+
+### T2 — verified, no halt
+
+`--state-focus-ring` **is defined** at `globals.css:202` and consumed in **16 other files**. `(auth)/error.tsx` joins an established set. `UI-A7.md:157`'s warning that neither guard catches a wrong `var()` stands; this one is fine.
+
+---
+
 ## 6 · Exit bar — `POLISH-0.md` §7
 
 | # | Item | State |
@@ -257,11 +297,11 @@ desktop-1440-only, so it cannot surface on this surface.
 ## 8 · Open questions — all for Gate C
 
 1. ✅ **D19 — RULED AND CLOSED at the correction gate.** The exception moved to `(auth)/layout.tsx`, line-scoped; fix landed at `0002ace` with §7.1a. No longer open.
-2. ⚠ **S-11(b) — P8 halt, unresolved.** `PD-0-15` lives in the pre-recorded table, whose header at `POLISH-register.md:162` has eight columns and **no Root-cause cell** (the per-surface tables have one). Web picks a cell. **The paragraph is on disk nowhere** — the plan text is committed, but the correction it prescribes is not applied.
-3. **The register rows are NOT allocated.** No `PD-7a-nn` exists; the `.7a` table is still the placeholder. §9.2's ratified commit sequence has no register-writing commit, and I did not add one. Web's call.
-4. ⚠ **`POLISH-register.md:43` now says `.7a` is *"Not yet inspected"*, which this PR falsifies** — the same staleness S-09 just fixed for `.1`. Not in §6's enumerated list, so not edited.
-5. **D14's placement is a §4.2 B3 call** — the back link moved inside the Card rather than above it, and `--hairline` is 1px where the mockup's ring is 1.5px. Both flagged, both want a ruling.
-6. **`@security-auditor` LOW-5 has no home** — `users.name`/`image` client-writable, residual risk in the 2026-11-06 dataset. I did not mint a destination name for it.
+2. ✅ **S-11(b) — RULED and APPLIED.** The last column, on the `PD-0-16/17/18` precedent. `PD-0-15`'s ID unchanged.
+3. ✅ **The register is ALLOCATED** — `PD-7a-01…21` at `990fe42`, from the live high-water mark.
+4. ✅ **`POLISH-register.md`'s `.7a` header is CORRECTED** — the machine-phase state, in the shape S-09 gave `.1`.
+5. ✅ **D14's placement and the ring width are RULED** — GR-3 (`PD-7a-20`) and GR-1 (`PD-7a-19`).
+6. ✅ **L-5 is HOMED** as `AUTH-HARDEN` item (7). ⚠ Its Gate-C-requested cross-reference `docs/specs/dataset-release.md` **does not exist** and was refused rather than written — see §5b.
 7. ✅ **The recon loss is RULED** — not reconstructed (§12 P-5, O-3). The plan's closing line stays false and the patch record is the correction of record.
 8. ⚠ **`docs/plans/POLISH-7a.md` §3's D19 row and §6 S-01's Components cell still name `src/app/layout.tsx`.** Superseded by §12 P-1 and **deliberately not rewritten** — the patch record is the correction of record, per ADR-0023's and POLISH-0's own pattern. Commit `0a8d762` landed S-01 with that text and **it stands**.
 
@@ -288,6 +328,8 @@ desktop-1440-only, so it cannot surface on this surface.
 > **V-7 — every proof obligation names its DISCRIMINATING CONDITION, not just its subject.** *"Measure route X"* admits a measurement taken where the defect cannot appear. *"Measure route X on a page taller than the viewport"* does not.
 
 Minted at the correction gate and recorded in the plan's §12. It generalises past this surface: for a layout change the condition is a page taller than the viewport; for a masking change, a removed row; for a guard, an offender that exists.
+
+**And the sentence Gate C added to it: a plan's coordinates are PRE-execution and a live docket's must be POST-execution.** A plan authored before the work cites a tree the work then changes — four of this PR's own citations were moved by its own restructure, in rows written after that restructure landed. Every coordinate a plan hands forward to a live docket is re-measured at PR head before the docket row lands.
 
 **Why it was needed here.** A proof that only exercises the case where the change is inert is not a proof, and naming that limit in the commit body does not discharge it. §7.1 asked for a per-consumer zero-delta proof of a root-layout change. I built one, caught it being vacuous once, rebuilt it, enumerated nine routes, measured four properties per route — and every route was shorter than the viewport, which is precisely where `body{height:100%}` changes nothing. I wrote *"HONEST LIMITS: no long page was ever exercised"* into the commit body and shipped. The reviewer read that sentence and went and loaded a long page.
 
