@@ -1044,7 +1044,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 ## A11Y.0 — the accessibility floor — **DATED, founder to set the date**
 
-**Originating task:** POLISH-TEMPLATE (2026-08-10). **Nine committed references routed work to it and it had no row until today** — `POLISH-0.md:22`, `:326`, `:356` · `docs/plans/PRIMITIVES-1.md:344`, `:348` · `docs/plans/HEADER-PORTFOLIO.md:111` · `docs/plans/SHELL-COMPLETE.md:292` · `docs/logs/POLISH-1a.md:125`, `:146`.
+**Originating task:** POLISH-TEMPLATE (2026-08-10). **Nine committed references routed work to it and it had no row until today** — `POLISH-0.md` §0 · the ruling index (R16), §7 · closing status, §5 · the routing taxonomy · `docs/plans/PRIMITIVES-1.md:344`, `:348` · `docs/plans/HEADER-PORTFOLIO.md:111` · `docs/plans/SHELL-COMPLETE.md:292` · `docs/logs/POLISH-1a.md:125`, `:146`.
 
 **Deferred work.** The accessibility floor, scope **ratified**: **keyboard reachability · accessible names · visible focus.** **WCAG 2.2 AA is scoped PAST the experiment, deliberately** — the floor is the three properties above, not a conformance claim.
 
@@ -1057,7 +1057,7 @@ the strikethroughs inside it are the corrections this task made.*
 | **PD-2-33's a11y half** — `alt` duplication, WCAG 1.1.1 | `POLISH-register.md` PD-2-33; the overflow half is POLISH.2's |
 | **POLISH-1a's `title`-reach finding** — titles on a `disabled` `<button>` (pointer events suppressed, tooltip never fires) and on role-less `<span>`s (mouse-hover only, no keyboard path, not reliably exposed to AT). The strings are source-of-truth-correct; their **delivery** is this task's | `docs/logs/POLISH-1a.md:125` |
 
-⚠ **Every POLISH surface closes `closed (a11y-deferred)` until this lands** — `POLISH-0.md:326`. **It gates a STATUS, not a build.** No surface's work waits on it; only the qualifier on the word "closed" does. That is why it can be dated rather than sequenced.
+⚠ **Every POLISH surface closes `closed (a11y-deferred)` until this lands** — `POLISH-0.md` §7 · *Closing status — R16*. **It gates a STATUS, not a build.** No surface's work waits on it; only the qualifier on the word "closed" does. That is why it can be dated rather than sequenced.
 
 **Why deferred.** The floor is a product decision about how much accessibility the experiment commits to, and the scope decision (three properties, AA scoped out) is ratified while the *date* is not. Nothing in POLISH is blocked by its absence.
 
@@ -1089,7 +1089,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 ## MOD-REPORT-PATH — no user-facing report trigger exists
 
-**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md:354` and `docs/plans/SHELL-COMPLETE.md:292` — both routing it away, with no row until today.
+**Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-0.md` §9 · *Explicitly out* and `docs/plans/SHELL-COMPLETE.md:292` — both routing it away, with no row until today.
 
 **Deferred work.** Design and ratify the user-facing report path. **ADR-0021's reactive moderation pipeline needs a user-facing trigger and none is designed.** CD-A stripped **REPORT** from the pop-up (founder ruling, 2026-07-14 — it had entered via an unratified prompt presupposition), and **no policy decision recorded that user reporting is out of scope.** Verified today: `grep -rni "report" src/components/debate/dialogs.tsx` returns **zero**.
 
@@ -1107,7 +1107,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10), the RECON-2 sweep.
 
-**Deferred work.** Resolve the chart's missing baseline. **`POLISH-0.md:158` cites `SPEC.CHART` as a TIER-1 source for POLISH.3.** It is **not in `docs/specs/` and never has been** — that directory holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md`, and nothing else.
+**Deferred work.** Resolve the chart's missing baseline. **`POLISH-0.md` §3 · POLISH.3 · Tier 1 cites `SPEC.CHART` as a TIER-1 source** (and §2's existence rider names it again). It is **not in `docs/specs/` and never has been** — that directory holds `cpmm.md`, `debate-export.md`, `flows/`, `RANKING.md`, `SPEC.1.md`, `SPEC.2.md`, and nothing else.
 
 ⚠ **The consequence is a halt, not an annoyance.** The chart's **expanded-overlay** variant is **built UI with NO baseline at any tier** — values-log branded three renders and four exist. Under `POLISH-0.md` §5 that is class **S**, and class S is a **SPEC-FIRST halt: no build**. So POLISH.3 cannot dispose of that component either way. It is **R13 — the only OPEN ruling** in the index.
 
@@ -1115,7 +1115,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 **Conditional trigger.** **Before POLISH.3 closes.** Two admissible outcomes, and only two: **write it**, or **record the overlay as permanently unbaselined and accept the divergence** (founder only, P12). A third outcome — POLISH.3 closing with the component undisposed — is what this row exists to prevent.
 
-**Expected next task.** A spec-lane task, or the founder at POLISH.3 kickoff. Evidence: `POLISH-0.md:158`; `POLISH-register.md` PD-0-16 (`R13`); `ls docs/specs/`.
+**Expected next task.** A spec-lane task, or the founder at POLISH.3 kickoff. Evidence: `POLISH-0.md` §3 · POLISH.3 · Tier 1; `POLISH-register.md` PD-0-16 (`R13`); `ls docs/specs/`.
 
 ---
 
@@ -1338,7 +1338,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Why struck rather than defined — four grounds, each independently sufficient.**
 
-1. **The page-level footer was withdrawn.** Founder ruling 2026-08-02; B4 is VOID, not deferred (`SPEC.1` v1.0.26 `:1498`). `POLISH-0.md:159`: *"The absence of a footer in `src/` is true and correct."*
+1. **The page-level footer was withdrawn.** Founder ruling 2026-08-02; B4 is VOID, not deferred (`SPEC.1` v1.0.26 `:1498`). `POLISH-0.md` §3 · POLISH.1 · Pre-recorded: *"The absence of a footer in `src/` is true and correct."*
 2. **The links would be dead.** `/terms` and `/privacy` do not exist as routes. `docs/logs/UI-A7.md:15` records the omission as deliberate and agreed by both reviewers, on exactly this ground.
 3. **A guard would go RED.** `tests/unit/shell/not-found.test.tsx:108-167` bans any `<footer>` under `src/app/**` that is not nested inside a content container, and names `(auth)/onboarding/page.tsx`'s nested footer as the legitimate case.
 4. **Tier 1 replaced the mechanism.** `SPEC.1.md:807-817` records that implicit footer acceptance lapsed and the explicit checkbox stands, calling it *"the stronger answer to the acceptance-evidence question W2.1 left open."*
@@ -1351,9 +1351,9 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ## LEGAL.1 — the ToS and Privacy bodies are placeholder Lorem ipsum — ⚠ **GO-LIVE GATE**
 
-**Originating task:** POLISH.7a (2026-08-11), ruled at R-E. Carries `P7a-D17` and `P7a-D18`, and the pre-recorded content-block on `POLISH-0.md:174`.
+**Originating task:** POLISH.7a (2026-08-11), ruled at R-E. Carries `P7a-D17` and `P7a-D18`, and the pre-recorded content-block in `POLISH-0.md` §3 · POLISH.7a · Pre-recorded.
 
-⚠ **`HARDEN.6` and `HARDEN.7` ARE ALIASES OF THIS ROW.** The same deliverable is named three ways across the corpus: `LEGAL.1` (`POLISH-0.md:174`), `LEGAL.1 ← HARDEN.6` (`POLISH-0.md:295`), and `HARDEN.7` in the placeholder files themselves. **`LEGAL.1` is canonical.**
+⚠ **`HARDEN.6` and `HARDEN.7` ARE ALIASES OF THIS ROW.** The same deliverable is named three ways across the corpus: `LEGAL.1` (`POLISH-0.md` §3 · POLISH.7a · Pre-recorded), `LEGAL.1 ← HARDEN.6` (`POLISH-0.md` §3 · *Surfaces with no POLISH row* · UI.10), and `HARDEN.7` in the placeholder files themselves. **`LEGAL.1` is canonical.**
 
 **Deferred work.** `public/legal/tos.txt:1` opens *"Zugzwang Experiment — Terms of Service (PLACEHOLDER v0)"* and `:3` says *"This is placeholder Lorem ipsum copy used during SCAFFOLD.3 development."* `public/legal/privacy.txt` is the same shape. Both are 22 lines. Both are rendered IN FULL, in-page, on `/onboarding` — `SPEC.1.md:776` requires exactly that — so a real participant accepts placeholder text on a screen whose entire purpose is recording that acceptance.
 
@@ -1373,7 +1373,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ## NO-RAW-HEX-REACH — **REACH CLOSED, SET-EQUALITY RESIDUAL OPEN** — routed to the quality lane with R15
 
-**Originating task:** POLISH.7a recon (2026-08-11), §5. Closed in the same PR that found it. The row exists to record a false receipt, not to track open work.
+**Originating task:** POLISH.7a recon (2026-08-11), §5. **The REACH half closed in the same PR that found it; two residuals did not** — see below. The row therefore does two jobs: it records a false receipt, **and** it tracks the open remainder. *(Corrected at the close-out: this sentence read "not to track open work" while the body already carried two open residuals and the heading said one was OPEN. GC-6.)*
 
 **What it was.** `tests/unit/design/no-raw-hex-view-layer.test.ts` claimed *"the participant view layer"* in its docblock (`:5-6`) while its input set reached `src/components` + `src/app/(public)` + four named files. Of the `(auth)` group only the LAYOUT was named; **all three route files were outside the set.**
 
