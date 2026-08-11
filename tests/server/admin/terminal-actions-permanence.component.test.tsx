@@ -56,6 +56,8 @@ const MARKET_ID = "00000000-0000-0000-0000-0000000000aa";
 const TITLE = "Will the thing happen by the date?";
 const PERMANENCE = "This action is permanent";
 const CLAWBACK = "F-RESOLVE-2";
+/** Any Tailwind side-pole class. INV-3's poles encode side; this note must not. */
+const POLE_CLASS = /\b(bg|text|border|ring|fill|stroke)-(yes|no)\b/;
 
 afterEach(() => {
 	cleanup();
@@ -142,6 +144,27 @@ describe("TerminalActions — confirm restates side + names permanence (D12)", (
 		// that is genuinely un-correctable, which is the opposite of what S-4 is
 		// for (@code-reviewer H-1).
 		expect(note.textContent).not.toContain(CLAWBACK);
+	});
+
+	it("never keys a COLOUR off the side string (INV-3 — not a pole site)", () => {
+		// @security-auditor L-3: this diff introduces the FIRST side-encoding
+		// string in (admin)/admin/markets/, and side-pole-binding.test.ts declares
+		// ADMIN_EXCLUSION = "src/app/(admin)/" — so the participant pole guard is
+		// structurally blind to it. Without this assertion the prohibition lives
+		// only in a source comment, and a later `className={side === "YES" ? …}`
+		// would mint a fourth pole surface with the whole suite green.
+		render(
+			<TerminalActions marketId={MARKET_ID} title={TITLE} status="Closed" />,
+		);
+		const note = screen.getByTestId("resolve-permanence");
+		const classes = [note, ...Array.from(note.querySelectorAll("*"))]
+			.map((el) => el.className)
+			.join(" ");
+
+		// POSITIVE CONTROL FIRST — a `not.toMatch` passes when the pattern matches
+		// nothing at all, which is exactly what a rename or reformat produces (V-2).
+		expect("text-yes").toMatch(POLE_CLASS);
+		expect(classes).not.toMatch(POLE_CLASS);
 	});
 
 	it("renders NO permanence note on Close, which is not a gated action", () => {
