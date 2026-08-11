@@ -358,4 +358,42 @@ Base set **H1–H17** from `POLISH-SURFACE-TEMPLATE.md` §5 inherited in full. *
 
 ---
 
+## §12 · Patch record — 2026-08-11 · D19's exception was granted on the wrong file
+
+**Amended after the machine run, before merge. Ruled at the POLISH.7a
+correction gate. Committed by CC.**
+
+**What happened.** §7.1's proof table required *"no geometry change"* per route
+family and did **not** require a page **taller than the viewport**. All nine
+routes measured were shorter than the viewport — exactly the region in which a
+definite `<body>` height is inert. **The proof could not have failed.** CC
+recorded the gap honestly in the commit body (*"no long page was ever
+exercised"*) and shipped; `@code-reviewer` read that sentence, loaded a long
+page, and returned a CRITICAL: a definite `<body>` height clamps the
+route-group wrapper by flex-shrink and un-sticks `GlobalHeader` on every page
+taller than the viewport — header top measured at **−62 / −562 / −578px**.
+D19 was reverted.
+
+**The defect is in this plan, not in its execution.** N1 and N3: a control that
+cannot fail is worse than no control, because it reads as discharged. The
+honest gap-declaration in the commit body is what caught it, one gate earlier
+than Gate C.
+
+| # | Change |
+|---|---|
+| **P-1** | **R-A's exception is WITHDRAWN from `src/app/layout.tsx`** — the root layout is POLISH.1's again and halt **P3** covers it with no exception — **and GRANTED, LINE-SCOPED, on `src/app/(auth)/layout.tsx`**, for `P7a-D19` only, limited to the wrapper node's min-height token |
+| **P-2** | `docs/logs/POLISH-1b.md:136` says *"repair the **wrapper's** `min-h-full` / body `height:auto` collapse."* **The wrapper is `(auth)/layout.tsx`.** This plan mapped *"upstream-only"* to the root layout by inference; the source text names which end of the collapse to fix. The ratified fix is **one token on one node — `min-h-full` → `min-h-dvh`** — with a blast radius of the three `(auth)` routes rather than every route in the product |
+| **P-3** | **§7.1's proof table is SUPERSEDED by §7.1a**: every route family measured at **two heights**, the long case's construction method stated so it is auditable, and `GlobalHeader`'s sticky top offset **asserted as a number** on every long page |
+| **P-4** | §3's `P7a-D19` row and §6 S-01's Components cell both name `src/app/layout.tsx` as the in-scope exception. **Both are superseded by P-1.** The correction of record is this patch record; the rows are not rewritten |
+| **P-5** | The closing line's *"Recon evidence: `~/Downloads/POLISH-7a-recon.md`"* is **FALSE as of commit 1.** That path was overwritten by this plan during the handoff — the `POLISH-SURFACE-TEMPLATE.md` §9.3 hazard, caused by the filename collision. **The recon file is lost. Its content survives in the ratification chat. It is NOT reconstructed** — O-3: a reconstruction does not merely omit, it can ASSERT |
+
+**Standing rule minted here, and it generalises past this surface. `V-7`:
+every proof obligation names its DISCRIMINATING CONDITION, not just its
+subject.** *"Measure route X"* admits a measurement taken where the defect
+cannot appear. *"Measure route X on a page taller than the viewport"* does not.
+This plan specified the subject and omitted the condition, and the omission was
+invisible until a reviewer supplied the condition by hand.
+
+---
+
 *Web-authored 2026-08-11 IST at the POLISH.7a ratification. Ground `origin/main` @ `903b2a1`. Committed verbatim by CC as commit 1 of `fix/polish-7a-auth`. Recon evidence: `~/Downloads/POLISH-7a-recon.md`, sentinel `ZZ-7A-RECON-2026-08-11`.*
