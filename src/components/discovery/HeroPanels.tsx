@@ -25,6 +25,33 @@ export const HERO_SIDE_EMPTY = {
 } as const;
 
 /**
+ * The hero replyhead's TEXT TIER — `.replyhead`, surface_discovery_v1_0.html
+ * :97-98. Extracted so a ruling on it costs ONE LINE here (PRIMITIVES-2 D8);
+ * OQ-2 — whether this tier is `text-n4` or `text-n6` — is the open question it
+ * exists for. Typography only: the replyhead's LAYOUT (`mt`/`flex`/`pt`/the
+ * top hairline) stays at the call site, because none of it is what OQ-2 rules
+ * on. The composed class attribute is byte-identical to the inline string this
+ * replaced — same tokens, same order, same position.
+ *
+ * ⚠ NAMED FOR THE REPLYHEAD, AND DELIBERATELY NOT FOR THE CONCEPT. It is not
+ * `MICRO_LABEL` or `SECONDARY_TEXT_TIER`: there are 12 other uppercase
+ * micro-labels in the participant tree across `shell/` and `debate/composer/`,
+ * with 4 sizes, 4 trackings, 2 weights and 4 colour tiers between them, and
+ * this constant governs NONE of them. A concept name would assert ownership it
+ * does not have, and the assertion would be found false by the first person to
+ * grep it.
+ *
+ * ⚠ SPECIFICALLY: `debate/composer/AuthGateSlot.tsx:49` is ALSO a `text-n4`
+ * uppercase micro-label (`text-xs font-medium tracking-wide`) — a DIFFERENT
+ * size, weight and tracking from this one, and it is POLISH.4's uninspected
+ * surface. It is not governed here and must not be pointed at this constant
+ * without that inspection. Normalising the set is the MICRO-LABEL-TIER docket
+ * row, routed to POLISH.4 — not a rider on a primitive pass.
+ */
+const REPLYHEAD_TIER =
+	"text-[9.5px] font-bold tracking-[0.12em] text-n4 uppercase";
+
+/**
  * The design-language §3.2 hero: three panels — **top-YES post · market
  * (image + question · two-line graph · price bar · stat line) · top-NO
  * post** — consuming the Slice-3 lean `HeroTopPosts` DTO. A hero-post click
@@ -198,7 +225,7 @@ function HeroPostPanel({
 			    opens the post (the mockup's whole-`.argbody` handler). */}
 			<div
 				data-testid={`hero-reply-head-${side}`}
-				className="mt-[9px] flex justify-between pt-[8px] text-[9.5px] font-bold tracking-[0.12em] text-n4 uppercase [border-top:var(--hairline)]"
+				className={`mt-[9px] flex justify-between pt-[8px] ${REPLYHEAD_TIER} [border-top:var(--hairline)]`}
 			>
 				{/* V48 — the count and its noun agree: `Reply · 1`, never `Replies · 1`. */}
 				<span>

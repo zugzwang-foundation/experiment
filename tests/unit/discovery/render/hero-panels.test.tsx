@@ -286,6 +286,26 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(head.textContent).toContain("Đ 0 staked");
 	});
 
+	// PRIMITIVES-2 D8 — the replyhead tier extracted to a named constant.
+	it("render::replyhead-class-attribute-is-byte-identical-after-the-extraction", () => {
+		// The BASELINE is the literal class attribute as it stood at f12d844,
+		// immediately before REPLYHEAD_TIER was extracted — captured from the
+		// component, not hand-written. Full-string equality, not `.toContain`:
+		// the extraction composes a template literal, so token ORDER and the
+		// SPACING around the interpolation are exactly what could move, and a
+		// containment assertion would not see either.
+		const BASELINE =
+			"mt-[9px] flex justify-between pt-[8px] text-[9.5px] font-bold tracking-[0.12em] text-n4 uppercase [border-top:var(--hairline)]";
+		// BOTH POLES: the replyhead renders per side, and a YES-only assertion
+		// passes on an inverted NO panel.
+		renderHero({ yes: heroPost("YES"), no: heroPost("NO") });
+		for (const side of ["YES", "NO"] as const) {
+			expect(
+				screen.getByTestId(`hero-reply-head-${side}`).getAttribute("class"),
+			).toBe(BASELINE);
+		}
+	});
+
 	// DISCOVERY-COMPLETE C6 — V17, the Support/Counter split bar.
 	it("render::v17-split-bar-geometry-and-figures", () => {
 		renderHero({ yes: heroPost("YES"), no: null });
