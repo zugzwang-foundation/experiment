@@ -51,6 +51,12 @@ const SCAN_FILES = [
 	"src/app/(auth)/sign-in/page.tsx",
 	"src/app/(auth)/sign-in/otp/page.tsx",
 	"src/app/(auth)/onboarding/page.tsx",
+	// The colocated `(auth)` components, enrolled in the commit that CREATES
+	// them (POLISH.7a D21/D20). Adding new unscanned view-layer files beside
+	// three that were just enrolled would re-open the blind spot in the same PR
+	// that closed it — the N8 failure committed knowingly. `SCAN_DIRS` does not
+	// reach `src/app/(auth)`, so anything colocated here has to be named.
+	"src/app/(auth)/AuthAlert.tsx",
 ];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the
 // likeliest smuggle spelling of the A2+ white/black-alpha treatments
