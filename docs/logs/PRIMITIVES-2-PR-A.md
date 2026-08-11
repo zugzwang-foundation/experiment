@@ -25,6 +25,8 @@ Six commits on `fix/primitives-2-market-thumb`:
 | 5 | `db3b72d` | `fix(discovery): address @code-reviewer findings on PR-A` |
 | 6 | `9c39704` | `chore(discovery): log session — PRIMITIVES-2 PR-A` |
 | 7 | `5fa19ab` | `fix(discovery): D2-P1 — MarketThumb catches a pre-hydration 404` |
+| 8 | `fb4e47c` | `chore(discovery): log session — D2-P1 landed, §11 patch HELD` |
+| 9 | `86263ed` | `fix(discovery): address @code-reviewer findings on D2-P1` |
 
 **Files — six, where the plan's §5 named four.** Both extras are forced
 completeness consequences of ratified rulings, not scope creep; both are
@@ -201,8 +203,27 @@ the final diff carries 7 file headers, not the 8 the relay expected.**
 
 ## 5 · Reviewer
 
-`@code-reviewer` only — **no `@security-auditor`, no `@test-writer`**, matching
-plan §3 D14 and the PRIMITIVES-1 precedent. Display-grade primitives and a
+**Two passes**, `@code-reviewer` only — **no `@security-auditor`, no
+`@test-writer`**, matching plan §3 D14 and the PRIMITIVES-1 precedent.
+
+**Pass 2**, scoped to `5fa19ab` (D2-P1) alone: **CRITICAL none · HIGH none ·
+MEDIUM 1 · LOW 8**, all nine in files that commit wrote, all nine **adopted**
+at `86263ed`. The MEDIUM was a latent cross-window comparison — the null
+baseline was captured outside the prototype stub and compared against a render
+inside it, and the stub is process-wide, reaching the detached `new
+window.Image()` radix builds for the hero avatars. Benign today only because
+radix's predicate is `complete && naturalWidth > 0`; a bump to `complete` alone
+would have reddened two sites for a reason unrelated to `MarketThumb`. Both
+sides are now captured inside a window.
+
+Two LOWs were **factual errors in prose I had written**, worth naming because
+neither would have failed a test: the `db3b72d` docblock claimed a carousel lap
+re-requests a previously-failed object (false — the single slot is only
+displaced by *another* failure, so A(fail) → B(ok) → A serves the fallback with
+no request), and the `react-dom-client.development.js:5274-5278` citation
+resolves to three files in this tree, only one of which matches.
+
+**Pass 1**, on the whole branch: Display-grade primitives and a
 client-side `onError`: no write path, no engine contact, none of CLAUDE.md §1's
 four critical paths.
 
@@ -229,6 +250,24 @@ session log) is this file.
 | `pnpm vitest run` full suite, run 3 | **317 passed / 1 skipped · 2807 passed**, exit 0, zero FAILs |
 | **Post-D2-P1** — `just verify` | **PASS** — "All checks passed" (exit 0) |
 | **Post-D2-P1** — full suite ×3, sequential | **all three green: 317 passed / 1 skipped · 2817 passed / 1 skipped / 4 todo**, exit 0, zero FAILs in any run |
+| **Post-review-pass-2** — `just verify` | **PASS** — "All checks passed" (exit 0) |
+| **Post-review-pass-2** — full suite ×3, sequential | runs 1 and 2 **green** (317 passed · 2818 passed); run 3 **1 failed** — an infrastructure artifact, below |
+
+**Run 3's failure is not a test failure and not `pseudonym-assigned-event`.**
+`tests/server/bets/daily-credit.test.ts` → `bet-place::credit-funds-the-post-floor [T4]`
+reported `Error: Hook timed out in 10000ms` in the `afterEach` **truncate**
+(`:278`) — a teardown hook, not an assertion. The runner recorded that test's
+duration as **26,375,459 ms (~7.3 hours)**, which is not a real elapsed time:
+the machine suspended mid-run, the pooled Postgres connection went away with
+it, and the teardown exceeded its 10 s budget on resume. Re-run in isolation
+immediately afterwards: **6/6 passing in 569 ms.** Nothing in this PR touches
+`tests/server/bets/`, `src/server/**`, or any DB code.
+
+**`pseudonym-assigned-event.test.ts:91` did NOT recur** in any of these three
+runs — nor in the three before them. Session total: **9 full-suite runs, 1
+occurrence**, in run 2 of the first batch. It remains a real latent isolation
+weakness (a *global* `events` row-count assertion in a parallel runner sharing
+one Postgres) that wants its own docket row, and it remains not PR-A's.
 | `tests/unit/design/side-pole-binding.test.ts` | **GREEN** — exit criterion 7 |
 | `tests/unit/design/tokens-monochrome.test.ts` | **GREEN** — exit criterion 8 |
 | `market-thumb.test.tsx` | 19 tests, all passing |
