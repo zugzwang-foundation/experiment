@@ -1012,3 +1012,58 @@ At go-live on **2026-09-15** all eight markets open **simultaneously, with zero 
 **Conditional trigger.** **Opportunistic — fold into the next task that legitimately opens `docs/adr/`.** ⚠ Nothing executes on it and nothing is wrong on `main` without it; the only cost of leaving it is that the commit exists in one place and one place only.
 
 **Expected next task.** Any task already editing an ADR. Evidence: `POLISH-register.md` CC-3; `docs/plans/DISCOVERY-COMPLETE.md:19`.
+
+---
+
+## OQ-6-ALT-EXCEPTION — the dynamic-alt rule now has two ratified exceptions
+
+**Originating task:** PRIMITIVES-2 PR-A (2026-08-11), Gate C finding GC-1. Rowed the moment it landed, per the standing rule, so the comprehensive founder visual pass does not rediscover `alt=""` as a defect and "fix" it back.
+
+**Deferred work.** Record, at the surface where the rule is stated, that **OQ-6's dynamic-alt rule ("image alt = the market question") no longer holds at two of its three sites.** PRIMITIVES-2 D4 (PD-2-33) superseded it there:
+
+- `src/components/discovery/MarketCard.tsx:50` — the 52×52 card thumb, `alt=""`.
+- `src/components/discovery/HeroPanels.tsx:62` — the 54×54 hero market thumb, `alt=""`.
+
+The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:184`, already shipped `alt=""` and was never governed by OQ-6. **All three Discovery image sites are now uniformly decorative**, which is the state a reviewer should expect to find.
+
+**Why the exception is correct, so it is not re-litigated from scratch.** The market question renders in the adjacent `<h3>`/`<h2>` two lines below the thumb in both cases, so a populated `alt` announces the same string twice (WCAG 1.1.1 duplicate announcement) — and, before D2-P1, the duplicated text was also what overflowed the metadata row when the image 404ed and the browser painted the `alt` string in place of the picture.
+
+**Why deferred.** The a11y half of PD-2-33 is **A11Y.0's** row, not a primitive pass's; PR-A landed only the overflow half. Restating the rule belongs with the surface that states it, and the exception is already carried in three docblocks (`MarketCard.tsx`, `HeroPanels.tsx`, `tests/unit/discovery/render/market-card.test.tsx`) so nothing is unrecorded in the meantime.
+
+**Conditional trigger.** **The comprehensive founder visual pass**, or A11Y.0 — whichever opens first.
+
+**Expected next task.** A11Y.0. Evidence: `docs/plans/PRIMITIVES-2.md` §3 D4 and §11 GC-1; `POLISH-register.md` PD-2-33.
+
+---
+
+## TEST-ISOLATION-EVENTS — a global `events` row count leaks across test files
+
+**Originating task:** PRIMITIVES-2 PR-A (2026-08-11). Observed, not theorised: **once in nine full-suite runs this session.**
+
+**Deferred work.** `tests/server/auth/pseudonym-assigned-event.test.ts:91` asserts `expect(rows.length).toBe(1)` over **the whole `events` table** — *"Exactly one events row total (exactly-once — no spurious rows)"*. In one run it read **2**. The other eight runs, and every isolated re-run, read 1. Scope the assertion to the rows this test creates (filter by its `user_id` / `event_type`, or assert a delta rather than an absolute) so a concurrently-committed row from another file cannot move it.
+
+⚠ **This is the LEDGER's `events` table** — the Bucket-A append-only spine every projection replays from (ADR-0005). A count assertion there that is *known* to read high sometimes is worse than no assertion: the next time it reads 2, the honest reading is "flake again", and that is exactly how a real double-emit — a genuine INV-class defect — gets waved through. The failure mode is not a red test; it is a **future red test that nobody believes.**
+
+**Why deferred.** Not PRIMITIVES-2's. PR-A touches no file under `src/server/**`, no DB code and no auth code, and nothing in its diff is reachable from that test's import graph. Fixing another suite's isolation from inside a display-primitive PR is exactly the "while we're here" that CLAUDE.md §5.4 forbids.
+
+**Conditional trigger.** **The next task that legitimately opens `tests/server/auth/`** — or immediately, if the count is ever seen high a second time, because two sightings retire the flake reading.
+
+**Expected next task.** Any auth-lane task. Evidence: `docs/logs/PRIMITIVES-2-PR-A.md` §6; run 2 of the first PR-A batch.
+
+---
+
+## TEST-SUSPEND-FALSE-RED — a suspended machine reports a FAILURE, not a skip
+
+**Originating task:** PRIMITIVES-2 PR-A (2026-08-11). Observed once, and diagnosed rather than re-run away.
+
+**Deferred work.** When the host suspends mid-run, the pooled Postgres connection dies with it. The next `afterEach` truncate then exceeds its 10 s hook budget and Vitest reports **`Error: Hook timed out in 10000ms`** — a **test-file FAILURE**, indistinguishable in the summary line from a real assertion failure. Seen at `tests/server/bets/daily-credit.test.ts:278` (the `afterEach` truncate) attributed to `bet-place::credit-funds-the-post-floor [T4]` (`:544`), with the runner recording that test's duration as **26,375,459 ms — about 7.3 hours**, which is the tell. The file passed **6/6 in 569 ms** on an isolated re-run minutes later.
+
+**The fix is to make the tell machine-readable, not to raise the timeout.** Raising `hookTimeout` hides it; the duration is already conclusive evidence and nothing reads it. Options: fail the run explicitly when any test's recorded duration exceeds a wall-clock sanity bound, or have the DB fixture detect a dead connection in teardown and abort with a distinguishable message.
+
+⚠ **It lands on a CRITICAL-PATH suite** (`tests/server/bets/` — the W-1 bet spine, CLAUDE.md §1). That is the worst possible place for a false red, because the correct response to a red there is to stop and investigate, and a team that has been burned by this once will reach for "probably the suspend thing" the second time — on the run where it is real.
+
+**Why deferred.** It is test-infrastructure, in a lane PRIMITIVES-2 does not own, and it is not a product defect. The diagnosis is the valuable part and it is recorded here.
+
+**Conditional trigger.** **The next task that opens `tests/_setup/` or a DB fixture** — or the second sighting, whichever comes first.
+
+**Expected next task.** Any task touching the test harness. Evidence: `docs/logs/PRIMITIVES-2-PR-A.md` §6, run 3 of the second PR-A batch.
