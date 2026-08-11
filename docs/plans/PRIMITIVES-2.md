@@ -508,3 +508,95 @@ An auto-deleted branch got recreated carrying an already-merged duplicate. Twice
 
 **On close:** staging advance (it is currently 4 docs-only commits behind), PK refresh
 table, and the tracker note that PRIMITIVES-2 is closed and `.7a` is the next machine run.
+
+---
+
+## §11 · Patch records
+
+### D2-P1 · The state machine gains a mount-time transition (2026-08-11)
+
+**Trigger.** PR-A reviewer finding M1. **Exit criterion 1 was not met by
+D2 as written.** React binds `error` on `<img>` as a NON-delegated
+listener at hydrate time, and `page.tsx:18` is `force-dynamic` with the
+`<img>` server-rendered. The DOM `error` event fires exactly once — one
+that resolves BEFORE hydration attaches the listener is lost
+permanently, and the broken glyph persists forever.
+
+⚠ **PERF-1 made this the common case, not the edge.** Discovery went
+**35.07 s → 0.692 s p50** at the `bom1` flip (`docs/parked.md:25`,
+closed 2026-08-10). A faster response arrives EARLIER relative to
+hydration, which WIDENS the lost-event window. The mitigation floated
+at review — that a slow read hides the defect — is a performance defect
+masking a correctness one, and it has already been retired.
+
+**The state machine, amended:**
+
+    src === null                              → fallback
+    onError fired                             → fallback
+    on mount / on src change:
+      complete && naturalWidth === 0          → fallback   ← D2-P1
+    otherwise                                 → <img>
+
+`complete` alone is true for a CACHED SUCCESS; `naturalWidth === 0` is
+what separates a finished-and-failed decode from a finished-and-
+succeeded one. A load still in flight reports `complete === false` and
+does not trigger. Both mechanisms are kept and both are needed:
+`onError` catches every post-hydration failure including each carousel
+`src` swap, the mount check catches the pre-hydration one.
+
+⚠ **The vacuity hazard, and it runs in BOTH directions.** jsdom reports
+`naturalWidth === 0` for every image — the half that makes an unstubbed
+test always-true — AND `complete === false` for every image, the half
+that makes the production check inert while reporting a confident
+green. Both properties must be stubbed explicitly, and the assertion is
+non-vacuous only with positive controls on both axes: `complete: true,
+naturalWidth: 200` must NOT fall back, and `complete: false` must NOT
+fall back.
+
+⚠ **An alive check counted after a failed-decode render measures the
+fix, not the fixture.** A correct component has already swapped the
+images out by the time `render()` returns, so the count must be taken
+under a DECODED stub. Recorded because the first shape of this test was
+green-impossible for exactly this reason and failed only after the fix
+landed.
+
+**`MarketThumb.tsx` gains `"use client"`.** It uses hooks now. A no-op
+for today's graph — all three consumers already sit inside
+`DiscoveryCarousel.tsx:1` — and it removes the future server-consumer
+footgun D2's docblock previously only warned about.
+
+**Scope unchanged.** No new consumer, no geometry moved, no token,
+nothing under `src/server/**`.
+
+### Recorded departures from §5's four-file fence
+
+Three files beyond the fence, each flagged in-commit and each ratified
+at Gate C rather than absorbed:
+
+- `tests/unit/discovery/render/market-card.test.tsx` — FORCED by D4.
+  `getByAltText` cannot survive `alt=""`.
+- `tests/unit/discovery/reserves-server-only.test.ts` — reviewer M2.
+  `MarketThumb` entered the V13 client graph when the three sites
+  adopted it. ⚠ This list is **hand-maintained and stays GREEN while
+  incomplete** — omitting the file is a silent coverage hole, NOT a red
+  test. It is therefore a discipline, not a guard, and this document
+  does not claim otherwise. (Contrast `side-pole-binding.test.ts`,
+  whose `PERMITTED_FILES` IS exact set equality and does redden.)
+- `docs/parked.md` — GC-1 and the two test-lane rows below.
+
+⚠ The PR's diff carries **nine** file headers, not three: `docs/plans/PRIMITIVES-2.md`
+(this patch record) and `docs/logs/PRIMITIVES-2-PR-A.md` (the session log CLAUDE.md
+§5.9 mandates) are the **recording mechanism**, not departures to be ratified —
+a fence that counted its own minutes would be unsatisfiable.
+
+### Gate C findings on PR-A
+
+- **GC-1 · `OQ-6`'s dynamic-alt rule has an exception at two sites.**
+  D4 supersedes it at `MarketCard` and `HeroPanels`' market thumb.
+  Rowed in `docs/parked.md` per the standing rule, so the comprehensive
+  founder pass does not rediscover `alt=""` as a defect.
+- **GC-2 · One grep owed before staging-verify.** In the ERROR state
+  the hero post image renders `hero-post-image-empty-${side}`, not
+  `hero-post-image-${side}`. Correct semantically; any E2E selector
+  asserting the non-empty testid on a media-bearing market now fails on
+  a 404 rather than finding a broken image.
