@@ -49,7 +49,7 @@ export function HeroPanels({
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 
-			<div className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:1px_solid_var(--color-n3)]">
+			<div className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:var(--border-hero)]">
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
 					    error · loaded across all three Discovery image sites. `alt=""`
@@ -105,7 +105,7 @@ function HeroPostPanel({
 			<div
 				data-testid="hero-side-empty"
 				data-side={side}
-				className="flex items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:1px_solid_var(--color-n3)]"
+				className="flex items-center justify-center rounded-[var(--r)] bg-n0 p-4 text-xs text-muted-foreground [border:var(--border-hero)]"
 			>
 				{HERO_SIDE_EMPTY[side]}
 			</div>
@@ -117,7 +117,7 @@ function HeroPostPanel({
 		<div
 			data-testid="hero-post"
 			data-side={side}
-			className="relative flex flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:1px_solid_var(--color-n3)]"
+			className="relative flex flex-col rounded-[var(--r)] bg-n0 px-3 pt-3 pb-[11px] [border:var(--border-hero)]"
 		>
 			<div className="flex flex-nowrap items-center gap-1.5 overflow-hidden text-[9.5px] whitespace-nowrap">
 				<Avatar size="xs">

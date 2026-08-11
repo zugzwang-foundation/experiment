@@ -49,7 +49,7 @@ export function DiscoveryGrid({
 						{...(active ? { "data-active": "true" } : {})}
 						className={
 							active
-								? "rounded-[var(--r)] [outline:1.5px_solid_var(--color-n4)] outline-offset-[3px]"
+								? "rounded-[var(--r)] [outline:var(--ring-active)] outline-offset-[3px]"
 								: undefined
 						}
 					>
