@@ -1392,3 +1392,33 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** For BOTH residuals: the next task that legitimately opens `tests/unit/design/`.
 
 **Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, THREE fixes**: R15's palette-class ban, the N5 set-equality floor, and the `SCAN_DIRS` structural fix. Evidence: `docs/logs/POLISH-7a.md` §5.
+
+---
+
+## R2-412-DEPLOY-GATE — ADR-0028's binding is mock-proven, not R2-proven — ⚠ **BLOCKS DP.2**
+
+**Originating task:** MOD-REPORT-PATH (2026-08-12), found while verifying ground 3 of ADR-0021's patch record. ⚠ **The gate itself is older** — `docs/logs/AUDIT-FIX-A1.md` recorded it as a HARD deploy gate and it has lived in a LOG with no docket row ever since, which is exactly the phantom-prerequisite shape the standing rule at the top of this file exists to prevent.
+
+**Deferred work.** Demonstrate a real **412 Precondition Failed** from **real Cloudflare R2** on a second write to an existing key, on staging, and retire the gate. Until then ADR-0028's binding is **wired and mock-proven only**.
+
+⚠ **Why it is not a formality.** The mechanism is a create-once conditional write, so the bytes that were moderated are the bytes that are served. **R2 is S3-COMPATIBLE, NOT S3.** If it accepts the header and silently no-ops rather than returning 412, the write succeeds, the swap-after-approval window is open, and **every test in the suite still passes** — the SDK mock asserts the header is SENT, not that the backend HONOURS it. The lock test says so in its own header: the mock is *necessary but insufficient*. **This is V-6 exactly** — a control that reads as discharged because nothing on disk can fail.
+
+⚠ **Child-safety adjacent.** ADR-0021's 2026-08-12 patch record cites this binding as **ground 3** for ruling user-facing reporting out of scope. **That ruling does not rest on ground 3 alone** — grounds 1, 2 and 4 are independently sufficient — but the property is asserted in a child-safety ADR and is unverified against the real backend.
+
+**Conditional trigger.** ⚠ **BEFORE DP.2.** It is a **third** DP.2 gate and it is **not** in DP.2's recorded blocker list — POOL-2 (resolved 2026-08-11) and `ProfileTradeStreamError` (recorded live, evidence stale since STAGING-PARITY Slices A–D) are the two that are. ⚠ **DP.2's blocker list needs a sweep, not just this row.**
+
+**Expected next task.** A staging exercise, not a build: one deliberate double-write against real R2, the 412 captured, the gate retired in `AUDIT-FIX-A1`'s log and here. Evidence: `docs/logs/AUDIT-FIX-A1.md`; ADR-0028; `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12, ground 3.
+
+---
+
+## DMARC-ALIGNMENT — DMARC stands on DKIM alone — founder decision, pre-go-live
+
+**Originating task:** POLISH.7a's carried findings (2026-08-11); rowed 2026-08-12 on the operator's staging smoke.
+
+**Deferred work.** `_dmarc.zugzwangworld.com` publishes `adkim=s; aspf=s`. SPF **cannot** align strictly — the envelope sender is a subdomain of the header domain — so **DMARC passes on DKIM alone, with no second leg.** Relaxing to `aspf=r` gives it one. Founder decision; one DNS record.
+
+**Status, measured 2026-08-12.** An OTP from the verified domain delivered to a **Gmail INBOX** — the same recipient class that landed in **spam** under the sandbox sender. ⚠ **That is evidence the path works today, not evidence the configuration is sound**: a DKIM-only pass is exactly what a working single leg looks like, and a broken signature or a forwarder that alters the message has nothing to fall back on. **Robustness, not delivery.**
+
+**Conditional trigger.** Before go-live, 2026-09-15. One DNS change, no code, no deploy.
+
+**Expected next task.** A founder ruling and a DNS edit. Evidence: `docs/logs/POLISH-7a.md` §6, criterion 3.

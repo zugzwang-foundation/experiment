@@ -220,10 +220,33 @@ phase.** Four grounds, each verified against the repo at ruling time:
    before it becomes public, so the reactive path is a second net beneath a
    first one — not the primary control. A report path acts only on content that
    already shipped.
-2. **The screen is a real classifier**, covering the harm categories including
-   sexual content involving minors — not a keyword list.
-3. **The screened artifact is the served artifact** (ADR-0028): byte-identity
-   binding leaves no swap-after-approval window.
+2. **The screen is a real classifier, and it is MULTIMODAL.**
+   `omni-moderation-2024-09-26`, covering the harm categories including
+   `sexual/minors`. ⚠ **Participant image attachments are screened by the same
+   call** — the pre-commit path mints a signed read URL and passes it to the
+   moderation client as an `image_url` input part **alongside the text**, so an
+   attached image is not a text-only model's blind spot. **Image-scoped
+   escalation is deliberately STRICTER than text**: adult sexual content *with
+   an image* escalates to **track A — block, auto-ban, CSAM report** — where
+   the same content in text alone does not. ⚠ **This is the ground the ruling
+   most rests on**, because an image is the artifact a user-facing report path
+   would most plausibly have caught, and it is caught earlier and harder here.
+3. **The screened artifact is the served artifact** (ADR-0028) — byte-identity
+   binding via a create-once conditional write on the participant upload path,
+   a fail-closed `HeadObject` verify before moderation, and an ETag fingerprint
+   recorded at placement. **Wired at five sites and mock-proven.**
+   ⚠ **AND ITS DEPLOY GATE IS UNDISCHARGED.** `docs/logs/AUDIT-FIX-A1.md`
+   records a **HARD** gate that is not retired until a real **412** is
+   demonstrated against **real R2**, and the lock test states in its own header
+   that the SDK mock is *necessary but insufficient*. **R2 is S3-COMPATIBLE,
+   NOT S3** — if it accepts the conditional header and silently no-ops, the
+   write succeeds, the swap-after-approval window is open, and **every test in
+   the suite still passes**, because the mock asserts the header is SENT, not
+   that the backend HONOURS it. **Nobody has checked.** Rowed at
+   `docs/parked.md` · **R2-412-DEPLOY-GATE**, which blocks DP.2.
+   ⚠ **This ground is therefore stated as WIRED, not VERIFIED, and the ruling
+   does not rest on it alone** — grounds 1, 2 and 4 are independently
+   sufficient, and ground 2 is the load-bearing one.
 4. **Posting friction is structural.** Every post carries a mandatory Dharma
    stake and a mandatory argument (INV-1/INV-2), which is orders of magnitude
    above an open forum, and the removal and ban-author paths are built.
