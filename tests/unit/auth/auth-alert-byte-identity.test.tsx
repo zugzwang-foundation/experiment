@@ -3,7 +3,7 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { AuthAlert } from "@/app/(auth)/AuthAlert";
+import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
 
 /**
  * POLISH.7a D21 — the §8.2 ZERO-DELTA PROOF for the de-duplicated auth error
@@ -16,10 +16,19 @@ import { AuthAlert } from "@/app/(auth)/AuthAlert";
  * ⚠ THE TWO BASELINES BELOW ARE CAPTURED FROM THE PRE-CHANGE FILES, not
  * re-derived from the component. They are what `git show HEAD~1` renders:
  *
- *   sign-in/page.tsx:147   className="mt-3 rounded-(--r) bg-n1 px-3 py-2 …"
- *   sign-in/otp/page.tsx:152  className="rounded-(--r) bg-n1 px-3 py-2 …"
+ *   sign-in/page.tsx:96   googleError → mt-3 rounded-(--r) bg-n1 px-3 py-2 …
+ *   sign-in/page.tsx:130  emailError  → mt-3 rounded-(--r) bg-n1 px-3 py-2 …
+ *   sign-in/otp/page.tsx:152           →      rounded-(--r) bg-n1 px-3 py-2 …
  *
- * The two differ by a leading `mt-3` and by nothing else, which is why
+ * ⚠ THREE call sites, not two. The first draft of this docstring said two and
+ * mapped "sign-in" to one string, conflating sign-in’s pair — and the emailError
+ * site shipped WITHOUT its `mt-3` under a green receipt (@code-reviewer H-1).
+ * A component rendered in isolation cannot prove anything about a call site, so
+ * the per-site pins now live in `sign-in-render.test.tsx` and `otp-render.test.tsx`
+ * where the class is actually emitted. This file proves only the component’s own
+ * two output shapes.
+ *
+ * They differ by a leading `mt-3` and by nothing else, which is why
  * `AuthAlert` PREPENDS `className` rather than merging it: `cn()` runs
  * `twMerge`, and its ordering over arbitrary-property utilities would become a
  * dependency of this assertion. Plain concatenation has no such dependency.
@@ -57,10 +66,6 @@ describe("AuthAlert — byte-identical to both pre-change call sites", () => {
 		// source: an appended className would still contain every token and
 		// still render, and only the order would betray it.
 		expect(cls.startsWith("mt-3 ")).toBe(true);
-	});
-
-	it("the two call sites differ by exactly the leading mt-3", () => {
-		expect(SIGN_IN_BASELINE.replace("mt-3 ", "")).toBe(OTP_BASELINE);
 	});
 
 	it("passes the message through unchanged — no code→copy branching", () => {

@@ -56,7 +56,7 @@ const SCAN_FILES = [
 	// three that were just enrolled would re-open the blind spot in the same PR
 	// that closed it — the N8 failure committed knowingly. `SCAN_DIRS` does not
 	// reach `src/app/(auth)`, so anything colocated here has to be named.
-	"src/app/(auth)/AuthAlert.tsx",
+	"src/app/(auth)/_components/AuthAlert.tsx",
 	"src/app/(auth)/error.tsx",
 ];
 // 8/6/4/3-digit forms, longest-first — alpha hex (#rrggbbaa/#rgba) is the

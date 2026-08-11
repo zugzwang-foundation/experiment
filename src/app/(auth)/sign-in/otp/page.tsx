@@ -4,6 +4,7 @@ import { Mail } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type FormEvent, type ReactElement, Suspense, useState } from "react";
+import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
 import { Button } from "@/components/ui/button";
 import {
 	Card,
@@ -15,7 +16,6 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { authClient } from "@/lib/auth-client";
-import { AuthAlert } from "../../AuthAlert";
 
 // F-AUTH-2 OTP code entry per plan §4 page inventory.
 // Client component (per SCAFFOLD.3-FOLLOWUP-1 §2 + Plan-Q5 +

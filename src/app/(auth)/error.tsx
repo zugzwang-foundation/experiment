@@ -17,6 +17,13 @@
  * `GlobalHeader` and `PageContainer preset="auth"` and must NOT declare a
  * container of its own — the box is POLISH.1's and is already around it.
  *
+ * ⚠ WHAT IT DOES NOT CATCH. Next’s `error.js` does not catch a throw from the
+ * `layout.js` of its OWN segment, and `(auth)/layout.tsx:30` awaits
+ * `auth.api.getSession({ headers })` on all three routes — the same class of
+ * session/DB read named above as the likeliest thrower. That path still
+ * escalates to `global-error.tsx`. Closing it would mean lifting a boundary a
+ * level, which is outside this surface’s edit boundary (@code-reviewer M-3).
+ *
  * `"use client"` is a Next.js framework requirement for `error.tsx`, not new
  * product logic. It does not engage `UI-A7.md:76`'s no-new-client-boundary
  * ruling, which is scoped to `/onboarding`'s card staying a pure RSC — that

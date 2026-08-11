@@ -122,5 +122,13 @@ describe("UI-A7 sign-in skin — branded presentation (DRIVER, RED pre-skin)", (
 
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toContain("rate_limited");
+		// POLISH.7a H-1 (@code-reviewer). The byte-identity suite renders
+		// `AuthAlert` in ISOLATION and so could not see that this call site had
+		// silently lost its `mt-3` when the file-local component was replaced —
+		// an unratified 12px delta with a green receipt over it. The pin belongs
+		// where the class is actually emitted.
+		expect(alert.getAttribute("class")).toBe(
+			"mt-3 rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]",
+		);
 	});
 });

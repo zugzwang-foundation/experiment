@@ -115,6 +115,11 @@ describe("UI-A7 otp skin — branded presentation (DRIVER, RED pre-skin)", () =>
 
 		const alert = await screen.findByRole("alert");
 		expect(alert.textContent).toContain("otp_invalid");
+		// POLISH.7a H-1 (@code-reviewer): the call-site pin. This site takes NO
+		// `className`, so it must emit the base string with no leading margin.
+		expect(alert.getAttribute("class")).toBe(
+			"rounded-(--r) bg-n1 px-3 py-2 text-sm text-ink [border:var(--hairline)]",
+		);
 	});
 });
 

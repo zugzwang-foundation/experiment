@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -71,9 +71,15 @@ describe("(auth) error boundary — D20", () => {
 		]) {
 			expect(html).not.toContain(secret);
 		}
-		// And the second control: those strings ARE distinctive enough to have
-		// been found if they had been rendered.
-		expect(thrown().message).toContain("SECRET_DB_DETAIL");
+		// REACHABILITY control (@code-reviewer M-6). The previous line here
+		// re-read the literal against itself, which measures nothing. This
+		// renders a component that DOES emit `error.message` through the same
+		// harness, proving the matcher can find that string when it is present —
+		// so the four `not.toContain`s above are absences, not blind spots.
+		const leaky = render(<p>{thrown().message}</p>);
+		expect(leaky.container.innerHTML).toContain(
+			"SECRET_DB_DETAIL_pg_connection_refused",
+		);
 	});
 
 	it("declares no container of its own — the (auth) layout owns the box", () => {
@@ -109,6 +115,13 @@ describe("(auth) error boundary — D20", () => {
 		// A route-group loading.tsx would blanket the two client pages that render
 		// instantly. The omission is a ruling, so it is pinned rather than left to
 		// be re-litigated by the next reader.
-		expect(() => read("src/app/(auth)/loading.tsx")).toThrow();
+		expect(existsSync(join(process.cwd(), "src/app/(auth)/loading.tsx"))).toBe(
+			false,
+		);
+		// Positive control (@code-reviewer L-4): `toThrow()` also passes on a
+		// path typo or a wrong cwd, so assert the sibling that DOES exist.
+		expect(existsSync(join(process.cwd(), "src/app/(auth)/error.tsx"))).toBe(
+			true,
+		);
 	});
 });

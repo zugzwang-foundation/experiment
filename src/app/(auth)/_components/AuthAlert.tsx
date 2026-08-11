@@ -27,6 +27,13 @@ import type { ReactNode } from "react";
  * pinned against literals captured from the pre-change files in
  * `tests/unit/auth/auth-alert-byte-identity.test.tsx`.
  *
+ * ⚠ CONSEQUENCE OF PREPENDING, stated because the prop type does not imply it:
+ * a CONFLICTING utility will NOT override. `cn()` would let `className="px-6"`
+ * beat the base `px-3`; plain concatenation emits both and Tailwind’s stylesheet
+ * order decides, which means the caller’s override silently does nothing. This
+ * prop is for ADDITIVE spacing only — today, exactly `mt-3` on the two sign-in
+ * sites. Anything else needs a different mechanism, not a different string.
+ *
  * No hooks and no state: the two client pages that import it keep their own
  * boundaries, and the message still flows through from the handler unchanged
  * (no code→copy branching — `docs/logs/UI-A7.md:13`; humanising is

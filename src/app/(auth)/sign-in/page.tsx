@@ -2,12 +2,12 @@
 
 import { useRouter } from "next/navigation";
 import { type FormEvent, type ReactElement, useState } from "react";
+import { AuthAlert } from "@/app/(auth)/_components/AuthAlert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { authClient } from "@/lib/auth-client";
-import { AuthAlert } from "../AuthAlert";
 
 // F-AUTH-1 + F-AUTH-2 sign-in landing per plan §4 page inventory.
 // Client component (per SCAFFOLD.3-FOLLOWUP-1 §2) — Better Auth's
@@ -145,7 +145,9 @@ export default function SignInPage(): ReactElement {
 						name="turnstileToken"
 						value="placeholder-token"
 					/>
-					{emailError ? <AuthAlert>{emailError}</AuthAlert> : null}
+					{emailError ? (
+						<AuthAlert className="mt-3">{emailError}</AuthAlert>
+					) : null}
 				</form>
 			</CardContent>
 		</Card>
