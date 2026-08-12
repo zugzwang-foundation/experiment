@@ -784,6 +784,47 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
 - **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2887 tests passed | 1 skipped | 4 todo (2892)**, EXIT=0. Measured at read-4 head. (Machine phase 2868 → read-1 2871 → read-2 2885 → read-3 2887 → read-4 2887 — R4 added no test, only two assertions inside existing ones.)
 - **Reviewer runs:** 3 agents total — @code-reviewer and @security-auditor at the machine phase (~12 and ~11 min), then a **scoped @code-reviewer re-run at read-2** (~10 min) for GC-1's control-flow change. Machine phase: 1 HIGH + 2 MEDIUM + 1 LOW fixed. Read-2: 1 MEDIUM fixed, 1 HIGH reported outside the boundary. @security-auditor was not re-run at read-2 — founder-ruled. **At read-3 it WAS re-run, scoped to the leak rail** (~9 min): 0 CRITICAL, 0 HIGH, 5 MEDIUM, 6 LOW, 1 SURPRISE; one LOW fixed as a truthfulness repair on my own docblock. @code-reviewer not re-run at read-3.
 
+## 11 · CLOSE-OUT
+
+**Surface · routes · components, as VERIFIED at step 0.** 8 routable entries — 7 pages + `POST /admin/markets/media/sign`, which no document listed. 16 files under `(admin)`. 16 components: 7 named in POLISH-0's row, 8 omitted from it (including `BanIndicator`, which holds the row's own pre-recorded delta), 1 added by this PR.
+
+**Step 0 findings: 30 claims swept — 24 TRUE · 5 FALSE · 1 ABSENT.** No named source failed to exist; the three ⟐ tier-1 candidates (ADR-0010 / 0027 / 0028) all resolved with the right subject. **No class-S HALT on source existence.** The FALSE five and the one ABSENT baseline are `PD-8-21` … `PD-8-25`.
+
+**Machine PR: #323 — 6 shipped · 2 halted · 1 superseded · 21 routed**, from an inventory of **28** (`P8-D01`–`P8-D29` with no `D21`). Merged `f6d9775`.
+
+**Gate C: FOUR reads, and every one found something.** Read 1 — four blocking items, one of them an honesty regression this PR introduced. Read 2 — a control-flow extraction that the skip-the-cascade rationale had described incorrectly; proven PURE by byte-identity plus a 220,442-input differential fuzz. Read 3 — the leak-rail HIGH, discharged with a demonstrated pre-fix GREEN. Read 4 — two one-line fixes the plan's own rule required and the round had left. ⚠ **Three surfaces had already shipped a real defect through a green suite; this one shipped none, and four reads is why.**
+
+**Halts routed to:** `ADMIN-CLOSE-CONFIRM` (`PD-8-08`) · `ADMIN-ERROR-COPY` (`PD-8-09`). Both halted on measurement, not on prediction.
+
+**Register: `PD-8-01` … `PD-8-28`**, allocated from a live high-water mark of zero, against the 9-column POLISH.8 schema read at head.
+
+**Exit bar — `POLISH-0.md` §7, item by item.**
+1. **Parity** — **N/A by ratification (P9).** No tier-4 baseline exists; criterion 1 does not apply to this surface.
+2. **Invariant-visual obligations** — **PASS, and this is the strongest thing `.8` delivers.** *Admin is not a participant* re-verified as a measurement on two arms with positive controls: structurally (no `role`, no `is_admin`, no `users` row, a separate auth tree) and by transitive import walk (105 modules, 2 reachable `src/components` files, both inert) against a 46-hit positive control under `(public)`.
+3. **Every interactive affordance functional end-to-end** — **PASS with three recorded exceptions**: `PD-8-08` (Close confirm), `PD-8-09` (error copy), `PD-8-15` (sign-out). All routed with named owners and dates.
+4. **All states rendered** — **N/A.** W2.11's kit governs participant surfaces; admin has no ratified state kit and design-language §7 defers its visual language to its own pass.
+5. **Cross-surface criteria** — **N/A.** No participant primitive is consumed; that is the point of criterion 2.
+6. **Token usage** — **PASS.** Zero raw hex under `(admin)`, measured directly since the guard does not reach here. The one Tailwind palette class in `src/` is fixed (`PD-8-01`) and the guard's two independent gaps are filed (`PD-8-27`, `PD-8-28`).
+7. **Pole binding on both sides** — **PASS.** The one side-encoding site is pinned at both poles with opposite-pole absence, RED-proven on two mutation classes. The one new side-encoding string is asserted never to key a colour.
+8. **Shell criteria** — **EXEMPT by ratification.** There is deliberately no `(admin)/layout.tsx`; otherwise eight checks read as failures.
+
+**Closing status: `closed (a11y-deferred)` for the machine phase. THE SURFACE IS OPEN** — the founder pass has not run, exactly as for `.1`, `.2` and `.7a`.
+
+**Emitted to the tracker:** one batched row.
+
+**Carried forward, each with a NAMED OWNER:** `ADMIN-EVENTS-WRITER` · `ADMIN-INLINE-MODERATION-ACCEPTED` · `ADMIN-CLOSE-CONFIRM` · `ADMIN-ERROR-COPY` · `ADMIN-SIGNOUT` · `AUDIT-ORDER-TOTAL` · `LEAK-RAIL-CLOSURE` · `ADMIN-MEDIA-EDIT` · `ADMIN-NOINDEX` · `STAGING-AUTO-ADVANCE`, plus amendments to `NO-RAW-HEX-REACH`.
+
+### ⚠ Lesson for the next relay: what the machine read missed
+
+**The bottleneck moved from the record to the instructions, and that is the finding.** `.7a` cost eight because the record was wrong. `.8` cost **ten, and six were caused by defects in the relays** — a stop condition that forbade committing the plan it mandated · an edit boundary drawn around source that forgot behaviour is pinned by tests · a ruling that traded a moderation safety control for a build fix without noticing · a spanning proof set blind to one field · a guard axis specified as a directory when the property was an import closure · a probe told to plant a token the guard does not scan, which would have passed vacuously and which **CC caught**.
+
+**Four things for `.3`'s relay to carry:**
+
+1. **Run the plan against its own stop conditions and its own edit boundary before shipping it** (§13.1, §13.2). Two of `.8`'s eight items hit jointly-unsatisfiable pairs.
+2. **At recon, for every delta whose fix changes behaviour, grep the suite for a test pinning the current behaviour** and report it on the row. `.8`'s recon read a conflict as doc-vs-doc when it was doc-vs-green-test, and the plan scoped it wrongly as a result.
+3. **A structural fix can trade one safety property for another.** GC-5 closed a latent Turbopack build hazard and narrowed a blocked-image leak rail in the same edit — the same change partly cured one finding on that guard while creating a HIGH. **State what a structural change costs, not only what it buys.**
+4. ⚠ **Tier 3 earned its place again, twice.** Two apparent divergences resolved FALSE on tier-3 documents — *Correct* being surfaced despite §15.3, and the three unstyled routes. **A pass that skipped step 3 would have filed both as defects**, which is precisely POLISH.0's finding that three of four apparent divergences were false and each resolved on a tier-3 document.
+
 ---
 
 *POLISH.8 — machine phase + Gate C reads 1 through 4 · ended at push, nothing merged · **the founder merges**.*

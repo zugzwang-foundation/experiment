@@ -23,12 +23,12 @@
 | **.4 Composers** | ❌ | ❌ | **CLEAR** — B1 closed | **full ritual** | ▶ after .3. Co-owns RR-3 |
 | **.5 Profile** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ⚠ **REGISTER-APPLY first** |
 | **.6 Bookmarks** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ▶ after .5 |
-| **.8 Admin** | ❌ | ❌ | **none** — pullable forward | single gated pass | ▶ no tier-4 baseline; §7 criterion 1 does not apply |
+| **.8 Admin** | ✅ **#323** `f6d9775` | ❌ | **none** — was pullable forward | single gated pass (⚠ the reviewer cascade ran anyway, twice, and returned a HIGH each time) | **OPEN, not closed** — joins the comprehensive pass. No tier-4 baseline; §7 criterion 1 does not apply |
 | **.7b Onboarding** | ❌ | ❌ | ⛔ **O1** | — | Blocked. Not a POLISH problem to solve |
 
 **Eight of nine are gate-clear.** `POLISH-0.md`'s original gate line implied four blocked surfaces; three of those four blocks had already evaporated when it was written. Only `.7b` is blocked, and its blocker is O1.
 
-**Five machine runs remain** — `.3 · .4 · .5 · .6 · .8`. `.1`, `.2` and now `.7a` have had theirs and join the comprehensive founder pass directly. ⚠ **A machine phase does not close a surface**: `.7a` is OPEN until the founder pass runs, exactly as `.1` and `.2` are.
+**Four machine runs remain** — `.3 · .4 · .5 · .6`. `.1`, `.2`, `.7a` and now `.8` have had theirs and join the comprehensive founder pass directly. ⚠ **A machine phase does not close a surface**: `.8` is OPEN until the founder pass runs, exactly as the other three are.
 
 ### Gate ledger
 
@@ -114,22 +114,17 @@ Dated or triggered, none blocking a machine run.
 ## §5 · Sequence
 
 ```
-POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6 ─▶ .8
-     (closed)          (closed 2026-08-11)  (#320) ▲
-                                                  NEXT
-                                           plan PARALLEL · execute SERIAL
-                                                   │
-                                                   ▼
-                                 ONE comprehensive founder visual pass
-                                      (.1 · .2 · .7a join here)
-                                                   │
-                                                   ▼
-                                  refinement PRs  ─▶  close-outs
+POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6
+     (closed)          (closed 08-11)   (#320)   (#323)   ▲
+                                                          NEXT
+                                                 plan PARALLEL · execute SERIAL
 ```
 
 **Execute serial** means **one machine-phase PR open at a time** — so a regression bisects to a surface and Gate C never queues. Recon and classification for several surfaces may be drafted concurrently.
 
-⚠ **`.7a` IS DONE (#320, `86a245f`) and `.3` IS NEXT** — the heaviest surface in the set. `.7a` cost **eight** founder-serial touches against a budget of two; see §6.
+⚠ **`.8` RAN OUT OF ORDER AND THAT WAS RATIFIED.** It was pulled forward on 2026-08-12 because it was gate-free and `.3`'s kickoff was blocked on MOD-REPORT-PATH (since resolved at #322). `.3` IS NEXT — the heaviest surface in the set, full ritual, with SPEC.CHART now landed (#324/#325).
+
+⚠ **R-G's batch lever is now spent for `.8`** — it ran standalone rather than batched with `.5`/`.6`, on the ground that a classification held across two full-ritual runs goes stale (a counted inventory went 9 → 13 inside one PR). The lever remains available for `.5` + `.6`.
 
 *Why `.7a` ran first, recorded as the rationale for a decision already executed:* it was the cheapest surface, gate-free, and `.1`'s machine phase had already run. Shell-first was **discharged, not abandoned**. ⚠ **This is the record of a past ordering call, not a live instruction** — `.7a` closed at #320 and the sequencer above now points at `.3`.
 
@@ -166,9 +161,17 @@ PRIMITIVES-2's scope, from evidence already on `main`: `MarketThumb` (PD-2-32 + 
 
 ⚠ **The measurement is stated HERE, in prose, and is deliberately NOT a row in the table above.** It is a measurement *against* the 12, not an addition *to* it — as a sibling row it read as one, and the column then summed to 26–29 while the Total still said ~18–21. `POLISH-SURFACE-TEMPLATE.md` §12 records the near-identical failure — *a stale count in the footer agreeing with a broken parse* — and here the two did not even agree. **The table keeps its five rows and its original Total; the number lives in the sentence.**
 
-The row above budgets **2 founder-serial touches per machine run** (12 for six). **`.7a` — the cheapest surface in the set, gate-free, three routes, nothing under `src/server/**` — cost EIGHT.** Spent on: **recon** · **plan ratification** · **execute** · **a correction gate** (D19's exception had been granted on the wrong file) · **Gate C** · **Gate C remediation** (five blocking items) · **this close-out**. ⚠ **Two of the eight were not in the estimate at all** — the correction gate and the remediation round — and both existed because the RECORD was wrong, not because the code was.
+The row above budgets **2 founder-serial touches per machine run** (12 for six). **TWO RUNS ARE NOW MEASURED AGAINST IT AND BOTH EXCEEDED IT BY A LARGE MULTIPLE.**
 
-⚠ **This is a MEASUREMENT, not a forecast.** Whether the remaining five cost 2 each, 8 each, or something between is a **founder ruling, not a CC one**: it turns on how much of `.7a`'s cost was first-run overhead on a brand-new template versus recurring, and on whether `.3` and `.4` — **full ritual**, and still needing SPEC.CHART and MOD-REPORT-PATH resolved — run cheaper or dearer than the cheapest surface. **The figure is stated; the re-forecast is left open.**
+**`.7a` — the cheapest surface in the set, gate-free, three routes, nothing under `src/server/**` — cost EIGHT.** Spent on: **recon** · **plan ratification** · **execute** · **a correction gate** (D19's exception had been granted on the wrong file) · **Gate C** · **Gate C remediation** (five blocking items) · **the close-out** · **a close-out remediation round**. ⚠ That is eight items and the enumeration formerly listed seven — corrected at the POLISH.8 close-out, `PD-8-26`. **Two of the eight were not in the estimate at all** — the correction gate and the remediation round — and both existed because the RECORD was wrong, not because the code was.
+
+**`.8` — no tier-4 baseline, no shell, no gates, one hard invariant check — cost TEN.** Spent on: **kickoff + rulings** · **recon return and classification** · **plan + overnight execute relay** · **Gate C read 1** (four blocking items) · **read 2** · **read 3** · **read 4** · **the cross-chat guardrail check** · **staging advance** · **this close-out**.
+
+⚠ **AND THE ATTRIBUTION MATTERS MORE THAN THE FIGURE. SIX of `.8`'s ten were caused by defects in the RELAYS, not by the code and not by the record:** the stop condition that forbade committing the plan it mandated · an edit boundary drawn around source files that forgot behaviour is pinned by tests · a ruling that traded a moderation safety control for a build fix without noticing · a spanning proof set blind to one field · a guard axis specified as a directory when the property was an import closure · a probe instructed to plant a token the guard does not scan, which would have passed vacuously.
+
+⚠ **The bottleneck has MOVED.** `.7a`'s overrun was the record being wrong. `.8`'s was the instructions being wrong. **`.3` and `.4` are next, both full ritual and both heavier than either measured surface.** The lesson is in `POLISH-SURFACE-TEMPLATE.md` §13, minted at this close-out: **run the plan against its own stop conditions and its own edit boundary before shipping the relay.**
+
+**This is a MEASUREMENT, not a forecast.** Whether the remaining four cost 2 each or 10 each is a founder ruling, not a CC one. The figures are stated; the re-forecast is left open.
 
 **R-G's batch lever is PULLED for `.5` · `.6` · `.8`** (POLISH.7a plan §2 R-G): their recon and classification are drafted concurrently and ratified in **one** session. **Execute stays SERIAL — one machine-phase PR open at a time — and Gate C never batches.** Not applicable to `.3` or `.4`.
 
