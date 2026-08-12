@@ -1,13 +1,14 @@
 # POLISH.8 — Admin Centre — machine-phase session log
 
-**SENTINEL:** ZZ-P8-EXEC-2026-08-12 · ZZ-P8-GCR-2026-08-12
+**SENTINEL:** ZZ-P8-EXEC-2026-08-12 · ZZ-P8-GCR-2026-08-12 · ZZ-P8-GC2-2026-08-12
 
 **Date:** 2026-08-12 · **Branch:** `polish/8-admin-centre` · **Base:** `dfa3012` on `main`
 **Mode:** overnight, unattended, pre-authorised under founder ruling D4 (no verdict round).
 **Governing ruling:** *"Admin pages are internal — they should be simple and not heavy. Just the core functions should work."* Axis A report-only except S-1; axis B is the run; axis C passed at recon and was not re-litigated.
 **Plan:** `docs/plans/POLISH-8.md`, committed verbatim at commit 0.
 
-> ⚠ **This run ENDED AT PR-OPEN. Nothing was merged. Gate C has not happened.**
+> ⚠ **NOTHING HAS BEEN MERGED. The founder merges after re-read.**
+> **Gate C history:** the machine phase ended at PR-open with Gate C pending; **read-1** returned four blocking items + one structural fix (GC-1…GC-5, §2a); **read-2** returned six more (R2-1…R2-6, §2b). This line said *"Gate C has not happened"* through both reads — R2-3.
 
 ---
 
@@ -165,6 +166,116 @@ Proof: `next build` green (`├ ƒ /admin/moderation/audit` still built); **zero
 
 ---
 
+## 2b · GATE C READ-2 REMEDIATION — six items, all PASS
+
+Read-1's remediation did not end Gate C. A second diff-read returned six more items — five of them defects in this log rather than in the code, which is itself the finding. Round label **R2-n**; GC-6…GC-9 are allocated to routed docket rows and must not collide.
+
+| Item | What | Outcome |
+|---|---|---|
+| **R2-1** | §9 said "Four things" and enumerated six | ✅ **PASS** — count **deleted**, not corrected |
+| **R2-2** | §7's category rows summed to 9 against a total of 10 | ✅ **PASS** — categories now partition, sum stated |
+| **R2-3** | Five statements true at an earlier round, false at head | ✅ **PASS** — 5 named + **3 more found** by the prose sweep |
+| **R2-4** | "Sessions: 2" beside a wall-clock describing one | ✅ **PASS** — one line per session |
+| **R2-5** | A citation that reads as checkable and is not | ✅ **PASS** — counts inlined; all §-refs audited |
+| **R2-6** | GC-1 replaced a control-flow expression | ✅ **PASS** — proven + cascade re-run |
+
+### ⚠ R2-6 — the substantive one
+
+**The founder was right about the description.** Log §6 justified skipping the cascade with *"confined to one string branch … no handler, no state and no data read"*, while §2a states GC-1 *"replaced its inline `Object.keys(filters).length > 0`"* — the expression choosing between `searchAuditLog` and `loadModerationAuditFeed`, **two different read models**. The skip rested on a description that did not match the change.
+
+**PART A — VERDICT: (i) PURE EXTRACTION.** Semantically identical for every possible `sp`; no input on which the two disagree.
+
+The old expression, verbatim at `b96a0c2` (`page.tsx:492-493`):
+
+```ts
+const filters = parseFilters(sp);
+const searching = Object.keys(filters).length > 0;
+```
+
+`searchRan`'s current body, verbatim:
+
+```ts
+export function searchRan(sp: SearchParams): boolean {
+	return Object.keys(parseFilters(sp)).length > 0;
+}
+```
+
+`parseFilters` is byte-identical to its `b96a0c2` form — GC-5 added only the `export` keyword — and pure: no clock, no IO, no shared state, never writes `sp`. The only real difference is **cost**: `parseFilters` now runs three times per render instead of two. Pure, trivial, no behavioural consequence.
+
+**Proven, not asserted.** The old expression is inlined as an ORACLE and pinned across a **12-row** spanning set, with two guards on the set itself: it spans both outcomes, and it *contains* an input a wrong extraction gets wrong — asserted, not hoped.
+
+⚠ **RED captured by mutation before the claim was trusted** — `searchRan` made to read `sp` directly:
+
+```
+× case 3 · ⚠ invalid date ALONE — search does NOT run, note states the fallback
+× agrees with the pre-GC-1 expression — invalid from
+× agrees with the pre-GC-1 expression — invalid to
+× agrees with the pre-GC-1 expression — every field invalid or blank
+Test Files  1 failed (1)   |   Tests  4 failed | 22 passed (26)
+```
+
+GC-1's own fire path and the equivalence proof fail on the same mutation — the strongest available evidence that the set discriminates where it matters.
+
+**PART B — @code-reviewer re-run, scoped to `b96a0c2..HEAD` on the audit surface. 0 CRITICAL · 1 HIGH · 2 MEDIUM · 4 LOW.**
+
+Its verdict, quoted: **"SAME read model, for every input. Unhedged."** It did not take the claim from me — it extracted both `parseFilters` bodies programmatically (**sha256 identical, 818 bytes each side**) and ran a **differential fuzz of the shipped bytes against the extracted `b96a0c2` bytes over 220,442 inputs**: `VALUE DIVERGENCES: 0`, `THROW MISMATCHES: 0`, including repeated-key `string[]`, null-prototype and `__proto__`-bearing objects, getter-backed props, and an identical `Proxy`-recorded access order.
+
+| Sev | Finding | Disposition |
+|---|---|---|
+| **HIGH** | `audit-feed-leak.test.ts:13,62-68` — **GC-5 narrowed the blocked-image leak rail without extending it.** `PAGE_FILE` is pinned to `audit/page.tsx`; GC-5 moved a JSX-rendering component out of it, so part of the render tree now lives where the guard never looks. **Nothing leaks today** (all four signer tokens, `<img`, `r2`, `imageR2Key`, `blockedText` absent from `search-surface.tsx`) — the defect is that the control got **weaker while reading green**. Same genus as §5.14 SC-1. | ⚠ **REPORT ONLY** — fix is a test file outside read-2's permitted set. **S-0j does not fire on a HIGH.** Needs a boundary extension or a tracker row |
+| **MEDIUM** | The spanning set had one hole — `userId` was the only field without a single-field row, and a **userId-blind** selector passed all 11 cases | ✅ **FIXED** (`097fd72`) — 12th row added, both wrong-extraction classes now pinned. RED on re-mutation: **1 failed \| 26 passed (27)** |
+| **MEDIUM** | §6's cascade-skip rationale describes half of GC-1 | ✅ **FIXED** — §6 rewritten under R2-3 |
+| **LOW** | The `searchRan` prop shadows the module function | Report only — cannot bite (TS2349, required prop, case 3 pins the false branch) |
+| **LOW** | `searching` re-derives from `sp` rather than reading the computed `filters` — the pairing rests on purity, not structure | Report only — proven to hold |
+| **LOW** | The oracle shares `parseFilters` with the implementation, so the proof is conditional on *"`parseFilters` unchanged since `b96a0c2`"* — a premise carried by a comment and no assertion | Report only |
+| **LOW** | No **page-level** test exercises the `searching === true` arm. **Pre-existing at `b96a0c2`** | Report only — it is why the unit-level proof is load-bearing |
+
+### R2-1 · every heading in this log that states a count, audited
+
+| Heading | States | Enumerates | Verdict |
+|---|---|---|---|
+| §2 Ship set | 6 shipped / 2 halted | 8 rows: 6 + 2 | **CONFIRMED** |
+| §2a Gate C read-1 | five items | 5 rows | **CONFIRMED** |
+| §2b Gate C read-2 | six items | 6 rows | **CONFIRMED** |
+| §4 ROUTED | *"20 rows"*, *"27 deltas"*, *"18 routed"* | **21 rows** | ⚠ **CORRECTED → 21 / 28 / 19** |
+| §6 @code-reviewer | 0/1/4/7 = 12 | 12 rows | **CONFIRMED** |
+| §6 @security-auditor | 0/0/0/5 + 3 SURPRISE = 8 | 8 rows | **CONFIRMED** |
+| §7 GC-4 audit | *"twenty-two rows"* (in §9) | 22 rows at read-1 | **CONFIRMED**, now labelled *read-1's* |
+| §9 LESSON | *"Four things"* | **6 items** | ⚠ **COUNT DELETED** (R2-1's ruling: do not correct it to six) |
+| §10 Commits | 12 | 12 numbered rows | **CONFIRMED** |
+| §1 Components | 16 | 7 + 8 + 1 = 16 | **CONFIRMED** |
+
+### R2-3 · the prose sweep GC-2 could not have done
+
+⚠ **GC-2 scoped itself to "all 192 added comment lines" — comments IN THE DIFF. The log's own prose was structurally outside the scan.** That is §9 item 2's lesson — an edit boundary drawn around one artifact class while the thing that mattered lived in another — recurring one document up.
+
+**Eight statements found: the five the founder named, plus three more.**
+
+| # | Where | Said | Disposition |
+|---|---|---|---|
+| 1 | header blockquote | "Gate C has not happened." | Rewritten with the two-read history |
+| 2 | §10 | "the next and only founder touch" | Rewritten; read-3 pending |
+| 3 | §6 cr M-3 | "REPORTED, NOT FIXED" | Labelled *at the cascade* — **SUPERSEDED BY GC-1** |
+| 4 | §6 sa L-1 | "REPORTED, NOT FIXED" | Same |
+| 5 | §6 CONVERGENCE | "Recommended as the first item of any follow-up" | Kept as written, outcome stated beside it |
+| **6** | §6 heading + rationale | "the reviewer cascade was NOT re-run" | ⚠ **Found by the sweep.** Reversed at read-2; rationale rewritten (also @code-reviewer MEDIUM) |
+| **7** | §7 GC-4 row | per-file counts "13" for `audit-search-surface` | ⚠ **Found by the sweep.** Now **27**; counts inlined (R2-5) |
+| **8** | §3 RULING 2 | "Founder may reverse in one line" | ⚠ **Found by the sweep.** **RATIFIED** at read-2; no longer my call |
+
+**Nothing further.** Every other statement in this log was re-read against head and holds.
+
+### R2-5 · internal §-reference audit
+
+Every `§N` reference this log makes, checked: **all RESOLVE.** §1 · §2 · §2a · §2b · §3 · §5 · §6 · §7 · §8 · §10 all exist as headings. §0, §4, §6, §7, §9 also appear as references to the **plan**, and §11 / §15 / §15.3 to **SPEC.1**, §5.4 / §5.14 to **CLAUDE.md** — external, and correct.
+
+**One was BROKEN and is fixed:** GC-4's *"Test files at PR head, per file"* row cited **§7**, which carries no per-file counts. Counts are now **inlined on the row** rather than pointed at — a pointer between two tables in one document is a V-8 hazard for no benefit.
+
+---
+
+Also confirmed by the reviewer, against the loader rather than my comment: GC-1's fallback copy is **exhaustively true** — `mod_reason` has five members, `BLOCKED_REASONS` holds three, and the two outside it are exactly `content_removed` and `user_banned`. And **§5.14 SC-1 does not fire** on this diff: neither audit loader reads `comments` at all.
+
+---
+
 ## 3 · RULINGS TAKEN — ⚠ FLAGGED FOR GATE C
 
 ### RULING 1 — S-3 / D11: SPEC outranks plan, **and the build is blocked anyway**
@@ -215,37 +326,41 @@ Plan §0 S-0a stops the run if a guarded child-safety string appears *"ANYWHERE 
 - this log: **zero**
 - **H-P8-4 held absolutely.** D09 (the LD-3 text-only carve-out ban-review surface) was reported as status only and never designed, scoped or sketched.
 
-**Founder may reverse in one line.** Recorded in the commit-0 body as well as here, so it sits in immutable history and not only in a log file.
+Recorded in the commit-0 body as well as here, so it sits in immutable history and not only in a log file.
+
+✅ **RATIFIED AT GATE C READ-2, and the judgment call removed rather than re-litigated.** The founder amended S-0a: it *"does NOT fire on the verbatim text of `docs/plans/POLISH-8.md`, which exists to state the prohibition. It fires on every other file without exception."* Read-1's *"Founder may reverse in one line"* is superseded — this stopped being my call. (R2-3 sweep item.)
 
 ---
 
-## 4 · ROUTED, NOT BUILT — 20 rows
+## 4 · ROUTED, NOT BUILT — 21 rows, numbered
 
-Recon produced **27** deltas. **6** were addressed, **1** is `superseded`, **20** are not built: **18 routed** + **2 halted**. Owners are **PROPOSED, not assigned.**
+⚠ **CORRECTED at read-2, and the old figures were wrong three ways.** Recon produced **28** deltas, not 27 — `D01`–`D29` with no `D21` is **28** IDs, and that miscount propagated out of the recon artifact into this heading. Measured: **6 addressed** (D01 · D28 · D12 · D17 · D20 · D06) + **1 `superseded`** (D29) + **21 not built** = **28**. The 21 are **19 routed** + **2 halted**.
 
-| # | Delta | Class | Disposition | Proposed owner |
-|---|---|---|---|---|
-| D11 | Close carries no confirmation of any kind | F | ⛔ **HALTED (S-0k)** | **Founder** — one-line ruling (§3) |
-| D19 | Create-market surfaces raw error codes | F | ⛔ **HALTED** — code sets disagree | **Founder / spec lane** (§2 S-5) |
-| D05 | `admin_events` has no writer; F-ADMIN-5's union arm is permanently inert | B (+R) | routed | **Founder** — writer vs. spec repoint; requested 2026-07-23, never granted |
-| D07 | F-ADMIN-4's inline arm entirely unbuilt | B | routed · `inherited` (fix lives in `(public)`) | held by **D08** |
-| D08 | ⚠ the three F-ADMIN-4 deferrals are docketed to a task that closed a month before they were minted | S | routed | **Founder** — H-P8-7 |
-| D09 | LD-3 text-only carve-out ban-review surface unbuilt | B | ⛔ **H-P8-4** — reported, never scoped | **Founder, own chat** (child-safety) |
-| D10 | Track-A informational rows absent; no "links to the audit record" | B | routed | held by **D08** |
-| D13 | No admin sign-out affordance; `adminLogoutAction` built and unreachable; cookie indefinite | F | routed | **H-P8-1** (auth surface) |
-| D14 | `loadAdminMarketsOverview` has no `.limit()` — unbounded | F | routed | **H-P8-1** (`src/server/admin/**`) |
-| D15 | Audit ordering is not a total order (no `id` tiebreaker on 3 queries) | F | routed | **H-P8-1** |
-| D16 | Audit feed has no pagination at all (X4) | R | `duplicate-of-known` | **Founder** — product ruling |
-| D18 | Create-market: uploaded media cannot be removed or reordered; reload orphans R2 objects | F | routed | admin build lane |
-| D02 | POLISH-0's invariant **proof** is imprecise; `ReviewFeed.tsx:22-25` claims "ZERO product components" while `:6` imports one | S | routed — **record fix, not code** | web / close-out |
-| D03 | Row says "7 routes"; there are 8 routable entries | S | routed | web / close-out |
-| D04 | Components cell omits 8, incl. `BanIndicator` — the component holding R7 | S | routed | web / close-out |
-| D22 | Tier-3 cites `docs/logs/UI-6-log.md`, which does not exist | S | routed | web / close-out |
-| D23 | Row omits SPEC.1 §15 — the functional baseline — from Tier 1 | S | routed | web / close-out |
-| D24 | Control set omits audit search, media sign, sign-out | S | routed | web / close-out |
-| D25 | POLISH-TRACKER §6 states the cost as EIGHT and enumerates SEVEN | S | routed | web / close-out |
-| D26 | `no-raw-hex-view-layer.test.ts` does not reach `src/app/(admin)/**` | S | routed | **H-P8-3** quality lane |
-| D27 | Same guard has no palette-class rule (already R15) | R | `duplicate-of-known` | **H-P8-3** quality lane |
+**The rows are numbered 1–21, so the total and the enumeration are the same artifact** — GC-3's fix for §10, applied here too. Owners are **PROPOSED, not assigned.**
+
+| # | ID | Delta | Class | Disposition | Proposed owner |
+|---|---|---|---|---|---|
+| 1 | D11 | Close carries no confirmation of any kind | F | ⛔ **HALTED (S-0k)** | **Founder** — one-line ruling (§3) |
+| 2 | D19 | Create-market surfaces raw error codes | F | ⛔ **HALTED** — code sets disagree | **Founder / spec lane** (§2 S-5) |
+| 3 | D05 | `admin_events` has no writer; F-ADMIN-5's union arm is permanently inert | B (+R) | routed | **Founder** — writer vs. spec repoint; requested 2026-07-23, never granted |
+| 4 | D07 | F-ADMIN-4's inline arm entirely unbuilt | B | routed · `inherited` (fix lives in `(public)`) | held by **D08** |
+| 5 | D08 | ⚠ the three F-ADMIN-4 deferrals are docketed to a task that closed a month before they were minted | S | routed | **Founder** — H-P8-7 |
+| 6 | D09 | LD-3 text-only carve-out ban-review surface unbuilt | B | ⛔ **H-P8-4** — reported, never scoped | **Founder, own chat** (child-safety) |
+| 7 | D10 | Track-A informational rows absent; no "links to the audit record" | B | routed | held by **D08** |
+| 8 | D13 | No admin sign-out affordance; `adminLogoutAction` built and unreachable; cookie indefinite | F | routed | **H-P8-1** (auth surface) |
+| 9 | D14 | `loadAdminMarketsOverview` has no `.limit()` — unbounded | F | routed | **H-P8-1** (`src/server/admin/**`) |
+| 10 | D15 | Audit ordering is not a total order (no `id` tiebreaker on 3 queries) | F | routed | **H-P8-1** |
+| 11 | D16 | Audit feed has no pagination at all (X4) | R | `duplicate-of-known` | **Founder** — product ruling |
+| 12 | D18 | Create-market: uploaded media cannot be removed or reordered; reload orphans R2 objects | F | routed | admin build lane |
+| 13 | D02 | POLISH-0's invariant **proof** is imprecise; `ReviewFeed.tsx:22-25` claims "ZERO product components" while `:6` imports one | S | routed — **record fix, not code** | web / close-out |
+| 14 | D03 | Row says "7 routes"; there are 8 routable entries | S | routed | web / close-out |
+| 15 | D04 | Components cell omits 8, incl. `BanIndicator` — the component holding R7 | S | routed | web / close-out |
+| 16 | D22 | Tier-3 cites `docs/logs/UI-6-log.md`, which does not exist | S | routed | web / close-out |
+| 17 | D23 | Row omits SPEC.1 §15 — the functional baseline — from Tier 1 | S | routed | web / close-out |
+| 18 | D24 | Control set omits audit search, media sign, sign-out | S | routed | web / close-out |
+| 19 | D25 | POLISH-TRACKER §6 states the cost as EIGHT and enumerates SEVEN | S | routed | web / close-out |
+| 20 | D26 | `no-raw-hex-view-layer.test.ts` does not reach `src/app/(admin)/**` | S | routed | **H-P8-3** quality lane |
+| 21 | D27 | Same guard has no palette-class rule (already R15) | R | `duplicate-of-known` | **H-P8-3** quality lane |
 
 ⚠ **`D02` / `D03` / `D04` / `D22` / `D23` / `D24` / `D25` are WEB-AUTHORED and land at the CLOSE-OUT, in a separate PR**, exactly as .7a did (#320 machine, #321 close-out). They were recorded here and deliberately **not** fixed: no doc under `docs/polish/` was touched by this run — verified, `git diff --name-only origin/main -- docs/polish` is empty.
 
@@ -288,7 +403,7 @@ Both reviewers ran **sequentially**, one at a time, from the primary tree at `po
 | **H-1** | **HIGH** | The S-4 permanence note promised *"Corrections are available only via an F-RESOLVE-2 clawback"* on the **Void** form. False, and false in the dangerous direction — `correct.ts` requires `expectedStatus ["Resolved"]` and `actionsForStatus("Voided")` is empty, so a voided market has **no** correction path. The operator armed an irreversible refund-and-unwind believing one existed. | `TerminalActions.tsx:174-176` | ✅ **FIXED** `cc26be1` + regression assertion |
 | **M-1** | MEDIUM | The S-2 guard I had just written **could not catch a foreground-pole defect** — demonstrated, not theorised: mutating `text-no`→`text-yes` (black-on-black, invisible) left it **GREEN at 4/4**. Same defect class as S-1, minted one directory away in the same PR. | `review-feed-side-chip.component.test.tsx:87-107` | ✅ **FIXED** `cc26be1`, proven by reversal |
 | **M-2** | MEDIUM | `invalidDateFields` **re-derived** `parseFilters`' NaN decision rather than consuming its output. Agreed today; future drift would be silent and in the worst direction — the note going quiet while the predicate was still dropped, i.e. the pre-S-6 defect restored. | `audit/page.tsx:279-288` | ✅ **FIXED** `cc26be1` |
-| **M-3** | MEDIUM | With `?from=junk` and no other filter, `searching` is false → the page falls back to the **blocked-submissions feed**, a different read model. The note says *"unfiltered by it"* — true but materially incomplete. | `audit/page.tsx:306-307` | ⚠ **REPORTED, NOT FIXED** — >1 line (plan §7). **See convergence note below.** |
+| **M-3** | MEDIUM | With `?from=junk` and no other filter, `searching` is false → the page falls back to the **blocked-submissions feed**, a different read model. The note says *"unfiltered by it"* — true but materially incomplete. | `audit/page.tsx:306-307` | ⚠ **REPORTED, NOT FIXED at the cascade** — >1 line (plan §7) — **✅ SUPERSEDED BY GC-1 (`013cf3b`)**, founder overrode §7 for it |
 | **M-4** | MEDIUM | The §7 count table in this log was self-inconsistent: "8 files changed" and "2 doc files added" could not both be true once the log is committed. | `docs/logs/POLISH-8.md` §7 | ✅ **FIXED** — §7 re-measured at PR head, below |
 | **L-1** | LOW | S-8 asserts the exported constant, never the rendered `placeholder` attribute — the V-4 weak form its own sibling item (S-7) rejected. Not vacuous (mutation → 2 failed), just aimed one layer above the DOM. | `audit-search-surface.component.test.tsx:103-122` | Reported |
 | **L-2** | LOW | S-1 ships with **zero committed regression guard** — the palette grep now returns 0 across `src/`, so a future `text-white` is unnoticed. Plan-sanctioned (S-0e forbade committing the probe); the §5 R15 handoff is the only carrier. | `audit/page.tsx:75` | Reported — see §5 |
@@ -304,7 +419,7 @@ Both reviewers ran **sequentially**, one at a time, from the primary tree at `po
 
 | ID | Sev | Finding | Disposition |
 |---|---|---|---|
-| **L-1** | LOW | Same fallback-copy issue as @code-reviewer M-3, reached independently: the note reads as *"you are seeing more"* when the operator has in fact been silently narrowed to the gate-block feed, which by construction contains **no** `content_removed` and **no** `user_banned` rows. | ⚠ **REPORTED, NOT FIXED** — see convergence note |
+| **L-1** | LOW | Same fallback-copy issue as @code-reviewer M-3, reached independently: the note reads as *"you are seeing more"* when the operator has in fact been silently narrowed to the gate-block feed, which by construction contains **no** `content_removed` and **no** `user_banned` rows. | ⚠ **REPORTED, NOT FIXED at the cascade** — **✅ SUPERSEDED BY GC-1 (`013cf3b`)**, same fix as M-3 |
 | **L-2** | LOW | A **sibling** malformed-input path 500s rather than being made visible: `?actionType=a&actionType=b` gives Next a `string[]`, and `v?.trim()` throws (optional chaining does not short-circuit a non-nullish value); a non-UUID `marketId` reaches Postgres and `22P02`s. **Unreachable by any attacker** — `requireAdminPage()` redirects before `searchParams` is awaited. Pre-existing; S-6 closed the date arm while the text arm still hard-fails. | Reported — plan forbade changing parse semantics |
 | **L-3** | LOW | This PR introduces the **first side-encoding string** in `(admin)/admin/markets/`, on a directory `side-pole-binding.test.ts` declares excluded — the prohibition lived only in comments. | ✅ **FIXED** `8fdc28c`, positive control + proven by reversal |
 | **L-4** | LOW | `audit-feed-leak.test.ts` proves gate-before-read by comparing **first occurrences** of two strings. This PR added ~67 lines of module-level helpers above the page function, so a future helper containing the literal `requireAdminPage(` would bind `gateAt` to itself and keep the guard green with the real gate gone. | ⚠ Reported — **file is outside plan §4**. Follow-up. |
@@ -319,11 +434,17 @@ Both reviewers ran **sequentially**, one at a time, from the primary tree at `po
 
 With `?from=<typo>` and no other filter, the audit page does **not** run the F-ADMIN-5 search at all — it silently falls back to `loadModerationAuditFeed`, which is restricted to the three gate-block reasons. An operator searching for a **removal** record therefore sees a feed that by construction cannot contain one, finds nothing, and concludes no removal was recorded. That is the same genus as D05 and D17 — *the surface telling the operator something untrue about what it did* — which is the genus this whole run exists to close.
 
-It was **not fixed** because plan §7 makes MEDIUM/LOW report-only unless the fix is one line, and this needs `searching` threaded into `InvalidDateNote` plus a new clause. **Recommended as the first item of any follow-up.**
+It was **not fixed at the cascade** because plan §7 makes MEDIUM/LOW report-only unless the fix is one line, and this needed `searching` threaded into `InvalidDateNote` plus a new clause.
 
-### Gate C — the reviewer cascade was NOT re-run
+✅ **It WAS the first item of the follow-up.** The founder overrode §7 for it at Gate C read-1 and it landed as **GC-1 (`013cf3b`)**. The recommendation above is kept as written — it was the cascade's output — with its outcome stated beside it rather than edited into it (R2-3).
 
-Plan §DO-NOT says re-run only if GC-1 or GC-5 changes behaviour I am unsure of. **GC-1's behaviour change is confined to one string branch inside a presentational component with no handler, no state and no data read**, and it is pinned by three explicit cases including the fire path. **GC-5 is a relocation** — `next build` green, zero page exports remaining, all four test files green at PR head with per-file counts recorded. Neither meets the bar. Not re-run; stated so it is a decision rather than an omission.
+### Gate C read-1 — the reviewer cascade was not re-run · ⚠ **REVERSED AT READ-2**
+
+At read-1 I wrote: *"GC-1's behaviour change is confined to one string branch inside a presentational component with no handler, no state and no data read"*, and skipped the cascade on that ground.
+
+⚠ **That rationale described HALF of GC-1, and the founder caught it at read-2.** GC-1 also replaced `page.tsx:401` — the expression selecting between `searchAuditLog` and `loadModerationAuditFeed`, i.e. **two different read models** on this surface. §2a discloses that correctly (*"the page uses it too, replacing its inline `Object.keys(filters).length > 0`"*), so the fact was on the record and only the **rationale** understated it. @code-reviewer independently raised the same contradiction at read-2 (MEDIUM).
+
+**The decision was defensible and the extraction is now PROVEN** (§2b) — but per **O-3, a correct call recorded with a misleading cause is itself a defect**, which is exactly why read-2 re-ran the cascade rather than accepting the conclusion. **@security-auditor was not re-run** — it audited this surface a round ago and GC-5 is a relocation; founder-ruled, recorded as a decision.
 
 ### Reviewer-verified claims I had asserted
 
@@ -346,9 +467,10 @@ Every number below was re-measured at PR head, not carried from when it was writ
 | Claim | Value at PR head |
 |---|---|
 | Files changed vs base `dfa3012` | **10** |
-| Source files changed | **3** (`audit/page.tsx`, `TerminalActions.tsx`, `create-market-form.tsx`) |
-| Test files added | **4** |
-| Doc files added | **2** (`docs/plans/POLISH-8.md`, `docs/logs/POLISH-8.md`) |
+| ↳ source files **modified** | **3** (`audit/page.tsx`, `TerminalActions.tsx`, `create-market-form.tsx`) |
+| ↳ source files **added** | **1** (`audit/search-surface.tsx`, GC-5) |
+| ↳ test files **added** | **4** |
+| ↳ doc files **added** | **2** (`docs/plans/POLISH-8.md`, `docs/logs/POLISH-8.md`) |
 | Commits | **12** — measured, see §10 |
 | Tailwind palette colour classes in `src/` | **0** (was 1) |
 | Files under `src/app/(admin)` | **16** (+1: `audit/search-surface.tsx`, GC-5) |
@@ -359,6 +481,9 @@ Every number below was re-measured at PR head, not carried from when it was writ
 | `docs/polish/**` files changed | **0** |
 | Migrations / ADRs / SPECs changed | **0** |
 | Guarded-string hits in added `src/` + `tests/` lines | **0** |
+
+**Sum check — the categories PARTITION the total:** 3 modified + 1 added + 4 tests + 2 docs = **10**, equal to *Files changed vs base*. Every changed file lands in exactly one row.
+⚠ Read-1's table had no *source added* row, so its categories summed to 9 against a total of 10 — **@code-reviewer M-4's exact defect, recurring in the table M-4 forced a re-measurement of** (R2-2).
 
 ### ⚠ GC-4 · every counted claim in this log, re-measured at PR head
 
@@ -386,8 +511,23 @@ Plan §6 required this and the machine phase did not fully do it. Each row is CO
 | Migrations / ADRs / SPECs: **0** | §7 | **CONFIRMED** |
 | `ReviewFeed.tsx` byte-identity: **0 diff lines** | §8 | **CONFIRMED** at PR head |
 | Guarded-string hits: **0** | §7 | **CONFIRMED** — independently re-counted by @security-auditor too |
-| Reviewer tallies (cr 0/1/4/7 · sa 0/0/0/5 + 3 SURPRISE) | §6 | **CONFIRMED** — 17 finding rows, matching the two reviewers' own headline counts |
-| Test files at PR head, per file | §7 | **CONFIRMED** — 8 / 3 / 4 / 13 = **28** across the four new files |
+| Reviewer tallies (cr 0/1/4/7 · sa 0/0/0/5 + 3 SURPRISE) | §6 | **CONFIRMED** — 20 finding rows across both cascade tables, matching the reviewers' own headline counts |
+
+**Rows added at Gate C read-2** — anything this round changed:
+
+| Claim | Where | Verdict |
+|---|---|---|
+| Recon delta total: **27** | §4 | ⚠ **CORRECTED → 28** — `D01`–`D29` has no `D21`, so the ID range is 28 |
+| Routed-not-built: **20 rows / 18 routed** | §4 | ⚠ **CORRECTED → 21 rows / 19 routed**; rows now numbered 1–21 |
+| §7 categories sum to the total | §7 | ⚠ **CORRECTED** — read-1 summed to 9 against 10; a *source added* row now closes the partition |
+| §9 item count | §9 | ⚠ **CORRECTED by DELETION** — said four, enumerated six; §9 now states no count |
+| `audit-search-surface.component.test.tsx` | §2b | ⚠ **CORRECTED → 27 passed** (was 13; R2-6 added the equivalence proof + the userId discriminator) |
+| Sessions: **2** | §10 | ⚠ **CORRECTED → 3**, one wall-clock line each |
+| Commits | §10 | ⚠ **CORRECTED → 15** — re-measured at read-2 head |
+| `searchRan` ≡ the pre-GC-1 selector | §2b | **CONFIRMED** — PURE EXTRACTION; sha256-identical `parseFilters`, 220,442-input differential fuzz, 0 divergences |
+| `search-surface.tsx` byte-identity after R2-6's two mutations | §2b | **CONFIRMED** — `git diff HEAD` empty after each revert; both R2-6 commits are test-only |
+| Files changed vs base | §7 | **CONFIRMED — still 10.** Read-2 changed only an existing test file and this log |
+| Test files at PR head, per file | *(inlined here — read-1 cited §7, which carries no per-file counts; R2-5)* | ⚠ **CORRECTED at read-2** — `terminal-actions-permanence` **8** · `create-market-form-utc-label` **3** · `review-feed-side-chip` **4** · `audit-search-surface` **27** (was 13; R2-6 added the equivalence proof) = **42** |
 
 ---
 
@@ -408,7 +548,9 @@ The same technique was applied to `TerminalActions.tsx` for the S-3 collision pr
 
 ## 9 · ⚠ LESSON FOR THE NEXT RELAY — what the machine read missed
 
-With the founder pass batched, this is the only surviving carrier of the feedback loop. Four things, in order of how much they cost.
+With the founder pass batched, this is the only surviving carrier of the feedback loop. Ordered by how much each cost.
+
+⚠ **This header states no count, deliberately.** It read *"Four things"* and enumerated six — items 5 and 6, added at Gate C read-1, broke a sentence two lines above them without either round noticing. Read-2 ruled: **delete the count, do not correct it to six.** §9 is a list, not a measurement; a total that carries no information is pure liability and would break again the next time an item is added.
 
 **1 · A plan can forbid its own execution, and both times it happened here the contradiction was invisible from the plan text alone.** Two of eight items hit a jointly-unsatisfiable pair — S-0a vs §2 at commit 0, and S-3 vs S-0k — and a third (S-5) hit the halt the plan itself anticipated. **That is a 3-in-8 rate on a plan that was carefully written.** The S-0a one is structural: §0 says "read before anything else", but §0 could not be satisfied by the very first action §2 mandates. **Next relay: run the stop conditions against the plan's own commit 0 before shipping the relay.** A one-line carve-out ("S-0a exempts the verbatim plan text") would have removed the whole judgment call.
 
@@ -418,11 +560,11 @@ With the founder pass batched, this is the only surviving carrier of the feedbac
 
 **4 · Two axis-A observations were correctly *not* filed, and the mechanism that stopped them is worth keeping.** Tier 3 killed the "Correct is surfaced though §15.3 says v1 doesn't" divergence (UI-6 plan R4 is a deliberate ratified reversal) and tier 1 killed the "three routes are unstyled" one (SPEC.1 §15.3 ratifies them as *"functional and unstyled"*). Both would have been filed as defects by a pass that skipped tier 3, which is exactly the POLISH.0 finding — **three of four apparent divergences were false, each resolving on a tier-3 document.** The read order is load-bearing; it earned its place again.
 
-**5 · The arithmetic-vs-enumeration defect is the corpus's most persistent genus, and I reproduced it while filing it.** This PR files **D25** against `POLISH-TRACKER` §6 for stating EIGHT and enumerating SEVEN. Then §7 of this log said "8 … 9 with this log" and §10 said "9" and enumerated eight — **the same defect, in the same document that reports it, and it survived a §7 table @code-reviewer M-4 had already forced a re-measurement of.** The measured figure was 8; no commit was missing; the error was purely arithmetic both times.
+**5 · The arithmetic-vs-enumeration defect is the corpus's most persistent genus, and I reproduced it four more times while filing it.** This PR files **D25** against `POLISH-TRACKER` §6 for stating EIGHT and enumerating SEVEN. Then, in the document that reports it: §7 said "8 … 9 with this log"; §10 said "9" and enumerated eight; **§9's own header said "Four things" and enumerated six** — broken by items 5 and 6, which this very lesson added; **§4 said "20 rows" and enumerated 21**, its "27 deltas" itself wrong because `D01`–`D29` has no `D21`; and **§7's categories summed to 9 against a total of 10**. **Six instances, five of them inside this PR, three inside the section that reports the genus.** Every one was arithmetic — no item was ever missing.
 
 The fix that would have caught all three instances is mechanical, not attentional: **never write a total you did not just measure, and never write a total beside an enumeration without counting the enumeration.** §10 now carries the enumeration as a numbered table, so the two cannot disagree silently — a list of 12 rows numbered 1–12 fails visibly if the total is wrong. **Next relay: require the count and the enumeration to be the same artifact.**
 
-**6 · "Re-verified at PR head" was written, not done.** Plan §6 required it. The S-4 green count ("7/7") was true when written at `6430f18` and false at PR head, because `8fdc28c` added an eighth `it` block *after* the RED was captured — for a reviewer finding, i.e. exactly the mechanism most likely to move a count late. Nothing flagged it; the founder did. §7 now carries a **CONFIRMED / CORRECTED** row per counted claim, which is the only form of that instruction that can be checked. **Three of the twenty-two rows came back CORRECTED** — file count, commit count, and files-under-`(admin)` — all three because GC-5 added a file *after* the numbers were written.
+**6 · "Re-verified at PR head" was written, not done.** Plan §6 required it. The S-4 green count ("7/7") was true when written at `6430f18` and false at PR head, because `8fdc28c` added an eighth `it` block *after* the RED was captured — for a reviewer finding, i.e. exactly the mechanism most likely to move a count late. Nothing flagged it; the founder did. §7 now carries a **CONFIRMED / CORRECTED** row per counted claim, which is the only form of that instruction that can be checked. **Three of read-1's twenty-two rows came back CORRECTED** — file count, commit count, and files-under-`(admin)` — all three because GC-5 added a file *after* the numbers were written.
 
 **Smaller, still worth carrying — and my first justification for it was wrong.** Exporting `invalidDateFields` / `InvalidDateNote` / `ACTION_TYPE_PLACEHOLDER` from a `page.tsx` was the only way to assert against shipped symbols without adding a colocated file outside the boundary. `next build` accepts it — but **not** for the reason I originally wrote here. I cited `(admin)/admin/login/page.tsx`'s `submitAdminLogin` as precedent; @code-reviewer (L-5) and @security-auditor both established that is **not like-for-like** — `submitAdminLogin` carries an inline `"use server"` directive and is therefore a Server Action, an explicitly sanctioned pattern with its own rules. A plain module export is a different thing.
 
@@ -432,10 +574,17 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
 
 ## 10 · Session count and wall-clock time
 
-- **Sessions:** 2 — the machine phase and this Gate C remediation round. Recon was a separate prior session.
-- **Founder-serial touches consumed by this run:** **0** — pre-authorised under D4, no verdict round. Gate C in the morning is the next and only founder touch.
-- **Wall-clock:** single unattended overnight session, 2026-08-12, ~04:00–05:00 local.
-- **Commits: 12** — `git log --oneline dfa3012..HEAD | wc -l`, MEASURED not reasoned. Exhaustive enumeration, one line per commit:
+- **Sessions — one line each, so the count and the enumeration cannot disagree** (R2-4; read-1 said "2" beside a wall-clock describing one):
+
+  | # | Session | Wall-clock |
+  |---|---|---|
+  | 1 | Machine phase — plan + ship set + reviewer cascade + PR-open | 2026-08-12, ~04:00–05:00 local, unattended |
+  | 2 | Gate C read-1 remediation — GC-1…GC-5 | 2026-08-12, ~05:00–06:00 local, unattended |
+  | 3 | Gate C read-2 remediation — R2-1…R2-6 | 2026-08-12, ~06:00–07:00 local, unattended |
+
+  Recon was a separate prior session and is not counted here.
+- **Founder-serial touches consumed:** **machine phase 0** (pre-authorised under D4, no verdict round) — but Gate C then cost **two reads**, and this line said *"the next and only founder touch"* through both (R2-3). Measured total for the surface so far: **recon · plan ratification · execute (0 serial) · Gate C read-1 · Gate C read-2** — with read-3 pending.
+- **Commits: 15** — `git log --oneline dfa3012..HEAD | wc -l`, MEASURED not reasoned, re-measured at read-2. Exhaustive enumeration, one line per commit:
 
   | # | SHA | What |
   |---|---|---|
@@ -450,13 +599,16 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
   | 9 | `013cf3b` | **GC-1** |
   | 10 | `d7b8402` | **GC-2** |
   | 11 | `7dcaa1a` | **GC-5** |
-  | 12 | *this commit* | **GC-3 + GC-4** log corrections |
+  | 12 | `c5c6620` | **GC-3 + GC-4** log corrections |
+  | 13 | `c687842` | **R2-6 part A** — the `searchRan` equivalence proof |
+  | 14 | `097fd72` | **R2-6 part B** — the userId discriminator @code-reviewer found missing |
+  | 15 | *this commit* | **R2-1 … R2-5** log corrections |
 
   ⚠ **The machine phase stated this wrong twice, in the same document.** §7 said "8 … 9 with this log"; §10 said "9" and then enumerated eight. The measured figure at that point was **8**, and no commit was missing from the enumeration — the error was purely arithmetic. **That is D25's exact genus** (POLISH-TRACKER §6 states EIGHT and enumerates SEVEN), third instance in the corpus, and it survived a §7 table that @code-reviewer M-4 had *already* forced a re-measurement of. The lesson is in §9.
-- **Full `just verify` runs:** 11 — one baseline, one per commit boundary, one re-run after a Biome format fix, one per reviewer round, and one per Gate C code item (GC-1, GC-2, GC-5). All green at every commit boundary; **⛔ S-0g never fired.**
-- **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2871 tests passed | 1 skipped | 4 todo (2876)**, EXIT=0. (The machine phase measured 2868/2873; Gate C remediation added three assertions.)
-- **Reviewer cascade:** 2 agents, sequential, ~12 min and ~11 min. 1 HIGH + 2 MEDIUM + 1 LOW fixed; 1 convergent MEDIUM/LOW reported and not fixed (see §6).
+- **Full `just verify` runs:** 14 — one baseline, one per commit boundary, one re-run after a Biome format fix, one per reviewer round, and one per Gate C read-1 code item (GC-1, GC-2, GC-5), and three at read-2. All green at every commit boundary; **⛔ S-0g never fired.**
+- **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2885 tests passed | 1 skipped | 4 todo (2890)**, EXIT=0. Measured at read-2 head. (Machine phase 2868 → read-1 2871 → read-2 2885; read-2's R2-6 added the 14-assertion equivalence proof.)
+- **Reviewer runs:** 3 agents total — @code-reviewer and @security-auditor at the machine phase (~12 and ~11 min), then a **scoped @code-reviewer re-run at read-2** (~10 min) for GC-1's control-flow change. Machine phase: 1 HIGH + 2 MEDIUM + 1 LOW fixed. Read-2: 1 MEDIUM fixed, 1 HIGH reported outside the boundary. @security-auditor was not re-run at read-2 — founder-ruled.
 
 ---
 
-*POLISH.8 machine phase + Gate C remediation · ended at push, nothing merged · founder merges after re-read.*
+*POLISH.8 — machine phase + Gate C read-1 + Gate C read-2 · ended at push, nothing merged · founder merges after re-read.*
