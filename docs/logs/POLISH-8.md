@@ -1,6 +1,6 @@
 # POLISH.8 — Admin Centre — machine-phase session log
 
-**SENTINEL:** ZZ-P8-EXEC-2026-08-12 · ZZ-P8-GCR-2026-08-12 · ZZ-P8-GC2-2026-08-12
+**SENTINEL:** ZZ-P8-EXEC-2026-08-12 · ZZ-P8-GCR-2026-08-12 · ZZ-P8-GC2-2026-08-12 · ZZ-P8-GC3-2026-08-12
 
 **Date:** 2026-08-12 · **Branch:** `polish/8-admin-centre` · **Base:** `dfa3012` on `main`
 **Mode:** overnight, unattended, pre-authorised under founder ruling D4 (no verdict round).
@@ -222,7 +222,7 @@ Its verdict, quoted: **"SAME read model, for every input. Unhedged."** It did no
 
 | Sev | Finding | Disposition |
 |---|---|---|
-| **HIGH** | `audit-feed-leak.test.ts:13,62-68` — **GC-5 narrowed the blocked-image leak rail without extending it.** `PAGE_FILE` is pinned to `audit/page.tsx`; GC-5 moved a JSX-rendering component out of it, so part of the render tree now lives where the guard never looks. **Nothing leaks today** (all four signer tokens, `<img`, `r2`, `imageR2Key`, `blockedText` absent from `search-surface.tsx`) — the defect is that the control got **weaker while reading green**. Same genus as §5.14 SC-1. | ⚠ **REPORT ONLY** — fix is a test file outside read-2's permitted set. **S-0j does not fire on a HIGH.** Needs a boundary extension or a tracker row |
+| **HIGH** | `audit-feed-leak.test.ts:13,62-68` — **GC-5 narrowed the blocked-image leak rail without extending it.** `PAGE_FILE` is pinned to `audit/page.tsx`; GC-5 moved a JSX-rendering component out of it, so part of the render tree now lives where the guard never looks. **Nothing leaks today** (all four signer tokens, `<img`, `r2`, `imageR2Key`, `blockedText` absent from `search-surface.tsx`) — the defect is that the control got **weaker while reading green**. Same genus as §5.14 SC-1. | ✅ **FIXED at read-3 (`cb0a655`)** — founder extended the boundary by exactly that file. Was report-only at read-2 (outside the permitted set; S-0j does not fire on a HIGH). See §2c |
 | **MEDIUM** | The spanning set had one hole — `userId` was the only field without a single-field row, and a **userId-blind** selector passed all 11 cases | ✅ **FIXED** (`097fd72`) — 12th row added, both wrong-extraction classes now pinned. RED on re-mutation: **1 failed \| 26 passed (27)** |
 | **MEDIUM** | §6's cascade-skip rationale describes half of GC-1 | ✅ **FIXED** — §6 rewritten under R2-3 |
 | **LOW** | The `searchRan` prop shadows the module function | Report only — cannot bite (TS2349, required prop, case 3 pins the false branch) |
@@ -273,6 +273,88 @@ Every `§N` reference this log makes, checked: **all RESOLVE.** §1 · §2 · §
 ---
 
 Also confirmed by the reviewer, against the loader rather than my comment: GC-1's fallback copy is **exhaustively true** — `mod_reason` has five members, `BLOCKED_REASONS` holds three, and the two outside it are exactly `content_removed` and `user_banned`. And **§5.14 SC-1 does not fire** on this diff: neither audit loader reads `comments` at all.
+
+---
+
+## 2c · GATE C READ-3 REMEDIATION — five items, all PASS
+
+Read-3 was otherwise clear: every hunk classified, R2-6 Part A verified independently by web (`parseFilters` byte-identical, 20 lines each side once the added `export` is stripped). One blocker remained, and the founder recorded that it was **caused by the GC-5 ruling, not by execution** — so the edit boundary was extended by exactly one file, `tests/server/admin/moderation/audit-feed-leak.test.ts`.
+
+| Item | What | Outcome |
+|---|---|---|
+| **R3-1** | HIGH — GC-5 narrowed the leak rail without extending it | ✅ **PASS** — `cb0a655` |
+| **R3-2** | `searchAuditLog` had no gate-before-read assertion | ✅ **PASS** — `cb0a655` |
+| **R3-3** | The positional binding was self-matchable | ✅ **PASS** — `cb0a655` |
+| **R3-4** | The fallback copy said "the only filter" over two | ✅ **PASS** — `3dfdced` |
+| **R3-5** | @security-auditor re-run, scoped to the leak rail | ✅ **PASS** — `bdc9c96` |
+
+**Every fix is proven by mutation PRE-FIX and POST-FIX**, so each is shown to have EXTENDED reach rather than merely not broken anything (RULE-1 axis ③).
+
+### R3-1 — the scanned set is now the route DIRECTORY, not a filename
+
+| Probe | Result |
+|---|---|
+| PRE-FIX · `getSignedUrl` planted in `search-surface.tsx` | **6 passed (6) — GREEN. ⚠ That green IS the gap.** |
+| POSITIVE CONTROL · same token planted in `page.tsx`, pre-fix | **RED** — the guard was alive; the blindness was specific to the moved file |
+| POST-FIX · `getSignedUrl` planted in `search-surface.tsx` | **1 failed \| 5 passed (6)** |
+
+O-1 applied: the set is derived from `AUDIT_ROUTE_DIR`, so the *next* file colocated with this route is scanned automatically. A named list is what let one file escape; adding a second name would have re-armed the same trap. Two N1 assertions guard the scan itself — it must contain `PAGE_FILE` **and** reach more than one file.
+
+⚠ **The relay suggested planting `imageR2Key`. That string is not in `SIGNER_TOKENS`, so planting it would have proved nothing** — a probe matching nothing passes vacuously (V-2). A real token was used instead.
+
+### R3-2 — gate-before-read now covers BOTH loaders
+
+⚠ **My first mutation was wrong and the test was right.** `const _early = searchAuditLog;` above the gate left the suite GREEN — because it has no `(`, so the probe still found the real call below. Recorded because a green run there could have been read as a broken assertion; the defect was in my probe.
+
+| Probe | Result |
+|---|---|
+| POST-FIX · a real `await searchAuditLog({...})` CALL above the gate | **1 failed \| 5 passed (6)** — *"expected 188 to be less than 138"* |
+| PRE-FIX · the SAME mutation against the old guard | **6 passed (6) — GREEN.** The assertion is new reach, not a restatement |
+
+### R3-3 — the positional binding is no longer self-matchable
+
+⚠ **Re-measured first, as instructed, and the fix is NOT smaller than the finding.** GC-5 shrank `page.tsx`, but at head the gate call sits at **line 397 of 514 — 396 lines and 8 function declarations above it.** The self-match surface is large, not residual.
+
+| Probe | Result |
+|---|---|
+| PRE-FIX · decoy helper returning `"requireAdminPage("` above the page fn, **and the real gate DELETED** | **6 passed (6) — GREEN WITH NO GATE.** The defect, demonstrated |
+| POST-FIX · same decoy, same deleted gate | **1 failed \| 5 passed (6)** — *"expected -1 to be greater than or equal to 0"* |
+
+### R3-4 — the fallback copy, plural-aware
+
+`?from=junk&to=junk` is an **already-tested** case, and the copy said *"it was the only filter supplied"* over two of them. It shipped past a green suite because nothing asserted the rendered sentence for that shape.
+
+RED, pre-fix: *"expected 'From and To date ignored. That value …' to contain 'the only filters supplied'"* — **1 failed | 28 passed (29)**.
+
+Both directions asserted, because "always plural" would have passed the new test on its own: BOTH-invalid pins the plural strings and asserts the singular ones ABSENT; ONE-invalid does the reverse. ⚠ **The three load-bearing claims are unchanged in both arms** — *"No search ran"*, *"the default blocked-submissions feed"*, *"content removals and user bans are never in it"* — and both cases re-assert them, so a future copy edit cannot trade substance for grammar.
+
+### R3-5 — @security-auditor, scoped
+
+**0 CRITICAL · 0 HIGH · 5 MEDIUM · 6 LOW · 1 SURPRISE.** ⛔ S-0j did not fire.
+
+Verdict, quoted: *"No blocked-image byte, signer token, raw r2 key, or blocked text reaches an unscanned render path in shipped code at `3dfdced`. **But the guard does not scan the render tree — it scans a directory, and those two sets are already different.**"*
+
+It stated its own discriminator rather than just a rating: the read-2 HIGH was HIGH because shipped code *had already escaped* the control; nothing has escaped here, so every finding needs a future change by a trusted committer.
+
+**ONE thing fixed, and it is a LOW under a report-only rule** — comment-only, in my own text, on a claim I wrote this round. The R3-3 docblock said the guard had **one** residual; the auditor demonstrated **three**: the string-literal decoy I stated, plus (2) `stripComments` anchors `//` at line start so a **trailing** comment survives it (GREEN at `gateAt=174` with the gate deleted), plus (3) the **slice key itself is decoy-able** — a string containing `export default async function` above the page re-widens the scope (GREEN at `gateAt=36`). **A control recorded with a misleading cause is itself a defect (O-3)**, and this round's whole subject is guards that read green while blind; shipping a docblock that overstates its own resistance would have been that defect, knowingly.
+
+Also recorded there: **the body-scoping cost one case.** A module-scope `loadModerationAuditFeed(...)` above the gate was caught by the old whole-file probe and is not caught by the body-scoped one (verified OLD RED / NEW GREEN). Contrived, leaks nothing, worth less than the self-match fix it bought — stated so read-4 does not rediscover it as a regression.
+
+All three residuals are bounded by an **independent behavioural control** the auditor verified: `audit-page-auth.test.ts` invokes the real page with a null session through the real `requireAdminPage`. A deleted gate goes RED there whatever the textual probe does. **This probe is a tripwire, not the gate.**
+
+**Reported, not fixed** (MEDIUM/LOW are report-only; none is a live leak):
+
+| ID | Sev | Finding |
+|---|---|---|
+| M-1 | MEDIUM | ⚠ **The scan axis is a DIRECTORY; the render tree is an IMPORT CLOSURE.** `page.tsx:3` already imports `AdminTabs` from outside `AUDIT_ROUTE_DIR`, so the unscanned set is non-empty at HEAD. Extracting `AuditRow` into `moderation/_components/` — the established convention, where `ReviewFeed` already lives — reproduces GC-5 one directory over, green. **Cannot be fixed by widening**: `moderation/` turns the suite RED on `ReviewFeed.tsx`, which is legitimately allowed to render images. Wants an import-closure walk — a separate task |
+| M-2 | MEDIUM | `SIGNER_TOKENS` misses `mintReadUrl` (`storage/r2.ts`), the actual minter — `signRead` is a wrapper over it |
+| M-3 | MEDIUM | The `<img` regex misses `<Image …>` and wrapper components. Chained with M-2, a complete green-guard leak path |
+| M-4 | MEDIUM | Guard (d) scans `src/app` only; participant surfaces read through `src/server/**`. One-line fix available and verified non-breaking — not taken |
+| M-5 | MEDIUM | The loader list is still hand-written; a call to a NEW loader above the gate leaves the probe green. SURPRISE-2 one level up |
+| L-1…L-6 | LOW | The two extra residuals (in the docblock now) · textual order ≠ execution order · the module-scope case · `files.length > 1` pins a non-safety fact · guard (d)'s loop is vacuous-capable |
+| S-1 | LOW | **No `robots.txt` anywhere**, while `login/page.tsx:8` comments that one exists. Mitigated to near-nil by the redirect. Separate task |
+
+⛔ **D15 stays ROUTED** — this was the positional gate assertion, never SQL ordering. **@code-reviewer was not re-run** — it reviewed this surface at read-2. A decision.
 
 ---
 
@@ -466,12 +548,13 @@ Every number below was re-measured at PR head, not carried from when it was writ
 
 | Claim | Value at PR head |
 |---|---|
-| Files changed vs base `dfa3012` | **10** |
+| Files changed vs base `dfa3012` | **11** (read-3 added `audit-feed-leak.test.ts`) |
 | ↳ source files **modified** | **3** (`audit/page.tsx`, `TerminalActions.tsx`, `create-market-form.tsx`) |
 | ↳ source files **added** | **1** (`audit/search-surface.tsx`, GC-5) |
 | ↳ test files **added** | **4** |
+| ↳ test files **modified** | **1** (`audit-feed-leak.test.ts`, R3-1/2/3/5) |
 | ↳ doc files **added** | **2** (`docs/plans/POLISH-8.md`, `docs/logs/POLISH-8.md`) |
-| Commits | **12** — measured, see §10 |
+| Commits | **19** — measured, see §10 |
 | Tailwind palette colour classes in `src/` | **0** (was 1) |
 | Files under `src/app/(admin)` | **16** (+1: `audit/search-surface.tsx`, GC-5) |
 | Routable entries under `(admin)` | **8** |
@@ -482,7 +565,7 @@ Every number below was re-measured at PR head, not carried from when it was writ
 | Migrations / ADRs / SPECs changed | **0** |
 | Guarded-string hits in added `src/` + `tests/` lines | **0** |
 
-**Sum check — the categories PARTITION the total:** 3 modified + 1 added + 4 tests + 2 docs = **10**, equal to *Files changed vs base*. Every changed file lands in exactly one row.
+**Sum check — the categories PARTITION the total:** 3 source modified + 1 source added + 4 tests added + 1 test modified + 2 docs = **11**, equal to *Files changed vs base*. Every changed file lands in exactly one row. (Read-1 summed to 9 against 10; read-3 re-checked the partition after adding a file.)
 ⚠ Read-1's table had no *source added* row, so its categories summed to 9 against a total of 10 — **@code-reviewer M-4's exact defect, recurring in the table M-4 forced a re-measurement of** (R2-2).
 
 ### ⚠ GC-4 · every counted claim in this log, re-measured at PR head
@@ -513,7 +596,20 @@ Plan §6 required this and the machine phase did not fully do it. Each row is CO
 | Guarded-string hits: **0** | §7 | **CONFIRMED** — independently re-counted by @security-auditor too |
 | Reviewer tallies (cr 0/1/4/7 · sa 0/0/0/5 + 3 SURPRISE) | §6 | **CONFIRMED** — 20 finding rows across both cascade tables, matching the reviewers' own headline counts |
 
-**Rows added at Gate C read-2** — anything this round changed:
+**Rows added at Gate C read-3** — anything that round changed:
+
+| Claim | Where | Verdict |
+|---|---|---|
+| §6's HIGH: *"REPORT ONLY — needs a boundary extension"* | §6 | ⚠ **CORRECTED → FIXED at `cb0a655`.** The founder extended the boundary by exactly that file |
+| `audit-feed-leak.test.ts` | §2c | **CONFIRMED — 6 passed (6)** at read-3 head, with three assertions strictly stronger than before |
+| `audit-search-surface.component.test.tsx` | §2c | ⚠ **CORRECTED → 29 passed** (was 27; R3-4 added the both-invalid case and its singular control) |
+| Gate call position in `page.tsx` | §2c | **MEASURED — line 397 of 514; 396 lines and 8 function declarations above it.** GC-5 only partly cured L-4 |
+| R3-3 residual count in the source docblock | §2c | ⚠ **CORRECTED → 3, was 1.** @security-auditor demonstrated all three |
+| Files changed vs base | §7 | ⚠ **CORRECTED → 11** — read-3 added `audit-feed-leak.test.ts` to the changed set |
+| Commits | §10 | ⚠ **CORRECTED → 19** — re-measured at read-3 head. ⚠ I first wrote **20** here and the numbered table caught it before push: 19 rows, 19 measured. **That is the numbered-table fix working as designed** (R2-1 / GC-3) — the seventh instance of the genus, and the first one caught by the mechanism instead of by a founder |
+| Sessions | §10 | ⚠ **CORRECTED → 4** |
+
+**Rows added at Gate C read-2** — anything that round changed:
 
 | Claim | Where | Verdict |
 |---|---|---|
@@ -566,6 +662,18 @@ The fix that would have caught all three instances is mechanical, not attentiona
 
 **6 · "Re-verified at PR head" was written, not done.** Plan §6 required it. The S-4 green count ("7/7") was true when written at `6430f18` and false at PR head, because `8fdc28c` added an eighth `it` block *after* the RED was captured — for a reviewer finding, i.e. exactly the mechanism most likely to move a count late. Nothing flagged it; the founder did. §7 now carries a **CONFIRMED / CORRECTED** row per counted claim, which is the only form of that instruction that can be checked. **Three of read-1's twenty-two rows came back CORRECTED** — file count, commit count, and files-under-`(admin)` — all three because GC-5 added a file *after* the numbers were written.
 
+**7 · A guard is scoped to an ARTIFACT; the property it protects is scoped to a BEHAVIOUR. Wherever those two diverge, the guard reads green while blind — and this PR hit that shape five times.**
+
+- `no-raw-hex-view-layer` is scoped to `SCAN_DIRS`; the property is *"no palette colour anywhere in the view layer"*. It could not see `(admin)` (**D26**).
+- `side-pole-binding` is scoped by `ADMIN_EXCLUSION`; the property is *"poles encode side"*. It could not see the admin chip (**S-2 exists only because of that**).
+- `audit-feed-leak` was scoped to `PAGE_FILE`; the property is *"nothing in this route's render tree mints a viewable URL"*. GC-5 moved a renderer one hop and it kept reading green (**R3-1**).
+- **GC-2's own sweep** was scoped to *comments in the diff*; the property was *"nothing in this PR describes a superseded implementation"*. The log's prose was outside the scan, and five stale statements survived (**R2-3**).
+- And the R3-3 docblock was scoped to *the residual I had thought of*; the property is *"the reader knows what this probe cannot catch"*. Two more residuals existed (**R3-5**).
+
+**The trap is that widening the scope by one notch fixes the instance and not the class.** R3-1 replaced a filename with a directory — and @security-auditor immediately showed that the route's render tree is not its directory either: `page.tsx` already imports a component from a sibling folder, and the natural home for an extracted `AuditRow` is the very directory where `ReviewFeed.tsx` — which would fail this guard's own assertion — already lives. Widening again is *worse*: scoping to `moderation/` turns the suite RED on a file legitimately allowed to render images.
+
+**Next relay: when a guard is written or repaired, state the PROPERTY first and the SCOPE second, then ask whether the scope can express the property at all.** If it cannot — as here, where the honest scope is the transitive import closure from the route entry — say so in the guard, and file the real control as its own task rather than shipping a narrower one that reads like closure. Three of the five above were found by a reviewer, not by the suite; none of them could have been found by running the tests.
+
 **Smaller, still worth carrying — and my first justification for it was wrong.** Exporting `invalidDateFields` / `InvalidDateNote` / `ACTION_TYPE_PLACEHOLDER` from a `page.tsx` was the only way to assert against shipped symbols without adding a colocated file outside the boundary. `next build` accepts it — but **not** for the reason I originally wrote here. I cited `(admin)/admin/login/page.tsx`'s `submitAdminLogin` as precedent; @code-reviewer (L-5) and @security-auditor both established that is **not like-for-like** — `submitAdminLogin` carries an inline `"use server"` directive and is therefore a Server Action, an explicitly sanctioned pattern with its own rules. A plain module export is a different thing.
 
 The real mechanism: Next 16's generated `.next/types/validator.ts` validates pages with a **subtype constraint** (`type __IsExpected<Specific extends AppPageConfig<…>>`), and `extends` is structural subtyping — excess properties pass by construction. **The legacy webpack `next-types-plugin` still shipped in the same `node_modules` does an EXACT check that would reject these**, via `checkFields<Diff<{…known…}, TEntry, ''>>()`. It does not run because this build is Turbopack. **So the tolerance is a Next-16-Turbopack property, not a stable contract** — a bundler change could break it. Carry that, not the precedent claim.
@@ -581,10 +689,11 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
   | 1 | Machine phase — plan + ship set + reviewer cascade + PR-open | 2026-08-12, ~04:00–05:00 local, unattended |
   | 2 | Gate C read-1 remediation — GC-1…GC-5 | 2026-08-12, ~05:00–06:00 local, unattended |
   | 3 | Gate C read-2 remediation — R2-1…R2-6 | 2026-08-12, ~06:00–07:00 local, unattended |
+  | 4 | Gate C read-3 remediation — R3-1…R3-5 | 2026-08-12, ~07:00–08:00 local, unattended |
 
   Recon was a separate prior session and is not counted here.
 - **Founder-serial touches consumed:** **machine phase 0** (pre-authorised under D4, no verdict round) — but Gate C then cost **two reads**, and this line said *"the next and only founder touch"* through both (R2-3). Measured total for the surface so far: **recon · plan ratification · execute (0 serial) · Gate C read-1 · Gate C read-2** — with read-3 pending.
-- **Commits: 15** — `git log --oneline dfa3012..HEAD | wc -l`, MEASURED not reasoned, re-measured at read-2. Exhaustive enumeration, one line per commit:
+- **Commits: 19** — `git log --oneline dfa3012..HEAD | wc -l`, MEASURED not reasoned, re-measured at read-3, and cross-checked against the 19 numbered rows below. Exhaustive enumeration, one line per commit:
 
   | # | SHA | What |
   |---|---|---|
@@ -602,13 +711,17 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
   | 12 | `c5c6620` | **GC-3 + GC-4** log corrections |
   | 13 | `c687842` | **R2-6 part A** — the `searchRan` equivalence proof |
   | 14 | `097fd72` | **R2-6 part B** — the userId discriminator @code-reviewer found missing |
-  | 15 | *this commit* | **R2-1 … R2-5** log corrections |
+  | 15 | `77e038d` | **R2-1 … R2-5** log corrections |
+  | 16 | `cb0a655` | **R3-1 / R3-2 / R3-3** — the leak rail repaired |
+  | 17 | `3dfdced` | **R3-4** — the plural fallback copy |
+  | 18 | `bdc9c96` | **R3-5** — the docblock's understated residual |
+  | 19 | *this commit* | **read-3 log** |
 
   ⚠ **The machine phase stated this wrong twice, in the same document.** §7 said "8 … 9 with this log"; §10 said "9" and then enumerated eight. The measured figure at that point was **8**, and no commit was missing from the enumeration — the error was purely arithmetic. **That is D25's exact genus** (POLISH-TRACKER §6 states EIGHT and enumerates SEVEN), third instance in the corpus, and it survived a §7 table that @code-reviewer M-4 had *already* forced a re-measurement of. The lesson is in §9.
-- **Full `just verify` runs:** 14 — one baseline, one per commit boundary, one re-run after a Biome format fix, one per reviewer round, and one per Gate C read-1 code item (GC-1, GC-2, GC-5), and three at read-2. All green at every commit boundary; **⛔ S-0g never fired.**
-- **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2885 tests passed | 1 skipped | 4 todo (2890)**, EXIT=0. Measured at read-2 head. (Machine phase 2868 → read-1 2871 → read-2 2885; read-2's R2-6 added the 14-assertion equivalence proof.)
-- **Reviewer runs:** 3 agents total — @code-reviewer and @security-auditor at the machine phase (~12 and ~11 min), then a **scoped @code-reviewer re-run at read-2** (~10 min) for GC-1's control-flow change. Machine phase: 1 HIGH + 2 MEDIUM + 1 LOW fixed. Read-2: 1 MEDIUM fixed, 1 HIGH reported outside the boundary. @security-auditor was not re-run at read-2 — founder-ruled.
+- **Full `just verify` runs:** 18 — one baseline, one per commit boundary, one re-run after a Biome format fix, one per reviewer round, and one per Gate C read-1 code item (GC-1, GC-2, GC-5), three at read-2, and four at read-3. All green at every commit boundary; **⛔ S-0g never fired.**
+- **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2887 tests passed | 1 skipped | 4 todo (2892)**, EXIT=0. Measured at read-3 head. (Machine phase 2868 → read-1 2871 → read-2 2885 → read-3 2887.)
+- **Reviewer runs:** 3 agents total — @code-reviewer and @security-auditor at the machine phase (~12 and ~11 min), then a **scoped @code-reviewer re-run at read-2** (~10 min) for GC-1's control-flow change. Machine phase: 1 HIGH + 2 MEDIUM + 1 LOW fixed. Read-2: 1 MEDIUM fixed, 1 HIGH reported outside the boundary. @security-auditor was not re-run at read-2 — founder-ruled. **At read-3 it WAS re-run, scoped to the leak rail** (~9 min): 0 CRITICAL, 0 HIGH, 5 MEDIUM, 6 LOW, 1 SURPRISE; one LOW fixed as a truthfulness repair on my own docblock. @code-reviewer not re-run at read-3.
 
 ---
 
-*POLISH.8 — machine phase + Gate C read-1 + Gate C read-2 · ended at push, nothing merged · founder merges after re-read.*
+*POLISH.8 — machine phase + Gate C reads 1, 2 and 3 · ended at push, nothing merged · founder merges after re-read.*
