@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 /**
  * POLISH.8 S-6 (D17) + S-8 (D06) — the two honesty defects on the F-ADMIN-5
@@ -24,24 +24,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * `mod_actions` ∪ `admin_events` union can ever match it, so the form was
  * advertising a query that provably returns nothing.
  *
- * The page's two server dependencies are mocked so this file never opens a DB
- * connection; the exports under test are pure/presentational.
+ * GC-5 · these symbols now live in the colocated `search-surface.tsx`, not on
+ * `page.tsx`. That module's ONLY import is a TYPE, so this file needs NO mocks
+ * at all — the two server-dependency mocks it previously carried are gone
+ * rather than left as dead scaffolding.
  */
-
-vi.mock("@/server/admin/moderation/audit-feed", () => ({
-	loadModerationAuditFeed: vi.fn(async () => []),
-	searchAuditLog: vi.fn(async () => []),
-}));
-vi.mock("@/server/admin/page-guards", () => ({
-	requireAdminPage: vi.fn(async () => undefined),
-}));
 
 import {
 	ACTION_TYPE_PLACEHOLDER,
 	InvalidDateNote,
 	invalidDateFields,
 	searchRan,
-} from "@/app/(admin)/admin/moderation/audit/page";
+} from "@/app/(admin)/admin/moderation/audit/search-surface";
 import { modReasonEnum } from "@/db/schema/audit";
 import { EVENT_TYPES } from "@/server/events/schemas";
 
