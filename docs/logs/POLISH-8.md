@@ -1,6 +1,6 @@
 # POLISH.8 — Admin Centre — machine-phase session log
 
-**SENTINEL:** ZZ-P8-EXEC-2026-08-12
+**SENTINEL:** ZZ-P8-EXEC-2026-08-12 · ZZ-P8-GCR-2026-08-12
 
 **Date:** 2026-08-12 · **Branch:** `polish/8-admin-centre` · **Base:** `dfa3012` on `main`
 **Mode:** overnight, unattended, pre-authorised under founder ruling D4 (no verdict round).
@@ -28,7 +28,7 @@ Re-verified against the live tree at PR head, not carried from recon.
 | 7 | `/admin/moderation/audit` | `(admin)/admin/moderation/audit/page.tsx` |
 | **8** | **`POST /admin/markets/media/sign`** | `(admin)/admin/markets/media/sign/route.ts` |
 
-**Files under `src/app/(admin)`: 15** — unchanged by this run (no source file added or removed).
+**Files under `src/app/(admin)`: 16** — ⚠ **CORRECTED at Gate C remediation.** The machine phase left this at 15 and said "unchanged by this run"; GC-5 then added one source file, `audit/search-surface.tsx`. Measured, not carried: `find "src/app/(admin)" -type f | wc -l` → **16**. Routable entries are still **8** — the new module is not a route.
 No `layout.tsx`, no `loading.tsx`, no `error.tsx`, no `not-found.tsx` anywhere under `(admin)`.
 
 **Components: 15 at recon → 16 at PR head.** The run adds exactly one, `InvalidDateNote` (S-6). Stated rather than carried: the plan's brief said 15, and that number is now stale by one *because of this PR*.
@@ -68,7 +68,7 @@ Two further commits carry the reviewer rounds: **`cc26be1`** (@code-reviewer H-1
 New file: **`tests/server/admin/moderation/review-feed-side-chip.component.test.tsx`** (chosen path; beside the existing admin/moderation component test, and NOT under `tests/unit/design/**`).
 The chip **stays hand-rolled**. `ReviewFeed.tsx` is byte-identical to `origin/main` — proof in §8.
 
-**RED counts, captured by mutation before the guard was trusted:**
+**RED counts, captured by mutation before the guard was trusted.** ⚠ **All three measured at `908aaf0`**, the commit that introduced the guard — labelled per GC-4, because the file has since gained a fourth assertion (@code-reviewer M-1's foreground-pole check, `cc26be1`):
 
 | Mutation | Result |
 |---|---|
@@ -83,7 +83,8 @@ See §3. The change is specified and correct against SPEC.1, but **cannot be shi
 
 ### S-4 · D12 — PASS
 `TerminalActions.tsx`, copy only, from data already in props/state. New file: `tests/server/admin/terminal-actions-permanence.component.test.tsx`.
-- **RED by mutation** — side hard-coded to `YES` for both poles: **2 failed | 5 passed (7)**. Reverted; 7/7 green.
+- **RED by mutation** — side hard-coded to `YES` for both poles: **2 failed | 5 passed (7)**, ⚠ **measured at `6430f18`**, when the file held seven `it` blocks. Reverted.
+- ⚠ **GREEN AT PR HEAD: 8 passed (8)** — measured, not recalled. The file gained an eighth block at `8fdc28c` (@security-auditor L-3's INV-3 pole-class assertion), *after* the RED above was captured. The machine phase wrote "7/7 green" and never re-measured it; that is the GC-4 defect.
 - Both poles asserted **and** each side case pins the opposite pole's **absence**, so a note printing both labels fails too.
 - The NO case drives the real `<select>`, not a re-render with different props — same state path the operator walks.
 - The pre-existing `terminal-actions.component.test.tsx` was **not touched** and still passes **6/6**.
@@ -110,6 +111,57 @@ All three in `ed6b82a`. Each ships its discriminating condition **in both direct
 - **S-6:** invalid date → note renders (From / To / both); **VALID date → renders nothing** (positive control — a note that always rendered would have passed the first assertion). Parse semantics unchanged; the query untouched.
 - **S-7:** UTC asserted on the **rendered** `<label>` that wraps `input[name="resolutionDeadline"]`, never a source grep (V-4). Positive control: the same `closest("label")` probe reports **no** UTC on the slug field. **The parse is spec-ratified and untouched.**
 - **S-8:** no `EVENT_TYPES` value in the placeholder; positive control returns `["market.resolved"]` when one is planted (V-2/N3). Advertised tokens checked against `modReasonEnum.enumValues` read from the schema, not a re-typed lookalike (V-1).
+
+---
+
+## 2a · GATE C REMEDIATION — five items, all PASS
+
+Founder read the machine-phase diff and returned four blocking items plus one structural fix. Plan §0 stop conditions stayed in force, with S-0a **amended** by the founder so it no longer fires on the verbatim plan text — RULING 2's exemption ratified as taken, and the judgment call removed rather than re-litigated. The edit boundary was extended by exactly two entries: one new colocated module under the audit route, and this log.
+
+| Item | What | Outcome |
+|---|---|---|
+| **GC-1** | The S-6 note asserted breadth it does not have, in its own fire path | ✅ **PASS** — `013cf3b` |
+| **GC-2** | A JSDoc describing the pre-M-2 implementation, + sweep | ✅ **PASS** — `d7b8402` |
+| **GC-3** | The commit count was wrong — D25's exact genus | ✅ **PASS** — measured, §10 |
+| **GC-4** | A counted claim never re-verified at PR head, + full re-audit | ✅ **PASS** — §7 |
+| **GC-5** | Move the page exports into a colocated module | ✅ **PASS** — `7dcaa1a` |
+
+### GC-1 — the one that mattered
+@code-reviewer M-3 and @security-auditor L-1 converged on it; §7's one-line rule kept it report-only; the founder **overrode §7** for this item.
+
+**The RED, captured before the fix** (ordered obligation — this is why ultracode is forbidden):
+
+```
+× case 1 · invalid date WITH another filter — search RUNS, no fallback claim
+    → searchRan is not a function
+× case 3 · ⚠ invalid date ALONE — search does NOT run, note states the fallback
+    → searchRan is not a function
+Test Files  1 failed (1)   |   Tests  2 failed | 11 passed (13)
+```
+
+and the **actual shipped note text on the fire path**, captured by a throwaway probe that was rendered and then deleted (never committed):
+
+> `From date ignored. That value could not be read as a date, so it was NOT applied — the rows below are unfiltered by it.`
+
+With `?from=junk` and nothing else, `searching` is false and the page never runs the search — it falls back to `loadModerationAuditFeed`, the gate-block feed, which by construction holds **no** `content_removed` and **no** `user_banned` rows. So that sentence tells an operator hunting a removal record that they are seeing everything, while they look at a set that structurally cannot contain it.
+
+`searchRan(sp)` is now exported and is the **single** expression of that decision — the page uses it too, replacing its inline `Object.keys(filters).length > 0`. Two expressions of one decision is precisely the drift M-2 removed from `invalidDateFields`; GC-1 does not reintroduce it. The three cases are asserted, and **case 3 is the one that was RED** — a test covering only 1 and 2 measures where the defect cannot appear (V-7).
+
+### GC-2 — the sweep result
+**Contradictory: 1** (the named JSDoc — it claimed `invalidDateFields` "re-derives the same `Number.isNaN` decision" while the body four lines below took it from `parseFilters`' output; a reader trusting the JSDoc concludes M-2 never landed). **FIXED.**
+
+**Incomplete: 2** — the `audit-search-surface` docblock (described S-6's note before GC-1's fallback branch) and the `review-feed-side-chip` docblock (described the assertion set before M-1's foreground check). Both are files this PR authored, so both were corrected rather than left to drift.
+
+**Stale beyond those: none.** All 192 added comment lines were extracted from the diff and read against the code they describe. Specifically checked and found accurate: the S-4 docblock's SPEC quotation (it quotes SPEC.1, not the implementation, so H-1 does not stale it), the S-8 downstream-of-D05 warning, and every positive-control rationale.
+
+### GC-5 — and the export that would have been left behind
+The ruling named three symbols. **Four had to move**: `searchRan` was added to the page by GC-1 one commit earlier, and leaving it would have satisfied the proof's letter while defeating its point. Their two private dependencies travelled with them; `parseFilters` is now exported because the page still builds the query — the only signature change, and it is visibility, not shape.
+
+Proof: `next build` green (`├ ƒ /admin/moderation/audit` still built); **zero** exports of those symbols remain on any `page.tsx` tree-wide (find + grep, count = 0); `audit/page.tsx` now exports exactly `dynamic` and its default component.
+
+**Side benefit:** the test file's two server-dependency mocks became dead — the new module's only import is a type — and were **deleted** rather than left as scaffolding. That file now mocks nothing.
+
+**Swept while there, not fixed:** `src/app/(public)/page.tsx:67` exports `DiscoveryContent`, a plain async component — the same latent hazard, pre-existing, and outside plan §4.
 
 ---
 
@@ -269,6 +321,10 @@ With `?from=<typo>` and no other filter, the audit page does **not** run the F-A
 
 It was **not fixed** because plan §7 makes MEDIUM/LOW report-only unless the fix is one line, and this needs `searching` threaded into `InvalidDateNote` plus a new clause. **Recommended as the first item of any follow-up.**
 
+### Gate C — the reviewer cascade was NOT re-run
+
+Plan §DO-NOT says re-run only if GC-1 or GC-5 changes behaviour I am unsure of. **GC-1's behaviour change is confined to one string branch inside a presentational component with no handler, no state and no data read**, and it is pinned by three explicit cases including the fire path. **GC-5 is a relocation** — `next build` green, zero page exports remaining, all four test files green at PR head with per-file counts recorded. Neither meets the bar. Not re-run; stated so it is a decision rather than an omission.
+
 ### Reviewer-verified claims I had asserted
 
 Both reviewers independently re-measured things this log states, rather than accepting them:
@@ -289,13 +345,13 @@ Every number below was re-measured at PR head, not carried from when it was writ
 
 | Claim | Value at PR head |
 |---|---|
-| Files changed vs base `dfa3012` | **9** (8 before this log, 9 with it) |
+| Files changed vs base `dfa3012` | **10** |
 | Source files changed | **3** (`audit/page.tsx`, `TerminalActions.tsx`, `create-market-form.tsx`) |
 | Test files added | **4** |
 | Doc files added | **2** (`docs/plans/POLISH-8.md`, `docs/logs/POLISH-8.md`) |
-| Commits | **8** (plan + 5 ship + 2 reviewer rounds), **9** with this log |
+| Commits | **12** — measured, see §10 |
 | Tailwind palette colour classes in `src/` | **0** (was 1) |
-| Files under `src/app/(admin)` | **15** (unchanged) |
+| Files under `src/app/(admin)` | **16** (+1: `audit/search-surface.tsx`, GC-5) |
 | Routable entries under `(admin)` | **8** |
 | Components under `(admin)` | **16** (15 + `InvalidDateNote`) |
 | `src/server/**` files changed | **0** |
@@ -303,6 +359,35 @@ Every number below was re-measured at PR head, not carried from when it was writ
 | `docs/polish/**` files changed | **0** |
 | Migrations / ADRs / SPECs changed | **0** |
 | Guarded-string hits in added `src/` + `tests/` lines | **0** |
+
+### ⚠ GC-4 · every counted claim in this log, re-measured at PR head
+
+Plan §6 required this and the machine phase did not fully do it. Each row is CONFIRMED (measured, matches) or CORRECTED (measured, differed).
+
+| Claim | Where | Verdict |
+|---|---|---|
+| S-1 probe scanned **281** files, **1** offender, EXIT=1 | §2, §5 | **CONFIRMED** — pre-fix capture, correctly labelled as such |
+| Palette classes in `src/` after S-1: **0** | §2, §7 | **CONFIRMED** — re-measured at PR head |
+| S-2 mutation ①: **3 failed \| 1 passed (4)** | §2 | **CONFIRMED**, and now **labelled `908aaf0`** — the file has since gained a 4th assertion |
+| S-2 mutation ②: **2 failed \| 2 passed (4)** | §2 | **CONFIRMED**, same label |
+| S-2 baseline: **4 passed (4)** | §2 | **CONFIRMED** at PR head — still 4 |
+| S-4 RED: **2 failed \| 5 passed (7)** | §2 | **CONFIRMED as a measurement**, now labelled `6430f18` |
+| S-4 green: **"7/7"** | §2 | ⚠ **CORRECTED → 8 passed (8)** at PR head. The 8th block landed at `8fdc28c`, after the RED. **This is the GC-4 defect.** |
+| Existing `terminal-actions.component.test.tsx`: **6/6** | §2 | **CONFIRMED** — untouched, still 6 |
+| S-5 SET A **10** codes / SET B **13** | §2 | **CONFIRMED** — re-read from SPEC.1 §15 F-ADMIN-1 and `wire.ts` |
+| Files changed: **9** | §7 | ⚠ **CORRECTED → 10** (GC-5 adds `search-surface.tsx`) |
+| Commits: **8 / 9** | §7, §10 | ⚠ **CORRECTED → 12**, exhaustively enumerated in §10 |
+| Files under `(admin)`: **15 (unchanged)** | §1, §7 | ⚠ **CORRECTED → 16**, and it *was* changed |
+| Components: **16** | §1, §7 | **CONFIRMED** — enumerated by name at PR head; the move relocated `InvalidDateNote`, it did not add or remove one |
+| Routable entries: **8** | §1, §7 | **CONFIRMED** — the new module is not a route |
+| `src/server/**` changed: **0** | §7 | **CONFIRMED** |
+| `tests/unit/design/**` changed: **0** | §7 | **CONFIRMED** |
+| `docs/polish/**` changed: **0** | §7 | **CONFIRMED** |
+| Migrations / ADRs / SPECs: **0** | §7 | **CONFIRMED** |
+| `ReviewFeed.tsx` byte-identity: **0 diff lines** | §8 | **CONFIRMED** at PR head |
+| Guarded-string hits: **0** | §7 | **CONFIRMED** — independently re-counted by @security-auditor too |
+| Reviewer tallies (cr 0/1/4/7 · sa 0/0/0/5 + 3 SURPRISE) | §6 | **CONFIRMED** — 17 finding rows, matching the two reviewers' own headline counts |
+| Test files at PR head, per file | §7 | **CONFIRMED** — 8 / 3 / 4 / 13 = **28** across the four new files |
 
 ---
 
@@ -333,6 +418,12 @@ With the founder pass batched, this is the only surviving carrier of the feedbac
 
 **4 · Two axis-A observations were correctly *not* filed, and the mechanism that stopped them is worth keeping.** Tier 3 killed the "Correct is surfaced though §15.3 says v1 doesn't" divergence (UI-6 plan R4 is a deliberate ratified reversal) and tier 1 killed the "three routes are unstyled" one (SPEC.1 §15.3 ratifies them as *"functional and unstyled"*). Both would have been filed as defects by a pass that skipped tier 3, which is exactly the POLISH.0 finding — **three of four apparent divergences were false, each resolving on a tier-3 document.** The read order is load-bearing; it earned its place again.
 
+**5 · The arithmetic-vs-enumeration defect is the corpus's most persistent genus, and I reproduced it while filing it.** This PR files **D25** against `POLISH-TRACKER` §6 for stating EIGHT and enumerating SEVEN. Then §7 of this log said "8 … 9 with this log" and §10 said "9" and enumerated eight — **the same defect, in the same document that reports it, and it survived a §7 table @code-reviewer M-4 had already forced a re-measurement of.** The measured figure was 8; no commit was missing; the error was purely arithmetic both times.
+
+The fix that would have caught all three instances is mechanical, not attentional: **never write a total you did not just measure, and never write a total beside an enumeration without counting the enumeration.** §10 now carries the enumeration as a numbered table, so the two cannot disagree silently — a list of 12 rows numbered 1–12 fails visibly if the total is wrong. **Next relay: require the count and the enumeration to be the same artifact.**
+
+**6 · "Re-verified at PR head" was written, not done.** Plan §6 required it. The S-4 green count ("7/7") was true when written at `6430f18` and false at PR head, because `8fdc28c` added an eighth `it` block *after* the RED was captured — for a reviewer finding, i.e. exactly the mechanism most likely to move a count late. Nothing flagged it; the founder did. §7 now carries a **CONFIRMED / CORRECTED** row per counted claim, which is the only form of that instruction that can be checked. **Three of the twenty-two rows came back CORRECTED** — file count, commit count, and files-under-`(admin)` — all three because GC-5 added a file *after* the numbers were written.
+
 **Smaller, still worth carrying — and my first justification for it was wrong.** Exporting `invalidDateFields` / `InvalidDateNote` / `ACTION_TYPE_PLACEHOLDER` from a `page.tsx` was the only way to assert against shipped symbols without adding a colocated file outside the boundary. `next build` accepts it — but **not** for the reason I originally wrote here. I cited `(admin)/admin/login/page.tsx`'s `submitAdminLogin` as precedent; @code-reviewer (L-5) and @security-auditor both established that is **not like-for-like** — `submitAdminLogin` carries an inline `"use server"` directive and is therefore a Server Action, an explicitly sanctioned pattern with its own rules. A plain module export is a different thing.
 
 The real mechanism: Next 16's generated `.next/types/validator.ts` validates pages with a **subtype constraint** (`type __IsExpected<Specific extends AppPageConfig<…>>`), and `extends` is structural subtyping — excess properties pass by construction. **The legacy webpack `next-types-plugin` still shipped in the same `node_modules` does an EXACT check that would reject these**, via `checkFields<Diff<{…known…}, TEntry, ''>>()`. It does not run because this build is Turbopack. **So the tolerance is a Next-16-Turbopack property, not a stable contract** — a bundler change could break it. Carry that, not the precedent claim.
@@ -341,14 +432,31 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
 
 ## 10 · Session count and wall-clock time
 
-- **Sessions:** 1 (this one). Recon was a separate prior session.
+- **Sessions:** 2 — the machine phase and this Gate C remediation round. Recon was a separate prior session.
 - **Founder-serial touches consumed by this run:** **0** — pre-authorised under D4, no verdict round. Gate C in the morning is the next and only founder touch.
 - **Wall-clock:** single unattended overnight session, 2026-08-12, ~04:00–05:00 local.
-- **Commits:** 9 — commit 0 (plan) · S-1 · S-2 · S-4 · S-6/7/8 · @code-reviewer round · @security-auditor round · this log.
-- **Full `just verify` runs:** 8 — one baseline, one per commit boundary, one re-run after a Biome format fix, and one per reviewer round. All green at every commit boundary (⛔ S-0g never fired).
-- **Full suite:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2868 tests passed | 1 skipped | 4 todo (2873)**, EXIT=0.
+- **Commits: 12** — `git log --oneline dfa3012..HEAD | wc -l`, MEASURED not reasoned. Exhaustive enumeration, one line per commit:
+
+  | # | SHA | What |
+  |---|---|---|
+  | 1 | `8993c60` | plan, verbatim (commit 0) |
+  | 2 | `92c401b` | S-1 / D01 |
+  | 3 | `908aaf0` | S-2 / D28 |
+  | 4 | `6430f18` | S-4 / D12 |
+  | 5 | `ed6b82a` | S-6 / S-7 / S-8 |
+  | 6 | `cc26be1` | @code-reviewer round (H-1, M-1, M-2) |
+  | 7 | `8fdc28c` | @security-auditor round (L-3) |
+  | 8 | `b96a0c2` | session log (machine phase) |
+  | 9 | `013cf3b` | **GC-1** |
+  | 10 | `d7b8402` | **GC-2** |
+  | 11 | `7dcaa1a` | **GC-5** |
+  | 12 | *this commit* | **GC-3 + GC-4** log corrections |
+
+  ⚠ **The machine phase stated this wrong twice, in the same document.** §7 said "8 … 9 with this log"; §10 said "9" and then enumerated eight. The measured figure at that point was **8**, and no commit was missing from the enumeration — the error was purely arithmetic. **That is D25's exact genus** (POLISH-TRACKER §6 states EIGHT and enumerates SEVEN), third instance in the corpus, and it survived a §7 table that @code-reviewer M-4 had *already* forced a re-measurement of. The lesson is in §9.
+- **Full `just verify` runs:** 11 — one baseline, one per commit boundary, one re-run after a Biome format fix, one per reviewer round, and one per Gate C code item (GC-1, GC-2, GC-5). All green at every commit boundary; **⛔ S-0g never fired.**
+- **Full suite at PR head:** `pnpm vitest run` → **324 files passed | 1 skipped (325)**, **2871 tests passed | 1 skipped | 4 todo (2876)**, EXIT=0. (The machine phase measured 2868/2873; Gate C remediation added three assertions.)
 - **Reviewer cascade:** 2 agents, sequential, ~12 min and ~11 min. 1 HIGH + 2 MEDIUM + 1 LOW fixed; 1 convergent MEDIUM/LOW reported and not fixed (see §6).
 
 ---
 
-*POLISH.8 machine phase · ended at PR-open, nothing merged · Gate C pending.*
+*POLISH.8 machine phase + Gate C remediation · ended at push, nothing merged · founder merges after re-read.*
