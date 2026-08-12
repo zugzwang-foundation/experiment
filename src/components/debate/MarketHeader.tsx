@@ -42,22 +42,6 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 }
 
 /**
- * Explicit deferred placeholders (D1 / SHELL placeholder discipline) — resolver
- * cards and market media are UNBACKED by the current schema and arrive with a
- * future market-content slice. Rendered as labelled stubs, never invented copy
- * (§3 refusals). (Price history is now backed — the UI.19 §9 chart mounts above
- * `PriceBar`; its placeholder line was removed here.)
- */
-function DeferredPlaceholders() {
-	return (
-		<div className="flex flex-col gap-1 rounded-md border border-dashed p-2 text-xs text-muted-foreground">
-			<span>Resolver cards — arrive with the market-content slice</span>
-			<span>Market media — arrive with the market-content slice</span>
-		</div>
-	);
-}
-
-/**
  * The market-view header (DEBATE.4 §4): question = `markets.title`, resolution
  * criterion = `markets.description` (R-14.4) · lifecycle marker · the price bar
  * (`getPrices`) · the attrs (Đ staked · posts · replies) · the deferred D1
@@ -113,7 +97,6 @@ export function MarketHeader({
 					{noun(market.totals.replyCount, "reply", "replies")}
 				</span>
 			</div>
-			<DeferredPlaceholders />
 		</section>
 	);
 }
