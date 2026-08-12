@@ -273,8 +273,8 @@ function parseFilters(sp: SearchParams): AuditSearchFilters {
  * applied, with nothing on screen saying so. This names the dropped fields so
  * the drop is legible.
  *
- * Pure. Parse semantics are UNCHANGED — this re-derives the same `Number.isNaN`
- * decision `parseFilters` makes, and never alters the query.
+ * Pure, and it never alters the query. Parse semantics are UNCHANGED — the
+ * decision is taken from `parseFilters`' OUTPUT, not re-derived; see the body.
  */
 export function invalidDateFields(sp: SearchParams): string[] {
 	// Derived from `parseFilters`' OUTPUT, never from a re-run of its decision.

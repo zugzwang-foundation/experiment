@@ -14,6 +14,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * screen saying so. `invalidDateFields` names the dropped fields and
  * `InvalidDateNote` renders them.
  *
+ * GC-1 · and the note must not assert breadth it does not have. When the
+ * dropped date was the ONLY filter, no search runs at all and the page falls
+ * back to the gate-block feed — so the note branches on `searchRan`. The three
+ * cases below cover that; case 3 is the fire path and was the one that was RED.
+ *
  * S-8 · The action-type placeholder advertised `market.resolved`, an
  * EVENT_TYPES value that lives only in the `events` table. NEITHER side of the
  * `mod_actions` ∪ `admin_events` union can ever match it, so the form was

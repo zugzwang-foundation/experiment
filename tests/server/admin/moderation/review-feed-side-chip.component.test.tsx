@@ -22,7 +22,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
  * BOTH POLES ARE ASSERTED, deliberately. A YES-only test passes on an inverted
  * NO panel — that is exactly how the last live INV-3 inversion survived a full
  * PR with tests. Each case additionally asserts the OPPOSITE pole is ABSENT, so
- * a chip that renders one pole for both sides cannot pass either.
+ * a chip that renders one pole for both sides cannot pass either — and, since
+ * @code-reviewer M-1, the FOREGROUND token too: pinning only the background let
+ * a black-on-black chip pass green.
  *
  * The REAL `ReviewFeed` is rendered — never a reassembled lookalike (V-1).
  * Harness precedent: `review-feed.component.test.tsx` in this directory (jsdom
