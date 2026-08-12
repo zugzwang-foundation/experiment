@@ -1427,7 +1427,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Conditional trigger.** For BOTH residuals: the next task that legitimately opens `tests/unit/design/`.
 
-**Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, THREE fixes**: R15's palette-class ban, the N5 set-equality floor, and the `SCAN_DIRS` structural fix. Evidence: `docs/logs/POLISH-7a.md` §5.
+**Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, FIVE fixes**: R15's palette-class ban, the N5 set-equality floor, the `SCAN_DIRS` structural fix, **`PD-8-27`'s undeclared `(admin)` reach gap** (which also needs the docblock's *"the participant view layer"* claim corrected in the same edit), and `LEAK-RAIL-CLOSURE`'s residue. ⚠ **R15 NO LONGER HAS A LIVE INSTANCE** — POLISH.8 fixed it at `92c401b`, so it must be minted RED by planted-offender mutation (RULE-1 axis ①), never by finding an offender; a green first run proves nothing (H15). Evidence: `docs/logs/POLISH-7a.md` §5 · `docs/logs/POLISH-8.md` §5.
 
 ---
 
@@ -1474,3 +1474,162 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** The next `docs/logs/UI-19-log.md` touch, or POLISH.3's kickoff — whichever comes first. One-line header correction; no other content changes.
 
 **Expected next task.** POLISH.3. Evidence: `docs/logs/UI-19-log.md` header block; `git log a3f136e`; `POLISH-0.md` §3 · POLISH.3 · Tier 3.
+
+---
+
+## ADMIN-EVENTS-WRITER — ⚠ `admin_events` ships in the Nov-6 dataset with zero writers
+
+**Originating task:** POLISH.8 recon (2026-08-12), `PD-8-10`. Requested as a ruling by `docs/logs/UI-6.md` on 2026-07-23 and never granted.
+
+**Deferred work.** `admin_events` has **no writer anywhere in `src/`** — 20 insert call sites across 13 tables, none of them this one. Two consequences, and the second is the serious one. (1) F-ADMIN-5's audit search unions `mod_actions ∪ admin_events`, so one arm is permanently empty; the page declares this in a `role="note"`, deliberately. (2) ⚠ **`SPEC.2` §19.3 ships `admin_events` in the 2026-11-06 public dataset** — table 8, Bucket A, YES, *"Admin-action audit trail"* — inside a contracted **"Shipped: 16 tables; not shipped: 5"** count and a named 9-table Bucket-A enumeration, and again in §19.4's PII row. **On 2026-11-06 the dataset would ship an empty table asserting a complete admin-action audit trail.**
+
+**Why deferred.** ⚠ **The fork is the founder's and it is not a two-line change.** Nine admin lifecycle event types already land in `events` — `admin.signed_in`, `admin.signed_out`, and the seven `market.*` types. So the record exists; only its declared home is empty. Three options: **(a) project `events` into `admin_events`** — ADR-0005's own model is *"every state change is an append to `events`, projected into read models"*, so this is a projection, not a second source of truth; it honours the dataset contract with **zero spec edits** and fixes F-ADMIN-5 as specified. **(b) Land a direct writer** — dual-writes the same fact into two tables in an event-sourced system. **(c) Amend SPEC.2 §19.3 to drop the table** — which moves the shipped count off 16 + 5, edits the 9-table Bucket-A enumeration, and touches §19.4's PII row: **three or four spec edit sites**, and ships a dataset with no admin-action audit trail on an experiment whose claim rests on the record being auditable.
+
+**Web Claude's recommendation: (a), a projection.** ⚠ **Recorded with its own correction:** the earlier recommendation was *"repoint F-ADMIN-5 at `events`"*, which fixes the admin search UI and leaves the dataset shipping an empty contracted table. It was made against ADR-0025, the wrong document — the contract is in SPEC.2 §19.3, and CC's check is what found it.
+
+**Conditional trigger.** ✅ **DECIDABLE NOW AT SPEC COST, NOT LATER AT DATA COST — and that window closes.** No exporter exists yet: no `src/server/dataset`, no export script in `scripts/`, and `adminEvents` appears in `src/` only in `audit-feed.ts`, `audit/page.tsx` and `db/schema/audit.ts`. **Dated pre-go-live, 2026-09-15.**
+
+**Expected next task.** Its own chat, founder-ruled. Touches `src/server/**` and, on option (a), the projection path — full ritual. ⚠ **`PD-8-06` is downstream**: if this lands, the audit search placeholder changes again.
+
+---
+
+## ADMIN-INLINE-MODERATION-ACCEPTED — F-ADMIN-4's three unbuilt arms, founder-accepted
+
+**Originating task:** POLISH.8, 2026-08-12. `PD-8-11` (inline participant Remove/Ban) · `PD-8-13` (LD-3 `sexual/minors` ban-review surface) · `PD-8-14` (Track-A informational rows + audit links). All three were docketed to **DEBATE.7, which closed 2026-06-19 — a month before UI.6 minted them** (`PD-8-12`).
+
+**Deferred work.** ⚠ **NONE — this row records an ACCEPTANCE, not deferred work.** Founder ruling, 2026-08-12, disposition `accepted-divergence` (P12, founder-only). It exists so the acceptance and its cost are on the record rather than discoverable only by reading a July build log.
+
+**Why deferred.** The reactive moderation loop is functional end-to-end from `/admin/moderation` — Remove and Ban both work, as two independent axes, per ADR-0021. The three unbuilt arms are operator convenience and review surfaces, not moderation capability.
+
+⚠ **What the acceptance costs, stated so nobody rediscovers it:**
+- **SPEC.1 §17 carries three acceptance rows** for the inline arm — `admin::moderation-inline-remove-live-comment`, `…-affordance-admin-only-server-verified`, `…-scope-comment-only-no-user-ban-no-resolve`. **They ship unmet.**
+- **`PD-8-13`'s basis is detection by the classifier plus response by reactive removal.** ⚠ **It does not cover the image arm.** `sexual/minors` is **TEXT-ONLY** on `omni-moderation-2024-09-26` — image input scores **0** for that category (`docs/DEBATE_7-moderation-smoke.md`). The named image backstops are the **PhotoDNA hash gate, which is parked and not wired**, the adult-`sexual` image gate, and **reactive admin removal — a human at a screen, which is what ADR-0021's architecture assumes**.
+- **Thresholds are untuned until HARDEN.5** (2026-08-15 → 08-31, values targeted 2026-09-01), so the text arm's false-positive rate is currently unmeasured, and an auto-banned participant has no surface where that ban is reviewable. ⚠ **`docs/parked.md`'s own *UI-6 Gate C D4* row already records that there is no un-ban affordance** and the only remedy is a raw SQL write via `BREAK_GLASS`.
+
+⚠ **The canon §10 append that POLISH-0 §5 attaches to `accepted-divergence` does not apply here.** That mechanism was written for **visual** divergences and appends to `design-canon.md`. These are functional divergences against SPEC.1 §15/§17. **This row is their home instead**, and the departure is recorded rather than left as an unexplained omission.
+
+**Conditional trigger.** Re-open if the founder pass, HARDEN.5's threshold tuning, or live operation shows the reactive-only loop is insufficient.
+
+**Expected next task.** None scheduled. Reopening is a founder decision.
+
+---
+
+## ADMIN-CLOSE-CONFIRM — Close has no confirmation, and a green test pins it that way
+
+**Originating task:** POLISH.8, `PD-8-08`. ⛔ **HALTED at S-0k** in PR #323 — proven, not predicted.
+
+**Deferred work.** SPEC.1 §15 F-ADMIN-3: *"Close requires a single ordinary confirm (it is reversible in effect … and carries no settlement)."* The built code has **neither** gate — `requiresTypedConfirm("close") === false` and `onSubmit` performs no confirm.
+
+**Why deferred.** ⚠ **The conflicting position is not merely in a document — it is baked into a PASSING TEST**, which is why nothing on disk was flagging it. `tests/server/admin/terminal-actions.component.test.tsx:128` is named `close-is-one-click`, and `:138` asserts the action fires on a bare click. Applying the SPEC behaviour measured **1 failed | 5 passed (6)**. **No** implementation of *"a single ordinary confirm"* can leave an assertion named `close-is-one-click` green. That test file was outside #323's edit boundary.
+
+**SPEC-over-plan precedence stands** — `docs/plans/UI-6.md` §2.S2 says *"Close stays one-click"* and its Acceptance line says *"Close one-click"*; SPEC.1 outranks a plan, and *"one-click"* most plausibly meant *"no typed ceremony"*. The conflict is quoted in full at `docs/logs/POLISH-8.md` §3 RULING 1 so the founder can reverse it in one line.
+
+**Conditional trigger.** Pre-go-live. ⚠ **Not go-live gating** — Close is reversible in effect and carries no settlement.
+
+**Expected next task.** Its own task, whose edit boundary **names `terminal-actions.component.test.tsx`**, since the test encodes the superseded position and its Close case needs updating. ⚠ **This shape recurs on every "spec outranks plan" item** — see `POLISH-SURFACE-TEMPLATE.md` §13.
+
+---
+
+## ADMIN-ERROR-COPY — a SPEC.1 rider first, then the copy map
+
+**Originating task:** POLISH.8, `PD-8-09`. ⛔ **HALTED** by the plan's own item-specific halt.
+
+**Deferred work.** `create-market-form.tsx:118` renders the raw error code and discards `error.message` and `field_errors`. `terminalErrorCopy` exists one directory over as the pattern to mirror.
+
+**Why deferred.** ⚠ **SPEC and code disagree on the code set, and the SPEC is the defect.** SPEC.1 §15 F-ADMIN-1 *Errors* lists **10**; `createMarketAction` can return **13** — the ten plus `admin_session_required` (`create.ts:62`), `validation_error` (`create.ts:85,92`) and `error_internal` (`wire.ts`'s `toActionError` fallback). **Three sibling entries — §15 F-ADMIN-3, §11 F-RESOLVE-2, §11 F-RESOLVE-3 — each explicitly append *"plus `validation_error` / `admin_session_required` at the wire boundary (ENGINE.15 R-15.5)"*. F-ADMIN-1's Errors line does not, on the same `ActionResult` envelope and the same wire boundary.** With two candidate sets there is no *"the code set"* to assert set equality against without silently picking one.
+
+**Conditional trigger.** Pre-go-live. ⚠ **Eight markets are created through this form on 2026-09-15**; an unreadable failure there is a core function failing.
+
+**Expected next task.** Two commits, one task: **(1)** the SPEC.1 §15 F-ADMIN-1 rider, web-authored and CC-committed verbatim, adding the wire-boundary clause in the wording its three siblings already use — **SPEC.1 1.0.29 → 1.0.30**; **(2)** the copy map, keyed over all 13, with an unknown code still surfacing the raw code rather than swallowing it. Plan-mode required — it touches a SPEC.
+
+---
+
+## ADMIN-SIGNOUT — the sign-out action is built and reachable from nothing
+
+**Originating task:** POLISH.8 recon, `PD-8-15`.
+
+**Deferred work.** `adminLogoutAction` (`src/server/auth/admin/logout.ts:30`) is fully built — session DELETE plus an `admin.signed_out` emit, atomic — and has **zero call sites**. No `(admin)` route renders a sign-out affordance. ⚠ **And the admin cookie carries no `maxAge` and no `expires`** (`login.ts:218-225`), so an admin session ends only when the cookie is manually cleared or the session row is deleted out of band.
+
+**Why deferred.** ⚠ **`src/server/auth/admin/**` is a CLAUDE.md §1 CRITICAL PATH.** H-P8-1 was amended at POLISH.8 to fire on **importing** from that tree, not only on editing it — the ambiguity resolves toward the halt.
+
+**Conditional trigger.** ⚠ **DATED 2026-08-15**, pre-go-live.
+
+**Expected next task.** Its own chat, full ritual, plan-then-execute with the named-reviewer cascade. **Scoped to cover the cookie lifetime as well as the affordance** — *how an admin session ends* is one property, and splitting it means two visits to the same critical-path file.
+
+---
+
+## AUDIT-ORDER-TOTAL — unbounded and unordered admin reads
+
+**Originating task:** POLISH.8 recon. Carries `PD-8-16` and `PD-8-17`, and **`PD-8-18`'s acceptance is conditional on it**.
+
+**Deferred work.** Two `src/server/admin/**` query defects, one visit: **(1)** `loadAdminMarketsOverview` (`overview.ts:30-39`) issues no `.limit()` — every `markets` row is read and rendered, with status tallies derived in JS. **(2)** All three audit queries (`audit-feed.ts:72,155,199`) order by `createdAt DESC` with **no tiebreaker**, so ties are nondeterministic at the 200-row boundary.
+
+**Why deferred.** `src/server/**` is a hard floor for a machine pass (F4 / H-P8-1). ⚠ **The internal contrast is what makes (2) unarguable**: `review-feed.ts:168` — the same file family, one module over — orders `desc(comments.createdAt), desc(comments.id)`.
+
+**Conditional trigger.** ⚠ **BEFORE `PD-8-18`'s acceptance can stand.** X4 — no pagination — was founder-accepted on the ground that the 200-cap is disclosed and volume is low. **Accepting a stable cap is a different act from accepting a nondeterministic boundary**, where rows can appear and vanish across reloads. **If this does not land, that acceptance lapses.** Pre-go-live.
+
+**Expected next task.** A single `src/server/admin/**` task. ⚠ **Not to be conflated with the positional gate-before-read assertion** added at POLISH.8 read 3 — that is a test-side control and it is done.
+
+---
+
+## LEAK-RAIL-CLOSURE — the blocked-image guard scans the wrong axis
+
+**Originating task:** POLISH.8 Gate C read 3 (2026-08-12), `@security-auditor`. ⚠ **The HIGH that opened this file was CAUSED BY THE GC-5 RULING** — moving four symbols out of `page.tsx` to close a Turbopack-dependent build hazard narrowed the guard's scanned set without extending it, so the control got **weaker while reading green**. That specific narrowing is **CLOSED** (`cb0a655`, pre-fix GREEN 6/6, post-fix 1 failed | 5 passed, with a positive control proving `page.tsx` was already RED). What follows is the residue.
+
+**Deferred work.** Five MEDIUMs and six LOWs, all pre-existing properties of a guard older than PR #323, none a live leak — verified: *"No blocked-image byte, signer token, raw r2 key, or blocked text reaches an unscanned render path in shipped code at `3dfdced`."*
+- ⚠ **M-1, and it is the real fix: the scan axis is a DIRECTORY; the render tree is an IMPORT CLOSURE.** `page.tsx:3` already imports `AdminTabs` from outside `AUDIT_ROUTE_DIR`, so the unscanned set is non-empty at head. Extracting `AuditRow` into `moderation/_components/` — the established convention — would reproduce GC-5 one directory over, green. **Cannot be fixed by widening**: `moderation/` reddens on `ReviewFeed.tsx`, which is legitimately allowed to render images. **Wants an import-closure walk** — the technique already used at POLISH.8's §3a ARM 2.
+- **M-3** — the `<img` regex misses `<Image …>` and wrapper components. ⚠ **Chained with the now-fixed M-2 this was a complete green-guard leak path**; M-2 (`mintReadUrl` absent from `SIGNER_TOKENS`) was fixed at read 4, which breaks the chain, but M-3 stands alone.
+- **M-5** — the loader list is hand-written; a call to a NEW loader above the gate leaves the probe green.
+- **L-1…L-6** — three demonstrated residuals in the positional probe (a string-literal decoy; `stripComments` anchors `//` at line start so a trailing comment survives; the slice key itself is decoy-able), textual order ≠ execution order, the module-scope case the body-scoping cost, `files.length > 1` pinning a non-safety fact, and guard (d)'s vacuous-capable loop.
+
+**Why deferred.** MEDIUM and LOW are report-only under the machine-phase rule, and M-1's fix is a new mechanism, not a widening. ⚠ **All three positional residuals are bounded by an INDEPENDENT BEHAVIOURAL control** the auditor verified: `audit-page-auth.test.ts` invokes the real page with a null session through the real `requireAdminPage` and asserts the loader is never called. **A deleted gate goes RED there whatever the textual probe does. This probe is a tripwire, not the gate.**
+
+**Conditional trigger.** Pre-go-live, and **before any refactor that moves a rendering component out of the audit route directory** — that is the exact change the guard cannot see.
+
+**Expected next task.** Quality lane, alongside **R15** and **`NO-RAW-HEX-REACH`** — one visit, several fixes. ⚠ **Note for that visit:** read 4 widened guard (d)'s scan from `src/app` to all of `src/`, verified before changing that exactly one file matches the predicate and it already sat under the old path. **The scanned set widened; the matched set did not.** A future file matching that predicate anywhere in `src/` will now redden.
+
+---
+
+## ADMIN-MEDIA-EDIT — uploaded market media cannot be removed or reordered
+
+**Originating task:** POLISH.8 recon, `PD-8-19`.
+
+**Deferred work.** On `/admin/markets/new`, an uploaded image cannot be removed or reordered before submit. The only recovery is a page reload — which regenerates `marketId` (`useState(() => uuidv7())`) and **orphans every already-PUT R2 object**. `displayOrder` is append-position-only.
+
+**Why deferred.** A feature build touching the submit path, outside a machine pass's edit boundary. SPEC.1 §15.3 sets the bar for these routes at *"functional"*, which this meets.
+
+**Conditional trigger.** ⚠ **Before 2026-09-15** — eight markets are created through this form on go-live day, each with a media pool requiring at least one image and exactly one default.
+
+**Expected next task.** The admin build lane. ⚠ **Interacts with `R2-KEY-OPACITY`** (dated 2026-09-05), which also touches R2 object keys — worth sequencing together.
+
+---
+
+## ADMIN-NOINDEX — no `robots.txt` exists, and a comment says one does
+
+**Originating task:** POLISH.8 Gate C read 1, `@security-auditor` SURPRISE-1; re-raised independently at read 3.
+
+**Deferred work.** There is **no `robots.txt` and no `src/app/robots.ts` anywhere in the tree**, while `(admin)/admin/login/page.tsx:8` carries a comment stating one exists. Only `/admin/login` sets `metadata.robots noindex`; the other five admin pages set none.
+
+**Why deferred.** Pre-existing, and exposure is bounded to near-nil: unauthenticated crawlers are redirected to the noindexed login, so **only paths can be indexed, never content**. ⚠ **The comment is the sharper half** — a control asserted in prose and absent on disk is the genus this phase exists to catch (O-3).
+
+**Conditional trigger.** Before 2026-09-15, when the public surfaces go live and a `robots.txt` is wanted for its own reasons.
+
+**Expected next task.** A small standalone task. Fix the comment even if the file is deferred.
+
+---
+
+## STAGING-AUTO-ADVANCE — `main → staging` has no mechanism
+
+**Originating task:** POLISH.8 close-out (2026-08-12), from the staging advance. Records the gap that O-4 names.
+
+**Deferred work.** Vercel auto-deploys staging from the **`staging` branch** (`branchMatcher: {"type":"equals","pattern":"staging"}`, `productionBranch: main`, `autoAssignCustomDomains: False`). **The second leg is automated; the first is not.** Nothing advances `main` → `staging`.
+
+**Why deferred.** ⚠ **`docs/runbooks/deploy-pipeline.md` §2.5 already predicted this and already recorded it happening once** — *"has never appeared in any build… fails nothing and reports nothing"*, eight commits by 2026-08-04. **It recurred on 2026-08-12: four merges, staging stale since 08-11.** The doc is accurate about the risk and **the standing step is prose, and prose is what got missed twice**. A third piece of prose is a receipt, not a fix (O-1).
+
+⚠ **One founder ruling is open and it must be taken before the mechanism is built:** auto-advancing means migrations run **unattended** on staging. **(a)** auto-advance always · **(b)** auto-advance, but **halt and notify** when the diff contains a migration · **(c)** a CI check that only reports staleness. **Web Claude's recommendation: (b).** Staging is production's migration rehearsal under ADR-0022/0024's drift guard, so the ordinary case should be automatic — but a migration is the one class where an unattended failure leaves staging half-applied, and ADR-0024 is explicit about sequencing. ⚠ **(c) is what already exists in prose form and it is what failed twice.**
+
+⚠ **Worth pinning while there:** the fixture exemption currently holds **because of what `staging-migrate.yml` happens not to contain**. One added line would silently end it. A guard asserting the workflow contains no seed/reset/truncate would make the exemption structural rather than incidental.
+
+**Conditional trigger.** Founder ruling on (a)/(b)/(c), then build.
+
+**Expected next task.** A small CI/workflow task. Not go-live gating, but it compounds: every stale day is a day the founder pass and the go-live rehearsal run against the wrong tree.
