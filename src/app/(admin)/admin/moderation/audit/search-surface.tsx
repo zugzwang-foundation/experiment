@@ -105,6 +105,12 @@ export function InvalidDateNote({
 	searchRan: boolean;
 }): React.ReactElement | null {
 	if (fields.length === 0) return null;
+	// R3-4 (Gate C read-3) — `?from=junk&to=junk` drops TWO filters, and the copy
+	// said "it was the only filter supplied". Plural-aware throughout; the three
+	// load-bearing claims ("No search ran", "the default blocked-submissions
+	// feed", "content removals and user bans are never in it") are unchanged in
+	// both arms, because they are what GC-1 exists to say.
+	const many = fields.length > 1;
 	return (
 		<p
 			role="note"
@@ -112,12 +118,16 @@ export function InvalidDateNote({
 			className="mb-4 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-xs text-foreground"
 		>
 			<strong className="font-semibold">
-				{fields.join(" and ")} date ignored.
+				{`${fields.join(" and ")} ${many ? "dates" : "date"} ignored.`}
 			</strong>{" "}
-			That value could not be read as a date, so it was NOT applied
+			{many
+				? "Those values could not be read as dates, so they were NOT applied"
+				: "That value could not be read as a date, so it was NOT applied"}
 			{searchRan
-				? " — the rows below are unfiltered by it."
-				: ". No search ran — it was the only filter supplied. The rows below are the default blocked-submissions feed, not audit-search results: content removals and user bans are never in it."}
+				? many
+					? " — the rows below are unfiltered by them."
+					: " — the rows below are unfiltered by it."
+				: `. No search ran — ${many ? "they were the only filters" : "it was the only filter"} supplied. The rows below are the default blocked-submissions feed, not audit-search results: content removals and user bans are never in it.`}
 		</p>
 	);
 }

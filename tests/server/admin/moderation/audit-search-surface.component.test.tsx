@@ -141,6 +141,53 @@ describe("S-6 · a dropped date predicate is visible (D17)", () => {
 		);
 	});
 
+	it("R3-4 · reads correctly when BOTH dates are invalid — plural, and still true", () => {
+		// `?from=junk&to=junk` is a TESTED case ("names BOTH when both are
+		// unparseable"), and the fallback copy said "it was the ONLY FILTER
+		// supplied" over two supplied filters. Copy-only fix; the three
+		// load-bearing claims must survive verbatim.
+		const sp = { from: "junk", to: "junk" };
+		expect(invalidDateFields(sp)).toEqual(["From", "To"]);
+		expect(searchRan(sp)).toBe(false);
+		render(
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
+		);
+		const note = screen.getByTestId("invalid-date-note");
+
+		// PLURAL, and no singular residue anywhere in the sentence.
+		expect(note.textContent).toContain("From and To");
+		expect(note.textContent).toContain("the only filters supplied");
+		expect(note.textContent).not.toContain("the only filter supplied");
+		expect(note.textContent).not.toContain("That value");
+
+		// ⚠ THE THREE LOAD-BEARING CLAIMS — unweakened.
+		expect(note.textContent).toContain("No search ran");
+		expect(note.textContent).toContain("blocked-submissions feed");
+		expect(note.textContent).toContain(
+			"content removals and user bans are never in it",
+		);
+	});
+
+	it("R3-4 · the SINGULAR case keeps singular copy", () => {
+		// The positive control for the plural fix: a one-field drop must NOT
+		// acquire plural copy. Without this, "always plural" would pass above.
+		const sp = { from: "junk" };
+		render(
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
+		);
+		const note = screen.getByTestId("invalid-date-note");
+		expect(note.textContent).toContain("the only filter supplied");
+		expect(note.textContent).not.toContain("the only filters supplied");
+		expect(note.textContent).toContain("That value");
+		expect(note.textContent).toContain("No search ran");
+	});
+
 	it("POSITIVE CONTROL — renders NOTHING when every date parsed", () => {
 		// A note that always rendered would satisfy the assertion above.
 		const sp = { from: "2026-08-12" };
