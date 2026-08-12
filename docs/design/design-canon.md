@@ -233,7 +233,7 @@ CTA present on Error (`Reload`) and absent on Empty.
 
 ### C-CHART-1 · Market price chart — expanded-overlay presentation
 
-**Ruled 2026-08-12 IST. Ratifies built state at `198d1d0`.** Governs the expanded overlay of `/m/[slug]`'s price chart — `MarketPriceChartOverlay` and `MarketPriceChart mode="expanded"`. The collapsed card's behaviour is SPEC.1 §9's and is not restated here.
+**Ruled 2026-08-12 IST. Ratifies built state measured at `198d1d0` and unchanged at `dfa3012`, the ground of the commit that landed it — `#322` touched no file under `src/`, so the chart components are byte-identical at both.** Governs the expanded overlay of `/m/[slug]`'s price chart — `MarketPriceChartOverlay` and `MarketPriceChart mode="expanded"`. The collapsed card's behaviour is SPEC.1 §9's and is not restated here.
 
 **Why this is canon's and not a spec's.** **SPEC.1 §9 · "X domain — market lifetime"** routes it here by name — *"Axis labels are the domain endpoints; intermediate tick granularity in expanded mode is a design decision (canon-owned), not a spec pin"* — and **`docs/plans/UI.19.md` §Self-critique #1** repeats the routing while fencing it out of the build: *"intermediate tick granularity is canon-owned, not spec-pinned — build endpoints only."* The component's own docblock says the same. **Three documents named canon as owner and canon never received the item** — verified 2026-08-12: the word `chart` appeared **zero** times in this file. This closes that gap. No new spec is written and none is needed: F-DEBATE-5 governs the overlay's behaviour, data, modes, X domain, node selection, freeze and refresh, and eight `debate-view::price-chart-*` rows in SPEC.1 §17 pin it. What was missing was never behaviour — it was presentation.
 
