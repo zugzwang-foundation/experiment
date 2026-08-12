@@ -53,8 +53,36 @@ function stripComments(src: string): string {
  * declarations still sit above the gate**, so the self-match surface is large,
  * not residual.
  *
- * Residual, stated rather than hidden: a decoy inside a STRING LITERAL within
- * the page body itself would still bind. Comments are stripped; strings are not.
+ * ⚠ RESIDUALS — THREE, not the one this docblock originally claimed.
+ * @security-auditor (read-3) demonstrated each against the real page; the
+ * original text said only the first and therefore overstated the guard's
+ * resistance. A control recorded with a misleading cause is itself a defect
+ * (O-3), so all three are named:
+ *
+ *   1. A decoy inside a STRING LITERAL within the page body binds the gate
+ *      probe. Comments are stripped; strings are not.
+ *   2. `stripComments` anchors `//` at LINE START (`/^\s*\/\/.*$/gm`), so a
+ *      TRAILING comment survives it — gate deleted plus `// requireAdminPage()`
+ *      appended to an existing line left the probe GREEN at gateAt=174.
+ *   3. The SLICE KEY is itself decoy-able: a string containing
+ *      `export default async function` ABOVE the page moves the slice start to
+ *      the top of the file and re-widens the scope — gate deleted plus such a
+ *      string left the probe GREEN at gateAt=36.
+ *
+ * All three require a committer, not an attacker, and all three are bounded by
+ * an INDEPENDENT BEHAVIOURAL control: `audit-page-auth.test.ts` invokes the real
+ * page with a null session through the real `requireAdminPage` and asserts the
+ * loader is never called. A deleted gate goes RED there whatever this textual
+ * probe does. That is why these are LOW and why this probe is a tripwire, not
+ * the gate.
+ *
+ * ⚠ AND ONE THING THE SCOPING COST, recorded so it is not rediscovered as a
+ * regression: a MODULE-SCOPE `loadModerationAuditFeed(...)` above the gate was
+ * caught by the old whole-file probe and is NOT caught by this body-scoped one
+ * (verified OLD RED / NEW GREEN). Contrived — it needs top-level await in a
+ * `force-dynamic` page — and it leaks nothing, since render is still gated. The
+ * L-4 self-match fix is worth more than the case it lost; the trade is stated,
+ * not hidden.
  */
 function pageComponentBody(src: string): string {
 	const stripped = stripComments(src);
