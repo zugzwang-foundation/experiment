@@ -221,6 +221,8 @@ This is **usage, not value**, and the value half is machine-enforced.
 
 **Forbidden in a machine PR, without exception:** anything under `src/server/**` · any field on `DebateViewModel` or a type it transitively contains · any submit path, handler or the argument-required gate · any migration, event type, ADR or SPEC edit · any file outside the declared component list.
 
+⚠ **`docs/**` writes NAMED IN A RATIFIED PLAN are INSIDE the boundary — amended 2026-08-12 at POLISH.3.** As written, the clause above forbade the register, tracker and `docs/parked.md` writes that §7's ratification record and §12's close-out hygiene *require* — including §12's own rule that a routing destination gets a `docs/parked.md` row **in the same commit**. Two mandates in one document, jointly unsatisfiable, and invisible from either alone: **§13.1's failure shape, committed by the document that mints §13.1.** It was found on paper at POLISH.3's plan gate rather than by an unattended run at 02:00, which is what §13.1 exists to buy. **The prohibition now binds `src/`, `tests/`, and every file a plan does not declare; a plan's declared file list may name `docs/**` paths, and the plan is then the authority for which.**
+
 > **⚠ This bounds the MACHINE PR, not the surface.** A halted delta routes to a gated follow-on where these prohibitions do not apply and the named-reviewer cascade does. DISCOVERY-COMPLETE changed `hero.ts` and added four DTO fields — correctly. Conflating the two produces either a template that forbids necessary work, or a machine pass quietly doing read-model work under a cosmetic gate.
 >
 > **One carve-out:** a canon amendment that a code change depends on lands in the **same commit** as that code. Docs are not SPEC.
