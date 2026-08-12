@@ -19,7 +19,7 @@
 | **.1 Shell** | ✅ #288 · #289 · #290 | ❌ | **CLEAR** — B4 void · B8 struck · B10 closed | — | Joins the comprehensive pass |
 | **.7a Auth** | ✅ **#320** `86a245f` | ❌ | **none** | single gated pass (⚠ the reviewer cascade ran anyway, and returned a CRITICAL) | **OPEN, not closed** — joins the comprehensive pass |
 | **.2 Discovery** | ✅ #306 · #311 · #312 · #313 | ❌ | **CLEAR** — B2 closed #276 | — | Joins the comprehensive pass |
-| **.3 Market Detail** | ❌ | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ **RUN NEXT** — `.7a` closed 2026-08-11 (#320). ⚠ 3 inherited rows · ✅ R13 RULED 2026-08-12 — the chart overlay is inspectable (SPEC.1 §9 F-DEBATE-5 + canon `C-CHART-1`) |
+| **.3 Market Detail** | ⏳ **RUNNING** | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ Plan committed at `docs/plans/POLISH-3.md`; **two PRs**, FRAME then CARDS. ⚠ **Inherited rows are ENUMERATED in `POLISH-register.md`'s POLISH.3 table and are not counted here** — this cell previously carried a count that had drifted one behind the register (§13.3). ✅ R13 RULED 2026-08-12 — the chart overlay is inspectable (SPEC.1 §9 F-DEBATE-5 + canon `C-CHART-1`) |
 | **.4 Composers** | ❌ | ❌ | **CLEAR** — B1 closed | **full ritual** | ▶ after .3. Co-owns RR-3 |
 | **.5 Profile** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ⚠ **REGISTER-APPLY first** |
 | **.6 Bookmarks** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ▶ after .5 |
@@ -40,7 +40,7 @@
 | **B4** | UI.11 AGPL footer | ⚠ **VOID** — withdrawn, not deferred. SPEC.1 v1.0.26 `:1498`. The §13 obligation survives, relocated to the ToS body |
 | **B8** | P4 freeze banner | ⚠ **STRUCK from `.1`** — SPEC-blocked on the unwritten §21.7 rider, and it renders only at freeze. Not inspectable in the window even if built |
 | **B10** | 404 boundaries | **CLOSED** — `acc2e03` (#283) |
-| **B11** | "Read more" | **NOT CLOSED** — zero occurrences repo-wide. `PD-0-01`, blocked on R4 |
+| **B11** | "Read more" | **NOT CLOSED** — zero occurrences repo-wide. `PD-0-01`. ✅ **No longer blocked on a ruling** — R4 RULED 2026-08-12, adopt. Scheduled to **POLISH.3 PR 2** for the `.3` site, then `.5` and `.6` |
 | **B12** | `text-white` | **NOT CLOSED** — one site, `audit/page.tsx:75`. `.8`'s row |
 | **C3** | CD-A pop-up close-out | **CLOSED** — `54b0b2a` (#278), five days before the document that called it uncommitted |
 
@@ -53,7 +53,7 @@
 | | Gate | Effect |
 |---|---|---|
 | **R13** | ✅ **RULED 2026-08-12 — no ruling in the index is OPEN.** `SPEC.CHART` is confirmed a phantom (absent repo-wide), but the chart's tier-1 baseline is **SPEC.1 §9 F-DEBATE-5** + eight §17 rows, and its presentational baseline is now **canon §10 `C-CHART-1`** | POLISH.3 inspects the overlay normally. `PD-0-16` reclassed **S → R** and closed. One new row minted for `.3` — `PD-3-04`, the overlay's missing accessible summary, a tier-1 conformance gap |
-| **R4 · R10 · R14** | Scheduled to `.3`'s kickoff | Dispositions, not blockers. ⚠ **R14 has no register row** — mint it at kickoff or it is lost |
+| **R4 · R10 · R14** | ✅ **ALL RULED 2026-08-12** at POLISH.3's kickoff | Dispositions taken; the full text is at `docs/plans/POLISH-3.md` §3 and the index states are in `POLISH-0.md` §0. **R4** → adopt "Read more" (`.3` PR 2 · `.5` · `.6`) · **R10** → `accepted-divergence`, canon `C-PRICEBAR-1`, founder-set P12 · **R14** → two rows, ✅ **minted as `PD-3-05` / `PD-3-06`** |
 | **R11 · R12** | Scheduled to `.5` / `.6` | ⚠ R12's INV-3 arm already shipped; only cosmetic consolidation remains |
 | **R7** | Scheduled to `.8` | One line |
 | **R15** | Guard to mint, not a product ruling | Quality lane. B12 is its one live instance |
@@ -73,11 +73,11 @@ Already owned. **An inspection that rediscovers one of these files `duplicate-of
 | **SideBadge presets** | ✅ **NOW OWNED — the rows exist.** ~~UNOWNED — no register row exists … a one-member union~~ was true until PRIMITIVES-2 PR-B (#318, `0ff2733`). **The SEAM landed**: `CHIP.detail` (10px) and `CHIP.profile` (8.5px) exist, the union is three-member, both are render-tested at both poles, and **zero call sites are wired by ruling D5** — a guard asserts it stays so. The `.6` routing error was corrected in `badges.tsx:18`; `DISCOVERY-COMPLETE.md` is a landed historical plan and was deliberately left alone, so **`PD-5-01` is the correction of record**. ⚠ Do **not** reuse `CHIP.profile` for d5's `.sm` sites — d5 carries contextual `border-radius:4px` overrides (`:882`, `:911`) a flattened preset cannot express | **`PD-3-03`** (`.3`) · **`PD-5-01`** (`.5`) — minted; adoption is theirs |
 | **RR-4** | `PositionMarker` outline → filled on `/bookmarks` and `/u/[pseudonym]`. **Founder-ACCEPTED known delta** — the adoption that delivered the missing `aria-label` | **Do not re-file.** `.5` / `.6` inspect the consolidated state |
 | **CC-9** | `(admin)/…/ReviewFeed.tsx:102-104` hand-rolls a side chip. Correct today, **excluded from the pole guard by directory**, and it is the chip the operator reads sides from while moderating. It can drift with nothing on disk going red | **`.8`** |
-| **PD-0-01** | `<Plus /> Full` where CD-A ratified "Read more". Zero occurrences repo-wide, re-verified 2026-08-10 | **`.3` · `.5` · `.6`**, on R4 |
+| **PD-0-01** | `<Plus /> Full` where CD-A ratified "Read more". Zero occurrences repo-wide, re-verified 2026-08-10 | **`.3` PR 2 · `.5` · `.6`** — R4 RULED 2026-08-12, adopt. ⚠ `.5`/`.6` are a **different remedy**: bare CSS clamps with no affordance at all, so an *addition*, not a rename |
 | **C0 inventory** | The pole guard's `PERMITTED_FILES` is **deliberately brittle**. Each new pole site is a **decision** — add the file explicitly with a reason. **Never relax the predicate** | every surface |
 | **CC-2** | `AGENTS.md` §3 still carries the superseded round-trip form. The reusable one is `1 + 12N`, machine-pinned | doc sweep |
 | **CC-5** | Spec↔code drift on `price_at_bet` — `debate-export.md:177` and `SPEC.2.md:2721` both say the entry price is the market YES-probability; the engine stores the **bought side's** price. The shipped export is numerically correct; the prose is not. ⚠ **SPEC.2 is web-authored — CC must not draft it** | founder-authored doc sweep |
-| **REGISTER-APPLY** | ⚠ **13 rows in `POLISH-register-ADDITIONS.md` are unapplied**, six of them `PD-5-nn`. **POLISH.5's register table reads empty while carrying six rows.** Allocate real numbers from the live high-water mark and route per the file's own checklist | **before `.5`** |
+| **REGISTER-APPLY** | ⚠ **11 rows in `POLISH-register-ADDITIONS.md` are unapplied**, six of them `PD-5-nn`. **POLISH.5's register table reads empty while carrying six rows.** Allocate real numbers from the live high-water mark and route per the file's own checklist. ✅ **Two were applied at POLISH.3's commit 0 (2026-08-12) as `PD-3-07` and `PD-3-08`**, so checklist item 4 has run once, for POLISH.3 only. ⚠ **The "before `.5`" timing was wrong about WHEN** — two of §C's three rows were `.3`'s and `.3` ran first; the date below is a floor for the remainder, not a start. ⚠ **§C's surviving row is routed to POLISH.1, whose machine phase is already complete** (#288 · #289 · #290) — its only remaining venue is the comprehensive founder pass, and it needs a named owner there | **before `.5`** |
 
 ---
 

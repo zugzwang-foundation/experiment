@@ -7,7 +7,7 @@
 >
 > **IDs are PROPOSED.** `PD-<surface>-<nn>` must be allocated against the live register's high-water mark, which the stale copy cannot supply. Renumber on apply; the scheme is *never renumbered, never reused* once set.
 >
-> **Thirteen rows: six (§A — P5-e split, see below) + three (§B) + three (§C) + one (§D).**
+> **Eleven rows unapplied: six (§A — P5-e split, see below) + three (§B) + one (§C) + one (§D).** Two of §C's three were applied at POLISH.3's commit 0, 2026-08-12, and are struck in place below.
 
 ---
 
@@ -52,13 +52,13 @@
 | SP-2 | **DECISION** — add `CHECK (share_quantity > 0)` to `bets` | R | SPEC.2 §5 (`bets` inventory) | DB-predicted vs live verdicts matched 6/6 | routed | open | No storage-layer floor on `share_quantity` | STAGING-PARITY planning — **DDL: full ritual + ADR. Do not build silently.** |
 | SP-3 | **DOCKET** — one bad row makes a whole profile permanently unreachable; append-only means no remediation | S | SPEC.1 §5 INV-4 / Bucket-A append-only | Distinct React digest per user (`723741083` RedOtter002, `154092059` dave, `2860378395` alice) — one offending bet id each | routed | open | Guard is correct; there is no repair path behind it | STAGING-PARITY — **`episodes.ts:168` is CORRECT. Do not weaken it. The question is blast radius, not whether to refuse.** |
 
-## C · Visual / copy — three rows
+## C · Visual / copy
 
 | ID | Title | Class | Baseline | Evidence | Disposition | Status | Root cause | Routed to |
 |---|---|---|---|---|---|---|---|---|
 | PD-1-nn *(proposed)* | Portfolio / Balance read as **nested** by a reader | V | tier-2 · SPEC.1 §21.8 | Operator read, staging global header (`Portfolio Đ 10` · `Balance Đ 1,010`) | routed | open | §21.8's labels carry load-bearing work and may not be sufficient on their own | POLISH.1 |
-| PD-3-nn *(proposed)* | `Đ10 staked` on `/m/[slug]` vs `Đ 100 staked` on discovery — Đ-glyph spacing inconsistent for the same quantity | V | tier-2 · SPEC.1 §10.8 governs the **value**; glyph spacing is unspecified — this is an internal inconsistency, not a spec violation | **VERIFIED IN SOURCE at `997f308`, not off the capture:** `MarketHeader.tsx:98` `` `Đ{formatDharma(...)} staked` `` (**no space**) vs `StatLine.tsx:31` `` `Đ {formatDharma(...)}</b> staked` `` (**space**) | routed | open | Two independent call sites for one design-language element; no shared primitive | POLISH.3 (defect) · POLISH.2 (reference form) |
-| PD-3-nn *(proposed)* | `"1 posts"` — count never pluralised | V | tier-2 · design-language copy register | Market page + discovery cards | routed | open | Bare interpolation, no plural rule | POLISH.3 · POLISH.2 |
+| ~~PD-3-nn *(proposed)*~~ → **`PD-3-07`** · **APPLIED 2026-08-12** | `Đ10 staked` on `/m/[slug]` vs `Đ 100 staked` on discovery — Đ-glyph spacing inconsistent for the same quantity | V | tier-2 · SPEC.1 §10.8 governs the **value**; glyph spacing is unspecified — this is an internal inconsistency, not a spec violation | **VERIFIED IN SOURCE at `997f308`, not off the capture:** `MarketHeader.tsx:98` `` `Đ{formatDharma(...)} staked` `` (**no space**) vs `StatLine.tsx:31` `` `Đ {formatDharma(...)}</b> staked` `` (**space**) | routed | open | Two independent call sites for one design-language element; no shared primitive | POLISH.3 (defect) · POLISH.2 (reference form) |
+| ~~PD-3-nn *(proposed)*~~ → **`PD-3-08`** · **APPLIED 2026-08-12** | `"1 posts"` — count never pluralised | V | tier-2 · design-language copy register | Market page + discovery cards | routed | open | Bare interpolation, no plural rule | POLISH.3 — ⚠ **POLISH.2's half is CLOSED and this routing was half-stale.** Fixed and pinned at V48, `tests/unit/discovery/render/stat-line.test.tsx:37-46`; `/m/[slug]` is the only unfixed surface |
 
 **On PD-3-nn (spacing):** the operator flagged this as read off a screenshot and asked for verification before docketing. **Verified — it is real**, and the evidence above is the source citation rather than the capture. Which form is correct (spaced or unspaced) is a ruling, not a finding; both surfaces render the same market staked total.
 
@@ -84,3 +84,7 @@
 **6.** Emit one batched summary row into the tracker at surface close — never row-by-row.
 
 *G1's seven requirements are **not** here by ruling — they go to the separate web-authored docs task against `docs/maintenance.md` and the recon template.*
+
+⚠ **Item 4 has RUN ONCE — POLISH.3 only, 2026-08-12.** §C's Đ-glyph and pluralisation rows were applied at POLISH.3's commit 0 as **`PD-3-07`** and **`PD-3-08`**, and are struck in place above with their allocated IDs. The other eleven rows are untouched and still owed at `REGISTER-APPLY`. ⚠ **`REGISTER-APPLY`'s stated timing of *"before `.5`"* was wrong about WHEN** — two of §C's three rows were POLISH.3's, and POLISH.3 ran first.
+
+⚠ **AN APPLIED ROW IS STRUCK, NEVER DELETED — ruled 2026-08-12, because this file did not say.** The original text is the record of what was proposed and against which baseline; deleting it destroys the provenance the live register's `routed_to` field points back at. Strike the **ID cell**, name the allocated ID and the date, and leave every other cell intact. This is the form already used at `POLISH-TRACKER.md` §3, `POLISH-0.md` §3 · POLISH.1, and `docs/parked.md`'s closed rows.

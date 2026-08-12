@@ -1,6 +1,6 @@
 # UI.19 EXECUTE — overnight unattended run log
 
-> **UNCOMMITTED / untracked.** Never `git add` this file — PR diffs stay code-only.
+> **COMMITTED** at `a3f136e` (#274). ⚠ This header previously read *"UNCOMMITTED / untracked. Never `git add` this file — PR diffs stay code-only."* — false since #274, and unambiguous enough that a session reading it would refuse to stage a correction to it. Corrected 2026-08-12 at POLISH.3's commit 0, per `docs/parked.md`'s `UI19-LOG-SELF-DESCRIPTION`.
 
 ---
 

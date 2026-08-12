@@ -1461,7 +1461,7 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 ---
 
-## UI19-LOG-SELF-DESCRIPTION — a committed file that says it is not
+## ~~UI19-LOG-SELF-DESCRIPTION~~ — ✅ **CLOSED 2026-08-12** · a committed file that said it was not
 
 **Originating task:** SPEC.CHART / R13 (2026-08-12), the recon, as an anomaly.
 
@@ -1474,6 +1474,8 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** The next `docs/logs/UI-19-log.md` touch, or POLISH.3's kickoff — whichever comes first. One-line header correction; no other content changes.
 
 **Expected next task.** POLISH.3. Evidence: `docs/logs/UI-19-log.md` header block; `git log a3f136e`; `POLISH-0.md` §3 · POLISH.3 · Tier 3.
+
+✅ **CLOSED at POLISH.3's commit 0, 2026-08-12.** The trigger — *"POLISH.3's kickoff"* — fired, and the header blockquote at `docs/logs/UI-19-log.md:3` was corrected to state the file's true committed status. One line; no other content changed. ⚠ **The contradiction was NOT resolved by untracking**: `tests/unit/docs/session-logs-survive.test.ts:70` asserts a `>= 150` floor over tracked session logs.
 
 ---
 
@@ -1633,3 +1635,53 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** Founder ruling on (a)/(b)/(c), then build.
 
 **Expected next task.** A small CI/workflow task. Not go-live gating, but it compounds: every stale day is a day the founder pass and the go-live rehearsal run against the wrong tree.
+
+---
+
+## MEDIA.2-GOLIVE — market media is spec-mandated on `/m/[slug]` and does not render there
+
+**Originating task:** POLISH.3 commit 0 (2026-08-12). Named as a destination in `docs/plans/POLISH-3.md`, so it gets a row in the same commit (`POLISH-0.md` §9's standing rule).
+
+**Deferred work.** SPEC.1 §9 mandates market media on the market-detail surface. Admins can upload it (ADR-0026 / ADR-0027) and Discovery renders it; `/m/[slug]` does not. Every `market_media` consumer in `src/` is admin-side or Discovery-side, with **zero** under `src/server/debate-view/` or `src/components/debate/`.
+
+**Why deferred.** ⚠ **This is a SCOPING question that a committed document already answered, and the row exists because the answer left an obligation unowned.** `POLISH-0.md` §3 · POLISH.3 · MEDIA.2 states: *"NOT BUILT — the question is answerable and the answer is no … **POLISH.3 does not absorb it.** If it is ever built it is a build row with its own founder eyeball at PR (W2.9, design-at-build)."* That settles whose it is **not**. It does not name whose it **is**, and SPEC.1 §9's obligation survives regardless. **A resolved scoping question with a live tier-1 obligation behind it is exactly the phantom-prerequisite shape the standing rule exists for.** This row does not re-open the scoping; it names an owner and a date.
+
+⚠ **Related but distinct: `PD-3-09`.** POLISH.3 PR 1 removes the dev-facing placeholder box that named market media and resolver cards on the header. That removal deletes the only **on-screen** trace that these elements are missing. This row and `POLISH-0.md` §3's MEDIA.2 cell are the record that survives it, deliberately.
+
+**Conditional trigger.** Founder decision on whether market media ships for the experiment phase. **If yes, before 2026-09-15** — it is a build row under W2.9 design-at-build with its own founder eyeball at PR, and it runs in a **PARALLEL lane**, not inside a POLISH surface pass.
+
+**Expected next task.** A build row, founder-scheduled. Evidence: SPEC.1 §9; ADR-0026 · ADR-0027; `POLISH-0.md` §3 · POLISH.3 · MEDIA.2; `POLISH-register.md` `PD-3-09`.
+
+---
+
+## REPLY-MASK-TYPE-SHAPE — the reply masking path is held by branch placement, not by the compiler
+
+**Originating task:** POLISH.3 commit 0 (2026-08-12), from the recon. Named as a destination in `docs/plans/POLISH-3.md`.
+
+**Deferred work.** The **post** masking path is type-enforced: a removed post's variant drops the fields a consumer must not read, so a mistake is a compile error. The **reply** path is not — `DebateReply`'s removed variant retains `id`, so nothing in the type system prevents a consumer reading through a mask. The property is held today by **where the branch sits** plus **one test**, and both are runtime facts. Evidence: `ReplyCard.tsx:19-28`.
+
+**Why deferred.** ⚠ **ADR-0034 D-1 territory — route it, do not build it.** Any fix touches `DebateViewModel` or a type it transitively contains, which is re-scoped and never built inside a POLISH machine pass (`POLISH-0.md` §5.1 / R17). D-1 exists because `DebateViewModel` is the input type of the public 2026-11-06 export (ADR-0025) and because viewer-independence is what makes content-removal masking **structurally** safe rather than merely tested.
+
+⚠ **Not currently a leak.** The masking is correct today. What is missing is the structural guarantee — O-1: a missing required field is a compile error; a correctly-placed branch is a thing someone must not move.
+
+**Conditional trigger.** The next task with permission to change `DebateViewModel` — a gated follow-on with the named-reviewer cascade. Also fires on any observed reply-mask defect, which would make it urgent rather than structural.
+
+**Expected next task.** A gated read-model task, ADR-0034-aware. Evidence: `ReplyCard.tsx:19-28`; ADR-0034 D-1; `POLISH-0.md` §5.1.
+
+---
+
+## DEBATECOLUMN-FALLBACK-DEAD — a dead legacy header branch survives R1, by ruling
+
+**Originating task:** POLISH.3 commit 0 (2026-08-12). Named as a destination in `docs/plans/POLISH-3.md` §5 G-2.
+
+**Deferred work.** `DebateColumn.tsx:49-70` renders `{header ?? (<>…legacy head…</>)}`. **Both production mounts pass `header`** — `DebateView.tsx:244` and `:308` — so the fallback is unreachable in the product. `header` is still optional (`:31`, `header?: ReactNode`). Making it required and deleting the branch would remove a dead code path and let the compiler enforce what the call sites already do.
+
+**Why deferred — and this is a RULING, not an oversight.** R1 names **`:58-66`**, which is the `<Button>`, not the branch. POLISH.3's kickoff contradicted itself on this — R1 said the Button, §5 said *"the dead fallback"*, and §5's gap 1 named `:49-70` — and the founder **ruled the narrow reading on 2026-08-12**. Deleting the branch is a structural refactor of a shared component's **type**, which no ruling authorises and a cosmetic pass must not take. It also breaks four currently-green assertions in files a cosmetic PR has no business editing: `side-badge.test.tsx:112` (the `>= 13` floor), `:119` (set equality over `countByFile`, which names `DebateColumn.tsx: 1`), `:130` (`toHaveLength(12)`), and `price-percent-pair.test.tsx:59-73`, whose `53/47/not-48` assertions read `{pct}` from inside the fallback.
+
+⚠ **The B2/PCT.ROUND guarantee is NOT at risk either way** — the same property is already asserted against both live paths at `price-percent-pair.test.tsx:75-99` (`SlotHeader`) and `:101-121` (`PositionStrip`).
+
+⚠ **Standing condition, live during POLISH.3 PR 1:** if execute concludes the whole branch should go rather than just the Button, **that is a ⛔ RUN-STOP**, not a judgment call — `docs/plans/POLISH-3.md` §12 condition 5.
+
+**Conditional trigger.** POLISH.4, which owns the composer surfaces and `SlotHeader`, or any task with permission to change a shared debate component's prop types. Not go-live gating; it is dead code, not a defect.
+
+**Expected next task.** POLISH.4, or a small typed-props cleanup. Evidence: `DebateColumn.tsx:31`, `:49-70`; `DebateView.tsx:244`, `:308`; `docs/plans/POLISH-3.md` §5 G-1 · G-2 · §12.
