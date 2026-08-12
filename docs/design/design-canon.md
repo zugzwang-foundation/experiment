@@ -24,7 +24,7 @@
 | W2.2 onboarding deck (6 cards, Depth-1) | 🔒 locked 06-29 | 1 still (§8); final copy + artwork → branding wave |
 | W2.3 universal back | 🔒 locked 06-18 (function/structure); **visual resolved inside W2.4/5/14** | close-out (no own still) |
 | W2.4/.5/.14 global header (timer · visitor · radio slot · back/home · social · research) | 🔒 locked | still v0.2 (§8; v0.1 superseded) |
-| W2.6 Dharma graph (market + profile halves) | 🔒 look locked 06-26 | prototype records (§8); throwaway Vite prototype off-repo |
+| W2.6 graph work (market **price chart** + profile Dharma graph) | 🔒 look locked 06-26 | prototype records (§8); throwaway Vite prototype off-repo. ⚠ The market half is a probability chart, not a Dharma graph — see §8 row 14 |
 | W2.7 bookmark Staked/Current | ✅ **resolved by DC ruling 1** (§4) — no still needed (page lives in v1.0 shell) | this canon |
 | W2.8 fresh-post compose entry | 🔒 locked 06-26 (single relabel `Buy` → `Đ BET`) | 1 still (§8) |
 | **W2.9 market-media tab** | **○ OPEN — not designed.** ADR-0026 itself routes the header pixels to a dedicated design-mockup task that must **precede MEDIA.2**; no still or close-out exists. Rides MEDIA.2's kickoff, not a DC blocker. | — |
@@ -42,7 +42,7 @@
 
 **Discovery** *(locked at integration v0.12)*. Market-discovery grid: hero featured market + 8 grid cards on **one shared carousel index** (hero market + both hero top posts + grid outline ring + active dot move in sync). Cards: image + title + stats + YES/NO bar. Rounded corners (`--r:8px`), ink argument text. Hero posts → the Reply page; author pseuds → Profile. Header identity: **Sign in / Sign up** logged-out, the **nav-identity widget** logged-in (ruling 4, §4).
 
-**Market Detail** *(frozen at integration v0.19 — the d5 "market" view)*. Media, resolution, resolver; two top posts side-by-side (**YES left / NO right**); market YES/NO bar. Post carousel: 4 posts/side. **Side-slot rule:** a bet's composer opens in the **opposite** slot so the side being bet on stays visible. Buy/Sell + position in the slot header; per-side colhead entry button reads **`Đ BET`** (W2.8). Pick is **view-only**.
+**Market Detail** *(frozen at integration v0.19 — the d5 "market" view)*. Media, resolution, resolver; two top posts side-by-side (**YES left / NO right**); market YES/NO bar. Post carousel: 4 posts/side. **Side-slot rule:** a bet's composer opens in the **opposite** slot so the side being bet on stays visible. Buy/Sell + position in the slot header; per-side colhead entry button reads **`Đ BET`** (W2.8). Pick is **view-only**. **Price-history chart slot** (SPEC.1 §9 · F-DEBATE-5): a collapsed card above the YES/NO bar — two-line YES/NO probability lines, no axis, no nodes, the whole card being the expand affordance — opening a fullscreen overlay (React state toggle, **not** a route) carrying the same lines with two X endpoint labels and the per-(UTC day, side) top-post nodes. Behaviour, X domain and node selection are SPEC.1's; the presentational rules are **C-CHART-1** (§10).
 
 **Reply** *(the d5 "postview" — per-post thread)*. **Columns are FIXED poles: left = YES, right = NO, for every post.** Column header = the side **price pill only** (`Yes 👍 38%` / `No 👎 62%`). **Support/Counter is a property of the POST, never the column** — it lives on the post's **split bar** (`Đ support ─ total ─ Đ counter`, with the Support/Counter buttons that open the composer) and in the composer ("Support/Counter <author>'s argument"). Replies route into columns by their **own** YES/NO side. Composer opens in the opposite slot.
 
@@ -146,7 +146,7 @@ All content is **illustrative dummy** — not final product copy (final copy, mi
 | 11 | State kit **P1–P7** + placement table (P7 minted at R8; T1 superseded) | `DESIGN_W2_11_state-kit_mockup-v0_1.html` | 🔒 W2.11 | ✅ |
 | 12 | State ledger (45-state disposition) | `W2.11_state-ledger_reconciled.csv` | named in the W2.11 close-out; **not found in PK — locate before DC.3** | ⚠ pending |
 | 13 | Post/reply share card | `DESIGN_W2_13_post-reply-share-card_mockup-v0_1.html` | 🔒 W2.13 | ✅ |
-| 14 | Dharma graph (profile + market halves) | `DESIGN-W2_6-graph-prototype-record.md` + `DESIGN-W2_6-profile-graph-CLOSE-OUT.md` | 🔒 look locked (prototype off-repo) | ✅ (records) |
+| 14 | Dharma graph (profile half) + **market price chart** (market half — ⚠ *not* a Dharma graph: it plots probability, and its production baseline is SPEC.1 §9 F-DEBATE-5 + §10 C-CHART-1, **not** this record) | `DESIGN-W2_6-graph-prototype-record.md` (market) + `DESIGN-W2_6-profile-graph-CLOSE-OUT.md` (profile) | 🔒 look locked (prototype off-repo) | ✅ (records) |
 | 15 | Universal back (function/structure) | `DESIGN_W2_3_universal-back_CLOSE-OUT.md` | 🔒 (visual in #8) | ✅ (record) |
 | 16 | Integration shell (navigable whole) | `DESIGN_integration-shell_v1_0.html` | 🔒 v1.0 — **PK-only by rule** | ✕ stays PK |
 | 17 | Market-media tab | — | **○ W2.9 OPEN** — design still to be produced before MEDIA.2 | — |
@@ -165,6 +165,8 @@ All content is **illustrative dummy** — not final product copy (final copy, mi
 ## §10 — Claude-Design fine-tune log (deferred to CD — logged, NOT resolved in DC)
 
 Carry these into the CD prompt sheet + sessions; none blocks DC or the handover.
+
+> **Numbering — ruled 2026-08-12.** The bare `R-n` / `Rn` sequence in this section is **CLOSED at R9**. Canon rulings from this date forward take the form **`C-<TOPIC>-<n>`** — `C-CHART-1`, and so on. The reason is a live collision: `POLISH-0.md` §0 runs its own **R1–R19** index over entirely different subjects, and this section's `R-2` / `R-3` / `R-5` are branding-session rulings that are **not** POLISH's R2 / R3 / R5. Two POLISH rulings still to land — **R10** (price-bar percentage labels) and **R14** (slot-header geometry and card media clip) — both state in their own text that their disposition *"appends to canon §10"*, and both dispose at POLISH.3. **They append here under the `C-` form, never as `R10` / `R14`.**
 
 1. **Side-chip shape inconsistency** — curved-rectangle (4px, card-scoped) vs pill chips still on reply cards + the `+` popover. Consolidated as-is; unify visually in CD.
 2. **Dead download icon** — the headzone download icon on Profile + Bookmark is visual-only ("later: download profile as a card"). W2.13 revived the *post/reply* share card but the profile-card JPEG **stays cut** — CD either wires the icon to a defined action or removes it; ledger as post-launch UI if kept.
@@ -226,6 +228,31 @@ them. P1's placement table gains **Discovery empty** and **Discovery error**;
 both now render the identical block (148px floor, `--r`, `bg-n0`, hairline,
 gap 10, pad 24; `.msg` 13.5/n6 ≤320px, `.sub` 12/n4), with P1's optional single
 CTA present on Error (`Reload`) and absent on Empty.
+
+---
+
+### C-CHART-1 · Market price chart — expanded-overlay presentation
+
+**Ruled 2026-08-12 IST. Ratifies built state at `198d1d0`.** Governs the expanded overlay of `/m/[slug]`'s price chart — `MarketPriceChartOverlay` and `MarketPriceChart mode="expanded"`. The collapsed card's behaviour is SPEC.1 §9's and is not restated here.
+
+**Why this is canon's and not a spec's.** **SPEC.1 §9 · "X domain — market lifetime"** routes it here by name — *"Axis labels are the domain endpoints; intermediate tick granularity in expanded mode is a design decision (canon-owned), not a spec pin"* — and **`docs/plans/UI.19.md` §Self-critique #1** repeats the routing while fencing it out of the build: *"intermediate tick granularity is canon-owned, not spec-pinned — build endpoints only."* The component's own docblock says the same. **Three documents named canon as owner and canon never received the item** — verified 2026-08-12: the word `chart` appeared **zero** times in this file. This closes that gap. No new spec is written and none is needed: F-DEBATE-5 governs the overlay's behaviour, data, modes, X domain, node selection, freeze and refresh, and eight `debate-view::price-chart-*` rows in SPEC.1 §17 pin it. What was missing was never behaviour — it was presentation.
+
+1. **Axis — endpoints only.** Two X labels in `fmtUtcDay` form ("Sep 15"), start anchored left, end anchored right, `n5` at 10px, expanded mode only. **No interior ticks, no gridlines, no bucketing, no day/week granularity rule.** ⚠ The d5 mockup's interior ticks — *"45d span · 15d breaks"*, two dotted rules at 33.33% / 66.66% — are **VOID for this component and are not a tier-4 divergence to be filed.** They derive from a fixed 45-day span; SPEC.1 §9 pins X to per-market lifetime and rules the fixed window out by name. A granularity derived from a constant span cannot govern a variable one.
+
+2. **Node — a plain dot.** `r=4`, filled by the post's frozen side token (`--graph-yes` / `--graph-no`, **INV-3** — never the `--color-*` slot, whose values the repo aliases such that a value-copy inverts the poles), with a 1.5px non-scaling rim in `--color-ground` separating a node from its same-token line. No stem, no snap line, no collision layout, no size encoding. ⚠ **`DESIGN-W2_6-graph-prototype-record.md` §3's locked node — a stake-sized inner disk inside a crowd-split ring, `scaleSqrt` honest-area — is NOT adopted.** It never shipped, and adopting it now is a build, not a polish. Docketed at `docs/parked.md` as **CHART-NODE-RING**. Recorded so a future reader does not mistake the plain dot for an oversight: it is a ruling.
+
+3. **Legend.** A two-item YES/NO key above the plot: a 4×0.5 swatch on each pole token beside its label, `n5` text, swatches `aria-hidden`. ⚠ **This element appears in no document at any tier** — not SPEC.1, not this canon before today, not `UI.19.md`, not the d5 mockup. It shipped unbaselined. It is **ratified here, not inherited**, and this clause is the first baseline it has ever had.
+
+4. **Panel.** Width `min(92vw, 880px)`, `--r` radius, `bg-n0`, `p-4`, `gap-3`. Plot area aspect **2:1** on a 640×320 viewBox. The collapsed card takes the full width of its parent at `p-3` with the **same** 2:1 plot — outer width and padding are the only geometric difference between the two modes.
+
+5. **Backdrop and close.** The backdrop fills the viewport on `--overlay`. The close control is a `✕` glyph at `--r-chip` radius, `n5` resting → ink on hover. ESC, backdrop click and `✕` all close; body scroll locks while open.
+
+**Explicitly NOT ruled here, and not absorbed:**
+
+- **The overlay's missing accessible summary.** SPEC.1 §9 · Accessibility requires a text summary naming opening price, current price and the domain endpoints. It exists on the collapsed card only; the overlay's SVG is `aria-hidden` and its only text is the dialog label plus two identical close names. That is a **tier-1 conformance gap with a live baseline**, not a presentational question — POLISH.3 files it as `PD-3-04`. `UI.19.md` scoped the summary to the card; tier 3 never supersedes tier 1.
+- **Overlay focus management.** No focus move on open, no trap, no restore on close; two controls sharing one accessible name; the backdrop button in the tab order. **Identical on `MarketPriceChartOverlay` and `ProfileGraphOverlay`** — one cross-surface item, routed to **A11Y.0**, not to either surface.
+
+**`DESIGN-W2_6-graph-prototype-record.md` is not a baseline for this component and must not be cited as one.** It is on-subject — probability lines, collapsed card → fullscreen overlay, one top post per (day, side) — and it is unusable: its X domain is the fixed Sep 15 → Nov 5 window SPEC.1 §9 rules out by name, every figure it derives from that window ("~46 nodes per side", "9 weekly labels") dies with it, its node primitive never shipped, and its own §10 item 1 instructs that a production spec be written **from** it. **Read it as history.**
 
 ---
 
