@@ -223,6 +223,16 @@ const SPANNING: ReadonlyArray<{
 		sp: { marketId: "00000000-0000-0000-0000-0000000000aa" },
 	},
 	{ name: "pseudonym only", sp: { pseudonym: "somebody" } },
+	// @code-reviewer MEDIUM (read-2): `userId` was the ONE field with no
+	// single-field row — it appeared only alongside five others, which
+	// co-determined the outcome. The reviewer built a userId-BLIND selector
+	// (`!!(from||to||actionType||marketId||pseudonym)`) and it passed all eleven
+	// cases while every other wrong-extraction class was caught. This row is the
+	// missing discriminator: oracle true, userId-blind selector false.
+	{
+		name: "userId only",
+		sp: { userId: "00000000-0000-0000-0000-0000000000bb" },
+	},
 	{
 		name: "every field valid",
 		sp: {
@@ -266,6 +276,21 @@ describe("R2-6 · searchRan is a PURE EXTRACTION of the pre-GC-1 selector", () =
 		const discriminating = SPANNING.filter((c) => naive(c.sp) !== oracle(c.sp));
 		expect(discriminating.map((c) => c.name)).toContain("invalid from");
 		expect(discriminating.length).toBeGreaterThan(0);
+
+		// A SECOND wrong-extraction class, from the read-2 review: a selector
+		// blind to ONE field. Nothing in the set caught it until "userId only"
+		// was added, so the property is pinned rather than left to the comment.
+		const userIdBlind = (sp: Parameters<typeof searchRan>[0]): boolean => {
+			const f = parseFilters(sp);
+			return Boolean(
+				f.from || f.to || f.actionType || f.marketId || f.pseudonym,
+			);
+		};
+		expect(
+			SPANNING.filter((c) => userIdBlind(c.sp) !== oracle(c.sp)).map(
+				(c) => c.name,
+			),
+		).toContain("userId only");
 	});
 
 	for (const { name, sp } of SPANNING) {
