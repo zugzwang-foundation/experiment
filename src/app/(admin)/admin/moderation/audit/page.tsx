@@ -8,13 +8,21 @@ import {
 } from "@/server/admin/moderation/audit-feed";
 import type {
 	AuditLogRowView,
-	AuditSearchFilters,
 	BlockedReason,
 	CategoryScore,
 	ModerationAuditRowView,
 	ModVerdict,
 } from "@/server/admin/moderation/audit-view";
 import { requireAdminPage } from "@/server/admin/page-guards";
+
+import {
+	ACTION_TYPE_PLACEHOLDER,
+	InvalidDateNote,
+	invalidDateFields,
+	parseFilters,
+	type SearchParams,
+	searchRan,
+} from "./search-surface";
 
 // UI.6 slice A + S4 — F-ADMIN-5 read-only moderation audit viewer (ADR-0021),
 // now nested under the Moderation tab with a searchParams-driven search form
@@ -72,7 +80,7 @@ function BanIndicator({
 }): React.ReactElement {
 	if (banned) {
 		return (
-			<span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-white">
+			<span className="inline-flex items-center gap-1.5 rounded-full bg-destructive px-2.5 py-0.5 text-xs font-semibold text-background">
 				<span aria-hidden>●</span>
 				BANNED
 				{bannedAt ? (
@@ -230,39 +238,6 @@ function AuditRow({
 	);
 }
 
-// ── S4 search surface ────────────────────────────────────────────────────────
-
-interface SearchParams {
-	from?: string;
-	to?: string;
-	actionType?: string;
-	marketId?: string;
-	userId?: string;
-	pseudonym?: string;
-}
-
-/** Build the AuditSearchFilters from raw search params (invalid dates dropped). */
-function parseFilters(sp: SearchParams): AuditSearchFilters {
-	const filters: AuditSearchFilters = {};
-	const from = sp.from ? new Date(`${sp.from}T00:00:00.000Z`) : null;
-	const to = sp.to ? new Date(`${sp.to}T23:59:59.999Z`) : null;
-	if (from && !Number.isNaN(from.getTime())) filters.from = from;
-	if (to && !Number.isNaN(to.getTime())) filters.to = to;
-	const trim = (v: string | undefined) => {
-		const t = v?.trim();
-		return t && t.length > 0 ? t : undefined;
-	};
-	const actionType = trim(sp.actionType);
-	const marketId = trim(sp.marketId);
-	const userId = trim(sp.userId);
-	const pseudonym = trim(sp.pseudonym);
-	if (actionType) filters.actionType = actionType;
-	if (marketId) filters.marketId = marketId;
-	if (userId) filters.userId = userId;
-	if (pseudonym) filters.pseudonym = pseudonym;
-	return filters;
-}
-
 const SOURCE_LABEL: Record<AuditLogRowView["source"], string> = {
 	mod_action: "moderation",
 	admin_event: "admin event",
@@ -299,7 +274,7 @@ function SearchForm({ sp }: { sp: SearchParams }): React.ReactElement {
 				<input
 					type="text"
 					name="actionType"
-					placeholder="content_removed · market.resolved …"
+					placeholder={`${ACTION_TYPE_PLACEHOLDER} …`}
 					defaultValue={sp.actionType ?? ""}
 					className={input}
 				/>
@@ -423,7 +398,7 @@ export default async function ModerationAuditPage(props: {
 
 	const sp = await props.searchParams;
 	const filters = parseFilters(sp);
-	const searching = Object.keys(filters).length > 0;
+	const searching = searchRan(sp);
 
 	// Search mode → the two-source union; default (no filters) → the unchanged
 	// blocked-submissions feed (loadModerationAuditFeed).
@@ -468,6 +443,8 @@ export default async function ModerationAuditPage(props: {
 				</div>
 
 				<SearchForm sp={sp} />
+
+				<InvalidDateNote fields={invalidDateFields(sp)} searchRan={searching} />
 
 				{/* admin_events has no writer yet — make its emptiness legible so an
 				    absent admin-event row reads as "not emitted", never "no match". */}
