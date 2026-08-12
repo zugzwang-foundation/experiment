@@ -35,6 +35,7 @@ import {
 	ACTION_TYPE_PLACEHOLDER,
 	InvalidDateNote,
 	invalidDateFields,
+	searchRan,
 } from "@/app/(admin)/admin/moderation/audit/page";
 import { modReasonEnum } from "@/db/schema/audit";
 import { EVENT_TYPES } from "@/server/events/schemas";
@@ -73,7 +74,17 @@ describe("S-6 · a dropped date predicate is visible (D17)", () => {
 	});
 
 	it("RENDERS the note when a date was dropped", () => {
-		render(<InvalidDateNote fields={invalidDateFields({ from: "junk" })} />);
+		// `searchRan` is now explicit: this is the search-DID-run shape, where the
+		// "unfiltered by it" wording is the true one. The fallback shape is case 3
+		// below. (Before GC-1 the note had one wording for both, which is the
+		// defect.)
+		const sp = { from: "junk", actionType: "content_removed" };
+		render(
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
+		);
 		const note = screen.getByTestId("invalid-date-note");
 		expect(note.getAttribute("role")).toBe("note");
 		expect(note.textContent).toContain("From");
@@ -81,10 +92,63 @@ describe("S-6 · a dropped date predicate is visible (D17)", () => {
 		expect(note.textContent).toContain("unfiltered");
 	});
 
+	// ── GC-1 · the three cases, and case 3 is the fire path ──────────────────
+	//
+	// `searchRan` is the page's own "did any predicate survive" decision, exported
+	// so these assertions run against the SHIPPED expression rather than a
+	// re-typed lookalike (V-1) — and so it cannot drift from the query the way
+	// M-2's re-derivation could have.
+
+	it("case 1 · invalid date WITH another filter — search RUNS, no fallback claim", () => {
+		const sp = { from: "junk", actionType: "content_removed" };
+		expect(searchRan(sp)).toBe(true);
+		render(
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
+		);
+		const note = screen.getByTestId("invalid-date-note");
+		expect(note.textContent).toContain("From");
+		// The search DID run, so the note must not claim a fallback happened.
+		expect(note.textContent).not.toContain("blocked-submissions");
+		expect(note.textContent).not.toContain("No search ran");
+	});
+
+	it("case 3 · ⚠ invalid date ALONE — search does NOT run, note states the fallback", () => {
+		// THE FIRE PATH. `?from=junk` with nothing else: parseFilters returns {},
+		// `searching` is false, and the page renders loadModerationAuditFeed —
+		// the gate-block feed, which by construction contains NO content_removed
+		// and NO user_banned rows. A note that says only "the rows below are
+		// unfiltered by it" asserts breadth it does not have: the operator reads
+		// "you are seeing everything" while looking at a set that structurally
+		// excludes what they searched for.
+		const sp = { from: "junk" };
+		expect(searchRan(sp)).toBe(false);
+		render(
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
+		);
+		const note = screen.getByTestId("invalid-date-note");
+		expect(note.textContent).toContain("From");
+		expect(note.textContent).toContain("No search ran");
+		expect(note.textContent).toContain("blocked-submissions");
+		// And it must NOT still be asserting the old breadth.
+		expect(note.textContent).not.toContain(
+			"the rows below are unfiltered by it",
+		);
+	});
+
 	it("POSITIVE CONTROL — renders NOTHING when every date parsed", () => {
 		// A note that always rendered would satisfy the assertion above.
+		const sp = { from: "2026-08-12" };
 		const { container } = render(
-			<InvalidDateNote fields={invalidDateFields({ from: "2026-08-12" })} />,
+			<InvalidDateNote
+				fields={invalidDateFields(sp)}
+				searchRan={searchRan(sp)}
+			/>,
 		);
 		expect(screen.queryByTestId("invalid-date-note")).toBeNull();
 		expect(container.textContent).toBe("");

@@ -291,11 +291,32 @@ export function invalidDateFields(sp: SearchParams): string[] {
 	return fields;
 }
 
-/** Renders nothing when every supplied date parsed — absence is the default. */
+/**
+ * Whether ANY predicate survived parsing — i.e. whether the F-ADMIN-5 search
+ * actually runs. Exported so the note and the page share ONE expression of this
+ * decision rather than two that can drift (the M-2 discipline).
+ */
+export function searchRan(sp: SearchParams): boolean {
+	return Object.keys(parseFilters(sp)).length > 0;
+}
+
+/**
+ * Renders nothing when every supplied date parsed — absence is the default.
+ *
+ * GC-1 — the note must never assert breadth it does not have. When the dropped
+ * date was the ONLY filter supplied, `searching` is false and the page does not
+ * run the search at all: it falls back to `loadModerationAuditFeed`, the
+ * gate-block feed, which by construction holds NO `content_removed` and NO
+ * `user_banned` rows. Saying only "the rows below are unfiltered by it" there
+ * reads as "you are seeing everything" while the operator looks at a set that
+ * structurally excludes what they searched for. So the fallback is stated.
+ */
 export function InvalidDateNote({
 	fields,
+	searchRan,
 }: {
 	fields: string[];
+	searchRan: boolean;
 }): React.ReactElement | null {
 	if (fields.length === 0) return null;
 	return (
@@ -307,8 +328,10 @@ export function InvalidDateNote({
 			<strong className="font-semibold">
 				{fields.join(" and ")} date ignored.
 			</strong>{" "}
-			That value could not be read as a date, so it was NOT applied — the rows
-			below are unfiltered by it.
+			That value could not be read as a date, so it was NOT applied
+			{searchRan
+				? " — the rows below are unfiltered by it."
+				: ". No search ran — it was the only filter supplied. The rows below are the default blocked-submissions feed, not audit-search results: content removals and user bans are never in it."}
 		</p>
 	);
 }
@@ -490,7 +513,7 @@ export default async function ModerationAuditPage(props: {
 
 	const sp = await props.searchParams;
 	const filters = parseFilters(sp);
-	const searching = Object.keys(filters).length > 0;
+	const searching = searchRan(sp);
 
 	// Search mode → the two-source union; default (no filters) → the unchanged
 	// blocked-submissions feed (loadModerationAuditFeed).
@@ -536,7 +559,7 @@ export default async function ModerationAuditPage(props: {
 
 				<SearchForm sp={sp} />
 
-				<InvalidDateNote fields={invalidDateFields(sp)} />
+				<InvalidDateNote fields={invalidDateFields(sp)} searchRan={searching} />
 
 				{/* admin_events has no writer yet — make its emptiness legible so an
 				    absent admin-event row reads as "not emitted", never "no match". */}
