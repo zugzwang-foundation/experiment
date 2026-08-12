@@ -382,6 +382,38 @@ Carried forward: build rows opened, rulings raised, each with a NAMED OWNER
 
 The last line is mandatory. With the founder pass batched, it is the only surviving carrier of the feedback loop.
 
+## §13 · Standing rules minted at POLISH.8
+
+Three rules, each from a defect that reached a founder. All three are about the **relay and the plan**, not about the code — which is where POLISH.8's cost actually landed.
+
+### §13.1 · Run the plan against its own stop conditions before shipping it
+
+**A plan can forbid its own execution, and the contradiction is invisible from the plan text alone.** POLISH.8's ⛔ stop condition S-0a halted the run if a guarded child-safety string appeared *"ANYWHERE in your working diff, in any file, for any reason"* — and §2 mandated committing the plan **verbatim**, while the plan's own text contained that string twice. The two mandates were jointly unsatisfiable: the run could not start. CC proceeded under a narrow stated exemption and the founder ratified it, but **an unattended overnight session was made to take a judgment call on the one condition class that is child-safety.**
+
+**The rule.** Before a relay ships: **run every stop condition against the plan's own commit 0**, and against the plan's own edit boundary. A carve-out written in advance — *"S-0a does not fire on the verbatim text of this plan"* — removes the judgment call entirely. **A guard that fires on the document defining it is not over-broad; it is broken.**
+
+### §13.2 · The edit boundary must name the tests that pin the behaviour, not only the source
+
+**Behaviour is pinned by tests, and a boundary drawn around source files forbids its own items.** POLISH.8's §4 listed *"the new admin-side test file(s)"* and no existing ones. S-3 — an ordinary confirm on Close, required by SPEC.1 — was therefore unshippable by construction: the old behaviour was asserted in a passing test **by name** (`close-is-one-click`). It halted at S-0k, proven at 1 failed | 5 passed, not predicted.
+
+**The rule.** For every item whose fix **changes behaviour**, the boundary names the existing tests that assert the current behaviour, or states that updating a test encoding a superseded position is in scope. ⚠ **And at recon: for every delta whose fix changes behaviour, grep the suite for a test pinning the current behaviour and report it on the row.** A delta with a green test defending it is a different, more expensive object than one without — and POLISH.8's recon filed that delta as doc-vs-doc when it was doc-vs-green-test.
+
+### §13.3 · Delete the count, or make the count and the enumeration the same artifact
+
+**A total written beside an enumeration will disagree with it.** Seven instances in this phase: `POLISH-TRACKER` §6 (EIGHT stated, SEVEN enumerated) · the POLISH.8 log's §7 and §10 (nine stated, eight enumerated) · §4 (*"20 rows"* / *"27 deltas"*, enumerating 21 against a true 28, with `D21` never existing) · §9 (*"Four things"*, six items) · and a 20-vs-19 commit count. **Four were inside PR #323 — one of them in the very section that minted the rule against it.**
+
+**The rule, and it has two forms.** Where the count carries no information — a lead-in like *"Four things"* — **delete it**; do not correct it, because the next added item breaks it again. Where the count is load-bearing, **make the count and the enumeration one artifact**: a numbered table of *n* rows fails visibly if the total is wrong. And **never write a total you did not just measure.**
+
+✅ **Evidenced, not merely argued:** after the numbered-table treatment was applied, the next instance — a 20-vs-19 commit count at Gate C read 3 — **died at authoring**, the first of the seven not to reach a founder.
+
+### §13.4 · Unattended runs fence by DIRECTORY on a critical path
+
+**An unattended run's stop conditions fence by DIRECTORY on a critical path, never by mechanism — and the fence is stated in the durable document, not only in the run's relay.**
+
+POLISH.8's stop set named the moderation **act path** — `moderateComment`, `recordGateBlock`, `BLOCKED_REASONS` — and not the moderation **directory**. The run legitimately edited `src/app/(admin)/admin/moderation/audit/page.tsx` with bypass permissions on, and the question surfaced at reconciliation rather than at relay-authoring time. **Fencing by mechanism requires the author to have enumerated every mechanism correctly in advance, which is exactly the assumption the guardrail exists because we cannot make.**
+
+**`src/app/(admin)/admin/moderation/**` joins the ⛔ stop set for any unattended run.** A relay-only fence dies with the session; that is O-1 applied to itself.
+
 ---
 
 *Authored by web Claude, 2026-08-10 IST, at the POLISH-TEMPLATE task. Ground `origin/main` @ `35d041d`. Supersedes `POLISH-STRATUM.md` following a statement-by-statement absorption audit. §1–§10 and §12 are written from three completed machine phases; **§11 is provisional and written from none.***

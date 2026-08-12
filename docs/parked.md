@@ -1615,3 +1615,21 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** Before 2026-09-15, when the public surfaces go live and a `robots.txt` is wanted for its own reasons.
 
 **Expected next task.** A small standalone task. Fix the comment even if the file is deferred.
+
+---
+
+## STAGING-AUTO-ADVANCE — `main → staging` has no mechanism
+
+**Originating task:** POLISH.8 close-out (2026-08-12), from the staging advance. Records the gap that O-4 names.
+
+**Deferred work.** Vercel auto-deploys staging from the **`staging` branch** (`branchMatcher: {"type":"equals","pattern":"staging"}`, `productionBranch: main`, `autoAssignCustomDomains: False`). **The second leg is automated; the first is not.** Nothing advances `main` → `staging`.
+
+**Why deferred.** ⚠ **`docs/runbooks/deploy-pipeline.md` §2.5 already predicted this and already recorded it happening once** — *"has never appeared in any build… fails nothing and reports nothing"*, eight commits by 2026-08-04. **It recurred on 2026-08-12: four merges, staging stale since 08-11.** The doc is accurate about the risk and **the standing step is prose, and prose is what got missed twice**. A third piece of prose is a receipt, not a fix (O-1).
+
+⚠ **One founder ruling is open and it must be taken before the mechanism is built:** auto-advancing means migrations run **unattended** on staging. **(a)** auto-advance always · **(b)** auto-advance, but **halt and notify** when the diff contains a migration · **(c)** a CI check that only reports staleness. **Web Claude's recommendation: (b).** Staging is production's migration rehearsal under ADR-0022/0024's drift guard, so the ordinary case should be automatic — but a migration is the one class where an unattended failure leaves staging half-applied, and ADR-0024 is explicit about sequencing. ⚠ **(c) is what already exists in prose form and it is what failed twice.**
+
+⚠ **Worth pinning while there:** the fixture exemption currently holds **because of what `staging-migrate.yml` happens not to contain**. One added line would silently end it. A guard asserting the workflow contains no seed/reset/truncate would make the exemption structural rather than incidental.
+
+**Conditional trigger.** Founder ruling on (a)/(b)/(c), then build.
+
+**Expected next task.** A small CI/workflow task. Not go-live gating, but it compounds: every stale day is a day the founder pass and the go-live rehearsal run against the wrong tree.
