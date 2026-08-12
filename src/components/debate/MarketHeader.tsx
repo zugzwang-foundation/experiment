@@ -16,6 +16,14 @@ const TERMINAL: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * PD-3-08 — the count and its noun agree: `1 post`, never `1 posts`. Zero is
+ * PLURAL (`0 replies`). Mirrors the shipped reference implementation in
+ * `src/components/discovery/StatLine.tsx`, which is file-private there and so
+ * cannot be imported without widening that module's surface.
+ */
+const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/**
  * The market lifecycle / resolution marker (INV-4 / design-language §3.1). A
  * terminal market (Closed/Resolving/Resolved/Voided/Frozen) reads as locked —
  * "read-only" — paired with the literal status (never colour alone, §8).
@@ -95,9 +103,15 @@ export function MarketHeader({
 			) : null}
 			<PriceBar pricing={market.pricing} size="detail" />
 			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-				<span>Đ{formatDharma(market.totals.dharmaStaked)} staked</span>
-				<span>{market.totals.postCount} posts</span>
-				<span>{market.totals.replyCount} replies</span>
+				<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+				<span>
+					{market.totals.postCount}{" "}
+					{noun(market.totals.postCount, "post", "posts")}
+				</span>
+				<span>
+					{market.totals.replyCount}{" "}
+					{noun(market.totals.replyCount, "reply", "replies")}
+				</span>
 			</div>
 			<DeferredPlaceholders />
 		</section>
