@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -112,8 +112,69 @@ const SITES: Site[] = [
 	},
 ];
 
+/**
+ * POLISH.3 §18 R-a — call sites that have NO `c5892bc` baseline, because the
+ * file did not exist at that commit.
+ *
+ * They cannot carry a `before`. That field is defined above as the VERBATIM
+ * className on disk at `c5892bc`, so authoring one for a file that was not
+ * there would invert the B2 no-change proof INSIDE the suite whose entire
+ * purpose is that proof — the same inversion V-1 fences on `DETAIL_BASELINE`.
+ * A greenfield site is therefore DECLARED here and left out of the class-set
+ * rows above, rather than faked into `SITES`. `SITES` stays at nine.
+ */
+const GREENFIELD: { file: string; reason: string }[] = [
+	{
+		file: "src/app/(public)/m/[slug]/error.tsx",
+		reason:
+			"POLISH.3 D4 / PD-3-11 — the /m/[slug] error boundary, added after c5892bc.",
+	},
+];
+
 const asSet = (s: string) => new Set(s.split(/\s+/).filter(Boolean));
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
+
+/** The two roots that may hold a `<PageContainer>` call site. */
+const CALL_SITE_ROOTS = ["src/app", "src/components"];
+
+/**
+ * EVERY `<PageContainer>` call site on the tree, read off disk.
+ *
+ * The rows above are a hardcoded array, self-consistent by construction: a NEW
+ * call site anywhere would silently escape the B2 no-change proof while every
+ * one of them stayed green. This is the only thing in this file that looks at
+ * the TREE rather than at a named path.
+ *
+ * ⚠ Each file is slurped WHOLE and matched with `callSite`'s own regex. A
+ * line-based scan would miss `(public)/not-found.tsx`, whose tag spans five
+ * lines. A bare `PageContainer` substring match would read the files that name
+ * the primitive in PROSE as call sites — `auth-error-boundary.test.tsx:90-94`
+ * records this repo already going RED on correct code for exactly that reason.
+ *
+ * ⚠ Scope is BOTH roots, deliberately. `src/app/(public)` alone would miss
+ * site 8, `src/app/(auth)/layout.tsx`, and a guard blind to part of its own
+ * domain reads as discharged over all of it.
+ */
+function treeCallSites(): string[] {
+	const found: string[] = [];
+	const walk = (rel: string) => {
+		for (const entry of readdirSync(join(process.cwd(), rel), {
+			withFileTypes: true,
+		})) {
+			const child = `${rel}/${entry.name}`;
+			if (entry.isDirectory()) {
+				walk(child);
+			} else if (
+				/\.tsx?$/.test(entry.name) &&
+				/<PageContainer\b[^>]*>/.test(read(child))
+			) {
+				found.push(child);
+			}
+		}
+	};
+	for (const root of CALL_SITE_ROOTS) walk(root);
+	return found.sort();
+}
 
 /** The real `<PageContainer>` tag at a site: its preset and its className. */
 function callSite(file: string): { preset: ContainerPreset; extras: string } {
@@ -288,6 +349,43 @@ describe("B2 — the container primitive moves nothing", () => {
 					`${name} declares ${axis}`,
 				).toBe(true);
 			}
+		}
+	});
+
+	/**
+	 * POLISH.3 §18 R-a — the declared set and the tree agree, asserted BOTH ways.
+	 *
+	 * ⚠ THE TWO DIRECTIONS ARE NOT REDUNDANT, and only one of them can go red on
+	 * the commit that introduces them. The tree holds nine sites and all nine are
+	 * already in `SITES`, so the direction below is GREEN THE MOMENT IT IS
+	 * WRITTEN. It is kept because it is the direction that catches a FUTURE
+	 * undeclared call site — the escape this whole pair exists to close. The RED
+	 * that proves the pair non-vacuous comes from the second direction only,
+	 * where `GREENFIELD` names a file disk does not have yet.
+	 */
+	it("every <PageContainer> on the tree is declared in SITES or GREENFIELD", () => {
+		const declared = new Set([
+			...SITES.map((s) => s.file),
+			...GREENFIELD.map((g) => g.file),
+		]);
+		for (const file of treeCallSites()) {
+			expect(
+				declared.has(file),
+				`${file} renders <PageContainer> but is declared in neither SITES nor GREENFIELD`,
+			).toBe(true);
+		}
+	});
+
+	it("every file declared in SITES or GREENFIELD is a real call site on disk", () => {
+		const tree = new Set(treeCallSites());
+		for (const file of [
+			...SITES.map((s) => s.file),
+			...GREENFIELD.map((g) => g.file),
+		]) {
+			expect(
+				tree.has(file),
+				`${file} is declared but renders no <PageContainer> on disk`,
+			).toBe(true);
 		}
 	});
 });
