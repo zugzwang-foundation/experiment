@@ -10,7 +10,14 @@ import { describe, expect, it } from "vitest";
 
 const ROOT = fileURLToPath(new URL("../../../../", import.meta.url));
 const FEED_MODULE = `${ROOT}src/server/admin/moderation/audit-feed.ts`;
-const PAGE_FILE = `${ROOT}src/app/(admin)/admin/moderation/audit/page.tsx`;
+// R3-1 (Gate C read-3) — the scanned set is DERIVED FROM THE DIRECTORY, never a
+// list of filenames. GC-5 moved a JSX-rendering component out of `page.tsx` into
+// a sibling and this guard kept reading green over the one file it named, so the
+// control got WEAKER WHILE READING GREEN. A named list is exactly what let one
+// file escape; a directory scan picks up the next one automatically (O-1:
+// structural beats procedural).
+const AUDIT_ROUTE_DIR = `${ROOT}src/app/(admin)/admin/moderation/audit`;
+const PAGE_FILE = `${AUDIT_ROUTE_DIR}/page.tsx`;
 
 // Anything that could turn an r2 key into a viewable URL.
 const SIGNER_TOKENS = [
@@ -22,6 +29,37 @@ const SIGNER_TOKENS = [
 
 function read(path: string): string {
 	return readFileSync(path, "utf8");
+}
+
+/**
+ * Strip comments before any POSITIONAL probe. A positional probe binds on the
+ * first textual occurrence of a literal, so prose mentioning the gate would
+ * satisfy it.
+ */
+function stripComments(src: string): string {
+	return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
+/**
+ * R3-3 (@security-auditor L-4) — the DEFAULT-EXPORTED page component's body.
+ *
+ * The gate probe below binds INSIDE THIS SCOPE ONLY. Previously it bound to the
+ * first occurrence of `requireAdminPage(` anywhere in the file, so a helper
+ * ABOVE the page function containing that literal would bind the guard to
+ * ITSELF and keep it green with the real gate deleted — demonstrated at read-3,
+ * where a decoy helper plus a removed gate left the suite at 6/6.
+ *
+ * Re-measured at read-3: GC-5 shrank the file but **396 lines and 8 function
+ * declarations still sit above the gate**, so the self-match surface is large,
+ * not residual.
+ *
+ * Residual, stated rather than hidden: a decoy inside a STRING LITERAL within
+ * the page body itself would still bind. Comments are stripped; strings are not.
+ */
+function pageComponentBody(src: string): string {
+	const stripped = stripComments(src);
+	const at = stripped.indexOf("export default async function");
+	return at < 0 ? "" : stripped.slice(at);
 }
 
 function tsxFilesUnder(dir: string): string[] {
@@ -50,20 +88,40 @@ describe("audit page — gated before read, no raw image (a/c)", () => {
 	});
 
 	it("audit-leak::page-calls-requireAdminPage-before-the-feed-loader", () => {
-		const src = read(PAGE_FILE);
-		const gateAt = src.indexOf("requireAdminPage(");
-		const loadAt = src.indexOf("loadModerationAuditFeed(");
+		// R3-2 (@security-auditor SURPRISE-2): BOTH loaders, not just one. The
+		// page has two data reads and only `loadModerationAuditFeed` was
+		// asserted — `searchAuditLog`, the one spanning BOTH union sides, was
+		// unasserted entirely.
+		const body = pageComponentBody(read(PAGE_FILE));
+		// N1 — the scope resolved. An empty body would make every position
+		// comparison below vacuous.
+		expect(body.length).toBeGreaterThan(0);
+
+		const gateAt = body.indexOf("requireAdminPage(");
 		expect(gateAt).toBeGreaterThanOrEqual(0);
-		expect(loadAt).toBeGreaterThanOrEqual(0);
-		// The Layer-2 gate must run before any data read.
-		expect(gateAt).toBeLessThan(loadAt);
+
+		for (const loader of ["loadModerationAuditFeed(", "searchAuditLog("]) {
+			const loadAt = body.indexOf(loader);
+			expect(loadAt).toBeGreaterThanOrEqual(0);
+			// The Layer-2 gate must run before any data read.
+			expect(gateAt).toBeLessThan(loadAt);
+		}
 	});
 
-	it("audit-leak::page-renders-no-raw-img-and-imports-no-signer", () => {
-		const src = read(PAGE_FILE);
-		expect(src).not.toMatch(/<img[\s/>]/);
-		for (const token of SIGNER_TOKENS) {
-			expect(src).not.toContain(token);
+	it("audit-leak::audit-route-renders-no-raw-img-and-imports-no-signer", () => {
+		const files = tsxFilesUnder(AUDIT_ROUTE_DIR);
+		// N1 — assert the scanned set before asserting anything about it, and
+		// assert it reaches MORE than the page: a directory scan that silently
+		// resolved to one file would read exactly like the defect it replaces.
+		expect(files).toContain(PAGE_FILE);
+		expect(files.length).toBeGreaterThan(1);
+
+		for (const file of files) {
+			const src = read(file);
+			expect(src).not.toMatch(/<img[\s/>]/);
+			for (const token of SIGNER_TOKENS) {
+				expect(src).not.toContain(token);
+			}
 		}
 	});
 });
