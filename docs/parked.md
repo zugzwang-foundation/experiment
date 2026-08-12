@@ -1056,6 +1056,7 @@ the strikethroughs inside it are the corrections this task made.*
 | **PD-2-10** — **no keyboard handler at all** on the carousel; ArrowLeft/ArrowRight did nothing, against tier-2 canon §5 (explicitly *not* a11y-deferred) | `POLISH-register.md` PD-2-10 |
 | **PD-2-33's a11y half** — `alt` duplication, WCAG 1.1.1 | `POLISH-register.md` PD-2-33; the overflow half is POLISH.2's |
 | **POLISH-1a's `title`-reach finding** — titles on a `disabled` `<button>` (pointer events suppressed, tooltip never fires) and on role-less `<span>`s (mouse-hover only, no keyboard path, not reliably exposed to AT). The strings are source-of-truth-correct; their **delivery** is this task's | `docs/logs/POLISH-1a.md:125` |
+| ⚠ **OVERLAY.FOCUS** — both graph overlays carry **identical** gaps: `role="dialog" aria-modal="true"` with **no focus move on open, no trap, no restore on close**; **two controls sharing one accessible name**; and the full-bleed backdrop `<button>` sitting **in the tab order**. Hits all three ratified scope lines at once — keyboard reachability, accessible names, visible focus. **One row covering both surfaces; neither POLISH.3 nor POLISH.5 owns it** | `src/components/debate/chart/MarketPriceChartOverlay.tsx` (two × `"Close price chart"`) + `src/components/profile/graph/ProfileGraphOverlay.tsx` (two × `GRAPH_COPY.aria.close`). ⚠ Recorded as *"cross-surface P1 docketed"* in `docs/logs/UI-19-log.md` on 2026-07-31 with **no row existing on `main`** until 2026-08-12 — found at the SPEC.CHART / R13 recon and minted here. **A claim that a thing is docketed is not a docket** |
 
 ⚠ **Every POLISH surface closes `closed (a11y-deferred)` until this lands** — `POLISH-0.md` §7 · *Closing status — R16*. **It gates a STATUS, not a build.** No surface's work waits on it; only the qualifier on the word "closed" does. That is why it can be dated rather than sequenced.
 
@@ -1107,7 +1108,7 @@ the strikethroughs inside it are the corrections this task made.*
 
 ---
 
-## SPEC.CHART — a tier-1 source that does not exist
+## ~~SPEC.CHART~~ — CLOSED 2026-08-12 · a tier-1 source that does not exist, and a baseline that did
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10), the RECON-2 sweep.
 
@@ -1120,6 +1121,41 @@ the strikethroughs inside it are the corrections this task made.*
 **Conditional trigger.** **Before POLISH.3 closes.** Two admissible outcomes, and only two: **write it**, or **record the overlay as permanently unbaselined and accept the divergence** (founder only, P12). A third outcome — POLISH.3 closing with the component undisposed — is what this row exists to prevent.
 
 **Expected next task.** A spec-lane task, or the founder at POLISH.3 kickoff. Evidence: `POLISH-0.md` §3 · POLISH.3 · Tier 1; `POLISH-register.md` PD-0-16 (`R13`); `ls docs/specs/`.
+
+---
+
+**✅ CLOSED 2026-08-12 IST.** ⚠ **Neither admissible outcome was taken. A third one was, and this row's framing is why it nearly wasn't.**
+
+`SPEC.CHART` is confirmed a phantom — absent from `docs/specs/` and from the entire repository at `198d1d0`, re-verified repo-wide, not merely in that directory. Everything this row says about the citation is true.
+
+**What is not true is the consequence.** The expanded overlay is **not** built UI with no baseline at any tier. **SPEC.1 §9** carries *"Market price history — the market-detail chart"* and **F-DEBATE-5**, appended at v1.0.22 on 2026-07-23 as the UI.19 blocker, specifying the collapsed and expanded modes by name — X domain, node selection by §9 Top, content-removed exclusion, INV-3 frozen sides, INV-4 freeze, F-DEBATE-4 refresh, and an accessibility obligation. **Eight** `debate-view::price-chart-*` rows in §17 pin it; `MARKET_SERIES_MAX_POINTS` is pinned in §16.1 and Appendix B. It sat inside the section `POLISH-0.md` §3's Tier-1 cell already cited — and the ⟐ marks on that cell's §16.1 and §17 entries recorded, in writing, that neither had been read.
+
+**Class S is a SPEC-FIRST halt on a build. The build shipped at UI.19 and is test-pinned.** Nothing was halted. The correct class was **R** — a missing product decision — and the missing decision was *presentational*: ticks, node form, legend, panel, backdrop, close-control form. **SPEC.1 §9 routes exactly that to canon by name**, `docs/plans/UI.19.md` repeats the routing, the component docblock repeats it — and canon never received the item.
+
+**Resolution:** `design-canon.md` §10 **`C-CHART-1`**, ratifying built state, plus a chart-slot sentence in canon §2. `PD-0-16` reclassed **S → R**, closed. `POLISH-0.md` §0 R13 → **RULED**; §2's existence rider gains its second half. **No spec was written. No divergence was accepted.**
+
+**Carried forward from this closure:**
+- **CHART-NODE-RING** — the W2.6 node primitive that never shipped. Its own row below.
+- **`PD-3-04`** — the overlay's missing accessible summary, a tier-1 conformance gap that only exists *because* tier 1 exists.
+- Overlay focus management, cross-surface on both overlays → **A11Y.0**, row minted in this same commit.
+
+⚠ **The lesson worth keeping is not the existence rider — that worked exactly as designed and found the phantom.** It is that the phantom's absence was allowed to stand in for a survey of the sources that were present. **A missing citation is a finding about the citation. It is not yet a finding about the component.**
+
+---
+
+## CHART-NODE-RING — a designed node primitive that never shipped
+
+**Originating task:** SPEC.CHART / R13 (2026-08-12), at the ruling.
+
+**Deferred work.** `DESIGN-W2_6-graph-prototype-record.md` §3 locks the market chart's node as a **solid grey inner disk inside a black/white side-split ring**, sized by `scaleSqrt` on an honest-area basis — the inner disk encoding the **author's own stake**, the ring encoding the **crowd's YES/NO split** on that post. What shipped at UI.19 is a plain `r=4` circle filled by the post's side token with a ground-toned rim. **The shipped dot encodes neither quantity.**
+
+⚠ **This is a designed primitive that was not built, not a polish detail.** The ring carries information — two dimensions of it — on the surface where stake is committed under mandatory commentary. Whether that information belongs on the chart is a product question, not a visual one.
+
+**Why deferred.** `C-CHART-1` ratifies the shipped dot as canon on 2026-08-12, explicitly and with this row named, so that a future reader does not mistake the plain dot for an oversight. Adopting the ring is a **build** — new geometry, a stake-per-node and crowd-split-per-node read model addition, and ⚠ **an ADR-0034 D-1 exposure that must be answered before anything else**: if the fix would add a field to `DebateViewModel` or to any type it transitively contains, it is **RE-SCOPED, not built** (`POLISH-0.md` §5.1, R17). `DebateViewModel` is the input type of the 2026-11-06 public export.
+
+**Conditional trigger.** Founder election only. **Not** pulled forward by POLISH.3 and **not** a `.3` defect — `C-CHART-1` disposes of the node as built. If it is ever taken, it is a build row with its own plan-then-execute, and the D-1 question is answered **per clause, never as a bare PASS**.
+
+**Expected next task.** None scheduled. Evidence: `DESIGN-W2_6-graph-prototype-record.md` §3; `design-canon.md` §10 `C-CHART-1` item 2; `src/components/debate/chart/MarketPriceChart.tsx` (the shipped node); `POLISH-0.md` §5.1.
 
 ---
 
@@ -1422,3 +1458,19 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** Before go-live, 2026-09-15. One DNS change, no code, no deploy.
 
 **Expected next task.** A founder ruling and a DNS edit. Evidence: `docs/logs/POLISH-7a.md` §6, criterion 3.
+
+---
+
+## UI19-LOG-SELF-DESCRIPTION — a committed file that says it is not
+
+**Originating task:** SPEC.CHART / R13 (2026-08-12), the recon, as an anomaly.
+
+**Deferred work.** `docs/logs/UI-19-log.md` opens with a header block reading **"UNCOMMITTED / untracked. Never `git add` this file — PR diffs stay code-only."** It **is** committed, on `main`, at `a3f136e` (#274). The self-description is false at head.
+
+⚠ **The hazard is not cosmetic.** A future CC session reading that header before touching the file will refuse to stage a correction to it — the instruction is unambiguous and reads as binding. The file is cited as **tier 3** for POLISH.3, so it is a document that will be read and may need amending during the surface pass.
+
+**Why deferred.** It is a descriptive doc (CC-authored from the repo) and its correction is not part of the R13 ruling. Folding it in would be scope creep into a task whose whole discipline was staying small.
+
+**Conditional trigger.** The next `docs/logs/UI-19-log.md` touch, or POLISH.3's kickoff — whichever comes first. One-line header correction; no other content changes.
+
+**Expected next task.** POLISH.3. Evidence: `docs/logs/UI-19-log.md` header block; `git log a3f136e`; `POLISH-0.md` §3 · POLISH.3 · Tier 3.

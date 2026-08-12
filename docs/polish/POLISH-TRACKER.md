@@ -19,7 +19,7 @@
 | **.1 Shell** | ✅ #288 · #289 · #290 | ❌ | **CLEAR** — B4 void · B8 struck · B10 closed | — | Joins the comprehensive pass |
 | **.7a Auth** | ✅ **#320** `86a245f` | ❌ | **none** | single gated pass (⚠ the reviewer cascade ran anyway, and returned a CRITICAL) | **OPEN, not closed** — joins the comprehensive pass |
 | **.2 Discovery** | ✅ #306 · #311 · #312 · #313 | ❌ | **CLEAR** — B2 closed #276 | — | Joins the comprehensive pass |
-| **.3 Market Detail** | ❌ | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ **RUN NEXT** — `.7a` closed 2026-08-11 (#320). ⚠ 3 inherited rows · ⚠ R13/SPEC.CHART still halts the chart overlay |
+| **.3 Market Detail** | ❌ | ❌ | **CLEAR** — B1 · B2 · B3 · C3 **all closed** | **full ritual** | ▶ **RUN NEXT** — `.7a` closed 2026-08-11 (#320). ⚠ 3 inherited rows · ✅ R13 RULED 2026-08-12 — the chart overlay is inspectable (SPEC.1 §9 F-DEBATE-5 + canon `C-CHART-1`) |
 | **.4 Composers** | ❌ | ❌ | **CLEAR** — B1 closed | **full ritual** | ▶ after .3. Co-owns RR-3 |
 | **.5 Profile** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ⚠ **REGISTER-APPLY first** |
 | **.6 Bookmarks** | ❌ | ❌ | **CLEAR** — B1 closed | single gated pass | ▶ after .5 |
@@ -48,11 +48,11 @@
 
 ## §2 · Phase gates
 
-**No ruling blocks the phase.** All nineteen are resolved in `POLISH-0.md` §0 — eight ruled, nine scheduled to their surface's kickoff, one open.
+**No ruling blocks the phase.** All nineteen are resolved in `POLISH-0.md` §0, and **zero are OPEN as of 2026-08-12** — R13, the last one, closed at `design-canon.md` §10 `C-CHART-1`. ⚠ **The per-state counts are deliberately NOT restated here.** This sentence previously carried *"eight ruled, nine scheduled … one open"* and had drifted from §0's table, while §0's own sentence had drifted differently again — two copies of one measurement, both wrong, disagreeing with each other and with the index. **§0's index is the count. This row points at it and does not re-derive it.**
 
 | | Gate | Effect |
 |---|---|---|
-| **R13** | ⚠ **THE ONLY OPEN RULING.** `SPEC.CHART` is cited as a **tier-1** source for POLISH.3 and does not exist in `docs/specs/` | The chart **expanded-overlay** has no baseline at any tier → class **S** → **SPEC-FIRST halt on that component.** POLISH.3 runs *around* it. Does not block the surface |
+| **R13** | ✅ **RULED 2026-08-12 — no ruling in the index is OPEN.** `SPEC.CHART` is confirmed a phantom (absent repo-wide), but the chart's tier-1 baseline is **SPEC.1 §9 F-DEBATE-5** + eight §17 rows, and its presentational baseline is now **canon §10 `C-CHART-1`** | POLISH.3 inspects the overlay normally. `PD-0-16` reclassed **S → R** and closed. One new row minted for `.3` — `PD-3-04`, the overlay's missing accessible summary, a tier-1 conformance gap |
 | **R4 · R10 · R14** | Scheduled to `.3`'s kickoff | Dispositions, not blockers. ⚠ **R14 has no register row** — mint it at kickoff or it is lost |
 | **R11 · R12** | Scheduled to `.5` / `.6` | ⚠ R12's INV-3 arm already shipped; only cosmetic consolidation remains |
 | **R7** | Scheduled to `.8` | One line |
@@ -95,7 +95,7 @@ Dated or triggered, none blocking a machine run.
 | **STAGING-FIXTURE-DISCOVERY-SHAPE** | **2026-09-05** | ⚠ **Land PD-2-32 FIRST.** Fixing the fixture would **hide** the defect without fixing it. The set is md5-pinned — a change is a deliberate re-pin, never an edit |
 | **O1-KICKOFF-INPUT** | → O1's kickoff | All eight markets open on 2026-09-15 with **zero posts**, so every hero frame renders both-sides-empty. ⚠ Any fix involving posts crosses market-content invention — the founder's, not a build choice. **Decided, not discovered, on the day** |
 | **MOD-REPORT-PATH** | ✅ **RULED 2026-08-12 — closed** | **User-facing reporting is OUT OF SCOPE for the experiment phase.** Decision of record: `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12. ⚠ **`.3` IS NO LONGER BLOCKED BY IT** — the prerequisite is discharged, and `.3`/`.4` inherit a ratified absence, not a hole. An inspection that rediscovers the missing REPORT control files `duplicate-of-known` against the patch record and opens no row. Re-open on any one of: operator can no longer read daily volume · the phase extends past 2026-11-05 · one observed contextual-class miss → **HARDEN** |
-| **SPEC.CHART** | before `.3` closes | R13. Either write it or record the overlay as permanently unbaselined |
+| ~~**SPEC.CHART**~~ | ✅ **CLOSED 2026-08-12** | R13 ruled. Neither arm taken — **the record was corrected instead.** Tier 1 was SPEC.1 §9 all along; the presentational gap landed at canon §10 `C-CHART-1`. New docket: **CHART-NODE-RING** |
 | **ADR-0006-DISCIPLINE** | opportunistic | Holds one known unpushed commit |
 | **AUTH-TURNSTILE-WIRE** | **2026-09-05**, with RATE-GUARD-PUBLIC | ⚠ Opened by `.7a` (#320). The widget is unmounted; the server half is BUILT and fails closed. Carries `PD-0-14`, `PD-7a-16`, `PD-7a-10`, `PD-7a-14`. **`ADR-0033` §Constraints binds it** — resend↔sign-in token parity, and the two sites are structurally asymmetric so a one-sided wiring fails SILENTLY (the resend path 200s regardless) |
 | **AUTH-ERROR-COPY** | **pre-go-live** | ⚠ Opened by `.7a`. Tier-1-named in `ADR-0033` §Scope. Raw codes render to anonymous visitors — `otp_rate_limited` (NOT `rate_limited`, which is POLISH.4's) and **`identity_pool_exhausted`, a pool-drain progress oracle**. ⚠ The three a user reaches are produced INSIDE `src/server/auth/**` — critical path. **Co-execute with AUTH-OTP-FIDELITY**: same file, one ritual |
