@@ -97,7 +97,7 @@ Sites 4 and 5 render unspaced because JSX strips the trailing newline and indent
 
 ---
 
-**D-H · `(auth)/error.tsx` READ. It states a rule neither v1.0 sibling could reveal — and it does NOT contradict `notice`.** *(OD-5's named obligation.)*
+**D-H · `(auth)/error.tsx` READ. It states a rule neither v1.0 sibling could reveal — and it is SILENT on WHICH preset.** *(OD-5's named obligation. ⚠ The preset itself was later re-ruled to `debate` at §18 R-b, on evidence from `PageContainer.tsx`, not from this file.)*
 
 `src/app/(auth)/error.tsx` **declares no container at all.** Its docblock, `:16-18`, verbatim:
 
@@ -199,15 +199,11 @@ Both siblings do, identically:
 - `src/app/(public)/bookmarks/error.tsx:16` → `<PageContainer preset="reading">`
 - `src/app/(public)/u/[pseudonym]/error.tsx:16` → `<PageContainer preset="reading">`
 
-So the new file follows, and **`tests/unit/shell/page-container.test.ts` becomes UNCONDITIONAL on the allow-list.** Three edits, same commit:
-
-1. a 10th `SITES` entry — `{ site: 10, file: "src/app/(public)/m/[slug]/error.tsx", before: "<the preset's exact class string>" }`
-2. the three `9`s at `:163-165` → `10`
-3. the `it(...)` title at `:162`, `"covers all nine declaration sites"` → ten
+So the new file follows, and **`tests/unit/shell/page-container.test.ts` becomes UNCONDITIONAL on the allow-list.** ⚠ **But NOT for the edit described here — see §18 R-a, which supersedes it.** `SITES` is not touched: `SITES.before` is defined at `page-container.test.ts:46` as *"VERBATIM className on disk at `c5892bc`. Never edited to match code."* **A file that did not exist at `c5892bc` has no `before`**, and authoring one inverts the POLISH-1b no-change proof inside the suite whose entire purpose is that proof — the same inversion V-1 fences on `DETAIL_BASELINE`. The edit is instead one purely additive **bidirectional set-equality** guard over a `GREENFIELD` array. **All four count tokens at `:162-165` stay, and the `adds` set-equality at `:168-174` stays green.**
 
 ⚠ **This test does NOT scan the tree** — it is a hardcoded array, self-consistent by construction. Nothing will force the update; a new `PageContainer` site would silently escape the B2 no-change proof while every assertion stayed green. That is why it is on the list rather than left to review.
 
-✅ **RULED at v1.1 — `preset="notice"`, under §4.2 B3.** The v1.0 recommendation of `debate` is withdrawn; my rule was inferred from n=2 with an unbreakable confound (see D-H). The unconfounded family precedent is `(public)/not-found.tsx` at `notice`. **`(auth)/error.tsx` was read as required and does not contradict it** — it declares no container because its layout supplies one, and `(public)/layout.tsx` supplies none (D-H). **Flagged for Gate C, not stalled.** The 10th SITES entry's `before` string is therefore the `notice` preset: `mx-auto w-full max-w-3xl px-4 py-24`.
+✅ **RULED — `preset="debate"`, under §4.2 B3. See §18 R-b, which supersedes v1.1's `notice`.** The sequence is worth keeping because two of its three steps were wrong: v1.0 recommended `debate` from a rule inferred at n=2 with an unbreakable confound; v1.1 withdrew it for `notice` on the `(public)/not-found.tsx` precedent; **§18 restored `debate` on two facts measured after both** — `PageContainer.tsx:40` scopes `notice` to *"the branded `(public)` 404 (site 1)"*, a single named consumer, and `PageContainer.tsx:19-23` names `/m/[slug]` as a **D2b** owner, so adding a second consumer to a scoped preset on the surface that owns the collapse decision takes a bite out of D2b under a cosmetic gate. **`debate` is the route's own preset, adds no consumer to a scoped one, and touches no doc comment.** ⚠ `(auth)/error.tsx` was read as required and is **silent on the preset** — it declares no container at all, because its layout supplies one and `(public)/layout.tsx` supplies none (D-H). The tie was genuinely unbroken by the repo, which is why B3 governs. **Flagged for Gate C, not stalled.** ⚠ **No `SITES` entry is written at all — see §18 R-a**, which supersedes the three edits listed above.
 
 ### G-4 · PriceBar zero-delta for hero and card — **enumerated, and structural rather than argued**
 
@@ -271,7 +267,7 @@ Each item carries a **discriminating condition**: the observation that would tel
 | **1** | `PriceBar` `detail` ships at d5's **14px bar / 10px labels**, breaking OD-2's byte pin | **D5** | `PriceBar.tsx:64`, `:73` | `PD-3-01` (exists, inherited) | `grep -n "h-1.5" src/components/debate/PriceBar.tsx` returns the `detail` bar line. **If it returns nothing, the change already landed.** Confirm the second axis: `text-[11px]` at `:73`. ⚠ Numbers only — **not** d5's structural `.barrow` form (D-J) |
 | **2** | Đ glyph normalised to the **SPACED** form — **`MarketHeader.tsx:98` ONLY** | **D2** (site 1 of 5) | `MarketHeader.tsx:98` | `PD-3-07` **PARTIAL — stays OPEN**, PR 2 closes it on sites 2–5 | Render `MarketHeader`; the staked line reads `Đ 14,260 staked`. **If it already carries the space, done.** ⚠ Sites 2–5 (`ReplyCard` · `ArgProfile` · `AggregateFooter` ×2) are **PR 2's and MUST NOT be touched here** — §10 |
 | **3** | `posts` / `replies` counts **pluralised** on the market header | ADDITIONS `:61` | `MarketHeader.tsx:99`, `:100` | `PD-3-08` | Render `MarketHeader` with `postCount: 1, replyCount: 1`. **If it reads `1 post` / `1 reply`, done.** The shipped reference implementation is `StatLine.tsx` (zero is plural — `0 replies`, never `0 reply`) |
-| **4** | Route state: **add `error.tsx` at `preset="notice"`, deliberately OMIT `loading.tsx`** | **D4** | `src/app/(public)/m/[slug]/error.tsx` (new) | `PD-3-11` | `ls src/app/(public)/m/[slug]/` shows only `page.tsx`, `export/`, `quote/`. **An `error.tsx` present ⇒ done; a `loading.tsx` present ⇒ ⛔ RUN-STOP.** Treatment is `(auth)/error.tsx:32-47`'s verbatim: render **nothing** from `error` — not `message`, `stack`, `digest` or `cause` (D-H) |
+| **4** | Route state: **add `error.tsx` at `preset="debate"` (§18 R-b — NOT `notice`), deliberately OMIT `loading.tsx`** | **D4** | `src/app/(public)/m/[slug]/error.tsx` (new) · `tests/unit/shell/page-container.test.ts` (the greenfield guard, **§18 R-a** — NOT a `SITES` entry) | `PD-3-11` | `ls src/app/(public)/m/[slug]/` shows only `page.tsx`, `export/`, `quote/`. **An `error.tsx` present ⇒ done; a `loading.tsx` present ⇒ ⛔ RUN-STOP.** Treatment is `(auth)/error.tsx:32-47`'s verbatim: render **nothing** from `error` — not `message`, `stack`, `digest` or `cause` (D-H). ⚠ **Read the class literal off `CONTAINER_PRESETS` (`PageContainer.tsx:37`), never off this plan** (§18 C-2) |
 | **5** | The **dev-facing placeholder box REMOVED** from the market header | register row + §4.2 B1 (OD-6) | `MarketHeader.tsx:43-50` (the function), `:102` (the mount), `:36-42` (its docblock) | `PD-3-09` | `grep -n "DeferredPlaceholders" src/components/debate/MarketHeader.tsx` returns `:43` and `:102`. **Zero ⇒ done.** ⚠ **Gating measured: NONE** — the box is unconditional and renders to every participant, so removal proceeds and the per-delta halt does **not** fire (D-I(b)). Tier-4 baseline: `surface_d5_v1_0.html:447` + `:251-252` — **class V, not S** (D-I(a)) |
 | **6** | `DebateColumn`'s **dead `Đ BET` REMOVED** — the third R1 site, on the shared row | **R1** (site 3 of 3) | `DebateColumn.tsx:58-66` | `PD-0-02` (shared; PR 2 closes sites 1–2) | `grep -n "Đ BET" src/components/debate/DebateColumn.tsx` returns `:63` and `:65`. **Zero ⇒ done.** Unreachable in production — both `DebateView` mounts pass `header` — so there is no visual delta to verify, only a compile one. ⚠ **NARROW reading, ratified:** `:58-66` only, never `:49-70` |
 
@@ -359,7 +355,7 @@ D2 has no test in either direction at any of its five sites. `tests/unit/debate/
 |---|---|---|---|
 | **C1** | item 6 — `DebateColumn.tsx:58-66` + the orphaned `Button` import | ⛔ **NO** | Smallest, fully isolated, zero test movement (G-1, G-2). Lands green and proves the branch is dead |
 | **C2** | item 1 — `PriceBar.tsx:64,:73` **and** the recaptured `DETAIL_BASELINE` in `price-bar-presets.test.tsx` | ⛔ **NO** — ordered proof obligation (V-1 capture-after-change), fails §6 condition 4 | **Must be ONE commit.** Splitting them lands a red suite at the boundary — H9 |
-| **C3** | item 4 — `error.tsx` **and** `page-container.test.ts`'s 10th SITES entry + three `9`→`10` | ⛔ **NO** | G-3: same commit or the no-change proof silently under-covers |
+| **C3** | item 4 — the **greenfield guard** in `page-container.test.ts` **and** `error.tsx`, in that order (**§18 R-a**; NOT a `SITES` entry and NOT the three `9`→`10`) | ⛔ **NO** — ordered proof obligation, fails `CLAUDE.md` §6 condition 4 | **ONE commit.** Write the guard → run → **capture the RED to a log** → write `error.tsx` → run green → commit both with the RED capture in the commit body. H15 is met by the observation; H9 is never tripped. ⚠ **`GREENFIELD` is populated BEFORE `error.tsx` exists**, or both directions pass at once and H15 fires for an accidental reason. ⚠ `callSite` **throws** rather than returning null, so the RED reads `no <PageContainer> found in …` — that is the intended failure, not a harness fault |
 | **C4** | items 2 + 3 — `MarketHeader.tsx` Đ site 1 + pluralisation + the new `market-header.test.tsx` | ⛔ **NO** — RED-first guard on new behaviour (§5.6), an ordered obligation | Tests-first: `market-header.test.tsx` RED, then the source, then green |
 | **C5** | item 5 — `MarketHeader.tsx` dev-box removal (`PD-3-09`) | ⛔ **NO** | **Deliberately SEPARATE from C4** so the removal is legible in the Gate C diff and does not ride C4's ordered RED-first proof |
 
@@ -539,12 +535,12 @@ Suggested receipts (each independently verifiable):
 |---|---|---|
 | **OD-1** | `PostCard` · `ReplyCard` · `ArgProfile` · `AggregateFooter` → **PR 2** | ✅ **Yes.** §8 strikes all four. ⚠ Carries a consequence, now recorded rather than discovered: `PD-3-07` is consumed PARTIAL and D2's other four sites ship unguarded until PR 2 (§7 rider, F3) |
 | **OD-2** | R4 → PR 2 with `PostCard` | ✅ **Yes.** Item 7 struck. D-F's token mapping is carried forward so PR 2 does not rediscover the raw-hex hazard |
-| **OD-3** | Six items, no total carried | ✅ **Yes.** §6 is a numbered table of six rows and no sentence anywhere states a total |
+| **OD-3** | Six items, no total carried | ✅ **Yes.** §6 is a numbered table of six rows — the enumeration is the count |
 | **OD-4** | Dissolved; commit 0's numbers stand | ✅ **Yes.** §0's "minted" leg struck, replaced with six consumed IDs. **PR 1 allocates nothing** |
-| **OD-5** | `preset="notice"`, §4.2 B3, flag for Gate C | ✅ **Yes**, and the named obligation is discharged — see below |
+| **OD-5** | **SUPERSEDED by §18 R-b — `preset="debate"`, not `notice`.** §4.2 B3 and the Gate C flag both stand | ✅ **Yes.** The named obligation — read `(auth)/error.tsx` — is discharged below, and it is what proved the repo cannot break the tie |
 | **OD-6** | Dev box in PR 1 as item 5, `PD-3-09` | ✅ **Yes**, and both attached obligations resolve in favour of removal — see below |
 
-### OD-5's obligation — `(auth)/error.tsx` READ, and it does not contradict `notice`
+### OD-5's obligation — `(auth)/error.tsx` READ, and it is SILENT on the preset
 
 Full finding at **D-H**. In short: it declares **no container**, because its layout supplies one; `(public)/layout.tsx` supplies none, so `/m/[slug]/error.tsx` must declare one and `(auth)` is silent on which. **No contradiction. No Gate C note needed on the preset from this file** — though the preset itself remains flagged for Gate C per §4.2 B3, as ruled.
 
