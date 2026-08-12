@@ -34,6 +34,7 @@ import {
 	ACTION_TYPE_PLACEHOLDER,
 	InvalidDateNote,
 	invalidDateFields,
+	parseFilters,
 	searchRan,
 } from "@/app/(admin)/admin/moderation/audit/search-surface";
 import { modReasonEnum } from "@/db/schema/audit";
@@ -183,4 +184,93 @@ describe("S-8 · the action-type placeholder only advertises matchable values (D
 			expect(reasons).toContain(token);
 		}
 	});
+});
+
+// ── R2-6 part A · the searchRan EQUIVALENCE PROOF ───────────────────────────
+//
+// GC-1 replaced the page's inline read-branch selector. At b96a0c2 the page read:
+//
+//     const filters = parseFilters(sp);
+//     const searching = Object.keys(filters).length > 0;
+//
+// and at head it reads `const searching = searchRan(sp)`. That expression selects
+// between `searchAuditLog` and `loadModerationAuditFeed` — TWO DIFFERENT READ
+// MODELS on the moderation audit surface. "Probably equivalent" is not the bar
+// for a control-flow expression there, so it is pinned here against the OLD
+// expression inlined as an ORACLE, across a spanning input set.
+//
+// `parseFilters` is byte-identical to its b96a0c2 form (GC-5 added only the
+// `export` keyword) and is pure — no IO, no clock, no randomness — so the oracle
+// is a faithful restatement of the pre-GC-1 semantics, not a lookalike.
+
+/** The pre-GC-1 inline expression, verbatim. */
+const oracle = (sp: Parameters<typeof searchRan>[0]): boolean =>
+	Object.keys(parseFilters(sp)).length > 0;
+
+const SPANNING: ReadonlyArray<{
+	name: string;
+	sp: Parameters<typeof searchRan>[0];
+}> = [
+	{ name: "no params", sp: {} },
+	{ name: "valid from", sp: { from: "2026-08-12" } },
+	{ name: "valid to", sp: { to: "2026-08-13" } },
+	{ name: "invalid from", sp: { from: "junk" } },
+	{ name: "invalid to", sp: { to: "not-a-date" } },
+	{ name: "invalid from + valid to", sp: { from: "junk", to: "2026-08-13" } },
+	{ name: "actionType only", sp: { actionType: "content_removed" } },
+	{
+		name: "marketId only",
+		sp: { marketId: "00000000-0000-0000-0000-0000000000aa" },
+	},
+	{ name: "pseudonym only", sp: { pseudonym: "somebody" } },
+	{
+		name: "every field valid",
+		sp: {
+			from: "2026-08-12",
+			to: "2026-08-13",
+			actionType: "content_removed",
+			marketId: "00000000-0000-0000-0000-0000000000aa",
+			userId: "00000000-0000-0000-0000-0000000000bb",
+			pseudonym: "somebody",
+		},
+	},
+	{
+		name: "every field invalid or blank",
+		sp: {
+			from: "junk",
+			to: "junk",
+			actionType: "   ",
+			marketId: "  ",
+			userId: " ",
+			pseudonym: "  ",
+		},
+	},
+];
+
+describe("R2-6 · searchRan is a PURE EXTRACTION of the pre-GC-1 selector", () => {
+	it("spans both outcomes — the set is not vacuous (N1)", () => {
+		// An input set that is all-true or all-false cannot detect an inverted or
+		// constant extraction, however many rows it has.
+		const outcomes = SPANNING.map((c) => oracle(c.sp));
+		expect(outcomes).toContain(true);
+		expect(outcomes).toContain(false);
+	});
+
+	it("⚠ contains an input a WRONG extraction would get wrong (V-7)", () => {
+		// The obvious wrong extraction reads `sp` instead of parseFilters' OUTPUT.
+		// `?from=junk` alone is the discriminating case: sp has one key, but the
+		// parsed filter set is empty. Without a row like this the whole table
+		// below could pass on a broken implementation.
+		const naive = (sp: Parameters<typeof searchRan>[0]): boolean =>
+			Object.keys(sp).length > 0;
+		const discriminating = SPANNING.filter((c) => naive(c.sp) !== oracle(c.sp));
+		expect(discriminating.map((c) => c.name)).toContain("invalid from");
+		expect(discriminating.length).toBeGreaterThan(0);
+	});
+
+	for (const { name, sp } of SPANNING) {
+		it(`agrees with the pre-GC-1 expression — ${name}`, () => {
+			expect(searchRan(sp)).toBe(oracle(sp));
+		});
+	}
 });
