@@ -34,11 +34,11 @@ const PRICING = { yes: "0.38", no: "0.62" };
  */
 const DETAIL_BASELINE =
 	'<div class="flex flex-col gap-1">' +
-	'<div class="flex h-1.5 w-full overflow-hidden rounded-full [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
+	'<div class="flex h-[14px] w-full overflow-hidden rounded-full [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
 	'<div class="h-full bg-yes" style="width: 38%;"></div>' +
 	'<div class="h-full flex-1 bg-no"></div>' +
 	"</div>" +
-	'<div class="flex justify-between font-mono text-[11px] text-muted-foreground">' +
+	'<div class="flex justify-between font-mono text-[10px] text-muted-foreground">' +
 	"<span>YES 38%</span><span>NO 62%</span>" +
 	"</div>" +
 	"</div>";
