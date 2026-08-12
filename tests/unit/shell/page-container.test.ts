@@ -147,9 +147,14 @@ const CALL_SITE_ROOTS = ["src/app", "src/components"];
  *
  * ⚠ Each file is slurped WHOLE and matched with `callSite`'s own regex. A
  * line-based scan would miss `(public)/not-found.tsx`, whose tag spans five
- * lines. A bare `PageContainer` substring match would read the files that name
- * the primitive in PROSE as call sites — `auth-error-boundary.test.tsx:90-94`
- * records this repo already going RED on correct code for exactly that reason.
+ * lines. The regex also excludes files that mention the primitive by BARE NAME
+ * in prose — `auth-error-boundary.test.tsx:90-94` records this repo already
+ * going RED on correct code for exactly that reason. ⚠ It NARROWS that class
+ * rather than eliminating it (@security-auditor, POLISH.3 S-L3): a doc comment
+ * quoting a full tag such as `<PageContainer preset="reading">` would still
+ * match and would produce a FALSE RED. That fails loudly, not silently, so it
+ * is a maintenance hazard rather than a coverage hole — but do not read the
+ * regex as prose-proof.
  *
  * ⚠ Scope is BOTH roots, deliberately. `src/app/(public)` alone would miss
  * site 8, `src/app/(auth)/layout.tsx`, and a guard blind to part of its own
@@ -162,6 +167,16 @@ function treeCallSites(): string[] {
 			withFileTypes: true,
 		})) {
 			const child = `${rel}/${entry.name}`;
+			// A symlink reports isDirectory() === false, so a symlinked ROUTE
+			// DIRECTORY would be skipped SILENTLY and any call site behind it would
+			// escape this coverage proof with every assertion still green
+			// (@security-auditor, POLISH.3 S-L2). Fail loudly instead. `src/` holds
+			// none today, so this can only fire on a deliberate introduction.
+			if (entry.isSymbolicLink()) {
+				throw new Error(
+					`symlink under a call-site root, unsupported: ${child}`,
+				);
+			}
 			if (entry.isDirectory()) {
 				walk(child);
 			} else if (
@@ -408,6 +423,15 @@ describe("B2 — the container primitive moves nothing", () => {
 	it.each(GREENFIELD)("greenfield $file leaves every box axis to the preset", ({
 		file,
 	}) => {
+		// CONTAINMENT BEFORE READ (@security-auditor, POLISH.3 S-L1). `callSite`
+		// resolves through `join(process.cwd(), …)`, which normalises `..`, so a
+		// declared path pointing outside the two roots would be READ here and
+		// could pass this row in isolation. Membership in the walk's own output is
+		// the check: every string it emits is root-prefixed by construction.
+		expect(
+			treeCallSites().includes(file),
+			`${file} must be a real call site under ${CALL_SITE_ROOTS.join(" or ")}`,
+		).toBe(true);
 		const { extras } = callSite(file);
 		for (const axis of BOX_AXES) {
 			expect(
