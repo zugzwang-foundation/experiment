@@ -25,6 +25,13 @@ const SIGNER_TOKENS = [
 	"getSignedUrl",
 	"s3-request-presigner",
 	"presign",
+	// R4-1 (@security-auditor M-2): `mintReadUrl` in `src/server/storage/r2.ts`
+	// is the ACTUAL minter — `signRead` is a thin wrapper over it, so importing
+	// `mintReadUrl` directly mints a viewable URL for a blocked object with all
+	// four tokens above absent. Chained with the unfixed M-3 (`<Image …>` is
+	// invisible to the img regex) that was a COMPLETE green-guard leak path;
+	// this token breaks the chain at the import arm even with M-3 open.
+	"mintReadUrl",
 ];
 
 function read(path: string): string {
@@ -156,8 +163,12 @@ describe("audit page — gated before read, no raw image (a/c)", () => {
 
 describe("non-admin reachability — blocked_text never leaves the admin surface (d)", () => {
 	it("audit-leak::no-non-admin-app-file-imports-the-audit-feed-loader", () => {
-		const appFiles = tsxFilesUnder(`${ROOT}src/app`);
-		const importers = appFiles.filter((path) => {
+		// R4-2 (@security-auditor M-4): scan `src`, not `src/app`. Participant
+		// surfaces do not import read models directly — they read through
+		// `src/server/**` — so a server module folding `blockedText` into a
+		// participant DTO was invisible to a scan rooted at `src/app`.
+		const srcFiles = tsxFilesUnder(`${ROOT}src`);
+		const importers = srcFiles.filter((path) => {
 			const src = read(path);
 			return (
 				src.includes("admin/moderation/audit-feed") ||
