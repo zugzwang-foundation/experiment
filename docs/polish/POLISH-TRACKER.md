@@ -118,6 +118,13 @@ POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ 
      (closed)          (closed 08-11)   (#320)   (#323)   ▲
                                                           NEXT
                                                  plan PARALLEL · execute SERIAL
+                                                          │
+                                                          ▼
+                                        ONE comprehensive founder visual pass
+                                          (.1 · .2 · .7a · .8 join here)
+                                                          │
+                                                          ▼
+                                         refinement PRs  ─▶  close-outs
 ```
 
 **Execute serial** means **one machine-phase PR open at a time** — so a regression bisects to a surface and Gate C never queues. Recon and classification for several surfaces may be drafted concurrently.
@@ -173,7 +180,7 @@ The row above budgets **2 founder-serial touches per machine run** (12 for six).
 
 **This is a MEASUREMENT, not a forecast.** Whether the remaining four cost 2 each or 10 each is a founder ruling, not a CC one. The figures are stated; the re-forecast is left open.
 
-**R-G's batch lever is PULLED for `.5` · `.6` · `.8`** (POLISH.7a plan §2 R-G): their recon and classification are drafted concurrently and ratified in **one** session. **Execute stays SERIAL — one machine-phase PR open at a time — and Gate C never batches.** Not applicable to `.3` or `.4`.
+**R-G's batch lever is PULLED for `.5` · `.6`** (POLISH.7a plan §2 R-G): their recon and classification are drafted concurrently and ratified in **one** session. ⚠ **`.8` is struck from that set — it ran STANDALONE at #323**, on the ground that a classification held across two full-ritual runs goes stale (a counted inventory went 9 → 13 inside one PR), and because it had been pulled forward specifically to use a slot `.3` could not. **Execute stays SERIAL — one machine-phase PR open at a time — and Gate C never batches.** Not applicable to `.3` or `.4`.
 
 **The binding constraint is founder-serial capacity, not calendar** — `tracker_v20` §10 holds the project budget and this file does not restate it. Two levers, if it binds:
 

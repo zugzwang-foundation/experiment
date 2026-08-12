@@ -384,7 +384,7 @@ The last line is mandatory. With the founder pass batched, it is the only surviv
 
 ## §13 · Standing rules minted at POLISH.8
 
-Three rules, each from a defect that reached a founder. All three are about the **relay and the plan**, not about the code — which is where POLISH.8's cost actually landed.
+Each rule below comes from a defect that reached a founder, and every one of them is about the **relay and the plan**, not about the code — which is where POLISH.8's cost actually landed. ⚠ **This lead-in states no count, deliberately.** It read *"Three rules … All three"* while §13 already carried four, and was wrong the moment it was committed — §13.3 firing on §13 itself. Per §13.3, the count is **deleted, not corrected**: correcting it to five would break again at §13.6.
 
 ### §13.1 · Run the plan against its own stop conditions before shipping it
 
@@ -413,6 +413,14 @@ Three rules, each from a defect that reached a founder. All three are about the 
 POLISH.8's stop set named the moderation **act path** — `moderateComment`, `recordGateBlock`, `BLOCKED_REASONS` — and not the moderation **directory**. The run legitimately edited `src/app/(admin)/admin/moderation/audit/page.tsx` with bypass permissions on, and the question surfaced at reconciliation rather than at relay-authoring time. **Fencing by mechanism requires the author to have enumerated every mechanism correctly in advance, which is exactly the assumption the guardrail exists because we cannot make.**
 
 **`src/app/(admin)/admin/moderation/**` joins the ⛔ stop set for any unattended run.** A relay-only fence dies with the session; that is O-1 applied to itself.
+
+### §13.5 · A replacement instruction names the UNIT, quoted in full — never the phrase it changes
+
+**Anchor on what you are REPLACING, not on what you are CHANGING.** The POLISH.8 close-out pack committed this five times. Three were caught before any commit — CC halted on them — and **one of those three would have SHIPPED**: it left `POLISH-TRACKER.md` §6 ending with two *"This is a MEASUREMENT, not a forecast"* paragraphs that disagreed three ways, and it rendered cleanly, so nothing downstream would have caught it. Two more were caught at Gate C: §5's diagram lost the entire downstream phase shape because the anchor named the diagram and the replacement redrew only its top half, and §5 was left contradicting §6 about R-G's batch lever because the anchor stopped one paragraph short.
+
+**The rule.** Every replacement instruction **quotes the full text it replaces, verbatim, in a fenced block** — the whole paragraph, the whole diagram, the whole table row. A receiver can string-match a quoted anchor; a receiver cannot check an anchor described in prose. ⚠ **And the failure mode is asymmetric: an under-scoped anchor that yields visible garbage is caught by the next reader, while one that renders cleanly and contradicts its neighbour is not.** Assume the second.
+
+**Corollary — a handoff's admit-check must be verifiable in the medium the handoff travels in.** v1.0 of that pack named a line count as an admit-check leg and was delivered as an inline paste; CC correctly reported it UNVERIFIABLE — *"counting my own transcription would measure my typing, not the artifact."* Name legs the receiver can check: a version string, a ground SHA, a block sequence, a contiguous ID range.
 
 ---
 

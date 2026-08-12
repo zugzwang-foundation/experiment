@@ -827,4 +827,4 @@ The real mechanism: Next 16's generated `.next/types/validator.ts` validates pag
 
 ---
 
-*POLISH.8 — machine phase + Gate C reads 1 through 4 · ended at push, nothing merged · **the founder merges**.*
+*POLISH.8 — machine phase (#323, `f6d9775`, merged 2026-08-12) + Gate C reads 1 through 4, then the close-out at #326. **The machine phase is closed; the SURFACE is open** until the comprehensive founder pass runs.*
