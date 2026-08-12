@@ -9,16 +9,18 @@ import { PriceBar } from "@/components/debate/PriceBar";
  * DISCOVERY-COMPLETE C1 — V29/V30 `PriceBar` size presets.
  *
  * The load-bearing test here is `detail`. `PriceBar` is a SHARED primitive with
- * three render sites — `MarketHeader.tsx:96` (`/m/[slug]`), `HeroPanels.tsx:78`
- * (Discovery hero, V29) and `MarketCard.tsx:68` (Discovery grid, V30) — and only
- * the two Discovery ones are in this task's scope. `detail` therefore pins the
- * render that shipped BEFORE the preset existed, byte for byte, so `/m/[slug]`
- * has a zero pixel delta (founder ruling OD-2). The literal below was captured
- * from the pre-change component, not hand-written.
+ * three render sites — `MarketHeader.tsx` (`/m/[slug]`), `HeroPanels.tsx`
+ * (Discovery hero, V29) and `MarketCard.tsx` (Discovery grid, V30). At
+ * DISCOVERY-COMPLETE only the two Discovery ones were in scope, so `detail`
+ * pinned the render that shipped BEFORE the preset existed, byte for byte,
+ * giving `/m/[slug]` a zero pixel delta (founder ruling OD-2).
  *
- * ⚠ `detail` is a NAMED TRANSITIONAL preset. d5 specifies a 14px bar / 10px
- * labels (surface_d5_v1_0.html:507-508); reconciling it is POLISH.3's row. When
- * POLISH.3 runs, this literal is what it is deliberately changing.
+ * ⚠ THAT PIN IS NOW BROKEN, DELIBERATELY. `detail` was a NAMED TRANSITIONAL
+ * preset and POLISH.3 was its row: d5 specifies a 14px bar / 10px labels
+ * (surface_d5_v1_0.html:507-508) and PD-3-01 / D5 applied them. The literal
+ * below is the POST-change capture. The suite's job is unchanged — it is still
+ * a byte pin, and any diff against it is still a regression on `/m/[slug]` —
+ * but it now pins the reconciled render, not the pre-preset one.
  *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
@@ -28,9 +30,16 @@ afterEach(cleanup);
 const PRICING = { yes: "0.38", no: "0.62" };
 
 /**
- * The pre-preset render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`,
- * captured from the component as it stood at origin/main aff76b3 — before
- * `size` existed. 385 bytes. Any diff here is a REGRESSION on `/m/[slug]`.
+ * The `detail` render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`,
+ * CAPTURED from the component — `container.innerHTML` dumped after the source
+ * edit and pasted wholesale, never authored by hand and never edited
+ * token-by-token to match (V-1). Any diff here is a REGRESSION on `/m/[slug]`.
+ *
+ * ⚠ PROVENANCE, because a stale one misdirects the exact audit V-1 exists to
+ * enable. Captured at POLISH.3 PR 1, 388 bytes. The PREVIOUS literal was the
+ * pre-preset render captured at origin/main `aff76b3` before `size` existed,
+ * 385 bytes; the +3 is `h-1.5` → `h-[14px]`. A reviewer checking this against
+ * `aff76b3` will find a mismatch, and that mismatch is D5, not tampering.
  */
 const DETAIL_BASELINE =
 	'<div class="flex flex-col gap-1">' +
@@ -43,8 +52,8 @@ const DETAIL_BASELINE =
 	"</div>" +
 	"</div>";
 
-describe("PriceBar presets — `detail` is byte-identical to the pre-change render", () => {
-	it("detail-render-is-unchanged", () => {
+describe("PriceBar presets — `detail` is byte-pinned to its captured render", () => {
+	it("detail-render-matches-the-captured-baseline", () => {
 		const { container } = render(<PriceBar pricing={PRICING} size="detail" />);
 		expect(container.innerHTML).toBe(DETAIL_BASELINE);
 	});

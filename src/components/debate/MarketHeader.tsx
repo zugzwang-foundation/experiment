@@ -44,9 +44,13 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 /**
  * The market-view header (DEBATE.4 §4): question = `markets.title`, resolution
  * criterion = `markets.description` (R-14.4) · lifecycle marker · the price bar
- * (`getPrices`) · the attrs (Đ staked · posts · replies) · the deferred D1
- * placeholders. Composes into the SHELL `(public)/layout.tsx` shell; the
- * placeholder global header is left untouched (superseded at UI.13).
+ * (`getPrices`) · the attrs (Đ staked · posts · replies). Composes into the
+ * SHELL `(public)/layout.tsx` shell; the placeholder global header is left
+ * untouched (superseded at UI.13). ⚠ The deferred D1 placeholder box was
+ * REMOVED at POLISH.3 (PD-3-09 / OD-6) — it rendered a build-time note about
+ * unbuilt work to every participant. The record that market media and resolver
+ * cards are still unbuilt survives at `docs/polish/POLISH-0.md` §3 and
+ * `docs/parked.md`'s `MEDIA.2-GOLIVE`; the carousel itself is MEDIA.2's.
  */
 export function MarketHeader({
 	market,

@@ -368,6 +368,12 @@ describe("B2 — the container primitive moves nothing", () => {
 			...SITES.map((s) => s.file),
 			...GREENFIELD.map((g) => g.file),
 		]);
+		// N1 non-vacuity floor. A `for` over an EMPTY walk passes silently, so a
+		// broken root path or a regex that stopped matching would read as a green
+		// coverage proof. `side-badge.test.tsx` installs the same floor for the
+		// same hazard. The second direction below would also catch an empty walk,
+		// but only as a side effect — this makes it explicit and independent.
+		expect(treeCallSites().length).toBeGreaterThanOrEqual(10);
 		for (const file of treeCallSites()) {
 			expect(
 				declared.has(file),
@@ -386,6 +392,28 @@ describe("B2 — the container primitive moves nothing", () => {
 				tree.has(file),
 				`${file} is declared but renders no <PageContainer> on disk`,
 			).toBe(true);
+		}
+	});
+
+	/**
+	 * GREENFIELD sites get the box-axis rule too (@code-reviewer, POLISH.3 M1).
+	 *
+	 * The `it.each(SITES)` row above cannot reach them, so a greenfield call site
+	 * could pass `px-8` and SILENTLY replace its preset's `px-6` through `cn`'s
+	 * twMerge — exactly the drift that row exists to stop, and exactly what would
+	 * put D2b back to hunting call sites. ⚠ The `before`-baseline objection that
+	 * correctly keeps these files OUT of `SITES` (§18 R-a) does not apply here:
+	 * this reads only `callSite(file).extras` and needs no `c5892bc` baseline.
+	 */
+	it.each(GREENFIELD)("greenfield $file leaves every box axis to the preset", ({
+		file,
+	}) => {
+		const { extras } = callSite(file);
+		for (const axis of BOX_AXES) {
+			expect(
+				[...asSet(extras)].some((c) => axis.test(c)),
+				`${file} className must not set ${axis}`,
+			).toBe(false);
 		}
 	});
 });
