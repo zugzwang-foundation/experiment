@@ -200,4 +200,46 @@ Taken **after** `c0a69e4`, not mid-run:
 
 ---
 
-*Applied by Claude Code, 2026-08-12, from `SPECCHART-apply-pack-v2.md`, verbatim. Ground `dfa3012` (pack authored against `198d1d0`; PF-0 caught the move). Twenty blocks, 25 verbatim fragments, all byte-exact. PR opened, not merged.*
+*Applied by Claude Code, 2026-08-12, from `SPECCHART-apply-pack-v2.md`, verbatim. Ground `dfa3012` (pack authored against `198d1d0`; PF-0 caught the move). Twenty blocks, 25 verbatim fragments, all byte-exact. PR opened, not merged.* ⚠ **The "all byte-exact" claim in this line is refined in §9 below — see the separator correction.**
+
+---
+
+## 9 · Gate C amendment (post-merge)
+
+⚠ **`#324` merged at 2026-08-12T07:10:41Z as `0c1b781`, before Gate C's amendments had landed.** Gate C produced two corrections to text this log records as applied; they are applied here, post-merge, on `docs/spec-chart-amendment` off `origin/main` @ `0c1b781`. Both are web-authored and were applied verbatim. Two files, one line each.
+
+### Amendment 1 · `POLISH-0.md` §2 — the existence rider's worked example
+
+**What was wrong.** As merged, §2's worked example still described the class-S conclusion as *"the correct finding"* — **three lines above the addendum explaining that it was wrong.** The paragraph and its own second half contradicted each other, in the section POLISH.3 reads at kickoff. The rider's *narrow* claim (a citation is not an artifact) was always sound; what had to go was the *broad* conclusion the example carried with it.
+
+**Why it happened, recorded so it is not mistaken for an application error.** This is a **web authoring defect, not an application one.** Block I's instruction was explicit — *"Append immediately after it. **Do not delete the existing text** — the rider is correct and its worked example still holds."* The run followed that instruction exactly and was right to. The defect is that the premise in the instruction — *"its worked example still holds"* — was false, and only became visible once the addendum sat beneath it.
+
+**Applied:** the whole paragraph replaced. The example now states plainly that POLISH.0's class-S conclusion **was itself wrong** and that R13 corrected it, tells the reader not to take the example as establishing that conclusion, and keeps the narrow claim that does hold.
+
+### Amendment 2 · `design-canon.md` §10 — `C-CHART-1`'s opening sentence
+
+**What was wrong.** The clause read *"Ratifies built state at `198d1d0`"* while the ruling was committed at `dfa3012`. §7 item 2 of this log had already flagged the mismatch as correct-but-confusing and asked Gate C to read it as deliberate. Gate C ruled it should say so in the artifact rather than only in the log.
+
+**Applied:** the opening sentence now records that the built state was **measured at `198d1d0` and unchanged at `dfa3012`**, naming the reason — `#322` touched no file under `src/`, so the chart components are byte-identical at both.
+
+⚠ **Scope held deliberately: only `C-CHART-1` was amended.** `PD-0-16` and `POLISH-0.md` §0's R13 row also cite `198d1d0`; in both it dates the **recon measurement** and is true exactly as written. Both were left untouched, and verified untouched after the edit.
+
+### Correction to this log's own verbatim claim
+
+§4 of this log states that **all 25 fenced blocks matched byte-exact**. That is true **of block content** and needs one qualifier, which is recorded here rather than left to be rediscovered:
+
+> **Corrected: byte-exact in content; one separator placement adjusted.**
+
+**The one adjustment — Block C.** The pack's `C-CHART-1` block carries **no trailing `---`**. Applied literally it would have consumed canon §10's pre-existing rule as its own leading separator and left **`## §11` with no section boundary**. One trailing `---` was therefore added after the block. Measured: canon's rule at that point moved from *before* `## §11` to *before* `### C-CHART-1`, and a new one now sits between `C-CHART-1` and `## §11`. **Necessary and correct** — without it two sections would have merged.
+
+⚠ **A second adjustment was reported to this task and is NOT borne out by measurement. Recorded so it is not carried forward as fact.** The claim was that Block O′'s leading `---` had been dropped. It was not. Counting rules in the `SPEC.CHART` → `ADR-0006-DISCIPLINE` span: **1 before the ruling, 3 after** — which reconciles exactly to a literal application, with no rule added or lost:
+
+| Rule | Origin |
+|---|---|
+| before the closure block | **O′'s own leading `---`** — present, not dropped |
+| between the closure block and `CHART-NODE-RING` | the **pre-existing section divider**, which O′ was instructed to be inserted *before* |
+| between `CHART-NODE-RING` and `## ADR-0006-DISCIPLINE` | **P′'s own trailing `---`** |
+
+Pack composition confirms it: O′ carries a leading rule and no trailing one; P′ carries a trailing rule and no leading one. **`parked.md` required zero separator adjustment.** The corrected count is **one**, in Block C, not two.
+
+*Amended by Claude Code, 2026-08-12, post-merge. Ground `0c1b781`. Two verbatim edits, two files, one line each. No `src/`, no ADR, no SPEC, no tracker, no register. PR opened, not merged.*
