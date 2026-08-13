@@ -371,18 +371,26 @@ describe("B2 — the container primitive moves nothing", () => {
 	 * POLISH.3 §18 R-a — the declared set and the tree agree, asserted BOTH ways.
 	 *
 	 * ⚠ THE TWO DIRECTIONS ARE NOT REDUNDANT, and only one of them could go red
-	 * on the commit that introduced them (POLISH.3 PR 1, `9468c30`, 2026-08-13).
-	 * AT THAT COMMIT the tree held NINE call sites and all nine were already in
-	 * `SITES`, so the membership loop below could not fail — it was green the
-	 * moment it was written. It is kept because it is the direction that catches
-	 * a FUTURE undeclared call site, which is the escape this pair exists to
-	 * close. The RED that proved the pair non-vacuous came from the SECOND
-	 * direction only, where `GREENFIELD` named a file disk did not have yet.
+	 * when they were introduced (POLISH.3 PR 1, `9468c30`, 2026-08-13).
 	 *
-	 * ⚠ THAT NINE IS A DATED MEASUREMENT, NOT A STANDING FACT. `error.tsx`
-	 * landed in the same commit, so from `9468c30` onward the tree holds TEN —
-	 * which is the floor asserted below. Nothing here counts nine at run time;
-	 * the number appears only in this account of why the pair is shaped as it is.
+	 * AT THE MOMENT THE PAIR WAS WRITTEN — `9468c30^`, before `error.tsx`
+	 * existed — the tree held NINE call sites and all nine were in `SITES`, so
+	 * the membership loop below could not fail. The RED that proved the pair
+	 * non-vacuous came from the SECOND direction only, where `GREENFIELD` named
+	 * a file disk did not have yet. The loop is kept because it is the direction
+	 * that catches a FUTURE undeclared call site, which is the escape this pair
+	 * exists to close.
+	 *
+	 * ⚠ AND `GREENFIELD` IS WHY THE LOOP IS STILL GREEN. `9468c30` CREATED
+	 * `error.tsx`, so AT that commit — and at every commit since — the tree
+	 * holds TEN, and the loop passes because the declared set is `SITES` (9)
+	 * ∪ `GREENFIELD` (1). The nine above describes `9468c30^`, not `9468c30`;
+	 * conflating the two is what an earlier draft of this docblock did.
+	 *
+	 * ⚠ BOTH NUMBERS ARE DATED MEASUREMENTS, NOT STANDING FACTS. Nothing here
+	 * counts nine TREE CALL SITES at run time — the `SITES`-length assertions
+	 * further down count the DECLARATION set, which is a different quantity.
+	 * The tree count that IS asserted is the floor below.
 	 */
 	it("every <PageContainer> on the tree is declared in SITES or GREENFIELD", () => {
 		const declared = new Set([

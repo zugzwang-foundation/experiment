@@ -40,11 +40,21 @@ const PRICING = { yes: "0.38", no: "0.62" };
  * NOT pasted from that dump. An earlier version of this paragraph claimed the
  * opposite; it was wrong, and it is corrected here rather than quietly.
  *
- * ⚠ BYTE-IDENTITY IS PROVEN TWICE, so the mechanism above costs nothing:
- * (1) this file's own exact-equality assertion runs green, which is the whole
- * proof — a hand-edit that missed a byte fails it; and (2) the dump is
- * preserved at `~/Downloads/p3-pr1-c2-baseline.txt`, 388 bytes, verified
- * character-identical to the resolved literal.
+ * ⚠ THE ORDERING CLAIM HAS AN ARTIFACT, and it is not the one you would
+ * reach for. A byte-identical dump proves identity and carries NO ordering
+ * information. What discharges the ordering is the capture RUN itself: a
+ * Vitest log stamped nine minutes before the commit, in which this assertion
+ * FAILS with `Expected` = the old 385-byte literal and `Received` = a render
+ * already carrying `h-[14px]` / `text-[10px]`. The component was edited; the
+ * literal was not yet. That state cannot be reconstructed after the fact.
+ *
+ * ⚠ BYTE-IDENTITY: the load-bearing proof is IN THIS FILE. The exact-equality
+ * assertion below runs on every `pnpm vitest run` — a hand-edit that missed a
+ * byte fails it, and `toBe` is `Object.is`. That is the whole proof, and it is
+ * reproducible by anyone. The capture log and its dump are OUT-OF-TREE
+ * artifacts retained by the operator, not committed and not reachable from a
+ * clone or from CI; they corroborate the account above but no reader should be
+ * asked to take them on trust.
  *
  * ⚠ V-1's ACTUAL HAZARD DID NOT OCCUR. The hazard is authoring an expected
  * string and then bending the component to match it, which yields a file

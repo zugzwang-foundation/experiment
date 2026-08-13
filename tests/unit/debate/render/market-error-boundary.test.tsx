@@ -37,15 +37,39 @@ import DebateRouteError from "@/app/(public)/m/[slug]/error";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
 
-/** An error carrying a distinctive planted string in each of the four fields
- *  a boundary could leak. Distinctive so a match cannot be coincidental. */
+/**
+ * An error carrying a distinctive planted string in each field a boundary could
+ * leak. Distinctive so a match cannot be coincidental.
+ *
+ * ⚠ THE FIXTURE MUST MATCH PRODUCTION SHAPE, OR THE ABSENCE ASSERTION COVERS
+ * ONLY THE LEAK SHAPES NOBODY WRITES (@security-auditor, POLISH.3 R6). Two
+ * earlier shortcuts each let a realistic leak through:
+ *
+ *   - `cause` was a bare STRING. In production `cause` comes from
+ *     `new Error(msg, { cause: err })` and is virtually always an Error, so the
+ *     idiomatic unwrap `cause instanceof Error ? cause.message : null`
+ *     evaluated to `null` and the guard stayed GREEN on a real leak. It is now
+ *     a real Error, with its OWN planted markers in `message` and `stack`.
+ *   - `stack` was ONE LINE with the marker at position 0. A real stack is
+ *     `"Error: <msg>\n    at …"`, so the normal "frames only, drop the header"
+ *     idiom `stack.split("\n").slice(1).join("\n")` rendered empty and the
+ *     guard stayed GREEN. The marker now sits on a FRAME line, not the header.
+ */
 function thrown() {
+	const cause = new Error("LEAK_CAUSE_MESSAGE_debate_view_load_failed");
+	cause.stack =
+		"Error: LEAK_CAUSE_MESSAGE_debate_view_load_failed\n" +
+		"    at LEAK_CAUSE_FRAME (src/server/debate-view/load-debate-view.ts:88:11)";
+
 	const err = new Error("LEAK_MESSAGE_pg_connection_refused_m3q7") as Error & {
 		digest?: string;
 	};
 	err.digest = "LEAK_DIGEST_4b81ce";
-	err.stack = "LEAK_STACK_FRAME at m/[slug]/page.tsx:99";
-	err.cause = "LEAK_CAUSE_debate_view_load_failed";
+	// Header line first, marker on a FRAME line — the production shape.
+	err.stack =
+		"Error: LEAK_MESSAGE_pg_connection_refused_m3q7\n" +
+		"    at LEAK_STACK_FRAME (src/app/(public)/m/[slug]/page.tsx:99:7)";
+	err.cause = cause;
 	return err;
 }
 
@@ -53,7 +77,8 @@ const SECRETS = [
 	"LEAK_MESSAGE_pg_connection_refused_m3q7",
 	"LEAK_DIGEST_4b81ce",
 	"LEAK_STACK_FRAME",
-	"LEAK_CAUSE_debate_view_load_failed",
+	"LEAK_CAUSE_MESSAGE_debate_view_load_failed",
+	"LEAK_CAUSE_FRAME",
 ];
 
 afterEach(cleanup);
@@ -88,9 +113,13 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		const html = container.innerHTML;
 
 		// ── POSITIVE CONTROL 1: the component actually rendered. Without this the
-		//    four absences below would pass just as happily against "".
+		//    absences below would pass just as happily against "".
+		//    ⚠ The `toContain` is the whole control. A length floor was tried and
+		//    dropped: an EMPTY `PageContainer` with this testid already
+		//    serialises to 93 characters, so a `> 100` threshold had seven
+		//    characters of headroom and contributed nothing it did not already
+		//    imply (@security-auditor, POLISH.3 R6).
 		expect(html).toContain("Something went wrong.");
-		expect(html.length).toBeGreaterThan(100);
 
 		// ── POSITIVE CONTROL 2: the planted strings are really ON the error
 		//    object. A typo in `thrown()` would otherwise make every absence
@@ -101,26 +130,31 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		expect(err.message).toContain(SECRETS[0]);
 		expect(err.digest).toContain(SECRETS[1]);
 		expect(err.stack).toContain(SECRETS[2]);
-		expect(String(err.cause)).toContain(SECRETS[3]);
+		expect((err.cause as Error).message).toContain(SECRETS[3]);
+		expect((err.cause as Error).stack).toContain(SECRETS[4]);
 
 		// ── THE ASSERTION. Container-wide: a leak anywhere in the subtree fails.
 		for (const secret of SECRETS) {
 			expect(html).not.toContain(secret);
 		}
 
-		// ── POSITIVE CONTROL 3 — REACHABILITY. Prove the matcher CAN find these
-		//    strings when they are present, through this same harness. Without
-		//    it the four `not.toContain`s are absences of unknown detectability.
+		// ── POSITIVE CONTROL 3 — REACHABILITY, for EVERY secret. Prove the
+		//    matcher CAN find each string when present, through this same
+		//    harness. Otherwise the absences are absences of unknown
+		//    detectability. ⚠ An earlier version proved reachability for two of
+		//    the five and read as if it covered all of them.
 		const leaky = render(
 			<p>
-				{thrown().message} {String(thrown().cause)}
+				{err.message} {err.digest} {err.stack} {(err.cause as Error).message}{" "}
+				{(err.cause as Error).stack}
 			</p>,
 		);
-		expect(leaky.container.innerHTML).toContain(SECRETS[0]);
-		expect(leaky.container.innerHTML).toContain(SECRETS[3]);
+		for (const secret of SECRETS) {
+			expect(leaky.container.innerHTML).toContain(secret);
+		}
 	});
 
-	it("market-error::the-error-prop-is-not-bound-so-a-leak-is-unconstructable", () => {
+	it("market-error::the-error-prop-is-never-read-during-render-effects-or-handlers", () => {
 		// ⚠ THE ARM THAT PROTECTS IS THE CLIENT ONE. In a production build
 		// React's Flight client already replaces a SERVER-side error with a fixed
 		// placeholder, so a server throw has nothing left to leak; an error
@@ -158,5 +192,54 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 			untouched.container.querySelector('[data-testid="debate-error"]'),
 		).not.toBeNull();
 		expect(untouched.container.innerHTML).toContain("Something went wrong.");
+
+		// ⚠ RENDER AND EFFECTS ARE NOT THE WHOLE SURFACE. `act()` flushes passive
+		// effects, so a `useEffect` touching `error` throws above — but it NEVER
+		// invokes an event handler, and a handler closure over `error` is the
+		// single likeliest future edit to an error boundary: a "Show details"
+		// affordance is exactly what this component's own docblock warns the
+		// next engineer against. Measured: a boundary carrying
+		// `onClick={() => { document.title = error.message }}` passed every
+		// other assertion in this file GREEN (@security-auditor, POLISH.3 R6).
+		//
+		// ⚠ AND A THROWING GETTER IS THE WRONG INSTRUMENT HERE. React catches a
+		// handler throw, so Vitest reports it as an UNHANDLED ERROR — non-zero
+		// exit, but the test itself still prints "passed", and Vitest's own
+		// warning is that this "might cause false positive tests". Measured too.
+		// So the handler sweep uses a RECORDING fixture instead: reads are
+		// logged, never thrown, and the assertion is on the log. Deterministic
+		// failure, no reliance on how a runner surfaces an uncaught throw.
+		cleanup();
+		const reads: string[] = [];
+		const tattle = {
+			get message() {
+				reads.push("message");
+				return "";
+			},
+			get digest() {
+				reads.push("digest");
+				return "";
+			},
+			get stack() {
+				reads.push("stack");
+				return "";
+			},
+			get cause() {
+				reads.push("cause");
+				return undefined;
+			},
+		} as unknown as Error & { digest?: string };
+
+		const swept = render(<DebateRouteError error={tattle} reset={() => {}} />);
+		expect(reads).toEqual([]); // nothing read during render or effects
+
+		for (const el of swept.container.querySelectorAll(
+			"button, a, [role='button'], [tabindex]",
+		)) {
+			fireEvent.click(el);
+			fireEvent.keyDown(el, { key: "Enter" });
+		}
+		// The whole point: no handler on this surface closes over `error`.
+		expect(reads).toEqual([]);
 	});
 });
