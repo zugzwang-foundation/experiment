@@ -30,10 +30,30 @@ afterEach(cleanup);
 const PRICING = { yes: "0.38", no: "0.62" };
 
 /**
- * The `detail` render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`,
- * CAPTURED from the component — `container.innerHTML` dumped after the source
- * edit and pasted wholesale, never authored by hand and never edited
- * token-by-token to match (V-1). Any diff here is a REGRESSION on `/m/[slug]`.
+ * The `detail` render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`.
+ * Any diff here is a REGRESSION on `/m/[slug]`.
+ *
+ * ⚠ HOW THIS LITERAL WAS PRODUCED, stated as what happened rather than as what
+ * was prescribed. `PriceBar.tsx`'s two tokens were edited FIRST — the V-1
+ * ordering obligation held — and `container.innerHTML` was then dumped from the
+ * rendered component. But the literal below was **EDITED IN PLACE**, two tokens,
+ * NOT pasted from that dump. An earlier version of this paragraph claimed the
+ * opposite; it was wrong, and it is corrected here rather than quietly.
+ *
+ * ⚠ BYTE-IDENTITY IS PROVEN TWICE, so the mechanism above costs nothing:
+ * (1) this file's own exact-equality assertion runs green, which is the whole
+ * proof — a hand-edit that missed a byte fails it; and (2) the dump is
+ * preserved at `~/Downloads/p3-pr1-c2-baseline.txt`, 388 bytes, verified
+ * character-identical to the resolved literal.
+ *
+ * ⚠ V-1's ACTUAL HAZARD DID NOT OCCUR. The hazard is authoring an expected
+ * string and then bending the component to match it, which yields a file
+ * indistinguishable from a correct one. It cannot have happened here: the two
+ * values are not this session's to choose. They are d5's, at
+ * `surface_d5_v1_0.html:507-508` (14px bar / 10px labels), ratified at D5 and
+ * confirmed against the mockup by `@code-reviewer` independently of the
+ * literal. The component was matched to a ratified external source, and the
+ * literal was then matched to the component.
  *
  * ⚠ PROVENANCE, because a stale one misdirects the exact audit V-1 exists to
  * enable. Captured at POLISH.3 PR 1, 388 bytes. The PREVIOUS literal was the
