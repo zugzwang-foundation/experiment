@@ -49,7 +49,7 @@
 
 ⚠ **`PD-3-07` IS CONSUMED PARTIAL AND REMAINS OPEN.** Only site 1 of 5 changed. `ReplyCard.tsx` · `ArgProfile.tsx` · `AggregateFooter.tsx` ×2 are PR 2's, are **not** guarded by anything today, and sit inside `src/components/debate/` — which the §10 deny-list does **not** cover, so the allow-list was their only fence. Between the two PRs `/m/[slug]` renders the spaced form in the header and the unspaced form in the cards; that is a **ratified consequence of the OD-1 split**, not a defect to file.
 
-**Test counts at `af3a070`:** `market-error-boundary` 5 · `market-header` 3 · `page-container` 12 (9 `SITES`, 1 `GREENFIELD`).
+**Test counts at `af3a070`, as the runner reports them:** `market-error-boundary` 5 · `market-header` 3 · `page-container` 28.
 
 ---
 
@@ -138,6 +138,8 @@ All 29 raw hits are either code fences legitimately terminating a table, or `|`-
 
 **The §19 instance was the only one, and it never reached `main`** — created and fixed inside this PR. ⚠ The naive count would have reported 29 or 5; both are wrong, and reporting either would have been the same class of error this pack spent four reads on.
 
+⚠ **This census is a DATED measurement with a NARROW definition, and it is already incomplete.** It was taken at `origin/main` **before** the merge, so it could not see `docs/plans/POLISH-3-RUN-TRACKER.md`, which joined the repo afterwards — and that file carries **two `---`-directly-under-a-list-item constructs**, where GFM reads the rule as a setext heading underline rather than a thematic break. That is a **sibling class the census did not look for**: it asked only "what follows a table row", not "what follows a list item or paragraph". **D4 owns both the re-measurement and the tracker's two instances**; nothing here re-runs it, and the tracker is committed verbatim by mandate.
+
 ---
 
 ## 8 · Open questions / carried, not fixed
@@ -170,7 +172,7 @@ Two different lessons are queued for the same number in the same file:
 
 `just verify` and the full suite ran **before every commit**, unpiped, exit code echoed. H12 checked before every suite run. Final suite at `db51cbc`: **326 files passed, 1 skipped; 2898 tests**. CI green on every push; final run **31701505151** on `db51cbc`.
 
-⚠ **The suite degraded 7× under sustained load** — 320s at C1, 3054s at R2 — then recovered to 185s at R3 when the machine idled. Not DB bloat (401 MB, near-zero dead tuples) and not leaked connections. A projection of "six more hours" made from the rising trend was **wrong**, and withdrawn.
+⚠ **The suite degraded badly under sustained load** — 320s at C1, 3054s at R2 — then recovered to 185s at R3 when the machine idled. Not DB bloat (401 MB, near-zero dead tuples) and not leaked connections. A projection of "six more hours" made from the rising trend was **wrong**, and withdrawn.
 
 ⚠ **`ZUGZWANG_ENV=preview` belongs to `just verify` and must never share a shell with the test runner.** Sourcing the build-env prelude and running `pnpm vitest run` in the same shell reddens `precommit-moderate::reservation-key-shape-with-namespacing` — `preview:` where `prod:` is expected. **This happened twice**, the second time after it had already been written up.
 
