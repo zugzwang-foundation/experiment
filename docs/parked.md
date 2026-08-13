@@ -1724,3 +1724,34 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** The next edit to `POLISH-SURFACE-TEMPLATE.md` §5, or the next unattended surface run that needs a wait loop. Not go-live gating: it affects the machine-run harness, never the product.
 
 **Expected next task.** POLISH close-out, or whichever surface next revises the halt set. Evidence: `POLISH-SURFACE-TEMPLATE.md` §5 H12; `docs/plans/POLISH-3.md` §19.
+
+---
+
+## PORTAL-SCOPED-ABSENCE — absence assertions scoped to `container` cannot see portalled content
+
+**Originating task:** POLISH.3 PR 1 R7 (2026-08-13), Gate C read-2. Named as a destination in `docs/plans/POLISH-3.md` §19 **PF-8**.
+
+**Deferred work.** An absence assertion scoped to React Testing Library's `container` is blind to anything rendered through `createPortal`, which mounts outside the parent DOM node. `baseElement` (i.e. `document.body`) is the correct scope. **Measured at R7:** a probe rendering `{error.message}` through a portal passed `market-error-boundary.test.tsx`'s primary string-leak guard **GREEN** — the secret was never in the haystack.
+
+⚠ **Live, not theoretical: this repo's `Dialog` portals BY DEFAULT.** `src/components/ui/dialog.tsx` wraps `DialogContent` in `DialogPortal`, so a "Show details" modal built from components already on disk lands outside `container` **by construction**. The likeliest future leak is the one the guard cannot see.
+
+**The census, corrected.** ⚠ The `@security-auditor` pass that surfaced this named two files; **one path was wrong, one was a non-issue, and the two highest-priority instances were missed.** Re-derived by grepping every `container.innerHTML` and `container.querySelectorAll` in `tests/`:
+
+| File | Class | Status |
+|---|---|---|
+| `tests/unit/debate/render/market-error-boundary.test.tsx` | leak guard | ✅ **FIXED at R7** — `baseElement` |
+| `tests/unit/auth/auth-error-boundary.test.tsx` | **leak guard** — the signed-out `(auth)` boundary | ⛔ container-scoped. **Compounds with `AUTH-BOUNDARY-GUARD-WEAK`**: it also carries the single-line-`stack` and string-`cause` fixture defects and has no booby-trap test |
+| `tests/unit/bookmarks/render/side-encoding.test.tsx:191` | **SC-1 masking guard** (`CLAUDE.md` §5.14) | ⛔ container-scoped |
+| `tests/unit/profile/render/argument-list-side.test.tsx:132` | **SC-1 masking guard** | ⛔ container-scoped |
+| `tests/unit/discovery/render/carousel.test.tsx:332` | hygiene — Canon §3.10's `:has()` ban | ⛔ container-scoped; consequence is a style-canon miss, not a data leak |
+| `tests/unit/composer/render/never-echo.test.tsx` | **leak guard** (SG-3 NEVER-ECHO) | ✅ **NOT AFFECTED** — see below |
+
+⚠ **`never-echo.test.tsx` IS a leak guard and has NO blind spot.** The relay asked explicitly whether it is a leak guard or hygiene: it is emphatically the former — SG-3 NEVER-ECHO drives a sentinel argument through the composer with the wire envelope carrying that sentinel **inside the error `message` field**, the hostile server-echo case, and asserts the client renders `copy.ts` strings only. But its sweep clones **`document.body`**, not `container`, so it is already at the correct scope. The audit pointed at its `clone.querySelectorAll("input, textarea")` — that is the *removal of the entry fields from the clone*, not the assertion's scope. **It needs no change, and it is the in-repo precedent for the correct form.**
+
+⚠ **The two SC-1 rows are the priority, and their severity is genuinely lower than it looks.** Both protect removed-comment body masking — exactly the class `CLAUDE.md` §5.14 SC-1 mandates a body-absence assertion for. But both sit on top of a **compile-enforced** property, and both say so at their site: *"The removed union carries no body/title field at all, so this is belt over a compile-enforced property."* The union type is the guard; the assertion is the belt. A portal cannot leak a field the DTO does not carry. **Fix them for form, not because a leak is reachable today** — and fix them before any change that gives the removed variant a body field, at which point the belt becomes the guard.
+
+**Why deferred.** All five remaining files are outside POLISH.3 PR 1's allow-list. Editing them would be ⛔ RUN-STOP condition 3.
+
+**Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes `auth-error-boundary.test.tsx` the R6 fixture corrections and a booby-trap test. Porting the corrected scope to all five is the same work in the same session — and that PR is the natural owner because it is already opening the one file that is both container-scoped *and* a live leak guard with no compile-enforced backstop.
+
+**Expected next task.** The `(auth)`-boundary follow-up. Evidence: `src/components/ui/dialog.tsx` · the five files above · `docs/plans/POLISH-3.md` §19 PF-7 · PF-8 · `CLAUDE.md` §5.14 SC-1.
