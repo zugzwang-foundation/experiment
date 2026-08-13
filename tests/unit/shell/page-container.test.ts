@@ -370,13 +370,19 @@ describe("B2 — the container primitive moves nothing", () => {
 	/**
 	 * POLISH.3 §18 R-a — the declared set and the tree agree, asserted BOTH ways.
 	 *
-	 * ⚠ THE TWO DIRECTIONS ARE NOT REDUNDANT, and only one of them can go red on
-	 * the commit that introduces them. The tree holds nine sites and all nine are
-	 * already in `SITES`, so the direction below is GREEN THE MOMENT IT IS
-	 * WRITTEN. It is kept because it is the direction that catches a FUTURE
-	 * undeclared call site — the escape this whole pair exists to close. The RED
-	 * that proves the pair non-vacuous comes from the second direction only,
-	 * where `GREENFIELD` names a file disk does not have yet.
+	 * ⚠ THE TWO DIRECTIONS ARE NOT REDUNDANT, and only one of them could go red
+	 * on the commit that introduced them (POLISH.3 PR 1, `9468c30`, 2026-08-13).
+	 * AT THAT COMMIT the tree held NINE call sites and all nine were already in
+	 * `SITES`, so the membership loop below could not fail — it was green the
+	 * moment it was written. It is kept because it is the direction that catches
+	 * a FUTURE undeclared call site, which is the escape this pair exists to
+	 * close. The RED that proved the pair non-vacuous came from the SECOND
+	 * direction only, where `GREENFIELD` named a file disk did not have yet.
+	 *
+	 * ⚠ THAT NINE IS A DATED MEASUREMENT, NOT A STANDING FACT. `error.tsx`
+	 * landed in the same commit, so from `9468c30` onward the tree holds TEN —
+	 * which is the floor asserted below. Nothing here counts nine at run time;
+	 * the number appears only in this account of why the pair is shaped as it is.
 	 */
 	it("every <PageContainer> on the tree is declared in SITES or GREENFIELD", () => {
 		const declared = new Set([
@@ -388,6 +394,11 @@ describe("B2 — the container primitive moves nothing", () => {
 		// coverage proof. `side-badge.test.tsx` installs the same floor for the
 		// same hazard. The second direction below would also catch an empty walk,
 		// but only as a side effect — this makes it explicit and independent.
+		//
+		// TEN is the POST-`error.tsx` measurement: the nine `SITES` files plus
+		// the one `GREENFIELD` file, counted on the tree at `9468c30` and every
+		// commit since. It is a FLOOR, not an equality — a tenth-plus site is
+		// caught by the membership loop below, not by this line.
 		expect(treeCallSites().length).toBeGreaterThanOrEqual(10);
 		for (const file of treeCallSites()) {
 			expect(
