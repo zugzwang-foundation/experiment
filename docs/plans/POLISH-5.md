@@ -439,11 +439,11 @@ src/components/ui/error-block.tsx
 >
 > **MEASURED** (`POLISH-56-HEADMEASURE.md` §3d): ratified O-space is **`O-1 … O-4`** and stops there (`CLAUDE.md:243-246`). `grep -rhoE '\bO-[0-9]+\b' CLAUDE.md AGENTS.md` returns nothing higher.
 >
-> | Token | Where this plan uses it | Meaning it is given |
-> |---|---|---|
-> | `O-5` | the header · §10 `P-9`/`P-10`'s carve-outs · §10's closing banner | *applied at the sites, never as an appendix* |
-> | **`O-6`** | **§0.7's title · §19's closing row** | *an unbidden arrival is DECLARED* |
-> | **`O-6`** | **§2.8 — *"the `O-6` / `PF-8` principle"*** | ***assert on `innerHTML`, never `textContent`*** |
+> | Token | Where this plan uses it | Meaning it is given | ⚠ **Allocated at commit 0** |
+> |---|---|---|---|
+> | `O-5` | the header · §10 `P-9`/`P-10`'s carve-outs · §10's closing banner | *applied at the sites, never as an appendix* | ✅ **ALLOCATED `O-5`** — citations already correct |
+> | **`O-6`** | **§0.7's title · §19's closing row** | *an unbidden arrival is DECLARED* | ✅ **ALLOCATED `O-6`** — citations already correct |
+> | **`O-6`** | **§2.8 — *"the `O-6` / `PF-8` principle"*** | ***assert on `innerHTML`, never `textContent`*** | ⚠ **ALLOCATED `O-7` — THIS IS THE SPLIT.** §2.8's citation is corrected in the same commit |
 >
 > ⚠ **`O-5` exists only as a PROPOSAL** awaiting a founder ruling at POLISH.3's D5 (`docs/plans/POLISH-3-RUN-TRACKER.md:139,143` — **a file that landed in the head commit itself**). **`O-6` has NO definition anywhere on `main`, in any namespace.** A third, unrelated `O-5`/`O-6` pair lives at `docs/logs/STAGING-PARITY-A.md:571,579` as that log's own open-question numbering.
 >
@@ -669,7 +669,7 @@ src/app/(admin)/admin/markets/_components/TerminalActions.tsx:248  title={title}
 
 **⇒ TWO CONCRETE OBLIGATIONS ON ITEM 6's GUARD — BOTH, NOT EITHER:**
 
-- **Assert on `innerHTML`, never `textContent`** — the `O-6` / `PF-8` principle. ⚠ **`surface.test.tsx:319-326`'s `removed-stub-render` asserts on `stub.textContent` — item 6's guard must not copy that instrument.**
+- **Assert on `innerHTML`, never `textContent`** — the `O-7` / `PF-8` principle. ⚠ **ALLOCATED AT COMMIT 0 (2026-08-14): this rule is `O-7`, NOT `O-6`** — the two were one bare identifier over two unrelated rules; the split is recorded at `CLAUDE.md` §8. ⚠ **`surface.test.tsx:319-326`'s `removed-stub-render` asserts on `stub.textContent` — item 6's guard must not copy that instrument.**
 - **The fixture's teaser must be a DISTINCTIVE marker.** Today it is `"The teaser."` (`:56`) — a string that could appear by accident. The guard fixture needs a `ZZ-`-style marker, exactly as `BODY` has one.
 
 ### 2.9 · ITEM 3 IS ALREADY BUILT INTO THE PRIMITIVE — and `NEW-1` IS RESOLVED
@@ -1507,8 +1507,8 @@ tests/unit/shell/page-container.test.ts              171 ±
 > | `D17` | **`PD-3-15`'s coordinate drift** (`:164-168` → `:161-169`), declared cross-surface — a `V-8` instance |
 > | `POLISH-0.md` | §3's **POLISH.5 AND POLISH.6** row corrections |
 > | Register | **`PD-5-03 … PD-5-08`** — ⚠ **`HM-3`: the block starts at `03`, NOT `02`** (§1.7) · **`PD-6-01 … PD-6-06`** ⚠ **the `PD-6` series is EMPTY repo-wide; `PD-6-01` is the first mint** |
-> | `.6`'s **`R-A`** | The O-space mint — ***fence by symbol, never by line***. ⚠ **Number read off `main` (`O-2`), never from memory** |
-> | ⚠ **`HM-4`** *(v2.3)* | **`O-5` and `O-6` minted, and `O-6`'s TWO unrelated rules SPLIT into two IDs** (§1.7). ⚠ **Resolve alongside `R-A`'s claim on the same space or the collision is manufactured at the commit meant to end it** |
+> | `.6`'s **`R-A`** | The O-space mint — ***fence by symbol, never by line***. ✅ **ALLOCATED `O-8`** at commit 0, 2026-08-14, off the live high-water `O-4` (`O-2`) |
+> | ⚠ **`HM-4`** *(v2.3)* | ✅ **DISCHARGED at commit 0, 2026-08-14. FOUR numbers issued in one pass, off the live high-water `O-4`:** `O-5` *(apply at every site)* · `O-6` *(an unbidden arrival is declared)* · **`O-7`** *(assert on `innerHTML`) — **the split*** · `O-8` *(`R-A`, fence by symbol)*. **All four are defined at `CLAUDE.md` §8.** ⚠ **`docs/logs/STAGING-PARITY-A.md`'s `O-5`/`O-6` pair is a DIFFERENT namespace and was NOT renumbered** |
 > | ⚠ **`D10`'s reversal** *(v2.3)* | `P5-D01` → **POLISH.5 item 17**, restoring the 2026-07-31 smoke disposition (§1.8, §3.1) |
 > | ⚠ **`V-9`/`V-10`** | **`CLAUDE.md:239` says V-space is `V-1…V-5`; the live register is `V-1…V-8`** (`POLISH-0_data-manifest.md:197-204`) — **stale by three, in the sentence that defines the register split.** A `V-9` proposal is queued |
 > | `OD-8` | `PostSubstrate.priceAtBet` / `ReplySubstrate.priceAtBet` — a **`V-3` false receipt** on the exact field item 3 renders. **By symbol, unnumbered** |

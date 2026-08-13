@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.5** — 2026-08-10 IST. Supersedes v1.4 (2026-08-08).
+> **Status:** **v1.7** — 2026-08-14 IST. Supersedes v1.6 (2026-08-11). ⚠ **v1.6 was never entered in §0** — V-7 and V-8 were minted, defined and cited while the amendment record stayed at v1.5, which is the D4 failure this manifest names at §0. **Both blocks are entered below.**
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
@@ -12,6 +12,21 @@
 ---
 
 ## §0 · Amendment record
+
+### v1.7 — 2026-08-14 · from POLISH.5/.6 commit 0
+
+| # | Amendment | Detail |
+|---|---|---|
+| **G1** | **V-9 added** — an inherited enumeration is a citation, not a proof | Ruled into V-space, not O-space: it states what makes a control weaker than it looks, which is §5's definition verbatim. **Not cross-listed into `CLAUDE.md` §8** (E1). ⚠ Its self-referential instance is what `CLAUDE.md:239` carried until this same commit. |
+| **G2** | **V-10 added** — a register cell is not a baseline | Six instances, the sixth (`HM-3`) caught a live ID collision before it was minted: a plan read the `PD-5` high-water off its own prior pass rather than off `main`, and `PD-5-02` already existed. |
+| **G3** | **The v1.6 block below is BACKFILLED, not newly ruled** | V-7 and V-8 were minted at POLISH.7a, defined in §5, cited in `CLAUDE.md` and in three plans — and never entered here. Recorded rather than quietly corrected, because §0's own D4 names this exact failure and V-7's own text says *"a V-number is minted HERE or it is not minted."* |
+
+### v1.6 — 2026-08-11 · from POLISH.7a — ⚠ **BACKFILLED at v1.7; never written at the time**
+
+| # | Amendment | Detail |
+|---|---|---|
+| **F1** | **V-7 added** — every proof obligation names its DISCRIMINATING CONDITION | Ruled at the POLISH.7a correction gate and recorded in `docs/plans/POLISH-7a.md` §12; it reached this register only at the close-out. |
+| **F2** | **V-8 added** — a line citation into a PROSE document is invalidated by any edit above it | Three distinct instances in one PR, one of them created by that PR's own insertion into `POLISH-0.md`. |
 
 ### v1.5 — 2026-08-10 · from POLISH-TEMPLATE
 
@@ -190,9 +205,9 @@ STAGING-PARITY is not done until **all six** pass from a cold rebuild.
 
 ## §5 · Inherited verification discipline — the **V-space** register
 
-**This section is the canonical home of V-1…V-8.** They are the *verification* lessons: what makes a control weaker than it looks. They are **not** L-space — L-numbers belong to `POLISH-register-ADDITIONS.md` (the PRIMITIVES-1 Gate C reviewer LOWs) and to task-scoped `@security-auditor` LOWs, which carry their task name. Cite a verification lesson as **V-n**, never as L-n.
+**This section is the canonical home of V-1…V-10.** They are the *verification* lessons: what makes a control weaker than it looks. They are **not** L-space — L-numbers belong to `POLISH-register-ADDITIONS.md` (the PRIMITIVES-1 Gate C reviewer LOWs) and to task-scoped `@security-auditor` LOWs, which carry their task name. Cite a verification lesson as **V-n**, never as L-n.
 
-V-1…V-4 came from Slice A, which found **six** controls that passed while blind to what they named; V-5 came from Slice C/D; **V-6 from POLISH-TEMPLATE; V-7 and V-8 from POLISH.7a**. These constraints are carried into every remaining slice.
+V-1…V-4 came from Slice A, which found **six** controls that passed while blind to what they named; V-5 came from Slice C/D; **V-6 from POLISH-TEMPLATE; V-7 and V-8 from POLISH.7a; V-9 and V-10 from POLISH.5/.6 commit 0**. These constraints are carried into every remaining slice.
 
 - **V-1 · A test that reassembles a lookalike proves nothing about the shipped one.** Assert against the shipped artifact, or against what actually happens on the wire.
 - **V-2 · A negative assertion needs a positive control** — `not.toMatch` passes when its pattern matches nothing, and "matches nothing" is exactly what a rename or a reformat produces.
@@ -202,8 +217,10 @@ V-1…V-4 came from Slice A, which found **six** controls that passed while blin
 - **V-6 · A promised assertion delivered VACUOUSLY is worse than an absent one, because it reads as discharged.** Two instances in one task: the plan named the `currentValue` never-echo assertion BY NAME and it shipped satisfying the letter while proving nothing — the removed post had no `positions` row, so the field was null whether it leaked or not; and the round-trip guard's first fixture measured `1 + 9N` because it seeded no events, and would have pinned 19 while claiming 25. An absent assertion is visible in a coverage read; a vacuous one is invisible and carries a false receipt.
 - **V-7 · Every proof obligation names its DISCRIMINATING CONDITION, not just its subject.** *"Measure route X"* admits a measurement taken where the defect cannot appear; *"measure route X on a page taller than the viewport"* does not. POLISH.7a's §7.1 required *"no geometry change"* across nine route families and four properties each, and every route it measured was **shorter than the viewport** — precisely the region in which the change under test is inert. **The proof could not have failed**, and it was the honest gap-declaration in the commit body (*"no long page was ever exercised"*) that a reviewer read and acted on. §8.1's nine non-vacuity rules are all about the ASSERTION; **none is about the FIXTURE.** ⚠ Minted at the POLISH.7a correction gate and recorded in `docs/plans/POLISH-7a.md` §12; it reached this register only at the close-out, which is the **D4 failure above happening again** — a lesson numbered in a document that is not its register is a citation without a definition. **A V-number is minted HERE or it is not minted.**
 - **V-8 · A line-number citation into a PROSE DOCUMENT is invalidated by any edit above it, including one in the same PR.** `POLISH-SURFACE-TEMPLATE.md` §7.2 already requires a coordinate in an IMMUTABLE artifact — a commit body, a PR body — to be symbol-anchored or SHA-qualified. A citation into a LIVING document is **worse, not better**: it is not frozen wrong, it is broken by the next edit and stays silently plausible. **Cite the section, not the line.** POLISH.7a produced three distinct instances of the same genus in one PR — coordinates a plan carried forward from before execution (§12 P-6), coordinates a reviewer round measured before a later commit, and coordinates invalidated by the PR's own one-line insertion into `POLISH-0.md`. **One fix covers all three.**
+- **V-9 · An enumeration inherited from another artifact is a CITATION, not a proof.** Carrying a count, a list or a range forward from a prompt, a plan, a register cell or a prior pass records what that artifact claimed — it does not establish it. The inheriting document then reads as though it measured, and the staleness travels with the citation while gaining apparent authority at every hop. **Re-run the instrument, or mark the figure as inherited and name its source.** ⚠ Its sharpest instance is self-referential: `CLAUDE.md` §8's own register-split sentence carried `V-1…V-5` for three mints after the register had moved, *in the paragraph that defines what a register is*.
+- **V-10 · A register cell is not a baseline.** Re-derive from the highest tier that speaks before accepting a row's own account of what it violates. A row states a finding **and** an implied baseline, and the second half is the weaker claim — it was written by whoever filed the row, not by the tier that governs. ⚠ **Six instances**: four at POLISH.5/.6's step-0 recon, a fifth in the plan chat, and a sixth at `HM-3` — where a plan stated the live `PD-5` high-water as `PD-5-01`, scheduled six rows at `02…07`, and `PD-5-02` already existed. **Left unread, commit 0's allocator would have re-issued a live ID at the one commit whose entire purpose is to make IDs citable.**
 - ⚠ **Load-bearing for Slice B:** ADR-0036 primitive 4's **no-direct-writes assertion** is what keeps gate 1 non-vacuous — if the generator could write both a `bets` row and its event, gate 1 would pass *because the generator wrote both halves*. It gets a **positive control per pattern**, a **non-empty file-set assertion**, **whitespace tolerance**, and a **mutation control at authoring time**.
 
 ---
 
-*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home) · v1.5 2026-08-10 from POLISH-TEMPLATE (V-6 minted) · v1.6 2026-08-11 from POLISH.7a (**V-7 and V-8 minted**; V-7 was ruled at the correction gate and reached this register only at the close-out — see its own entry). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
+*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home) · v1.5 2026-08-10 from POLISH-TEMPLATE (V-6 minted) · v1.6 2026-08-11 from POLISH.7a (**V-7 and V-8 minted**; V-7 was ruled at the correction gate and reached this register only at the close-out — see its own entry) · v1.7 2026-08-14 from POLISH.5/.6 commit 0 (**V-9 and V-10 minted**; v1.6’s amendment block BACKFILLED, having never been written). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
