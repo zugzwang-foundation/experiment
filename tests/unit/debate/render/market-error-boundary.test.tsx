@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -107,10 +110,18 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 	});
 
 	it("market-error::leaks-NOTHING-from-the-error-message-stack-digest-cause", () => {
-		const { container } = render(
+		const { baseElement } = render(
 			<DebateRouteError error={thrown()} reset={() => {}} />,
 		);
-		const html = container.innerHTML;
+		// ⚠ `baseElement` (document.body), NOT `container`. A `createPortal`
+		// renders OUTSIDE `container`, so a container-scoped absence guard cannot
+		// see it — measured: `{error.message}` rendered through a portal left this
+		// assertion GREEN (@security-auditor, POLISH.3 R7). Not hypothetical:
+		// `src/components/ui/dialog.tsx` wraps `DialogContent` in `DialogPortal`,
+		// so a "Show details" modal built from the components already on disk
+		// lands outside `container` by default. PF-7 says an absence guard scopes
+		// to the WHOLE rendered output; `container` was not it.
+		const html = baseElement.innerHTML;
 
 		// ── POSITIVE CONTROL 1: the component actually rendered. Without this the
 		//    absences below would pass just as happily against "".
@@ -154,7 +165,7 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		}
 	});
 
-	it("market-error::the-error-prop-is-never-read-during-render-effects-or-handlers", () => {
+	it("market-error::the-error-prop-is-never-read-during-render-effects-or-handlers", async () => {
 		// ⚠ THE ARM THAT PROTECTS IS THE CLIENT ONE. In a production build
 		// React's Flight client already replaces a SERVER-side error with a fixed
 		// placeholder, so a server throw has nothing left to leak; an error
@@ -233,13 +244,135 @@ describe("POLISH.3 — /m/[slug] error boundary", () => {
 		const swept = render(<DebateRouteError error={tattle} reset={() => {}} />);
 		expect(reads).toEqual([]); // nothing read during render or effects
 
-		for (const el of swept.container.querySelectorAll(
-			"button, a, [role='button'], [tabindex]",
-		)) {
-			fireEvent.click(el);
-			fireEvent.keyDown(el, { key: "Enter" });
+		// ⚠ EVERY NODE, NOT A SELECTOR OF LIKELY ONES. `expect(reads).toEqual([])`
+		// is an ABSENCE assertion, so PF-7 governs it and its scope must be the
+		// whole rendered output. An earlier version swept
+		// `"button, a, [role='button'], [tabindex]"` and claimed "no handler on
+		// this surface" — four element kinds wide while reading as total. A bare
+		// `<span onClick={…}>` escaped it, which is exactly how a discreet "Show
+		// details" toggle gets written. That was PF-7 violated in the file that
+		// minted PF-7. Measured both ways: widened → RED, old selector on the
+		// same leak → GREEN (@security-auditor, POLISH.3 R7).
+		//
+		// ⚠ FIXPOINT, NOT ONE PASS. `querySelectorAll` returns a STATIC list, so
+		// a node revealed BY an earlier click is never dispatched at — and a
+		// state-toggled "Show details" is precisely that shape. Re-querying each
+		// round also survives the inverse: a handler that UNMOUNTS part of the
+		// subtree mid-loop, which left later nodes detached and their handlers
+		// unreachable. Both were measured GREEN before this loop existed.
+		//
+		// ⚠ AND SCOPED TO `baseElement`, so a portalled affordance is swept too.
+		const seen = new Set<Element>();
+		for (let round = 0; round < 8; round++) {
+			const batch = [...swept.baseElement.querySelectorAll("*")].filter(
+				(el) => !seen.has(el),
+			);
+			if (batch.length === 0) break;
+			if (round === 0) {
+				// N1 non-vacuity floor, CALIBRATED. `> 0` passes with the wrapper
+				// div alone — a sweep covering nothing that can carry an
+				// affordance. The rendered subtree is div/h1/p/button, so four is
+				// the measured floor, and the interactive element is pinned by
+				// kind rather than by count so a benign addition cannot mask its
+				// removal. A FLOOR, never an equality — an exact count is the
+				// PF-3 fragility this file forbids.
+				expect(batch.length).toBeGreaterThanOrEqual(4);
+				expect(batch.some((el) => el.tagName === "BUTTON")).toBe(true);
+			}
+			for (const el of batch) {
+				seen.add(el);
+				if (!swept.baseElement.contains(el)) continue;
+				fireEvent.click(el);
+				fireEvent.doubleClick(el);
+				fireEvent.mouseOver(el);
+				fireEvent.mouseEnter(el);
+				fireEvent.focus(el);
+				fireEvent.blur(el);
+				fireEvent.pointerDown(el);
+				fireEvent.contextMenu(el);
+				for (const key of ["Enter", " ", "Escape", "ArrowDown"]) {
+					fireEvent.keyDown(el, { key });
+					fireEvent.keyUp(el, { key });
+				}
+			}
 		}
-		// The whole point: no handler on this surface closes over `error`.
+		// Let anything a handler deferred (queueMicrotask, an un-awaited promise)
+		// settle before asserting — a synchronous check cannot see it, and
+		// `void trackError(error.message)` is how a boundary usually touches the
+		// error object.
+		await Promise.resolve();
+		await new Promise((r) => setTimeout(r, 0));
+
+		// ⚠ WHAT THIS SWEEP DOES AND DOES NOT PROVE, stated so the residual is
+		// visible rather than implied (O-3). It proves: no handler reachable from
+		// `baseElement`, for the events fired above, on any node present in any
+		// round, reads `error` synchronously or in a queued microtask/macrotask.
+		// It does NOT enumerate every DOM event. That residual is why the
+		// SOURCE-LEVEL assertion below exists — it is the structural claim, and
+		// this sweep is the behavioural backstop for the day a binding
+		// legitimately appears.
 		expect(reads).toEqual([]);
+	});
+
+	/**
+	 * THE STRUCTURAL CLAIM — and it is the one that actually closes the surface.
+	 *
+	 * Every gap the behavioural sweep above has to work around — portals, the
+	 * event vocabulary, which key a handler guards on, nodes revealed by a later
+	 * click, a read deferred into a microtask — exists because a sweep is
+	 * PROCEDURAL: enumerate the surfaces, enumerate the events, hope the
+	 * enumeration is complete. It never is.
+	 *
+	 * The component's real property is structural and its own docblock says so:
+	 * the `error` prop is accepted because Next's contract passes it, and is
+	 * deliberately NOT DESTRUCTURED. NO BINDING IMPLIES NO READ — of any kind, on
+	 * any element, in any subtree or portal, for any event, at any time. One
+	 * assertion covers what seven behavioural probes could not
+	 * (@security-auditor, POLISH.3 R7).
+	 *
+	 * Source-reading is an established idiom here — `page-container.test.ts` and
+	 * `side-badge.test.tsx` both assert over files read off disk.
+	 */
+	it("market-error::the-component-binds-no-reference-to-the-error-prop", () => {
+		const source = readFileSync(
+			join(process.cwd(), "src/app/(public)/m/[slug]/error.tsx"),
+			"utf8",
+		);
+		// Strip comments: the docblock discusses `error.message` at length and a
+		// naive scan would read that prose as a binding — the same false-positive
+		// hazard `page-container.test.ts` records for `<PageContainer>` in prose.
+		const code = source
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/^[ \t]*\/\/.*$/gm, "");
+
+		const sig = code.match(
+			/export default function DebateRouteError\(([\s\S]*?)\)\s*:/,
+		);
+		expect(sig, "component signature is findable").not.toBeNull();
+		const [pattern = "", types = ""] = (sig?.[1] ?? "").split(/\}\s*:\s*\{/);
+
+		// The DESTRUCTURING PATTERN binds `reset`, and nothing else.
+		expect(pattern.replace(/[{}\s,]/g, "")).toBe("reset");
+		// POSITIVE CONTROL: the prop IS still declared in the type — Next's
+		// contract passes it — so this test is not passing because the whole
+		// signature vanished, and the matcher demonstrably finds `error` in this
+		// file's own text when it is present.
+		expect(types).toMatch(/\berror\b/);
+
+		// And the BODY never names it. Two things are blanked first, because the
+		// word legitimately appears in both and neither is an identifier:
+		// STRING LITERALS (`data-testid="debate-error"`) and JSX TEXT (the copy
+		// line "An unexpected error stopped this page from loading.").
+		const body = code
+			.slice(code.indexOf("React.JSX.Element {"))
+			.replace(/"(?:[^"\\]|\\.)*"/g, '""')
+			.replace(/'(?:[^'\\]|\\.)*'/g, "''")
+			.replace(/`(?:[^`\\]|\\.)*`/g, "``")
+			.replace(/>[^<>{}]*</g, "><");
+		// POSITIVE CONTROL: the matcher still finds an identifier read after all
+		// that blanking, so the absence below is an absence and not a scrubbed
+		// haystack (V-2).
+		expect(`${body} error.message`).toMatch(/\berror\b/);
+		expect(body).not.toMatch(/\berror\b/);
 	});
 });
