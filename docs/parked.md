@@ -1685,3 +1685,73 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** POLISH.4, which owns the composer surfaces and `SlotHeader`, or any task with permission to change a shared debate component's prop types. Not go-live gating; it is dead code, not a defect.
 
 **Expected next task.** POLISH.4, or a small typed-props cleanup. Evidence: `DebateColumn.tsx:31`, `:49-70`; `DebateView.tsx:244`, `:308`; `docs/plans/POLISH-3.md` §5 G-1 · G-2 · §12.
+
+---
+
+## PLURAL-NOUN-DUP — one display rule, two implementations, and a third string beside it
+
+**Originating task:** POLISH.3 PR 1 (2026-08-13), Gate C read-1 GC-2. Named as a destination in `docs/plans/POLISH-3.md` §19.
+
+**Deferred work.** The count-and-noun agreement rule now exists **twice**, as two file-private copies of the same expression:
+
+- `src/components/discovery/StatLine.tsx` — `const noun = (n, one, many) => (n === 1 ? one : many)`, minted at POLISH.2 V48, pinned by `tests/unit/discovery/render/stat-line.test.tsx`.
+- `src/components/debate/MarketHeader.tsx` — the identical expression, minted at POLISH.3 PR 1 (`181b0fc`), pinned by `tests/unit/debate/render/market-header.test.tsx`.
+
+**Why deferred — the duplication was CORRECT here, and that is the point.** `StatLine.tsx`'s `noun` is file-private and `StatLine.tsx` is a **Discovery** component. Extracting it to a shared module, or exporting it, would have been a §4.2 C1 / **H4 surface crossing** — a `.3` cosmetic pass reaching into `.2`'s surface to widen a module's public API, which no ruling authorises. Duplicating inside the allow-listed file was the only lawful move. **The debt is real anyway**, and filing it is how a correct local decision stops becoming a silent global one.
+
+⚠ **Precedent for why this gets a row and not a shrug: `PD-2-32`.** There, one behaviour — a market thumbnail's null / error / loaded states — had **three independent call sites** (`MarketCard.tsx`, `HeroPanels.tsx`, and the hero POST image), and the docket row's own warning is *"Do not patch the `<img>` tags independently — that is how PD-0-10 happened."* A minted URL that later 404s with no degradation path became a real production defect precisely because the behaviour lived in three places and only some were fixed. Two copies of a pluralisation rule is the same genus, one instance earlier.
+
+⚠ **A SECOND, UNRELATED DUPLICATION LANDED IN THE SAME PR, and is filed here so the pair is visible.** `src/app/(public)/m/[slug]/error.tsx` copies the state-family copy string *"An unexpected error stopped this page from loading."* verbatim from `src/app/(auth)/error.tsx`. That string now has **exactly two sites**, both hardcoded — there is no shared state-kit module, and every member of the boundary family hardcodes its own literal, which is the pre-existing convention. It is **not** invented copy (CLAUDE.md §3 does not fire — the string is the established family's), but a future copy change now has two edit sites and no guard tying them together.
+
+**Conditional trigger.** A task that owns **both** surfaces — a shared display-formatter pass, or the `.2`/`.3` reconciliation — or any task already exporting from `StatLine.tsx` for another reason. Not go-live gating: both copies are correct today and both are pinned by tests.
+
+**Expected next task.** A shared-formatter extraction alongside `src/components/debate/format.ts`, which is already the single shared home for `formatDharma` and would be the natural owner. Evidence: `StatLine.tsx` · `MarketHeader.tsx` · `stat-line.test.tsx` · `market-header.test.tsx` · `(auth)/error.tsx` · `(public)/m/[slug]/error.tsx` · `docs/plans/POLISH-3.md` §19.
+
+---
+
+## H12-SELF-MATCH — the concurrent-runner guard can match the shell that runs it
+
+**Originating task:** POLISH.3 PR 1 (2026-08-13), Gate C read-1 Q3. Named as a destination in `docs/plans/POLISH-3.md` §19.
+
+**Deferred work.** `POLISH-SURFACE-TEMPLATE.md` §5 H12 specifies `pgrep -f 'node.*vitest'` to detect a second Vitest runner, because concurrent runs truncate each other's fixtures into a **false RED**. `pgrep -f` matches against the **full command line of every process**, including any shell whose command line happens to contain the pattern.
+
+**It fired on itself.** During POLISH.3 PR 1, a wait loop written as `until ! pgrep -f 'node.*vitest'; do sleep 15; done` was itself matched by the next `pgrep -f 'node.*vitest'`, because the waiting shell's own command line contains the literal string. H12 reported TRIPPED with **no second runner in existence** — verified by resolving each matched PID, which were the two waiter shells and nothing else.
+
+**Why it matters, and why it is not merely cosmetic.** The template already records the adjacent hazard for `ps | grep` (*"`ps | grep` matches its own command string"*) — H12 is one level up and inherits it. The failure mode is **asymmetric and the dangerous direction is the quiet one**: a false TRIP costs a discarded measurement and is loud; but an operator who learns H12 cries wolf will start waving it through, and the guard exists for a case where proceeding produces a *false RED that reads as a real regression*. ⚠ In this run the discipline held — the measurement taken under a tripped guard was **discarded and re-taken clean** rather than accepted — but a guard should not depend on that.
+
+**Candidate fixes, none applied here** (the template is not on POLISH.3 PR 1's allow-list): exclude the current process and its ancestors (`pgrep -f 'node.*vitest' | grep -v "^$$\$"` is insufficient — the waiter is a sibling, not self); match the **executable** rather than the command line (`pgrep -x node` plus an argv check, or `pgrep -f 'vitest' -a` and filter for lines whose command starts with a node binary path); or forbid the pattern from appearing in wait-loop command lines at all, which is the O-1 structural answer — a waiter that greps a **log file** for a completion marker never matches itself.
+
+**Conditional trigger.** The next edit to `POLISH-SURFACE-TEMPLATE.md` §5, or the next unattended surface run that needs a wait loop. Not go-live gating: it affects the machine-run harness, never the product.
+
+**Expected next task.** POLISH close-out, or whichever surface next revises the halt set. Evidence: `POLISH-SURFACE-TEMPLATE.md` §5 H12; `docs/plans/POLISH-3.md` §19.
+
+---
+
+## PORTAL-SCOPED-ABSENCE — absence assertions scoped to `container` cannot see portalled content
+
+**Originating task:** POLISH.3 PR 1 R7 (2026-08-13), Gate C read-2. Named as a destination in `docs/plans/POLISH-3.md` §19 **PF-8**.
+
+**Deferred work.** An absence assertion scoped to React Testing Library's `container` is blind to anything rendered through `createPortal`, which mounts outside the parent DOM node. `baseElement` (i.e. `document.body`) is the correct scope. **Measured at R7:** a probe rendering `{error.message}` through a portal passed `market-error-boundary.test.tsx`'s primary string-leak guard **GREEN** — the secret was never in the haystack.
+
+⚠ **Live, not theoretical: this repo's `Dialog` portals BY DEFAULT.** `src/components/ui/dialog.tsx` wraps `DialogContent` in `DialogPortal`, so a "Show details" modal built from components already on disk lands outside `container` **by construction**. The likeliest future leak is the one the guard cannot see.
+
+**The census, corrected.** ⚠ The `@security-auditor` pass that surfaced this named two files; **one path was wrong, one was a non-issue, and the two highest-priority instances were missed.** Re-derived by grepping every `container.innerHTML` and `container.querySelectorAll` in `tests/`:
+
+| File | Class | Status |
+|---|---|---|
+| `tests/unit/debate/render/market-error-boundary.test.tsx` | leak guard | ✅ **FIXED at R7** — `baseElement` |
+| `tests/unit/auth/auth-error-boundary.test.tsx` | **leak guard** — the signed-out `(auth)` boundary | ⛔ container-scoped. **Compounds with `AUTH-BOUNDARY-GUARD-WEAK`**: it also carries the single-line-`stack` and string-`cause` fixture defects and has no booby-trap test |
+| `tests/unit/bookmarks/render/side-encoding.test.tsx:191` | **SC-1 masking guard** (`CLAUDE.md` §5.14) | ⛔ container-scoped |
+| `tests/unit/profile/render/argument-list-side.test.tsx:132` | **SC-1 masking guard** | ⛔ container-scoped |
+| `tests/unit/discovery/render/carousel.test.tsx:332` | hygiene — Canon §3.10's `:has()` ban | ⛔ container-scoped; consequence is a style-canon miss, not a data leak |
+| `tests/unit/composer/render/never-echo.test.tsx` | **leak guard** (SG-3 NEVER-ECHO) | ✅ **NOT AFFECTED** — see below |
+
+⚠ **`never-echo.test.tsx` IS a leak guard and has NO blind spot.** The relay asked explicitly whether it is a leak guard or hygiene: it is emphatically the former — SG-3 NEVER-ECHO drives a sentinel argument through the composer with the wire envelope carrying that sentinel **inside the error `message` field**, the hostile server-echo case, and asserts the client renders `copy.ts` strings only. But its sweep clones **`document.body`**, not `container`, so it is already at the correct scope. The audit pointed at its `clone.querySelectorAll("input, textarea")` — that is the *removal of the entry fields from the clone*, not the assertion's scope. **It needs no change, and it is the in-repo precedent for the correct form.**
+
+⚠ **The two SC-1 rows are the priority, and their severity is genuinely lower than it looks.** Both protect removed-comment body masking — exactly the class `CLAUDE.md` §5.14 SC-1 mandates a body-absence assertion for. But both sit on top of a **compile-enforced** property, and both say so at their site: *"The removed union carries no body/title field at all, so this is belt over a compile-enforced property."* The union type is the guard; the assertion is the belt. A portal cannot leak a field the DTO does not carry. **Fix them for form, not because a leak is reachable today** — and fix them before any change that gives the removed variant a body field, at which point the belt becomes the guard.
+
+**Why deferred.** All five remaining files are outside POLISH.3 PR 1's allow-list. Editing them would be ⛔ RUN-STOP condition 3.
+
+**Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes `auth-error-boundary.test.tsx` the R6 fixture corrections and a booby-trap test. Porting the corrected scope to all five is the same work in the same session — and that PR is the natural owner because it is already opening the one file that is both container-scoped *and* a live leak guard with no compile-enforced backstop.
+
+**Expected next task.** The `(auth)`-boundary follow-up. Evidence: `src/components/ui/dialog.tsx` · the five files above · `docs/plans/POLISH-3.md` §19 PF-7 · PF-8 · `CLAUDE.md` §5.14 SC-1.

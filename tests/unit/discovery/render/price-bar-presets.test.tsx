@@ -9,16 +9,18 @@ import { PriceBar } from "@/components/debate/PriceBar";
  * DISCOVERY-COMPLETE C1 — V29/V30 `PriceBar` size presets.
  *
  * The load-bearing test here is `detail`. `PriceBar` is a SHARED primitive with
- * three render sites — `MarketHeader.tsx:96` (`/m/[slug]`), `HeroPanels.tsx:78`
- * (Discovery hero, V29) and `MarketCard.tsx:68` (Discovery grid, V30) — and only
- * the two Discovery ones are in this task's scope. `detail` therefore pins the
- * render that shipped BEFORE the preset existed, byte for byte, so `/m/[slug]`
- * has a zero pixel delta (founder ruling OD-2). The literal below was captured
- * from the pre-change component, not hand-written.
+ * three render sites — `MarketHeader.tsx` (`/m/[slug]`), `HeroPanels.tsx`
+ * (Discovery hero, V29) and `MarketCard.tsx` (Discovery grid, V30). At
+ * DISCOVERY-COMPLETE only the two Discovery ones were in scope, so `detail`
+ * pinned the render that shipped BEFORE the preset existed, byte for byte,
+ * giving `/m/[slug]` a zero pixel delta (founder ruling OD-2).
  *
- * ⚠ `detail` is a NAMED TRANSITIONAL preset. d5 specifies a 14px bar / 10px
- * labels (surface_d5_v1_0.html:507-508); reconciling it is POLISH.3's row. When
- * POLISH.3 runs, this literal is what it is deliberately changing.
+ * ⚠ THAT PIN IS NOW BROKEN, DELIBERATELY. `detail` was a NAMED TRANSITIONAL
+ * preset and POLISH.3 was its row: d5 specifies a 14px bar / 10px labels
+ * (surface_d5_v1_0.html:507-508) and PD-3-01 / D5 applied them. The literal
+ * below is the POST-change capture. The suite's job is unchanged — it is still
+ * a byte pin, and any diff against it is still a regression on `/m/[slug]` —
+ * but it now pins the reconciled render, not the pre-preset one.
  *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
@@ -28,23 +30,60 @@ afterEach(cleanup);
 const PRICING = { yes: "0.38", no: "0.62" };
 
 /**
- * The pre-preset render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`,
- * captured from the component as it stood at origin/main aff76b3 — before
- * `size` existed. 385 bytes. Any diff here is a REGRESSION on `/m/[slug]`.
+ * The `detail` render of `<PriceBar pricing={{yes:"0.38",no:"0.62"}} />`.
+ * Any diff here is a REGRESSION on `/m/[slug]`.
+ *
+ * ⚠ HOW THIS LITERAL WAS PRODUCED, stated as what happened rather than as what
+ * was prescribed. `PriceBar.tsx`'s two tokens were edited FIRST — the V-1
+ * ordering obligation held — and `container.innerHTML` was then dumped from the
+ * rendered component. But the literal below was **EDITED IN PLACE**, two tokens,
+ * NOT pasted from that dump. An earlier version of this paragraph claimed the
+ * opposite; it was wrong, and it is corrected here rather than quietly.
+ *
+ * ⚠ THE ORDERING CLAIM HAS AN ARTIFACT, and it is not the one you would
+ * reach for. A byte-identical dump proves identity and carries NO ordering
+ * information. What discharges the ordering is the capture RUN itself: a
+ * Vitest log stamped nine minutes before the commit, in which this assertion
+ * FAILS with `Expected` = the old 385-byte literal and `Received` = a render
+ * already carrying `h-[14px]` / `text-[10px]`. The component was edited; the
+ * literal was not yet. That state cannot be reconstructed after the fact.
+ *
+ * ⚠ BYTE-IDENTITY: the load-bearing proof is IN THIS FILE. The exact-equality
+ * assertion below runs on every `pnpm vitest run` — a hand-edit that missed a
+ * byte fails it, and `toBe` is `Object.is`. That is the whole proof, and it is
+ * reproducible by anyone. The capture log and its dump are OUT-OF-TREE
+ * artifacts retained by the operator, not committed and not reachable from a
+ * clone or from CI; they corroborate the account above but no reader should be
+ * asked to take them on trust.
+ *
+ * ⚠ V-1's ACTUAL HAZARD DID NOT OCCUR. The hazard is authoring an expected
+ * string and then bending the component to match it, which yields a file
+ * indistinguishable from a correct one. It cannot have happened here: the two
+ * values are not this session's to choose. They are d5's, at
+ * `surface_d5_v1_0.html:507-508` (14px bar / 10px labels), ratified at D5 and
+ * confirmed against the mockup by `@code-reviewer` independently of the
+ * literal. The component was matched to a ratified external source, and the
+ * literal was then matched to the component.
+ *
+ * ⚠ PROVENANCE, because a stale one misdirects the exact audit V-1 exists to
+ * enable. Captured at POLISH.3 PR 1, 388 bytes. The PREVIOUS literal was the
+ * pre-preset render captured at origin/main `aff76b3` before `size` existed,
+ * 385 bytes; the +3 is `h-1.5` → `h-[14px]`. A reviewer checking this against
+ * `aff76b3` will find a mismatch, and that mismatch is D5, not tampering.
  */
 const DETAIL_BASELINE =
 	'<div class="flex flex-col gap-1">' +
-	'<div class="flex h-1.5 w-full overflow-hidden rounded-full [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
+	'<div class="flex h-[14px] w-full overflow-hidden rounded-full [border:var(--hairline)]" role="img" aria-label="YES 38%, NO 62%">' +
 	'<div class="h-full bg-yes" style="width: 38%;"></div>' +
 	'<div class="h-full flex-1 bg-no"></div>' +
 	"</div>" +
-	'<div class="flex justify-between font-mono text-[11px] text-muted-foreground">' +
+	'<div class="flex justify-between font-mono text-[10px] text-muted-foreground">' +
 	"<span>YES 38%</span><span>NO 62%</span>" +
 	"</div>" +
 	"</div>";
 
-describe("PriceBar presets — `detail` is byte-identical to the pre-change render", () => {
-	it("detail-render-is-unchanged", () => {
+describe("PriceBar presets — `detail` is byte-pinned to its captured render", () => {
+	it("detail-render-matches-the-captured-baseline", () => {
 		const { container } = render(<PriceBar pricing={PRICING} size="detail" />);
 		expect(container.innerHTML).toBe(DETAIL_BASELINE);
 	});

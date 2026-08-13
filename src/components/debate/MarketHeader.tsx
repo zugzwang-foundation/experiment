@@ -16,6 +16,14 @@ const TERMINAL: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * PD-3-08 — the count and its noun agree: `1 post`, never `1 posts`. Zero is
+ * PLURAL (`0 replies`). Mirrors the shipped reference implementation in
+ * `src/components/discovery/StatLine.tsx`, which is file-private there and so
+ * cannot be imported without widening that module's surface.
+ */
+const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
+
+/**
  * The market lifecycle / resolution marker (INV-4 / design-language §3.1). A
  * terminal market (Closed/Resolving/Resolved/Voided/Frozen) reads as locked —
  * "read-only" — paired with the literal status (never colour alone, §8).
@@ -34,27 +42,15 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 }
 
 /**
- * Explicit deferred placeholders (D1 / SHELL placeholder discipline) — resolver
- * cards and market media are UNBACKED by the current schema and arrive with a
- * future market-content slice. Rendered as labelled stubs, never invented copy
- * (§3 refusals). (Price history is now backed — the UI.19 §9 chart mounts above
- * `PriceBar`; its placeholder line was removed here.)
- */
-function DeferredPlaceholders() {
-	return (
-		<div className="flex flex-col gap-1 rounded-md border border-dashed p-2 text-xs text-muted-foreground">
-			<span>Resolver cards — arrive with the market-content slice</span>
-			<span>Market media — arrive with the market-content slice</span>
-		</div>
-	);
-}
-
-/**
  * The market-view header (DEBATE.4 §4): question = `markets.title`, resolution
  * criterion = `markets.description` (R-14.4) · lifecycle marker · the price bar
- * (`getPrices`) · the attrs (Đ staked · posts · replies) · the deferred D1
- * placeholders. Composes into the SHELL `(public)/layout.tsx` shell; the
- * placeholder global header is left untouched (superseded at UI.13).
+ * (`getPrices`) · the attrs (Đ staked · posts · replies). Composes into the
+ * SHELL `(public)/layout.tsx` shell; the placeholder global header is left
+ * untouched (superseded at UI.13). ⚠ The deferred D1 placeholder box was
+ * REMOVED at POLISH.3 (PD-3-09 / OD-6) — it rendered a build-time note about
+ * unbuilt work to every participant. The record that market media and resolver
+ * cards are still unbuilt survives at `docs/polish/POLISH-0.md` §3 and
+ * `docs/parked.md`'s `MEDIA.2-GOLIVE`; the carousel itself is MEDIA.2's.
  */
 export function MarketHeader({
 	market,
@@ -95,11 +91,16 @@ export function MarketHeader({
 			) : null}
 			<PriceBar pricing={market.pricing} size="detail" />
 			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-				<span>Đ{formatDharma(market.totals.dharmaStaked)} staked</span>
-				<span>{market.totals.postCount} posts</span>
-				<span>{market.totals.replyCount} replies</span>
+				<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+				<span>
+					{market.totals.postCount}{" "}
+					{noun(market.totals.postCount, "post", "posts")}
+				</span>
+				<span>
+					{market.totals.replyCount}{" "}
+					{noun(market.totals.replyCount, "reply", "replies")}
+				</span>
 			</div>
-			<DeferredPlaceholders />
 		</section>
 	);
 }

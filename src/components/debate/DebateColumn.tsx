@@ -1,7 +1,5 @@
 import type { ReactNode } from "react";
 
-import { Button } from "@/components/ui/button";
-
 import { SideBadge } from "./badges";
 import { formatPricePercent } from "./format";
 import type { Side } from "./types";
@@ -9,10 +7,9 @@ import type { Side } from "./types";
 /**
  * One pole column of the two-column arena (DEBATE.4 §4 / D3) — LEFT=YES,
  * RIGHT=NO, the fixed side poles (never a Support/Counter label). The column
- * head carries the side's price tag, the DISABLED Đ BET trigger (C1 §7 —
- * present but unwired), and the static "No active position" stub (the viewer/auth-
- * dependent readout is OUT of DEBATE.4). The body hosts the post-scroller
- * (market-view) or reply-scroller (post-view).
+ * head carries the side's price tag and the static "No active position" stub
+ * (the viewer/auth-dependent readout is OUT of DEBATE.4). The body hosts the
+ * post-scroller (market-view) or reply-scroller (post-view).
  */
 export function DebateColumn({
 	side,
@@ -55,15 +52,6 @@ export function DebateColumn({
 								{pct}
 							</span>
 						</div>
-						<Button
-							variant="outline"
-							size="xs"
-							disabled
-							aria-disabled="true"
-							aria-label={`Đ BET ${side} — sign in to bet`}
-						>
-							Đ BET
-						</Button>
 					</div>
 					<p className="text-xs text-muted-foreground">No active position</p>
 				</>

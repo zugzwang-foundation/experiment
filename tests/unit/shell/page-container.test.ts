@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -112,8 +112,84 @@ const SITES: Site[] = [
 	},
 ];
 
+/**
+ * POLISH.3 §18 R-a — call sites that have NO `c5892bc` baseline, because the
+ * file did not exist at that commit.
+ *
+ * They cannot carry a `before`. That field is defined above as the VERBATIM
+ * className on disk at `c5892bc`, so authoring one for a file that was not
+ * there would invert the B2 no-change proof INSIDE the suite whose entire
+ * purpose is that proof — the same inversion V-1 fences on `DETAIL_BASELINE`.
+ * A greenfield site is therefore DECLARED here and left out of the class-set
+ * rows above, rather than faked into `SITES`. `SITES` stays at nine.
+ */
+const GREENFIELD: { file: string; reason: string }[] = [
+	{
+		file: "src/app/(public)/m/[slug]/error.tsx",
+		reason:
+			"POLISH.3 D4 / PD-3-11 — the /m/[slug] error boundary, added after c5892bc.",
+	},
+];
+
 const asSet = (s: string) => new Set(s.split(/\s+/).filter(Boolean));
 const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
+
+/** The two roots that may hold a `<PageContainer>` call site. */
+const CALL_SITE_ROOTS = ["src/app", "src/components"];
+
+/**
+ * EVERY `<PageContainer>` call site on the tree, read off disk.
+ *
+ * The rows above are a hardcoded array, self-consistent by construction: a NEW
+ * call site anywhere would silently escape the B2 no-change proof while every
+ * one of them stayed green. This is the only thing in this file that looks at
+ * the TREE rather than at a named path.
+ *
+ * ⚠ Each file is slurped WHOLE and matched with `callSite`'s own regex. A
+ * line-based scan would miss `(public)/not-found.tsx`, whose tag spans five
+ * lines. The regex also excludes files that mention the primitive by BARE NAME
+ * in prose — `auth-error-boundary.test.tsx:90-94` records this repo already
+ * going RED on correct code for exactly that reason. ⚠ It NARROWS that class
+ * rather than eliminating it (@security-auditor, POLISH.3 S-L3): a doc comment
+ * quoting a full tag such as `<PageContainer preset="reading">` would still
+ * match and would produce a FALSE RED. That fails loudly, not silently, so it
+ * is a maintenance hazard rather than a coverage hole — but do not read the
+ * regex as prose-proof.
+ *
+ * ⚠ Scope is BOTH roots, deliberately. `src/app/(public)` alone would miss
+ * site 8, `src/app/(auth)/layout.tsx`, and a guard blind to part of its own
+ * domain reads as discharged over all of it.
+ */
+function treeCallSites(): string[] {
+	const found: string[] = [];
+	const walk = (rel: string) => {
+		for (const entry of readdirSync(join(process.cwd(), rel), {
+			withFileTypes: true,
+		})) {
+			const child = `${rel}/${entry.name}`;
+			// A symlink reports isDirectory() === false, so a symlinked ROUTE
+			// DIRECTORY would be skipped SILENTLY and any call site behind it would
+			// escape this coverage proof with every assertion still green
+			// (@security-auditor, POLISH.3 S-L2). Fail loudly instead. `src/` holds
+			// none today, so this can only fire on a deliberate introduction.
+			if (entry.isSymbolicLink()) {
+				throw new Error(
+					`symlink under a call-site root, unsupported: ${child}`,
+				);
+			}
+			if (entry.isDirectory()) {
+				walk(child);
+			} else if (
+				/\.tsx?$/.test(entry.name) &&
+				/<PageContainer\b[^>]*>/.test(read(child))
+			) {
+				found.push(child);
+			}
+		}
+	};
+	for (const root of CALL_SITE_ROOTS) walk(root);
+	return found.sort();
+}
 
 /** The real `<PageContainer>` tag at a site: its preset and its className. */
 function callSite(file: string): { preset: ContainerPreset; extras: string } {
@@ -288,6 +364,99 @@ describe("B2 — the container primitive moves nothing", () => {
 					`${name} declares ${axis}`,
 				).toBe(true);
 			}
+		}
+	});
+
+	/**
+	 * POLISH.3 §18 R-a — the declared set and the tree agree, asserted BOTH ways.
+	 *
+	 * ⚠ THE TWO DIRECTIONS ARE NOT REDUNDANT, and only one of them could go red
+	 * when they were introduced (POLISH.3 PR 1, `9468c30`, 2026-08-13).
+	 *
+	 * AT THE MOMENT THE PAIR WAS WRITTEN — `9468c30^`, before `error.tsx`
+	 * existed — the tree held NINE call sites and all nine were in `SITES`, so
+	 * the membership loop below could not fail. The RED that proved the pair
+	 * non-vacuous came from the SECOND direction only, where `GREENFIELD` named
+	 * a file disk did not have yet. The loop is kept because it is the direction
+	 * that catches a FUTURE undeclared call site, which is the escape this pair
+	 * exists to close.
+	 *
+	 * ⚠ AND `GREENFIELD` IS WHY THE LOOP IS STILL GREEN. `9468c30` CREATED
+	 * `error.tsx`, so AT that commit — and at every commit since — the tree
+	 * holds TEN, and the loop passes because the declared set is `SITES` (9)
+	 * ∪ `GREENFIELD` (1). The nine above describes `9468c30^`, not `9468c30`;
+	 * conflating the two is what an earlier draft of this docblock did.
+	 *
+	 * ⚠ BOTH NUMBERS ARE DATED MEASUREMENTS, NOT STANDING FACTS. Nothing here
+	 * counts nine TREE CALL SITES at run time — the `SITES`-length assertions
+	 * further down count the DECLARATION set, which is a different quantity.
+	 * The tree count that IS asserted is the floor below.
+	 */
+	it("every <PageContainer> on the tree is declared in SITES or GREENFIELD", () => {
+		const declared = new Set([
+			...SITES.map((s) => s.file),
+			...GREENFIELD.map((g) => g.file),
+		]);
+		// N1 non-vacuity floor. A `for` over an EMPTY walk passes silently, so a
+		// broken root path or a regex that stopped matching would read as a green
+		// coverage proof. `side-badge.test.tsx` installs the same floor for the
+		// same hazard. The second direction below would also catch an empty walk,
+		// but only as a side effect — this makes it explicit and independent.
+		//
+		// TEN is the POST-`error.tsx` measurement: the nine `SITES` files plus
+		// the one `GREENFIELD` file, counted on the tree at `9468c30` and every
+		// commit since. It is a FLOOR, not an equality — a tenth-plus site is
+		// caught by the membership loop below, not by this line.
+		expect(treeCallSites().length).toBeGreaterThanOrEqual(10);
+		for (const file of treeCallSites()) {
+			expect(
+				declared.has(file),
+				`${file} renders <PageContainer> but is declared in neither SITES nor GREENFIELD`,
+			).toBe(true);
+		}
+	});
+
+	it("every file declared in SITES or GREENFIELD is a real call site on disk", () => {
+		const tree = new Set(treeCallSites());
+		for (const file of [
+			...SITES.map((s) => s.file),
+			...GREENFIELD.map((g) => g.file),
+		]) {
+			expect(
+				tree.has(file),
+				`${file} is declared but renders no <PageContainer> on disk`,
+			).toBe(true);
+		}
+	});
+
+	/**
+	 * GREENFIELD sites get the box-axis rule too (@code-reviewer, POLISH.3 M1).
+	 *
+	 * The `it.each(SITES)` row above cannot reach them, so a greenfield call site
+	 * could pass `px-8` and SILENTLY replace its preset's `px-6` through `cn`'s
+	 * twMerge — exactly the drift that row exists to stop, and exactly what would
+	 * put D2b back to hunting call sites. ⚠ The `before`-baseline objection that
+	 * correctly keeps these files OUT of `SITES` (§18 R-a) does not apply here:
+	 * this reads only `callSite(file).extras` and needs no `c5892bc` baseline.
+	 */
+	it.each(GREENFIELD)("greenfield $file leaves every box axis to the preset", ({
+		file,
+	}) => {
+		// CONTAINMENT BEFORE READ (@security-auditor, POLISH.3 S-L1). `callSite`
+		// resolves through `join(process.cwd(), …)`, which normalises `..`, so a
+		// declared path pointing outside the two roots would be READ here and
+		// could pass this row in isolation. Membership in the walk's own output is
+		// the check: every string it emits is root-prefixed by construction.
+		expect(
+			treeCallSites().includes(file),
+			`${file} must be a real call site under ${CALL_SITE_ROOTS.join(" or ")}`,
+		).toBe(true);
+		const { extras } = callSite(file);
+		for (const axis of BOX_AXES) {
+			expect(
+				[...asSet(extras)].some((c) => axis.test(c)),
+				`${file} className must not set ${axis}`,
+			).toBe(false);
 		}
 	});
 });
