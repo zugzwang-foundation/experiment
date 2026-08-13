@@ -1755,3 +1755,47 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes `auth-error-boundary.test.tsx` the R6 fixture corrections and a booby-trap test. Porting the corrected scope to all five is the same work in the same session — and that PR is the natural owner because it is already opening the one file that is both container-scoped *and* a live leak guard with no compile-enforced backstop.
 
 **Expected next task.** The `(auth)`-boundary follow-up. Evidence: `src/components/ui/dialog.tsx` · the five files above · `docs/plans/POLISH-3.md` §19 PF-7 · PF-8 · `CLAUDE.md` §5.14 SC-1.
+
+---
+
+## GUARD-HARDENING — four guard-reach defects share one remedy and none has a home
+
+**Originating task:** PRIMITIVES-1 Gate C, carried unapplied in `POLISH-register-ADDITIONS.md` §A; **named as a destination by `PD-5-03` and `PD-5-05`** at POLISH.5/.6 commit 0 (2026-08-14). ⚠ **Minted here in the SAME COMMIT that files those rows**, per this file's standing rule at the head — until now it was a **phantom**, cited twice with no section, no owner and no date.
+
+**Deferred work.** Four defects in the shell/format guard family, all of the same shape — *the guard's stated reach exceeds its mechanism*:
+
+| # | Row | Defect |
+|---|---|---|
+| 1 | `PD-5-03` (P5-a) · **M-2** | A footer rendered by a component defined elsewhere and merely **mounted** evades both arms — ancestry never sees the element, and the name belt greps one string. |
+| 2 | `PD-5-03` (P5-a) · **F4** | A self-closing container before a `<footer` unbalances the count permanently, making later footers read "nested". ⚠ The **false-negative** direction; verified absent today. |
+| 3 | `PD-5-05` (P5-c) · **L-4** | `floor` widens the object-shorthand false-positive surface in `MONEY_IDS`; the hazard pre-existed for `spendable`/`balance`/`current`/`stake` and was ratified at R4c. |
+| 4 | `PD-5-05` (P5-c) · **L-5** | The `SiteFooter` name belt reads **raw** source while mechanism A **strips comments**, so prose naming `SiteFooter` in any globbed file REDs. That file set grew **3 → 17** in one PR. |
+
+**Why deferred.** Following a mount needs **import resolution** — a different class of guard from either arm, and a build not a polish. ⚠ **Items 3 and 4 are LATENT: neither fires today.** Item 2 is the false-negative direction and is verified absent. ⛔ **None is a live defect**, which is exactly why each was routed rather than fixed, and exactly why the set needs one owner instead of four incidental ones. ⚠ **`PD-5-04` (P5-b) is NOT parked here** — it is a live ruling (*widen the regex, or scope both remaining claims*) and belongs to whoever opens `format.ts`.
+
+**Conditional trigger.** Any task that opens the shell-guard mechanism or `format.ts`'s `ROUND0_RENDER` belt — or the first time item 3 or item 4 actually REDs a run, at which point it stops being latent and stops being parkable.
+
+**Expected next task.** A guard-hardening chore PR owning all four, or the next task with legitimate cause to open `tests/unit/shell/not-found.test.tsx`. Evidence: `docs/polish/POLISH-register.md` `PD-5-03` · `PD-5-05` · `docs/polish/POLISH-register-ADDITIONS.md` §A and its Gate C verbatim block.
+
+---
+
+## AUTH-BOUNDARY-GUARD-WEAK — the `(auth)` leak guard is measurably weaker than its debate twin, and would pass all five of its tests green
+
+**Originating task:** PR #328's reviewer pass; **named as a destination at `PORTAL-SCOPED-ABSENCE` above** and minted here at POLISH.5/.6 commit 0 (2026-08-14). ⚠ **It was a phantom** — cross-referenced by name in this same file with no section of its own.
+
+**Deferred work.** `tests/unit/auth/auth-error-boundary.test.tsx` (127 lines, **five** `it()` blocks) guards the signed-out `(auth)` route boundary against leaking `message` / `digest` / `stack` / `cause`. **Three structural weaknesses, measured at `16971cd`** — and the file is GREEN with all three present, which is the whole problem:
+
+| # | Site | Defect | The debate twin |
+|---|---|---|---|
+| 1 | `:59` | `container.innerHTML` — **container-scoped**, so anything rendered through `createPortal` is invisible to the assertion | `market-error-boundary.test.tsx:113`,`:124`,`:264` use **`baseElement`** |
+| 2 | `:32` | `err.stack = "SECRET_STACK_FRAME at …"` — a **single-line** stack. A real stack is multi-line, so this fixture cannot detect a guard that strips only the first frame | — |
+| 3 | `:33` | `err.cause = "SECRET_CAUSE_…"` — a **string** cause. A real `cause` is usually an `Error`, so this fixture cannot detect a guard that fails to recurse into a nested one | — |
+| 4 | — | **No booby-trap test.** Nothing proves the guard can fail | `market-error-boundary.test.tsx:184` carries one |
+
+⚠ **This is a `V-2`/`V-6` shape: the assertions are not absent, they are WEAK, and a weak assertion reads as discharged.** The five tests pass, the coverage read looks complete, and none of the three defects is visible from inside the file.
+
+**Why deferred.** ⛔ **`tests/**` is deny-listed on commit 0**, which writes documentation only. ⚠ **And it must not be absorbed incidentally**: `src/server/auth/` is a **CLAUDE.md §1 critical path**, so the fix carries the full ritual — `@code-reviewer` then `@security-auditor`, §5.10 pre-PR audit, §5.11 subagent review — which a cosmetic or doc pass cannot give it.
+
+**Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes this same file the R6 fixture corrections and the `baseElement` re-scope from `PORTAL-SCOPED-ABSENCE`. ⚠ **All of it is one session's work in one file** — and that PR is the natural owner because it is the one already opening the only file that is both container-scoped *and* a live leak guard with no compile-enforced backstop behind it.
+
+**Expected next task.** The `(auth)`-boundary follow-up PR. **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `tests/unit/auth/auth-error-boundary.test.tsx:32`,`:33`,`:59` · `tests/unit/debate/render/market-error-boundary.test.tsx:113`,`:184`,`:264` · `PORTAL-SCOPED-ABSENCE` above · `CLAUDE.md` §1 critical paths.
