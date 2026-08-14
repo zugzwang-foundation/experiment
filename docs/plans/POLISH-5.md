@@ -38,7 +38,7 @@
 
 **⚠ SEVENTEEN items, THREE PRs, EIGHTEEN commits.** v2.3 is the first pass to move the item count. It adds **one item** (`PB-1`, item 17), **one commit** (`A8`), and **one allow-list row** (`IdentityCard.tsx`, row 18). Everything else in the item table, the PR split and the commit ordering is carried from v2.2 **verbatim**.
 
-**⚠ THE GROUND DID NOT MOVE. `POLISH-5-plan-v2.2.md`'s ground `16971cd` IS `origin/main`, distance ZERO** — measured per-path across all 17 v2.2 allow-list rows (`POLISH-56-HEADMEASURE.md` §0). **Zero moved WRITE-set paths. Every coordinate in this document is a claim about the tree that is byte-identical to head.** Three allow-list files are ABSENT and all three are files this plan **mints** — the expected state, not drift.
+**⚠ v2.3 — THE GROUND DID NOT MOVE.** ⚠⚠ **v2.4 — IT HAS, AND EVERY PRESENT-TENSE CLAIM IN THIS PARAGRAPH IS A v2.3 RECORD.** `POLISH-5-plan-v2.2.md`'s ground `16971cd` **WAS** `origin/main` at v2.3, distance ZERO — measured per-path across all 17 v2.2 allow-list rows (`POLISH-56-HEADMEASURE.md` §0). ⛔ **AT v2.4 THE GROUND IS `5ff418b`, TWO COMMITS ON** (§A leg 2). ⛔ **AND *"every coordinate in this document is byte-identical to head"* WAS TRUE AT v2.3 AND IS FALSE NOW — TWENTY-FOUR MOVED, all inside `ArgumentList.tsx` and `surface.test.tsx`; §1.18 carries the re-key.** Three allow-list files were ABSENT and all three are files this plan **mints** — the expected state, not drift, and still true.
 
 **What v2.3 changes, and where each finding came from:**
 
@@ -59,7 +59,7 @@
 - **`C-3` — §2.4's re-worded sentence is REVERTED to v2.0's**, and the mechanism was re-verified at source rather than accepted. §2.4.
 - **`C-4` — the `GC-n` collision ROUTES TO COMMIT 0**, by symbol, unnumbered, beside `OD-8`'s row. §1.7 · §3.1.
 - **`NEW-3` — THE EXECUTION ORDER IS FOUNDER-RULED**, and `.6` depends on `.5` by a **hard, measured mechanism**, not a preference. §0.3 · §17.
-- **`NEW-4` — precondition 3 is RE-SCOPED, not deleted:** `.3 PR 2` gates **`.6`**, not PR A. §15.
+- **`NEW-4` — precondition 3 was RE-SCOPED, not deleted:** `.3 PR 2` gated **`.6`**, not PR A. §15. ⚠⚠ **v2.4 — REVERSED BY `D-4`, 2026-08-14. `.3 PR 2` NOW GATES NEITHER PR A NOR `.6`.** Its obligation is a **recording** one, not a build dependency, and it files its own adoption record at its own close-out (§0.3 · §15 · §19).
 - **`OD-2` — RESOLVED. `.5` RUNS AHEAD OF `.4`.** `D7`'s branch collapses to `.5`-FIRST; §5 rows 11–12 become **firm**; `P-5` is **DISCHARGED**; the `.4`-first arm is **KEPT as a superseded RECORD**. §1.4 · §10 P-5 · §15.
 - **⚠ NEW FINDING, and it is load-bearing for item 9:** POLISH.3 PR 1 landed `src/app/(public)/m/[slug]/error.tsx` — **a route error boundary with a working, visible, focusable retry control**, minted **bespoke** and labelled **"Try again"**. It is a live precedent, a copy divergence, and a testid-placement divergence, all three arriving after v2.1 measured the field. §2.16.
 
@@ -320,7 +320,21 @@ At a **single** tier the panel's `textContent` **is** the one message string, so
 
 **Commit 0 does not exist** (§2.2, re-run at the new head). It is authored separately, doc-only, and carries the routed items — **now including `OD-8`'s register row AND `C-4`'s `GC-n` row** (§1.7, §16).
 
-**⚠ v2.3 — THE CANON WRITE CARRIES TWO ITEMS, NOT ONE.** The converged kickoff §2.4 rules both, and **an executor who writes only the glyph pin ships half a ratified amendment**:
+> ### ⚠⚠ v2.4 — **THIS SECTION'S CITED AUTHORITY DOES NOT EXIST, AND §1.5A DOES NOT COVER IT**
+>
+> v2.3 read *"the converged kickoff §2.4 rules both."* ⛔ **§2.4 is a FIFTH subsection of a document DOC-1 proved absent** — across six filesystem roots, six title fragments, 485 paste-cache files and 241 session transcripts. **§1.5A replaces §2.0–§2.3 only, so nothing in this plan inherits §2.4.**
+>
+> **⇒ THE SURVIVING AUTHORITY FOR THE CANON WRITE, in three parts, every one readable on `main`:**
+>
+> - **WHAT the pin says** — **`D1(b)`**, `docs/logs/POLISH-56-STEP0-RECON-CLOSE-OUT.md` §2 `E-4`: *"commit 0 adds a canon line pinning the thumb **by component name and props**"* — with the fallback pre-ruled, *"tier 2 beats tier 4, so if no reusable primitive exists, word-only — never emoji."*
+> - **WHERE it lands** — **`D6(b)`**: `design-canon.md` §3. ⛔ **PR B's, never commit 0's.**
+> - **WHEN** — **§5 row 13**: the same commit as `ui/thumb-glyph.tsx` (`B5`).
+>
+> ⛔ **If the pin appears to need anything beyond these three, that is a ⛔ HALT at `B5` — never a reconstruction of §2.4.**
+>
+> ⚠ **`D1(b)` is citable at all only because `X6` landed the recon close-out one commit before it was needed.** Until DOC-1 it existed in exactly one place that was not the repository.
+
+**⚠ v2.3 — THE CANON WRITE CARRIES TWO ITEMS, NOT ONE**, and **an executor who writes only the glyph pin ships half a ratified amendment**:
 
 **1. THE THUMB GLYPH**, pinned **BY COMPONENT NAME AND PROPS**, superseding the mockup's and the close-out's emoji shorthands. Anchor **by symbol**: immediately after the line beginning `12. **Side chip**` in `design-canon.md` §3. ⛔ **If that string is not found verbatim → RUN-STOP, not a search** (§10 `P-10`, §11 condition 8).
 
