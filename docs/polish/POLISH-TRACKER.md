@@ -114,9 +114,9 @@ Dated or triggered, none blocking a machine run.
 ## §5 · Sequence
 
 ```
-POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ .3 ─▶ .4 ─▶ .5 ─▶ .6
-     (closed)          (closed 08-11)   (#320)   (#323)   ▲
-                                                          NEXT
+POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ .3 PR 1 ✅ ─▶ .5 PR A ✅ ─▶ .5 PR B ─▶ .6 ─▶ .5 PR C ─▶ .3 PR 2 ─▶ .4
+     (closed)          (closed 08-11)   (#320)   (#323)   (#328)      (#331)        ▲
+                                                                                    NEXT — after DOC-1
                                                  plan PARALLEL · execute SERIAL
                                                           │
                                                           ▼
@@ -126,6 +126,8 @@ POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ 
                                                           ▼
                                          refinement PRs  ─▶  close-outs
 ```
+
+⚠ **Live as of 2026-08-14.** `.5` PR A merged (#331). **DOC-1 is the doc-only commit before PR B branches.** `.6` is hard-blocked on PR B by three measured mechanisms (`POLISH-5.md` §0.3). **`.3 PR 2` gates nothing in `.5`/`.6`** (`D-4`) and files its own adoption record at its own close-out.
 
 **Execute serial** means **one machine-phase PR open at a time** — so a regression bisects to a surface and Gate C never queues. Recon and classification for several surfaces may be drafted concurrently.
 
