@@ -8,13 +8,12 @@ import { PageContainer } from "@/components/shell/PageContainer";
  * (canon §10 `C-STATES-1`). `notFound()` is handled separately by
  * `not-found`; this catches a load failure and offers the retry.
  *
- * ⚠ THE INVISIBLE WRAPPER IS GONE (POLISH.5 item 9 / P5-D12). This file used
- * to wrap `<ProfileError />` in a `<button type="button" onClick={reset}
- * className="block w-full text-left">` — an action that worked and looked like
+ * ⚠ THE INVISIBLE WRAPPER IS GONE (POLISH.5 item 9 / P5-D12). This file used to
+ * wrap `ProfileError` in a `button` element carrying `onClick={reset}` and
+ * `className="block w-full text-left"` — an action that worked and looked like
  * nothing. `reset` is now passed as a prop and lands on the block's own visible,
  * focusable, accessible-named control. It also had to go structurally: the
- * block renders its own `<button>`, and a `<button>` cannot nest in a
- * `<button>`.
+ * block renders its own button, and a button cannot nest inside a button.
  *
  * ⛔ NO `className` ON THE `PageContainer` CALL SITE.
  * `tests/unit/shell/page-container.test.ts` asserts class-set EQUALITY against

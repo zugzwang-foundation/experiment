@@ -157,6 +157,18 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 
 		// ⛔ NO host on a non-sellable row — reserving 50px under a row that can
 		// never sell would be dead space, not a fixed footer.
+		// ⚠ THE POSITIVE CONTROL IS LOAD-BEARING HERE. `M2` is the Closed market,
+		// and item 11 defaults the status filter to `Open`, so asserting its host
+		// absent at mount would pass because THE ROW IS NOT RENDERED — not
+		// because a non-sellable row gets no host. Without the switch and the
+		// row assertion below, deleting `sellable &&` from the host `<tr>` leaves
+		// this whole suite green while shipping a blank 50px strip under every
+		// Closed and every visitor row.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-host-${M2}`)).toBeNull();
 	});
 
@@ -219,16 +231,20 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		);
 		expect(filter.value).toBe(M2);
 		// ⚠ `fixture-beta` is the CLOSED market, and item 11 defaults the STATUS
-		// filter to `Open` — so the preselected row is withheld by the status
-		// filter, not by the market filter this case is about. Switching to
-		// Closed isolates the mechanism under test; the preselect itself is
-		// already proven by `filter.value` above, which item 11 does not touch.
+		// filter to `Open` — so the preselected row is withheld by the STATUS
+		// filter, not by the market filter this case is about. The preselect
+		// itself is proven by `filter.value` above, which item 11 does not touch.
 		fireEvent.change(
 			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
 			{ target: { value: "Closed" } },
 		);
-		// Only the preselected market's row is visible.
-		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+		// The preselected market's row renders. ⚠ THE MATCHING NEGATIVE IS
+		// DELIBERATELY NOT ASSERTED HERE: under `status=Closed`, `M1` (Open) is
+		// excluded by the STATUS predicate whatever the market filter does, so
+		// `queryByTestId(M1) === null` would pass with the market filter
+		// entirely broken. Market isolation keeps its own attributable proof in
+		// `surface.test.tsx`'s `positions-filters`, where the status filter is
+		// held constant and the market selection is what moves.
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 
 		// An UNKNOWN slug falls back to "all" (never rendered raw).

@@ -155,15 +155,25 @@ export function PositionsTable({
 							<Fragment key={row.marketId}>
 								<tr data-testid={`position-row-${row.marketId}`}>
 									<td className="p-2 text-ink">
-										{/* Item 1 (P5-D02) — the FROZEN side, the mockup's
-										    `.pside`: the side WORD beside the thumb glyph at
-										    12px. ⛔ NOT a chip (R12). Before this item
-										    `row.side` reached NO rendered node on this
-										    surface — it went only to `SellModule`'s prop, so
-										    nothing on screen showed which side was held. The
-										    word is the side VALUE (data, not copy), cased as
-										    the shipped `SlotHeader` word+thumb cluster cases
-										    it; `gap-[5px]` is that cluster's gap. */}
+										{/* Item 1 (P5-D02), the mockup's `.pside`: the side WORD
+										    beside the thumb glyph at 12px. ⛔ NOT a chip (R12).
+										    Before this item `row.side` reached NO rendered node
+										    on this surface — it went only to `SellModule`'s
+										    prop, so nothing on screen showed which side is
+										    held. The word is the side VALUE (data, not copy),
+										    cased as the shipped `SlotHeader` word+thumb cluster
+										    cases it; `gap-[5px]` is that cluster's gap.
+										    ⚠ THIS IS THE HELD SIDE, NOT THE INV-3 FROZEN ONE,
+										    and the distinction is worth the line. `row.side`
+										    comes from `positions.side` — Bucket C, MUTABLE: a
+										    sell-out and re-entry on the other pole changes what
+										    renders here. The side that is frozen at post time is
+										    `comments.side_at_post_time`, which is what
+										    `ArgumentList` renders through `SideBadge`. Item 1's
+										    plan text calls this "the frozen side"; the FIELD is
+										    not, and labelling a Bucket-C value frozen inside the
+										    component that renders it is the conflation INV-3
+										    exists to prevent. */}
 										<span
 											data-testid={`position-side-${row.marketId}`}
 											className="flex items-center gap-[5px] text-xs"
@@ -208,9 +218,18 @@ export function PositionsTable({
 									</td>
 								</tr>
 								{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
-								    row ratifies the mechanism: "the replica footer is a fixed 50px
-								    box … the sell module replaces it over .26s — fixed height ⇒ never
-								    reflows."
+								    row, quoted WHOLE because the omitted half is the half not built:
+								    "the replica footer is a fixed 50 px box; on Sell the footer
+								    slides down (translateY 110% + fade) and the sell module replaces
+								    it over .26 s — fixed height ⇒ never reflows."
+								    ⇒ BUILT HERE: the fixed 50px box, the .26s fade, the JS toggle.
+								    ⇒ NOT BUILT: the footer's translateY-110% exit. That clause
+								    governs a FOOTER ELEMENT the replica card has and this table does
+								    not, so there is nothing to slide away; inventing footer content
+								    to animate would be authoring design. ⚠ The consequence is
+								    user-visible and is raised for the founder rather than absorbed:
+								    the reserved box is BLANK when closed, so an owner sees an empty
+								    band under every sellable row.
 								    ⚠ THE HOST RENDERS FOR EVERY SELLABLE ROW, OPEN OR CLOSED, and
 								    reserving the box IS the mechanism: opening Sell now inserts
 								    nothing, so no row moves. The whole `<tr>` used to be conditional,

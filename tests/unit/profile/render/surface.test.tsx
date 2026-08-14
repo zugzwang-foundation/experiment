@@ -649,12 +649,20 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		}
 	});
 
-	it("position-cell-carries-the-frozen-side", () => {
+	it("position-cell-carries-the-held-side", () => {
 		// POLISH.5 item 1 (P5-D02) — the mockup's `.pside`: the side WORD plus
 		// the thumb glyph at 12px, in the Position cell. ⛔ NOT a chip (R12).
 		// ⚠ Before this item `row.side` reached NO rendered node anywhere on this
 		// surface — it went only to `SellModule`'s prop — so `band-composition`
 		// above cannot see this and could not have caught its absence.
+		//
+		// ⚠ NAMED "HELD", NOT "FROZEN", DELIBERATELY. Item 1's plan text says
+		// "the frozen side", but `row.side` is `positions.side` — Bucket C,
+		// MUTABLE. The frozen-at-post-time side is `comments.side_at_post_time`
+		// (INV-3), rendered elsewhere by `SideBadge`. A test name asserting
+		// "frozen" over a mutable field is the conflation INV-3 exists to
+		// prevent, and a test name that contradicts its subject is the
+		// lying-docblock class this plan polices.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
 
 		// BOTH POLES, or the case proves nothing: a YES-only assertion passes
