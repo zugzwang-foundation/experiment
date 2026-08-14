@@ -192,23 +192,43 @@ export function PositionsTable({
 										)}
 									</td>
 								</tr>
-								{sellable && sellOpen && (
+								{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
+								    row ratifies the mechanism: "the replica footer is a fixed 50px
+								    box … the sell module replaces it over .26s — fixed height ⇒ never
+								    reflows."
+								    ⚠ THE HOST RENDERS FOR EVERY SELLABLE ROW, OPEN OR CLOSED, and
+								    reserving the box IS the mechanism: opening Sell now inserts
+								    nothing, so no row moves. The whole `<tr>` used to be conditional,
+								    so opening it pushed every following row down — which is why the
+								    comment that sat here, claiming the module "replaces the
+								    fixed-height footer" and "never reflows the table above", was FALSE
+								    the day it was written. It is true now, and it has moved here.
+								    ⛔ No host on a non-sellable row: reserving 50px under a row that
+								    can never sell would be dead space, not a fixed footer.
+								    ⛔ `:has()` is banned (canon §3 item 10) — the toggle stays JS
+								    state, exactly as before. */}
+								{sellable && (
 									<tr data-testid={`sell-row-${row.marketId}`}>
 										<td colSpan={5} className="p-2">
-											{/* Canon §5 slide — the module replaces the fixed-height
-											    footer (JS-toggled; never reflows the table above). */}
-											<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
-												<SellModule
-													marketId={row.marketId}
-													slug={row.marketSlug}
-													position={{
-														side: row.side,
-														quantity: row.quantity,
-														currentValue: row.current,
-													}}
-													onClose={() => setSellMarketId(null)}
-													onSuspended={() => setSellMarketId(null)}
-												/>
+											<div
+												data-testid={`sell-host-${row.marketId}`}
+												className="h-[50px]"
+											>
+												{sellOpen && (
+													<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
+														<SellModule
+															marketId={row.marketId}
+															slug={row.marketSlug}
+															position={{
+																side: row.side,
+																quantity: row.quantity,
+																currentValue: row.current,
+															}}
+															onClose={() => setSellMarketId(null)}
+															onSuspended={() => setSellMarketId(null)}
+														/>
+													</div>
+												)}
 											</div>
 										</td>
 									</tr>

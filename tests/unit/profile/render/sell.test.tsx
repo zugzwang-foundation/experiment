@@ -112,6 +112,44 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		).toContain("Closed");
 	});
 
+	it("sell-host-is-fixed-height-and-does-not-reflow", () => {
+		// POLISH.5 item 10 (P5-D13). Canon §5's Profile row ratifies the
+		// mechanism: "the replica footer is a fixed 50px box … the sell module
+		// replaces it over .26s — fixed height ⇒ never reflows."
+		//
+		// ⚠ A MOUNT ASSERTION CANNOT SEE A REFLOW. `owner-sell-mount` above
+		// proves the module appears, and it passed identically on the shipped
+		// behaviour this item fixes — where opening Sell INSERTED a `<tr>` and
+		// pushed every following row down. The reflow is the law under test.
+		render(
+			<PositionsTable
+				payload={{ owner: true, rows: [OPEN_SELLABLE, SETTLED_UNSELLABLE] }}
+			/>,
+		);
+
+		// THE HOST EXISTS BEFORE THE CLICK. This is the whole mechanism: the box
+		// is reserved whether or not the module is open.
+		const host = screen.getByTestId(`sell-host-${M1}`);
+		expect(host.getAttribute("class") ?? "").toContain("h-[50px]");
+		expect(screen.queryByTestId("sell-module")).toBeNull();
+
+		// The row inventory is IDENTICAL either side of the toggle — the literal
+		// non-reflow claim, not a proxy for it.
+		const rowsBefore = document.querySelectorAll("tbody tr").length;
+		fireEvent.click(screen.getByTestId(`sell-trigger-${M1}`));
+		expect(screen.getByTestId("sell-module")).toBeTruthy();
+		expect(document.querySelectorAll("tbody tr").length).toBe(rowsBefore);
+
+		// …and the host is still the same fixed box, not one that grew to fit.
+		expect(
+			screen.getByTestId(`sell-host-${M1}`).getAttribute("class") ?? "",
+		).toContain("h-[50px]");
+
+		// ⛔ NO host on a non-sellable row — reserving 50px under a row that can
+		// never sell would be dead space, not a fixed footer.
+		expect(screen.queryByTestId(`sell-host-${M2}`)).toBeNull();
+	});
+
 	it("visitor-excludes-sell-render", () => {
 		const view = render(
 			<PositionsTable
