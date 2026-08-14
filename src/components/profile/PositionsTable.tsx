@@ -52,7 +52,13 @@ export function PositionsTable({
 		() =>
 			rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all",
 	);
-	const [status, setStatus] = useState("all");
+	// Item 11 (P5-D17a) — the canon inventory is Open/Closed, so the initial
+	// state is `Open`. ⛔ THIS MOVES WITH THE `All` OPTION BELOW OR THE FILTER
+	// SHIPS A LIE: dropping the option alone would leave a `<select>` whose
+	// `value` matches no option, and a `<select>` with no matching value paints
+	// its FIRST option — so the control would read "Open" while the predicate
+	// still returned every row.
+	const [status, setStatus] = useState("Open");
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
 
@@ -74,8 +80,12 @@ export function PositionsTable({
 
 	const visible = rows.filter(
 		(r) =>
-			(market === "all" || r.marketId === market) &&
-			(status === "all" || r.statusLabel === status),
+			// ⛔ The MARKET filter keeps its `all` sentinel. The STATUS filter's
+			// was orphaned by item 11 — with `All` removed and the initial state
+			// `Open`, no code path can set `status` to `"all"` — so the dead
+			// disjunct goes with it and the predicate matches the ratified
+			// inventory the docblock above already describes.
+			(market === "all" || r.marketId === market) && r.statusLabel === status,
 	);
 
 	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
@@ -116,7 +126,12 @@ export function PositionsTable({
 					onChange={(e) => setStatus(e.target.value)}
 					className="rounded-[var(--r-chip)] bg-n1 px-2 py-1 text-sm text-ink"
 				>
-					<option value="all">All</option>
+					{/* Item 11 (P5-D17a) — `All` is GONE, and the initial state moves
+					    with it. ⚠ A CAPABILITY REMOVAL, recorded as one rather than
+					    filed as polish: after this there is no route — no component,
+					    no URL param, no server read — by which open and closed
+					    positions appear together. ⛔ The MARKET filter's `all`
+					    sentinel above is UNTOUCHED; it is a different control. */}
 					<option value="Open">Open</option>
 					<option value="Closed">Closed</option>
 				</select>

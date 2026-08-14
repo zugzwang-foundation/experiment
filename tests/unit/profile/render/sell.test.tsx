@@ -106,6 +106,16 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		expect(screen.getByTestId("sell-module")).toBeTruthy();
 
 		// The settled/Closed row: NO trigger; its status cell shows Closed.
+		// ⚠ Item 11 removed the status filter's `All` and defaults it to `Open`,
+		// so the Closed row is no longer on screen at mount. The filter must be
+		// switched to reach it — and the switch must come BEFORE the negative
+		// assertion, or "no trigger" would pass on a row that simply is not
+		// rendered.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-trigger-${M2}`)).toBeNull();
 		expect(
 			(screen.getByTestId(`position-status-${M2}`).textContent ?? "").trim(),
@@ -163,13 +173,26 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		).toHaveLength(0);
 		expect(screen.queryByTestId("sell-module")).toBeNull();
 
-		// Non-vacuity: both rows render with their status cells.
+		// Non-vacuity: the rows render with their status cells — an EMPTY table
+		// would satisfy the trigger census above.
+		// ⚠ Item 11 removed the status filter's `All`, so the two rows are never
+		// on screen together. Each is reached in its own filter state, AND the
+		// trigger census is re-run in the Closed state — otherwise that arm
+		// would go unchecked, which is the vacuity this case exists to prevent.
 		expect(
 			(screen.getByTestId(`position-status-${M1}`).textContent ?? "").trim(),
 		).toContain("Open");
+
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
 		expect(
 			(screen.getByTestId(`position-status-${M2}`).textContent ?? "").trim(),
 		).toContain("Closed");
+		expect(
+			view.container.querySelectorAll('[data-testid^="sell-trigger-"]'),
+		).toHaveLength(0);
 	});
 
 	it("sell-close-collapses", () => {
@@ -195,6 +218,15 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 			"positions-market-filter",
 		);
 		expect(filter.value).toBe(M2);
+		// ⚠ `fixture-beta` is the CLOSED market, and item 11 defaults the STATUS
+		// filter to `Open` — so the preselected row is withheld by the status
+		// filter, not by the market filter this case is about. Switching to
+		// Closed isolates the mechanism under test; the preselect itself is
+		// already proven by `filter.value` above, which item 11 does not touch.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
 		// Only the preselected market's row is visible.
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();

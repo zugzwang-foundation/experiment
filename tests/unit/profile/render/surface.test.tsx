@@ -264,13 +264,22 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(within(rowOpen).getByTestId(`position-arg-${M1}`))).toContain(
 			"Opener argument alpha",
 		);
-		// Status cells show the statusLabel.
+		// Status cells show the statusLabel. ⚠ Item 11 removed the status
+		// filter's `All` option and defaults it to `Open`, so the two rows are
+		// no longer on screen together — each label is read in its own filter
+		// state. The assertion is unchanged; only the reach is.
 		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
 			"Open",
 		);
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Closed" },
+		});
 		expect(text(within(table).getByTestId(`position-status-${M2}`))).toContain(
 			"Closed",
 		);
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Open" },
+		});
 
 		// Argument list: present post + present reply + removed stub.
 		const list = screen.getByTestId("argument-list");
@@ -398,7 +407,13 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		list.unmount();
 
 		// Positions table: a row whose argument cell is the removed variant.
+		// ⚠ `ROW_SETTLED` is the CLOSED market, and item 11 defaults the status
+		// filter to `Open`, so it is filtered out at mount. The masking law is
+		// unchanged; reaching the row now costs a filter change.
 		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Closed" },
+		});
 		const cell = screen.getByTestId(`position-arg-removed-${M2}`);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
@@ -644,13 +659,28 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 		// BOTH POLES, or the case proves nothing: a YES-only assertion passes
 		// unchanged on a component that hard-codes YES (V-2).
+		// ⚠ Item 11 removed the status filter's `All`, so the YES row (Open) and
+		// the NO row (Closed) are never on screen together. The both-pole
+		// property is PRESERVED by reading each in its own filter state — it is
+		// the reach that changed, not the law.
+		// The YES pole, and the market title that proves the glyph is ADDITIVE.
 		const yes = screen.getByTestId(`position-side-${M1}`);
-		const no = screen.getByTestId(`position-side-${M2}`);
+		const yesGlyph = yes.querySelector("svg");
 		expect(text(yes)).toBe("Yes");
+		expect(
+			(screen.getByTestId(`position-row-${M1}`).textContent ?? "").includes(
+				ROW_OPEN.marketTitle,
+			),
+		).toBe(true);
+
+		// The NO pole, in its own filter state.
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Closed" },
+		});
+		const no = screen.getByTestId(`position-side-${M2}`);
+		const noGlyph = no.querySelector("svg");
 		expect(text(no)).toBe("No");
 
-		const yesGlyph = yes.querySelector("svg");
-		const noGlyph = no.querySelector("svg");
 		// THIS surface's size is 12. The slot header's 16 is scoped to it BY
 		// NAME in the values-log and does not inherit — so a glyph rendering at
 		// 16 here means the default leaked through.
@@ -677,10 +707,6 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			"currentColor",
 		);
 		expect(yesGlyph?.querySelector("path")?.getAttribute("fill")).toBe("none");
-
-		// The cell still carries the market title — the glyph is ADDITIVE.
-		const rowOpen = screen.getByTestId(`position-row-${M1}`);
-		expect(rowOpen.textContent ?? "").toContain(ROW_OPEN.marketTitle);
 	});
 
 	it("positions-filters", () => {
@@ -693,12 +719,25 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const marketFilter = screen.getByTestId<HTMLSelectElement>(
 			"positions-market-filter",
 		);
-		// Option inventories: All/Open/Closed; All + one per distinct marketId.
-		expect(statusFilter.options).toHaveLength(3);
+		// Option inventories (item 11, P5-D17a): the STATUS filter is now
+		// Open/Closed — the canon inventory, with `All` removed. ⛔ The MARKET
+		// filter is a DIFFERENT control and keeps its `all` sentinel: `All` +
+		// one per distinct marketId. Repairing the two together would ship a
+		// defect.
+		expect(statusFilter.options).toHaveLength(2);
 		expect(marketFilter.options).toHaveLength(3);
-		// Both rows visible pre-filter.
+
+		// The initial state moved WITH the option. A `<select>` whose `value`
+		// matched no option would paint its first option while the predicate
+		// still returned every row — the control saying one thing and the table
+		// showing another, with nothing going red.
+		expect(statusFilter.value).toBe("Open");
+
+		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
+		// REMOVAL, asserted rather than implied: there is no longer any state of
+		// this surface in which an open and a closed position appear together.
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
 
 		// Status → Closed hides the Open row, keeps the Closed row.
 		fireEvent.change(statusFilter, { target: { value: "Closed" } });
@@ -706,13 +745,22 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		first.unmount();
 
-		// Fresh mount: the market filter isolates one market's rows.
+		// Fresh mount: the market filter isolates one market's rows, and it does
+		// so independently of the status filter.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-market-filter"),
-			{ target: { value: M1 } },
+		const market = screen.getByTestId<HTMLSelectElement>(
+			"positions-market-filter",
 		);
-		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
+		fireEvent.change(market, { target: { value: M1 } });
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+
+		// ⚠ The negative arm now selects the OTHER market rather than asserting
+		// M2's absence under `market=M1`: item 11's `Open` default already
+		// withholds M2, so the old assertion became over-determined and would
+		// have passed with the market filter entirely broken. Hiding M1 by
+		// selecting M2 is the market filter's own doing — the status filter has
+		// not moved.
+		fireEvent.change(market, { target: { value: M2 } });
+		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 	});
 });
