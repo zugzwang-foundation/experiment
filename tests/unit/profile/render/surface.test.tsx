@@ -334,7 +334,10 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const link = card.querySelector('a[href="/bookmarks"]');
 		expect(link).not.toBeNull();
 		// Icon-only: an accessible name via aria-label, and NO visible "@" —
-		// `:303` below asserts the whole subtree contains none.
+		// the `scrubbed-silhouette-and-zero-pii` case asserts the whole
+		// identity-card subtree contains none. (Named by TEST, not by line:
+		// the coordinate this comment used to carry was both wrong and in the
+		// wrong direction — O-8 demotes a line number to evidence.)
 		expect(link?.getAttribute("aria-label")).toBe("Bookmarks");
 		expect(link?.textContent ?? "").toBe("");
 		// ⛔ Bookmark ONLY — W2.13 R2 struck the download icon.
@@ -494,6 +497,34 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(screen.getByTestId("profile-error"))).toBe(
 			PROFILE_COPY.error.load,
 		);
+	});
+
+	it("profile-loading-adopts-p7", () => {
+		// POLISH.5 item 7 (P5-D10) — `ProfileLoading` becomes P7's SECOND
+		// consumer. `PD-0-08` closed because the PRIMITIVE was minted, not
+		// because every surface it lists had adopted it.
+		//
+		// ⚠ NON-VACUITY IS THE WHOLE POINT OF THIS CASE. `states-kit` above
+		// asserts only the wrapper testid, and the wrapper does not move in
+		// this swap — that assertion stays green on a component rendering
+		// NOTHING inside it. These assertions are what make the adoption
+		// observable at all.
+		const { container } = render(<ProfileLoading />);
+		const blocks = container.querySelectorAll("[data-loading-block]");
+
+		// NINE blocks: identity + SIX tiles + graph + arena. ⚠ Grepping the
+		// source for nine tags finds FOUR — the tile band is one tag mapped
+		// over the surface's own count constant, which is what P7 requires
+		// instead of the six-element literal it replaced.
+		expect(blocks).toHaveLength(9);
+
+		// BOTH markers coexist. `ui/loading-block.tsx:30-35` records the
+		// failure that minted the rule: passing `data-slot="loading-block"`
+		// silently REPLACED the shadcn primitive marker. A test asserting only
+		// `data-loading-block` passes on exactly that regression.
+		for (const block of blocks) {
+			expect(block.getAttribute("data-slot")).toBe("skeleton");
+		}
 	});
 
 	it("positions-filters", () => {
