@@ -265,9 +265,13 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			"Opener argument alpha",
 		);
 		// Status cells show the statusLabel. ⚠ Item 11 removed the status
-		// filter's `All` option and defaults it to `Open`, so the two rows are
-		// no longer on screen together — each label is read in its own filter
-		// state. The assertion is unchanged; only the reach is.
+		// filter's `All` option, so the two rows are never on screen together
+		// — each label is read in its own filter state. ⚠ Gate C S-1 then made
+		// the default DERIVED rather than fixed, and `ROWS` contains an Open
+		// row, so the derivation yields `Open` here and this switch is STILL
+		// REQUIRED. ⛔ Not the twin B10 removed: that one's fixture was
+		// all-Closed under a market preselect, which is what made its switch a
+		// no-op. The assertion is unchanged; only the attribution moved.
 		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
 			"Open",
 		);
