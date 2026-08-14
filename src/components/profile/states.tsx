@@ -1,3 +1,4 @@
+import { ErrorBlock } from "@/components/ui/error-block";
 import { LoadingBlock } from "@/components/ui/loading-block";
 
 import { PROFILE_COPY } from "./copy";
@@ -45,14 +46,38 @@ export function ProfileLoading(): React.JSX.Element {
 	);
 }
 
-/** The profile error state (W2.11 kit) — the OQ-7 load-error line. */
-export function ProfileError(): React.JSX.Element {
+/**
+ * The profile error state — the route-boundary family block, not a W2.11 kit
+ * member (canon §10 `C-STATES-1`).
+ *
+ * ⚠ THIS IS A REPLACEMENT, NOT A WRAPPING. It was a bare `<p>`: no container,
+ * no heading, no action, no panel. The retry already WORKED — `error.tsx`
+ * wrapped the whole message in a `<button onClick={reset}>` styled `block
+ * w-full text-left` — but it had no AFFORDANCE: no visible control, no focus
+ * treatment, no accessible name. A working action that looks like nothing is
+ * not a working affordance.
+ *
+ * THE PROP IS `onAction`, NOT `onRetry`, and the name is carried unchanged
+ * through to the leaf on purpose. The action is a segment re-render (`reset()`),
+ * not a "retry" of anything in particular; re-naming it here would reintroduce
+ * at the adapter exactly the framing the leaf's own ⛔ was written against.
+ *
+ * `bodyTestId` keeps `profile-error` on the MESSAGE NODE, where it already was.
+ * `OD-7` rules BESIDE, so the button is the body's SIBLING inside the block and
+ * stays outside the marked subtree — which is what keeps the surface's
+ * exact-equality assertion against `error.load` green.
+ */
+export function ProfileError({
+	onAction,
+}: {
+	onAction: () => void;
+}): React.JSX.Element {
 	return (
-		<p
-			data-testid="profile-error"
-			className="py-12 text-center text-sm text-n5"
-		>
-			{PROFILE_COPY.error.load}
-		</p>
+		<ErrorBlock
+			body={PROFILE_COPY.error.load}
+			bodyTestId="profile-error"
+			actionLabel={PROFILE_COPY.error.action}
+			onAction={onAction}
+		/>
 	);
 }

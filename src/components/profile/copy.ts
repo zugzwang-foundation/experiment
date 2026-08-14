@@ -20,8 +20,15 @@ export const PROFILE_COPY = {
 	graph: {
 		empty: "Nothing to plot yet.",
 	},
+	// Item 9 (P5-D12) — the two members arrive TOGETHER. `load` is TRIMMED at
+	// its sentence boundary (was "Couldn't load this profile. Retry.") because
+	// the retry promise moves out of the body and onto a real control; `action`
+	// is CREATED, and its value is a byte-copy of the shipped, ratified
+	// `m/[slug]/error.tsx` label. Both are carriage, never authoring
+	// (CLAUDE.md §3).
 	error: {
-		load: "Couldn't load this profile. Retry.",
+		load: "Couldn't load this profile.",
+		action: "Try again",
 	},
 } as const;
 

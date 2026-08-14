@@ -7,7 +7,7 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { PROFILE_COPY } from "@/components/profile/copy";
@@ -547,10 +547,63 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("profile-loading")).toBeTruthy();
 		loading.unmount();
 
-		render(<ProfileError />);
+		// Item 9 gave `ProfileError` its action as a prop; the assertion itself
+		// is unchanged and still reads THROUGH the const, so `error.load`'s trim
+		// moved both sides together and this stayed green.
+		render(<ProfileError onAction={vi.fn()} />);
 		expect(text(screen.getByTestId("profile-error"))).toBe(
 			PROFILE_COPY.error.load,
 		);
+	});
+
+	it("error-state-has-a-real-retry-affordance", () => {
+		// POLISH.5 item 9 (P5-D12). ⚠ THE RETRY ALREADY WORKED before this item:
+		// `error.tsx` wrapped the whole message in a `<button onClick={reset}
+		// className="block w-full text-left">`. What it had was no AFFORDANCE —
+		// no visible control, no focus treatment, no accessible name. So the law
+		// here is not "an action exists" but "an action is REACHABLE".
+		const onAction = vi.fn();
+		const { container } = render(<ProfileError onAction={onAction} />);
+
+		// Exactly one control, and `getByRole` would throw on a second — which
+		// is also the ⛔ no-button-inside-a-button proof, since the wrapper this
+		// item removes could not have coexisted with the block's own CTA.
+		const button = screen.getByRole("button");
+		expect(container.querySelectorAll("button")).toHaveLength(1);
+		expect(button.getAttribute("type")).toBe("button");
+
+		// Accessible-named, from the copy const — never a re-typed literal.
+		expect((button.textContent ?? "").trim()).toBe(PROFILE_COPY.error.action);
+
+		// The focus treatment, copied BY NAME from the shipped `m/[slug]`
+		// boundary. `--state-focus-ring` is already in the raw-props token set,
+		// so nothing is added and the 11-token census is untouched.
+		expect(button.getAttribute("class") ?? "").toContain(
+			"focus-visible:shadow-(--state-focus-ring)",
+		);
+
+		// Reachable, and it actually fires `reset`.
+		button.focus();
+		expect(document.activeElement).toBe(button);
+		fireEvent.click(button);
+		expect(onAction).toHaveBeenCalledTimes(1);
+
+		// `OD-7` = BESIDE. The marked subtree is the BODY ALONE: the button is
+		// its sibling, not its child. ⚠ `m/[slug]/error.tsx` marks its CONTAINER
+		// instead; copying that placement would pull the button's label into
+		// this subtree and redden `states-kit`'s exact-equality assertion above.
+		const body = screen.getByTestId("profile-error");
+		expect(body.tagName).toBe("P");
+		expect(body.contains(button)).toBe(false);
+		expect(text(body)).toBe(PROFILE_COPY.error.load);
+
+		// ⛔ NOT the P1 panel. `error-block` is NEITHER kit member: no hairline,
+		// no `bg-n0`, no 148px floor. Asserting this is what stops a later
+		// reader "harmonising" the two leaves into one shape.
+		expect(body.closest("[data-empty-block]")).toBeNull();
+		const block = container.querySelector("[data-error-block]");
+		expect(block).not.toBeNull();
+		expect(block?.getAttribute("class") ?? "").toBe("text-center");
 	});
 
 	it("profile-loading-adopts-p7", () => {
