@@ -51,7 +51,7 @@
 
 **What changed at v2.2, carried forward unchanged:**
 
-- **⚠ THE GROUND MOVED TWICE AND THE GATE FAILED ON FIRST READING.** `origin/main` is now `16971cdff8b58f82d1144290926b52cbeadc7af5`. This worktree was detached at `2326e84` and was therefore **STALE**; the first `§GATE` reading was a **FAIL**, and it is recorded as a fail before the remedy. §0.1.
+- **⚠ THE GROUND MOVED TWICE AND THE GATE FAILED ON FIRST READING.** `origin/main` **was** `16971cdff8b58f82d1144290926b52cbeadc7af5` **at v2.3** — ⚠ **it is `5ff418b` at v2.4; §A leg 2 carries the live ground.** This worktree was detached at `2326e84` and was therefore **STALE**; the first `§GATE` reading was a **FAIL**, and it is recorded as a fail before the remedy. §0.1.
 - **`R3` — THE REAL TWO-POINT RE-KEY IS EMPTY.** `git diff --stat 2326e84..origin/main` over the six carve-out paths returns **nothing**. **Every v2.1 coordinate in `src/components/profile/`, `src/components/ui/`, `src/server/profile/`, `src/components/debate/composer/`, `tests/unit/profile/` and `design-canon.md` CARRIES.** §0.1 · §10 P-2.
 - **⚠ AND THE CARVE-OUT LIST DOES NOT COVER EVERYTHING THIS PLAN CITES — so four coordinates outside it were re-measured anyway.** `POLISH-3.md` and `docs/parked.md` **both changed** in the range and this plan quotes both by line. Both **HOLD, verified verbatim**. §2.17.
 - **⚠ `C-1` — THE RELAY IS RIGHT AND v2.1 IS WRONG.** `--graph-yes` is `#737373`, **a mid-grey stand-in**, not the YES pole (`#181818`). The docblock's *"grey core"* is **DESCRIPTIVELY TRUE** and v2.1 ruled it false by conflating a token's **NAME** with its **VALUE** — in the row whose entire purpose is to stop exactly that. **The correction is applied and the failure is recorded as this document's own.** §2.11 · §18.
