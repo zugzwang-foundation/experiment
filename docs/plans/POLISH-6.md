@@ -1,4 +1,4 @@
-# POLISH.6 · /bookmarks — EXECUTE PLAN v1.4
+# POLISH.6 · /bookmarks — EXECUTE PLAN v1.5
 
 > ## ⚠ v1.5 — TWO AMENDMENTS AT DOC-1, BOTH FOUNDER-RATIFIED
 >
