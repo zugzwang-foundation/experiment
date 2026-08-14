@@ -27,7 +27,12 @@ export function DiscoveryGrid({
 	return (
 		<div
 			data-testid="discovery-grid"
-			className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
+			// HTML-FINISH row 8 — the grid is CONTENT-HEIGHT and REFUSES the
+			// slack: the mockup's `.grid` is `flex:0 0 auto` with
+			// `align-content:start` (`:148-149`). Everything left over belongs to
+			// the hero, which is what makes the hero the focal panel rather than
+			// eight tiles stretching to fill the window.
+			className="grid flex-none gap-3 sm:grid-cols-2 lg:grid-cols-4"
 		>
 			{markets.map((m, i) => (
 				<MarketCard key={m.card.id} card={m.card} active={i === activeIndex} />

@@ -82,7 +82,32 @@ export default async function PublicLayout({
 				portfolio={portfolio}
 				spendable={spendable}
 			/>
-			<main className="flex-1">{children}</main>
+			{/* HTML-FINISH row 8 — the surface column fills the viewport BELOW the
+			    header, so a surface can hand its leftover vertical space to a
+			    child that wants to grow. MEASURED, not reasoned: `flex-1` alone
+			    delivered nothing here, because the wrapper above carries
+			    `min-h-full` and `min-height:100%` against a parent whose own
+			    height is min-height-driven resolves to `auto` — in a 777px
+			    viewport that column measured 510px, so `<main>` had no slack to
+			    divide and the hero absorbed none of it.
+			    `100vh` is the window, which is literally what the row asks for.
+			    The subtrahend is the header's BORDER-BOX, written as its two
+			    shipped contributors rather than as a single opaque number:
+			    `60px` is `GlobalHeader.tsx`'s `h-[60px]` inner row, and `2px` is
+			    its `border-y` (1px top + 1px bottom, Tailwind's default width).
+			    Neither is read off the mockup and nothing new is invented.
+			    ⚠ MEASURED, AND THE FIRST ATTEMPT WAS WRONG. Subtracting only the
+			    60px left the column 2px taller than the viewport, i.e. a permanent
+			    scrollbar on a page that fits — caught by measuring the real
+			    compiled CSS in a browser, not by reading the class strings.
+			    ⛔ `min-h-*`, never `h-*`, and NO `min-h-0` anywhere in the chain:
+			    the floor lets the page GROW and SCROLL when content exceeds the
+			    viewport (RULED A1) instead of clipping it. The mockup's
+			    `overflow:hidden` on html/body is a fixed-viewport prototype
+			    affordance and is deliberately NOT adopted. */}
+			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
+				{children}
+			</main>
 		</div>
 	);
 }
