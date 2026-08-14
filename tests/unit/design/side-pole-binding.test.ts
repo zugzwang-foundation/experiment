@@ -284,20 +284,33 @@ const sideKeyedColour: SideKeyedColourExpression[] = sourceFiles.flatMap(
  *
  * SURVEY DELTA, recorded not absorbed: the C0 survey handed to this file
  * enumerated FIVE legitimate expressions across FOUR files. Two more exist and
- * are collected here — `composer/PositionStrip.tsx:102` and
- * `composer/SlotHeader.tsx:43`, the `{...(side === "YES" ? {stroke} : {className:
- * "fill-no"})}` thumb-glyph spread. Both are POLE-BOUND and therefore NOT
+ * are collected here — `composer/PositionStrip.tsx:102` and the
+ * `{...(side === "YES" ? {stroke} : {className: "fill-no"})}` THUMB-GLYPH
+ * SPREAD. Both are POLE-BOUND and therefore NOT
  * offenders (halt item 14 does not fire — it fires on a third INVERTED site, and
  * there is none). They are in the inventory because they are genuinely
  * side-keyed colour, and narrowing the predicate to exclude the property-object
  * form to match the survey would weaken the guard to fit a count.
+ *
+ * ⚠ THE THUMB-GLYPH SPREAD MOVED, AND ITS INVENTORY ENTRY MOVED WITH IT. It
+ * lived in `composer/SlotHeader.tsx` until POLISH.5 item 1 lifted `ThumbGlyph`
+ * out to `ui/thumb-glyph.tsx`. The re-point left `SlotHeader.tsx` holding NO
+ * side-keyed colour expression at all, so that file LEAVES the inventory below
+ * and the leaf ENTERS it — a break in both directions at once, which is why the
+ * plan pre-fenced this edit rather than meeting it as a surprise.
+ *
+ * ⛔ THE ENUMERATION MOVED; THE INVARIANT DID NOT. The pole-boundness predicate,
+ * both `>=` floors and every `offenders.toEqual([])` are UNTOUCHED, and the
+ * scanner still walks `src/` recursively and still reaches the new leaf — so
+ * INV-3 is guarded exactly as before. This is a widening of an ENUMERATION, not
+ * a weakening of a GUARD. Leaving the old name in place would have left a lying
+ * docblock naming a file the expression has left.
  */
 const PERMITTED_FILES = [
 	"src/components/debate/badges.tsx",
 	"src/components/debate/chart/MarketPriceChart.tsx",
 	"src/components/debate/composer/PositionStrip.tsx",
 	"src/components/debate/composer/ReplySplitBar.tsx",
-	"src/components/debate/composer/SlotHeader.tsx",
 	// SEVENTH ENTRY, added deliberately at the V17 fix — the guard's own
 	// documented mechanism, exercised rather than worked around. V17's
 	// Support/Counter split bar originally used a FIXED `bg-yes` fill over a
@@ -310,6 +323,12 @@ const PERMITTED_FILES = [
 	// is the one thing this file must never do to stay green.
 	"src/components/discovery/HeroPanels.tsx",
 	"src/components/profile/graph/ProfileChart.tsx",
+	// EIGHTH ENTRY, and it REPLACES `composer/SlotHeader.tsx` rather than
+	// joining it — POLISH.5 item 1 lifted `ThumbGlyph` here, so the spread this
+	// guard collects left that file and arrived in this one. See the SURVEY
+	// DELTA note above. Added as a DECISION, in the same commit as the lift;
+	// the predicate was not touched.
+	"src/components/ui/thumb-glyph.tsx",
 ];
 
 describe("side-pole-binding — a side value may resolve only to a pole token", () => {

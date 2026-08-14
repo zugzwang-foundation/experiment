@@ -9,6 +9,7 @@ import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
+import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import type {
 	ProfilePositionsPayload,
 	SellablePositionRow,
@@ -138,7 +139,25 @@ export function PositionsTable({
 						return (
 							<Fragment key={row.marketId}>
 								<tr data-testid={`position-row-${row.marketId}`}>
-									<td className="p-2 text-ink">{row.marketTitle}</td>
+									<td className="p-2 text-ink">
+										{/* Item 1 (P5-D02) — the FROZEN side, the mockup's
+										    `.pside`: the side WORD beside the thumb glyph at
+										    12px. ⛔ NOT a chip (R12). Before this item
+										    `row.side` reached NO rendered node on this
+										    surface — it went only to `SellModule`'s prop, so
+										    nothing on screen showed which side was held. The
+										    word is the side VALUE (data, not copy), cased as
+										    the shipped `SlotHeader` word+thumb cluster cases
+										    it; `gap-[5px]` is that cluster's gap. */}
+										<span
+											data-testid={`position-side-${row.marketId}`}
+											className="flex items-center gap-[5px] text-xs"
+										>
+											{row.side === "YES" ? "Yes" : "No"}
+											<ThumbGlyph side={row.side} size={12} />
+										</span>
+										{row.marketTitle}
+									</td>
 									<td className="p-2">
 										<ArgumentCell cell={row.argument} marketId={row.marketId} />
 									</td>

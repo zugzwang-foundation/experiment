@@ -66,6 +66,7 @@
 10. **`:has()` is banned** (silently dropped CSS blocks in the operator's browser) — JS-toggled body classes instead.
 11. **Card anatomy** (all card renders): rounded corners `--r:8px` / `--imgr:6px`; ink argument text; head = avatar · name | SIDE @ entry% | stake → current + right-edge bookmark/download cluster; `Replies · N` inline with enlarged count (`.repn`); split-bar staked total enlarged + ink (`.stkn`); titles are the click targets.
 12. **Side chip** = curved rectangle (4px), card-scoped *(reply cards + popover still show pill chips — CD fine-tune log, §10)*.
+13. **Thumb glyph = the `ThumbGlyph` primitive** (`src/components/ui/thumb-glyph.tsx`), pinned **by component name and props — never by emoji**: `side` (required) and `size` (optional, **default 16**). Thumb-up renders **stroked `currentColor`**; thumb-down renders **FILLED `--color-no` (`fill-no`), `stroke="none"`, rotated 180°** *(values-log §1 item 3, which supersedes the W2.6 mockup's stroked `THDN` — "match the mockup" regresses it)*. ⚠ **Size does not inherit**: values-log `:186` scopes **16** to the slot header BY NAME, and the profile positions table passes **12** (`surface_profile_v1_0.html:509-510`), so each caller states its own. ⛔ The mockup's and the step-0 close-out's 👍/👎 shorthands are **superseded** — `D1(b)` ruled tier 2 over tier 4, with word-only (**never** an emoji) as the fallback had no reusable primitive existed.
 
 ---
 

@@ -634,6 +634,55 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		}
 	});
 
+	it("position-cell-carries-the-frozen-side", () => {
+		// POLISH.5 item 1 (P5-D02) — the mockup's `.pside`: the side WORD plus
+		// the thumb glyph at 12px, in the Position cell. ⛔ NOT a chip (R12).
+		// ⚠ Before this item `row.side` reached NO rendered node anywhere on this
+		// surface — it went only to `SellModule`'s prop — so `band-composition`
+		// above cannot see this and could not have caught its absence.
+		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
+
+		// BOTH POLES, or the case proves nothing: a YES-only assertion passes
+		// unchanged on a component that hard-codes YES (V-2).
+		const yes = screen.getByTestId(`position-side-${M1}`);
+		const no = screen.getByTestId(`position-side-${M2}`);
+		expect(text(yes)).toBe("Yes");
+		expect(text(no)).toBe("No");
+
+		const yesGlyph = yes.querySelector("svg");
+		const noGlyph = no.querySelector("svg");
+		// THIS surface's size is 12. The slot header's 16 is scoped to it BY
+		// NAME in the values-log and does not inherit — so a glyph rendering at
+		// 16 here means the default leaked through.
+		expect(yesGlyph?.getAttribute("width")).toBe("12");
+		expect(yesGlyph?.getAttribute("height")).toBe("12");
+		expect(noGlyph?.getAttribute("width")).toBe("12");
+		expect(noGlyph?.getAttribute("height")).toBe("12");
+
+		// Decorative: the WORD carries the meaning, so the glyph stays out of
+		// the accessibility tree.
+		expect(yesGlyph?.getAttribute("aria-hidden")).toBe("true");
+		expect(noGlyph?.getAttribute("aria-hidden")).toBe("true");
+
+		// The two arms, as RATIFIED rather than as the mockup draws them: NO is
+		// the rotated, FILLED thumb (`fill-no`, no stroke); YES is stroked
+		// `currentColor`. The mockup's `THDN` is stroked and does NOT govern.
+		expect(noGlyph?.getAttribute("class")).toBe("rotate-180");
+		expect(yesGlyph?.getAttribute("class")).toBeNull();
+		expect(noGlyph?.querySelector("path")?.getAttribute("class")).toBe(
+			"fill-no",
+		);
+		expect(noGlyph?.querySelector("path")?.getAttribute("stroke")).toBe("none");
+		expect(yesGlyph?.querySelector("path")?.getAttribute("stroke")).toBe(
+			"currentColor",
+		);
+		expect(yesGlyph?.querySelector("path")?.getAttribute("fill")).toBe("none");
+
+		// The cell still carries the market title — the glyph is ADDITIVE.
+		const rowOpen = screen.getByTestId(`position-row-${M1}`);
+		expect(rowOpen.textContent ?? "").toContain(ROW_OPEN.marketTitle);
+	});
+
 	it("positions-filters", () => {
 		const first = render(
 			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
