@@ -1,96 +1,91 @@
 # POLISH.5 PR A — HALT RECORD
 
-Three halts, all **RUN-STOP condition 1** (*"Any write outside §5's allow-list becomes necessary"*), all the same shape: **a ratified fence the plan did not census.** Two are RESOLVED; the third is LIVE.
+**All three halts are RESOLVED. PR A is complete: A1 … A8, items 2 · 3 · 4 · 5 · 6 · 15 · 17.**
 
-| # | Raised at | Blocks | File needed | Excluded by | State |
+Three halts, all **RUN-STOP condition 1** (*"Any write outside §5's allow-list becomes necessary"*), all the same shape: **a ratified fence the plan did not census.** Each was ruled rather than absorbed, and each ruling is carried verbatim in the commit that spends it.
+
+| # | Raised at | File needed | Excluded by | Ruling | State |
 |---|---|---|---|---|---|
-| **H-1** | A1 | item 2 | `tests/unit/debate/render/side-badge.test.tsx` | allow-list only (§6 blind) | ✅ **RESOLVED** — §5 row 19, ruled 2026-08-14. Shipped in A1 (`697347d`) |
-| **H-2** | A5 | items 3 · 4 | `tests/unit/bookmarks/render/side-encoding.test.tsx` | §5 STRUCK; §6 blind | ✅ **RESOLVED** — §5 row 20, ruled 2026-08-14. Built, not yet committed (blocked behind H-3) |
-| **H-3** | A5 | items 3 · 4 | `tests/server/bookmarks/masking.test.ts` | §5 STRUCK **and** §6 DENY-LISTED | ⛔ **LIVE** |
+| **H-1** | A1 | `tests/unit/debate/render/side-badge.test.tsx` | allow-list only (§6 blind) | **§5 row 19**, 2026-08-14 | ✅ shipped in A1 |
+| **H-2** | A5 | `tests/unit/bookmarks/render/side-encoding.test.tsx` | §5 STRUCK; §6 blind | **§5 row 20**, 2026-08-14 | ✅ shipped in A5 |
+| **H-3** | A5 | `tests/server/bookmarks/masking.test.ts` | §5 STRUCK **and** §6 DENY-LISTED | **§5 row 21**, 2026-08-14 | ✅ shipped in A5 |
 
-**Branch:** `polish/5-pr-a`. **Landed: A1 · A2 · A3 · A4** (items 2 · 5 · 6 · 15). **Built and green except H-3: A5 · A6 · A7 · A8.**
+⚠ **Rows 19 · 20 · 21 exist only in this record, in the commit messages that spend them, and in PR #331's body.** `docs/plans/**` is deny-listed at §6, so `docs/plans/POLISH-5.md`'s §5 table still ends at row 18. **The close-out must land all three**, or a reviewer reading the plan fresh after merge finds three rows cited by commits and defined nowhere — the register-collision shape CLAUDE.md §8 exists to end.
 
 ---
 
-## ⚠ POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT
+## The pattern, stated once
+
+All three are one failure mode: **a plan that widens a shared DTO enumerated the files that CONSUME it and missed the files that CONSTRUCT or ASSERT it.**
+
+- §8.2's zero-delta table measured `src/server/bookmarks/list.ts` and cleared it correctly — it imports the builders and receives the new fields for free.
+- It could not see `side-encoding.test.tsx`, which **constructs** a `BookmarkItem` literal, or `masking.test.ts`, which **exhaustively asserts** its key set.
+
+**Adopted for close-out** (⛔ not written here — `POLISH-SURFACE-TEMPLATE.md` + `parked.md` own it):
+
+> *When a plan widens a shared DTO, its allow-list must include every file that **constructs, or exhaustively asserts the shape of**, that DTO — not only those that consume it.*
+
+And the mechanical finder, as a **pre-flight step**, not a lesson:
+
+```
+grep -rn 'Object.keys(' tests/ | grep -E 'toEqual|toHaveLength'
+```
+
+18 shape assertions tree-wide; it located H-3 in one command after three rounds of prose had missed it.
+
+---
+
+## H-3 · the security review, recorded
+
+`masking.test.ts:332` asserts the exhaustive sorted key set of the present-post `BookmarkItem`. A5 widens that union, so the whitelist moved.
+
+**Arithmetic, measured at source and CORRECTED.** An earlier draft of this record said *"16 → 17"*. That was **wrong** — a misread of vitest's `…(N)` notation, which counts entries **after** the first, so `…(17)` is 18 and `…(15)` is 16. Counted directly:
+
+| | count |
+|---|---|
+| BEFORE | **16** |
+| ADDED | `authorStake`, `priceAtBet` — **2** |
+| AFTER | **18** |
+| delta == entries added | ✅ |
+
+Both fields do reach the present-post variant. The review stands on the corrected number.
+
+**Founder finding, 2026-08-14, verbatim:**
+
+> "Reviewed 2026-08-14 under the guard's own terms. authorStake and priceAtBet are properties of the AUTHOR'S bet frozen at post time (pb.stake, pb.price_at_bet), not of the viewer's position — viewer-independent by construction, which is the property forced-visitor mode requires. Neither is Sell-eligibility; /bookmarks never mounts SellModule (F-BM-3). Ratified upstream at ADR-0032 D-4 and canon ruling 1, and REQUIRED downstream by PD-6-01. SC-1 intact: live variants only. The no-Sell-key loop is untouched and still enforcing."
+
+`@code-reviewer` independently corroborated this four ways: the `JOIN LATERAL` keys the bet to the **comment**, so it is the comment author's own bet; `loadBookmarks`' post query carries no viewer predicate on that path; `price_at_bet` stores `pEff` of the **bought** side (`bets/place.ts:162` → `cpmm/calculate.ts:97`); and both figures already render publicly on shipped surfaces (`HeroPanels.tsx:169`/`:176`, `ArgProfile.tsx:67`) — so this is not a new exposure class.
+
+---
+
+## POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT
 
 > **POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT:** POLISH.5 PR A added `authorStake` + `priceAtBet` to `side-encoding.test.tsx`'s `liveItem` factory (§5 row 20, ratified 2026-08-14). Ratified propagation of the A5 passthrough. Not a re-key finding.
 
 > **POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT:** POLISH.5 PR A amended three census assertions in `tests/unit/debate/render/side-badge.test.tsx` (§5 row 19, ratified 2026-08-14). Ratified adoption of the `profile` preset. Not a re-key finding.
 
-`side-encoding.test.tsx` is **POLISH.6's allow-list row 5**, so this moves a `.6` WRITE-set path and would be a RUN-STOP at `.6`'s re-key unless pre-declared. `side-badge.test.tsx` is not on `.6`'s list but is the second file this PR touches outside `src/components/profile/`, so it is declared on the same terms. ⚠ **A third path now joins them if H-3 is ruled: `tests/server/bookmarks/masking.test.ts`** — a `.6`-adjacent DB-backed suite. Its declaration is drafted in the ruling section below.
+`side-encoding.test.tsx` is POLISH.6's allow-list **row 5** — a WRITE-set path, so this declaration is mandatory. `side-badge.test.tsx` is not on `.6`'s list but is declared on the same terms.
+
+**Third file — MEASURED, not assumed.** `tests/server/bookmarks/masking.test.ts` is on **NEITHER** POLISH.6's write set (v1_3 §7's seven rows) **nor** its cite set; it appears nowhere in that plan. **No declaration is owed.** One is carried anyway, as a courtesy re-measure trigger:
+
+> **POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT:** POLISH.5 PR A added `authorStake` + `priceAtBet` to the present-post key whitelist in `tests/server/bookmarks/masking.test.ts` (§5 row 21, ratified 2026-08-14). The §4.4 exposure boundary gains two author-figure fields and no Sell/owner field. Not a re-key finding.
+
+⚠ **And one interaction handled rather than discovered:** POLISH.6 STEP 0.2 runs `grep -rniw "value" tests/server/bookmarks tests/unit/bookmarks` and pins the result at **2 hits**. The row-21 comment is deliberately worded **without** the whole word *"value"*. Re-measured after the edit: **still 2.**
+
+⚠ **Version note:** the ruling cited POLISH.6 **v1.4** §7; the latest copy available here is **v1_3**. Its §7 does carry seven rows with `side-encoding.test.tsx` at row 5, matching the ruling, so the numbering is stable across that gap — but the measurement above is against v1_3 and should be re-confirmed if v1.4 moved the list.
 
 ---
 
-## H-1 · RESOLVED — the `profile` preset census
+## Open findings surfaced, NOT absorbed
 
-`side-badge.test.tsx` pinned by set-equality that **no call site wires `profile`**. It fired **by design** — *"If a later PR wires one, this reddens and the wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`."* §5 row 19 split the assertion so **`detail` keeps its zero** for POLISH.3 (R1), moved the names with their assertions (R2), carried the ground in-file (R3). Shipped in A1.
+From `@code-reviewer` on A5 (verdict: **zero CRITICAL, zero HIGH** — §11 condition 11 does not fire):
 
-## H-2 · RESOLVED — the passthrough's TYPE reaches a struck file
+- **MEDIUM · `tests/server/profile/masking.test.ts:233-248` — the REMOVED-variant runtime belt was not widened.** It is a non-exhaustive `"key" in obj` whitelist naming `title`/`teaser`/`body`/`marker`(/`stake`/`repliedToTitle`); it does not name `authorStake` or `priceAtBet`. Consequence, precisely: **after A5, no test fails if a builder's removed branch emits `priceAtBet`.** The designated §11-condition-7 tripwire (`argument-list-side.test.tsx:121-135`) is a render test over a hand-written fixture — it proves the component does not render a price on a removed item; it cannot see the server builder producing one. ⛔ **Not fixed here:** `tests/server/**` is §6 deny-listed and closing it needs a fourth ruling. Same class as H-3, and the finder above would have caught it.
+- **MEDIUM · `src/server/profile/arguments.ts:30-36` — *"a leak is a COMPILE error"* over-claims.** TypeScript's excess-property check fires only on a **fresh object literal** in the return position. The reviewer probed three leak forms: the direct literal (what both builders use) errors; an intermediate `const` and a spread **do not**. The guarantee is real for the code as shipped and **form-dependent** — a routine refactor to either other form voids it silently, and per the MEDIUM above nothing downstream would notice. ⛔ **Not fixed here:** pre-existing text, not required for A5's correctness, and editing it would be absorbing a finding.
+- **LOW · `src/lib/ranking.ts:45`/`:62` still call `price_at_bet` "the market YES-probability"** — this is `OD-8`, which the plan routed to commit 0 and **commit 0 did not close** (`git log` shows the file last moved at #180). A5's new docblock now states the opposite of its own source type's docblock, and A5 is right. Correctly not fixed here (`src/lib/**` is §6 deny-listed); PR C's directed `@security-auditor` question is about exactly this docblock.
 
-`BookmarkItem` is `Extract<ProfileArgumentItem, …> & {…}` (`bookmarks/list.ts:43-53`), and `.6`'s test **constructs** a full literal, so A5's two new required fields reach it. §5 row 20 fenced the fix to the `liveItem` factory's two fields — no assertion, not `removedItem` (SC-1 intact), nothing else. **Built; commits with A5 once H-3 clears.**
+## Defects caught and fixed in-session
 
----
-
-## ⛔ H-3 · LIVE — the passthrough widens a guarded EXPOSURE BOUNDARY
-
-### The condition
-
-`tests/server/bookmarks/masking.test.ts:332` asserts the **exhaustive sorted key set** of the present-post `BookmarkItem`:
-
-```ts
-// The EXACT present-post BookmarkItem key set — a whitelist. No Sell mount,
-// no owner delta, ever.
-expect(Object.keys(item).sort()).toEqual([ …16 keys… ]);
-```
-
-A5 adds `authorStake` + `priceAtBet` to the union ⇒ **17 keys vs 16** ⇒ `AssertionError: expected [ 'aggregate', …(17) ] to deeply equal [ 'aggregate', …(15) ]`.
-
-**The file is excluded twice over** — §5's struck table (*"`tests/server/profile/**` · `tests/server/bookmarks/**` | DB-backed. ⚠ **Measured NOT to redden** (§2.14)"*) **and** §6's deny-list by directory (`⛔ tests/server/**`). It is the strongest fence in the plan, and the only halt so far where §6 was not blind.
-
-### ⚠ This one is not bookkeeping — it guards an exposure boundary
-
-H-1 unpinned a design property; H-2 was a fixture literal. **H-3 is a security-shaped whitelist.** Its own words: *"Forced-visitor: EVERY bookmarked item is someone else's content (D-3 others-only), so the DTO carries NO Sell-eligibility field EVER … its keys are EXACTLY the §4.4 union whitelist."* The `§4.4 union IS the exposure boundary`, and the assertion exists so that **any** widening of it is reviewed rather than absorbed.
-
-**The widening is almost certainly intended** — canon `:51` already rules that a bookmarked row shows *"that bookmarked author's figures on their argument"*, `staked`/`current` are already exposed on exactly that ground, and §17 item 7 states `.6` inherits `authorStake`/`priceAtBet` deliberately. ⇒ Two more of the same author's figures is consistent.
-
-⛔ **But that is the reviewer's call, not the executor's, and this is precisely the guard built to force it.** No `Sell`/owner key is added; the belt-and-braces loop (`sell`, `sellable`, `canSell`, `sellEligible`, `sellMount`, `owner`, `isOwner`, `ownedByViewer`, `viewerHolds`) still passes untouched.
-
-### The exact fix
-
-Two entries into the sorted whitelist, in place:
-
-```
-"aggregate", "authorPseudonym", "authorStake",   ← ADD
-"body", "createdAt", "current", "id", "kind", "marker",
-"marketSlug", "marketTitle", "ordinal", "priceAtBet",   ← ADD
-"removed", "side", "staked", "teaser", "title",
-```
-
-⛔ Nothing else in the file. The belt-and-braces loop and the compile-time `Extract` guard below it are untouched.
-
-### ⚠ THE DRAFTED PLANNING RULE WOULD NOT HAVE CAUGHT THIS ONE
-
-The close-out rule as worded — *"when a plan widens a shared DTO, its allow-list must include every file that **CONSTRUCTS** that DTO"* — catches H-2 (`side-encoding.test.tsx` constructs a literal) and **misses H-3**: `masking.test.ts` never constructs a `BookmarkItem`; it **receives** one from `loadBookmarks` and asserts its shape. Suggested widening, for the close-out author:
-
-> *…must include every file that **constructs, or exhaustively asserts the shape of**, that DTO.*
-
-⚠ **And a mechanical way to find them, since prose will keep missing cases:** `grep -rn 'Object.keys(' tests/ | grep -E 'toEqual|toHaveLength'` returns **18 shape assertions** tree-wide. Run it against the widened type's consumers at plan time; it is what found H-3 in one command after the fact.
-
-### Declaration to carry if H-3 is ruled
-
-> **POLISH.6 STEP 0 — EXPECTED MOVE, NOT DRIFT:** POLISH.5 PR A added `authorStake` + `priceAtBet` to the present-post key whitelist in `tests/server/bookmarks/masking.test.ts` (§5 row 21, ratified 2026-08-14). Ratified propagation of the A5 passthrough; the §4.4 exposure boundary gains two author-figure fields and no Sell/owner field. Not a re-key finding.
-
----
-
-## State of the built-but-unlanded work
-
-A5 · A6 · A7 · A8 are **complete and green except H-3**, saved at `~/Downloads/POLISH-5-PRA-A5-A8.patch` (388 lines). Full suite at that tree: **325 files passed / 1 skipped / 1 failed**, **2907 passed / 1 failed** — the single failure being H-3. `pnpm tsc --noEmit` **0 errors**. All **seven** `tests/unit/design/` guards **green**.
-
-**Gate C read intact by construction:** `arguments.ts` is **pure addition — 18 lines, ZERO deletions**. No query line at `:145`/`:181`/`:258`/`:267` moved; no removed-variant block touched.
-
-**A8's V-2 proof was run in all three states**, not asserted: RED with no link (owner arm: *"expected null not to be null"*) → GREEN with the `owner` gate → RED again with the gate removed (visitor arm: *"expected `<a aria-label="Bookmarks">` to be null"*). **Both arms have teeth.**
-
-### ✅ One defect caught and fixed in-session
-
-`pct-round-render.test.ts` — one of the seven design guards — went RED at 4 markers vs `EXPECTED_ALLOW_MARKERS = 3`. Cause: **an explanatory comment I wrote in `ArgumentList.tsx` contained the literal string `pctround-allow:`**, which the guard counts as a marker. Per §11 condition 2 (*"a red guard is a finding about the change, never a file to fix"*) the comment was reworded; the guard was not touched. All seven now pass.
+- **`pct-round-render.test.ts` went RED** at 4 markers vs `EXPECTED_ALLOW_MARKERS = 3` — because an explanatory comment **I** wrote in `ArgumentList.tsx` contained the literal string `pctround-allow:`. Per §11 condition 2 (*"a red guard is a finding about the change, never a file to fix"*) the comment was reworded; the guard was untouched.
+- **A5's own new comments cited `:216`/`:217`/`:224`**, which the union addition above them had already displaced to `:226`/`:227`/`:234` — stale *inside the commit that wrote them*, which is `O-8` minted at this branch's own base. Re-cited by symbol.
+- **A5's comment mis-attributed the canonical form** to those substrate lines, which are raw passthrough; 18-dp comes from the **column type** (`numeric(38,18)`). `O-3`: a true conclusion with a wrong stated cause is a defect.
