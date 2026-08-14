@@ -1755,3 +1755,127 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes `auth-error-boundary.test.tsx` the R6 fixture corrections and a booby-trap test. Porting the corrected scope to all five is the same work in the same session — and that PR is the natural owner because it is already opening the one file that is both container-scoped *and* a live leak guard with no compile-enforced backstop.
 
 **Expected next task.** The `(auth)`-boundary follow-up. Evidence: `src/components/ui/dialog.tsx` · the five files above · `docs/plans/POLISH-3.md` §19 PF-7 · PF-8 · `CLAUDE.md` §5.14 SC-1.
+
+---
+
+## GUARD-HARDENING — four guard-reach defects share one remedy and none has a home
+
+**Originating task:** PRIMITIVES-1 Gate C, carried unapplied in `POLISH-register-ADDITIONS.md` §A; **named as a destination by `PD-5-03` and `PD-5-05`** at POLISH.5/.6 commit 0 (2026-08-14). ⚠ **Minted here in the SAME COMMIT that files those rows**, per this file's standing rule at the head — until now it was a **phantom**, cited twice with no section, no owner and no date.
+
+**Deferred work.** Four defects in the shell/format guard family, all of the same shape — *the guard's stated reach exceeds its mechanism*:
+
+| # | Row | Defect |
+|---|---|---|
+| 1 | `PD-5-03` (P5-a) · **M-2** | A footer rendered by a component defined elsewhere and merely **mounted** evades both arms — ancestry never sees the element, and the name belt greps one string. |
+| 2 | `PD-5-03` (P5-a) · **F4** | A self-closing container before a `<footer` unbalances the count permanently, making later footers read "nested". ⚠ The **false-negative** direction; verified absent today. |
+| 3 | `PD-5-05` (P5-c) · **L-4** | `floor` widens the object-shorthand false-positive surface in `MONEY_IDS`; the hazard pre-existed for `spendable`/`balance`/`current`/`stake` and was ratified at R4c. |
+| 4 | `PD-5-05` (P5-c) · **L-5** | The `SiteFooter` name belt reads **raw** source while mechanism A **strips comments**, so prose naming `SiteFooter` in any globbed file REDs. That file set grew **3 → 17** in one PR. |
+
+**Why deferred.** Following a mount needs **import resolution** — a different class of guard from either arm, and a build not a polish. ⚠ **Items 3 and 4 are LATENT: neither fires today.** Item 2 is the false-negative direction and is verified absent. ⛔ **None is a live defect**, which is exactly why each was routed rather than fixed, and exactly why the set needs one owner instead of four incidental ones. ⚠ **`PD-5-04` (P5-b) is NOT parked here** — it is a live ruling (*widen the regex, or scope both remaining claims*) and belongs to whoever opens `format.ts`.
+
+**Conditional trigger.** Any task that opens the shell-guard mechanism or `format.ts`'s `ROUND0_RENDER` belt — or the first time item 3 or item 4 actually REDs a run, at which point it stops being latent and stops being parkable.
+
+**Expected next task.** A guard-hardening chore PR owning all four, or the next task with legitimate cause to open `tests/unit/shell/not-found.test.tsx`. Evidence: `docs/polish/POLISH-register.md` `PD-5-03` · `PD-5-05` · `docs/polish/POLISH-register-ADDITIONS.md` §A and its Gate C verbatim block.
+
+---
+
+## AUTH-BOUNDARY-GUARD-WEAK — the `(auth)` leak guard is measurably weaker than its debate twin, and would pass all five of its tests green
+
+**Originating task:** PR #328's reviewer pass; **named as a destination at `PORTAL-SCOPED-ABSENCE` above** and minted here at POLISH.5/.6 commit 0 (2026-08-14). ⚠ **It was a phantom** — cross-referenced by name in this same file with no section of its own.
+
+**Deferred work.** `tests/unit/auth/auth-error-boundary.test.tsx` (127 lines, **five** `it()` blocks) guards the signed-out `(auth)` route boundary against leaking `message` / `digest` / `stack` / `cause`. **Three structural weaknesses, measured at `16971cd`** — and the file is GREEN with all three present, which is the whole problem:
+
+| # | Site | Defect | The debate twin |
+|---|---|---|---|
+| 1 | `:59` | `container.innerHTML` — **container-scoped**, so anything rendered through `createPortal` is invisible to the assertion | `market-error-boundary.test.tsx:113`,`:124`,`:264` use **`baseElement`** |
+| 2 | `:32` | `err.stack = "SECRET_STACK_FRAME at …"` — a **single-line** stack. A real stack is multi-line, so this fixture cannot detect a guard that strips only the first frame | — |
+| 3 | `:33` | `err.cause = "SECRET_CAUSE_…"` — a **string** cause. A real `cause` is usually an `Error`, so this fixture cannot detect a guard that fails to recurse into a nested one | — |
+| 4 | — | **No booby-trap test.** Nothing proves the guard can fail | `market-error-boundary.test.tsx:184` carries one |
+
+⚠ **This is a `V-2`/`V-6` shape: the assertions are not absent, they are WEAK, and a weak assertion reads as discharged.** The five tests pass, the coverage read looks complete, and none of the three defects is visible from inside the file.
+
+**Why deferred.** ⛔ **`tests/**` is deny-listed on commit 0**, which writes documentation only. ⚠ **And it must not be absorbed incidentally**: `src/server/auth/` is a **CLAUDE.md §1 critical path**, so the fix carries the full ritual — `@code-reviewer` then `@security-auditor`, §5.10 pre-PR audit, §5.11 subagent review — which a cosmetic or doc pass cannot give it.
+
+**Conditional trigger.** The `(auth)`-boundary follow-up PR, which already owes this same file the R6 fixture corrections and the `baseElement` re-scope from `PORTAL-SCOPED-ABSENCE`. ⚠ **All of it is one session's work in one file** — and that PR is the natural owner because it is the one already opening the only file that is both container-scoped *and* a live leak guard with no compile-enforced backstop behind it.
+
+**Expected next task.** The `(auth)`-boundary follow-up PR. **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `tests/unit/auth/auth-error-boundary.test.tsx:32`,`:33`,`:59` · `tests/unit/debate/render/market-error-boundary.test.tsx:113`,`:184`,`:264` · `PORTAL-SCOPED-ABSENCE` above · `CLAUDE.md` §1 critical paths.
+
+---
+
+## CANON-D18-ROWS-UNAUTHORED — `D18` routed four canon `C-` rows to commit 0; three were never authored and the fourth's text never arrived
+
+**Originating task:** POLISH.5/.6 commit 0, `X3′` (2026-08-14). Named as a destination at `docs/plans/POLISH-5.md:1505` — §15's precondition-2 payload table. Recorded under this file's own standing rule at `:10-14`: *a routing destination named in a committed document gets a row here in the SAME commit.*
+
+**Deferred work.** `POLISH-5.md:1505` is the **whole** specification of `D18`, and it is one table cell:
+
+> `| D18 | **Four canon `C-` rows**, including `D8`'s accepted-divergence row for the `/bookmarks` fork |`
+
+**Four rows are named. One is identified by subject. None carries text.** Measured at commit 0:
+
+| # | Row | State |
+|---|---|---|
+| 1 | **`D8`** — the `/bookmarks` accepted-divergence row | **Identified by subject only.** Its verbatim text, *including its closing scope paragraph*, was to be operator-supplied at the continuation kickoff and **did not arrive**. ⛔ Not authored, not landed |
+| 2 | **`D12`** | **Named, never authored.** No subject, no text |
+| 3–4 | two further rows | **Not even named.** `D18` states a *count*, not an enumeration |
+
+⇒ `D18`'s own text lives in `POLISH-56-STEP0-RECON-CLOSE-OUT.md`, which is **not on `main`** and not in the relay set in hand. ⚠ **A fifth row — `R-B`, the P1-vs-route-boundary rule — was NOT one of `D18`'s four**, had text (`POLISH-6_commit-0-contribution-block.md` §4), and **landed in this same commit as `C-STATES-1`.** It is the only canon row commit 0 wrote.
+
+**Why deferred.** ⛔ **Canon rows are ratified design-decision text, and CC does not author them.** This is the same rule that holds `CC-5`'s SPEC.2 half at `POLISH-TRACKER.md:79` — *"SPEC.2 is web-authored — CC must not draft it."* Minting four rows to satisfy a count would put invented text into the tier-2 register that every surface reads as a baseline — the exact `V-3` false-receipt class commit 0 exists to close. ⚠ **The count is also not self-evidently four**: `D18` may have been written before `R-B` existed, so whether the target is four rows, five, or three-plus-`D8` is itself unresolved and is part of what needs ruling.
+
+**Conditional trigger.** Either (a) the operator or web Claude supplies the verbatim text — `D8`'s row **with its closing scope paragraph**, `D12`'s, and an identification of the two unnamed rows — or (b) `POLISH-56-STEP0-RECON-CLOSE-OUT.md` lands on `main`, at which point the rows can be read from it rather than re-requested. ⚠ **Fires on supply, not on a date.**
+
+**Expected next task.** A commit-0 follow-up PR, or POLISH.6's own `C0`. ⚠ **The topic slug is already ruled** — `design-canon.md:169`'s `C-<TOPIC>-<n>` form, appended as `###` sections in §10; the `/bookmarks` fork row is **not** obviously `STATES` and needs its own slug decision. **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `docs/plans/POLISH-5.md:1505` · `docs/design/design-canon.md` §10 (`C-CHART-1`, `C-STATES-1` — the only two members) · `POLISH-6_commit-0-contribution-block.md` §4 · `COMMIT-0-HALT-1.md` §1.3.
+
+---
+
+## CANON-C-N-PREFIX-COLLISION — the bare `C-<n>` form runs three independent plan-local series at once, and canon's own rows are a fourth claimant
+
+**Originating task:** POLISH.5/.6 commit 0, `X3′` (2026-08-14). Surfaced while allocating the canon row that became `C-STATES-1`; first written up at `COMMIT-0-HALT-1.md` §1.2.
+
+**Deferred work.** ⛔ **RECORD ONLY. Nothing is renumbered, and nothing should be.** Instrument: `grep -rhoE '\bC-[0-9]+\b' --include='*.md' .`
+
+| Ground | Occurrences | Note |
+|---|---|---|
+| `origin/main` `16971cd` | **63** | the figure `COMMIT-0-HALT-1.md` §1.2 measured |
+| **this commit's head** | **130**, across **19** files | ⚠ **`X0` roughly DOUBLED the population** by landing `docs/plans/POLISH-5.md`, which alone carries **54** |
+| `design-canon.md` | **0** | ✅ **not one occurrence anywhere is a canon row** — the canon's own register is `C-<TOPIC>-<n>` and the bare pattern cannot match it |
+
+At least three independent series use the bare form simultaneously:
+
+| # | Series | Where | Range |
+|---|---|---|---|
+| 1 | POLISH.3's plan-local corrections | `docs/plans/POLISH-3.md:591-595` | `C-1` … `C-5` |
+| 2 | ENGINE.9's plan-local corrections | `docs/plans/ENGINE.9.md`, and the same form in `ENGINE.14.md` · `ENGINE.15.md` · `BOOKMARK-ADD-WIRE.md` · `POLISH-3-RUN-TRACKER.md` | `C-1` … `C-7` |
+| 3 | POLISH.5's plan-local corrections | `docs/plans/POLISH-5.md` | `C-1` (§2.11) · `C-2` (§14) · `C-3` (§2.4) · `C-4` (§1.7) |
+
+⚠ **And `POLISH-5.md` runs one prefix over two registers inside one document** — its payload table calls one of them *"`C-4`'s rule"* while its canon-row section uses `C-` for canon rows. **A reader who greps `C-4` in that file finds a correction ID and a canon row and cannot tell which was cited.**
+
+**Why deferred.** `main` already ruled the remedy on 2026-08-12, and it is **prospective, not retroactive**: `design-canon.md:169` closes the bare `R-n` sequence at `R9` and requires canon rulings to take the **`C-<TOPIC>-<n>`** form — which is exactly why minting `C-1 … C-5` into the canon at commit 0 would have manufactured a *sixth* claimant on the bare form. ⛔ **The three series above are closed and historical.** Renumbering them would rewrite landed plans for zero safety gain and break every citation into them. ⚠ **This is the `L-n` genus `CLAUDE.md` §8 was written to end, and §8's own answer was to commit the adjudicating register — not to renumber the claimants.** What is genuinely undecided is the **forward convention**: §8 already requires task-scoped `@security-auditor` LOWs to carry their task name (`F-DEBATE-4 L-2`, never a bare `L-n`), and **no equivalent rule exists for plan-local `C-<n>` correction series.**
+
+**Conditional trigger.** A **new** correction series being opened on the bare `C-<n>` form — the first task that would make it four — or any attempt to mint a canon row as a bare `C-<n>`. ⚠ **Not go-live gating**: every existing citation resolves inside its own document, and the canon's own register is already topic-scoped and collision-free.
+
+**Expected next task.** The next `CLAUDE.md` / `AGENTS.md` SYNC sweep, which owns §8's register-namespace rules, or the next task that opens a plan-local correction series. **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `docs/design/design-canon.md:169` · `docs/plans/POLISH-3.md:591-595` · `docs/plans/POLISH-5.md` §1.7 · `CLAUDE.md` §8 · `COMMIT-0-HALT-1.md` §1.2.
+
+---
+
+## MARKDOWN-UNGATED-BY-CI — `just verify` and `ci.yml` read zero bytes of a documentation-only PR, and report green
+
+**Originating task:** POLISH.5/.6 commit 0 (2026-08-14). Measured across the run; first written up at `COMMIT-0-HALT-1.md` §3.3, which found the commit-0 plan's own verification rationale — *"it is the markdown/format gate, and this PR is entirely markdown"* — to be false.
+
+**Deferred work.** Measured, not inferred:
+
+```
+pnpm exec biome check docs/plans/POLISH-5.md
+→ Checked 0 files … × No files were processed in the specified paths.
+  i These paths were provided but ignored:  - docs/plans/POLISH-5.md
+```
+
+**Biome 2.4.13 has no markdown support**, and `biome.json` sets `"ignoreUnknown": true`, so every `.md` file is **silently skipped** rather than erroring. `just verify` is `typecheck → biome check . → next build`; CI (`.github/workflows/ci.yml`) is Biome → `tsc` → `drizzle-kit check` → migrate → `db:check-drift` → `vitest run`. **No step in either reads a `.md` byte.** ⇒ A documentation-only PR — this one, POLISH.3's commit 0, every close-out and every log — clears every mechanical gate having had **zero bytes of its diff inspected**.
+
+⚠ **The receipt is not merely absent; it is FALSE.** A green `just verify` on a markdown-only PR reads as *"checked"*. That is a `V-3` instance sitting inside the verification step itself, and it is the same genus as the already-recorded fact that `just verify` cannot see a `.github/workflows/*.yml` edit either. ⛔ **Consequence, stated so it is not re-derived: on a doc-only PR the founder/Gate C review is not the strongest gate — it is the ONLY gate.**
+
+**Why deferred.** Installing a markdown linter (`markdownlint`, `prettier --parser markdown`, or a Biome version that supports it) is **a dependency addition, which AGENTS.md §11 makes an *ask-first* decision**, and a CI-workflow edit — neither of which a doc-only commit whose entire deny-belt excludes `.github/` may take. ⚠ **And the fix is not free**: the POLISH corpus uses heavy inline HTML entities, emoji sentinels and very wide single-line table rows, so a default rule set would red the whole tree on arrival and the real work is choosing a rule subset.
+
+**Conditional trigger.** The next tooling or CI pass — **or** the first time a broken table, a truncated file tail, or a stray tool-delimiter token reaches `main` inside a doc-only PR. ⚠ Both failure modes have live near-misses already: a bulk-rewrite script once truncated 74 files, and Write-tool tails have leaked delimiter tokens.
+
+**Expected next task.** A tooling chore PR, alongside the other not-installed gates AGENTS.md §11 already tracks (`commitlint`, the `block-main-commits` / `block-destructive` hooks, `permissions.deny`). **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `biome.json` (`ignoreUnknown: true`) · `justfile:38` · `.github/workflows/ci.yml` · `AGENTS.md` §11 · `COMMIT-0-HALT-1.md` §3.3.

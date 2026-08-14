@@ -256,6 +256,36 @@ CTA present on Error (`Reload`) and absent on Empty.
 
 ---
 
+### C-STATES-1 · State-block ownership — P1 governs in-surface blocks; the route-boundary family governs route `error.tsx` and `not-found.tsx`
+
+**Ruled 2026-08-14 IST at POLISH.5/.6 commit 0.** `STATES` is a new topic under the `C-<TOPIC>-<n>` form ruled at §10's head on 2026-08-12, and this is its first member. **It lands here, ahead of POLISH.6's own PR, because the ruling governs two surfaces and POLISH.6's plan is its citable form — and that plan lands LAST in the chain, so POLISH.5 executes before it and cannot cite it.**
+
+**`ui/empty-block.tsx` is P1. `ui/loading-block.tsx` is P7. ⚠ `ui/error-block.tsx` is NEITHER — it renders the route-boundary family**, and it sits in `ui/` beside two kit members without being one.
+
+**Ground:** `R9` extended P1's placement table to *"Discovery empty and Discovery error"* reasoning from **Discovery specifically** — §10's own **`R9` clause**, the paragraph opening *"Same ruling, second clause (R9)"* (`:223-230` at this commit; named by symbol per **`O-8`**, which demotes the range to evidence) — and **Discovery has no route `error.tsx`**; `ErrorState.tsx` renders from an in-page RSC catch. **`R9` never reached route boundaries.** The family is `(auth)/error.tsx` → `(public)/not-found.tsx` → `m/[slug]/error.tsx`, verified byte-consistent across all three.
+
+⚠ **Without this row, three files in one directory imply one kit and one of them is not** — a false receipt of exactly the class `OD-8` routes for.
+
+---
+
+### C-BOOKMARKS-1 · The `/bookmarks` fork is an accepted divergence — §3 item 9 is satisfied by mode-of-the-CARD, not mode-of-the-SURFACE
+
+**Ruled 2026-08-14 IST at POLISH.5/.6 commit 0.** `BOOKMARKS` is a new topic under the `C-<TOPIC>-<n>` form ruled at §10's head on 2026-08-12, and this is its first member. Measured at this commit, §10 carried `CHART` and `STATES` and no surface/bookmarks topic.
+
+Three tiers say *reuse the profile surface in forced-visitor mode*, and `design-canon.md` §3 item 9 puts *"not a fork"* inside the invariant spine. The build renders `PageContainer` → `<h1>` + `<Badge>` + a card list.
+
+**The divergence is ACCEPTED. §3 item 9 is satisfied by mode-of-the-CARD, not mode-of-the-SURFACE.**
+
+**Grounds — three, independent:**
+
+1. **The DTO difference is structural, not incidental.** `BookmarkItem` is **author-keyed** (ADR-0032 D-5: each item shows the bookmarked author's Đa/Đb and marker, never the viewer's). `ProfileArgumentItem` is **viewer-keyed**. These are different read models, not two renderings of one.
+2. **Mode-of-the-surface would be wrong on its face.** It would put an identity card, six wallet tiles and a Dharma graph on a route that spans **many** authors — attributing one person's figures to a list of other people's arguments.
+3. **The tier-4 artifact anticipates the divergence in its own comment:** *"Mockup reuses the demo rows; production loads the user's bookmarked posts/replies here."* The shell's `FRAMES.bookmark = 'profile'` is **source reuse in a mockup**, not a specification that bookmarks carries profile's chrome.
+
+⚠ **SCOPE — this row ratifies the CURRENT build and nothing beyond it.** A founder ruling of **2026-08-13** directs `/bookmarks` toward the Profile page's structure **before go-live**, under its own surface spec. **This row records why the fork is not a defect today. It does not fix, freeze, or forbid the surface's future shape.**
+
+---
+
 ## §11 — Residual open items (properly homed — nothing floating)
 
 | Item | Home | Note |
