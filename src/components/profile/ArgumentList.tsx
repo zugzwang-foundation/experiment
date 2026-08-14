@@ -74,6 +74,20 @@ export function ArgumentList({
 							    supplies the `aria-label="Author Flipped"` the hand-roll
 							    lacked (PD-0-10's root cause: primitive duplication). */}
 							<PositionMarker marker={item.marker} />
+							{/* Item 4 (P5-D06a) — the author's own opening stake, canon §3
+							    item 11's head. POST VARIANT ONLY: a reply's `stake` is the
+							    §3.6 ranking ruler, a different figure (§0.5). D21 struck
+							    the `→ current` half, so the stake ships alone. Routed
+							    through `formatDharma` — `authorStake` is a MONEY_ID and a
+							    bare `{item.authorStake}` reddens no-raw-dharma-render. */}
+							{item.kind === "post" && (
+								<span
+									data-testid={`argument-stake-${item.id}`}
+									className="text-n6 text-xs"
+								>
+									Đ {formatDharma(item.authorStake)}
+								</span>
+							)}
 						</div>
 						<Link
 							data-testid={`argument-title-${item.id}`}

@@ -67,6 +67,26 @@ const liveItem = (
 	aggregate: AGGREGATE,
 });
 
+/** The reply variant — item 4's negative arm (a reply carries no author stake;
+ * its own `stake` is the §3.6 ranking ruler, a different figure — §0.5). */
+const replyItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
+	removed: false,
+	kind: "reply",
+	id: "0190b3a0-9999-7000-8000-00000000000e",
+	side,
+	marketSlug: "will-x-happen",
+	marketTitle: "Will X happen?",
+	ordinal: 4,
+	title: "A profile reply",
+	teaser: TEASER,
+	body: BODY,
+	marker: "none",
+	stake: "6.000000000000000000",
+	priceAtBet: "0.270000000000000000",
+	repliedToTitle: "A parent argument",
+	createdAt: "2026-07-01T00:00:00.000Z",
+});
+
 const removedItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	removed: true,
 	kind: "post",
@@ -250,6 +270,41 @@ describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", ()
 		expect(container.innerHTML).not.toContain(BODY);
 		expect(
 			container.querySelector('[data-testid^="argument-teaser-"]'),
+		).toBeNull();
+	});
+});
+
+describe("ArgumentList — item 4, the author's stake on the post replica", () => {
+	it("post-carries-the-author-stake-formatted", () => {
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		const stake = container.querySelector('[data-testid^="argument-stake-"]');
+		// Rendered through `formatDharma` — grouped and rounded. A raw render
+		// would print `50.000000000000000000` and redden no-raw-dharma-render.
+		expect(stake?.textContent?.trim()).toBe("Đ 50");
+		expect(container.innerHTML).not.toContain("50.000000000000000000");
+	});
+
+	it("reply-carries-no-author-stake", () => {
+		// POST VARIANT ONLY. A reply's `stake` is the §3.6 ranking ruler, not the
+		// author's basis (§0.5's name collision) — conflating them would put a
+		// different figure on the card. The reply branch renders no stake node.
+		const { container } = render(
+			<ArgumentList items={[replyItem("NO")]} owner={false} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-stake-"]'),
+		).toBeNull();
+	});
+
+	it("removed-variant-carries-no-author-stake", () => {
+		// SC-1 belt: the removed variant has no `authorStake` field at all.
+		const { container } = render(
+			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-stake-"]'),
 		).toBeNull();
 	});
 });
