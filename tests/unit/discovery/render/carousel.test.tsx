@@ -348,11 +348,19 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expect(screen.getByTestId("discovery-grid")).toBeTruthy();
 		expect(screen.getAllByTestId("market-card")).toHaveLength(3);
 		expect(screen.getAllByTestId("carousel-dot")).toHaveLength(3);
-		// Anchor census: n whole-card links + market 1's TWO hero-post
-		// deep-links + market 1's TWO hero-author profile links (UI.A5 A4
-		// follow-up #2); the hero market panel + side-empty panels carry ZERO.
-		// n=3 → 3 + 2 + 2 = 7.
-		expect(container.querySelectorAll("a")).toHaveLength(7);
+		// Anchor census: n whole-card links + THE HERO MARKET PANEL + market 1's
+		// TWO hero-post deep-links + market 1's TWO hero-author profile links
+		// (UI.A5 A4 follow-up #2); the side-empty panels carry ZERO.
+		// n=3 → 3 + 1 + 2 + 2 = 8.
+		//
+		// ⚠ 7 → 8 AT HTML-FINISH row 2. The hero market panel used to be a plain
+		// `<div>` — "the hero market panel + side-empty panels carry ZERO" was
+		// this line's own note. Row 2 makes the WHOLE panel open its market, the
+		// way the tiles already do (mockup `:399-401`, `:395`), so it is now an
+		// anchor and the census gains exactly one. The count is deliberately
+		// exact: it is what would catch a stray second anchor smuggled into any
+		// panel.
+		expect(container.querySelectorAll("a")).toHaveLength(8);
 	});
 
 	it("render::empty-views-render-nothing", () => {
