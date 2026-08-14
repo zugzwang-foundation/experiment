@@ -329,9 +329,19 @@ describe("UI-A6 Slice 3 — loadBookmarks masking + forced-visitor mode (F-BM-3)
 
 		// The EXACT present-post BookmarkItem key set — a whitelist. No Sell mount,
 		// no owner delta, ever.
+		//
+		// ⚠ WIDENED BY TWO AT POLISH.5 PR A / A5 (§5 row 21, ratified 2026-08-14),
+		// 16 -> 18. `authorStake` and `priceAtBet` are properties of the AUTHOR'S
+		// bet frozen at post time (`pb.stake`, `pb.price_at_bet`), not of the
+		// viewer's position — viewer-independent by construction, which is the
+		// property forced-visitor mode requires. Neither is Sell-eligibility.
+		// Ratified upstream at ADR-0032 D-4 and canon ruling 1; required
+		// downstream by PD-6-01. The no-Sell-key loop below is UNTOUCHED and
+		// still enforcing — it is the invariant; this list is the enumeration.
 		expect(Object.keys(item).sort()).toEqual([
 			"aggregate",
 			"authorPseudonym",
+			"authorStake",
 			"body",
 			"createdAt",
 			"current",
@@ -341,6 +351,7 @@ describe("UI-A6 Slice 3 — loadBookmarks masking + forced-visitor mode (F-BM-3)
 			"marketSlug",
 			"marketTitle",
 			"ordinal",
+			"priceAtBet",
 			"removed",
 			"side",
 			"staked",

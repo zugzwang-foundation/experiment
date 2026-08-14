@@ -16,10 +16,15 @@ import { SideBadge } from "@/components/debate/badges";
  * PRIMITIVES-2 commit 1 (D7) re-measured this inventory at ITS head and the
  * zero-delta subject is TWELVE, not the EIGHT this docblock previously claimed.
  *
- * COUNTED INVENTORY, re-measured at PRIMITIVES-2 PR-B HEAD (not at the branch
- * point). `SideBadge` has THIRTEEN render sites across TEN consumer files, plus
- * the definition. Exactly ONE — `discovery/HeroPanels.tsx:169` — passes a
- * `size`; the other TWELVE pass none and therefore ride `CHIP.base`.
+ * COUNTED INVENTORY, re-measured at POLISH.5 PR A (2026-08-14). `SideBadge` has
+ * THIRTEEN render sites across TEN consumer files, plus the definition. THREE
+ * pass a `size` — `discovery/HeroPanels.tsx` (`hero`) and `profile/ArgumentList
+ * .tsx` ×2 (`profile`, POLISH.5 item 2) — and the other TEN ride `CHIP.base`.
+ *
+ * ⚠ THAT WAS "ONE sized / TWELVE base" UNTIL 2026-08-14. The count moved
+ * because POLISH.5 item 2 adopted the `profile` preset, which this file's own
+ * seam assertion forced to be RULED rather than absorbed (POLISH.5 §5 row 19).
+ * The paragraphs below are the PRIOR corrections, kept as the record they are.
  *
  * ⚠ That line was `:142` when this paragraph was first written at the branch
  * point `143380b`, and commit 4's `REPLYHEAD_TIER` block shifted it. Corrected
@@ -62,10 +67,10 @@ const OWNED_TAIL =
 	"rounded-sm px-1.5 font-mono text-[10px] tracking-wide [border:var(--hairline)] bg-yes text-no";
 
 /**
- * The census that makes "twelve sites" a MEASUREMENT rather than a claim.
+ * The census that makes the base-site count a MEASUREMENT rather than a claim.
  *
  * The two render assertions below exercise the base preset through both poles,
- * which is the whole of what those twelve sites render — every one of them is
+ * which is the whole of what those base sites render — every one of them is
  * `<SideBadge side={…} />` and nothing else. What that pair cannot show is HOW
  * MANY sites it speaks for, and a prose count is exactly what went stale above.
  * So the count is read off the tree here.
@@ -105,17 +110,24 @@ const countByFile = (sites: ReadonlyArray<{ file: string }>) => {
 	return counts;
 };
 
-describe("SideBadge — the twelve CHIP.base call sites are a measured set", () => {
+describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 	it("census-is-alive", () => {
 		// A glob that silently matched nothing passes vacuously (N1). If this
 		// floor ever trips, the matcher broke — not the inventory.
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-twelve-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-ten-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
-		// Set equality, never a bare count (N5) — a count of 12 is also satisfied
-		// by twelve sites in the wrong files.
+		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
+		// by ten sites in the wrong files.
+		//
+		// ⚠ THE SUBJECT WAS TWELVE UNTIL 2026-08-14. `ArgumentList.tsx`'s two
+		// sites wire `profile` per PD-5-01 — POLISH.5 item 2, tier-4 baseline
+		// `surface_profile_v1_0.html:278-279`. Ratified 2026-08-14: the guard
+		// fired and the adoption was RULED, not absorbed (POLISH.5 §5 row 19).
+		// `detail` remains pinned at zero for POLISH.3 — see the split assertion
+		// in the seam-presets block below.
 		expect(countByFile(base)).toEqual({
 			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/debate/ArgProfile.tsx": 1,
@@ -125,23 +137,23 @@ describe("SideBadge — the twelve CHIP.base call sites are a measured set", () 
 			"src/components/debate/ReplyCard.tsx": 2,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
-			"src/components/profile/ArgumentList.tsx": 2,
 		});
-		expect(base).toHaveLength(12);
+		expect(base).toHaveLength(10);
 	});
 
-	it("the-only-sized-site-is-the-discovery-hero", () => {
+	it("the-sized-sites-are-the-discovery-hero-and-the-profile-list", () => {
 		// The positive control beside the assertion above (N3): the classifier
-		// does distinguish the two kinds, so "twelve unsized" is not just "the
+		// does distinguish the two kinds, so "ten unsized" is not just "the
 		// matcher never sees a size".
 		const sized = sideBadgeSites.filter((site) => site.sized);
 		expect(countByFile(sized)).toEqual({
 			"src/components/discovery/HeroPanels.tsx": 1,
+			"src/components/profile/ArgumentList.tsx": 2,
 		});
 	});
 });
 
-describe("SideBadge — the twelve CHIP.base call sites have a zero delta", () => {
+describe("SideBadge — the CHIP.base call sites have a zero delta", () => {
 	it("bare-yes-render-is-unchanged", () => {
 		const { container } = render(<SideBadge side="YES" />);
 		const badge = container.firstElementChild;
@@ -421,13 +433,32 @@ describe("SideBadge — the detail and profile seam presets", () => {
 		expect(new Set(emitted).size).toBe(4);
 	});
 
-	it("no-call-site-wires-detail-or-profile", () => {
+	it("detail-stays-unwired-and-profile-is-wired-only-where-ruled", () => {
 		// D5, asserted rather than trusted. The seam lands here; the adoption is
 		// POLISH.3's and POLISH.5's. If a later PR wires one, this reddens and the
 		// wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`.
-		const wired = sideBadgeSites.filter((site) =>
-			/size\s*=\s*["{]?\s*["']?(?:detail|profile)/.test(site.markup),
+		//
+		// ⚠ SPLIT ON 2026-08-14, DELIBERATELY, RATHER THAN RELAXED. POLISH.5
+		// item 2 wired `profile` at `ArgumentList.tsx:49`/`:59` (PD-5-01, tier-4
+		// baseline `surface_profile_v1_0.html:278-279`) and this assertion is
+		// what forced that adoption to be ruled instead of absorbed — POLISH.5
+		// §5 row 19, ratified 2026-08-14.
+		//
+		// ⛔ `detail` IS NOT UNPINNED. A blanket amendment would have spent
+		// POLISH.3's gate for free; POLISH.3 PR 2 must hit this same wall and
+		// get its OWN ruling. So `detail` keeps its zero and only `profile`
+		// moves to an enumerated set — the guard still has teeth in both
+		// directions: a THIRD surface wiring `profile` reddens the map below.
+		const wiredDetail = sideBadgeSites.filter((site) =>
+			/size\s*=\s*["{]?\s*["']?detail/.test(site.markup),
 		);
-		expect(wired).toEqual([]);
+		expect(wiredDetail).toEqual([]);
+
+		const wiredProfile = sideBadgeSites.filter((site) =>
+			/size\s*=\s*["{]?\s*["']?profile/.test(site.markup),
+		);
+		expect(countByFile(wiredProfile)).toEqual({
+			"src/components/profile/ArgumentList.tsx": 2,
+		});
 	});
 });

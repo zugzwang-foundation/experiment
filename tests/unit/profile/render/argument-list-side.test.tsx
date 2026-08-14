@@ -41,6 +41,11 @@ const AGGREGATE = {
 
 const BODY = "ZZ-DISTINCTIVE-BODY-MARKER-c4b";
 
+/** Item 6's teaser marker. DISTINCTIVE for the same reason `BODY` is: the
+ * shipped fixture string `"The teaser."` could appear by accident, and an
+ * absence assertion over a string that occurs incidentally proves nothing. */
+const TEASER = "ZZ-DISTINCTIVE-TEASER-MARKER-p5i6";
+
 const liveItem = (
 	side: "YES" | "NO",
 	marker: "none" | "Flipped" | "Exited" = "none",
@@ -53,11 +58,33 @@ const liveItem = (
 	marketTitle: "Will X happen?",
 	ordinal: 4,
 	title: "A profile argument",
-	teaser: "The teaser.",
+	teaser: TEASER,
 	body: BODY,
 	marker,
+	authorStake: "50.000000000000000000",
+	priceAtBet: "0.270000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 	aggregate: AGGREGATE,
+});
+
+/** The reply variant — item 4's negative arm (a reply carries no author stake;
+ * its own `stake` is the §3.6 ranking ruler, a different figure — §0.5). */
+const replyItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
+	removed: false,
+	kind: "reply",
+	id: "0190b3a0-9999-7000-8000-00000000000e",
+	side,
+	marketSlug: "will-x-happen",
+	marketTitle: "Will X happen?",
+	ordinal: 4,
+	title: "A profile reply",
+	teaser: TEASER,
+	body: BODY,
+	marker: "none",
+	stake: "6.000000000000000000",
+	priceAtBet: "0.270000000000000000",
+	repliedToTitle: "A parent argument",
+	createdAt: "2026-07-01T00:00:00.000Z",
 });
 
 const removedItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
@@ -72,11 +99,26 @@ const removedItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	aggregate: AGGREGATE,
 });
 
+/** The entry price the live fixture carries, as `SideBadge` renders it. */
+const ENTRY_PCT = "27%";
+
+/**
+ * ⚠ REPAIRED AT ITEM 3 (A6). This matched `el.textContent?.trim() === side` by
+ * EXACT equality, which returned `null` the moment the live chip started
+ * reading `YES @ 27%` — cascading `classTokens(null)` = `[]` into three cases.
+ * The live chip is now `SIDE` or `SIDE @ N%`; the REMOVED chip stays bare
+ * (it carries no price field at all), so both must match.
+ *
+ * ⛔ Still ANCHORED, not a substring search: a `startsWith(side)` would also
+ * match a hypothetical `YESTERDAY`, and the pole tokens this file exists to
+ * pin are exactly what a loose matcher would stop distinguishing.
+ */
 function sideChip(container: HTMLElement, side: "YES" | "NO"): Element | null {
 	return (
-		[...container.querySelectorAll('[data-slot="badge"]')].find(
-			(el) => el.textContent?.trim() === side,
-		) ?? null
+		[...container.querySelectorAll('[data-slot="badge"]')].find((el) => {
+			const t = el.textContent?.trim() ?? "";
+			return t === side || t === `${side} @ ${ENTRY_PCT}`;
+		}) ?? null
 	);
 }
 
@@ -108,12 +150,27 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 		expect(cls).not.toContain("bg-secondary");
 	});
 
-	it("the-chip-announces-the-side", () => {
+	it("the-chip-announces-the-side-and-its-entry-price", () => {
 		const { container } = render(
 			<ArgumentList items={[liveItem("YES")]} owner={false} />,
 		);
+		// Item 3 (A6): the accessible name gains the entry price. This is the
+		// PRIMITIVE'S SHIPPED STRING (badges.tsx:155-157), not one invented here.
 		expect(sideChip(container, "YES")?.getAttribute("aria-label")).toBe(
-			"YES side",
+			`YES side, entry price ${ENTRY_PCT}`,
+		);
+	});
+
+	it("the-live-chip-renders-the-entry-price-raw-not-inverted", () => {
+		// `price_at_bet` is ALREADY the bought side's price. Deriving `100 − x`
+		// would print `NO @ 73%` for an author who entered NO at 27% and would
+		// disagree with the shipped .md export. Asserted at the NO pole, which
+		// is where an inversion would be visible.
+		const { container } = render(
+			<ArgumentList items={[liveItem("NO")]} owner={false} />,
+		);
+		expect(sideChip(container, "NO")?.textContent?.trim()).toBe(
+			`NO @ ${ENTRY_PCT}`,
 		);
 	});
 });
@@ -123,14 +180,132 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		const { container } = render(
 			<ArgumentList items={[removedItem("YES")]} owner={false} />,
 		);
-		const cls = classTokens(sideChip(container, "YES"));
+		const chip = sideChip(container, "YES");
+		const cls = classTokens(chip);
 		expect(cls).toContain("bg-yes");
 		expect(cls).not.toContain("bg-primary");
+
+		// ⚠ THE RUN-STOP 7 TRIPWIRE, ASSERTED EXPLICITLY RATHER THAN RELIED ON.
+		// It used to be implicit in `sideChip`'s exact-equality match: a removed
+		// chip carrying a price returned null and every assertion below it fell
+		// over. Item 3 had to widen that matcher for the LIVE chip (`YES @ 27%`),
+		// which would have silently disarmed the detector here. The removed
+		// variant carries no price field at all, so its chip must read the BARE
+		// pole — and if it ever does not, THAT is the SC-1 leak, caught here.
+		expect(chip?.textContent?.trim()).toBe("YES");
 
 		expect(container.textContent).toContain(REMOVED_STUB_TEXT);
 		// SC-1: assert the BODY's absence, not the row's.
 		expect(container.innerHTML).not.toContain(BODY);
 		expect(container.textContent).not.toContain("A profile argument");
+	});
+
+	it("removed-chip-is-pole-bound-at-the-NO-pole-too", () => {
+		// POLISH.5 item 15 (P5-D23) — the removed variant was covered at ONE pole
+		// only, and a YES-only assertion passes on an inverted NO chip. That is
+		// the exact mechanism by which the last live inversion survived a full
+		// PR (C4/C4b). The factory already took `side`; only "YES" was ever
+		// passed. Adopts `.6`'s two-poled shape
+		// (bookmarks/render/side-encoding.test.tsx:196).
+		const { container } = render(
+			<ArgumentList items={[removedItem("NO")]} owner={false} />,
+		);
+		const chip = sideChip(container, "NO");
+		const cls = classTokens(chip);
+		expect(cls).toContain("bg-no");
+		expect(cls).toContain("text-yes");
+		expect(cls).not.toContain("bg-primary");
+		expect(cls).not.toContain("bg-secondary");
+
+		// The RUN-STOP 7 tripwire at this pole too — see the YES case above.
+		expect(chip?.textContent?.trim()).toBe("NO");
+
+		// The stub still renders and still leaks nothing at this pole either.
+		expect(container.textContent).toContain(REMOVED_STUB_TEXT);
+		expect(container.innerHTML).not.toContain(BODY);
+	});
+});
+
+describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", () => {
+	it("live-card-renders-the-teaser-clamped", () => {
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		const teaser = container.querySelector('[data-testid^="argument-teaser-"]');
+		expect(teaser?.textContent).toBe(TEASER);
+		// The clamp is a CLASS, not an attribute and not a JS truncation — the
+		// whole paragraph is in the DOM and only its HEIGHT is reduced (§2.8).
+		expect(teaser?.getAttribute("class")).toContain("line-clamp-2");
+	});
+
+	it("no-title-attribute-carries-the-teaser-or-the-body", () => {
+		// AM-1 / RUN-STOP 13. A native tooltip over the full paragraph is a
+		// SECOND read affordance beside the title <Link> — what D13 rules out,
+		// reached by a different mechanism. This fires on the ATTRIBUTE, not on
+		// whether some other guard is present: a guard that permits the leak is
+		// not a defence. Three in-repo precedents exist for `title={…}` on a
+		// clamped node (SlotHeader.tsx:102, ReplySplitBar.tsx:133,
+		// SellModule.tsx:260) and NONE of them is authority here.
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		expect(container.innerHTML).not.toMatch(/title="[^"]*ZZ-/);
+		// Non-vacuity: the markers this asserts the absence of are genuinely on
+		// the page, so the assertion is about `title=` and not about the strings
+		// being missing altogether.
+		expect(container.innerHTML).toContain(TEASER);
+	});
+
+	it("removed-variant-leaks-neither-teaser-nor-body", () => {
+		// SC-1 (CLAUDE.md §5.14). The removed union variant carries no `teaser`
+		// and no `body` BY CONSTRUCTION, so this is the runtime belt on a
+		// compile-time guarantee. ⛔ On innerHTML, never textContent (O-7) — a
+		// value parked in an attribute is invisible to textContent.
+		const { container } = render(
+			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+		);
+		expect(container.innerHTML).not.toContain(TEASER);
+		// `:132`'s assertion, re-asserted verbatim in item 6's own commit — the
+		// proof that adding a second body-derived text read moved nothing.
+		expect(container.innerHTML).not.toContain(BODY);
+		expect(
+			container.querySelector('[data-testid^="argument-teaser-"]'),
+		).toBeNull();
+	});
+});
+
+describe("ArgumentList — item 4, the author's stake on the post replica", () => {
+	it("post-carries-the-author-stake-formatted", () => {
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		const stake = container.querySelector('[data-testid^="argument-stake-"]');
+		// Rendered through `formatDharma` — grouped and rounded. A raw render
+		// would print `50.000000000000000000` and redden no-raw-dharma-render.
+		expect(stake?.textContent?.trim()).toBe("Đ 50");
+		expect(container.innerHTML).not.toContain("50.000000000000000000");
+	});
+
+	it("reply-carries-no-author-stake", () => {
+		// POST VARIANT ONLY. A reply's `stake` is the §3.6 ranking ruler, not the
+		// author's basis (§0.5's name collision) — conflating them would put a
+		// different figure on the card. The reply branch renders no stake node.
+		const { container } = render(
+			<ArgumentList items={[replyItem("NO")]} owner={false} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-stake-"]'),
+		).toBeNull();
+	});
+
+	it("removed-variant-carries-no-author-stake", () => {
+		// SC-1 belt: the removed variant has no `authorStake` field at all.
+		const { container } = render(
+			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-stake-"]'),
+		).toBeNull();
 	});
 });
 

@@ -71,6 +71,14 @@ export type ProfileArgumentItem =
 			body: string;
 			/** `computeMarker` on the PROFILE USER's held side in this market. */
 			marker: Marker;
+			/** The author's OWN opening stake on this post (canon §3 item 11's
+			 * head). Distinct from a reply's `stake` below — see §0.5's name
+			 * collision — and distinct from `.6`'s `staked` (the episode basis). */
+			authorStake: string;
+			/** `price_at_bet` — the effective price of THE SIDE THE AUTHOR BOUGHT,
+			 * already side-scoped by the engine. ⚠ NOT the YES probability:
+			 * deriving `100 − x` would misprint a NO entry. Forwarded RAW. */
+			priceAtBet: string;
 			createdAt: string;
 			aggregate: ProfileArgumentAggregate;
 	  }
@@ -89,6 +97,8 @@ export type ProfileArgumentItem =
 			marker: Marker;
 			/** The reply-bet's own stake — the §3.6 reply ruler. */
 			stake: string;
+			/** `price_at_bet` — the bought side's price, as on the post variant. */
+			priceAtBet: string;
 			/** The parent post's title; null when the parent is removed (no leak). */
 			repliedToTitle: string | null;
 			createdAt: string;
@@ -402,6 +412,14 @@ export function buildPostItem(args: {
 			sideAtPostTime: post.parentSide,
 			heldSide: heldByMarket.get(meta?.marketId ?? "") ?? null,
 		}),
+		// Read-and-forward: both are already fetched by the unchanged post query
+		// and already carried on `PostSubstrate`. This re-derives neither.
+		// ⚠ They are 18-dp by COLUMN TYPE (`bets.stake` / `bets.price_at_bet` are
+		// numeric(38,18)), not by a `toFixed18` call — unlike the aggregate sums
+		// beside them in the substrate assembly, which are canonicalised there
+		// because COALESCE(...,0) yields a bare "0".
+		authorStake: post.authorStake,
+		priceAtBet: post.priceAtBet,
 		createdAt,
 		aggregate,
 	};
@@ -474,6 +492,9 @@ export function buildReplyItem(args: {
 			heldSide: heldByMarket.get(meta?.marketId ?? "") ?? null,
 		}),
 		stake: reply.stake,
+		// Read-and-forward, as on the post variant — already carried on
+		// `ReplySubstrate` from the unchanged reply query, 18-dp by column type.
+		priceAtBet: reply.priceAtBet,
 		repliedToTitle,
 		createdAt,
 	};

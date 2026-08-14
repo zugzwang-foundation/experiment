@@ -1879,3 +1879,61 @@ pnpm exec biome check docs/plans/POLISH-5.md
 **Conditional trigger.** The next tooling or CI pass — **or** the first time a broken table, a truncated file tail, or a stray tool-delimiter token reaches `main` inside a doc-only PR. ⚠ Both failure modes have live near-misses already: a bulk-rewrite script once truncated 74 files, and Write-tool tails have leaked delimiter tokens.
 
 **Expected next task.** A tooling chore PR, alongside the other not-installed gates AGENTS.md §11 already tracks (`commitlint`, the `block-main-commits` / `block-destructive` hooks, `permissions.deny`). **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `biome.json` (`ignoreUnknown: true`) · `justfile:38` · `.github/workflows/ci.yml` · `AGENTS.md` §11 · `COMMIT-0-HALT-1.md` §3.3.
+
+---
+
+## DTO-WIDENING-PREFLIGHT — the shape-assertion finder is a rule in a template, and rules in templates get read once
+
+**Owner: the next POLISH surface plan (POLISH.6 is first). Minted 2026-08-14, POLISH.5 PR A close-out.**
+
+`POLISH-SURFACE-TEMPLATE.md` §13.6 now carries the standing rule — *"when a plan widens a shared DTO, its allow-list must include every file that CONSTRUCTS, OR EXHAUSTIVELY ASSERTS THE SHAPE OF, that DTO"* — and the mechanical finder beside it:
+
+```
+grep -rn 'Object.keys(' tests/ | grep -E 'toEqual|toHaveLength'
+```
+
+**Why this is parked rather than done.** The rule is written; **the finder is not yet a numbered leg of §13.1's pre-flight**, and §13.1 is the list an executor actually runs. A rule that lives one section away from the checklist is a rule that gets read at plan time and forgotten at execute time — which is precisely how POLISH.5 PR A halted twice on it. ⛔ **Wiring it in is a template edit with its own review**, not something PR A's doc-only close-out may take.
+
+**Evidence it works:** 18 shape assertions tree-wide at `c8ba802`; the command located `tests/server/bookmarks/masking.test.ts` in one invocation after three rounds of prose analysis had missed it.
+
+**Conditional trigger.** The next plan that widens any shared type — or the next POLISH-TEMPLATE pass, whichever lands first.
+
+---
+
+## REMOVED-VARIANT-BELT-UNWIDENED — the server-side SC-1 belt has three non-firing controls and no live path
+
+**Owner: POLISH.6, or the first task that may write `tests/server/**`. Minted 2026-08-14, POLISH.5 PR A close-out. Latent — NO live path today.**
+
+POLISH.5 PR A's passthrough added `authorStake` + `priceAtBet` to `ProfileArgumentItem`'s live variants. **Three independent controls that should catch either field reaching a REMOVED variant are all currently non-firing**, and the plan named only the third:
+
+**1.** `tests/server/profile/masking.test.ts:233-248` — the removed-variant runtime belt is a **non-exhaustive** `"key" in obj` whitelist naming `title`/`teaser`/`body`/`marker`(/`stake`/`repliedToTitle`). It was **never widened** for the two new fields. ⇒ No test fails if a builder's removed branch emits `priceAtBet`.
+
+**2.** `src/server/bookmarks/list.ts:504` builds the removed `BookmarkItem` by **SPREAD** — `{ ...argItem, authorPseudonym }`. Spreads bypass TypeScript's excess-property check entirely, and a leaked field would not be in `argItem`'s declared type in the first place, so **the compiler cannot see that boundary at all**. `tests/server/bookmarks/masking.test.ts`'s removed-stub belt omits both fields too.
+
+**3.** `src/server/profile/arguments.ts:30-36`'s *"a leak is a COMPILE error"* is **form-dependent and over-claims**. Probed with `tsc --strict`: a fresh object literal in the return position **errors** (correctly, and even for properties that exist on sibling union constituents — TS narrows on the discriminant first); an intermediate `const` and a spread **pass silently**. Both builders use direct literals today, so the guarantee is real **as shipped** — and a routine refactor to either other form voids it with nothing downstream to notice.
+
+⚠ **No live path exists today** — `ArgumentList.tsx:49` passes no price, and adding one is a compile error. This is defence-in-depth, ranked and recorded rather than fixed. ⛔ **Not PR A's to close:** `tests/server/**` is §6 deny-listed and §5-struck, and closing it would have needed a fourth RUN-STOP ruling mid-run.
+
+**Fix when owned:** add `authorStake`/`priceAtBet` to both removed-variant belts, and state the compile guarantee's precondition in the docblock (*"…while the removed branches return fresh object literals"*) so a future refactorer knows what they are dismantling. **This is `O-1` territory — structural beats procedural, and the structure here is narrower than its label.**
+
+**Source:** `@security-auditor` L-2/L-3 and `@code-reviewer` MEDIUM 1/2 on PR #331, both independently reached.
+
+---
+
+## OD-8-RANKING-DOCBLOCK-STILL-FALSE — routed to commit 0, not closed there, and it now has a SECOND live consumer
+
+**Owner: unassigned — needs one named before POLISH close-out. Minted 2026-08-14, POLISH.5 PR A close-out. ⚠ RAISED, not re-filed: the risk went up.**
+
+`src/lib/ranking.ts:45` and `:62` — `PostSubstrate.priceAtBet` and `ReplySubstrate.priceAtBet` — both still read *"the market YES-probability at the instant the post's bet executed."* **That is false at source.** `bets/place.ts:162` stores `computeBuy(...).pEff`, computed at `cpmm/calculate.ts:73-97` as `stake ÷ shares` where `a = reserves[side]` is the **BOUGHT** side. A NO bet stores the NO price.
+
+**This is `OD-8`. POLISH.5's plan routed it to commit 0 (§2.9, §5's struck table) and commit 0 did not close it** — `git log -- src/lib/ranking.ts` shows the file last moved at #180 (EXPORT.1); `c8ba802` never touched it. A `V-3` false receipt survived the commit that was supposed to end it.
+
+⚠ **WHY THIS IS NOW WORSE THAN WHEN IT WAS FILED, AND THE REASON IT IS RAISED RATHER THAN CARRIED FLAT:**
+
+- **It has a second live consumer.** POLISH.5 item 3 renders this field on the profile argument card. It was already rendered on Discovery (`HeroPanels.tsx:169`) and in the debate view (`ArgProfile.tsx:67`).
+- **A file on `main` now states the opposite of its own source type.** `src/server/profile/arguments.ts:78-81` documents `priceAtBet` correctly — *"the effective price of THE SIDE THE AUTHOR BOUGHT … NOT the YES probability"* — while `ranking.ts`, the type it reads **from**, says the reverse. Two docblocks on one value, contradicting each other, both on `main`.
+- **The concrete failure it invites:** an editor trusting `ranking.ts` "corrects" a render to `100 − x` and ships `NO @ 73%` for an author who entered NO at 27%, disagreeing with the `.md` export, which renders the same field unmodified.
+
+**The only guard against that today** is `tests/unit/profile/render/argument-list-side.test.tsx`'s NO-pole raw-price assertion, minted at PR A. It is one assertion on one surface, against a docblock that is wrong on every surface.
+
+**Fix:** correct both docblocks to name the bought side. One-line each; `src/lib/**` is §6 deny-listed to POLISH.5, so it needs a task that may write it. **PR C's directed `@security-auditor` question is about precisely this docblock's accuracy** — that is the natural owner if none is assigned sooner.
