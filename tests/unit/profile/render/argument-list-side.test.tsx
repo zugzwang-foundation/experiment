@@ -79,11 +79,26 @@ const removedItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	aggregate: AGGREGATE,
 });
 
+/** The entry price the live fixture carries, as `SideBadge` renders it. */
+const ENTRY_PCT = "27%";
+
+/**
+ * ⚠ REPAIRED AT ITEM 3 (A6). This matched `el.textContent?.trim() === side` by
+ * EXACT equality, which returned `null` the moment the live chip started
+ * reading `YES @ 27%` — cascading `classTokens(null)` = `[]` into three cases.
+ * The live chip is now `SIDE` or `SIDE @ N%`; the REMOVED chip stays bare
+ * (it carries no price field at all), so both must match.
+ *
+ * ⛔ Still ANCHORED, not a substring search: a `startsWith(side)` would also
+ * match a hypothetical `YESTERDAY`, and the pole tokens this file exists to
+ * pin are exactly what a loose matcher would stop distinguishing.
+ */
 function sideChip(container: HTMLElement, side: "YES" | "NO"): Element | null {
 	return (
-		[...container.querySelectorAll('[data-slot="badge"]')].find(
-			(el) => el.textContent?.trim() === side,
-		) ?? null
+		[...container.querySelectorAll('[data-slot="badge"]')].find((el) => {
+			const t = el.textContent?.trim() ?? "";
+			return t === side || t === `${side} @ ${ENTRY_PCT}`;
+		}) ?? null
 	);
 }
 
@@ -115,12 +130,27 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 		expect(cls).not.toContain("bg-secondary");
 	});
 
-	it("the-chip-announces-the-side", () => {
+	it("the-chip-announces-the-side-and-its-entry-price", () => {
 		const { container } = render(
 			<ArgumentList items={[liveItem("YES")]} owner={false} />,
 		);
+		// Item 3 (A6): the accessible name gains the entry price. This is the
+		// PRIMITIVE'S SHIPPED STRING (badges.tsx:155-157), not one invented here.
 		expect(sideChip(container, "YES")?.getAttribute("aria-label")).toBe(
-			"YES side",
+			`YES side, entry price ${ENTRY_PCT}`,
+		);
+	});
+
+	it("the-live-chip-renders-the-entry-price-raw-not-inverted", () => {
+		// `price_at_bet` is ALREADY the bought side's price. Deriving `100 − x`
+		// would print `NO @ 73%` for an author who entered NO at 27% and would
+		// disagree with the shipped .md export. Asserted at the NO pole, which
+		// is where an inversion would be visible.
+		const { container } = render(
+			<ArgumentList items={[liveItem("NO")]} owner={false} />,
+		);
+		expect(sideChip(container, "NO")?.textContent?.trim()).toBe(
+			`NO @ ${ENTRY_PCT}`,
 		);
 	});
 });
@@ -130,9 +160,19 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		const { container } = render(
 			<ArgumentList items={[removedItem("YES")]} owner={false} />,
 		);
-		const cls = classTokens(sideChip(container, "YES"));
+		const chip = sideChip(container, "YES");
+		const cls = classTokens(chip);
 		expect(cls).toContain("bg-yes");
 		expect(cls).not.toContain("bg-primary");
+
+		// ⚠ THE RUN-STOP 7 TRIPWIRE, ASSERTED EXPLICITLY RATHER THAN RELIED ON.
+		// It used to be implicit in `sideChip`'s exact-equality match: a removed
+		// chip carrying a price returned null and every assertion below it fell
+		// over. Item 3 had to widen that matcher for the LIVE chip (`YES @ 27%`),
+		// which would have silently disarmed the detector here. The removed
+		// variant carries no price field at all, so its chip must read the BARE
+		// pole — and if it ever does not, THAT is the SC-1 leak, caught here.
+		expect(chip?.textContent?.trim()).toBe("YES");
 
 		expect(container.textContent).toContain(REMOVED_STUB_TEXT);
 		// SC-1: assert the BODY's absence, not the row's.
@@ -150,11 +190,15 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		const { container } = render(
 			<ArgumentList items={[removedItem("NO")]} owner={false} />,
 		);
-		const cls = classTokens(sideChip(container, "NO"));
+		const chip = sideChip(container, "NO");
+		const cls = classTokens(chip);
 		expect(cls).toContain("bg-no");
 		expect(cls).toContain("text-yes");
 		expect(cls).not.toContain("bg-primary");
 		expect(cls).not.toContain("bg-secondary");
+
+		// The RUN-STOP 7 tripwire at this pole too — see the YES case above.
+		expect(chip?.textContent?.trim()).toBe("NO");
 
 		// The stub still renders and still leaks nothing at this pole either.
 		expect(container.textContent).toContain(REMOVED_STUB_TEXT);

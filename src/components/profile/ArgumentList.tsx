@@ -56,7 +56,20 @@ export function ArgumentList({
 						className="gap-2 p-3"
 					>
 						<div className="flex flex-wrap items-center gap-2">
-							<SideBadge side={item.side} size="profile" />
+							{/* Item 3 (P5-D04) — canon §3 item 11's `SIDE @ entry%`. A PROP
+							    PASS: `SideBadge` already takes `price` and already renders
+							    it, so NO formatting happens here. Formatting it in this
+							    component would need a fourth allow-marker and redden
+							    `pct-round-render` (its count is exact, deliberately), and
+							    routing through the PAIRED formatter would print `NO @ 45%`
+							    for an author who entered NO at 55%. ⛔ NEVER on the
+							    removed variant at `:49` — it carries no price field, so
+							    that is a compile error, which is the guarantee working. */}
+							<SideBadge
+								side={item.side}
+								size="profile"
+								price={item.priceAtBet}
+							/>
 							{/* `PositionMarker` returns null for "none" itself, and
 							    supplies the `aria-label="Author Flipped"` the hand-roll
 							    lacked (PD-0-10's root cause: primitive duplication). */}
