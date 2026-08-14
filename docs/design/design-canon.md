@@ -268,6 +268,24 @@ CTA present on Error (`Reload`) and absent on Empty.
 
 ---
 
+### C-BOOKMARKS-1 · The `/bookmarks` fork is an accepted divergence — §3 item 9 is satisfied by mode-of-the-CARD, not mode-of-the-SURFACE
+
+**Ruled 2026-08-14 IST at POLISH.5/.6 commit 0.** `BOOKMARKS` is a new topic under the `C-<TOPIC>-<n>` form ruled at §10's head on 2026-08-12, and this is its first member. Measured at this commit, §10 carried `CHART` and `STATES` and no surface/bookmarks topic.
+
+Three tiers say *reuse the profile surface in forced-visitor mode*, and `design-canon.md` §3 item 9 puts *"not a fork"* inside the invariant spine. The build renders `PageContainer` → `<h1>` + `<Badge>` + a card list.
+
+**The divergence is ACCEPTED. §3 item 9 is satisfied by mode-of-the-CARD, not mode-of-the-SURFACE.**
+
+**Grounds — three, independent:**
+
+1. **The DTO difference is structural, not incidental.** `BookmarkItem` is **author-keyed** (ADR-0032 D-5: each item shows the bookmarked author's Đa/Đb and marker, never the viewer's). `ProfileArgumentItem` is **viewer-keyed**. These are different read models, not two renderings of one.
+2. **Mode-of-the-surface would be wrong on its face.** It would put an identity card, six wallet tiles and a Dharma graph on a route that spans **many** authors — attributing one person's figures to a list of other people's arguments.
+3. **The tier-4 artifact anticipates the divergence in its own comment:** *"Mockup reuses the demo rows; production loads the user's bookmarked posts/replies here."* The shell's `FRAMES.bookmark = 'profile'` is **source reuse in a mockup**, not a specification that bookmarks carries profile's chrome.
+
+⚠ **SCOPE — this row ratifies the CURRENT build and nothing beyond it.** A founder ruling of **2026-08-13** directs `/bookmarks` toward the Profile page's structure **before go-live**, under its own surface spec. **This row records why the fork is not a defect today. It does not fix, freeze, or forbid the surface's future shape.**
+
+---
+
 ## §11 — Residual open items (properly homed — nothing floating)
 
 | Item | Home | Note |
