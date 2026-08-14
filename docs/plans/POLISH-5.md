@@ -1,4 +1,18 @@
-# POLISH.5 · Profile (`/u/[pseudonym]`) — MACHINE-PHASE PLAN **v2.3**
+# POLISH.5 · Profile (`/u/[pseudonym]`) — MACHINE-PHASE PLAN **v2.4**
+
+> **AMENDS `POLISH-5-plan-v2.3` (md5 `e262b4910d6a7de45a5e3012aaf1b145`, the artifact commit 0's `X0` landed verbatim), as amended on `main` by PR A's close-out.** v2.3 is the ACCEPTED BASE.
+>
+> ## ⛔ v2.4 EXISTS BECAUSE THE PLAN'S OWN AUTHORITY DOES NOT
+>
+> §1.5 cites a **converged kickoff §2** that **DOES NOT EXIST** — proven at DOC-1 across six filesystem roots, six title fragments, two content greps, 485 paste-cache files and 241 session transcripts. **All 41 hits are one citation line or a copy of it.** ⇒ **§1.5A is minted and IS the authority.**
+>
+> **⚠ AND TWENTY-TWO SITES STATED A POSITION A LATER AMENDMENT HAD REVERSED.** Fifteen were found by the PR-B pre-flight sweep; seven since. **All are applied AT THE SITES (`O-5`), never as an appendix.**
+>
+> **⚠ THE GROUND HAS MOVED. `16971cd` → `5ff418b`, two commits — commit 0 (#330) and PR A (#331).** Every path in the WRITE set is attributable to one of the two; **zero unattributable.** ⇒ **`P-2` did not fire on evidence, and its WORDING is amended so it cannot fire spuriously at PR B's branch point** (§10, §11 condition 5).
+>
+> **⚠ TWENTY-FOUR COORDINATES MOVED**, all inside `ArgumentList.tsx` and `surface.test.tsx`. Every one is re-keyed at §1.18's table and re-anchored **by symbol**.
+>
+> ⛔ **THE ITEM SET IS UNCHANGED. Seventeen items, three PRs, eighteen commits. v2.4 adds no item and moves no PR column.**
 
 > **AMENDS `POLISH-5-plan-v2.2.md`** (md5 `c431f035255b0cc45caa253175a391c5`, **verified off disk before reading** — the value matches the converged kickoff §0's ratified record exactly, so the base is the ratified artifact and not a lookalike (`V-1`)). **v2.2 is the ACCEPTED BASE.** This is an amendment pass, not a re-author: everything v2.2 got right is carried verbatim and is **not** re-derived.
 >
@@ -8,7 +22,7 @@
 >
 > - **`HM-1` · RUN-STOP 4 forbids the edit `JR-2` mandates.** §11 condition 4's `v2.2` rider names *"harmonising `PROFILE_COPY.error.action` with `m/[slug]/error.tsx`'s `"Try again"` in EITHER direction"* as a RUN-STOP. `JR-2` rules exactly that value. **A carve-out is RATIFIED and written into §11 condition 4 itself** (§11), on the ground the kickoff did not state: `"Try again"` is a **byte-copy from `m/[slug]/error.tsx:77`**, shipped and ratified — **carried, not authored** (CLAUDE.md §3).
 > - **`HM-2` · `PROFILE_COPY.error.action` DOES NOT EXIST at `16971cd`.** `copy.ts:23-25` has **one** member, `load`. Zero occurrences of `error.action` in `src/` or `tests/`. **The kickoff's `JR-2` describes it as *"amended from `Retry`"*; there is nothing to amend.** Item 9 **creates** it. §2.9, §5 row 6, §7, §11.
-> - **`HM-3` · §1.7's ID allocation is OFF BY ONE.** The live `PD-5` high-water is **`PD-5-02`**, not `PD-5-01`. The six ADDITIONS rows take **`PD-5-03 … PD-5-08`**; any new row starts at **`PD-5-09`**. §1.7.
+> - **`HM-3` · §1.7's ID allocation is OFF BY ONE.** The live `PD-5` high-water is **`PD-5-02`**, not `PD-5-01`. The six ADDITIONS rows take **`PD-5-03 … PD-5-08`**; any new row starts at **`PD-5-10`**. ⛔ **Read it again at execute (`O-2`); never count, never trust this number.** §1.7.
 > - **`HM-4` · `O-5` and `O-6` are CITED BY THIS PLAN AND DEFINED NOWHERE — and `O-6` carries TWO unrelated rules.** Ratified O-space stops at `O-4` (`CLAUDE.md:243-246`). **Commit 0 mints both at numbers read off `main`, and `O-6`'s two meanings SPLIT into two IDs.** §1.7, §3.1.
 > - **`HM-5` · §7's copy-fence ground is FALSE.** All seven `PROFILE_COPY` assertions in `surface.test.tsx` are **REFERENCE pins** against the imported constant, not literal pins. **Re-wording any of those strings leaves the suite GREEN.** The fence is RUN-STOP 4 and CLAUDE.md §3 — never the suite. §7.
 >
@@ -60,10 +74,10 @@
 | # | Leg | Value |
 |---|---|---|
 | 1 | Version string | `POLISH.5 · MACHINE-PHASE PLAN v2.3` |
-| 2 | Ground SHA | **`16971cdff8b58f82d1144290926b52cbeadc7af5`**, *chore(polish): log session — POLISH.3 PR 1 FRAME (#329)*. ⚠ **v2.3: RE-VERIFIED at the head measurement — `origin/main` IS this SHA and the two-point distance is ZERO.** Per-path across all v2.2 allow-list rows: **zero moved WRITE-set paths** (`POLISH-56-HEADMEASURE.md` §0) |
+| 2 | Ground SHA | ⚠ **`5ff418b66c76079236ec9ed24b17c147b3e7587b`** — *POLISH.5 PR A — COMPLETE (8/8) (#331)*. **RE-GROUNDED AT v2.4.** v2.3's ground `16971cd` is **TWO COMMITS BEHIND**: `c8ba802` (#330, commit 0) and `5ff418b` (#331, PR A). ⚠ **The v2.3 document never said so — the plan asserted a ground it no longer had. That is what this leg now fixes.** Per-path attribution of all ten moved paths: **ten of ten resolve to #330 or #331; zero unattributable** |
 | 3 | Base-file md5, verified off disk before reading | **`c431f035255b0cc45caa253175a391c5`** (`POLISH-5-plan-v2.2.md`) — ⚠ **matches the converged kickoff §0's ratified record exactly.** The base is the ratified artifact, not a lookalike (`V-1`) |
 | 4 | Binding-file md5, carried from v2.0 | `f495fbc2a37aec57ac35f67fa23a7f8e` |
-| 5 | Section sequence, in order | `§A · §0 · §1 · §2 · §3 · §4 · §5 · §6 · §7 · §8 · §9 · §10 · §11 · §12 · §13 · §14 · §15 · §16 · §17 · §18 · §19` — **unchanged**. ⚠ **v2.3: §1 gains §1.8; no section is renumbered** |
+| 5 | Section sequence, in order | `§A · §0 · §1 · §2 · §3 · §4 · §5 · §6 · §7 · §8 · §9 · §10 · §11 · §12 · §13 · §14 · §15 · §16 · §17 · §18 · §19` — **unchanged**. ⚠ **v2.3: §1 gains §1.8; no section is renumbered** ⚠ **v2.4: §1 gains §1.5A. No section is renumbered.** |
 | 6 | Item IDs, contiguous, each keyed to exactly one `P5-D` | ⚠ **`1 … 17`**, §3. **v2.3 is the FIRST pass to move the count.** Item 17 is `PB-1`, keyed to `P5-D01` — the delta `D10` routed out and the founder reversed on 2026-08-13 |
 | 7 | Every `P5-D` in the recon's range accounted for | `P5-D01 … P5-D26`, §3 + §3.1. ⚠ **`P5-D01` moves from §3.1's routed table to §3's item table** |
 | 8 | Open-decision IDs | ⚠ **`OD-2` RESOLVED** (`.5`-first) · `NEW-1` · `OD-7` · `OD-8` · `OD-9` all RESOLVED · **PR C's auditor RULED** (`C-2`). ⚠ **v2.3 opens NONE and closes `HM-1` by founder ratification.** ⇒ **ZERO open decisions carried out of this pass**, §16 |
@@ -71,8 +85,9 @@
 | 10 | No line count asserted about this document | ✅ |
 | 11 | `D7`'s branch | **RESOLVED: `.5`-FIRST.** Chosen from the founder's `OD-2` ruling, **not** at execute kickoff. §1.4 · §15 |
 | 12 | ⚠ **NEW — the eleven v2.3 sites** | Six from the converged kickoff §5.1; **five (`HM-1`…`HM-5`) from `POLISH-56-HEADMEASURE.md`**, of which **`HM-1` and `HM-3` are defects in v2.2 that would have fired at execute** and **`HM-5` is a false ground in v2.2's own §7**. All applied **AT THE SITES** |
-| 13 | ⚠ **NEW — the shared-primitive contract** | **CITED, NEVER RE-DERIVED.** `error-block`, `empty-block` and `thumb-glyph` take their shape from the **converged kickoff §2**, which is the single authority both `.5` and `.6` absorb. Re-derivation here is the `R12` / `F-7` failure. §1.5 |
+| 13 | the shared-primitive contract | ⚠⚠ **v2.4 — THE CITED AUTHORITY DOES NOT EXIST AND §1.5A REPLACES IT.** The converged kickoff §2 is absent from every filesystem root, every session transcript and the repo. **§1.5A is authored here from sources that exist, carries every string as a byte-copy or a sentence split, and is cited by BOTH plans by path and section.** ⛔ Re-derivation remains the `R12` / `F-7` failure |
 | 14 | ⚠ **NEW — commit 0's queue from this plan** | **FIVE** routed rows: `OD-8` · `C-4` · **`O-5`/`O-6`'s mint and split (`HM-4`)** · `D10`'s reversal for item 17 · the carried three. **All by symbol, all unnumbered.** §1.7 |
+| ⚠ **15** *(new, v2.4)* | **The twenty-two supersession sites and the twenty-four re-keyed coordinates** | **Applied AT THE SITES**, never appended (`O-5`). §1.18 carries the coordinate table; each supersession is applied in its own section. ⚠ **`O-5` failed twice on this task before this pass — POLISH.3's §18, and this document's own §6** (`E7`) |
 
 ---
 
@@ -172,10 +187,10 @@ concurrently.
 **⇒ ⚠ `NEW-3` — THE RULED CHAIN. FOUNDER-SET:**
 
 ```
-  .5 PR A ─▶ .5 PR B ─▶ .3 PR 2 ─▶ .6 ─▶ .5 PR C ─▶ .4
-  └────────┬────────┘             ▲                  ▲
-     THIS PLAN's first two        │                  └── OD-2: .4 runs LAST
-                                  └── .6 is HARD-BLOCKED on PR B, not merely sequenced
+  .5 PR A ─▶ .5 PR B ─▶ .6 ─▶ .5 PR C ─▶ .3 PR 2 ─▶ .4
+  └────────┬────────┘    ▲                            ▲
+     THIS PLAN's first   │                            └── OD-2: .4 runs LAST
+     two, PR A MERGED    └── .6 is HARD-BLOCKED on PR B, by three measured mechanisms
 ```
 
 **⇒ ⚠ THE GROUND FOR `.6` SITTING AFTER PR B IS A HARD DEPENDENCY, NOT A PREFERENCE — AND IT IS MEASURED, NOT ASSERTED.** Three mechanisms, each of which independently blocks `.6`:
@@ -184,7 +199,7 @@ concurrently.
 **2.** **`.6` inherits `priceAtBet` and `authorStake` through `BookmarkItem`**, which reaches them only because `src/server/bookmarks/list.ts:26` imports `buildPostItem`/`buildReplyItem` from `arguments.ts` (§8.2, §17 item 7). ⇒ **The fields do not exist until PR A merges.**
 **3.** **`.6` inherits `OD-7`'s BESIDE ruling and `error-block`'s testid-as-prop API** (§1.5, §17 item 4). ⇒ **Neither exists before PR B.**
 
-**⇒ `.3 PR 2` SITS BEFORE `.6`** because `POLISH-3.md:58` — **re-verified verbatim at the new head** (§2.17) — rules that PR 2 writes `BookmarkToggle.tsx` as a named allow-list exception and that *"`.5`/`.6` record the adoption."* A `.6` that runs first would be recording an adoption that has not happened.
+**⇒ ⚠ v2.4 · `.3 PR 2` NO LONGER SITS BEFORE `.6`. FOUNDER-RULED (`D-4`, 2026-08-14).** v2.3 placed it there on `POLISH-3.md:58` — that PR 2 writes `BookmarkToggle.tsx` and *"`.5`/`.6` record the adoption."* ⚠ **That is a RECORDING obligation, not a build dependency**, and this plan's own §0.3 says so: the three mechanisms it calls *"a HARD dependency, NOT a preference … measured, not asserted"* are **all `.5`'s**, and `.3 PR 2` is **not one of them**. ⇒ **The adoption record is filed at PR 2's OWN close-out.** ⛔ **Leaving it as a gate also deadlocked against `H-A3`, which gates PR 2's branch on `.5` and `.6` having executed.**
 
 **⇒ `.5 PR C` SITS LAST OF THE THREE** because it is **independent of `.6` in both directions** — §2.15 measures PR C's four properties, and none of them touches `src/components/bookmarks/**` or any leaf `.6` needs. **Parking it after `.6` costs nothing and moves `.6` one PR earlier.**
 
@@ -192,7 +207,7 @@ concurrently.
 
 **⇒ THE COST, RECORDED HONESTLY RATHER THAN DISCOVERED:**
 
-- ⚠ **PR C is now separated from PR B by two whole surfaces.** Its branch point is a `main` carrying `.3 PR 2` and all of `.6`. **`R3`'s two-point diff is therefore MANDATORY before PR C branches, not optional** — §10 P-2 and §11 run-stop 5 both fire on that gap, and `graph.test.tsx` is the file most exposed (PR B writes it, then two surfaces land, then PR C writes it again).
+- ⚠ **PR C is separated from PR B by ONE surface** — `.6`. *(v2.3 read "two"; `D-4` removed `.3 PR 2` from the interval.)* Its branch point is a `main` carrying all of `.6`. **`R3`'s two-point diff is MANDATORY before PR C branches, not optional** — §10 `P-2` and §11 condition 5 both fire on that gap, and `graph.test.tsx` is the file most exposed (PR B writes it, then `.6` lands, then PR C writes it again).
 - **Three Gate C cycles for `.5`, interleaved with two other surfaces' cycles.**
 - ⚠ **Zero additional commits.** Seventeen, unchanged.
 - ⚠ **`PR A` is UNCHANGED** — same six items, same seven commits, same single-file Gate C read.
@@ -259,11 +274,11 @@ pgrep -f 'node.*vitest'   →   no match, exit 1      ── CLEAR ✅
 
 ### 1.1 · `D3(a)` — EMPTY STATES ADOPT P1 AT A SINGLE MESSAGE TIER
 
-**No `.sub`. No new copy.** Grounds, as ruled: the four `PROFILE_COPY.empty` strings are pinned by `.toBe()` exact-equality on full element text; a second tier reddens all four; and a `.sub` string cannot be authored by CC (CLAUDE.md §3).
+**No `.sub` IS PASSED on this surface.** ⚠ **v2.4 — THE TIER IS OPTIONAL ON THE PRIMITIVE, NOT ABSENT FROM IT** (§1.5A.1). §2.1's tier rule: *a tier is REQUIRED when every consumer carries content for it, OPTIONAL when only some do, ABSENT when none does.* **`.6` carries a sub string; `.5`'s three sites do not.** ⇒ **declared, and unpassed here.** The ground this sentence protects is unchanged and correct: the four `PROFILE_COPY.empty` strings are pinned by `.toBe()` exact-equality on full element text, so **adding a second text node inside the marked subtree breaks all four** — and "declared, unpassed" delivers exactly that protection. ⚠ **This is independent of `HM-5` and survives it:** `HM-5` corrected the *re-wording* claim; this is the *added-node* claim, which breaks a reference pin just as surely.
 
 **⇒ Stated in the form `POLISH.6`'s `P6-D06` can CITE:**
 
-> **P1 adopts at ONE message tier on every non-Discovery surface.** The `.sub` tier is **not deferred, not partial, and not owed** — it is ruled absent, because the tier's content is product copy and CC never authors product copy (CLAUDE.md §3). A surface adopting P1 renders P1's panel — hairline border, `--r`, `bg-n0`, `min-h-[148px]`, centred column, `gap-[10px]`, `p-6` — around its **existing** single string, unchanged. `discovery/EmptyState.tsx`'s two-tier fill is **Discovery's**, is copy-bound, and is **not a shape other surfaces are behind on**.
+> **P1 adopts at ONE message tier on every non-Discovery surface.** ⚠ **v2.4: the `.sub` tier is OPTIONAL on the primitive and UNPASSED here** — not deferred, not partial, and not owed on this surface, because the tier's content is product copy and CC never authors product copy (CLAUDE.md §3). **`.5` carries no sub string, so it passes none.** A surface adopting P1 renders P1's panel — hairline border, `--r`, `bg-n0`, `min-h-[148px]`, centred column, `gap-[10px]`, `p-6` — around its **existing** single string, unchanged.
 
 **⇒ Item 8's test cost — carried, and `R3` proves the file did not move.** `surface.test.tsx:190-192` defines the helper the four assertions run through:
 
@@ -357,13 +372,15 @@ src/components/ui/empty-block.tsx
 src/components/ui/error-block.tsx
 ```
 
-> ## ⛔ v2.3 — THE SHAPE OF BOTH LEAVES IS **CITED, NEVER RE-DERIVED HERE**
+> ## ⛔ v2.4 — THE SHAPE OF ALL THREE LEAVES IS **§1.5A's**, CITED AND NEVER RE-DERIVED HERE
 >
-> **THE AUTHORITY IS THE CONVERGED KICKOFF §2 — `POLISH.5 + POLISH.6 · CONVERGED SEQUENTIAL KICKOFF v1.1`, §2.1 (`empty-block`), §2.2 (`error-block`), §2.3 (`thumb-glyph`), §2.0 (the conventions binding all three).**
+> ⚠⚠ **v2.3 CITED A DOCUMENT THAT DOES NOT EXIST.** It named *"`POLISH.5 + POLISH.6 · CONVERGED SEQUENTIAL KICKOFF v1.1` §2"* as *"the single authority both `.5` and `.6` absorb."* **DOC-1 proved that document absent from `~/Downloads`, `~/Desktop`, `~/Documents`, `~/code`, `~/.claude` and `/tmp`, by six title fragments, two content greps, a `find -iname` sweep, a `§2.x`-heading grep, 485 paste-cache files and a programmatic scan of 241 session transcripts. All 41 hits are one citation line — this one — or a copy or diff of it. No artifact quotes §2.0, §2.1, §2.2 or §2.3.**
 >
-> **It is authored ONCE and absorbed by BOTH plans by citation.** Where that section and this plan disagree, **§2 governs the primitive's shape and this plan governs everything else.**
+> **⇒ THE AUTHORITY IS `docs/plans/POLISH-5.md` §1.5A**, authored at DOC-1 from sources that exist and measured at `5ff418b`. **It is cited by BOTH plans by path and section number.**
 >
-> ⛔ **Re-derivation is the `R12` / `F-7` failure and it has already been caught three times on this task.** An executor reads §2 for the props, the marker, the tiers and the treatment. **This section states only what is `.5`-specific.**
+> **⇒ PRECEDENCE, replacing v2.3's now self-referential clause:** **§1.5A governs the SHAPE of `empty-block`, `error-block` and `thumb-glyph` — props, tiers, markers, classes, copy and treatment. Every other section of this plan governs everything else. Where any other section states a primitive's shape and disagrees with §1.5A, §1.5A wins and the other section is a defect to be amended, not a competing authority.**
+>
+> ⛔ **Re-derivation remains the `R12` / `F-7` failure and it has been caught three times on this task.** An executor reads §1.5A for the props, the marker, the tiers and the treatment. **This section states only what is `.5`-specific.**
 >
 > **The four rulings §2 carries that an executor of this plan must not re-open:**
 >
@@ -395,7 +412,268 @@ src/components/ui/error-block.tsx
 - **kebab-case inside `ui/`**, without exception — all ten. ⚠ This contradicts AGENTS.md §4 (*"`PascalCase.tsx` for components"*), **which governs everywhere else**. `ui/` is the carve-out. ⇒ `empty-block.tsx`, `error-block.tsx`, `thumb-glyph.tsx`.
 - **Own `data-*` marker, NEVER override `data-slot`** — `loading-block.tsx:30-35`.
 - **Existing tokens only, or the 11-token census reddens** — `loading-block.tsx:17-19`.
-- **A `ui/` leaf is pinned by its CONSUMERS' render tests, not its own.** `tests/unit/ui/` does not exist.
+- **A `ui/` leaf is pinned by its CONSUMERS' render tests.** ⚠⚠ **v2.4 — v2.3's STATED GROUND IS FALSE AND IS CORRECTED.** v2.3 read *"`tests/unit/ui/` does not exist."* **It exists at head AND at this plan's own ground `16971cd`** — `tests/unit/ui/avatar-sizes.test.tsx`, measured both ways at DOC-1. ⇒ **The convention stands as a RULE; the fact it rested on is wrong.** ⛔ **Neither new leaf mints a test file under `tests/unit/ui/`, and the reason is the rule, not an absence.** ⚠ **Born false, like §13's `Try again` gate — not drift.**
+
+### 1.5A · THE SHARED PRIMITIVE CONTRACT — the authority for all three ui/ leaves
+
+> ## ⛔ WHY THIS SECTION EXISTS — the citation it replaces points at nothing
+>
+> §1.5 cites **`POLISH.5 + POLISH.6 · CONVERGED SEQUENTIAL KICKOFF v1.1` §2** as *"the single authority both `.5` and `.6` absorb"* and forbids re-derivation. **That document does not exist.** Proven at DOC-1 across `~/Downloads`, `~/Desktop`, `~/Documents`, `~/code`, `~/.claude` and `/tmp`, by six title fragments, two content greps, a `find -iname` sweep, a `§2.x`-heading grep, 485 paste-cache files and a programmatic scan of 241 Claude Code session transcripts. **All 41 hits are one citation line — `docs/plans/POLISH-5.md:362` — or a copy or diff of it. No artifact quotes §2.0, §2.1, §2.2 or §2.3.**
+>
+> **⇒ THIS SECTION IS THE AUTHORITY. It is not a reconstruction of the kickoff; it is the contract, authored here from sources that exist and measured at `5ff418b`.**
+>
+> **PROVENANCE — every clause below is CARRIED, not authored:**
+>
+> | Source | What it supplies |
+> |---|---|
+> | `POLISH-5.md` §1.5 | `error-block`'s API · `bodyTestId`'s rename ground · the `reset()` rule · the centring rule · the four `ui/` conventions · `JR-1`…`JR-5` |
+> | `POLISH-5.md` §1.4 | `thumb-glyph`'s `size` prop, default 16, item 1 passes 12 |
+> | `POLISH-5.md` §1.1 · §2.6 | P1's single message tier · `empty-block` takes no action prop |
+> | `design-canon.md` §10 · `C-STATES-1` | P1 governs in-surface blocks; the route-boundary family governs route boundaries; `error-block` is neither kit member |
+> | `design-canon.md` §10 · `R9` | P1's panel geometry, ratified |
+> | `src/components/ui/loading-block.tsx` | the shipped leaf form — export shape, marker convention, token discipline, docblock form |
+> | `src/components/discovery/EmptyState.tsx` | P1's panel and tier classes, measured |
+> | `src/app/(auth)/error.tsx` · `m/[slug]/error.tsx` | the family's heading, body and action class strings and its heading string — **byte-identical across both** |
+> | `src/components/debate/composer/SlotHeader.tsx` `:27-54` | `thumb-glyph`'s entire implementation |
+>
+> ⛔ **NOT ONE STRING IN THIS SECTION IS AUTHORED BY CC OR BY THIS PLAN.** Every copy string is a byte-copy of a shipped, ratified string, or a clean sentence split of one at its sentence boundary (CLAUDE.md §3).
+
+---
+
+## 1.5A.0 · CONVENTIONS BINDING ALL THREE LEAVES
+
+Measured across all ten shipped members of `src/components/ui/`, with `loading-block.tsx` as the exemplar (it is the only non-shadcn member and the only one minted under these rules).
+
+| # | Convention | Ground |
+|---|---|---|
+| **1** | **kebab-case filename**, without exception — all ten members. ⚠ This contradicts AGENTS.md §4 (*"`PascalCase.tsx` for components"*), which governs everywhere else. `ui/` is the carve-out | measured, ten of ten |
+| **2** | **Named `export function` with a PascalCase symbol.** ⛔ Never a default export | `loading-block.tsx:26` |
+| **3** | **Own `data-*` marker, empty-string value. ⛔ NEVER override `data-slot`** | `loading-block.tsx:38`, and its in-body comment `:30-35` recording that overriding it *"silently REPLACED it and reddened surface-states.test.tsx"* |
+| **4** | **Existing tokens only.** No new colour token, no new custom property — the 11-token census in `tests/unit/design/tokens-monochrome.test.ts` stays untouched | `loading-block.tsx:17-19` |
+| **5** | **A leaf is pinned by its CONSUMERS' render tests.** ⚠⚠ **CORRECTION — `POLISH-5.md:398`'s stated ground is FALSE.** It reads *"`tests/unit/ui/` does not exist."* **It exists at head AND at this plan's own ground `16971cd`** — `tests/unit/ui/avatar-sizes.test.tsx`. **The convention stands as a rule; the fact it rests on is wrong and is corrected here.** ⇒ **Neither new leaf mints a test file under `tests/unit/ui/`**, and the reason is the rule, not the absence | measured at `5ff418b` and at `16971cd` |
+| **6** | **`className` merges through `cn(...)`, caller's last; `{...props}` spread last on the element** | `loading-block.tsx:39-41` |
+| **7** | **The docblock names the canon row that ratifies the leaf**, and the same-commit rule (CLAUDE.md §5.12) | `loading-block.tsx:4-8` |
+| **8** | **`"use client"` only when the leaf itself binds a handler.** `loading-block.tsx` and `EmptyState.tsx` carry none. `ErrorState.tsx` carries one *because its button binds `onClick`* | measured |
+
+---
+
+## 1.5A.1 · `src/components/ui/empty-block.tsx` — **P1**
+
+**`empty-block` IS P1** (`C-STATES-1`). It renders the W2.11 P1 panel around an existing single string.
+
+### The API
+
+```tsx
+<EmptyBlock
+  message={…}          // string · REQUIRED
+  messageTestId={…}    // string · REQUIRED
+  sub={…}              // string · OPTIONAL
+/>
+```
+
+| Prop | Type | Tier | Ground |
+|---|---|---|---|
+| `message` | `string` | **REQUIRED** | Every consumer carries content for it — `.5`'s three sites and `.6`'s one |
+| `messageTestId` | `string` | **REQUIRED** | ⛔ **Rides the MESSAGE NODE, never the panel.** A testid on the panel would return message + sub through `text()`, breaking `.6`'s assertion the moment it passes a `sub` |
+| `sub` | `string` | ⚠ **OPTIONAL** | **§2.1's tier rule:** *a tier is REQUIRED when every consumer has carried content for it, OPTIONAL when only some do, and ABSENT when none does.* **`.5`'s three sites carry no sub string and pass none; `.6`'s one site does.** ⇒ optional, declared, unpassed on `.5` |
+| *(action)* | — | ⛔ **ABSENT** | **`JR-3`.** ⚠ Scoped to the current consumer set, **not "never"** — canon `R9` contemplates P1's optional single CTA and Discovery's error block ships one. **The structural ground for `.5`: `ProfileGraphCard` is itself a `<button>` (`:22`) and `graph-empty` renders inside it (`:30`) — a `<button>` cannot nest in a `<button>`** |
+
+> ### ⚠ **`sub` IS OPTIONAL, NOT ABSENT — AND THIS CORRECTS §1.1 AND §1.5**
+>
+> `POLISH-5.md:262` and `:266` rule the `.sub` tier **absent** — *"not deferred, not partial, and not owed — it is ruled absent."* **Measured against §2.1's tier rule with `.6` as a consumer carrying a sub string, that is the wrong word for the right behaviour.**
+>
+> **The behaviour `:262` protects is unchanged and correct:** a second text node inside the marked subtree changes `text(element)`, so all four `.toBe()` pins at `surface.test.tsx:462 · :469 · :477 · :484` would break. **"Declared and not passed" delivers exactly that protection.** ⛔ **`.5` passes NO `sub`, on any of its three sites.**
+>
+> ⚠ **This is independent of `HM-5` and survives it.** `HM-5` corrected the claim that *re-wording a string* reddens the suite (it does not — the pins are reference pins). `:262`'s claim is about *adding a node*, which breaks a reference pin just as surely. **`:262` is correct as written; only its word "absent" moves to "optional, unpassed."**
+
+### The render
+
+⚠ **The panel and tier classes are CARRIED BYTE-FOR-BYTE from `EmptyState.tsx:31,33,36`**, which are byte-identical to `ErrorState.tsx`'s. **They are not re-derived and not re-measured from the mockup.**
+
+```
+panel     flex min-h-[148px] flex-col items-center justify-center gap-[10px]
+          rounded-[var(--r)] bg-n0 p-6 text-center [border:var(--hairline)]
+message   <h2 className="max-w-[320px] text-[13.5px] text-n6">   ← carries messageTestId
+sub       <p  className="text-[12px] text-n4">                    ← rendered iff `sub` provided
+marker    data-empty-block=""    on the panel
+```
+
+- **`<h2>`, not a `<div>`.** `EmptyState.tsx`'s own docblock records the choice and its ground: *"demoting a heading to a div would lose document semantics for no visual gain."* Carried.
+- ⛔ **No `"use client"`** — no handler.
+- ⛔ **No interactive element of any kind.** At single tier it renders a message node inside a panel and nothing else, so it nests legally inside `ProfileGraphCard`'s `<button>`.
+
+---
+
+## 1.5A.2 · `src/components/ui/error-block.tsx` — **THE ROUTE-BOUNDARY FAMILY**
+
+⚠ **`error-block` is NEITHER P1 NOR P7** (`C-STATES-1`). It renders the route-boundary family and sits in `ui/` beside two kit members without being one. **`JR-1` — `.6`'s scope argument beat `.5`'s position and `.5` withdrew.**
+
+### The API
+
+```tsx
+<ErrorBlock
+  body={…}          // string       · REQUIRED
+  bodyTestId={…}    // string       · REQUIRED
+  actionLabel={…}   // string       · REQUIRED
+  onAction={…}      // () => void   · REQUIRED
+/>
+```
+
+| Prop | Type | Ground |
+|---|---|---|
+| `body` | `string` · **REQUIRED** | **`JR-5` / VARIANT B′.** Each consumer passes its **own carried surface string**. `.5` passes `PROFILE_COPY.error.load`; `.6` passes `"Couldn't load your bookmarks."` |
+| `bodyTestId` | `string` · **REQUIRED** | ⚠ **Renamed from `messageTestId` because THE NODE IT NAMES MOVED, not because the ruling did.** Under B′ the surface-specific line is the **body**. ⛔ **Rides the `<p>` ALONE. NEVER the container** — that is `m/[slug]/error.tsx:65`'s shape, and copying it reddens `surface.test.tsx`'s exact-equality assertion (`OD-7` = BESIDE) |
+| `actionLabel` | `string` · **REQUIRED** | `.5` passes `PROFILE_COPY.error.action`; `.6` passes `"Try again"` |
+| `onAction` | `() => void` · **REQUIRED** | ⛔ **NOT `onRetry`.** Both consumers mount from identical `"use client"` `error.tsx` boundaries with `reset()` in scope. **One action serves both.** ⛔⛔ **NEVER `window.location.reload()`** — `discovery/ErrorState.tsx:49` is the tempting model and copying it would silently downgrade both surfaces from a segment re-render to a full document reload, invisible to every test either surface has |
+
+### The internal heading const — **NOT a prop, NOT authored**
+
+```
+"Something went wrong."
+```
+
+⚠ **Byte-identical at `(auth)/error.tsx:63` and `m/[slug]/error.tsx:70`.** It is the family's generic title, in W2.11's generic-error vocabulary. **It is CARRIED, not authored — CC does not write product copy (CLAUDE.md §3).** It is a module-scope const inside the leaf, never a prop: no consumer overrides it, and the family's whole point is that the heading is generic while the body is the surface's.
+
+### The render
+
+⚠ **All three class strings are CARRIED BYTE-FOR-BYTE from the family, verified identical across `(auth)/error.tsx`, `(public)/not-found.tsx` and `m/[slug]/error.tsx` at `5ff418b`.**
+
+```
+outer     text-center                    ← the leaf centres ITSELF (see below)
+marker    data-error-block=""            on the outer element
+heading   <h1 className="font-medium text-ink text-lg">        {HEADING}
+body      <p  className="mt-2 text-n5 text-sm">                 {body}    ← carries bodyTestId
+action    <button type="button" onClick={onAction}
+            className="mt-6 inline-block font-medium text-ink text-sm
+                       underline-offset-4 outline-none hover:underline
+                       focus-visible:shadow-(--state-focus-ring)">        {actionLabel}
+```
+
+**⛔ WHAT IT DOES NOT RENDER, each with its ground:**
+
+| Not rendered | Ground |
+|---|---|
+| **A P1 panel** — no border, no `bg-n0`, no `min-h-[148px]`, no `rounded-[var(--r)]` | `JR-1` / `C-STATES-1`. The family is a bare centred column; **the panel is P1's and P1 is `empty-block`'s** |
+| **A `<PageContainer>`** | The consumer supplies the container. Two of the three family members declare one and one does not; `m/[slug]/error.tsx`'s docblock states the rule the repo supports — *"declare one iff your layout does not"* — and records it as *"a judgement recorded, not a precedent found"* |
+| **Anything from an `error` object** | Both error-boundary family members type `error` and destructure it out. `m/[slug]/error.tsx` states the reason is structural (`O-1`): *"deliberately NOT DESTRUCTURED, so no binding exists to render by accident"* |
+
+> ### ⚠ THE LEAF CENTRES ITSELF — and `u/[pseudonym]/error.tsx` must pass **NO** `className` to `<PageContainer>`
+>
+> The family puts `text-center` on the container. **`.5` cannot.** `tests/unit/shell/page-container.test.ts`'s `callSite()` asserts class-set **EQUALITY** against `SITES`, and **`u/[pseudonym]/error.tsx` is entry 7** with `before: "mx-auto w-full max-w-3xl px-4 py-6"` — the bare `reading` preset, no `className`, no `adds` (**re-verified at `5ff418b`; the file was not touched by `#330` or `#331`**).
+>
+> ⇒ **`text-center` moves INSIDE the leaf.** ⛔ **A `className` on that `<PageContainer>` reddens the guard — RUN-STOP 15.**
+>
+> ⚠ **`m/[slug]/error.tsx` escapes only because POLISH.3 declared it in a separate `GREENFIELD` array** (`page-container.test.ts:126-132`). **That is not a precedent `.5` may follow.** ⚠ **`page-container.test.ts` is on no allow-list and is NOT under `tests/unit/design/**`, so RUN-STOP 2 does not cover it** — which is why condition 15 exists.
+
+### `"use client"` — **PRESENT.** Ruled, with the ground
+
+The leaf binds `onClick`. Both current consumers are already `"use client"` boundaries, so the directive is **currently redundant** — a module imported by a client module compiles into the client graph regardless. **It is carried anyway, for one reason: the leaf is unusable from an RSC by construction** (`POLISH-5.md:389` — *"an RSC cannot pass an event handler … A shared leaf requiring an action prop is unusable there"*), **and the directive makes that self-describing at the top of the file rather than discoverable at a build error.** It costs nothing and it is what `ErrorState.tsx` does for the same class of reason.
+
+---
+
+## 1.5A.3 · `src/components/ui/thumb-glyph.tsx` — **THE LIFT**
+
+⚠ **This leaf is a LIFT, not a mint.** Its entire implementation exists at `SlotHeader.tsx:27-54` and is carried byte-for-byte. **`SlotHeader`'s re-point must be a byte-identical render** (§8.2), and that obligation is what fixes every clause below.
+
+### The API
+
+```tsx
+<ThumbGlyph
+  side={…}     // Side   · REQUIRED — the same `Side` type SlotHeader.tsx imports
+  size={…}     // number · OPTIONAL, DEFAULT 16
+/>
+```
+
+- **`size` defaults to `16`** so `SlotHeader`'s call site becomes `<ThumbGlyph side={side} />` and renders byte-identically (§1.4, §8.2).
+- **Item 1 passes `12`.** `values-log:186` scopes 16 to the slot header **by name**; the profile mockup's positions-table thumb is `width="12" height="12"` (`surface_profile_v1_0.html:509-510`). **Neither value inherits.**
+
+### Carried byte-for-byte from `SlotHeader.tsx:27-54`
+
+```
+THUMB_PATH   the 179-character literal at :29, EXACTLY — not re-typed, not reformatted
+viewBox      "0 0 14 14"
+aria-hidden  "true"                                    on the <svg>
+rotation     className={side === "NO" ? "rotate-180" : undefined}   on the <svg>, NOT the <path>
+YES arm      { fill: "none", stroke: "currentColor", strokeWidth: 1.1,
+               strokeLinejoin: "round" as const }
+NO arm       { className: "fill-no", stroke: "none" }
+spread form  a SINGLE {...(side === "YES" ? {…} : {…})} on the <path>
+```
+
+⚠ **THE ONLY DIFFERENCE FROM THE SHIPPED SOURCE:** `width="16" height="16"` becomes `width={size} height={size}`. **Nothing else changes.**
+
+⚠ **`ThumbGlyph` is currently module-local** — `function ThumbGlyph(...)`, not exported, with exactly one call site (`SlotHeader.tsx:120`). The lift makes it a named export.
+
+⛔ **The mockup does not govern the NO arm.** The values-log supersedes it (`:36`, `:186`) and the shipped form (`className: "fill-no", stroke: "none"`) is the ratified one. **"Match the mockup" regresses this.**
+
+### ⚠ A NAMED EXCEPTION TO CONVENTION 3 — **`thumb-glyph` carries NO `data-*` marker**
+
+Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the exception is stated rather than left to be discovered as an oversight:
+
+**Ground.** §8.2's zero-delta obligation requires `SlotHeader`'s render to be **byte-identical** after the re-point. **An added attribute is a render change.** The marker convention exists so a consumer's render test can key on a state block; a glyph inside a composed header is not that, and it has no assertion of its own to serve. ⇒ **No marker. The obligation outranks the convention, and the convention's purpose is not engaged.**
+
+---
+
+## 1.5A.4 · PRECEDENCE — replacing the clause that dissolved
+
+§1.5 reads: *"Where that section and this plan disagree, §2 governs the primitive's shape and this plan governs everything else."* **With §2 gone and the contract inside this plan, that clause is self-referential and is REPLACED:**
+
+> **§1.5A governs the SHAPE of `empty-block`, `error-block` and `thumb-glyph` — props, tiers, markers, classes, copy and treatment. Every other section of this plan governs everything else. Where any other section of this plan states a primitive's shape and disagrees with §1.5A, §1.5A wins and the other section is a defect to be amended, not a competing authority.**
+
+**⇒ `docs/plans/POLISH-6.md` cites `docs/plans/POLISH-5.md` §1.5A by path and section number.** ⛔ **Every "converged kickoff §2" / "§2.1" / "§2.2" citation in either plan is re-pointed here.** A citation to a document that does not exist is not an authority; it is a dangling pointer that reads as one.
+
+⛔ **Re-derivation remains the `R12` / `F-7` failure and it has been caught three times on this task.** An executor reads §1.5A for the props, the marker, the tiers and the treatment. Each plan states only what is surface-specific.
+
+---
+
+## 1.5A.5 · THE FOUR RULINGS AN EXECUTOR MUST NOT RE-OPEN
+
+| ID | Ruling |
+|---|---|
+| **`JR-1`** | `ui/error-block.tsx` renders the **ROUTE-BOUNDARY FAMILY**, not the P1 panel. ⚠ `.6`'s scope argument beat `.5`'s position and **`.5` WITHDREW** |
+| **`JR-2`** | Both surfaces say **`"Try again"`**. ⚠ Per `HM-1`/`HM-2` this **CREATES** `PROFILE_COPY.error.action`; it does not amend one. `PROFILE_COPY.error` has exactly one member at head — **re-measured at `5ff418b`, not carried**. The value is admissible as a **byte-copy** of a shipped ratified string (`m/[slug]/error.tsx:77`), which is carriage, not authoring |
+| **`JR-3`** | `empty-block` takes **NO ACTION PROP** for the current consumer set. ⚠ **Scoped deliberately, NOT "never"** |
+| **`JR-5` / B′** | The **body tier is REQUIRED** and each consumer passes its **OWN carried surface string**. The testid rides the `<p>` alone under `bodyTestId`. **`OD-7`'s property is UNCHANGED** — the marked subtree still excludes the button and the `h1` |
+
+---
+
+## 1.5A.6 · ⚠ WHAT `.5`'s CONSUMERS PASS — measured, so item 9 is not a guess
+
+**`ProfileError` at head is a SINGLE `<p>`.** No container, no heading, no action, no panel — `states.tsx:29-32`, classes `py-12 text-center text-sm text-n5`, zero props. ⛔ **Item 9 is a REPLACEMENT, not a wrapping.**
+
+**And `PROFILE_COPY.error.load` at head is `"Couldn't load this profile. Retry."`** — ⚠ **the retry promise lives INSIDE the body string.**
+
+⇒ **`NEW-1`'s trim is a clean sentence split at the sentence boundary, with the trailing action phrase routed to `actionLabel`. It is the same mechanism `.6` applies to its own string, and nothing is authored:**
+
+| | Live at `copy.ts:24` | Under B′ |
+|---|---|---|
+| `error.load` → **body** | `Couldn't load this profile. Retry.` | **`Couldn't load this profile.`** |
+| `error.action` → **actionLabel** | *(does not exist)* | **`Try again`** — byte-copy of `m/[slug]/error.tsx:77`, verified at head |
+
+⚠ **`surface.test.tsx`'s pin STAYS GREEN, for two independent reasons.** It reads `text(getByTestId("profile-error")).toBe(PROFILE_COPY.error.load)` — a **reference** pin, so the trim moves both sides together; **and** `OD-7` = BESIDE keeps the button outside the marked subtree, so `text()` returns the body alone.
+
+---
+
+## 1.5A.7 · ⚠ TWO MEASURED FACTS THE EXECUTOR WILL MEET, RECORDED SO THEY ARE NOT DISCOVERED
+
+**1 · `ProfileLoading` does NOT consume `LoadingBlock` today.** It imports `Skeleton` directly from `@/components/ui/skeleton` (`states.tsx:1`). **Item 7 adds the second consumer of P7; it does not modify the first** (Discovery's `LoadingSkeleton.tsx` is untouched).
+
+**2 · The skeleton count is 4 in source and 9 rendered**, and the gap is entirely `states.tsx:16`'s literal six-element array `["a","b","c","d","e","f"]`. ⚠ **An executor grepping for nine `<Skeleton` tags finds four.** ⚠⚠ **And canon §10's P7 row rules that a P7 count is *"sourced from the surface's own constant … never a literal."*** Whether item 7 mints that constant is a **scope question surfaced to the founder, not absorbed** (§16).
+
+---
+
+## 1.5A.8 · ADMIT-CHECK FOR THIS SECTION
+
+| # | Leg | Value |
+|---|---|---|
+| 1 | Ground measured at | `5ff418b66c76079236ec9ed24b17c147b3e7587b` |
+| 2 | Strings authored by CC or by this plan | ⛔ **ZERO.** Every string is a byte-copy or a sentence split of a shipped ratified string |
+| 3 | Prop names declared | `message` · `messageTestId` · `sub` · `body` · `bodyTestId` · `actionLabel` · `onAction` · `side` · `size` — **nine, and `.6`'s two call sites pass only names in this set** |
+| 4 | Class strings carried byte-for-byte | P1 panel + two tiers (from `EmptyState.tsx`) · family heading + body + action (from `(auth)/error.tsx` ≡ `m/[slug]/error.tsx`) |
+| 5 | Conventions stated | **eight**, §1.5A.0 — with **one named exception** (`thumb-glyph`, convention 3) |
+| 6 | Corrections this section makes to the plan | **two** — `:398`'s *"`tests/unit/ui/` does not exist"* is FALSE; `:262`/`:266`'s `sub` "absent" becomes "optional, unpassed" |
+| 7 | Open questions carried out | **one**, surfaced not decided — item 7's literal array vs canon's P7 count rule |
+| 8 | Citations re-pointed | every *"converged kickoff §2"* in `POLISH-5.md` and `POLISH-6.md` |
 
 ### 1.6 · `D9(a)` — `src/app/(public)/u/[pseudonym]/error.tsx` JOINS THE ALLOW-LIST
 
@@ -426,8 +704,8 @@ src/components/ui/error-block.tsx
 >
 > **MEASURED at `16971cd`** (`POLISH-56-HEADMEASURE.md` §3d): a whole-repo grep of `PD-5-[0-9]+` across all `*.md` returns **TWO distinct IDs — `PD-5-01` AND `PD-5-02`** (19 occurrences across seven files). **The live high-water is `PD-5-02`.**
 >
-> **⇒ Commit 0 applies the six `POLISH-register-ADDITIONS.md` §A rows as `PD-5-03` … `PD-5-08`.**
-> **⇒ Any new register row starts at `PD-5-09`.**
+> **⇒ Commit 0 applied the six `POLISH-register-ADDITIONS.md` §A rows as `PD-5-03` … `PD-5-08`.** ✅ **LANDED.**
+> **⇒ ⚠ v2.4 — ANY NEW REGISTER ROW STARTS AT `PD-5-10`, NOT `PD-5-09`.** Commit 0 **spent `PD-5-09`** on the `OD-8` mint (`POLISH-register.md:168`), which §1.7 itself authorised. **The live high-water is `PD-5-09`, read off `main` at DOC-1.** ⛔ **Read it again at execute (`O-2`); never count, never trust this number.**
 >
 > ⚠ **Left uncorrected, commit 0's allocator would have re-issued `PD-5-02` to a row that already holds it** — a collision in the ID space, minted at the one commit whose entire purpose is to make IDs citable. **This is `V-10`'s genus: a register cell is not a baseline.**
 
@@ -435,15 +713,13 @@ src/components/ui/error-block.tsx
 
 ⚠ **AND THE SIX ADDITIONS ROWS ARE QUEUED AHEAD OF ANY NEW MINT.** `POLISH-register-ADDITIONS.md:18-23` carries six rows whose ID column is the literal placeholder `PD-5-nn *(proposed)*` — P5-a, P5-b, P5-c, P5-d, P5-e(i), P5-e(ii). `POLISH-register.md:321` confirms *"the remaining eleven, six of them `PD-5-nn`, are still owed at `REGISTER-APPLY`."* **An allocator must know they hold `03`–`08` before issuing anything.**
 
-> ### ⛔ v2.3 · `HM-4` — **THIS PLAN CITES `O-5` AND `O-6`. NEITHER IS DEFINED ON `main`. AND `O-6` CARRIES TWO UNRELATED RULES.**
+> ### ✅ v2.4 · `HM-4` — **DISCHARGED. COMMIT 0 MINTED ALL FOUR AND SPLIT `O-6`.**
 >
-> **MEASURED** (`POLISH-56-HEADMEASURE.md` §3d): ratified O-space is **`O-1 … O-4`** and stops there (`CLAUDE.md:243-246`). `grep -rhoE '\bO-[0-9]+\b' CLAUDE.md AGENTS.md` returns nothing higher.
+> **MEASURED AT `5ff418b`: `CLAUDE.md` §8 defines `O-1 … O-8`.** `O-5` *(a durable amendment is applied at every site that states the superseded position)* · `O-6` *(an unbidden fenced arrival is DECLARED, its bearing STATED)* · `O-7` *(assert on `innerHTML`, never `textContent`)* · `O-8` *(fence by symbol, never by line)*. **Landed by `c8ba802` (#330), exactly as routed.**
 >
-> | Token | Where this plan uses it | Meaning it is given | ⚠ **Allocated at commit 0** |
-> |---|---|---|---|
-> | `O-5` | the header · §10 `P-9`/`P-10`'s carve-outs · §10's closing banner | *applied at the sites, never as an appendix* | ✅ **ALLOCATED `O-5`** — citations already correct |
-> | **`O-6`** | **§0.7's title · §19's closing row** | *an unbidden arrival is DECLARED* | ✅ **ALLOCATED `O-6`** — citations already correct |
-> | **`O-6`** | **§2.8 — *"the `O-6` / `PF-8` principle"*** | ***assert on `innerHTML`, never `textContent`*** | ⚠ **ALLOCATED `O-7` — THIS IS THE SPLIT.** §2.8's citation is corrected in the same commit |
+> ⛔ **v2.3's statements that `O-5` and `O-6` are *"CITED BY THIS PLAN AND DEFINED NOWHERE"* are SUPERSEDED at every site they appear** — the header, §1.7, §10's banner. **Every `O-n` this plan cites now resolves.** ⚠ **v2.3's cited coordinate `CLAUDE.md:243-246` is also stale: the `O-1…O-4` block sits at `:245-248` at head, and the register runs to `:253`.**
+>
+> ⚠ **THE SPLIT LANDED TOO.** §2.8's *"`O-6` / `PF-8` principle"* is `O-7`, and §2.8 already carries the correction — **applied at the site, which is why it is not on this list.**
 >
 > ⚠ **`O-5` exists only as a PROPOSAL** awaiting a founder ruling at POLISH.3's D5 (`docs/plans/POLISH-3-RUN-TRACKER.md:139,143` — **a file that landed in the head commit itself**). **`O-6` has NO definition anywhere on `main`, in any namespace.** A third, unrelated `O-5`/`O-6` pair lives at `docs/logs/STAGING-PARITY-A.md:571,579` as that log's own open-question numbering.
 >
@@ -507,6 +783,60 @@ src/components/ui/error-block.tsx
 
 - **`surface.test.tsx:301`** — `expect(card.textContent ?? "").not.toContain("@")`, a **whole-subtree text assertion** on `identity-card`. ⇒ **The icon carries an `aria-label` and NO visible text containing `@`.** An icon-only control passes; a label reading *"@bookmarks"* does not.
 - **`page-container.test.ts:395-415`** — fires on a **new `<PageContainer>` call site**, never on a link. **Item 17 adds no container.** Named so it is not mistaken for a link census.
+
+### 1.18 · ⚠ THE COORDINATE RE-KEY
+
+**Twenty-four coordinates moved. All are inside the two files PR A wrote.** Every citation of these in the plan is re-keyed, and every fence re-anchored **by symbol** (`O-8`).
+
+#### `ArgumentList.tsx`
+
+| Anchor | v2.3 | `5ff418b` |
+|---|---|---|
+| `if (items.length === 0) {` — empty block | `:28-38` | **`:27-38`** |
+| `size="profile"` — removed variant | `:49` | `:49` ✅ |
+| `size="profile"` — live variant | `:59` | **`:70`** |
+| `Support {…supportCount}` | `:82` | **`:137`** |
+| `Counter {…counterCount}` | `:84` | **`:138`** |
+| `formatDharma(…supportDharma)` | `:83` | **`:138`** |
+| `formatDharma(…counterDharma)` | `:85` | **`:140`** |
+| `line-clamp-2 text-xs text-n5` — the "Replied to" clamp | `:75` | **`:118`** |
+| `<Link data-testid={…argument-title…}>` | `:70` | **`:92-98`** |
+| `import { formatDharma }` | `:4` | `:4` ✅ |
+
+⚠⚠ **TWO NEW HAZARDS PR A CREATED, both stated so an executor does not meet them cold:**
+
+1. **`line-clamp-2 text-xs text-n5` NOW MATCHES TWO LINES** — `:110` (item 6's teaser) and `:118` (the "Replied to" clamp). ⛔ **A grep-by-string re-anchor is no longer unique. Anchor on the surrounding node.**
+2. **A THIRD `Đ` render exists** — `Đ {formatDharma(item.authorStake)}` at `:88`, PR A's item 4. `no-raw-dharma-render.test.ts` governs it and is green; recorded because §8's census counted two.
+
+#### `surface.test.tsx` — **PR A moved every `PROFILE_COPY` assertion and every `positions-filters` pin by a uniform +61**
+
+| Anchor (test name · assertion) | v2.3 | `5ff418b` |
+|---|---|---|
+| `scrubbed-silhouette-and-zero-pii` · `not.toContain("@")` | `:301` | **`:306`** *(+5)* |
+| `owner-vs-visitor-body-identical` · `chip.owner` | `:387` | **`:448`** |
+| `owner-vs-visitor-body-identical` · `chip.visitor` | `:392` | **`:453`** |
+| `empty-states` · `empty.positionsOwner` | `:401` | **`:462`** |
+| `empty-states` · `empty.positionsVisitor` | `:408` | **`:469`** |
+| `empty-states` · `empty.argumentsOwner` | `:416` | **`:477`** |
+| `empty-states` · `empty.argumentsVisitor` | `:423` | **`:484`** |
+| `states-kit` · `profile-loading` | `:428-429` | **`:490`** |
+| `states-kit` · `profile-error` `.toBe(error.load)` | `:432-435` | **`:493-496`** |
+| `positions-filters` · the option-inventory comment | `:448` | **`:509`** |
+| `positions-filters` · `statusFilter.options` — **item 11's target** | `:449` | **`:510`** |
+| `positions-filters` · `marketFilter.options` — ⛔ **MUST NOT BE TOUCHED** | `:450` | **`:511`** |
+| `positions-filters` · `position-row-${M1}` | `:452` | **`:513`** |
+| `positions-filters` · `position-row-${M2}` | `:453` | **`:514`** |
+| `removed-stub-render` · the `textContent` instrument | `:319-326` | **`:378-379`, `:387-388`** |
+| `band-composition` · column labels | `:237-240` | **`:241`** |
+| `band-composition` · Đ substrings | `:245-246` | **`:248`, `:249`** |
+
+⚠ **Two tests are NEW, landed by PR A:** `owner-only-bookmark-affordance-on-the-identity-card` (`:322`, item 17) and `post-carries-replies-count-summing-both-poles` (`:351`, item 5).
+
+**S1 · A defect PR A shipped in its own new test.** `surface.test.tsx:337` carries a comment reading *"`:303` below asserts the whole subtree contains none."* **The `@` assertion is at `:306`, and it is ABOVE, not below.** ⛔ **Both the number and the direction are wrong.** The file is allow-list row 14. ⇒ **PR B corrects the comment to name the assertion BY TEST NAME, not by line** (`O-8`), in whichever of its commits first writes the file.
+
+#### Files where **every** coordinate holds
+
+⚠ **Measured, not assumed** — `PositionsTable.tsx` (11 of 11) · `sell.test.tsx` (4 of 4) · `graph.test.tsx` (still no empty-series case) · `copy.ts` · `states.tsx` · `ProfileGraphCard.tsx` · `loading-block.tsx` · `u/[pseudonym]/error.tsx` · `m/[slug]/error.tsx` · `ErrorState.tsx` · `SlotHeader.tsx` · `page-container.test.ts` entry 7 · `design-canon.md` §3 item 12 · `tokens-monochrome.test.ts` · `pct-round-render.test.ts`. **None was touched by #330 or #331.**
 
 ---
 
@@ -1057,9 +1387,9 @@ tests/unit/shell/page-container.test.ts              171 ±
 | **4** | `P5-D06a` | **A** | The author's **stake** on the replica card. **Post variant only** — the reply carries `stake` at `arguments.ts:91` | An author-stake figure on the post card. ⚠ **`D21` strikes only the `→ current` half** (§0.5) |
 | **5** | `P5-D07` | **A** | `Replies · N` on the post variant, inline, enlarged count | A reply count on the post branch. ✅ **PURE COMPONENT** — `N = supportCount + counterCount`, both already rendering at `:82`/`:84` (§2.7) |
 | **6** | `P5-D08` | **A** | The **teaser**, rendered with a **CSS clamp**. The existing title `<Link>` is the read affordance | A teaser node on a live card. ⛔ **D13: do NOT build the `+` control or the `.argprofile` popover.** ⛔ **`AM-1`: NO `title` attribute** (§2.8) |
-| **7** | `P5-D10` | **B** | `ProfileLoading` adopts the **P7 `LoadingBlock`** primitive | `data-loading-block` on the profile skeletons. ⚠ `PD-0-08` is the **register row, not a reason not to build** (§2.13) |
+| **7** | `P5-D10` | **B** | `ProfileLoading` adopts the **P7 `LoadingBlock`** primitive | `data-loading-block` on the profile skeletons. ⚠ `PD-0-08` is the **register row, not a reason not to build** (§2.13). ⚠⚠ **v2.4 · `D-13` — ITEM 7 ALSO MINTS THE COUNT CONSTANT.** `states.tsx:16` renders the tile grid from a **literal six-element array** `["a","b","c","d","e","f"]`. **Canon §10's P7 row rules a P7 count is *"sourced from the surface's own constant … never a literal."*** ⛔ **Adopting P7 while leaving the literal ships a known violation of the rule the adoption is under.** ⇒ **Item 7 mints a module-scope constant in `states.tsx` and maps over it, in its own commit (`B1`).** ⚠ **Recorded as a scope widening, ratified rather than absorbed** (§16). ⚠ **The skeleton count is FOUR in source and NINE rendered — an executor grepping for nine `<Skeleton` tags finds four, and the gap is entirely this array.** |
 | **8** | `P5-D11` | **B** | The **three** empty states adopt **W2.11 P1** at **ONE** message tier (D3(a)) — `PositionsTable.tsx:79-90` · `ArgumentList.tsx:28-38` · `ProfileGraphCard.tsx:29-32` | The empties carrying P1's hairline panel. None does. **All three in PR B** (§1.2) |
-| **9** | `P5-D12` | **B** | `ProfileError` gets a **real, visible, focusable retry control** — `ui/error-block.tsx` under **B′**, action `reset()`, and `error.tsx` loses its invisible wrapper | A focusable control with an accessible name. ✅ **UNBLOCKED — `NEW-1` RESOLVED** (§2.9). ⚠ **v2.2: copy the precedent's FOCUS RECIPE, never its copy string or its testid placement** (§2.16). ⚠⚠ **v2.3 · `HM-2`: `PROFILE_COPY.error.action` DOES NOT EXIST at head — this item CREATES it. `JR-2`'s *"amended from `Retry`"* framing is false; the outcome is unchanged** (§2.9, §11 cond. 4) |
+| **9** | `P5-D12` | **B** | `ProfileError` gets a **real, visible, focusable retry control** — `ui/error-block.tsx` under **B′**, action `reset()`, and `error.tsx` loses its invisible wrapper | A focusable control with an accessible name. ✅ **UNBLOCKED — `NEW-1` RESOLVED** (§2.9). ⚠ **v2.2: copy the precedent's FOCUS RECIPE, never its copy string or its testid placement** (§2.16). ⚠⚠ **v2.3 · `HM-2`: `PROFILE_COPY.error.action` DOES NOT EXIST at head — this item CREATES it. `JR-2`'s *"amended from `Retry`"* framing is false; the outcome is unchanged** (§2.9, §11 cond. 4). ⚠ **v2.4 · `D-14` — ITEM 9's COMMIT ALSO ADDS THE MISSING SPDX LINE.** `u/[pseudonym]/error.tsx` carries **no** `// SPDX-License-Identifier: AGPL-3.0-or-later`; `"use client"` sits at `:1`. **All three route-boundary family members carry SPDX at `:1` and `"use client"` at `:2`** (measured at DOC-1). ⛔ **This is an AGPL compliance gap, not a style nit**, the file is allow-list row 8, and `B4` already rewrites its render body. |
 | **10** | `P5-D13` | **B** | The **Sell mount stops reflowing** — fixed-height host, replica-footer motion | A fixed-height sell host. ⚠ **D14 RULED IT** — tier 1 (SPEC.1 §23 `:1660`) settles `UI-A5.md:113`↔`:116`; canon §5 `:92` — 50px, translateY 110% + fade, **.26s**, `:has()` banned |
 | **11** | `P5-D17a` | **B** | The status filter's **`All`** option is removed; the canon inventory is `Open`/`Closed`. **The market filter's `all` sentinel is UNTOUCHED** | `statusFilter.options` having two entries **and** initial state `"Open"`. **`:53` and `:114` move together or item 11 ships a lie** (§2.4) |
 | **12** | `P5-D20a` | **C** | Fix the **lying docblock** at `ProfileChart.tsx:251` | A docblock that describes what the code draws. ⚠ **D16: the docblock ships; the RING ENCODING does not.** ⚠⚠ **v2.2 · `C-1`: the corrected text must distinguish the token's NAME from its VALUE — `--graph-yes` renders `#737373` GREY** (§2.11) |
@@ -1153,6 +1483,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | ⚠ **20** *(PR A execute)* | `tests/unit/bookmarks/render/side-encoding.test.tsx` | **A** | **A5** — ⛔ **SYMBOL-FENCED to the `liveItem` factory ONLY: the two fields `tsc` names.** ⛔ No assertion. ⛔ **NOT `removedItem`** — it is the removed variant and carries neither (SC-1 intact). ⛔ Nothing else in the file. **Ground:** `BookmarkItem` is `Extract<ProfileArgumentItem, …>` (`bookmarks/list.ts:43-53`) and this file **CONSTRUCTS** a full literal, so the passthrough's two new REQUIRED fields reach it and the literal goes incomplete |
 | ⚠ **21** *(PR A execute)* | `tests/server/bookmarks/masking.test.ts` | **A** | **A5** — ⛔ **SYMBOL-FENCED to the sorted key list of the PRESENT-POST variant: the two entries the assertion names, 16 → 18.** ⛔ **The belt-and-braces no-Sell-key loop: UNTOUCHED. It is the INVARIANT; the whitelist is only the ENUMERATION — that distinction is WHY this is a widening and not a weakening.** ⛔ No other variant, no other assertion, no removed-variant key. **Security finding, verbatim:** *"Reviewed 2026-08-14 under the guard's own terms. authorStake and priceAtBet are properties of the AUTHOR'S bet frozen at post time (pb.stake, pb.price_at_bet), not of the viewer's position — viewer-independent by construction, which is the property forced-visitor mode requires. Neither is Sell-eligibility; /bookmarks never mounts SellModule (F-BM-3). Ratified upstream at ADR-0032 D-4 and canon ruling 1, and REQUIRED downstream by PD-6-01. SC-1 intact: live variants only. The no-Sell-key loop is untouched and still enforcing."* |
 | ⚠ **22** *(§11 reconciliation)* | `docs/logs/POLISH-5-HALT.md` | **A · B · C** | **the halt record.** ⚠ **PLAN-INTERNAL CONFLICT, RESOLVED HERE.** §11 mandates this exact path — *"written **before** stopping, in-session"* — while §6 deny-lists `docs/logs/**` and this table omitted it, so **obeying §11 was a §5 violation and obeying §5 made a RUN-STOP unrecordable.** The mandate wins: a halt that cannot be written is a halt that is not recorded. ⛔ **This row admits the halt record and NOTHING else under `docs/logs/**`** — the session log at close-out is a separate, later commit and is not licensed by this row |
+| ⚠ **23** *(new, v2.4)* | `tests/unit/design/side-pole-binding.test.ts` | **B** | **item 1 — ⛔ SYMBOL-FENCED to `PERMITTED_FILES`'s TWO ENTRIES and the `:285-293` SURVEY-DELTA DOCBLOCK. Nothing else in the file.** ⚠⚠ **WHY THIS ROW EXISTS: `:363`'s `expect(inventory).toEqual(PERMITTED_FILES)` is a CLOSED exact-equality inventory, and `SlotHeader.tsx` is in it SOLELY because of the `ThumbGlyph` colour spread at `:43` — the exact expression item 1 lifts.** At `B5` it breaks in **BOTH directions at once**: `ui/thumb-glyph.tsx` **enters** the inventory unpermitted, and `SlotHeader.tsx` **leaves** it. ⛔ **THE ENUMERATION MOVES; THE INVARIANT DOES NOT.** The pole-boundness predicate, the two `>=` floors and every `offenders.toEqual([])` assertion are **UNTOUCHED** — the scanner still walks `src/` recursively and still reaches the new leaf, so INV-3 is guarded exactly as before. **This is a widening of an ENUMERATION, not a weakening of a GUARD — the distinction PR A's row 21 drew and this row inherits.** ⛔ **The docblock moves in the SAME COMMIT or it becomes a lying docblock naming a file the expression has left** — the `P5-D20` class this plan catches elsewhere. ⛔ **No other file under `tests/unit/design/` is admitted, and a red guard anywhere else remains RUN-STOP 2.** |
 
 > ### ⚠ ROWS 19 – 22 WERE RATIFIED **BY RELAY, 2026-08-14**, DURING PR A's EXECUTE — NOT AT PLAN TIME
 >
@@ -1173,11 +1504,11 @@ tests/unit/shell/page-container.test.ts              171 ±
 | ⚠ **`src/app/(public)/m/[slug]/error.tsx`** *(new)* | ⚠ **POLISH.3's, merged at #328.** A live retry precedent, a copy divergence and a testid divergence — **read as reference, written NEVER.** An edit here is ⛔ **RUN-STOP condition 1** (§2.16) |
 | `src/app/(public)/bookmarks/error.tsx` | **`.6`'s.** Identical defect, identical fix, **not this plan's file** |
 | `src/components/discovery/**` | **NOT REFACTORED** (D8(b)). POLISH.2 is closed. `ErrorState.tsx`'s CTA is the **reference** for item 9's leaf; read, written never |
-| `src/components/bookmarks/**` | POLISH.6's. ⚠ **POLISH.3 PR 2 will write `BookmarkToggle.tsx` there** (`POLISH-3.md:58`, re-verified §2.17) — `.5` and `.6` never share a file |
+| `src/components/bookmarks/**` | POLISH.6's. ⚠ **POLISH.3 PR 2 will write `BookmarkToggle.tsx` there** (`POLISH-3.md:58`, re-verified §2.17) — ~~`.5` and `.6` never share a file~~ ⚠ v2.4: superseded — see rows 20 and 21. |
 | `src/app/(public)/u/[pseudonym]/{page,loading}.tsx` | No item reaches them. ⚠ `loading.tsx` **hosts** `ProfileLoading` but needs no edit for item 7 |
 | `tests/unit/design/**` — **all SEVEN** *(re-counted at the new head)* | **Guards.** A red one is a ⛔ RUN-STOP — a finding about the change, never a file to fix: `avatar-ring-token` · `emphasis-ladder-tokens` · `no-raw-dharma-render` · `no-raw-hex-view-layer` · **`pct-round-render`** · `side-pole-binding` · **`tokens-monochrome`** ⚠ *(the last two are `C-1`'s evidence — read, never written)* |
-| `tests/server/profile/**` · `tests/server/bookmarks/**` | DB-backed. ⚠ **Measured NOT to redden** (§2.14) |
-| `tests/unit/bookmarks/render/side-encoding.test.tsx` | `.6`'s. **It exists** and holds zero state-string assertions (§17) |
+| `tests/server/profile/**` · `tests/server/bookmarks/**` | ⚠⚠ **v2.4 — PARTLY SUPERSEDED BY ROW 21, WHICH THIS TABLE NEVER RECORDED.** The DB-backed reasoning holds for `tests/server/profile/**` and for every `tests/server/bookmarks/` file **except** `masking.test.ts`, which **PR A wrote** under row 21. ⚠ **The struck row and row 21 contradicted each other on `main` from PR A's close-out until now** — an `O-5` survivor of the amendment that added the row. **`tests/server/**` remains ⛔ for PR B and PR C** |
+| `tests/unit/bookmarks/render/side-encoding.test.tsx` | ⚠⚠ **v2.4 — SUPERSEDED BY ROW 20.** v2.3 read *"`.6`'s. **It exists** and holds zero state-string assertions."* **PR A wrote its `liveItem` factory** under row 20, symbol-fenced to the two fields `tsc` named. ⇒ **`.5` and `.6` HAVE now shared a file, once, by ratified exception.** ⛔ **Struck for PR B and PR C; the file is `.6`'s** |
 | `docs/logs/**` · `docs/adr/**` | ⚠ **Two carry PROSE COPIES of the pre-trim error string** (§2.9). **Neither is a pin; neither is edited** |
 | `docs/plans/POLISH-3.md` · `docs/plans/POLISH-3-RUN-TRACKER.md` · `docs/parked.md` | ⚠ **CITED by this plan and CHANGED in the re-key range** (§2.17). **Read and re-verified; written never** |
 | `docs/polish/**` · `docs/specs/**` | Commit 0's, or out of scope. **`docs/design/design-canon.md` is the single declared `docs/` write** |
@@ -1200,14 +1531,15 @@ tests/unit/shell/page-container.test.ts              171 ±
 ⛔ src/components/bookmarks/**                — POLISH.6's (and .3 PR 2's BookmarkToggle.tsx)
 ⛔ src/lib/**                                 — incl. ranking.ts, whose docblock defect is ROUTED (OD-8)
 ⛔ tests/staging/**  ·  tests/scale/**        — ADR-0035/0036 live-DB runners
-⛔ tests/unit/design/**                       — all seven guards
+⛔ tests/unit/design/**                       — all seven guards. EXCEPT side-pole-binding.test.ts (§5 row 23, symbol-fenced, PR B only)
 ⛔ tests/server/**                            — DB-backed
-⛔ docs/polish/**  ·  docs/specs/**  ·  docs/adr/**  ·  docs/logs/**  ·  docs/plans/**
+⛔ docs/polish/**  ·  docs/specs/**  ·  docs/adr/**  ·  docs/plans/**
+⛔ docs/logs/**                               — EXCEPT docs/logs/POLISH-5-HALT.md (§5 row 22, the halt record ONLY)
 ```
 
 **⚠ THE BELT CANNOT SEE FOUR OF THIS PLAN'S EXCLUSIONS**, and that is stated rather than left to be discovered:
 
-- `IdentityCard.tsx`, `ProfileTiles.tsx` and the four other `graph/` files sit **inside** `src/components/profile/`, which is **not** deny-listed. They are excluded **by the allow-list alone.** An edit there is ⛔ RUN-STOP condition 1.
+- ⚠ **v2.4 · CORRECTED.** `ProfileTiles.tsx` and the four `graph/` files sit **inside** `src/components/profile/`, which is **not** deny-listed. They are excluded **by the allow-list alone.** An edit there is ⛔ RUN-STOP condition 1. ⛔⛔ **`IdentityCard.tsx` IS NO LONGER AMONG THEM.** v2.3 made it **allow-list row 18** and RUN-STOP condition **16** permits item 17's fenced write — **and this bullet still declared any edit there a RUN-STOP, over a write PR A had already landed.** v2.3's eleven-site banner listed §5 and §11 and **not** §6. **`O-5`'s failure mode, in the document that cites `O-5`.**
 - `SlotHeader.tsx` is excluded **by symbol**, not by path.
 - `src/server/profile/` holds seven files; **only `arguments.ts` is admissible.** `episodes.ts`, `graph-series.ts`, `owner-view.ts`, `positions.ts`, `resolve.ts`, `tiles.ts` are ⛔ despite sitting beside the one exception.
 - ⚠ **NEW — `src/app/(public)/m/[slug]/error.tsx`** sits inside `src/app/(public)/`, which is **not** deny-listed, and `u/[pseudonym]/error.tsx` **is** on the allow-list one directory over. **The new boundary is excluded by the allow-list alone, and an executor comparing the two files will have both open** (§2.16).
@@ -1223,7 +1555,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | `LoadingBlock` | `ui/loading-block.tsx` | Consumed as shipped by item 7. Its `data-loading-block` marker is the convention rows 9–11 copy |
 | `EmptyState` · `EMPTY_COPY` · `ErrorState` · `ERROR_COPY` | `discovery/**` | The **reference** for items 8 and 9. Read, never written |
 | ⚠ **`DebateRouteError` and every string in it** *(new)* | `app/(public)/m/[slug]/error.tsx` | ⚠ **v2.2.** POLISH.3's merged file. ✅ **Its FOCUS RECIPE may be copied by name** into `error-block` (`outline-none hover:underline focus-visible:shadow-(--state-focus-ring)`). ⛔ **Its COPY (`"Try again"`, `"Something went wrong."`) and its CONTAINER-level `data-testid` must NOT be copied** — the first is product copy CC never authors, the second reddens `surface.test.tsx:432-435` against `OD-7` (§2.16) |
-| **Every `PROFILE_COPY` member EXCEPT `error.load` and `error.action` · ALL of `GRAPH_COPY`** | `profile/copy.ts` | **OQ-7 web-authored (CLAUDE.md §3).** ⚠ **`NEW-1` RESOLVED — the fence widens to EXACTLY TWO members and no others:** `error.action` is **added**, `error.load` is **trimmed**, and they arrive **together**. ⛔ **`chip.*`, all four `empty.*`, `graph.empty` and every `GRAPH_COPY` member remain no-edit.** ⚠⚠ **v2.3 · `HM-5` — v2.2's STATED GROUND HERE IS FALSE AND IS CORRECTED.** v2.2 said the four `empty.*` *"are pinned by `.toBe()` at `surface.test.tsx:400-424`"*. **True as to LOCATION** (`:401`, `:408`, `:416`, `:423` all fall in that range) **and FALSE as to EFFECT: all seven `PROFILE_COPY` assertions in that file are REFERENCE pins against the imported constant, not literal pins** (`:387`, `:392`, `:401`, `:408`, `:416`, `:423`, `:434` — head-measured). **Re-wording ANY of those strings in `copy.ts` leaves the suite GREEN.** ⇒ **THE FENCE IS RUN-STOP 4 AND CLAUDE.md §3. IT IS NOT THE SUITE.** ⛔ **An executor must not infer that a green suite licenses a re-word** |
+| **Every `PROFILE_COPY` member EXCEPT `error.load` and `error.action` · ALL of `GRAPH_COPY`** | `profile/copy.ts` | **OQ-7 web-authored (CLAUDE.md §3).** ⚠ **`NEW-1` RESOLVED — the fence widens to EXACTLY TWO members and no others:** `error.action` is **added**, `error.load` is **trimmed**, and they arrive **together**. ⛔ **`chip.*`, all four `empty.*`, `graph.empty` and every `GRAPH_COPY` member remain no-edit.** ⚠⚠ **v2.3 · `HM-5` — v2.2's STATED GROUND HERE IS FALSE AND IS CORRECTED.** v2.2 said the four `empty.*` *"are pinned by `.toBe()` at `surface.test.tsx:400-424`"*. **True as to LOCATION** (`:401`, `:408`, `:416`, `:423` all fall in that range) **and FALSE as to EFFECT: all seven `PROFILE_COPY` assertions in that file are REFERENCE pins against the imported constant, not literal pins** (`:448`, `:453`, `:462`, `:469`, `:477`, `:484`, `:495` — ⚠ **re-measured at `5ff418b`; PR A moved every one by +61** (§1.18)). **Re-wording ANY of those strings in `copy.ts` leaves the suite GREEN.** ⇒ **THE FENCE IS RUN-STOP 4 AND CLAUDE.md §3. IT IS NOT THE SUITE.** ⛔ **An executor must not infer that a green suite licenses a re-word** |
 | ⛔ **ANY `title` ATTRIBUTE CARRYING TEASER OR BODY TEXT** | `profile/ArgumentList.tsx` — **and any argument card, any surface** | ⚠ **`AM-1`.** A no-edit-shaped **prohibition**: the clamp is **CSS-ONLY**. A native tooltip revealing the full paragraph is a **second read affordance beside the title `<Link>`** — what **D13** rules out, reached by a different mechanism (§2.8). ⚠ **The idiom is LIVE at EIGHT sites under `src/components/` and TEN under `src/`** (v2.2 re-count), incl. `SlotHeader.tsx:102` — **eleven lines from item 1's lift.** ⛔ **RUN-STOP 13** |
 | `SellModule`'s **prop object** (`PositionsTable.tsx:178-188`) · `sellMarketId`'s one-at-a-time semantics | `profile/PositionsTable.tsx` | **D14 rules `P5-D13` IN, so the `sellable && sellOpen` block is item 10's work surface.** ⇒ **Item 10 may edit the HOST** (the `<tr>`/`<td>`/wrapper geometry at `:172-192`); **it may not change what is passed to `SellModule`.** Items 1, 8 and 11 may touch **none** of it |
 | `Segment`'s `data-side` (`:177`) · `GraphNodeMark`'s `data-side` (`:265`) · `GraphNodeMark`'s side-keyed **fill** (`:271`) | `graph/ProfileChart.tsx` | ⚠ **PR C's fence.** Item 13 drops **`FlipMarker`'s `data-side` (`:220`) and nothing else**; item 14 **asserts** the fill; item 12 **describes** it. The rule is §2.10's |
@@ -1276,6 +1608,14 @@ tests/unit/shell/page-container.test.ts              171 ±
 
 ### 8.2 · ZERO-DELTA PROOF, PER CONSUMER
 
+> ### ⚠⚠ v2.4 — **THIS TABLE IS THE ROOT CAUSE PR A's CLOSE-OUT NAMED, AND PR A's CLOSE-OUT DID NOT AMEND IT**
+>
+> `POLISH-SURFACE-TEMPLATE.md` §13.6 was minted from this table's failure: *"§8.2's zero-delta table enumerated the files that CONSUME the widened DTO and missed the files that CONSTRUCT or ASSERT it."* **It measured `src/server/bookmarks/list.ts` and cleared it correctly — but could not see a test that BUILDS a `BookmarkItem` literal, nor one that ASSERTS its exhaustive key set. Rows 20 and 21 both exist because of that gap.** ⚠ **The diagnosis landed at §13.6; the table it diagnoses was left unchanged. This banner closes that.**
+>
+> **⇒ THE STANDING RULE, restated here where the failure happened:** a zero-delta proof over a shared type must enumerate every file that **CONSUMES**, **CONSTRUCTS**, or **EXHAUSTIVELY ASSERTS THE SHAPE OF** it. **Finder:** `grep -rn 'Object.keys(' tests/ | grep -E 'toEqual|toHaveLength'`.
+>
+> **⇒ AND ITS PR-B ANALOGUE, because PR B widens no DTO and has the same exposure by a different mechanism:** **a plan that MINTS a shared primitive must enumerate every DOWNSTREAM CONSUMER'S declared prop contract before the mint** — a consumer forbidden to edit the leaf has no repair path after the merge. ⚠ **`.6`'s RUN-STOP 12 makes `src/components/ui/` import-only; §1.5A is what discharges this for PR B.** **Routed to `POLISH-SURFACE-TEMPLATE.md` §13 as a new rule, by symbol, unnumbered.**
+
 | Change | Consumer | How zero-delta is PROVEN, not argued |
 |---|---|---|
 | `ThumbGlyph` lifts to `ui/thumb-glyph.tsx` | `SlotHeader.tsx` | the existing `SlotHeader` suite runs **unchanged** and green; `size` defaults to 16; the `fill-no` / `stroke="none"` NO arm and the `strokeWidth 1.1` YES arm carry byte-for-byte. ⚠ **FIRM under `OD-2` — this is no longer a conditional obligation** |
@@ -1286,6 +1626,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | `arguments.ts` passthrough | `debate-export`, `debate-view` | ⚠ **THE CORRECTED CHECK** (§2.14). The pass condition is **ZERO hits under `src/server/debate-view/`, `src/server/debate-export/` and `src/components/debate/`** — **not** "only `profile/**`" |
 | `arguments.ts` passthrough | `src/server/bookmarks/list.ts` | ✅ **Measured: `list.ts` imports `buildPostItem`/`buildReplyItem`, so it receives the fields automatically.** That is D23's *"one edit, not two"* working — **and `NEW-3` ground 2 is why `.6` cannot precede PR A** (§0.3) |
 | **PR C's four items** | **everything outside `ProfileChart.tsx`** | `ProfileChart.tsx` is imported by exactly one component (`ProfileGraphCard.tsx:6`) and one test (`graph.test.tsx:12`). Items 12/13/16 change **a comment, an attribute and additive SVG furniture** — **no exported signature, no prop, no geometry primitive** (§7). ⇒ **`ProfileGraphCard` cannot move.** ⚠ **v2.2: item 12 also changes NO token value** (§7) |
+| `ui/thumb-glyph.tsx` mint | ⚠ **`tests/unit/design/side-pole-binding.test.ts`** | ⚠⚠ **v2.4 · NOT ZERO-DELTA — AND THIS IS THE PR-B INSTANCE OF THE RULE ABOVE.** `:363`'s closed inventory breaks in both directions at `B5`. **Pre-fenced at §5 row 23; the enumeration moves in `B5`'s own commit.** ⛔ **Every other guard, floor and offender assertion in that file is untouched** |
 
 ---
 
@@ -1312,11 +1653,11 @@ tests/unit/shell/page-container.test.ts              171 ±
 
 | Commit | Items | Ultracode | Why this boundary |
 |---|---|---|---|
-| **B1** | item 7 — `ProfileLoading` adopts `LoadingBlock` **+ non-vacuity guard** | ⛔ **NO** | First because it consumes an **existing** primitive and mints nothing. Lands green independent of B2 |
+| **B1** | item 7 — `ProfileLoading` adopts `LoadingBlock` **+ non-vacuity guard** | ⛔ **NO** | First because it consumes an **existing** primitive and mints nothing. Lands green independent of B2. ⚠ v2.4 · D-13: this commit ALSO mints the tile-count constant (§3 item 7). |
 | **B2** | `ui/empty-block.tsx` + `ui/error-block.tsx`, **minted with NO consumer** | ⛔ **NO** | D8(b) rules them minted together. With no consumer, the seven design guards are exercised against the leaves **alone** — **if any reddens here, the cause is unambiguous** |
 | **B3** | item 8 — three empties adopt `empty-block` **+ the first-ever `graph-empty` assertion + the non-vacuity guard** | ⛔ **NO** | All three sites in one commit (§1.2 ground 2). ⚠ **This is PR B's ONLY write to `graph.test.tsx`** (§2.15) |
-| **B4** | item 9 — `error-block` consumer + `states.tsx` + `error.tsx`'s wrapper removal **+ BOTH `NEW-1` copy members** | ⛔ **NO** | ⚠ **MUST BE ONE COMMIT.** Removing the wrapper without wiring `reset()` leaves the surface with **no retry at all** at a boundary. ✅ **NOT BLOCKED — `NEW-1` is RESOLVED.** ⚠ **The trim and the addition land TOGETHER**, per §5 row 6. ⚠ **`OD-7` = BESIDE is a design constraint OF THIS COMMIT**, not a later fix. ⚠⚠ **v2.2: the executor of this commit will have `m/[slug]/error.tsx` open. COPY ITS FOCUS RECIPE; COPY NEITHER ITS COPY STRING NOR ITS TESTID PLACEMENT** (§2.16) |
-| **B5** | item 1 — the lift, the re-point, the canon pin **and** the positions-row render + guard | ⛔ **NO** | ⚠ **MUST BE ONE COMMIT, and it is the plan's largest.** D6 requires the canon amendment in the same commit as `ui/thumb-glyph.tsx`; §8.2 requires `SlotHeader`'s suite green unchanged in the same commit as the re-point. ⛔ **`SlotHeader.tsx:102`'s `title=` is OUT of the symbol fence** (§5 row 12). ⚠ **v2.2 · `OD-2`: THE `.4`-FIRST SHRINK IS GONE. This commit does the full lift, unconditionally** (§1.4) |
+| **B4** | item 9 — `error-block` consumer + `states.tsx` + `error.tsx`'s wrapper removal **+ BOTH `NEW-1` copy members** | ⛔ **NO** | ⚠ **MUST BE ONE COMMIT.** Removing the wrapper without wiring `reset()` leaves the surface with **no retry at all** at a boundary. ✅ **NOT BLOCKED — `NEW-1` is RESOLVED.** ⚠ **The trim and the addition land TOGETHER**, per §5 row 6. ⚠ **`OD-7` = BESIDE is a design constraint OF THIS COMMIT**, not a later fix. ⚠⚠ **v2.2: the executor of this commit will have `m/[slug]/error.tsx` open. COPY ITS FOCUS RECIPE; COPY NEITHER ITS COPY STRING NOR ITS TESTID PLACEMENT** (§2.16). ⚠ v2.4 · D-14: this commit ALSO adds the SPDX line to error.tsx (§3 item 9). ⛔ The leaf centres itself — NO className on `<PageContainer>` (RUN-STOP 15). |
+| **B5** | item 1 — the lift, the re-point, the canon pin **and** the positions-row render + guard | ⛔ **NO** | ⚠ **MUST BE ONE COMMIT, and it is the plan's largest.** D6 requires the canon amendment in the same commit as `ui/thumb-glyph.tsx`; §8.2 requires `SlotHeader`'s suite green unchanged in the same commit as the re-point. ⛔ **`SlotHeader.tsx:102`'s `title=` is OUT of the symbol fence** (§5 row 12). ⚠ **v2.2 · `OD-2`: THE `.4`-FIRST SHRINK IS GONE. This commit does the full lift, unconditionally** (§1.4). ⚠⚠ **v2.4 — THIS COMMIT REDDENS `side-pole-binding.test.ts` DETERMINISTICALLY, AND THAT IS EXPECTED.** The lift moves the only qualifying expression out of `SlotHeader.tsx` and into `ui/thumb-glyph.tsx`, so `:363`'s closed inventory fails in both directions. ⛔ **The enumeration and the `:285-293` docblock move IN THIS COMMIT** (§5 row 23). ⛔ **RUN-STOP 2 is carved out for THIS FILE, THIS COMMIT, and nothing else** (§11 condition 2). |
 | **B6** | item 10 — the fixed-height sell host + guard **+ the `:175-176` comment correction** | ⛔ **NO** | ⚠ **Before item 11**, because item 11 changes which rows are visible and `sell.test.tsx` is the file both move |
 | **B7** | item 11 — the filter, **`:53` and `:114` together** + the five assertion repairs + the `:448` comment. ⚠ **PR B's full-suite floor runs here** | ⛔ **NO** | ⚠ **NEVER split `:53` from `:114`** (§2.4). ⚠ **Do not touch `surface.test.tsx:450`.** **B7 is PR B's last commit and carries the floor** |
 
@@ -1340,7 +1681,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | # | ⛔ Condition | Run against this plan | Verdict |
 |---|---|---|---|
 | **P-1** | *"the query-clause fence fires"* | **FIRES.** §7 names `loadProfileArguments`' query text no-edit, and §8.2 requires a grep over `arguments.ts` | **CARVE-OUT, IN ADVANCE:** *the query-clause fence is scoped to the **DIFF** of `src/server/profile/arguments.ts`, never to quoted text in this plan or any relay* |
-| **P-2** | *"the `origin/main` re-key goes non-empty"* | ⚠⚠ **RE-STATED WITH THE REAL TWO-POINT DIFF — v2.1's version was an IDENTITY and could not detect movement. THIS ONE RAN, AND IT RAN EMPTY.** Measured `2326e84..16971cd` over the six write-paths: **no output.** ⇒ **Every coordinate carries** (§0.1) | ⚠ **CARVE-OUT, NOW IN TWO PARTS — because the single-set version UNDER-COVERS (§2.17):** **(a) THE WRITE SET** — `git diff --stat <GROUND>..origin/main -- src/components/profile/ src/components/ui/ src/server/profile/ src/components/debate/composer/ tests/unit/profile/ docs/design/design-canon.md`. **(b) ⚠ NEW — THE CITE SET**, which this plan quotes by line and never writes: `src/components/debate/badges.tsx` · `src/components/debate/placeholders.tsx` · `src/server/debate-view/load-debate-view.ts` · `src/lib/ranking.ts` · `src/app/globals.css` · `tests/unit/design/` · `docs/plans/POLISH-3.md` · `docs/parked.md`. **A hit in (a) is a ⛔ RUN-STOP; a hit in (b) is a MANDATORY RE-MEASURE of the quoting section before the commit that depends on it.** ⚠ **Both sets ran this pass: (a) empty; (b) two files moved and BOTH quotes were re-verified exact** (§2.17). ⛔ **RE-RUN BOTH AT EVERY PR's BRANCH POINT — and `NEW-3` makes PR C's the sharpest, two surfaces downstream** |
+| **P-2** | *"the `origin/main` re-key goes non-empty"* | ⚠⚠ **RE-STATED WITH THE REAL TWO-POINT DIFF — v2.1's version was an IDENTITY and could not detect movement. THIS ONE RAN, AND IT RAN EMPTY.** Measured `2326e84..16971cd` over the six write-paths: **no output.** ⇒ **Every coordinate carries** (§0.1) | ⚠ **CARVE-OUT, NOW IN TWO PARTS — because the single-set version UNDER-COVERS (§2.17):** **(a) THE WRITE SET** — `git diff --stat <GROUND>..origin/main -- src/components/profile/ src/components/ui/ src/server/profile/ src/components/debate/composer/ tests/unit/profile/ docs/design/design-canon.md`. **(b) ⚠ NEW — THE CITE SET**, which this plan quotes by line and never writes: `src/components/debate/badges.tsx` · `src/components/debate/placeholders.tsx` · `src/server/debate-view/load-debate-view.ts` · `src/lib/ranking.ts` · `src/app/globals.css` · `tests/unit/design/` · `docs/plans/POLISH-3.md` · `docs/parked.md`. **A hit in (a) is a ⛔ RUN-STOP; a hit in (b) is a MANDATORY RE-MEASURE of the quoting section before the commit that depends on it.** ⚠ **Both sets ran this pass: (a) empty; (b) two files moved and BOTH quotes were re-verified exact** (§2.17). ⛔ **RE-RUN BOTH AT EVERY PR's BRANCH POINT — and `NEW-3` makes PR C's the sharpest, two surfaces downstream** ⚠⚠ **v2.4 — THE CONDITION IS RE-WORDED, BECAUSE AS WRITTEN IT FIRES SPURIOUSLY AT EVERY BRANCH POINT AFTER THE FIRST.** v2.3 wrote it against a ground that had not yet absorbed this plan's own merged PRs. **At PR B's branch point the WRITE-set diff is non-empty BY CONSTRUCTION — PR A merged into it.** ⇒ **THE TEST IS ATTRIBUTION, NOT EMPTINESS: every moved path must be attributable to a commit of this plan's own chain (#330, #331, and each subsequent PR of this plan or a ratified interleaved surface). An UNATTRIBUTABLE path is the ⛔ RUN-STOP.** ⚠ **Measured at DOC-1: ten of ten moved paths resolve to #330 or #331; zero unattributable.** ⛔ **The CITE set's rule is unchanged — a hit there is a MANDATORY RE-MEASURE of the quoting section.** |
 | **P-3** | §7.4 — *"an item requires new or re-worded product copy"* | ⚠⚠ **FIRES, AND IS DISCHARGED RATHER THAN HALTED.** Item 9 ships a **visible, accessible-named control**, which needs a **label string**. **`NEW-1` RESOLVED: the founder authored TWO members and they arrive together** — `error.action = "Retry"` (new) and `error.load = "Couldn't load this profile."` (trimmed) | **CARVE-OUT, NARROW AND CLOSED:** *`copy.ts` is allow-listed for **EXACTLY TWO FOUNDER-AUTHORED MEMBERS** and for nothing else.* ⚠ **The cost claim is corrected (§2.9): the trim reddens NOTHING.** ⚠ **AND `OD-7` keeps `:432-435` green for a SECOND, INDEPENDENT reason** |
 | **P-3** *(re-run across all sixteen)* | — | **⇒ IT FIRES IN EXACTLY ONE MORE PLACE, MARGINALLY, AND IS DISCHARGED THERE TOO.** Item 5 renders the literal **`Replies`**. Two grounds it is not an invention: **(i)** the string is given **verbatim in the ratified item text**, so the founder authored it, not CC; **(ii)** the shipped precedent is four lines away — `ArgumentList.tsx:82`/`:84` render literal `Support` / `Counter` **inline, not from `copy.ts`**. ⇒ **Item 5 needs no `copy.ts` member.** ⚠ **And it fires NOWHERE ELSE on the remaining fourteen:** item 1's "word" is the **side value** (data, not copy); item 11 **removes** a label; item 12's text is a **docblock** (not user-visible); item 16 ships **unlabelled** gridlines (`OD-9`); items 2, 3, 4, 7, 8, 10, 13, 14, 15 add **no user-visible string at all** | **⇒ CLEAN ON FOURTEEN. DISCHARGED ON ITEM 5. RESOLVED ON ITEM 9.** ⚠⚠ **v2.2 ADDS A NEGATIVE CLAUSE: `"Try again"` on `m/[slug]/error.tsx` is ALSO product copy, it is POLISH.3's, and `.5` HARMONISES NEITHER DIRECTION** (§2.16). **A `.5` commit that edits either string to match the other is ⛔ RUN-STOP condition 4** |
 | **P-4** | §7.2 — *"a design guard reddens"* | **FIRES, predictably, on B2.** `error-block` copies `ErrorState.tsx:50`'s recipe | **NOT A HALT — CARVE-OUT:** the measured recipe is `bg-n0` · `--r-chip` · `--dur-hover` · `--state-hover-fill` · `--state-focus-ring` · `--state-pressed-fill` · `--color-ink`, **every one an already-shipped raw-props token.** Copying **by name** adds no token, so the 11-token census is untouched and `no-raw-hex-view-layer` sees no hex. ⚠ **v1.0's list included `--btn-fill`; measured, Discovery's button does not use it** — corrected. ✅ ⚠ **v2.2 STRENGTHENS THIS: `m/[slug]/error.tsx:75` ships `focus-visible:shadow-(--state-focus-ring)` — a NEWER, guard-passing precedent using a token already inside this carve-out's named set** (§2.16). **B2 mints with no consumer precisely so this is tested in isolation. If either reddens anyway the carve-out is VOID → ⛔ RUN-STOP condition 2** |
@@ -1376,7 +1717,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 **⛔ RUN-STOP → write the halt record and stop the PR.**
 
 1. Any write outside §5's allow-list becomes necessary. ⚠ **Includes the six non-listed files inside `src/components/profile/` AND `src/app/(public)/m/[slug]/error.tsx`, none of which §6's belt can see** (§6, §2.16).
-2. **Any of the SEVEN `tests/unit/design/` guards reddens.** **A red guard is a finding about the change, never a file to fix.**
+2. **Any of the SEVEN `tests/unit/design/` guards reddens.** **A red guard is a finding about the change, never a file to fix.** ⚠⚠ **v2.4 — ONE NAMED CARVE-OUT, FOUNDER-RATIFIED: `side-pole-binding.test.ts`'s `closed-inventory-of-side-keyed-colour-sites` at commit `B5` ONLY.** That red is **predicted, grounded and pre-fenced** (§5 row 23, §8.2, §9 `B5`) — the enumeration moves with the expression it enumerates. ⛔ **ANY OTHER red in that file, in that commit or any other, and ANY red in the other six guards, remains RUN-STOP in full.** ⛔ **The carve-out permits editing `PERMITTED_FILES` and the `:285-293` docblock. It does NOT permit touching a predicate, a floor, or an `offenders.toEqual([])`.**
 3. An item requires a `src/server/**` edit other than `arguments.ts`, or any `src/db/**` / `drizzle/**` edit.
 4. An item requires new or **re-worded** product copy beyond `NEW-1`'s **two** founder-authored members (CLAUDE.md §3). ⚠ **v2.2 rider: this explicitly includes "harmonising" `PROFILE_COPY.error.action` with `m/[slug]/error.tsx`'s `"Try again"` in EITHER direction** (§2.16).
    > ### ⚠⚠ v2.3 · `HM-1` — **A NAMED CARVE-OUT TO CONDITION 4, FOUNDER-RATIFIED 2026-08-13. IT IS AN OVERRIDE OF A RUN-STOP, NOT A CLARIFICATION.**
@@ -1388,7 +1729,7 @@ tests/unit/shell/page-container.test.ts              171 ±
    > **⇒ `PROFILE_COPY.error.action = "Try again"` IS PERMITTED, AND ONLY THAT VALUE.** ⛔ **Condition 4 otherwise stands in full.** Any OTHER value for `error.action`, any re-word of `error.load` beyond `NEW-1`'s ratified trim, and any edit to any other `PROFILE_COPY` or `GRAPH_COPY` member remain ⛔ **RUN-STOP** (condition 10).
    >
    > ⚠ **`error.load`'s VALUE is unchanged by `JR-2`.** Only its **PLACEMENT** moves — under **B′** it is the leaf's **body**, not its heading (§1.5, `A2`). `surface.test.tsx:432-435` pins it by reference and stays green.
-5. `origin/main` advances with a non-empty diff under **`P-2`'s WRITE set** — ⚠ **and a non-empty diff under `P-2`'s CITE set is a MANDATORY RE-MEASURE, escalating to RUN-STOP if any quoted line has moved** (§10 P-2, §2.17). ⚠ **Sharpest at PR C's branch point, two surfaces downstream under `NEW-3`.**
+5. ⚠ **v2.4 — `origin/main` advances with a WRITE-set path that is NOT ATTRIBUTABLE** to #330, #331, or a subsequent PR of this plan or a ratified interleaved surface. ⛔ **A non-empty WRITE-set diff is NOT itself the run-stop — after PR A it is the expected state.** The executor runs `git log --oneline <GROUND>..origin/main -- <path>` per moved path and attributes each. **An unattributable path is ⛔ RUN-STOP.** ⚠ **A non-empty CITE-set diff remains a MANDATORY RE-MEASURE of the quoting section, escalating to RUN-STOP if any quoted line has moved.** ⚠ **Sharpest at PR C's branch point, ONE surface downstream** (`D-4`, §0.3).
 6. A commit boundary would land RED (H9).
 7. **A price value reaches a removed union variant, in any form** — SC-1. ⚠ Its tripwire is `argument-list-side.test.tsx:121-135` going red at A6.
 8. **`12. **Side chip**` is not found verbatim in `design-canon.md` §3** (P-10).
@@ -1398,8 +1739,8 @@ tests/unit/shell/page-container.test.ts              171 ±
 12. ⚠ **`H12` fires and cannot be cleared** — a concurrent runner is live and its owning session is not this one (§0.6). **Wait; do not proceed and do not kill another session's process.** ⚠ **Instrument: `pgrep -f 'node.*vitest'`, never `ps | grep`.** ⚠ **v2.2: under `NEW-3` a live `.6` session during `.5`'s PR B→PR C gap is the EXPECTED state, not an anomaly.**
 13. ⚠ **`AM-1`. ANY `title` ATTRIBUTE CARRYING TEASER OR BODY TEXT APPEARS ON AN ARGUMENT CARD, in any commit, in any PR.** The clamp is **CSS-only** (§2.8). ⚠ **This fires on the ATTRIBUTE, not on the guard**: it is a run-stop even if item 6's `innerHTML` assertion is present and green, because a guard that permits the leak is not a defence. ⚠ **Three in-repo precedents exist and none of them is authority here** (`SlotHeader.tsx:102` · `ReplySplitBar.tsx:133` · `SellModule.tsx:260`).
 14. ⚠ **`C-1`. ANY EDIT TO A TOKEN VALUE IN `src/app/globals.css`, in any commit, in any PR.** ⛔ **`--graph-yes`, `--graph-no`, `--color-yes` and `--color-no` are ratified and `tokens-monochrome.test.ts:78-80` pins two of them by exact string.** **Item 12 changes PROSE to match the values; it never changes a value to make prose true** (§2.11, §7). ⚠ **`globals.css` is on no allow-list, so this is also condition 1 — it is named separately because the temptation is specific and the file is not deny-listed by directory.**
-15. ⚠ **NEW at v2.3 — ANY `className` ON THE `<PageContainer>` IN `src/app/(public)/u/[pseudonym]/error.tsx`.** `tests/unit/shell/page-container.test.ts`'s `callSite()` asserts class-set **EQUALITY** against `SITES`, and **entry 7 is this file** with `before: "mx-auto w-full max-w-3xl px-4 py-6"` — the bare preset (head-measured). **Adding a `className` reddens it.** ⇒ **Centring lives INSIDE `error-block`; the leaf centres itself** (§1.5). ⚠ **`m/[slug]/error.tsx` escapes only because POLISH.3 declared it in a separate `GREENFIELD` array — that is not a precedent this file may follow.** ⚠⚠ **`page-container.test.ts` is on NO allow-list and is NOT under `tests/unit/design/**`, so condition 2 does not cover it. That is exactly why this condition exists.** ⚠ **The executor verifies THIS route's `SITES` entry at head** — `.6` measured entry 4, which is a different row.
-16. ⚠ **NEW at v2.3 — ANY EDIT INSIDE `IdentityCard.tsx` OTHER THAN ITEM 17's FENCED WRITE** (§5 row 18). ⛔ **Explicitly including `justify-between` on the root `Card` at `:32`, any change to the `<img>` at `:40`, and any download-icon affordance** (W2.13 R2 struck it). ⚠ **An icon whose text contains `"@"` reddens `surface.test.tsx:301` — that is a finding about the change, not a file to fix.**
+15. ⚠ **NEW at v2.3 — ANY `className` ON THE `<PageContainer>` IN `src/app/(public)/u/[pseudonym]/error.tsx`.** `tests/unit/shell/page-container.test.ts`'s `callSite()` asserts class-set **EQUALITY** against `SITES`, and **entry 7 is this file** with `before: "mx-auto w-full max-w-3xl px-4 py-6"` — the bare preset (head-measured). **Adding a `className` reddens it.** ⇒ **Centring lives INSIDE `error-block`; the leaf centres itself** (§1.5). ⚠ **`m/[slug]/error.tsx` escapes only because POLISH.3 declared it in a separate `GREENFIELD` array — that is not a precedent this file may follow.** ⚠⚠ **`page-container.test.ts` is on NO allow-list and is NOT under `tests/unit/design/**`, so condition 2 does not cover it. That is exactly why this condition exists.** ⚠ **The executor verifies THIS route's `SITES` entry at head** — `.6` measured entry 4, which is a different row. ✅ ⚠ v2.4: RE-VERIFIED AT 5ff418b. u/[pseudonym]/error.tsx IS SITES entry 7, before: "mx-auto w-full max-w-3xl px-4 py-6", no className, no adds. The file was untouched by #330 and #331. The premise HOLDS.
+16. ⚠ **NEW at v2.3 — ANY EDIT INSIDE `IdentityCard.tsx` OTHER THAN ITEM 17's FENCED WRITE** (§5 row 18). ⛔ **Explicitly including `justify-between` on the root `Card` at `:32`, any change to the `<img>` at `:40`, and any download-icon affordance** (W2.13 R2 struck it). ⚠ **An icon whose text contains `"@"` reddens `surface.test.tsx:301` — that is a finding about the change, not a file to fix.** ✅ ⚠ v2.4: SPENT. Item 17 landed at PR A (#331), IdentityCard.tsx +36 lines. Kept as a RECORD of the fence the write ran under, not as a live condition for PR B or PR C.
 
 ---
 
@@ -1443,7 +1784,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | At **C3** *(PR C's last commit)* | `pnpm vitest run` (full-suite floor) | **PR C's own floor.** Its items touch the graph render and `side-pole-binding.test.ts`'s territory, which is exactly where a cross-suite pin lives. ⚠ **v2.2: `tokens-monochrome.test.ts` is now known to pin the graph tokens by exact string — this floor is what catches an accidental token edit** (§11 condition 14) |
 | Before PR A's first commit | `grep -rn '@/server/profile/arguments' src/ tests/` | ⚠ **CORRECTED PASS CONDITION (§2.14):** **ZERO hits under `src/server/debate-view/`, `src/server/debate-export/`, `src/components/debate/`.** ⛔ **NOT** *"only `profile/**`"* — `src/server/bookmarks/list.ts:26` and three `tests/server/` suites are **expected** consumers |
 | Before B4 | `grep -rn 'PROFILE_COPY.error' src/ tests/` | ⚠ **`NEW-1`'s zero-delta proof, re-run at execute rather than inherited.** **Pass condition: exactly TWO hits** — `states.tsx` (the render) and `surface.test.tsx` (the assertion, **through the const**). **A third hit, or any literal `"Couldn't load this profile"` in `src/` or `tests/`, means the trim now moves a pin → re-measure before committing** (§2.9) |
-| ⚠ **Before B4** | **`grep -rn 'Try again' src/`** | ⚠ **v2.2 · NEW.** **Expected: exactly ONE hit — `src/app/(public)/m/[slug]/error.tsx:77`, POLISH.3's, off the allow-list.** **A second hit means `.5` authored product copy → ⛔ RUN-STOP condition 4** (§2.16) |
+| ⚠ **Before B4** | **`grep -rn 'Try again' src/components/profile/ src/components/ui/ src/app/\(public\)/u/`** | ⚠⚠ **v2.4 — THE GATE IS RE-SCOPED, BECAUSE v2.2's VERSION WAS BORN FALSE.** It read *"Expected: exactly ONE hit — `m/[slug]/error.tsx:77`."* **Measured: SIX in `src/` at head AND SIX at this plan's own ground `16971cd`** — `global-error.tsx:68` · `m/[slug]/error.tsx:77` · `(auth)/error.tsx:76` · three composer rate-limit strings in `debate/composer/copy.ts`. **Not drift — wrong the day it was written, and carried through the HEADMEASURE pass unexamined. Run as written it fires a FALSE ⛔ RUN-STOP 4 before B4 writes a byte.** ⇒ **SCOPED TO `.5`'s OWN WRITE SET, which is what the gate was always for: detecting `.5` AUTHORING copy, not counting the repo.** **PASS CONDITION: ZERO hits before `B4`; EXACTLY ONE after — `copy.ts`'s `error.action`.** ⛔ **A second hit inside the write set means `.5` authored product copy → RUN-STOP condition 4.** ⚠ **Five further literal pins exist in `tests/` (`auth-error-boundary` ×2, `global-error`, `market-error-boundary` ×2) and are OUT of scope — none is `.5`'s** |
 | Pre-PR | §5.10 self-audit, item by item against §3 | PASS / FAIL / SURPRISE. FAIL → fix in-session. SURPRISE → `claude-progress.md` + surface. ⚠ **Run it THREE times — once per PR** |
 | Every PR | CI `ci.yml:134` → `pnpm vitest run` | ⚠ **Recorded so no one reads the local floor as the only one:** CI runs the **full suite on every PR to `main`**. Each of the three PRs is floored by CI regardless; the local floor is the pre-push proxy that avoids burning a CI cycle |
 | DB-backed suites | **NOT RUN by this plan** | ⚠ **Measured, not assumed** (§2.14): no exact-shape assertion on a `ProfileArgumentItem` exists, so the passthrough reddens none. If one becomes necessary → ⛔ RUN-STOP condition 3 |
@@ -1452,13 +1793,11 @@ tests/unit/shell/page-container.test.ts              171 ±
 
 ## §14 · REVIEWERS
 
-> ### ⚠ v2.3 — **THIS PLAN MUST LAND ON `main` BEFORE ANY REVIEWER CAN READ IT, AND THIS PLAN'S OWN PRs CANNOT COMMIT IT**
+> ### ✅ v2.4 — **DISCHARGED. THIS PLAN IS ON `main` AND EVERY REVIEWER CAN READ IT**
 >
-> Every reviewer invocation below passes **`@docs/plans/POLISH-5.md`** as context. **`docs/plans/**` is DENY-LISTED at §6**, so no PR in this plan can put the file there.
+> `docs/plans/POLISH-5.md` **landed at `c8ba802` (#330)** and was amended at `5ff418b` (#331). ⛔ **The precondition is MET. This banner is a RECORD of why commit 0 had to exist, not a live gate** — v2.3's *"MUST LAND … BEFORE"* and *"without it, an execute session halts on day one"* read as unmet and are not.
 >
-> **⇒ `docs/plans/POLISH-5.md` LANDS VIA COMMIT 0** — the doc-only PR that precedes PR A (§1.3, §15 precondition 2). ⛔ **Without it, an execute session either halts on day one or a reviewer reads nothing and returns a green pass on an unread plan** — which is worse than a halt, because it looks like a receipt.
->
-> ⚠ **A reviewer that cannot open the path it was handed must SAY SO and halt.** A silent fallback to reading the diff alone is a **`V-3` false receipt**: asserting a review ran is not asserting what it read.
+> **The standing instruction below is UNCHANGED and remains live:** ⚠ **a reviewer that cannot open the path it was handed must SAY SO and halt.** A silent fallback to reading the diff alone is a **`V-3` false receipt**: asserting a review ran is not asserting what it read.
 
 **`@code-reviewer` is MANDATORY on PR A. Not discretionary.** CLAUDE.md §5.11's `src/server/` row fires on PR A's `arguments.ts` passthrough — the trigger is met on its face. **PR B inherits it** because item 9's boundary rewrite ships on top of PR A's DTO.
 
@@ -1504,9 +1843,9 @@ tests/unit/shell/page-container.test.ts              171 ±
 
 | # | Precondition | State at GROUND `16971cd` |
 |---|---|---|
-| **1** | **This plan RATIFIED** | ❌ **NOT MET** |
-| **2** | **Commit 0 landed** | ❌ **NOT MET.** Absent by every route, re-run at the new head (§2.2). ⚠⚠ **v2.3 — ITS PAYLOAD IS RESTATED, BECAUSE "doc-only" HAS BEEN READ AS "one file" AND THAT WOULD ORPHAN SIXTEEN RATIFIED ANCHORS.** See the payload table below |
-| **3** | **`H12` clear at the moment of the first suite run** | ⚠ **CLEAR NOW** (§0.6), **but not a guarantee.** POLISH.3 PR 1's lane has closed; **a `.6` lane and a `.3 PR 2` lane may open** (`NEW-3`). ⛔ **Re-read `pgrep -f 'node.*vitest'` at execute; if it fires, WAIT** |
+| **1** | **This plan RATIFIED** | ✅ MET at 5ff418b. The plan is on main (c8ba802, amended 5ff418b) and PR A executed against it, 8/8. |
+| **2** | **Commit 0 landed** | ✅ MET. c8ba802 = #330. Payload verified 7/7 at DOC-1: the plan · O-5…O-8 at CLAUDE.md:250-253 · PD-5-03…08 · C-STATES-1 and C-BOOKMARKS-1 · PD-5-09 (OD-8) · REGISTER-APPLY · design-canon §3 correctly UNTOUCHED. ⚠ v2.4: the squash SUBJECT says "D8 unauthored" and describes an INTERMEDIATE STATE OF ITS OWN BODY — X7, later in the same squash, landed D8 as C-BOOKMARKS-1 (design-canon.md:271-285) and closed "Commit-0 rulings still open after this: ZERO." |
+| **3** | **`H12` clear at the moment of the first suite run** | ✅ CLEAR at every DOC-1 reading. Still not a guarantee — re-read pgrep at execute. |
 
 > ### ⚠ v2.3 · **PRECONDITION 2's PAYLOAD — the MINIMUM, not the whole**
 >
@@ -1546,7 +1885,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 | **`.5` PR A branches** | preconditions 1–3 all hold. ⚠ **`.3 PR 2` is NOT a gate here** (`NEW-4`) |
 | **`.5` PR B branches** | ⚠ **PR A MERGED** — `POLISH-TRACKER.md:130`'s one-PR-at-a-time, applied **inside** this surface (§4) |
 | **`.3 PR 2` executes** | ⚠ **PR B MERGED.** It needs its own full ritual — an eleven-step phase (`POLISH-3-RUN-TRACKER.md` §4) |
-| **`.6` executes** | ⚠⚠ **`.5` PR B MERGED *and* `.3 PR 2` MERGED.** **`NEW-4`'s re-scoped precondition 3 lands HERE**, and PR B is a **hard** dependency by three independent mechanisms (§0.3) |
+| **`.6` executes** | ⚠ v2.4 · D-4: .5 PR B MERGED. .3 PR 2 is NO LONGER A GATE (§0.3). |
 | **`.5` PR C branches** | ⚠ **`.6` MERGED.** ⛔ **Not "PR B merged"** — `NEW-3` parks PR C after `.6` because it is independent of it and parking it costs nothing. ⛔ **`P-2`'s two-point diff is MANDATORY here** (§13) |
 | **`.4` executes** | ⚠ **LAST** (`OD-2`) |
 
@@ -1683,8 +2022,7 @@ tests/unit/shell/page-container.test.ts              171 ±
                    symbolic-ref exit 1 → "detached: OK"                   ── DETACHED ✅
                    ⇒ ALL THREE LEGS PASS — MEASURED, and the FAIL is recorded first
 
-ground             16971cd  chore(polish): log session — POLISH.3 PR 1 FRAME (#329)
-                   was 2326e84 (#327) at v2.1 — three commits back
+ground             5ff418b (#331)  ·  was 16971cd (#329) at v2.3 — two commits back
 
 R2                 BOTH #328 AND #329 EXIST. BOTH MERGED. Neither is a typo.
                    #328 af3a070  polish/3-pr1-frame     — the machine PR (head db51cbc, NOT 4b19d47)
@@ -1711,11 +2049,11 @@ H12                pgrep -f 'node.*vitest' → no match, exit 1              ─
                    third consecutive clear reading. No process killed; none to kill
                    ⚠ ps | grep is NOT the instrument
 
-O-6                ⚠ DECLARED: POLISH-6-plan-v1_3.md (20:52, NEWER than v2.1) present in
-                   ~/Downloads with five other .6 artifacts. NOT READ. NOT an input.
-                   §17 item 14 routes .6's own question to .6. Corroboration is not authority
+O-6                ✅ RESOLVED at v2.4. POLISH-6-plan-v1_4.md is FOUNDER-RATIFIED and LANDS at DOC-1
+                   as docs/plans/POLISH-6.md. v2.3 declared v1_3 "NOT READ. NOT an input" — correct
+                   then; superseded now. Corroboration became authority by ratification, not by proximity
 
-shape              16 items · 3 PRs · 17 commits · 0 added or removed · 0 items moved
+shape              17 items · 3 PRs · 18 commits · 1 item added at v2.3 · 0 items moved
 resolved           OD-2 · PR C's auditor · NEW-1 · OD-7 · OD-8 · OD-9      held: NONE
 applied            C-1 (§2.11 · §3 · §7 · §8 · §9 C1 · §10 · §11.14 · §14 · §18)
                    C-2 (§4 · §14 · §16)   C-3 (§2.4)   C-4 (§1.7 · §3.1 · §18)
@@ -1724,7 +2062,7 @@ applied            C-1 (§2.11 · §3 · §7 · §8 · §9 C1 · §10 · §11.14
 preconditions      SIX → THREE, no gap.  MET: .3 PR 1 merged
                    DISCHARGED: OD-2 reorder · D7's branch · NEW-1's copy
                    RE-SCOPED: .3 PR 2 now gates .6, not PR A
-chain              .5 PR A ─▶ .5 PR B ─▶ .3 PR 2 ─▶ .6 ─▶ .5 PR C ─▶ .4
+chain              .5 PR A ✅ ─▶ .5 PR B ─▶ .6 ─▶ .5 PR C ─▶ .3 PR 2 ─▶ .4
 ```
 
 No branch created. No commit. No PR. No write under `src/` or `tests/`. No build, no suite, no DB, no credentialed command. **No landed artifact edited or proposed for edit.** The only tree mutation was the relay-directed `git checkout --detach origin/main`.
