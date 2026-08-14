@@ -218,6 +218,19 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(card.tagName).toBe("BUTTON");
 		expect(card.querySelectorAll("button")).toHaveLength(0);
 		expect(card.contains(panel)).toBe(true);
+
+		// ⚠ POLISH.5 Gate C G-2 — THE MESSAGE IS A `<p>` HERE, NOT A HEADING.
+		// `EmptyState.tsx`'s ground for the `<h2>` — "demoting a heading to a div
+		// would lose document semantics" — is SITE-SPECIFIC and does not hold
+		// inside this card, whose root IS a `<button>`: a heading announced
+		// inside a control is noise, not semantics. The other two P1 sites keep
+		// the default `<h2>`.
+		expect(message.tagName).toBe("P");
+
+		// The stronger form of the same law: NO heading of any level anywhere in
+		// the card. Asserting only `tagName === "P"` would pass if the leaf
+		// rendered a `<p>` beside an `<h2>`.
+		expect(card.querySelectorAll("h1, h2, h3, h4, h5, h6")).toHaveLength(0);
 	});
 
 	it("nodes-absent-in-placeholder", () => {

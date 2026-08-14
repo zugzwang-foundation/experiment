@@ -36,27 +36,40 @@
  * rule) — and composes EXISTING tokens only, so the 11-token census in
  * `tests/unit/design/tokens-monochrome.test.ts` is untouched. No `"use
  * client"`: the leaf binds no handler.
+ *
+ * ⚠ POLISH.5 Gate C G-2 — `messageAs` exists for ONE measured reason.
+ * `EmptyState.tsx`'s ground for the <h2> — "demoting a heading to a div
+ * would lose document semantics" — is SITE-SPECIFIC and does not hold
+ * inside `ProfileGraphCard`, whose root IS a <button>: there the heading
+ * is announced as a heading inside a control, which is noise, not
+ * semantics. ⚠ THIS DOES NOT FIX THE NESTING. The panel <div> is flow
+ * content inside a <button> and remains invalid — pre-existing, unchanged
+ * by POLISH.5, and NOT fixable by reshaping the panel for all three sites
+ * to suit one. Routed to the close-out.
  */
 export function EmptyBlock({
 	message,
 	messageTestId,
 	sub,
+	messageAs = "h2",
 }: {
 	message: string;
 	messageTestId: string;
 	sub?: string;
+	messageAs?: "h2" | "p";
 }) {
+	const Message = messageAs;
 	return (
 		<div
 			data-empty-block=""
 			className="flex min-h-[148px] flex-col items-center justify-center gap-[10px] rounded-[var(--r)] bg-n0 p-6 text-center [border:var(--hairline)]"
 		>
-			<h2
+			<Message
 				data-testid={messageTestId}
 				className="max-w-[320px] text-[13.5px] text-n6"
 			>
 				{message}
-			</h2>
+			</Message>
 			{sub !== undefined && <p className="text-[12px] text-n4">{sub}</p>}
 		</div>
 	);

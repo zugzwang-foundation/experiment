@@ -548,6 +548,12 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// inside the marked subtree would break every one of them, so no `sub`
 		// is passed on this surface.
 		expect(text(positionsPanel)).toBe(PROFILE_COPY.empty.positionsOwner);
+		// ⚠ Gate C G-2 — THE DEFAULT DID NOT MOVE. `messageAs` was added for
+		// `ProfileGraphCard` alone; these two sites pass nothing and must still
+		// render the `<h2>`, on `EmptyState.tsx`'s recorded semantics ground.
+		// Without this pin, flipping the default would be caught only by the
+		// graph site's assertion.
+		expect(screen.getByTestId("positions-empty").tagName).toBe("H2");
 		positions.unmount();
 
 		render(<ArgumentList items={[]} owner={true} />);
@@ -557,6 +563,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(argumentsClass).toContain("bg-n0");
 		expect(argumentsClass).toContain("min-h-[148px]");
 		expect(text(argumentsPanel)).toBe(PROFILE_COPY.empty.argumentsOwner);
+		expect(screen.getByTestId("arguments-empty").tagName).toBe("H2");
 	});
 
 	it("states-kit", () => {

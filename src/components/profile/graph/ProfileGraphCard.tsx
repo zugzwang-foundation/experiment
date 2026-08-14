@@ -33,9 +33,14 @@ export function ProfileGraphCard({
 			    `<button>` cannot nest in a `<button>`. That is the structural
 			    reason `empty-block` takes no action prop. */}
 			{empty ? (
+				/* ⚠ Gate C G-2 — `messageAs="p"` HERE AND ONLY HERE. This card's
+				   root is the expand `<button>`, so P1's default `<h2>` would be
+				   announced as a heading inside a control: noise, not semantics.
+				   The other two P1 sites keep the default. */
 				<EmptyBlock
 					message={PROFILE_COPY.graph.empty}
 					messageTestId="graph-empty"
+					messageAs="p"
 				/>
 			) : (
 				<div className="aspect-[2/1] w-full">
