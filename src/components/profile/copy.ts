@@ -11,11 +11,18 @@ export const PROFILE_COPY = {
 		owner: "Viewing as owner",
 		visitor: "Public view",
 	},
+	// ⚠ POLISH.5 Gate C S-1 — a THIRD founder-authored member beyond NEW-1's
+	// two, ratified 2026-08-15. It is filter-scoped and deliberately NOT
+	// owner/visitor split: the owner/visitor pair above differ only by their
+	// CTA, and this state has none. ⛔ Reusing `positionsOwner` here would
+	// render "No positions yet" to someone whose positions the filter is
+	// hiding — a lying empty state that every test would pass.
 	empty: {
 		positionsOwner: "No positions yet. Stake a side to open your record.",
 		positionsVisitor: "No positions yet.",
 		argumentsOwner: "No arguments yet — every bet carries one.",
 		argumentsVisitor: "No arguments yet.",
+		positionsFiltered: "No positions match this filter.",
 	},
 	graph: {
 		empty: "Nothing to plot yet.",

@@ -407,13 +407,15 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		list.unmount();
 
 		// Positions table: a row whose argument cell is the removed variant.
-		// ⚠ `ROW_SETTLED` is the CLOSED market, and item 11 defaults the status
-		// filter to `Open`, so it is filtered out at mount. The masking law is
-		// unchanged; reaching the row now costs a filter change.
+		// ⚠ B7 had to switch the status filter to `Closed` here, because item 11
+		// defaulted it to a FIXED `Open` and `ROW_SETTLED` is the Closed market —
+		// the row was filtered out at mount. Gate C S-1 made the default DERIVED,
+		// and this fixture is all-Closed, so the row is visible at mount and that
+		// switch became a no-op. It is REMOVED rather than left: a redundant step
+		// under a comment describing a default that no longer exists is the
+		// lying-docblock class, and it would have hidden a real regression in the
+		// derivation behind a manual override.
 		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Closed" },
-		});
 		const cell = screen.getByTestId(`position-arg-removed-${M2}`);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
@@ -739,6 +741,10 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// matched no option would paint its first option while the predicate
 		// still returned every row — the control saying one thing and the table
 		// showing another, with nothing going red.
+		// ⚠ `Open` here is DERIVED, not fixed (Gate C S-1): `ROWS` contains an
+		// Open row, so the derivation selects it. The derivation itself is
+		// pinned by `status-default-is-derived`, including the all-Closed and
+		// deep-link arms this fixture cannot reach.
 		expect(statusFilter.value).toBe("Open");
 
 		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
@@ -770,5 +776,100 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// not moved.
 		fireEvent.change(market, { target: { value: M2 } });
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+	});
+
+	it("positions-filtered-empty-is-not-stranded", () => {
+		// POLISH.5 Gate C S-1. Item 11 made `rows > 0 ∧ visible === 0` reachable
+		// at mount; the component rendered four column headers over an empty
+		// `<tbody>` and NO message. This is that state, entered deliberately.
+		// The OWNER arm, because that is the motivating case: an owner opening
+		// their own profile. Its rows carry `sellEligible` (`SellablePositionRow`).
+		render(
+			<PositionsTable
+				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: false }] }}
+			/>,
+		);
+		const statusFilter = screen.getByTestId<HTMLSelectElement>(
+			"positions-status-filter",
+		);
+		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+
+		// The filter-scoped message, which is a DIFFERENT state from "no
+		// positions at all" and carries different copy.
+		expect(text(screen.getByTestId("positions-empty-filtered"))).toBe(
+			PROFILE_COPY.empty.positionsFiltered,
+		);
+
+		// ⛔ THE TWO EMPTY STATES NEVER COLLIDE. Reusing `positions-empty` here
+		// would render "No positions yet" to someone whose positions the filter
+		// is merely hiding — a lying empty state every existing test would pass.
+		expect(screen.queryByTestId("positions-empty")).toBeNull();
+
+		// ⚠ NON-VACUITY, AND IT IS THE ACTUAL LAW: the message alone would still
+		// TRAP the user. Both filter controls must survive into this state, or
+		// there is no way back out of it.
+		expect(screen.getByTestId("positions-status-filter")).toBeTruthy();
+		expect(screen.getByTestId("positions-market-filter")).toBeTruthy();
+		// …and the control still reads the state the user selected, so the way
+		// out is discoverable rather than merely present.
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+
+		// The way out WORKS: switching back restores the row.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Open" } },
+		);
+		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+	});
+
+	it("status-default-is-derived", () => {
+		// POLISH.5 Gate C S-1. A FIXED `Open` default is permanently empty for
+		// anyone whose held markets are all non-Open — and after the 2026-11-05
+		// freeze that is every participant.
+
+		// (a) An Open row is present → `Open`.
+		const withOpen = render(
+			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Open");
+		withOpen.unmount();
+
+		// (b) EVERY row is Closed → `Closed`.
+		const allClosed = render(
+			<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+		// ⚠ POSITIVE CONTROL. A default that only moves the `<select>`'s value
+		// while the table stays empty satisfies a value-only assertion — which
+		// is the exact bug this finding is about.
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+		allClosed.unmount();
+
+		// (c) ⚠ THE DEEP-LINK ARM — the one that pins the SCOPING. `fixture-beta`
+		// is Closed and is the preselected market, while an Open row exists in
+		// ANOTHER market. A derivation over ALL rows would see that Open row,
+		// choose `Open`, and land the `?market=<slug>` deep link on a blank
+		// table. Scoping to the initial market is what this arm guards.
+		render(
+			<PositionsTable
+				payload={{ owner: false, rows: ROWS }}
+				initialMarketSlug="fixture-beta"
+			/>,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-market-filter").value,
+		).toBe(M2);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 	});
 });
