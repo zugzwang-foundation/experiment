@@ -424,6 +424,31 @@ POLISH.8's stop set named the moderation **act path** — `moderateComment`, `re
 
 **Corollary — a handoff's admit-check must be verifiable in the medium the handoff travels in.** v1.0 of that pack named a line count as an admit-check leg and was delivered as an inline paste; CC correctly reported it UNVERIFIABLE — *"counting my own transcription would measure my typing, not the artifact."* Name legs the receiver can check: a version string, a ground SHA, a block sequence, a contiguous ID range.
 
+### §13.6 · A plan that widens a shared DTO must allow-list every file that CONSTRUCTS or ASSERTS it — minted at POLISH.5 PR A
+
+**The rule.**
+
+> **When a plan widens a shared DTO, its allow-list must include every file that CONSTRUCTS, OR EXHAUSTIVELY ASSERTS THE SHAPE OF, that DTO — not only those that CONSUME it.**
+
+**The ground.** POLISH.5 PR A added two required fields to `ProfileArgumentItem`'s live variants and halted **twice** on files its allow-list had never named. Its §8.2 zero-delta table analysed the change correctly and still missed both: it measured `src/server/bookmarks/list.ts`, saw that it imports the shared builders and therefore receives the new fields **for free**, and cleared it. That analysis was right. It was also **the wrong question** — because the type propagates further than the call graph:
+
+| Missed file | Why the consumer analysis could not see it |
+|---|---|
+| `tests/unit/bookmarks/render/side-encoding.test.tsx` | **CONSTRUCTS** a full `BookmarkItem` object literal, so a widened required-field set makes the literal incomplete |
+| `tests/server/bookmarks/masking.test.ts` | **EXHAUSTIVELY ASSERTS** the DTO's sorted key set, so any widening breaks set-equality |
+
+⚠ **The first-draft rule said only "CONSTRUCTS", and that version would have caught the first file and missed the second** — `masking.test.ts` never builds the DTO, it receives one and asserts its shape. The corrected wording is above; the near-miss is recorded because a rule that catches half the cases reads as complete.
+
+**⇒ AND THE PART THAT ACTUALLY FIRES — A PRE-FLIGHT STEP, NOT A LESSON.** Prose rules get read once; a grep gets run. Add to the §13.1 pre-flight of any plan that widens a shared type:
+
+```
+grep -rn 'Object.keys(' tests/ | grep -E 'toEqual|toHaveLength'
+```
+
+**18 shape assertions tree-wide** at `c8ba802`. It located the second missed file **in one command**, after three rounds of careful prose had not. ⛔ **Run it against the widened type's consumers at PLAN time, not at execute** — both misses became RUN-STOP halts mid-run, each costing a founder ruling and a relay round-trip, and both were findable before a line of code was written.
+
+⚠ **A widening is not a weakening, and the plan must say which it is.** The key-set whitelist that halted PR A guards an **exposure boundary** (forced-visitor mode: the DTO carries no Sell-eligibility field, ever). Its belt-and-braces loop is the **invariant**; the enumerated list is only the **enumeration**. Amending the enumeration while leaving the loop untouched is a widening; touching the loop would have been a weakening and a different ruling. **State which one an amendment is, in the amendment.**
+
 ---
 
 *Authored by web Claude, 2026-08-10 IST, at the POLISH-TEMPLATE task. Ground `origin/main` @ `35d041d`. Supersedes `POLISH-STRATUM.md` following a statement-by-statement absorption audit. §1–§10 and §12 are written from three completed machine phases; **§11 is provisional and written from none.***

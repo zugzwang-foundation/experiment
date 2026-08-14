@@ -179,3 +179,41 @@ Today is **2026-08-13**. Go-live is **2026-09-15** — **33 days**.
 ---
  
 *Authored by web Claude, 2026-08-12 IST. Sequencer only. Re-read at every close-out and kickoff; verify each prerequisite against the live repo before naming the next step.*
+
+---
+
+## §7 · MEASURED — POLISH.5 PR A, the first machine phase to run under the amended-allow-list regime
+
+**Recorded here because this is the only place the project measures itself, and PR B is next.** Ground `c8ba802` → `ca38704`, 2026-08-14.
+
+| | Count |
+|---|---|
+| Commits | **8** (A1…A8) + 4 doc/halt-record commits = 12 on the branch |
+| Items shipped | **7** — 2 · 3 · 4 · 5 · 6 · 15 · 17 |
+| ⛔ **RUN-STOPs** | **3**, all condition 1, all ruled by the founder rather than absorbed |
+| §5 allow-list rows added mid-run | **3** (19 · 20 · 21) + 1 at close-out (22, a plan-internal conflict) |
+| Reviewer passes | **2** — `@code-reviewer` (mandatory, on A5) then `@security-auditor` |
+| Reviewer verdicts | **0 CRITICAL · 0 HIGH** both; auditor also **0 MEDIUM** |
+| Defects caught + fixed in-session | **3** |
+| Regressions caught by a reviewer and fixed **in the commit that caused them** | **1** |
+| Founder relays | **6** (pre-flight · execute · 3 rulings · close-out) |
+
+### ⚠ THE HEADLINE: THREE RUN-STOPs, ONE ROOT CAUSE, AND IT WAS FINDABLE AT PLAN TIME
+
+All three halts were the same defect in the plan, not three defects: **§8.2's zero-delta table enumerated the files that CONSUME the widened DTO and missed the files that CONSTRUCT or ASSERT it.** Each cost a founder ruling and a full relay round-trip. **A single `grep` at plan time would have found the third in one command** — the rule and the finder are now `POLISH-SURFACE-TEMPLATE.md` §13.6, with the wiring-into-pre-flight step docketed at `DTO-WIDENING-PREFLIGHT`.
+
+⇒ **Forecast for PR B: the DTO-widening class does not recur.** PR B mints two `ui/` leaves and writes no server file — §4 gives it `src/server/` = ⛔ none. Its analogous risk is different and already named: **B5 is the plan's largest commit** (the `ThumbGlyph` lift + re-point + canon pin + render, one commit, unconditionally under `OD-2`), and it carries a **symbol-fenced exception into a deny-listed directory** (`composer/SlotHeader.tsx`). That is where to spend the pre-flight.
+
+### What the three in-session defects were — the pattern is worth more than the count
+
+| # | Defect | Caught by | Note |
+|---|---|---|---|
+| 1 | A comment I wrote contained the literal `pctround-allow:`, so a **design guard** counted a 4th marker against its exact 3 | the guard itself | §11 condition 2 applied to my own comment: I reworded the comment, **not** the guard |
+| 2 | A5's new comments cited `:216`/`:217`/`:224` — displaced to `:226`/`:227`/`:234` by the addition **above them, in the same commit** | `@code-reviewer` | `O-8` (*fence by symbol, never by line*) violated **inside the branch whose base commit minted it**. Re-cited by symbol |
+| 3 | A6's required matcher widening **silently disarmed the plan's own RUN-STOP-7 tripwire** | `@security-auditor` | Fixed **inside A6** via reset + amend + cherry-pick, not bolted on as a 9th commit. Proposed to V-space, unnumbered |
+
+⚠ **Defect 3 is the expensive one to have missed** and is why the reviewer cascade earned its cost this run: the detector was never an assertion, so **no coverage read could have shown it missing**, and the edit that removed it was correct and required. Three independent controls against the same leak were non-firing simultaneously.
+
+### Cost honesty
+
+**PR A ran long — 6 relays against a plan that expected 1.** ⛔ **The overrun was NOT re-discovery**, which is the failure mode §1 warns about: every relay resolved a *new* ratified fence the plan had not censused, and each ruling is now written into §5 where the next reader finds it. The three halts were **correct halts** — each was a real fence, each was ruled, and the founder confirmed all three. **The lesson is that the plan should have found them, not that the executor should have pushed through.**
