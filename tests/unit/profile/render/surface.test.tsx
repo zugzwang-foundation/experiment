@@ -141,6 +141,8 @@ const A_POST: ProfileArgumentItem = {
 	teaser: "Neutral fixture teaser alpha.",
 	body: "Argument post alpha\n\nNeutral fixture body alpha.",
 	marker: "none",
+	authorStake: "25.000000000000000000",
+	priceAtBet: "0.410000000000000000",
 	createdAt: "2026-09-20T00:00:00.000Z",
 	aggregate: {
 		supportCount: 2,
@@ -163,6 +165,7 @@ const A_REPLY: ProfileArgumentItem = {
 	body: "Argument reply beta\n\nNeutral fixture body beta.",
 	marker: "Flipped",
 	stake: "6.000000000000000000",
+	priceAtBet: "0.630000000000000000",
 	repliedToTitle: "Parent argument gamma",
 	createdAt: "2026-09-21T00:00:00.000Z",
 };

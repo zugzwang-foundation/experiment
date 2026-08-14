@@ -61,6 +61,8 @@ const liveItem = (
 	teaser: TEASER,
 	body: BODY,
 	marker,
+	authorStake: "50.000000000000000000",
+	priceAtBet: "0.270000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 	aggregate: AGGREGATE,
 });

@@ -73,6 +73,15 @@ function liveItem(
 		teaser: "The teaser.",
 		body: BODY,
 		marker,
+		// POLISH.5 PR A / A5 (§5 row 20, ratified 2026-08-14). `BookmarkItem` is
+		// defined OVER `ProfileArgumentItem` via `Extract<…>` (bookmarks/list.ts
+		// :43-53), so the profile passthrough's two new REQUIRED fields reach
+		// this literal — it CONSTRUCTS the DTO rather than receiving it, which
+		// is why the runtime zero-delta analysis (§8.2) did not predict it.
+		// ⛔ Fixture fields only: no assertion here reads them, and `removedItem`
+		// below is the removed variant and carries neither (SC-1 intact).
+		authorStake: "1000.000000000000000000",
+		priceAtBet: "0.380000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 		aggregate: AGGREGATE,
 		authorPseudonym: "ashen-rook-12",
