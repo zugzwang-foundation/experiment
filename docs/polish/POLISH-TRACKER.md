@@ -115,8 +115,8 @@ Dated or triggered, none blocking a machine run.
 
 ```
 POLISH-TEMPLATE ✅ ─▶ PRIMITIVES-2 ✅ ─▶ .7a ✅ ─▶ .8 ✅ ─▶ .3 PR 1 ✅ ─▶ .5 PR A ✅ ─▶ .5 PR B ─▶ .6 ─▶ .5 PR C ─▶ .3 PR 2 ─▶ .4
-     (closed)          (closed 08-11)   (#320)   (#323)   ▲
-                                                          NEXT
+     (closed)          (closed 08-11)   (#320)   (#323)   (#328)      (#331)        ▲
+                                                                                    NEXT — after DOC-1
                                                  plan PARALLEL · execute SERIAL
                                                           │
                                                           ▼
