@@ -46,7 +46,7 @@ export function ArgumentList({
 						data-testid={`argument-removed-${item.id}`}
 						className="gap-2 p-3"
 					>
-						<SideBadge side={item.side} />
+						<SideBadge side={item.side} size="profile" />
 						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
 					</Card>
 				) : (
@@ -56,7 +56,7 @@ export function ArgumentList({
 						className="gap-2 p-3"
 					>
 						<div className="flex flex-wrap items-center gap-2">
-							<SideBadge side={item.side} />
+							<SideBadge side={item.side} size="profile" />
 							{/* `PositionMarker` returns null for "none" itself, and
 							    supplies the `aria-label="Author Flipped"` the hand-roll
 							    lacked (PD-0-10's root cause: primitive duplication). */}
