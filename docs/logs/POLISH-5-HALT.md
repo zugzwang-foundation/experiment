@@ -1,79 +1,90 @@
-# POLISH.5 PR A — ⛔ RUN-STOP 1 · ITEM 2
+# POLISH.5 PR A — HALT RECORD
 
-**Grade: ⛔ RUN-STOP** (plan §11 condition 1 — *"Any write outside §5's allow-list becomes necessary"*), **compounded by condition 6** (*"A commit boundary would land RED"*).
-**Raised at:** commit **A1**, item 2 (`P5-D03`), the first commit of PR A.
-**Branch:** `polish/5-pr-a` at `c8ba802` — **no code committed, no PR opened.**
-**Ground:** `origin/main` = `c8ba8026079721acaf0f47558330b3e5b614417b` (#330 merged 2026-08-14T08:16:25Z).
+Two halts, both **RUN-STOP condition 1** (*"Any write outside §5's allow-list becomes necessary"*), both the same shape: **a ratified fence the plan did not census.** The first is RESOLVED and shipped; the second is LIVE.
+
+| # | Raised at | Item | File needed | State |
+|---|---|---|---|---|
+| **H-1** | A1 | 2 | `tests/unit/debate/render/side-badge.test.tsx` | ✅ **RESOLVED** — §5 row 19, founder ruling 2026-08-14. Shipped in A1 (`697347d`) |
+| **H-2** | A5 | — (blocks 3 · 4) | `tests/unit/bookmarks/render/side-encoding.test.tsx` | ⛔ **LIVE** — awaiting a ruling |
+
+**Branch:** `polish/5-pr-a`. **Landed: A1 · A2 · A3 · A4** (items 2 · 5 · 6 · 15). **Blocked: A5 · A6 · A7** (items 3 · 4). **Not reached: A8** (item 17) — pinned LAST by §9 and deliberately not reordered.
 
 ---
 
-## 1 · The condition, named
+## H-1 · RESOLVED — the `profile` preset census (item 2)
 
-**Item 2 cannot ship without editing `tests/unit/debate/render/side-badge.test.tsx`, which is on no §5 allow-list row.**
+Item 2 wires `size="profile"`; `side-badge.test.tsx` is a source-scanning census that pinned, by set-equality, that **no call site wires it**. The guard fired **by design** — its own comment: *"If a later PR wires one, this reddens and the wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`."*
 
-That file is a **source-scanning census** over the whole `src` tree. Item 2 wires `size="profile"` at `ArgumentList.tsx:49` and `:59`; the census pins, by set-equality, that **no call site wires `profile`**. Three of its assertions redden:
+**Founder ruling 2026-08-14 — §5 row 19**, symbol-fenced to the three census assertions; `census-is-alive` and the four zero-delta render assertions untouched. `detail` **deliberately NOT unpinned** (R1) so POLISH.3 PR 2 hits the same wall and gets its own ruling. Names moved with their assertions (R2), ground carried in-file (R3), plan-file amendment routed to close-out (R4). **Shipped in A1.**
 
-| Test | Line | Why item 2 breaks it |
-|---|---|---|
-| `no-call-site-wires-detail-or-profile` | `side-badge.test.tsx:424` | Filters sites on `/size\s*=\s*["{]?\s*["']?(?:detail\|profile)/` and asserts `[]`. Item 2 IS the wiring |
-| `exactly-twelve-sites-pass-no-size-and-ride-CHIP-base` | `:115` | Set-equality map includes `"src/components/profile/ArgumentList.tsx": 2` in the **unsized** set. Item 2 moves both → `base` becomes 10 |
-| `the-only-sized-site-is-the-discovery-hero` | `:134` | Asserts the **sized** set is exactly `{HeroPanels.tsx: 1}`. Item 2 adds `ArgumentList.tsx: 2` |
+---
 
-## 2 · ⚠ The guard was DESIGNED to fire here. It is working, not broken.
+## H-2 · LIVE — the passthrough's TYPE reaches a struck file
 
-`side-badge.test.tsx`, in its own words, at the failing assertion:
+### The condition
 
-> ```
-> it("no-call-site-wires-detail-or-profile", () => {
->     // D5, asserted rather than trusted. The seam lands here; the adoption is
->     // POLISH.3's and POLISH.5's. If a later PR wires one, this reddens and the
->     // wiring becomes a DECISION — the same mechanism as `PERMITTED_FILES`.
-> ```
+**A5 cannot land without adding two fields to one fixture literal in `tests/unit/bookmarks/render/side-encoding.test.tsx:64`** — a file §5 **STRUCK**:
 
-**This is the `PERMITTED_FILES` pattern deliberately applied to the `profile` preset.** DISCOVERY-COMPLETE C3 shipped the seam and pinned the zero so that POLISH.5's adoption would have to be ratified rather than absorbed. ⇒ **The redness is the mechanism succeeding.** It is not a defect to fix, and per §11 condition 2's principle — *"a red guard is a finding about the change, never a file to fix"* — I did not touch it.
+> | `tests/unit/bookmarks/render/side-encoding.test.tsx` | `.6`'s. **It exists** and holds zero state-string assertions (§17) |
 
-## 3 · Where the plan missed it
+### Why it is unavoidable
 
-The plan **measured the zero and did not notice it was pinned**.
+`BookmarkItem` is defined **over** the profile union (`src/server/bookmarks/list.ts:43-53`):
 
-- **§8's census, item 2 row** names only `argument-list-side.test.tsx:93-97`, `:104-108` and rules the item **"GREEN."** `side-badge.test.tsx` is absent from §8 entirely.
-- **§2.9** got within one sentence of it: *"`detail` and `profile` have ZERO call sites by design (D5) … Their only coverage is therefore the direct render tests, at both poles."* It read the file as **coverage of the preset**, not as a **census pinning the zero**.
-- **§5's struck row** for `badges.tsx` says *"`CHIP.profile` … already exist**s**. Items 2 and 3 **consume**; neither touches the primitive."* True of the primitive — but the *census* is a third thing, neither primitive nor profile-suite.
-- **§10 `P-2`'s CITE set** lists `tests/unit/design/` but **not** `tests/unit/debate/render/`, so the file was outside both the write set and the cite set.
+```ts
+export type BookmarkItem =
+  | (Extract<ProfileArgumentItem, { removed: true }>  & { authorPseudonym: string })
+  | (Extract<ProfileArgumentItem, { removed: false }> & { authorPseudonym: string;
+                                                          staked: string; current: string });
+```
 
-⚠ **This is a `V-2`-shaped miss:** the plan verified that item 2's *own* suite stays green and did not ask which *other* suite asserts the property item 2 changes.
+`side-encoding.test.tsx:61-82` constructs a **full `BookmarkItem` object literal**. A5 adds two REQUIRED fields to the live-post variant, so that literal becomes incomplete. `tsc` fails ⇒ **A5's commit boundary lands RED (condition 6)** ⇒ A6 and A7, which consume the passthrough, are blocked behind it.
 
-## 4 · Blast radius — measured, not reasoned
+### Measured to exactly one file, one literal, two lines
 
-**Item 2 alone.** Proven three ways:
+With the three **allow-listed** fixtures updated (`surface.test.tsx` ×2 — row 14; `argument-list-side.test.tsx` ×1 — row 15), `pnpm tsc --noEmit` reports **ONE** remaining error:
 
-1. **Census green at `c8ba802` with A1 reverted** — `pnpm vitest run tests/unit/debate/render/side-badge.test.tsx` → **19/19 passed, exit 0.**
-2. **The classifier regexes do not see item 3.** Probed directly: `<SideBadge side={…} price={…} />` → `sized: false`, `wires detail|profile: false`. Item 3 passes `price=`, never `size=`.
-3. **Full unit-suite probe with ALL SEVEN items' production edits applied at once** (1641 tests) — the only non-allow-listed file that reddens is `side-badge.test.tsx`:
+```
+tests/unit/bookmarks/render/side-encoding.test.tsx(64,2): error TS2322:
+  Type '{ removed: false; kind: "post"; … }' is not assignable to type 'BookmarkItem'.
+```
 
-| File | Failures | On §5's allow-list? |
-|---|---|---|
-| `tests/unit/debate/render/side-badge.test.tsx` | **3** | ❌ **NO — this is the RUN-STOP** |
-| `tests/unit/profile/render/argument-list-side.test.tsx` | 5 | ✅ **row 15 (PR A)** — expected |
-| `tests/unit/profile/render/surface.test.tsx` | 2 | ✅ **row 14 (PR A)** — expected |
+The whole fix, inserted after `marker,` in the `liveItem` factory:
 
-Both allow-listed files fail for **one shared, benign cause**: `TypeError: Cannot read properties of undefined (reading 'includes')` — the fixtures do not yet carry A5's new `authorStake`/`priceAtBet`, so `formatDharma(undefined)` throws. **That is the fixture work A4/A6/A7 already own.** It is *not* item 17: `owner-vs-visitor-body-identical` fails from the same fixture gap, and the pre-flight's finding that `arena()` (`:343-361`) never mounts `IdentityCard` **stands**.
+```ts
+  authorStake: "<18dp string>",
+  priceAtBet:  "<18dp string>",
+```
 
-⇒ **Items 3 · 4 · 5 · 6 · 15 · 17 are clear of every censusless test in the suite.** The probe was reverted in full; the tree is byte-identical to `origin/main` and `arguments.ts` hashes `6e1c9c491ddd57b122db03dd740ba0e0`.
+⛔ `removedItem` in the same file is the **removed** variant and is unaffected — SC-1 intact.
 
-## 5 · What a ruling would need to say
+### Where the plan missed it
 
-⛔ **Not mine to make** — §5 is ratified and this is a founder call. The shape of it:
+§8.2's zero-delta table has a row for exactly this change and it measured the **runtime** consumer only:
 
-- **(a) Amend §5** with an eighteenth row: `tests/unit/debate/render/side-badge.test.tsx`, **PR A**, item 2, **symbol-fenced** to the three census assertions — the `countByFile` map (`ArgumentList.tsx` moves from the unsized map to the sized one) and the `no-call-site-wires-detail-or-profile` expectation. ⛔ Nothing else in the file; the four `zero delta` render assertions and `census-is-alive` stay untouched. **A1 then also carries the census update, one commit.**
-- **(b) Or drop item 2 from PR A** and route it wherever the census amendment is ratified.
+> | `arguments.ts` passthrough | `src/server/bookmarks/list.ts` | ✅ **Measured: `list.ts` imports `buildPostItem`/`buildReplyItem`, so it receives the fields automatically.** That is D23's *"one edit, not two"* working |
 
-⚠ **If (a):** the file is `tests/unit/debate/**`, which §6's belt does **not** deny-list — so, exactly like `IdentityCard.tsx` before v2.3, it is excluded by the allow-list alone. Worth naming in §6's *"the belt cannot see"* list.
+True, and it is why `.6` inherits the fields for free at runtime (§17 item 7). **But the TYPE propagates further than the call graph:** `.6`'s test *constructs* the DTO rather than receiving it, so a widened required-field set reaches a file the runtime analysis correctly cleared. ⇒ **The same `V-2` shape as H-1** — the plan verified the consumer it expected to move and not the one that only the type reaches.
 
-⚠ **And note the ordering consequence:** the census asserts a property of `src/` **as a whole**, so it reddens the moment the *first* `size="profile"` lands and stays red until the map is updated. There is no commit split that avoids it — which is why the amendment must ride A1 itself, not a later commit.
+### ⚠ How this differs from H-1 — stated because it may change the ruling, not to pre-empt it
 
-## 6 · State
+H-1 **unpinned a ratified property** (`profile`'s zero call sites) with cross-surface consequences for POLISH.3 — a real decision, and R1 shows it deserved a careful one. H-2 decides nothing: it adds two fields to a fixture so it satisfies a DTO the founder has already ratified, unpins no assertion, and changes no `.6` behaviour. §8.2 and §17 already establish that `.6` receives these fields.
 
-**Nothing shipped.** Branch `polish/5-pr-a` created at `c8ba802` and holds only this record. No push, no PR, no `POLISH-5-PRA-DIFF.md`. `git diff origin/main -- src/ tests/` is **empty**.
+⛔ **I did not act on that difference.** The fence is the fence and the last halt was ruled correct; this is surfaced for the ruling, not resolved by it.
 
-Gate legs at this head: 1 ✅ · 2 ✅ · 3 ✅ · 4 ✅ · 5 ⚠ *(md5 `2b0ecfd405b56a82bd27cb903fecd628` ≠ the kickoff's `e262b491…` — commit 0's own ratified `HM-4` discharge, three hunks allocating `O-5…O-8`; all seven PR-A-governing sections verified byte-identical)* · 6 ✅. `P-2` re-measure: WRITE set touched `design-canon.md` only (two `C-` rows appended at `@@ -256`, §3 untouched, `12. **Side chip**` still `:68`); CITE set touched `docs/parked.md` only (`:1061` unmoved). **Every PR-A file and citation: diff empty.**
+### The shape of a ruling
+
+- **(a) §5 row 20** — `tests/unit/bookmarks/render/side-encoding.test.tsx`, **PR A**, A5. ⛔ Symbol-fenced to the `liveItem` factory's two added fields. ⛔ No assertion, no `removedItem`, nothing else. **Or**
+- **(b) A standing carve-out** — "a fixture literal that must gain a field because a ratified DTO change widened its type is not a write within the meaning of §5" — which would also cover `.6`, POLISH.3 PR 2 and anything else downstream of a union edit. Broader, and worth considering precisely *because* this will recur on every future passthrough.
+
+⚠ Whichever: **`.6`'s file is `tests/unit/bookmarks/**`, which §6's belt does NOT deny-list** — like `IdentityCard.tsx` before v2.3 and `side-badge.test.tsx` at H-1, it is excluded by the allow-list alone. That is now **three** for §6's *"the belt cannot see"* list.
+
+### Resume cost
+
+**Near zero.** The A5 diff is saved at `~/Downloads/POLISH-5-PRA-A5.patch` (84 lines) and re-applies cleanly on `polish/5-pr-a`. It is **pure addition — 18 added lines to `arguments.ts`, ZERO deletions**, so PR A's Gate C read is intact by construction: no query line at `:145`/`:181`/`:258`/`:267` moved, and no removed-variant block was touched.
+
+---
+
+## State
+
+`polish/5-pr-a` = `origin/main` + the halt record + **A1 · A2 · A3 · A4**. Working tree clean; `pnpm tsc --noEmit` **0 errors**; `ZUGZWANG_ENV=preview just verify` **exit 0** at every landed boundary. `src/server/` is **untouched** in the landed set, so §14's `@code-reviewer` mandatory trigger (the `arguments.ts` passthrough) does not fire on it — the reviewer pass belongs with A5.
