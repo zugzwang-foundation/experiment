@@ -73,7 +73,7 @@
 
 | # | Leg | Value |
 |---|---|---|
-| 1 | Version string | `POLISH.5 · MACHINE-PHASE PLAN v2.3` |
+| 1 | Version string | `POLISH.5 · MACHINE-PHASE PLAN v2.4` |
 | 2 | Ground SHA | ⚠ **`5ff418b66c76079236ec9ed24b17c147b3e7587b`** — *POLISH.5 PR A — COMPLETE (8/8) (#331)*. **RE-GROUNDED AT v2.4.** v2.3's ground `16971cd` is **TWO COMMITS BEHIND**: `c8ba802` (#330, commit 0) and `5ff418b` (#331, PR A). ⚠ **The v2.3 document never said so — the plan asserted a ground it no longer had. That is what this leg now fixes.** Per-path attribution of all ten moved paths: **ten of ten resolve to #330 or #331; zero unattributable** |
 | 3 | Base-file md5, verified off disk before reading | **`c431f035255b0cc45caa253175a391c5`** (`POLISH-5-plan-v2.2.md`) — ⚠ **matches the converged kickoff §0's ratified record exactly.** The base is the ratified artifact, not a lookalike (`V-1`) |
 | 4 | Binding-file md5, carried from v2.0 | `f495fbc2a37aec57ac35f67fa23a7f8e` |
@@ -397,7 +397,7 @@ src/components/ui/error-block.tsx
 
 ⚠ **THE PROP IS RENAMED FROM v2.2's `messageTestId`, AND THE RULING DID NOT MOVE — THE NODE IT NAMES DID.** Under **B′** the surface-specific line is the **BODY**, not the heading. **`OD-7`'s property is UNCHANGED:** the marked subtree excludes the button and the `h1`, so `surface.test.tsx:432-435`'s exact-equality assertion against `PROFILE_COPY.error.load` **stays green**. ⛔ **Never on the container** — that is `m/[slug]/error.tsx:65`'s shape and copying it reddens the assertion (§2.16, §7).
 
-⇒ **The leaf's API is `{ body, bodyTestId, actionLabel, onAction }`** — full contract at the converged kickoff §2.2 — and its **own** marker is `data-error-block=""` per the `ui/` convention. ⛔ **It must NOT override `data-slot`** — `loading-block.tsx:30-35` records the failure that minted that rule.
+⇒ **The leaf's API is `{ body, bodyTestId, actionLabel, onAction }`** — **full contract at §1.5A.2** — and its **own** marker is `data-error-block=""` per the `ui/` convention. ⛔ **It must NOT override `data-slot`** — `loading-block.tsx:30-35` records the failure that minted that rule.
 
 **⇒ ⚠ v2.3 — THE LEAF CENTRES ITSELF, AND NEITHER CONSUMER PUTS A `className` ON `<PageContainer>`.** `tests/unit/shell/page-container.test.ts`'s `callSite()` asserts class-set **EQUALITY** against its `SITES` array, and **`u/[pseudonym]/error.tsx` is SITES entry 7** with `before: "mx-auto w-full max-w-3xl px-4 py-6"` — the bare preset, no `className` (head-measured, `POLISH-56-HEADMEASURE.md` §3b). `m/[slug]/error.tsx` escapes only because POLISH.3 declared it in a separate `GREENFIELD` array. ⇒ **Centring lives INSIDE `error-block`.** ⛔ **A `className` on that tag reddens the guard — RUN-STOP 15** (§11). ⚠ **`page-container.test.ts` is on no allow-list and is NOT under `tests/unit/design/**`, so §11 condition 2 does not cover it** — which is why condition 15 exists.
 
@@ -440,7 +440,7 @@ src/components/ui/error-block.tsx
 
 ---
 
-## 1.5A.0 · CONVENTIONS BINDING ALL THREE LEAVES
+#### 1.5A.0 · CONVENTIONS BINDING ALL THREE LEAVES
 
 Measured across all ten shipped members of `src/components/ui/`, with `loading-block.tsx` as the exemplar (it is the only non-shadcn member and the only one minted under these rules).
 
@@ -457,7 +457,7 @@ Measured across all ten shipped members of `src/components/ui/`, with `loading-b
 
 ---
 
-## 1.5A.1 · `src/components/ui/empty-block.tsx` — **P1**
+#### 1.5A.1 · `src/components/ui/empty-block.tsx` — **P1**
 
 **`empty-block` IS P1** (`C-STATES-1`). It renders the W2.11 P1 panel around an existing single string.
 
@@ -504,7 +504,7 @@ marker    data-empty-block=""    on the panel
 
 ---
 
-## 1.5A.2 · `src/components/ui/error-block.tsx` — **THE ROUTE-BOUNDARY FAMILY**
+#### 1.5A.2 · `src/components/ui/error-block.tsx` — **THE ROUTE-BOUNDARY FAMILY**
 
 ⚠ **`error-block` is NEITHER P1 NOR P7** (`C-STATES-1`). It renders the route-boundary family and sits in `ui/` beside two kit members without being one. **`JR-1` — `.6`'s scope argument beat `.5`'s position and `.5` withdrew.**
 
@@ -571,7 +571,7 @@ The leaf binds `onClick`. Both current consumers are already `"use client"` boun
 
 ---
 
-## 1.5A.3 · `src/components/ui/thumb-glyph.tsx` — **THE LIFT**
+#### 1.5A.3 · `src/components/ui/thumb-glyph.tsx` — **THE LIFT**
 
 ⚠ **This leaf is a LIFT, not a mint.** Its entire implementation exists at `SlotHeader.tsx:27-54` and is carried byte-for-byte. **`SlotHeader`'s re-point must be a byte-identical render** (§8.2), and that obligation is what fixes every clause below.
 
@@ -614,7 +614,7 @@ Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the
 
 ---
 
-## 1.5A.4 · PRECEDENCE — replacing the clause that dissolved
+#### 1.5A.4 · PRECEDENCE — replacing the clause that dissolved
 
 §1.5 reads: *"Where that section and this plan disagree, §2 governs the primitive's shape and this plan governs everything else."* **With §2 gone and the contract inside this plan, that clause is self-referential and is REPLACED:**
 
@@ -626,7 +626,7 @@ Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the
 
 ---
 
-## 1.5A.5 · THE FOUR RULINGS AN EXECUTOR MUST NOT RE-OPEN
+#### 1.5A.5 · THE FOUR RULINGS AN EXECUTOR MUST NOT RE-OPEN
 
 | ID | Ruling |
 |---|---|
@@ -637,7 +637,7 @@ Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the
 
 ---
 
-## 1.5A.6 · ⚠ WHAT `.5`'s CONSUMERS PASS — measured, so item 9 is not a guess
+#### 1.5A.6 · ⚠ WHAT `.5`'s CONSUMERS PASS — measured, so item 9 is not a guess
 
 **`ProfileError` at head is a SINGLE `<p>`.** No container, no heading, no action, no panel — `states.tsx:29-32`, classes `py-12 text-center text-sm text-n5`, zero props. ⛔ **Item 9 is a REPLACEMENT, not a wrapping.**
 
@@ -654,7 +654,7 @@ Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the
 
 ---
 
-## 1.5A.7 · ⚠ TWO MEASURED FACTS THE EXECUTOR WILL MEET, RECORDED SO THEY ARE NOT DISCOVERED
+#### 1.5A.7 · ⚠ TWO MEASURED FACTS THE EXECUTOR WILL MEET, RECORDED SO THEY ARE NOT DISCOVERED
 
 **1 · `ProfileLoading` does NOT consume `LoadingBlock` today.** It imports `Skeleton` directly from `@/components/ui/skeleton` (`states.tsx:1`). **Item 7 adds the second consumer of P7; it does not modify the first** (Discovery's `LoadingSkeleton.tsx` is untouched).
 
@@ -662,7 +662,7 @@ Conventions 1, 2, 4, 6 and 8 apply unchanged. **Convention 3 does not**, and the
 
 ---
 
-## 1.5A.8 · ADMIT-CHECK FOR THIS SECTION
+#### 1.5A.8 · ADMIT-CHECK FOR THIS SECTION
 
 | # | Leg | Value |
 |---|---|---|
@@ -1841,7 +1841,7 @@ tests/unit/shell/page-container.test.ts              171 ±
 
 ⚠⚠ **RENUMBERED. THE LIST WAS SIX AND IS NOW THREE, WITH NO GAP.** Precondition 2 is **MET** (POLISH.3 PR 1 merged at #328/#329). Old 3 is **RE-SCOPED to the chain** (`NEW-4`). Old 4 and old 6 are **DISCHARGED** (`OD-2`). Old 7 was discharged at v2.1.
 
-| # | Precondition | State at GROUND `16971cd` |
+| # | Precondition | ⚠ **State at GROUND `5ff418b`** *(v2.4; the column read `16971cd` at v2.3)* |
 |---|---|---|
 | **1** | **This plan RATIFIED** | ✅ MET at 5ff418b. The plan is on main (c8ba802, amended 5ff418b) and PR A executed against it, 8/8. |
 | **2** | **Commit 0 landed** | ✅ MET. c8ba802 = #330. Payload verified 7/7 at DOC-1: the plan · O-5…O-8 at CLAUDE.md:250-253 · PD-5-03…08 · C-STATES-1 and C-BOOKMARKS-1 · PD-5-09 (OD-8) · REGISTER-APPLY · design-canon §3 correctly UNTOUCHED. ⚠ v2.4: the squash SUBJECT says "D8 unauthored" and describes an INTERMEDIATE STATE OF ITS OWN BODY — X7, later in the same squash, landed D8 as C-BOOKMARKS-1 (design-canon.md:271-285) and closed "Commit-0 rulings still open after this: ZERO." |
@@ -2058,10 +2058,12 @@ resolved           OD-2 · PR C's auditor · NEW-1 · OD-7 · OD-8 · OD-9      
 applied            C-1 (§2.11 · §3 · §7 · §8 · §9 C1 · §10 · §11.14 · §14 · §18)
                    C-2 (§4 · §14 · §16)   C-3 (§2.4)   C-4 (§1.7 · §3.1 · §18)
                    NEW-3 (§0.3 · §0.6 · §1.2 · §1.5 · §2.15 · §4 · §9 · §15 · §17.13)
-                   NEW-4 (§15)   OD-2 (§1.4 and eleven further sites, §16)
-preconditions      SIX → THREE, no gap.  MET: .3 PR 1 merged
+                   NEW-4 (§15) — ⚠ REVERSED at v2.4 by D-4; kept as a record
+                   OD-2 (§1.4 and eleven further sites, §16)
+preconditions      SIX → THREE, no gap.  ALL THREE MET at 5ff418b (§15)
                    DISCHARGED: OD-2 reorder · D7's branch · NEW-1's copy
-                   RE-SCOPED: .3 PR 2 now gates .6, not PR A
+                   ⚠ v2.4 · D-4: NEW-4 is REVERSED. .3 PR 2 gates NEITHER PR A NOR .6.
+                              It files its own adoption record at its own close-out
 chain              .5 PR A ✅ ─▶ .5 PR B ─▶ .6 ─▶ .5 PR C ─▶ .3 PR 2 ─▶ .4
 ```
 
