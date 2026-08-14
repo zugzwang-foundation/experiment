@@ -319,6 +319,35 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 	});
 
+	it("owner-only-bookmark-affordance-on-the-identity-card", () => {
+		// POLISH.5 item 17 (PB-1, W2.13 R2 + founder ruling 2026-07-31:
+		// OWNER-ONLY). The headzone bookmark icon is navigation to the viewer's
+		// OWN saved set, so a visitor must not see it. Before this item,
+		// `grep -rn '"/bookmarks"' src/` returned ZERO — the route was live,
+		// auth-gated and ORPHANED from the navigation graph.
+		//
+		// ⚠ TWO ARMS OR IT IS VACUOUS (V-2). An owner-only affordance asserted
+		// only on the owner arm passes identically on a control that is ALWAYS
+		// visible, so the negative arm is what gives the positive one meaning.
+		const asOwner = render(<IdentityCard user={USER} owner={true} />);
+		const card = screen.getByTestId("identity-card");
+		const link = card.querySelector('a[href="/bookmarks"]');
+		expect(link).not.toBeNull();
+		// Icon-only: an accessible name via aria-label, and NO visible "@" —
+		// `:303` below asserts the whole subtree contains none.
+		expect(link?.getAttribute("aria-label")).toBe("Bookmarks");
+		expect(link?.textContent ?? "").toBe("");
+		// ⛔ Bookmark ONLY — W2.13 R2 struck the download icon.
+		expect(card.querySelector('a[href*="download"]')).toBeNull();
+		asOwner.unmount();
+
+		// The negative arm: a visitor gets NO link at all.
+		render(<IdentityCard user={USER} owner={false} />);
+		expect(
+			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
+		).toBeNull();
+	});
+
 	it("post-carries-replies-count-summing-both-poles", () => {
 		// POLISH.5 item 5 (P5-D07) — canon §3 item 11's `Replies · N`, inline,
 		// count enlarged. N sums BOTH poles: every reply is a Support or a
@@ -363,9 +392,13 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("owner-vs-visitor-body-identical", () => {
 		// F-PROF-3 at Slice 6: the arena body is IDENTICAL across owner and
-		// visitor — the only owner delta is the identity chip (Sell mounts at
-		// Slice 7, not here). Compare the tiles' innerHTML and the row /
-		// argument testid SETS (Slice-7-proof: sets survive the Sell mount).
+		// visitor. ⚠ The identity card now carries TWO owner deltas — the view
+		// chip and, since POLISH.5 item 17, the bookmark link — but neither is
+		// in scope here: `arena()` renders the tiles, the table and the argument
+		// list and NOT `IdentityCard`, so the body-identity law is unaffected
+		// (Sell mounts at Slice 7, not here). Compare the tiles' innerHTML and
+		// the row / argument testid SETS (Slice-7-proof: sets survive the Sell
+		// mount).
 		const arena = (owner: boolean) =>
 			render(
 				<>
@@ -407,7 +440,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(asVisitor.rowIds).toEqual(asOwner.rowIds);
 		expect(asVisitor.argIds).toEqual(asOwner.argIds);
 
-		// The one Slice 6 owner delta: the identity chip.
+		// The FIRST of the identity card's two owner deltas: the view chip. The
+		// second — item 17's bookmark link — has its own two-armed guard above
+		// (`owner-only-bookmark-affordance-on-the-identity-card`).
 		const ownerCard = render(<IdentityCard user={USER} owner={true} />);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.owner,
