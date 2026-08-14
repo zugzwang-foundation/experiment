@@ -137,6 +137,27 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		expect(container.innerHTML).not.toContain(BODY);
 		expect(container.textContent).not.toContain("A profile argument");
 	});
+
+	it("removed-chip-is-pole-bound-at-the-NO-pole-too", () => {
+		// POLISH.5 item 15 (P5-D23) — the removed variant was covered at ONE pole
+		// only, and a YES-only assertion passes on an inverted NO chip. That is
+		// the exact mechanism by which the last live inversion survived a full
+		// PR (C4/C4b). The factory already took `side`; only "YES" was ever
+		// passed. Adopts `.6`'s two-poled shape
+		// (bookmarks/render/side-encoding.test.tsx:196).
+		const { container } = render(
+			<ArgumentList items={[removedItem("NO")]} owner={false} />,
+		);
+		const cls = classTokens(sideChip(container, "NO"));
+		expect(cls).toContain("bg-no");
+		expect(cls).toContain("text-yes");
+		expect(cls).not.toContain("bg-primary");
+		expect(cls).not.toContain("bg-secondary");
+
+		// The stub still renders and still leaks nothing at this pole either.
+		expect(container.textContent).toContain(REMOVED_STUB_TEXT);
+		expect(container.innerHTML).not.toContain(BODY);
+	});
 });
 
 describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", () => {
