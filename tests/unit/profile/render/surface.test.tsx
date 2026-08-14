@@ -316,6 +316,29 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 	});
 
+	it("post-carries-replies-count-summing-both-poles", () => {
+		// POLISH.5 item 5 (P5-D07) — canon §3 item 11's `Replies · N`, inline,
+		// count enlarged. N sums BOTH poles: every reply is a Support or a
+		// Counter bet (ADR-0017), so supportCount + counterCount IS the total.
+		render(<ArgumentList items={ITEMS} owner={false} />);
+
+		// A_POST is 2 support + 1 counter. THREE is the sum and equals NEITHER
+		// operand, so this cannot pass by rendering one of the halves.
+		const count = screen.getByTestId(`argument-replies-${C_POST}`);
+		expect(text(count)).toBe("3");
+		expect(text(count)).not.toBe("2");
+		expect(text(count)).not.toBe("1");
+
+		// Post-only: a reply carries no Support/Counter footer, so no count.
+		expect(screen.queryByTestId(`argument-replies-${C_REPLY}`)).toBeNull();
+		// And the removed stub renders no footer at all.
+		expect(screen.queryByTestId(`argument-replies-${C_REMOVED}`)).toBeNull();
+
+		// The label rides beside the count, in the same line (canon "inline").
+		const post = screen.getByTestId(`argument-${C_POST}`);
+		expect(post.textContent ?? "").toContain("Replies · 3");
+	});
+
 	it("removed-stub-render", () => {
 		// Argument list: the removed post renders the stub variant only.
 		const list = render(<ArgumentList items={[A_REMOVED]} owner={false} />);

@@ -79,7 +79,19 @@ export function ArgumentList({
 						)}
 						{item.kind === "post" && (
 							<p className="text-xs text-n5">
-								Support {item.aggregate.supportCount} : Đ{" "}
+								{/* Canon §3 item 11 — `Replies · N` inline, count enlarged
+								    (`.repn`). N is the post's own reply-bets across BOTH
+								    poles: every reply IS a Support or Counter bet
+								    (ADR-0017), so the two counts already on the DTO sum to
+								    the total. No passthrough field is needed (§2.7). */}
+								Replies ·{" "}
+								<span
+									data-testid={`argument-replies-${item.id}`}
+									className="font-[650] text-n6 text-sm"
+								>
+									{item.aggregate.supportCount + item.aggregate.counterCount}
+								</span>{" "}
+								· Support {item.aggregate.supportCount} : Đ{" "}
 								{formatDharma(item.aggregate.supportDharma)} · Counter{" "}
 								{item.aggregate.counterCount} : Đ{" "}
 								{formatDharma(item.aggregate.counterDharma)}
