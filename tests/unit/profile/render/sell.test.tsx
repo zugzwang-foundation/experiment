@@ -106,11 +106,14 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		expect(screen.getByTestId("sell-module")).toBeTruthy();
 
 		// The settled/Closed row: NO trigger; its status cell shows Closed.
-		// ⚠ Item 11 removed the status filter's `All` and defaults it to `Open`,
-		// so the Closed row is no longer on screen at mount. The filter must be
-		// switched to reach it — and the switch must come BEFORE the negative
+		// ⚠ The status filter's `All` is gone (item 11) and its default is now
+		// DERIVED (Gate C S-1). This fixture passes no `initialMarketSlug`, so
+		// the derivation scopes to ALL rows, finds an Open one and selects
+		// `Open` — the Closed row is off-screen at mount. The filter must be
+		// switched to reach it, and the switch must come BEFORE the negative
 		// assertion, or "no trigger" would pass on a row that simply is not
-		// rendered.
+		// rendered. ⛔ Unlike `market-preselect-from-searchparam`, this switch is
+		// NOT a no-op: the derivation genuinely yields `Open` for this fixture.
 		fireEvent.change(
 			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
 			{ target: { value: "Closed" } },
@@ -158,9 +161,9 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		// ⛔ NO host on a non-sellable row — reserving 50px under a row that can
 		// never sell would be dead space, not a fixed footer.
 		// ⚠ THE POSITIVE CONTROL IS LOAD-BEARING HERE. `M2` is the Closed market,
-		// and item 11 defaults the status filter to `Open`, so asserting its host
-		// absent at mount would pass because THE ROW IS NOT RENDERED — not
-		// because a non-sellable row gets no host. Without the switch and the
+		// and this fixture's DERIVED default (Gate C S-1) is `Open`, so asserting
+		// its host absent at mount would pass because THE ROW IS NOT RENDERED —
+		// not because a non-sellable row gets no host. Without the switch and the
 		// row assertion below, deleting `sellable &&` from the host `<tr>` leaves
 		// this whole suite green while shipping a blank 50px strip under every
 		// Closed and every visitor row.
@@ -230,14 +233,15 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 			"positions-market-filter",
 		);
 		expect(filter.value).toBe(M2);
-		// ⚠ `fixture-beta` is the CLOSED market, and item 11 defaults the STATUS
-		// filter to `Open` — so the preselected row is withheld by the STATUS
-		// filter, not by the market filter this case is about. The preselect
-		// itself is proven by `filter.value` above, which item 11 does not touch.
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Closed" } },
-		);
+		// ⚠ B7 added a status switch here because item 11 defaulted the filter
+		// to a FIXED `Open` and `fixture-beta` is the Closed market. Gate C S-1
+		// made the default DERIVED **and scoped to the initial market** — this
+		// preselect IS that market, and it is all-Closed — so the switch became
+		// a no-op. REMOVED rather than left: a redundant step under a comment
+		// describing a default that no longer exists is the lying-docblock
+		// class, and it would mask a regression in the derivation behind a
+		// manual override. ⚠ This case's own subject is the MARKET preselect,
+		// which `filter.value` above proves and S-1 does not touch.
 		// The preselected market's row renders. ⚠ THE MATCHING NEGATIVE IS
 		// DELIBERATELY NOT ASSERTED HERE: under `status=Closed`, `M1` (Open) is
 		// excluded by the STATUS predicate whatever the market filter does, so
