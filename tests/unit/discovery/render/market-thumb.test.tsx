@@ -30,7 +30,7 @@ import {
  * not there (plan §2, recon R10).
  *
  * Sites, re-counted at `f51a9dd`, not inherited from the plan's §2:
- *   1. `MarketCard.tsx:51-55`      — 52×52, `items-start`
+ *   1. `MarketCard.tsx:51-55`      — 52×52, `items-center` (HTML-FINISH row 5)
  *   2. `HeroPanels.tsx:62-66`      — 54×54, `items-center`
  *   3. `HeroPanels.tsx:184-191`    — `flex-1 min-h-[40px]`, both `data-testid` arms
  * Zero `onError` handlers exist anywhere under `src/` at this commit.
@@ -137,12 +137,11 @@ function topPosts(postImageUrl: string | null): HeroTopPosts {
  */
 const SITES = [
 	{
-		name: "card-thumb · MarketCard.tsx:51-55 @ f51a9dd (52×52, items-start)",
+		name: "card-thumb · MarketCard.tsx:51-55 @ f51a9dd (52×52, items-center @ HTML-FINISH row 5)",
 		imgCount: 1,
-		renderNull: () =>
-			render(<MarketCard card={cardFixture(null)} series={SERIES} />),
+		renderNull: () => render(<MarketCard card={cardFixture(null)} />),
 		renderLoaded: () =>
-			render(<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />),
+			render(<MarketCard card={cardFixture(CARD_IMAGE_URL)} />),
 		selector: `img[src="${CARD_IMAGE_URL}"]`,
 	},
 	{
@@ -278,7 +277,7 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
  * captured. The hero POST image's `alt=""` is unchanged and was captured as-is.
  */
 
-/** `MarketCard`'s 52×52 thumb — first child of the `items-start` row. */
+/** `MarketCard`'s 52×52 thumb — first child of the `items-center` row. */
 const CARD_THUMB_LOADED =
 	'<img alt="" class="h-[52px] w-[52px] shrink-0 rounded-[var(--imgr)] object-cover" src="https://signed.test/market-media/m/x/card.webp">';
 /** 178 bytes as captured. */
@@ -324,25 +323,23 @@ function postSlot(container: HTMLElement, side: "YES" | "NO"): string {
 }
 
 describe("§8.1 zero-delta — MarketCard's 52×52 thumb", () => {
-	const ROW = ".items-start.gap-3";
+	const ROW = ".items-center.gap-3";
 
 	it("null-path-is-byte-identical-to-the-f51a9dd-render", () => {
-		const { container } = render(
-			<MarketCard card={cardFixture(null)} series={SERIES} />,
-		);
+		const { container } = render(<MarketCard card={cardFixture(null)} />);
 		expect(thumbSlot(container, ROW)).toBe(CARD_THUMB_NULL);
 	});
 
 	it("loaded-path-is-byte-identical-to-the-f51a9dd-render-but-for-D4s-alt", () => {
 		const { container } = render(
-			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} />,
 		);
 		expect(thumbSlot(container, ROW)).toBe(CARD_THUMB_LOADED);
 	});
 
 	it("error-path-renders-the-null-baseline-node", () => {
 		const { container } = render(
-			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
+			<MarketCard card={cardFixture(CARD_IMAGE_URL)} />,
 		);
 		const imgs = findImgs(container, `img[src="${CARD_IMAGE_URL}"]`);
 		expect(imgs).toHaveLength(1);
@@ -612,10 +609,8 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 	 */
 	function renderThenSwap(decode: { complete: boolean; naturalWidth: number }) {
 		const good = "https://signed.test/market-media/m/x/good.webp";
-		const view = render(
-			<MarketCard card={cardFixture(good)} series={SERIES} />,
-		);
-		const img = view.container.querySelector(".items-start.gap-3 > img");
+		const view = render(<MarketCard card={cardFixture(good)} />);
+		const img = view.container.querySelector(".items-center.gap-3 > img");
 		if (!(img instanceof HTMLImageElement)) {
 			throw new Error("fixture broken: the loaded arm rendered no thumb <img>");
 		}
@@ -628,18 +623,14 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 			get: () => decode.naturalWidth,
 		});
 		// The carousel advancing to the next market.
-		view.rerender(
-			<MarketCard card={cardFixture(CARD_IMAGE_URL)} series={SERIES} />,
-		);
+		view.rerender(<MarketCard card={cardFixture(CARD_IMAGE_URL)} />);
 		return view;
 	}
 
 	it("re-checks on a src CHANGE, not only on first mount", () => {
 		// `DiscoveryCarousel.tsx:102` swaps `card` on the SAME mounted node every
 		// 10s, so a mount-only check would miss every market after the first.
-		const nullRender = render(
-			<MarketCard card={cardFixture(null)} series={SERIES} />,
-		);
+		const nullRender = render(<MarketCard card={cardFixture(null)} />);
 		const nullHtml = nullRender.container.innerHTML;
 		nullRender.unmount();
 
@@ -655,7 +646,7 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 		const view = renderThenSwap({ complete: true, naturalWidth: 200 });
 		const imgs = findImgs(view.container, `img[src="${CARD_IMAGE_URL}"]`);
 		expect(imgs).toHaveLength(1);
-		expect(view.container.querySelector(".items-start.gap-3 > img")).toBe(
+		expect(view.container.querySelector(".items-center.gap-3 > img")).toBe(
 			imgs[0],
 		);
 	});

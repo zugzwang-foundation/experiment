@@ -8,6 +8,14 @@ import { MarketCard } from "./MarketCard";
  * active carousel index rings its card (`active` → `data-active`; one
  * shared index with the hero + dot, owned by the importing carousel).
  * No directive — client via the carousel's graph.
+ *
+ * HTML-FINISH row 4 — THE CARDS ARE THE GRID'S DIRECT CHILDREN. Each used to
+ * be wrapped in an extra `<div data-testid="grid-ring">` that carried the
+ * active outline. The mockup has no such element: `.grid`'s children ARE the
+ * `.mcard`s (`:267-282`) and the ring is on the card itself (`.mcard.athero`,
+ * `:152`). The wrapper made every tile a child of its grid cell rather than
+ * the cell it fills, so it is gone and the ring — geometry, colour call and
+ * rationale intact — now lives on `MarketCard`'s own root.
  */
 export function DiscoveryGrid({
 	markets,
@@ -21,42 +29,9 @@ export function DiscoveryGrid({
 			data-testid="discovery-grid"
 			className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
 		>
-			{markets.map((m, i) => {
-				const active = i === activeIndex;
-				return (
-					// The grid OWNS the active ring visual (plan §4: "the ≤8-card
-					// grid + the active ring"); the card itself carries only the
-					// data-active state hook (Slice 4). JS-toggled class — no
-					// :has() (canon §3.10).
-					//
-					// V42 — geometry to the mockup (`.mcard.athero`, :152): 1.5px
-					// outline at 3px offset, was 2px at 2px.
-					//
-					// The COLOUR is a call, logged: the mockup rings in `--ink`,
-					// but BRIDGE retired ink-emphasis borders and
-					// `--border-strong` was aliased to n2 — the exact value of
-					// every card's own hairline. So the "active" ring differed
-					// from a resting card by 2px of width and nothing else.
-					// Mapping `--ink` by name is forbidden (it is #fafafa on the
-					// dark ramp, far louder than the mockup's #0A0A0A-on-white),
-					// so the ring takes n4: one step brighter than the hero
-					// panel's n3 (V7), which is one step brighter than the grid's
-					// n2 hairline. Three legible steps, all inside the ratified
-					// ramp. Founder ruling requested at Gate C.
-					<div
-						key={m.card.id}
-						data-testid="grid-ring"
-						{...(active ? { "data-active": "true" } : {})}
-						className={
-							active
-								? "rounded-[var(--r)] [outline:var(--ring-active)] outline-offset-[3px]"
-								: undefined
-						}
-					>
-						<MarketCard card={m.card} series={m.series} active={active} />
-					</div>
-				);
-			})}
+			{markets.map((m, i) => (
+				<MarketCard key={m.card.id} card={m.card} active={i === activeIndex} />
+			))}
 		</div>
 	);
 }

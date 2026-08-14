@@ -50,7 +50,19 @@ const CONSUMERS = [
 		count: 3,
 	},
 	{
-		file: "src/components/discovery/DiscoveryGrid.tsx",
+		// ⚠ RE-POINTED AT HTML-FINISH row 4, and it is a CENSUS UPDATE, NOT A
+		// WEAKENING. Row 4 removed the `grid-ring` wrapper `<div>` that used to
+		// carry the active outline and moved the ring onto the tile's own root,
+		// so the token string left `DiscoveryGrid.tsx` and arrived in
+		// `MarketCard.tsx`. This block is built to be re-measured — see the
+		// "Re-measured at this commit's head" note above it — and every
+		// assertion over it is untouched: still an EXACT count of 1, still
+		// `not.toContain` the literal, and the whole-tree
+		// `the-literals-survive-nowhere-in-src` scan below is unchanged and
+		// still reaches the new file. Leaving the old name here would have
+		// reddened the guard for a bookkeeping reason while the invariant it
+		// exists for held perfectly.
+		file: "src/components/discovery/MarketCard.tsx",
 		token: "[outline:var(--ring-active)]",
 		literal: "[outline:1.5px_solid_var(--color-n4)]",
 		count: 1,

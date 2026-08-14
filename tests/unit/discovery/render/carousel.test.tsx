@@ -137,15 +137,23 @@ function expectActive(index: number): void {
 	expect(activeCards).toHaveLength(1);
 	expect(cards.indexOf(activeCards[0])).toBe(index);
 
-	// The ring VISUAL (code-review HIGH fold): exactly one grid-ring wrapper
-	// is active and carries an outline class — the state attr alone is not a
-	// ring (canon §2: hero + posts + grid OUTLINE RING + dot move in sync).
-	const rings = screen.getAllByTestId("grid-ring");
-	const activeRings = rings.filter(
-		(r) => r.getAttribute("data-active") === "true",
-	);
-	expect(activeRings).toHaveLength(1);
-	expect(rings.indexOf(activeRings[0])).toBe(index);
+	// The ring VISUAL (code-review HIGH fold): exactly one card is active and
+	// carries an outline class — the state attr alone is not a ring (canon §2:
+	// hero + posts + grid OUTLINE RING + dot move in sync).
+	//
+	// ⚠ THE `grid-ring` TESTID IS RETIRED, NOT DROPPED — HTML-FINISH row 4.
+	// The ring used to hang on a wrapper `<div data-testid="grid-ring">` that
+	// the grid put around every tile; row 4 removed that wrapper and moved the
+	// ring onto the tile's own root, which already carries
+	// `data-testid="market-card"` (one element cannot hold two). Every
+	// guarantee the hook made is carried here verbatim — exactly one ringed
+	// element, at the active index, with an `outline` class, and no outline on
+	// any other — now asserted against the CARDS. It is strictly stronger than
+	// what it replaces: it proves the ring is on the tile itself, which is the
+	// thing row 4 exists to establish, where the old form could pass with the
+	// outline on a different box from the `data-active` attribute.
+	const rings = cards;
+	const activeRings = activeCards;
 	expect(activeRings[0].getAttribute("class") ?? "").toContain("outline");
 	for (const r of rings) {
 		if (r !== activeRings[0]) {
