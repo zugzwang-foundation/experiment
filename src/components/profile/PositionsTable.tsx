@@ -8,6 +8,7 @@ import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyBlock } from "@/components/ui/empty-block";
 import type {
 	ProfilePositionsPayload,
 	SellablePositionRow,
@@ -76,16 +77,19 @@ export function PositionsTable({
 			(status === "all" || r.statusLabel === status),
 	);
 
+	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
+	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
+	// still returns exactly this string; no `sub` is passed on this surface.
 	if (rows.length === 0) {
 		return (
-			<p
-				data-testid="positions-empty"
-				className="py-8 text-center text-sm text-n5"
-			>
-				{owner
-					? PROFILE_COPY.empty.positionsOwner
-					: PROFILE_COPY.empty.positionsVisitor}
-			</p>
+			<EmptyBlock
+				message={
+					owner
+						? PROFILE_COPY.empty.positionsOwner
+						: PROFILE_COPY.empty.positionsVisitor
+				}
+				messageTestId="positions-empty"
+			/>
 		);
 	}
 

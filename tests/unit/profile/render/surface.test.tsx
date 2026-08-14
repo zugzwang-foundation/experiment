@@ -194,6 +194,19 @@ function text(el: Element): string {
 	return (el.textContent ?? "").trim();
 }
 
+/**
+ * The P1 panel wrapping a marked message node. Throws rather than returning
+ * `Element | null` so callers assert on a real element without a cast (no
+ * jest-dom, and `as` is reserved for trust boundaries — AGENTS.md §4).
+ */
+function panelOf(messageTestId: string): Element {
+	const panel = screen.getByTestId(messageTestId).closest("[data-empty-block]");
+	if (panel === null) {
+		throw new Error(`no [data-empty-block] ancestor for "${messageTestId}"`);
+	}
+	return panel;
+}
+
 /** Sorted data-testid values under `root` whose testid starts with `prefix`. */
 function testids(root: ParentNode, prefix: string): string[] {
 	return Array.from(root.querySelectorAll(`[data-testid^="${prefix}"]`))
@@ -486,6 +499,47 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(screen.getByTestId("arguments-empty"))).toBe(
 			PROFILE_COPY.empty.argumentsVisitor,
 		);
+	});
+
+	it("empty-states-adopt-p1", () => {
+		// POLISH.5 item 8 (P5-D11) — the empties adopt W2.11 P1 at ONE message
+		// tier (D3(a)). TWO of the three sites are here; the third is
+		// `ProfileGraphCard`, which this file does not import — its assertion
+		// lives in `graph.test.tsx`, beside the component that renders it.
+		//
+		// ⚠ NON-VACUITY IS WHY THIS CASE EXISTS. The four `empty-states`
+		// equalities above stay green at a single tier — but they stay green on
+		// the bare `<p>` this item REPLACES, and on a component that renders the
+		// string and no panel at all. The panel is what has to be asserted.
+		const positions = render(
+			<PositionsTable payload={{ owner: true, rows: [] }} />,
+		);
+		const positionsPanel = panelOf("positions-empty");
+		// P1's ratified geometry (canon §10, R9's second clause): hairline
+		// border, `bg-n0`, the 148px floor, `--r`. On the PANEL, not the message.
+		const positionsClass = positionsPanel.getAttribute("class") ?? "";
+		expect(positionsClass).toContain("[border:var(--hairline)]");
+		expect(positionsClass).toContain("bg-n0");
+		expect(positionsClass).toContain("min-h-[148px]");
+		expect(positionsClass).toContain("rounded-[var(--r)]");
+		// …and the string is STILL THERE, on the message node inside it.
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsOwner,
+		);
+		// ONE TIER: the panel's whole subtree is that message and nothing else.
+		// This is what keeps the four equalities above green — a `sub` node
+		// inside the marked subtree would break every one of them, so no `sub`
+		// is passed on this surface.
+		expect(text(positionsPanel)).toBe(PROFILE_COPY.empty.positionsOwner);
+		positions.unmount();
+
+		render(<ArgumentList items={[]} owner={true} />);
+		const argumentsPanel = panelOf("arguments-empty");
+		const argumentsClass = argumentsPanel.getAttribute("class") ?? "";
+		expect(argumentsClass).toContain("[border:var(--hairline)]");
+		expect(argumentsClass).toContain("bg-n0");
+		expect(argumentsClass).toContain("min-h-[148px]");
+		expect(text(argumentsPanel)).toBe(PROFILE_COPY.empty.argumentsOwner);
 	});
 
 	it("states-kit", () => {

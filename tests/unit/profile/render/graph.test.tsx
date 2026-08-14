@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { PROFILE_COPY } from "@/components/profile/copy";
 import { ProfileChart } from "@/components/profile/graph/ProfileChart";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { ProfileGraphCard } from "@/components/profile/graph/ProfileGraphCard";
@@ -127,6 +128,21 @@ const FULL: ProfileGraphSeries = {
 	],
 };
 
+/**
+ * NOTHING TO PLOT — no net-worth samples AND no positions, the exact pair
+ * `ProfileGraphCard` gates its empty branch on. Added at POLISH.5 item 8: no
+ * empty-series fixture existed, which is why `graph-empty` had no assertion.
+ */
+const EMPTY: ProfileGraphSeries = {
+	windowStart: "2026-09-15T00:00:00.000Z",
+	windowEnd: "2026-11-05T23:59:00.000Z",
+	yMax: 10_000,
+	freeDharma: [],
+	netWorth: [],
+	perMarket: [],
+	nodes: [],
+};
+
 /** Every element under `root` whose data-testid starts with `prefix`. */
 function byPrefix(root: ParentNode, prefix: string): Element[] {
 	return Array.from(root.querySelectorAll(`[data-testid^="${prefix}"]`));
@@ -164,6 +180,44 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(screen.getByTestId("line-networth")).toBeTruthy();
 		expect(screen.queryByTestId("line-freedharma")).toBeNull();
 		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
+	});
+
+	it("graph-empty-adopts-p1", () => {
+		// POLISH.5 item 8 (P5-D11), THIRD SITE — and the first assertion
+		// `graph-empty` has ever had. Before this commit `grep -rn 'graph-empty'
+		// tests/` returned ZERO and `PROFILE_COPY.graph.empty` had no assertion
+		// anywhere: the state rendered and nothing watched it.
+		//
+		// It lives in this file rather than `surface.test.tsx` because that file
+		// does not import `ProfileGraphCard` at all — the two suites divide by
+		// component family, and their docblocks say so.
+		render(<ProfileGraphCard series={EMPTY} onExpand={vi.fn()} />);
+
+		// Non-vacuity in BOTH directions: the empty branch rendered AND the
+		// chart branch did not.
+		const message = screen.getByTestId("graph-empty");
+		expect(screen.queryByTestId("line-networth")).toBeNull();
+		expect((message.textContent ?? "").trim()).toBe(PROFILE_COPY.graph.empty);
+
+		// P1's ratified geometry (canon §10, R9's second clause), on the PANEL.
+		const panel = message.closest("[data-empty-block]");
+		if (panel === null) {
+			throw new Error("no [data-empty-block] ancestor for graph-empty");
+		}
+		const panelClass = panel.getAttribute("class") ?? "";
+		expect(panelClass).toContain("[border:var(--hairline)]");
+		expect(panelClass).toContain("bg-n0");
+		expect(panelClass).toContain("min-h-[148px]");
+		expect(panelClass).toContain("rounded-[var(--r)]");
+
+		// ⛔ P1 RENDERS NO INTERACTIVE ELEMENT, and on this site that is
+		// structural rather than stylistic: the whole card IS the expand
+		// `<button>`, and a `<button>` cannot nest inside a `<button>`. This is
+		// the measured reason `empty-block` takes no action prop.
+		const card = screen.getByTestId("profile-graph-card");
+		expect(card.tagName).toBe("BUTTON");
+		expect(card.querySelectorAll("button")).toHaveLength(0);
+		expect(card.contains(panel)).toBe(true);
 	});
 
 	it("nodes-absent-in-placeholder", () => {
