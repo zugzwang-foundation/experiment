@@ -41,6 +41,11 @@ const AGGREGATE = {
 
 const BODY = "ZZ-DISTINCTIVE-BODY-MARKER-c4b";
 
+/** Item 6's teaser marker. DISTINCTIVE for the same reason `BODY` is: the
+ * shipped fixture string `"The teaser."` could appear by accident, and an
+ * absence assertion over a string that occurs incidentally proves nothing. */
+const TEASER = "ZZ-DISTINCTIVE-TEASER-MARKER-p5i6";
+
 const liveItem = (
 	side: "YES" | "NO",
 	marker: "none" | "Flipped" | "Exited" = "none",
@@ -53,7 +58,7 @@ const liveItem = (
 	marketTitle: "Will X happen?",
 	ordinal: 4,
 	title: "A profile argument",
-	teaser: "The teaser.",
+	teaser: TEASER,
 	body: BODY,
 	marker,
 	createdAt: "2026-07-01T00:00:00.000Z",
@@ -131,6 +136,54 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		// SC-1: assert the BODY's absence, not the row's.
 		expect(container.innerHTML).not.toContain(BODY);
 		expect(container.textContent).not.toContain("A profile argument");
+	});
+});
+
+describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", () => {
+	it("live-card-renders-the-teaser-clamped", () => {
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		const teaser = container.querySelector('[data-testid^="argument-teaser-"]');
+		expect(teaser?.textContent).toBe(TEASER);
+		// The clamp is a CLASS, not an attribute and not a JS truncation — the
+		// whole paragraph is in the DOM and only its HEIGHT is reduced (§2.8).
+		expect(teaser?.getAttribute("class")).toContain("line-clamp-2");
+	});
+
+	it("no-title-attribute-carries-the-teaser-or-the-body", () => {
+		// AM-1 / RUN-STOP 13. A native tooltip over the full paragraph is a
+		// SECOND read affordance beside the title <Link> — what D13 rules out,
+		// reached by a different mechanism. This fires on the ATTRIBUTE, not on
+		// whether some other guard is present: a guard that permits the leak is
+		// not a defence. Three in-repo precedents exist for `title={…}` on a
+		// clamped node (SlotHeader.tsx:102, ReplySplitBar.tsx:133,
+		// SellModule.tsx:260) and NONE of them is authority here.
+		const { container } = render(
+			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+		);
+		expect(container.innerHTML).not.toMatch(/title="[^"]*ZZ-/);
+		// Non-vacuity: the markers this asserts the absence of are genuinely on
+		// the page, so the assertion is about `title=` and not about the strings
+		// being missing altogether.
+		expect(container.innerHTML).toContain(TEASER);
+	});
+
+	it("removed-variant-leaks-neither-teaser-nor-body", () => {
+		// SC-1 (CLAUDE.md §5.14). The removed union variant carries no `teaser`
+		// and no `body` BY CONSTRUCTION, so this is the runtime belt on a
+		// compile-time guarantee. ⛔ On innerHTML, never textContent (O-7) — a
+		// value parked in an attribute is invisible to textContent.
+		const { container } = render(
+			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+		);
+		expect(container.innerHTML).not.toContain(TEASER);
+		// `:132`'s assertion, re-asserted verbatim in item 6's own commit — the
+		// proof that adding a second body-derived text read moved nothing.
+		expect(container.innerHTML).not.toContain(BODY);
+		expect(
+			container.querySelector('[data-testid^="argument-teaser-"]'),
+		).toBeNull();
 	});
 });
 

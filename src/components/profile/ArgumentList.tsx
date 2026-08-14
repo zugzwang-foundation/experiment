@@ -69,6 +69,22 @@ export function ArgumentList({
 						>
 							{item.title}
 						</Link>
+						{/* Item 6 (P5-D08) — the teaser, clamped. ⛔ AM-1: the clamp is
+						    CSS-ONLY. NO `title` attribute may carry this text: a native
+						    tooltip revealing the whole paragraph is a SECOND read
+						    affordance beside the title <Link>, which is what D13 rules
+						    out, reached by a different mechanism. The compliant shape is
+						    already in this file — the "Replied to …" context below clamps
+						    with no `title`. The removed variant carries no `teaser` field
+						    at all, so a leak here is a COMPILE error (SC-1). */}
+						{item.teaser !== "" && (
+							<p
+								data-testid={`argument-teaser-${item.id}`}
+								className="line-clamp-2 text-xs text-n5"
+							>
+								{item.teaser}
+							</p>
+						)}
 						{item.kind === "reply" && item.repliedToTitle !== null && (
 							<p
 								data-testid={`argument-reply-context-${item.id}`}
