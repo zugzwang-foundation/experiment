@@ -106,10 +106,73 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		expect(screen.getByTestId("sell-module")).toBeTruthy();
 
 		// The settled/Closed row: NO trigger; its status cell shows Closed.
+		// ⚠ The status filter's `All` is gone (item 11) and its default is now
+		// DERIVED (Gate C S-1). This fixture passes no `initialMarketSlug`, so
+		// the derivation scopes to ALL rows, finds an Open one and selects
+		// `Open` — the Closed row is off-screen at mount. The filter must be
+		// switched to reach it, and the switch must come BEFORE the negative
+		// assertion, or "no trigger" would pass on a row that simply is not
+		// rendered. ⛔ Unlike `market-preselect-from-searchparam`, this switch is
+		// NOT a no-op: the derivation genuinely yields `Open` for this fixture.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-trigger-${M2}`)).toBeNull();
 		expect(
 			(screen.getByTestId(`position-status-${M2}`).textContent ?? "").trim(),
 		).toContain("Closed");
+	});
+
+	it("sell-host-is-fixed-height-and-does-not-reflow", () => {
+		// POLISH.5 item 10 (P5-D13). Canon §5's Profile row ratifies the
+		// mechanism: "the replica footer is a fixed 50px box … the sell module
+		// replaces it over .26s — fixed height ⇒ never reflows."
+		//
+		// ⚠ A MOUNT ASSERTION CANNOT SEE A REFLOW. `owner-sell-mount` above
+		// proves the module appears, and it passed identically on the shipped
+		// behaviour this item fixes — where opening Sell INSERTED a `<tr>` and
+		// pushed every following row down. The reflow is the law under test.
+		render(
+			<PositionsTable
+				payload={{ owner: true, rows: [OPEN_SELLABLE, SETTLED_UNSELLABLE] }}
+			/>,
+		);
+
+		// THE HOST EXISTS BEFORE THE CLICK. This is the whole mechanism: the box
+		// is reserved whether or not the module is open.
+		const host = screen.getByTestId(`sell-host-${M1}`);
+		expect(host.getAttribute("class") ?? "").toContain("h-[50px]");
+		expect(screen.queryByTestId("sell-module")).toBeNull();
+
+		// The row inventory is IDENTICAL either side of the toggle — the literal
+		// non-reflow claim, not a proxy for it.
+		const rowsBefore = document.querySelectorAll("tbody tr").length;
+		fireEvent.click(screen.getByTestId(`sell-trigger-${M1}`));
+		expect(screen.getByTestId("sell-module")).toBeTruthy();
+		expect(document.querySelectorAll("tbody tr").length).toBe(rowsBefore);
+
+		// …and the host is still the same fixed box, not one that grew to fit.
+		expect(
+			screen.getByTestId(`sell-host-${M1}`).getAttribute("class") ?? "",
+		).toContain("h-[50px]");
+
+		// ⛔ NO host on a non-sellable row — reserving 50px under a row that can
+		// never sell would be dead space, not a fixed footer.
+		// ⚠ THE POSITIVE CONTROL IS LOAD-BEARING HERE. `M2` is the Closed market,
+		// and this fixture's DERIVED default (Gate C S-1) is `Open`, so asserting
+		// its host absent at mount would pass because THE ROW IS NOT RENDERED —
+		// not because a non-sellable row gets no host. Without the switch and the
+		// row assertion below, deleting `sellable &&` from the host `<tr>` leaves
+		// this whole suite green while shipping a blank 50px strip under every
+		// Closed and every visitor row.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`sell-host-${M2}`)).toBeNull();
 	});
 
 	it("visitor-excludes-sell-render", () => {
@@ -125,13 +188,26 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		).toHaveLength(0);
 		expect(screen.queryByTestId("sell-module")).toBeNull();
 
-		// Non-vacuity: both rows render with their status cells.
+		// Non-vacuity: the rows render with their status cells — an EMPTY table
+		// would satisfy the trigger census above.
+		// ⚠ Item 11 removed the status filter's `All`, so the two rows are never
+		// on screen together. Each is reached in its own filter state, AND the
+		// trigger census is re-run in the Closed state — otherwise that arm
+		// would go unchecked, which is the vacuity this case exists to prevent.
 		expect(
 			(screen.getByTestId(`position-status-${M1}`).textContent ?? "").trim(),
 		).toContain("Open");
+
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Closed" } },
+		);
 		expect(
 			(screen.getByTestId(`position-status-${M2}`).textContent ?? "").trim(),
 		).toContain("Closed");
+		expect(
+			view.container.querySelectorAll('[data-testid^="sell-trigger-"]'),
+		).toHaveLength(0);
 	});
 
 	it("sell-close-collapses", () => {
@@ -157,8 +233,22 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 			"positions-market-filter",
 		);
 		expect(filter.value).toBe(M2);
-		// Only the preselected market's row is visible.
-		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+		// ⚠ B7 added a status switch here because item 11 defaulted the filter
+		// to a FIXED `Open` and `fixture-beta` is the Closed market. Gate C S-1
+		// made the default DERIVED **and scoped to the initial market** — this
+		// preselect IS that market, and it is all-Closed — so the switch became
+		// a no-op. REMOVED rather than left: a redundant step under a comment
+		// describing a default that no longer exists is the lying-docblock
+		// class, and it would mask a regression in the derivation behind a
+		// manual override. ⚠ This case's own subject is the MARKET preselect,
+		// which `filter.value` above proves and S-1 does not touch.
+		// The preselected market's row renders. ⚠ THE MATCHING NEGATIVE IS
+		// DELIBERATELY NOT ASSERTED HERE: under `status=Closed`, `M1` (Open) is
+		// excluded by the STATUS predicate whatever the market filter does, so
+		// `queryByTestId(M1) === null` would pass with the market filter
+		// entirely broken. Market isolation keeps its own attributable proof in
+		// `surface.test.tsx`'s `positions-filters`, where the status filter is
+		// held constant and the market selection is what moves.
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 
 		// An UNKNOWN slug falls back to "all" (never rendered raw).

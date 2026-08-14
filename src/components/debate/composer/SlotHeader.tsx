@@ -3,6 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import { formatDharma, formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { COMPOSER_COPY, c3OppositeSide, formatMultiplier } from "./copy";
@@ -23,35 +24,6 @@ import { isEntryDisabled } from "./gating";
  * LINK-shaped element rendered NON-INTERACTIVE until A5 (F-4 — its Profile
  * click-through wires there), beside the Đb-only `Your position` readout.
  */
-
-/** The locked d5 thumb glyph (14×14 viewBox; slot-header size 16). */
-const THUMB_PATH =
-	"M1.6 6.4h2.1v5.4H1.6z M3.7 11.2V6.9l2.3-4.1c.9 0 1.5.7 1.3 1.6L6.9 6h3.5c.8 0 1.4.7 1.2 1.5l-.8 2.9c-.2.8-.8 1.4-1.6 1.4H3.7z";
-
-/** Thumb-up stroked currentColor; thumb-down FILLED `--color-no`, rotated 180° (values-log §1 item 3). */
-function ThumbGlyph({ side }: { side: Side }) {
-	return (
-		<svg
-			viewBox="0 0 14 14"
-			width="16"
-			height="16"
-			aria-hidden="true"
-			className={side === "NO" ? "rotate-180" : undefined}
-		>
-			<path
-				d={THUMB_PATH}
-				{...(side === "YES"
-					? {
-							fill: "none",
-							stroke: "currentColor",
-							strokeWidth: 1.1,
-							strokeLinejoin: "round" as const,
-						}
-					: { className: "fill-no", stroke: "none" })}
-			/>
-		</svg>
-	);
-}
 
 export function SlotHeader({
 	side,

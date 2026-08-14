@@ -8,6 +8,8 @@ import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyBlock } from "@/components/ui/empty-block";
+import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import type {
 	ProfilePositionsPayload,
 	SellablePositionRow,
@@ -46,11 +48,24 @@ export function PositionsTable({
 }): React.JSX.Element {
 	const owner = payload.owner;
 	const rows = payload.rows;
-	const [market, setMarket] = useState(
-		() =>
-			rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all",
-	);
-	const [status, setStatus] = useState("all");
+	const initialMarketId =
+		rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all";
+	const [market, setMarket] = useState(initialMarketId);
+	// ⚠ POLISH.5 Gate C S-1 — the default is DERIVED, not fixed. A fixed `Open`
+	// is permanently empty for anyone whose held markets are all non-Open, and
+	// after the 2026-11-05 freeze that is EVERY participant — so an owner would
+	// open their own profile to four column headers and nothing else, forever.
+	// ⛔ SCOPED TO THE INITIAL MARKET, not to all rows: a `?market=<slug>` deep
+	// link to a market whose only position is Closed would otherwise still land
+	// on a blank table. ⚠ The canon inventory is UNCHANGED — two options, `All`
+	// still gone. Only which one is selected at mount moves.
+	const [status, setStatus] = useState(() => {
+		const scoped =
+			initialMarketId === "all"
+				? rows
+				: rows.filter((r) => r.marketId === initialMarketId);
+		return scoped.some((r) => r.statusLabel === "Open") ? "Open" : "Closed";
+	});
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
 
@@ -72,20 +87,27 @@ export function PositionsTable({
 
 	const visible = rows.filter(
 		(r) =>
-			(market === "all" || r.marketId === market) &&
-			(status === "all" || r.statusLabel === status),
+			// ⛔ The MARKET filter keeps its `all` sentinel. The STATUS filter's
+			// was orphaned by item 11 — with `All` removed and the initial state
+			// `Open`, no code path can set `status` to `"all"` — so the dead
+			// disjunct goes with it and the predicate matches the ratified
+			// inventory the docblock above already describes.
+			(market === "all" || r.marketId === market) && r.statusLabel === status,
 	);
 
+	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
+	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
+	// still returns exactly this string; no `sub` is passed on this surface.
 	if (rows.length === 0) {
 		return (
-			<p
-				data-testid="positions-empty"
-				className="py-8 text-center text-sm text-n5"
-			>
-				{owner
-					? PROFILE_COPY.empty.positionsOwner
-					: PROFILE_COPY.empty.positionsVisitor}
-			</p>
+			<EmptyBlock
+				message={
+					owner
+						? PROFILE_COPY.empty.positionsOwner
+						: PROFILE_COPY.empty.positionsVisitor
+				}
+				messageTestId="positions-empty"
+			/>
 		);
 	}
 
@@ -111,90 +133,173 @@ export function PositionsTable({
 					onChange={(e) => setStatus(e.target.value)}
 					className="rounded-[var(--r-chip)] bg-n1 px-2 py-1 text-sm text-ink"
 				>
-					<option value="all">All</option>
+					{/* Item 11 (P5-D17a) — `All` is GONE, and the initial state moves
+					    with it. ⚠ A CAPABILITY REMOVAL, recorded as one rather than
+					    filed as polish: after this there is no route — no component,
+					    no URL param, no server read — by which open and closed
+					    positions appear together. ⛔ The MARKET filter's `all`
+					    sentinel above is UNTOUCHED; it is a different control. */}
 					<option value="Open">Open</option>
 					<option value="Closed">Closed</option>
 				</select>
 			</div>
 
-			<table data-testid="positions-table" className="w-full text-left text-sm">
-				<thead className="text-xs text-n5">
-					<tr>
-						<th className="p-2">Position</th>
-						<th className="p-2">Argument</th>
-						<th className="p-2">Staked</th>
-						<th className="p-2">Current</th>
-						<th className="p-2" />
-					</tr>
-				</thead>
-				<tbody>
-					{visible.map((row) => {
-						const sellable = sellEligibleOf(row);
-						const sellOpen = sellMarketId === row.marketId;
-						return (
-							<Fragment key={row.marketId}>
-								<tr data-testid={`position-row-${row.marketId}`}>
-									<td className="p-2 text-ink">{row.marketTitle}</td>
-									<td className="p-2">
-										<ArgumentCell cell={row.argument} marketId={row.marketId} />
-									</td>
-									<td className="p-2 tabular-nums text-ink">
-										{formatDharma(row.staked)}
-									</td>
-									<td className="p-2 tabular-nums text-ink">
-										{formatDharma(row.current)}
-									</td>
-									<td className="flex items-center gap-2 p-2">
-										<Badge
-											data-testid={`position-status-${row.marketId}`}
-											variant={
-												row.statusLabel === "Open" ? "secondary" : "outline"
-											}
-										>
-											{row.statusLabel}
-										</Badge>
-										{sellable && (
-											<Button
-												type="button"
-												size="xs"
-												variant="outline"
-												data-testid={`sell-trigger-${row.marketId}`}
-												aria-expanded={sellOpen}
-												onClick={() =>
-													setSellMarketId(sellOpen ? null : row.marketId)
+			{/* ⚠ POLISH.5 Gate C S-1 — THE STRANDED STATE. `rows > 0 ∧ visible === 0`
+			    used to render four column headers over an empty `<tbody>` and no
+			    message at all. ⛔ THE FILTER CONTROLS STAY RENDERED ABOVE: returning
+			    early here would trap the user in the state with no way out, which is
+			    worse than the bug. Only the TABLE is replaced.
+			    ⚠ A DISTINCT testid — this is not `positions-empty`. That state means
+			    "you hold nothing"; this one means "the filter is hiding what you
+			    hold", and they carry different copy. */}
+			{visible.length === 0 ? (
+				<EmptyBlock
+					message={PROFILE_COPY.empty.positionsFiltered}
+					messageTestId="positions-empty-filtered"
+				/>
+			) : (
+				<table
+					data-testid="positions-table"
+					className="w-full text-left text-sm"
+				>
+					<thead className="text-xs text-n5">
+						<tr>
+							<th className="p-2">Position</th>
+							<th className="p-2">Argument</th>
+							<th className="p-2">Staked</th>
+							<th className="p-2">Current</th>
+							<th className="p-2" />
+						</tr>
+					</thead>
+					<tbody>
+						{visible.map((row) => {
+							const sellable = sellEligibleOf(row);
+							const sellOpen = sellMarketId === row.marketId;
+							return (
+								<Fragment key={row.marketId}>
+									<tr data-testid={`position-row-${row.marketId}`}>
+										<td className="p-2 text-ink">
+											{/* Item 1 (P5-D02), the mockup's `.pside`: the side WORD
+											    beside the thumb glyph at 12px. ⛔ NOT a chip (R12).
+											    Before this item `row.side` reached NO rendered node
+											    on this surface — it went only to `SellModule`'s
+											    prop, so nothing on screen showed which side is
+											    held. The word is the side VALUE (data, not copy),
+											    cased as the shipped `SlotHeader` word+thumb cluster
+											    cases it; `gap-[5px]` is that cluster's gap.
+											    ⚠ THIS IS THE HELD SIDE, NOT THE INV-3 FROZEN ONE,
+											    and the distinction is worth the line. `row.side`
+											    comes from `positions.side` — Bucket C, MUTABLE: a
+											    sell-out and re-entry on the other pole changes what
+											    renders here. The side that is frozen at post time is
+											    `comments.side_at_post_time`, which is what
+											    `ArgumentList` renders through `SideBadge`. Item 1's
+											    plan text calls this "the frozen side"; the FIELD is
+											    not, and labelling a Bucket-C value frozen inside the
+											    component that renders it is the conflation INV-3
+											    exists to prevent. */}
+											<span
+												data-testid={`position-side-${row.marketId}`}
+												className="flex items-center gap-[5px] text-xs"
+											>
+												{row.side === "YES" ? "Yes" : "No"}
+												<ThumbGlyph side={row.side} size={12} />
+											</span>
+											{row.marketTitle}
+										</td>
+										<td className="p-2">
+											<ArgumentCell
+												cell={row.argument}
+												marketId={row.marketId}
+											/>
+										</td>
+										<td className="p-2 tabular-nums text-ink">
+											{formatDharma(row.staked)}
+										</td>
+										<td className="p-2 tabular-nums text-ink">
+											{formatDharma(row.current)}
+										</td>
+										<td className="flex items-center gap-2 p-2">
+											<Badge
+												data-testid={`position-status-${row.marketId}`}
+												variant={
+													row.statusLabel === "Open" ? "secondary" : "outline"
 												}
 											>
-												Sell
-											</Button>
-										)}
-									</td>
-								</tr>
-								{sellable && sellOpen && (
-									<tr data-testid={`sell-row-${row.marketId}`}>
-										<td colSpan={5} className="p-2">
-											{/* Canon §5 slide — the module replaces the fixed-height
-											    footer (JS-toggled; never reflows the table above). */}
-											<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
-												<SellModule
-													marketId={row.marketId}
-													slug={row.marketSlug}
-													position={{
-														side: row.side,
-														quantity: row.quantity,
-														currentValue: row.current,
-													}}
-													onClose={() => setSellMarketId(null)}
-													onSuspended={() => setSellMarketId(null)}
-												/>
-											</div>
+												{row.statusLabel}
+											</Badge>
+											{sellable && (
+												<Button
+													type="button"
+													size="xs"
+													variant="outline"
+													data-testid={`sell-trigger-${row.marketId}`}
+													aria-expanded={sellOpen}
+													onClick={() =>
+														setSellMarketId(sellOpen ? null : row.marketId)
+													}
+												>
+													Sell
+												</Button>
+											)}
 										</td>
 									</tr>
-								)}
-							</Fragment>
-						);
-					})}
-				</tbody>
-			</table>
+									{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
+									    row, quoted WHOLE because the omitted half is the half not built:
+									    "the replica footer is a fixed 50 px box; on Sell the footer
+									    slides down (translateY 110% + fade) and the sell module replaces
+									    it over .26 s — fixed height ⇒ never reflows."
+									    ⇒ BUILT HERE: the fixed 50px box, the .26s fade, the JS toggle.
+									    ⇒ NOT BUILT: the footer's translateY-110% exit. That clause
+									    governs a FOOTER ELEMENT the replica card has and this table does
+									    not, so there is nothing to slide away; inventing footer content
+									    to animate would be authoring design. ⚠ The consequence is
+									    user-visible and is raised for the founder rather than absorbed:
+									    the reserved box is BLANK when closed, so an owner sees an empty
+									    band under every sellable row.
+									    ⚠ THE HOST RENDERS FOR EVERY SELLABLE ROW, OPEN OR CLOSED, and
+									    reserving the box IS the mechanism: opening Sell now inserts
+									    nothing, so no row moves. The whole `<tr>` used to be conditional,
+									    so opening it pushed every following row down — which is why the
+									    comment that sat here, claiming the module "replaces the
+									    fixed-height footer" and "never reflows the table above", was FALSE
+									    the day it was written. It is true now, and it has moved here.
+									    ⛔ No host on a non-sellable row: reserving 50px under a row that
+									    can never sell would be dead space, not a fixed footer.
+									    ⛔ `:has()` is banned (canon §3 item 10) — the toggle stays JS
+									    state, exactly as before. */}
+									{sellable && (
+										<tr data-testid={`sell-row-${row.marketId}`}>
+											<td colSpan={5} className="p-2">
+												<div
+													data-testid={`sell-host-${row.marketId}`}
+													className="h-[50px]"
+												>
+													{sellOpen && (
+														<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
+															<SellModule
+																marketId={row.marketId}
+																slug={row.marketSlug}
+																position={{
+																	side: row.side,
+																	quantity: row.quantity,
+																	currentValue: row.current,
+																}}
+																onClose={() => setSellMarketId(null)}
+																onSuspended={() => setSellMarketId(null)}
+															/>
+														</div>
+													)}
+												</div>
+											</td>
+										</tr>
+									)}
+								</Fragment>
+							);
+						})}
+					</tbody>
+				</table>
+			)}
 		</div>
 	);
 }

@@ -7,7 +7,7 @@ import {
 	screen,
 	within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { PROFILE_COPY } from "@/components/profile/copy";
@@ -194,6 +194,19 @@ function text(el: Element): string {
 	return (el.textContent ?? "").trim();
 }
 
+/**
+ * The P1 panel wrapping a marked message node. Throws rather than returning
+ * `Element | null` so callers assert on a real element without a cast (no
+ * jest-dom, and `as` is reserved for trust boundaries — AGENTS.md §4).
+ */
+function panelOf(messageTestId: string): Element {
+	const panel = screen.getByTestId(messageTestId).closest("[data-empty-block]");
+	if (panel === null) {
+		throw new Error(`no [data-empty-block] ancestor for "${messageTestId}"`);
+	}
+	return panel;
+}
+
 /** Sorted data-testid values under `root` whose testid starts with `prefix`. */
 function testids(root: ParentNode, prefix: string): string[] {
 	return Array.from(root.querySelectorAll(`[data-testid^="${prefix}"]`))
@@ -251,13 +264,26 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(within(rowOpen).getByTestId(`position-arg-${M1}`))).toContain(
 			"Opener argument alpha",
 		);
-		// Status cells show the statusLabel.
+		// Status cells show the statusLabel. ⚠ Item 11 removed the status
+		// filter's `All` option, so the two rows are never on screen together
+		// — each label is read in its own filter state. ⚠ Gate C S-1 then made
+		// the default DERIVED rather than fixed, and `ROWS` contains an Open
+		// row, so the derivation yields `Open` here and this switch is STILL
+		// REQUIRED. ⛔ Not the twin B10 removed: that one's fixture was
+		// all-Closed under a market preselect, which is what made its switch a
+		// no-op. The assertion is unchanged; only the attribution moved.
 		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
 			"Open",
 		);
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Closed" },
+		});
 		expect(text(within(table).getByTestId(`position-status-${M2}`))).toContain(
 			"Closed",
 		);
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Open" },
+		});
 
 		// Argument list: present post + present reply + removed stub.
 		const list = screen.getByTestId("argument-list");
@@ -334,7 +360,10 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const link = card.querySelector('a[href="/bookmarks"]');
 		expect(link).not.toBeNull();
 		// Icon-only: an accessible name via aria-label, and NO visible "@" —
-		// `:303` below asserts the whole subtree contains none.
+		// the `scrubbed-silhouette-and-zero-pii` case asserts the whole
+		// identity-card subtree contains none. (Named by TEST, not by line:
+		// the coordinate this comment used to carry was both wrong and in the
+		// wrong direction — O-8 demotes a line number to evidence.)
 		expect(link?.getAttribute("aria-label")).toBe("Bookmarks");
 		expect(link?.textContent ?? "").toBe("");
 		// ⛔ Bookmark ONLY — W2.13 R2 struck the download icon.
@@ -382,6 +411,14 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		list.unmount();
 
 		// Positions table: a row whose argument cell is the removed variant.
+		// ⚠ B7 had to switch the status filter to `Closed` here, because item 11
+		// defaulted it to a FIXED `Open` and `ROW_SETTLED` is the Closed market —
+		// the row was filtered out at mount. Gate C S-1 made the default DERIVED,
+		// and this fixture is all-Closed, so the row is visible at mount and that
+		// switch became a no-op. It is REMOVED rather than left: a redundant step
+		// under a comment describing a default that no longer exists is the
+		// lying-docblock class, and it would have hidden a real regression in the
+		// derivation behind a manual override.
 		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
 		const cell = screen.getByTestId(`position-arg-removed-${M2}`);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
@@ -485,15 +522,212 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 	});
 
+	it("empty-states-adopt-p1", () => {
+		// POLISH.5 item 8 (P5-D11) — the empties adopt W2.11 P1 at ONE message
+		// tier (D3(a)). TWO of the three sites are here; the third is
+		// `ProfileGraphCard`, which this file does not import — its assertion
+		// lives in `graph.test.tsx`, beside the component that renders it.
+		//
+		// ⚠ NON-VACUITY IS WHY THIS CASE EXISTS. The four `empty-states`
+		// equalities above stay green at a single tier — but they stay green on
+		// the bare `<p>` this item REPLACES, and on a component that renders the
+		// string and no panel at all. The panel is what has to be asserted.
+		const positions = render(
+			<PositionsTable payload={{ owner: true, rows: [] }} />,
+		);
+		const positionsPanel = panelOf("positions-empty");
+		// P1's ratified geometry (canon §10, R9's second clause): hairline
+		// border, `bg-n0`, the 148px floor, `--r`. On the PANEL, not the message.
+		const positionsClass = positionsPanel.getAttribute("class") ?? "";
+		expect(positionsClass).toContain("[border:var(--hairline)]");
+		expect(positionsClass).toContain("bg-n0");
+		expect(positionsClass).toContain("min-h-[148px]");
+		expect(positionsClass).toContain("rounded-[var(--r)]");
+		// …and the string is STILL THERE, on the message node inside it.
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsOwner,
+		);
+		// ONE TIER: the panel's whole subtree is that message and nothing else.
+		// This is what keeps the four equalities above green — a `sub` node
+		// inside the marked subtree would break every one of them, so no `sub`
+		// is passed on this surface.
+		expect(text(positionsPanel)).toBe(PROFILE_COPY.empty.positionsOwner);
+		// ⚠ Gate C G-2 — THE DEFAULT DID NOT MOVE. `messageAs` was added for
+		// `ProfileGraphCard` alone; these two sites pass nothing and must still
+		// render the `<h2>`, on `EmptyState.tsx`'s recorded semantics ground.
+		// Without this pin, flipping the default would be caught only by the
+		// graph site's assertion.
+		expect(screen.getByTestId("positions-empty").tagName).toBe("H2");
+		positions.unmount();
+
+		render(<ArgumentList items={[]} owner={true} />);
+		const argumentsPanel = panelOf("arguments-empty");
+		const argumentsClass = argumentsPanel.getAttribute("class") ?? "";
+		expect(argumentsClass).toContain("[border:var(--hairline)]");
+		expect(argumentsClass).toContain("bg-n0");
+		expect(argumentsClass).toContain("min-h-[148px]");
+		expect(text(argumentsPanel)).toBe(PROFILE_COPY.empty.argumentsOwner);
+		expect(screen.getByTestId("arguments-empty").tagName).toBe("H2");
+	});
+
 	it("states-kit", () => {
 		const loading = render(<ProfileLoading />);
 		expect(screen.getByTestId("profile-loading")).toBeTruthy();
 		loading.unmount();
 
-		render(<ProfileError />);
+		// Item 9 gave `ProfileError` its action as a prop; the assertion itself
+		// is unchanged and still reads THROUGH the const, so `error.load`'s trim
+		// moved both sides together and this stayed green.
+		render(<ProfileError onAction={vi.fn()} />);
 		expect(text(screen.getByTestId("profile-error"))).toBe(
 			PROFILE_COPY.error.load,
 		);
+	});
+
+	it("error-state-has-a-real-retry-affordance", () => {
+		// POLISH.5 item 9 (P5-D12). ⚠ THE RETRY ALREADY WORKED before this item:
+		// `error.tsx` wrapped the whole message in a `<button onClick={reset}
+		// className="block w-full text-left">`. What it had was no AFFORDANCE —
+		// no visible control, no focus treatment, no accessible name. So the law
+		// here is not "an action exists" but "an action is REACHABLE".
+		const onAction = vi.fn();
+		const { container } = render(<ProfileError onAction={onAction} />);
+
+		// Exactly one control, and `getByRole` would throw on a second — which
+		// is also the ⛔ no-button-inside-a-button proof, since the wrapper this
+		// item removes could not have coexisted with the block's own CTA.
+		const button = screen.getByRole("button");
+		expect(container.querySelectorAll("button")).toHaveLength(1);
+		expect(button.getAttribute("type")).toBe("button");
+
+		// Accessible-named, from the copy const — never a re-typed literal.
+		expect((button.textContent ?? "").trim()).toBe(PROFILE_COPY.error.action);
+
+		// The focus treatment, copied BY NAME from the shipped `m/[slug]`
+		// boundary. `--state-focus-ring` is already in the raw-props token set,
+		// so nothing is added and the 11-token census is untouched.
+		expect(button.getAttribute("class") ?? "").toContain(
+			"focus-visible:shadow-(--state-focus-ring)",
+		);
+
+		// Reachable, and it actually fires `reset`.
+		button.focus();
+		expect(document.activeElement).toBe(button);
+		fireEvent.click(button);
+		expect(onAction).toHaveBeenCalledTimes(1);
+
+		// `OD-7` = BESIDE. The marked subtree is the BODY ALONE: the button is
+		// its sibling, not its child. ⚠ `m/[slug]/error.tsx` marks its CONTAINER
+		// instead; copying that placement would pull the button's label into
+		// this subtree and redden `states-kit`'s exact-equality assertion above.
+		const body = screen.getByTestId("profile-error");
+		expect(body.tagName).toBe("P");
+		expect(body.contains(button)).toBe(false);
+		expect(text(body)).toBe(PROFILE_COPY.error.load);
+
+		// ⛔ NOT the P1 panel. `error-block` is NEITHER kit member: no hairline,
+		// no `bg-n0`, no 148px floor. Asserting this is what stops a later
+		// reader "harmonising" the two leaves into one shape.
+		expect(body.closest("[data-empty-block]")).toBeNull();
+		const block = container.querySelector("[data-error-block]");
+		expect(block).not.toBeNull();
+		expect(block?.getAttribute("class") ?? "").toBe("text-center");
+	});
+
+	it("profile-loading-adopts-p7", () => {
+		// POLISH.5 item 7 (P5-D10) — `ProfileLoading` becomes P7's SECOND
+		// consumer. `PD-0-08` closed because the PRIMITIVE was minted, not
+		// because every surface it lists had adopted it.
+		//
+		// ⚠ NON-VACUITY IS THE WHOLE POINT OF THIS CASE. `states-kit` above
+		// asserts only the wrapper testid, and the wrapper does not move in
+		// this swap — that assertion stays green on a component rendering
+		// NOTHING inside it. These assertions are what make the adoption
+		// observable at all.
+		const { container } = render(<ProfileLoading />);
+		const blocks = container.querySelectorAll("[data-loading-block]");
+
+		// NINE blocks: identity + SIX tiles + graph + arena. ⚠ Grepping the
+		// source for nine tags finds FOUR — the tile band is one tag mapped
+		// over the surface's own count constant, which is what P7 requires
+		// instead of the six-element literal it replaced.
+		expect(blocks).toHaveLength(9);
+
+		// BOTH markers coexist. `ui/loading-block.tsx:30-35` records the
+		// failure that minted the rule: passing `data-slot="loading-block"`
+		// silently REPLACED the shadcn primitive marker. A test asserting only
+		// `data-loading-block` passes on exactly that regression.
+		for (const block of blocks) {
+			expect(block.getAttribute("data-slot")).toBe("skeleton");
+		}
+	});
+
+	it("position-cell-carries-the-held-side", () => {
+		// POLISH.5 item 1 (P5-D02) — the mockup's `.pside`: the side WORD plus
+		// the thumb glyph at 12px, in the Position cell. ⛔ NOT a chip (R12).
+		// ⚠ Before this item `row.side` reached NO rendered node anywhere on this
+		// surface — it went only to `SellModule`'s prop — so `band-composition`
+		// above cannot see this and could not have caught its absence.
+		//
+		// ⚠ NAMED "HELD", NOT "FROZEN", DELIBERATELY. Item 1's plan text says
+		// "the frozen side", but `row.side` is `positions.side` — Bucket C,
+		// MUTABLE. The frozen-at-post-time side is `comments.side_at_post_time`
+		// (INV-3), rendered elsewhere by `SideBadge`. A test name asserting
+		// "frozen" over a mutable field is the conflation INV-3 exists to
+		// prevent, and a test name that contradicts its subject is the
+		// lying-docblock class this plan polices.
+		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
+
+		// BOTH POLES, or the case proves nothing: a YES-only assertion passes
+		// unchanged on a component that hard-codes YES (V-2).
+		// ⚠ Item 11 removed the status filter's `All`, so the YES row (Open) and
+		// the NO row (Closed) are never on screen together. The both-pole
+		// property is PRESERVED by reading each in its own filter state — it is
+		// the reach that changed, not the law.
+		// The YES pole, and the market title that proves the glyph is ADDITIVE.
+		const yes = screen.getByTestId(`position-side-${M1}`);
+		const yesGlyph = yes.querySelector("svg");
+		expect(text(yes)).toBe("Yes");
+		expect(
+			(screen.getByTestId(`position-row-${M1}`).textContent ?? "").includes(
+				ROW_OPEN.marketTitle,
+			),
+		).toBe(true);
+
+		// The NO pole, in its own filter state.
+		fireEvent.change(screen.getByTestId("positions-status-filter"), {
+			target: { value: "Closed" },
+		});
+		const no = screen.getByTestId(`position-side-${M2}`);
+		const noGlyph = no.querySelector("svg");
+		expect(text(no)).toBe("No");
+
+		// THIS surface's size is 12. The slot header's 16 is scoped to it BY
+		// NAME in the values-log and does not inherit — so a glyph rendering at
+		// 16 here means the default leaked through.
+		expect(yesGlyph?.getAttribute("width")).toBe("12");
+		expect(yesGlyph?.getAttribute("height")).toBe("12");
+		expect(noGlyph?.getAttribute("width")).toBe("12");
+		expect(noGlyph?.getAttribute("height")).toBe("12");
+
+		// Decorative: the WORD carries the meaning, so the glyph stays out of
+		// the accessibility tree.
+		expect(yesGlyph?.getAttribute("aria-hidden")).toBe("true");
+		expect(noGlyph?.getAttribute("aria-hidden")).toBe("true");
+
+		// The two arms, as RATIFIED rather than as the mockup draws them: NO is
+		// the rotated, FILLED thumb (`fill-no`, no stroke); YES is stroked
+		// `currentColor`. The mockup's `THDN` is stroked and does NOT govern.
+		expect(noGlyph?.getAttribute("class")).toBe("rotate-180");
+		expect(yesGlyph?.getAttribute("class")).toBeNull();
+		expect(noGlyph?.querySelector("path")?.getAttribute("class")).toBe(
+			"fill-no",
+		);
+		expect(noGlyph?.querySelector("path")?.getAttribute("stroke")).toBe("none");
+		expect(yesGlyph?.querySelector("path")?.getAttribute("stroke")).toBe(
+			"currentColor",
+		);
+		expect(yesGlyph?.querySelector("path")?.getAttribute("fill")).toBe("none");
 	});
 
 	it("positions-filters", () => {
@@ -506,12 +740,29 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const marketFilter = screen.getByTestId<HTMLSelectElement>(
 			"positions-market-filter",
 		);
-		// Option inventories: All/Open/Closed; All + one per distinct marketId.
-		expect(statusFilter.options).toHaveLength(3);
+		// Option inventories (item 11, P5-D17a): the STATUS filter is now
+		// Open/Closed — the canon inventory, with `All` removed. ⛔ The MARKET
+		// filter is a DIFFERENT control and keeps its `all` sentinel: `All` +
+		// one per distinct marketId. Repairing the two together would ship a
+		// defect.
+		expect(statusFilter.options).toHaveLength(2);
 		expect(marketFilter.options).toHaveLength(3);
-		// Both rows visible pre-filter.
+
+		// The initial state moved WITH the option. A `<select>` whose `value`
+		// matched no option would paint its first option while the predicate
+		// still returned every row — the control saying one thing and the table
+		// showing another, with nothing going red.
+		// ⚠ `Open` here is DERIVED, not fixed (Gate C S-1): `ROWS` contains an
+		// Open row, so the derivation selects it. The derivation itself is
+		// pinned by `status-default-is-derived`, including the all-Closed and
+		// deep-link arms this fixture cannot reach.
+		expect(statusFilter.value).toBe("Open");
+
+		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
+		// REMOVAL, asserted rather than implied: there is no longer any state of
+		// this surface in which an open and a closed position appear together.
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
 
 		// Status → Closed hides the Open row, keeps the Closed row.
 		fireEvent.change(statusFilter, { target: { value: "Closed" } });
@@ -519,13 +770,117 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		first.unmount();
 
-		// Fresh mount: the market filter isolates one market's rows.
+		// Fresh mount: the market filter isolates one market's rows, and it does
+		// so independently of the status filter.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-market-filter"),
-			{ target: { value: M1 } },
+		const market = screen.getByTestId<HTMLSelectElement>(
+			"positions-market-filter",
 		);
-		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
+		fireEvent.change(market, { target: { value: M1 } });
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+
+		// ⚠ The negative arm now selects the OTHER market rather than asserting
+		// M2's absence under `market=M1`: item 11's `Open` default already
+		// withholds M2, so the old assertion became over-determined and would
+		// have passed with the market filter entirely broken. Hiding M1 by
+		// selecting M2 is the market filter's own doing — the status filter has
+		// not moved.
+		fireEvent.change(market, { target: { value: M2 } });
+		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+	});
+
+	it("positions-filtered-empty-is-not-stranded", () => {
+		// POLISH.5 Gate C S-1. Item 11 made `rows > 0 ∧ visible === 0` reachable
+		// at mount; the component rendered four column headers over an empty
+		// `<tbody>` and NO message. This is that state, entered deliberately.
+		// The OWNER arm, because that is the motivating case: an owner opening
+		// their own profile. Its rows carry `sellEligible` (`SellablePositionRow`).
+		render(
+			<PositionsTable
+				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: false }] }}
+			/>,
+		);
+		const statusFilter = screen.getByTestId<HTMLSelectElement>(
+			"positions-status-filter",
+		);
+		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+
+		// The filter-scoped message, which is a DIFFERENT state from "no
+		// positions at all" and carries different copy.
+		expect(text(screen.getByTestId("positions-empty-filtered"))).toBe(
+			PROFILE_COPY.empty.positionsFiltered,
+		);
+
+		// ⛔ THE TWO EMPTY STATES NEVER COLLIDE. Reusing `positions-empty` here
+		// would render "No positions yet" to someone whose positions the filter
+		// is merely hiding — a lying empty state every existing test would pass.
+		expect(screen.queryByTestId("positions-empty")).toBeNull();
+
+		// ⚠ NON-VACUITY, AND IT IS THE ACTUAL LAW: the message alone would still
+		// TRAP the user. Both filter controls must survive into this state, or
+		// there is no way back out of it.
+		expect(screen.getByTestId("positions-status-filter")).toBeTruthy();
+		expect(screen.getByTestId("positions-market-filter")).toBeTruthy();
+		// …and the control still reads the state the user selected, so the way
+		// out is discoverable rather than merely present.
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+
+		// The way out WORKS: switching back restores the row.
+		fireEvent.change(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
+			{ target: { value: "Open" } },
+		);
+		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+	});
+
+	it("status-default-is-derived", () => {
+		// POLISH.5 Gate C S-1. A FIXED `Open` default is permanently empty for
+		// anyone whose held markets are all non-Open — and after the 2026-11-05
+		// freeze that is every participant.
+
+		// (a) An Open row is present → `Open`.
+		const withOpen = render(
+			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Open");
+		withOpen.unmount();
+
+		// (b) EVERY row is Closed → `Closed`.
+		const allClosed = render(
+			<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+		// ⚠ POSITIVE CONTROL. A default that only moves the `<select>`'s value
+		// while the table stays empty satisfies a value-only assertion — which
+		// is the exact bug this finding is about.
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+		allClosed.unmount();
+
+		// (c) ⚠ THE DEEP-LINK ARM — the one that pins the SCOPING. `fixture-beta`
+		// is Closed and is the preselected market, while an Open row exists in
+		// ANOTHER market. A derivation over ALL rows would see that Open row,
+		// choose `Open`, and land the `?market=<slug>` deep link on a blank
+		// table. Scoping to the initial market is what this arm guards.
+		render(
+			<PositionsTable
+				payload={{ owner: false, rows: ROWS }}
+				initialMarketSlug="fixture-beta"
+			/>,
+		);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-market-filter").value,
+		).toBe(M2);
+		expect(
+			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
+		).toBe("Closed");
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 	});
 });

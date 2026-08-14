@@ -4,6 +4,7 @@ import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Card } from "@/components/ui/card";
+import { EmptyBlock } from "@/components/ui/empty-block";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
 
 import { PROFILE_COPY } from "./copy";
@@ -24,16 +25,19 @@ export function ArgumentList({
 	items: ProfileArgumentItem[];
 	owner: boolean;
 }): React.JSX.Element {
+	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
+	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
+	// still returns exactly this string; no `sub` is passed on this surface.
 	if (items.length === 0) {
 		return (
-			<p
-				data-testid="arguments-empty"
-				className="py-8 text-center text-sm text-n5"
-			>
-				{owner
-					? PROFILE_COPY.empty.argumentsOwner
-					: PROFILE_COPY.empty.argumentsVisitor}
-			</p>
+			<EmptyBlock
+				message={
+					owner
+						? PROFILE_COPY.empty.argumentsOwner
+						: PROFILE_COPY.empty.argumentsVisitor
+				}
+				messageTestId="arguments-empty"
+			/>
 		);
 	}
 
