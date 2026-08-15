@@ -72,11 +72,36 @@ export function IdentityCard({
 			    ⛔ NOT SATISFIED LITERALLY WITH AN INVENTED BOUND. Capping the
 			    growth needs a number, and the only number available is the mockup's
 			    188px band — a light-prototype VALUE, and one that would be wrong
-			    the moment the real band exists. So the shipped `size-14` box stays
-			    and the ROW IS ROUTED BACK: it becomes correct, with no new value,
-			    the moment the height chain lands and the headzone is bounded.
+			    the moment the real band exists.
 			    `object-cover` is kept — a FIT RULE, not a value (precedent
-			    `HeroPanels.tsx:113`), and it is right for a square box regardless. */}
+			    `HeroPanels.tsx:113`), and it is right for a square box regardless.
+
+			    ⛔⛔ RE-ATTEMPTED IN ROUND 2 AND REFUSED AGAIN — ON THE PRECONDITION,
+			    which is the cleaner refusal. Round 2 was authorised to retry this
+			    "only after row 1's band actually has a DECLARED height". It has
+			    none. The band is `grid gap-6 lg:grid-cols-2` — no `h-*`, no
+			    `min-h-*`, no aspect. The ONLY thing in the whole headzone subtree
+			    that produces a height is `graph/ProfileGraphCard.tsx:46`'s
+			    `aspect-[2/1]`, which is a RATIO ON THE GRAPH'S OWN WIDTH — so the
+			    band's height is a function of the column width and moves with the
+			    viewport. Content-derived, never declared.
+
+			    THAT IS THE SAME DEFECT AS ROUND 1, NOT A DIFFERENT ONE. `h-full`
+			    resolves against this card, whose height is the grid row's, which is
+			    `max(card content, graph content)`. On any viewport where the CARD
+			    is the taller of the two, the round-1 feedback loop re-enters
+			    unchanged — wider square → narrower identity column → taller tiles →
+			    taller card → wider square — and round 1 measured where that
+			    settles: PFP 324 × 578, identity column and tile band at ZERO width.
+			    And where the GRAPH wins, the outcome is not "the PFP fills the
+			    band" but "the PFP becomes the band": at 1440 the measured headzone
+			    is 358px, so `h-full aspect-square` computes to a 326 × 326 avatar
+			    beside six tiles squeezed into the remaining ~310px.
+
+			    ⇒ ROUTED BACK, unchanged: this row becomes correct — with no new
+			    value — only once the headzone has a height of its own. That is a
+			    DESIGN decision about the band (the mockup's is `flex:0 0 188px`),
+			    not something this row can supply for itself. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.

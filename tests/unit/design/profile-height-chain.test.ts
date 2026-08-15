@@ -40,6 +40,35 @@ import { describe, expect, it } from "vitest";
  * "panel-scoped, never viewport-scoped". Two different scopes, two different
  * rules. `h-*` remains forbidden everywhere on the chain and is asserted so.
  *
+ * ⛔⛔ WHAT THE CHAIN DOES **NOT** DELIVER, MEASURED AND REFUSED — READ THIS
+ * BEFORE "FIXING" ANYTHING BELOW. Row 3 also asks that the fourth position row
+ * and later be reached by SCROLLING INSIDE the panel. That is UNREACHABLE under
+ * RULED A1, and it is a contradiction rather than a wiring bug:
+ *
+ *   `<main>`'s height is `max(floor, content)` — the floor is a `min-height`,
+ *   deliberately, so the page GROWS AND SCROLLS instead of clipping (A1).
+ *   Panel-internal scrolling needs `arena height < arena content`, which needs
+ *   `main < content`. But `main = max(floor, content) >= content`. The two
+ *   requirements cannot both hold.
+ *
+ * PROVEN BY CONTROL, not inferred: with the chain fully wired at 1440, injecting
+ * twelve extra rows moved `main` 1383 -> 1619 and the panel body's CLIENT height
+ * 901 -> 1136, while `scrollHeight > clientHeight` stayed FALSE throughout. The
+ * page grew; the panel never scrolled. Binding it needs a DEFINITE height on an
+ * ancestor (`h-[calc(...)]`), which §4 forbids outright, which A1 forbids in
+ * `(public)/layout.tsx:103-107`, and which recon A-5 struck as a fixed-viewport
+ * prototype affordance.
+ *
+ * ⇒ WHAT THIS CHAIN DOES DELIVER, and why it is still worth every line: the
+ * panel FILLS the arena band (measured: positions panel 953 == arena 953, and
+ * 1189 == 1189 under the control) instead of sitting at content height, and the
+ * scroll container is correctly wired the moment any ancestor ever becomes
+ * definite. The `<thead>` is `sticky`, so the column-header row is already held
+ * out of that scroll for when it engages.
+ * ⛔ DO NOT "FIX" THE MISSING SCROLL BY ADDING `h-*` ANYWHERE ON THIS CHAIN. The
+ * A1 assertion below exists to stop exactly that, and it is the whole reason the
+ * forbidden set is asymmetric with `min-h-0`.
+ *
  * ⚠ WHY A SOURCE SCAN AND NOT A RENDER TEST. jsdom performs no layout: it
  * resolves no `calc()`, no `100vh`, no percentage height and no Tailwind
  * utility, so a render test structurally cannot see any of this.
