@@ -11,19 +11,23 @@ import type { AuthorIdentity, Marker, Side } from "./types";
 /**
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
- * author's own stake `a` · reply count · the bookmark/download card actions.
+ * author's own stake `a` · reply count · the bookmark card action.
  * The marker chip sits after the side badge, before the stake (D5).
  *
  * BOOKMARK-ADD-WIRE: the bookmark trigger is now LIVE — `CardActions` owns the
  * full icon matrix (signed-out disabled / own-argument absent / active
- * outline-or-filled). The download trigger stays present-but-disabled (C1 / §7).
+ * outline-or-filled). ⛔ The download trigger was REMOVED at POLISH.3 PR 2
+ * row 7 (`PD-3-15`).
  * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
  * never `YES @ 27%` or `Đ a → Đ now`.
  *
- * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster (bookmark
- * AND download), so it is deliberately NOT the own-suppression hook — using it
- * that way would also strip the download trigger from the viewer's own
- * arguments. Own-suppression is a condition inside `BookmarkToggle`.
+ * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster, so it is
+ * deliberately NOT the own-suppression hook. Own-suppression is a condition
+ * inside `BookmarkToggle`. ⚠ The original reason for that separation was that
+ * `showActions` would also strip the DOWNLOAD trigger from the viewer's own
+ * arguments; row 7 removed that trigger, but the separation stands on its own
+ * — `showActions` is a caller-side layout switch and own-ness is a viewer
+ * fact, and collapsing them would re-couple two unrelated decisions.
  */
 export function ArgProfile({
 	commentId,
@@ -64,7 +68,7 @@ export function ArgProfile({
 				</div>
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
 					{authorStake !== undefined ? (
-						<span className="font-mono">Đ{formatDharma(authorStake)}</span>
+						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
 					) : null}
 					{replyCount !== undefined ? (
 						<>
