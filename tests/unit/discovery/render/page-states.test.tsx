@@ -302,7 +302,20 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// surface_discovery_v1_0.html:67-68), pinned so it cannot silently
 		// regress. Re-tuning these at D2b is a deliberate edit, not a drift.
 		expect(el.type).toBe("div");
-		expect(el.props.className).toBe("px-7 pt-4 pb-3");
+		// ⚠ HTML-FINISH row 8 added the three LAYOUT classes. The mockup's
+		// `.content` is `flex:1 1 auto` in a column (`:67-68` — the same rule
+		// that carries the inset), so the element that owns the inset is also
+		// the one that passes the page's height down to the carousel.
+		// Still FULL-STRING equality, deliberately: the inset values are what
+		// this line exists to protect and a `toContain` would stop protecting
+		// them. The VALUE half is byte-identical — `px-7 pt-4 pb-3` is
+		// untouched; only topology was added.
+		expect(el.props.className).toBe("flex flex-1 flex-col px-7 pt-4 pb-3");
+		// The inset triple, asserted separately so a future reorder of the
+		// class string cannot quietly drop one of them.
+		for (const inset of ["px-7", "pt-4", "pb-3"]) {
+			expect(el.props.className.split(" ")).toContain(inset);
+		}
 
 		// The inset wraps BOTH states, so the skeleton and the loaded surface
 		// sit on the same inset and the page does not jump on hydration.

@@ -72,11 +72,34 @@ export function HeroPanels({
 	return (
 		<div
 			data-testid="hero-panels"
-			className="grid gap-[14px] md:grid-cols-[1fr_1.9fr_1fr]"
+			// HTML-FINISH row 8 — THE HERO ABSORBS THE LEFTOVER VERTICAL SPACE.
+			// The mockup's `.hero` is `flex:1 1 auto` (`:71-72`) and it is the one
+			// element in the column that grows; the rail is fixed and the grid is
+			// content-height, so everything left over lands here. The three panels
+			// are grid items and stretch to the row height, so each fills the
+			// hero's height without needing its own growth rule.
+			// ⛔ The mockup's `min-height:0` is NOT ported — see `page.tsx`.
+			className="grid flex-1 gap-[14px] md:grid-cols-[1fr_1.9fr_1fr]"
 		>
 			<HeroPostPanel side="YES" post={topPosts.yes} slug={card.slug} />
 
-			<div className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:var(--border-hero)]">
+			{/* HTML-FINISH row 2 — THE WHOLE PANEL OPENS ITS MARKET. The mockup
+			    binds its handler to `.mktpanel` itself (`:399-401`) and marks the
+			    whole panel `cursor:pointer` (`:395`) — not the title. Built as a
+			    real `<Link>` wrapping the panel, matching `MarketCard`'s
+			    whole-card-is-the-link pattern (§22 F-DISC-1) rather than the side
+			    panels' stretched-link workaround: that workaround exists ONLY
+			    because those panels contain a second, independent author anchor
+			    and anchors cannot nest. This panel contains none — thumb, `<h2>`,
+			    `StatLine`, `PriceSparkline` and `PriceBar` are all anchor-free —
+			    so the simple form is available and is used.
+			    ⚠ Canon §3 item 6 ("Pick / carousel-select is view-only — never
+			    mutates a position") governs POSITION MUTATION. Navigating to
+			    `/m/[slug]` mutates nothing; ruled as not barring this. */}
+			<Link
+				href={`/m/${card.slug}`}
+				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:var(--border-hero)]"
+			>
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
 					    error · loaded across all three Discovery image sites. `alt=""`
@@ -104,17 +127,50 @@ export function HeroPanels({
 						<StatLine totals={card.totals} size="hero" />
 					</div>
 				</div>
-				<div className="mt-[11px] h-24 rounded-[var(--r)] [border:var(--hairline)]">
+				{/* HTML-FINISH row 9 — the hero price graph GROWS WITH ITS PANEL
+				    instead of sitting at a fixed height. The mockup's `.graph` is
+				    `flex:1 1 auto` (`:130`), so it takes whatever the panel has
+				    spare once the question row and the price bar are placed.
+				    ⚠ NO NEW VALUE. `h-24` becomes `min-h-24` — the SAME 6rem, as a
+				    FLOOR rather than a fixed height — and `flex-1` lets it grow
+				    above that. A growing box with the shipped number as its
+				    minimum invents nothing. */}
+				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
 					<PriceSparkline series={series} size="hero" />
 				</div>
 				<div className="mt-[9px]">
 					<PriceBar pricing={card.pricing} size="hero" />
 				</div>
-			</div>
+			</Link>
 
 			<HeroPostPanel side="NO" post={topPosts.no} slug={card.slug} />
 		</div>
 	);
+}
+
+/**
+ * HTML-FINISH row 6 — the thin upright separator between the author name, the
+ * side chip and the stake figure. TWO per post panel (mockup markup `:187` and
+ * `:189`; `.vsep` at `:87`).
+ *
+ * ⛔ THE GLYPH IS BYTE-CARRIED, NOT TYPED. `hexdump` of both mockup lines gives
+ * `3e 7c 3c` — the content byte is `0x7C`, U+007C VERTICAL LINE, plain ASCII.
+ * Both lines are byte-identical to each other.
+ *
+ * ⚠ THE COLOUR COMES FROM SHIPPED CODE, NEVER FROM THE MOCKUP. `StatLine.tsx`
+ * already ships `<span className="… text-n3">|</span>` for this exact glyph in
+ * this exact separator role ("V27 — an explicit n3 separator"), so `text-n3` is
+ * a shipped-precedent match. The mockup's `.vsep{color:var(--n3)}` is NOT the
+ * source: the ramps are inverted between the light prototype and the shipped
+ * dark system, and porting a neutral by NAME across them is exactly the
+ * failure `side-pole-binding` and the V7/V42 rulings exist to prevent.
+ *
+ * No margin is invented either — the mockup's `.vsep` carries none and spacing
+ * comes from `.argprofile`'s `gap:6px`, which this row already ships as
+ * `gap-1.5`. `shrink-0` is the mockup's `flex:0 0 auto`, i.e. topology.
+ */
+function HeadSeparator() {
+	return <span className="shrink-0 text-n3">|</span>;
 }
 
 /** One side's hero post panel — or the OQ-6 empty copy when none eligible. */
@@ -166,7 +222,9 @@ function HeroPostPanel({
 				>
 					{post.author.pseudonym}
 				</Link>
+				<HeadSeparator />
 				<SideBadge side={post.side} size="hero" price={post.entryPrice} />
+				<HeadSeparator />
 				{/* V13 — `.argstake` (mockup :86-88, markup :190). The progression is
 				    POST-ANCHORED (founder ruling OD-1 = Option B): the left figure is
 				    THIS post's own entry bet, the right the author's current value on
@@ -194,9 +252,19 @@ function HeroPostPanel({
 				<h3 className="line-clamp-2 text-sm leading-snug font-medium">
 					{post.title}
 				</h3>
+				{/* HTML-FINISH row 7 — THE ARGUMENT TEXT IS QUOTED; the headline
+				    above it is NOT (the mockup's `.argtext` at `:192` carries the
+				    quotes and its own header declares the missing headline a MOCKUP
+				    gap at `:11-13`, so row 3 — "drop the headline" — is STRUCK).
+				    ⛔ Glyphs BYTE-CARRIED from `:192`: hexdump gives `3e 22 52 …`
+				    opening and `… 2e 22 3c` closing — `0x22` both ends, U+0022
+				    QUOTATION MARK, straight ASCII, NOT curly. Corroborated by the
+				    mockup's own JS: `q('.argtext').textContent='"'+d[4]+'"'`
+				    (`:455`). Curly-vs-straight is a byte question, and this is the
+				    byte. */}
 				{post.teaser !== "" && (
 					<p className="line-clamp-3 text-xs leading-snug text-muted-foreground">
-						{post.teaser}
+						"{post.teaser}"
 					</p>
 				)}
 			</Link>

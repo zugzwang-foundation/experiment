@@ -40,7 +40,14 @@ export const dynamic = "force-dynamic";
  */
 export default function DiscoveryPage() {
 	return (
-		<div className="px-7 pt-4 pb-3">
+		// HTML-FINISH row 8 — the mockup's `.content` is `flex:1 1 auto` in a
+		// column (`:67-68`), i.e. it takes the height `<main>` now provides and
+		// passes it on. The inset itself is V2/PD-2-01 and is unchanged.
+		// ⛔ The mockup's `min-height:0` on this element is NOT ported: it is
+		// what would let the column shrink below its content and clip. Without
+		// it flex items keep `min-height:auto`, so they grow into slack and the
+		// PAGE scrolls when there is none (RULED A1).
+		<div className="flex flex-1 flex-col px-7 pt-4 pb-3">
 			<Suspense fallback={<LoadingSkeleton />}>
 				<DiscoveryContent />
 			</Suspense>
