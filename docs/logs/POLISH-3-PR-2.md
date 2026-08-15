@@ -92,6 +92,16 @@ Test Files  336 passed | 1 skipped (337)
 
 ⚠ `FULL_EXIT` is read from the log, not from the shell's reported status: the run was `pnpm vitest run > log; echo FULL_EXIT=$? >> log`, and the harness reports the **trailing `echo`'s** exit, which is always 0. Gate commands never let another command own the exit (§14).
 
+## The two reviewer passes on C13 (attended)
+
+**`@code-reviewer`** — CRITICAL none · HIGH none on the code, but **HIGH-2 caught a false citation that would have licensed a revert**: C13 claimed "the mockup was never wrong". Re-measured independently and it is wrong — `d5:1247`/`:1249` are the Support/Counter BUTTONS, the bar at `:1248` carries NO side class, `.barrow .bar`/`.bar .fill` are a fixed `--n0`/`--ink` (`:510-512`), `.bar .fill.right` (`:513`) is never applied, `:1591-1592` set only the buttons' classNames, and the annotated post is `side:'no'` with `sPct:69`. ⇒ **d5's bar is itself a Route-3 instance**; C13 is a DELIBERATE DIVERGENCE, not a return. Corrected at `a34dd43`. ⚠ The plan's §7 V-2 (`:395`) carries the same overreach in its closing sentence and is **surfaced, not overridden**.
+
+Also fixed there: **O-5 was not closed** (three in-fence sites still called the inversion live — GC-14's genus recurring one commit later), and **O-8's fourth canonical instance** — C13's own +21-line comment moved `TriggerPill`'s pole const and then cited the old coordinates, *invalidating its own citation by being inserted*. All in-fence coordinates re-fenced by symbol.
+
+**`@security-auditor`** (C13 only, scoped to the `composer/**` exception) — CRITICAL none · HIGH none. **The fence held behaviourally, verified by hash**: `TriggerPill` byte-identical to `origin/main`, the whole delta two `className` attributes, no prop/branch/data-path/write/import. **The pole encoding was verified against the SERVER's partition** (`ranking-substrate.ts:75-86` — support = same side, counter = opposite), not merely the UI convention. **INV-3's striking confirmed sound** — the write-time derivation is server-side and storage-enforced, unreachable from a className.
+
+Its **MEDIUM was a real miss of mine**: C13's corrected track had **no edge**, so on a NO post it sat at ~1.10:1 against its own card and vanished — trading an inversion for an erasure on the very post side the row fixes. My C13 body had dismissed the earlier `MEDIUM-3` as *"different bar, different commit"* — a **file** boundary where it was a **defect class**. Fixed at `375dc2e`, and **pinned in both guards**, which were positive-only and would have stayed green if either hairline were deleted.
+
 ## Open questions
 
 - **LOW-5 (`@code-reviewer`)** — does **T3** owe `d5`-exact typography, or consistency with the shipped `ReplySplitBar` it currently mirrors? Three divergences named in the halt record §10.
