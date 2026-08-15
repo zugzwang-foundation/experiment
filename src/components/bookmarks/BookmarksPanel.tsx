@@ -56,13 +56,22 @@ import { Badge } from "@/components/ui/badge";
  * behaviour this surface has never had; it is recorded as a widening rather
  * than authored in passing.
  *
- * ⚠ THE BODY'S SCROLL IS WIRED AND CANNOT ENGAGE YET, deliberately and
- * measurably. `flex-1 min-h-0 overflow-y-auto` is the byte-carried topology,
- * but a panel-scoped scroll needs a DEFINITE height from an ancestor, and this
- * surface's PageContainer call site cannot take one: it is pinned
- * class-set-exact as site 2 of `tests/unit/shell/page-container.test.ts`, a
- * file outside this round's write allow-list. The halt is asserted, by name, in
+ * ⚠ THE BODY'S SCROLL IS WIRED AND, AS OF R1, BOUND. `flex-1 min-h-0
+ * overflow-y-auto` is the byte-carried topology; a panel-scoped scroll also
+ * needs a DEFINITE height from an ancestor, and until the founder ruling of
+ * 2026-08-15 this surface's PageContainer call site could not take one — it was
+ * pinned class-set-exact as site 2 of `tests/unit/shell/page-container.test.ts`,
+ * a file that sat outside the round's write allow-list. The ruling extended the
+ * allow-list by that file; the container now carries `wide` + `flex-1 min-h-0
+ * flex-col` and the chain starts there. Asserted node by node in
  * `tests/unit/design/bookmarks-height-chain.test.ts`.
+ *
+ * ⚠ WHAT THAT DOES AND DOES NOT BUY, measured rather than assumed. The panel now
+ * FILLS the arena instead of sitting at content height. Whether the body's
+ * `overflow-y-auto` actually engages depends on `<main>`, whose height is
+ * `max(floor, content)` under RULED A1 — the same asymmetry
+ * `profile-height-chain.test.ts` records under control for the profile. The
+ * per-viewport measurement is in the close-out; do not infer it from this line.
  *
  * ⛔ EVERY MENTION OF THAT PRIMITIVE ABOVE IS UNBRACKETED, AND THAT IS LOAD-
  * BEARING. The guard just named locates call sites by regex over the raw file

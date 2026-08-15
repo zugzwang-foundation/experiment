@@ -83,6 +83,28 @@ const SITES: Site[] = [
 		site: 2,
 		file: "src/app/(public)/bookmarks/page.tsx",
 		before: "mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6",
+		// HTML-FINISH · BOOKMARKS R1. The bookmarks arena was measured rendering a
+		// 768px container at 1024, 1440 AND 1920 — identical at all three, because
+		// `reading` caps at `max-w-3xl`. That is the same defect row 20 minted
+		// `wide` to clear on the profile, one surface over, and it is cleared the
+		// same way: the preset and `max-w-[1440px] px-6` are byte-carried from
+		// profile's call site (site 5), which byte-carried them from
+		// `GlobalHeader.tsx`.
+		//
+		// ⚠ `flex-1 min-h-0` are the HEIGHT CHAIN's first link, not the width's —
+		// they are what lets the bookmarks panel take a definite height and scroll
+		// INSIDE itself instead of growing. `tests/unit/design/
+		// bookmarks-height-chain.test.ts` asserts the chain node by node; this row
+		// asserts only that the class SET moved deliberately. They are CONTENT
+		// layout, so `BOX_AXES` below is untouched by them.
+		//
+		// ⚠ `gap-4` IS RETAINED, NOT MOVED TO PROFILE'S `gap-6`. The ruling names
+		// the preset and the two chain classes; a gap is neither, and with a
+		// single-panel arena it spaces nothing. Keeping it is what makes this row
+		// a three-token move rather than a four-token one.
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-4 px-6 py-6",
+		movedBy:
+			"HTML-FINISH · BOOKMARKS R1 (founder-ruled 2026-08-15 — the allow-list extended by this file)",
 	},
 	{
 		site: 3,
@@ -266,8 +288,13 @@ describe("B2 — the container primitive moves nothing", () => {
 			).toBeTruthy();
 			expect(s.now).not.toBe(s.before);
 		}
-		// EXACT, so a second silent move cannot join the first.
-		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([5]);
+		// EXACT, so a THIRD silent move cannot join the two ruled ones. ⚠ The
+		// list is ordered by `SITES` position, not by ruling date: site 2 is the
+		// bookmarks container (HTML-FINISH · BOOKMARKS R1, 2026-08-15), site 5 the
+		// profile's (HTML-FINISH · PROFILE rows 20 + 3). Each carries its own
+		// `movedBy`, which the loop above requires; this line is what stops an
+		// unruled fourth site from arriving unnoticed beside them.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({

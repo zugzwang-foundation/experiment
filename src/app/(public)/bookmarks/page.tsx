@@ -42,24 +42,30 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 	const items = await loadBookmarks(db, { viewerId });
 
 	return (
-		/* ⛔⛔ HTML-FINISH · BOOKMARKS — THE CONTAINER DOES NOT MOVE, AND THE
-		   REASON IS A PIN, NOT A PREFERENCE. This round was to consume #337's
-		   minted `wide` preset here and start the height chain from this tag.
-		   Both are BLOCKED by one file: `tests/unit/shell/page-container.test.ts`
-		   declares this call site as SITE 2 and asserts CLASS-SET EQUALITY of
-		   `cn(preset, className)` against its verbatim `c5892bc` baseline
-		   `mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6`, and separately
-		   pins the enumeration of ruled moves at `[5]` — profile's, and only
-		   profile's. Changing the preset OR adding `flex-1 min-h-0` here reddens
-		   both rows. That file is OUTSIDE this round's write allow-list, and its
-		   own `now`/`movedBy` mechanism is how a deliberate move is recorded — the
-		   same mechanism #337 used for site 5, in the same commit as the move.
-		   ⇒ The move needs a ruling that extends the allow-list by that one file.
-		   It is REFUSED here rather than worked around: reshaping the tag to dodge
-		   the guard's regex would defeat the exact regression the guard exists to
-		   catch. Asserted, by name, in
-		   `tests/unit/design/bookmarks-height-chain.test.ts`. */
-		<PageContainer preset="reading" className="flex flex-col gap-4">
+		/* HTML-FINISH · BOOKMARKS R1 — THE CONTAINER MOVES, ON A RULING.
+		   The previous round REFUSED this edit and recorded why: the tag is SITE 2
+		   of `tests/unit/shell/page-container.test.ts`, which asserts class-set
+		   equality against its verbatim `c5892bc` baseline and pins the
+		   enumeration of ruled moves; that file sat outside the write allow-list,
+		   so the move was a ruling rather than an edit. The founder ruled it on
+		   2026-08-15 and extended the allow-list by exactly that one file. The
+		   guard's own `now`/`movedBy` mechanism carries the move — the same
+		   mechanism #337 used for site 5, in the same commit as the move.
+
+		   ⛔ THE VALUES ARE BYTE-CARRIED FROM PROFILE'S OWN CALL SITE ON THIS
+		   BRANCH (`u/[pseudonym]/page.tsx`'s container tag), not retyped: the
+		   `wide` preset and `flex min-h-0 flex-1 flex-col`. `wide` is
+		   `max-w-[1440px] px-6 py-6`, itself byte-carried from
+		   `GlobalHeader.tsx` at #337 — so this surface aligns to the same chrome
+		   Profile does, and nothing is read off a mockup.
+
+		   ⚠ `gap-4` IS THIS SURFACE'S OWN AND DELIBERATELY DOES NOT MOVE TO
+		   PROFILE'S `gap-6`. The ruling names three changes — the preset and the
+		   two chain classes — and a gap is CONTENT layout, neither a container
+		   axis nor a chain link. It is also inert here either way: the arena is
+		   ONE panel, so there is no sibling for a gap to space. Moving it would be
+		   an unrequested value change wearing the shape of a ruled one. */
+		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-4">
 			{/* HTML-FINISH · BOOKMARKS — the arena panel. The header row that used
 			    to sit here MOVED into the panel's header bar (it is the same pair,
 			    relocated, never copied); the list and the empty state are now the
