@@ -35,9 +35,18 @@ by opening each file, not by trusting the diffstat.
   `the-literals-survive-nowhere-in-src` scan untouched and still reaching the new file.
 - `data-testid="grid-ring"` is **retired, not dropped**. Its element no longer exists and the tile
   that replaces it already carries `data-testid="market-card"` (one element, one testid). Every
-  guarantee is carried verbatim into `expectActive`. It is now **strictly stronger**: it proves the
-  ring is *on the tile*, where the old form could pass with the outline on a different box from the
-  `data-active` attribute.
+  guarantee is carried verbatim into `expectActive`.
+
+  > ⚠ **CORRECTED at Gate C (finding M-2) — the original ground stated here was WRONG.** This entry
+  > first claimed the old form "could pass with the outline on a different box from the `data-active`
+  > attribute." **It could not.** In the old code both the attribute and the outline class were on the
+  > *same* `grid-ring` wrapper, and the old assertion read the outline off the element it had just
+  > selected by that attribute — so the two could not diverge. **What actually improved** is narrower
+  > and worth stating accurately: the ring is now provably **on the TILE**, which is the thing row 4
+  > exists to establish; previously the assertion proved only that *some wrapper* was ringed, and said
+  > nothing about the tile's own relationship to it. Two of the assertions removed in that edit were
+  > exact duplicates of the two lines immediately above them, not a loss of coverage.
+  > **The change is right; the ground I gave for it was not, and a wrong ground gets inherited.**
 
 **3 · Row 2's colour and glyph provenance.** `text-n3` on the row-6 separator is taken from
 **shipped code** — `StatLine.tsx` already ships `<span className="… text-n3">|</span>` for this exact
@@ -191,3 +200,123 @@ carousel is client-side motion over pre-loaded props (§22, "no re-fetch"), so m
 ## Time
 
 One unsupervised session, 2026-08-15.
+
+---
+
+# ROUND 2 — GATE C REMEDIATION (2026-08-15)
+
+Gate C read the diff and **PASSED** it with six findings. All six were founder-ruled and landed as
+three commits on the same branch / same PR **#334**. ⛔ Still DO NOT MERGE.
+
+| Commit | Finding | What landed |
+|---|---|---|
+| `d09bd6d` | **G-1** *(blocker)* | SPEC.1 → **1.0.30** · design-language → **v0.8-draft** |
+| `82361bb` | **M-1**, **H-1** | ladder census zero-count entry · new `discovery-height-chain` guard |
+| *this* | **7.1**, **7.1b**, PD-2-08, PD-2-35, **M-2**, **M-3** | measurements · dispositions · parked rows · this log |
+
+## G-1 — the tier-1 spec conflict, and the founder's ruling
+
+**FINDING.** Row 1 removed the tile price chart. **SPEC.1 §22 and design-language §3.2 both NAMED
+that sparkline in the LOCKED card composition.** The kickoff's own rule — *where a ratified tier-1
+ruling already decided a presentational question, that ruling wins and the row is STRUCK* — was
+applied correctly to row 3 and **never applied to row 1**.
+
+**FOUNDER RULING: the spec is STALE; the mockup governs. Row 1 STANDS.** The card sparkline is
+defined *by SPEC.1 itself* as **decorative** — no axis, `aria-hidden`, index-spaced X — and
+composition of decoration is the ratified mockup's jurisdiction.
+
+**§5.1 reconnaissance narrowed the rider, which is why it ran first.**
+**`design-canon.md` §2 ALREADY OMITS THE SPARKLINE** — verbatim: *"Cards: image + title + stats +
+YES/NO bar."* So canon and the mockup **already agreed**, and SPEC.1 + design-language were the
+**lone stragglers**. That strengthens the ruling and it means **canon needed no amendment and was
+not touched** — two prescriptive docs amended, not three. Every replacement unit was quoted from the
+file **at HEAD**.
+
+Amended: SPEC.1 §22 read model + §22 *Price series* + §22 F-DISC-1 + §9 *Market price history* +
+§16.1 + Appendix B; design-language §3.2 Market card + §3.2 two-line graph.
+⚠ **"must be identical everywhere" was RETAINED** — the sparkline leaves *both* renders together, so
+Discovery and Profile stay one composition. Dropping that clause would have been the opposite of the
+fix. ⛔ **Historical records deliberately untouched**: SPEC.1's own change-log rows 1.0.17/1.0.18/
+1.0.22, all logs, plans, POLISH-0, the register's defect rows, the brand values-log. A record that no
+longer matches the build is *correct* — it records what was true then.
+⚠ **Nothing architectural changed**: no field, no query, no cache behaviour, no ADR, no §17 row.
+
+## M-1 / H-1 — the two guards
+
+**M-1.** The ladder census asserts **per-listed-file**, so dropping `DiscoveryGrid.tsx` from
+CONSUMERS silently retired the only assertion that ever examined it — a re-added ring token there
+would have passed, and the whole-tree scan does not cover it (it bans the raw *literal*, never the
+token). Fixed by keeping the file listed at **`count: 0`**. ⚠ **Verified against the assertion code
+before writing it**: `occurrences()` is `split(needle).length - 1`, which returns `0` for an absent
+needle, so `toBe(0)` pins absence exactly as `toBe(1)` pins presence — **no assertion weakened, one
+restored.** **Proven by reversal**: re-adding the token turns the suite RED
+(`token count: expected 1 to be +0`); the mutation was transient and reverted, `src/` untouched.
+
+**H-1.** New source-scan guard `tests/unit/design/discovery-height-chain.test.ts`, modelled on
+`emphasis-ladder-tokens.test.ts`. jsdom performs no layout — it resolves no `calc()`, no `100vh`, no
+Tailwind utility — so a render test structurally cannot see this. It reads the **shipped files** and
+asserts `layout.tsx`'s calc subtrahends against `GlobalHeader`'s own row height and border.
+**Positive control included** and it is the point: the predicate is a pure function of the two file
+contents, run against the real sources with one byte-level mutation each — header row `60px→72px`,
+calc border allowance dropped (*literally this PR's shipped 2px bug*), `border-y→border-y-2`, border
+removed. All four redden; unmutated agrees.
+
+> ⚠ **ONE RESIDUAL ASSUMPTION, DECLARED NOT HIDDEN — and the halt condition applies to it.**
+> The header carries the bare `border-y` utility and **its width is NOT readable from this repo**:
+> no `tailwind.config.*` (v4 is CSS-first), no border-width in `globals.css`, and the pinned
+> `tailwindcss` package ships no `--default-border-width` in `theme.css`/`preflight.css` — the value
+> lives inside the compiler. I did **not** halt the whole sub-item, because both drift vectors that
+> actually live in this repo *are* derivable and are derived: the row height is read from
+> `GlobalHeader` and compared, and the border **utility string is pinned exactly**. `BORDER_Y_TOTAL_PX
+> = 2` is **measured** (62px border-box vs a 60px row, real compiled CSS), isolated in one named
+> constant. **Residual risk, stated:** a Tailwind *major upgrade* that changes the default border
+> width would go stale without reddening. **What I would need to close it:** a
+> `--default-border-width` (or a `--header-h`) declared in `globals.css` — which needs a shell file
+> this round's allow-list excludes.
+
+## 7.1 / 7.1b — the measurements
+
+Real compiled CSS, layout viewport pinned by a **fixed-width iframe**.
+⚠ **Method note worth keeping:** `resize_window` resized the OS window but left `innerWidth` at
+**1800** — the first attempt measured desktop three times and would have reported a clean pass. An
+iframe is the only reliable way to pin a layout viewport here.
+
+| | 390px | 768px | 1440px |
+|---|---|---|---|
+| Clips anywhere | **NO** | **NO** | **NO** |
+| Scrolls vertically | yes (1737 > 844) | no | no |
+| Grid reachable · last tile | **yes**, 108px | **yes** | **yes** |
+| `overflow:hidden` in chain | **none** | **none** | **none** |
+| `html`/`body` `overflow-y` | visible | visible | visible |
+| Hero panel heights | 206 / 206 | equal | 618 / 618 |
+| **Head row clips (both poles)** | **NO** (sw = cw) | **NO** | **NO** |
+| **Stake right edge inside row + viewport** | **yes** | **yes** | **yes** |
+| **Horizontal overflow** | **105px** | **320px** | **0** |
+
+**7.1b — row 6 did NOT break the head row.** `scrollWidth === clientWidth` at every width for both
+poles; the stake figure (`Đ 1,000 → Đ 1,407`) is fully rendered and its right edge sits inside both
+the row's client box and the viewport. **Delta attributable to row 6, isolated by a with/without
+control rather than inferred:** +16px of head-row min-content per panel (2 separators × 8px);
+**page-level +0px at 390, +32px of 320 at 768 (~10%), +0px at 1440.**
+
+**⚠ THE MEASUREMENT'S REAL FINDING — horizontal overflow below `lg`, and it is NOT row 6's.**
+`min-width: auto` on grid items meets nowrap content: the post head row is `flex-nowrap …
+whitespace-nowrap` and the hero `<h2>` is `truncate` (also nowrap), and a grid item will not shrink
+below its content's min-content width. **At 390 the overflow is 105px WITH and WITHOUT the
+separators — delta 0** — so at mobile it is entirely pre-existing. Filed as **PD-2-36**.
+
+## Dispositions
+
+- **PD-2-08 → CLOSED.** `n4` ratified. Recorded with its full ground; the ring **moved files** at row
+  4 but its value did not change, and both files are now pinned by the ladder census.
+- **PD-2-35 → HELD OPEN, deliberately.** The literal §7.2 condition (no clipping, grid reachable)
+  **passes**. But the measurement surfaced a third state the condition did not contemplate, and
+  PD-2-35's whole content is *"the responsive column behaviour is deliberate"* — banking
+  `accepted-divergence` over a layout that forces sideways scrolling at every sub-desktop width would
+  convert an unexamined defect into a ratified decision, which is what the conditional exists to
+  prevent. **One-word flip once PD-2-36 is dispositioned. Founder's call, now with numbers.**
+- **PD-2-36 → MINTED**, `routed`/`open`. ⛔ No code — the fix (`min-w-0` on the grid items, or
+  relaxing `nowrap`) is a layout change to a ratified surface.
+- **M-2 → corrected in place** above, in the round-1 entry it falsified.
+- **M-3 + the clamped-teaser artefact → two rows in `docs/parked.md`**, the second carrying the
+  founder's KEEP ruling so it is not rediscovered and "fixed".

@@ -1937,3 +1937,34 @@ POLISH.5 PR A's passthrough added `authorStake` + `priceAtBet` to `ProfileArgume
 **The only guard against that today** is `tests/unit/profile/render/argument-list-side.test.tsx`'s NO-pole raw-price assertion, minted at PR A. It is one assertion on one surface, against a docblock that is wrong on every surface.
 
 **Fix:** correct both docblocks to name the bought side. One-line each; `src/lib/**` is §6 deny-listed to POLISH.5, so it needs a task that may write it. **PR C's directed `@security-auditor` question is about precisely this docblock's accuracy** — that is the natural owner if none is assigned sooner.
+
+---
+
+## A11Y-HERO-PANEL-ACCESSIBLE-NAME — the hero market panel's accessible name is its entire contents
+
+**Routed to A11Y.0. Minted 2026-08-15, HTML-FINISH · DISCOVERY Gate C finding M-3. Not a blocker.**
+
+HTML-FINISH row 2 made the whole centre hero market panel a `<Link>` (mockup `:399-401`, `:395` — the mockup binds its handler to `.mktpanel` itself, not to the title). An anchor's accessible name is computed from its subtree, so the link now announces the market **title + the whole StatLine + the PriceBar's `"YES 38%, NO 62%"`** as one utterance. That is long and noisy for a screen-reader user moving by link.
+
+⚠ **This is CONSISTENT PRECEDENT, not a new defect class.** `MarketCard` has had exactly this shape since UI.A4 — the whole card is one link wrapping thumb, `<h3>`, StatLine and PriceBar (SPEC.1 §22 F-DISC-1, "a card click navigates to that market's detail view"). Row 2 made the hero match the tiles; it did not invent the pattern. Fixing one without the other would split a composition the design language requires to be identical (`design-language.md` §3.2, "must be identical everywhere").
+
+**Why it is parked rather than fixed here.** The fix is an `aria-label` (or an `aria-labelledby` pointing at the question) on the link, plus `aria-hidden` on the decorative sub-parts — and it must land on **both** the hero panel and `MarketCard` together, which makes it a cross-surface a11y decision rather than a rider on a layout-parity pass. A11Y.0 already owns the sibling items (overlay focus management, the `alt=""` exception at `OQ-6-ALT-EXCEPTION`, WCAG 1.1.1 on the market thumb).
+
+**Code touch points** (forward reference, do not act on now): `src/components/discovery/HeroPanels.tsx` (the hero market panel `<Link>`), `src/components/discovery/MarketCard.tsx` (the card `<Link>`).
+
+---
+
+## DISCOVERY-CLAMPED-TEASER-UNCLOSED-QUOTE — ✅ **FOUNDER-RATIFIED COSMETIC ARTEFACT, 2026-08-15. KEEP AS IS.**
+
+**Minted 2026-08-15, HTML-FINISH · DISCOVERY Gate C. ⛔ This row exists so the artefact is NOT rediscovered and "fixed" by a later pass.**
+
+HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (`U+0022`, byte-carried from mockup `:192`; the mockup's own JS builds the same pair at `:455`). The teaser is `line-clamp-3`. When the argument is long enough to clamp, the **closing quote is clamped away with the overflowing text**, so the rendered result is an ellipsis after an unclosed opening quote.
+
+**FOUNDER RULING: KEEP IT.** Two grounds:
+
+1. **The mockup has the identical behaviour.** Its `.argtext` is `-webkit-line-clamp:3` with the quotes inside the clamped box (`:89-90`, `:192`), so a clamping argument loses its closing quote there too. The build is faithful, not divergent.
+2. **Every available fix costs more than the artefact.** Dropping the clamp changes the panel's proportion — a ratified layout value, not a bug. Moving the quotes outside the clamped element, or appending a synthesised `…"`, invents structure the mockup does not have and the design language has not ratified. Neither is a polish item; both are design changes.
+
+**Not a defect. Not routed. No owner needed.** Recorded only so a future reader who notices the unclosed pair finds a ruling instead of filing it again.
+
+**Code touch points** (forward reference, do not act on now): `src/components/discovery/HeroPanels.tsx` — the teaser `<p class="line-clamp-3 …">`.
