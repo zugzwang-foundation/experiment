@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { SellModule } from "@/components/debate/composer/SellModule";
 import { formatDharma } from "@/components/debate/format";
@@ -68,6 +68,36 @@ export function PositionsTable({
 	});
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
+	// HTML-FINISH row 7 — the market popover's open state (mockup `.fpop.open`,
+	// `:245`, toggled at `:586-587`).
+	const [filterOpen, setFilterOpen] = useState(false);
+	const filterRef = useRef<HTMLDivElement | null>(null);
+
+	// Canon §5 (Profile) rules the dismissal grammar for a popover on this
+	// surface: "ESC / click-out closes". Both are wired here rather than left to
+	// the option click, because a popover that can only be dismissed by CHOOSING
+	// traps the reader in a decision they may not want to make.
+	useEffect(() => {
+		if (!filterOpen) {
+			return;
+		}
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				setFilterOpen(false);
+			}
+		};
+		const onPointer = (e: PointerEvent) => {
+			if (!filterRef.current?.contains(e.target as Node)) {
+				setFilterOpen(false);
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		document.addEventListener("pointerdown", onPointer);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("pointerdown", onPointer);
+		};
+	}, [filterOpen]);
 
 	// `sellEligible` exists only on the owner arm's `SellablePositionRow`.
 	const sellEligibleOf = (row: ProfilePositionRow): boolean =>
@@ -100,50 +130,112 @@ export function PositionsTable({
 	// still returns exactly this string; no `sub` is passed on this surface.
 	if (rows.length === 0) {
 		return (
-			<EmptyBlock
-				message={
-					owner
-						? PROFILE_COPY.empty.positionsOwner
-						: PROFILE_COPY.empty.positionsVisitor
-				}
-				messageTestId="positions-empty"
-			/>
+			<PositionsPanel>
+				<EmptyBlock
+					message={
+						owner
+							? PROFILE_COPY.empty.positionsOwner
+							: PROFILE_COPY.empty.positionsVisitor
+					}
+					messageTestId="positions-empty"
+				/>
+			</PositionsPanel>
 		);
 	}
 
 	return (
-		<div className="flex flex-col gap-3">
-			<div className="flex flex-wrap gap-2">
-				<select
-					data-testid="positions-market-filter"
-					value={market}
-					onChange={(e) => setMarket(e.target.value)}
-					className="rounded-[var(--r-chip)] bg-n1 px-2 py-1 text-sm text-ink"
-				>
-					<option value="all">All markets</option>
-					{marketOptions.map(([id, title]) => (
-						<option key={id} value={id}>
-							{title}
-						</option>
-					))}
-				</select>
-				<select
-					data-testid="positions-status-filter"
-					value={status}
-					onChange={(e) => setStatus(e.target.value)}
-					className="rounded-[var(--r-chip)] bg-n1 px-2 py-1 text-sm text-ink"
-				>
-					{/* Item 11 (P5-D17a) — `All` is GONE, and the initial state moves
-					    with it. ⚠ A CAPABILITY REMOVAL, recorded as one rather than
-					    filed as polish: after this there is no route — no component,
-					    no URL param, no server read — by which open and closed
-					    positions appear together. ⛔ The MARKET filter's `all`
-					    sentinel above is UNTOUCHED; it is a different control. */}
-					<option value="Open">Open</option>
-					<option value="Closed">Closed</option>
-				</select>
-			</div>
-
+		<PositionsPanel
+			controls={
+				<>
+					{/* HTML-FINISH row 7a — THE MARKET FILTER IS A LABELLED BUTTON THAT
+					    OPENS A POPOVER LIST, not a native `<select>`. Mockup `:458-459`
+					    (`.mfilter` + `.fpop`), built at `:580-595`.
+					    ⛔ THE LABEL AND ITS CARET ARE FOUNDER-SUPPLIED, NOT AUTHORED —
+					    canon §6 (Profile) pins `Select market ▾` verbatim. The caret is
+					    BYTE-CARRIED: hexdump of canon §6 and of mockup `:458`/`:591`
+					    all give `e2 96 be`, U+25BE BLACK DOWN-POINTING SMALL TRIANGLE,
+					    identical in all three.
+					    ⚠ THE TESTID IS UNCHANGED so every existing consumer keeps its
+					    handle, but the ELEMENT is now a `<button>` — a `fireEvent.change`
+					    against it is meaningless and its call sites move with this row.
+					    `relative` is load-bearing: the popover is absolutely positioned
+					    against this wrapper, which is what keeps it inside the header bar
+					    instead of against the page. */}
+					<div ref={filterRef} className="relative">
+						<Button
+							type="button"
+							size="xs"
+							variant="outline"
+							data-testid="positions-market-filter"
+							aria-haspopup="listbox"
+							aria-expanded={filterOpen}
+							onClick={() => setFilterOpen((o) => !o)}
+						>
+							Select market ▾
+						</Button>
+						{filterOpen && (
+							<div
+								data-testid="positions-market-popover"
+								role="listbox"
+								aria-label="Select market"
+								className="absolute top-full left-0 z-20 mt-1 flex min-w-full flex-col rounded-[var(--r)] bg-n0 p-1 [border:var(--hairline)]"
+							>
+								<PopoverOption
+									testid="positions-market-option-all"
+									selected={market === "all"}
+									onSelect={() => {
+										setMarket("all");
+										setFilterOpen(false);
+									}}
+								>
+									All markets
+								</PopoverOption>
+								{marketOptions.map(([id, title]) => (
+									<PopoverOption
+										key={id}
+										testid={`positions-market-option-${id}`}
+										selected={market === id}
+										onSelect={() => {
+											setMarket(id);
+											setFilterOpen(false);
+										}}
+									>
+										{title}
+									</PopoverOption>
+								))}
+							</div>
+						)}
+					</div>
+					{/* HTML-FINISH row 7b — THE STATUS FILTER IS A TWO-BUTTON SEGMENTED
+					    PAIR (mockup `:460-463` `.segwrap` + two `.seg`, driven by
+					    `setStatus` at `:597-602`).
+					    ⚠ THE INVENTORY IS UNCHANGED — two options, `All` still gone
+					    (item 11 / P5-D17a). Only the CONTROL SHAPE moves; the values,
+					    the derived initial state and the filter predicate are untouched.
+					    `ml-auto` is the mockup's `.segwrap{margin-left:auto}` — topology.
+					    `aria-pressed` carries the selection, which a pair of buttons must
+					    state and a `<select>` got for free. */}
+					<span
+						data-testid="positions-status-filter"
+						className="ml-auto flex items-center gap-1"
+					>
+						{(["Open", "Closed"] as const).map((s) => (
+							<Button
+								key={s}
+								type="button"
+								size="xs"
+								variant={status === s ? "default" : "outline"}
+								data-testid={`positions-status-${s.toLowerCase()}`}
+								aria-pressed={status === s}
+								onClick={() => setStatus(s)}
+							>
+								{s}
+							</Button>
+						))}
+					</span>
+				</>
+			}
+		>
 			{/* ⚠ POLISH.5 Gate C S-1 — THE STRANDED STATE. `rows > 0 ∧ visible === 0`
 			    used to render four column headers over an empty `<tbody>` and no
 			    message at all. ⛔ THE FILTER CONTROLS STAY RENDERED ABOVE: returning
@@ -366,7 +458,98 @@ export function PositionsTable({
 					</tbody>
 				</table>
 			)}
-		</div>
+		</PositionsPanel>
+	);
+}
+
+/**
+ * HTML-FINISH row 2 — THE ARENA HALF IS A BORDERED PANEL WITH A HEADER BAR.
+ * Canon §2 rules the arena as two panels; canon §6 (Profile) names the left
+ * one: "list `Positions` (→ `Bookmarks`)". The mockup's `.deb` is a bordered,
+ * rounded, overflow-hidden flex column whose `.colhead` carries the title and
+ * the controls and whose `.colwrap` holds the body (`:224-228`, `:258-259`,
+ * markup `:455-464`). Before this, the filters and the table floated bare in
+ * the page column with no panel, no bar and no title on either half.
+ *
+ * ⛔ THE TITLE IS RATIFIED COPY, NOT AUTHORED — canon §6's `Positions`,
+ * verbatim, the same string the recon quotes as row 2's baseline.
+ *
+ * ⚠ EVERY VALUE IS TRACED, none read off the mockup, whose 1px-solid-ink
+ * border, 52px min-height and 10/14px paddings are light-prototype numbers:
+ *   `[border:var(--hairline)]`        ← HeroPanels.tsx:138, DebateColumn.tsx:48
+ *   `[border-bottom:var(--hairline)]` ← the same token in the `[border-top:…]`
+ *                                       form at HeroPanels.tsx:296
+ *   `rounded-[var(--r)]` · `bg-n0`    ← HeroPanels.tsx:101
+ *   `p-3` (bar and body)              ← this surface's own Card padding
+ *                                       (ProfileTiles Tile, ArgumentList Card)
+ *   `gap-2` (the bar cluster)         ← the filter row this bar replaces
+ *   `text-xs`                         ← this file's own `<thead>` tier
+ *   `font-medium text-ink`            ← IdentityCard.tsx's pseudonym
+ * ⛔ NO uppercase micro-label tier is reached for: `HeroPanels`'s
+ * `REPLYHEAD_TIER` is explicitly named for the replyhead and its docblock
+ * forbids pointing other labels at it before the MICRO-LABEL-TIER docket row
+ * (routed to POLISH.4). Inventing one here would be a value.
+ *
+ * `overflow-hidden` is the mockup's `.deb{overflow:hidden}` — topology, and it
+ * is what keeps the rounded corner from being squared off by the header bar's
+ * own background.
+ */
+function PositionsPanel({
+	controls,
+	children,
+}: {
+	controls?: React.ReactNode;
+	children: React.ReactNode;
+}): React.JSX.Element {
+	return (
+		<section
+			data-testid="positions-panel"
+			aria-label="Positions"
+			className="flex flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+		>
+			<div
+				data-testid="positions-panel-head"
+				className="flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+			>
+				<span className="text-xs font-medium text-ink">Positions</span>
+				{controls}
+			</div>
+			<div className="flex flex-col gap-3 p-3">{children}</div>
+		</section>
+	);
+}
+
+/** One option in the row-7a market popover (mockup `.fopt`, `:246-251`). A
+ * `<button>` inside a `role="listbox"`, so it is keyboard-reachable by default
+ * and needs no roving-tabindex machinery. `aria-selected` carries the current
+ * choice — the state a native `<option>` supplied for free and a hand-rolled
+ * list must state. `font-medium` on the selected row is the mockup's
+ * `.fopt.sel{font-weight:800}` expressed in the shipped weight scale this
+ * surface already uses (IdentityCard's pseudonym), not at the mockup's number. */
+function PopoverOption({
+	testid,
+	selected,
+	onSelect,
+	children,
+}: {
+	testid?: string;
+	selected: boolean;
+	onSelect: () => void;
+	children: React.ReactNode;
+}): React.JSX.Element {
+	return (
+		<button
+			type="button"
+			role="option"
+			aria-selected={selected}
+			data-testid={testid}
+			onClick={onSelect}
+			className={`rounded-[var(--r-chip)] px-2 py-1 text-left text-sm text-ink hover:bg-n1 ${
+				selected ? "font-medium" : ""
+			}`}
+		>
+			{children}
+		</button>
 	);
 }
 

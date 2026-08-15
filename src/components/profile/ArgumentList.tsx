@@ -75,27 +75,30 @@ export function ArgumentList({
 	// still returns exactly this string; no `sub` is passed on this surface.
 	if (items.length === 0) {
 		return (
-			<EmptyBlock
-				message={
-					owner
-						? PROFILE_COPY.empty.argumentsOwner
-						: PROFILE_COPY.empty.argumentsVisitor
-				}
-				messageTestId="arguments-empty"
-			/>
+			<ArgumentsPanel>
+				<EmptyBlock
+					message={
+						owner
+							? PROFILE_COPY.empty.argumentsOwner
+							: PROFILE_COPY.empty.argumentsVisitor
+					}
+					messageTestId="arguments-empty"
+				/>
+			</ArgumentsPanel>
 		);
 	}
 
 	return (
-		<div data-testid="argument-list" className="flex flex-col gap-3">
-			{items.map((item) =>
-				item.removed ? (
-					<Card
-						key={item.id}
-						data-testid={`argument-removed-${item.id}`}
-						className="gap-2 p-3"
-					>
-						{/* HTML-FINISH row 4, removed variant — the head cluster ships
+		<ArgumentsPanel>
+			<div data-testid="argument-list" className="flex flex-col gap-3">
+				{items.map((item) =>
+					item.removed ? (
+						<Card
+							key={item.id}
+							data-testid={`argument-removed-${item.id}`}
+							className="gap-2 p-3"
+						>
+							{/* HTML-FINISH row 4, removed variant — the head cluster ships
 						    the SUBSET the union permits, and the union is what decides:
 						    the removed variants carry no `marker`, no `priceAtBet`, no
 						    `authorStake` and (for a reply) no `aggregate`, so reaching
@@ -104,20 +107,20 @@ export function ArgumentList({
 						    so all three render — the identity of a removed argument's
 						    author is not the thing that was removed (SC-1 governs the
 						    BODY, and no body field exists on this variant to leak). */}
-						<div className="flex flex-wrap items-center gap-2">
-							<AuthorHead author={author} />
-							<HeadSeparator />
-							<SideBadge side={item.side} size="profile" />
-						</div>
-						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
-					</Card>
-				) : (
-					<Card
-						key={item.id}
-						data-testid={`argument-${item.id}`}
-						className="gap-2 p-3"
-					>
-						{/* HTML-FINISH row 4 — THE SHIPPED CARD-HEAD CLUSTER. Canon §3
+							<div className="flex flex-wrap items-center gap-2">
+								<AuthorHead author={author} />
+								<HeadSeparator />
+								<SideBadge side={item.side} size="profile" />
+							</div>
+							<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
+						</Card>
+					) : (
+						<Card
+							key={item.id}
+							data-testid={`argument-${item.id}`}
+							className="gap-2 p-3"
+						>
+							{/* HTML-FINISH row 4 — THE SHIPPED CARD-HEAD CLUSTER. Canon §3
 						    item 11: "head = avatar · name | SIDE @ entry% | stake …
 						    `Replies · N` inline with enlarged count (`.repn`)". The build
 						    carried only side chip, marker and stake — no avatar, no
@@ -137,10 +140,10 @@ export function ArgumentList({
 						    ⚠ NO GAP IS INTRODUCED: `gap-2` is the class this row already
 						    carried AND the mockup's `.rchead{gap:8px}` (`:321`) — the
 						    same number from both directions, so nothing moves. */}
-						<div className="flex flex-wrap items-center gap-2">
-							<AuthorHead author={author} />
-							<HeadSeparator />
-							{/* Item 3 (P5-D04) — canon §3 item 11's `SIDE @ entry%`. A PROP
+							<div className="flex flex-wrap items-center gap-2">
+								<AuthorHead author={author} />
+								<HeadSeparator />
+								{/* Item 3 (P5-D04) — canon §3 item 11's `SIDE @ entry%`. A PROP
 							    PASS: `SideBadge` already takes `price` and already renders
 							    it, so NO formatting happens here. Formatting it in this
 							    component would need a fourth allow-marker and redden
@@ -149,32 +152,32 @@ export function ArgumentList({
 							    for an author who entered NO at 55%. ⛔ NEVER on the
 							    removed variant at `:49` — it carries no price field, so
 							    that is a compile error, which is the guarantee working. */}
-							<SideBadge
-								side={item.side}
-								size="profile"
-								price={item.priceAtBet}
-							/>
-							{/* `PositionMarker` returns null for "none" itself, and
+								<SideBadge
+									side={item.side}
+									size="profile"
+									price={item.priceAtBet}
+								/>
+								{/* `PositionMarker` returns null for "none" itself, and
 							    supplies the `aria-label="Author Flipped"` the hand-roll
 							    lacked (PD-0-10's root cause: primitive duplication). */}
-							<PositionMarker marker={item.marker} />
-							{/* Item 4 (P5-D06a) — the author's own opening stake, canon §3
+								<PositionMarker marker={item.marker} />
+								{/* Item 4 (P5-D06a) — the author's own opening stake, canon §3
 							    item 11's head. POST VARIANT ONLY: a reply's `stake` is the
 							    §3.6 ranking ruler, a different figure (§0.5). D21 struck
 							    the `→ current` half, so the stake ships alone. Routed
 							    through `formatDharma` — `authorStake` is a MONEY_ID and a
 							    bare `{item.authorStake}` reddens no-raw-dharma-render. */}
-							{item.kind === "post" && (
-								<>
-									<HeadSeparator />
-									<span
-										data-testid={`argument-stake-${item.id}`}
-										className="text-n6 text-xs"
-									>
-										Đ {formatDharma(item.authorStake)}
-									</span>
-									<HeadSeparator />
-									{/* HTML-FINISH row 12 — `Replies · N` MOVES INTO THE HEAD,
+								{item.kind === "post" && (
+									<>
+										<HeadSeparator />
+										<span
+											data-testid={`argument-stake-${item.id}`}
+											className="text-n6 text-xs"
+										>
+											Đ {formatDharma(item.authorStake)}
+										</span>
+										<HeadSeparator />
+										{/* HTML-FINISH row 12 — `Replies · N` MOVES INTO THE HEAD,
 									    beside the stake. Canon §3 item 11 places it "inline
 									    with enlarged count (`.repn`)", i.e. inline in the head
 									    cluster, and the mockup emits it there (`:619-621`)
@@ -187,27 +190,27 @@ export function ArgumentList({
 									    the footer they left; N is still the sum of the two
 									    pole counts (every reply IS a Support or Counter bet,
 									    ADR-0017), so no passthrough field is needed. */}
-									<span className="text-xs text-n5">
-										Replies ·{" "}
-										<span
-											data-testid={`argument-replies-${item.id}`}
-											className="font-[650] text-n6 text-sm"
-										>
-											{item.aggregate.supportCount +
-												item.aggregate.counterCount}
+										<span className="text-xs text-n5">
+											Replies ·{" "}
+											<span
+												data-testid={`argument-replies-${item.id}`}
+												className="font-[650] text-n6 text-sm"
+											>
+												{item.aggregate.supportCount +
+													item.aggregate.counterCount}
+											</span>
 										</span>
-									</span>
-								</>
-							)}
-						</div>
-						<Link
-							data-testid={`argument-title-${item.id}`}
-							href={`/m/${item.marketSlug}?post=${item.ordinal}`}
-							className="font-medium text-ink hover:underline"
-						>
-							{item.title}
-						</Link>
-						{/* Item 6 (P5-D08) — the teaser, clamped. ⛔ AM-1: the clamp is
+									</>
+								)}
+							</div>
+							<Link
+								data-testid={`argument-title-${item.id}`}
+								href={`/m/${item.marketSlug}?post=${item.ordinal}`}
+								className="font-medium text-ink hover:underline"
+							>
+								{item.title}
+							</Link>
+							{/* Item 6 (P5-D08) — the teaser, clamped. ⛔ AM-1: the clamp is
 						    CSS-ONLY. NO `title` attribute may carry this text: a native
 						    tooltip revealing the whole paragraph is a SECOND read
 						    affordance beside the title <Link>, which is what D13 rules
@@ -215,29 +218,71 @@ export function ArgumentList({
 						    already in this file — the "Replied to …" context below clamps
 						    with no `title`. The removed variant carries no `teaser` field
 						    at all, so a leak here is a COMPILE error (SC-1). */}
-						{item.teaser !== "" && (
-							<p
-								data-testid={`argument-teaser-${item.id}`}
-								className="line-clamp-2 text-xs text-n5"
-							>
-								{item.teaser}
-							</p>
-						)}
-						{item.kind === "reply" && item.repliedToTitle !== null && (
-							<p
-								data-testid={`argument-reply-context-${item.id}`}
-								className="line-clamp-2 text-xs text-n5"
-							>
-								Replied to {item.repliedToTitle}
-							</p>
-						)}
-						{item.kind === "post" && (
-							<SplitBar id={item.id} aggregate={item.aggregate} />
-						)}
-					</Card>
-				),
-			)}
-		</div>
+							{item.teaser !== "" && (
+								<p
+									data-testid={`argument-teaser-${item.id}`}
+									className="line-clamp-2 text-xs text-n5"
+								>
+									{item.teaser}
+								</p>
+							)}
+							{item.kind === "reply" && item.repliedToTitle !== null && (
+								<p
+									data-testid={`argument-reply-context-${item.id}`}
+									className="line-clamp-2 text-xs text-n5"
+								>
+									Replied to {item.repliedToTitle}
+								</p>
+							)}
+							{item.kind === "post" && (
+								<SplitBar id={item.id} aggregate={item.aggregate} />
+							)}
+						</Card>
+					),
+				)}
+			</div>
+		</ArgumentsPanel>
+	);
+}
+
+/**
+ * HTML-FINISH row 2 — THE RIGHT ARENA HALF IS A BORDERED PANEL WITH A HEADER
+ * BAR, matching the left. Canon §2 rules the arena as two panels; the mockup's
+ * `.deb` is the same bordered, rounded, overflow-hidden flex column on both
+ * sides (`:224-228`, markup `:475-484`).
+ *
+ * ⛔ THE TITLE IS BYTE-CARRIED, NOT AUTHORED, AND THE MOCKUP'S CANNOT BE USED.
+ * The mockup's right `.colhead` carries the SELECTED MARKET'S TITLE and a live
+ * price (`:477`, written by `renderReplica` at `:650-653`) — but that header
+ * exists only inside the REPLICA reading, which recon table A-1 STRUCK on tier
+ * 1: SPEC.1 §23 enumerates "the **argument list**" and rules its own §3.6
+ * order, and a panel bound to the positions selection has no such order. With
+ * the list reading there is no selected market, so there is no market title to
+ * put here. `Arguments` is byte-carried from the SHIPPED tile label
+ * (`ProfileTiles.tsx`, `label="Arguments"`), canon §6 (Profile) verbatim — the
+ * same word this surface already prints for the same set.
+ *
+ * Every value is the left panel's, byte-for-byte, because the two halves are
+ * one composition — see `PositionsTable.tsx`'s `PositionsPanel` for the trace
+ * of each token. ⚠ ATTRIBUTED DUPLICATION, ROUTED NOT ABSORBED: lifting the
+ * shared shell into `ui/**` would mint a new primitive, which this task
+ * forbids. Filed as a widening.
+ */
+function ArgumentsPanel({ children }: { children: React.ReactNode }) {
+	return (
+		<section
+			data-testid="arguments-panel"
+			aria-label="Arguments"
+			className="flex flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+		>
+			<div
+				data-testid="arguments-panel-head"
+				className="flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+			>
+				<span className="text-xs font-medium text-ink">Arguments</span>
+			</div>
+			<div className="flex flex-col gap-3 p-3">{children}</div>
+		</section>
 	);
 }
 

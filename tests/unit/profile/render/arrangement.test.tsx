@@ -3,7 +3,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
@@ -514,6 +514,174 @@ describe("HTML-FINISH profile rows 6 · 14 · 17 — the positions grid", () => 
 			expect(classes).toContain("flex-col");
 			expect(classes).toContain("items-center");
 		}
+	});
+});
+
+describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", () => {
+	const PAYLOAD = { owner: false as const, rows: [ROW_OPEN, ROW_SETTLED] };
+
+	const ARG_POST: ProfileArgumentItem = {
+		removed: false,
+		kind: "post",
+		id: "0190b3a0-9999-7000-8000-00000000000c",
+		side: "YES",
+		marketSlug: "fixture-alpha",
+		marketTitle: "Market fixture-alpha",
+		ordinal: 4,
+		title: "A profile argument",
+		teaser: "Neutral fixture teaser.",
+		body: "A profile argument\n\nNeutral fixture body.",
+		marker: "none",
+		authorStake: "50.000000000000000000",
+		priceAtBet: "0.270000000000000000",
+		createdAt: "2026-07-01T00:00:00.000Z",
+		aggregate: {
+			supportCount: 3,
+			counterCount: 1,
+			supportDharma: "300.000000000000000000",
+			counterDharma: "100.000000000000000000",
+		},
+	};
+
+	it("row2::both-arena-halves-are-bordered-panels-with-a-header-bar", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		cleanup();
+		// Rendered separately because each half is its own component; the BAND
+		// that puts them side by side is row 1's, guarded above.
+		const left = render(<PositionsTable payload={PAYLOAD} />);
+		const leftPanel = screen.getByTestId("positions-panel");
+		const leftHead = screen.getByTestId("positions-panel-head");
+		expect(leftPanel.contains(leftHead)).toBe(true);
+		// The bar is the panel's FIRST child — a header bar below the body is not
+		// a header bar.
+		expect(indexOf(leftHead)).toBe(0);
+		// Canon §6 (Profile): "list `Positions`". Ratified copy, not authored.
+		expect(leftHead.textContent).toContain("Positions");
+		// The border and the bar's rule both ride the shipped hairline token, so
+		// the panel reads as a panel rather than as a bare column.
+		expect(leftPanel.className).toContain("[border:var(--hairline)]");
+		expect(leftHead.className).toContain("[border-bottom:var(--hairline)]");
+		left.unmount();
+
+		render(<ArgumentList items={[ARG_POST]} owner={false} author={USER} />);
+		const rightPanel = screen.getByTestId("arguments-panel");
+		const rightHead = screen.getByTestId("arguments-panel-head");
+		expect(rightPanel.contains(rightHead)).toBe(true);
+		expect(indexOf(rightHead)).toBe(0);
+		// Byte-carried from the shipped tile label (canon §6 verbatim). ⛔ NOT the
+		// mockup's right colhead, which carries the selected market's title and a
+		// live price — that header exists only inside the REPLICA reading, which
+		// recon A-1 STRUCK on tier 1.
+		expect(rightHead.textContent).toContain("Arguments");
+		expect(rightPanel.className).toContain("[border:var(--hairline)]");
+	});
+
+	it("row2::the-panel-survives-the-EMPTY-state-on-both-halves", () => {
+		// A panel that vanishes when its list is empty is not a panel — and the
+		// empty state is exactly when a reader most needs the frame to say WHAT
+		// is empty.
+		const a = render(<PositionsTable payload={{ owner: false, rows: [] }} />);
+		expect(screen.getByTestId("positions-panel")).toBeTruthy();
+		expect(screen.getByTestId("positions-empty")).toBeTruthy();
+		a.unmount();
+
+		render(<ArgumentList items={[]} owner={false} author={USER} />);
+		expect(screen.getByTestId("arguments-panel")).toBeTruthy();
+		expect(screen.getByTestId("arguments-empty")).toBeTruthy();
+	});
+
+	it("row7::both-filters-live-ON-the-header-bar", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		const head = screen.getByTestId("positions-panel-head");
+		expect(
+			head.contains(screen.getByTestId("positions-market-filter")),
+			`row 7: the market filter is not on the panel header bar.`,
+		).toBe(true);
+		expect(head.contains(screen.getByTestId("positions-status-filter"))).toBe(
+			true,
+		);
+	});
+
+	it("row7a::the-market-filter-is-a-BUTTON-that-opens-a-popover-list", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		const trigger = screen.getByTestId("positions-market-filter");
+		// Not a <select>. The element TYPE is the row.
+		expect(trigger.tagName).toBe("BUTTON");
+		expect(trigger.getAttribute("aria-haspopup")).toBe("listbox");
+		expect(trigger.getAttribute("aria-expanded")).toBe("false");
+		// ⛔ The label is canon §6's `Select market ▾`, and the caret is
+		// BYTE-CARRIED — U+25BE, asserted by CODE POINT so a lookalike reddens.
+		const label = trigger.textContent ?? "";
+		expect(label).toBe("Select market ▾");
+		expect(label.codePointAt(label.length - 1)).toBe(0x25be);
+
+		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
+		fireEvent.click(trigger);
+		const popover = screen.getByTestId("positions-market-popover");
+		expect(trigger.getAttribute("aria-expanded")).toBe("true");
+		// `All markets` + one per distinct market. The inventory is UNCHANGED
+		// from the `<select>` this replaced — only the control shape moved.
+		expect(popover.querySelectorAll('[role="option"]').length).toBe(3);
+		expect(
+			popover
+				.querySelector('[data-testid="positions-market-option-all"]')
+				?.getAttribute("aria-selected"),
+		).toBe("true");
+	});
+
+	it("row7a::ESC-closes-the-popover-canon-§5", () => {
+		// Canon §5 (Profile) rules the dismissal grammar: "ESC / click-out
+		// closes". A popover dismissible only by CHOOSING traps the reader.
+		render(<PositionsTable payload={PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-market-filter"));
+		expect(screen.getByTestId("positions-market-popover")).toBeTruthy();
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
+	});
+
+	it("row7a::click-OUT-closes-the-popover-canon-§5", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-market-filter"));
+		expect(screen.getByTestId("positions-market-popover")).toBeTruthy();
+		fireEvent.pointerDown(document.body);
+		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
+	});
+
+	it("row7b::the-status-filter-is-a-two-button-SEGMENTED-PAIR", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		const seg = screen.getByTestId("positions-status-filter");
+		const buttons = [...seg.querySelectorAll("button")];
+		// Two, and only two — item 11 (P5-D17a) removed `All` and this row must
+		// not reintroduce it by widening the control.
+		expect(buttons.length).toBe(2);
+		expect(buttons.map((b) => b.textContent)).toEqual(["Open", "Closed"]);
+		// `aria-pressed` carries the selection — the state a `<select>` supplied
+		// in `.value` and a hand-rolled pair must declare.
+		expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
+		expect(buttons[1]?.getAttribute("aria-pressed")).toBe("false");
+	});
+
+	it("row7b::the-segments-still-DRIVE-the-filter-not-just-paint-it", () => {
+		// ⚠ NON-VACUITY. Every assertion above is about SHAPE; this one is about
+		// behaviour, because a control that looks right and filters nothing is
+		// precisely the defect a shape-only guard ships.
+		render(<PositionsTable payload={PAYLOAD} />);
+		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
+		fireEvent.click(screen.getByTestId("positions-status-closed"));
+		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+	});
+
+	it("row7a::the-popover-still-DRIVES-the-market-filter", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-market-filter"));
+		fireEvent.click(screen.getByTestId(`positions-market-option-${M2}`));
+		// M2 is Closed and the status filter is Open, so choosing it empties the
+		// table — the filter-scoped empty, not the "you hold nothing" one.
+		expect(screen.getByTestId("positions-empty-filtered")).toBeTruthy();
+		// …and choosing closes the popover.
+		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
 	});
 });
 

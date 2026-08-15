@@ -45,6 +45,43 @@ vi.mock("@/components/debate/composer/SellModule", () => ({
 
 afterEach(cleanup);
 
+/**
+ * HTML-FINISH row 7 — THE FILTER DRIVERS MOVED WITH THE CONTROLS, AND ONLY THE
+ * DRIVERS. The market `<select>` became a labelled button that opens a popover
+ * list, and the status `<select>` became a two-button segmented pair (canon §6:
+ * `filters `Select market ▾`, `Open`/`Closed``), so `fireEvent.change` against
+ * either is meaningless — jsdom reports "the given element does not have a
+ * value setter".
+ *
+ * ⛔ EVERY ASSERTION IN THIS FILE IS UNCHANGED. These helpers translate HOW the
+ * state is driven and HOW the selection is read; they assert nothing themselves,
+ * so no test's subject moved with its mechanism. `selectedStatus` reads
+ * `aria-pressed` and `selectedMarketCount` reads `role="option"` — the state a
+ * `<select>` carried in `.value`/`.options` and a hand-rolled control must
+ * declare explicitly.
+ */
+function setStatusFilter(label: "Open" | "Closed"): void {
+	fireEvent.click(
+		screen.getByTestId(`positions-status-${label.toLowerCase()}`),
+	);
+}
+
+/** The chosen market, read off `aria-selected` inside the popover — the
+ * `<select>`'s `.value`. Returns `"all"` for the sentinel option. Opens the
+ * popover to read, then closes it again so the caller's state is unchanged. */
+function selectedMarket(): string | null {
+	const trigger = screen.getByTestId("positions-market-filter");
+	fireEvent.click(trigger);
+	const chosen = screen
+		.getByTestId("positions-market-popover")
+		.querySelector('[role="option"][aria-selected="true"]');
+	const testid = chosen?.getAttribute("data-testid") ?? null;
+	fireEvent.click(trigger);
+	return testid === null
+		? null
+		: testid.replace("positions-market-option-", "");
+}
+
 const M1 = "0190c0de-aaaa-7000-8000-000000000001"; // Open market — sellable
 const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // Resolved — settled
 const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
@@ -114,10 +151,7 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		// assertion, or "no trigger" would pass on a row that simply is not
 		// rendered. ⛔ Unlike `market-preselect-from-searchparam`, this switch is
 		// NOT a no-op: the derivation genuinely yields `Open` for this fixture.
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Closed" } },
-		);
+		setStatusFilter("Closed");
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-trigger-${M2}`)).toBeNull();
 		expect(
@@ -167,10 +201,7 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		// row assertion below, deleting `sellable &&` from the host `<tr>` leaves
 		// this whole suite green while shipping a blank 50px strip under every
 		// Closed and every visitor row.
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Closed" } },
-		);
+		setStatusFilter("Closed");
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-host-${M2}`)).toBeNull();
 	});
@@ -198,10 +229,7 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 			(screen.getByTestId(`position-status-${M1}`).textContent ?? "").trim(),
 		).toContain("Open");
 
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Closed" } },
-		);
+		setStatusFilter("Closed");
 		expect(
 			(screen.getByTestId(`position-status-${M2}`).textContent ?? "").trim(),
 		).toContain("Closed");
@@ -229,10 +257,7 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 				initialMarketSlug="fixture-beta"
 			/>,
 		);
-		const filter = screen.getByTestId<HTMLSelectElement>(
-			"positions-market-filter",
-		);
-		expect(filter.value).toBe(M2);
+		expect(selectedMarket()).toBe(M2);
 		// ⚠ B7 added a status switch here because item 11 defaulted the filter
 		// to a FIXED `Open` and `fixture-beta` is the Closed market. Gate C S-1
 		// made the default DERIVED **and scoped to the initial market** — this
@@ -241,7 +266,7 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		// describing a default that no longer exists is the lying-docblock
 		// class, and it would mask a regression in the derivation behind a
 		// manual override. ⚠ This case's own subject is the MARKET preselect,
-		// which `filter.value` above proves and S-1 does not touch.
+		// which `selectedMarket()` above proves and S-1 does not touch.
 		// The preselected market's row renders. ⚠ THE MATCHING NEGATIVE IS
 		// DELIBERATELY NOT ASSERTED HERE: under `status=Closed`, `M1` (Open) is
 		// excluded by the STATUS predicate whatever the market filter does, so
@@ -259,8 +284,6 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 				initialMarketSlug="does-not-exist"
 			/>,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-market-filter").value,
-		).toBe("all");
+		expect(selectedMarket()).toBe("all");
 	});
 });

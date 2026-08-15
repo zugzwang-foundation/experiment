@@ -51,6 +51,79 @@ import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
 afterEach(cleanup);
 
+/**
+ * HTML-FINISH row 7 — THE FILTER DRIVERS MOVED WITH THE CONTROLS, AND ONLY THE
+ * DRIVERS. The market `<select>` became a labelled button that opens a popover
+ * list, and the status `<select>` became a two-button segmented pair (canon §6:
+ * `filters `Select market ▾`, `Open`/`Closed``), so `fireEvent.change` against
+ * either is meaningless — jsdom reports "the given element does not have a
+ * value setter".
+ *
+ * ⛔ EVERY ASSERTION IN THIS FILE IS UNCHANGED. These helpers translate HOW the
+ * state is driven and HOW the selection is read; they assert nothing themselves,
+ * so no test's subject moved with its mechanism. `selectedStatus` reads
+ * `aria-pressed` and `selectedMarketCount` reads `role="option"` — the state a
+ * `<select>` carried in `.value`/`.options` and a hand-rolled control must
+ * declare explicitly.
+ */
+function setStatusFilter(label: "Open" | "Closed"): void {
+	fireEvent.click(
+		screen.getByTestId(`positions-status-${label.toLowerCase()}`),
+	);
+}
+
+/** The pressed segment, read off `aria-pressed` — the `<select>`'s `.value`. */
+function selectedStatus(): string | null {
+	for (const label of ["Open", "Closed"] as const) {
+		const btn = screen.getByTestId(`positions-status-${label.toLowerCase()}`);
+		if (btn.getAttribute("aria-pressed") === "true") {
+			return label;
+		}
+	}
+	return null;
+}
+
+/** Open the market popover and click one option (`"all"` or a marketId). */
+function setMarketFilter(marketId: string): void {
+	fireEvent.click(screen.getByTestId("positions-market-filter"));
+	fireEvent.click(screen.getByTestId(`positions-market-option-${marketId}`));
+}
+
+/** The popover's option count — the `<select>`'s `.options.length`. Opens the
+ * popover to count, then closes it again so the caller's state is unchanged. */
+function marketOptionCount(): number {
+	const trigger = screen.getByTestId("positions-market-filter");
+	fireEvent.click(trigger);
+	const n = screen
+		.getByTestId("positions-market-popover")
+		.querySelectorAll('[role="option"]').length;
+	fireEvent.click(trigger);
+	return n;
+}
+
+/** The chosen market, read off `aria-selected` inside the popover — the
+ * `<select>`'s `.value`. Returns `"all"` for the sentinel option. Opens the
+ * popover to read, then closes it again so the caller's state is unchanged. */
+function selectedMarket(): string | null {
+	const trigger = screen.getByTestId("positions-market-filter");
+	fireEvent.click(trigger);
+	const chosen = screen
+		.getByTestId("positions-market-popover")
+		.querySelector('[role="option"][aria-selected="true"]');
+	const testid = chosen?.getAttribute("data-testid") ?? null;
+	fireEvent.click(trigger);
+	return testid === null
+		? null
+		: testid.replace("positions-market-option-", "");
+}
+
+/** The status segment count — the `<select>`'s `.options.length`. */
+function statusOptionCount(): number {
+	return screen
+		.getByTestId("positions-status-filter")
+		.querySelectorAll("button").length;
+}
+
 const M1 = "0190c0de-aaaa-7000-8000-000000000001"; // Open market
 const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // settled market
 const C_POST = "0190c0de-cccc-7000-8000-000000000011";
@@ -287,15 +360,11 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
 			"Open",
 		);
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Closed" },
-		});
+		setStatusFilter("Closed");
 		expect(text(within(table).getByTestId(`position-status-${M2}`))).toContain(
 			"Closed",
 		);
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Open" },
-		});
+		setStatusFilter("Open");
 
 		// Argument list: present post + present reply + removed stub.
 		const list = screen.getByTestId("argument-list");
@@ -719,9 +788,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		).toBe(true);
 
 		// The NO pole, in its own filter state.
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Closed" },
-		});
+		setStatusFilter("Closed");
 		const no = screen.getByTestId(`position-side-${M2}`);
 		const noGlyph = no.querySelector("svg");
 		expect(text(no)).toBe("No");
@@ -758,19 +825,13 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const first = render(
 			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
 		);
-		const statusFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-status-filter",
-		);
-		const marketFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-market-filter",
-		);
 		// Option inventories (item 11, P5-D17a): the STATUS filter is now
 		// Open/Closed — the canon inventory, with `All` removed. ⛔ The MARKET
 		// filter is a DIFFERENT control and keeps its `all` sentinel: `All` +
 		// one per distinct marketId. Repairing the two together would ship a
 		// defect.
-		expect(statusFilter.options).toHaveLength(2);
-		expect(marketFilter.options).toHaveLength(3);
+		expect(statusOptionCount()).toBe(2);
+		expect(marketOptionCount()).toBe(3);
 
 		// The initial state moved WITH the option. A `<select>` whose `value`
 		// matched no option would paint its first option while the predicate
@@ -780,7 +841,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// Open row, so the derivation selects it. The derivation itself is
 		// pinned by `status-default-is-derived`, including the all-Closed and
 		// deep-link arms this fixture cannot reach.
-		expect(statusFilter.value).toBe("Open");
+		expect(selectedStatus()).toBe("Open");
 
 		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
 		// REMOVAL, asserted rather than implied: there is no longer any state of
@@ -789,7 +850,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
 
 		// Status → Closed hides the Open row, keeps the Closed row.
-		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+		setStatusFilter("Closed");
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		first.unmount();
@@ -797,10 +858,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// Fresh mount: the market filter isolates one market's rows, and it does
 		// so independently of the status filter.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
-		const market = screen.getByTestId<HTMLSelectElement>(
-			"positions-market-filter",
-		);
-		fireEvent.change(market, { target: { value: M1 } });
+		setMarketFilter(M1);
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
 
 		// ⚠ The negative arm now selects the OTHER market rather than asserting
@@ -809,7 +867,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// have passed with the market filter entirely broken. Hiding M1 by
 		// selecting M2 is the market filter's own doing — the status filter has
 		// not moved.
-		fireEvent.change(market, { target: { value: M2 } });
+		setMarketFilter(M2);
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 	});
 
@@ -824,10 +882,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: false }] }}
 			/>,
 		);
-		const statusFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-status-filter",
-		);
-		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+		setStatusFilter("Closed");
 
 		// The filter-scoped message, which is a DIFFERENT state from "no
 		// positions at all" and carries different copy.
@@ -847,15 +902,10 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("positions-market-filter")).toBeTruthy();
 		// …and the control still reads the state the user selected, so the way
 		// out is discoverable rather than merely present.
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedStatus()).toBe("Closed");
 
 		// The way out WORKS: switching back restores the row.
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Open" } },
-		);
+		setStatusFilter("Open");
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
 		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
 	});
@@ -869,18 +919,14 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const withOpen = render(
 			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Open");
+		expect(selectedStatus()).toBe("Open");
 		withOpen.unmount();
 
 		// (b) EVERY row is Closed → `Closed`.
 		const allClosed = render(
 			<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedStatus()).toBe("Closed");
 		// ⚠ POSITIVE CONTROL. A default that only moves the `<select>`'s value
 		// while the table stays empty satisfies a value-only assertion — which
 		// is the exact bug this finding is about.
@@ -899,12 +945,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 				initialMarketSlug="fixture-beta"
 			/>,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-market-filter").value,
-		).toBe(M2);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedMarket()).toBe(M2);
+		expect(selectedStatus()).toBe("Closed");
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 	});
 });
