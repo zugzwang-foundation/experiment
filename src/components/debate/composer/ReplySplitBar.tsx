@@ -60,11 +60,32 @@ export function ReplySplitBar({
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
+				{/* RR-3 — THE POLES NAME THE SIDE, NEVER THE RELATION.
+				    The fill is the SUPPORT share and the track is the counter
+				    remainder, and both resolve to a SIDE: Support inherits the post's
+				    side, Counter opposes it (`deriveReplySide`'s rule, the same one
+				    `TriggerPill` applies at `:118-122` — this component's own correct
+				    sibling, and this row's positive control).
+				    Both were FIXED (`bg-no` track over a `bg-yes` fill), so on every NO
+				    post the NO-side share was painted in the YES pole — a lie about
+				    which side an argument backs. The mockup was never wrong: it poles
+				    these by RESULTING SIDE (`d5:1247,1249`, confirmed in JS at
+				    `d5:1591`), so this makes the build agree with the artifact.
+				    ⚠ Written as `postSide === "YES"` rather than as a
+				    `deriveReplySide(...)` call ON PURPOSE: `side-pole-binding.test.ts`'s
+				    `SIDE_COMPARISON` matches an IDENTIFIER compared to a side literal,
+				    so this form is VISIBLE to the guard where a call expression would
+				    not be. Route 3 is that guard's known blind spot and this file is the
+				    instance it was written around — the fix should be the thing it can
+				    see. */}
 				<span
-					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-no"
+					className={`h-1.5 w-full overflow-hidden rounded-(--r-dot) ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
 					aria-hidden="true"
 				>
-					<span className="block h-full bg-yes" style={{ width: supportPct }} />
+					<span
+						className={`block h-full ${postSide === "YES" ? "bg-yes" : "bg-no"}`}
+						style={{ width: supportPct }}
+					/>
 				</span>
 				<span className="text-n5">
 					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
