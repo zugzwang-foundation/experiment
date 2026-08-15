@@ -454,6 +454,19 @@ describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable",
 		// anyone who cannot resolve a 0.5px border delta.
 		expect(open.className).toContain("text-ink");
 		expect(closed.className).toContain("text-n5");
+		// ⚠⚠ THE ASSERTION THAT WOULD HAVE CAUGHT THE ORIGINAL DEFECT, and it is
+		// deliberately the crudest one here: the two halves must not RENDER THE
+		// SAME. Round 2 shipped `variant={selected ? "default" : "outline"}`,
+		// whose guard asserted `aria-pressed` flipped — true, passing, and
+		// invisible on screen, because those two variants are byte-identical.
+		// Every guard written for a VISUAL difference must compare the two
+		// states against each other, not assert a flag on one of them.
+		expect(
+			open.className,
+			`item 2: the selected and unselected halves render the SAME class ` +
+				`string. Whatever mechanism is in use expresses no visible ` +
+				`difference — which is exactly the defect the founder found.`,
+		).not.toBe(closed.className);
 	});
 
 	it("item2::the-ring-FOLLOWS-the-selection", () => {
