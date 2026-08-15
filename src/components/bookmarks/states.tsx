@@ -30,15 +30,3 @@ export function BookmarksLoading(): React.JSX.Element {
 		</div>
 	);
 }
-
-/** The /bookmarks error state (plan §3.3 states) — the load-error retry line. */
-export function BookmarksError(): React.JSX.Element {
-	return (
-		<p
-			data-testid="bookmarks-error"
-			className="py-12 text-center text-n5 text-sm"
-		>
-			Couldn't load your bookmarks. Tap to retry.
-		</p>
-	);
-}

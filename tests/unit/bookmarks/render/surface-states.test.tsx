@@ -1,6 +1,9 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -30,6 +33,7 @@ vi.mock("@/server/auth", () => ({
 }));
 vi.mock("@/server/bookmarks/list", () => ({ loadBookmarks: vi.fn() }));
 
+import BookmarksRouteError from "@/app/(public)/bookmarks/error";
 import * as bookmarksPage from "@/app/(public)/bookmarks/page";
 import { BookmarksLoading } from "@/components/bookmarks/states";
 import { auth } from "@/server/auth";
@@ -155,5 +159,139 @@ describe("PD-6-05 — the loading state IS the P7 primitive", () => {
 		const { container } = render(<BookmarksLoading />);
 		expect(screen.getByTestId("bookmarks-loading")).toBeTruthy();
 		expect(container.querySelectorAll("[data-loading-block]").length).toBe(3);
+	});
+});
+
+/**
+ * PD-6-06 — the route error boundary adopts the ROUTE-BOUNDARY FAMILY by
+ * importing `ui/error-block.tsx` (JR-1 + JR-5, variant B′).
+ *
+ * PRIMARY MODEL: `tests/unit/debate/render/market-error-boundary.test.tsx` —
+ * the default export imported directly, its four load-bearing shapes reused.
+ * ⚠ ABSENCE assertions are CONTAINER-WIDE and PRESENCE assertions are TARGETED,
+ * that file's `:20-35` rule.
+ */
+const THROWN = {
+	message: "ZZ-DISTINCTIVE-THROWN-MESSAGE-c5",
+	digest: "ZZ-DISTINCTIVE-DIGEST-c5",
+	stack: "ZZ-DISTINCTIVE-STACK-c5",
+	cause: "ZZ-DISTINCTIVE-CAUSE-c5",
+};
+
+/** A thrown error carrying a distinctive marker in every field a leak could
+ *  travel through. */
+const thrown = (): Error & { digest?: string } =>
+	Object.assign(new Error(THROWN.message), THROWN);
+
+/** This surface's own body string, carried under B′ — the sentence split of the
+ *  live `states.tsx` line at its sentence boundary, with the trailing action
+ *  phrase routed to `actionLabel`. Never authored. */
+const BOOKMARKS_ERROR_BODY = "Couldn't load your bookmarks.";
+
+describe("PD-6-06 — the error boundary IS the route-boundary family block", () => {
+	it("adopts-the-leaf-rather-than-re-implementing-the-family", () => {
+		// ⚠ THE DISCRIMINATING ASSERTION, third of three. `ui/error-block.tsx`
+		// marks itself `data-error-block`, its OWN marker. An inline byte-copy
+		// of the family treatment — which is exactly what v1.3 of the plan ruled
+		// before the leaf existed — would satisfy every copy and class assertion
+		// below and FAIL this one.
+		const { container } = render(
+			<BookmarksRouteError error={thrown()} reset={vi.fn()} />,
+		);
+		expect(container.querySelectorAll("[data-error-block]").length).toBe(1);
+	});
+
+	it("renders-the-family-generic-heading-and-action-label", () => {
+		// Both are byte-copies carried by the leaf: the heading is its internal
+		// module const, and `Try again` is byte-identical to the family's own
+		// label at the debate boundary. The HEADING and the BUTTON go generic —
+		// that is the family ruling — while the BODY does not.
+		const { container } = render(
+			<BookmarksRouteError error={thrown()} reset={vi.fn()} />,
+		);
+		expect(container.querySelector("h1")?.textContent).toBe(
+			"Something went wrong.",
+		);
+		expect(container.querySelector("button")?.textContent).toBe("Try again");
+	});
+
+	it("the-body-carries-THIS-surfaces-string-never-the-family-generic", () => {
+		// B′ — OD-4 removed the tier that could hold a surface string; JR-5 gives
+		// the tier back. Two of the four boundaries carry a surface line and two
+		// do not, and that divergence falls on a principled line: surfaces with a
+		// carried string vs surfaces without.
+		const { container } = render(
+			<BookmarksRouteError error={thrown()} reset={vi.fn()} />,
+		);
+		expect(screen.getByTestId("bookmarks-error").textContent).toBe(
+			BOOKMARKS_ERROR_BODY,
+		);
+		// ⛔ And NOT the debate boundary's generic paragraph.
+		expect(container.innerHTML).not.toContain(
+			"An unexpected error stopped this page from loading.",
+		);
+		// ⛔ Nor the dropped trailing phrase — the split is a sentence split, and
+		// `Tap to retry.` is deleted rather than relocated.
+		expect(container.innerHTML).not.toContain("Tap to retry");
+	});
+
+	it("the-testid-rides-the-body-node-beside-the-button-never-the-container", () => {
+		// OD-7 = BESIDE. The marked subtree EXCLUDES the button and the h1 — the
+		// debate boundary marks its CONTAINER instead, and copying that placement
+		// would put the button's label inside the marked subtree and break the
+		// exact-equality above the moment anyone read `textContent`.
+		render(<BookmarksRouteError error={thrown()} reset={vi.fn()} />);
+		const body = screen.getByTestId("bookmarks-error");
+		expect(body.tagName).toBe("P");
+		expect(body.querySelector("button")).toBeNull();
+		expect(body.querySelector("h1")).toBeNull();
+	});
+
+	it("the-action-invokes-reset-exactly-once", () => {
+		// A segment re-render, never a full document reload. The whole-panel
+		// button this replaces DID work; it simply had no affordance.
+		const reset = vi.fn();
+		render(<BookmarksRouteError error={thrown()} reset={reset} />);
+		fireEvent.click(screen.getByText("Try again"));
+		expect(reset).toHaveBeenCalledTimes(1);
+	});
+
+	it("nothing-from-the-error-object-reaches-the-DOM", () => {
+		// CONTAINER-WIDE absence, every field a leak could travel through.
+		const { container } = render(
+			<BookmarksRouteError error={thrown()} reset={vi.fn()} />,
+		);
+		for (const marker of Object.values(THROWN)) {
+			expect(container.innerHTML).not.toContain(marker);
+		}
+	});
+
+	it("the-component-binds-no-reference-to-the-error-prop", () => {
+		// THE STRUCTURAL PIN. Behavioural probes cannot prove a NEGATIVE about
+		// code that is not there; this reads the source and proves no binding
+		// EXISTS to render by accident (CLAUDE.md §8 O-1 — structural, not a rule
+		// someone has to remember). Source-reading is an established idiom here.
+		const source = readFileSync(
+			join(process.cwd(), "src/app/(public)/bookmarks/error.tsx"),
+			"utf8",
+		);
+		// Strip comments first: the docblock discusses the error prop in prose and
+		// a naive scan would read that as a binding.
+		const code = source
+			.replace(/\/\*[\s\S]*?\*\//g, "")
+			.replace(/^[ \t]*\/\/.*$/gm, "");
+
+		const sig = code.match(
+			/export default function BookmarksRouteError\(([\s\S]*?)\)\s*:/,
+		);
+		expect(sig, "component signature is findable").not.toBeNull();
+		const [pattern = "", types = ""] = (sig?.[1] ?? "").split(/\}\s*:\s*\{/);
+
+		// The DESTRUCTURING PATTERN binds `reset`, and nothing else.
+		expect(pattern.replace(/[{}\s,]/g, "")).toBe("reset");
+		// POSITIVE CONTROL: the prop IS still declared in the type — Next's
+		// contract passes it — so this is not passing because the signature
+		// vanished, and the matcher demonstrably finds the word when present.
+		expect(types).toMatch(/\berror\b/);
 	});
 });
