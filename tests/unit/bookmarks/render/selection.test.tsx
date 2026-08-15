@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 	useRouter: () => ({ refresh: vi.fn() }),
 }));
 
+import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
 import { BookmarksTable } from "@/components/bookmarks/BookmarksTable";
 import type { BookmarkItem } from "@/server/bookmarks/list";
 
@@ -231,5 +232,93 @@ describe("C5 — the selected row RENDERS DIFFERENTLY, not just flagged", () => 
 		expect(classesOf(1)).toContain("focus-visible:shadow-(--state-focus-ring)");
 		fireEvent.keyDown(rowEl(1), { key: "Enter" });
 		expect(isPicked(1)).toBe(true);
+	});
+});
+
+describe("C6 — the arena's two panels share one selection", () => {
+	const mount = () => render(<BookmarksArena items={ITEMS} />);
+	const panelTitle = () =>
+		screen.getByTestId("bookmarks-replica-panel-title").textContent ?? "";
+
+	it("arena::with-nothing-picked-the-replica-body-is-EMPTY", () => {
+		// ⚠⚠ THIS IS THE DELIBERATE DIVERGENCE FROM PROFILE. Profile's right panel
+		// FILTERS rather than replaces, because SPEC.1 §16.3 D8 / §17 make its
+		// argument list the complete record and its table drops exited markets.
+		// ⛔ That constraint does not reach /bookmarks: C-BOOKMARKS-1 forked this
+		// route and the TABLE already is the complete list, so nothing is lost by
+		// an empty panel.
+		mount();
+		const body = screen.getByTestId("bookmarks-replica-panel-body");
+		expect(body.textContent).toBe("");
+		expect(panelTitle()).toBe("Arguments");
+	});
+
+	it("arena::a-click-fills-the-replica-and-retitles-the-panel", () => {
+		mount();
+		fireEvent.click(rowEl(1));
+		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market fixture-alpha");
+	});
+
+	it("arena::DESELECT-empties-the-panel-and-restores-the-word", () => {
+		mount();
+		fireEvent.click(rowEl(1));
+		fireEvent.click(rowEl(1));
+		expect(screen.queryByTestId(`bookmark-replica-${ID(1)}`)).toBeNull();
+		expect(panelTitle()).toBe("Arguments");
+	});
+
+	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS-and-wraps", () => {
+		mount();
+		const t = screen.getByTestId("bookmarks-table");
+		fireEvent.keyDown(t, { key: "ArrowDown" });
+		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
+		fireEvent.keyDown(t, { key: "ArrowDown" });
+		expect(screen.getByTestId(`bookmark-replica-${ID(2)}`)).toBeTruthy();
+		fireEvent.keyDown(t, { key: "ArrowUp" });
+		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
+	});
+
+	it("arena::the-replica-renders-head-title-body-image-slot-footer", () => {
+		mount();
+		fireEvent.click(rowEl(1));
+		const card = screen.getByTestId(`bookmark-replica-${ID(1)}`);
+		expect(card.children[0]?.textContent).toContain("RedWolf001");
+		expect(screen.getByTestId(`bookmark-replica-title-${ID(1)}`)).toBeTruthy();
+		const body = screen.getByTestId(`bookmark-replica-body-${ID(1)}`);
+		expect(body.textContent).toBe(ITEMS[0]?.removed ? "" : ITEMS[0]?.body);
+		expect(body.className).not.toContain("line-clamp");
+		expect(
+			screen.getByTestId(`bookmark-replica-aggregate-${ID(1)}`),
+		).toBeTruthy();
+	});
+
+	it("arena::the-IMAGE-SLOT-exists-and-renders-NOTHING", () => {
+		// ⛔ The image is a LIVE VALUE — `comments.imageUploadsId` is never
+		// selected by bookmarks/list.ts, so a real image is a new server read per
+		// render. The slot is the growth region that pins the footer, and it is
+		// EMPTY: not a grey box, which would state "an image is missing" on every
+		// argument, most of which have none.
+		mount();
+		fireEvent.click(rowEl(1));
+		const slot = screen.getByTestId(`bookmark-replica-image-slot-${ID(1)}`);
+		expect(slot.childNodes.length).toBe(0);
+		expect(slot.textContent).toBe("");
+		for (const banned of ["bg-", "border"]) {
+			expect(slot.className.includes(banned)).toBe(false);
+		}
+		expect(slot.className.split(/\s+/)).toContain("flex-1");
+		expect(slot.className.split(/\s+/)).toContain("min-h-0");
+	});
+
+	it("arena::a-filter-that-hides-the-pick-empties-the-panel", () => {
+		const mixed = [item(1), item(4, "fixture-beta")];
+		render(<BookmarksArena items={mixed} />);
+		fireEvent.click(rowEl(1));
+		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
+		fireEvent.click(screen.getByTestId("bookmarks-market-filter"));
+		fireEvent.click(screen.getByTestId("bookmarks-market-option-fixture-beta"));
+		expect(screen.queryByTestId(`bookmark-replica-${ID(1)}`)).toBeNull();
+		expect(panelTitle()).toBe("Arguments");
 	});
 });

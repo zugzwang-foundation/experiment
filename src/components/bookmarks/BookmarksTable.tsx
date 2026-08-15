@@ -10,6 +10,7 @@ import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import type { BookmarkItem } from "@/server/bookmarks/list";
 
+import type { BookmarkSelection } from "./selection";
 import { UnbookmarkButton } from "./UnbookmarkButton";
 
 /**
@@ -49,8 +50,19 @@ import { UnbookmarkButton } from "./UnbookmarkButton";
  */
 export function BookmarksTable({
 	items,
+	onSelect,
 }: {
 	items: BookmarkItem[];
+	/**
+	 * C6 — report the picked row to the replica panel (`BookmarksArena` holds
+	 * it). ⚠ OPTIONAL: omitting it drops NOTHING this component renders — the
+	 * selection is still owned, still visible, still keyboard driven — so a
+	 * required prop would buy no guarantee and would churn every render-test
+	 * call site. There is one production call site and it always passes it.
+	 * ⛔ PASS A STABLE FUNCTION. It is an effect dependency below, and the value
+	 * it reports is a fresh object, so an inline arrow loops.
+	 */
+	onSelect?: (selection: BookmarkSelection | null) => void;
 }): React.JSX.Element {
 	// ⚠⚠ C4 — ONE FILTER, AND ONLY ONE. Profile's header bar carries TWO: a market
 	// popover and an Open/Closed segmented pair. The pair CANNOT come across —
@@ -124,6 +136,23 @@ export function BookmarksTable({
 	// Derivation, not an effect: an effect would render one frame with a
 	// selection that is no longer on screen.
 	const selectedRow = visible.find((i) => i.id === selectedId) ?? null;
+
+	// C6 — REPORT THE DERIVED SELECTION UPWARD. The deps are PRIMITIVES, never
+	// `selectedRow` itself: the row object is rebuilt on every render, so
+	// depending on it would fire the effect every time and hand the panel a new
+	// object it cannot compare.
+	// ⚠ IT REPORTS THE DERIVED ROW, NOT THE STORED ID, which is what makes a
+	// filtered-away pick stop counting on the OTHER side of the arena too — the
+	// panel empties rather than showing an argument whose row is off screen.
+	const pickedId = selectedRow?.id ?? null;
+	const pickedMarketTitle = selectedRow?.marketTitle ?? null;
+	useEffect(() => {
+		if (pickedId === null || pickedMarketTitle === null) {
+			onSelect?.(null);
+			return;
+		}
+		onSelect?.({ commentId: pickedId, marketTitle: pickedMarketTitle });
+	}, [pickedId, pickedMarketTitle, onSelect]);
 
 	/** Click the selected row again to clear it — Profile's `pick()`. */
 	const pick = (id: string) => {

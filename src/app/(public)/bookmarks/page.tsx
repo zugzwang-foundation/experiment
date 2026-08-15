@@ -1,7 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { BookmarksTable } from "@/components/bookmarks/BookmarksTable";
+import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
@@ -130,16 +130,15 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    by Profile's five-column table inside a bordered panel; the EMPTY arm
 			    moved inside that panel with it, so the state is framed rather than
 			    floating bare in the page column.
-			    ⚠ The RIGHT half of the arena lands at C6 — until then this band
-			    holds one panel and `lg:grid-cols-2` leaves its second cell empty,
-			    which is a visible intermediate and a deliberate one: C3 ships a
-			    whole table, C6 ships a whole replica, and neither half is a stub of
-			    the other. */}
+			    ⚠ C6 FILLED THE SECOND CELL. `BookmarksArena` holds the shared
+			    selection and returns a FRAGMENT, so both panels stay DIRECT children
+			    of this grid and remain its two columns — and this band keeps its
+			    className here, where the C7 height-chain guard reads it. */}
 			<div
 				data-testid="bookmarks-arena"
 				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
 			>
-				<BookmarksTable items={items} />
+				<BookmarksArena items={items} />
 			</div>
 		</PageContainer>
 	);
