@@ -115,7 +115,22 @@ describe("POLISH.3 PR 2 — RR-3, the split bar's poles name the SIDE", () => {
 	});
 
 	it("reply-split-bar::on-a-NO-post-the-track-takes-the-YES-pole", () => {
-		// ⛔ Assertion 4 of 4, the mirror. The build hard-codes `bg-no` at `:64`.
+		// ⛔ Assertion 4 of 4, the mirror. The build hard-coded the counter pole.
 		expect(bar("NO").track).toContain("bg-yes");
+	});
+
+	it("reply-split-bar::the-track-keeps-a-visible-edge-on-BOTH-poles", () => {
+		// ⛔ THE POLE FIX IS NOT SAFE WITHOUT THIS, and the first draft of C13
+		// shipped without it (@security-auditor MEDIUM). Side-keying the track
+		// means it takes `bg-yes` #181818 on a NO post against a `bg-card` →
+		// `--color-n0` #212121 surface — ~1.10:1, invisible — so the fill has no
+		// visible extent to be a proportion OF. Correcting the pole without the
+		// edge trades an INVERSION for an ERASURE on the very post side this row
+		// exists to fix.
+		// ⚠ Asserted on BOTH poles, not just the failing one: the four pole
+		// assertions above are positive-only `toContain`, so nothing else in this
+		// file would notice the edge being deleted.
+		expect(bar("YES").track).toContain("[border:var(--hairline)]");
+		expect(bar("NO").track).toContain("[border:var(--hairline)]");
 	});
 });

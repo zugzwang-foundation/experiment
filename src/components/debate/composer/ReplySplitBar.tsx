@@ -98,9 +98,26 @@ export function ReplySplitBar({
 				    comparison, so a hoisted const would ALSO be visible while a bare
 				    call expression would not. Both facts hold; only the fence decides.
 				    (Inlining the ternary is also the shape of both ruled precedents —
-				    `HeroPanels` entry 7 and `AggregateFooter` entry 9.) */}
+				    `HeroPanels` entry 7 and `AggregateFooter` entry 9.)
+
+				    ⛔ THE HAIRLINE IS LOAD-BEARING, AND THE FIRST DRAFT OF THIS FIX
+				    OMITTED IT. Side-keying the track means it takes `bg-yes` #181818 on
+				    a NO post, against a `bg-card` → `--color-n0` #212121 surface — about
+				    1.10:1, i.e. GONE. The fill would then have no visible extent to be a
+				    proportion OF. ⇒ Correcting the pole without adding the edge would
+				    have traded an INVERSION for an ERASURE, on exactly the post side
+				    this row exists to fix.
+				    Both sibling bars already carry it — `HeroPanels` (this genus's ruled
+				    precedent) and `AggregateFooter` — and so does the mockup, whose
+				    `.barrow .bar` is an OUTLINE (`d5:511`, `border:1px solid var(--ink)`
+				    over an `--n0` ground). This component's own `TriggerPill` carries the
+				    same idea as its "black-pill exception" 0.5px n2 edge: the sibling
+				    that is this row's positive control for the POLE rule is also its
+				    positive control for the EDGE rule.
+				    ⛔ NOT `--border-strong` — `emphasis-ladder-tokens.test.ts` pins that
+				    token at zero consumers. */}
 				<span
-					className={`h-1.5 w-full overflow-hidden rounded-(--r-dot) ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
+					className={`h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)] ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
 					aria-hidden="true"
 				>
 					<span

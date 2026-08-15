@@ -152,4 +152,18 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 
 		expect(classOf(footer, "aggregate-split-track")).toContain("bg-yes");
 	});
+
+	it("aggregate-footer::the-track-keeps-a-visible-edge-on-BOTH-poles", () => {
+		// The hairline this bar already carries was UNDEFENDED until now: the four
+		// pole assertions are positive-only `toContain`, so it could have been
+		// deleted with this whole suite staying green (@security-auditor LOW).
+		// It is load-bearing — on a NO post the track is `bg-yes` #181818 on a
+		// #212121 card, ~1.10:1, and without the edge it disappears.
+		expect(classOf(renderFooter("YES"), "aggregate-split-track")).toContain(
+			"[border:var(--hairline)]",
+		);
+		expect(classOf(renderFooter("NO"), "aggregate-split-track")).toContain(
+			"[border:var(--hairline)]",
+		);
+	});
 });
