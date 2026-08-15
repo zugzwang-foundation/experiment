@@ -32,12 +32,39 @@ vi.mock("@/server/auth", () => ({
 	auth: { api: { getSession: vi.fn() } },
 }));
 vi.mock("@/server/bookmarks/list", () => ({ loadBookmarks: vi.fn() }));
+/**
+ * ⚠⚠ HTML-FINISH · BOOKMARKS round 3 — THE TOP BAND'S FOUR READS ARE MOCKED,
+ * and the reason is the recorded failure mode rather than convenience. `@/db` is
+ * mocked above as the bare object `{}`; the moment the page began calling
+ * `resolveProfileUser` / `loadProfilePositions` / `loadProfileTiles` /
+ * `loadProfileGraphSeries`, every test in this file died on
+ * `client.select is not a function` — a real defect in the MOCK, reported by six
+ * assertions that have nothing to do with the top band.
+ * ⛔ MOCK THE READ MODELS, NOT `db.select`. Shimming `select` onto the fake `db`
+ * would make these tests depend on the internal query shape of four modules this
+ * file does not test, and would break again on the next query they add. The
+ * read-model boundary is the one this suite already mocks (`loadBookmarks`).
+ * ⚠ The fixtures are the EMPTY/zero arms — this file tests the empty, loading
+ * and error states, so the band must render without asserting anything about it.
+ */
+vi.mock("@/server/profile/resolve", () => ({ resolveProfileUser: vi.fn() }));
+vi.mock("@/server/profile/positions", () => ({
+	loadProfilePositions: vi.fn(),
+}));
+vi.mock("@/server/profile/tiles", () => ({ loadProfileTiles: vi.fn() }));
+vi.mock("@/server/profile/graph-series", () => ({
+	loadProfileGraphSeries: vi.fn(),
+}));
 
 import BookmarksRouteError from "@/app/(public)/bookmarks/error";
 import * as bookmarksPage from "@/app/(public)/bookmarks/page";
 import { BookmarksLoading } from "@/components/bookmarks/states";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
+import { loadProfileGraphSeries } from "@/server/profile/graph-series";
+import { loadProfilePositions } from "@/server/profile/positions";
+import { resolveProfileUser } from "@/server/profile/resolve";
+import { loadProfileTiles } from "@/server/profile/tiles";
 
 const BookmarksPage = bookmarksPage.default;
 const { BOOKMARKS_EMPTY_COPY } = bookmarksPage;
@@ -49,6 +76,31 @@ beforeEach(() => {
 		user: { id: "0190b3a0-9999-7000-8000-00000000000f" },
 	} as unknown as Awaited<ReturnType<typeof auth.api.getSession>>);
 	vi.mocked(loadBookmarks).mockResolvedValue([]);
+	vi.mocked(resolveProfileUser).mockResolvedValue({
+		id: "0190b3a0-9999-7000-8000-00000000000f",
+		pseudonym: "RedFox001",
+		banned: false,
+		pfpUrl: "/pfp-placeholder.svg",
+	});
+	vi.mocked(loadProfilePositions).mockResolvedValue([]);
+	vi.mocked(loadProfileTiles).mockResolvedValue({
+		walletValue: "0.000000000000000000",
+		positionsValue: "0.000000000000000000",
+		netProfitLoss: "0.000000000000000000",
+		argumentsCount: { total: 0, posts: 0, replies: 0 },
+		supportReceived: "0.000000000000000000",
+		counterReceived: "0.000000000000000000",
+	});
+	vi.mocked(loadProfileGraphSeries).mockResolvedValue({
+		windowStart: "2026-09-15T00:00:00.000Z",
+		windowEnd: "2026-11-05T23:59:00.000Z",
+		netWorth: [],
+		freeDharma: [],
+		perMarket: [],
+		nodes: [],
+		yMax: 0,
+		markets: [],
+	} as unknown as Awaited<ReturnType<typeof loadProfileGraphSeries>>);
 });
 
 describe("PD-6-04 — the empty state IS the P1 primitive", () => {
@@ -58,8 +110,25 @@ describe("PD-6-04 — the empty state IS the P1 primitive", () => {
 		// itself `data-empty-block`, its OWN marker. A hand-rolled panel that
 		// merely copied the class string would satisfy every geometry assertion
 		// below and NOT this one. This is the assertion that distinguishes them.
+		//
+		// ⚠⚠ RE-DERIVED AT HTML-FINISH · BOOKMARKS round 3, AND NOT WEAKENED. This
+		// counted `data-empty-block` DOCUMENT-WIDE and expected exactly 1. Round 3
+		// puts Profile's graph slot on this route, and `ProfileGraphCard` renders
+		// its OWN P1 block when there is nothing to plot — so an account with no
+		// bookmarks AND no plottable history now carries TWO, legitimately. The
+		// document-wide count was never the property; it was a proxy for it.
+		// ⇒ THE PROPERTY, STATED DIRECTLY: the block that carries this surface's
+		// empty MESSAGE is itself the primitive. A copied class string still
+		// fails, which is the whole point of the assertion.
 		render(await BookmarksPage());
-		expect(document.querySelectorAll("[data-empty-block]").length).toBe(1);
+		const panel = screen
+			.getByTestId("bookmarks-empty")
+			.closest("[data-empty-block]");
+		expect(
+			panel,
+			"the bookmarks empty message is not inside a `data-empty-block` — the " +
+				"panel was re-implemented rather than adopted.",
+		).not.toBeNull();
 	});
 
 	it("renders-the-P1-panel-geometry-as-exact-class-tokens", async () => {
