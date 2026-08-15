@@ -10,15 +10,16 @@ import type { DebateReply } from "./types";
 
 /**
  * A depth-1 reply row (design-language §3.1 "Reply"): frozen side badge · live
- * position marker · reply stake · the bookmark/download card actions · argument
+ * position marker · reply stake · the bookmark card action · argument
  * text + author pseudonym. A removed reply renders only its frozen side + the
  * "removed by moderator" placeholder — its body/author/marker/stake were
  * withheld server-side (§6), so they are absent from `reply` at the type level.
  * No vote control anywhere (§4.3).
  *
  * BOOKMARK-ADD-WIRE (C3): the reply card carries the FULL cluster, rendered from
- * the SAME `CardActions` as `ArgProfile` so the two cannot drift (canon §6 names
- * bookmark AND download on the reply card).
+ * the SAME `CardActions` as `ArgProfile` so the two cannot drift. ⚠ Canon §6
+ * named bookmark AND download on the reply card; the download half was REMOVED
+ * at POLISH.3 PR 2 row 7 (`PD-3-15`, D3).
  *
  * MASKING — the affordance is added to the NON-REMOVED branch ONLY, and the
  * removed branch below gains nothing. Unlike the post path this is NOT enforced
