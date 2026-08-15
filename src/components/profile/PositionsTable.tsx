@@ -404,13 +404,32 @@ function ArgumentCell({
 	// sub-line 20 lines below — same file, same role (a muted sub-line under the
 	// cell's title). Nothing is read off the mockup's `.pmkt .mq`, whose 11px /
 	// `--n5` are light-prototype VALUES.
+	//
+	// HTML-FINISH row 13 — THE MARKET QUESTION IS THE LINK TO ITS MARKET. Canon
+	// §7 item 6: "Cross-surface navigation — nav identity → Profile; market title
+	// → overview; argument titles → that post's thread". Before this, NOTHING on
+	// the profile navigated to a market: both of this surface's links (the
+	// positions title and the argument-list title) go to `?post=`, i.e. to a
+	// thread. The mockup binds the same target — `nav('market','market')` on the
+	// market title at `:711-713`.
+	// ⛔ A SIBLING OF THE TITLE LINK, NEVER NESTED INSIDE IT: anchors cannot nest,
+	// and the title's `?post=` target must stay independently clickable. This is
+	// the same constraint `HeroPanels.tsx:212-217` records for the author link.
+	// `hover:underline` is the title link's own class in this file, 20 lines
+	// below — a same-file match, not a mockup value.
+	// ⚠ IT WRAPS ON THE REMOVED VARIANT TOO. `marketSlug` is present on BOTH
+	// arms of `ProfileArgumentCell` (`{removed: true, marketSlug}`), so the
+	// navigation survives a removed opener — the market is still reachable when
+	// its argument is not, which is the point of masking content rather than
+	// rows.
 	const marketLine = (
-		<span
+		<Link
 			data-testid={`position-market-${marketId}`}
-			className="block text-xs text-n5"
+			href={`/m/${cell.marketSlug}`}
+			className="block text-xs text-n5 hover:underline"
 		>
 			{marketTitle}
-		</span>
+		</Link>
 	);
 	if (cell.removed) {
 		return (

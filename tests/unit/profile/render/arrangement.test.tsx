@@ -547,6 +547,42 @@ describe("HTML-FINISH profile row 10 — the market question sits under the argu
 		expect(marketLine.previousElementSibling?.tagName).toBe("A");
 	});
 
+	it("row13::the-market-question-links-to-its-MARKET-not-to-a-thread", () => {
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const marketLink = screen.getByTestId(`position-market-${M1}`);
+		expect(marketLink.tagName).toBe("A");
+		// Canon §7 item 6: "market title → overview". The market OVERVIEW, with
+		// no `?post=` — that query is the ARGUMENT title's target, and before
+		// this row every link on the surface carried it.
+		expect(marketLink.getAttribute("href")).toBe("/m/fixture-alpha");
+		expect(marketLink.getAttribute("href")).not.toContain("?post=");
+	});
+
+	it("row13::it-is-a-SIBLING-of-the-title-link-never-nested", () => {
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const marketLink = screen.getByTestId(`position-market-${M1}`);
+		const titleLink = screen
+			.getByTestId(`position-arg-${M1}`)
+			.querySelector("a[href*='?post=']");
+		if (titleLink === null) {
+			throw new Error("row13: the argument title link is missing");
+		}
+		// Anchors cannot nest — a nested one is invalid HTML and the inner target
+		// becomes unreachable. Asserted in BOTH directions.
+		expect(titleLink.contains(marketLink)).toBe(false);
+		expect(marketLink.contains(titleLink)).toBe(false);
+	});
+
+	it("row13::the-market-stays-reachable-on-a-REMOVED-opener", () => {
+		// `marketSlug` is present on BOTH arms of `ProfileArgumentCell`, so the
+		// navigation survives masking: the market is reachable when its argument
+		// is not. That is the point of masking CONTENT rather than rows.
+		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
+		const marketLink = screen.getByTestId(`position-market-${M2}`);
+		expect(marketLink.tagName).toBe("A");
+		expect(marketLink.getAttribute("href")).toBe("/m/fixture-beta");
+	});
+
 	it("row10::it-renders-on-the-REMOVED-row-too", () => {
 		// `marketTitle` is `markets.title` — market metadata, not argument text —
 		// so SC-1 attaches no masking obligation, and MOVING a per-row element
