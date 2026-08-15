@@ -770,59 +770,77 @@ describe("HTML-FINISH profile row 10 — the market question sits under the argu
 	});
 });
 
-describe("HTML-FINISH profile row 16 — the PFP fills the band as a square", () => {
+describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays fixed", () => {
 	/**
-	 * ⚠ A CLASS-PRESENCE GUARD, AND THE LIMIT IS STATED. jsdom performs NO
-	 * layout — it resolves no percentage height, no `aspect-ratio` and no
-	 * Tailwind utility — so this cannot prove the rendered box is square. It
-	 * proves the DECLARATION is intact, which is the drift this file can see;
-	 * the rendered geometry is proven in a browser against compiled CSS
-	 * (`discovery-height-chain.test.ts:19-24` states the same limit).
+	 * ⛔ THIS GUARD ASSERTS THE REFUSAL, NOT THE ROW.
+	 *
+	 * Row 16 ("the PFP fills the identity band's height as a square") was BUILT
+	 * — `h-full aspect-square w-auto shrink-0 min-h-14`, all topology, all
+	 * traced — and then measured in a browser against real compiled CSS at a
+	 * viewport PINNED to 390px by a fixed-width same-origin iframe:
+	 *
+	 *   WITH row 16     PFP 324 × 578 · idcol width 0 · tiles width 0 (content
+	 *                   clipped, scrollWidth 89 vs clientWidth 0) · identity
+	 *                   card scrollWidth 445 > clientWidth 356
+	 *   WITHOUT row 16  PFP  56 ×  56 · idcol 252 · tiles 252 · nothing clipped
+	 *
+	 * The row's PREMISE is absent from this build. The mockup's PFP fills a band
+	 * that is `flex:0 0 188px` (`.headzone`, `:189`) — BOUNDED. Here the height
+	 * chain is halted (see `tests/unit/design/profile-height-chain.test.ts`), so
+	 * `height:100%` resolves against a card sized by the tile column row 8 put
+	 * beside it: taller tiles → taller card → wider square → narrower column →
+	 * taller tiles, settling with the tiles at zero width.
+	 *
+	 * ⚠ THE ASSERTIONS BELOW ARE DELIBERATELY THE INVERSE OF WHAT THIS FILE
+	 * ASSERTED BEFORE MEASUREMENT. They exist so the row is not re-applied from
+	 * the mockup by the next reader, who will see `.pfp{height:100%}` and no
+	 * reason it was declined. When the height chain lands, DELETE this block and
+	 * build the row — that is the intended end state, not this one.
 	 */
-	it("row16::pfp-is-height-driven-and-ratio-derived", () => {
+	it("row16::the-pfp-keeps-its-fixed-box-while-the-band-is-unbounded", () => {
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
-		const card = screen.getByTestId("identity-card");
-		const pfp = card.querySelector("img");
+		const pfp = screen.getByTestId("identity-card").querySelector("img");
 		if (pfp === null) {
 			throw new Error("row16: the identity card renders no <img>");
 		}
 		const classes = pfp.className.split(/\s+/);
-		// The mockup's three declarations (`:191`), each ported as topology.
-		expect(classes).toContain("h-full");
-		expect(classes).toContain("aspect-square");
-		expect(classes).toContain("shrink-0");
-		// `w-auto` is what hands the width back to the ratio — without it the
-		// `width={56}` presentational hint pins both axes and `aspect-ratio` is
-		// ignored. Pinned by name because dropping it is a SILENT regression:
-		// the element still renders, at the old fixed size.
-		expect(
-			classes,
-			`row 16: \`w-auto\` is missing, so the width={56} attribute pins the ` +
-				`box and aspect-square is inert. The PFP is back at a fixed size.`,
-		).toContain("w-auto");
-		// The fixed box must be GONE — its survival would win over the ratio.
-		expect(classes).not.toContain("size-14");
-		expect(classes).not.toContain("h-14");
+		expect(classes).toContain("size-14");
+		// ⛔ The unbounded trio. Any ONE of these re-introduces the measured
+		// defect, because none of them is bounded by anything in this build.
+		for (const c of ["h-full", "aspect-square", "w-auto", "min-h-14"]) {
+			expect(
+				classes,
+				`row 16 was REFUSED ON MEASUREMENT and \`${c}\` has come back. At ` +
+					`390px this renders the PFP at 324×578 and crushes the tile ` +
+					`column to zero width. It is only correct once the headzone has ` +
+					`a bounded height — see profile-height-chain.test.ts.`,
+			).not.toContain(c);
+		}
 	});
 
 	it("row16::the-intrinsic-ratio-hint-attributes-survive", () => {
-		// Deliberately asserted: `w-auto` only works BECAUSE the attributes are a
-		// hint rather than an author rule, so a future reader must not "clean up"
-		// the attributes on the theory that the CSS replaced them. They are the
-		// pre-load ratio hint that keeps the identity band from shifting.
+		// The pre-load ratio hint that keeps the identity band from shifting.
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		const pfp = screen.getByTestId("identity-card").querySelector("img");
 		expect(pfp?.getAttribute("width")).toBe("56");
 		expect(pfp?.getAttribute("height")).toBe("56");
 	});
 
-	it("row16::POSITIVE-CONTROL-the-pre-change-class-list-fails", () => {
-		// ⚠ PROOF BY REVERSAL over the REAL class string this row replaced.
-		const before = "size-14 rounded-[var(--imgr)] bg-n1".split(/\s+/);
-		expect(before).not.toContain("h-full");
-		expect(before).not.toContain("aspect-square");
-		expect(before).not.toContain("w-auto");
-		expect(before).toContain("size-14");
+	it("row16::POSITIVE-CONTROL-the-refusal-check-detects-the-measured-defect", () => {
+		// ⚠ PROOF BY REVERSAL over the REAL class string that was measured at
+		// 324×578. The guard above must be false against it, or it asserts
+		// nothing.
+		const measuredDefect =
+			"aspect-square h-full min-h-14 w-auto shrink-0 rounded-[var(--imgr)] bg-n1 object-cover".split(
+				/\s+/,
+			);
+		const trio = ["h-full", "aspect-square", "w-auto", "min-h-14"];
+		expect(trio.every((c) => measuredDefect.includes(c))).toBe(true);
+		expect(measuredDefect).not.toContain("size-14");
+		// …and the shipped list does NOT trip it, so the check discriminates.
+		const shipped =
+			"size-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover".split(/\s+/);
+		expect(trio.some((c) => shipped.includes(c))).toBe(false);
 	});
 });
 

@@ -44,45 +44,59 @@ export function IdentityCard({
 			data-testid="identity-card"
 			className="flex flex-row items-center gap-4 p-4"
 		>
-			{/* HTML-FINISH row 16 — THE PFP FILLS THE BAND AS A SQUARE. The mockup's
-			    `.pfp` is `height:100%; aspect-ratio:1/1; flex:0 0 auto` (`:191-193`,
-			    markup `:436`) — it takes the identity band's height and derives its
-			    width from that, rather than sitting at a fixed box. All three of
-			    those are TOPOLOGY, so all three port: `h-full aspect-square
-			    shrink-0`. `w-auto` is load-bearing and is not decoration — the
-			    `width={56}` attribute below is a presentational hint that would
-			    otherwise pin the width and silently disable `aspect-ratio` (both
-			    axes specified); an author rule outranks the hint, so `w-auto` is
-			    what hands the width back to the ratio. The attributes STAY, as the
-			    intrinsic-ratio hint the browser uses before the image loads.
-			    ⚠ NO NEW VALUE. `min-h-14` is `size-14`'s OWN 3.5rem re-expressed as
-			    a FLOOR instead of a fixed height — the move `HeroPanels.tsx:138`
-			    already ships at HTML-FINISH row 9 ("`h-24` becomes `min-h-24` — the
-			    SAME 6rem, as a FLOOR rather than a fixed height"). It is what stops
-			    the PFP collapsing in the three route states that do not yet frame it
-			    in a band.
-			    `object-cover` is a FIT RULE, not a value (precedent:
-			    `HeroPanels.tsx:113`): once the box is height-derived, a non-square
-			    source would otherwise stretch, and "fill it as a square" would ship
-			    as "fill it as a squashed rectangle". */}
+			{/* ⛔⛔ HTML-FINISH row 16 — REFUSED ON MEASUREMENT, AND THE MEASUREMENT
+			    IS THE REASON. The row asks the PFP to "fill the identity band's
+			    height as a square": the mockup's `.pfp` is `height:100%;
+			    aspect-ratio:1/1; flex:0 0 auto` (`:191-193`). That was built —
+			    `h-full aspect-square w-auto shrink-0 min-h-14` — and then measured
+			    in a browser against real compiled CSS, in a viewport PINNED to
+			    390px by a fixed-width same-origin iframe. It is a DEFECT:
+
+			      WITH row 16      PFP 324 × 578 · idcol width 0 · tiles width 0
+			                       (tile content clipped: scrollWidth 89 vs
+			                       clientWidth 0) · card scrollWidth 445 > 356
+			      WITHOUT row 16   PFP  56 ×  56 · idcol width 252 · tiles 252
+			                       · card height 596 → 356, nothing clipped
+
+			    THE PREMISE THE ROW RESTS ON IS ABSENT FROM THE BUILD. The mockup's
+			    PFP fills a band that is `flex:0 0 188px` (`.headzone`, `:189`) —
+			    a BOUNDED height. This build has no such bound: HTML-FINISH row 20
+			    and the height chain are both HALTED (`tests/unit/design/
+			    profile-height-chain.test.ts` states why), so `height:100%` here
+			    resolves against a card whose height is driven by the TILE COLUMN
+			    row 8 just put beside it. That is a feedback loop — taller tiles →
+			    taller card → wider square → narrower column → taller tiles — and it
+			    settles with the tiles at zero width and clipped by the Card's own
+			    `overflow-hidden`.
+
+			    ⛔ NOT SATISFIED LITERALLY WITH AN INVENTED BOUND. Capping the
+			    growth needs a number, and the only number available is the mockup's
+			    188px band — a light-prototype VALUE, and one that would be wrong
+			    the moment the real band exists. So the shipped `size-14` box stays
+			    and the ROW IS ROUTED BACK: it becomes correct, with no new value,
+			    the moment the height chain lands and the headzone is bounded.
+			    `object-cover` is kept — a FIT RULE, not a value (precedent
+			    `HeroPanels.tsx:113`), and it is right for a square box regardless. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.
 			    A scrubbed user shows the same placeholder until the R2 PFP builder +
 			    the owed scrubbed-silhouette asset land (surfaced for Gate C).
-			    ⛔ THIS BLOCK MUST STAY THE LAST COMMENT BEFORE THE ELEMENT. A
-			    `biome-ignore` attaches to the node that FOLLOWS it, so inserting a
-			    comment between the two detaches the suppression — and because both
-			    the orphaned suppression and the un-suppressed `noImgElement` are
-			    WARNINGS, `just verify` stays EXIT=0 while reporting both. Measured
-			    here at HTML-FINISH row 16, which did exactly that.
+			    ⛔ A `biome-ignore` ATTACHES TO THE NODE THAT FOLLOWS IT, so no
+			    comment may be inserted between the block above and this element —
+			    and because both an orphaned suppression and the un-suppressed
+			    `noImgElement` are WARNINGS, `just verify` stays EXIT=0 while
+			    reporting both. Measured at HTML-FINISH row 16, which did exactly
+			    that; the suppression therefore rides the LAST block, which is this
+			    one — and it was moved OFF the row-16 block above precisely because
+			    that block stopped being last when this one was written.
 			    biome-ignore lint/performance/noImgElement: static SVG placeholder — next/image is not warranted */}
 			<img
 				src={user.pfpUrl}
 				alt=""
 				width={56}
 				height={56}
-				className="aspect-square h-full min-h-14 w-auto shrink-0 rounded-[var(--imgr)] bg-n1 object-cover"
+				className="size-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover"
 			/>
 			{/* HTML-FINISH row 8 — `.idcol` (mockup `:194`, `:437`): the identity
 			    COLUMN, holding the pseudonym row and — new — the six tiles beneath
