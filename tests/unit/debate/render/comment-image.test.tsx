@@ -70,11 +70,23 @@ describe("POLISH.3 PR 2 — T2, the post image is aspect-respecting in a max box
 		expect(img.getAttribute("class")).not.toContain("max-w-[var(--imgmax)]");
 	});
 
-	it("comment-image::width-is-100-percent", () => {
-		// "100% width" — the second half of the ruled recipe.
-		const img = renderImage();
+	it("comment-image::width-is-BOUNDED-at-100-percent-not-stretched", () => {
+		// "100% width" — the second half of the ruled recipe, and §17 phrases it
+		// as "BOUNDED BY `--imgmax` on height AND 100% on width". Both are max-*
+		// BOUNDS, which is precisely why the ruling can say "no fixed box ⇒ the
+		// `object-fit` question does not arise": with no pinned axis the UA keeps
+		// the intrinsic aspect on its own.
+		//
+		// ⛔ TIGHTENED at C4 (@code-reviewer LOW-6). The original assertion read
+		// `toContain("w-full")`, which "max-w-full" satisfies as a SUBSTRING — so
+		// it could not tell a bound from a stretch. A bare `w-full` would force
+		// width to 100% and then clamp height at `--imgmax`, BREAKING the aspect:
+		// the one outcome H-T2 exists to forbid. Asserted on the token list, not
+		// on a substring.
+		const tokens = (renderImage().getAttribute("class") ?? "").split(/\s+/);
 
-		expect(img.getAttribute("class")).toContain("w-full");
+		expect(tokens).toContain("max-w-full");
+		expect(tokens).not.toContain("w-full");
 	});
 
 	it("comment-image::corners-ride-the-ratified-imgr-token", () => {
