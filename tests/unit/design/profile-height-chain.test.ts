@@ -262,6 +262,43 @@ describe("profile height chain — every link, asserted by name", () => {
 		}
 	});
 
+	it("profile-height-chain::the-THREE-ROW-WINDOW-bounds-the-panel-without-clipping", () => {
+		// ⚠⚠ ROUND 4 item 8 ADDS A SECOND, PANEL-SCOPED BOUND, and this file is
+		// where it has to be recorded or the next reader will meet an inline
+		// `max-height` on the very chain whose docblock says heights are forbidden.
+		//
+		// THE TWO SCOPES ARE STILL TWO. RULED A1 governs the PAGE-LEVEL column so
+		// the page GROWS AND SCROLLS instead of clipping — asserted unchanged
+		// above, on the container and the two bands. The window is the other
+		// scope: it caps the positions panel BODY, which is a scroll container, so
+		// row four is reached by SCROLLING rather than lost. A bound with a scroll
+		// is not a clip; that is the whole distinction, and it is why the cap is
+		// `max-height` and never `height`.
+		//
+		// ⛔ THE MOCKUP'S OWN CSS RULE IS UNUSABLE HERE and the reason is measured,
+		// not asserted: `.rows .prow{flex:0 0 calc(100% / 3)}` (`:273`) needs a
+		// DEFINITE panel height, which its fixed-100vh page has and this one does
+		// not. Measured at 1440, the arena is 1187 and the panel body 1135, so a
+		// one-third basis renders three rows at ~378px each. The mechanism shipped
+		// is the mockup's own EARLIER one, from its changelog: v0.11 — "the rows
+		// container is height-capped to exactly the first three rows (JS measures
+		// the 3rd row's bottom) … No row content is clipped."
+		const pos = read(POSITIONS);
+		// It is a BOUND…
+		expect(pos).toContain("style.maxHeight");
+		// …never a fixed height, on the node the chain hands the scroll to.
+		expect(pos).not.toContain("style.height");
+		// …and the scroll container it caps still declares its overflow, so the
+		// capped rows remain reachable.
+		expect(
+			panelClasses(pos, POSITIONS, "positions-panel-body"),
+			"the three-row window caps a container that no longer scrolls — that " +
+				"is a CLIP, and RULED A1 forbids it.",
+		).toContain("overflow-y-auto");
+		// The window is the founder's three, named once.
+		expect(/const ROW_WINDOW = 3;/.test(pos)).toBe(true);
+	});
+
 	it("profile-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {
 		// ⚠ PROOF BY REVERSAL. A guard that has only ever been run against a
 		// passing tree is indistinguishable from one that cannot fail. Each

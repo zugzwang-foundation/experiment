@@ -23,6 +23,14 @@ import { PROFILE_COPY } from "./copy";
 import type { ProfileSelection } from "./selection";
 
 /**
+ * ROUND 4 item 8 — how many position rows fill the panel before the rest
+ * scroll. FOUNDER-SUPPLIED ("three rows fill the panel"), and the same three the
+ * mockup's `.rows .prow{flex:0 0 calc(100% / 3)}` (`:273`) divides its own panel
+ * into. Named rather than inlined so the window is one thing with one source.
+ */
+const ROW_WINDOW = 3;
+
+/**
  * The cross-market positions arena (canon §2 / SPEC.1 §23) — columns
  * `Position · Argument · Staked · Current`, with a market filter and an
  * Open/Closed filter (client state over the server DTO). The Argument cell is
@@ -105,6 +113,9 @@ export function PositionsTable({
 	// One entry per rendered position row, for `scrollIntoView` + focus on an
 	// arrow step. A ref, not state: moving focus must not re-render.
 	const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+	// ROUND 4 item 8 — the two nodes the three-row window measures between.
+	const bodyRef = useRef<HTMLDivElement | null>(null);
+	const tableRef = useRef<HTMLTableElement | null>(null);
 	// HTML-FINISH row 7 — the market popover's open state (mockup `.fpop.open`,
 	// `:245`, toggled at `:586-587`).
 	const [filterOpen, setFilterOpen] = useState(false);
@@ -197,6 +208,82 @@ export function PositionsTable({
 		});
 	}, [pickedMarketId, pickedMarketTitle, pickedCommentId, onSelect]);
 
+	// ⚠⚠ ROUND 4 item 8 — THE THREE-ROW WINDOW. Three rows fill the panel; the
+	// rest scroll INSIDE it; the column-header row stays out of that scroll
+	// (`<thead>` is `sticky top-0`, shipped at row 3).
+	//
+	// ⛔ THE MOCKUP'S CSS RULE CANNOT BE PORTED, AND THAT IS MEASURED. Its
+	// `.rows .prow{flex:0 0 calc(100% / 3)}` (`:273`) works because `.colwrap`
+	// has a DEFINITE height — the mockup's page is a fixed 100vh with
+	// `overflow:hidden` on html/body. On this build `<main>` is
+	// `max(floor, content)` by RULED A1, so the panel is CONTENT-sized: measured
+	// at 1440, the arena is 1187 tall and the panel body 1135, so a one-third
+	// flex-basis would render three rows at ~378px each. That is not the mockup's
+	// look; it is a different defect.
+	// ⇒ THE MECHANISM IS THE MOCKUP'S OWN EARLIER ONE, from its changelog rather
+	// than its stylesheet: v0.11 — "the rows container is height-capped to
+	// exactly the first three rows (JS measures the 3rd row's bottom) so the 4th
+	// sits below the fold and the list scrolls. No row content is clipped."
+	// v0.12 replaced it with the CSS thirds only because its panel was definite.
+	// Ours is not, so v0.11's measurement is the faithful port.
+	//
+	// ⛔ THIS IS A BOUND, NOT A CLIP. `max-height` + the panel body's existing
+	// `overflow-y-auto` means row four is REACHED BY SCROLLING, never lost — the
+	// distinction RULED A1 draws and `profile-height-chain.test.ts` records: A1
+	// governs the PAGE-level column so the page can grow and scroll; a
+	// panel-scoped bound with a scroll container is the other scope.
+	// ⛔ NO PIXEL IS INVENTED. The cap is read off the rendered third row and the
+	// body's own computed padding; `ROW_WINDOW` is the founder's "three rows",
+	// and the mockup's `calc(100%/3)` is the same three.
+	// ⚠ IT GATES ON THE NODES HAVING A BOX. jsdom performs no layout and returns
+	// zero rects, so the cap is simply not applied there — the render suite sees
+	// the uncapped panel rather than a `max-height:0px` that would hide every row.
+	useEffect(() => {
+		const body = bodyRef.current;
+		const table = tableRef.current;
+		if (body === null || table === null) {
+			return;
+		}
+		const measure = () => {
+			if (visible.length < ROW_WINDOW) {
+				// Fewer rows than the window — nothing to window, and the panel goes
+				// back to its natural height rather than keeping a stale cap.
+				body.style.maxHeight = "";
+				return;
+			}
+			const positionRows = table.querySelectorAll<HTMLTableRowElement>(
+				'tbody > tr[data-testid^="position-row-"]',
+			);
+			const last = positionRows[ROW_WINDOW - 1];
+			if (!last) {
+				return;
+			}
+			const bodyBox = body.getBoundingClientRect();
+			const lastBox = last.getBoundingClientRect();
+			if (bodyBox.height === 0 || lastBox.height === 0) {
+				return;
+			}
+			const padBottom =
+				Number.parseFloat(getComputedStyle(body).paddingBottom) || 0;
+			const next = `${Math.ceil(
+				lastBox.bottom - bodyBox.top + body.scrollTop + padBottom,
+			)}px`;
+			// Write only on a real change: the observer below watches the table, and
+			// capping the body can itself resize the table (a scrollbar re-wraps the
+			// rows). Comparing first is what makes that converge instead of loop.
+			if (body.style.maxHeight !== next) {
+				body.style.maxHeight = next;
+			}
+		};
+		measure();
+		if (typeof ResizeObserver === "undefined") {
+			return;
+		}
+		const observer = new ResizeObserver(measure);
+		observer.observe(table);
+		return () => observer.disconnect();
+	}, [visible.length]);
+
 	/** `pick(i)` (`:679`) — click the selected row again to clear it. The mockup
 	 * has no deselect because it always holds one; here deselect is the way back
 	 * to the full argument list, so the click TOGGLES. */
@@ -251,6 +338,7 @@ export function PositionsTable({
 
 	return (
 		<PositionsPanel
+			bodyRef={bodyRef}
 			controls={
 				<>
 					{/* HTML-FINISH row 7a — THE MARKET FILTER IS A LABELLED BUTTON THAT
@@ -400,6 +488,7 @@ export function PositionsTable({
 			) : (
 				<table
 					data-testid="positions-table"
+					ref={tableRef}
 					// ⛔ THE KEY HANDLER IS SCOPED TO THE TABLE, NOT TO `document`.
 					// The mockup binds `document.addEventListener('keydown', …)` with
 					// `e.preventDefault()` (`:751-756`) — safe there because its
@@ -771,9 +860,17 @@ export function PositionsTable({
  */
 function PositionsPanel({
 	controls,
+	bodyRef,
 	children,
 }: {
 	controls?: React.ReactNode;
+	/**
+	 * ROUND 4 item 8 — the scroll container the three-row window caps. It lives
+	 * here and is measured there, so the ref is handed down rather than the
+	 * measurement moved up: the panel owns the box, the table owns the rows, and
+	 * the effect needs both.
+	 */
+	bodyRef?: React.Ref<HTMLDivElement>;
 	children: React.ReactNode;
 }): React.JSX.Element {
 	return (
@@ -808,6 +905,7 @@ function PositionsPanel({
 			<div
 				data-testid="positions-panel-body"
 				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+				ref={bodyRef}
 			>
 				{children}
 			</div>
