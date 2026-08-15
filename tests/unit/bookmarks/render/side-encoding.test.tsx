@@ -103,12 +103,27 @@ const removedItem = (side: "YES" | "NO"): BookmarkItem => ({
 	authorPseudonym: "tidal-knight-88",
 });
 
-/** The chip is the badge whose text is exactly the side literal. */
+/**
+ * The chip is the badge whose text is the side literal — bare, or carrying the
+ * entry price.
+ *
+ * ⚠ WIDENED AT POLISH.6 ITEM 1 (PD-6-01). A SELECTOR CHANGE, NOT AN ASSERTION
+ * DELETION. `badges.tsx:166` renders `` `${side} @ ${pct}` `` as soon as a
+ * `price` is passed, so the live arm's chip now reads `YES @ 38%` and the old
+ * equality predicate returned `null` — a FALSE NEGATIVE, which is exactly the
+ * failure the docblock below exists to prevent (O-3).
+ *
+ * ⛔ STILL ANCHORED AT THE SIDE, never a bare `includes`. `text === side` keeps
+ * the removed arm — which carries no price field and never will (S-5) — and
+ * `startsWith(`${side} @ `)` admits only the priced form, so a badge whose text
+ * merely CONTAINS the literal cannot satisfy it.
+ */
 function sideChip(container: HTMLElement, side: "YES" | "NO"): Element | null {
 	return (
-		[...container.querySelectorAll('[data-slot="badge"]')].find(
-			(el) => el.textContent?.trim() === side,
-		) ?? null
+		[...container.querySelectorAll('[data-slot="badge"]')].find((el) => {
+			const text = el.textContent?.trim() ?? "";
+			return text === side || text.startsWith(`${side} @ `);
+		}) ?? null
 	);
 }
 
@@ -151,12 +166,21 @@ describe("BookmarkCard — INV-3, the side chip is pole-bound", () => {
 		expect(cls).not.toContain("bg-secondary");
 	});
 
-	it("the-chip-announces-the-side", () => {
+	it("the-chip-announces-the-side-and-its-entry-price", () => {
 		// The adopted primitive carries the `aria-label` the hand-roll lacked —
 		// colour paired with literal text (AGENTS.md §8).
+		//
+		// ⚠ RELAXED TO THE PRICED LABEL AT POLISH.6 ITEM 1 (PD-6-01). Both
+		// strings below are DERIVED FROM `badges.tsx`'s own templates at head,
+		// never copied off a render: `${side} @ ${pct}` (:166) and
+		// `${side} side, entry price ${pct}` (:155-157), where `pct` is
+		// `formatPercentUnpaired("0.380000000000000000")` → `wholePercent` reads
+		// intPart "0" → 0, firstTwo "38", third "0" (< 5, no bump) → `"38%"`.
 		const { container } = render(<BookmarkCard item={liveItem("YES")} />);
+		// The visible deliverable, pinned rather than inferred from the selector.
+		expect(sideChip(container, "YES")?.textContent?.trim()).toBe("YES @ 38%");
 		expect(sideChip(container, "YES")?.getAttribute("aria-label")).toBe(
-			"YES side",
+			"YES side, entry price 38%",
 		);
 	});
 });
@@ -206,5 +230,105 @@ describe("BookmarkCard — the removed variant keeps its slot and leaks no body"
 		const cls = classTokens(sideChip(container, "YES"));
 		expect(cls).toContain("bg-yes");
 		expect(cls).not.toContain("bg-primary");
+	});
+
+	it("removed-arm-chip-renders-the-bare-side-never-a-price", () => {
+		// ⚠ THE POSITIVE CONTROL THE WIDENED SELECTOR LOST. Every other
+		// removed-arm assertion routes through `sideChip()`, whose predicate now
+		// ACCEPTS the priced form — so if a price ever did reach a removed stub,
+		// all of them would still pass. This is the one assertion that would not.
+		//
+		// The compile boundary is the real control: `BookmarkItem`'s removed
+		// variant is `Extract<ProfileArgumentItem,{removed:true}>` and carries no
+		// price field, so `price={item.priceAtBet}` at that call site is a TS
+		// error, not a runtime absence (S-5). This is the BELT — and it is worth
+		// having because the belt got LOOSER in the same commit that made the
+		// price renderable at all. A negative assertion needs a positive control.
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={removedItem(side)} />);
+			expect(sideChip(container, side)?.textContent?.trim()).toBe(side);
+			cleanup();
+		}
+	});
+});
+
+/**
+ * POLISH.6 item 3 / `PD-6-03` — the ratified `profile` chip geometry, adopted at
+ * BOTH call sites. Tier-4 baseline `surface_profile_v1_0.html:278-279`
+ * (8.5px / 2px 7px / .08em / 800).
+ *
+ * ASSERTED AS THE FLATTENED CASCADE, property by property and at BOTH POLES —
+ * `side-badge.test.tsx:374-392`'s shape, reused rather than re-invented. The
+ * mockups are cascading CSS and this component has none, so a property the
+ * modifier would inherit from its base is silently dropped unless it is written
+ * out. `font-extrabold` is the sharp edge: omit it and the chip lands on
+ * shadcn's `font-medium` (500) instead of the mockups' 800, which no geometry
+ * assertion would catch.
+ *
+ * BOTH CALL SITES, deliberately. `BookmarkCard.tsx:32` is the `removed === true`
+ * arm and `:46` the live arm (S-5). A live-arm-only assertion passes while a
+ * removed stub still renders the default preset — precisely the split this
+ * file's chip coverage exists to close.
+ *
+ * ⚠ These ride `sideChip()` rather than a hand-rolled selector so that item 1's
+ * widening of that helper (C2, when the live chip's text becomes `YES @ 38%`)
+ * carries them automatically. The removed arm never gains a price, so its chip
+ * text stays the bare side literal under either predicate.
+ *
+ * ⚠ THAT NUMBER READ `27%` UNTIL THE REMEDIATION COMMIT, AND IT WAS WRONG FROM
+ * THE MOMENT C2 LANDED. `27%` is POLISH.5's `ArgumentList` fixture value,
+ * carried in from another surface's plan while this block was written at C1 —
+ * before the real number existed. C2 set this surface's fixture to
+ * `0.380000000000000000` and pinned `YES @ 38%` thirty lines above, and never
+ * came back for the prose. ⇒ The correct value and the stale one sat in ONE
+ * FILE, and two reviewer passes missed it because both checked the diff's
+ * claims against the REPO and neither checked the diff's PROSE against the
+ * diff's own CODE.
+ */
+const PROFILE_CHIP_TOKENS = [
+	"rounded-[var(--r)]",
+	"px-[7px]",
+	"py-[2px]",
+	"text-[8.5px]",
+	"font-extrabold",
+	"tracking-[0.08em]",
+	"[border:var(--hairline)]",
+];
+
+describe("BookmarkCard — PD-6-03, both chips carry the profile geometry", () => {
+	it("live-arm-chip-emits-the-full-flattened-profile-cascade-at-both-poles", () => {
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={liveItem(side)} />);
+			const cls = classTokens(sideChip(container, side));
+			for (const token of PROFILE_CHIP_TOKENS) {
+				expect(cls).toContain(token);
+			}
+			cleanup();
+		}
+	});
+
+	it("removed-arm-chip-emits-the-full-flattened-profile-cascade-at-both-poles", () => {
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={removedItem(side)} />);
+			const cls = classTokens(sideChip(container, side));
+			for (const token of PROFILE_CHIP_TOKENS) {
+				expect(cls).toContain(token);
+			}
+			cleanup();
+		}
+	});
+
+	it("neither-chip-inherits-a-shadcn-default-the-preset-must-override", () => {
+		// The flattening rule's teeth, asserted as ABSENCE. `font-medium` and
+		// `rounded-4xl` are the two `badgeVariants` defaults `twMerge` does NOT
+		// resolve away on its own, so absence is the only way to catch them
+		// (`side-badge.test.tsx:394-415`).
+		for (const item of [liveItem("YES"), removedItem("YES")]) {
+			const { container } = render(<BookmarkCard item={item} />);
+			const cls = classTokens(sideChip(container, "YES"));
+			expect(cls).not.toContain("font-medium");
+			expect(cls).not.toContain("rounded-4xl");
+			cleanup();
+		}
 	});
 });

@@ -4,9 +4,18 @@ import { redirect } from "next/navigation";
 import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { Badge } from "@/components/ui/badge";
+import { EmptyBlock } from "@/components/ui/empty-block";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
+
+/** W2.11 P1 copy — web-authored, carried VERBATIM from the state-kit mockup's
+ *  "Empty Bookmarks · id 18" block (`:198`, `:199`), ratified as OD-1. Tests
+ *  import these; they are never re-typed inline. */
+export const BOOKMARKS_EMPTY_COPY = {
+	msg: "No bookmarks yet.",
+	sub: "Saved arguments will appear here.",
+} as const;
 
 /**
  * The /bookmarks surface (ADR-0032 D-5 / D-6; plan §3.3), composed into the
@@ -39,12 +48,11 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				<Badge variant="outline">Your bookmarks</Badge>
 			</div>
 			{items.length === 0 ? (
-				<p
-					data-testid="bookmarks-empty"
-					className="py-8 text-center text-n5 text-sm"
-				>
-					No bookmarks yet.
-				</p>
+				<EmptyBlock
+					message={BOOKMARKS_EMPTY_COPY.msg}
+					messageTestId="bookmarks-empty"
+					sub={BOOKMARKS_EMPTY_COPY.sub}
+				/>
 			) : (
 				<div data-testid="bookmark-list" className="flex flex-col gap-3">
 					{items.map((item) => (
