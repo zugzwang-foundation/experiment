@@ -307,7 +307,7 @@ C3 left open whether canon's *"frozen at integration v0.19"* conflicts with a sh
 | Suite | Movement | Direction (§9) |
 |---|---|---|
 | `tests/unit/debate/render/post-card.test.tsx` | **NEW** — rows 1, 2, 3 | proof → artifact |
-| `tests/unit/debate/render/post-popup.test.tsx` | **NEW** — rows 10, 11, 12, 14 | proof → artifact |
+| `tests/unit/debate/render/post-popup.test.tsx` | **NEW** — rows **9**, 10, 11, 12, 14 ⚠ **FIVE — corrected at `GC-12`** | proof → artifact |
 | `tests/unit/debate/render/reply-preview.test.tsx` | **NEW** — row 13, side-aware expansion | proof → artifact |
 | `tests/unit/debate/render/dharma-spacing.test.tsx` | **NEW** — rows 4, 5, 6. ⚠ **Covers ALL FOUR `PD-3-07` sites in one guard** — see below | proof → artifact |
 | `tests/unit/debate/render/aggregate-footer.test.tsx` | **NEW** — row T3 only (the split-bar visual half) | proof → artifact |
@@ -561,7 +561,7 @@ Base set inherited from `POLISH-SURFACE-TEMPLATE.md` §5. Per-surface additions:
 | Guard | Rows | Goes GREEN at | Partial window | Expected? |
 |---|---|---|---|---|
 | `dharma-spacing.test.tsx` | 4, 5, **6** | **sites 4–5 at C2** *(GC-10)*; **sites 2–3 at C10** | ⚠ **EIGHT commits, C2 → C10** | ✅ **EXPECTED — the longest window in the PR** |
-| `post-popup.test.tsx` | 10, 11, 12, **14** | **row 14 at C5**; rows 10–12 at **C6** | 1 commit | ✅ **EXPECTED** |
+| `post-popup.test.tsx` | **9**, 10, 11, 12, **14** | **rows 9 + 14 at C5**; rows 10–12 at **C6** | 1 commit | ✅ **EXPECTED** |
 | `post-card.test.tsx` | 1, 2, **3** | **rows 1–2 at C8**; row 3 at **C9** | 1 commit | ✅ **EXPECTED** |
 | `aggregate-footer.test.tsx` | T3 | C2 | — | ✅ single-commit guard |
 | `comment-image.test.tsx` | T2 | C4 | — | ✅ single-commit guard |

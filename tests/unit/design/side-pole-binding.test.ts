@@ -58,11 +58,18 @@ import { describe, expect, it } from "vitest";
  * A REJECTED candidate check, recorded so it is not re-proposed as new: "flag a
  * component that RECEIVES a side prop, renders a pole-family colour, and never
  * keys on it." It fails on the single most important instance —
- * `composer/ReplySplitBar.tsx` has BOTH a correct side-keyed pole (`:118-122`,
- * why it is in the inventory above) AND a separate fixed pair (`:64`, `:67`)
- * carrying the same defect on `/m/[slug]`. A component-level check sees the
- * correct expression and clears the file, so the rule would FALSE-NEGATIVE on
- * the exact case that most needs catching. A segment-level version would need to
+ * `composer/ReplySplitBar.tsx`, which for the length of this guard's life had
+ * BOTH a correct side-keyed pole (`:118-122`, why it is in the inventory above)
+ * AND a separate FIXED pair on the track and fill spans carrying the same
+ * defect on `/m/[slug]`. A component-level check sees the correct expression and
+ * clears the file, so the rule would FALSE-NEGATIVE on the exact case that most
+ * needs catching.
+ * ⚠ THAT FIXED PAIR IS GONE — corrected at POLISH.3 PR 2 C13 (`RR-3`), and both
+ * spans are now side-keyed on `postSide`. The instance is HISTORICAL; THE
+ * REJECTION STANDS UNCHANGED, because the argument is about what a
+ * component-level check CANNOT SEE, not about this file's current state. Kept
+ * as evidence rather than deleted — a rejected candidate with its evidence
+ * removed reads as an unexplained preference and gets re-proposed. A segment-level version would need to
  * decide which DOM node a quantity belongs to, which is not a static property.
  *
  * Route 3 therefore stays a KNOWN GAP, closed by review and by per-pole render

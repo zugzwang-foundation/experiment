@@ -121,8 +121,8 @@ export function BookmarkToggle({
 }
 
 /**
- * The card action cluster (design-language §3.1) — the bookmark trigger. In
- * order. Co-located with `BookmarkToggle` rather than given its own file so the
+ * The card action cluster (design-language §3.1) — the bookmark trigger.
+ * Co-located with `BookmarkToggle` rather than given its own file so the
  * POST card (`ArgProfile`) and the REPLY card (`ReplyCard`) render the cluster
  * from ONE source: ratified correction C3 requires the reply card to match
  * `ArgProfile` byte-for-byte, and duplicated markup in two files is exactly how

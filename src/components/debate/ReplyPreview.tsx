@@ -16,6 +16,35 @@ import type { ReplyGroups } from "./types";
  * rendered. Each reply carries its own frozen side badge (D3 placement is by own
  * side). This is the "two-slot expand" read affordance (§7); the per-side
  * paged reply-scroller is the post-view surface.
+ *
+ * ⚠ RULED CONSEQUENCE OF THE ROW-13 PARTITION (POLISH.3 PR 2 C7, founder-ruled
+ * 2026-08-16 — RECORDED, NOT FIXED). Expanding changes the TYPE at position 0
+ * of the container (collapsed renders a mapped array; expanded renders two
+ * side-keyed `<ul>`s), so React cannot match the keyed `ReplyCard`s across the
+ * toggle and every reply card REMOUNTS on expand. `BookmarkToggle` seeds its
+ * `useState` at mount from the page-load prop, so a bookmark placed on a
+ * default-slot reply reads as UNSAVED after expanding.
+ *
+ * ✅ DATA IS UNAFFECTED — `addBookmarkAction` is `onConflictDoNothing` and
+ * returns `{ok:true}`, so one click restores the display and nothing is lost or
+ * double-written.
+ *
+ * ⚠ This is a new INSTANCE of a divergence class D5 already ratified for v1:
+ * paging triggers no server render, so client-seeded state does not survive a
+ * remount. It is the same law `CardActions`' `key={commentId}` exists to
+ * exploit in the other direction.
+ *
+ * ⛔ THE HALF FIX WAS MEASURED AND REJECTED. Rendering the collapsed branch
+ * through a `<ul>` too keeps position 0's type, but the lists still differ:
+ * collapsed position 0 is [top support, top counter] and expanded position 0 is
+ * [top support, support tail]. The support reply's key matches and survives;
+ * the counter reply moves lists and remounts anyway. ⇒ It would preserve one
+ * side's state and drop the other, making the defect INTERMITTENT — harder to
+ * find and easier to disbelieve than a consistent one.
+ *
+ * ⇒ The REAL cause is `BookmarkToggle` seeding `useState` at mount, so ANY
+ * remount loses optimistic state. That is docketed to ADR-0032 / UI-A6's lane,
+ * not fixed here.
  */
 export function ReplyPreview({
 	replies,
