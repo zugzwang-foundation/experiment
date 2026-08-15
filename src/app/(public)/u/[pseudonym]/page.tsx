@@ -131,7 +131,35 @@ export default async function ProfilePage({
 			    prototype and declares no breakpoint at all (recon A.4).
 			    `gap-6` is the gap ALREADY on this container's className for the
 			    same inter-section role; no new spacing value is introduced. */}
-			<div data-testid="profile-headzone" className="grid gap-6 lg:grid-cols-2">
+			{/* ⚠⚠ FOUNDER EYE PASS item 3 — THE BAND SIZED TO THE TILES, NOT TO THE
+			    GRAPH. Measured at 1440 before the change: headzone 358px, of which
+			    the identity card genuinely needed 287 (tiles bottom 357 + the card's
+			    16px bottom padding) — so ~71px was dead space, and the graph slot
+			    ballooned to fill it.
+			    THE DRIVER IS ARITHMETIC, NOT OPINION. `graph/ProfileGraphCard.tsx:46`
+			    renders `aspect-[2/1] w-full`, so the graph card's height is
+			    (columnWidth − 32) / 2 + 32. At an equal split the graph column was
+			    684 ⇒ 652 × 326 ⇒ card 358. Measured exactly: aspect box 652 × 326.
+			    ⇒ THE FIX IS THE COLUMN RATIO, because the aspect box is the height
+			    and the aspect box is driven by WIDTH. Solving (W − 32)/2 + 32 = 287
+			    gives W = 542 against an 826 identity column — 1.52 : 1. `3fr 2fr`
+			    is the nearest simple ratio, and it MEASURES:
+			      1440 · band 358 → 290 · graph card 358 → 290 · tiles 144, unchanged
+			      1024 · band       258 · identity column 465 · nothing clipped
+			    ⛔ DERIVED FROM THE TILES, NOT COPIED. The mockup's `.headzone` is
+			    `1fr 1fr` with `flex:0 0 188px` (`:189`) — a fixed-desktop pixel band
+			    this deliberately does NOT port. No height is declared here at all;
+			    the band is still content-sized, it is simply the TILES' content that
+			    now wins instead of the graph's.
+			    ⛔ THE GRAPH'S OWN SYMBOLS ARE UNTOUCHED — POLISH.5 PR C owns them.
+			    Only the SLOT's width changes, which is placement.
+			    The arbitrary-template form is `HeroPanels.tsx:82`'s
+			    (`md:grid-cols-[1fr_1.9fr_1fr]`), the shipped precedent for a derived
+			    fr ratio in a grid template. */}
+			<div
+				data-testid="profile-headzone"
+				className="grid gap-6 lg:grid-cols-[3fr_2fr]"
+			>
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
 				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling

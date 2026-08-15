@@ -379,6 +379,65 @@ describe("FOUNDER EYE PASS item 1 — Đ on every Đ tile", () => {
 	});
 });
 
+describe("FOUNDER EYE PASS item 3 — the band sizes to the tiles, not the graph", () => {
+	const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
+	const page = () => readFileSync(join(process.cwd(), PAGE), "utf8");
+
+	it("item3::the-headzone-split-is-UNEQUAL-so-the-graph-stops-driving-the-band", () => {
+		// MEASURED at 1440 before the change: headzone 358px, of which the
+		// identity card needed 287 — ~71px dead. The driver is arithmetic:
+		// `graph/ProfileGraphCard.tsx:46` is `aspect-[2/1] w-full`, so the graph
+		// card's height is (columnWidth − 32)/2 + 32, and at an equal split that
+		// was 684 ⇒ 652 × 326 ⇒ 358. Narrowing the graph column is therefore the
+		// ONLY lever available from outside that file — and `graph/**` is
+		// forbidden here (POLISH.5 PR C owns its symbols).
+		// MEASURED after: 1440 band 358 → 290 · 1024 band 258 · tiles unchanged
+		// at 144 · nothing clipped.
+		const cls =
+			/"profile-headzone"[\s\S]{0,120}?className="([^"]*)"/.exec(page())?.[1] ??
+			"";
+		const token = cls.split(/\s+/).find((c) => /^lg:grid-cols-/.test(c));
+		expect(
+			token,
+			"item 3: the headzone declares no lg grid template",
+		).toBeDefined();
+		// ⛔ An EQUAL split is the pre-change state and re-introduces the balloon.
+		expect(
+			token,
+			`item 3: the headzone is back to an equal split, so the graph's 2:1 ` +
+				`aspect drives the band again (measured 358px against the 287px the ` +
+				`tiles need). The ratio is DERIVED — solving (W−32)/2+32 = 287 gives ` +
+				`1.52:1 — not copied from the mockup, whose band is a fixed 188px.`,
+		).not.toBe("lg:grid-cols-2");
+		expect(token).toBe("lg:grid-cols-[3fr_2fr]");
+	});
+
+	it("item3::the-ARENA-keeps-its-EQUAL-split", () => {
+		// Only the headzone is asymmetric. The arena's two panels are peers and
+		// an unequal arena would be a different (unasked) change.
+		const cls =
+			/"profile-arena"[\s\S]{0,200}?className="([^"]*)"/.exec(page())?.[1] ??
+			"";
+		expect(cls.split(/\s+/)).toContain("lg:grid-cols-2");
+	});
+
+	it("item3::NO-HEIGHT-IS-DECLARED-on-the-band", () => {
+		// ⛔ The founder ruled the mockup's pixel band a VALUE ("derive from the
+		// tiles, do not copy"). This fix declares no height at all — the band is
+		// still content-sized; it is simply the TILES' content that now wins.
+		const cls =
+			/"profile-headzone"[\s\S]{0,120}?className="([^"]*)"/.exec(page())?.[1] ??
+			"";
+		for (const c of cls.split(/\s+/)) {
+			expect(
+				/^(h-|min-h-(?!0$)|max-h-)/.test(c),
+				`item 3: the headzone declares \`${c}\` — a height. The band must ` +
+					`stay content-sized; the ratio is what makes the tiles win.`,
+			).toBe(false);
+		}
+	});
+});
+
 describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable", () => {
 	const PAYLOAD = { owner: false as const, rows: [ROW_OPEN, ROW_SETTLED] };
 
@@ -901,6 +960,29 @@ describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays f
 	 * beside it: taller tiles → taller card → wider square → narrower column →
 	 * taller tiles, settling with the tiles at zero width.
 	 *
+	 * ⛔⛔ RE-ATTEMPTED A THIRD TIME AT THE FOUNDER EYE PASS (item 4), AFTER
+	 * item 3 shrank the band — AND REFUSED AGAIN, on new and stronger evidence.
+	 * The retry was authorised "only after item 3 gives the band a height". Item
+	 * 3 gives it a LOWER CONTENT-DERIVED height, not a declared one, and measured
+	 * live at two container widths with item 3 in place:
+	 *
+	 *            item 3 alone            item 3 + item 4
+	 *   1440     band 290 · idcol 715    band 290 · PFP 272x272 · idcol 499
+	 *   1024     band 258 · idcol 465    band 338 · PFP 320x320 · idcol 201
+	 *
+	 * ⇒ AT 1024 ITEM 4 CANCELS ITEM 3. The band goes 258 -> 338 — taller than the
+	 * 290 item 3 achieves at 1440, and 80px taller than item 3's own result — the
+	 * identity column collapses 465 -> 201, and the tiles grow 43% taller (184 ->
+	 * 264) as they wrap into it. The founder's mark 3 was "the band is too tall";
+	 * item 4 makes it taller. The PFP is also LARGER at the NARROWER width
+	 * (320 > 272), which is the feedback loop's signature: wider square ->
+	 * narrower column -> taller tiles -> taller card -> wider square.
+	 * ⇒ The literal round-2 refusal condition (324x578, zero-width column) is NOT
+	 * reproduced — but §7's conditional is: the premise "item 3 gives the band a
+	 * height" is false, and satisfying item 4 literally would undo item 3.
+	 * ⇒ Only a DECLARED band height breaks the loop, and the founder ruled the
+	 * mockup's pixel band out. ROUTED BACK, unchanged.
+	 *
 	 * ⚠ THE ASSERTIONS BELOW ARE DELIBERATELY THE INVERSE OF WHAT THIS FILE
 	 * ASSERTED BEFORE MEASUREMENT. They exist so the row is not re-applied from
 	 * the mockup by the next reader, who will see `.pfp{height:100%}` and no
@@ -992,18 +1074,25 @@ describe("HTML-FINISH profile rows 1 · 8 — the two-band frame", () => {
 			// (measured 214px) PLUS the Argument column's min-content (115px). At
 			// `md` each half measured 356px and Argument rendered at 117px against
 			// that 115px min-content — pinned, which is the eight-character
-			// symptom. `lg` gives it ~244px. Pinned by NAME, and `md` pinned
-			// ABSENT, so "make it responsive sooner" reddens instead of quietly
-			// re-shipping the cramped column.
+			// symptom. `lg` gives it ~244px. The BREAKPOINT is pinned and `md` is
+			// pinned ABSENT, so "make it responsive sooner" reddens instead of
+			// quietly re-shipping the cramped column.
+			//
+			// ⚠ MATCHED BY PREFIX, NOT BY WHOLE TOKEN, because the two bands
+			// legitimately carry DIFFERENT templates: founder eye-pass item 3 gave
+			// the headzone `lg:grid-cols-[3fr_2fr]` (the graph column shrunk so its
+			// 2:1 aspect stops driving the band height) while the arena keeps
+			// `lg:grid-cols-2` (equal halves). What must hold across both is the
+			// BREAKPOINT; the TEMPLATE is each band's own business.
 			expect(
-				cls.split(/\s+/),
+				cls.split(/\s+/).some((c) => /^lg:grid-cols-/.test(c)),
 				`row 1: ${name} must go two-column at \`lg\`, not sooner — at \`md\` ` +
 					`the Argument column is pinned at its 115px min-content.`,
-			).toContain("lg:grid-cols-2");
+			).toBe(true);
 			expect(
-				cls.split(/\s+/),
-				`row 1: ${name} still carries \`md:grid-cols-2\`.`,
-			).not.toContain("md:grid-cols-2");
+				cls.split(/\s+/).some((c) => /^md:grid-cols-/.test(c)),
+				`row 1: ${name} still carries an \`md:\` grid template.`,
+			).toBe(false);
 		}
 	});
 
@@ -1013,13 +1102,19 @@ describe("HTML-FINISH profile rows 1 · 8 — the two-band frame", () => {
 		// EQUALITY between the two rather than as two independent pins, so
 		// changing one and forgetting the other reddens.
 		const src = page();
+		// ⚠ THE BREAKPOINT PREFIX ONLY. The two bands carry different templates
+		// after item 3 (`[3fr_2fr]` vs `2`), so comparing whole tokens would
+		// redden on a difference that is deliberate and correct. The invariant
+		// this guard exists for — both bands turn two-column at the SAME width —
+		// is exactly the prefix.
 		const bp = (testid: string) => {
-			const cls = new RegExp(`"${testid}"\\s+className="([^"]*)"`).exec(
-				src,
-			)?.[1];
-			return (
-				(cls ?? "").split(/\s+/).find((x) => x.endsWith(":grid-cols-2")) ?? null
-			);
+			const cls = new RegExp(
+				`"${testid}"[\\s\\S]{0,120}?className="([^"]*)"`,
+			).exec(src)?.[1];
+			const token = (cls ?? "")
+				.split(/\s+/)
+				.find((x) => /^[a-z]+:grid-cols-/.test(x));
+			return token ? (token.split(":")[0] ?? null) : null;
 		};
 		expect(bp("profile-headzone")).not.toBeNull();
 		expect(bp("profile-headzone")).toBe(bp("profile-arena"));
