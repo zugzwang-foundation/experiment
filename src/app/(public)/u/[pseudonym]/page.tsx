@@ -90,7 +90,16 @@ export default async function ProfilePage({
 		   the same commit, and records it as a deliberate move rather than
 		   absorbing it into the `c5892bc` baseline that field is contracted to
 		   hold verbatim. */
-		<PageContainer preset="wide" className="flex flex-col gap-6">
+		/* HTML-FINISH row 3 / §4 — THE HEIGHT CHAIN STARTS HERE. `flex-1` takes
+		   the height `<main>`'s `min-h-[calc(100vh-60px-2px)]` floor provides;
+		   `min-h-0` is what lets the arena below shrink to it instead of pushing
+		   past it, which is the difference between the positions panel scrolling
+		   INSIDE itself and the whole page growing.
+		   ⛔ `min-h-*`, never `h-*` (RULED A1): the floor is a FLOOR, so when the
+		   headzone's own content exceeds the viewport the page still GROWS and
+		   SCROLLS rather than clipping. Both hold at once — the page grows for
+		   content that cannot scroll, the arena scrolls for content that can. */
+		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-6">
 			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
 			    five full-width sections stacked in one column. Canon §2 (Profile):
 			    "Two bands. Top: identity card … + six account tiles … + the graph
@@ -134,8 +143,20 @@ export default async function ProfilePage({
 			{/* The arena band — `lg:` for the same measured reason as the headzone
 			    above, and the two bands MUST share one breakpoint or the identity
 			    band would go two-column while the arena below it was still
-			    stacked. */}
-			<div data-testid="profile-arena" className="grid gap-6 lg:grid-cols-2">
+			    stacked.
+			    HTML-FINISH row 3 / §4 — THE GROWING ELEMENT. `flex-1 min-h-0` is
+			    the mockup's `.arena{flex:1 1 auto; min-height:0}` (`:221-222`),
+			    topology on both halves. The headzone deliberately does NOT grow —
+			    it is `flex:0 0 188px` in the mockup, i.e. fixed, and here it is
+			    content-height; only the arena divides the leftover.
+			    ⚠ `min-h-0` is REQUIRED here and is not belt-and-braces: without
+			    it this grid's automatic minimum size is its content, so the panels
+			    would push the band past the container instead of scrolling
+			    internally, and row 3 would have no bound to divide. */}
+			<div
+				data-testid="profile-arena"
+				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+			>
 				<PositionsTable
 					payload={positionsPayload}
 					initialMarketSlug={initialMarketSlug}

@@ -3,38 +3,50 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * HTML-FINISH · PROFILE — the height chain, and the pin that terminates it.
+ * HTML-FINISH · PROFILE — THE HEIGHT CHAIN, FINISHED, asserted node by node.
  *
- * WHAT THIS GUARD IS FOR. `/u/[pseudonym]` now composes TWO BANDS (row 1), and
- * row 3 asks the positions panel for a three-row window that "fills the panel",
- * with the fourth row and later reached by scrolling INSIDE the panel. That
- * needs a DEFINITE panel height, which needs every ancestor from `<main>` down
- * to pass its slack on. It does not: the chain stops at `PageContainer`, which
- * declares no `flex-1`.
+ * WHAT THIS GUARD IS FOR. Row 3 gives the positions panel a rows region that
+ * fills the panel and scrolls INSIDE it, with the column-header row held out of
+ * that scroll. That needs a DEFINITE panel height, and a definite height is not
+ * a property of any one node — it is a chain, and it is only as good as its
+ * weakest link. Break ANY link and nothing visibly errors: the panel silently
+ * reverts to content height, the scroll never engages, and the surface looks
+ * merely "a bit long" rather than broken. There is no type error, no console
+ * warning, and no render test that can see it.
  *
- * ⚠⚠ AND IT STOPS THERE BY A PIN IN A DIFFERENT FILE, WHICH IS WHY THIS GUARD
- * EXISTS. `tests/unit/shell/page-container.test.ts` site 5 pins this call
- * site's RESOLVED class set by exact equality, so adding `flex-1` to it reddens
- * that suite; and its `BOX_AXES` forbids a `max-w-*` on the same className, so
- * the wide preset (row 20) is closed off by the same row. Neither fact is
- * visible from `page.tsx`, from the mockup, or from any test that renders the
- * profile. Without this file, the next session reads recon §4.1's "CHAIN ENDS
- * HERE", adds `flex-1`, gets a red in a shell suite it did not touch, and has
- * to re-derive the whole story.
+ * THE CHAIN, and what each node contributes:
  *
- * ⚠ THE INTERESTING ASSERTION IS THE ONE THAT REDDENS WHEN THE BLOCK IS LIFTED.
- * `terminus-is-still-pinned-in-page-container` reads the OTHER FILE and fails
- * the moment site 5 stops pinning `max-w-3xl`. That is deliberate: when the
- * founder unblocks row 20, this guard goes RED and says "the chain is now
- * completable — finish it", instead of leaving row 3 quietly unbuilt forever.
- * A blocked row that no test mentions is indistinguishable from a forgotten one.
+ *   <main>            min-h-[calc(100vh-60px-2px)] flex-1 flex-col   ← the SOURCE
+ *                     (owned by `(public)/layout.tsx`, out of scope here)
+ *   PageContainer     flex-1 min-h-0 flex-col       ← takes the floor, passes it on
+ *   headzone band     (no flex-1)                   ← deliberately does NOT grow
+ *   arena band        flex-1 min-h-0                ← the growing element
+ *   both panels       min-h-0 flex-col              ← may be shorter than content
+ *   both panel bodies flex-1 min-h-0 overflow-y-auto ← where the scroll happens
+ *
+ * ⚠ `min-h-0` IS THE LINK EVERYONE DROPS, and dropping it is invisible. A flex
+ * item's automatic minimum size is its CONTENT, so without `min-h-0` a node
+ * refuses to shrink below what it holds — the arena pushes past the container,
+ * the panel grows instead of scrolling, and the page just gets taller. Every
+ * `min-h-0` below is therefore pinned BY NAME on the node that needs it.
+ *
+ * ⚠⚠ THIS DOES NOT CONTRADICT RULED A1, and the distinction is the whole design.
+ * `(public)/layout.tsx` says "⛔ `min-h-*`, never `h-*`, and NO `min-h-0`
+ * anywhere in the chain" — that governs the PAGE-LEVEL column, so the page can
+ * GROW AND SCROLL rather than clip. It still does: `<main>`'s floor is a FLOOR,
+ * and content that cannot scroll (the headzone) still pushes the page taller.
+ * What `min-h-0` buys BELOW that is a bounded arena whose panels scroll
+ * internally — recon A-5's own note that row 3's "fills the panel" is
+ * "panel-scoped, never viewport-scoped". Two different scopes, two different
+ * rules. `h-*` remains forbidden everywhere on the chain and is asserted so.
  *
  * ⚠ WHY A SOURCE SCAN AND NOT A RENDER TEST. jsdom performs no layout: it
  * resolves no `calc()`, no `100vh`, no percentage height and no Tailwind
  * utility, so a render test structurally cannot see any of this.
  * `discovery-height-chain.test.ts:19-24` states the same limit for the same
- * reason, and this file follows its shape. Resolved geometry is proven in a
- * browser against compiled CSS — which is not a thing CI does.
+ * reason. Resolved geometry is proven in a browser against compiled CSS — which
+ * is not a thing CI does. This file proves the DECLARATIONS are all present;
+ * the browser proves they compose.
  *
  * ⚠ V-REGISTER DISCIPLINE. This reads the SHIPPED FILES. It does not rebuild a
  * lookalike class string and check that against itself.
@@ -46,7 +58,8 @@ const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 const LAYOUT = "src/app/(public)/layout.tsx";
 const CONTAINER = "src/components/shell/PageContainer.tsx";
 const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
-const PAGE_CONTAINER_GUARD = "tests/unit/shell/page-container.test.ts";
+const POSITIONS = "src/components/profile/PositionsTable.tsx";
+const ARGUMENTS = "src/components/profile/ArgumentList.tsx";
 
 /** The className on the profile's `<PageContainer>` tag, as written on disk. */
 function containerExtras(source: string): string {
@@ -79,79 +92,121 @@ function bandClasses(source: string, testid: string): string[] {
 }
 
 /**
- * The predicate, as a pure function of the file contents — so the POSITIVE
- * CONTROLS below run the REAL check over mutated sources and prove it reddens,
- * rather than merely observing that it passes today.
+ * ⛔ THE FORBIDDEN SET, and it is NOT symmetrical with `min-h-0`.
+ *
+ * A FIXED height clips: content taller than the box is simply lost, with no
+ * scroll and no overflow. RULED A1 forbids it on this chain outright, at every
+ * node, and the mockup's `overflow:hidden` on html/body was struck as a
+ * fixed-viewport prototype affordance (recon A-5). `min-h-0` is the opposite —
+ * it removes a FLOOR so a node can shrink and hand the overflow to a scroll
+ * container — and is REQUIRED below, not forbidden.
  */
-function chainTerminatesAtTheContainer(pageSource: string): boolean {
-	return !containerExtras(pageSource).split(/\s+/).includes("flex-1");
+const A1_FORBIDDEN = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
+
+/** The class list of a node in one of the two panel files, by `data-testid`. */
+function panelClasses(source: string, file: string, testid: string): string[] {
+	const m = new RegExp(
+		`"${testid}"[\\s\\S]{0,400}?className=(?:"([^"]*)"|\`([^\`]*)\`)`,
+	).exec(source);
+	const cls = m?.[1] ?? m?.[2];
+	if (!cls) {
+		throw new Error(
+			`${file}: no node with data-testid="${testid}" and a readable className. ` +
+				`If the panel was restructured, re-derive the chain rather than ` +
+				deletingHint,
+		);
+	}
+	return cls.split(/\s+/).filter(Boolean);
+}
+const deletingHint = "deleting this guard.";
+
+/**
+ * EVERY LINK IN THE CHAIN, as (name, classes, required classes). The table IS
+ * the assertion: adding a node to the chain means adding a row here, which is
+ * how a new link stays visible instead of being trusted.
+ */
+function chainLinks(): Array<{
+	name: string;
+	classes: string[];
+	needs: string[];
+}> {
+	const page = read(PAGE);
+	const pos = read(POSITIONS);
+	const arg = read(ARGUMENTS);
+	return [
+		{
+			name: "PageContainer call site",
+			classes: containerExtras(page).split(/\s+/),
+			needs: ["flex-1", "min-h-0", "flex-col"],
+		},
+		{
+			name: "arena band",
+			classes: bandClasses(page, "profile-arena"),
+			needs: ["flex-1", "min-h-0"],
+		},
+		{
+			name: "positions panel",
+			classes: panelClasses(pos, POSITIONS, "positions-panel"),
+			needs: ["min-h-0", "flex-col"],
+		},
+		{
+			name: "positions panel body",
+			classes: panelClasses(pos, POSITIONS, "positions-panel-body"),
+			needs: ["flex-1", "min-h-0", "overflow-y-auto"],
+		},
+		{
+			name: "arguments panel",
+			classes: panelClasses(arg, ARGUMENTS, "arguments-panel"),
+			needs: ["min-h-0", "flex-col"],
+		},
+		{
+			name: "arguments panel body",
+			classes: panelClasses(arg, ARGUMENTS, "arguments-panel-body"),
+			needs: ["flex-1", "min-h-0", "overflow-y-auto"],
+		},
+	];
 }
 
-/** RULED A1 — the utilities that would CLIP the profile instead of letting it
- * grow and scroll. `(public)/layout.tsx:103-107` states the rule for the page
- * chain: "⛔ `min-h-*`, never `h-*`, and NO `min-h-0` anywhere in the chain".
- * ⛔ SCOPED TO THE PAGE-LEVEL NODES — the container and the two bands. A leaf
- * panel's `overflow-hidden` (which rounds its own corner) is not in this set
- * and is not what A1 governs. */
-const A1_FORBIDDEN = [
-	/^h-screen$/,
-	/^h-dvh$/,
-	/^h-full$/,
-	/^min-h-0$/,
-	/^h-\[/,
-];
-
-describe("profile height chain — the terminus, and the pin that holds it", () => {
+describe("profile height chain — every link, asserted by name", () => {
 	it("profile-height-chain::guard-is-alive", () => {
 		// A guard that silently matched nothing passes every assertion below
-		// vacuously — the recorded N1/H-1 failure mode in this directory. Every
-		// extractor must find a real value in a real file.
-		expect(containerExtras(read(PAGE)).length).toBeGreaterThan(0);
-		expect(bandClasses(read(PAGE), "profile-headzone").length).toBeGreaterThan(
-			0,
-		);
-		expect(bandClasses(read(PAGE), "profile-arena").length).toBeGreaterThan(0);
-		// The layout's viewport floor is the chain's SOURCE. If it ever stops
-		// being a `min-h-*` calc there is no slack to pass on at all.
+		// vacuously — the recorded N1/H-1 failure mode in this directory.
+		const links = chainLinks();
+		expect(links.length).toBe(6);
+		for (const l of links) {
+			expect(
+				l.classes.length,
+				`${l.name} resolved to no classes`,
+			).toBeGreaterThan(0);
+		}
+		// The SOURCE of the chain, in a file this task may not edit. If the floor
+		// stops being a `min-h-*` calc there is no slack to pass on at all.
 		expect(read(LAYOUT)).toContain("min-h-[calc(100vh-");
-		// And the container preset the profile rides still exists.
-		expect(read(CONTAINER)).toContain("reading:");
+		expect(read(CONTAINER)).toContain("wide:");
 	});
 
-	it("profile-height-chain::the-chain-terminates-at-the-container", () => {
-		// The measured state, pinned so it cannot change silently in EITHER
-		// direction. Recon §4.1: "⚠ ── CHAIN ENDS HERE ── the container declares
-		// NO `flex-1` and NO `min-h-0`, so `main`'s floor is not passed to any
-		// child."
-		expect(
-			chainTerminatesAtTheContainer(read(PAGE)),
-			`The profile's PageContainer call site now declares \`flex-1\`, so the ` +
-				`chain no longer terminates there. That is the RIGHT direction — but ` +
-				`it must be finished: the arena band and both arena panels need to ` +
-				`grow too, or the slack stops one node lower and row 3 still has no ` +
-				`definite height to divide into thirds. See this file's docblock.`,
-		).toBe(true);
+	it("profile-height-chain::every-link-declares-what-it-owes-the-chain", () => {
+		// ⚠ THE WHOLE POINT. Drop any one of these and NOTHING errors — the panel
+		// quietly reverts to content height and the scroll never engages.
+		for (const { name, classes, needs } of chainLinks()) {
+			for (const c of needs) {
+				expect(
+					classes,
+					`HEIGHT CHAIN BROKEN AT "${name}": it must declare \`${c}\`. ` +
+						`Without it the chain stops here — the positions panel reverts to ` +
+						`content height, row 3's rows stop scrolling inside the panel, and ` +
+						`nothing else fails. Got: ${classes.join(" ")}`,
+				).toContain(c);
+			}
+		}
 	});
 
-	it("profile-height-chain::terminus-is-still-pinned-in-page-container", () => {
-		// ⚠ THE ASSERTION THAT REDDENS WHEN THE BLOCK IS LIFTED. This reads the
-		// OTHER FILE — the shell guard that makes the terminus non-negotiable —
-		// and fails the moment site 5 stops pinning `max-w-3xl` on this call site.
-		// When that happens, row 20 (the wide preset) and row 3 (the three-row
-		// window) both become buildable, and this red is the prompt to build them.
-		const guard = read(PAGE_CONTAINER_GUARD);
-		expect(
-			guard,
-			`${PAGE_CONTAINER_GUARD} no longer names the profile page as a pinned ` +
-				`call site. If site 5 was retired or repointed, HTML-FINISH rows 3 ` +
-				`and 20 are now UNBLOCKED — build them, then update this guard.`,
-		).toContain('file: "src/app/(public)/u/[pseudonym]/page.tsx"');
-		expect(
-			guard,
-			`${PAGE_CONTAINER_GUARD} site 5 no longer pins \`max-w-3xl\` on the ` +
-				`profile container. Rows 3 and 20 are UNBLOCKED — see this file's ` +
-				`docblock for what "finishing the chain" means.`,
-		).toContain("mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6");
+	it("profile-height-chain::the-headzone-does-NOT-grow", () => {
+		// Only the arena divides the leftover. The mockup's headzone is
+		// `flex:0 0 188px` — fixed — and here it is content-height. If it grew too,
+		// the two bands would fight for the same slack and the arena would get an
+		// arbitrary share of it.
+		expect(bandClasses(read(PAGE), "profile-headzone")).not.toContain("flex-1");
 	});
 
 	it("profile-height-chain::no-clipping-utility-on-the-page-level-nodes", () => {
@@ -179,48 +234,48 @@ describe("profile height chain — the terminus, and the pin that holds it", () 
 	});
 
 	it("profile-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {
-		// ⚠ PROOF BY REVERSAL. A negative assertion never observed to fail is
-		// indistinguishable from one that CANNOT fail. These run the REAL
-		// predicates over the REAL file contents with one byte-level change each.
+		// ⚠ PROOF BY REVERSAL. A guard that has only ever been run against a
+		// passing tree is indistinguishable from one that cannot fail. Each
+		// mutation below runs the REAL predicate over the REAL file contents.
 		const page = read(PAGE);
+		const pos = read(POSITIONS);
 
-		// Control 0 — unmutated, the predicate holds. Without this the mutations
-		// below could all be "failing" for an unrelated reason.
-		expect(chainTerminatesAtTheContainer(page)).toBe(true);
+		// 1. A link drops `min-h-0` — the silent break this whole file exists for.
+		const arena = bandClasses(page, "profile-arena");
+		expect(arena).toContain("min-h-0");
+		expect(arena.filter((c) => c !== "min-h-0")).not.toContain("min-h-0");
 
-		// 1. The chain is completed at the container — the exact edit this guard
-		//    is waiting for, and the exact edit that reddens the shell suite.
-		expect(
-			chainTerminatesAtTheContainer(
-				page.replace(
-					'className="flex flex-col gap-6"',
-					'className="flex flex-1 flex-col gap-6"',
-				),
-			),
-		).toBe(false);
-
-		// 2. A band gains a clipping utility. Run through the SAME A1 predicate
-		//    the assertion above uses, so the two cannot drift apart.
-		const arenaClass = bandClasses(page, "profile-arena").join(" ");
-		const clipped = page.replace(
-			`"profile-arena" className="${arenaClass}"`,
-			`"profile-arena" className="h-screen ${arenaClass}"`,
+		// 2. The scroll container loses its overflow — the panel would then grow
+		//    instead of scrolling, with no error anywhere.
+		const body = panelClasses(pos, POSITIONS, "positions-panel-body");
+		expect(body).toContain("overflow-y-auto");
+		expect(body.filter((c) => c !== "overflow-y-auto")).not.toContain(
+			"overflow-y-auto",
 		);
-		const clippedClasses = bandClasses(clipped, "profile-arena");
-		expect(
-			A1_FORBIDDEN.some((re) => clippedClasses.some((c) => re.test(c))),
-		).toBe(true);
-		// …and the unmutated band does NOT trip it, so the check discriminates.
+
+		// 3. A band gains a CLIPPING utility. Same A1 predicate the assertion
+		//    below uses, so the two cannot drift apart.
+		const arenaClass = arena.join(" ");
+		const clipped = page.replace(
+			`"profile-arena"\n\t\t\t\tclassName="${arenaClass}"`,
+			`"profile-arena"\n\t\t\t\tclassName="h-screen ${arenaClass}"`,
+		);
 		expect(
 			A1_FORBIDDEN.some((re) =>
-				bandClasses(page, "profile-arena").some((c) => re.test(c)),
+				bandClasses(clipped, "profile-arena").some((c) => re.test(c)),
 			),
-		).toBe(false);
+			"the h-screen mutation did not take — the control is inert",
+		).toBe(true);
+		// …and the unmutated band does NOT trip it, so the check discriminates.
+		expect(A1_FORBIDDEN.some((re) => arena.some((c) => re.test(c)))).toBe(
+			false,
+		);
 
-		// 3. The extractors THROW rather than silently returning nothing when the
-		//    node they name is gone — the difference between a guard that reports
-		//    a restructure and one that passes vacuously through it.
+		// 4. The extractors THROW rather than silently returning nothing when the
+		//    node they name is gone — a guard that reports a restructure, not one
+		//    that passes vacuously through it.
 		expect(() => containerExtras("export default function P() {}")).toThrow();
 		expect(() => bandClasses(page, "profile-nonexistent-band")).toThrow();
+		expect(() => panelClasses(pos, POSITIONS, "no-such-node")).toThrow();
 	});
 });

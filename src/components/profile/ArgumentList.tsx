@@ -273,7 +273,11 @@ function ArgumentsPanel({ children }: { children: React.ReactNode }) {
 		<section
 			data-testid="arguments-panel"
 			aria-label="Arguments"
-			className="flex flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+			// HTML-FINISH row 3 / §4 — the same `min-h-0` as the left panel, for
+			// the same reason and by the same chain. The two halves must scroll
+			// independently: with the arena bounded, whichever list is longer
+			// would otherwise set the band's height and drag the other with it.
+			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
 			<div
 				data-testid="arguments-panel-head"
@@ -281,7 +285,14 @@ function ArgumentsPanel({ children }: { children: React.ReactNode }) {
 			>
 				<span className="text-xs font-medium text-ink">Arguments</span>
 			</div>
-			<div className="flex flex-col gap-3 p-3">{children}</div>
+			{/* The argument list scrolls inside its own panel — the mockup's
+			    `.colwrap` on the right slot (`:478`), same topology as the left. */}
+			<div
+				data-testid="arguments-panel-body"
+				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+			>
+				{children}
+			</div>
 		</section>
 	);
 }

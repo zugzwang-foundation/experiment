@@ -102,8 +102,16 @@ const SITES: Site[] = [
 		// two 356px columns at 1440 — IDENTICAL to its 768 rendering, because the
 		// container never widened. It moves to the minted `wide` preset, whose
 		// `max-w-[1440px] px-6` is byte-carried from `GlobalHeader.tsx:91`.
-		now: "mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-6 py-6",
-		movedBy: "HTML-FINISH · PROFILE row 20 (founder-ruled 2026-08-15)",
+		//
+		// ⚠ `flex-1 min-h-0` are ROW 3's, not row 20's: this call site is the
+		// first link of the profile's height chain, which is what lets the
+		// positions panel scroll internally instead of growing. They are CONTENT
+		// layout, not container axes, so `BOX_AXES` is untouched by them — and
+		// `tests/unit/design/profile-height-chain.test.ts` is where the chain
+		// itself is asserted, node by node.
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6",
+		movedBy:
+			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2)",
 	},
 	{
 		site: 6,

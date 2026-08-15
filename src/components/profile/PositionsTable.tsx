@@ -280,7 +280,24 @@ export function PositionsTable({
 					    both `.num` headers (`:269`). The table keeps `text-left`: only
 					    the HEADERS and the two value CELLS centre — the Argument cell's
 					    prose stays left, which is what `text-left` on the table is for. */}
-					<thead className="text-xs text-n5">
+					{/* HTML-FINISH row 3 — THE COLUMN-HEADER ROW STAYS OUT OF THE
+					    SCROLL. The mockup puts `.thead` in `.colwrap` above the
+					    scrolling `.rows` (`:466-470`); here the scroll container is
+					    the panel body and the header is `sticky top-0`, so it never
+					    scrolls away — the same observable, reached without splitting
+					    the `<table>`.
+					    ⛔ SPLITTING IT WOULD COST MORE THAN IT BUYS. Lifting `<thead>`
+					    into a sibling of the scroll box means two tables, and two
+					    tables do not share column widths — the header would drift off
+					    its own cells at every viewport. The alternative, a div grid,
+					    needs an explicit track template, and the only one available is
+					    the mockup's `96px 1fr 78px 16px 118px` (`:262`) — five
+					    light-prototype VALUES the VALUE RULE forbids. Sticky keeps the
+					    real `<table>`, its column algorithm, and its semantics.
+					    `bg-n0` is the panel's own background, already on the section —
+					    a sticky header over scrolling rows must be opaque or the rows
+					    read through it. */}
+					<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
 						<tr>
 							<th className="p-2 text-center">Position</th>
 							<th className="p-2 text-center">Argument</th>
@@ -516,7 +533,11 @@ function PositionsPanel({
 		<section
 			data-testid="positions-panel"
 			aria-label="Positions"
-			className="flex flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
+			// HTML-FINISH row 3 / §4 — `min-h-0` so the panel can be SHORTER than
+			// its content, which is what makes the body below scroll instead of
+			// the panel growing. As a grid item it already stretches to the arena
+			// row's height; `min-h-0` is what lets that height actually bind.
+			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
 			{/* `relative` is the row-7a popover's POSITIONING CONTEXT, and it lives
 			    here rather than on the trigger — see the ⛔ at the trigger for the
@@ -529,7 +550,20 @@ function PositionsPanel({
 				<span className="text-xs font-medium text-ink">Positions</span>
 				{controls}
 			</div>
-			<div className="flex flex-col gap-3 p-3">{children}</div>
+			{/* HTML-FINISH row 3 — THE PANEL-SCOPED SCROLL. `flex-1 min-h-0
+			    overflow-y-auto` is the mockup's `.colwrap{flex:1 1 auto;
+			    min-height:0; overflow-y:auto}` (`:258-259`), topology throughout.
+			    ⚠ PANEL-SCOPED, NEVER VIEWPORT-SCOPED (recon A-5): the rows scroll
+			    inside this box; the page itself still grows and scrolls when
+			    content that CANNOT scroll exceeds the viewport. The mockup's
+			    `overflow:hidden` on html/body was struck as a fixed-viewport
+			    prototype affordance and is not adopted anywhere. */}
+			<div
+				data-testid="positions-panel-body"
+				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+			>
+				{children}
+			</div>
 		</section>
 	);
 }
