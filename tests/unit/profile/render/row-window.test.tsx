@@ -137,3 +137,39 @@ describe("item 8 — the measurement gates on the node having a box", () => {
 		expect(SOURCE).toContain('typeof ResizeObserver === "undefined"');
 	});
 });
+
+describe("ROUND 5 item A — the window narrows to the case that still needs it", () => {
+	it("window::it-gates-on-the-PAGE-being-free-to-grow", () => {
+		// ⚠⚠ ROUND 4 BUILT THIS CAP FOR AN UNBOUNDED PAGE. Item A bounds the page
+		// at `lg`+, which gives the panel a definite height from the VIEWPORT — and
+		// a 3-row cap on top of that is no longer a window, it is dead space: at
+		// 1440 × 1080 the arena gives the panel 638px and the cap would slice it to
+		// 276, re-creating the gap item A was ruled in to close, against a founder
+		// instruction that says "the list bigger".
+		// ⛔ THE TEST IS THE PAGE, NOT A BREAKPOINT — no `1024` literal anywhere.
+		// Clear the cap, ask whether the DOCUMENT can still scroll, window only if
+		// it can. That is exactly the condition the cap was built for, and it keeps
+		// round 4's mechanism alive below `lg` where the page does still grow.
+		expect(SOURCE).toContain("doc.scrollHeight <= doc.clientHeight + 1");
+		expect(SOURCE).toContain("document.documentElement");
+		// ⛔ No breakpoint literal smuggled in as a media query or a width compare.
+		expect(SOURCE).not.toContain("matchMedia");
+		expect(SOURCE).not.toContain("innerWidth");
+	});
+
+	it("window::the-cap-is-CLEARED-before-the-page-is-measured", () => {
+		// Order is load-bearing and invisible if wrong: a stale cap can itself be
+		// what makes the page fit, so measuring the document while the cap is still
+		// applied would latch the window on forever. The clear must precede the
+		// read.
+		const clearIdx = SOURCE.indexOf(
+			'body.style.maxHeight = "";\n\t\t\tconst doc',
+		);
+		expect(
+			clearIdx,
+			"item A: the three-row cap is not cleared immediately before the " +
+				"document is measured — a stale cap can be what makes the page fit, " +
+				"and the window would then never release.",
+		).toBeGreaterThan(-1);
+	});
+});
