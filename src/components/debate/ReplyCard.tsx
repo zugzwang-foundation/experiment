@@ -52,7 +52,7 @@ export function ReplyCard({
 				    `CardActions`' own `ml-auto` is inert inside this content-sized group. */}
 				<div className="ml-auto flex items-center gap-1.5">
 					<span className="font-mono text-xs text-muted-foreground">
-						Đ{formatDharma(reply.stake)}
+						Đ {formatDharma(reply.stake)}
 					</span>
 					<CardActions commentId={reply.id} bookmarks={bookmarks} />
 				</div>

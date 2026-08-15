@@ -64,7 +64,7 @@ export function ArgProfile({
 				</div>
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
 					{authorStake !== undefined ? (
-						<span className="font-mono">Đ{formatDharma(authorStake)}</span>
+						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
 					) : null}
 					{replyCount !== undefined ? (
 						<>
