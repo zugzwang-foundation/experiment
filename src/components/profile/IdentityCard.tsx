@@ -34,18 +34,45 @@ export function IdentityCard({
 			data-testid="identity-card"
 			className="flex flex-row items-center gap-4 p-4"
 		>
+			{/* HTML-FINISH row 16 — THE PFP FILLS THE BAND AS A SQUARE. The mockup's
+			    `.pfp` is `height:100%; aspect-ratio:1/1; flex:0 0 auto` (`:191-193`,
+			    markup `:436`) — it takes the identity band's height and derives its
+			    width from that, rather than sitting at a fixed box. All three of
+			    those are TOPOLOGY, so all three port: `h-full aspect-square
+			    shrink-0`. `w-auto` is load-bearing and is not decoration — the
+			    `width={56}` attribute below is a presentational hint that would
+			    otherwise pin the width and silently disable `aspect-ratio` (both
+			    axes specified); an author rule outranks the hint, so `w-auto` is
+			    what hands the width back to the ratio. The attributes STAY, as the
+			    intrinsic-ratio hint the browser uses before the image loads.
+			    ⚠ NO NEW VALUE. `min-h-14` is `size-14`'s OWN 3.5rem re-expressed as
+			    a FLOOR instead of a fixed height — the move `HeroPanels.tsx:138`
+			    already ships at HTML-FINISH row 9 ("`h-24` becomes `min-h-24` — the
+			    SAME 6rem, as a FLOOR rather than a fixed height"). It is what stops
+			    the PFP collapsing in the three route states that do not yet frame it
+			    in a band.
+			    `object-cover` is a FIT RULE, not a value (precedent:
+			    `HeroPanels.tsx:113`): once the box is height-derived, a non-square
+			    source would otherwise stretch, and "fill it as a square" would ship
+			    as "fill it as a squashed rectangle". */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.
 			    A scrubbed user shows the same placeholder until the R2 PFP builder +
 			    the owed scrubbed-silhouette asset land (surfaced for Gate C).
+			    ⛔ THIS BLOCK MUST STAY THE LAST COMMENT BEFORE THE ELEMENT. A
+			    `biome-ignore` attaches to the node that FOLLOWS it, so inserting a
+			    comment between the two detaches the suppression — and because both
+			    the orphaned suppression and the un-suppressed `noImgElement` are
+			    WARNINGS, `just verify` stays EXIT=0 while reporting both. Measured
+			    here at HTML-FINISH row 16, which did exactly that.
 			    biome-ignore lint/performance/noImgElement: static SVG placeholder — next/image is not warranted */}
 			<img
 				src={user.pfpUrl}
 				alt=""
 				width={56}
 				height={56}
-				className="size-14 rounded-[var(--imgr)] bg-n1"
+				className="aspect-square h-full min-h-14 w-auto shrink-0 rounded-[var(--imgr)] bg-n1 object-cover"
 			/>
 			<div className="flex flex-col gap-1">
 				<div className="flex items-center gap-2">

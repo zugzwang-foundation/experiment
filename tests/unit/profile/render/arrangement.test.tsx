@@ -3,7 +3,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { IdentityCard } from "@/components/profile/IdentityCard";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
+import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
 /**
@@ -34,6 +36,13 @@ const TILES: ProfileTilesData = {
 	argumentsCount: { total: 5, posts: 3, replies: 2 },
 	supportReceived: "40.000000000000000000",
 	counterReceived: "12.000000000000000000",
+};
+
+const USER: ProfileUser = {
+	id: "0190c0de-1111-7000-8000-0000000000f1",
+	pseudonym: "RedFox001",
+	banned: false,
+	pfpUrl: "/pfp-placeholder.svg",
 };
 
 /** The index of `child` among its parent's element children. */
@@ -90,6 +99,62 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 		// first, so the same predicate is false here.
 		expect(second?.className).not.toContain("text-n5");
 		expect(first?.className).toContain("text-n5");
+	});
+});
+
+describe("HTML-FINISH profile row 16 — the PFP fills the band as a square", () => {
+	/**
+	 * ⚠ A CLASS-PRESENCE GUARD, AND THE LIMIT IS STATED. jsdom performs NO
+	 * layout — it resolves no percentage height, no `aspect-ratio` and no
+	 * Tailwind utility — so this cannot prove the rendered box is square. It
+	 * proves the DECLARATION is intact, which is the drift this file can see;
+	 * the rendered geometry is proven in a browser against compiled CSS
+	 * (`discovery-height-chain.test.ts:19-24` states the same limit).
+	 */
+	it("row16::pfp-is-height-driven-and-ratio-derived", () => {
+		render(<IdentityCard user={USER} owner={false} />);
+		const card = screen.getByTestId("identity-card");
+		const pfp = card.querySelector("img");
+		if (pfp === null) {
+			throw new Error("row16: the identity card renders no <img>");
+		}
+		const classes = pfp.className.split(/\s+/);
+		// The mockup's three declarations (`:191`), each ported as topology.
+		expect(classes).toContain("h-full");
+		expect(classes).toContain("aspect-square");
+		expect(classes).toContain("shrink-0");
+		// `w-auto` is what hands the width back to the ratio — without it the
+		// `width={56}` presentational hint pins both axes and `aspect-ratio` is
+		// ignored. Pinned by name because dropping it is a SILENT regression:
+		// the element still renders, at the old fixed size.
+		expect(
+			classes,
+			`row 16: \`w-auto\` is missing, so the width={56} attribute pins the ` +
+				`box and aspect-square is inert. The PFP is back at a fixed size.`,
+		).toContain("w-auto");
+		// The fixed box must be GONE — its survival would win over the ratio.
+		expect(classes).not.toContain("size-14");
+		expect(classes).not.toContain("h-14");
+	});
+
+	it("row16::the-intrinsic-ratio-hint-attributes-survive", () => {
+		// Deliberately asserted: `w-auto` only works BECAUSE the attributes are a
+		// hint rather than an author rule, so a future reader must not "clean up"
+		// the attributes on the theory that the CSS replaced them. They are the
+		// pre-load ratio hint that keeps the identity band from shifting.
+		render(<IdentityCard user={USER} owner={false} />);
+		const pfp = screen.getByTestId("identity-card").querySelector("img");
+		expect(pfp?.getAttribute("width")).toBe("56");
+		expect(pfp?.getAttribute("height")).toBe("56");
+	});
+
+	it("row16::POSITIVE-CONTROL-the-pre-change-class-list-fails", () => {
+		// ⚠ PROOF BY REVERSAL over the REAL class string this row replaced.
+		const before = "size-14 rounded-[var(--imgr)] bg-n1".split(/\s+/);
+		expect(before).not.toContain("h-full");
+		expect(before).not.toContain("aspect-square");
+		expect(before).not.toContain("w-auto");
+		expect(before).toContain("size-14");
 	});
 });
 
