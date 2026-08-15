@@ -124,6 +124,11 @@ Add `tests/unit/design/side-pole-binding.test.ts` to §8's allow-list, and in it
 // seventh entry's were …
 ```
 
+> ⛔ **MECHANICAL CORRECTION — THE ENTRY GOES AT INDEX 0, NOT APPENDED.**
+> `inventory` is `[...new Set(...)].sort()` (`:379-381`), and `"A"` (0x41) sorts
+> before `"b"` (0x62), so `AggregateFooter.tsx` precedes `badges.tsx`.
+> **An appended entry leaves the test RED.** *(Caught by `@code-reviewer`.)*
+
 - **Precedent: exact, and twice.** Entries 7 and 8 were both added this way.
 - **The predicate is not touched** — the one thing the file says it must never do.
 - **Cost:** one line + a comment. **Widens the allow-list by one test file.**
@@ -146,6 +151,8 @@ Add `tests/unit/design/side-pole-binding.test.ts` to §8's allow-list, and in it
 | **C0** `4d9ba0f` | ✅ ratified plan landed; committed blob md5 identical to the ratified file. **GC-13 discharged** |
 | **C1** `13fcf48` | ✅ eight greenfield guards, **all eight RED on first run** — `H-GREEN (a)` does not fire |
 | **C2** `008e3bb` | ⛔ **HALTED, NOT CLEARED.** Committed as evidence so the ruling can be made against the diff |
+| — `e12a015` | this halt record |
+| — `422fb8b` | post-halt remediation: `@code-reviewer` HIGH-1 + MEDIUM-3, absorbed in-session (§10). **Does not advance the run** |
 | C3–C12 | ⛔ **DID NOT RUN** |
 | C13 | ⛔ attended-only; never in tonight's scope |
 
@@ -175,11 +182,72 @@ The prop pass is structurally unavoidable: `ReplyAggregate` carries counts and D
 
 ---
 
-## 10 · Next action
+## 10 · `@code-reviewer`'s pass — verdict and findings
 
-1. **Founder/web rules on §6** — Option A or Option B.
-2. If **A**: add `tests/unit/design/side-pole-binding.test.ts` to §8's allow-list, amend C2 (or land a C2a) with the ninth entry + decision comment, re-run the C2 gate, then continue at **C3**.
-3. Apply §20 step 7's **added** checkpoint: re-key `PostCard.tsx` before **C8** (§8 above).
-4. `C13` remains **attended-only** and out of scope for any unattended continuation.
+Run after the halt, on the full branch diff, with the plan and this record as context. **`@security-auditor` did NOT run** — it is C13's, and C13 did not run.
+
+⚠ The reviewer **did not execute the suite**: another session's `pnpm vitest run` was live in `/Users/hrishikesh/code/zz-hf-bookmarks`, and §14.3 forbids a concurrent runner. It verified statically plus `tsc --noEmit` (exit 0) and `biome check` (exit 0). *(Re-checked here with PID resolution before the remediation run below; it had finished. No other session's process was signalled.)*
+
+### ✅ Verdict on the halt: **CALLED CORRECTLY. Do not absorb.**
+
+Three grounds, the third of which is new evidence:
+
+1. `side-pole-binding.test.ts:283` states the mechanism as a rule about **who may act**: *"Each such addition must be a DECISION, made by adding the file here explicitly — never by relaxing the predicate."* **A decision is not an unattended executor's to take.**
+2. From the diff alone, *"unattended agent adds its own file to a closed inventory to green its own change"* is **behaviourally indistinguishable** from the anti-pattern the guard exists to forbid. The distinction lives entirely in an argument about pole semantics read against the read model — a review judgement.
+3. **The same collision is waiting at C12** (below). Ruling on C2 alone and resuming would hit an identical wall eight commits later. **The halt bought the chance to rule once, generally.**
+
+**CRITICAL: none.** No invariant surface, no refusal trigger, no `src/server/`, no schema, no migration, no auth path. **§5.14 SC-1 does not fire** — the diff adds no read over `comments.body`.
+
+### ⛔ HIGH-2 · **A SECOND COLLISION OF THE SAME GENUS IS WAITING AT C12, AND IT HAS NO FENCE-CLEAN ESCAPE**
+
+`tests/unit/design/pct-round-render.test.ts:52` pins `EXPECTED_ALLOW_MARKERS = 3` and asserts `toHaveLength(EXPECTED_ALLOW_MARKERS)` at `:101` — an **exact count, not a floor**. The three live markers are `badges.tsx:149`, `chart/MarketPriceChartCard.tsx:21`, `:24`.
+
+C1's landed guard (`chart-overlay-a11y.test.tsx:96-100`) requires the overlay summary to render `40%` / `73%` via `formatPercentUnpaired` — correctly, since these are single-side historical values and the paired formatter would derive `100 − x`. Any such call in `MarketPriceChartOverlay.tsx` needs a `pctround-allow:` marker ⇒ **markers becomes 4 ⇒ RED**.
+
+**Every escape is blocked:**
+
+| Escape | Why it fails |
+|---|---|
+| Compute in `MarketPriceChartCard.tsx`, pass down | That file is **not on §8's allow-list** ⇒ `H-FENCE` **RUN-STOP** — worse than a guard red |
+| Pass the summary from the parent | The parent is `MarketPriceChartHost`, a **§11 no-edit symbol** |
+| Use the paired formatter | A semantic defect the guard's own comment at `:42-51` argues against |
+
+⇒ **This is the THIRD instance of the genus** (`GC-3`, `GC-12`, the C2 halt). **Recommendation: rule the GENERAL form now** — *a correct new site enters a closed inventory/count as a ruled entry, and the plan's allow-list gains the guard file* — and apply it to **both** `side-pole-binding.test.ts` **and** `pct-round-render.test.ts` in one pass, rather than halting again at C12.
+
+### ✅ HIGH-1 and MEDIUM-3 — FOUND, CONFIRMED, FIXED IN-SESSION at `422fb8b`
+
+- **HIGH-1 · `dharma-spacing.test.tsx` selected the wrong element.** `.font-mono` returned the **SideBadge** (`CHIP.base` carries `font-mono`, `badges.tsx:61`; the badge precedes the stake at `ReplyCard.tsx:49`→`:54` and `ArgProfile.tsx:62`→`:67`), so **sites 2 and 3 could never have gone green — not at C1, not after C10.** §18's closure of `PD-3-07` rests on this guard, so this was `GC-3` reproduced inside `GC-3`'s own remedy. Fixed to `.font-mono:not([data-slot="badge"])`; the failure message moved from `expected 'YES' to contain 'Đ 5,000'` to `expected 'Đ5,000' to contain 'Đ 5,000'` — red for the right reason.
+- **MEDIUM-3 · the split-bar track was invisible on a NO post.** `--color-yes` `#181818` on `bg-card` → `--color-n0` `#212121` ≈ **1.09:1**; and on a zero-reply post the bar read as "100 % Counter". The mockup's `.bar` is an **outline** (`d5:510 border:1px solid var(--ink)`) and the port dropped it. Fixed with `[border:var(--hairline)]`. All four pole assertions remain green.
+
+### Recorded, NOT fixed — owners named
+
+- **MEDIUM-4 · `O-5`, in the committed plan.** `docs/plans/POLISH-3-PR-2.md:310` (§7) and `:564` (§12's `H-GREEN` schedule) still say **four** rows for `post-popup.test.tsx`. `GC-12` ruled **five**. §12 is the table an executor grades partial greens against. ⚠ **Deliberately NOT amended here:** the committed plan is the ratified v1.4 *verbatim* and its md5 is stamped in C0's body — editing it would invalidate that stamp. **Owner: the founder's next plan revision.**
+- **LOW-5 · T3 typography.** No `border-top:var(--hairline)` (`d5:583`); side figures `text-xs` vs `.sb2` `10px/700/n4` (`d5:595`); lowercase `staked` vs `.sb2.mid` uppercase + `.1em` (`d5:620`). All three inherited verbatim from the shipped `ReplySplitBar`, so C2 is **consistent** rather than **faithful**. T3 is a fidelity row — **one founder line owed** on whether it owes `d5`-exact typography or sibling consistency. *(Layout IS faithful: `shrink-0` / `min-w-0 flex-1` match `.sidewrap` / `.midwrap` at `d5:585,588`.)*
+- **LOW-6 · a C4 note.** `comment-image.test.tsx:77` pins `w-full` on the `<img>`, but the parent `<button>` is `block w-fit` (`CommentImage.tsx:23`). Inside a shrink-to-fit box the percentage resolves against the image's intrinsic width, so the guard would pass on a render that does not achieve `H-T2`'s ruled 100 % width. **C4 will need to touch the button too** — fence-clean (§8 row 7), but the guard as landed will not say so.
+- **LOW-7 · `§20` step 7.** Confirms §8 of this record: the `PostCard.tsx` re-key must move to **before C8**, not only before C9.
+
+### Confirmations requested and given
+
+- **Pole correctness — VERIFIED against the read model.** `ranking-substrate.ts:75-83` defines the aggregate as `support = rc.side_at_post_time = p.side_at_post_time`, `counter = <>` — Support is the post's own side, Counter the opposite. `supportPole`/`counterPole` match exactly, at **both** `PostCard` call sites, and `sideAtPostTime` is the correct INV-3-frozen basis on the removed variant too. The code is the **exact shape** `PERMITTED_FILES`' seventh entry documents as the ruled remedy — not the hole.
+- **`composer/split-bar.ts` reuse — sound, client-safe.** Full chain audited; `grep -rn "server-only" src/components/debate/` returns **prose only, zero imports**. Exact decimal throughout, no JS float touches a Đ value, `displaySplitTotal` adds before it groups (SPEC.1 §10.8). No `composer/**` file written, so §10 holds.
+- **The eight guards — composition constraint and `O-7` honoured.** No count, no whole-subtree snapshot, no composed-root equality. `post-popup` correctly uses `baseElement` (portal); `chart-overlay-a11y` correctly uses `container` (plain fixed `<div>`, not a portal). The one whole-root `innerHTML` use is the plan-prescribed ABSENCE form over unique fixture strings, immune to C10/C11. `chart-overlay-a11y`'s `@/server/**` imports are `import type` only — erased at compile.
+- **No second design-guard reddening at C3–C11.** The next one is at **C12** (HIGH-2).
+
+---
+
+## 11 · Next action
+
+1. **Founder/web rules on §6 — and rule the GENERAL form, not just this instance.** The recommended shape, covering both known collisions in one pass:
+
+   > *A **correct** new site that trips a closed inventory or an exact count in `tests/unit/design/**` enters that inventory as a **ruled entry**, in the same commit as the code — the predicate is never relaxed — and the plan's §8 allow-list gains the guard file so the entry is fence-clean.*
+
+   Applied now, that clears **both** `side-pole-binding.test.ts` (C2, live) and `pct-round-render.test.ts` (C12, forecast — §10 HIGH-2), instead of halting a second time eight commits later with no fence-clean escape.
+
+2. If **Option A**: add `tests/unit/design/side-pole-binding.test.ts` to §8's allow-list, then insert `"src/components/debate/AggregateFooter.tsx"` **at index 0** (⛔ not appended — see §6's mechanical correction) with a decision comment, re-run the C2 gate, and continue at **C3**.
+3. Apply §20 step 7's **added** checkpoint: re-key `PostCard.tsx` before **C8** as well as before C9 (§8).
+4. Amend the plan's §7 `:310` and §12 `:564` to `GC-12`'s **five** rows (`O-5`, §10 MEDIUM-4). Owner: the next plan revision — deliberately not done here, because the committed plan is the ratified v1.4 verbatim and its md5 is stamped in C0's body.
+5. Answer the **LOW-5** fidelity question: does T3 owe `d5`-exact typography, or consistency with the shipped `ReplySplitBar` it currently mirrors?
+6. Carry the **LOW-6** note into C4: `CommentImage`'s parent `<button>` is `w-fit`, so `H-T2`'s ruled 100 % width needs that element too.
+7. `C13` remains **attended-only** and out of scope for any unattended continuation.
 
 **Nothing was pushed to `main`. No PR was opened. No merge occurred.**
