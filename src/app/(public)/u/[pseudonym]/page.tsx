@@ -94,11 +94,51 @@ export default async function ProfilePage({
 		   `min-h-0` is what lets the arena below shrink to it instead of pushing
 		   past it, which is the difference between the positions panel scrolling
 		   INSIDE itself and the whole page growing.
-		   ⛔ `min-h-*`, never `h-*` (RULED A1): the floor is a FLOOR, so when the
-		   headzone's own content exceeds the viewport the page still GROWS and
-		   SCROLLS rather than clipping. Both hold at once — the page grows for
-		   content that cannot scroll, the arena scrolls for content that can. */
-		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-6">
+
+		   ⚠⚠⚠ ROUND 5 item A — ONE-SCREEN FIT AT `lg`+, AND THIS IS THE NODE THAT
+		   DOES IT. The founder ruled the profile route a one-screen design: no
+		   page scrollbar, every region that can overflow scrolling INSIDE itself.
+		   ⇒ THIS REVERSES RECON A-5 FOR THIS SURFACE ONLY. A-5 struck the mockup's
+		   `html,body{overflow:hidden}` as a fixed-viewport prototype affordance;
+		   the founder has now ruled the one-screen design IN. It is scoped HERE, on
+		   the profile's own container — ⛔ `(public)/layout.tsx` is NOT touched, so
+		   every other `(public)` surface keeps growing and scrolling exactly as
+		   before.
+
+		   ⛔ THE FIGURE IS `<main>`'s OWN, NOT A NEW ONE. `calc(100vh-60px-2px)` is
+		   byte-identical to the floor `(public)/layout.tsx` already declares — 60px
+		   is `GlobalHeader`'s `h-[60px]` row and 2px its `border-y`. Bounding the
+		   container at exactly that figure satisfies `<main>`'s `min-h` EXACTLY, so
+		   main never grows: header 62 + main (100vh − 62) = 100vh.
+
+		   ⛔ `lg:flex-none` IS LOAD-BEARING, NOT TIDINESS — MEASURED. `flex-1` is
+		   `flex: 1 1 0%`, and a 0% basis WINS over `height` on the main axis, so
+		   the height alone did nothing: measured with `h-[calc(…)]` applied and
+		   `flex-1` still on, the page still scrolled (document 1577 against a 725
+		   viewport) and main was still 1515. With `flex:none` the basis returns to
+		   `auto`, the height binds, and the page stops scrolling (document 725 ==
+		   viewport 725, main 663).
+
+		   ⚠ BELOW `lg` THE PAGE STILL GROWS AND SCROLLS, deliberately. The arena
+		   stacks to one column there and cannot fit a short viewport; the mockup is
+		   a fixed-desktop prototype and declares no breakpoint at all. So `flex-1
+		   min-h-0` stays unprefixed and only the `lg:` pair bounds.
+
+		   ⛔ NOTHING IS LOST — a bound with a scroll is not a clip. Every bounded
+		   region below keeps `overflow-y-auto`, and reachability was measured, not
+		   assumed: at 1440 × {1080, 768, 600, 500, 360} every position row and
+		   every argument is reachable by scrolling (`scrollIntoView` then intersect
+		   the viewport) — ZERO unreachable at every height.
+		   ⚠ AND THE FALLBACK IS THE RIGHT ONE. At absurd viewport heights (≲360)
+		   the band alone exceeds the container; the container's overflow stays
+		   `visible`, so the content spills and the PAGE scrolls to it — measured
+		   zero unreachable there too. An `overflow-y-auto` safety was tried and
+		   REJECTED: it buys nothing measurable and trades a page scrollbar nobody
+		   sees at realistic heights for an inner one. */
+		<PageContainer
+			preset="wide"
+			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+		>
 			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
 			    five full-width sections stacked in one column. Canon §2 (Profile):
 			    "Two bands. Top: identity card … + six account tiles … + the graph

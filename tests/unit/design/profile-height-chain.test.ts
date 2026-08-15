@@ -18,9 +18,10 @@ import { describe, expect, it } from "vitest";
  *
  *   <main>            min-h-[calc(100vh-60px-2px)] flex-1 flex-col   ← the SOURCE
  *                     (owned by `(public)/layout.tsx`, out of scope here)
- *   PageContainer     flex-1 min-h-0 flex-col       ← takes the floor, passes it on
- *   headzone band     (no flex-1)                   ← deliberately does NOT grow
- *   arena band        flex-1 min-h-0                ← the growing element
+ *   PageContainer     flex-1 min-h-0 flex-col                   ← below `lg`
+ *                     + lg:h-[calc(100vh-60px-2px)] lg:flex-none ← THE BOUND (R5 A)
+ *   headzone band     lg:h-[256px], no flex-1       ← declared, does NOT grow (R5 B)
+ *   arena band        flex-1 min-h-0                ← takes ALL the leftover
  *   both panels       min-h-0 flex-col              ← may be shorter than content
  *   both panel bodies flex-1 min-h-0 overflow-y-auto ← where the scroll happens
  *
@@ -30,44 +31,41 @@ import { describe, expect, it } from "vitest";
  * the panel grows instead of scrolling, and the page just gets taller. Every
  * `min-h-0` below is therefore pinned BY NAME on the node that needs it.
  *
- * ⚠⚠ THIS DOES NOT CONTRADICT RULED A1, and the distinction is the whole design.
+ * ⚠⚠ TWO SCOPES, TWO RULES — AND AT ROUND 5 THE OUTER ONE MOVED.
  * `(public)/layout.tsx` says "⛔ `min-h-*`, never `h-*`, and NO `min-h-0`
- * anywhere in the chain" — that governs the PAGE-LEVEL column, so the page can
- * GROW AND SCROLL rather than clip. It still does: `<main>`'s floor is a FLOOR,
- * and content that cannot scroll (the headzone) still pushes the page taller.
- * What `min-h-0` buys BELOW that is a bounded arena whose panels scroll
- * internally — recon A-5's own note that row 3's "fills the panel" is
- * "panel-scoped, never viewport-scoped". Two different scopes, two different
- * rules. `h-*` remains forbidden everywhere on the chain and is asserted so.
+ * anywhere in the chain", so the page can GROW AND SCROLL rather than clip.
+ * That still governs every OTHER `(public)` surface and it is untouched — the
+ * layout file was not edited. What changed is this ROUTE: the founder ruled the
+ * profile a ONE-SCREEN design, so the profile's own container is bounded at
+ * `lg`+ against the same figure the floor uses, and `<main>`'s `min-h` is
+ * satisfied exactly instead of being exceeded.
  *
- * ⛔⛔ WHAT THE CHAIN DOES **NOT** DELIVER, MEASURED AND REFUSED — READ THIS
- * BEFORE "FIXING" ANYTHING BELOW. Row 3 also asks that the fourth position row
- * and later be reached by SCROLLING INSIDE the panel. That is UNREACHABLE under
- * RULED A1, and it is a contradiction rather than a wiring bug:
+ * ⛔⛔ WHAT THE CHAIN COULD NOT DELIVER BEFORE ROUND 5 — KEPT, BECAUSE IT IS THE
+ * MEASUREMENT THAT EXPLAINS WHY THE BOUND EXISTS. Row 3 asks that the fourth
+ * position row and later be reached by SCROLLING INSIDE the panel. Under a
+ * floor-only chain that is unreachable, and it is a contradiction rather than a
+ * wiring bug:
  *
- *   `<main>`'s height is `max(floor, content)` — the floor is a `min-height`,
- *   deliberately, so the page GROWS AND SCROLLS instead of clipping (A1).
- *   Panel-internal scrolling needs `arena height < arena content`, which needs
- *   `main < content`. But `main = max(floor, content) >= content`. The two
- *   requirements cannot both hold.
+ *   `<main>`'s height is `max(floor, content)`. Panel-internal scrolling needs
+ *   `arena height < arena content`, which needs `main < content`. But
+ *   `main = max(floor, content) >= content`. The two cannot both hold.
  *
  * PROVEN BY CONTROL, not inferred: with the chain fully wired at 1440, injecting
  * twelve extra rows moved `main` 1383 -> 1619 and the panel body's CLIENT height
  * 901 -> 1136, while `scrollHeight > clientHeight` stayed FALSE throughout. The
- * page grew; the panel never scrolled. Binding it needs a DEFINITE height on an
- * ancestor (`h-[calc(...)]`), which §4 forbids outright, which A1 forbids in
- * `(public)/layout.tsx:103-107`, and which recon A-5 struck as a fixed-viewport
- * prototype affordance.
+ * page grew; the panel never scrolled.
  *
- * ⇒ WHAT THIS CHAIN DOES DELIVER, and why it is still worth every line: the
- * panel FILLS the arena band (measured: positions panel 953 == arena 953, and
- * 1189 == 1189 under the control) instead of sitting at content height, and the
- * scroll container is correctly wired the moment any ancestor ever becomes
- * definite. The `<thead>` is `sticky`, so the column-header row is already held
- * out of that scroll for when it engages.
- * ⛔ DO NOT "FIX" THE MISSING SCROLL BY ADDING `h-*` ANYWHERE ON THIS CHAIN. The
- * A1 assertion below exists to stop exactly that, and it is the whole reason the
- * forbidden set is asymmetric with `min-h-0`.
+ * ✅ ROUND 5 item A RESOLVED IT, and by the only lever that ever could: a
+ * DEFINITE height on an ancestor. `lg:h-[calc(100vh-60px-2px)] lg:flex-none` on
+ * the container makes `main` exactly the viewport below the header, so the arena
+ * is definite, both panels get a real height, and the overflow goes to their
+ * `overflow-y-auto` bodies. Measured after: page does NOT scroll at `lg`+
+ * (document 725 == viewport 725), and at 1440 × {1080, 768, 600, 500, 360} ZERO
+ * position rows and ZERO arguments are unreachable.
+ * ⛔ THE OLD BLANKET BAN ("never `h-*` anywhere on this chain") IS SUPERSEDED and
+ * has been re-derived onto the property it actually protected — see the
+ * FORBIDDEN-SET docblock below. An UNPREFIXED `h-*` is still forbidden, because
+ * below `lg` the bands stack and the page must still be free to grow.
  *
  * ⚠ WHY A SOURCE SCAN AND NOT A RENDER TEST. jsdom performs no layout: it
  * resolves no `calc()`, no `100vh`, no percentage height and no Tailwind
@@ -121,16 +119,51 @@ function bandClasses(source: string, testid: string): string[] {
 }
 
 /**
- * ⛔ THE FORBIDDEN SET, and it is NOT symmetrical with `min-h-0`.
+ * ⛔ THE FORBIDDEN SET — RE-DERIVED AT ROUND 5, NOT DELETED.
  *
- * A FIXED height clips: content taller than the box is simply lost, with no
- * scroll and no overflow. RULED A1 forbids it on this chain outright, at every
- * node, and the mockup's `overflow:hidden` on html/body was struck as a
- * fixed-viewport prototype affordance (recon A-5). `min-h-0` is the opposite —
- * it removes a FLOOR so a node can shrink and hand the overflow to a scroll
- * container — and is REQUIRED below, not forbidden.
+ * WHAT IT USED TO SAY. "A FIXED height clips: content taller than the box is
+ * simply lost, with no scroll and no overflow. RULED A1 forbids it on this
+ * chain outright, at every node." That banned `h-*` unconditionally, and the
+ * mockup's `overflow:hidden` on html/body was struck as a fixed-viewport
+ * prototype affordance (recon A-5).
+ *
+ * WHAT CHANGED. The founder ruled the profile a ONE-SCREEN design: the route
+ * occupies exactly the viewport below the header, and every region that can
+ * overflow scrolls inside itself. That reverses A-5 FOR THIS SURFACE, so the
+ * chain is now deliberately BOUNDED at two nodes — the container at
+ * `lg:h-[calc(100vh-60px-2px)]` and the headzone at `lg:h-[256px]`.
+ *
+ * ⚠⚠ THE PROPERTY A1 ACTUALLY PROTECTS IS NOT "NO HEIGHT" — IT IS "NOTHING IS
+ * LOST". A bound with a scroll container is not a clip: the content past the
+ * fold is REACHED BY SCROLLING. A bound WITHOUT one is a clip, and that is what
+ * must stay forbidden. So this file now asserts the property directly:
+ *
+ *   ⑴ the two bounds are declared, BY NAME, and are `lg:`-scoped — below `lg`
+ *     the arena stacks and the page must still grow and scroll;
+ *   ⑵ the container's figure is byte-identical to `<main>`'s own floor, so the
+ *     `min-h` is satisfied exactly and main never grows;
+ *   ⑶ every bounded region hands its overflow to a scroll container — both
+ *     panel bodies keep `overflow-y-auto`, and the arena keeps `flex-1 min-h-0`
+ *     so it can shrink to the bound instead of pushing past it;
+ *   ⑷ NOTHING on the chain declares a clipping overflow.
+ *
+ * ⛔ THE UNPREFIXED BAN SURVIVES, and it is the half that still does A1's
+ * original job: an unprefixed `h-*` would cap the STACKED layout below `lg`,
+ * where the identity card sits above a full-width graph and there is no
+ * one-screen promise to keep. `min-h-0` remains REQUIRED, not forbidden — it
+ * removes a FLOOR so a node can shrink and hand overflow to a scroll container.
+ *
+ * ⚠ Resolved geometry is proven in a browser, not here: at 1440 × {1080, 768,
+ * 600, 500, 360} the page does not scroll at `lg`+ and ZERO position rows and
+ * ZERO arguments are unreachable. jsdom performs no layout and can see none of
+ * that; this file proves the DECLARATIONS compose.
  */
 const A1_FORBIDDEN = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
+
+/** A clipping overflow on the vertical path — the thing that turns a bound
+ * into a clip. `overflow-y-auto` and `overflow-hidden` are NOT interchangeable
+ * here, and only one of them keeps the content reachable. */
+const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
 
 /** The class list of a node in one of the two panel files, by `data-testid`. */
 function panelClasses(source: string, file: string, testid: string): string[] {
@@ -238,12 +271,12 @@ describe("profile height chain — every link, asserted by name", () => {
 		expect(bandClasses(read(PAGE), "profile-headzone")).not.toContain("flex-1");
 	});
 
-	it("profile-height-chain::no-clipping-utility-on-the-page-level-nodes", () => {
-		// RULED A1 (`(public)/layout.tsx:103-107`), enforced on the nodes it
-		// governs: the floor lets the page GROW and SCROLL when content exceeds
-		// the viewport instead of clipping it. The mockup's `overflow:hidden` on
-		// html/body is a fixed-viewport prototype affordance and is deliberately
-		// NOT adopted (recon A-5).
+	it("profile-height-chain::no-UNPREFIXED-height-so-the-stacked-layout-still-grows", () => {
+		// ⚠ THE HALF OF RULED A1 THAT SURVIVES ROUND 5 UNCHANGED. Below `lg` the
+		// two bands stack to one column and the page must GROW AND SCROLL — the
+		// arena cannot fit a short viewport there, and the mockup (a fixed-desktop
+		// prototype) declares no breakpoint at all. An UNPREFIXED `h-*` on any of
+		// these three nodes would cap that layout too, and THAT is a clip.
 		const page = read(PAGE);
 		const nodes: Array<[string, string[]]> = [
 			["the PageContainer call site", containerExtras(page).split(/\s+/)],
@@ -255,11 +288,91 @@ describe("profile height chain — every link, asserted by name", () => {
 				const hit = classes.find((c) => forbidden.test(c));
 				expect(
 					hit,
-					`RULED A1: ${name} declares \`${hit}\`, which CLIPS instead of ` +
-						`letting the page grow and scroll. Use a \`min-h-*\` floor.`,
+					`RULED A1: ${name} declares \`${hit}\` UNPREFIXED, which caps the ` +
+						`STACKED layout below \`lg\` as well — where nothing scrolls ` +
+						`internally and the page must be free to grow. The one-screen ` +
+						`bound is \`lg:\`-scoped for exactly this reason.`,
 				).toBeUndefined();
 			}
 		}
+	});
+
+	it("profile-height-chain::the-ONE-SCREEN-bound-is-declared-at-lg-and-only-at-lg", () => {
+		// ⑴ + ⑵ of the re-derivation. The container is bounded against the SAME
+		// figure `<main>`'s floor uses, so the `min-h` is satisfied exactly and
+		// main never grows: header 62 + main (100vh − 62) = 100vh.
+		// ⛔ `lg:flex-none` IS LOAD-BEARING AND WAS MEASURED. `flex-1` is
+		// `flex: 1 1 0%`, and a 0% basis WINS over `height` on the main axis — with
+		// the height applied and `flex-1` still on, the page STILL scrolled
+		// (document 1577 against a 725 viewport). With `flex:none` the basis
+		// returns to `auto`, the height binds, and document == viewport.
+		const page = read(PAGE);
+		const extras = containerExtras(page).split(/\s+/);
+		expect(
+			extras,
+			"item A: the container declares no one-screen bound, so `<main>` grows " +
+				"with its content and the page scrolls.",
+		).toContain("lg:h-[calc(100vh-60px-2px)]");
+		expect(
+			extras,
+			"item A: the bound is inert without `lg:flex-none` — `flex-1`'s 0% " +
+				"basis wins over `height` on the main axis. MEASURED: page still " +
+				"scrolled at 1577 against a 725 viewport.",
+		).toContain("lg:flex-none");
+		// …and the figure is byte-identical to the floor the shell already sets.
+		expect(
+			read(LAYOUT),
+			"item A: the container's bound and `<main>`'s floor have drifted apart. " +
+				"They must be the same figure or main either grows or is starved.",
+		).toContain("min-h-[calc(100vh-60px-2px)]");
+		// The headzone's declared height, pinned here too — it is the other half of
+		// what makes the arena's height definite.
+		expect(bandClasses(page, "profile-headzone")).toContain("lg:h-[256px]");
+	});
+
+	it("profile-height-chain::every-bounded-region-hands-overflow-to-a-SCROLL-container", () => {
+		// ⑶ + ⑷ — THE PROPERTY A1 ACTUALLY PROTECTS. A bound with a scroll is not
+		// a clip; a bound without one is. So: no clipping overflow anywhere on the
+		// vertical path, and both panel bodies keep their scroll container.
+		const page = read(PAGE);
+		const pos = read(POSITIONS);
+		const arg = read(ARGUMENTS);
+		const nodes: Array<[string, string[]]> = [
+			["the PageContainer call site", containerExtras(page).split(/\s+/)],
+			["the headzone band", bandClasses(page, "profile-headzone")],
+			["the arena band", bandClasses(page, "profile-arena")],
+			[
+				"the positions panel body",
+				panelClasses(pos, POSITIONS, "positions-panel-body"),
+			],
+			[
+				"the arguments panel body",
+				panelClasses(arg, ARGUMENTS, "arguments-panel-body"),
+			],
+		];
+		for (const [name, classes] of nodes) {
+			const hit = classes.find((c) => CLIPPING_OVERFLOW.test(c));
+			expect(
+				hit,
+				`item A: ${name} declares \`${hit}\`. With the chain BOUNDED, a ` +
+					`clipping overflow makes content unreachable — content past the ` +
+					`fold must be reached by SCROLLING. Measured at 1440 × {1080, 768, ` +
+					`600, 500, 360}: zero rows and zero arguments unreachable.`,
+			).toBeUndefined();
+		}
+		// The two scroll containers, by name — these are what "nothing is lost"
+		// rests on once the page can no longer grow.
+		expect(panelClasses(pos, POSITIONS, "positions-panel-body")).toContain(
+			"overflow-y-auto",
+		);
+		expect(panelClasses(arg, ARGUMENTS, "arguments-panel-body")).toContain(
+			"overflow-y-auto",
+		);
+		// …and the arena must still be able to SHRINK to the bound rather than
+		// pushing past it, or the bound would simply overflow.
+		const arena = bandClasses(page, "profile-arena");
+		expect(arena).toContain("flex-1");
+		expect(arena).toContain("min-h-0");
 	});
 
 	it("profile-height-chain::the-THREE-ROW-WINDOW-bounds-the-panel-without-clipping", () => {

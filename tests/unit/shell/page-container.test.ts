@@ -109,9 +109,26 @@ const SITES: Site[] = [
 		// layout, not container axes, so `BOX_AXES` is untouched by them — and
 		// `tests/unit/design/profile-height-chain.test.ts` is where the chain
 		// itself is asserted, node by node.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6",
+		//
+		// ⚠⚠ ROUND 5 item A ADDS THE ONE-SCREEN BOUND — `lg:h-[calc(100vh-60px-2px)]`
+		// and `lg:flex-none`. The founder ruled the profile route a one-screen
+		// design: it occupies exactly the viewport below the header, no page
+		// scrollbar, every region that can overflow scrolling inside itself. This
+		// call site is the node that does it, because bounding the container at
+		// the SAME figure `<main>`'s floor already uses satisfies that `min-h`
+		// EXACTLY, so main never grows: header 62 + main (100vh − 62) = 100vh.
+		// ⛔ `lg:flex-none` IS NOT TIDINESS — `flex-1` is `flex: 1 1 0%` and a 0%
+		// basis WINS over `height` on the main axis. MEASURED: with the height
+		// applied and `flex-1` still on, the page STILL scrolled (document 1577
+		// against a 725 viewport). With `flex:none` it stops (725 == 725).
+		// ⛔ BOTH ARE `lg:`-SCOPED. Below `lg` the two bands stack and the page
+		// must stay free to grow and scroll, so `BOX_AXES` is untouched at every
+		// width and the three container axes still move only where row 20 moved
+		// them.
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
 		movedBy:
-			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2)",
+			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2); " +
+			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5)",
 	},
 	{
 		site: 6,

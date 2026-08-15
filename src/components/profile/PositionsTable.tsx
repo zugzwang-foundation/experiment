@@ -238,6 +238,10 @@ export function PositionsTable({
 	// ⚠ IT GATES ON THE NODES HAVING A BOX. jsdom performs no layout and returns
 	// zero rects, so the cap is simply not applied there — the render suite sees
 	// the uncapped panel rather than a `max-height:0px` that would hide every row.
+	// ⚠⚠ AND SINCE ROUND 5 IT GATES ON THE PAGE BEING FREE TO GROW — see the
+	// second guard inside `measure()`. At `lg`+ the profile is a one-screen
+	// layout (item A) and the panel's height comes from the viewport, so the
+	// window would subtract from the list rather than bound it.
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
@@ -249,6 +253,25 @@ export function PositionsTable({
 				// Fewer rows than the window — nothing to window, and the panel goes
 				// back to its natural height rather than keeping a stale cap.
 				body.style.maxHeight = "";
+				return;
+			}
+			// ⚠⚠ ROUND 5 item A — THE WINDOW NARROWS TO THE CASE THAT STILL NEEDS
+			// IT. Round 4 built this cap because the page was free to grow, so the
+			// panel had no definite height and would have run to N rows. Item A
+			// bounds the page at `lg`+, which gives the panel a definite height
+			// from the VIEWPORT — and a 3-row cap on top of that is no longer a
+			// window, it is dead space: at 1440 × 1080 the arena gives the panel
+			// 638px and the cap would slice it to 276, re-creating the very gap
+			// item A was ruled in to close, against a founder instruction that
+			// says "the list bigger".
+			// ⇒ THE TEST IS THE PAGE, NOT A BREAKPOINT. Clear the cap, ask whether
+			// the DOCUMENT can still scroll, and only window when it can. That is
+			// exactly the condition the cap was built for, it needs no `1024`
+			// literal, and it keeps round 4's mechanism alive below `lg` where the
+			// page does still grow.
+			body.style.maxHeight = "";
+			const doc = document.documentElement;
+			if (doc.scrollHeight <= doc.clientHeight + 1) {
 				return;
 			}
 			const positionRows = table.querySelectorAll<HTMLTableRowElement>(
