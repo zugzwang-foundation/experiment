@@ -230,14 +230,45 @@ export function PositionsTable({
 						data-testid="positions-status-filter"
 						className="ml-auto flex items-center gap-1"
 					>
+						{/* ⚠⚠ FOUNDER EYE PASS item 2 — THE SELECTED HALF WAS INVISIBLE,
+						    and the cause is worth stating because it looks like working
+						    code. This pair was `variant={status === s ? "default" :
+						    "outline"}`, and `ui/button.tsx:16-19` renders those TWO
+						    VARIANTS IDENTICALLY — same `--btn-fill`, same hairline, same
+						    ink text — under its own docblock: "One-button system
+						    (values-log §3 item 3 / R-6): primary and outline render
+						    identically". So the toggle carried a real `aria-pressed` and
+						    a real state change with ZERO pixels of difference. A variant
+						    swap can never express selection in this system.
+						    ⇒ THE SELECTED STATE COMES FROM THE EMPHASIS LADDER INSTEAD.
+						    `--ring-active` is rung 3 and is literally the token for this
+						    (`globals.css:178`, `1.5px solid var(--color-n4)`); the shipped
+						    consumption form is `[outline:var(--ring-active)]` at
+						    `discovery/MarketCard.tsx:74`, reused verbatim here. Against
+						    the unselected half's 1px `--hairline` (`globals.css:166`) that
+						    is a thicker, brighter edge — unmistakable, and derived
+						    entirely from shipped tokens.
+						    ⛔ NOT THE MOCKUP'S BLACK-ON-WHITE (`.seg.on{background:
+						    var(--ink); color:var(--n0)}`, `:257`). That is a VALUE from a
+						    light-mode prototype, and porting it by name would render the
+						    selected half near-WHITE in the shipped dark system — the exact
+						    inversion `side-pole-binding` exists to prevent.
+						    `text-ink` vs `text-n5` is the shipped emphasis pair already
+						    used across this surface (`<thead>` is `text-n5`, values are
+						    `text-ink`), so the label brightens with the edge. */}
 						{(["Open", "Closed"] as const).map((s) => (
 							<Button
 								key={s}
 								type="button"
 								size="xs"
-								variant={status === s ? "default" : "outline"}
+								variant="outline"
 								data-testid={`positions-status-${s.toLowerCase()}`}
 								aria-pressed={status === s}
+								className={
+									status === s
+										? "[outline:var(--ring-active)] text-ink"
+										: "text-n5"
+								}
 								onClick={() => setStatus(s)}
 							>
 								{s}

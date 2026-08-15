@@ -324,6 +324,116 @@ describe("HTML-FINISH profile rows 4 · 5 · 12 — the argument card", () => {
 	});
 });
 
+describe("FOUNDER EYE PASS item 1 — Đ on every Đ tile", () => {
+	/** The four tiles whose value is a Đ quantity. */
+	const DHARMA_TILES = [
+		"tile-wallet",
+		"tile-positions",
+		"tile-support",
+		"tile-counter",
+	];
+
+	it("item1::every-dharma-tile-prefixes-the-byte-carried-glyph", () => {
+		render(<ProfileTiles tiles={TILES} />);
+		for (const testid of DHARMA_TILES) {
+			const value = screen.getByTestId(testid).children[0];
+			const text = (value?.textContent ?? "").trim();
+			// ⛔ ASSERTED BY CODE POINT, not by pasting the character. U+0110 has
+			// lookalikes (Ð U+00D0 ETH, Đ U+0110) that are visually identical in
+			// many faces; a paste-comparison would accept the wrong one.
+			expect(
+				text.codePointAt(0),
+				`item 1: ${testid}'s value must start with Đ (U+0110). Got "${text}".`,
+			).toBe(0x110);
+			// …and the glyph is followed by a space and then the formatted number,
+			// i.e. the shipped `Đ {formatDharma(…)}` spacing, not `Đ1,234`.
+			expect(text.slice(0, 2)).toBe("Đ ");
+			expect(text.length).toBeGreaterThan(2);
+		}
+	});
+
+	it("item1::the-ARGUMENTS-tile-takes-no-Đ-it-is-a-count", () => {
+		// The mockup gives it none (`:443`) and SPEC.1 §23 pins the string as
+		// `N (P Posts | R Replies)`. A Đ here would be a category error AND a
+		// spec violation.
+		render(<ProfileTiles tiles={TILES} />);
+		const value = screen.getByTestId("tile-arguments-value");
+		expect(value.textContent).toBe("5 (3 Posts | 2 Replies)");
+		expect(value.textContent).not.toContain("Đ");
+	});
+
+	it("item1::NET-P/L-IS-BLOCKED-and-stays-exactly-as-shipped", () => {
+		// ⛔ THIS PINS A BLOCK, DELIBERATELY. The founder asked for `+Đ 238` /
+		// `−Đ n`. `displayNetProfitLoss` emits neither sign-before-glyph form,
+		// and both routes to it are closed this round: editing
+		// `debate/format.ts` (READ ONLY) or reading the DISPLAYED string back
+		// into conditional rendering (SPEC.1 §10.8 bans that by name).
+		// A bare `Đ ` would print `Đ -30` — worse than today. So the tile is
+		// unchanged, and this guard exists so the next reader meets the block
+		// rather than "forgetting" the founder's mark.
+		render(<ProfileTiles tiles={TILES} />);
+		const tile = screen.getByTestId("tile-net-pl");
+		const value = (tile.children[0]?.textContent ?? "").trim();
+		expect(value).toBe("-30");
+		expect(value).not.toContain("Đ");
+	});
+});
+
+describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable", () => {
+	const PAYLOAD = { owner: false as const, rows: [ROW_OPEN, ROW_SETTLED] };
+
+	it("item2::the-selected-half-carries-the-ACTIVE-ring-and-the-other-does-not", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		const open = screen.getByTestId("positions-status-open");
+		const closed = screen.getByTestId("positions-status-closed");
+		expect(open.getAttribute("aria-pressed")).toBe("true");
+		// `--ring-active` is rung 3 of the shipped emphasis ladder
+		// (`globals.css:178`); the consumption form is `MarketCard.tsx:74`'s.
+		expect(open.className).toContain("[outline:var(--ring-active)]");
+		expect(closed.className).not.toContain("[outline:var(--ring-active)]");
+		// …and the label brightens with the edge, so the difference survives for
+		// anyone who cannot resolve a 0.5px border delta.
+		expect(open.className).toContain("text-ink");
+		expect(closed.className).toContain("text-n5");
+	});
+
+	it("item2::the-ring-FOLLOWS-the-selection", () => {
+		render(<PositionsTable payload={PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-status-closed"));
+		expect(screen.getByTestId("positions-status-closed").className).toContain(
+			"[outline:var(--ring-active)]",
+		);
+		expect(screen.getByTestId("positions-status-open").className).not.toContain(
+			"[outline:var(--ring-active)]",
+		);
+	});
+
+	it("item2::POSITIVE-CONTROL-a-variant-swap-CANNOT-express-selection-here", () => {
+		// ⚠⚠ THE REASON THE BUG WAS INVISIBLE, PINNED SO IT CANNOT BE REINTRODUCED.
+		// The pair was `variant={selected ? "default" : "outline"}`. Read the two
+		// variant strings off the SHIPPED primitive: they are IDENTICAL, by
+		// design ("One-button system … primary and outline render identically",
+		// `ui/button.tsx:13-15`). Anyone "simplifying" item 2 back to a variant
+		// swap ships a toggle with correct ARIA and zero pixels of difference.
+		const src = readFileSync(
+			join(process.cwd(), "src/components/ui/button.tsx"),
+			"utf8",
+		);
+		const grab = (name: string) =>
+			new RegExp(`\\b${name}:\\s*\\n?\\s*"([^"]*)"`).exec(src)?.[1] ?? null;
+		const def = grab("default");
+		const outline = grab("outline");
+		expect(def, "could not read the `default` variant string").toBeTruthy();
+		expect(outline, "could not read the `outline` variant string").toBeTruthy();
+		expect(
+			def,
+			`ui/button.tsx's \`default\` and \`outline\` are no longer identical. ` +
+				`If the one-button system changed, item 2's ring may no longer be ` +
+				`the right mechanism — re-derive it rather than reverting.`,
+		).toBe(outline);
+	});
+});
+
 describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", () => {
 	it("row15::value-node-precedes-label-node-in-every-tile", () => {
 		render(<ProfileTiles tiles={TILES} />);

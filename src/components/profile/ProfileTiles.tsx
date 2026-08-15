@@ -27,12 +27,47 @@ export function ProfileTiles({
 			// Arguments tile's breakdown (row 19 below) dragged the top row down.
 			className="grid auto-rows-fr grid-cols-2 gap-3 sm:grid-cols-3"
 		>
+			{/* FOUNDER EYE PASS item 1 — Đ ON EVERY Đ VALUE. The mockup's tiles read
+			    `Đ 2,430` / `Đ 2,668` / `Đ 8,640` / `Đ 5,210` (`:440-445`); the build
+			    printed bare digits, so a wallet balance and a reply count looked
+			    like the same kind of number.
+			    ⛔ THE GLYPH IS BYTE-CARRIED, NOT TYPED — `c4 90`, U+0110 LATIN
+			    CAPITAL LETTER D WITH STROKE. Hexdump of `ArgumentList.tsx`'s shipped
+			    `Đ {formatDharma(…)}` and of mockup `:440` both give `c4 90 20`,
+			    identical, and this reuses the shipped spacing too.
+			    ⛔ NO FORMATTER IS AUTHORED: `formatDharma` is untouched and still
+			    wraps every value, so `no-raw-dharma-render` holds unchanged.
+			    ⚠ THE ARGUMENTS TILE TAKES NO Đ — it is a COUNT, the mockup gives it
+			    none (`:443`), and SPEC.1 §23 pins its string as
+			    `N (P Posts | R Replies)`. */}
 			<Tile testid="tile-wallet" label="Wallet value">
-				{formatDharma(tiles.walletValue)}
+				Đ {formatDharma(tiles.walletValue)}
 			</Tile>
 			<Tile testid="tile-positions" label="Positions value">
-				{formatDharma(tiles.positionsValue)}
+				Đ {formatDharma(tiles.positionsValue)}
 			</Tile>
+			{/* ⛔⛔ NET P/L TAKES NO Đ AND NO `+` — BLOCKED, NOT OVERLOOKED, and it
+			    is the one tile the founder named explicitly ("Net P/L carries its
+			    sign, `+Đ 238` / `−Đ n`").
+			    THE SHIPPED FORMATTER EMITS NEITHER. `displayNetProfitLoss`
+			    (`debate/format.ts:142-165`) returns `groupInteger(...)` — digits with
+			    a leading ASCII `-` for negatives (`format.ts:72`) and NO sign for
+			    positives. Reaching the founder's form needs the sign BEFORE the Đ,
+			    and there are exactly two routes to it:
+			      (a) teach `format.ts` a signed variant — but
+			          `src/components/debate/**` is READ ONLY this round; or
+			      (b) inspect the returned string (`startsWith("-")`, or test for a
+			          leading `+`) and re-assemble around it — which is reading a
+			          DISPLAYED figure back into conditional rendering, and SPEC.1
+			          §10.8 forbids exactly that by name: "Rounded values are
+			          terminal: a displayed figure is a string, and is never read
+			          back into arithmetic, comparison, validation, clamping, or
+			          CONDITIONAL RENDERING."
+			    ⛔ A BARE `Đ ` PREFIX IS NOT SHIPPED AS A CONSOLATION: it would print
+			    `Đ -30`, which is worse than today's `-30` — the sign lands on the
+			    wrong side of the glyph and the tile stops matching the other four.
+			    ⇒ The tile is LEFT EXACTLY AS IT SHIPPED and the block is reported.
+			    Route (a) is one line the moment `format.ts` is writable. */}
 			<Tile testid="tile-net-pl" label="Net profit / loss">
 				{displayNetProfitLoss(
 					tiles.walletValue,
@@ -61,10 +96,10 @@ export function ProfileTiles({
 				</span>
 			</Tile>
 			<Tile testid="tile-support" label="Total Support received">
-				{formatDharma(tiles.supportReceived)}
+				Đ {formatDharma(tiles.supportReceived)}
 			</Tile>
 			<Tile testid="tile-counter" label="Total Counter received">
-				{formatDharma(tiles.counterReceived)}
+				Đ {formatDharma(tiles.counterReceived)}
 			</Tile>
 		</div>
 	);
