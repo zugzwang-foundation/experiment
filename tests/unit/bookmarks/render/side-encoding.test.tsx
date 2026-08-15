@@ -231,6 +231,25 @@ describe("BookmarkCard — the removed variant keeps its slot and leaks no body"
 		expect(cls).toContain("bg-yes");
 		expect(cls).not.toContain("bg-primary");
 	});
+
+	it("removed-arm-chip-renders-the-bare-side-never-a-price", () => {
+		// ⚠ THE POSITIVE CONTROL THE WIDENED SELECTOR LOST. Every other
+		// removed-arm assertion routes through `sideChip()`, whose predicate now
+		// ACCEPTS the priced form — so if a price ever did reach a removed stub,
+		// all of them would still pass. This is the one assertion that would not.
+		//
+		// The compile boundary is the real control: `BookmarkItem`'s removed
+		// variant is `Extract<ProfileArgumentItem,{removed:true}>` and carries no
+		// price field, so `price={item.priceAtBet}` at that call site is a TS
+		// error, not a runtime absence (S-5). This is the BELT — and it is worth
+		// having because the belt got LOOSER in the same commit that made the
+		// price renderable at all. A negative assertion needs a positive control.
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={removedItem(side)} />);
+			expect(sideChip(container, side)?.textContent?.trim()).toBe(side);
+			cleanup();
+		}
+	});
 });
 
 /**
@@ -252,9 +271,19 @@ describe("BookmarkCard — the removed variant keeps its slot and leaks no body"
  * file's chip coverage exists to close.
  *
  * ⚠ These ride `sideChip()` rather than a hand-rolled selector so that item 1's
- * widening of that helper (C2, when the live chip's text becomes `YES @ 27%`)
+ * widening of that helper (C2, when the live chip's text becomes `YES @ 38%`)
  * carries them automatically. The removed arm never gains a price, so its chip
  * text stays the bare side literal under either predicate.
+ *
+ * ⚠ THAT NUMBER READ `27%` UNTIL THE REMEDIATION COMMIT, AND IT WAS WRONG FROM
+ * THE MOMENT C2 LANDED. `27%` is POLISH.5's `ArgumentList` fixture value,
+ * carried in from another surface's plan while this block was written at C1 —
+ * before the real number existed. C2 set this surface's fixture to
+ * `0.380000000000000000` and pinned `YES @ 38%` thirty lines above, and never
+ * came back for the prose. ⇒ The correct value and the stale one sat in ONE
+ * FILE, and two reviewer passes missed it because both checked the diff's
+ * claims against the REPO and neither checked the diff's PROSE against the
+ * diff's own CODE.
  */
 const PROFILE_CHIP_TOKENS = [
 	"rounded-[var(--r)]",

@@ -44,7 +44,7 @@ export function BookmarkCard({
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2">
 					{/* Item 1 (PD-6-01) — canon §3 item 11's `SIDE @ entry%`, the same
-					    PROP PASS POLISH.5 item 3 made at `ArgumentList.tsx:73-77`.
+					    PROP PASS POLISH.5 item 3 made at `ArgumentList.tsx:72-76`.
 					    `SideBadge` already takes `price` and already formats it under
 					    its own allow-marker, so NO formatting happens here: doing it
 					    at this call site would need a fourth marker and redden
