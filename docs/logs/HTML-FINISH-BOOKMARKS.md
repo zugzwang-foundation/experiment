@@ -417,3 +417,90 @@ Written last. Unamendable.
 **One dispatch change.** §2's allow-list enumerates the new design guard to the exact path — `tests/unit/design/bookmarks-height-chain.test.ts (new)` — while omitting `tests/unit/shell/page-container.test.ts`, which pins the single JSX tag that **C1 and C5 both have to change**. That precision-next-to-omission is the line. It made the dispatch's own first build step unexecutable, and the executor had to derive the refusal from §6's CONDITIONALS clause rather than being told which of two contradicting rules wins. Either §2 should carry that file, or §3 C1 should state the fallback in one sentence: *"if a guard outside the allow-list pins the call site, HALT C1 and report the authorising edit."* The round would have reached the same outcome an hour earlier and with no ambiguity about whether refusing was compliance or evasion.
 
 **What I would not change.** Refusing C1 and refusing C3's second panel were both correct and both cost most of the round's visible output. The deliverable is thinner than the dispatch imagined because the surface's read model is thinner than the dispatch imagined, and the honest response to that was to say so with the measurement attached rather than to fill the shapes.
+
+---
+
+# ROUND 2 — the surface is the Profile arrangement
+
+**Commit** `5f0352a` · **preview** https://experiment-eybntq0sh-zugzwang-worlds-projects.vercel.app
+
+## §1.1 · Does SPEC.1 speak to /bookmarks? — **NO HALT**
+
+Three hits for `bookmark|BookmarkItem|saved` in `docs/specs/SPEC.1.md`:
+
+- `:1406` — *"no user-defined or **saved** custom sorts in v1"*. About sort variants; unrelated.
+- `:1490` — the §0 changelog row for the Profile amendment, which mentions *"one forward sentence to A6 bookmarks"*.
+- `:1665`, the sentence itself, verbatim:
+  > **Forward (A6).** This surface hosts a **bookmark mode at A6** (design-canon ruling 1) — specified by A6's own ADR, not here.
+
+⇒ **SPEC.1 does not enumerate this route.** A-1's strike was taken on §23's enumeration of the **profile** page, so it is surface-bound and **does not travel**. The founder's ruling stands.
+
+⚠ **But the test as posed was incomplete, and following the delegation strengthens the ruling rather than voiding it.** SPEC.1 hands governance to A6's ADR, and **ADR-0032 §Context** accepts it: *"SPEC.1 §23 defers them entirely to this ADR … **this ADR must serve as the A6 build spec, not a thin storage-choice record.**"* Its **D-5** then enumerates the surface:
+> The bookmark page **reuses the Profile surface in forced-visitor mode** (canon §2 *Bookmark*): the list is retitled **"Bookmarks,"** every card renders **without owner affordances** (there is never a Sell mount…), and the **Staked/Current shown are the bookmarked author's** figures…
+
+Canon §6 carries a dedicated **Bookmark** line saying the same in copy terms. Two binding constraints follow and are honoured: **order is `bookmarks.created_at DESC`** (D-8), not RANKING §3.6; and **never a Sell mount**.
+
+## §1.2 · The top band, under the corrected question
+
+**E1's proof, verified at source:** `src/app/(public)/layout.tsx:67-74` calls `auth.api.getSession()` then `getHeaderBalance(db, session.user.id)` and `getHeaderPortfolio(db, session.user.id)`; the viewer's pseudonym is read at `:69` as `session.user?.pseudonym`. That is where the header's PORTFOLIO / BALANCE come from on this route today.
+
+| Region | Existing loader | Signature | viewerId satisfies? | Profile page already calls it? |
+|---|---|---|---|---|
+| Identity card | `resolveProfileUser` | `(client, pseudonym)` | ⚠ **No — it takes a PSEUDONYM.** Satisfied instead by `session.user.pseudonym`, which the layout already reads | yes (`u/[pseudonym]/page.tsx:54`) |
+| Tiles 1–6 | `loadProfileTiles` | `(client, { userId, positions })` | **Yes**, plus `positions` from `loadProfilePositions(client, { userId })` | yes (`:67-70`) |
+| Graph slot | `loadProfileGraphSeries` | `(client, { userId })` | **Yes** | yes (`:65`) |
+
+**Tile 4 (Arguments):** `loadProfileTiles` counts `argumentsCount` by `userId`. With viewer-as-subject that is the viewer's own authored count — correct, as the dispatch anticipated.
+
+⇒ **All three regions are buildable. None renders nothing.**
+
+## §1.3 · Table and replica, field by field
+
+**Table columns** — Position: the argument's frozen `side` **carries** (rendered as Profile's word + `ThumbGlyph`, *not* a chip — R12); its **status token is DATA-BLOCKED (`statusLabel`)** and Sell is ruled out by D-5. Argument: `title` · `marketTitle` · `marketSlug` · `ordinal` · `repliedToTitle` **carry**. Staked: `staked` **carries** (the AUTHOR's Đa). Arrow: topology. Current: `current` **carries**.
+
+**Header bar** — market filter **carries**; ⚠ **the key becomes `marketSlug`**, because `BookmarkItem` has no `marketId`. Open/Closed pair: **DATA-BLOCKED (`statusLabel`)**.
+
+**Replica parts** — pseudonym · side · `priceAtBet` (as entry %) · stake (`authorStake` / `stake`) · `Replies · N` · card actions (`UnbookmarkButton`) · title · **body** · split bar · "Replied to …" · panel-header market title: **all carry**.
+
+**The three predicted blocks — all CONFIRMED at source, none accepted on faith:**
+1. **Author avatar** — `debate-view/resolve-authors.ts:48` selects `{ id, pseudonym }` only. Missing: the author's `pfp_filename`/`pfpUrl`.
+2. **Argument image** — `comments.image_uploads_id` **does exist** (`db/schema/comments.ts:48`), but no bookmarks DTO field carries it and surfacing it means editing `src/server/**`. Missing: `comments.image_uploads_id` on the DTO.
+3. **Live price** — `BookmarkItem` carries only `priceAtBet`, the frozen entry price. ⛔ Never substituted.
+
+**A fourth block the dispatch did not predict:** the Open/Closed filter and the Position cell's status token, both on `statusLabel`.
+
+**And one element halted on a GUARD, not on data:** the replica head's side chip. `side` and `priceAtBet` both carry, but `tests/unit/debate/render/side-badge.test.tsx:182` pins the sized `SideBadge` call sites as an exact per-file `toEqual` map, and that file is outside this round's allow-list. Renders nothing pending a one-file ruling — the same shape as R1's `page-container.test.ts` extension, and the same precedent POLISH.6 recorded.
+
+## §5 · Measurement — fixed-width same-origin iframe, five widths
+
+| viewport | container | arena | left panel | right panel | body scrolls | doc X-overflow | offscreen in arena |
+|---|---|---|---|---|---|---|---|
+| 390 | 390 | stacked | 342 | 342 | no | yes (570) — `<header>` only, P-1 | 0 |
+| 768 | 768 | stacked | 720 | 720 | no | no | 0 |
+| 1024 | 1024 | **stacked** | 976 | 976 | no | no | 0 |
+| 1440 | 1440 | **two-column** | 684 | 684 | no | no | 0 |
+| 1920 | **1440** | **two-column** | 684 | 684 | no | no | 0 |
+
+⚠ **The `lg` boundary is 1025, not 1024** — measured: at a 1024 layout width `matchMedia('(min-width: 64rem)')` is **false** and the arena stacks; at 1025 it is **true** and the arena is 476 + 476. Inherited from Profile's ruled breakpoint, not chosen here. ⚠ I could not run the Profile control locally — `/u/[pseudonym]` hits the stuck-Suspense environment defect — so the parity claim rests on the shared class string, not on a side-by-side measurement.
+
+**Clipping:** none. `overflow-hidden` appears once per panel (the token that keeps the bar's background off the rounded corner); zero overflowing nodes inside the arena at any width. **Every control reachable:** yes, 0 offscreen in the arena at all five. **Panel scroll:** does not engage at any width — the known A1 asymmetry (`<main>` is `max(floor, content)`), identical to Profile's own recorded control.
+
+## Values, strings, widenings, untested rows
+
+**Every value byte-carried**, each traced in-file: panel section/body ← `ArgumentList.tsx:280,292`; panel head ← `PositionsTable.tsx:548` (the `relative` one, for the popover context); panel title ← `ArgumentList.tsx:286`; table head + arrow track + value cells ← `PositionsTable.tsx:300-308,396-431`; Position cell word+thumb ← `PositionsTable.tsx:357-364`; head cluster, separators, split bar ← `ArgumentList.tsx:41-43,143-205,371-425`; bands ← `u/[pseudonym]/page.tsx:134,156-159`.
+
+**Every string sourced** (`copy.ts` names each): `Bookmarks` and `Your bookmarks` ← ⑵ canon §6 **Bookmark** line, hexdumped; `Select market ▾` ← ⑵ canon §6 **Profile** line, hexdumped against canon *and* `PositionsTable.tsx` (identical, caret `e2 96 be`); `All markets` ← ⑶ mockup + shipped popover; empty msg/sub ← ⑴ `BOOKMARKS_EMPTY_COPY`, moved byte-unchanged. **Two mockup strings deliberately NOT carried**, each with its reason recorded in `copy.ts`: the no-selection line (its second sentence promises Sell, which D-5 forbids, and the state is unreachable here) and the `Market title` placeholder.
+
+**Widenings recorded, not implemented:** the `HeadSeparator` third copy (still not lifted into `ui/**`); the split bar's side-pole residual (inherited from `ArgumentList`); the market filter's mockup relabel to `All markets ▾` (canon §6 outranks it).
+
+**Rows with no test:** the browser-resolved geometry (jsdom performs no layout — proven in a browser, recorded above); the `lg`-boundary behaviour at 1024/1025; the halted side chip.
+
+## ⚠ SEALED SELF-ASSESSMENT — R2
+
+**What the loop missed.** I put a `SideBadge` in the table's Position cell on the first draft. Profile's Position cell is not a chip — its own source says `⛔ NOT a chip (R12)` eight lines above the code I was copying from — and I had that file open. The census caught it, and only then did I read the cell properly and find that byte-carrying the *real* thing (word + `ThumbGlyph`) was simultaneously more faithful and census-free. I reached for the primitive that looked right instead of copying the cell I was told to copy. Cheapest catch: reading the eight lines of `PositionsTable.tsx` immediately above the block I was byte-carrying.
+
+**Second miss, same family as R1's.** I asserted `expect(...length).toBe(1)` on `[data-empty-block]` in R1 and it broke the moment a second, unrelated P1 consumer (the graph card) joined the page. A page-wide count was never the right instrument for "did THIS component adopt the primitive"; scoping it to the block containing `bookmarks-empty` is what I should have written the first time.
+
+**What this dispatch caused — the line.** §1.1 reads *"⛔ DOES SPEC.1 SPEAK TO /bookmarks AT ALL?"* and makes the whole shape turn on that one document. But SPEC.1's answer is *"specified by A6's own ADR, not here"* — it hands governance elsewhere, and the test as written stops one document short of the authority it points at. Had ADR-0032 D-5 said "a card list" instead of "reuses the Profile surface", following the dispatch literally would have shipped the table anyway, against the ratified spec, with a green §1.1 verdict as cover. The fix is one clause: *"and if SPEC.1 delegates, read what it delegates to."* I read it regardless — but a halt gate that can be satisfied without reading the governing document is not a gate.
+
+**What I would not change.** Halting the side chip rather than hand-rolling one, and refusing to substitute `priceAtBet` for a live price. Both cost visible completeness; both would have been silent and plausible defects.
