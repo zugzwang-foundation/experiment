@@ -31,6 +31,7 @@ vi.mock("@/server/auth", () => ({
 vi.mock("@/server/bookmarks/list", () => ({ loadBookmarks: vi.fn() }));
 
 import * as bookmarksPage from "@/app/(public)/bookmarks/page";
+import { BookmarksLoading } from "@/components/bookmarks/states";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
 
@@ -115,5 +116,44 @@ describe("PD-6-04 — the empty state IS the P1 primitive", () => {
 		// empty list would satisfy every assertion above.
 		render(await BookmarksPage());
 		expect(screen.queryByTestId("bookmark-list")).toBeNull();
+	});
+});
+
+describe("PD-6-05 — the loading state IS the P7 primitive", () => {
+	it("adopts-the-P7-leaf-rather-than-re-implementing-the-skeleton", () => {
+		// ⚠ THE DISCRIMINATING ASSERTION, same shape as item 4's. `LoadingBlock`
+		// marks itself `data-loading-block`, its OWN marker. The state this
+		// replaces was a raw `<Skeleton className="h-24 w-full
+		// rounded-[var(--r)]">` — which already carried `data-slot="skeleton"`
+		// and the same radius, so it would satisfy a marker check and a geometry
+		// check alike. It CANNOT satisfy this one.
+		const { container } = render(<BookmarksLoading />);
+		expect(container.querySelectorAll("[data-loading-block]").length).toBe(3);
+	});
+
+	it("every-block-keeps-the-shadcn-skeleton-marker", () => {
+		// Mirrors `discovery/render/surface-states.test.tsx:186-197`, and that
+		// shape exists because a first draft of `LoadingBlock` passed
+		// `data-slot="loading-block"` and SILENTLY DROPPED the shadcn marker
+		// every skeleton-wide assertion keys on. Both markers must coexist.
+		const { container } = render(<BookmarksLoading />);
+		const blocks = [...container.querySelectorAll("[data-loading-block]")];
+		expect(blocks.length).toBeGreaterThan(0);
+		for (const block of blocks) {
+			expect(block.getAttribute("data-slot")).toBe("skeleton");
+		}
+	});
+
+	it("keeps-its-container-testid-and-its-three-block-count", () => {
+		// ⚠ THREE IS A LITERAL, AND THAT IS A KNOWINGLY ACCEPTED PARTIAL (S-6,
+		// ruled OD-3). Canon §10's P7 requires the count come from the surface's
+		// own constant — Discovery has `DISCOVERY_GRID_SIZE`; `/bookmarks` has
+		// no equivalent because `loadBookmarks` is UNPAGINATED, and minting one
+		// would be new server API for a single consumer (§5.2). Item 5
+		// discharges P7's PRIMITIVE clause and deliberately not its COUNT
+		// clause. Pinned here so the partial is visible rather than implied.
+		const { container } = render(<BookmarksLoading />);
+		expect(screen.getByTestId("bookmarks-loading")).toBeTruthy();
+		expect(container.querySelectorAll("[data-loading-block]").length).toBe(3);
 	});
 });
