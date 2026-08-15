@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
+import type { ProfileUser } from "@/server/profile/resolve";
 
 /**
  * DISCOVERY-COMPLETE C4b — INV-3 on `/u/[pseudonym]`. Written and failing FIRST.
@@ -37,6 +38,19 @@ const AGGREGATE = {
 	counterCount: 1,
 	supportDharma: "300.000000000000000000",
 	counterDharma: "100.000000000000000000",
+};
+
+/**
+ * HTML-FINISH row 4 — `ArgumentList` now takes the head cluster's identity. It
+ * is the PROFILE USER (every argument in the list is theirs), prop-passed from
+ * the page rather than read per item. Required by design (O-1): an optional
+ * author would render the cluster on some call sites and omit it on others.
+ */
+const AUTHOR: ProfileUser = {
+	id: "0190c0de-1111-7000-8000-0000000000f1",
+	pseudonym: "RedFox001",
+	banned: false,
+	pfpUrl: "/pfp-placeholder.svg",
 };
 
 const BODY = "ZZ-DISTINCTIVE-BODY-MARKER-c4b";
@@ -130,7 +144,7 @@ const classTokens = (el: Element | null): string[] =>
 describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59)", () => {
 	it("yes-chip-is-black-not-near-white", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		const cls = classTokens(sideChip(container, "YES"));
 		expect(cls).toContain("bg-yes");
@@ -141,7 +155,7 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 
 	it("no-chip-is-white-not-near-black", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("NO")]} owner={false} />,
+			<ArgumentList items={[liveItem("NO")]} owner={false} author={AUTHOR} />,
 		);
 		const cls = classTokens(sideChip(container, "NO"));
 		expect(cls).toContain("bg-no");
@@ -152,7 +166,7 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 
 	it("the-chip-announces-the-side-and-its-entry-price", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		// Item 3 (A6): the accessible name gains the entry price. This is the
 		// PRIMITIVE'S SHIPPED STRING (badges.tsx:155-157), not one invented here.
@@ -167,7 +181,7 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 		// disagree with the shipped .md export. Asserted at the NO pole, which
 		// is where an inversion would be visible.
 		const { container } = render(
-			<ArgumentList items={[liveItem("NO")]} owner={false} />,
+			<ArgumentList items={[liveItem("NO")]} owner={false} author={AUTHOR} />,
 		);
 		expect(sideChip(container, "NO")?.textContent?.trim()).toBe(
 			`NO @ ${ENTRY_PCT}`,
@@ -178,7 +192,11 @@ describe("ArgumentList — INV-3, the side chip is pole-bound (live variant, :59
 describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => {
 	it("removed-chip-is-pole-bound-and-leaks-no-body", () => {
 		const { container } = render(
-			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+			<ArgumentList
+				items={[removedItem("YES")]}
+				owner={false}
+				author={AUTHOR}
+			/>,
 		);
 		const chip = sideChip(container, "YES");
 		const cls = classTokens(chip);
@@ -208,7 +226,11 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 		// passed. Adopts `.6`'s two-poled shape
 		// (bookmarks/render/side-encoding.test.tsx:196).
 		const { container } = render(
-			<ArgumentList items={[removedItem("NO")]} owner={false} />,
+			<ArgumentList
+				items={[removedItem("NO")]}
+				owner={false}
+				author={AUTHOR}
+			/>,
 		);
 		const chip = sideChip(container, "NO");
 		const cls = classTokens(chip);
@@ -229,7 +251,7 @@ describe("ArgumentList — INV-3 holds on the removed variant too (:49)", () => 
 describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", () => {
 	it("live-card-renders-the-teaser-clamped", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		const teaser = container.querySelector('[data-testid^="argument-teaser-"]');
 		expect(teaser?.textContent).toBe(TEASER);
@@ -247,7 +269,7 @@ describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", ()
 		// clamped node (SlotHeader.tsx:102, ReplySplitBar.tsx:133,
 		// SellModule.tsx:260) and NONE of them is authority here.
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		expect(container.innerHTML).not.toMatch(/title="[^"]*ZZ-/);
 		// Non-vacuity: the markers this asserts the absence of are genuinely on
@@ -262,7 +284,11 @@ describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", ()
 		// compile-time guarantee. ⛔ On innerHTML, never textContent (O-7) — a
 		// value parked in an attribute is invisible to textContent.
 		const { container } = render(
-			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+			<ArgumentList
+				items={[removedItem("YES")]}
+				owner={false}
+				author={AUTHOR}
+			/>,
 		);
 		expect(container.innerHTML).not.toContain(TEASER);
 		// `:132`'s assertion, re-asserted verbatim in item 6's own commit — the
@@ -277,7 +303,7 @@ describe("ArgumentList — item 6, the teaser clamps in CSS and only in CSS", ()
 describe("ArgumentList — item 4, the author's stake on the post replica", () => {
 	it("post-carries-the-author-stake-formatted", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={false} />,
+			<ArgumentList items={[liveItem("YES")]} owner={false} author={AUTHOR} />,
 		);
 		const stake = container.querySelector('[data-testid^="argument-stake-"]');
 		// Rendered through `formatDharma` — grouped and rounded. A raw render
@@ -291,7 +317,7 @@ describe("ArgumentList — item 4, the author's stake on the post replica", () =
 		// author's basis (§0.5's name collision) — conflating them would put a
 		// different figure on the card. The reply branch renders no stake node.
 		const { container } = render(
-			<ArgumentList items={[replyItem("NO")]} owner={false} />,
+			<ArgumentList items={[replyItem("NO")]} owner={false} author={AUTHOR} />,
 		);
 		expect(
 			container.querySelector('[data-testid^="argument-stake-"]'),
@@ -301,7 +327,11 @@ describe("ArgumentList — item 4, the author's stake on the post replica", () =
 	it("removed-variant-carries-no-author-stake", () => {
 		// SC-1 belt: the removed variant has no `authorStake` field at all.
 		const { container } = render(
-			<ArgumentList items={[removedItem("YES")]} owner={false} />,
+			<ArgumentList
+				items={[removedItem("YES")]}
+				owner={false}
+				author={AUTHOR}
+			/>,
 		);
 		expect(
 			container.querySelector('[data-testid^="argument-stake-"]'),
@@ -312,7 +342,11 @@ describe("ArgumentList — item 4, the author's stake on the post replica", () =
 describe("ArgumentList — PD-0-10, the marker gains its missing aria-label", () => {
 	it("flipped-marker-announces-itself", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES", "Flipped")]} owner={true} />,
+			<ArgumentList
+				items={[liveItem("YES", "Flipped")]}
+				owner={true}
+				author={AUTHOR}
+			/>,
 		);
 		const marker = [...container.querySelectorAll('[data-slot="badge"]')].find(
 			(el) => el.textContent?.trim() === "Flipped",
@@ -323,7 +357,7 @@ describe("ArgumentList — PD-0-10, the marker gains its missing aria-label", ()
 
 	it("none-marker-renders-nothing", () => {
 		const { container } = render(
-			<ArgumentList items={[liveItem("YES")]} owner={true} />,
+			<ArgumentList items={[liveItem("YES")]} owner={true} author={AUTHOR} />,
 		);
 		const labels = [...container.querySelectorAll('[data-slot="badge"]')].map(
 			(el) => el.textContent?.trim(),

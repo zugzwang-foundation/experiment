@@ -51,6 +51,79 @@ import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
 afterEach(cleanup);
 
+/**
+ * HTML-FINISH row 7 — THE FILTER DRIVERS MOVED WITH THE CONTROLS, AND ONLY THE
+ * DRIVERS. The market `<select>` became a labelled button that opens a popover
+ * list, and the status `<select>` became a two-button segmented pair (canon §6:
+ * `filters `Select market ▾`, `Open`/`Closed``), so `fireEvent.change` against
+ * either is meaningless — jsdom reports "the given element does not have a
+ * value setter".
+ *
+ * ⛔ EVERY ASSERTION IN THIS FILE IS UNCHANGED. These helpers translate HOW the
+ * state is driven and HOW the selection is read; they assert nothing themselves,
+ * so no test's subject moved with its mechanism. `selectedStatus` reads
+ * `aria-pressed` and `selectedMarketCount` reads `role="option"` — the state a
+ * `<select>` carried in `.value`/`.options` and a hand-rolled control must
+ * declare explicitly.
+ */
+function setStatusFilter(label: "Open" | "Closed"): void {
+	fireEvent.click(
+		screen.getByTestId(`positions-status-${label.toLowerCase()}`),
+	);
+}
+
+/** The pressed segment, read off `aria-pressed` — the `<select>`'s `.value`. */
+function selectedStatus(): string | null {
+	for (const label of ["Open", "Closed"] as const) {
+		const btn = screen.getByTestId(`positions-status-${label.toLowerCase()}`);
+		if (btn.getAttribute("aria-pressed") === "true") {
+			return label;
+		}
+	}
+	return null;
+}
+
+/** Open the market popover and click one option (`"all"` or a marketId). */
+function setMarketFilter(marketId: string): void {
+	fireEvent.click(screen.getByTestId("positions-market-filter"));
+	fireEvent.click(screen.getByTestId(`positions-market-option-${marketId}`));
+}
+
+/** The popover's option count — the `<select>`'s `.options.length`. Opens the
+ * popover to count, then closes it again so the caller's state is unchanged. */
+function marketOptionCount(): number {
+	const trigger = screen.getByTestId("positions-market-filter");
+	fireEvent.click(trigger);
+	const n = screen
+		.getByTestId("positions-market-popover")
+		.querySelectorAll('[role="option"]').length;
+	fireEvent.click(trigger);
+	return n;
+}
+
+/** The chosen market, read off `aria-selected` inside the popover — the
+ * `<select>`'s `.value`. Returns `"all"` for the sentinel option. Opens the
+ * popover to read, then closes it again so the caller's state is unchanged. */
+function selectedMarket(): string | null {
+	const trigger = screen.getByTestId("positions-market-filter");
+	fireEvent.click(trigger);
+	const chosen = screen
+		.getByTestId("positions-market-popover")
+		.querySelector('[role="option"][aria-selected="true"]');
+	const testid = chosen?.getAttribute("data-testid") ?? null;
+	fireEvent.click(trigger);
+	return testid === null
+		? null
+		: testid.replace("positions-market-option-", "");
+}
+
+/** The status segment count — the `<select>`'s `.options.length`. */
+function statusOptionCount(): number {
+	return screen
+		.getByTestId("positions-status-filter")
+		.querySelectorAll("button").length;
+}
+
 const M1 = "0190c0de-aaaa-7000-8000-000000000001"; // Open market
 const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // settled market
 const C_POST = "0190c0de-cccc-7000-8000-000000000011";
@@ -216,12 +289,18 @@ function testids(root: ParentNode, prefix: string): string[] {
 
 describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 	it("band-composition", () => {
+		// HTML-FINISH row 8 — the tiles are NO LONGER A SIBLING BAND. They render
+		// inside `IdentityCard` now, so mounting `<ProfileTiles>` here as well
+		// would put two `profile-tiles` nodes in the tree and `getByTestId` would
+		// throw. Dropping the standalone mount is the row's own consequence, not a
+		// relaxation: every assertion below still runs, and the tile lookup at
+		// `:238` now proves the tiles are REACHABLE THROUGH the identity card —
+		// a stronger statement than the sibling mount made.
 		render(
 			<>
-				<IdentityCard user={USER} owner={false} />
-				<ProfileTiles tiles={TILES} />
+				<IdentityCard user={USER} owner={false} tiles={TILES} />
 				<PositionsTable payload={{ owner: false, rows: ROWS }} />
-				<ArgumentList items={ITEMS} owner={false} />
+				<ArgumentList items={ITEMS} owner={false} author={USER} />
 			</>,
 		);
 
@@ -230,6 +309,12 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("profile-tiles")).toBeTruthy();
 		expect(screen.getByTestId("positions-table")).toBeTruthy();
 		expect(screen.getByTestId("argument-list")).toBeTruthy();
+		// …and the tile band is INSIDE the identity band (row 8), not beside it.
+		expect(
+			screen
+				.getByTestId("identity-card")
+				.contains(screen.getByTestId("profile-tiles")),
+		).toBe(true);
 
 		// Identity: the pseudonym is rendered verbatim.
 		expect(text(screen.getByTestId("identity-pseudonym"))).toBe(USER.pseudonym);
@@ -275,15 +360,11 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
 			"Open",
 		);
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Closed" },
-		});
+		setStatusFilter("Closed");
 		expect(text(within(table).getByTestId(`position-status-${M2}`))).toContain(
 			"Closed",
 		);
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Open" },
-		});
+		setStatusFilter("Open");
 
 		// Argument list: present post + present reply + removed stub.
 		const list = screen.getByTestId("argument-list");
@@ -304,17 +385,23 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("banned-label", () => {
 		const banned = render(
-			<IdentityCard user={{ ...USER, banned: true }} owner={false} />,
+			<IdentityCard
+				user={{ ...USER, banned: true }}
+				owner={false}
+				tiles={TILES}
+			/>,
 		);
 		expect(screen.getByTestId("identity-banned")).toBeTruthy();
 		banned.unmount();
 
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(screen.queryByTestId("identity-banned")).toBeNull();
 	});
 
 	it("scrubbed-silhouette-and-zero-pii", () => {
-		const scrubbed = render(<IdentityCard user={SCRUBBED} owner={false} />);
+		const scrubbed = render(
+			<IdentityCard user={SCRUBBED} owner={false} tiles={TILES} />,
+		);
 		const card = screen.getByTestId("identity-card");
 
 		// The scrub marker renders for a placeholder pseudonym.
@@ -333,7 +420,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		scrubbed.unmount();
 
 		// Control: a non-scrubbed pseudonym renders NO scrub marker.
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(screen.queryByTestId("identity-scrubbed")).toBeNull();
 	});
 
@@ -355,7 +442,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// ⚠ TWO ARMS OR IT IS VACUOUS (V-2). An owner-only affordance asserted
 		// only on the owner arm passes identically on a control that is ALWAYS
 		// visible, so the negative arm is what gives the positive one meaning.
-		const asOwner = render(<IdentityCard user={USER} owner={true} />);
+		const asOwner = render(
+			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		);
 		const card = screen.getByTestId("identity-card");
 		const link = card.querySelector('a[href="/bookmarks"]');
 		expect(link).not.toBeNull();
@@ -371,7 +460,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		asOwner.unmount();
 
 		// The negative arm: a visitor gets NO link at all.
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(
 			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
 		).toBeNull();
@@ -381,7 +470,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// POLISH.5 item 5 (P5-D07) — canon §3 item 11's `Replies · N`, inline,
 		// count enlarged. N sums BOTH poles: every reply is a Support or a
 		// Counter bet (ADR-0017), so supportCount + counterCount IS the total.
-		render(<ArgumentList items={ITEMS} owner={false} />);
+		render(<ArgumentList items={ITEMS} owner={false} author={USER} />);
 
 		// A_POST is 2 support + 1 counter. THREE is the sum and equals NEITHER
 		// operand, so this cannot pass by rendering one of the halves.
@@ -402,7 +491,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("removed-stub-render", () => {
 		// Argument list: the removed post renders the stub variant only.
-		const list = render(<ArgumentList items={[A_REMOVED]} owner={false} />);
+		const list = render(
+			<ArgumentList items={[A_REMOVED]} owner={false} author={USER} />,
+		);
 		const stub = screen.getByTestId(`argument-removed-${C_REMOVED}`);
 		expect(stub.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(stub.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
@@ -452,7 +543,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 								: { owner: false, rows: ROWS }
 						}
 					/>
-					<ArgumentList items={ITEMS} owner={owner} />
+					<ArgumentList items={ITEMS} owner={owner} author={USER} />
 				</>,
 			);
 		const snapshot = (root: ParentNode) => ({
@@ -480,12 +571,14 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// The FIRST of the identity card's two owner deltas: the view chip. The
 		// second — item 17's bookmark link — has its own two-armed guard above
 		// (`owner-only-bookmark-affordance-on-the-identity-card`).
-		const ownerCard = render(<IdentityCard user={USER} owner={true} />);
+		const ownerCard = render(
+			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.owner,
 		);
 		ownerCard.unmount();
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.visitor,
 		);
@@ -508,7 +601,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		b.unmount();
 
 		// Arguments — owner copy.
-		const c = render(<ArgumentList items={[]} owner={true} />);
+		const c = render(<ArgumentList items={[]} owner={true} author={USER} />);
 		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(text(screen.getByTestId("arguments-empty"))).toBe(
 			PROFILE_COPY.empty.argumentsOwner,
@@ -516,7 +609,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		c.unmount();
 
 		// Arguments — visitor copy.
-		render(<ArgumentList items={[]} owner={false} />);
+		render(<ArgumentList items={[]} owner={false} author={USER} />);
 		expect(text(screen.getByTestId("arguments-empty"))).toBe(
 			PROFILE_COPY.empty.argumentsVisitor,
 		);
@@ -560,7 +653,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("positions-empty").tagName).toBe("H2");
 		positions.unmount();
 
-		render(<ArgumentList items={[]} owner={true} />);
+		render(<ArgumentList items={[]} owner={true} author={USER} />);
 		const argumentsPanel = panelOf("arguments-empty");
 		const argumentsClass = argumentsPanel.getAttribute("class") ?? "";
 		expect(argumentsClass).toContain("[border:var(--hairline)]");
@@ -695,9 +788,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		).toBe(true);
 
 		// The NO pole, in its own filter state.
-		fireEvent.change(screen.getByTestId("positions-status-filter"), {
-			target: { value: "Closed" },
-		});
+		setStatusFilter("Closed");
 		const no = screen.getByTestId(`position-side-${M2}`);
 		const noGlyph = no.querySelector("svg");
 		expect(text(no)).toBe("No");
@@ -734,19 +825,13 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const first = render(
 			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
 		);
-		const statusFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-status-filter",
-		);
-		const marketFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-market-filter",
-		);
 		// Option inventories (item 11, P5-D17a): the STATUS filter is now
 		// Open/Closed — the canon inventory, with `All` removed. ⛔ The MARKET
 		// filter is a DIFFERENT control and keeps its `all` sentinel: `All` +
 		// one per distinct marketId. Repairing the two together would ship a
 		// defect.
-		expect(statusFilter.options).toHaveLength(2);
-		expect(marketFilter.options).toHaveLength(3);
+		expect(statusOptionCount()).toBe(2);
+		expect(marketOptionCount()).toBe(3);
 
 		// The initial state moved WITH the option. A `<select>` whose `value`
 		// matched no option would paint its first option while the predicate
@@ -756,7 +841,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// Open row, so the derivation selects it. The derivation itself is
 		// pinned by `status-default-is-derived`, including the all-Closed and
 		// deep-link arms this fixture cannot reach.
-		expect(statusFilter.value).toBe("Open");
+		expect(selectedStatus()).toBe("Open");
 
 		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
 		// REMOVAL, asserted rather than implied: there is no longer any state of
@@ -765,7 +850,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
 
 		// Status → Closed hides the Open row, keeps the Closed row.
-		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+		setStatusFilter("Closed");
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		first.unmount();
@@ -773,10 +858,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// Fresh mount: the market filter isolates one market's rows, and it does
 		// so independently of the status filter.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
-		const market = screen.getByTestId<HTMLSelectElement>(
-			"positions-market-filter",
-		);
-		fireEvent.change(market, { target: { value: M1 } });
+		setMarketFilter(M1);
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
 
 		// ⚠ The negative arm now selects the OTHER market rather than asserting
@@ -785,7 +867,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// have passed with the market filter entirely broken. Hiding M1 by
 		// selecting M2 is the market filter's own doing — the status filter has
 		// not moved.
-		fireEvent.change(market, { target: { value: M2 } });
+		setMarketFilter(M2);
 		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
 	});
 
@@ -800,10 +882,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: false }] }}
 			/>,
 		);
-		const statusFilter = screen.getByTestId<HTMLSelectElement>(
-			"positions-status-filter",
-		);
-		fireEvent.change(statusFilter, { target: { value: "Closed" } });
+		setStatusFilter("Closed");
 
 		// The filter-scoped message, which is a DIFFERENT state from "no
 		// positions at all" and carries different copy.
@@ -823,15 +902,10 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("positions-market-filter")).toBeTruthy();
 		// …and the control still reads the state the user selected, so the way
 		// out is discoverable rather than merely present.
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedStatus()).toBe("Closed");
 
 		// The way out WORKS: switching back restores the row.
-		fireEvent.change(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter"),
-			{ target: { value: "Open" } },
-		);
+		setStatusFilter("Open");
 		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
 		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
 	});
@@ -845,18 +919,14 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const withOpen = render(
 			<PositionsTable payload={{ owner: false, rows: ROWS }} />,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Open");
+		expect(selectedStatus()).toBe("Open");
 		withOpen.unmount();
 
 		// (b) EVERY row is Closed → `Closed`.
 		const allClosed = render(
 			<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedStatus()).toBe("Closed");
 		// ⚠ POSITIVE CONTROL. A default that only moves the `<select>`'s value
 		// while the table stays empty satisfies a value-only assertion — which
 		// is the exact bug this finding is about.
@@ -875,12 +945,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 				initialMarketSlug="fixture-beta"
 			/>,
 		);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-market-filter").value,
-		).toBe(M2);
-		expect(
-			screen.getByTestId<HTMLSelectElement>("positions-status-filter").value,
-		).toBe("Closed");
+		expect(selectedMarket()).toBe(M2);
+		expect(selectedStatus()).toBe("Closed");
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 	});
 });

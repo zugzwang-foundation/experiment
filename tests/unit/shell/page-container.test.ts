@@ -52,6 +52,25 @@ type Site = {
 	 * `before`.
 	 */
 	adds?: string;
+	/**
+	 * ⚠ THE SITE'S CLASS SET NOW, when a ruling has deliberately MOVED it off
+	 * the `c5892bc` baseline.
+	 *
+	 * WHY A THIRD FIELD RATHER THAN EDITING `before`. That field's contract is
+	 * one line up — "VERBATIM className on disk at `c5892bc`. Never edited to
+	 * match code." Rewriting it to match a change is exactly the drift it
+	 * exists to make impossible, and it would erase the evidence that anything
+	 * moved. `adds` cannot express this either: it is additive by construction
+	 * and this ruling REPLACES `max-w-3xl` and `px-4`.
+	 *
+	 * So `before` stays the historical baseline, `now` states the ruled current
+	 * value, and `movedBy` says who ruled it. A site with `now` is asserted
+	 * against `now`; every other site is still asserted against
+	 * `before + adds`, unchanged.
+	 */
+	now?: string;
+	/** Required whenever `now` is set — the ruling, named. */
+	movedBy?: string;
 };
 
 const SITES: Site[] = [
@@ -79,6 +98,37 @@ const SITES: Site[] = [
 		site: 5,
 		file: "src/app/(public)/u/[pseudonym]/page.tsx",
 		before: "mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6",
+		// HTML-FINISH row 20. The profile's two-band arena was measured rendering
+		// two 356px columns at 1440 — IDENTICAL to its 768 rendering, because the
+		// container never widened. It moves to the minted `wide` preset, whose
+		// `max-w-[1440px] px-6` is byte-carried from `GlobalHeader.tsx:91`.
+		//
+		// ⚠ `flex-1 min-h-0` are ROW 3's, not row 20's: this call site is the
+		// first link of the profile's height chain, which is what lets the
+		// positions panel scroll internally instead of growing. They are CONTENT
+		// layout, not container axes, so `BOX_AXES` is untouched by them — and
+		// `tests/unit/design/profile-height-chain.test.ts` is where the chain
+		// itself is asserted, node by node.
+		//
+		// ⚠⚠ ROUND 5 item A ADDS THE ONE-SCREEN BOUND — `lg:h-[calc(100vh-60px-2px)]`
+		// and `lg:flex-none`. The founder ruled the profile route a one-screen
+		// design: it occupies exactly the viewport below the header, no page
+		// scrollbar, every region that can overflow scrolling inside itself. This
+		// call site is the node that does it, because bounding the container at
+		// the SAME figure `<main>`'s floor already uses satisfies that `min-h`
+		// EXACTLY, so main never grows: header 62 + main (100vh − 62) = 100vh.
+		// ⛔ `lg:flex-none` IS NOT TIDINESS — `flex-1` is `flex: 1 1 0%` and a 0%
+		// basis WINS over `height` on the main axis. MEASURED: with the height
+		// applied and `flex-1` still on, the page STILL scrolled (document 1577
+		// against a 725 viewport). With `flex:none` it stops (725 == 725).
+		// ⛔ BOTH ARE `lg:`-SCOPED. Below `lg` the two bands stack and the page
+		// must stay free to grow and scroll, so `BOX_AXES` is untouched at every
+		// width and the three container axes still move only where row 20 moved
+		// them.
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		movedBy:
+			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2); " +
+			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5)",
 	},
 	{
 		site: 6,
@@ -213,10 +263,28 @@ describe("B2 — the container primitive moves nothing", () => {
 		file,
 		before,
 		adds,
+		now,
 	}) => {
 		const { preset, extras } = callSite(file);
-		const expected = asSet(`${before} ${adds ?? ""}`);
+		// A site with a RULED move is asserted against `now`; every other site is
+		// still asserted against `before + adds`, byte-for-byte as before.
+		const expected = asSet(now ?? `${before} ${adds ?? ""}`);
 		expect(asSet(cn(CONTAINER_PRESETS[preset], extras))).toEqual(expected);
+	});
+
+	it("every moved site names the ruling that moved it, and moves are enumerated", () => {
+		// A `now` without a `movedBy` would be a silent rewrite wearing the shape
+		// of a deliberate one — the exact failure `before`'s "never edited to
+		// match code" contract exists to prevent.
+		for (const s of SITES.filter((x) => x.now)) {
+			expect(
+				s.movedBy,
+				`site ${s.site} sets \`now\` with no \`movedBy\``,
+			).toBeTruthy();
+			expect(s.now).not.toBe(s.before);
+		}
+		// EXACT, so a second silent move cannot join the first.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([5]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({
@@ -344,15 +412,50 @@ describe("B2 — the container primitive moves nothing", () => {
 		}
 	});
 
-	it("pins the four presets — a preset edit is a D2b decision, not a tidy-up", () => {
+	it("pins the presets — a preset edit is a D2b decision, not a tidy-up", () => {
 		// Exact strings, so POLISH .2/.3/.5/.6 changing one is a visible,
 		// deliberate diff rather than something that slips through.
+		//
+		// ⚠ `wide` is the FIFTH, minted at HTML-FINISH · PROFILE row 20. The four
+		// originals are BYTE-UNCHANGED above and below it, which is the whole
+		// claim: the mint was ADDITIVE. Its `max-w-[1440px] px-6` is byte-carried
+		// from `GlobalHeader.tsx:91`, the widest surface wrapper on `main`; its
+		// `py-6` is `reading`'s. Nothing here is read off a mockup.
 		expect(CONTAINER_PRESETS).toEqual({
 			reading: "mx-auto w-full max-w-3xl px-4 py-6",
 			debate: "mx-auto w-full max-w-5xl px-6 py-8",
 			auth: "mx-auto w-full max-w-md px-4 py-8",
 			notice: "mx-auto w-full max-w-3xl px-4 py-24",
+			wide: "mx-auto w-full max-w-[1440px] px-6 py-6",
 		});
+	});
+
+	it("the minted `wide` preset carries the GlobalHeader value it claims", () => {
+		// ⛔ THE BYTE-CARRY, ASSERTED AGAINST THE SOURCE FILE rather than restated
+		// as a literal. A trace that only lives in a comment goes stale silently;
+		// this one reddens if `GlobalHeader` ever changes its wrapper, which is
+		// exactly when the profile's alignment to its own chrome would break.
+		const header = read("src/components/shell/GlobalHeader.tsx");
+		const wrapper = /<div className="([^"]*max-w-\[[^\]]+\][^"]*)"/.exec(
+			header,
+		);
+		expect(
+			wrapper,
+			"GlobalHeader no longer renders a max-w-[…] wrapper",
+		).toBeTruthy();
+		const headerClasses = asSet(wrapper?.[1] ?? "");
+		const wideClasses = asSet(CONTAINER_PRESETS.wide);
+		for (const c of [...wideClasses].filter(
+			(x) => x.startsWith("max-w-") || x === "px-6",
+		)) {
+			expect(
+				headerClasses.has(c),
+				`\`wide\` claims to byte-carry \`${c}\` from GlobalHeader.tsx, but ` +
+					`the header no longer declares it. Re-derive the profile's ` +
+					`container width against the header, or the page will stop ` +
+					`aligning with its own chrome.`,
+			).toBe(true);
+		}
 	});
 
 	it("every preset carries all three axes — none may be half-declared", () => {

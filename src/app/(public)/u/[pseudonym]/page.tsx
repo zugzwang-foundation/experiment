@@ -1,11 +1,9 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
-import { PositionsTable } from "@/components/profile/PositionsTable";
-import { ProfileTiles } from "@/components/profile/ProfileTiles";
+import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
@@ -84,15 +82,225 @@ export default async function ProfilePage({
 	const initialMarketSlug = typeof market === "string" ? market : undefined;
 
 	return (
-		<PageContainer preset="reading" className="flex flex-col gap-6">
-			<IdentityCard user={profileUser} owner={owner} />
-			<ProfileTiles tiles={tiles} />
-			<ProfileGraph series={graph} />
-			<PositionsTable
-				payload={positionsPayload}
-				initialMarketSlug={initialMarketSlug}
-			/>
-			<ArgumentList items={argumentItems} owner={owner} />
+		/* HTML-FINISH row 20 — THE WIDTH. `wide` is minted additively in
+		   `PageContainer.tsx`; the census and the byte-carry are recorded there.
+		   The allow-list was extended by one path this round, so site 5's pin in
+		   `tests/unit/shell/page-container.test.ts` moves WITH this change, in
+		   the same commit, and records it as a deliberate move rather than
+		   absorbing it into the `c5892bc` baseline that field is contracted to
+		   hold verbatim. */
+		/* HTML-FINISH row 3 / §4 — THE HEIGHT CHAIN STARTS HERE. `flex-1` takes
+		   the height `<main>`'s `min-h-[calc(100vh-60px-2px)]` floor provides;
+		   `min-h-0` is what lets the arena below shrink to it instead of pushing
+		   past it, which is the difference between the positions panel scrolling
+		   INSIDE itself and the whole page growing.
+
+		   ⚠⚠⚠ ROUND 5 item A — ONE-SCREEN FIT AT `lg`+, AND THIS IS THE NODE THAT
+		   DOES IT. The founder ruled the profile route a one-screen design: no
+		   page scrollbar, every region that can overflow scrolling INSIDE itself.
+		   ⇒ THIS REVERSES RECON A-5 FOR THIS SURFACE ONLY. A-5 struck the mockup's
+		   `html,body{overflow:hidden}` as a fixed-viewport prototype affordance;
+		   the founder has now ruled the one-screen design IN. It is scoped HERE, on
+		   the profile's own container — ⛔ `(public)/layout.tsx` is NOT touched, so
+		   every other `(public)` surface keeps growing and scrolling exactly as
+		   before.
+
+		   ⛔ THE FIGURE IS `<main>`'s OWN, NOT A NEW ONE. `calc(100vh-60px-2px)` is
+		   byte-identical to the floor `(public)/layout.tsx` already declares — 60px
+		   is `GlobalHeader`'s `h-[60px]` row and 2px its `border-y`. Bounding the
+		   container at exactly that figure satisfies `<main>`'s `min-h` EXACTLY, so
+		   main never grows: header 62 + main (100vh − 62) = 100vh.
+
+		   ⛔ `lg:flex-none` IS LOAD-BEARING, NOT TIDINESS — MEASURED. `flex-1` is
+		   `flex: 1 1 0%`, and a 0% basis WINS over `height` on the main axis, so
+		   the height alone did nothing: measured with `h-[calc(…)]` applied and
+		   `flex-1` still on, the page still scrolled (document 1577 against a 725
+		   viewport) and main was still 1515. With `flex:none` the basis returns to
+		   `auto`, the height binds, and the page stops scrolling (document 725 ==
+		   viewport 725, main 663).
+
+		   ⚠ BELOW `lg` THE PAGE STILL GROWS AND SCROLLS, deliberately. The arena
+		   stacks to one column there and cannot fit a short viewport; the mockup is
+		   a fixed-desktop prototype and declares no breakpoint at all. So `flex-1
+		   min-h-0` stays unprefixed and only the `lg:` pair bounds.
+
+		   ⛔ NOTHING IS LOST — a bound with a scroll is not a clip. Every bounded
+		   region below keeps `overflow-y-auto`, and reachability was measured, not
+		   assumed: at 1440 × {1080, 768, 600, 500, 360} every position row and
+		   every argument is reachable by scrolling (`scrollIntoView` then intersect
+		   the viewport) — ZERO unreachable at every height.
+		   ⚠ AND THE FALLBACK IS THE RIGHT ONE. At absurd viewport heights (≲360)
+		   the band alone exceeds the container; the container's overflow stays
+		   `visible`, so the content spills and the PAGE scrolls to it — measured
+		   zero unreachable there too. An `overflow-y-auto` safety was tried and
+		   REJECTED: it buys nothing measurable and trades a page scrollbar nobody
+		   sees at realistic heights for an inner one. */
+		<PageContainer
+			preset="wide"
+			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+		>
+			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
+			    five full-width sections stacked in one column. Canon §2 (Profile):
+			    "Two bands. Top: identity card … + six account tiles … + the graph
+			    slot. Bottom 'arena': Positions table … + the argument [list]".
+			    The mockup's `.headzone` and `.arena` are both `grid-template-
+			    columns:1fr 1fr` (`:189`, `:221-222`).
+			    ⚠⚠ `lg:`, NOT `md:` — RULED FROM MEASUREMENT, NOT CHOSEN. The arena
+			    is two columns ONLY where each half clears the positions table's
+			    fixed-track requirement. Measured in a browser against real
+			    compiled CSS, on the shipped table with real data:
+
+			      fixed track (Position 64 + Staked 58 + arrow 31 + Current 61)
+			                                                        = 214px
+			      Argument column min-content                       = 115px
+			      ⇒ a half that clears both needs a 329px table,
+			        + 26px panel chrome (p-3 ×2 + hairline ×2)      = 355px
+			      ⇒ two halves + the 24px gap + px-6 ×2             = 782px
+
+			    At `md` (768) each half measured 356px and the Argument column
+			    rendered at 117px against its own 115px min-content — pinned, with
+			    nothing left to give, which is the eight-character symptom. `md`
+			    therefore MEETS the track and never clears it. At `lg` (1024) the
+			    same column gets ~244px.
+			    ⛔ NO BREAKPOINT VALUE IS INVENTED: `lg` is a shipped token, already
+			    used at `DiscoveryGrid.tsx:35`, `LoadingSkeleton.tsx:48` and
+			    `SlotHeader.tsx:81`. Below it the two columns STACK — the posture
+			    `HeroPanels.tsx:82` ships for Discovery's hero.
+			    ⚠ The mockup contributes NOTHING here: it is a fixed-desktop
+			    prototype and declares no breakpoint at all (recon A.4).
+			    `gap-6` is the gap ALREADY on this container's className for the
+			    same inter-section role; no new spacing value is introduced. */}
+			{/* ⚠⚠⚠ ROUND 5 item B — THE BAND HEIGHT IS DECLARED, AND THE GRAPH NOW
+			    FITS IT INSTEAD OF SETTING IT. This is the HARD COMMAND that three
+			    earlier rounds refused, and what unblocked it was the founder opening
+			    `graph/ProfileGraphCard.tsx` to a sizing-only fence: its
+			    `aspect-[2/1] w-full` is what made the card's height
+			    `(colWidth − 32)/2 + 32`, i.e. the reason the GRAPH set the band. It
+			    is now `h-full w-full` on a `min-h-0` card, so the card fills its
+			    cell. See that file for the two-token diff and what was NOT touched.
+
+			    ⛔ 256px IS DERIVED FROM THE IDENTITY CARD, NOT COPIED. The mockup's
+			    band is `flex:0 0 188px` (`:189`) and is NOT the source. Measured
+			    live against real compiled CSS on the shipped surface with real data,
+			    `1fr 1fr` restored, taking the identity card's INTRINSIC height with
+			    the grid stretch removed (`align-self:start`) and sweeping the band
+			    height for the smallest value at which its content fits:
+
+			      vw     smallest band height that fits the identity card + tiles
+			      1024        256   ← the binding case: tiles 370×184, tile 115 wide
+			      1280        256
+			      1440        216
+			      1920        216
+
+			    ⇒ ONE NUMBER FOR ALL OF `lg`+, so it is the WORST case: 256.
+			    ⚠ SWEPT, NOT SPOT-CHECKED: every width from 1024 to 2560 in 16px
+			    steps was measured at 256 — ZERO breaks, worst case 255 of 256 used.
+			    ⚠ AND ROBUST TO THE DATA: re-measured with `Đ 999,999` in every tile,
+			    the identity card still needs 255 at 1024 and 254 at 1440/1920. The
+			    tile grid's height is driven by its fixed LABEL copy wrapping, not by
+			    the value widths, so a large balance cannot break the band.
+
+			    ⇒ WHAT THE FOUNDER ASKED FOR, IN PIXELS — the band SHRINKS and every
+			    pixel goes to the arena:
+			      1024   258 → 256   (−2)
+			      1440   358 → 256   (−102)
+			      1920   478 → 256   (−222)
+
+			    ⛔ `lg:`-SCOPED, NOT UNCONDITIONAL. Below `lg` the two bands stack to
+			    one column and the identity card sits above a full-width graph; a
+			    256px cap there would crush both. The page still grows and scrolls
+			    below `lg` (item A), so no height is declared there.
+			    ⛔ THE EQUAL SPLIT STAYS. Round 3's `3fr 2fr` was the wrong lever and
+			    was reverted at round 4; `1fr 1fr` is the mockup's (`:189`). */}
+			{/* ⚠⚠ ROUND 4 item 3 — `3fr 2fr` REVERTED TO THE MOCKUP'S EQUAL SPLIT,
+			    ON FOUNDER ORDER. Round 3 narrowed the graph column to stop the
+			    graph's 2:1 aspect driving the band. The founder ruled that the wrong
+			    lever: the mockup's `.headzone` is `grid-template-columns:1fr 1fr`
+			    (`:189`) and this task exists to match the mockup's composition, so
+			    the ratio goes back and the height was to be DECLARED instead.
+			    ⛔⛔ THE DECLARED HEIGHT IS REFUSED ON MEASUREMENT — the other half of
+			    item 3, and the refusal is about the GRAPH, not about the guard.
+			    Measured live in a browser against real compiled CSS, on the shipped
+			    surface with real data, at three container widths with `1fr 1fr`
+			    restored (the identity card's INTRINSIC height taken with
+			    `align-self:start`, i.e. with the grid stretch removed):
+
+			      vw    identity needs   graph needs   overflow if the band is
+			                                           declared at what identity needs
+			      1024      258              258            0
+			      1280      258              318           60
+			      1440      218              358          140
+
+			    ⇒ AT 1440 THE DECLARED HEIGHT IS 218 AND THE GRAPH STILL WANTS 358.
+			    Declared at 218, the graph card does NOT fill the band and does NOT
+			    shrink: it measures 684 × 358 with the band's clientHeight at 218 and
+			    its scrollHeight at 358 — 140px of chart painting over the arena
+			    (graph bottom 444 against arena top 328). The graph's height is
+			    `(columnWidth − 32)/2 + 32` and it lives in
+			    `graph/ProfileGraphCard.tsx`'s `aspect-[2/1] w-full`, which §1 puts
+			    OUT OF BOUNDS (POLISH.5 PR C owns those symbols). From outside that
+			    file the ONLY way to make the graph fit a shorter band is to cap its
+			    WIDTH to 2H − 32 (404px at 1440, inside a 684px column) — which is
+			    the column-narrowing lever this revert exists to undo, just moved
+			    from the template into the cell.
+			    ⇒ "The graph slot FILLS its cell at that height instead of driving
+			    it" was therefore not reachable AT ROUND 4.
+			    ✅ DISCHARGED AT ROUND 5, and the round-4 note above called it: "the
+			    fix has to land inside the graph card, not beside it." The founder
+			    opened `ProfileGraphCard.tsx` under a sizing-only fence, the
+			    `aspect-[2/1]` is gone, and the band height IS declared — see the
+			    round-5 block above. This paragraph is kept because it is the
+			    measurement that proved WHERE the blocker was, and a reader who meets
+			    `lg:h-[256px]` should be able to find out why three rounds could not
+			    write it. ⛔ It is no longer a live refusal. */}
+			<div
+				data-testid="profile-headzone"
+				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+			>
+				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
+				    the right of the PFP and under the pseudonym row (mockup `:437`:
+				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling
+				    band, so `IdentityCard` renders them and this file no longer
+				    mounts `ProfileTiles` directly. */}
+				<IdentityCard user={profileUser} owner={owner} tiles={tiles} />
+				<ProfileGraph series={graph} />
+			</div>
+			{/* The arena band — `lg:` for the same measured reason as the headzone
+			    above, and the two bands MUST share one breakpoint or the identity
+			    band would go two-column while the arena below it was still
+			    stacked.
+			    HTML-FINISH row 3 / §4 — THE GROWING ELEMENT. `flex-1 min-h-0` is
+			    the mockup's `.arena{flex:1 1 auto; min-height:0}` (`:221-222`),
+			    topology on both halves. The headzone deliberately does NOT grow —
+			    it is `flex:0 0 188px` in the mockup, i.e. fixed, and here it is
+			    content-height; only the arena divides the leftover.
+			    ⚠ `min-h-0` is REQUIRED here and is not belt-and-braces: without
+			    it this grid's automatic minimum size is its content, so the panels
+			    would push the band past the container instead of scrolling
+			    internally, and row 3 would have no bound to divide. */}
+			<div
+				data-testid="profile-arena"
+				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+			>
+				{/* ROUND 4 item 7 — THE TWO PANELS SHARE ONE SELECTION, so the holder
+				    sits between this band and them. It renders a FRAGMENT: both
+				    panels stay direct children of this grid and remain its two
+				    columns, and this band keeps its className here where the height
+				    chain reads it.
+				    HTML-FINISH row 4 — the head cluster's identity. Every argument in
+				    the list is authored by the profile user, so the avatar and
+				    pseudonym come from the ALREADY-RESOLVED `profileUser` rather than
+				    from a per-item field: `loadProfileArguments` is untouched and no
+				    new read is issued — by this row or by item 7, which renders only
+				    fields the list already carries. */}
+				<ProfileArena
+					positions={positionsPayload}
+					argumentItems={argumentItems}
+					owner={owner}
+					author={profileUser}
+					initialMarketSlug={initialMarketSlug}
+				/>
+			</div>
 		</PageContainer>
 	);
 }
