@@ -36,6 +36,14 @@ import { PROFILE_COPY } from "./copy";
  * clamped, SG-2). The VISITOR payload arm carries no `sellEligible` field, so no
  * trigger can render. Empty → the OQ-7 copy (owner/visitor). Đ values are
  * `formatDharma`-trimmed, never float math.
+ *
+ * ROUND 4 item 5 — THE ROWS ARE SELECTABLE, by pointer and by Up/Down. The
+ * mockup's `pick()` / `stepRow()` / `onKey()` (`:679`, `:741-756`) are
+ * reimplemented as behaviour: click toggles, arrows wrap through the CURRENTLY
+ * VISIBLE (filtered) rows, and the stepped-to row is scrolled into view at
+ * `block:"nearest"`. Selection is keyed by `marketId`, starts EMPTY (the founder
+ * ruled the full argument list the empty state, so no auto-select), and is
+ * derived against the visible set so a filter that hides it simply clears it.
  */
 export function PositionsTable({
 	payload,
@@ -68,6 +76,21 @@ export function PositionsTable({
 	});
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
+	// ⚠ ROUND 4 item 5 — THE SELECTED ROW. The mockup keeps this in one module
+	// variable (`var sel = -1`, `:536`) and every path goes through `pick()`
+	// (`:679`); here it is one more piece of the state this component already
+	// holds, keyed by `marketId` rather than by INDEX. The mockup can use an
+	// index because its row array never changes; ours is re-filtered by two
+	// controls, so an index would silently point at a different row the moment a
+	// filter moved.
+	// ⛔ IT STARTS AT NULL, NOT AT THE FIRST ROW. The mockup auto-selects
+	// (`refresh()`, `:571` — "the replica always shows an argument"); the founder
+	// ruled the opposite for this build — the full argument list IS the empty
+	// state — so nothing is selected until the reader picks.
+	const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
+	// One entry per rendered position row, for `scrollIntoView` + focus on an
+	// arrow step. A ref, not state: moving focus must not re-render.
+	const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 	// HTML-FINISH row 7 — the market popover's open state (mockup `.fpop.open`,
 	// `:245`, toggled at `:586-587`).
 	const [filterOpen, setFilterOpen] = useState(false);
@@ -124,6 +147,49 @@ export function PositionsTable({
 			// inventory the docblock above already describes.
 			(market === "all" || r.marketId === market) && r.statusLabel === status,
 	);
+
+	// ⚠ THE SELECTION IS DERIVED AGAINST THE VISIBLE SET, NOT STORED AS TRUTH.
+	// The mockup handles a selection that a filter has hidden by re-picking the
+	// first remaining row (`refresh()`, `:571`); with no auto-select that answer
+	// is unavailable, so a hidden selection simply stops counting and the panel
+	// returns to the list. Derivation, not an effect: an effect would render one
+	// frame with a selection that is no longer on screen.
+	const selectedRow =
+		visible.find((r) => r.marketId === selectedMarketId) ?? null;
+
+	/** `pick(i)` (`:679`) — click the selected row again to clear it. The mockup
+	 * has no deselect because it always holds one; here deselect is the way back
+	 * to the full argument list, so the click TOGGLES. */
+	const pick = (marketId: string) => {
+		setSelectedMarketId((current) => (current === marketId ? null : marketId));
+	};
+
+	/** `stepRow(dir)` (`:741-749`) — Up/Down step through the CURRENTLY VISIBLE
+	 * (filtered) rows and WRAP, `(at + dir + len) % len`, entering at index 0
+	 * from no selection (`at < 0 ? 0`). Both halves are the mockup's arithmetic.
+	 * ⚠ `scrollIntoView({block:"nearest"})` is the mockup's, guarded exactly as
+	 * the mockup guards it (`if (el && el.scrollIntoView)`) — jsdom implements no
+	 * layout and defines no `scrollIntoView`, so the render suite would throw on
+	 * an unguarded call. Focus moves with the selection so the next arrow keeps
+	 * arriving at this handler; `preventScroll` because the line above has
+	 * already done the scrolling, and more precisely. */
+	const stepRow = (dir: 1 | -1) => {
+		if (visible.length === 0) {
+			return;
+		}
+		const at = visible.findIndex((r) => r.marketId === selectedMarketId);
+		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
+		const target = visible[next];
+		if (target === undefined) {
+			return;
+		}
+		setSelectedMarketId(target.marketId);
+		const el = rowRefs.current.get(target.marketId);
+		if (el?.scrollIntoView) {
+			el.scrollIntoView({ block: "nearest" });
+		}
+		el?.focus({ preventScroll: true });
+	};
 
 	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
 	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
@@ -294,6 +360,23 @@ export function PositionsTable({
 			) : (
 				<table
 					data-testid="positions-table"
+					// ⛔ THE KEY HANDLER IS SCOPED TO THE TABLE, NOT TO `document`.
+					// The mockup binds `document.addEventListener('keydown', …)` with
+					// `e.preventDefault()` (`:751-756`) — safe there because its
+					// html/body are `overflow:hidden`, a fixed-viewport prototype
+					// affordance recon A-5 STRUCK. On this build the page GROWS AND
+					// SCROLLS (RULED A1), so a document-level ArrowDown that prevents
+					// default would kill keyboard scrolling of the whole profile
+					// route. Bound here, the keys are live exactly while focus is
+					// inside the table — the BEHAVIOUR the mockup describes, without
+					// the side effect its own page could not have.
+					onKeyDown={(e) => {
+						if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+							return;
+						}
+						e.preventDefault();
+						stepRow(e.key === "ArrowUp" ? -1 : 1);
+					}}
 					className="w-full text-left text-sm"
 				>
 					{/* HTML-FINISH row 14 — THE ARROW TRACK MOVES BETWEEN THE TWO VALUE
@@ -338,12 +421,105 @@ export function PositionsTable({
 						</tr>
 					</thead>
 					<tbody>
-						{visible.map((row) => {
+						{visible.map((row, index) => {
 							const sellable = sellEligibleOf(row);
 							const sellOpen = sellMarketId === row.marketId;
+							const isSelected = selectedRow?.marketId === row.marketId;
 							return (
 								<Fragment key={row.marketId}>
-									<tr data-testid={`position-row-${row.marketId}`}>
+									{/* ⚠⚠ ROUND 4 items 5 + 6 — THE ROW IS A BORDERED, SELECTABLE
+									    CARD. The mockup's `.rows` is a bordered rounded box whose
+									    `.prow`s are separated by hairlines (`:270-275`), and the
+									    selected one is picked out by `.prow.sel` (`:277`:
+									    `outline:2px solid var(--ink); outline-offset:-2px;
+									    border-radius:var(--r); background:var(--n1)`).
+									    ⛔ NOT ONE VALUE OF THAT IS PORTED. `--ink` is #fafafa in
+									    the shipped dark system — a near-WHITE 2px outline, the
+									    exact inversion `side-pole-binding` exists to prevent — and
+									    `--n1` is the light prototype's SECOND-BRIGHTEST step while
+									    the shipped `n1` is the second-DARKEST. What is ported is
+									    the COMPOSITION: a heavier, brighter edge plus a distinct
+									    fill.
+									      unselected  `[border:var(--hairline)]`  1px n2 — the
+									                  shipped rung 1, this file's own panel edge
+									      selected    `[border:var(--ring-active)]` 1.5px n4 — the
+									                  shipped rung 3, `globals.css:178`, the SAME
+									                  token item 2 used for the selected filter half
+									                  and `discovery/MarketCard.tsx:74` for a picked
+									                  card
+									      fill        `bg-n1` — the shipped raised surface already on
+									                  this file's `PopoverOption` hover
+									    ⚠ THE HEAVIER BORDER WINS BY THE COLLAPSING MODEL, and that
+									    is measured, not assumed: Tailwind's preflight sets
+									    `border-collapse:collapse` (verified in a browser against
+									    the compiled CSS), under which adjacent row borders merge
+									    into one and conflict resolution picks the WIDER — so the
+									    selected row's 1.5px edge reads unbroken against its
+									    neighbours' 1px. It is also why the two border classes are
+									    written as one conditional and never both: two arbitrary
+									    `[border:…]` utilities on one element resolve by stylesheet
+									    order, not by the order they are written here.
+									    ⛔ THE ROWS BOX TAKES NO `rounded-[var(--r)]`: the collapsing
+									    model ignores `border-radius`, so declaring it would be a
+									    class that does nothing. Square corners on the rows run are
+									    the cost of keeping a real `<table>` — and row 3 already
+									    recorded why the table stays (two grids cannot share column
+									    widths without the mockup's five px tracks).
+									    ⚠ A ROW OWNS NO SELL HOST BORDER. The reserved 50px sell box
+									    below is deliberately unbordered — bordering an empty
+									    reserved band would draw an empty card under every sellable
+									    row. */}
+									<tr
+										data-testid={`position-row-${row.marketId}`}
+										ref={(el) => {
+											if (el) {
+												rowRefs.current.set(row.marketId, el);
+											} else {
+												rowRefs.current.delete(row.marketId);
+											}
+										}}
+										// ⚠ `aria-current`, NOT `aria-selected`, AND THAT IS A BLOCKED
+										// ROUTE RATHER THAN A PREFERENCE. `aria-selected` is only
+										// defined inside a grid or a listbox — this file's own
+										// `PopoverOption` uses it exactly that way — but Biome's
+										// a11y rule rejects `role="grid"` on a `<table>` as
+										// redundant, and disabling a Biome rule is an ask-first
+										// decision (AGENTS.md §11), not something to take in
+										// passing. `aria-current` is valid on ANY element and says
+										// precisely this: the current item within a set. The
+										// selection is announced either way.
+										aria-current={isSelected ? "true" : undefined}
+										// Roving tabindex: one tab stop for the whole table, on the
+										// selected row — or on the first row when nothing is
+										// selected, so the keys are reachable without a click.
+										tabIndex={
+											isSelected || (selectedRow === null && index === 0)
+												? 0
+												: -1
+										}
+										onClick={(e) => {
+											// The row's own children stay clickable: the title and
+											// market links navigate, Sell opens its module. The
+											// mockup reaches this with `event.stopPropagation()` on
+											// each child (`:548`); one `closest` here covers every
+											// child without threading a handler through them.
+											if ((e.target as HTMLElement).closest("a,button")) {
+												return;
+											}
+											pick(row.marketId);
+										}}
+										onKeyDown={(e) => {
+											if (e.key === "Enter" || e.key === " ") {
+												e.preventDefault();
+												pick(row.marketId);
+											}
+										}}
+										className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+											isSelected
+												? "bg-n1 [border:var(--ring-active)]"
+												: "[border:var(--hairline)] hover:bg-n1"
+										}`}
+									>
 										<td className="p-2 text-ink">
 											{/* Item 1 (P5-D02), the mockup's `.pside`: the side WORD
 											    beside the thumb glyph at 12px. ⛔ NOT a chip (R12).
