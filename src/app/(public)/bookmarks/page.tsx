@@ -123,6 +123,13 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    ⚠ `owner` IS TRUE AND THAT IS NOT A GUESS: `/bookmarks` is auth-gated
 			    and `viewerId` is always `session.user.id`, so the viewer IS the user
 			    whose band this is. The visitor arm cannot occur on this route.
+			    ⚠ ROUND 5 — `showViewChip={false}`. Founder-ruled: this surface shows
+			    ONE chip, the panel head's "Your bookmarks", which is what the
+			    mockup's bookmark mode does (`:768`). Without it the identity card's
+			    own chip read "Viewing as owner" beside it — two chips describing the
+			    same view in different words. ⛔ The suppression is SCOPED to this
+			    call site; `IdentityCard`'s default is unchanged, so Profile renders
+			    byte-identically.
 			    ⚠ ONE WART, NAMED NOT HIDDEN: `IdentityCard`'s owner arm renders a
 			    Bookmark icon linking to `/bookmarks`, so on THIS route it is a
 			    self-link. `src/components/profile/**` is read-only here, so it is
@@ -144,7 +151,12 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				{viewer === null ? (
 					<div data-testid="bookmarks-identity-unresolved" />
 				) : (
-					<IdentityCard user={viewer} owner={true} tiles={tiles} />
+					<IdentityCard
+						user={viewer}
+						owner={true}
+						tiles={tiles}
+						showViewChip={false}
+					/>
 				)}
 				<ProfileGraph series={graph} />
 			</div>

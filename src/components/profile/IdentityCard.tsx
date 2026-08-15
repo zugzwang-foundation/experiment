@@ -26,6 +26,7 @@ export function IdentityCard({
 	user,
 	owner,
 	tiles,
+	showViewChip = true,
 }: {
 	user: ProfileUser;
 	owner: boolean;
@@ -36,6 +37,27 @@ export function IdentityCard({
 	 * (O-1): an optional `tiles` would let a call site silently drop the band.
 	 */
 	tiles: ProfileTilesData;
+	/**
+	 * ⚠⚠ HTML-FINISH · BOOKMARKS round 5 — SUPPRESS THE VIEW CHIP, AND NOTHING
+	 * ELSE. Founder-ruled: on `/bookmarks` the "Viewing as owner" chip is REMOVED
+	 * and the panel head's "Your bookmarks" is the only chip — which is what the
+	 * mockup's bookmark mode does (`surface_profile_v1_0.html:768`,
+	 * `vc.textContent='Your bookmarks'`, ONE chip). Two chips describing the same
+	 * view in different words is the defect this closes.
+	 *
+	 * ⛔ THE DEFAULT IS TODAY'S BEHAVIOUR. Every existing call site — Profile's
+	 * page and twelve test renders — passes nothing and renders BYTE-IDENTICALLY.
+	 * Profile is on `main`; a regression here would be live, not on a branch.
+	 *
+	 * ⛔ IT GOVERNS THE VIEW CHIP ALONE. The Banned badge, the Scrubbed badge,
+	 * the owner-only bookmark link, the pseudonym, the PFP and every class are
+	 * untouched — including the chip row's own wrapper, so a banned or scrubbed
+	 * viewer still gets those badges in the same box.
+	 * ⛔ NO STRING IS RETITLED: `profile/copy.ts` is untouched, so
+	 * `PROFILE_COPY.chip.owner` / `.visitor` still read exactly as they did. The
+	 * fix is SUPPRESSION on one surface, not a re-wording for all of them.
+	 */
+	showViewChip?: boolean;
 }): React.JSX.Element {
 	const scrubbed = user.pseudonym.startsWith("[");
 
@@ -230,9 +252,11 @@ export function IdentityCard({
 						)}
 					</div>
 					<div className="flex flex-wrap items-center gap-2">
-						<Badge data-testid="profile-chip" variant="secondary">
-							{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
-						</Badge>
+						{showViewChip && (
+							<Badge data-testid="profile-chip" variant="secondary">
+								{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
+							</Badge>
+						)}
 						{user.banned && (
 							<Badge data-testid="identity-banned" variant="destructive">
 								Banned

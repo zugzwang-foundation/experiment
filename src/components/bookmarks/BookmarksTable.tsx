@@ -541,15 +541,16 @@ function BookmarksPanel({
 				    `<span>` they replace and to Profile's — so the element changes and
 				    not one pixel does. */}
 				<h1 className="text-xs font-medium text-ink">Bookmarks</h1>
-				{/* ⚠ THE `Your bookmarks` CHIP LANDS HERE BY NECESSITY, NOT BY RULING.
-				    It shared the removed page-level row with the `<h1>`, so it had to
-				    go somewhere; this keeps it adjacent to the title exactly as it was.
-				    ⛔ THE TWO-CHIP QUESTION IS NOT RESOLVED HERE — `IdentityCard`
-				    renders with `owner=true` and its own chip reads "Viewing as owner",
-				    so two chips describe the same view in different words. Both
-				    `IdentityCard` and `profile/copy.ts` are READ ONLY this round. The
-				    options are reported to the founder; nothing is recommended and
-				    nothing is decided. */}
+				{/* ⚠⚠ ROUND 5 — THE TWO-CHIP QUESTION IS RESOLVED, AND THIS IS THE
+				    SURVIVING CHIP. It arrived here at F-1 because it shared the removed
+				    page-level row with the `<h1>`; the founder has now ruled that it
+				    STAYS and that `IdentityCard`'s "Viewing as owner" is REMOVED on
+				    this surface — which is what the mockup's bookmark mode does
+				    (`surface_profile_v1_0.html:768`, `vc.textContent='Your bookmarks'`,
+				    ONE chip). The suppression rides a new optional prop whose default
+				    is today's behaviour, so Profile is untouched; see
+				    `IdentityCard.tsx`'s `showViewChip`.
+				    ⛔ NO STRING WAS RETITLED — `profile/copy.ts` is untouched. */}
 				<Badge data-testid="bookmarks-view-chip" variant="outline">
 					Your bookmarks
 				</Badge>

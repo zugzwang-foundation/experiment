@@ -59,6 +59,7 @@ vi.mock("@/server/profile/graph-series", () => ({
 import BookmarksRouteError from "@/app/(public)/bookmarks/error";
 import * as bookmarksPage from "@/app/(public)/bookmarks/page";
 import { BookmarksLoading } from "@/components/bookmarks/states";
+import { IdentityCard } from "@/components/profile/IdentityCard";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileGraphSeries } from "@/server/profile/graph-series";
@@ -449,5 +450,108 @@ describe("GATE C F-1 — `Bookmarks` renders exactly once", () => {
 			(el) => el.children.length === 0 && el.textContent === "Bookmarks",
 		);
 		expect(exact.length).toBe(2);
+	});
+});
+
+describe("ROUND 5 — one chip on /bookmarks, and Profile keeps its own", () => {
+	/**
+	 * ⚠ LEAF TEXT NODES, as the F-1 guard does. An ancestor's `textContent`
+	 * concatenates its descendants', so a whole-tree sweep matches on any wrapper
+	 * containing the words and cannot tell one chip from two.
+	 */
+	const leaves = (root: ParentNode, text: string) =>
+		[...root.querySelectorAll("*")].filter(
+			(el) => el.children.length === 0 && el.textContent === text,
+		);
+
+	it("chip::`Your bookmarks` renders exactly ONCE on the surface", async () => {
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		const { container } = render(await BookmarksPage());
+		const hits = leaves(container, "Your bookmarks");
+		expect(
+			hits.length,
+			`round 5: "Your bookmarks" renders ${hits.length} times; it is the ` +
+				`surface's ONLY chip and lives in the panel head.`,
+		).toBe(1);
+		expect(
+			screen.getByTestId("bookmarks-panel-head").contains(hits[0] as Node),
+		).toBe(true);
+	});
+
+	it("chip::`Viewing as owner` renders ZERO times on the surface", async () => {
+		// ⛔ THE FOUNDER'S RULING. The identity card is still mounted with
+		// `owner={true}` — the viewer IS the owner — but its view chip is
+		// suppressed, so the surface no longer says the same thing twice in two
+		// different wordings.
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		const { container } = render(await BookmarksPage());
+		expect(leaves(container, "Viewing as owner").length).toBe(0);
+		// …and the suppression is the CHIP, not the card: the identity card is
+		// still there, with its pseudonym.
+		expect(screen.getByTestId("identity-card")).toBeTruthy();
+		expect(screen.getByTestId("identity-pseudonym").textContent).toBe(
+			"RedFox001",
+		);
+		// …and the chip's testid is gone, not merely re-worded.
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+	});
+
+	it("chip::PROFILE still renders its chip — the default is today's behaviour", async () => {
+		// ⚠⚠ THE REGRESSION THIS EXISTS TO CATCH IS ON `main`, NOT ON THIS BRANCH.
+		// `IdentityCard` is Profile's component; the new prop defaults to `true`,
+		// so a call site that passes nothing must be byte-identical. Rendered here
+		// with Profile's own call shape.
+		const { container } = render(
+			<IdentityCard
+				user={{
+					id: "0190b3a0-9999-7000-8000-00000000000f",
+					pseudonym: "RedFox001",
+					banned: false,
+					pfpUrl: "/pfp-placeholder.svg",
+				}}
+				owner={true}
+				tiles={{
+					walletValue: "0.000000000000000000",
+					positionsValue: "0.000000000000000000",
+					netProfitLoss: "0.000000000000000000",
+					argumentsCount: { total: 0, posts: 0, replies: 0 },
+					supportReceived: "0.000000000000000000",
+					counterReceived: "0.000000000000000000",
+				}}
+			/>,
+		);
+		expect(leaves(container, "Viewing as owner").length).toBe(1);
+		expect(screen.getByTestId("profile-chip")).toBeTruthy();
+	});
+
+	it("chip::the-prop-suppresses-the-VIEW-CHIP-only", async () => {
+		// ⛔ THE FENCE, ASSERTED. A banned + scrubbed user with the chip suppressed
+		// still gets both badges, in the same wrapper — the prop governs one Badge
+		// and nothing else.
+		const { container } = render(
+			<IdentityCard
+				user={{
+					id: "0190b3a0-9999-7000-8000-00000000000f",
+					pseudonym: "[scrubbed_user_4729]",
+					banned: true,
+					pfpUrl: "/pfp-placeholder.svg",
+				}}
+				owner={true}
+				tiles={{
+					walletValue: "0.000000000000000000",
+					positionsValue: "0.000000000000000000",
+					netProfitLoss: "0.000000000000000000",
+					argumentsCount: { total: 0, posts: 0, replies: 0 },
+					supportReceived: "0.000000000000000000",
+					counterReceived: "0.000000000000000000",
+				}}
+				showViewChip={false}
+			/>,
+		);
+		expect(leaves(container, "Viewing as owner").length).toBe(0);
+		expect(screen.getByTestId("identity-banned")).toBeTruthy();
+		expect(screen.getByTestId("identity-scrubbed")).toBeTruthy();
+		expect(screen.getByTestId("identity-pseudonym")).toBeTruthy();
+		expect(container.querySelector("img")).not.toBeNull();
 	});
 });
