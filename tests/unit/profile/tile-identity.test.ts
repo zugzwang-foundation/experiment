@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { displayNetProfitLoss, formatDharma } from "@/components/debate/format";
+import {
+	displayNetProfitLoss,
+	displayNetProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 
 // DROUND R2 (SPEC.1 §10.8) — the §23 tile identity is preserved in DISPLAYED
 // space: displayed Net P/L = displayed Wallet + displayed Positions − Σ issuance.
@@ -52,5 +56,68 @@ describe("displayNetProfitLoss — §23 tile identity in displayed space (R2)", 
 
 	it("degrades to the rounded raw P/L on a malformed operand", () => {
 		expect(displayNetProfitLoss("—", "0.4", "0.8")).toBe(formatDharma("0.8"));
+	});
+});
+
+// ROUND 4 item 1 — the SIGNED variant. It must be the SAME figure as the plain
+// one (one identity, computed once) with the sign lifted out so the tile can
+// render `<sign>Đ <magnitude>`. The two properties that matter are (i) the two
+// exports never disagree, and (ii) the sign comes from the NUMERIC identity, not
+// from the printed string (SPEC.1 §10.8).
+describe("displayNetProfitLossSigned — sign, then Đ, then the number", () => {
+	/** The tile's own composition, so the assertions read as the rendered form. */
+	const render = (w: string, p: string, n: string) => {
+		const { sign, magnitude } = displayNetProfitLossSigned(w, p, n);
+		return `${sign}Đ ${magnitude}`;
+	};
+
+	it("emits +Đ for a gain and −Đ for a loss", () => {
+		// issuance = 500 + 120 − 238 = 382 ⇒ displayed = 500 + 120 − 382 = 238.
+		expect(render("500", "120", "238")).toBe("+Đ 238");
+		// issuance = 500 + 120 − (−30) = 650 ⇒ displayed = −30.
+		expect(render("500", "120", "-30")).toBe("−Đ 30");
+	});
+
+	it("uses U+2212 MINUS SIGN, never the ASCII hyphen groupInteger emits", () => {
+		// ⛔ BY CODE POINT. `-` (U+002D) and `−` (U+2212) are near-identical on
+		// screen, and the plain variant legitimately emits the ASCII one — so a
+		// paste-comparison would accept the wrong glyph in either direction.
+		const { sign } = displayNetProfitLossSigned("500", "120", "-30");
+		expect(sign.codePointAt(0)).toBe(0x2212);
+		expect(displayNetProfitLoss("500", "120", "-30").codePointAt(0)).toBe(0x2d);
+	});
+
+	it("gives ZERO no sign at all — never +Đ 0 and never −Đ 0", () => {
+		expect(render("500", "120", "0")).toBe("Đ 0");
+		// …including the signed-zero path the plain variant guards with isZero().
+		expect(render("0.4", "0", "0.4")).toBe("Đ 0");
+	});
+
+	it("is the SAME figure as the plain variant, magnitude for magnitude", () => {
+		// The property that keeps the two exports from drifting: strip the sign
+		// from the plain output and the magnitudes must match exactly.
+		for (const [w, p, n] of [
+			["500", "120", "238"],
+			["500", "120", "-30"],
+			["0.6", "0.1", "0.7"],
+			["14260", "3225", "-1234"],
+			["500.100000000000000001", "120.200000000000000002", "0.3"],
+		] as const) {
+			const plain = displayNetProfitLoss(w, p, n);
+			const { magnitude } = displayNetProfitLossSigned(w, p, n);
+			expect(magnitude).toBe(plain.replace(/^-/, ""));
+		}
+	});
+
+	it("groups the magnitude, so the tile row cannot render one ungrouped", () => {
+		// issuance = 14260 + 3225 − (−1234) = 18719 ⇒ displayed = −1234.
+		expect(render("14260", "3225", "-1234")).toBe("−Đ 1,234");
+	});
+
+	it("degrades UNSIGNED on a malformed operand, exactly as the plain does", () => {
+		expect(displayNetProfitLossSigned("—", "0.4", "0.8")).toEqual({
+			sign: "",
+			magnitude: formatDharma("0.8"),
+		});
 	});
 });

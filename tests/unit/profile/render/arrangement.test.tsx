@@ -362,20 +362,42 @@ describe("FOUNDER EYE PASS item 1 — Đ on every Đ tile", () => {
 		expect(value.textContent).not.toContain("Đ");
 	});
 
-	it("item1::NET-P/L-IS-BLOCKED-and-stays-exactly-as-shipped", () => {
-		// ⛔ THIS PINS A BLOCK, DELIBERATELY. The founder asked for `+Đ 238` /
-		// `−Đ n`. `displayNetProfitLoss` emits neither sign-before-glyph form,
-		// and both routes to it are closed this round: editing
-		// `debate/format.ts` (READ ONLY) or reading the DISPLAYED string back
-		// into conditional rendering (SPEC.1 §10.8 bans that by name).
-		// A bare `Đ ` would print `Đ -30` — worse than today. So the tile is
-		// unchanged, and this guard exists so the next reader meets the block
-		// rather than "forgetting" the founder's mark.
+	it("item1::NET-P/L-CARRIES-SIGN-THEN-GLYPH-THEN-NUMBER", () => {
+		// ⚠⚠ RE-INVERTED AT ROUND 4. This assertion used to PIN THE BLOCK — the
+		// tile read a bare `-30` because `debate/format.ts` was read-only. Round
+		// 4's allow-list opened that file for one addition
+		// (`displayNetProfitLossSigned`), so the block is DISCHARGED and the
+		// assertion now states the founder's form instead of the refusal.
+		// ⛔ The order is SIGN → Đ → number. `Đ -30` is the shape round 3 refused
+		// to ship as a consolation, so it is asserted against by name below.
 		render(<ProfileTiles tiles={TILES} />);
 		const tile = screen.getByTestId("tile-net-pl");
 		const value = (tile.children[0]?.textContent ?? "").trim();
-		expect(value).toBe("-30");
-		expect(value).not.toContain("Đ");
+		// TILES.netProfitLoss is negative in this fixture (see TILES above).
+		expect(value).toBe("−Đ 30");
+		// …by code point, because U+2212 MINUS SIGN and the ASCII hyphen `-` are
+		// near-identical on screen and `groupInteger` emits the ASCII one.
+		expect(value.codePointAt(0)).toBe(0x2212);
+		expect(value.codePointAt(1)).toBe(0x110);
+		expect(value).not.toContain("Đ -");
+	});
+
+	it("item1::the-POSITIVE-form-is-+Đ-and-ZERO-carries-no-sign", () => {
+		// The two other arms of the same tile, asserted through the REAL
+		// component rather than the formatter alone — a formatter that is right
+		// and a tile that drops `sign` would pass a formatter-only test.
+		const gain = { ...TILES, walletValue: "500", positionsValue: "120" };
+		const { unmount } = render(
+			<ProfileTiles tiles={{ ...gain, netProfitLoss: "238" }} />,
+		);
+		expect(
+			(screen.getByTestId("tile-net-pl").children[0]?.textContent ?? "").trim(),
+		).toBe("+Đ 238");
+		unmount();
+		render(<ProfileTiles tiles={{ ...gain, netProfitLoss: "0" }} />);
+		expect(
+			(screen.getByTestId("tile-net-pl").children[0]?.textContent ?? "").trim(),
+		).toBe("Đ 0");
 	});
 });
 

@@ -1,4 +1,7 @@
-import { displayNetProfitLoss, formatDharma } from "@/components/debate/format";
+import {
+	displayNetProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 import { Card } from "@/components/ui/card";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
@@ -6,8 +9,9 @@ import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
  * The six §23 account tiles (canon §2/§6, 3×2). All values are server-computed
  * strings; every Đ figure renders at 0 dp via `formatDharma` (DROUND / SPEC.1
  * §10.8), and the Net P/L tile is derived in DISPLAYED space by
- * `displayNetProfitLoss` so the tile identity holds on screen — exact decimal,
- * never a JS float (CLAUDE.md §2). The Arguments tile renders the count as
+ * `displayNetProfitLossSigned` so the tile identity holds on screen AND the
+ * figure carries its sign before the glyph — exact decimal, never a JS float
+ * (CLAUDE.md §2). The Arguments tile renders the count as
  * `N (P Posts | R Replies)` (N-7). Labels are canon §6 verbatim.
  */
 export function ProfileTiles({
@@ -15,6 +19,14 @@ export function ProfileTiles({
 }: {
 	tiles: ProfileTilesData;
 }): React.JSX.Element {
+	// Item 1 — the sign is resolved ONCE, in decimal space, by the formatter. It
+	// is bound here rather than called inline because the tile interpolates the
+	// two halves either side of the Đ glyph.
+	const netProfitLoss = displayNetProfitLossSigned(
+		tiles.walletValue,
+		tiles.positionsValue,
+		tiles.netProfitLoss,
+	);
 	return (
 		<div
 			data-testid="profile-tiles"
@@ -46,34 +58,27 @@ export function ProfileTiles({
 			<Tile testid="tile-positions" label="Positions value">
 				Đ {formatDharma(tiles.positionsValue)}
 			</Tile>
-			{/* ⛔⛔ NET P/L TAKES NO Đ AND NO `+` — BLOCKED, NOT OVERLOOKED, and it
-			    is the one tile the founder named explicitly ("Net P/L carries its
-			    sign, `+Đ 238` / `−Đ n`").
-			    THE SHIPPED FORMATTER EMITS NEITHER. `displayNetProfitLoss`
-			    (`debate/format.ts:142-165`) returns `groupInteger(...)` — digits with
-			    a leading ASCII `-` for negatives (`format.ts:72`) and NO sign for
-			    positives. Reaching the founder's form needs the sign BEFORE the Đ,
-			    and there are exactly two routes to it:
-			      (a) teach `format.ts` a signed variant — but
-			          `src/components/debate/**` is READ ONLY this round; or
-			      (b) inspect the returned string (`startsWith("-")`, or test for a
-			          leading `+`) and re-assemble around it — which is reading a
-			          DISPLAYED figure back into conditional rendering, and SPEC.1
-			          §10.8 forbids exactly that by name: "Rounded values are
-			          terminal: a displayed figure is a string, and is never read
-			          back into arithmetic, comparison, validation, clamping, or
-			          CONDITIONAL RENDERING."
-			    ⛔ A BARE `Đ ` PREFIX IS NOT SHIPPED AS A CONSOLATION: it would print
-			    `Đ -30`, which is worse than today's `-30` — the sign lands on the
-			    wrong side of the glyph and the tile stops matching the other four.
-			    ⇒ The tile is LEFT EXACTLY AS IT SHIPPED and the block is reported.
-			    Route (a) is one line the moment `format.ts` is writable. */}
+			{/* ⚠⚠ ROUND 4 item 1 — NET P/L JOINS THE OTHER FOUR, and the block that
+			    stood here is DISCHARGED, not forgotten. Round 3 shipped Đ on four
+			    tiles and left this one bare beside them; the cause was route (a) —
+			    `debate/format.ts` was READ ONLY — and round 4's allow-list opens
+			    that file for exactly one addition. `displayNetProfitLossSigned`
+			    (`debate/format.ts`) is that addition: it returns the SAME
+			    displayed-space figure as `displayNetProfitLoss`, split into sign +
+			    magnitude, so the tile can render sign → glyph → number.
+			    ⛔ ROUTE (b) IS STILL CLOSED AND STILL NOT TAKEN. The sign is
+			    `Decimal.isNegative()` on the numeric identity INSIDE the formatter —
+			    the displayed string is never read back (SPEC.1 §10.8: "a displayed
+			    figure … is never read back into arithmetic, comparison, validation,
+			    clamping, or CONDITIONAL RENDERING"). Nothing in this file inspects a
+			    rendered figure; it interpolates two values the formatter handed it.
+			    ⛔ THE GLYPH IS THE SAME BYTE-CARRY AS THE OTHER FOUR — `c4 90`,
+			    U+0110 — and the SPACING is the shipped `Đ {…}` form, so the five Đ
+			    tiles are byte-identical in their prefix. Only the sign is new, and
+			    the MINUS is U+2212 (`e2 88 92`), byte-carried from the mockup's
+			    `pl()` (`:672`), never the ASCII hyphen the plain variant emits. */}
 			<Tile testid="tile-net-pl" label="Net profit / loss">
-				{displayNetProfitLoss(
-					tiles.walletValue,
-					tiles.positionsValue,
-					tiles.netProfitLoss,
-				)}
+				{netProfitLoss.sign}Đ {netProfitLoss.magnitude}
 			</Tile>
 			{/* HTML-FINISH row 19 — THE BREAKDOWN GETS ITS OWN ELEMENT. The mockup's
 			    value node is `<div class="tv">5<span class="tsub">(3 Posts | 2

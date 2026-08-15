@@ -144,24 +144,93 @@ export function displayNetProfitLoss(
 	positionsValue: string,
 	netProfitLoss: string,
 ): string {
-	let displayed: Decimal;
+	const displayed = netProfitLossDisplayed(
+		walletValue,
+		positionsValue,
+		netProfitLoss,
+	);
+	if (displayed === null) {
+		return formatDharma(netProfitLoss);
+	}
+	return groupInteger(displayed.isZero() ? "0" : displayed.toFixed(0));
+}
+
+/**
+ * The §23 Net P/L identity in DISPLAYED space, as a DECIMAL — the shared core of
+ * the two exported Net P/L formatters above and below, so the identity is
+ * computed in exactly one place and the plain and signed renders can never
+ * disagree about the figure. `null` ⇒ a malformed / non-finite operand; each
+ * caller supplies its own degrade.
+ */
+function netProfitLossDisplayed(
+	walletValue: string,
+	positionsValue: string,
+	netProfitLoss: string,
+): Decimal | null {
 	try {
 		const wallet = new DisplayDecimal(walletValue);
 		const positions = new DisplayDecimal(positionsValue);
 		const netPL = new DisplayDecimal(netProfitLoss);
 		if (!wallet.isFinite() || !positions.isFinite() || !netPL.isFinite()) {
-			return formatDharma(netProfitLoss);
+			return null;
 		}
 		const issuance = wallet.plus(positions).minus(netPL);
-		displayed = wallet
+		return wallet
 			.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
 			.plus(positions.toDecimalPlaces(0, Decimal.ROUND_HALF_UP))
 			.minus(issuance)
 			.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
 	} catch {
-		return formatDharma(netProfitLoss);
+		return null;
 	}
-	return groupInteger(displayed.isZero() ? "0" : displayed.toFixed(0));
+}
+
+/**
+ * The SIGNED §23 Net P/L display — the SAME displayed-space figure as
+ * `displayNetProfitLoss`, returned SPLIT into its sign and its unsigned
+ * magnitude so a tile can render `<sign>Đ <magnitude>`: `+Đ 238` / `−Đ 30`
+ * (canon §2's Net P/L tile; the mockup's own `pl()` emits the same two prefixes
+ * at `surface_profile_v1_0.html:672`). Sign FIRST, then the glyph, then the
+ * number — which is why this returns two parts instead of one string: the Đ
+ * glyph stays in the view layer beside every other Đ on the surface, and this
+ * module keeps emitting numbers only.
+ *
+ * ⛔ THE SIGN IS DERIVED FROM THE NUMERIC INPUTS, NEVER FROM THE OUTPUT STRING.
+ * SPEC.1 §10.8: "Rounded values are terminal: a displayed figure is a string,
+ * and is never read back into arithmetic, comparison, validation, clamping, or
+ * CONDITIONAL RENDERING." So the branch is `Decimal.isNegative()` on the
+ * displayed-space figure, taken BEFORE grouping — not `startsWith("-")` on what
+ * `displayNetProfitLoss` printed.
+ *
+ * ⚠ ZERO CARRIES NO SIGN, and that is the same rule the plain variant already
+ * holds: `isZero()` covers +0 and −0, so the tile reads `Đ 0`, never `+Đ 0` or
+ * `−Đ 0`. The MINUS is U+2212 (`e2 88 92`), not the ASCII hyphen `groupInteger`
+ * would have emitted — byte-carried from the mockup's `pl()`, which is also the
+ * form the founder's mark writes.
+ *
+ * Degrades exactly as the plain variant does — `formatDharma(netProfitLoss)`,
+ * unsigned — so a malformed value is not dressed in a sign it cannot support.
+ */
+export function displayNetProfitLossSigned(
+	walletValue: string,
+	positionsValue: string,
+	netProfitLoss: string,
+): { sign: string; magnitude: string } {
+	const displayed = netProfitLossDisplayed(
+		walletValue,
+		positionsValue,
+		netProfitLoss,
+	);
+	if (displayed === null) {
+		return { sign: "", magnitude: formatDharma(netProfitLoss) };
+	}
+	if (displayed.isZero()) {
+		return { sign: "", magnitude: "0" };
+	}
+	return {
+		sign: displayed.isNegative() ? "−" : "+",
+		magnitude: groupInteger(displayed.abs().toFixed(0)),
+	};
 }
 
 /**
