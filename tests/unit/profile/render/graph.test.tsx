@@ -456,4 +456,43 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 			expect(node.hasAttribute("data-side")).toBe(true);
 		}
 	});
+
+	it("y-gridline-intervals-cumulative-only", () => {
+		// POLISH.5 item 16 / `OD-9` — the TWO CUMULATIVE ARMS ONLY: 5 intervals
+		// collapsed, 10 expanded, as UNLABELLED gridlines over the fixed
+		// 0..`yMax` domain. Each line is one interval's UPPER bound, so N
+		// intervals draw N lines and the COUNT is what this asserts.
+		//
+		// ⛔ THIS CASE ASSERTS NOTHING ABOUT THE PER-MARKET VIEW — not a count,
+		// not a presence, not an absence. That view autoscales through `niceMax`
+		// and its interval count is UNRULED; a "zero gridlines there" assertion
+		// would silently convert an unruled question into a ruled one, and the
+		// next plan would inherit a decision no founder made.
+		//
+		// Two renders, each read through its OWN container: `screen` spans the
+		// whole body and would see both at once, making both counts wrong.
+		const { container: collapsed } = render(
+			<ProfileGraphCard series={FULL} onExpand={vi.fn()} />,
+		);
+		// Non-vacuity: the chart branch rendered, not the empty branch.
+		expect(within(collapsed).getByTestId("line-networth")).toBeTruthy();
+		expect(byPrefix(collapsed, "grid-y-")).toHaveLength(5);
+
+		const { container: expanded } = render(
+			<ProfileChart series={FULL} selection="cumulative" mode="expanded" />,
+		);
+		expect(within(expanded).getByTestId("line-freedharma")).toBeTruthy();
+		const lines = byPrefix(expanded, "grid-y-");
+		expect(lines).toHaveLength(10);
+
+		// UNLABELLED, and inside the chart: each gridline is a bare <line> that
+		// carries no text of its own. Labels would print Đ figures and would
+		// have to route through `formatDharma`.
+		const chart = within(expanded).getByTestId("profile-chart");
+		for (const line of lines) {
+			expect(line.tagName.toLowerCase()).toBe("line");
+			expect(chart.contains(line)).toBe(true);
+			expect(line.textContent).toBe("");
+		}
+	});
 });

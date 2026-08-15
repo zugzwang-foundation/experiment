@@ -49,6 +49,22 @@ export function ProfileChart({
 		? series.nodes.filter((n) => n.marketId === selection)
 		: series.nodes;
 
+	// `OD-9` — Y-AXIS INTERVALS, THE TWO CUMULATIVE ARMS ONLY. Both run the
+	// fixed 0..`series.yMax` domain, ruled at 5 intervals collapsed and 10
+	// expanded (DESIGN-W2_6-profile-graph-CLOSE-OUT.md §3 item 2).
+	//
+	// ⛔ The PER-MARKET view autoscales through `niceMax` and its interval count
+	// is UNRULED, so it draws NONE and this component makes no claim about it.
+	// Zero here means "not ruled", never "ruled zero".
+	const gridIntervals = perMarket ? 0 : mode === "expanded" ? 10 : 5;
+	// The interval UPPER bounds, in Đ. N intervals over 0..yMax yield N bounds,
+	// which is why N intervals draw N lines. Each value is distinct, so it also
+	// serves as the React key without keying on an array index.
+	const gridBounds = Array.from(
+		{ length: gridIntervals },
+		(_, i) => (series.yMax * (i + 1)) / gridIntervals,
+	);
+
 	return (
 		<svg
 			data-testid="profile-chart"
@@ -57,6 +73,30 @@ export function ProfileChart({
 			aria-hidden="true"
 			className="h-full w-full"
 		>
+			{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound,
+			    so N intervals draw N lines and the 0 baseline is carried by the X
+			    labels below. Drawn FIRST so they paint behind every series. Spanned
+			    by the same `xPx` endpoints the axis labels use, so item 16 adds no
+			    geometry primitive and `geometry.ts` is read, never written. Labels
+			    would print Đ figures and would have to route through `formatDharma`;
+			    unlabelled is the ratified reading and needs no data. */}
+			{gridBounds.map((bound, i) => {
+				const gy = yPx(String(bound), series.yMax);
+				return (
+					<line
+						key={bound}
+						data-testid={`grid-y-${i + 1}`}
+						x1={xPx(series.windowStart, startMs, endMs)}
+						x2={xPx(series.windowEnd, startMs, endMs)}
+						y1={gy}
+						y2={gy}
+						stroke="var(--color-n2)"
+						strokeWidth="1"
+						vectorEffect="non-scaling-stroke"
+					/>
+				);
+			})}
+
 			{/* X endpoint labels — exactly two (Sep 15 · Nov 5), no interior ticks. */}
 			<text
 				data-testid="axis-x-start"
