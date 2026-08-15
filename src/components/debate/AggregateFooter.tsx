@@ -28,8 +28,10 @@ import type { ReplyAggregate, Side } from "./types";
  * docstring names the case as "Route 3 — a FIXED pole colour on a PER-SIDE
  * element ... no side value appears in the expression at all", records that
  * "V17's Support/Counter split bar lived in exactly this hole for the length of
- * this PR", and notes the file "stayed green throughout". The live inversion at
- * `composer/ReplySplitBar.tsx:64,67` (`RR-3`) is the same defect still shipped.
+ * this PR", and notes the file "stayed green throughout". `RR-3` — the same
+ * defect on `ReplySplitBar`'s own track and fill spans — was corrected at
+ * POLISH.3 PR 2 C13; cited here as the worked example of the genus, not as a
+ * live defect.
  * ⇒ The side value is resolved to a pole token AT the call site below, which is
  * the shape that cannot invert silently, and the control is the render guard
  * `tests/unit/debate/render/aggregate-footer.test.tsx` (four assertions: two

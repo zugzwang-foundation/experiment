@@ -63,21 +63,42 @@ export function ReplySplitBar({
 				{/* RR-3 — THE POLES NAME THE SIDE, NEVER THE RELATION.
 				    The fill is the SUPPORT share and the track is the counter
 				    remainder, and both resolve to a SIDE: Support inherits the post's
-				    side, Counter opposes it (`deriveReplySide`'s rule, the same one
-				    `TriggerPill` applies at `:118-122` — this component's own correct
-				    sibling, and this row's positive control).
+				    side, Counter opposes it — `deriveReplySide`'s rule, the same one
+				    `TriggerPill (→ the pole const)` applies below: this component's own
+				    correct sibling, and this row's positive control.
 				    Both were FIXED (`bg-no` track over a `bg-yes` fill), so on every NO
 				    post the NO-side share was painted in the YES pole — a lie about
-				    which side an argument backs. The mockup was never wrong: it poles
-				    these by RESULTING SIDE (`d5:1247,1249`, confirmed in JS at
-				    `d5:1591`), so this makes the build agree with the artifact.
+				    which side an argument backs.
+
+				    ⛔ THE MOCKUP DOES **NOT** VINDICATE THIS BAR, AND AN EARLIER DRAFT OF
+				    THIS COMMENT CLAIMED IT DID. Measured in `surface_d5_v1_0.html`:
+				    `:1247`/`:1249` are the Support/Counter BUTTONS (`.rbtn2 n` / `.rbtn2
+				    y`), and the bar between them at `:1248` carries NO side class at all.
+				    `.barrow .bar` is a fixed `--n0` and `.bar .fill` a fixed `--ink`
+				    (`:510-512`); `.bar .fill.right` exists at `:513` and is NEVER
+				    applied; and the JS at `:1591-1592` sets only the two buttons'
+				    classNames while `:1596` sets only the fill's WIDTH. The annotated
+				    post is `side:'no'` with `sPct:69`, so d5 paints a NO post's SUPPORT
+				    share in the YES pole.
+				    ⇒ d5's BAR is itself a Route-3 instance. The mockup demonstrates the
+				    rule at its TRIGGERS and fails to apply it at its BAR; this build
+				    applies it in both places. So C13 is a DELIBERATE DIVERGENCE from the
+				    artifact on the design-language rule (`design-language.md:268`,
+				    CLAUDE.md §8), NOT a return to it — recorded because §3 ratifies
+				    "mimic the mockup", and a later fidelity pass reading `d5:1248`
+				    without this note would revert the fix.
+
 				    ⚠ Written as `postSide === "YES"` rather than as a
-				    `deriveReplySide(...)` call ON PURPOSE: `side-pole-binding.test.ts`'s
-				    `SIDE_COMPARISON` matches an IDENTIFIER compared to a side literal,
-				    so this form is VISIBLE to the guard where a call expression would
-				    not be. Route 3 is that guard's known blind spot and this file is the
-				    instance it was written around — the fix should be the thing it can
-				    see. */}
+				    `deriveReplySide(...)` call, and THE FENCE IS THE REASON. §10 permits
+				    exactly one `composer/**` exception, symbol-fenced to these two
+				    spans, and any work resolving outside them is `H-COMPOSER`, a HALT —
+				    so a hoisted `const` above the return was not available.
+				    ⚠ Guard visibility alone does NOT select this form, and saying so
+				    would mislead: `SIDE_COMPARISON` matches an IDENTIFIER before the
+				    comparison, so a hoisted const would ALSO be visible while a bare
+				    call expression would not. Both facts hold; only the fence decides.
+				    (Inlining the ternary is also the shape of both ruled precedents —
+				    `HeroPanels` entry 7 and `AggregateFooter` entry 9.) */}
 				<span
 					className={`h-1.5 w-full overflow-hidden rounded-(--r-dot) ${postSide === "YES" ? "bg-no" : "bg-yes"}`}
 					aria-hidden="true"

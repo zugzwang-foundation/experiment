@@ -19,9 +19,10 @@ import type { ReplyGroups } from "./types";
  *
  * ⚠ RULED CONSEQUENCE OF THE ROW-13 PARTITION (POLISH.3 PR 2 C7, founder-ruled
  * 2026-08-16 — RECORDED, NOT FIXED). Expanding changes the TYPE at position 0
- * of the container (collapsed renders a mapped array; expanded renders two
- * side-keyed `<ul>`s), so React cannot match the keyed `ReplyCard`s across the
- * toggle and every reply card REMOUNTS on expand. `BookmarkToggle` seeds its
+ * of the container. Both branches reconcile to a Fragment fiber (collapsed a
+ * mapped array, expanded an explicit `<>`), so the mismatch lands ONE LEVEL
+ * DOWN: keyed `ReplyCard`s on one side against unkeyed `<ul>`s on the other,
+ * which React cannot match — so every reply card REMOUNTS on expand. `BookmarkToggle` seeds its
  * `useState` at mount from the page-load prop, so a bookmark placed on a
  * default-slot reply reads as UNSAVED after expanding.
  *
@@ -34,8 +35,11 @@ import type { ReplyGroups } from "./types";
  * remount. It is the same law `CardActions`' `key={commentId}` exists to
  * exploit in the other direction.
  *
- * ⛔ THE HALF FIX WAS MEASURED AND REJECTED. Rendering the collapsed branch
- * through a `<ul>` too keeps position 0's type, but the lists still differ:
+ * ⛔ THE HALF FIX WAS REASONED THROUGH AND REJECTED — reasoned, not measured;
+ * no test or observation records it, and calling it "measured" would be the
+ * same O-3 slip this file's neighbours were corrected for. Wrapping the
+ * collapsed branch so slot 0 keeps a Fragment above two `<ul>`s would preserve
+ * the reconciliation path, but the lists still differ:
  * collapsed position 0 is [top support, top counter] and expanded position 0 is
  * [top support, support tail]. The support reply's key matches and survives;
  * the counter reply moves lists and remounts anyway. ⇒ It would preserve one

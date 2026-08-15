@@ -1,6 +1,6 @@
 # POLISH.3 · PR 2 — session log
 
-**Sessions:** 2026-08-15 (unattended, halted at C2) + 2026-08-16 (unattended, resumed C3→C12)
+**Sessions:** 2026-08-15 (unattended, halted at C2) + 2026-08-16 (unattended, resumed C3→C12) + 2026-08-16 (**ATTENDED — C13 + Gate C riders**)
 **Branch:** `polish/3-pr2-cards` (pushed; **no PR, no merge**) · **Branch point:** `origin/main` = `ea1795e`
 **Plan:** `docs/plans/POLISH-3-PR-2.md` v1.4
 
@@ -10,7 +10,7 @@
 
 ## What landed (files + PR#)
 
-**No PR opened.** `C0…C12` complete. **`C13` did not run — attended-only.**
+**No PR opened.** ✅ **`C0…C13` COMPLETE — every row in the plan is landed.**
 
 | SHA | Commit |
 |---|---|
@@ -29,6 +29,9 @@
 | `e6ba033` | **C10** — spaced `Đ` sites 2-3; sites 4-5 **VERIFIED**, not edited (rows 4, 5) |
 | `2998ff0` | **C11** — the `Download` trigger removed + the `O-5` prose sweep (row 7) |
 | `a133c47` | **C12** — the expanded chart's accessible summary + `R-3` on `pct-round-render` (row 8) |
+| `bc8532e` | post-review remediation — `@code-reviewer` MEDIUM-1 + two `O-3` comments |
+| `9f86076` | **C13** — `RR-3`, the split bar's poles name the SIDE (row 15) · **ATTENDED** |
+| `5c389f0` | Gate C riders — `GC-14`, the plan's own `O-5`, the remount record |
 
 ## Decisions made
 
@@ -41,15 +44,51 @@
 7. **`role="group"` → labelled `<ul>/<li>`** at C7 after Biome's `useSemanticElements` rejected it. The rule was right; disabling it would have been an AGENTS.md §11 ask-first.
 8. **Discarded C11's first suite run** — another session's runner was live. Waited ~705 s, re-measured clean, committed on that.
 
+## ⚠ A FLAKE SIGHTING, RECORDED SO THE SECOND ONE IS RECOGNISABLE
+
+**The C13 full-suite run came back RED on a test this PR cannot touch**, and it
+is written down rather than discarded because `docs/parked.md:1203-1207` rules
+exactly this case: *"the honest reading is 'flake again', and that is exactly how
+a real INV-class defect gets waved through. The failure mode is not a red test;
+it is a future red test that nobody believes"* — and *"two sightings retire the
+flake reading."* **This is SIGHTING ONE.**
+
+```
+FAIL tests/server/bets/atomicity.test.ts
+     > bet-place::every-persisted-comment-has-a-bet-referencing-it   (:363)
+     AssertionError: expected 500 to be 200
+```
+
+⚠ It is an **INV-1 critical-path test**, which is why it was diagnosed rather
+than re-run and forgotten. The evidence that it is contention, not regression:
+
+1. **The PR touches ZERO `src/server/`, `src/db/` or `drizzle/` files** —
+   measured on the branch diff, not assumed.
+2. **It passes 3/3 in isolation**, including that exact test.
+3. **10.9 s under full-suite load vs 4.3 s isolated** — heavy DB contention.
+4. The route has a **documented honest-500 path** for an exhausted or
+   unretryable DB error (`api/bets/place/route.ts:193`, `bets/endpoint.ts:361`),
+   so a serialization failure surfacing as a 500 is designed behaviour.
+5. The class is already on record: `AUDIT-FIX-A22.md:65` names "the B5-noted
+   local-PG flake class", and `AUDIT-FIX-B5.md:47` records local Postgres
+   saturation producing random failures.
+6. **The immediately following full run was FULLY GREEN** (below).
+
+⇒ **If `bet-place::every-persisted-comment-has-a-bet-referencing-it` is seen red
+a second time, the flake reading is retired and it is a defect.** That is the
+whole reason this paragraph exists.
+
 ## The final local gate — full `pnpm vitest run` (§14)
 
 ```
-Test Files  1 failed | 335 passed | 1 skipped (337)
-     Tests  2 failed | 2981 passed | 1 skipped | 4 todo (2988)
-  FULL_EXIT=1
+Test Files  336 passed | 1 skipped (337)
+     Tests  2983 passed | 1 skipped | 4 todo (2988)
+  FULL2_EXIT=0
 ```
 
-**The ONE failing file is `tests/unit/debate/render/reply-split-bar.test.tsx`, with exactly its two NO-post pole assertions** — `RR-3`, which is **C13, attended-only and not run**. Every other suite in the repository is green, which is the check that matters for a PR touching shared components (`BookmarkToggle` / `CardActions`, `ArgProfile`, `ReplyCard`, and the `SideBadge` census that Profile and Bookmarks also feed). **No cross-suite regression.**
+✅ **FULLY GREEN — every suite in the repository.** `reply-split-bar`'s red closed at C13, and no cross-suite regression from a PR touching shared components (`BookmarkToggle` / `CardActions`, `ArgProfile`, `ReplyCard`, and the `SideBadge` census that Profile and Bookmarks also feed).
+
+*(The run before this one was red on the unrelated `atomicity` flake recorded above; it was diagnosed, not re-rolled until green — the re-run is the receipt, the record above is the honesty.)*
 
 ⚠ `FULL_EXIT` is read from the log, not from the shell's reported status: the run was `pnpm vitest run > log; echo FULL_EXIT=$? >> log`, and the harness reports the **trailing `echo`'s** exit, which is always 0. Gate commands never let another command own the exit (§14).
 
@@ -62,8 +101,12 @@ Test Files  1 failed | 335 passed | 1 skipped (337)
 
 ## Next session starts at
 
-**`C13` (`RR-3`, `composer/ReplySplitBar.tsx:64,67`) — ATTENDED ONLY**, with `@code-reviewer` **and** `@security-auditor` (§15). It is a live pole inversion adjacent to commentary, a `CLAUDE.md` §1 critical path.
-`tests/unit/debate/render/reply-split-bar.test.tsx` is **RED by design** until then — 2 of its 4 assertions fail, and they are exactly the NO-post pole pair. That red is the standing proof the work is outstanding.
+**The founder's Gate C read on the completed PR.** Every row is landed and the branch is green; nothing is queued for an executor.
+
+Three docket rows are **drafted and handed to web, deliberately uncommitted** (`docs/design/**` and the docket are off §8):
+1. **The canon SWEEP** (`R-4` / `GC-15`) — not two coordinates. `design-canon.md:67`, `:110` and a third the diff itself cites via `ReplyCard`'s new docstring ("Canon §6 named bookmark AND download on the reply card"). Grep every surface form and disposition every hit.
+2. **`MEDIUM-2`'s real cause** — `BookmarkToggle` seeds `useState` at mount, so ANY remount loses optimistic state. Owner: ADR-0032 / UI-A6's lane.
+3. **`LOW-5`'s three T3 typography divergences** — consistency won now, fidelity docketed.
 
 ## Context to preserve
 

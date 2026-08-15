@@ -32,9 +32,11 @@ import type { DebatePost, ReplyGroups, Side } from "@/components/debate/types";
  * and records that "V17's Support/Counter split bar lived in exactly this hole
  * for the length of this PR ... and this file stayed green throughout". The
  * static guard is structurally blind here; THIS render guard is the control.
- * ⇒ The bar must resolve its poles FROM the post's side, and `RR-3`'s live
- * inversion at `composer/ReplySplitBar.tsx:64,67` is the same defect shipped —
- * do not copy that form. Its correct sibling at `:118-122` is the reference.
+ * ⇒ The bar must resolve its poles FROM the post's side. `RR-3` was the same
+ * defect on `ReplySplitBar`'s own track and fill spans — corrected at C13, and
+ * cited here as the worked example rather than as a live defect. The reference
+ * shape is `ReplySplitBar (→ TriggerPill → the pole const)`, which derives from
+ * `deriveReplySide`.
  *
  * ⚠ GUARD-COMPOSITION CONSTRAINT (plan §7). Read through `PostCard` — the only
  * component that renders `AggregateFooter` — and scoped by testid to the bar's

@@ -27,13 +27,20 @@ import type { Side } from "@/components/debate/types";
  * column" (`design-language.md:268`), and `CLAUDE.md` §8 — "the poles name the
  * SIDE (YES/NO), never the Support/Counter relation."
  *
- * ⚠ THE MOCKUP IS THIS ROW'S POSITIVE CONTROL (plan §7, V-2). It poles the
- * split-bar triggers by RESULTING SIDE, not by relation — right-column Support
- * is `.rbtn2 n`, Counter `.rbtn2 y` (`d5:1247,1249`), confirmed in JS at
- * `d5:1591 (fs.className)`. And the component's OWN sibling already gets it
- * right: `ReplySplitBar.tsx:118-122 (ReplySplitBar → pole)` derives from
- * `deriveReplySide`. Only `:64,67` — the track and fill spans — are fixed.
- * ⇒ The fix makes the build agree with an artifact that was never wrong.
+ * ⚠ THE MOCKUP IS THIS ROW'S POSITIVE CONTROL **AT ITS TRIGGERS ONLY** (plan
+ * §7, V-2 — whose closing sentence overreaches; surfaced to the founder). It
+ * poles the split-bar TRIGGERS by RESULTING SIDE — right-column Support is
+ * `.rbtn2 n`, Counter `.rbtn2 y` (`d5:1247,1249`), confirmed in JS at
+ * `d5:1591-1592`, which set those two buttons' classNames and nothing else.
+ * ⛔ ITS BAR IS NOT A CONTROL — IT IS A ROUTE-3 INSTANCE. `d5:1248` carries no
+ * side class; `.barrow .bar` is a fixed `--n0` over a fixed `--ink` `.fill`
+ * (`:510-512`); `.bar .fill.right` (`:513`) is never applied; `:1596` sets only
+ * the fill's width. The annotated post is `side:'no'` with `sPct:69`, so d5
+ * paints a NO post's SUPPORT share in the YES pole.
+ * ⇒ C13 is a DELIBERATE DIVERGENCE from the artifact's bar on the
+ * design-language rule, not a return to it. The component's own sibling
+ * `(ReplySplitBar → TriggerPill → the pole const)` was always right; the track
+ * and fill spans were the fixed pair, corrected at C13.
  *
  * ⛔ QUERIED STRUCTURALLY, ON PURPOSE — NO TESTID IS INTRODUCED. §10's safety
  * argument for the `composer/**` exception IS its narrowness: "the edit is TWO

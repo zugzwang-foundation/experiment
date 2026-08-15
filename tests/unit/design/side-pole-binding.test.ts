@@ -59,18 +59,19 @@ import { describe, expect, it } from "vitest";
  * component that RECEIVES a side prop, renders a pole-family colour, and never
  * keys on it." It fails on the single most important instance —
  * `composer/ReplySplitBar.tsx`, which for the length of this guard's life had
- * BOTH a correct side-keyed pole (`:118-122`, why it is in the inventory above)
- * AND a separate FIXED pair on the track and fill spans carrying the same
- * defect on `/m/[slug]`. A component-level check sees the correct expression and
- * clears the file, so the rule would FALSE-NEGATIVE on the exact case that most
- * needs catching.
+ * BOTH a correct side-keyed pole (`TriggerPill → the pole const`, why it is in
+ * the inventory above) AND a separate FIXED pair on the track and fill spans
+ * carrying the same defect on `/m/[slug]`. A component-level check sees the
+ * correct expression and clears the file, so the rule would FALSE-NEGATIVE on
+ * the exact case that most needs catching.
  * ⚠ THAT FIXED PAIR IS GONE — corrected at POLISH.3 PR 2 C13 (`RR-3`), and both
  * spans are now side-keyed on `postSide`. The instance is HISTORICAL; THE
  * REJECTION STANDS UNCHANGED, because the argument is about what a
  * component-level check CANNOT SEE, not about this file's current state. Kept
  * as evidence rather than deleted — a rejected candidate with its evidence
- * removed reads as an unexplained preference and gets re-proposed. A segment-level version would need to
- * decide which DOM node a quantity belongs to, which is not a static property.
+ * removed reads as an unexplained preference and gets re-proposed.
+ * A segment-level version would need to decide which DOM node a quantity
+ * belongs to, which is not a static property.
  *
  * Route 3 therefore stays a KNOWN GAP, closed by review and by per-pole render
  * tests (assert BOTH a YES and a NO instance — a YES-only test passes on an
@@ -157,8 +158,9 @@ const blankComments = (source: string) =>
  * A comparison of a SIDE discriminant against a side literal. The discriminant
  * may be a bare identifier (`side`, `resultingSide`) or a property access
  * (`node.side`, `seg.side`, `args.parentSide`) — a line-by-line regex would miss
- * neither, but would miss the MULTI-LINE ternaries at `ReplySplitBar.tsx:119`
- * and `ProfileChart.tsx:181`, so the whole file is matched as one string.
+ * neither, but would miss the MULTI-LINE ternaries at
+ * `ReplySplitBar (→ TriggerPill → the pole const)` and in `ProfileChart`, so
+ * the whole file is matched as one string.
  */
 const SIDE_COMPARISON =
 	/([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*[!=]==\s*["'](?:YES|NO)["']/g;
