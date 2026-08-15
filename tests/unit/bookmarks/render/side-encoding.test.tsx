@@ -208,3 +208,74 @@ describe("BookmarkCard — the removed variant keeps its slot and leaks no body"
 		expect(cls).not.toContain("bg-primary");
 	});
 });
+
+/**
+ * POLISH.6 item 3 / `PD-6-03` — the ratified `profile` chip geometry, adopted at
+ * BOTH call sites. Tier-4 baseline `surface_profile_v1_0.html:278-279`
+ * (8.5px / 2px 7px / .08em / 800).
+ *
+ * ASSERTED AS THE FLATTENED CASCADE, property by property and at BOTH POLES —
+ * `side-badge.test.tsx:374-392`'s shape, reused rather than re-invented. The
+ * mockups are cascading CSS and this component has none, so a property the
+ * modifier would inherit from its base is silently dropped unless it is written
+ * out. `font-extrabold` is the sharp edge: omit it and the chip lands on
+ * shadcn's `font-medium` (500) instead of the mockups' 800, which no geometry
+ * assertion would catch.
+ *
+ * BOTH CALL SITES, deliberately. `BookmarkCard.tsx:32` is the `removed === true`
+ * arm and `:46` the live arm (S-5). A live-arm-only assertion passes while a
+ * removed stub still renders the default preset — precisely the split this
+ * file's chip coverage exists to close.
+ *
+ * ⚠ These ride `sideChip()` rather than a hand-rolled selector so that item 1's
+ * widening of that helper (C2, when the live chip's text becomes `YES @ 27%`)
+ * carries them automatically. The removed arm never gains a price, so its chip
+ * text stays the bare side literal under either predicate.
+ */
+const PROFILE_CHIP_TOKENS = [
+	"rounded-[var(--r)]",
+	"px-[7px]",
+	"py-[2px]",
+	"text-[8.5px]",
+	"font-extrabold",
+	"tracking-[0.08em]",
+	"[border:var(--hairline)]",
+];
+
+describe("BookmarkCard — PD-6-03, both chips carry the profile geometry", () => {
+	it("live-arm-chip-emits-the-full-flattened-profile-cascade-at-both-poles", () => {
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={liveItem(side)} />);
+			const cls = classTokens(sideChip(container, side));
+			for (const token of PROFILE_CHIP_TOKENS) {
+				expect(cls).toContain(token);
+			}
+			cleanup();
+		}
+	});
+
+	it("removed-arm-chip-emits-the-full-flattened-profile-cascade-at-both-poles", () => {
+		for (const side of ["YES", "NO"] as const) {
+			const { container } = render(<BookmarkCard item={removedItem(side)} />);
+			const cls = classTokens(sideChip(container, side));
+			for (const token of PROFILE_CHIP_TOKENS) {
+				expect(cls).toContain(token);
+			}
+			cleanup();
+		}
+	});
+
+	it("neither-chip-inherits-a-shadcn-default-the-preset-must-override", () => {
+		// The flattening rule's teeth, asserted as ABSENCE. `font-medium` and
+		// `rounded-4xl` are the two `badgeVariants` defaults `twMerge` does NOT
+		// resolve away on its own, so absence is the only way to catch them
+		// (`side-badge.test.tsx:394-415`).
+		for (const item of [liveItem("YES"), removedItem("YES")]) {
+			const { container } = render(<BookmarkCard item={item} />);
+			const cls = classTokens(sideChip(container, "YES"));
+			expect(cls).not.toContain("font-medium");
+			expect(cls).not.toContain("rounded-4xl");
+			cleanup();
+		}
+	});
+});

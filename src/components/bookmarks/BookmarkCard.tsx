@@ -29,7 +29,7 @@ export function BookmarkCard({
 			<Card data-testid={`bookmark-removed-${item.id}`} className="gap-2 p-3">
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex flex-wrap items-center gap-2">
-						<SideBadge side={item.side} />
+						<SideBadge side={item.side} size="profile" />
 						<AuthorHead pseudonym={item.authorPseudonym} />
 					</div>
 					<UnbookmarkButton commentId={item.id} />
@@ -43,7 +43,7 @@ export function BookmarkCard({
 		<Card data-testid={`bookmark-${item.id}`} className="gap-2 p-3">
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2">
-					<SideBadge side={item.side} />
+					<SideBadge side={item.side} size="profile" />
 					{/* `PositionMarker` returns null for "none" itself, so the call
 					    site no longer carries that condition. It also supplies the
 					    `aria-label="Author Flipped"` the hand-roll lacked — the PD-0-10
@@ -77,7 +77,7 @@ export function BookmarkCard({
 				data-testid={`bookmark-figures-${item.id}`}
 				className="text-n5 text-xs"
 			>
-				Staked Đ {formatDharma(item.staked)} · Value Đ{" "}
+				Staked Đ {formatDharma(item.staked)} · Current Đ{" "}
 				{formatDharma(item.current)}
 			</p>
 		</Card>

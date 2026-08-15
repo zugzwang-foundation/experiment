@@ -128,8 +128,18 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// fired and the adoption was RULED, not absorbed (POLISH.5 §5 row 19).
 		// `detail` remains pinned at zero for POLISH.3 — see the split assertion
 		// in the seam-presets block below.
+		//
+		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
+		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
+		// `surface_profile_v1_0.html:278-279`. Ratified 2026-08-15: the guard
+		// fired a THIRD time and the adoption was RULED, not absorbed
+		// (POLISH.6 HALT-1, raised at STEP 0.6 before any write). The ruling
+		// admitted this file to POLISH.6's allow-list SYMBOL-FENCED to the three
+		// maps, the one length and this comment — nothing else here is that
+		// task's to write. `detail` STILL holds its zero: this is a
+		// surface-scoped adoption, never a blanket amendment, and POLISH.3 PR 2
+		// must still hit this wall and get its own ruling.
 		expect(countByFile(base)).toEqual({
-			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/debate/DebateColumn.tsx": 1,
 			"src/components/debate/PostCard.tsx": 1,
@@ -138,7 +148,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
 		});
-		expect(base).toHaveLength(10);
+		expect(base).toHaveLength(8);
 	});
 
 	it("the-sized-sites-are-the-discovery-hero-and-the-profile-list", () => {
@@ -147,6 +157,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// matcher never sees a size".
 		const sized = sideBadgeSites.filter((site) => site.sized);
 		expect(countByFile(sized)).toEqual({
+			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/discovery/HeroPanels.tsx": 1,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
@@ -458,6 +469,7 @@ describe("SideBadge — the detail and profile seam presets", () => {
 			/size\s*=\s*["{]?\s*["']?profile/.test(site.markup),
 		);
 		expect(countByFile(wiredProfile)).toEqual({
+			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
 	});
