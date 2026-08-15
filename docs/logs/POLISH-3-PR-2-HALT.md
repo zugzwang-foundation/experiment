@@ -326,3 +326,55 @@ With the original `.font-mono` selector the assertion would **still** have read 
 | `reply-split-bar` | — | C13 | ⛔ **still RED, expected** |
 
 **No unscheduled green anywhere. `H-GREEN` never fired.** All 8 design guards green.
+
+---
+
+## 13 · `@code-reviewer`'s second pass (post-C12) — verdict and disposition
+
+Full context read, full branch diff walked file by file, gates re-measured independently: `tests/unit/debate/ tests/unit/design/` → **28 passed / 1 failed (29)**, the single failure being the by-design C13 pole pair; `tsc --noEmit` exit 0; `biome check .` exit 0.
+
+**CRITICAL: none. HIGH: none.**
+
+### ✅ The headline check — no guard was made to pass by weakening it
+
+Every guard the branch edits was compared against its `origin/main` state and found **census-only**:
+
+| Guard | Verdict |
+|---|---|
+| `side-pole-binding.test.ts` | predicate, both `>=` floors, `offenders.toEqual([])`, scanner — **byte-identical**. Index-0 placement independently confirmed necessary |
+| `pct-round-render.test.ts` | `UNPAIRED_CALL`, `ALLOW_MARKER`, `FLOAT_PERCENT`, `SCAN_DIRS`, liveness floor, `offenders.toEqual([])` — **untouched**. Marker arithmetic re-derived: card 2 + badges 1 + overlay 2 = **5** |
+| `side-badge.test.tsx` | inside its own stated fence; `>=13` floor, sized test and `detail-stays-unwired…` untouched; census re-run → 14 sites, 9 unsized, **zero `detail`** |
+| `comment-image.test.tsx` | **strictly tightened** — and the old form would have *passed* on `max-w-full` as a substring, so it did not flip red→green |
+| `bookmark-toggle.test.tsx` | proper inversions, no test weakened |
+| `dharma-spacing.test.tsx` | HIGH-1 fix confirmed correct and unambiguous |
+| `market-header.test.tsx` | additive only |
+
+MEDIUM-3's fix also verified: the hairline is on the track and all four pole assertions still pass.
+
+### Fixed in-session (post-review remediation commit)
+
+- **MEDIUM-1 · an `O-5` miss inside the file C8 edited.** `PostCard.tsx`'s own docstring still described "the disabled write triggers (Đ BET / Support-Counter)" that C8 deleted. C11's prose sweep reached three docstrings and missed this one. Fence-clean (§8 row 1) — corrected.
+- **LOW · two comments stated a WRONG CSS mechanism** (`CommentImage.tsx`, `dialogs.tsx`). They claimed `width:100%` + a binding `max-height` breaks a replaced element's aspect. It does not — CSS 2.1 §10.4 recomputes the used width from the intrinsic ratio. **The choices were right and their stated causes were not**, which is `O-3` exactly. Corrected, with the real reasons given (`max-w-full` avoids upscaling a sub-160px image and avoids a circular percentage inside the `w-fit` parent; `object-contain` in the pop-up is defensive, not load-bearing).
+- **LOW · `CommentImage`'s docstring** said "Capped at `--imgmax`" without naming the axis, which is now the entire substance of row T2. Corrected.
+
+### ⚠ RECORDED, NOT FIXED — needs a founder line
+
+- **MEDIUM-2 · C7 introduces a remount at the expand/collapse boundary.** Position 0 of `ReplyPreview`'s container changes type across the toggle (collapsed = a mapped array; expanded = an explicit fragment of two unkeyed `<ul>`s), so React cannot match the keyed `ReplyCard`s and **every reply card remounts on expand**. `BookmarkToggle` seeds its `useState` at mount from the page-load prop, so **a bookmark placed on a default-slot reply reads as unsaved after expanding**. Data is unaffected (`add.ts` is `onConflictDoNothing` → `{ok:true}`) and one click restores it.
+  ⚠ The component's docstring already ratifies this divergence **class** for v1 (paging triggers no server render, D5) — but **this is a new instance and the plan does not name it**. Two options: (a) record it as a ruled consequence, or (b) render both branches through a `<ul>` so position 0 keeps its type.
+  ⛔ **Deliberately not fixed unattended**: it is a structural change to a component whose row is already satisfied, arriving after the full suite had passed, and it touches bookmark-state perception, which is UI-A6 / ADR-0032's lane.
+  ✅ Confirmed NOT broken: the `<li key={reply.id}>` placement is correct, and `CardActions`' `key={commentId}` remount law is intact.
+- **MEDIUM-3 · `docs/design/design-canon.md:67` and `:110`** still describe the card cluster as "bookmark/download". That is `O-5`'s harm precisely — a future reader restores the trigger from canon. ⛔ **Not fixable in-fence**: §8 lists `Docs: ⛔ none`. **Needs a docket row, owner POLISH.3 close-out.**
+
+### Recorded — no action
+
+- `PostCard.tsx`'s `text-n5 hover:text-ink` is redundant: `buttonVariants`' `ghost` already emits both, and the prior control was also `ghost`. Explicit is defensible, but row 3's real proof is the `Read more` copy and the no-`<svg>` assertion, not the token classes.
+- `MarketPriceChartOverlay`'s `series[0]` / `series[length-1]` are unchecked index reads, safe only because `MarketPriceChartHost` returns `null` on an empty series. Mirrors `MarketPriceChartCard` exactly — a standing shape, not a regression.
+- `MarketHeader`'s `mt-[5px]` adopts one `.crittext` property while its `font-size`/`color` are not adopted — **fold into LOW-5's single founder line**, not a separate question.
+- `PostCard.tsx:141`'s `aria-label="Open this debate"` over visible "Open debate" is the same WCAG 2.5.3 shape C9's comment argues against. Pre-existing, outside row 3 — flagged only so C9's argument is not read as repo-wide-true.
+- **Plan/file-set divergence**: the PR edits two `tests/unit/design/` guards that the committed plan's §8 does not list. Authorised by **R-3**, which names both; the plan is deliberately left at ratified v1.4 verbatim. **Not scope creep — but the PR body should say so in one line.**
+
+### Confirmations on C3–C12
+
+C3's recipe is `.overline`'s and only `.overline`'s (the three sibling rules carry three different size/tracking pairs and none of them landed). C4's "bounded" reading confirmed as the only one consistent with "no fixed box ⇒ object-fit does not arise". **C5's override wins deterministically** — and for a reason worth keeping: `ui/dialog.tsx`'s base is *unprefixed* `max-w-lg`, not shadcn's usual `sm:max-w-lg`; a `sm:`-prefixed base would not dedupe and would win at ≥640px. C6's re-key stayed in-fence with `detail` still at zero, and the new `<span>` children are valid inside `DialogDescription`'s `<p>`. **C10's space genuinely renders at both sites** — Babel strips leading whitespace on continuation lines but not trailing whitespace on the last, so the text node really is `"Đ "`. C11 leaves no in-code site asserting the superseded position. C12 widened the census only, and both new call sites genuinely qualify for the single-side hatch.
+
+**Nothing in C3–C12 will redden a currently-green guard** — measured, not inferred. `no-raw-hex-view-layer` stays green because the four hex values the diff adds are all inside comments and that guard strips comments before matching.

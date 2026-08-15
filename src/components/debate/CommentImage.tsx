@@ -1,7 +1,8 @@
 /**
  * A comment's attached image (F-COMMENT-3 / D9) — rendered from a server-minted
- * presigned R2 GET URL (`signRead`, 3600s). Capped at `--imgmax`, `--imgr`
- * radius, hairline border (the SHELL/UI.0 tokens). Click opens the read-only
+ * presigned R2 GET URL (`signRead`, 3600s). Bounded on HEIGHT by `--imgmax`
+ * (the T2 axis, POLISH.3 PR 2) and on width by 100%, `--imgr` radius, hairline
+ * border (the SHELL/UI.0 tokens). Click opens the read-only
  * lightbox via `onOpen` (the only wired image affordance — C1). A removed
  * comment never reaches here: its URL is withheld server-side (§6).
  */
@@ -35,10 +36,16 @@ export function CommentImage({
 			    160px-wide sliver and "shown whole · any orientation" (the promise
 			    to the author, canon §107) holds in both orientations.
 
-			    ⚠ `max-w-full`, NOT `w-full`. A stretch would force width to 100% and
-			    then clamp height at `--imgmax`, which BREAKS the aspect — the exact
-			    thing this ruling forbids. The parent button stays `w-fit` and
-			    correctly shrinks around the height-bounded image. */}
+			    ⚠ `max-w-full`, NOT `w-full` — and NOT for the reason first written
+			    here. A `width:100%` would NOT break the aspect: for a replaced element
+			    CSS 2.1 §10.4's `h > max-h` rule recomputes the used width as
+			    `max-h × (intrinsic w / intrinsic h)`, so the ratio survives. The real
+			    reasons are (i) `max-w-full` never UPSCALES a sub-160px image past its
+			    intrinsic size, which a stretch would, and (ii) a percentage width
+			    inside the `block w-fit` parent below resolves against a box that is
+			    itself sized by this image. The parent stays `w-fit` and shrinks around
+			    the height-bounded image. (Corrected post-review: the call was right and
+			    its stated cause was not — `O-3`.) */}
 			<img
 				src={url}
 				alt="Argument attachment"

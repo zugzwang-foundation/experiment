@@ -95,9 +95,13 @@ export function PostPopup({
 							   The remedy mirrors the SHIPPED SIBLING IN THIS FILE — the
 							   register names `ImageLightbox` (`:88`, `max-h-[80vh] w-full
 							   object-contain`) as the contrast that "does constrain it".
-							   Here `object-contain` IS load-bearing, because `w-full` pins
-							   the width axis; that is the difference from T2's card image,
-							   where nothing is pinned and object-fit does not arise.
+							   ⚠ `object-contain` here is DEFENSIVE, not load-bearing — and the
+							   first version of this comment claimed otherwise. `w-full` plus a
+							   binding `max-height` does NOT squash a replaced element: CSS 2.1
+							   §10.4 recomputes the used width from the intrinsic ratio. It is
+							   kept because it mirrors `ImageLightbox` exactly and costs nothing.
+							   (Corrected post-review — `O-3`: a right call with a wrong stated
+							   cause is still a defect.)
 							   ⚠ MUST FOLLOW C4/row 14: at 720px "whole" means something
 							   different than it did at 512px. */
 							<img

@@ -16,9 +16,12 @@ import type { DebatePost, PresentPost } from "./types";
 
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
- * the argprofile · lane badge · title (opens the pop-up) · teaser · image · the
- * disabled write triggers (Đ BET / Support-Counter, C1 §7) · the aggregate footer
- * · the two-slot reply preview · an "Open debate" focus toggle. A REMOVED post
+ * the argprofile · lane badge · title (opens the pop-up) · teaser · image · a
+ * "Read more" link to the full body · the aggregate footer · the two-slot reply
+ * preview · an "Open debate" focus toggle. ⛔ The disabled `Đ BET` and
+ * `Support / Counter` write triggers were REMOVED at POLISH.3 PR 2 rows 1-2
+ * (`PD-0-02`, R1) — redundancy plus the thesis ground that argument should be
+ * deliberate, not reflexive. A REMOVED post
  * keeps only its structural slot — frozen side badge + the "removed by
  * moderator" placeholder + aggregate + its surviving replies (§6). The post's
  * body/author/marker/badge are absent at the type level on the removed variant,
