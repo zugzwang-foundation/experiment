@@ -20,6 +20,7 @@ import type {
 } from "@/server/profile/positions";
 
 import { PROFILE_COPY } from "./copy";
+import type { ProfileSelection } from "./selection";
 
 /**
  * The cross-market positions arena (canon §2 / SPEC.1 §23) — columns
@@ -48,11 +49,24 @@ import { PROFILE_COPY } from "./copy";
 export function PositionsTable({
 	payload,
 	initialMarketSlug,
+	onSelect,
 }: {
 	payload: ProfilePositionsPayload;
 	/** OQ-5 B — the W2.10-C `?market=<slug>` preselect; matched against the
 	 * rows' `marketSlug` (unknown → "all"; the raw param is never rendered). */
 	initialMarketSlug?: string;
+	/**
+	 * ROUND 4 item 7 — report the picked row to the argument panel (`ProfileArena`
+	 * holds it). ⚠ OPTIONAL, and that is a departure from O-1's "structural beats
+	 * procedural" taken on purpose: omitting it drops NOTHING this component
+	 * renders — the selection is still owned, still visible, still keyboard
+	 * driven — so a required prop would buy no guarantee and would churn every
+	 * render-test call site for it. There is exactly one production call site and
+	 * it always passes it.
+	 * ⛔ PASS A STABLE FUNCTION. It is an effect dependency below, and the value
+	 * it reports is a fresh object, so an inline arrow loops.
+	 */
+	onSelect?: (selection: ProfileSelection | null) => void;
 }): React.JSX.Element {
 	const owner = payload.owner;
 	const rows = payload.rows;
@@ -156,6 +170,32 @@ export function PositionsTable({
 	// frame with a selection that is no longer on screen.
 	const selectedRow =
 		visible.find((r) => r.marketId === selectedMarketId) ?? null;
+
+	// ROUND 4 item 7 — REPORT THE DERIVED SELECTION UPWARD. The deps are all
+	// PRIMITIVES, never `selectedRow` itself: the row object is rebuilt on every
+	// render, so depending on it would fire the effect every time and hand the
+	// panel a new object it cannot compare.
+	// ⚠ IT REPORTS THE DERIVED ROW, NOT THE STORED ID, which is what makes a
+	// filtered-away pick stop counting on the OTHER side of the arena too — the
+	// panel returns to the full list rather than showing an argument whose row is
+	// no longer on screen.
+	const pickedMarketId = selectedRow?.marketId ?? null;
+	const pickedMarketTitle = selectedRow?.marketTitle ?? null;
+	const pickedCommentId =
+		selectedRow && !selectedRow.argument.removed
+			? selectedRow.argument.commentId
+			: null;
+	useEffect(() => {
+		if (pickedMarketId === null || pickedMarketTitle === null) {
+			onSelect?.(null);
+			return;
+		}
+		onSelect?.({
+			marketId: pickedMarketId,
+			marketTitle: pickedMarketTitle,
+			commentId: pickedCommentId,
+		});
+	}, [pickedMarketId, pickedMarketTitle, pickedCommentId, onSelect]);
 
 	/** `pick(i)` (`:679`) — click the selected row again to clear it. The mockup
 	 * has no deselect because it always holds one; here deselect is the way back

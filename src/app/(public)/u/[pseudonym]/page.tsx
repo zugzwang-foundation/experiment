@@ -1,10 +1,9 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
-import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
-import { PositionsTable } from "@/components/profile/PositionsTable";
+import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
@@ -196,19 +195,23 @@ export default async function ProfilePage({
 				data-testid="profile-arena"
 				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
 			>
-				<PositionsTable
-					payload={positionsPayload}
-					initialMarketSlug={initialMarketSlug}
-				/>
-				{/* HTML-FINISH row 4 — the head cluster's identity. Every argument in
-				    this list is authored by the profile user, so the avatar and
+				{/* ROUND 4 item 7 — THE TWO PANELS SHARE ONE SELECTION, so the holder
+				    sits between this band and them. It renders a FRAGMENT: both
+				    panels stay direct children of this grid and remain its two
+				    columns, and this band keeps its className here where the height
+				    chain reads it.
+				    HTML-FINISH row 4 — the head cluster's identity. Every argument in
+				    the list is authored by the profile user, so the avatar and
 				    pseudonym come from the ALREADY-RESOLVED `profileUser` rather than
 				    from a per-item field: `loadProfileArguments` is untouched and no
-				    new read is issued. */}
-				<ArgumentList
-					items={argumentItems}
+				    new read is issued — by this row or by item 7, which renders only
+				    fields the list already carries. */}
+				<ProfileArena
+					positions={positionsPayload}
+					argumentItems={argumentItems}
 					owner={owner}
 					author={profileUser}
+					initialMarketSlug={initialMarketSlug}
 				/>
 			</div>
 		</PageContainer>

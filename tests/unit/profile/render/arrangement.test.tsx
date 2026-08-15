@@ -797,10 +797,16 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		const rightHead = screen.getByTestId("arguments-panel-head");
 		expect(rightPanel.contains(rightHead)).toBe(true);
 		expect(indexOf(rightHead)).toBe(0);
-		// Byte-carried from the shipped tile label (canon §6 verbatim). ⛔ NOT the
-		// mockup's right colhead, which carries the selected market's title and a
-		// live price — that header exists only inside the REPLICA reading, which
-		// recon A-1 STRUCK on tier 1.
+		// Byte-carried from the shipped tile label (canon §6 verbatim).
+		// ⚠⚠ AMENDED AT ROUND 4 — the half of this note that said the mockup's
+		// colhead "cannot be used" is SUPERSEDED and is corrected here rather than
+		// left to an appendix (O-5). Item 7 makes the header the SELECTED market's
+		// question while a positions row is picked; recon A-1's strike stands for
+		// what it actually struck — the REPLICA-REPLACES-LIST reading, which would
+		// have cost the §23 §3.6 order — and round 4 does not adopt that reading.
+		// This render passes no selection, so `Arguments` is still what shows, and
+		// that default is asserted here. ⛔ The colhead's LIVE PRICE is still not
+		// built (founder-ruled, and a live value).
 		expect(rightHead.textContent).toContain("Arguments");
 		expect(rightPanel.className).toContain("[border:var(--hairline)]");
 	});
