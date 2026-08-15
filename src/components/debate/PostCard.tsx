@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize2, Plus } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,12 @@ import type { DebatePost, PresentPost } from "./types";
 
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
- * the argprofile · lane badge · title (opens the pop-up) · teaser · image · the
- * disabled write triggers (Đ BET / Support-Counter, C1 §7) · the aggregate footer
- * · the two-slot reply preview · an "Open debate" focus toggle. A REMOVED post
+ * the argprofile · lane badge · title (opens the pop-up) · teaser · image · a
+ * "Read more" link to the full body · the aggregate footer · the two-slot reply
+ * preview · an "Open debate" focus toggle. ⛔ The disabled `Đ BET` and
+ * `Support / Counter` write triggers were REMOVED at POLISH.3 PR 2 rows 1-2
+ * (`PD-0-02`, R1) — redundancy plus the thesis ground that argument should be
+ * deliberate, not reflexive. A REMOVED post
  * keeps only its structural slot — frozen side badge + the "removed by
  * moderator" placeholder + aggregate + its surviving replies (§6). The post's
  * body/author/marker/badge are absent at the type level on the removed variant,
@@ -51,7 +54,12 @@ export function PostCard({
 			<Card className="gap-2 p-3">
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
-				<AggregateFooter aggregate={post.aggregate} />
+				{/* The removed variant keeps its frozen side (§6 — thread integrity),
+				    so the split bar stays correctly poled on a removed post too. */}
+				<AggregateFooter
+					aggregate={post.aggregate}
+					postSide={post.sideAtPostTime}
+				/>
 				{/* A removed POST keeps its surviving replies (§6 — the thread stays
 				    intact), so its live replies keep their own affordances. */}
 				<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
@@ -99,36 +107,33 @@ export function PostCard({
 			) : null}
 
 			<div className="flex flex-wrap items-center gap-1.5">
+				{/* Row 3 (PD-0-01) — R4 RULED 2026-08-12: ADOPT CD-A's "Read more" TEXT
+				    LINK. `Read more` had zero occurrences repo-wide.
+				    ⚠ The icon goes with the copy. "Text link" is the ratified form, so
+				    the Plus glyph is REMOVED rather than relabelled — keeping an icon
+				    beside the new copy would preserve the affordance CD-A retired.
+				    ⚠ The `aria-label` is removed DELIBERATELY, not dropped. It read
+				    "Read the full argument", which does not CONTAIN the visible text
+				    "Read more" — an accessible name that omits the visible label is a
+				    WCAG 2.5.3 (Label in Name) failure. With self-describing text the
+				    visible string IS the accessible name, which is the stronger form.
+				    ✅ CD-A's `#989898` / `#FAFAFA` ARE `--color-n5` / `--color-ink`, so
+				    the port is BY TOKEN — a raw hex here reddens no-raw-hex-view-layer
+				    (Ruling A / H-HEX). */}
 				<Button
 					variant="ghost"
 					size="xs"
 					onClick={() => onOpenPopup(post)}
-					aria-label="Read the full argument"
+					className="text-n5 hover:text-ink"
 				>
-					<Plus /> Full
-				</Button>
-				{/* Write triggers render present-but-disabled (C1 / §7) — no handlers. */}
-				<Button
-					variant="outline"
-					size="xs"
-					disabled
-					aria-disabled="true"
-					aria-label="Đ BET — sign in to bet"
-				>
-					Đ BET
-				</Button>
-				<Button
-					variant="outline"
-					size="xs"
-					disabled
-					aria-disabled="true"
-					aria-label="Reply — sign in to argue"
-				>
-					Support / Counter
+					Read more
 				</Button>
 			</div>
 
-			<AggregateFooter aggregate={post.aggregate} />
+			<AggregateFooter
+				aggregate={post.aggregate}
+				postSide={post.sideAtPostTime}
+			/>
 			<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 
 			<Button

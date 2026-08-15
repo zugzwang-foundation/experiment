@@ -117,7 +117,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-eight-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-nine-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -128,6 +128,19 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// fired and the adoption was RULED, not absorbed (POLISH.5 §5 row 19).
 		// `detail` remains pinned at zero for POLISH.3 — see the split assertion
 		// in the seam-presets block below.
+		//
+		// ⚠ AND EIGHT UNTIL 2026-08-16. `dialogs.tsx`'s `PostPopup` gains ONE
+		// UNSIZED site per PD-3-14 — POLISH.3 PR 2 row 12, commit C6, tier-1
+		// baseline INV-3 side binding via POLISH-0.md §7 criterion 2. The pop-up
+		// had rendered the side as BARE INTERPOLATED TEXT with no badge at all, so
+		// this is the primitive arriving where it was missing, not a re-skin.
+		// ⚠ THE WALL THIS FILE PREDICTED IS THE ONE PR 2 HIT. The note below says
+		// "POLISH.3 PR 2 must still hit this wall and get its own ruling" — it did,
+		// the adoption was RULED at the plan (§9 C6 names this re-key explicitly,
+		// §7 measures it as 8 base → 9), and it is recorded here rather than
+		// absorbed. `detail` STILL holds its zero: row 12's badge is UNSIZED, which
+		// is why only the base map moves and the seam-preset assertion below is
+		// untouched.
 		//
 		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
 		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
@@ -170,8 +183,9 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/ReplyCard.tsx": 2,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
+			"src/components/debate/dialogs.tsx": 1,
 		});
-		expect(base).toHaveLength(8);
+		expect(base).toHaveLength(9);
 	});
 
 	it("the-sized-sites-are-the-bookmark-card-the-discovery-hero-and-the-profile-list", () => {

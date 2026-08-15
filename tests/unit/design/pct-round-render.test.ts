@@ -49,7 +49,32 @@ const FORMATTER_MODULE = "src/components/debate/format.ts";
 // `formatPricePercent` would derive `100 - x` from an already-side-scoped
 // number and print `NO @ 45%` for an author who entered NO at 55%. That is
 // exactly what this guard's exact count exists to force an argument about.
-const EXPECTED_ALLOW_MARKERS = 3;
+//
+// THE FOURTH AND FIFTH, argued (POLISH.3 PR 2 row 8, commit C12, under founder
+// ruling R-3 of 2026-08-16): `debate/chart/MarketPriceChartOverlay.tsx` renders
+// the SPEC.1 §9 accessible summary the expanded chart lacked — a tier-1
+// conformance gap (`PD-3-04`). It names the OPENING and the CURRENT YES price,
+// which is the SAME pair of readouts, on the same grounds, as the two in
+// `MarketPriceChartCard.tsx`: two points in TIME, not one half of a live pair.
+// ⇒ TWO markers, not one, because the summary names two figures.
+//
+// Routing them through the PAIRED `formatPricePercent` was considered and is
+// WRONG for the same reason it is wrong for the card — it would derive `100 - x`
+// from a value that is already a single-side price at an instant.
+//
+// R-3's three conditions, each checked rather than asserted:
+//   (1) the OFFENDER PREDICATE passes — verified BEFORE this count moved: the
+//       run failed ONLY at `expect(markers).toHaveLength(…)` while
+//       `expect(offenders).toEqual([])` on the line above passed. Both new call
+//       sites carry a `pctround-allow:` marker; the code was correct and only
+//       the census was stale.
+//   (2) the addition is NAMED — R-3 names this file explicitly as one of the
+//       two it rules on.
+//   (3) it lands in the SAME COMMIT as the code that makes it necessary.
+// ⛔ THE PLAN WIDENS THE CENSUS, NEVER THE PREDICATE. `UNPAIRED_CALL`,
+// `ALLOW_MARKER`, `FLOAT_PERCENT`, `SCAN_DIRS`, the liveness floor and
+// `expect(offenders).toEqual([])` are all UNTOUCHED.
+const EXPECTED_ALLOW_MARKERS = 5;
 
 const UNPAIRED_CALL = /formatPercentUnpaired\s*\(/;
 const ALLOW_MARKER = /pctround-allow:/;

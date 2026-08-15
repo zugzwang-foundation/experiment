@@ -77,8 +77,46 @@ export function MarketHeader({
 					</a>
 				</div>
 			</div>
+			{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
+			    `.overline`). The container is a TOP HAIRLINE RULE + padding
+			    (`d5:467` `margin-top:12px; border-top:var(--hairline);
+			    padding-top:10px`), NOT a boxed card; the 12px margin is already
+			    carried by this section's `gap-3`.
+
+			    ⛔ NO CLAMP, AND THAT IS A RULING, NOT AN OMISSION (§17 H-T1(c)).
+			    The mockup's `.crittext` carries `-webkit-line-clamp:2` (`d5:470-471`)
+			    and it is filed BUCKET D. `market.description` is the RESOLUTION
+			    CRITERION — the terms of the bet: (i) a bare clamp with no affordance
+			    is the exact defect class PD-0-01/R4 is REMOVING from post cards in
+			    this same PR, so introducing it on the most consequential text on the
+			    surface would be incoherent; (ii) U3 makes criteria long BY DESIGN
+			    and the mockup's demo criterion is a short stand-in; (iii) unclamped
+			    IS the status quo, so the mockup would be INTRODUCING a truncation of
+			    the bet terms. ⛔ No affordance either — "Criterion length treatment"
+			    is docketed to HEADER-3ZONE.
+
+			    ⚠ LOCAL STYLES, NOT A PRESET (§17 H-T1(b)). `git grep -i
+			    "overline|eyebrow" -- src/` is clean, and within PR 2's fence there is
+			    exactly ONE consumer; every existing micro-label consumer is out of
+			    fence (`discovery/HeroPanels`, `composer/BetComposer` — deny-listed,
+			    `shell/IdentityCluster`, `shell/DharmaCluster`), and §5 forbids a
+			    batch spanning surfaces. The docket row carries the census.
+
+			    ⚠ The recipe is `.overline`'s (`d5:468-469`) and ONLY `.overline`'s.
+			    The family shares weight/transform/colour and NOTHING else — `.poslab`
+			    and `.colstk .lab` are 8px/.12em, `.reslabel` is 8px/.14em. Reading
+			    any of those and generalising across ROLES is how the earlier
+			    8px/.12em recipe was wrong. Ported BY TOKEN (`text-n4`), never the
+			    hex — Ruling A / H-HEX. */}
 			{market.description ? (
-				<p className="text-sm text-muted-foreground">{market.description}</p>
+				<div className="pt-2.5 [border-top:var(--hairline)]">
+					<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
+						Resolution
+					</div>
+					<p className="mt-[5px] text-sm text-muted-foreground">
+						{market.description}
+					</p>
+				</div>
 			) : null}
 			{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
 			    ONLY when non-null: a null series read is non-fatal (web Gate-C

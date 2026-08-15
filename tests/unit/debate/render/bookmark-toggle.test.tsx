@@ -42,7 +42,8 @@ import type { DebatePost, ReplyGroups } from "@/components/debate/types";
  *  - a REMOVED post renders no cluster at all (plan §5 matrix; structural).
  *  - optimistic flip, then SILENT revert on `{ ok: false }` and on a transport
  *    throw (D5 / ratified C6 — no toast, no invented copy).
- *  - the download trigger stays `disabled` in EVERY cell (plan §4).
+ *  - ⛔ the download trigger is ABSENT from every cell — removed at POLISH.3
+ *    PR 2 row 7 (`PD-3-15`, D3 RULED).
  */
 
 const addBookmarkAction = vi.fn();
@@ -243,30 +244,34 @@ describe("BOOKMARK-ADD-WIRE — the bookmark icon matrix", () => {
 });
 
 describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
-	it("card-actions::download-stays-disabled-in-every-viewer-state", () => {
-		// The download trigger is out of scope and must stay disabled on every card
-		// in every cell of the matrix (plan §4 / §8).
+	it("card-actions::download-trigger-is-REMOVED-in-every-viewer-state", () => {
+		// Row 7 · PD-3-15 · D3 RULED 2026-08-12 — REMOVED, the same disposition as
+		// R1's two card controls. This test previously asserted the trigger stayed
+		// DISABLED in every cell; it now asserts it is ABSENT from every cell, and
+		// the matrix loop is what makes that a claim about the whole viewer state
+		// space rather than about one render.
 		for (const bookmarks of [null, FRESH, SIGNED_IN] as BookmarkAffordance[]) {
 			const { unmount } = render(
 				<CardActions commentId={OTHERS} bookmarks={bookmarks} />,
 			);
-			const download = screen.getByRole("button", {
-				name: "Download — sign in to use",
-			});
-			expect((download as HTMLButtonElement).disabled).toBe(true);
-			expect(download.getAttribute("aria-disabled")).toBe("true");
+			expect(
+				screen.queryByRole("button", { name: "Download — sign in to use" }),
+			).toBeNull();
 			unmount();
 		}
 	});
 
-	it("card-actions::own-argument-keeps-the-download-trigger", () => {
-		// `showActions` is NOT the own-suppression hook: suppressing the whole
-		// cluster would strip download from the viewer's own arguments too.
+	it("card-actions::own-argument-renders-no-cluster-controls", () => {
+		// ⚠ RENAMED AT ROW 7. The old name was `own-argument-keeps-the-download-
+		// trigger`, which is now FALSE — a name is an assertion, and a stale one is
+		// a false receipt a reader greps and believes without opening the body.
+		// The law it guarded survives: `showActions` is NOT the own-suppression
+		// hook. Own-suppression is a condition inside `BookmarkToggle`.
 		render(<CardActions commentId={MINE} bookmarks={SIGNED_IN} />);
 
 		expect(
-			screen.getByRole("button", { name: "Download — sign in to use" }),
-		).toBeTruthy();
+			screen.queryByRole("button", { name: "Download — sign in to use" }),
+		).toBeNull();
 		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Remove bookmark" }),
@@ -467,22 +472,22 @@ function clusterHtml(container: HTMLElement): string {
 
 /**
  * BOOKMARK-ADD-WIRE Slice 3 — the reply card carries the FULL cluster (ratified
- * correction C3: bookmark active, download disabled with the same aria-label as
- * ArgProfile, matching byte-for-byte), and the masking rule holds on a branch
+ * correction C3: the cluster matches ArgProfile byte-for-byte — the download
+ * half was removed at row 7), and the masking rule holds on a branch
  * that — unlike the post path — has NO type-level lock.
  */
 describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
-	it("reply-card::present-reply-renders-the-full-cluster", () => {
+	it("reply-card::present-reply-renders-the-bookmark-affordance", () => {
+		// ⚠ RENAMED AT ROW 7 — "the full cluster" was a two-control claim, and the
+		// cluster is now one control.
 		render(<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />);
 
 		expect(
 			screen.getByRole("button", { name: "Remove bookmark" }),
 		).toBeTruthy();
-		const download = screen.getByRole("button", {
-			name: "Download — sign in to use",
-		});
-		expect((download as HTMLButtonElement).disabled).toBe(true);
-		expect(download.getAttribute("aria-disabled")).toBe("true");
+		expect(
+			screen.queryByRole("button", { name: "Download — sign in to use" }),
+		).toBeNull();
 	});
 
 	it("reply-card::cluster-matches-argprofile-byte-for-byte", () => {
@@ -581,8 +586,9 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
 	});
 
-	it("reply-card::own-reply-renders-no-bookmark-but-keeps-download", () => {
-		// Own-suppression reaches the reply surface too, and does not strip download.
+	it("reply-card::own-reply-renders-no-bookmark-and-no-download", () => {
+		// ⚠ RENAMED AT ROW 7. Own-suppression reaches the reply surface too; with
+		// the download trigger removed the own-reply cluster now renders nothing.
 		render(<ReplyCard reply={presentReply(MINE)} bookmarks={SIGNED_IN} />);
 
 		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
@@ -590,7 +596,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 			screen.queryByRole("button", { name: "Remove bookmark" }),
 		).toBeNull();
 		expect(
-			screen.getByRole("button", { name: "Download — sign in to use" }),
-		).toBeTruthy();
+			screen.queryByRole("button", { name: "Download — sign in to use" }),
+		).toBeNull();
 	});
 });

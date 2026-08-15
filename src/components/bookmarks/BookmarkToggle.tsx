@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, Download } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -121,16 +121,21 @@ export function BookmarkToggle({
 }
 
 /**
- * The card action cluster (design-language §3.1) — bookmark + download, in that
- * order. Co-located with `BookmarkToggle` rather than given its own file so the
+ * The card action cluster (design-language §3.1) — the bookmark trigger.
+ * Co-located with `BookmarkToggle` rather than given its own file so the
  * POST card (`ArgProfile`) and the REPLY card (`ReplyCard`) render the cluster
  * from ONE source: ratified correction C3 requires the reply card to match
  * `ArgProfile` byte-for-byte, and duplicated markup in two files is exactly how
  * that drifts.
  *
- * The download trigger stays present-but-disabled on every card and in every
- * viewer state (C1/§7 as shipped) — wiring the ADR-0025 export button is a
- * separate task.
+ * ⛔ THE DOWNLOAD TRIGGER IS REMOVED (POLISH.3 PR 2 row 7, `PD-3-15`; D3 RULED
+ * 2026-08-12, the same disposition as R1's two card controls). It was a THIRD
+ * permanently-disabled control rendering on every post and every reply, and no
+ * register row had named it — canon §10 item 2's "wire the icon or remove it"
+ * was scoped by SURFACE (Profile + Bookmarks) rather than by COMPONENT, so a
+ * shared control inherited the disabled state on a surface the rule never
+ * named. Wiring the ADR-0025 export remains a separate task; when it lands it
+ * arrives as an `<a href download>`, not as a disabled button.
  */
 export function CardActions({
 	commentId,
@@ -158,15 +163,6 @@ export function CardActions({
 				commentId={commentId}
 				bookmarks={bookmarks}
 			/>
-			<Button
-				variant="ghost"
-				size="icon-xs"
-				disabled
-				aria-disabled="true"
-				aria-label="Download — sign in to use"
-			>
-				<Download />
-			</Button>
 		</div>
 	);
 }

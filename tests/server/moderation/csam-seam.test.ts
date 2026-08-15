@@ -47,7 +47,17 @@ describe("DEBATE.7 moderation — CSAM seam (Sentry-only; no NCMEC)", () => {
 		vi.clearAllMocks();
 	});
 	afterEach(async () => {
-		await truncateTables(testClient, ["mod_actions", "markets", "users"]);
+		// R-4 — `"events"` is NOT optional here. `recordGateBlock` writes a
+		// `moderation.blocked` row (`consequences.ts:164`), so omitting it left 2
+		// rows behind for whichever file ran next. All nine sibling
+		// `recordGateBlock` suites list it directly after `mod_actions`; this file
+		// was the lone outlier. Truncate list only — no assertion changed.
+		await truncateTables(testClient, [
+			"mod_actions",
+			"events",
+			"markets",
+			"users",
+		]);
 	});
 
 	it("csam-seam::track-a-sexual-minors-fires-sentry-seam", async () => {
