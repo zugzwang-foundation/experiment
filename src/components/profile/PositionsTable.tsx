@@ -158,10 +158,18 @@ export function PositionsTable({
 					    ⚠ THE TESTID IS UNCHANGED so every existing consumer keeps its
 					    handle, but the ELEMENT is now a `<button>` — a `fireEvent.change`
 					    against it is meaningless and its call sites move with this row.
-					    `relative` is load-bearing: the popover is absolutely positioned
-					    against this wrapper, which is what keeps it inside the header bar
-					    instead of against the page. */}
-					<div ref={filterRef} className="relative">
+					    ⛔ THIS WRAPPER IS DELIBERATELY NOT `relative`, AND THAT IS A
+					    MEASURED CORRECTION. It was, and the popover then sized to the
+					    TRIGGER: measured in a browser at 1440, `min-w-full` against a
+					    107px button produced a 107 × 590 column in which every market
+					    question wrapped over ~6 lines. The mockup's `.fpop` is positioned
+					    against `.colhead`, not against the button (`:242-244` — `top:46px;
+					    left:14px; max-width:calc(100% - 28px)`), so spanning the BAR is
+					    both the faithful port and the readable one. The positioning
+					    context therefore lives on the header bar and this wrapper carries
+					    only the ref, whose `contains()` check is a DOM test and is
+					    unaffected by where the box is painted. */}
+					<div ref={filterRef}>
 						<Button
 							type="button"
 							size="xs"
@@ -178,7 +186,10 @@ export function PositionsTable({
 								data-testid="positions-market-popover"
 								role="listbox"
 								aria-label="Select market"
-								className="absolute top-full left-0 z-20 mt-1 flex min-w-full flex-col rounded-[var(--r)] bg-n0 p-1 [border:var(--hairline)]"
+								// `left-0 right-0` spans the header bar (the mockup's
+								// `.fpop` behaviour) — TOPOLOGY, no width value. `top-full`
+								// sits it flush under the bar; no margin is invented.
+								className="absolute top-full right-0 left-0 z-20 flex flex-col rounded-[var(--r)] bg-n0 p-1 [border:var(--hairline)]"
 							>
 								<PopoverOption
 									testid="positions-market-option-all"
@@ -507,9 +518,13 @@ function PositionsPanel({
 			aria-label="Positions"
 			className="flex flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
+			{/* `relative` is the row-7a popover's POSITIONING CONTEXT, and it lives
+			    here rather than on the trigger — see the ⛔ at the trigger for the
+			    measurement that moved it. The mockup's `.colhead` is
+			    `position:relative` for exactly this reason (`:227`). */}
 			<div
 				data-testid="positions-panel-head"
-				className="flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				<span className="text-xs font-medium text-ink">Positions</span>
 				{controls}
