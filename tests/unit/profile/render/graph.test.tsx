@@ -349,11 +349,52 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		const chart = screen.getByTestId("profile-chart");
 		expect(chart.tagName.toLowerCase()).toBe("svg");
 		expect(byPrefix(chart, "graph-node-")).toHaveLength(FULL.nodes.length);
+
+		// POLISH.5 item 14 — the r=5 disc's `fill` is the ONE genuinely
+		// side-keyed expression in `GraphNodeMark`, and it was asserted at
+		// NEITHER pole while both poles were already on screen (`FULL.nodes` is
+		// two-poled by fixture, so this costs no new fixture).
+		//
+		// ⛔ ON THE `fill` ATTRIBUTE, NEVER ON `data-side`. The node also carries
+		// `data-side`, and an assertion written against it would pass while
+		// proving nothing about colour — that is the attribute item 13 removes
+		// from `FlipMarker` precisely because attributes can lie.
+		//
+		// ⛔⛔ AND THE LITERAL TOKEN STRING, NEVER A RESOLVED COLOUR.
+		// `--graph-no` and `--color-no` are BOTH `#fafafa`, so a resolved-colour
+		// assertion cannot distinguish the POLE family from the GRAPH family on
+		// the NO arm — it would pass just as happily against `var(--graph-no)`,
+		// and this guard would silently stop proving what it exists to prove.
+		// jsdom returns the attribute as the authored string, so the literal is
+		// both the sound instrument and the natural one (AGENTS.md §9: no
+		// jest-dom — assert with `getAttribute`).
+		const POLE_FILL = {
+			YES: "var(--color-yes)",
+			NO: "var(--color-no)",
+		} as const;
+
+		const fills: (string | null)[] = [];
 		for (const node of FULL.nodes) {
 			const el = screen.getByTestId(`graph-node-${node.id}`);
 			expect(chart.contains(el)).toBe(true);
 			expect(carriesPosition(el)).toBe(true);
+
+			const disc = el.querySelector('circle[r="5"]');
+			if (disc === null) {
+				throw new Error(`no r=5 disc under graph-node-${node.id}`);
+			}
+			expect(disc.getAttribute("fill")).toBe(POLE_FILL[node.side]);
+			fills.push(disc.getAttribute("fill"));
 		}
+
+		// Non-vacuity in BOTH directions: both poles were genuinely on screen,
+		// AND the fill VARIED across them. A FIXED fill — the Route 3 defect
+		// this closes — satisfies a one-pole assertion and collapses this set
+		// to a single member.
+		expect(new Set(FULL.nodes.map((n) => n.side))).toEqual(
+			new Set(["YES", "NO"]),
+		);
+		expect(new Set(fills).size).toBe(2);
 	});
 
 	it("flip-marker-not-a-node", () => {

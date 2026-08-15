@@ -248,8 +248,32 @@ function FlipMarker({
 	);
 }
 
-/** One own post/reply node — the grey core + side ring (the R2 node primitive).
- * Placement is `netWorthValue` (cumulative) or `marketValue` (per-market). */
+/** One own post/reply node — a side-keyed disc with a FIXED grey ring and core
+ * (the R2 node primitive). Placement is `netWorthValue` (cumulative) or
+ * `marketValue` (per-market).
+ *
+ * ⚠ TWO TOKEN FAMILIES MEET HERE AND ONLY ONE IS SIDE-KEYED — read each token's
+ * NAME and its VALUE separately, because here they disagree:
+ *
+ * - The r=5 disc's `fill` is the component's ONLY side-keyed expression:
+ *   `--color-yes` (#181818, black) for YES, `--color-no` (#fafafa, white) for
+ *   NO. That is the POLE family, carrying the locked binding — the poles name
+ *   the SIDE, never the Support/Counter relation (AGENTS.md §8;
+ *   design-language.md §1 "Binding resolved").
+ * - The ring (that disc's stroke) and the r=2 core are BOTH `--graph-yes`,
+ *   FIXED on every side. Its NAME says YES; its VALUE is a mid-grey (#737373),
+ *   the graph-family stand-in minted because the YES pole IS the ground colour
+ *   (`--color-yes` = `--color-ground` = #181818, so a black arm cannot render).
+ *   "Grey" is true of what you SEE and says nothing about side.
+ *
+ * ⚠ The families COINCIDE ON NO (`--graph-no` and `--color-no` are both
+ * #fafafa) and DIFFER ON YES, so a RESOLVED-colour assertion cannot tell them
+ * apart on the NO arm. The fill's guard asserts the LITERAL token string —
+ * graph.test.tsx, "node-on-line-placement".
+ *
+ * ⛔ Whether the ring SHOULD stay side-blind is routed, not settled here: this
+ * docblock is `P5-D20a`; the ring encoding is `P5-D20b`, split at decision D16
+ * (`docs/logs/POLISH-56-STEP0-RECON-CLOSE-OUT.md`). */
 function GraphNodeMark({
 	node,
 	x,
