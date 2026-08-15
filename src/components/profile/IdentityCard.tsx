@@ -122,12 +122,51 @@ export function IdentityCard({
 			    against the grid ROW, the row is `max(identity content, graph)`, and
 			    a taller card widens the square → narrows the column → heightens the
 			    tiles → heightens the card.
-			    ⇒ AND THE UNBLOCK IS ITSELF BLOCKED THIS ROUND: declaring the band
+			    ⇒ AND THE UNBLOCK IS ITSELF BLOCKED AT ROUND 4: declaring the band
 			    height spills the graph 140px over the arena at 1440, because the
 			    graph's height is `(colWidth − 32)/2 + 32` inside
-			    `graph/ProfileGraphCard.tsx` — a file this task may not edit. Both
-			    halves now trace to that ONE symbol; see `page.tsx`'s headzone block
-			    for the full table. */}
+			    `graph/ProfileGraphCard.tsx` — a file that task could not edit. Both
+			    halves traced to that ONE symbol; see `page.tsx`'s headzone block
+			    for the full table.
+
+			    ⛔⛔ FIFTH ATTEMPT, ROUND 5 item C — REFUSED, AND THIS TIME THE
+			    PRECONDITION WAS FINALLY MET. Round 5 declared the band at 256px and
+			    the graph now fits it, so the feedback loop this row died to four
+			    times CANNOT close: the band height no longer depends on anything
+			    inside the band. The row was retried against that, and it fails for a
+			    DIFFERENT and simpler reason — there is not enough WIDTH.
+			    Measured live against the shipped build at the shipped 256px band:
+
+			      vw    tile column      tile width    identity card
+			            without → with   without→with  overflows its band by
+			      1024   370 → 188        115 → 55           +49
+			      1152   434 → 252        137 → 76           +41
+			      1280   498 → 316        158 → 97           +21
+			      1312   514 → 332        163 → 103          +1   ← first fit
+			      1440   578 → 396        185 → 124          +1
+			      1920   818 → 636        265 → 204           0
+
+			    ⇒ AT `lg` (1024) THE TILE COLUMN COLLAPSES BY 49% AND EACH TILE IS
+			    55px WIDE — the collapse item C's own clause names ("if a tile column
+			    still collapses, REFUSE ITEM C ONLY and report the numbers").
+			    ⇒ THE ARITHMETIC IS SIMPLE AND HAS NO FIXED POINT AT 1024. A square
+			    that fills a 256px band is 224px wide; the identity half at 1024 is
+			    476, so the tiles get 476 − 32 (card padding) − 224 − 16 (gap) = 204.
+			    Three tiles in 204px wrap their labels to five lines, the grid grows
+			    to 280px tall, and the card needs 303 against a 256 box. Shrinking the
+			    band shrinks the square but ALSO shrinks the box — measured across
+			    every band height from 150 to 460 at 1024, there is NO value at which
+			    the content fits; from 360 up the tile grid is CLIPPED outright with
+			    the column at 84 → 24 → 0px.
+			    ⛔ AND IT CANNOT BE BREAKPOINT-SCOPED WITHOUT INVENTING A VALUE. The
+			    square first fits at 1312px. `xl` (1280) misses by 21px; `2xl` (1536)
+			    would exclude 1440, which is the width the founder reviews on. A
+			    `min-[1312px]:` variant is an invented breakpoint and is forbidden.
+			    ⇒ ROUTED BACK with three options that are the founder's to rule, not
+			    mine: (1) let the tile grid drop to 2 columns below ~1312 — canon §2
+			    pins 3×2, so that is a DESIGN change; (2) accept the square only
+			    above a width and accept the invented breakpoint; (3) shorten the
+			    tile LABEL copy, which is founder-owned. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.

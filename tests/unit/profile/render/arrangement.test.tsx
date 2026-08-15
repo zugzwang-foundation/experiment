@@ -1146,16 +1146,58 @@ describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays f
 		const classes = pfp.className.split(/\s+/);
 		expect(classes).toContain("size-14");
 		// ⛔ The unbounded trio. Any ONE of these re-introduces the measured
-		// defect, because none of them is bounded by anything in this build.
+		// defect.
+		// ⚠⚠ THE REASON CHANGED AT ROUND 5 AND THE ASSERTION DID NOT. Rounds 1–4
+		// refused this row because the band had no declared height, so a square
+		// PFP fed a loop: taller card → wider square → narrower column → taller
+		// tiles. ROUND 5 CLOSED THAT — the band is `lg:h-[256px]` and the graph
+		// fits it, so the loop cannot close. The row was retried against the
+		// shipped band and fails for a DIFFERENT reason: there is not enough
+		// WIDTH at `lg`. Measured live at the shipped 256px band:
+		//
+		//   vw    tile column        tile width      identity card overflows by
+		//   1024   370 → 188          115 → 55            +49
+		//   1152   434 → 252          137 → 76            +41
+		//   1280   498 → 316          158 → 97            +21
+		//   1312   514 → 332          163 → 103           +1   ← first fit
+		//   1440   578 → 396          185 → 124           +1
+		//
+		// A square filling a 256px band is 224 wide; the 1024 half is 476, so the
+		// tiles get 204px, wrap to five label lines, and the grid grows to 280px
+		// against a 256px box. Shrinking the band shrinks the square AND the box —
+		// swept 150→460 at 1024: no value fits, and from 360 the grid is CLIPPED
+		// with the column at 84 → 24 → 0px. The square first fits at 1312, which
+		// is not a shipped breakpoint: `xl` (1280) misses by 21px and `2xl` (1536)
+		// would exclude 1440, the width the founder reviews on.
+		// ⇒ ROUTED BACK. Unblocking it is a DESIGN call (2-column tiles below
+		// ~1312, an invented breakpoint, or shorter tile labels) — not one this
+		// task can take.
 		for (const c of ["h-full", "aspect-square", "w-auto", "min-h-14"]) {
 			expect(
 				classes,
-				`row 16 was REFUSED ON MEASUREMENT and \`${c}\` has come back. At ` +
-					`390px this renders the PFP at 324×578 and crushes the tile ` +
-					`column to zero width. It is only correct once the headzone has ` +
-					`a bounded height — see profile-height-chain.test.ts.`,
+				`row 16 / item C was REFUSED ON MEASUREMENT and \`${c}\` has come ` +
+					`back. At 1024 this renders the tile column at 188px — each tile ` +
+					`55px wide — and overflows the declared 256px band by 49px. The ` +
+					`band height is no longer the blocker; the identity half's WIDTH ` +
+					`is. Re-derive this guard from a fresh measurement rather than ` +
+					`deleting it.`,
 			).not.toContain(c);
 		}
+	});
+
+	it("row16::the-BAND-precondition-this-row-waited-for-is-now-MET", () => {
+		// ⚠ THE HALF THAT DID CHANGE, PINNED SO THE NEXT READER DOES NOT RE-REFUSE
+		// ON THE OLD GROUND. Four rounds recorded "this becomes correct once the
+		// headzone has a height of its own". It now has one. Anyone retrying item
+		// C must start from the WIDTH measurement above, not from the band.
+		const page = readFileSync(
+			join(process.cwd(), "src/app/(public)/u/[pseudonym]/page.tsx"),
+			"utf8",
+		);
+		const cls =
+			/"profile-headzone"[\s\S]{0,160}?className="([^"]*)"/.exec(page)?.[1] ??
+			"";
+		expect(cls.split(/\s+/)).toContain("lg:h-[256px]");
 	});
 
 	it("row16::the-intrinsic-ratio-hint-attributes-survive", () => {
