@@ -103,12 +103,27 @@ const removedItem = (side: "YES" | "NO"): BookmarkItem => ({
 	authorPseudonym: "tidal-knight-88",
 });
 
-/** The chip is the badge whose text is exactly the side literal. */
+/**
+ * The chip is the badge whose text is the side literal — bare, or carrying the
+ * entry price.
+ *
+ * ⚠ WIDENED AT POLISH.6 ITEM 1 (PD-6-01). A SELECTOR CHANGE, NOT AN ASSERTION
+ * DELETION. `badges.tsx:166` renders `` `${side} @ ${pct}` `` as soon as a
+ * `price` is passed, so the live arm's chip now reads `YES @ 38%` and the old
+ * equality predicate returned `null` — a FALSE NEGATIVE, which is exactly the
+ * failure the docblock below exists to prevent (O-3).
+ *
+ * ⛔ STILL ANCHORED AT THE SIDE, never a bare `includes`. `text === side` keeps
+ * the removed arm — which carries no price field and never will (S-5) — and
+ * `startsWith(`${side} @ `)` admits only the priced form, so a badge whose text
+ * merely CONTAINS the literal cannot satisfy it.
+ */
 function sideChip(container: HTMLElement, side: "YES" | "NO"): Element | null {
 	return (
-		[...container.querySelectorAll('[data-slot="badge"]')].find(
-			(el) => el.textContent?.trim() === side,
-		) ?? null
+		[...container.querySelectorAll('[data-slot="badge"]')].find((el) => {
+			const text = el.textContent?.trim() ?? "";
+			return text === side || text.startsWith(`${side} @ `);
+		}) ?? null
 	);
 }
 
@@ -151,12 +166,21 @@ describe("BookmarkCard — INV-3, the side chip is pole-bound", () => {
 		expect(cls).not.toContain("bg-secondary");
 	});
 
-	it("the-chip-announces-the-side", () => {
+	it("the-chip-announces-the-side-and-its-entry-price", () => {
 		// The adopted primitive carries the `aria-label` the hand-roll lacked —
 		// colour paired with literal text (AGENTS.md §8).
+		//
+		// ⚠ RELAXED TO THE PRICED LABEL AT POLISH.6 ITEM 1 (PD-6-01). Both
+		// strings below are DERIVED FROM `badges.tsx`'s own templates at head,
+		// never copied off a render: `${side} @ ${pct}` (:166) and
+		// `${side} side, entry price ${pct}` (:155-157), where `pct` is
+		// `formatPercentUnpaired("0.380000000000000000")` → `wholePercent` reads
+		// intPart "0" → 0, firstTwo "38", third "0" (< 5, no bump) → `"38%"`.
 		const { container } = render(<BookmarkCard item={liveItem("YES")} />);
+		// The visible deliverable, pinned rather than inferred from the selector.
+		expect(sideChip(container, "YES")?.textContent?.trim()).toBe("YES @ 38%");
 		expect(sideChip(container, "YES")?.getAttribute("aria-label")).toBe(
-			"YES side",
+			"YES side, entry price 38%",
 		);
 	});
 });
