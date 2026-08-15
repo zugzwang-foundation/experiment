@@ -1,6 +1,6 @@
 "use client";
 
-import { Maximize2, Plus } from "lucide-react";
+import { Maximize2 } from "lucide-react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
@@ -104,13 +104,26 @@ export function PostCard({
 			) : null}
 
 			<div className="flex flex-wrap items-center gap-1.5">
+				{/* Row 3 (PD-0-01) — R4 RULED 2026-08-12: ADOPT CD-A's "Read more" TEXT
+				    LINK. `Read more` had zero occurrences repo-wide.
+				    ⚠ The icon goes with the copy. "Text link" is the ratified form, so
+				    the Plus glyph is REMOVED rather than relabelled — keeping an icon
+				    beside the new copy would preserve the affordance CD-A retired.
+				    ⚠ The `aria-label` is removed DELIBERATELY, not dropped. It read
+				    "Read the full argument", which does not CONTAIN the visible text
+				    "Read more" — an accessible name that omits the visible label is a
+				    WCAG 2.5.3 (Label in Name) failure. With self-describing text the
+				    visible string IS the accessible name, which is the stronger form.
+				    ✅ CD-A's `#989898` / `#FAFAFA` ARE `--color-n5` / `--color-ink`, so
+				    the port is BY TOKEN — a raw hex here reddens no-raw-hex-view-layer
+				    (Ruling A / H-HEX). */}
 				<Button
 					variant="ghost"
 					size="xs"
 					onClick={() => onOpenPopup(post)}
-					aria-label="Read the full argument"
+					className="text-n5 hover:text-ink"
 				>
-					<Plus /> Full
+					Read more
 				</Button>
 			</div>
 
