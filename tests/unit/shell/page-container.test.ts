@@ -91,12 +91,12 @@ const SITES: Site[] = [
 		// every screen and never widen. That is the exact measured defect
 		// HTML-FINISH row 20 minted `wide` to fix on Profile (site 5).
 		// ⇒ This site moves to `wide` and takes Profile's own content-layout
-		// classes byte-for-byte. ⚠ The `lg:` ONE-SCREEN PAIR is NOT here yet — it
-		// lands with the height chain at this round's last commit, and this pin
-		// moves again with it, in that commit.
+		// classes byte-for-byte, INCLUDING the `lg:` one-screen pair: the route
+		// occupies exactly the viewport below the header at `lg`+, bounded against
+		// the same figure `<main>`'s own floor uses.
 		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
 		// read-only this round, so `BOX_AXES` moves by preset selection alone.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6",
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
 		movedBy:
 			"HTML-FINISH · BOOKMARKS round 3 — full replication of Profile " +
 			"(founder-ruled 2026-08-15)",

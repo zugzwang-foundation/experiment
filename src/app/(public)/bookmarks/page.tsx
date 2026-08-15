@@ -85,8 +85,28 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 		   layout at its own minimum on every screen and never widen — the measured
 		   defect HTML-FINISH row 20 minted `wide` to fix on Profile.
 		   ⚠ `flex min-h-0 flex-1 flex-col gap-6` is byte-carried from Profile's
-		   call site (`:140`) minus the `lg:` one-screen pair, which lands at C7. */
-		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-6">
+		   call site (`:140`).
+
+		   ⚠⚠ C7 — THE ONE-SCREEN FIT, byte-carried whole from Profile's container.
+		   The route occupies exactly the viewport below the header at `lg`+: no
+		   page scrollbar, every region that can overflow scrolling INSIDE itself.
+		   ⛔ THE FIGURE IS `<main>`'s OWN — `calc(100vh-60px-2px)` is byte-identical
+		   to the floor `(public)/layout.tsx` already declares (60px is
+		   `GlobalHeader`'s `h-[60px]` row, 2px its `border-y`), so `<main>`'s
+		   `min-h` is satisfied EXACTLY and it never grows: header 62 + main
+		   (100vh − 62) = 100vh. ⛔ `(public)/layout.tsx` is NOT touched — the bound
+		   is scoped to this route's own container, exactly as Profile scoped it.
+		   ⛔ `lg:flex-none` IS LOAD-BEARING, NOT TIDINESS. `flex-1` is
+		   `flex: 1 1 0%` and a 0% basis WINS over `height` on the main axis — with
+		   the height applied and `flex-1` still on, Profile measured the page STILL
+		   scrolling (document 1577 against a 725 viewport). With `flex:none` the
+		   basis returns to `auto` and the height binds.
+		   ⚠ BELOW `lg` THE PAGE STILL GROWS AND SCROLLS, deliberately: the arena
+		   stacks to one column there and cannot fit a short viewport. */
+		<PageContainer
+			preset="wide"
+			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+		>
 			<div className="flex flex-wrap items-center gap-2">
 				<h1 className="font-semibold text-ink text-lg">Bookmarks</h1>
 				<Badge variant="outline">Your bookmarks</Badge>
@@ -109,7 +129,7 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    every loader exists; no region renders empty and none is flagged. */}
 			<div
 				data-testid="bookmarks-headzone"
-				className="grid gap-6 lg:grid-cols-2"
+				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
 			>
 				{/* ⚠ `resolveProfileUser` returns `ProfileUser | null` and the null is
 				    kept rather than asserted away. It cannot occur for an onboarded
