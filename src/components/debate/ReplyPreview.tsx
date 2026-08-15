@@ -26,17 +26,68 @@ export function ReplyPreview({
 	bookmarks: BookmarkAffordance;
 }) {
 	const [expanded, setExpanded] = useState(false);
-	const all = [...replies.support, ...replies.counter];
-	if (all.length === 0) {
+	// Row 13 (PD-3-10) — TIER 1, SPEC.1 §9 F-DEBATE-1: the affordance expands
+	// "EACH SIDE'S full stake-sorted list".
+	//
+	// ⛔ THE DEFECT WAS AT THE SOURCE, NOT AT THE RENDER. The build computed
+	// `all = [...support, ...counter]` and then rendered THAT, so every consumer
+	// downstream of the concatenation was side-BLIND and the two sides were
+	// indistinguishable as lists. Counting is not the fix: a flat list renders all
+	// four replies and satisfies any "everything is present" assertion, which is
+	// exactly why the guard asserts the PARTITION.
+	//
+	// ⚠ A side-blind expansion on the reply-as-bet surface is a THESIS-ADJACENT
+	// defect, not a layout one — Support and Counter are read-time aggregates over
+	// SIDE, and flattening them erases the distinction the affordance exists to
+	// show.
+	//
+	// ⚠ The read model ALREADY carries them apart (`ReplyGroups` exposes `support`,
+	// `counter` and `twoSlot` separately), so this partitions what is already
+	// there and adds NO `DebateViewModel` field — ADR-0034 D-1 does not fire.
+	const total = replies.support.length + replies.counter.length;
+	if (total === 0) {
 		return null;
 	}
-	const shown = expanded ? all : replies.twoSlot;
-	const hasMore = all.length > replies.twoSlot.length;
+	const hasMore = total > replies.twoSlot.length;
 	return (
 		<div className="flex flex-col gap-1.5 border-t pt-2">
-			{shown.map((reply) => (
-				<ReplyCard key={reply.id} reply={reply} bookmarks={bookmarks} />
-			))}
+			{expanded ? (
+				<>
+					{replies.support.length > 0 ? (
+						<ul
+							data-testid="reply-group-support"
+							aria-label="Support replies"
+							className="flex flex-col gap-1.5"
+						>
+							{replies.support.map((reply) => (
+								<li key={reply.id}>
+									<ReplyCard reply={reply} bookmarks={bookmarks} />
+								</li>
+							))}
+						</ul>
+					) : null}
+					{replies.counter.length > 0 ? (
+						<ul
+							data-testid="reply-group-counter"
+							aria-label="Counter replies"
+							className="flex flex-col gap-1.5"
+						>
+							{replies.counter.map((reply) => (
+								<li key={reply.id}>
+									<ReplyCard reply={reply} bookmarks={bookmarks} />
+								</li>
+							))}
+						</ul>
+					) : null}
+				</>
+			) : (
+				/* The two-slot default is SPEC-MANDATED and §2 explicitly does NOT
+				   remove it. Its edge cases ride `twoSlot` unchanged: one side empty →
+				   two from the other; a single reply → it alone, no expand. */
+				replies.twoSlot.map((reply) => (
+					<ReplyCard key={reply.id} reply={reply} bookmarks={bookmarks} />
+				))
+			)}
 			{hasMore ? (
 				<Button
 					variant="ghost"
@@ -45,7 +96,7 @@ export function ReplyPreview({
 					onClick={() => setExpanded((v) => !v)}
 					aria-expanded={expanded}
 				>
-					{expanded ? "Show fewer replies" : `Show all ${all.length} replies`}
+					{expanded ? "Show fewer replies" : `Show all ${total} replies`}
 				</Button>
 			) : null}
 		</div>
