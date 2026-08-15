@@ -307,6 +307,33 @@ const sideKeyedColour: SideKeyedColourExpression[] = sourceFiles.flatMap(
  * docblock naming a file the expression has left.
  */
 const PERMITTED_FILES = [
+	// NINTH ENTRY — POLISH.3 PR 2 row T3, under founder ruling R-3 (2026-08-16):
+	// a ratified plan may add ITS OWN SUBJECT to a closed inventory when the
+	// OFFENDER PREDICATE passes, the addition is NAMED in the plan, and it lands
+	// in the SAME COMMIT as the code. All three hold here, and this commit
+	// carries both halves.
+	//
+	// The market-view aggregate footer became the split bar, and its segments are
+	// side-keyed for exactly the reason the SEVENTH entry's are — Support
+	// inherits the post's side, Counter takes the opposite, so a FIXED pole
+	// renders the NO-side share in the YES pole on every NO post (route 3 below,
+	// which this guard cannot catch):
+	//   supportPole = postSide === "YES" ? "bg-yes" : "bg-no"
+	//   counterPole = postSide === "YES" ? "bg-no"  : "bg-yes"
+	// Verified against the read model: `ranking-substrate.ts:75-83` defines
+	// support as `rc.side_at_post_time = p.side_at_post_time` and counter as
+	// `<>`, so the mapping is the server's own, not a UI convention.
+	//
+	// ⛔ INDEX 0, NOT APPENDED. `inventory` is `[...new Set(...)].sort()` and
+	// "A" (0x41) precedes "b" (0x62), so this entry sorts before `badges.tsx`.
+	// An appended entry leaves the test RED — measured, not assumed.
+	//
+	// ⛔ THE PREDICATE IS UNTOUCHED. Both `>=` floors, the pole-boundness test
+	// and every `offenders.toEqual([])` are unchanged; the scanner still walks
+	// `src/` recursively and still reaches this file. This is a widening of an
+	// ENUMERATION, not a weakening of a GUARD — and relaxing the predicate
+	// remains the one thing this file must never do to stay green.
+	"src/components/debate/AggregateFooter.tsx",
 	"src/components/debate/badges.tsx",
 	"src/components/debate/chart/MarketPriceChart.tsx",
 	"src/components/debate/composer/PositionStrip.tsx",

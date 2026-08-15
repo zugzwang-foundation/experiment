@@ -51,7 +51,12 @@ export function PostCard({
 			<Card className="gap-2 p-3">
 				<SideBadge side={post.sideAtPostTime} />
 				<RemovedPlaceholder />
-				<AggregateFooter aggregate={post.aggregate} />
+				{/* The removed variant keeps its frozen side (§6 — thread integrity),
+				    so the split bar stays correctly poled on a removed post too. */}
+				<AggregateFooter
+					aggregate={post.aggregate}
+					postSide={post.sideAtPostTime}
+				/>
 				{/* A removed POST keeps its surviving replies (§6 — the thread stays
 				    intact), so its live replies keep their own affordances. */}
 				<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
@@ -128,7 +133,10 @@ export function PostCard({
 				</Button>
 			</div>
 
-			<AggregateFooter aggregate={post.aggregate} />
+			<AggregateFooter
+				aggregate={post.aggregate}
+				postSide={post.sideAtPostTime}
+			/>
 			<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
 
 			<Button
