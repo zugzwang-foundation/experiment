@@ -6,6 +6,26 @@
 
 ---
 
+## ✅ 0 · RESOLVED — founder ruling **R-3**, 2026-08-16
+
+**The halt was accepted as correctly called**, on the reviewer's ground: *from the diff alone, an unattended agent adding its own file to a closed inventory to green its own change is indistinguishable from the anti-pattern the guard forbids.*
+
+> **R-3 · CLOSED-INVENTORY ADDITIONS.** A ratified plan may add **its own subject** to a closed design-guard inventory when all three hold: **(1)** the guard's OFFENDER PREDICATE passes — the code is correct and only the census is stale; **(2)** the addition is NAMED in the plan's item table; **(3)** it lands in the SAME COMMIT as the code that makes it necessary.
+> ⛔ **The plan widens the CENSUS, never the PREDICATE.** An addition failing any of the three is still a HALT.
+
+**Applied to both collisions, once:**
+
+| Guard | Change | Condition (1) |
+|---|---|---|
+| `side-pole-binding.test.ts` | `AggregateFooter.tsx` added at **index 0** | ✅ all three offender-predicate tests passed at the halt |
+| `pct-round-render.test.ts` | `EXPECTED_ALLOW_MARKERS` **3 → 5** | ✅ verified separately at C12 *before* the count moved — see §12 |
+
+**C2 was AMENDED** (not followed by a census commit) so both halves land in one diff — `008e3bb` → **`53f503f`**. The run resumed at C3 and **C1…C12 are complete**. §12 below records the outcome.
+
+⚠ **Two corrections to this record's own forecasts came out of the resumed run** — §12.
+
+---
+
 ## 1 · The condition
 
 > **`+ any tests/unit/design/** guard reddening.`**
@@ -251,3 +271,58 @@ C1's landed guard (`chart-overlay-a11y.test.tsx:96-100`) requires the overlay su
 7. `C13` remains **attended-only** and out of scope for any unattended continuation.
 
 **Nothing was pushed to `main`. No PR was opened. No merge occurred.**
+
+---
+
+## 12 · Outcome of the resumed run (2026-08-16) — and two corrections to this record
+
+**C1…C12 complete.** C13 (`RR-3`) did not run and remains attended-only.
+
+### ✅ R-3 condition (1), verified separately at C12 — the check that mattered
+
+R-3 is a rule, not a pre-clearance, so `pct-round-render` was run with the **new code and the OLD count** before the count moved:
+
+```
+✓ scans a non-empty file set (guard is alive)
+× uses formatPercentUnpaired only at the exact allowlisted single-side readouts
+    → expected [ …(5) ] to have a length of 3 but got 5
+      AT :101   expect(markers).toHaveLength(EXPECTED_ALLOW_MARKERS)
+✓ computes no percent by float multiplication on a price
+```
+
+The failing assertion is **`:101`, the CENSUS**. The assertion immediately above — **`:100` `expect(offenders).toEqual([])`, THE OFFENDER PREDICATE — passed** (vitest stops at the first failing assertion, so reaching `:101` proves `:100` held). ⇒ **Condition (1) HOLDS.** Had `offenders` been non-empty, R-3 would not have applied and C12 would have been a second halt.
+
+### ⚠ CORRECTION 1 — the C12 count is **5**, not 4
+
+§10 HIGH-2 forecast `EXPECTED_ALLOW_MARKERS` 3 → **4**. It is 3 → **5**. The summary names **two** figures (opening *and* current), so it needs **two** `pctround-allow:` markers — exactly as `MarketPriceChartCard.tsx` carries two for its two. The forecast assumed a single call site.
+
+### ⚠ CORRECTION 2 — §8's new checkpoint was **load-bearing, not ceremonial**
+
+§8 recorded that `PostCard.tsx` needs a re-key before **C8** as well as before C9. Measured at C8, the drift was **+5** and the plan's row-1 fence `:111-119` had come to span **from row 3's `aria-label` into the middle of row 1's block** — a fragment cutting across two buttons. **Deleting it blind would have destroyed the control C9 rewrites and left row 1 malformed.** The deletion was done by SYMBOL instead. This is `O-8` firing inside a single PR, measured rather than argued.
+
+**The complete pair set is FIVE**, re-derived rather than taken: `PostCard.tsx` is written by C2, C8, C9 → **(C2,C8) · (C2,C9) · (C8,C9)**; `dialogs.tsx` by C5, C6 → **(C5,C6)**; `AggregateFooter.tsx` by C2 with C10 fenced to it → **(C2,C10)**. **The fifth is (C2,C9)** — the before-C9 checkpoint existed for C8's deletion alone, but `PostCard.tsx` now has *two* earlier writers.
+
+⚠ **A sixth writer relationship exists and GC-7's rule as written covers it:** the post-halt remediation commit also writes `AggregateFooter.tsx` and `dharma-spacing.test.tsx`. The before-C10 re-key therefore accounts for **two** earlier writers, not one — and it had to: sites 4–5 moved `:14`/`:19` → `:78`/`:118`.
+
+### ✅ GC-10 verified
+
+`AggregateFooter`'s support/counter spans carry `Đ{" "}` — **PRESENT**, zero unspaced occurrences. Recorded "verified, discharged at C2"; `git diff --name-only` for C10 lists only `ReplyCard.tsx` and `ArgProfile.tsx`, so **no no-op edit was written and reported as work**.
+
+### ✅ HIGH-1's fix is what made C10's green real
+
+With the original `.font-mono` selector the assertion would **still** have read the SideBadge's `"YES"` and stayed red *after* the source was correctly spaced — leaving the PR carrying a permanently-red guard over a defect it had actually fixed, with §18's closure of `PD-3-07` resting on it.
+
+### Guards, against §12's schedule
+
+| Guard | Green at | §12 says | Verdict |
+|---|---|---|---|
+| `aggregate-footer` | C2 | C2, single-commit | ✅ |
+| `comment-image` | C4 | C4, single-commit | ✅ |
+| `post-popup` | rows 9+14 C5 → rows 10-12 C6 | GC-12's corrected 1-commit window | ✅ |
+| `reply-preview` | C7 | C7, single-commit | ✅ |
+| `post-card` | rows 1-2 C8 → row 3 C9 | 1-commit window | ✅ |
+| `dharma-spacing` | sites 4-5 C2 → sites 2-3 C10 | 8-commit window, the longest | ✅ |
+| `chart-overlay-a11y` | C12 | C12, single-commit | ✅ |
+| `reply-split-bar` | — | C13 | ⛔ **still RED, expected** |
+
+**No unscheduled green anywhere. `H-GREEN` never fired.** All 8 design guards green.
