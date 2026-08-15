@@ -103,6 +103,33 @@ function presentPost(): DebatePost {
 
 const noop = () => {};
 
+/**
+ * ⛔ THE STAKE SPAN, AND WHY IT IS NOT JUST `.font-mono`.
+ *
+ * `SideBadge` rides `CHIP.base`, which CARRIES `font-mono`
+ * (`badges.tsx:61 (CHIP → base)`, pinned verbatim by a passing assertion at
+ * `side-badge.test.tsx:66-67`). And in BOTH components the badge precedes the
+ * stake in document order — `ReplyCard.tsx:49` before `:54`,
+ * `ArgProfile.tsx:62` before `:67`.
+ *
+ * ⇒ A bare `.font-mono` returns the FIRST match in tree order, which is the
+ * SIDE BADGE, whose innerHTML is "YES". Sites 2 and 3 would have failed at C1
+ * and failed again after C10 wrote the ruled spaced form, because C10 does not
+ * touch the element that selector returns. The guard would have looked like
+ * coverage while proving only that a side badge contains no Đ figure — `O-3`,
+ * a true refusal reported with a misleading cause.
+ *
+ * ⚠ THIS IS THE ASSERTION §18's CLOSURE OF `PD-3-07` RESTS ON. PR 1 consumed
+ * the row PARTIAL precisely because sites 2-5 were unguarded; closing it on a
+ * guard that cannot observe sites 2 and 3 would close it on the exact footing
+ * PR 1 refused — `GC-3` reproduced inside `GC-3`'s own remedy.
+ *
+ * `Badge` stamps `data-slot="badge"` (`ui/badge.tsx:41`); the stake spans carry
+ * no `data-slot`, so excluding it selects the figure and nothing else.
+ * Caught by `@code-reviewer` (HIGH-1) on the C1 diff.
+ */
+const STAKE_SPAN = '.font-mono:not([data-slot="badge"])';
+
 describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", () => {
 	it("dharma-spacing::site-2-the-reply-card-stake-is-spaced", () => {
 		// Site 2 · `ReplyCard.tsx:55 (ReplyCard → stake span)` · lands at C10.
@@ -110,7 +137,7 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 			<ReplyCard reply={presentReply()} bookmarks={VIEWER} />,
 		);
 
-		const stake = container.querySelector(".font-mono");
+		const stake = container.querySelector(STAKE_SPAN);
 		expect(stake).not.toBeNull();
 		expect(stake?.innerHTML).toContain("Đ 5,000");
 	});
@@ -129,7 +156,7 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 			/>,
 		);
 
-		const stake = container.querySelector(".font-mono");
+		const stake = container.querySelector(STAKE_SPAN);
 		expect(stake).not.toBeNull();
 		expect(stake?.innerHTML).toContain("Đ 1,500");
 	});

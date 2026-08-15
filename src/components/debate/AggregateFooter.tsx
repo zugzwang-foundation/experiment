@@ -81,11 +81,25 @@ export function AggregateFooter({
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
 				{/* Decorative: the figures either side carry the meaning, and colour
 				    is never the only channel (§8 a11y). */}
+				{/* ⚠ THE HAIRLINE IS LOAD-BEARING, NOT TRIM. `--color-yes` is #181818
+				    and the card surface is `bg-card` → `--color-n0` #212121, so on a
+				    NO post the track (the YES pole) sits at ~1.09:1 against its own
+				    card and DISAPPEARS — leaving the fill no visible extent to be a
+				    proportion of. The zero-reply case is the same defect from the
+				    other side: `computeSplitBar` returns "0%", so a YES post would
+				    render a solid full-width white bar reading as "100% Counter"
+				    beside text saying Support (0) / Counter (0).
+				    The mockup does not have this problem because `.bar` is an
+				    OUTLINE — `d5:510` `border:1px solid var(--ink)` — and the port
+				    dropped it. Ruling A forbids porting the VALUE, not the
+				    STRUCTURE, so the border returns via the build's own token.
+				    ⛔ NOT `--border-strong`: `emphasis-ladder-tokens.test.ts:216`
+				    pins that token at zero consumers. */}
 				<span
 					data-testid="aggregate-split-track"
 					aria-hidden="true"
 					className={cn(
-						"h-1.5 w-full overflow-hidden rounded-(--r-dot)",
+						"h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
 						counterPole,
 					)}
 				>
