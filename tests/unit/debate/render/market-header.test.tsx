@@ -90,3 +90,87 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		expect(screen.getByText("5 replies")).toBeTruthy();
 	});
 });
+
+/**
+ * POLISH.3 PR 2 · C3 — row T1, Tier B-1: the RESOLUTION overline + its hairline
+ * container (`d5:467-471`, `.criterion` / `.overline` / `.crittext`).
+ *
+ * ⚠ THE PLAN NAMES C3's RISK AS **FABRICATION** (§9), because this commit writes
+ * the artifact and then its proof. The mitigation is that every value asserted
+ * below is READ OFF THE MOCKUP — `d5:468-469`'s `.overline` rule — and not off
+ * the component. A test that mirrored whatever the component happened to emit
+ * would pass on the earlier, WRONG `8px / .12em` recipe, which came from reading
+ * `.poslab` (`d5:556`) and `.colstk .lab` (`d5:614`) and generalising across
+ * ROLES. The family shares weight (800), transform (uppercase) and colour (n4)
+ * and NOTHING else — `.reslabel` (`d5:483`) is a third pair again, 8px/.14em.
+ *
+ * ⚠ EVERY QUERY IS TARGETED (PF-3), for the reason this file's header already
+ * gives: a `container.innerHTML` pin or a snapshot here would sweep in unrelated
+ * neighbours and turn a copy guard into a tripwire.
+ *
+ * ⛔ THE NEGATIVE ASSERTION IS A RULING, NOT A MIRROR. `.crittext` carries
+ * `-webkit-line-clamp:2` in the mockup and it is filed BUCKET D (§17 H-T1(c)):
+ * `market.description` is the resolution criterion — the terms of the bet — and
+ * clamping it with no affordance is the exact defect class PD-0-01/R4 is
+ * removing from post cards in this same PR. Pinned so a later reader cannot
+ * "restore fidelity" by adopting it.
+ */
+describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
+	it("market-header::overline-labels-the-criterion", () => {
+		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+
+		// The mockup's own source text is "Resolution"; `uppercase` does the
+		// rendering, so the DOM text is title case BY DESIGN (`d5:975`).
+		expect(screen.getByText("Resolution")).toBeTruthy();
+	});
+
+	it("market-header::overline-carries-the-ruled-d5-recipe", () => {
+		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+
+		const className =
+			screen.getByText("Resolution").getAttribute("class") ?? "";
+
+		// `.overline{font-size:9.5px;font-weight:800;letter-spacing:.14em;
+		//            text-transform:uppercase;color:var(--n4);}`  — d5:468-469
+		expect(className).toContain("text-[9.5px]");
+		expect(className).toContain("font-extrabold");
+		expect(className).toContain("tracking-[.14em]");
+		expect(className).toContain("uppercase");
+		// Ported BY TOKEN — a raw hex here also reddens no-raw-hex-view-layer.
+		expect(className).toContain("text-n4");
+
+		// The superseded recipe, pinned as gone. It was WRONG, and it was wrong
+		// by generalising across roles rather than by a typo.
+		expect(className).not.toContain("text-[8px]");
+		expect(className).not.toContain("tracking-[.12em]");
+	});
+
+	it("market-header::criterion-container-is-a-hairline-rule-not-a-card", () => {
+		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+
+		const container = screen.getByText("Resolution").parentElement;
+		const className = container?.getAttribute("class") ?? "";
+
+		// `.criterion{margin-top:12px;border-top:var(--hairline);padding-top:10px}`
+		// — a TOP RULE, never a boxed card. The 12px margin is carried by the
+		// section's own `gap-3`.
+		expect(className).toContain("[border-top:var(--hairline)]");
+		expect(className).toContain("pt-2.5");
+	});
+
+	it("market-header::criterion-is-NOT-clamped-and-carries-no-affordance", () => {
+		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+
+		const container = screen.getByText("Resolution").parentElement;
+
+		// H-T1(c) — bucket D. Unclamped IS the status quo; the mockup would be
+		// INTRODUCING a truncation of the bet terms.
+		expect(container?.innerHTML).not.toContain("line-clamp");
+		expect(container?.innerHTML).not.toContain("truncate");
+		// And no "more"/expand control — "criterion length treatment" is
+		// docketed to HEADER-3ZONE, not decided here.
+		expect(container?.querySelector("button")).toBeNull();
+		// The criterion text itself still renders, in full.
+		expect(container?.innerHTML).toContain("Resolution criterion text.");
+	});
+});

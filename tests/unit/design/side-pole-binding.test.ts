@@ -58,12 +58,20 @@ import { describe, expect, it } from "vitest";
  * A REJECTED candidate check, recorded so it is not re-proposed as new: "flag a
  * component that RECEIVES a side prop, renders a pole-family colour, and never
  * keys on it." It fails on the single most important instance —
- * `composer/ReplySplitBar.tsx` has BOTH a correct side-keyed pole (`:118-122`,
- * why it is in the inventory above) AND a separate fixed pair (`:64`, `:67`)
+ * `composer/ReplySplitBar.tsx`, which for the length of this guard's life had
+ * BOTH a correct side-keyed pole (`TriggerPill → the pole const`, why it is in
+ * the inventory above) AND a separate FIXED pair on the track and fill spans
  * carrying the same defect on `/m/[slug]`. A component-level check sees the
  * correct expression and clears the file, so the rule would FALSE-NEGATIVE on
- * the exact case that most needs catching. A segment-level version would need to
- * decide which DOM node a quantity belongs to, which is not a static property.
+ * the exact case that most needs catching.
+ * ⚠ THAT FIXED PAIR IS GONE — corrected at POLISH.3 PR 2 C13 (`RR-3`), and both
+ * spans are now side-keyed on `postSide`. The instance is HISTORICAL; THE
+ * REJECTION STANDS UNCHANGED, because the argument is about what a
+ * component-level check CANNOT SEE, not about this file's current state. Kept
+ * as evidence rather than deleted — a rejected candidate with its evidence
+ * removed reads as an unexplained preference and gets re-proposed.
+ * A segment-level version would need to decide which DOM node a quantity
+ * belongs to, which is not a static property.
  *
  * Route 3 therefore stays a KNOWN GAP, closed by review and by per-pole render
  * tests (assert BOTH a YES and a NO instance — a YES-only test passes on an
@@ -150,8 +158,9 @@ const blankComments = (source: string) =>
  * A comparison of a SIDE discriminant against a side literal. The discriminant
  * may be a bare identifier (`side`, `resultingSide`) or a property access
  * (`node.side`, `seg.side`, `args.parentSide`) — a line-by-line regex would miss
- * neither, but would miss the MULTI-LINE ternaries at `ReplySplitBar.tsx:119`
- * and `ProfileChart.tsx:181`, so the whole file is matched as one string.
+ * neither, but would miss the MULTI-LINE ternaries at
+ * `ReplySplitBar (→ TriggerPill → the pole const)` and in `ProfileChart`, so
+ * the whole file is matched as one string.
  */
 const SIDE_COMPARISON =
 	/([A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*)\s*[!=]==\s*["'](?:YES|NO)["']/g;
@@ -307,6 +316,33 @@ const sideKeyedColour: SideKeyedColourExpression[] = sourceFiles.flatMap(
  * docblock naming a file the expression has left.
  */
 const PERMITTED_FILES = [
+	// NINTH ENTRY — POLISH.3 PR 2 row T3, under founder ruling R-3 (2026-08-16):
+	// a ratified plan may add ITS OWN SUBJECT to a closed inventory when the
+	// OFFENDER PREDICATE passes, the addition is NAMED in the plan, and it lands
+	// in the SAME COMMIT as the code. All three hold here, and this commit
+	// carries both halves.
+	//
+	// The market-view aggregate footer became the split bar, and its segments are
+	// side-keyed for exactly the reason the SEVENTH entry's are — Support
+	// inherits the post's side, Counter takes the opposite, so a FIXED pole
+	// renders the NO-side share in the YES pole on every NO post (route 3 below,
+	// which this guard cannot catch):
+	//   supportPole = postSide === "YES" ? "bg-yes" : "bg-no"
+	//   counterPole = postSide === "YES" ? "bg-no"  : "bg-yes"
+	// Verified against the read model: `ranking-substrate.ts:75-83` defines
+	// support as `rc.side_at_post_time = p.side_at_post_time` and counter as
+	// `<>`, so the mapping is the server's own, not a UI convention.
+	//
+	// ⛔ INDEX 0, NOT APPENDED. `inventory` is `[...new Set(...)].sort()` and
+	// "A" (0x41) precedes "b" (0x62), so this entry sorts before `badges.tsx`.
+	// An appended entry leaves the test RED — measured, not assumed.
+	//
+	// ⛔ THE PREDICATE IS UNTOUCHED. Both `>=` floors, the pole-boundness test
+	// and every `offenders.toEqual([])` are unchanged; the scanner still walks
+	// `src/` recursively and still reaches this file. This is a widening of an
+	// ENUMERATION, not a weakening of a GUARD — and relaxing the predicate
+	// remains the one thing this file must never do to stay green.
+	"src/components/debate/AggregateFooter.tsx",
 	"src/components/debate/badges.tsx",
 	"src/components/debate/chart/MarketPriceChart.tsx",
 	"src/components/debate/composer/PositionStrip.tsx",

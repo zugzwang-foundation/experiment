@@ -29,7 +29,7 @@ export function BookmarkCard({
 			<Card data-testid={`bookmark-removed-${item.id}`} className="gap-2 p-3">
 				<div className="flex items-center justify-between gap-2">
 					<div className="flex flex-wrap items-center gap-2">
-						<SideBadge side={item.side} />
+						<SideBadge side={item.side} size="profile" />
 						<AuthorHead pseudonym={item.authorPseudonym} />
 					</div>
 					<UnbookmarkButton commentId={item.id} />
@@ -43,7 +43,18 @@ export function BookmarkCard({
 		<Card data-testid={`bookmark-${item.id}`} className="gap-2 p-3">
 			<div className="flex items-center justify-between gap-2">
 				<div className="flex flex-wrap items-center gap-2">
-					<SideBadge side={item.side} />
+					{/* Item 1 (PD-6-01) — canon §3 item 11's `SIDE @ entry%`, the same
+					    PROP PASS POLISH.5 item 3 made at `ArgumentList.tsx:72-76`.
+					    `SideBadge` already takes `price` and already formats it under
+					    its own allow-marker, so NO formatting happens here: doing it
+					    at this call site would need a fourth marker and redden
+					    `pct-round-render` (its count is exact, deliberately). The
+					    stored value is ALREADY the bought side's price — routing it
+					    through the PAIRED formatter would print `NO @ 45%` for an
+					    author who entered NO at 55%. ⛔ NEVER on the removed variant
+					    at `:32`: that arm carries no price field, so it is a compile
+					    error — the masking boundary working (S-5, SC-1). */}
+					<SideBadge side={item.side} size="profile" price={item.priceAtBet} />
 					{/* `PositionMarker` returns null for "none" itself, so the call
 					    site no longer carries that condition. It also supplies the
 					    `aria-label="Author Flipped"` the hand-roll lacked — the PD-0-10
@@ -77,7 +88,7 @@ export function BookmarkCard({
 				data-testid={`bookmark-figures-${item.id}`}
 				className="text-n5 text-xs"
 			>
-				Staked Đ {formatDharma(item.staked)} · Value Đ{" "}
+				Staked Đ {formatDharma(item.staked)} · Current Đ{" "}
 				{formatDharma(item.current)}
 			</p>
 		</Card>

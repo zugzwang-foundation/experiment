@@ -117,7 +117,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-ten-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-nine-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -128,8 +128,54 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// fired and the adoption was RULED, not absorbed (POLISH.5 §5 row 19).
 		// `detail` remains pinned at zero for POLISH.3 — see the split assertion
 		// in the seam-presets block below.
+		//
+		// ⚠ AND EIGHT UNTIL 2026-08-16. `dialogs.tsx`'s `PostPopup` gains ONE
+		// UNSIZED site per PD-3-14 — POLISH.3 PR 2 row 12, commit C6, tier-1
+		// baseline INV-3 side binding via POLISH-0.md §7 criterion 2. The pop-up
+		// had rendered the side as BARE INTERPOLATED TEXT with no badge at all, so
+		// this is the primitive arriving where it was missing, not a re-skin.
+		// ⚠ THE WALL THIS FILE PREDICTED IS THE ONE PR 2 HIT. The note below says
+		// "POLISH.3 PR 2 must still hit this wall and get its own ruling" — it did,
+		// the adoption was RULED at the plan (§9 C6 names this re-key explicitly,
+		// §7 measures it as 8 base → 9), and it is recorded here rather than
+		// absorbed. `detail` STILL holds its zero: row 12's badge is UNSIZED, which
+		// is why only the base map moves and the seam-preset assertion below is
+		// untouched.
+		//
+		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
+		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
+		// `surface_profile_v1_0.html:278-279`. Ratified 2026-08-15: the guard
+		// fired a THIRD time and the adoption was RULED, not absorbed
+		// (POLISH.6 HALT-1, raised at STEP 0.6 before any write). `detail` STILL
+		// holds its zero: this is a surface-scoped adoption, never a blanket
+		// amendment, and POLISH.3 PR 2 must still hit this wall and get its own
+		// ruling.
+		//
+		// ⛔ THE FENCE. POLISH.6 may write the sites ENUMERATED BELOW and nothing
+		// else in this file. ⚠ COUNT THE LIST — do not trust a number written
+		// beside it. This sentence has now been WRONG TWICE by exactly that
+		// mechanism: it said "three maps, one length and this comment" and went
+		// stale when a test name joined, then said SIX and went stale when a
+		// second name joined. A prose count is an assertion with no guard, so
+		// the list is the fence and any count is a reading of it.
+		//   · the `countByFile(base)` map
+		//   · the `countByFile(sized)` map
+		//   · the `countByFile(wiredProfile)` map
+		//   · the one `toHaveLength` on `base`
+		//   · this comment
+		//   · the name of the test that owns the `base` map
+		//   · the name of the test that owns the `sized` map
+		//
+		// ⚠ THE NAMES ARE FENCED BECAUSE A NAME IS AN ASSERTION.
+		// `exactly-ten-sites-…` above an `expect(…).toHaveLength(8)` is a FALSE
+		// RECEIPT — a reader greps the name, believes it, and never opens the
+		// body. PR A set the convention here when it renamed twelve → ten.
+		// ⚠⚠ AND THE SECOND NAME PROVES THE SHARPER FORM: it carried NO count,
+		// it carried an ENUMERATION ("the discovery hero and the profile list"),
+		// and it went stale the moment a third file joined the map. A
+		// count-shaped sweep cannot find a count-free name. ⇒ It is not numbers
+		// that rot; it is any name making a factual claim.
 		expect(countByFile(base)).toEqual({
-			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/debate/DebateColumn.tsx": 1,
 			"src/components/debate/PostCard.tsx": 1,
@@ -137,16 +183,18 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/ReplyCard.tsx": 2,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
+			"src/components/debate/dialogs.tsx": 1,
 		});
-		expect(base).toHaveLength(10);
+		expect(base).toHaveLength(9);
 	});
 
-	it("the-sized-sites-are-the-discovery-hero-and-the-profile-list", () => {
+	it("the-sized-sites-are-the-bookmark-card-the-discovery-hero-and-the-profile-list", () => {
 		// The positive control beside the assertion above (N3): the classifier
 		// does distinguish the two kinds, so "ten unsized" is not just "the
 		// matcher never sees a size".
 		const sized = sideBadgeSites.filter((site) => site.sized);
 		expect(countByFile(sized)).toEqual({
+			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/discovery/HeroPanels.tsx": 1,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
@@ -458,6 +506,7 @@ describe("SideBadge — the detail and profile seam presets", () => {
 			/size\s*=\s*["{]?\s*["']?profile/.test(site.markup),
 		);
 		expect(countByFile(wiredProfile)).toEqual({
+			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
 	});
