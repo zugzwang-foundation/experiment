@@ -320,3 +320,17 @@ separators — delta 0** — so at mobile it is entirely pre-existing. Filed as 
 - **M-2 → corrected in place** above, in the round-1 entry it falsified.
 - **M-3 + the clamped-teaser artefact → two rows in `docs/parked.md`**, the second carrying the
   founder's KEEP ruling so it is not rediscovered and "fixed".
+
+---
+
+## SEALED — how well this loop actually works
+
+**Cheapest stage: the RECON, by a wide margin.** One `grep -n sparkline docs/specs/SPEC.1.md` when row 1 was minted kills it before ratification. The recon table had `Mockup line` and `Build file:line` columns and **no baseline column** — while `POLISH-register.md`'s own template makes `baseline` mandatory and says outright: *"If you cannot name the tier and the document a thing violates, it is not a visual defect."* **The recon minted ten rows that could not have passed the register's own schema.** There it costs a grep; here it cost a spec amendment on a live branch.
+
+**Why row 3 was reflexive and row 1 was not — it is not mockup-vs-spec, it is STRUCK-vs-ACCEPTED.** Row 3 arrived pre-struck with its ground pre-written; I only *verified a supplied conclusion*, which is cheap, and I did it. Row 1 needed me to *originate* a challenge to a row the founder had already accepted. I gave the one contested row an adversarial read and the nine accepted rows none. The mockup was open in front of me all night — I hexdumped two glyphs out of it — and **I never once opened SPEC.1.** My reading followed the artifact I was told to compare against, and nothing told me to compare against anything else.
+
+**What should have fired at the docblock.** I deleted the words *"two-line sparkline"* from a sentence reading *"the design-language §3.2 LOCKED card composition"*. Editing prose that **cites a governing document by section number**, in a way that changes what the citation asserts, is a same-commit-rider trigger under CLAUDE.md §5.12. I was making a docblock disagree with the document it names, in the same keystroke, and I treated it as comment maintenance. That was the loudest available signal and I had my hands on it.
+
+**One dispatch change:** give the row table a mandatory **`baseline` column** — tier + document + section that licenses or contradicts the row — filled at recon and **re-quoted at HEAD by the executor before implementing**. G-1 becomes structurally impossible: row 1's cell reads *"tier-1 · SPEC.1 §22 NAMES this"* and it is struck or escalated before ratification. Not a new mechanism — the register's existing schema, applied one artifact upstream.
+
+**Was it the brief? Partly, and here is the line.** §1: *"⚠ THIS TABLE IS THE SCOPE. Anything not on it is a WIDENING… ⛔ Do not 'while I'm here' a single line."* With §0.3 — which had me re-verify that each row's ELEMENT still existed, never its LICENCE — the brief made *check the anchor* reflexive and *check the authority* invisible, and made looking outside the table read as a scope violation. **And the principle governing row 1 was demonstrated once, on row 3, but never stated as a rule.** A principle shown on one row does not generalise to nine. That half is the method's. The other half is mine: I had the demonstration in hand and did not abstract it.
