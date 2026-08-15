@@ -221,7 +221,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 				<IdentityCard user={USER} owner={false} />
 				<ProfileTiles tiles={TILES} />
 				<PositionsTable payload={{ owner: false, rows: ROWS }} />
-				<ArgumentList items={ITEMS} owner={false} />
+				<ArgumentList items={ITEMS} owner={false} author={USER} />
 			</>,
 		);
 
@@ -381,7 +381,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// POLISH.5 item 5 (P5-D07) — canon §3 item 11's `Replies · N`, inline,
 		// count enlarged. N sums BOTH poles: every reply is a Support or a
 		// Counter bet (ADR-0017), so supportCount + counterCount IS the total.
-		render(<ArgumentList items={ITEMS} owner={false} />);
+		render(<ArgumentList items={ITEMS} owner={false} author={USER} />);
 
 		// A_POST is 2 support + 1 counter. THREE is the sum and equals NEITHER
 		// operand, so this cannot pass by rendering one of the halves.
@@ -402,7 +402,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("removed-stub-render", () => {
 		// Argument list: the removed post renders the stub variant only.
-		const list = render(<ArgumentList items={[A_REMOVED]} owner={false} />);
+		const list = render(
+			<ArgumentList items={[A_REMOVED]} owner={false} author={USER} />,
+		);
 		const stub = screen.getByTestId(`argument-removed-${C_REMOVED}`);
 		expect(stub.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(stub.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
@@ -452,7 +454,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 								: { owner: false, rows: ROWS }
 						}
 					/>
-					<ArgumentList items={ITEMS} owner={owner} />
+					<ArgumentList items={ITEMS} owner={owner} author={USER} />
 				</>,
 			);
 		const snapshot = (root: ParentNode) => ({
@@ -508,7 +510,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		b.unmount();
 
 		// Arguments — owner copy.
-		const c = render(<ArgumentList items={[]} owner={true} />);
+		const c = render(<ArgumentList items={[]} owner={true} author={USER} />);
 		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(text(screen.getByTestId("arguments-empty"))).toBe(
 			PROFILE_COPY.empty.argumentsOwner,
@@ -516,7 +518,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		c.unmount();
 
 		// Arguments — visitor copy.
-		render(<ArgumentList items={[]} owner={false} />);
+		render(<ArgumentList items={[]} owner={false} author={USER} />);
 		expect(text(screen.getByTestId("arguments-empty"))).toBe(
 			PROFILE_COPY.empty.argumentsVisitor,
 		);
@@ -560,7 +562,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("positions-empty").tagName).toBe("H2");
 		positions.unmount();
 
-		render(<ArgumentList items={[]} owner={true} />);
+		render(<ArgumentList items={[]} owner={true} author={USER} />);
 		const argumentsPanel = panelOf("arguments-empty");
 		const argumentsClass = argumentsPanel.getAttribute("class") ?? "";
 		expect(argumentsClass).toContain("[border:var(--hairline)]");

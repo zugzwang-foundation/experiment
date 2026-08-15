@@ -3,9 +3,11 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ArgumentList } from "@/components/profile/ArgumentList";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PositionsTable } from "@/components/profile/PositionsTable";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
+import type { ProfileArgumentItem } from "@/server/profile/arguments";
 import type { ProfilePositionRow } from "@/server/profile/positions";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
@@ -102,6 +104,222 @@ function cellsOf(marketId: string): HTMLTableCellElement[] {
 	const row = screen.getByTestId(`position-row-${marketId}`);
 	return [...row.querySelectorAll("td")];
 }
+
+describe("HTML-FINISH profile rows 4 · 5 · 12 — the argument card", () => {
+	const AGGREGATE = {
+		supportCount: 3,
+		counterCount: 1,
+		supportDharma: "300.000000000000000000",
+		counterDharma: "100.000000000000000000",
+	};
+
+	const POST: ProfileArgumentItem = {
+		removed: false,
+		kind: "post",
+		id: "0190b3a0-9999-7000-8000-00000000000c",
+		side: "YES",
+		marketSlug: "fixture-alpha",
+		marketTitle: "Market fixture-alpha",
+		ordinal: 4,
+		title: "A profile argument",
+		teaser: "Neutral fixture teaser.",
+		body: "A profile argument\n\nNeutral fixture body.",
+		marker: "none",
+		authorStake: "50.000000000000000000",
+		priceAtBet: "0.270000000000000000",
+		createdAt: "2026-07-01T00:00:00.000Z",
+		aggregate: AGGREGATE,
+	};
+
+	/**
+	 * The card's head row — the first element child of the first card.
+	 *
+	 * ⚠ NOT `querySelector('[data-testid^="argument-"]')`. That prefix ALSO
+	 * matches the LIST wrapper (`data-testid="argument-list"`), so it returned
+	 * the list, and `firstElementChild` returned the CARD rather than the head
+	 * row. The order guard below still passed on that — `head.querySelector` is
+	 * a descendant search and `indexOf` compares against the real parent — while
+	 * the separator guard, which reads the head's OWN children, correctly went
+	 * RED. Recorded because a prefix selector silently widening its match is
+	 * exactly the class of defect these guards exist to catch, and this one was
+	 * in the guard.
+	 */
+	function headOf(container: HTMLElement): Element {
+		const card = container.querySelector(
+			'[data-testid="argument-list"]',
+		)?.firstElementChild;
+		const head = card?.firstElementChild;
+		if (head == null) {
+			throw new Error("the argument card rendered no head row");
+		}
+		return head;
+	}
+
+	it("row4::the-head-carries-avatar-pseudonym-chip-marker-and-stake-IN-ORDER", () => {
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		const head = headOf(container);
+		// Canon §3 item 11: "head = avatar · name | SIDE @ entry% | stake …".
+		// ORDER, not mere presence — the pre-change head already contained the
+		// chip and the stake, so a presence-only guard passes on it.
+		const avatar = head.querySelector('[data-slot="avatar"]');
+		const pseudonym = head.querySelector('[data-testid="argument-author"]');
+		const chip = head.querySelector('[data-slot="badge"]');
+		const stake = head.querySelector('[data-testid^="argument-stake-"]');
+		if (avatar === null || pseudonym === null || chip === null) {
+			throw new Error("row4: the head cluster is missing a part");
+		}
+		expect(pseudonym.textContent).toBe(USER.pseudonym);
+		expect(indexOf(avatar)).toBeLessThan(indexOf(pseudonym));
+		expect(indexOf(pseudonym)).toBeLessThan(indexOf(chip));
+		expect(stake).not.toBeNull();
+		if (stake !== null) {
+			expect(indexOf(chip)).toBeLessThan(indexOf(stake));
+		}
+	});
+
+	it("row4::the-vsep-separators-are-present-and-byte-exact", () => {
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		const head = headOf(container);
+		const seps = [...head.children].filter((c) => c.textContent === "|");
+		// Canon §3 item 11 writes THREE seam points on a post head:
+		// `avatar · name | SIDE @ entry% | stake | Replies · N`.
+		expect(seps.length).toBe(3);
+		// ⛔ The glyph is U+007C, plain ASCII — not U+2502 or any box-drawing
+		// lookalike. Asserted by CODE POINT so a visually identical substitute
+		// reddens.
+		for (const sep of seps) {
+			expect(sep.textContent?.codePointAt(0)).toBe(0x7c);
+		}
+	});
+
+	it("row4::the-removed-variant-carries-the-permitted-SUBSET-and-no-body", () => {
+		const removed: ProfileArgumentItem = {
+			removed: true,
+			kind: "post",
+			id: "0190b3a0-9999-7000-8000-00000000000d",
+			side: "NO",
+			marketSlug: "fixture-alpha",
+			marketTitle: "Market fixture-alpha",
+			ordinal: 5,
+			createdAt: "2026-07-01T00:00:00.000Z",
+			aggregate: AGGREGATE,
+		};
+		const { container } = render(
+			<ArgumentList items={[removed]} owner={false} author={USER} />,
+		);
+		const head = headOf(container);
+		expect(head.querySelector('[data-slot="avatar"]')).not.toBeNull();
+		expect(head.querySelector('[data-slot="badge"]')).not.toBeNull();
+		// SC-1 — assert the BODY's absence, not the row's. The removed union
+		// variant carries no body/teaser/title field at all, so this is the
+		// compile-level guarantee restated at the render.
+		expect(container.innerHTML).not.toContain("Neutral fixture body");
+		expect(container.innerHTML).not.toContain("A profile argument");
+	});
+
+	it("row12::Replies-N-is-in-the-HEAD-not-in-a-footer", () => {
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		const head = headOf(container);
+		const replies = container.querySelector(
+			'[data-testid^="argument-replies-"]',
+		);
+		if (replies === null) {
+			throw new Error("row12: no reply count rendered");
+		}
+		expect(
+			head.contains(replies),
+			`row 12: \`Replies · N\` is not inside the head cluster — it is still ` +
+				`in the footer text line.`,
+		).toBe(true);
+		// The count is still the sum of both poles (every reply IS a Support or
+		// Counter bet — ADR-0017), so the MOVE changed no number.
+		expect(replies.textContent).toBe("4");
+	});
+
+	it("row5::the-footer-running-text-is-GONE-and-a-split-bar-replaces-it", () => {
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-split-bar-"]'),
+		).not.toBeNull();
+		// The pre-change footer read `· Support 3 : Đ … · Counter 1 : Đ …`. Its
+		// distinctive `N : Đ` grammar must be gone, or the bar was ADDED beside
+		// the text rather than replacing it.
+		expect(container.textContent ?? "").not.toMatch(/Support \d+ : Đ/);
+		expect(container.textContent ?? "").not.toMatch(/Counter \d+ : Đ/);
+	});
+
+	it("row5::text-is-never-inside-the-bar-and-the-bar-is-display-only", () => {
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		const bar = container.querySelector('[data-testid^="argument-split-bar-"]');
+		if (bar === null) {
+			throw new Error("row5: no split bar rendered");
+		}
+		// design-language §3.2: "label — bar — label, text never inside the bar."
+		const track = bar.querySelector('[aria-hidden="true"]');
+		expect(track?.textContent).toBe("");
+		// ⚠ DISPLAY-ONLY IS AN INVARIANT, not a style choice: Support and Counter
+		// are read-time AGGREGATES over reply-bets (ADR-0017/0018); there is no
+		// standalone friendly-fire vote and `friendly_fire_events` was dropped at
+		// DEBATE.9. A control here would imply one exists.
+		expect(bar.querySelectorAll("button").length).toBe(0);
+		expect(bar.querySelectorAll("a").length).toBe(0);
+		expect(bar.querySelectorAll("input").length).toBe(0);
+	});
+
+	it("row5::the-staked-total-is-the-DISPLAYED-sum-of-the-DISPLAYED-parts", () => {
+		// SPEC.1 §10.8 names "the reply split bar's staked total" as one of the
+		// TWO displayed-space aggregate identities: displayed total = displayed
+		// Support + displayed Counter, so the visible arithmetic is always true.
+		const { container } = render(
+			<ArgumentList items={[POST]} owner={false} author={USER} />,
+		);
+		const bar = container.querySelector('[data-testid^="argument-split-bar-"]');
+		const total = bar?.querySelector("b");
+		expect(total?.textContent).toBe("Đ 400");
+		// And `.stkn` — canon §3 item 11's "enlarged + ink".
+		const classes = (total?.className ?? "").split(/\s+/);
+		expect(classes).toContain("text-ink");
+	});
+
+	it("row5::the-reply-variant-gets-NO-split-bar", () => {
+		// A reply has no Support/Counter aggregate of its own — the union carries
+		// none, so this is structural. Asserted because a bar rendered on a reply
+		// would be inventing an aggregate.
+		const reply: ProfileArgumentItem = {
+			removed: false,
+			kind: "reply",
+			id: "0190b3a0-9999-7000-8000-00000000000e",
+			side: "NO",
+			marketSlug: "fixture-alpha",
+			marketTitle: "Market fixture-alpha",
+			ordinal: 4,
+			title: "A profile reply",
+			teaser: "Neutral fixture teaser.",
+			body: "A profile reply\n\nNeutral fixture body.",
+			marker: "none",
+			stake: "6.000000000000000000",
+			priceAtBet: "0.270000000000000000",
+			repliedToTitle: "A parent argument",
+			createdAt: "2026-07-01T00:00:00.000Z",
+		};
+		const { container } = render(
+			<ArgumentList items={[reply]} owner={false} author={USER} />,
+		);
+		expect(
+			container.querySelector('[data-testid^="argument-split-bar-"]'),
+		).toBeNull();
+	});
+});
 
 describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", () => {
 	it("row15::value-node-precedes-label-node-in-every-tile", () => {

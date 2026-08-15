@@ -92,7 +92,12 @@ export default async function ProfilePage({
 				payload={positionsPayload}
 				initialMarketSlug={initialMarketSlug}
 			/>
-			<ArgumentList items={argumentItems} owner={owner} />
+			{/* HTML-FINISH row 4 — the head cluster's identity. Every argument in
+			    this list is authored by the profile user, so the avatar and
+			    pseudonym come from the ALREADY-RESOLVED `profileUser` rather than
+			    from a per-item field: `loadProfileArguments` is untouched and no
+			    new read is issued. */}
+			<ArgumentList items={argumentItems} owner={owner} author={profileUser} />
 		</PageContainer>
 	);
 }
