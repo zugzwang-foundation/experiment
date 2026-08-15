@@ -112,25 +112,6 @@ export function PostCard({
 				>
 					<Plus /> Full
 				</Button>
-				{/* Write triggers render present-but-disabled (C1 / §7) — no handlers. */}
-				<Button
-					variant="outline"
-					size="xs"
-					disabled
-					aria-disabled="true"
-					aria-label="Đ BET — sign in to bet"
-				>
-					Đ BET
-				</Button>
-				<Button
-					variant="outline"
-					size="xs"
-					disabled
-					aria-disabled="true"
-					aria-label="Reply — sign in to argue"
-				>
-					Support / Counter
-				</Button>
 			</div>
 
 			<AggregateFooter
