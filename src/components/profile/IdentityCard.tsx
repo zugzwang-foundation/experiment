@@ -4,8 +4,10 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import type { ProfileUser } from "@/server/profile/resolve";
+import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
 import { PROFILE_COPY } from "./copy";
+import { ProfileTiles } from "./ProfileTiles";
 
 /**
  * The profile identity band (SPEC.1 §23) — PFP + pseudonym + the owner/visitor
@@ -23,9 +25,17 @@ import { PROFILE_COPY } from "./copy";
 export function IdentityCard({
 	user,
 	owner,
+	tiles,
 }: {
 	user: ProfileUser;
 	owner: boolean;
+	/**
+	 * HTML-FINISH row 8 — the six account tiles now live INSIDE this block
+	 * (mockup `:437`: `.idcol` is `[.unamerow][.tiles]`), so the card owns them
+	 * rather than standing beside them as a sibling band. Required, not optional
+	 * (O-1): an optional `tiles` would let a call site silently drop the band.
+	 */
+	tiles: ProfileTilesData;
 }): React.JSX.Element {
 	const scrubbed = user.pseudonym.startsWith("[");
 
@@ -74,15 +84,25 @@ export function IdentityCard({
 				height={56}
 				className="aspect-square h-full min-h-14 w-auto shrink-0 rounded-[var(--imgr)] bg-n1 object-cover"
 			/>
-			<div className="flex flex-col gap-1">
-				<div className="flex items-center gap-2">
-					<span
-						data-testid="identity-pseudonym"
-						className="font-medium text-ink"
-					>
-						{user.pseudonym}
-					</span>
-					{/* PB-1 (item 17) — the headzone bookmark icon, OWNER-ONLY by the
+			{/* HTML-FINISH row 8 — `.idcol` (mockup `:194`, `:437`): the identity
+			    COLUMN, holding the pseudonym row and — new — the six tiles beneath
+			    it. `min-w-0` and `flex-1` are the mockup's `min-width:0; flex:1 1
+			    auto` (`:194`), i.e. topology; they are what lets the tile grid take
+			    the band's remaining width instead of overflowing it.
+			    `gap-3` is `ProfileTiles.tsx`'s OWN grid gap, reused here rather
+			    than the mockup's `.idcol{gap:12px}` — same-file trace, not a
+			    prototype value. The existing pseudonym/chip pair keeps its `gap-1`
+			    exactly, in its own nested column, so nothing inside it moves. */}
+			<div className="flex min-w-0 flex-1 flex-col gap-3">
+				<div className="flex flex-col gap-1">
+					<div className="flex items-center gap-2">
+						<span
+							data-testid="identity-pseudonym"
+							className="font-medium text-ink"
+						>
+							{user.pseudonym}
+						</span>
+						{/* PB-1 (item 17) — the headzone bookmark icon, OWNER-ONLY by the
 					    founder ruling of 2026-07-31: it is navigation to the viewer's
 					    OWN saved set, so a visitor never sees it. Before this, the
 					    `/bookmarks` route was live, auth-gated and ORPHANED from the
@@ -95,31 +115,33 @@ export function IdentityCard({
 					    left-pack against this block rather than float right.
 					    Icon + `aria-label`, no visible text — `surface.test.tsx:303`
 					    asserts the whole identity-card subtree contains no "@". */}
-					{owner && (
-						<Link
-							href="/bookmarks"
-							aria-label="Bookmarks"
-							className="text-n5 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
-						>
-							<Bookmark className="size-4" />
-						</Link>
-					)}
-				</div>
-				<div className="flex flex-wrap items-center gap-2">
-					<Badge data-testid="profile-chip" variant="secondary">
-						{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
-					</Badge>
-					{user.banned && (
-						<Badge data-testid="identity-banned" variant="destructive">
-							Banned
+						{owner && (
+							<Link
+								href="/bookmarks"
+								aria-label="Bookmarks"
+								className="text-n5 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+							>
+								<Bookmark className="size-4" />
+							</Link>
+						)}
+					</div>
+					<div className="flex flex-wrap items-center gap-2">
+						<Badge data-testid="profile-chip" variant="secondary">
+							{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
 						</Badge>
-					)}
-					{scrubbed && (
-						<Badge data-testid="identity-scrubbed" variant="outline">
-							Scrubbed
-						</Badge>
-					)}
+						{user.banned && (
+							<Badge data-testid="identity-banned" variant="destructive">
+								Banned
+							</Badge>
+						)}
+						{scrubbed && (
+							<Badge data-testid="identity-scrubbed" variant="outline">
+								Scrubbed
+							</Badge>
+						)}
+					</div>
 				</div>
+				<ProfileTiles tiles={tiles} />
 			</div>
 		</Card>
 	);

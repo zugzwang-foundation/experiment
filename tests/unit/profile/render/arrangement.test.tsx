@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -609,7 +612,7 @@ describe("HTML-FINISH profile row 16 — the PFP fills the band as a square", ()
 	 * (`discovery-height-chain.test.ts:19-24` states the same limit).
 	 */
 	it("row16::pfp-is-height-driven-and-ratio-derived", () => {
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		const card = screen.getByTestId("identity-card");
 		const pfp = card.querySelector("img");
 		if (pfp === null) {
@@ -639,7 +642,7 @@ describe("HTML-FINISH profile row 16 — the PFP fills the band as a square", ()
 		// hint rather than an author rule, so a future reader must not "clean up"
 		// the attributes on the theory that the CSS replaced them. They are the
 		// pre-load ratio hint that keeps the identity band from shifting.
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		const pfp = screen.getByTestId("identity-card").querySelector("img");
 		expect(pfp?.getAttribute("width")).toBe("56");
 		expect(pfp?.getAttribute("height")).toBe("56");
@@ -652,6 +655,91 @@ describe("HTML-FINISH profile row 16 — the PFP fills the band as a square", ()
 		expect(before).not.toContain("aspect-square");
 		expect(before).not.toContain("w-auto");
 		expect(before).toContain("size-14");
+	});
+});
+
+describe("HTML-FINISH profile rows 1 · 8 — the two-band frame", () => {
+	const ROOT = process.cwd();
+	const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
+	const page = () => readFileSync(join(ROOT, PAGE), "utf8");
+
+	/**
+	 * ⚠ A SOURCE SCAN, AND THE LIMIT IS STATED. The page is an ASYNC RSC that
+	 * awaits `resolveProfileUser`, `auth.api.getSession` and four read models,
+	 * so it cannot be rendered under jsdom without mocking the whole server
+	 * layer — and a render whose every input is mocked proves the mock's shape,
+	 * not the page's. `discovery-height-chain.test.ts` reads its two shipped
+	 * files the same way for the same reason. What the scan CANNOT see is
+	 * resolved geometry; that is measured in a browser (§7).
+	 */
+	it("row1::the-page-composes-TWO-BANDS-not-five-stacked-siblings", () => {
+		const src = page();
+		expect(src).toContain('data-testid="profile-headzone"');
+		expect(src).toContain('data-testid="profile-arena"');
+		// Each band is a two-column grid above the `md` breakpoint. Canon §2:
+		// "Two bands. Top: identity card … + the graph slot. Bottom 'arena':
+		// Positions table … + the argument [list]".
+		const headzone = /profile-headzone"\s+className="([^"]*)"/.exec(src)?.[1];
+		const arena = /profile-arena"\s+className="([^"]*)"/.exec(src)?.[1];
+		for (const [name, cls] of [
+			["headzone", headzone],
+			["arena", arena],
+		] as const) {
+			if (cls === undefined) {
+				throw new Error(`row1: the ${name} band has no literal className`);
+			}
+			expect(cls.split(/\s+/), `row 1: ${name} is not a grid`).toContain(
+				"grid",
+			);
+			expect(
+				cls.split(/\s+/),
+				`row 1: ${name} is not two columns above md`,
+			).toContain("md:grid-cols-2");
+		}
+	});
+
+	it("row1::the-five-siblings-are-GONE-from-the-container", () => {
+		// The pre-change page mounted IdentityCard · ProfileTiles · ProfileGraph ·
+		// PositionsTable · ArgumentList as five direct children of one container.
+		// Two of those mounts must no longer exist at all: `ProfileTiles` moved
+		// INSIDE IdentityCard (row 8), so the page must not import or mount it.
+		const src = page();
+		expect(
+			src,
+			`row 8: the page still mounts <ProfileTiles> directly — the tiles were ` +
+				`COPIED into the identity card rather than MOVED.`,
+		).not.toContain("<ProfileTiles");
+		expect(src).not.toContain('from "@/components/profile/ProfileTiles"');
+	});
+
+	it("row8::the-tile-band-renders-INSIDE-the-identity-card", () => {
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
+		const card = screen.getByTestId("identity-card");
+		const tiles = screen.getByTestId("profile-tiles");
+		expect(
+			card.contains(tiles),
+			`row 8: the tiles are not inside the identity card.`,
+		).toBe(true);
+		// …and specifically UNDER the pseudonym row, in the identity COLUMN — the
+		// mockup's `.idcol` is `[.unamerow][.tiles]` (`:437`), so the tiles are a
+		// SIBLING of the name block, not a child of it and not a sibling of the
+		// PFP.
+		const pseudonym = screen.getByTestId("identity-pseudonym");
+		const nameBlock = tiles.previousElementSibling;
+		expect(nameBlock).not.toBeNull();
+		expect(nameBlock?.contains(pseudonym)).toBe(true);
+	});
+
+	it("row8::the-PFP-is-not-a-sibling-of-the-tiles", () => {
+		// The PFP stays the identity BAND's first child; the column beside it
+		// holds the name block and the tiles. If the tiles landed beside the PFP
+		// the band would be three columns, not two.
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
+		const card = screen.getByTestId("identity-card");
+		const img = card.querySelector("img");
+		const tiles = screen.getByTestId("profile-tiles");
+		expect(img?.parentElement).toBe(card);
+		expect(tiles.parentElement).not.toBe(card);
 	});
 });
 

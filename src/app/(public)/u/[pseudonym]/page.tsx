@@ -5,7 +5,6 @@ import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PositionsTable } from "@/components/profile/PositionsTable";
-import { ProfileTiles } from "@/components/profile/ProfileTiles";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
@@ -84,20 +83,61 @@ export default async function ProfilePage({
 	const initialMarketSlug = typeof market === "string" ? market : undefined;
 
 	return (
+		/* ⛔ THE CONTAINER TAG IS FROZEN — preset AND className. `tests/unit/shell/
+		   page-container.test.ts` site 5 (`:79-82`) pins this call site's RESOLVED
+		   class set to `mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6`
+		   and asserts equality, and its `BOX_AXES` (`:40`) additionally forbids a
+		   `max-w-*` on the className. So HTML-FINISH row 20 (the wide preset) is
+		   HALTED: both routes to it cross a guard outside this task's write
+		   allow-list. The two bands below therefore compose INSIDE the 3xl frame.
+		   ⚠ The same pin blocks `flex-1` here, which is what recon §4.1 calls
+		   "CHAIN ENDS HERE" — see the arena band's note. */
 		<PageContainer preset="reading" className="flex flex-col gap-6">
-			<IdentityCard user={profileUser} owner={owner} />
-			<ProfileTiles tiles={tiles} />
-			<ProfileGraph series={graph} />
-			<PositionsTable
-				payload={positionsPayload}
-				initialMarketSlug={initialMarketSlug}
-			/>
-			{/* HTML-FINISH row 4 — the head cluster's identity. Every argument in
-			    this list is authored by the profile user, so the avatar and
-			    pseudonym come from the ALREADY-RESOLVED `profileUser` rather than
-			    from a per-item field: `loadProfileArguments` is untouched and no
-			    new read is issued. */}
-			<ArgumentList items={argumentItems} owner={owner} author={profileUser} />
+			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
+			    five full-width sections stacked in one column. Canon §2 (Profile):
+			    "Two bands. Top: identity card … + six account tiles … + the graph
+			    slot. Bottom 'arena': Positions table … + the argument [list]".
+			    The mockup's `.headzone` and `.arena` are both `grid-template-
+			    columns:1fr 1fr` (`:189`, `:221-222`).
+			    ⚠ `md:` IS THE BUILD'S BREAKPOINT, NOT THE MOCKUP'S. The mockup is a
+			    fixed-desktop prototype and declares no breakpoint at all (recon
+			    A.4), so it makes no responsive statement to diverge from. Below
+			    `md` the two columns stack — the same posture `HeroPanels.tsx:82`
+			    ships for Discovery's three-panel hero.
+			    `gap-6` is the gap ALREADY on this container's className for the
+			    same inter-section role; no new spacing value is introduced. */}
+			<div data-testid="profile-headzone" className="grid gap-6 md:grid-cols-2">
+				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
+				    the right of the PFP and under the pseudonym row (mockup `:437`:
+				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling
+				    band, so `IdentityCard` renders them and this file no longer
+				    mounts `ProfileTiles` directly. */}
+				<IdentityCard user={profileUser} owner={owner} tiles={tiles} />
+				<ProfileGraph series={graph} />
+			</div>
+			{/* The arena band. ⚠ NO `flex-1` — see the container note above: the
+			    growth that would let these panels divide the viewport's leftover
+			    height has to start at the container, and that node is pinned. The
+			    band is content-height, so row 3's panel-scoped scroll has no slack
+			    to divide. HALTED and reported, not approximated with a hand-derived
+			    `calc()` — that would rebuild the exact cross-file height coupling
+			    `discovery-height-chain.test.ts` exists to prevent. */}
+			<div data-testid="profile-arena" className="grid gap-6 md:grid-cols-2">
+				<PositionsTable
+					payload={positionsPayload}
+					initialMarketSlug={initialMarketSlug}
+				/>
+				{/* HTML-FINISH row 4 — the head cluster's identity. Every argument in
+				    this list is authored by the profile user, so the avatar and
+				    pseudonym come from the ALREADY-RESOLVED `profileUser` rather than
+				    from a per-item field: `loadProfileArguments` is untouched and no
+				    new read is issued. */}
+				<ArgumentList
+					items={argumentItems}
+					owner={owner}
+					author={profileUser}
+				/>
+			</div>
 		</PageContainer>
 	);
 }

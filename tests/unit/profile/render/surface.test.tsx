@@ -216,10 +216,16 @@ function testids(root: ParentNode, prefix: string): string[] {
 
 describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 	it("band-composition", () => {
+		// HTML-FINISH row 8 — the tiles are NO LONGER A SIBLING BAND. They render
+		// inside `IdentityCard` now, so mounting `<ProfileTiles>` here as well
+		// would put two `profile-tiles` nodes in the tree and `getByTestId` would
+		// throw. Dropping the standalone mount is the row's own consequence, not a
+		// relaxation: every assertion below still runs, and the tile lookup at
+		// `:238` now proves the tiles are REACHABLE THROUGH the identity card —
+		// a stronger statement than the sibling mount made.
 		render(
 			<>
-				<IdentityCard user={USER} owner={false} />
-				<ProfileTiles tiles={TILES} />
+				<IdentityCard user={USER} owner={false} tiles={TILES} />
 				<PositionsTable payload={{ owner: false, rows: ROWS }} />
 				<ArgumentList items={ITEMS} owner={false} author={USER} />
 			</>,
@@ -230,6 +236,12 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(screen.getByTestId("profile-tiles")).toBeTruthy();
 		expect(screen.getByTestId("positions-table")).toBeTruthy();
 		expect(screen.getByTestId("argument-list")).toBeTruthy();
+		// …and the tile band is INSIDE the identity band (row 8), not beside it.
+		expect(
+			screen
+				.getByTestId("identity-card")
+				.contains(screen.getByTestId("profile-tiles")),
+		).toBe(true);
 
 		// Identity: the pseudonym is rendered verbatim.
 		expect(text(screen.getByTestId("identity-pseudonym"))).toBe(USER.pseudonym);
@@ -304,17 +316,23 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 	it("banned-label", () => {
 		const banned = render(
-			<IdentityCard user={{ ...USER, banned: true }} owner={false} />,
+			<IdentityCard
+				user={{ ...USER, banned: true }}
+				owner={false}
+				tiles={TILES}
+			/>,
 		);
 		expect(screen.getByTestId("identity-banned")).toBeTruthy();
 		banned.unmount();
 
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(screen.queryByTestId("identity-banned")).toBeNull();
 	});
 
 	it("scrubbed-silhouette-and-zero-pii", () => {
-		const scrubbed = render(<IdentityCard user={SCRUBBED} owner={false} />);
+		const scrubbed = render(
+			<IdentityCard user={SCRUBBED} owner={false} tiles={TILES} />,
+		);
 		const card = screen.getByTestId("identity-card");
 
 		// The scrub marker renders for a placeholder pseudonym.
@@ -333,7 +351,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		scrubbed.unmount();
 
 		// Control: a non-scrubbed pseudonym renders NO scrub marker.
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(screen.queryByTestId("identity-scrubbed")).toBeNull();
 	});
 
@@ -355,7 +373,9 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// ⚠ TWO ARMS OR IT IS VACUOUS (V-2). An owner-only affordance asserted
 		// only on the owner arm passes identically on a control that is ALWAYS
 		// visible, so the negative arm is what gives the positive one meaning.
-		const asOwner = render(<IdentityCard user={USER} owner={true} />);
+		const asOwner = render(
+			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		);
 		const card = screen.getByTestId("identity-card");
 		const link = card.querySelector('a[href="/bookmarks"]');
 		expect(link).not.toBeNull();
@@ -371,7 +391,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		asOwner.unmount();
 
 		// The negative arm: a visitor gets NO link at all.
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(
 			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
 		).toBeNull();
@@ -482,12 +502,14 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// The FIRST of the identity card's two owner deltas: the view chip. The
 		// second — item 17's bookmark link — has its own two-armed guard above
 		// (`owner-only-bookmark-affordance-on-the-identity-card`).
-		const ownerCard = render(<IdentityCard user={USER} owner={true} />);
+		const ownerCard = render(
+			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.owner,
 		);
 		ownerCard.unmount();
-		render(<IdentityCard user={USER} owner={false} />);
+		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.visitor,
 		);
