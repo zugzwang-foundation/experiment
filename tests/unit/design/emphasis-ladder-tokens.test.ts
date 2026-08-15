@@ -41,7 +41,14 @@ const RUNG_2_LITERAL = "1px solid var(--color-n3)";
 const RUNG_3_LITERAL = "1.5px solid var(--color-n4)";
 
 /** Every consumer of the ladder, with the Tailwind arbitrary property it uses.
- * Re-measured at this commit's head: 3 rung-2 sites in one file, 1 rung-3. */
+ * Re-measured at this commit's head: 3 rung-2 sites in one file, 1 rung-3 — plus
+ * ONE DELIBERATE ZERO-COUNT ENTRY (`DiscoveryGrid.tsx`), see below.
+ *
+ * ⚠ A FILE MAY BE LISTED WITH `count: 0`, AND THAT IS A REAL ASSERTION, NOT A
+ * PLACEHOLDER. `occurrences()` is `split(needle).length - 1`, which returns 0
+ * for an absent needle, so `toBe(0)` pins the token's ABSENCE from that file
+ * exactly as `toBe(1)` pins its presence in another. Verified against the
+ * assertion code before this entry was written, not assumed. */
 const CONSUMERS = [
 	{
 		file: "src/components/discovery/HeroPanels.tsx",
@@ -50,18 +57,52 @@ const CONSUMERS = [
 		count: 3,
 	},
 	{
-		file: "src/components/discovery/DiscoveryGrid.tsx",
+		// ⚠ RE-POINTED AT HTML-FINISH row 4, and it is a CENSUS UPDATE, NOT A
+		// WEAKENING. Row 4 removed the `grid-ring` wrapper `<div>` that used to
+		// carry the active outline and moved the ring onto the tile's own root,
+		// so the token string left `DiscoveryGrid.tsx` and arrived in
+		// `MarketCard.tsx`. This block is built to be re-measured — see the
+		// "Re-measured at this commit's head" note above it — and every
+		// assertion over it is untouched: still an EXACT count of 1, still
+		// `not.toContain` the literal, and the whole-tree
+		// `the-literals-survive-nowhere-in-src` scan below is unchanged and
+		// still reaches the new file. Leaving the old name here would have
+		// reddened the guard for a bookkeeping reason while the invariant it
+		// exists for held perfectly.
+		file: "src/components/discovery/MarketCard.tsx",
 		token: "[outline:var(--ring-active)]",
 		literal: "[outline:1.5px_solid_var(--color-n4)]",
 		count: 1,
+	},
+	{
+		// ⚠ ZERO-COUNT ENTRY — Gate C finding M-1, and it closes a real hole.
+		// When HTML-FINISH row 4 moved the ring onto the tile, this file was
+		// simply DROPPED from CONSUMERS. That silently retired the only
+		// assertion that had ever looked at it: this suite asserts
+		// PER-LISTED-FILE, so an unlisted file is unexamined, and a re-added
+		// `[outline:var(--ring-active)]` in `DiscoveryGrid.tsx` would have
+		// passed. The whole-tree scan below does NOT cover it — that scan bans
+		// the raw LITERAL, never the token.
+		//
+		// Keeping the file listed at `count: 0` restores the examination and
+		// states the post-row-4 fact positively: the grid owns the layout, the
+		// TILE owns the ring, and the ring token must not reappear here.
+		file: "src/components/discovery/DiscoveryGrid.tsx",
+		token: "[outline:var(--ring-active)]",
+		literal: "[outline:1.5px_solid_var(--color-n4)]",
+		count: 0,
 	},
 ];
 
 const occurrences = (haystack: string, needle: string) =>
 	haystack.split(needle).length - 1;
 
-/** The two literal forms the tokens replaced, as they appear in a className. */
-const LADDER_LITERALS = CONSUMERS.map(({ literal }) => literal);
+/** The two literal forms the tokens replaced, as they appear in a className.
+ * De-duplicated: two CONSUMERS entries now share the rung-3 literal (the
+ * `count: 1` tile and the `count: 0` grid), and a duplicate would report the
+ * same `file :: literal` twice in the whole-tree scan's failure message. The
+ * SET of literals scanned for is unchanged. */
+const LADDER_LITERALS = [...new Set(CONSUMERS.map(({ literal }) => literal))];
 
 /**
  * Every `.ts`/`.tsx` under `src/` — the shape already used by

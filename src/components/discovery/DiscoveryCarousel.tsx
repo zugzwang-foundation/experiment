@@ -98,14 +98,21 @@ export function DiscoveryCarousel({
 		// V4 — the mockup's rhythm is hero → 9px → an 18px dot rail → 8px →
 		// grid (`.sliderwrap{margin:9px 0 8px}`, :138-139), not a uniform stack
 		// gap. The rail owns its own margins so the two gaps can differ.
-		<div data-testid="discovery-carousel" className="flex flex-col">
+		//
+		// HTML-FINISH row 8 — `flex-1` so this column takes the height the page
+		// now hands down and distributes it among hero / rail / grid below.
+		<div data-testid="discovery-carousel" className="flex flex-1 flex-col">
 			<HeroPanels
 				card={view.card}
 				series={view.series}
 				topPosts={view.topPosts}
 			/>
 
-			<div className="mt-[9px] mb-2 flex h-[18px] items-center justify-center gap-[7px]">
+			{/* HTML-FINISH row 8 — the rail is FIXED height and takes no share of
+			    the slack: the mockup's `.sliderwrap` is `flex:0 0 18px` (`:139`).
+			    The 18px was already shipped; `flex-none` is what makes it refuse
+			    to grow now that there is slack to be had. */}
+			<div className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px]">
 				{n > 1 && (
 					<button
 						type="button"

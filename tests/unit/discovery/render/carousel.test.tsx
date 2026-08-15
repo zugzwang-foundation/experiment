@@ -137,15 +137,23 @@ function expectActive(index: number): void {
 	expect(activeCards).toHaveLength(1);
 	expect(cards.indexOf(activeCards[0])).toBe(index);
 
-	// The ring VISUAL (code-review HIGH fold): exactly one grid-ring wrapper
-	// is active and carries an outline class — the state attr alone is not a
-	// ring (canon §2: hero + posts + grid OUTLINE RING + dot move in sync).
-	const rings = screen.getAllByTestId("grid-ring");
-	const activeRings = rings.filter(
-		(r) => r.getAttribute("data-active") === "true",
-	);
-	expect(activeRings).toHaveLength(1);
-	expect(rings.indexOf(activeRings[0])).toBe(index);
+	// The ring VISUAL (code-review HIGH fold): exactly one card is active and
+	// carries an outline class — the state attr alone is not a ring (canon §2:
+	// hero + posts + grid OUTLINE RING + dot move in sync).
+	//
+	// ⚠ THE `grid-ring` TESTID IS RETIRED, NOT DROPPED — HTML-FINISH row 4.
+	// The ring used to hang on a wrapper `<div data-testid="grid-ring">` that
+	// the grid put around every tile; row 4 removed that wrapper and moved the
+	// ring onto the tile's own root, which already carries
+	// `data-testid="market-card"` (one element cannot hold two). Every
+	// guarantee the hook made is carried here verbatim — exactly one ringed
+	// element, at the active index, with an `outline` class, and no outline on
+	// any other — now asserted against the CARDS. It is strictly stronger than
+	// what it replaces: it proves the ring is on the tile itself, which is the
+	// thing row 4 exists to establish, where the old form could pass with the
+	// outline on a different box from the `data-active` attribute.
+	const rings = cards;
+	const activeRings = activeCards;
 	expect(activeRings[0].getAttribute("class") ?? "").toContain("outline");
 	for (const r of rings) {
 		if (r !== activeRings[0]) {
@@ -340,11 +348,19 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expect(screen.getByTestId("discovery-grid")).toBeTruthy();
 		expect(screen.getAllByTestId("market-card")).toHaveLength(3);
 		expect(screen.getAllByTestId("carousel-dot")).toHaveLength(3);
-		// Anchor census: n whole-card links + market 1's TWO hero-post
-		// deep-links + market 1's TWO hero-author profile links (UI.A5 A4
-		// follow-up #2); the hero market panel + side-empty panels carry ZERO.
-		// n=3 → 3 + 2 + 2 = 7.
-		expect(container.querySelectorAll("a")).toHaveLength(7);
+		// Anchor census: n whole-card links + THE HERO MARKET PANEL + market 1's
+		// TWO hero-post deep-links + market 1's TWO hero-author profile links
+		// (UI.A5 A4 follow-up #2); the side-empty panels carry ZERO.
+		// n=3 → 3 + 1 + 2 + 2 = 8.
+		//
+		// ⚠ 7 → 8 AT HTML-FINISH row 2. The hero market panel used to be a plain
+		// `<div>` — "the hero market panel + side-empty panels carry ZERO" was
+		// this line's own note. Row 2 makes the WHOLE panel open its market, the
+		// way the tiles already do (mockup `:399-401`, `:395`), so it is now an
+		// anchor and the census gains exactly one. The count is deliberately
+		// exact: it is what would catch a stray second anchor smuggled into any
+		// panel.
+		expect(container.querySelectorAll("a")).toHaveLength(8);
 	});
 
 	it("render::empty-views-render-nothing", () => {

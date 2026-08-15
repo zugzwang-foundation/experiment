@@ -98,7 +98,10 @@ function precedes(a: Element, b: Element): boolean {
 
 describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 	it("render::three-panels-in-order", () => {
-		renderHero({ yes: heroPost("YES"), no: heroPost("NO") });
+		const { container } = renderHero({
+			yes: heroPost("YES"),
+			no: heroPost("NO"),
+		});
 		expect(screen.getByTestId("hero-panels")).toBeTruthy();
 		// Two post panels, YES first, NO last (document order).
 		const posts = screen.getAllByTestId("hero-post");
@@ -122,6 +125,82 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		// that grouped. Inverted with market-card.test.tsx:65 (ruling R-K).
 		expect(statText).toContain("Đ 14,260 staked");
 		expect(screen.getByRole("img", { name: "YES 38%, NO 62%" })).toBeTruthy();
+
+		// HTML-FINISH row 2 — THE WHOLE MARKET PANEL IS THE LINK. The mockup
+		// binds its handler to `.mktpanel` itself (`:399-401`) and marks the whole
+		// panel `cursor:pointer` (`:395`). Asserted as containment, not as a
+		// title anchor: the panel's OWN element is the `<a>`, so the thumb, the
+		// heading, the stat line, the graph and the bar are all inside it.
+		const marketLink = container.querySelector(`a[href="/m/${SLUG}"]`);
+		if (!marketLink) {
+			throw new Error("expected the hero market panel to be a link");
+		}
+		expect(marketLink.contains(screen.getByText(MARKET_TITLE))).toBe(true);
+		expect(marketLink.contains(sparkline)).toBe(true);
+		expect(marketLink.contains(screen.getByTestId("stat-line"))).toBe(true);
+		// It is the market link, never a post deep-link.
+		expect(marketLink.getAttribute("href")).not.toContain("?post=");
+		// …and it does NOT swallow the post panels: anchors cannot nest, and a
+		// panel wrapped around the wrong subtree would show up here.
+		expect(marketLink.contains(yesPanel)).toBe(false);
+		expect(marketLink.contains(noPanel)).toBe(false);
+	});
+
+	it("render::html-finish-post-head-separators-and-quoted-argument", () => {
+		// HTML-FINISH rows 6 and 7, pinned at BOTH poles — a YES-only assertion
+		// passes against a NO panel that never received the change.
+		const { container } = renderHero({
+			yes: heroPost("YES"),
+			no: heroPost("NO"),
+		});
+
+		for (const side of ["YES", "NO"] as const) {
+			const panel = container.querySelector(
+				`[data-testid="hero-post"][data-side="${side}"]`,
+			);
+			if (!panel) {
+				throw new Error(`expected the ${side} hero post panel`);
+			}
+
+			// Row 6 — TWO separators per panel (mockup markup `:187`, `:189`),
+			// between the author name and the side chip, and between the chip and
+			// the stake figure. The head row is the panel's first child.
+			const head = panel.children[0];
+			const kids = Array.from(head.children);
+			const seps = kids.filter((el) => el.textContent === "|");
+			expect(seps).toHaveLength(2);
+			// Sibling ORDER is the point, so assert positions rather than a count
+			// alone: avatar · author · SEP · chip · SEP · stake.
+			const authorLink = head.querySelector(
+				`[data-testid="hero-author-link-${side}"]`,
+			);
+			if (!authorLink) {
+				throw new Error(`expected the ${side} author link`);
+			}
+			expect(kids.indexOf(seps[0])).toBe(kids.indexOf(authorLink) + 1);
+			expect(kids.indexOf(seps[1])).toBe(kids.indexOf(seps[0]) + 2);
+			// The glyph is the BYTE the mockup carries — U+007C, not U+2502 and
+			// not any box-drawing look-alike.
+			for (const sep of seps) {
+				expect(sep.textContent).toBe("|");
+			}
+
+			// Row 7 — the ARGUMENT TEXT is wrapped in the mockup's own straight
+			// ASCII quotes (U+0022, byte-carried from `:192`; the mockup's JS at
+			// `:455` builds the same pair).
+			const teaser = panel.querySelector("p");
+			if (!teaser) {
+				throw new Error(`expected the ${side} teaser paragraph`);
+			}
+			expect(teaser.textContent).toBe(`"${EXTENDED}"`);
+
+			// ⛔ AND THE HEADLINE IS NOT WRAPPED — row 3 is STRUCK, so the title
+			// keeps its shipped, unquoted form. This is the assertion that would
+			// catch row 7 being over-applied to the headline as well.
+			const headline = panel.querySelector("h3");
+			expect(headline?.textContent).toBe(TITLE);
+			expect(headline?.textContent?.startsWith('"')).toBe(false);
+		}
 	});
 
 	it("render::hero-post-deep-links-to-ordinal", () => {
