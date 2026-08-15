@@ -32,6 +32,10 @@
 | `bc8532e` | post-review remediation — `@code-reviewer` MEDIUM-1 + two `O-3` comments |
 | `9f86076` | **C13** — `RR-3`, the split bar's poles name the SIDE (row 15) · **ATTENDED** |
 | `5c389f0` | Gate C riders — `GC-14`, the plan's own `O-5`, the remount record |
+| `a34dd43` | post-review — the mockup claim was FALSE, plus the `O-5` and `O-8` sweeps |
+| `375dc2e` | C13's track gets the edge — `@security-auditor` MEDIUM |
+| `a072721` | log — C13's two reviewer passes |
+| *(this commit)* | **post-reboot resume** — the second reviewer pass's citation FAILs, the true tip receipt, and the `events`-residue defect |
 
 ## Decisions made
 
@@ -40,7 +44,7 @@
 3. **`R-3` condition (1) is checked, never assumed.** At C12 the guard was run with the new code and the OLD count; the failure landed on the census assertion with the offender predicate passing on the line above. Had offenders been non-empty, C12 would have been a second halt.
 4. **Reused `computeSplitBar` / `displaySplitTotal`** (read-only import from the deny-listed `composer/**`) rather than writing a second split-bar implementation.
 5. **Fixed HIGH-1 and MEDIUM-3 in-session** (§5.10 FAIL → fix before continuing; same-commit doctrine).
-6. **Did NOT amend the committed plan** for `GC-12`'s five-row correction, though `O-5` asks for it: the file is the ratified v1.4 *verbatim* and its md5 is stamped in C0's body. Routed to the next plan revision.
+6. ~~**Did NOT amend the committed plan** for `GC-12`'s five-row correction~~ — **REVERSED at `5c389f0`, and the reversal is the decision worth keeping.** The ground for deferring (the file must stay byte-identical to ratified v1.4 because C0's body stamps its md5) confused a **receipt** with a **lock**: C0's stamp records what landed *at C0*, that blob is fixed in history, and a later amending commit is ordinary history, not a falsified receipt. Deferring bought nothing and shipped `O-5`'s harm onto `main` — §12's schedule is the table an executor grades partial greens against, and it would have said FOUR, grading row 9's green at C5 as UNSCHEDULED, which is a HALT condition. Both sites (§7 `:310`, §12 `:564`) now read FIVE.
 7. **`role="group"` → labelled `<ul>/<li>`** at C7 after Biome's `useSemanticElements` rejected it. The rule was right; disabling it would have been an AGENTS.md §11 ask-first.
 8. **Discarded C11's first suite run** — another session's runner was live. Waited ~705 s, re-measured clean, committed on that.
 
@@ -78,17 +82,31 @@ than re-run and forgotten. The evidence that it is contention, not regression:
 a second time, the flake reading is retired and it is a defect.** That is the
 whole reason this paragraph exists.
 
-## The final local gate — full `pnpm vitest run` (§14)
+## The local gate — full `pnpm vitest run` (§14)
+
+⛔ **THIS SECTION'S ORIGINAL RECEIPT WAS STALE BY TWO COMMITS, AND THE HEADING SAID "FINAL".** `git log -S"FULL2_EXIT=0"` places it at **`a34dd43`** — after which **`375dc2e` changed `ReplySplitBar.tsx` (+21) AND both guard files** (`reply-split-bar` +17, `aggregate-footer` +14). A green measured before the last code commit is not a receipt for the tip; the heading claiming finality is what made it read as one. Retained below as history, superseded by the two runs beneath it.
 
 ```
-Test Files  336 passed | 1 skipped (337)
-     Tests  2983 passed | 1 skipped | 4 todo (2988)
-  FULL2_EXIT=0
+(a34dd43, superseded)  Test Files  336 passed | 1 skipped (337)
+                            Tests  2983 passed | 1 skipped | 4 todo (2988)
+                       FULL2_EXIT=0
 ```
 
-✅ **FULLY GREEN — every suite in the repository.** `reply-split-bar`'s red closed at C13, and no cross-suite regression from a PR touching shared components (`BookmarkToggle` / `CardActions`, `ArgProfile`, `ReplyCard`, and the `SideBadge` census that Profile and Bookmarks also feed).
+### The tip's own two runs (post-reboot, `a072721`)
 
-*(The run before this one was red on the unrelated `atomicity` flake recorded above; it was diagnosed, not re-rolled until green — the re-run is the receipt, the record above is the honesty.)*
+```
+run 1   Test Files  1 failed | 335 passed | 1 skipped (337)
+             Tests  1 failed | 2984 passed | 1 skipped | 4 todo (2990)
+        FULL_EXIT=1        ← tests/server/bets/events-idempotency.test.ts:259
+
+run 2   Test Files  336 passed | 1 skipped (337)
+             Tests  2985 passed | 1 skipped | 4 todo (2990)
+        FULL2_EXIT=0
+```
+
+⛔ **RUN 2's GREEN IS NOT THE RECEIPT, AND RECORDING IT AS ONE WOULD BE THE RE-ROLL THIS LOG ALREADY RULED AGAINST.** Same tip, same file set, opposite results — because **vitest's file order is non-deterministic between runs** (measured: runs 1 and 2 executed in completely different orders). The red is a real defect with a randomly-scheduled trigger, not a correct test failing randomly. Diagnosis below.
+
+⚠ **Environment, recorded because it is invisible afterwards:** the reboot took Docker down with it. The stack was restarted and **verified migrated before any gate ran** — 25 rows in `drizzle.__drizzle_migrations` (= `0000`–`0024`), `uuidv7()` present, 38 base tables. Without that check the suite would have produced a whole-DB false RED.
 
 ⚠ `FULL_EXIT` is read from the log, not from the shell's reported status: the run was `pnpm vitest run > log; echo FULL_EXIT=$? >> log`, and the harness reports the **trailing `echo`'s** exit, which is always 0. Gate commands never let another command own the exit (§14).
 
@@ -102,16 +120,55 @@ Also fixed there: **O-5 was not closed** (three in-fence sites still called the 
 
 Its **MEDIUM was a real miss of mine**: C13's corrected track had **no edge**, so on a NO post it sat at ~1.10:1 against its own card and vanished — trading an inversion for an erasure on the very post side the row fixes. My C13 body had dismissed the earlier `MEDIUM-3` as *"different bar, different commit"* — a **file** boundary where it was a **defect class**. Fixed at `375dc2e`, and **pinned in both guards**, which were positive-only and would have stayed green if either hairline were deleted.
 
+## ⛔ THE `events`-RESIDUE DEFECT — pre-existing on `main`, surfaced not absorbed
+
+**`tests/server/bets/events-idempotency.test.ts:259` — `AssertionError: expected 5 to be 3`.** Proven end to end rather than inferred:
+
+1. That assertion counts the **whole `events` table, unfiltered** — `.from(events)` with no `.where()` (`:257-258`) — and the file truncates in `afterEach`, **not** `beforeEach`. It is therefore only correct if `events` is empty when the file starts, i.e. it depends on whichever file ran before it.
+2. `tests/server/moderation/csam-seam.test.ts` ran immediately before it in run 1 (`fileParallelism: false`, so log order *is* execution order). Its 2 tests each call `recordGateBlock`, which writes a `moderation.blocked` row (`src/server/moderation/consequences.ts:164`, AUDIT-FIX-B5). Its `afterEach` truncates `["mod_actions","markets","users"]` — **`events` is missing** (`csam-seam.test.ts:50`).
+3. **Measured:** `csam-seam` alone against an empty table leaves **exactly 2 rows**, both `moderation.blocked`/`mod_action`.
+4. **Reproduced in isolation:** with those 2 rows present, the file fails alone with the identical `expected 5 to be 3`. 3 + 2 = 5. **Deterministic once the pairing occurs.**
+5. **Control:** with `events` empty, the same file passes 2/2. And in run 2 the preceding file was `sell-oversell.test.ts` (which *does* truncate `events`) — green.
+
+**Blast radius is one file, and the convention proves the intent.** Of the **10** test files that call `recordGateBlock`, **exactly one omits `"events"`** from its truncate list: `csam-seam.test.ts`. The other nine include it. And of the three unfiltered `.from(events)` reads in the repo, the other two (`viewer-context.integration`, `market-quote.integration`) are **before/after deltas** and are structurally immune. One leaking outlier meeting the one absolute whole-table count.
+
+**PR 2 cannot have caused it.** `git diff --stat origin/main..HEAD -- src/server/ src/db/ drizzle/ tests/server/ tests/integration/ tests/invariants/ tests/db/` is **EMPTY**; both implicated files and `consequences.ts` are byte-identical to `origin/main`.
+
+⛔ **NOT FIXED — the one-line fix (`"events"` into `csam-seam.test.ts:50`) is OUT of §8's allow-list, where an unlisted edit is a RUN-STOP.** Filed to `claude-progress.md` and raised for a founder ruling. Option (b), scoping `events-idempotency.test.ts:258` with a `.where()`, removes the whole-table dependency rather than just this instance — but is a larger edit to a critical-path test.
+
+⚠ **This also bears on the FLAKE SIGHTING recorded above.** That one was `atomicity.test.ts` with a 500-vs-200 signature, so it is not the same test and I am not claiming it is the same cause. But "a preceding file left state behind" is now a *demonstrated* mechanism in this suite, and it is a cheaper explanation than contention. The standing rule stands: a second `bet-place::every-persisted-comment-has-a-bet-referencing-it` red retires the flake reading.
+
+## The THIRD reviewer pass — post-reboot, on `375dc2e` (which the first pass never saw)
+
+The two passes recorded above ran on content **before `375dc2e`**, which is itself the remediation of the `@security-auditor` MEDIUM. Both were re-run on the tip.
+
+**`@security-auditor`** — CRITICAL none · HIGH none · MEDIUM none. `H-COMPOSER` does **not** fire, proven mechanically: with comments stripped and whitespace normalised, the entire non-comment delta vs `origin/main` is **two `className` attributes**. `TriggerPill` byte-identical by sha256. INV-3 unreachable — the reply's side is written at `src/server/bets/place.ts:145` from a zod-validated wire field inside the W-1 tx, and **Support/Counter is never stored**, so no client value can desync it. SC-1 clean **by construction**: `ReplyAggregate` is four scalars and the removed variant of `DebatePost` carries no body field at all.
+
+**`@code-reviewer`** — CRITICAL none, and the pole encoding, the fence and the hairline all verified correct. **HIGH-1: both rule citations backing the divergence note were wrong**, and I re-measured them myself before acting:
+- `design-language.md:268` is a **changelog entry**. The normative locked binding is **§1 "Binding resolved"** (`:62`); `:269` merely *records* the axis correction.
+- The poles sentence is **`AGENTS.md` §8** (`:222`), not `CLAUDE.md` §8 — which is O-space (`CLAUDE.md:237`).
+
+⇒ Graded HIGH by the note's own standard: it exists to stop a later fidelity pass reverting the fix off `d5:1248`, and a note whose two pointers do not resolve leaves the reader with `d5:1248` alone. **Fixed in-fence at both code sites** (`ReplySplitBar.tsx`, `reply-split-bar.test.tsx`), cited by SYMBOL per `O-8`, with the wrong pair named so it is not restored. The plan's copy (§9 A4, `:489`) is **surfaced, not overridden**.
+
+**MEDIUM-1, also fixed:** the comment cited `d5:511` for `border:1px solid var(--ink)`; it is on **`:510`** — and the sibling `AggregateFooter.tsx:95`, written in this same PR, already cited `:510` correctly. Two comments in one PR disagreeing on one coordinate.
+
 ## Open questions
 
 - **LOW-5 (`@code-reviewer`)** — does **T3** owe `d5`-exact typography, or consistency with the shipped `ReplySplitBar` it currently mirrors? Three divergences named in the halt record §10.
 - **C5's one unruled parameter** — the pop-up image's `max-h-[60vh]`. The plan rules that a height bound must exist; it names no value. Chosen so the image renders whole inside the 90vh dialog without pushing the body out of view.
-- **`O-5` on the committed plan** — §7 `:310` and §12 `:564` still say four rows for `post-popup`; `GC-12` ruled five.
+- ~~**`O-5` on the committed plan**~~ — **CLOSED at `5c389f0`.** Both sites now read FIVE.
 - **`ProfileGraphOverlay`** has no accessible summary either (same root cause as `PD-3-04`) — recorded at C12, out of fence, POLISH.5's.
+- ⛔ **THE `events`-RESIDUE DEFECT — needs a founder ruling, the fix is out of fence.** See the section below. Unruled, this PR's CI is a coin-flip on vitest's file order.
+- **The plan's §9 A4 (`:489`) still carries the wrong citation pair** (`design-language.md:268` / `CLAUDE.md §8`) corrected in the code this session. Surfaced, not overridden — the plan is the contract.
+- **The plan's §6 row 15 (`:278`) and §10's named exception (`:504`) still fence `ReplySplitBar.tsx:64,67`.** The spans are now `:120` / `:123-126`. `H-REKEY` makes a drifted anchor update-and-continue, not a halt — but this is `O-8` firing on the plan's own fence, in a row whose §8 entry literally reads *"Symbol-fenced to `:64,67`"*, which claims symbol-fencing while naming lines.
 
 ## Next session starts at
 
-**The founder's Gate C read on the completed PR.** Every row is landed and the branch is green; nothing is queued for an executor.
+**The founder's Gate C read on the completed PR.** Every row is landed and `just verify` is exit 0.
+
+⛔ **ONE RULING IS OWED BEFORE THE PR OPENS: the `events`-residue defect above.** It is pre-existing on `main` and out of §8's fence, so it was not fixed. Unruled, this PR's CI is a coin-flip on vitest's non-deterministic file order — and a green run is not evidence it is closed.
+
+⚠ **"The branch is green" is no longer a statement this log will make without qualification.** The tip measured RED then GREEN on two consecutive whole-suite runs with nothing changed between them.
 
 Three docket rows are **drafted and handed to web, deliberately uncommitted** (`docs/design/**` and the docket are off §8):
 1. **The canon SWEEP** (`R-4` / `GC-15`) — not two coordinates. `design-canon.md:67`, `:110` and a third the diff itself cites via `ReplyCard`'s new docstring ("Canon §6 named bookmark AND download on the reply card"). Grep every surface form and disposition every hit.
@@ -120,12 +177,15 @@ Three docket rows are **drafted and handed to web, deliberately uncommitted** (`
 
 ## Context to preserve
 
-- **Worktree:** `/Users/hrishikesh/code/zugzwang/wt-p3-pr2b`. No `.env.local`; `ZUGZWANG_ENV=preview` plus the `tests/_setup/env.ts` placeholder set is required or `next build` fails on `"unknown"`. ⛔ Never read or copy a real `.env*`.
+- **Worktree:** `/Users/hrishikesh/code/zugzwang/wt-p3-c13` ⚠ **(this log said `wt-p3-pr2b` until the post-reboot resume — the unpushed commits were never in that tree).** No `.env.local`; `ZUGZWANG_ENV=preview` **plus the full `tests/_setup/env.ts` placeholder set** is required or `next build` fails — and the first failure is **`DATABASE_URL is not set`**, not the `"unknown"` env message, which is the one this line used to name. ⛔ Never read or copy a real `.env*`.
+- ⚠ **After a reboot, Docker is DOWN and so is local Postgres.** `next build` does not need it, but every DB-backed suite does, and a bare run yields a whole-suite false RED. Start Docker Desktop (the Supabase stack auto-restarts), then **verify migrated before gating**: `select count(*) from drizzle.__drizzle_migrations` = 25 at `0024`.
 - **The §20 step-7 pair set is FIVE, not three** — `(C2,C8) · (C2,C9) · (C8,C9) · (C5,C6) · (C2,C10)`. The before-C8 checkpoint was **load-bearing**: the plan's row-1 fence had drifted to span two different buttons.
 - **A sixth writer relationship** the plan's own rule covers: the remediation commit also writes `AggregateFooter.tsx` and `dharma-spacing.test.tsx`, so the before-C10 re-key accounts for two earlier writers.
-- **`GC-12` is applied in code but not in the plan** — `post-popup.test.tsx` covers rows 9, 10, 11, 12, 14.
+- ~~**`GC-12` is applied in code but not in the plan**~~ — **applied in BOTH since `5c389f0`.** `post-popup.test.tsx` covers rows 9, 10, 11, 12, 14.
 - **`R-3` widened exactly two design guards** — `side-pole-binding.test.ts` (index 0) and `pct-round-render.test.ts` (3 → **5**, not 4). Any *other* design-guard reddening is still a HALT.
-- Diff deliverables: `~/Downloads/POLISH-3-PR-2-DIFF.md` (halted run) and `~/Downloads/POLISH-3-PR-2-DIFF-2.md` (this run).
+- Diff deliverables: `~/Downloads/POLISH-3-PR-2-DIFF.md` (halted run), `-DIFF-2.md` (C1…C12), `-DIFF-3.md` (this tip).
+- **The census is unmoved by the three open out-of-track PRs.** `#338` (`htmlfinish/bookmarks-parity`) and `#337` (`htmlfinish/profile-parity`) touch **zero** §8 allow-list paths, and both measure **13 `<SideBadge>` / 8 unsized** — identical to `origin/main`. This branch's 14 / 9 is C6's re-key and nothing else. ⚠ But `#338` **edits `docs/design/design-canon.md`**, which is exactly `R-4`'s canon-sweep target (`:67`, `:110`) — if it lands first, the drafted docket row's coordinates drift and must be re-measured, not carried.
+- **`R-4`'s sweep is far wider than the drafted row's three coordinates: 48 hits for `download` across `docs/design/**`.** They are not one class — `design-canon.md` `:49/:67/:110/:125/:173` and the values-log `:194` are the removed cluster icon, while the `DESIGN_W2_13` close-out and its mockup are the *share-card download*, a different live feature. Every hit needs dispositioning; a blanket sweep would delete a real one.
 
 ## Time
 

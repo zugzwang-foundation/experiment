@@ -83,10 +83,20 @@ export function ReplySplitBar({
 				    ⇒ d5's BAR is itself a Route-3 instance. The mockup demonstrates the
 				    rule at its TRIGGERS and fails to apply it at its BAR; this build
 				    applies it in both places. So C13 is a DELIBERATE DIVERGENCE from the
-				    artifact on the design-language rule (`design-language.md:268`,
-				    CLAUDE.md §8), NOT a return to it — recorded because §3 ratifies
-				    "mimic the mockup", and a later fidelity pass reading `d5:1248`
-				    without this note would revert the fix.
+				    artifact on the design-language rule (`design-language.md` §1
+				    "Binding resolved" — and AGENTS.md §8's "the poles name the SIDE
+				    (YES/NO), never the Support/Counter relation"), NOT a return to
+				    it — recorded because §3 ratifies "mimic the mockup", and a later
+				    fidelity pass reading `d5:1248` without this note would revert
+				    the fix.
+				    ⚠ BOTH POINTERS WERE WRONG UNTIL @code-reviewer RE-MEASURED THEM,
+				    and they are named here so the wrong pair is not restored:
+				    `design-language.md:268` is a CHANGELOG entry, not the rule (the
+				    locked binding is §1, `:62`; `:269` merely records the axis
+				    correction), and CLAUDE.md §8 is O-space — the poles sentence is
+				    AGENTS.md §8. A note whose pointers do not resolve leaves the
+				    reader with `d5:1248` alone, which is the revert this paragraph
+				    exists to prevent. Cited by SYMBOL now, per O-8.
 
 				    ⚠ Written as `postSide === "YES"` rather than as a
 				    `deriveReplySide(...)` call, and THE FENCE IS THE REASON. §10 permits
@@ -109,7 +119,7 @@ export function ReplySplitBar({
 				    this row exists to fix.
 				    Both sibling bars already carry it — `HeroPanels` (this genus's ruled
 				    precedent) and `AggregateFooter` — and so does the mockup, whose
-				    `.barrow .bar` is an OUTLINE (`d5:511`, `border:1px solid var(--ink)`
+				    `.barrow .bar` is an OUTLINE (`d5:510`, `border:1px solid var(--ink)`
 				    over an `--n0` ground). This component's own `TriggerPill` carries the
 				    same idea as its "black-pill exception" 0.5px n2 edge: the sibling
 				    that is this row's positive control for the POLE rule is also its

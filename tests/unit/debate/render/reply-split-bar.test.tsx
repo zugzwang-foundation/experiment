@@ -24,8 +24,13 @@ import type { Side } from "@/components/debate/types";
  * immutable post-INSERT) and a Tailwind class in a client component cannot
  * violate it. The rule actually broken is the design-language AXIS correction:
  * "Support/Counter is a separate, post-relative relation, never a colour or
- * column" (`design-language.md:268`), and `CLAUDE.md` §8 — "the poles name the
- * SIDE (YES/NO), never the Support/Counter relation."
+ * column" (`design-language.md` §1 "Binding resolved"), and `AGENTS.md` §8 —
+ * "the poles name the SIDE (YES/NO), never the Support/Counter relation."
+ * ⚠ Both pointers read `design-language.md:268` / `CLAUDE.md §8` until
+ * @code-reviewer re-measured them: `:268` is a changelog entry (the locked
+ * binding is §1, `:62`) and CLAUDE.md §8 is O-space. Same wrong pair in
+ * `ReplySplitBar.tsx` and still live in the plan (§9 A4) — surfaced there,
+ * not overridden, because the plan is the contract.
  *
  * ⚠ THE MOCKUP IS THIS ROW'S POSITIVE CONTROL **AT ITS TRIGGERS ONLY** (plan
  * §7, V-2 — whose closing sentence overreaches; surfaced to the founder). It
