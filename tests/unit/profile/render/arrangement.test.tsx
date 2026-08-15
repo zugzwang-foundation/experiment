@@ -401,60 +401,85 @@ describe("FOUNDER EYE PASS item 1 — Đ on every Đ tile", () => {
 	});
 });
 
-describe("FOUNDER EYE PASS item 3 — the band sizes to the tiles, not the graph", () => {
+describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED", () => {
 	const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
 	const page = () => readFileSync(join(process.cwd(), PAGE), "utf8");
-
-	it("item3::the-headzone-split-is-UNEQUAL-so-the-graph-stops-driving-the-band", () => {
-		// MEASURED at 1440 before the change: headzone 358px, of which the
-		// identity card needed 287 — ~71px dead. The driver is arithmetic:
-		// `graph/ProfileGraphCard.tsx:46` is `aspect-[2/1] w-full`, so the graph
-		// card's height is (columnWidth − 32)/2 + 32, and at an equal split that
-		// was 684 ⇒ 652 × 326 ⇒ 358. Narrowing the graph column is therefore the
-		// ONLY lever available from outside that file — and `graph/**` is
-		// forbidden here (POLISH.5 PR C owns its symbols).
-		// MEASURED after: 1440 band 358 → 290 · 1024 band 258 · tiles unchanged
-		// at 144 · nothing clipped.
-		const cls =
+	const headzoneClasses = () =>
+		(
 			/"profile-headzone"[\s\S]{0,120}?className="([^"]*)"/.exec(page())?.[1] ??
-			"";
-		const token = cls.split(/\s+/).find((c) => /^lg:grid-cols-/.test(c));
+			""
+		)
+			.split(/\s+/)
+			.filter(Boolean);
+
+	it("item3::the-headzone-is-back-to-the-mockup's-EQUAL-split", () => {
+		// ⚠⚠ RE-INVERTED AT ROUND 4, ON FOUNDER ORDER. This assertion used to pin
+		// `lg:grid-cols-[3fr_2fr]` and to REJECT `lg:grid-cols-2` by name. The
+		// founder ruled the narrowing the wrong lever: the mockup's `.headzone` is
+		// `grid-template-columns:1fr 1fr` (`:189`) and the task is to match the
+		// mockup's composition. The height was to be declared instead — see the
+		// next assertion for why that half is refused.
+		const token = headzoneClasses().find((c) => /^lg:grid-cols-/.test(c));
 		expect(
 			token,
 			"item 3: the headzone declares no lg grid template",
 		).toBeDefined();
-		// ⛔ An EQUAL split is the pre-change state and re-introduces the balloon.
 		expect(
 			token,
-			`item 3: the headzone is back to an equal split, so the graph's 2:1 ` +
-				`aspect drives the band again (measured 358px against the 287px the ` +
-				`tiles need). The ratio is DERIVED — solving (W−32)/2+32 = 287 gives ` +
-				`1.52:1 — not copied from the mockup, whose band is a fixed 188px.`,
-		).not.toBe("lg:grid-cols-2");
-		expect(token).toBe("lg:grid-cols-[3fr_2fr]");
+			`item 3: the headzone is not on the mockup's equal split. ` +
+				`\`3fr 2fr\` was round 3's lever and the founder reverted it.`,
+		).toBe("lg:grid-cols-2");
 	});
 
 	it("item3::the-ARENA-keeps-its-EQUAL-split", () => {
-		// Only the headzone is asymmetric. The arena's two panels are peers and
-		// an unequal arena would be a different (unasked) change.
+		// Both bands are `1fr 1fr` in the mockup (`:189`, `:221`), and they must
+		// share one breakpoint or the identity band would go two-column while the
+		// arena below it was still stacked.
 		const cls =
 			/"profile-arena"[\s\S]{0,200}?className="([^"]*)"/.exec(page())?.[1] ??
 			"";
 		expect(cls.split(/\s+/)).toContain("lg:grid-cols-2");
 	});
 
-	it("item3::NO-HEIGHT-IS-DECLARED-on-the-band", () => {
-		// ⛔ The founder ruled the mockup's pixel band a VALUE ("derive from the
-		// tiles, do not copy"). This fix declares no height at all — the band is
-		// still content-sized; it is simply the TILES' content that now wins.
-		const cls =
-			/"profile-headzone"[\s\S]{0,120}?className="([^"]*)"/.exec(page())?.[1] ??
-			"";
-		for (const c of cls.split(/\s+/)) {
+	it("item3::NO-HEIGHT-IS-DECLARED-on-the-band—REFUSED-ON-MEASUREMENT", () => {
+		// ⛔⛔ THIS PINS A REFUSAL, AND THE REFUSAL IS ABOUT THE GRAPH, NOT THE
+		// GUARD. The founder asked for a DERIVED, DECLARED band height with the
+		// graph slot filling its cell at that height. Measured live against real
+		// compiled CSS, `1fr 1fr` restored, identity height taken with the grid
+		// stretch removed (`align-self:start`):
+		//
+		//   vw     identity needs   graph needs   overflow at the declared height
+		//   1024       258              258             0
+		//   1280       258              318            60
+		//   1440       218              358           140
+		//
+		// Declared at 218 the graph card measures 684 × 358 inside a band whose
+		// clientHeight is 218 and whose scrollHeight is 358 — 140px of chart over
+		// the arena. The graph's height is `(columnWidth − 32)/2 + 32`, owned by
+		// `graph/ProfileGraphCard.tsx`'s `aspect-[2/1] w-full`, which this task
+		// may not edit. The only outside lever is capping the graph's WIDTH to
+		// 2H − 32 (404px in a 684px column) — the very lever the revert above
+		// undoes. So no height is declared, nothing is clipped, and the band
+		// stays content-sized.
+		// ⚠ At 1024 the band is ALREADY tile-derived (258 = 258): the dead space
+		// is a ≥1280 phenomenon, entirely the 2:1 aspect on a wide column.
+		for (const c of headzoneClasses()) {
 			expect(
 				/^(h-|min-h-(?!0$)|max-h-)/.test(c),
-				`item 3: the headzone declares \`${c}\` — a height. The band must ` +
-					`stay content-sized; the ratio is what makes the tiles win.`,
+				`item 3: the headzone declares \`${c}\` — a height. Declaring one ` +
+					`without a fix inside ProfileGraphCard spills the chart 140px ` +
+					`over the arena at 1440. If the graph card can now fill a shorter ` +
+					`box, re-derive this guard rather than deleting it.`,
+			).toBe(false);
+		}
+		// …and the same for a variant-prefixed spelling, which the unprefixed
+		// pattern above would silently pass. A `lg:h-[288px]` is exactly the form
+		// this refusal is about, so it must not slip through on its prefix.
+		for (const c of headzoneClasses()) {
+			expect(
+				/^[a-z-]+:(h-|min-h-(?!0$)|max-h-)/.test(c),
+				`item 3: the headzone declares \`${c}\` — a variant-scoped height, ` +
+					`which is the exact form the measurement above refuses.`,
 			).toBe(false);
 		}
 	});
@@ -1017,6 +1042,32 @@ describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays f
 	 * height" is false, and satisfying item 4 literally would undo item 3.
 	 * ⇒ Only a DECLARED band height breaks the loop, and the founder ruled the
 	 * mockup's pixel band out. ROUTED BACK, unchanged.
+	 *
+	 * ⛔⛔ RE-ATTEMPTED A FOURTH TIME AT ROUND 4 — REFUSED ON THE ROW'S OWN
+	 * CLAUSE ("if the tile column still collapses, REFUSE ITEM 4 ONLY and report
+	 * the numbers"), AND THE COLUMN STILL COLLAPSES. Round 4 restored the
+	 * mockup's equal split, so this is the FAIREST test the row has had: the
+	 * identity column's width no longer depends on the PFP at all — `1fr 1fr` is
+	 * fixed — and the loop closes anyway, through the ROW HEIGHT.
+	 *
+	 *              item 3 revert only              + item 4 PFP
+	 *   1024   band 258 · PFP 56 · idcol 370   band 378 · PFP 360 · idcol 66
+	 *          tiles 370x184 · tile 115x86     tiles 66x344 · tile 26x166
+	 *                                          ⛔ TILE GRID CLIPPED
+	 *   1440   band 358 · PFP 56 · idcol 578   band 358 · PFP 340 · idcol 294
+	 *          tiles 578x144 · tile 185x66     tiles 294x224 · tile 90x106
+	 *
+	 * ⇒ AT 1024 EACH TILE IS 26px WIDE AND THE GRID IS CLIPPED — the round-1
+	 * collapse, reproduced at a viewport two and a half times wider. The band
+	 * grows 258 -> 378 (+120) and the identity column falls 370 -> 66 (-82%).
+	 * The mechanism is unchanged and is NOT about the column ratio: `h-full`
+	 * resolves against the grid ROW, the row is `max(identity content, graph)`,
+	 * and a taller card widens the square, which narrows the column, which
+	 * heightens the tiles, which heightens the card.
+	 * ⇒ Only a DECLARED band height breaks it, and round 4 measured that the
+	 * declaration itself is blocked — it spills the graph 140px over the arena
+	 * at 1440 (see the item 3 block above). Both halves are now blocked by the
+	 * SAME symbol: `graph/ProfileGraphCard.tsx`'s `aspect-[2/1]`.
 	 *
 	 * ⚠ THE ASSERTIONS BELOW ARE DELIBERATELY THE INVERSE OF WHAT THIS FILE
 	 * ASSERTED BEFORE MEASUREMENT. They exist so the row is not re-applied from

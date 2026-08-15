@@ -131,35 +131,46 @@ export default async function ProfilePage({
 			    prototype and declares no breakpoint at all (recon A.4).
 			    `gap-6` is the gap ALREADY on this container's className for the
 			    same inter-section role; no new spacing value is introduced. */}
-			{/* ⚠⚠ FOUNDER EYE PASS item 3 — THE BAND SIZED TO THE TILES, NOT TO THE
-			    GRAPH. Measured at 1440 before the change: headzone 358px, of which
-			    the identity card genuinely needed 287 (tiles bottom 357 + the card's
-			    16px bottom padding) — so ~71px was dead space, and the graph slot
-			    ballooned to fill it.
-			    THE DRIVER IS ARITHMETIC, NOT OPINION. `graph/ProfileGraphCard.tsx:46`
-			    renders `aspect-[2/1] w-full`, so the graph card's height is
-			    (columnWidth − 32) / 2 + 32. At an equal split the graph column was
-			    684 ⇒ 652 × 326 ⇒ card 358. Measured exactly: aspect box 652 × 326.
-			    ⇒ THE FIX IS THE COLUMN RATIO, because the aspect box is the height
-			    and the aspect box is driven by WIDTH. Solving (W − 32)/2 + 32 = 287
-			    gives W = 542 against an 826 identity column — 1.52 : 1. `3fr 2fr`
-			    is the nearest simple ratio, and it MEASURES:
-			      1440 · band 358 → 290 · graph card 358 → 290 · tiles 144, unchanged
-			      1024 · band       258 · identity column 465 · nothing clipped
-			    ⛔ DERIVED FROM THE TILES, NOT COPIED. The mockup's `.headzone` is
-			    `1fr 1fr` with `flex:0 0 188px` (`:189`) — a fixed-desktop pixel band
-			    this deliberately does NOT port. No height is declared here at all;
-			    the band is still content-sized, it is simply the TILES' content that
-			    now wins instead of the graph's.
-			    ⛔ THE GRAPH'S OWN SYMBOLS ARE UNTOUCHED — POLISH.5 PR C owns them.
-			    Only the SLOT's width changes, which is placement.
-			    The arbitrary-template form is `HeroPanels.tsx:82`'s
-			    (`md:grid-cols-[1fr_1.9fr_1fr]`), the shipped precedent for a derived
-			    fr ratio in a grid template. */}
-			<div
-				data-testid="profile-headzone"
-				className="grid gap-6 lg:grid-cols-[3fr_2fr]"
-			>
+			{/* ⚠⚠ ROUND 4 item 3 — `3fr 2fr` REVERTED TO THE MOCKUP'S EQUAL SPLIT,
+			    ON FOUNDER ORDER. Round 3 narrowed the graph column to stop the
+			    graph's 2:1 aspect driving the band. The founder ruled that the wrong
+			    lever: the mockup's `.headzone` is `grid-template-columns:1fr 1fr`
+			    (`:189`) and this task exists to match the mockup's composition, so
+			    the ratio goes back and the height was to be DECLARED instead.
+			    ⛔⛔ THE DECLARED HEIGHT IS REFUSED ON MEASUREMENT — the other half of
+			    item 3, and the refusal is about the GRAPH, not about the guard.
+			    Measured live in a browser against real compiled CSS, on the shipped
+			    surface with real data, at three container widths with `1fr 1fr`
+			    restored (the identity card's INTRINSIC height taken with
+			    `align-self:start`, i.e. with the grid stretch removed):
+
+			      vw    identity needs   graph needs   overflow if the band is
+			                                           declared at what identity needs
+			      1024      258              258            0
+			      1280      258              318           60
+			      1440      218              358          140
+
+			    ⇒ AT 1440 THE DECLARED HEIGHT IS 218 AND THE GRAPH STILL WANTS 358.
+			    Declared at 218, the graph card does NOT fill the band and does NOT
+			    shrink: it measures 684 × 358 with the band's clientHeight at 218 and
+			    its scrollHeight at 358 — 140px of chart painting over the arena
+			    (graph bottom 444 against arena top 328). The graph's height is
+			    `(columnWidth − 32)/2 + 32` and it lives in
+			    `graph/ProfileGraphCard.tsx`'s `aspect-[2/1] w-full`, which §1 puts
+			    OUT OF BOUNDS (POLISH.5 PR C owns those symbols). From outside that
+			    file the ONLY way to make the graph fit a shorter band is to cap its
+			    WIDTH to 2H − 32 (404px at 1440, inside a 684px column) — which is
+			    the column-narrowing lever this revert exists to undo, just moved
+			    from the template into the cell.
+			    ⇒ "The graph slot FILLS its cell at that height instead of driving
+			    it" is therefore not reachable this round. REPORTED, NOT DODGED: no
+			    height is declared, no `overflow-hidden` hides the spill, and the
+			    band stays content-sized so nothing clips.
+			    ⚠ NOTE FOR THE NEXT ROUND — at 1024 the band is ALREADY tile-derived
+			    (258 = 258, exactly). The dead space the founder marked is a
+			    ≥1280 phenomenon and is entirely the 2:1 aspect on a wide column, so
+			    the fix has to land inside the graph card, not beside it. */}
+			<div data-testid="profile-headzone" className="grid gap-6 lg:grid-cols-2">
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
 				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling

@@ -101,7 +101,33 @@ export function IdentityCard({
 			    ⇒ ROUTED BACK, unchanged: this row becomes correct — with no new
 			    value — only once the headzone has a height of its own. That is a
 			    DESIGN decision about the band (the mockup's is `flex:0 0 188px`),
-			    not something this row can supply for itself. */}
+			    not something this row can supply for itself.
+
+			    ⛔⛔ FOURTH ATTEMPT, ROUND 4 item 4 — REFUSED ON ITS OWN CLAUSE ("if
+			    the tile column still collapses, REFUSE ITEM 4 ONLY and report the
+			    numbers"). Round 4 restored the mockup's EQUAL split, which is the
+			    fairest test this row has had: at `1fr 1fr` the identity column's
+			    WIDTH no longer depends on the PFP at all. It collapses anyway,
+			    through the row HEIGHT. Measured live against real compiled CSS:
+
+			                item 3 revert only              + item 4 PFP
+			      1024  band 258 · PFP 56 · idcol 370   band 378 · PFP 360 · idcol 66
+			            tiles 370×184 · tile 115×86     tiles 66×344 · tile 26×166
+			                                            ⛔ TILE GRID CLIPPED
+			      1440  band 358 · PFP 56 · idcol 578   band 358 · PFP 340 · idcol 294
+			            tiles 578×144 · tile 185×66     tiles 294×224 · tile 90×106
+
+			    At 1024 each tile is 26px wide and the grid clips — round 1's
+			    collapse at a viewport two and a half times wider. `h-full` resolves
+			    against the grid ROW, the row is `max(identity content, graph)`, and
+			    a taller card widens the square → narrows the column → heightens the
+			    tiles → heightens the card.
+			    ⇒ AND THE UNBLOCK IS ITSELF BLOCKED THIS ROUND: declaring the band
+			    height spills the graph 140px over the arena at 1440, because the
+			    graph's height is `(colWidth − 32)/2 + 32` inside
+			    `graph/ProfileGraphCard.tsx` — a file this task may not edit. Both
+			    halves now trace to that ONE symbol; see `page.tsx`'s headzone block
+			    for the full table. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.
