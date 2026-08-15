@@ -441,46 +441,102 @@ describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED"
 		expect(cls.split(/\s+/)).toContain("lg:grid-cols-2");
 	});
 
-	it("item3::NO-HEIGHT-IS-DECLARED-on-the-band—REFUSED-ON-MEASUREMENT", () => {
-		// ⛔⛔ THIS PINS A REFUSAL, AND THE REFUSAL IS ABOUT THE GRAPH, NOT THE
-		// GUARD. The founder asked for a DERIVED, DECLARED band height with the
-		// graph slot filling its cell at that height. Measured live against real
-		// compiled CSS, `1fr 1fr` restored, identity height taken with the grid
-		// stretch removed (`align-self:start`):
+	it("item3::THE-BAND-HEIGHT-IS-DECLARED—the-round-4-refusal-is-DISCHARGED", () => {
+		// ⚠⚠ RE-INVERTED AT ROUND 5. This assertion used to pin a REFUSAL: it
+		// rejected every `h-*` on the headzone, prefixed or not, because declaring
+		// a height while `ProfileGraphCard` still carried `aspect-[2/1] w-full`
+		// spilled 140px of chart over the arena at 1440 (measured at round 4).
+		// The founder opened that file under a sizing-only fence, the aspect is
+		// gone, and the height is now DECLARED — so the guard states the number
+		// instead of forbidding it.
 		//
-		//   vw     identity needs   graph needs   overflow at the declared height
-		//   1024       258              258             0
-		//   1280       258              318            60
-		//   1440       218              358           140
-		//
-		// Declared at 218 the graph card measures 684 × 358 inside a band whose
-		// clientHeight is 218 and whose scrollHeight is 358 — 140px of chart over
-		// the arena. The graph's height is `(columnWidth − 32)/2 + 32`, owned by
-		// `graph/ProfileGraphCard.tsx`'s `aspect-[2/1] w-full`, which this task
-		// may not edit. The only outside lever is capping the graph's WIDTH to
-		// 2H − 32 (404px in a 684px column) — the very lever the revert above
-		// undoes. So no height is declared, nothing is clipped, and the band
-		// stays content-sized.
-		// ⚠ At 1024 the band is ALREADY tile-derived (258 = 258): the dead space
-		// is a ≥1280 phenomenon, entirely the 2:1 aspect on a wide column.
+		// ⛔ 256 IS DERIVED, NOT COPIED. The mockup's band is a fixed 188px and is
+		// NOT the source. Measured live, `1fr 1fr`, identity height taken with the
+		// grid stretch removed, sweeping for the smallest band that fits:
+		//   1024 → 256 (the binding case) · 1280 → 256 · 1440 → 216 · 1920 → 216
+		// One number for all of `lg`+, so it is the worst case. Swept 1024→2560 in
+		// 16px steps: zero breaks. Re-measured with `Đ 999,999` in every tile:
+		// still 255 at 1024 — the tile grid's height is driven by its fixed LABEL
+		// copy, not by value widths.
+		const declared = headzoneClasses().filter((c) => /^lg:h-\[/.test(c));
+		expect(
+			declared,
+			`item B: the headzone declares no lg height. The band must be DECLARED ` +
+				`so the arena gets the remaining space — that is the founder's hard ` +
+				`command, and it is what makes the square PFP's feedback loop ` +
+				`impossible to close.`,
+		).toEqual(["lg:h-[256px]"]);
+	});
+
+	it("item3::the-height-is-lg-SCOPED-so-the-stacked-layout-is-not-crushed", () => {
+		// ⛔ Below `lg` the two bands stack to one column and the identity card
+		// sits above a full-width graph; a 256px cap there would crush both. The
+		// page grows and scrolls below `lg` (item A), so no height is declared.
 		for (const c of headzoneClasses()) {
 			expect(
 				/^(h-|min-h-(?!0$)|max-h-)/.test(c),
-				`item 3: the headzone declares \`${c}\` — a height. Declaring one ` +
-					`without a fix inside ProfileGraphCard spills the chart 140px ` +
-					`over the arena at 1440. If the graph card can now fill a shorter ` +
-					`box, re-derive this guard rather than deleting it.`,
+				`item B: the headzone declares \`${c}\` UNPREFIXED — that caps the ` +
+					`stacked layout below \`lg\` too, where the identity card and a ` +
+					`full-width graph need far more than 256px.`,
 			).toBe(false);
 		}
-		// …and the same for a variant-prefixed spelling, which the unprefixed
-		// pattern above would silently pass. A `lg:h-[288px]` is exactly the form
-		// this refusal is about, so it must not slip through on its prefix.
-		for (const c of headzoneClasses()) {
+	});
+
+	it("item3::the-graph-card-no-longer-derives-its-HEIGHT-from-its-WIDTH", () => {
+		// ⛔ THE OTHER HALF OF ITEM B, AND THE REASON THREE ROUNDS FAILED. While
+		// `aspect-[2/1]` was on the chart box the card's height was
+		// `(colWidth − 32)/2 + 32`, so the GRAPH set the band and any declared
+		// height spilled. `min-h-0` removes the grid item's automatic minimum so
+		// the declared height can bind; `h-full` makes the chart box the card's
+		// content box. Measured after: card 256 = cell 256, spill 0, at 1024 /
+		// 1440 / 1920.
+		const card = readFileSync(
+			join(process.cwd(), "src/components/profile/graph/ProfileGraphCard.tsx"),
+			"utf8",
+		);
+		// ⚠ READ THE CLASSNAMES, NOT THE FILE TEXT. The docblock explaining WHY
+		// this changed necessarily quotes `aspect-[2/1]` several times, so a bare
+		// `.not.toContain("aspect-[2/1]")` over the source reddens on the record
+		// of the fix rather than on the fix — the recorded false-RED hazard for
+		// doc comments that quote the thing they removed.
+		const classNames = [...card.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classNames.length).toBeGreaterThan(0);
+		for (const cls of classNames) {
 			expect(
-				/^[a-z-]+:(h-|min-h-(?!0$)|max-h-)/.test(c),
-				`item 3: the headzone declares \`${c}\` — a variant-scoped height, ` +
-					`which is the exact form the measurement above refuses.`,
-			).toBe(false);
+				cls,
+				"item B: a className in ProfileGraphCard still declares an aspect " +
+					"ratio, so the card's height derives from its width again.",
+			).not.toContain("aspect-");
+		}
+		expect(classNames).toContain("h-full w-full");
+		expect(
+			classNames.some((c) => c.includes("block min-h-0 w-full")),
+			"item B: the card lost `min-h-0`, so as a grid item its automatic " +
+				"minimum size is its content again and the declared band height " +
+				"cannot bind.",
+		).toBe(true);
+		// ⛔ POLISH.5 PR C is fenced to symbols in that directory and is UNSTARTED:
+		// the fence was SIZING ONLY, so every symbol and prop must still be there.
+		for (const symbol of [
+			"export function ProfileGraphCard",
+			"series",
+			"onExpand",
+			"ProfileChart",
+			'selection="cumulative"',
+			'mode="placeholder"',
+			"EmptyBlock",
+			"GRAPH_COPY.aria.expand",
+			"PROFILE_COPY.graph.empty",
+			'messageTestId="graph-empty"',
+			'messageAs="p"',
+		]) {
+			expect(
+				card,
+				`item B: \`${symbol}\` left ProfileGraphCard. The fence was SIZING ` +
+					`ONLY — no symbol may be renamed or removed.`,
+			).toContain(symbol);
 		}
 	});
 });

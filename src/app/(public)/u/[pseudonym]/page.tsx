@@ -130,6 +130,48 @@ export default async function ProfilePage({
 			    prototype and declares no breakpoint at all (recon A.4).
 			    `gap-6` is the gap ALREADY on this container's className for the
 			    same inter-section role; no new spacing value is introduced. */}
+			{/* ⚠⚠⚠ ROUND 5 item B — THE BAND HEIGHT IS DECLARED, AND THE GRAPH NOW
+			    FITS IT INSTEAD OF SETTING IT. This is the HARD COMMAND that three
+			    earlier rounds refused, and what unblocked it was the founder opening
+			    `graph/ProfileGraphCard.tsx` to a sizing-only fence: its
+			    `aspect-[2/1] w-full` is what made the card's height
+			    `(colWidth − 32)/2 + 32`, i.e. the reason the GRAPH set the band. It
+			    is now `h-full w-full` on a `min-h-0` card, so the card fills its
+			    cell. See that file for the two-token diff and what was NOT touched.
+
+			    ⛔ 256px IS DERIVED FROM THE IDENTITY CARD, NOT COPIED. The mockup's
+			    band is `flex:0 0 188px` (`:189`) and is NOT the source. Measured
+			    live against real compiled CSS on the shipped surface with real data,
+			    `1fr 1fr` restored, taking the identity card's INTRINSIC height with
+			    the grid stretch removed (`align-self:start`) and sweeping the band
+			    height for the smallest value at which its content fits:
+
+			      vw     smallest band height that fits the identity card + tiles
+			      1024        256   ← the binding case: tiles 370×184, tile 115 wide
+			      1280        256
+			      1440        216
+			      1920        216
+
+			    ⇒ ONE NUMBER FOR ALL OF `lg`+, so it is the WORST case: 256.
+			    ⚠ SWEPT, NOT SPOT-CHECKED: every width from 1024 to 2560 in 16px
+			    steps was measured at 256 — ZERO breaks, worst case 255 of 256 used.
+			    ⚠ AND ROBUST TO THE DATA: re-measured with `Đ 999,999` in every tile,
+			    the identity card still needs 255 at 1024 and 254 at 1440/1920. The
+			    tile grid's height is driven by its fixed LABEL copy wrapping, not by
+			    the value widths, so a large balance cannot break the band.
+
+			    ⇒ WHAT THE FOUNDER ASKED FOR, IN PIXELS — the band SHRINKS and every
+			    pixel goes to the arena:
+			      1024   258 → 256   (−2)
+			      1440   358 → 256   (−102)
+			      1920   478 → 256   (−222)
+
+			    ⛔ `lg:`-SCOPED, NOT UNCONDITIONAL. Below `lg` the two bands stack to
+			    one column and the identity card sits above a full-width graph; a
+			    256px cap there would crush both. The page still grows and scrolls
+			    below `lg` (item A), so no height is declared there.
+			    ⛔ THE EQUAL SPLIT STAYS. Round 3's `3fr 2fr` was the wrong lever and
+			    was reverted at round 4; `1fr 1fr` is the mockup's (`:189`). */}
 			{/* ⚠⚠ ROUND 4 item 3 — `3fr 2fr` REVERTED TO THE MOCKUP'S EQUAL SPLIT,
 			    ON FOUNDER ORDER. Round 3 narrowed the graph column to stop the
 			    graph's 2:1 aspect driving the band. The founder ruled that the wrong
@@ -162,14 +204,19 @@ export default async function ProfilePage({
 			    the column-narrowing lever this revert exists to undo, just moved
 			    from the template into the cell.
 			    ⇒ "The graph slot FILLS its cell at that height instead of driving
-			    it" is therefore not reachable this round. REPORTED, NOT DODGED: no
-			    height is declared, no `overflow-hidden` hides the spill, and the
-			    band stays content-sized so nothing clips.
-			    ⚠ NOTE FOR THE NEXT ROUND — at 1024 the band is ALREADY tile-derived
-			    (258 = 258, exactly). The dead space the founder marked is a
-			    ≥1280 phenomenon and is entirely the 2:1 aspect on a wide column, so
-			    the fix has to land inside the graph card, not beside it. */}
-			<div data-testid="profile-headzone" className="grid gap-6 lg:grid-cols-2">
+			    it" was therefore not reachable AT ROUND 4.
+			    ✅ DISCHARGED AT ROUND 5, and the round-4 note above called it: "the
+			    fix has to land inside the graph card, not beside it." The founder
+			    opened `ProfileGraphCard.tsx` under a sizing-only fence, the
+			    `aspect-[2/1]` is gone, and the band height IS declared — see the
+			    round-5 block above. This paragraph is kept because it is the
+			    measurement that proved WHERE the blocker was, and a reader who meets
+			    `lg:h-[256px]` should be able to find out why three rounds could not
+			    write it. ⛔ It is no longer a live refusal. */}
+			<div
+				data-testid="profile-headzone"
+				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+			>
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
 				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling
