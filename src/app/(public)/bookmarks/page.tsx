@@ -1,35 +1,66 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
-import { BookmarksPanel } from "@/components/bookmarks/BookmarksPanel";
+import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
+import { BOOKMARKS_COPY } from "@/components/bookmarks/copy";
+import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
+import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
-import { EmptyBlock } from "@/components/ui/empty-block";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
+import { loadProfileGraphSeries } from "@/server/profile/graph-series";
+import { loadProfilePositions } from "@/server/profile/positions";
+import { resolveProfileUser } from "@/server/profile/resolve";
+import { loadProfileTiles } from "@/server/profile/tiles";
 
-/** W2.11 P1 copy — web-authored, carried VERBATIM from the state-kit mockup's
- *  "Empty Bookmarks · id 18" block (`:198`, `:199`), ratified as OD-1. Tests
- *  import these; they are never re-typed inline. */
-export const BOOKMARKS_EMPTY_COPY = {
-	msg: "No bookmarks yet.",
-	sub: "Saved arguments will appear here.",
-} as const;
+/** Re-exported under its original name so POLISH.6's tests and any other
+ *  consumer keep their handle; the strings themselves moved to `copy.ts`
+ *  byte-unchanged, where every string on this surface now names its source. */
+export const BOOKMARKS_EMPTY_COPY = BOOKMARKS_COPY.empty;
 
 /**
- * The /bookmarks surface (ADR-0032 D-5 / D-6; plan §3.3), composed into the
- * ADR-0023 `(public)/` shell. The session user's saved pointers at OTHER
- * authors' arguments, rendered in FORCED-VISITOR mode: list titled "Bookmarks,"
- * a "Your bookmarks" chip, NO Sell mount ever (every item is someone else's
- * content by D-3), each card's bookmark icon ACTIVE (un-bookmark).
+ * The /bookmarks surface (ADR-0032; plan §3.3), composed into the ADR-0023
+ * `(public)/` shell. The session user's saved pointers at OTHER authors'
+ * arguments.
  *
- * AUTH-GATED: there is no anonymous bookmark set, so an anonymous visitor is
- * redirected to /sign-in. `viewerId` is ALWAYS `session.user.id` — never a
- * client-supplied value — and `loadBookmarks` scopes the read `WHERE
- * user_id = $viewer`, so a viewer only ever sees their OWN bookmarks. UNCACHED /
- * dynamic v1 (§7 S1 — `cacheComponents` absent; the retrofit rides the named
- * foundational follow-up). Content masking + author scrub are applied inside
+ * ⚠⚠ R2 — THE SURFACE IS THE PROFILE PAGE, and R1 got that wrong. R1 read the
+ * arrangement off the SHIPPED PROFILE, which renders a plain list because recon
+ * A-1 struck the replica there. Measured this round: that strike was taken on
+ * **SPEC.1 §23's enumeration of the profile page**, and SPEC.1 names this route
+ * exactly once — `:1665`, *"This surface hosts a bookmark mode at A6 (design-
+ * canon ruling 1) — specified by A6's own ADR, not here."* The strike is
+ * therefore SURFACE-BOUND and does not travel. The delegated spec, **ADR-0032
+ * D-5**, rules the page *"reuses the Profile surface in forced-visitor mode"*
+ * with *"the list retitled 'Bookmarks'"*; canon §6's **Bookmark** line says the
+ * same in copy terms. Hence: top band, two-panel arena, table + replica.
+ *
+ * ⚠ THE TOP BAND IS THE VIEWER'S OWN RECORD, and asking "does `BookmarkItem`
+ * carry it?" was the wrong question — it never could. The right question is
+ * whether THIS ROUTE can render it, and it can: the page holds `viewerId`, and
+ * the A5 loaders are exported and `{ userId }`-scoped. Calling them is not an
+ * edit to `src/server/**`. Precedent on this very route: `(public)/layout.tsx`
+ * `:67-74` already calls `getHeaderBalance(db, session.user.id)` and
+ * `getHeaderPortfolio(db, session.user.id)` — which is where the header's
+ * PORTFOLIO / BALANCE figures come from today.
+ *
+ * ⚠ `resolveProfileUser` takes a PSEUDONYM, not a userId — measured. The session
+ * carries one (`session.user.pseudonym`, the Better Auth `additionalFields`
+ * column `(public)/layout.tsx:69` already reads), so the identity card resolves
+ * with no new lookup shape.
+ *
+ * ⚠⚠ FIVE READS ON A ROUTE THAT USED TO MAKE ONE — RECORDED, NOT HIDDEN. This
+ * adds `loadProfilePositions`, `loadProfileTiles`, `loadProfileGraphSeries` and
+ * `resolveProfileUser` beside `loadBookmarks`. Staging was diagnosed hours ago
+ * exhausting the Supabase session-mode pooler at `pool_size: 15`, and more
+ * concurrent reads per render is the axis that exhausts it. The profile page
+ * already carries exactly this load, so this is parity rather than a new class
+ * of cost — but it is the wrong direction while that defect is open, and it is
+ * flagged for the founder rather than absorbed silently.
+ *
+ * AUTH-GATED: there is no anonymous bookmark set (ADR-0032 D-6). `viewerId` is
+ * ALWAYS `session.user.id`, never client-supplied, and `loadBookmarks` scopes
+ * the read `WHERE user_id = $viewer`. Masking + author scrub are applied inside
  * `loadBookmarks` before any DTO crosses to the client (D-7).
  */
 export default async function BookmarksPage(): Promise<React.JSX.Element> {
@@ -39,54 +70,61 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 		redirect("/sign-in");
 	}
 
-	const items = await loadBookmarks(db, { viewerId });
+	const [items, positions, graph] = await Promise.all([
+		loadBookmarks(db, { viewerId }),
+		loadProfilePositions(db, { userId: viewerId }),
+		loadProfileGraphSeries(db, { userId: viewerId }),
+	]);
+	// Tiles inherit the positions rows (the FI-2 law: one holding, one value —
+	// the tile never recomputes Đb), so this one follows rather than joins the
+	// parallel batch, exactly as `u/[pseudonym]/page.tsx:62-70` orders it.
+	const tiles = await loadProfileTiles(db, { userId: viewerId, positions });
+	const viewerPseudonym = session?.user?.pseudonym ?? null;
+	const viewer =
+		typeof viewerPseudonym === "string"
+			? await resolveProfileUser(db, viewerPseudonym)
+			: null;
 
 	return (
-		/* HTML-FINISH · BOOKMARKS R1 — THE CONTAINER MOVES, ON A RULING.
-		   The previous round REFUSED this edit and recorded why: the tag is SITE 2
-		   of `tests/unit/shell/page-container.test.ts`, which asserts class-set
-		   equality against its verbatim `c5892bc` baseline and pins the
-		   enumeration of ruled moves; that file sat outside the write allow-list,
-		   so the move was a ruling rather than an edit. The founder ruled it on
-		   2026-08-15 and extended the allow-list by exactly that one file. The
-		   guard's own `now`/`movedBy` mechanism carries the move — the same
-		   mechanism #337 used for site 5, in the same commit as the move.
-
-		   ⛔ THE VALUES ARE BYTE-CARRIED FROM PROFILE'S OWN CALL SITE ON THIS
-		   BRANCH (`u/[pseudonym]/page.tsx`'s container tag), not retyped: the
-		   `wide` preset and `flex min-h-0 flex-1 flex-col`. `wide` is
-		   `max-w-[1440px] px-6 py-6`, itself byte-carried from
-		   `GlobalHeader.tsx` at #337 — so this surface aligns to the same chrome
-		   Profile does, and nothing is read off a mockup.
-
-		   ⚠ `gap-4` IS THIS SURFACE'S OWN AND DELIBERATELY DOES NOT MOVE TO
-		   PROFILE'S `gap-6`. The ruling names three changes — the preset and the
-		   two chain classes — and a gap is CONTENT layout, neither a container
-		   axis nor a chain link. It is also inert here either way: the arena is
-		   ONE panel, so there is no sibling for a gap to space. Moving it would be
-		   an unrequested value change wearing the shape of a ruled one. */
+		/* The container and the height chain are R1's, ruled and unchanged: `wide`
+		   + `flex min-h-0 flex-1 flex-col`, byte-carried from profile's call site,
+		   with site 2's `now`/`movedBy` row in `page-container.test.ts` carrying
+		   the ruling that authorises them. */
 		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-4">
-			{/* HTML-FINISH · BOOKMARKS — the arena panel. The header row that used
-			    to sit here MOVED into the panel's header bar (it is the same pair,
-			    relocated, never copied); the list and the empty state are now the
-			    panel BODY's children, which is where Profile's two halves put
-			    theirs. See `BookmarksPanel.tsx` for the per-token trace and for
-			    why this surface has ONE panel where Profile has two. */}
-			<BookmarksPanel>
-				{items.length === 0 ? (
-					<EmptyBlock
-						message={BOOKMARKS_EMPTY_COPY.msg}
-						messageTestId="bookmarks-empty"
-						sub={BOOKMARKS_EMPTY_COPY.sub}
-					/>
-				) : (
-					<div data-testid="bookmark-list" className="flex flex-col gap-3">
-						{items.map((item) => (
-							<BookmarkCard key={item.id} item={item} />
-						))}
-					</div>
-				)}
-			</BookmarksPanel>
+			{/* THE TOP BAND — two side-by-side columns, byte-carried from
+			    `u/[pseudonym]/page.tsx:134` (`grid gap-6 lg:grid-cols-2`), including
+			    the `lg:` breakpoint that page ruled FROM MEASUREMENT rather than
+			    chose. The band deliberately does NOT grow: only the arena divides
+			    the leftover height. */}
+			<div
+				data-testid="bookmarks-headzone"
+				className="grid gap-6 lg:grid-cols-2"
+			>
+				{/* ⛔ THE IDENTITY CARD RENDERS ONLY IF THE VIEWER RESOLVES. It is the
+				    viewer's OWN identity — this route is their private saved set
+				    (ADR-0032 D-6), not a pseudonym-keyed public page, so there is no
+				    conflict with canon §10 `C-BOOKMARKS-1` ground 2, which objects to
+				    attributing ONE person's figures to a list of OTHER people's
+				    arguments. These figures are the viewer's and are labelled as the
+				    viewer's; the per-item figures in the arena remain each bookmarked
+				    AUTHOR's, exactly as ruling 1 requires.
+				    ⚠ `owner` is TRUE by construction: the subject IS the session user.
+				    That is what makes the six tiles the viewer's own record, and it is
+				    why tile 4 (`Arguments`) counts arguments the VIEWER authored —
+				    `loadProfileTiles` counts by `userId`, which is the viewer. */}
+				{viewer && <IdentityCard user={viewer} owner tiles={tiles} />}
+				<ProfileGraph series={graph} />
+			</div>
+			{/* THE ARENA — `flex-1 min-h-0` is the growing element, and the two halves
+			    share the headzone's `lg:` breakpoint, because a band that went
+			    two-column while the arena below it stayed stacked would read as a
+			    mistake. Byte-carried from `u/[pseudonym]/page.tsx:156-159`. */}
+			<div
+				data-testid="bookmarks-arena"
+				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+			>
+				<BookmarksArena items={items} />
+			</div>
 		</PageContainer>
 	);
 }

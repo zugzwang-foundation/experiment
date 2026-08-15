@@ -32,6 +32,37 @@ vi.mock("@/server/auth", () => ({
 	auth: { api: { getSession: vi.fn() } },
 }));
 vi.mock("@/server/bookmarks/list", () => ({ loadBookmarks: vi.fn() }));
+// R2 — the page now also calls the A5 loaders to build the viewer's own top
+// band (identity card, six tiles, graph). They are mocked here for the same
+// reason `loadBookmarks` is: this is a render suite, and unit tests never touch
+// a database. The SHAPES below are the loaders' real return types, minimal.
+vi.mock("@/server/profile/positions", () => ({
+	loadProfilePositions: vi.fn(async () => []),
+}));
+vi.mock("@/server/profile/graph-series", () => ({
+	loadProfileGraphSeries: vi.fn(async () => ({
+		windowStart: "2026-09-15T00:00:00.000Z",
+		windowEnd: "2026-11-05T23:59:00.000Z",
+		yMax: 10000,
+		freeDharma: [],
+		netWorth: [],
+		perMarket: [],
+		nodes: [],
+	})),
+}));
+vi.mock("@/server/profile/tiles", () => ({
+	loadProfileTiles: vi.fn(async () => ({
+		walletValue: "0.000000000000000000",
+		positionsValue: "0.000000000000000000",
+		netProfitLoss: "0.000000000000000000",
+		argumentsCount: { total: 0, posts: 0, replies: 0 },
+		supportReceived: "0.000000000000000000",
+		counterReceived: "0.000000000000000000",
+	})),
+}));
+vi.mock("@/server/profile/resolve", () => ({
+	resolveProfileUser: vi.fn(async () => null),
+}));
 
 import BookmarksRouteError from "@/app/(public)/bookmarks/error";
 import * as bookmarksPage from "@/app/(public)/bookmarks/page";
@@ -59,7 +90,18 @@ describe("PD-6-04 — the empty state IS the P1 primitive", () => {
 		// merely copied the class string would satisfy every geometry assertion
 		// below and NOT this one. This is the assertion that distinguishes them.
 		render(await BookmarksPage());
-		expect(document.querySelectorAll("[data-empty-block]").length).toBe(1);
+		// ⚠ SCOPED TO THIS SURFACE'S BLOCK AT R2, NOT LOOSENED. The page now also
+		// mounts the viewer's Dharma graph, and `ProfileGraphCard` renders its OWN
+		// P1 block when the series is empty — so a bare page-wide count is 2 and
+		// says nothing about which component adopted what. Asserting that the
+		// block CONTAINING `bookmarks-empty` is a real `data-empty-block` keeps
+		// the original question exactly ("adopted, or re-implemented?") while
+		// surviving a second, unrelated P1 consumer on the same page.
+		const own = document.querySelector("[data-testid='bookmarks-empty']");
+		expect(own?.closest("[data-empty-block]")).not.toBeNull();
+		expect(
+			document.querySelectorAll("[data-empty-block]").length,
+		).toBeGreaterThanOrEqual(1);
 	});
 
 	it("renders-the-P1-panel-geometry-as-exact-class-tokens", async () => {
