@@ -73,9 +73,11 @@ export function ProfileChart({
 			aria-hidden="true"
 			className="h-full w-full"
 		>
-			{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound,
-			    so N intervals draw N lines and the 0 baseline is carried by the X
-			    labels below. Drawn FIRST so they paint behind every series. Spanned
+			{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound, so
+			    N intervals draw N lines; value 0 sits at the plot floor and NOTHING
+			    draws it — there is no baseline rule, and the X labels below encode
+			    dates, not the Y zero. Drawn FIRST so they paint behind every series.
+			    Spanned
 			    by the same `xPx` endpoints the axis labels use, so item 16 adds no
 			    geometry primitive and `geometry.ts` is read, never written. Labels
 			    would print Đ figures and would have to route through `formatDharma`;
@@ -287,32 +289,44 @@ function FlipMarker({
 	);
 }
 
-/** One own post/reply node — a side-keyed disc with a FIXED grey ring and core
- * (the R2 node primitive). Placement is `netWorthValue` (cumulative) or
- * `marketValue` (per-market).
+/** One own post/reply node — a side-keyed disc inside a FIXED grey rim, with a
+ * FIXED grey core. Placement is `netWorthValue` (cumulative) or `marketValue`
+ * (per-market).
+ *
+ * ⛔ NOT the W2.6 "R2" primitive, which this docblock claimed until POLISH.5
+ * item 12. R2 is a CROWD-SPLIT ring — "black/white ring = crowd split", "Ring
+ * orientation = R2: BLACK = YES-money on EVERY node"
+ * (DESIGN-W2_6-profile-graph-CLOSE-OUT.md §3 item 5). This rim is ONE FIXED
+ * GREY and encodes nothing, and `GraphNode` carries neither a stake nor a crowd
+ * field — so R2 is not merely unbuilt here, it is unrenderable from this DTO.
+ * Its market twin is docketed as `CHART-NODE-RING`; the profile half is routed,
+ * not settled here (`P5-D20b`, defined at `docs/plans/POLISH-5.md` §3.1).
  *
  * ⚠ TWO TOKEN FAMILIES MEET HERE AND ONLY ONE IS SIDE-KEYED — read each token's
  * NAME and its VALUE separately, because here they disagree:
  *
- * - The r=5 disc's `fill` is the component's ONLY side-keyed expression:
- *   `--color-yes` (#181818, black) for YES, `--color-no` (#fafafa, white) for
- *   NO. That is the POLE family, carrying the locked binding — the poles name
- *   the SIDE, never the Support/Counter relation (AGENTS.md §8;
- *   design-language.md §1 "Binding resolved").
- * - The ring (that disc's stroke) and the r=2 core are BOTH `--graph-yes`,
- *   FIXED on every side. Its NAME says YES; its VALUE is a mid-grey (#737373),
- *   the graph-family stand-in minted because the YES pole IS the ground colour
- *   (`--color-yes` = `--color-ground` = #181818, so a black arm cannot render).
- *   "Grey" is true of what you SEE and says nothing about side.
+ * - The r=5 disc's `fill` is this node's only side-keyed COLOUR expression:
+ *   `--color-yes` (#181818) for YES, `--color-no` (#fafafa) for NO — the POLE
+ *   family, carrying the locked binding: the poles name the SIDE, never the
+ *   Support/Counter relation (AGENTS.md §8; design-language.md §1 "Binding
+ *   resolved"). ⚠ The sibling MARKET-chart node is ruled onto `--graph-*`
+ *   instead (design-canon.md §10 `C-CHART-1` item 2) — a ruling its own text
+ *   scopes to `MarketPriceChart`, so the two differ by decision, not by drift.
+ * - The rim (that disc's stroke) and the r=2 core are BOTH `--graph-yes`, FIXED
+ *   on every side. Its NAME says YES; its VALUE is a mid-grey (#737373).
+ *
+ * ⚠ AND THEY DO NOT COMPOSE THE WAY THE NAMES SUGGEST. `--color-yes` equals
+ * `--color-ground` (#181818) and both charts sit on `bg-n0` (#212121), so on a
+ * YES node the disc is very nearly invisible: what actually changes between the
+ * poles is the ANNULUS between core and rim — ground-dark on YES, white on NO.
+ * The always-visible grey core is the documented fix for precisely that, not a
+ * side effect of the token (DESIGN-W2_6-graph-prototype-record.md §3 — it
+ * "rescues mostly-black YES nodes that otherwise vanished").
  *
  * ⚠ The families COINCIDE ON NO (`--graph-no` and `--color-no` are both
  * #fafafa) and DIFFER ON YES, so a RESOLVED-colour assertion cannot tell them
  * apart on the NO arm. The fill's guard asserts the LITERAL token string —
- * graph.test.tsx, "node-on-line-placement".
- *
- * ⛔ Whether the ring SHOULD stay side-blind is routed, not settled here: this
- * docblock is `P5-D20a`; the ring encoding is `P5-D20b`, split at decision D16
- * (`docs/logs/POLISH-56-STEP0-RECON-CLOSE-OUT.md`). */
+ * graph.test.tsx, "node-on-line-placement". */
 function GraphNodeMark({
 	node,
 	x,

@@ -446,10 +446,14 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 			screen.getByTestId(`segment-${M1}-1`).hasAttribute("data-side"),
 		).toBe(true);
 
-		// ARM 3 — `graph-node-*` still carries it. Asserted by NO test anywhere
-		// before this one: `node-on-line-placement` deliberately asserts the
-		// FILL (item 14) and never the attribute, so without this arm the
-		// removal could silently over-reach into the node primitive.
+		// ARM 3 — `graph-node-*` still carries it. Asserted by no test of THIS
+		// component before this one: `node-on-line-placement` deliberately
+		// asserts the FILL (item 14) and never the attribute, so without this
+		// arm the removal could silently over-reach into the node primitive.
+		// (`tests/unit/debate/render/price-chart.test.tsx` does assert
+		// `data-side` on a `graph-node-*` — but that is `MarketPriceChart`, a
+		// different component sharing the testid prefix, and it would stay
+		// green through any over-reach here.)
 		const nodes = byPrefix(document.body, "graph-node-");
 		expect(nodes.length).toBeGreaterThanOrEqual(1);
 		for (const node of nodes) {
@@ -485,14 +489,21 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		const lines = byPrefix(expanded, "grid-y-");
 		expect(lines).toHaveLength(10);
 
-		// UNLABELLED, and inside the chart: each gridline is a bare <line> that
-		// carries no text of its own. Labels would print Đ figures and would
-		// have to route through `formatDharma`.
+		// DISTINCT positions, not N copies at one y — the count alone passes on
+		// an implementation that stacks all ten lines on top of each other.
+		expect(new Set(lines.map((l) => l.getAttribute("y1"))).size).toBe(10);
+
+		// UNLABELLED, and inside the chart: each gridline is a bare <line>
+		// carrying no text of its own, AND the chart's ONLY text is the two
+		// endpoint labels. The per-line check alone would miss a `<text>`
+		// rendered as a SIBLING of the lines. Labels would print Đ figures and
+		// would have to route through `formatDharma`.
 		const chart = within(expanded).getByTestId("profile-chart");
 		for (const line of lines) {
 			expect(line.tagName.toLowerCase()).toBe("line");
 			expect(chart.contains(line)).toBe(true);
 			expect(line.textContent).toBe("");
 		}
+		expect(chart.querySelectorAll("text")).toHaveLength(2);
 	});
 });
