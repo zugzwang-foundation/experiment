@@ -74,19 +74,26 @@ describe("C1 — Đ on every Đ quantity, all of them or none", () => {
 			const src = code(readFileSync(file, "utf8"));
 			const lines = src.split("\n");
 			lines.forEach((line, i) => {
-				if (!/\{\s*formatDharma\(/.test(line)) {
-					return;
-				}
-				// The glyph may sit on this line before the call, or end the line
-				// above (the shipped `Đ{" "}` / `Đ ` continuation forms).
-				const before = line.slice(0, line.indexOf("{"));
-				const prev = lines[i - 1] ?? "";
-				const carriesHere = /Đ\s*$/.test(before) || /Đ\{" "\}\s*$/.test(before);
-				const carriesAbove = /Đ\s*(\{" "\})?\s*$/.test(prev.trimEnd());
-				if (!carriesHere && !carriesAbove) {
-					offenders.push(
-						`${file.replace(`${ROOT}/`, "")}:${i + 1} → ${line.trim().slice(0, 70)}`,
-					);
+				// ⚠ SLICE BEFORE THE CALL, NOT BEFORE THE FIRST BRACE ON THE LINE.
+				// The first `{` is often an unrelated conditional — measured on
+				// `{item.removed ? null : <>Đ {formatDharma(item.staked)}</>}`, where
+				// slicing at the first brace reported a bare render that was not
+				// there (O-3: a true refusal with a misleading cause is a defect,
+				// and so is a false one). Every occurrence on the line is checked.
+				const call = /\{\s*formatDharma\(/g;
+				let m = call.exec(line);
+				while (m !== null) {
+					const before = line.slice(0, m.index);
+					const prev = lines[i - 1] ?? "";
+					const carriesHere =
+						/Đ\s*$/.test(before) || /Đ\{" "\}\s*$/.test(before);
+					const carriesAbove = /Đ\s*(\{" "\})?\s*$/.test(prev.trimEnd());
+					if (!carriesHere && !carriesAbove) {
+						offenders.push(
+							`${file.replace(`${ROOT}/`, "")}:${i + 1} → ${line.trim().slice(0, 70)}`,
+						);
+					}
+					m = call.exec(line);
 				}
 			});
 		}
@@ -122,12 +129,22 @@ describe("C1 — Đ on every Đ quantity, all of them or none", () => {
 	it("glyph::POSITIVE-CONTROL-the-predicate-rejects-a-bare-render", () => {
 		// ⚠ PROOF BY REVERSAL. A guard only ever run against a passing tree is
 		// indistinguishable from one that cannot fail.
-		const bare = "const x = <span>{formatDharma(item.staked)}</span>;";
-		const line = bare;
-		const before = line.slice(0, line.indexOf("{"));
-		expect(/Đ\s*$/.test(before)).toBe(false);
-		const carried = "const x = <span>Đ {formatDharma(item.staked)}</span>;";
-		const b2 = carried.slice(0, carried.indexOf("{"));
-		expect(/Đ\s*$/.test(b2)).toBe(true);
+		const at = (line: string) => {
+			const m = /\{\s*formatDharma\(/.exec(line);
+			return m === null ? "" : line.slice(0, m.index);
+		};
+		expect(
+			/Đ\s*$/.test(at("const x = <span>{formatDharma(item.staked)}</span>;")),
+		).toBe(false);
+		expect(
+			/Đ\s*$/.test(at("const x = <span>Đ {formatDharma(item.staked)}</span>;")),
+		).toBe(true);
+		// …and the conditional form that produced a FALSE RED before the predicate
+		// was corrected: the glyph is present, just not before the first brace.
+		expect(
+			/Đ\s*$/.test(
+				at("{item.removed ? null : <>Đ {formatDharma(item.staked)}</>}"),
+			),
+		).toBe(true);
 	});
 });

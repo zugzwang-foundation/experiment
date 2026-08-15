@@ -1,12 +1,11 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { BookmarkCard } from "@/components/bookmarks/BookmarkCard";
+import { BookmarksTable } from "@/components/bookmarks/BookmarksTable";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { Badge } from "@/components/ui/badge";
-import { EmptyBlock } from "@/components/ui/empty-block";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
@@ -17,11 +16,14 @@ import { loadProfileTiles } from "@/server/profile/tiles";
 
 /** W2.11 P1 copy — web-authored, carried VERBATIM from the state-kit mockup's
  *  "Empty Bookmarks · id 18" block (`:198`, `:199`), ratified as OD-1. Tests
- *  import these; they are never re-typed inline. */
-export const BOOKMARKS_EMPTY_COPY = {
-	msg: "No bookmarks yet.",
-	sub: "Saved arguments will appear here.",
-} as const;
+ *  import these; they are never re-typed inline.
+ *
+ *  ⚠ ROUND 3 C3 — THE DEFINITION MOVED, THE EXPORT DID NOT. The empty arm now
+ *  lives inside `BookmarksTable`, with the list it replaces, so the const moved
+ *  there and is RE-EXPORTED here. ⛔ It is re-exported rather than re-typed:
+ *  every existing importer keeps its handle, and the two strings still exist in
+ *  exactly one place. */
+export { BOOKMARKS_EMPTY_COPY } from "@/components/bookmarks/BookmarksTable";
 
 /**
  * The /bookmarks surface (ADR-0032 D-5 / D-6; plan §3.3), composed into the
@@ -123,19 +125,22 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				)}
 				<ProfileGraph series={graph} />
 			</div>
-			{items.length === 0 ? (
-				<EmptyBlock
-					message={BOOKMARKS_EMPTY_COPY.msg}
-					messageTestId="bookmarks-empty"
-					sub={BOOKMARKS_EMPTY_COPY.sub}
-				/>
-			) : (
-				<div data-testid="bookmark-list" className="flex flex-col gap-3">
-					{items.map((item) => (
-						<BookmarkCard key={item.id} item={item} />
-					))}
-				</div>
-			)}
+			{/* ⚠⚠ ROUND 3 C3 — THE ARENA BAND, byte-carried from Profile's
+			    (`u/[pseudonym]/page.tsx:282-283`). The stacked card list is replaced
+			    by Profile's five-column table inside a bordered panel; the EMPTY arm
+			    moved inside that panel with it, so the state is framed rather than
+			    floating bare in the page column.
+			    ⚠ The RIGHT half of the arena lands at C6 — until then this band
+			    holds one panel and `lg:grid-cols-2` leaves its second cell empty,
+			    which is a visible intermediate and a deliberate one: C3 ships a
+			    whole table, C6 ships a whole replica, and neither half is a stub of
+			    the other. */}
+			<div
+				data-testid="bookmarks-arena"
+				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+			>
+				<BookmarksTable items={items} />
+			</div>
 		</PageContainer>
 	);
 }
