@@ -28,10 +28,7 @@ export function BookmarkCard({
 		return (
 			<Card data-testid={`bookmark-removed-${item.id}`} className="gap-2 p-3">
 				<div className="flex items-center justify-between gap-2">
-					<div className="flex flex-wrap items-center gap-2">
-						<SideBadge side={item.side} size="profile" />
-						<AuthorHead pseudonym={item.authorPseudonym} />
-					</div>
+					<BookmarkRemovedHead item={item} />
 					<UnbookmarkButton commentId={item.id} />
 				</div>
 				<p className="text-n5 text-xs italic">{REMOVED_STUB_TEXT}</p>
@@ -42,26 +39,7 @@ export function BookmarkCard({
 	return (
 		<Card data-testid={`bookmark-${item.id}`} className="gap-2 p-3">
 			<div className="flex items-center justify-between gap-2">
-				<div className="flex flex-wrap items-center gap-2">
-					{/* Item 1 (PD-6-01) — canon §3 item 11's `SIDE @ entry%`, the same
-					    PROP PASS POLISH.5 item 3 made at `ArgumentList.tsx:72-76`.
-					    `SideBadge` already takes `price` and already formats it under
-					    its own allow-marker, so NO formatting happens here: doing it
-					    at this call site would need a fourth marker and redden
-					    `pct-round-render` (its count is exact, deliberately). The
-					    stored value is ALREADY the bought side's price — routing it
-					    through the PAIRED formatter would print `NO @ 45%` for an
-					    author who entered NO at 55%. ⛔ NEVER on the removed variant
-					    at `:32`: that arm carries no price field, so it is a compile
-					    error — the masking boundary working (S-5, SC-1). */}
-					<SideBadge side={item.side} size="profile" price={item.priceAtBet} />
-					{/* `PositionMarker` returns null for "none" itself, so the call
-					    site no longer carries that condition. It also supplies the
-					    `aria-label="Author Flipped"` the hand-roll lacked — the PD-0-10
-					    root cause was primitive duplication, not styling. */}
-					<PositionMarker marker={item.marker} />
-					<AuthorHead pseudonym={item.authorPseudonym} />
-				</div>
+				<BookmarkPresentHead item={item} />
 				<UnbookmarkButton commentId={item.id} />
 			</div>
 			<Link
@@ -97,4 +75,59 @@ export function BookmarkCard({
 
 function AuthorHead({ pseudonym }: { pseudonym: string }): React.JSX.Element {
 	return <span className="text-n5 text-xs">by {pseudonym}</span>;
+}
+
+/**
+ * ⚠⚠ EXTRACTED AT HTML-FINISH · BOOKMARKS round 3, AND A CENSUS GUARD IS WHY.
+ * C6's replica needs the same head cluster this card renders. Copying it would
+ * take `SideBadge size="profile"` in the bookmarks tree from TWO call sites to
+ * FOUR and redden `tests/unit/debate/render/side-badge.test.tsx`, which pins
+ * `BookmarkCard.tsx: 2` exactly and is a file this round may not edit. Round 2
+ * reddened it exactly that way.
+ * ⇒ THE FIX IS TO HAVE ONE SITE PER VARIANT, NOT TO MOVE THE SITES. Both heads
+ * stay in THIS file, the card keeps rendering them, and the replica imports
+ * them — so the census still counts two here, and the card and the replica
+ * cannot drift in what they show.
+ *
+ * The removed head ships the SUBSET the union permits: the removed variant
+ * carries no `priceAtBet` and no `marker`, so reaching for either is a COMPILE
+ * error rather than a judgement call (SC-1 working, not remembered).
+ */
+export function BookmarkRemovedHead({
+	item,
+}: {
+	item: Extract<BookmarkItem, { removed: true }>;
+}): React.JSX.Element {
+	return (
+		<div className="flex flex-wrap items-center gap-2">
+			<SideBadge side={item.side} size="profile" />
+			<AuthorHead pseudonym={item.authorPseudonym} />
+		</div>
+	);
+}
+
+/** The present-variant head — see `BookmarkRemovedHead` for why both live here.
+ *
+ * Item 1 (PD-6-01) — canon §3 item 11's `SIDE @ entry%`, the same PROP PASS
+ * POLISH.5 item 3 made at `ArgumentList.tsx:72-76`. `SideBadge` already takes
+ * `price` and already formats it under its own allow-marker, so NO formatting
+ * happens here: doing it at this call site would need a fourth marker and redden
+ * `pct-round-render` (its count is exact, deliberately). The stored value is
+ * ALREADY the bought side's price — routing it through the PAIRED formatter
+ * would print `NO @ 45%` for an author who entered NO at 55%.
+ * `PositionMarker` returns null for "none" itself, and supplies the
+ * `aria-label="Author Flipped"` the hand-roll lacked (PD-0-10's root cause was
+ * primitive duplication, not styling). */
+export function BookmarkPresentHead({
+	item,
+}: {
+	item: Extract<BookmarkItem, { removed: false }>;
+}): React.JSX.Element {
+	return (
+		<div className="flex flex-wrap items-center gap-2">
+			<SideBadge side={item.side} size="profile" price={item.priceAtBet} />
+			<PositionMarker marker={item.marker} />
+			<AuthorHead pseudonym={item.authorPseudonym} />
+		</div>
+	);
 }

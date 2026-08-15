@@ -83,6 +83,23 @@ const SITES: Site[] = [
 		site: 2,
 		file: "src/app/(public)/bookmarks/page.tsx",
 		before: "mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6",
+		// ⚠⚠ HTML-FINISH · BOOKMARKS round 3 — `/bookmarks` takes the PROFILE
+		// ARRANGEMENT as it ships on `main` (founder-ruled). That is a two-column
+		// arena, and `reading`'s `max-w-3xl` = 768 caps the container BELOW the
+		// `lg` breakpoint at which the arena may become two columns at all — so
+		// the surface would render its two-column layout at its own minimum on
+		// every screen and never widen. That is the exact measured defect
+		// HTML-FINISH row 20 minted `wide` to fix on Profile (site 5).
+		// ⇒ This site moves to `wide` and takes Profile's own content-layout
+		// classes byte-for-byte, INCLUDING the `lg:` one-screen pair: the route
+		// occupies exactly the viewport below the header at `lg`+, bounded against
+		// the same figure `<main>`'s own floor uses.
+		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
+		// read-only this round, so `BOX_AXES` moves by preset selection alone.
+		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		movedBy:
+			"HTML-FINISH · BOOKMARKS round 3 — full replication of Profile " +
+			"(founder-ruled 2026-08-15)",
 	},
 	{
 		site: 3,
@@ -284,7 +301,13 @@ describe("B2 — the container primitive moves nothing", () => {
 			expect(s.now).not.toBe(s.before);
 		}
 		// EXACT, so a second silent move cannot join the first.
-		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([5]);
+		// ⚠ SITE 2 JOINS SITE 5 AT HTML-FINISH · BOOKMARKS round 3, and the two
+		// moves are the SAME ruling reaching two routes: `/bookmarks` takes the
+		// Profile arrangement, which is a two-column arena, and `reading`'s
+		// `max-w-3xl` = 768 caps the container BELOW the `lg` breakpoint at which
+		// that arena may become two columns at all. ⛔ THE LIST STAYS EXACT — this
+		// is an enumeration of ruled moves, not a permission to drift.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({
