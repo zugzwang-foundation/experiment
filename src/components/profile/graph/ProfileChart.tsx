@@ -217,7 +217,6 @@ function FlipMarker({
 	return (
 		<g
 			data-testid={`flip-marker-${seg.marketId}-${seg.episodeIndex}`}
-			data-side={seg.side}
 			transform={`translate(${xPx(last.at, startMs, endMs)},${yPx(last.value, yMax)})`}
 		>
 			<circle

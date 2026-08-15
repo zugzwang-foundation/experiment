@@ -412,4 +412,48 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(nodeEls).not.toContain(marker);
 		expect(marker.closest('[data-testid^="graph-node-"]')).toBeNull();
 	});
+
+	it("flip-marker-carries-no-data-side", () => {
+		// POLISH.5 item 13. `FlipMarker` strokes `--graph-yes` (rim) and
+		// `--graph-no` (swap arrows) UNCONDITIONALLY, on every side — it has no
+		// side-keyed render at all, so `data-side` was encoding nothing and is
+		// removed. Its own docblock already says it is "a marker, NOT a node".
+		//
+		// THE RULE, and it is why this guard has three arms: `data-side` STAYS
+		// where the element's render IS side-keyed and GOES where it is not.
+		// `Segment` keys its stroke class on `seg.side`; `GraphNodeMark` keys
+		// its fill on `node.side`. Asserting only the removal would prove half —
+		// these three arms together prove it was SURGICAL.
+		//
+		// One per-market render reaches all three families: M1 has an exited
+		// episode (the marker), two segments, and one own node.
+		render(<ProfileChart series={FULL} selection={M1} mode="expanded" />);
+
+		// ARM 1 — the marker carries NO `data-side`. `hasAttribute` is the
+		// deliberate instrument: it also rejects a `data-side=""` that
+		// `getAttribute(...) !== null` would let through.
+		const marker = screen.getByTestId(`flip-marker-${M1}-0`);
+		expect(marker.hasAttribute("data-side")).toBe(false);
+
+		// ARM 2 — `segment-*` still carries it. The VALUES are asserted by
+		// `segment-stroke-by-side` above, at both poles and against the stroke
+		// token; this arm asserts only that the attribute SURVIVED, so the two
+		// cases do not duplicate one another.
+		expect(
+			screen.getByTestId(`segment-${M1}-0`).hasAttribute("data-side"),
+		).toBe(true);
+		expect(
+			screen.getByTestId(`segment-${M1}-1`).hasAttribute("data-side"),
+		).toBe(true);
+
+		// ARM 3 — `graph-node-*` still carries it. Asserted by NO test anywhere
+		// before this one: `node-on-line-placement` deliberately asserts the
+		// FILL (item 14) and never the attribute, so without this arm the
+		// removal could silently over-reach into the node primitive.
+		const nodes = byPrefix(document.body, "graph-node-");
+		expect(nodes.length).toBeGreaterThanOrEqual(1);
+		for (const node of nodes) {
+			expect(node.hasAttribute("data-side")).toBe(true);
+		}
+	});
 });
