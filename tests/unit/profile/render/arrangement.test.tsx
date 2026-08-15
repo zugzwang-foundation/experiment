@@ -1309,3 +1309,85 @@ describe("HTML-FINISH profile row 19 — the Arguments breakdown is its own elem
 		expect(flat.textContent).toBe("5 (3 Posts | 2 Replies)");
 	});
 });
+
+describe("ROUND 5 item D — Đ on the positions table's two value cells", () => {
+	const VISITOR_PAYLOAD = { owner: false as const, rows: [ROW_OPEN] };
+
+	/** The Staked and Current cells, by their fixed positions in the five-column
+	 * grid (Position · Argument · Staked · ␣ · Current — row 14's order). */
+	const valueCells = () => {
+		const cells = cellsOf(M1);
+		return { staked: cells[2], current: cells[4] };
+	};
+
+	it("itemD::BOTH-value-cells-carry-the-glyph", () => {
+		// ⛔ ALL OF THEM OR NONE. A half-applied glyph is the round-3 defect this
+		// item exists to close, so both cells are asserted in ONE test — a pair of
+		// separate tests can go half-green and read as "mostly passing".
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const { staked, current } = valueCells();
+		for (const [name, cell] of [
+			["Staked", staked],
+			["Current", current],
+		] as const) {
+			const text = (cell?.textContent ?? "").trim();
+			// ⛔ BY CODE POINT, not by pasting the character: U+0110 has lookalikes
+			// (Ð U+00D0 ETH) that are visually identical in many faces.
+			expect(
+				text.codePointAt(0),
+				`item D: the ${name} cell must start with Đ (U+0110). Got "${text}".`,
+			).toBe(0x110);
+			// …and the SHIPPED spacing — `Đ 25`, never `Đ25`.
+			expect(text.slice(0, 2)).toBe("Đ ");
+			expect(text.length).toBeGreaterThan(2);
+		}
+	});
+
+	it("itemD::the-rendered-strings-are-exactly-the-mockup's-shape", () => {
+		// The mockup reads `Đ 240 → Đ 310` (`:556`, `:558`). The fixture's own
+		// figures, in that shape.
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const { staked, current } = valueCells();
+		expect((staked?.textContent ?? "").trim()).toBe("Đ 25");
+		expect((current?.textContent ?? "").trim()).toBe("Đ 31");
+	});
+
+	it("itemD::the-ARROW-track-between-them-takes-no-glyph", () => {
+		// It is a relation, not a quantity — and it is `aria-hidden`.
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const arrow = cellsOf(M1)[3];
+		expect((arrow?.textContent ?? "").trim()).toBe("→");
+	});
+
+	it("itemD::formatDharma-still-wraps-the-value-so-DROUND-holds", () => {
+		// The glyph is a sibling TEXT NODE, not a change to the formatter, so
+		// `no-raw-dharma-render` sees the same wrapped call. Proven by the
+		// GROUPING surviving: a bare `{row.staked}` would print the raw
+		// NUMERIC(38,18) string.
+		render(
+			<PositionsTable
+				payload={{
+					owner: false,
+					rows: [
+						{
+							...ROW_OPEN,
+							staked: "14260.000000000000000000",
+							current: "3225.500000000000000000",
+						},
+					],
+				}}
+			/>,
+		);
+		const { staked, current } = valueCells();
+		expect((staked?.textContent ?? "").trim()).toBe("Đ 14,260");
+		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226");
+	});
+
+	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {
+		// ⚠ PROOF BY REVERSAL. The bare form is what shipped through round 4, and
+		// the assertion above must reject it — otherwise this guard cannot fail.
+		const { container } = render(<span data-testid="control-bare">25</span>);
+		const bare = container.querySelector('[data-testid="control-bare"]');
+		expect((bare?.textContent ?? "").codePointAt(0)).not.toBe(0x110);
+	});
+});

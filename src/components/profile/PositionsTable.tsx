@@ -739,10 +739,30 @@ export function PositionsTable({
 										    ships with one child each, which is the arrangement the row
 										    names and the slot those two figures land in if the DTO ever
 										    carries them. `text-center` stays on the `<td>` so the
-										    alignment survives if the inner span is ever unwrapped. */}
+										    alignment survives if the inner span is ever unwrapped.
+										    ⚠⚠ ROUND 5 item D — THE GLYPH. These two cells printed bare
+										    digits (`25 → 25`, `280 → 267`) beside five tiles and four
+										    argument-head figures that all carried Đ, so the one place
+										    on the surface where two Đ quantities sit side by side was
+										    the one place that did not say so. The mockup reads
+										    `Đ 240 → Đ 310` (`:556`, `:558`).
+										    ⛔ BYTE-CARRIED, NOT TYPED — `c4 90`, U+0110, hexdumped from
+										    `ProfileTiles.tsx`'s shipped `Đ {formatDharma(…)}`, and the
+										    SAME spacing (glyph, space, formatted number).
+										    ⛔ `formatDharma` IS UNTOUCHED — the glyph is a sibling text
+										    node, exactly as at every other site, so
+										    `no-raw-dharma-render` sees the same wrapped call it saw
+										    before.
+										    ⚠ THE SWEEP WAS WHOLE, and it found exactly these two: every
+										    other `formatDharma` render on this surface
+										    (`ProfileTiles` ×4 + the signed Net P/L, `ArgumentList`'s
+										    author stake and the split bar's three) already carried the
+										    glyph. `SellModule` carries its own at `:268`/`:284` and is
+										    read-only this round. Two sites, both changed here — a
+										    half-applied glyph is the round-3 defect. */}
 										<td className="p-2 text-center tabular-nums text-ink">
 											<span className="flex flex-col items-center">
-												{formatDharma(row.staked)}
+												Đ {formatDharma(row.staked)}
 											</span>
 										</td>
 										{/* Row 14's arrow track. ⛔ THE GLYPH IS BYTE-CARRIED, NOT
@@ -762,7 +782,7 @@ export function PositionsTable({
 										</td>
 										<td className="p-2 text-center tabular-nums text-ink">
 											<span className="flex flex-col items-center">
-												{formatDharma(row.current)}
+												Đ {formatDharma(row.current)}
 											</span>
 										</td>
 									</tr>
