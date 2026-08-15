@@ -5,7 +5,6 @@ import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
-import { Badge } from "@/components/ui/badge";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
@@ -107,10 +106,14 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			preset="wide"
 			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
 		>
-			<div className="flex flex-wrap items-center gap-2">
-				<h1 className="font-semibold text-ink text-lg">Bookmarks</h1>
-				<Badge variant="outline">Your bookmarks</Badge>
-			</div>
+			{/* ⚠⚠ GATE C F-1 — THE PRE-REPLICATION HEADER ROW IS REMOVED, NOT
+			    DUPLICATED. It carried `<h1>Bookmarks</h1>` and the `Your bookmarks`
+			    chip above the panel, while the panel head titled itself `Bookmarks`
+			    again — the word rendered TWICE on one screen. Both elements moved
+			    INTO the panel head (`BookmarksTable.tsx`), which is where Profile's
+			    equivalent title lives; the `<h1>` is preserved as an `<h1>` because
+			    this document has no other heading. A copy would have been the
+			    defect. */}
 			{/* ⚠⚠ ROUND 3 C2 — THE HEADZONE, byte-carried from Profile's
 			    (`u/[pseudonym]/page.tsx:257-266`): `grid gap-6 lg:grid-cols-2`, the
 			    identity card (which renders the six tiles inside it) on the left and

@@ -364,3 +364,90 @@ describe("PD-6-06 — the error boundary IS the route-boundary family block", ()
 		expect(types).toMatch(/\berror\b/);
 	});
 });
+
+describe("GATE C F-1 — `Bookmarks` renders exactly once", () => {
+	/**
+	 * ⚠⚠ RECOVERED FROM `bookmarks-parity-r1-archive`, NOT RE-WRITTEN. Round 2
+	 * caught this exact defect and wrote this exact assertion
+	 * (`tests/unit/bookmarks/render/arrangement.test.tsx:189` on that branch);
+	 * the guard was discarded with round 2's code, and the defect came straight
+	 * back with round 3's replication. Its answer was correct then and is the
+	 * ruling now, so the predicate is carried verbatim rather than re-derived —
+	 * a re-derivation would be a second chance to get it wrong.
+	 *
+	 * ⚠ IT COUNTS LEAF TEXT NODES, and that is what makes it work. An ancestor's
+	 * `textContent` concatenates its descendants', so `container.textContent`
+	 * would match on any wrapper containing the word and a whole-tree
+	 * `getAllByText` would be defeated by nesting. `children.length === 0`
+	 * restricts the count to elements that OWN the string.
+	 */
+	it("f1::the-word-renders-once-and-the-survivor-is-the-h1", async () => {
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		const { container } = render(await BookmarksPage());
+		const exact = [...container.querySelectorAll("*")].filter(
+			(el) => el.children.length === 0 && el.textContent === "Bookmarks",
+		);
+		expect(
+			exact.length,
+			`F-1: "Bookmarks" renders ${exact.length} times. The page-level header ` +
+				`row is REMOVED and the panel head carries the only one.`,
+		).toBe(1);
+		expect(exact[0]?.tagName).toBe("H1");
+		expect(
+			screen.getByTestId("bookmarks-panel-head").contains(exact[0] as Node),
+		).toBe(true);
+	});
+
+	it("f1::the-heading-keeps-the-PANEL-TITLE-classes-so-nothing-moves", async () => {
+		// The element changed from `<span>` to `<h1>`; the class string did not.
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		render(await BookmarksPage());
+		const h1 = screen.getByTestId("bookmarks-panel-head").querySelector("h1");
+		expect(h1?.className.split(/\s+/)).toEqual([
+			"text-xs",
+			"font-medium",
+			"text-ink",
+		]);
+	});
+
+	it("f1::no-page-level-header-row-survives-above-the-panel", async () => {
+		// ⛔ A COPY IS THE DEFECT. The heading must not exist outside the panel.
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		const { container } = render(await BookmarksPage());
+		const headings = [...container.querySelectorAll("h1")];
+		expect(headings.length).toBe(1);
+		const head = screen.getByTestId("bookmarks-panel-head");
+		expect(head.contains(headings[0] as Node)).toBe(true);
+	});
+
+	it("f1::the-view-chip-still-renders-exactly-once-pending-the-ruling", async () => {
+		// ⚠ The chip is SHIPPED WHERE IT WAS relative to the title, not resolved.
+		// The two-chip question (this vs IdentityCard's "Viewing as owner") is the
+		// founder's; this only pins that moving it did not duplicate or drop it.
+		vi.mocked(loadBookmarks).mockResolvedValue([]);
+		const { container } = render(await BookmarksPage());
+		const chips = [...container.querySelectorAll("*")].filter(
+			(el) => el.children.length === 0 && el.textContent === "Your bookmarks",
+		);
+		expect(chips.length).toBe(1);
+		expect(
+			screen.getByTestId("bookmarks-panel-head").contains(chips[0] as Node),
+		).toBe(true);
+	});
+
+	it("f1::POSITIVE-CONTROL-the-leaf-predicate-catches-a-duplicate", () => {
+		// ⚠ PROOF BY REVERSAL, and it also proves the predicate is not fooled by
+		// an ancestor: the wrapper's textContent is "Bookmarks" too, but it has
+		// children, so only the two LEAVES are counted.
+		const { container } = render(
+			<div>
+				<h1>Bookmarks</h1>
+				<span>Bookmarks</span>
+			</div>,
+		);
+		const exact = [...container.querySelectorAll("*")].filter(
+			(el) => el.children.length === 0 && el.textContent === "Bookmarks",
+		);
+		expect(exact.length).toBe(2);
+	});
+});

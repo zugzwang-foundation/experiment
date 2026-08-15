@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
@@ -522,7 +523,36 @@ function BookmarksPanel({
 				data-testid="bookmarks-panel-head"
 				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
-				<span className="text-xs font-medium text-ink">Bookmarks</span>
+				{/* ⚠⚠ GATE C F-1 — THE `<h1>` LIVES HERE, AND IT IS THE ONLY ONE.
+				    Before this, `page.tsx` carried a pre-replication header row
+				    (`<h1>Bookmarks</h1>` + the chip) ABOVE the panel while this bar
+				    titled itself `Bookmarks` again — the word rendered TWICE. Round 2
+				    caught it and guarded it; the guard went with round 2's code and
+				    the defect came back with the replication.
+				    ⇒ THE HEADING MOVED IN; the page-level row is REMOVED, not copied.
+				    ⛔ IT STAYS AN `<h1>`, NOT A `<span>`, AND THAT IS THE RULING —
+				    Profile's equivalent bar uses a `<span>` only because Profile's
+				    heading role is filled by the identity card's pseudonym, and this
+				    document has no other heading at all. Canon §10 `C-STATES-1`'s
+				    DOC-1 rider is the governing line: a shared TREATMENT never
+				    ratifies a shared FILE SHAPE, and a reader must not "fix" a
+				    structural divergence to match a sibling surface.
+				    ⚠ THE CLASSES ARE THE PANEL-TITLE CLASSES, byte-identical to the
+				    `<span>` they replace and to Profile's — so the element changes and
+				    not one pixel does. */}
+				<h1 className="text-xs font-medium text-ink">Bookmarks</h1>
+				{/* ⚠ THE `Your bookmarks` CHIP LANDS HERE BY NECESSITY, NOT BY RULING.
+				    It shared the removed page-level row with the `<h1>`, so it had to
+				    go somewhere; this keeps it adjacent to the title exactly as it was.
+				    ⛔ THE TWO-CHIP QUESTION IS NOT RESOLVED HERE — `IdentityCard`
+				    renders with `owner=true` and its own chip reads "Viewing as owner",
+				    so two chips describe the same view in different words. Both
+				    `IdentityCard` and `profile/copy.ts` are READ ONLY this round. The
+				    options are reported to the founder; nothing is recommended and
+				    nothing is decided. */}
+				<Badge data-testid="bookmarks-view-chip" variant="outline">
+					Your bookmarks
+				</Badge>
 				{controls}
 			</div>
 			<div
