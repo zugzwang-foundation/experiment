@@ -106,6 +106,26 @@ run 2   Test Files  336 passed | 1 skipped (337)
 
 ⛔ **RUN 2's GREEN IS NOT THE RECEIPT, AND RECORDING IT AS ONE WOULD BE THE RE-ROLL THIS LOG ALREADY RULED AGAINST.** Same tip, same file set, opposite results — because **vitest's file order is non-deterministic between runs** (measured: runs 1 and 2 executed in completely different orders). The red is a real defect with a randomly-scheduled trigger, not a correct test failing randomly. Diagnosis below.
 
+### The full ledger — SEVEN whole-suite runs, and the runtime column is the tell
+
+| # | When | Result | Duration | Note |
+|---|---|---|---|---|
+| 1 | pre-`R-4·events` | ⛔ RED ×1 | 174 s | `events-idempotency` — the real defect |
+| 2 | pre-`R-4·events` | ✅ green | 232 s | lucky ordering; proves nothing |
+| 3 | post-fix | ✅ green | **355 s** | ⚠ adjacency NOT exercised |
+| 4 | post-fix | ⛔ RED ×1 | **504 s** | `profile/tiles` — environmental |
+| 5 | post-fix | ⛔ RED ×2 | **727 s** | `debate-export` + `page-wiring` — environmental |
+| 6 | **post-`VACUUM FULL`** | ✅ green | **409 s** | ⚠ adjacency NOT exercised |
+| 7 | **post-`VACUUM FULL`** | ✅ green | **529 s** | ⚠ adjacency NOT exercised |
+
+✅ **THE BAR IS MET: runs 6 and 7 are two CONSECUTIVE green whole-suite runs on the remediated environment** — `336 passed | 1 skipped (337)`, `2985 passed`, exits read from the log.
+
+⚠ **BUT THE REMEDIATION IS PARTIAL, AND RUN 7 SAYS SO: 409 s → 529 s.** The bloat is already re-accumulating, because `VACUUM FULL` cannot reclaim what the replication slot pins and the slot is still active. ⇒ **Expect these reds to return.** The durable fix is to stop `supabase_realtime_experiment`, advance or drop the slot, then `VACUUM FULL` again — **not done, founder's call, shared local infra.**
+
+⛔ **THE DURATION COLUMN IS THE DIAGNOSIS.** 355 → 504 → 727 on an unchanged tip is not test flakiness, it is an environment degrading under the suite's own catalog churn; and 727 → **409** immediately after `VACUUM FULL` is the same finding read backwards. **A pass/fail column alone would have hidden it** — three runs of "sometimes red" reads as flake, while the runtimes read as a cause.
+
+⚠ **NO RUN OF THE SEVEN HAPPENED TO SCHEDULE `csam-seam` IMMEDIATELY BEFORE `events-idempotency`.** Every green above is therefore silent on `R-4·events`. The deliberate two-invocation control is the ONLY evidence for that fix, exactly as the ruling anticipated — recorded here so a later reader does not mistake seven runs for seven confirmations.
+
 ⚠ **Environment, recorded because it is invisible afterwards:** the reboot took Docker down with it. The stack was restarted and **verified migrated before any gate ran** — 25 rows in `drizzle.__drizzle_migrations` (= `0000`–`0024`), `uuidv7()` present, 38 base tables. Without that check the suite would have produced a whole-DB false RED.
 
 ⚠ `FULL_EXIT` is read from the log, not from the shell's reported status: the run was `pnpm vitest run > log; echo FULL_EXIT=$? >> log`, and the harness reports the **trailing `echo`'s** exit, which is always 0. Gate commands never let another command own the exit (§14).
@@ -137,6 +157,69 @@ Its **MEDIUM was a real miss of mine**: C13's corrected track had **no edge**, s
 ⛔ **NOT FIXED — the one-line fix (`"events"` into `csam-seam.test.ts:50`) is OUT of §8's allow-list, where an unlisted edit is a RUN-STOP.** Filed to `claude-progress.md` and raised for a founder ruling. Option (b), scoping `events-idempotency.test.ts:258` with a `.where()`, removes the whole-table dependency rather than just this instance — but is a larger edit to a critical-path test.
 
 ⚠ **This also bears on the FLAKE SIGHTING recorded above.** That one was `atomicity.test.ts` with a 500-vs-200 signature, so it is not the same test and I am not claiming it is the same cause. But "a preceding file left state behind" is now a *demonstrated* mechanism in this suite, and it is a cheaper explanation than contention. The standing rule stands: a second `bet-place::every-persisted-comment-has-a-bet-referencing-it` red retires the flake reading.
+
+## `R-4·events` — RULED (option a), FIXED, and the control that proves it
+
+Founder ruling: add `"events"` to `csam-seam.test.ts`'s `afterEach` truncate list. **One string**, placed directly after `"mod_actions"` — the ordering all nine sibling `recordGateBlock` suites use. §8's allow-list gains `tests/server/moderation/csam-seam.test.ts` **for this addition only**, the same shape as `R-3`.
+
+**Scope condition held.** The diff touches the truncate list only — grepped for `expect|toBe|toEqual|toHaveBeen|it(|describe(`, no hits.
+
+**Positive control — the exact failing sequence, forced deterministically:**
+
+| Step | Before | After |
+|---|---|---|
+| `events` at start | 0 | 0 |
+| `vitest run csam-seam` → rows left | **2** | **0** ✅ |
+| `vitest run events-idempotency` immediately after, no truncation between | **`expected 5 to be 3`** | **2/2, exit 0** ✅ |
+
+⛔ **AND THE TEST WAS NOT WEAKENED, WHICH IS THE CHECKABLE PART:** `git diff origin/main..HEAD -- tests/server/bets/events-idempotency.test.ts` is **EMPTY**. It is byte-identical to `main` — still an unfiltered whole-table count, still `toBe(3)`. Nothing was made to pass by changing what it measures.
+
+⚠ **A paired single-invocation run is NOT a control and is not cited as one.** `vitest run csam-seam events-idempotency` scheduled `events-idempotency` FIRST, so it never exercised the adjacency. It passed and proves nothing.
+
+## ⚠ THE `tiles` RED — UNREPRODUCED, and graded that way on purpose
+
+Full run 4 came back RED on `tests/server/profile/tiles.test.ts > derivations`:
+
+```
+PostgresError 23503 — insert or update on table "dharma_ledger" violates foreign key
+constraint "dharma_ledger_user_id_users_id_fk"
+detail: Key (user_id)=(01a0061a-…) is not present in table "users".
+```
+
+A `users` row committed by `seedUser` (`:160`) was **absent** by the ledger insert (`:168`). With `testClient { max: 1 }` there is no second connection to blame, so something removed it.
+
+**What I measured, and what I could NOT establish:**
+
+- ✅ `tiles.test.ts` passes **3/3 in isolation**.
+- ✅ The exact run-4 adjacency (`tests/unit/comments/foreclosure.test.ts` → `tiles.test.ts`) **passes 2/2 when forced** — so the obvious hypothesis is **NOT confirmed**.
+- ✅ `foreclosure.test.ts`'s teardown is `TRUNCATE positions, markets, users CASCADE`, and `truncateTables` is always CASCADE in one implicit transaction — a late-landing teardown *would* explain it. **Plausible, unproven.**
+- ✅ `tiles.test.ts` has **no `beforeEach` truncate** — only `afterEach` (`:147`). It is uniquely exposed to any late-landing teardown, and that is a real fragility whether or not it caused this.
+- ✅ PR 2 touches **zero** files under `src/server/profile/`, `tests/server/profile/` or `tests/unit/comments/`.
+
+### ⇒ ROOT CAUSE FOUND, and it is the ENVIRONMENT — `pg_class` bloat pinned by a replication slot
+
+Two further full runs made the pattern legible. **Runtimes climbed monotonically on an unchanged tip: 355 s → 504 s → 727 s.** Run 5 failed **two** files, both at fixture-seed time, both `23503` on a `users` FK — `integration/debate-export` (`seedNode`) and `discovery/page-wiring` (`seedCommentWithBet`). Three runs, three different files, one signature.
+
+**Measured on the live database:**
+
+```
+pg_class     943 live / 564,181 dead / 317 MB      ← for 943 rows
+pg_trigger   320 live / 194,925 dead /  68 MB
+```
+
+**The harness generates the churn.** `truncateTables` issues **13 × `ALTER TABLE … DISABLE TRIGGER` + `TRUNCATE … CASCADE` + 13 × `ENABLE TRIGGER` per call**, every `afterEach`, thousands of times — each rewriting `pg_class`/`pg_trigger` rows.
+
+**Autovacuum cannot reclaim any of it.** A logical replication slot — `cainophile_xtgm8wby`, `pgoutput`, Supabase **Realtime's** — holds `catalog_xmin` **32,372 transactions behind**. While it does, catalog dead tuples are unreclaimable: 93 autovacuum runs, zero progress. Bloated catalogs slow every FK check and plan, which **widens the window on a latent cross-file teardown race** — which is exactly why the FK reds land in whichever file happens to be adjacent and move around between runs.
+
+**Remediation taken:** `VACUUM (FULL, ANALYZE)` on `pg_class` / `pg_trigger` / `pg_attribute` / `pg_depend` / `pg_type` — 317 MB → **145 MB**, 68 MB → **35 MB**. ⚠ It cannot finish while the slot pins `catalog_xmin`, and the slot is `active`, so `pg_replication_slot_advance()` errors. **Fully clearing it needs `supabase_realtime_experiment` stopped first — NOT done: that is shared local infrastructure other worktrees use, and it is the founder's call.**
+
+⛔ **NONE OF THE THREE REDS IS A BRANCH DEFECT.** PR 2 touches zero files under `src/server/`, `src/db/`, `drizzle/`, `tests/server/profile/`, `tests/integration/` or `tests/unit/comments/`. ⚠ And the *earlier* framing of this as an unreproducible flake was itself the trap: it survived six targeted attempts because **the trigger was never in the test files at all**. `AUDIT-FIX-A22:65`'s "local-PG flake class" now has a measured mechanism instead of a shrug.
+
+⛔ **`R-4·events` IS UNAFFECTED AND STILL STANDS.** That one reproduced deterministically against a *clean* database — seed the 2 rows, get `expected 5 to be 3`; empty the table, get 2/2. It is a genuine omission fixed at source, and it must not be relabelled environmental now that an environmental cause exists for the others. **Two different failures, two different standards of proof, kept apart deliberately.**
+
+⚠ **It is a DIFFERENT test from the `atomicity.test.ts` sighting**, so it does not trigger that rule's "second red retires the flake reading" — that rule stays scoped to its own test and stays live.
+
+**Docketed:** `tests/unit/comments/foreclosure.test.ts` is a **DB-touching test living under `tests/unit/`**, which AGENTS.md §9 defines as *"Unit (no IO)"*. Only two files in `tests/unit/` do this. Independent of this red, it is a convention violation in the directory a developer assumes is safe to run without a database.
 
 ## The THIRD reviewer pass — post-reboot, on `375dc2e` (which the first pass never saw)
 
@@ -170,10 +253,13 @@ The two passes recorded above ran on content **before `375dc2e`**, which is itse
 
 ⚠ **"The branch is green" is no longer a statement this log will make without qualification.** The tip measured RED then GREEN on two consecutive whole-suite runs with nothing changed between them.
 
-Three docket rows are **drafted and handed to web, deliberately uncommitted** (`docs/design/**` and the docket are off §8):
-1. **The canon SWEEP** (`R-4` / `GC-15`) — not two coordinates. `design-canon.md:67`, `:110` and a third the diff itself cites via `ReplyCard`'s new docstring ("Canon §6 named bookmark AND download on the reply card"). Grep every surface form and disposition every hit.
+⚠ **`R-4` NAMES TWO DIFFERENT THINGS IN THIS TASK, AND THAT IS THE `GC-n` GENUS ONE PREFIX OVER (`CLAUDE.md` §8).** Gate C read 1's rider `R-4` is the **canon sweep**; Gate C read 2's ruling `R-4` is the **`events`-residue fix**. Both are cited in this log and in two different commit bodies. **Disambiguated here as `R-4·canon` and `R-4·events`** pending web's numbering — surfaced, not unilaterally renumbered, because a register that renumbers itself locally is how the collision started.
+
+Docket rows **drafted and handed to web, deliberately uncommitted** (`docs/design/**` and the docket are off §8):
+1. **The canon SWEEP** (`R-4·canon` / `GC-15`) — not two coordinates. ⚠ **Measured this session: 48 `download` hits across `docs/design/**`, and they are NOT one class.** `design-canon.md` `:49`/`:67`/`:110`/`:125`/`:173` and the values-log `:194` are the removed bookmark/download cluster; the **`DESIGN_W2_13` set (mockup + CLOSE-OUT) is the share-card download, a LIVE feature**, as is `design-handoff.md:143`'s Wave-2 row. ⛔ **A blanket sweep would delete a real one.** The row carries this distinction, not just the coordinates: grep every surface form, then disposition each hit by which feature it names.
 2. **`MEDIUM-2`'s real cause** — `BookmarkToggle` seeds `useState` at mount, so ANY remount loses optimistic state. Owner: ADR-0032 / UI-A6's lane.
 3. **`LOW-5`'s three T3 typography divergences** — consistency won now, fidelity docketed.
+4. **`R-4·events` option (b), the durable half** — scope `events-idempotency.test.ts:258` with a `.where()` on the fixture's own aggregate ids, removing the whole-table dependency itself rather than the one instance of it. Deliberately **not** taken under the ruling: it is a larger edit to a critical-path INVARIANT test. **Owner: the next task touching `tests/server/bets/`.**
 
 ## Context to preserve
 
@@ -183,6 +269,8 @@ Three docket rows are **drafted and handed to web, deliberately uncommitted** (`
 - **A sixth writer relationship** the plan's own rule covers: the remediation commit also writes `AggregateFooter.tsx` and `dharma-spacing.test.tsx`, so the before-C10 re-key accounts for two earlier writers.
 - ~~**`GC-12` is applied in code but not in the plan**~~ — **applied in BOTH since `5c389f0`.** `post-popup.test.tsx` covers rows 9, 10, 11, 12, 14.
 - **`R-3` widened exactly two design guards** — `side-pole-binding.test.ts` (index 0) and `pct-round-render.test.ts` (3 → **5**, not 4). Any *other* design-guard reddening is still a HALT.
+- ⛔ **THE FLAKE RULE SURVIVES THIS PR, AND IT IS CARRIED HERE SO IT DOES.** `tests/server/bets/atomicity.test.ts > bet-place::every-persisted-comment-has-a-bet-referencing-it` is **SIGHTING ONE** (§ above). **A second red retires the flake reading and it is a defect.** ⚠ Sharpened by `R-4·events`: "a preceding file left state behind" is now a **demonstrated** mechanism in this suite, not a hypothesis — and it is cheaper than contention. Check the *previous file's* truncate list before reaching for a timing explanation.
+- **`R-4·events` closed the one leak; it did not close the CLASS.** `events-idempotency.test.ts:258` still counts the whole table unfiltered, so the next file that writes `events` without truncating them re-opens exactly this failure. Docket row 4 is the structural fix.
 - Diff deliverables: `~/Downloads/POLISH-3-PR-2-DIFF.md` (halted run), `-DIFF-2.md` (C1…C12), `-DIFF-3.md` (this tip).
 - **The census is unmoved by the three open out-of-track PRs.** `#338` (`htmlfinish/bookmarks-parity`) and `#337` (`htmlfinish/profile-parity`) touch **zero** §8 allow-list paths, and both measure **13 `<SideBadge>` / 8 unsized** — identical to `origin/main`. This branch's 14 / 9 is C6's re-key and nothing else. ⚠ But `#338` **edits `docs/design/design-canon.md`**, which is exactly `R-4`'s canon-sweep target (`:67`, `:110`) — if it lands first, the drafted docket row's coordinates drift and must be re-measured, not carried.
 - **`R-4`'s sweep is far wider than the drafted row's three coordinates: 48 hits for `download` across `docs/design/**`.** They are not one class — `design-canon.md` `:49/:67/:110/:125/:173` and the values-log `:194` are the removed cluster icon, while the `DESIGN_W2_13` close-out and its mockup are the *share-card download*, a different live feature. Every hit needs dispositioning; a blanket sweep would delete a real one.
