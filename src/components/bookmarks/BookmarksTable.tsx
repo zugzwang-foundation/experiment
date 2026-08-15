@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
+import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
 import type { BookmarkItem } from "@/server/bookmarks/list";
@@ -50,6 +52,62 @@ export function BookmarksTable({
 }: {
 	items: BookmarkItem[];
 }): React.JSX.Element {
+	// ⚠⚠ C4 — ONE FILTER, AND ONLY ONE. Profile's header bar carries TWO: a market
+	// popover and an Open/Closed segmented pair. The pair CANNOT come across —
+	// `BookmarkItem` carries no `statusLabel`, no `marketStatus` and no `settled`
+	// (verified at `main`'s head: they are Q7/Q8 locals inside `list.ts` and never
+	// reach the DTO), so there is nothing to partition on and a two-button control
+	// would be a lie the DTO cannot answer. ⛔ It is not rendered disabled either:
+	// a disabled control still asserts the axis exists.
+	// ⇒ The market filter DOES carry — `marketSlug` keys it and `marketTitle`
+	// labels it, both on every variant including the removed one.
+	const [market, setMarket] = useState("all");
+	const [filterOpen, setFilterOpen] = useState(false);
+	const filterRef = useRef<HTMLDivElement | null>(null);
+
+	// Canon §5 rules the dismissal grammar for a popover on this surface family:
+	// "ESC / click-out closes". Byte-carried from `PositionsTable.tsx`, both
+	// halves — a popover dismissible only by CHOOSING traps the reader in a
+	// decision they may not want to make.
+	useEffect(() => {
+		if (!filterOpen) {
+			return;
+		}
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === "Escape") {
+				setFilterOpen(false);
+			}
+		};
+		const onPointer = (e: PointerEvent) => {
+			if (!filterRef.current?.contains(e.target as Node)) {
+				setFilterOpen(false);
+			}
+		};
+		document.addEventListener("keydown", onKey);
+		document.addEventListener("pointerdown", onPointer);
+		return () => {
+			document.removeEventListener("keydown", onKey);
+			document.removeEventListener("pointerdown", onPointer);
+		};
+	}, [filterOpen]);
+
+	// ⚠ KEYED BY `marketSlug`, NOT by a market id — `BookmarkItem` carries no
+	// `marketId`. The slug is unique per market and is already the routing key on
+	// this surface, so it is the natural handle rather than a substitute.
+	const marketOptions = useMemo(() => {
+		const seen = new Map<string, string>();
+		for (const i of items) {
+			if (!seen.has(i.marketSlug)) {
+				seen.set(i.marketSlug, i.marketTitle);
+			}
+		}
+		return [...seen.entries()];
+	}, [items]);
+
+	const visible = items.filter(
+		(i) => market === "all" || i.marketSlug === market,
+	);
+
 	if (items.length === 0) {
 		return (
 			<BookmarksPanel>
@@ -63,7 +121,65 @@ export function BookmarksTable({
 	}
 
 	return (
-		<BookmarksPanel>
+		<BookmarksPanel
+			controls={
+				/* ⛔ THE LABEL AND ITS CARET ARE BYTE-CARRIED, NOT AUTHORED — canon §6
+				   pins `Select market ▾` verbatim, and the caret is `e2 96 be`,
+				   U+25BE BLACK DOWN-POINTING SMALL TRIANGLE, identical in canon, in
+				   the mockup (`:458`/`:591`) and in Profile's shipped button.
+				   ⛔ THIS WRAPPER IS DELIBERATELY NOT `relative` — Profile measured
+				   that: `min-w-full` against a ~107px trigger produced a 107px column
+				   in which every market question wrapped over ~6 lines. The
+				   positioning context lives on the HEADER BAR, so the popover spans
+				   the bar; this wrapper carries only the ref, whose `contains()` is a
+				   DOM test unaffected by where the box is painted. */
+				<div ref={filterRef}>
+					<Button
+						type="button"
+						size="xs"
+						variant="outline"
+						data-testid="bookmarks-market-filter"
+						aria-haspopup="listbox"
+						aria-expanded={filterOpen}
+						onClick={() => setFilterOpen((o) => !o)}
+					>
+						Select market ▾
+					</Button>
+					{filterOpen && (
+						<div
+							data-testid="bookmarks-market-popover"
+							role="listbox"
+							aria-label="Select market"
+							className="absolute top-full right-0 left-0 z-20 flex flex-col rounded-[var(--r)] bg-n0 p-1 [border:var(--hairline)]"
+						>
+							<PopoverOption
+								testid="bookmarks-market-option-all"
+								selected={market === "all"}
+								onSelect={() => {
+									setMarket("all");
+									setFilterOpen(false);
+								}}
+							>
+								All markets
+							</PopoverOption>
+							{marketOptions.map(([slug, title]) => (
+								<PopoverOption
+									key={slug}
+									testid={`bookmarks-market-option-${slug}`}
+									selected={market === slug}
+									onSelect={() => {
+										setMarket(slug);
+										setFilterOpen(false);
+									}}
+								>
+									{title}
+								</PopoverOption>
+							))}
+						</div>
+					)}
+				</div>
+			}
+		>
 			{/* ⛔ THE COLUMN COUNT IS FIVE AND THE ARROW TRACK IS FOURTH OF THEM —
 			    `PositionsTable.tsx`'s row 14 order, byte-for-byte. The empty `<th>`
 			    sits BETWEEN Staked and Current, never trailing: a trailing blank
@@ -87,7 +203,7 @@ export function BookmarksTable({
 					</tr>
 				</thead>
 				<tbody>
-					{items.map((item) => (
+					{visible.map((item) => (
 						<BookmarkRow key={item.id} item={item} />
 					))}
 				</tbody>
@@ -242,8 +358,10 @@ function BookmarkArgumentCell({
  * the DTO can support.
  */
 function BookmarksPanel({
+	controls,
 	children,
 }: {
+	controls?: React.ReactNode;
 	children: React.ReactNode;
 }): React.JSX.Element {
 	return (
@@ -257,6 +375,7 @@ function BookmarksPanel({
 				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				<span className="text-xs font-medium text-ink">Bookmarks</span>
+				{controls}
 			</div>
 			<div
 				data-testid="bookmarks-panel-body"
@@ -281,3 +400,36 @@ export const BOOKMARKS_EMPTY_COPY = {
 	msg: "No bookmarks yet.",
 	sub: "Saved arguments will appear here.",
 } as const;
+
+/** One option in C4's market popover — `PositionsTable.tsx`'s `PopoverOption`,
+ * byte-for-byte. A `<button>` inside a `role="listbox"`, so it is
+ * keyboard-reachable by default and needs no roving-tabindex machinery;
+ * `aria-selected` carries the current choice, which a native `<option>` supplied
+ * for free and a hand-rolled list must state. `font-medium` on the selected row
+ * is the shipped weight scale, not the mockup's `font-weight:800`. */
+function PopoverOption({
+	testid,
+	selected,
+	onSelect,
+	children,
+}: {
+	testid?: string;
+	selected: boolean;
+	onSelect: () => void;
+	children: React.ReactNode;
+}): React.JSX.Element {
+	return (
+		<button
+			type="button"
+			role="option"
+			aria-selected={selected}
+			data-testid={testid}
+			onClick={onSelect}
+			className={`rounded-[var(--r-chip)] px-2 py-1 text-left text-sm text-ink hover:bg-n1 ${
+				selected ? "font-medium" : ""
+			}`}
+		>
+			{children}
+		</button>
+	);
+}
