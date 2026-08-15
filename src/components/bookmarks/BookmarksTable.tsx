@@ -64,6 +64,16 @@ export function BookmarksTable({
 	const [market, setMarket] = useState("all");
 	const [filterOpen, setFilterOpen] = useState(false);
 	const filterRef = useRef<HTMLDivElement | null>(null);
+	// ⚠⚠ C5 — THE SELECTED ROW, keyed by the COMMENT id (`item.id`) rather than
+	// by index. Profile keys by `marketId` for the same reason: the visible set is
+	// re-filtered by a control, so an index would silently point at a different
+	// row the moment the filter moved. Here the comment id is also the natural
+	// key — a bookmark IS a pointer at one comment.
+	// ⛔ IT STARTS AT NULL. Nothing is selected until the reader picks.
+	const [selectedId, setSelectedId] = useState<string | null>(null);
+	// One entry per rendered row, for `scrollIntoView` + focus on an arrow step.
+	// A ref, not state: moving focus must not re-render.
+	const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
 	// Canon §5 rules the dismissal grammar for a popover on this surface family:
 	// "ESC / click-out closes". Byte-carried from `PositionsTable.tsx`, both
@@ -107,6 +117,44 @@ export function BookmarksTable({
 	const visible = items.filter(
 		(i) => market === "all" || i.marketSlug === market,
 	);
+
+	// ⚠ THE SELECTION IS DERIVED AGAINST THE VISIBLE SET, NOT STORED AS TRUTH —
+	// Profile's rule. A pick the filter has hidden simply stops counting; it is
+	// REMEMBERED rather than destroyed, so switching the filter back restores it.
+	// Derivation, not an effect: an effect would render one frame with a
+	// selection that is no longer on screen.
+	const selectedRow = visible.find((i) => i.id === selectedId) ?? null;
+
+	/** Click the selected row again to clear it — Profile's `pick()`. */
+	const pick = (id: string) => {
+		setSelectedId((current) => (current === id ? null : id));
+	};
+
+	/** Up/Down step through the CURRENTLY VISIBLE rows and WRAP,
+	 * `(at + dir + len) % len`, entering at index 0 from no selection
+	 * (`at < 0 ? 0`) — Profile's `stepRow()`, arithmetic and all.
+	 * ⚠ `scrollIntoView` is GUARDED exactly as Profile guards it: jsdom
+	 * implements no layout and defines no `scrollIntoView`, so the render suite
+	 * would throw on an unguarded call. Focus moves with the selection so the
+	 * next arrow keeps arriving at the table's handler; `preventScroll` because
+	 * the line above has already scrolled, and more precisely. */
+	const stepRow = (dir: 1 | -1) => {
+		if (visible.length === 0) {
+			return;
+		}
+		const at = visible.findIndex((i) => i.id === selectedId);
+		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
+		const target = visible[next];
+		if (target === undefined) {
+			return;
+		}
+		setSelectedId(target.id);
+		const el = rowRefs.current.get(target.id);
+		if (el?.scrollIntoView) {
+			el.scrollIntoView({ block: "nearest" });
+		}
+		el?.focus({ preventScroll: true });
+	};
 
 	if (items.length === 0) {
 		return (
@@ -192,7 +240,23 @@ export function BookmarksTable({
 			    template available is a light-prototype VALUE).
 			    `bg-n0` is the panel's own background: a sticky header over scrolling
 			    rows must be opaque or the rows read through it. */}
-			<table data-testid="bookmarks-table" className="w-full text-left text-sm">
+			{/* ⛔ THE KEY HANDLER IS SCOPED TO THE TABLE, NOT TO `document` —
+			    Profile's ruling, and the reason is this surface's own: the page
+			    GROWS AND SCROLLS below `lg`, so a document-level ArrowDown that
+			    prevents default would kill keyboard scrolling of the whole route.
+			    Bound here, the keys are live exactly while focus is inside the
+			    table. */}
+			<table
+				data-testid="bookmarks-table"
+				onKeyDown={(e) => {
+					if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
+						return;
+					}
+					e.preventDefault();
+					stepRow(e.key === "ArrowUp" ? -1 : 1);
+				}}
+				className="w-full text-left text-sm"
+			>
 				<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
 					<tr>
 						<th className="p-2 text-center">Position</th>
@@ -203,8 +267,15 @@ export function BookmarksTable({
 					</tr>
 				</thead>
 				<tbody>
-					{visible.map((item) => (
-						<BookmarkRow key={item.id} item={item} />
+					{visible.map((item, index) => (
+						<BookmarkRow
+							key={item.id}
+							item={item}
+							isSelected={selectedRow?.id === item.id}
+							isFirst={selectedRow === null && index === 0}
+							onPick={pick}
+							rowRefs={rowRefs}
+						/>
 					))}
 				</tbody>
 			</table>
@@ -227,11 +298,59 @@ export function BookmarksTable({
  * `border-collapse: collapse` — measured in a browser against the compiled CSS
  * on Profile, and the same table model applies here.
  */
-function BookmarkRow({ item }: { item: BookmarkItem }): React.JSX.Element {
+function BookmarkRow({
+	item,
+	isSelected,
+	isFirst,
+	onPick,
+	rowRefs,
+}: {
+	item: BookmarkItem;
+	isSelected: boolean;
+	isFirst: boolean;
+	onPick: (id: string) => void;
+	rowRefs: React.RefObject<Map<string, HTMLTableRowElement>>;
+}): React.JSX.Element {
 	return (
 		<tr
 			data-testid={`bookmark-row-${item.id}`}
-			className="[border:var(--hairline)] hover:bg-n1"
+			ref={(el) => {
+				if (el) {
+					rowRefs.current.set(item.id, el);
+				} else {
+					rowRefs.current.delete(item.id);
+				}
+			}}
+			// ⚠ `aria-current`, NOT `aria-selected` — Profile's blocked route, and
+			// the block is the same here: `aria-selected` is only defined inside a
+			// grid or a listbox, and Biome's a11y rule rejects `role="grid"` on a
+			// `<table>` as redundant. `aria-current` is valid on ANY element and
+			// says precisely this: the current item within a set.
+			aria-current={isSelected ? "true" : undefined}
+			// Roving tabindex: one tab stop for the whole table, on the selected row
+			// — or on the first row when nothing is selected, so the keys are
+			// reachable without a click.
+			tabIndex={isSelected || isFirst ? 0 : -1}
+			onClick={(e) => {
+				// The row's own children stay clickable: the title and market links
+				// navigate, the unbookmark button acts. One `closest` covers every
+				// child without threading a handler through them.
+				if ((e.target as HTMLElement).closest("a,button")) {
+					return;
+				}
+				onPick(item.id);
+			}}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					e.preventDefault();
+					onPick(item.id);
+				}
+			}}
+			className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+				isSelected
+					? "bg-n1 [border:var(--ring-active)]"
+					: "[border:var(--hairline)] hover:bg-n1"
+			}`}
 		>
 			{/* THE POSITION CELL — `PositionsTable.tsx`'s `.poscell`: a centred
 			    column of [side word + thumb] over the row's action slot.
