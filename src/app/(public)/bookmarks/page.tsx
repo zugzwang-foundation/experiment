@@ -42,7 +42,18 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 	const items = await loadBookmarks(db, { viewerId });
 
 	return (
-		<PageContainer preset="reading" className="flex flex-col gap-4">
+		/* ⚠⚠ ROUND 3 C1 — THE WIDE CONTAINER. Founder-ruled: `/bookmarks` takes the
+		   Profile arrangement as it ships on `main`. `wide` is the preset Profile
+		   uses (`u/[pseudonym]/page.tsx:139`) and it is CONSUMED here, never
+		   re-minted — `PageContainer.tsx` is read-only this round.
+		   ⛔ `reading` (max-w-3xl px-4) cannot hold a two-column arena: it caps at
+		   768, which is BELOW the `lg` breakpoint at which the arena is allowed to
+		   become two columns at all, so the surface would render its two-column
+		   layout at its own minimum on every screen and never widen — the measured
+		   defect HTML-FINISH row 20 minted `wide` to fix on Profile.
+		   ⚠ `flex min-h-0 flex-1 flex-col gap-6` is byte-carried from Profile's
+		   call site (`:140`) minus the `lg:` one-screen pair, which lands at C7. */
+		<PageContainer preset="wide" className="flex min-h-0 flex-1 flex-col gap-6">
 			<div className="flex flex-wrap items-center gap-2">
 				<h1 className="font-semibold text-ink text-lg">Bookmarks</h1>
 				<Badge variant="outline">Your bookmarks</Badge>
