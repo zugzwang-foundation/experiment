@@ -877,11 +877,42 @@ describe("HTML-FINISH profile rows 1 · 8 — the two-band frame", () => {
 			expect(cls.split(/\s+/), `row 1: ${name} is not a grid`).toContain(
 				"grid",
 			);
+			// ⚠ `lg`, NOT `md` — RULED FROM MEASUREMENT. The arena is two columns
+			// only where each half clears the positions table's fixed track
+			// (measured 214px) PLUS the Argument column's min-content (115px). At
+			// `md` each half measured 356px and Argument rendered at 117px against
+			// that 115px min-content — pinned, which is the eight-character
+			// symptom. `lg` gives it ~244px. Pinned by NAME, and `md` pinned
+			// ABSENT, so "make it responsive sooner" reddens instead of quietly
+			// re-shipping the cramped column.
 			expect(
 				cls.split(/\s+/),
-				`row 1: ${name} is not two columns above md`,
-			).toContain("md:grid-cols-2");
+				`row 1: ${name} must go two-column at \`lg\`, not sooner — at \`md\` ` +
+					`the Argument column is pinned at its 115px min-content.`,
+			).toContain("lg:grid-cols-2");
+			expect(
+				cls.split(/\s+/),
+				`row 1: ${name} still carries \`md:grid-cols-2\`.`,
+			).not.toContain("md:grid-cols-2");
 		}
+	});
+
+	it("row1::both-bands-share-ONE-breakpoint", () => {
+		// If the headzone went two-column while the arena below it was still
+		// stacked, the page would read as three bands, not two. Asserted as an
+		// EQUALITY between the two rather than as two independent pins, so
+		// changing one and forgetting the other reddens.
+		const src = page();
+		const bp = (testid: string) => {
+			const cls = new RegExp(`"${testid}"\\s+className="([^"]*)"`).exec(
+				src,
+			)?.[1];
+			return (
+				(cls ?? "").split(/\s+/).find((x) => x.endsWith(":grid-cols-2")) ?? null
+			);
+		};
+		expect(bp("profile-headzone")).not.toBeNull();
+		expect(bp("profile-headzone")).toBe(bp("profile-arena"));
 	});
 
 	it("row1::the-five-siblings-are-GONE-from-the-container", () => {

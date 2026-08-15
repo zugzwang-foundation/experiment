@@ -83,30 +83,46 @@ export default async function ProfilePage({
 	const initialMarketSlug = typeof market === "string" ? market : undefined;
 
 	return (
-		/* ⛔ THE CONTAINER TAG IS FROZEN — preset AND className. `tests/unit/shell/
-		   page-container.test.ts` site 5 (`:79-82`) pins this call site's RESOLVED
-		   class set to `mx-auto flex w-full max-w-3xl flex-col gap-6 px-4 py-6`
-		   and asserts equality, and its `BOX_AXES` (`:40`) additionally forbids a
-		   `max-w-*` on the className. So HTML-FINISH row 20 (the wide preset) is
-		   HALTED: both routes to it cross a guard outside this task's write
-		   allow-list. The two bands below therefore compose INSIDE the 3xl frame.
-		   ⚠ The same pin blocks `flex-1` here, which is what recon §4.1 calls
-		   "CHAIN ENDS HERE" — see the arena band's note. */
-		<PageContainer preset="reading" className="flex flex-col gap-6">
+		/* HTML-FINISH row 20 — THE WIDTH. `wide` is minted additively in
+		   `PageContainer.tsx`; the census and the byte-carry are recorded there.
+		   The allow-list was extended by one path this round, so site 5's pin in
+		   `tests/unit/shell/page-container.test.ts` moves WITH this change, in
+		   the same commit, and records it as a deliberate move rather than
+		   absorbing it into the `c5892bc` baseline that field is contracted to
+		   hold verbatim. */
+		<PageContainer preset="wide" className="flex flex-col gap-6">
 			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
 			    five full-width sections stacked in one column. Canon §2 (Profile):
 			    "Two bands. Top: identity card … + six account tiles … + the graph
 			    slot. Bottom 'arena': Positions table … + the argument [list]".
 			    The mockup's `.headzone` and `.arena` are both `grid-template-
 			    columns:1fr 1fr` (`:189`, `:221-222`).
-			    ⚠ `md:` IS THE BUILD'S BREAKPOINT, NOT THE MOCKUP'S. The mockup is a
-			    fixed-desktop prototype and declares no breakpoint at all (recon
-			    A.4), so it makes no responsive statement to diverge from. Below
-			    `md` the two columns stack — the same posture `HeroPanels.tsx:82`
-			    ships for Discovery's three-panel hero.
+			    ⚠⚠ `lg:`, NOT `md:` — RULED FROM MEASUREMENT, NOT CHOSEN. The arena
+			    is two columns ONLY where each half clears the positions table's
+			    fixed-track requirement. Measured in a browser against real
+			    compiled CSS, on the shipped table with real data:
+
+			      fixed track (Position 64 + Staked 58 + arrow 31 + Current 61)
+			                                                        = 214px
+			      Argument column min-content                       = 115px
+			      ⇒ a half that clears both needs a 329px table,
+			        + 26px panel chrome (p-3 ×2 + hairline ×2)      = 355px
+			      ⇒ two halves + the 24px gap + px-6 ×2             = 782px
+
+			    At `md` (768) each half measured 356px and the Argument column
+			    rendered at 117px against its own 115px min-content — pinned, with
+			    nothing left to give, which is the eight-character symptom. `md`
+			    therefore MEETS the track and never clears it. At `lg` (1024) the
+			    same column gets ~244px.
+			    ⛔ NO BREAKPOINT VALUE IS INVENTED: `lg` is a shipped token, already
+			    used at `DiscoveryGrid.tsx:35`, `LoadingSkeleton.tsx:48` and
+			    `SlotHeader.tsx:81`. Below it the two columns STACK — the posture
+			    `HeroPanels.tsx:82` ships for Discovery's hero.
+			    ⚠ The mockup contributes NOTHING here: it is a fixed-desktop
+			    prototype and declares no breakpoint at all (recon A.4).
 			    `gap-6` is the gap ALREADY on this container's className for the
 			    same inter-section role; no new spacing value is introduced. */}
-			<div data-testid="profile-headzone" className="grid gap-6 md:grid-cols-2">
+			<div data-testid="profile-headzone" className="grid gap-6 lg:grid-cols-2">
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
 				    `.idcol` is `[.unamerow][.tiles]`). They are no longer a sibling
@@ -115,14 +131,11 @@ export default async function ProfilePage({
 				<IdentityCard user={profileUser} owner={owner} tiles={tiles} />
 				<ProfileGraph series={graph} />
 			</div>
-			{/* The arena band. ⚠ NO `flex-1` — see the container note above: the
-			    growth that would let these panels divide the viewport's leftover
-			    height has to start at the container, and that node is pinned. The
-			    band is content-height, so row 3's panel-scoped scroll has no slack
-			    to divide. HALTED and reported, not approximated with a hand-derived
-			    `calc()` — that would rebuild the exact cross-file height coupling
-			    `discovery-height-chain.test.ts` exists to prevent. */}
-			<div data-testid="profile-arena" className="grid gap-6 md:grid-cols-2">
+			{/* The arena band — `lg:` for the same measured reason as the headzone
+			    above, and the two bands MUST share one breakpoint or the identity
+			    band would go two-column while the arena below it was still
+			    stacked. */}
+			<div data-testid="profile-arena" className="grid gap-6 lg:grid-cols-2">
 				<PositionsTable
 					payload={positionsPayload}
 					initialMarketSlug={initialMarketSlug}

@@ -201,9 +201,10 @@ describe("profile height chain — the terminus, and the pin that holds it", () 
 
 		// 2. A band gains a clipping utility. Run through the SAME A1 predicate
 		//    the assertion above uses, so the two cannot drift apart.
+		const arenaClass = bandClasses(page, "profile-arena").join(" ");
 		const clipped = page.replace(
-			'"profile-arena" className="grid gap-6 md:grid-cols-2"',
-			'"profile-arena" className="grid h-screen gap-6 md:grid-cols-2"',
+			`"profile-arena" className="${arenaClass}"`,
+			`"profile-arena" className="h-screen ${arenaClass}"`,
 		);
 		const clippedClasses = bandClasses(clipped, "profile-arena");
 		expect(
