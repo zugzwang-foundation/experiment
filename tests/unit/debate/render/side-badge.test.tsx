@@ -117,7 +117,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-ten-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-eight-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -134,11 +134,20 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// `surface_profile_v1_0.html:278-279`. Ratified 2026-08-15: the guard
 		// fired a THIRD time and the adoption was RULED, not absorbed
 		// (POLISH.6 HALT-1, raised at STEP 0.6 before any write). The ruling
-		// admitted this file to POLISH.6's allow-list SYMBOL-FENCED to the three
-		// maps, the one length and this comment — nothing else here is that
-		// task's to write. `detail` STILL holds its zero: this is a
-		// surface-scoped adoption, never a blanket amendment, and POLISH.3 PR 2
-		// must still hit this wall and get its own ruling.
+		// admitted this file to POLISH.6's allow-list SYMBOL-FENCED to SIX
+		// sites: the three `countByFile` maps, the one `toHaveLength`, this
+		// comment, and THIS TEST'S NAME — nothing else here is that task's to
+		// write. `detail` STILL holds its zero: this is a surface-scoped
+		// adoption, never a blanket amendment, and POLISH.3 PR 2 must still hit
+		// this wall and get its own ruling.
+		//
+		// ⚠ THE NAME IS THE SIXTH SITE, AND IT IS FENCED BECAUSE IT IS AN
+		// ASSERTION. `exactly-ten-sites-…` above an `expect(…).toHaveLength(8)`
+		// is a FALSE RECEIPT IN A TEST NAME — a reader greps the name, believes
+		// the count, and never opens the body. PR A set the convention on this
+		// file when it renamed twelve → ten; the sweep for every surface form of
+		// the old name returned exactly one hit, this line, so the rename moved
+		// no citation with it.
 		expect(countByFile(base)).toEqual({
 			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/debate/DebateColumn.tsx": 1,
