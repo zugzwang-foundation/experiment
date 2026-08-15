@@ -162,13 +162,28 @@ export function PositionsTable({
 					data-testid="positions-table"
 					className="w-full text-left text-sm"
 				>
+					{/* HTML-FINISH row 14 — THE ARROW TRACK MOVES BETWEEN THE TWO VALUE
+					    COLUMNS. The mockup's grid is `Position | Argument | Staked | ␣ |
+					    Current` (`:262`, header markup `:466-469`), with the empty track
+					    FOURTH of five; the build's empty `<th>` was FIFTH, i.e. a
+					    trailing action column, and Staked sat directly against Current.
+					    ⛔ THE COLUMN COUNT IS UNCHANGED AT FIVE, which is why the sell
+					    host's `colSpan={5}` below is untouched: row 6 deletes the
+					    trailing action column in the same commit as row 14 adds the
+					    arrow track, so the two edits net to zero. Splitting them across
+					    commits would have left a mid-state with a wrong colSpan.
+					    HTML-FINISH row 17 — ALL FOUR HEADERS CENTRE OVER THEIR CELLS.
+					    The mockup centres `Position` (`:264`), `Argument` (`:265`) and
+					    both `.num` headers (`:269`). The table keeps `text-left`: only
+					    the HEADERS and the two value CELLS centre — the Argument cell's
+					    prose stays left, which is what `text-left` on the table is for. */}
 					<thead className="text-xs text-n5">
 						<tr>
-							<th className="p-2">Position</th>
-							<th className="p-2">Argument</th>
-							<th className="p-2">Staked</th>
-							<th className="p-2">Current</th>
+							<th className="p-2 text-center">Position</th>
+							<th className="p-2 text-center">Argument</th>
+							<th className="p-2 text-center">Staked</th>
 							<th className="p-2" />
+							<th className="p-2 text-center">Current</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -198,50 +213,101 @@ export function PositionsTable({
 											    not, and labelling a Bucket-C value frozen inside the
 											    component that renders it is the conflation INV-3
 											    exists to prevent. */}
-											<span
-												data-testid={`position-side-${row.marketId}`}
-												className="flex items-center gap-[5px] text-xs"
-											>
-												{row.side === "YES" ? "Yes" : "No"}
-												<ThumbGlyph side={row.side} size={12} />
+											{/* HTML-FINISH row 6 — THE STATUS TOKEN AND SELL MOVE INTO
+											    THE POSITION CELL, UNDER THE SIDE WORD, and the trailing
+											    fifth column is deleted. The mockup's `.poscell` is a
+											    centred column of [side word + thumb] over the slot
+											    (`:282`, emitted at `:546-551`), and canon §2 names FOUR
+											    columns — `Position · Argument · Staked · Current` — with
+											    no action column at all.
+											    ⚠ THE STATUS BADGE SURVIVES, and that is a RULING, not an
+											    oversight. The mockup shows `Closed` only on closed rows
+											    (an open row carries Sell in the same slot), but recon
+											    table A-8 STRUCK that reading on tier 1: SPEC.1 §23 —
+											    "Per holding the page renders: … status Open / Closed by
+											    market state". So the badge renders on EVERY row and Sell
+											    joins it in the slot rather than replacing it. The
+											    counter-reading (the segmented filter makes every visible
+											    row share one status, so the panel could state it once)
+											    is recorded at A-8 and is the founder's call, not mine.
+											    `gap-[5px]` is the mockup's `.poscell{gap:5px}` — and it
+											    is not read off the mockup for its NUMBER: the identical
+											    token is already on the side span one line below, shipped
+											    at POLISH.5 item 1, so this is a same-file match. */}
+											<span className="flex flex-col items-center gap-[5px]">
+												<span
+													data-testid={`position-side-${row.marketId}`}
+													className="flex items-center gap-[5px] text-xs"
+												>
+													{row.side === "YES" ? "Yes" : "No"}
+													<ThumbGlyph side={row.side} size={12} />
+												</span>
+												<Badge
+													data-testid={`position-status-${row.marketId}`}
+													variant={
+														row.statusLabel === "Open" ? "secondary" : "outline"
+													}
+												>
+													{row.statusLabel}
+												</Badge>
+												{sellable && (
+													<Button
+														type="button"
+														size="xs"
+														variant="outline"
+														data-testid={`sell-trigger-${row.marketId}`}
+														aria-expanded={sellOpen}
+														onClick={() =>
+															setSellMarketId(sellOpen ? null : row.marketId)
+														}
+													>
+														Sell
+													</Button>
+												)}
 											</span>
-											{row.marketTitle}
 										</td>
 										<td className="p-2">
 											<ArgumentCell
 												cell={row.argument}
 												marketId={row.marketId}
+												marketTitle={row.marketTitle}
 											/>
 										</td>
-										<td className="p-2 tabular-nums text-ink">
-											{formatDharma(row.staked)}
+										{/* HTML-FINISH row 17 — STACK AND CENTRE THE TWO VALUE CELLS.
+										    The mockup's `.pnum` is `display:flex; flex-direction:column;
+										    align-items:center` (`:296-297`) — a COLUMN, because the
+										    entry % and live % sit under the Đ figure there. Both of
+										    those are recon table B-1: `ProfilePositionRow` carries
+										    neither an entry price nor a live price, so they are
+										    DATA-BLOCKED and no arrangement can render them. The column
+										    ships with one child each, which is the arrangement the row
+										    names and the slot those two figures land in if the DTO ever
+										    carries them. `text-center` stays on the `<td>` so the
+										    alignment survives if the inner span is ever unwrapped. */}
+										<td className="p-2 text-center tabular-nums text-ink">
+											<span className="flex flex-col items-center">
+												{formatDharma(row.staked)}
+											</span>
 										</td>
-										<td className="p-2 tabular-nums text-ink">
-											{formatDharma(row.current)}
+										{/* Row 14's arrow track. ⛔ THE GLYPH IS BYTE-CARRIED, NOT
+										    TYPED: hexdump of mockup `:557` and `:626` and of the
+										    shipped `HeroPanels.tsx:237` all give `e2 86 92` — U+2192
+										    RIGHTWARDS ARROW, identical in all three. `text-n4` is that
+										    same shipped line's colour for this same arrow role; the
+										    mockup's `.parrow{color:var(--n4)}` is NOT the source (the
+										    ramps are inverted between the light prototype and the
+										    shipped dark system). `aria-hidden` because the arrow states
+										    a relation the two adjacent column headers already name. */}
+										<td
+											aria-hidden="true"
+											className="p-2 text-center font-normal text-n4"
+										>
+											→
 										</td>
-										<td className="flex items-center gap-2 p-2">
-											<Badge
-												data-testid={`position-status-${row.marketId}`}
-												variant={
-													row.statusLabel === "Open" ? "secondary" : "outline"
-												}
-											>
-												{row.statusLabel}
-											</Badge>
-											{sellable && (
-												<Button
-													type="button"
-													size="xs"
-													variant="outline"
-													data-testid={`sell-trigger-${row.marketId}`}
-													aria-expanded={sellOpen}
-													onClick={() =>
-														setSellMarketId(sellOpen ? null : row.marketId)
-													}
-												>
-													Sell
-												</Button>
-											)}
+										<td className="p-2 text-center tabular-nums text-ink">
+											<span className="flex flex-col items-center">
+												{formatDharma(row.current)}
+											</span>
 										</td>
 									</tr>
 									{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
@@ -305,21 +371,52 @@ export function PositionsTable({
 }
 
 /** The episode-opener argument cell (N-1a) — present title (post → own ordinal;
- * reply → the parent's, with the "Replied to …" context) or the removed stub. */
+ * reply → the parent's, with the "Replied to …" context) or the removed stub.
+ *
+ * HTML-FINISH row 10 — THE MARKET QUESTION LIVES HERE, not in the Position
+ * cell. The mockup's `.pcellt` is `[.ptitle][.pmkt > .mq]` (`:287-292`, emitted
+ * at `:554-555`): the market question is a sub-line under the argument title,
+ * and the Position cell carries only the side and its slot. Canon §2's column
+ * names `Position · Argument` are adjacent evidence, not a ruling on which cell
+ * holds the question (recon row 10, tier 4).
+ *
+ * ⚠ IT RENDERS ON THE REMOVED VARIANT TOO, deliberately. `marketTitle` is
+ * `markets.title` — market metadata, NOT user argument text — so no masking
+ * obligation attaches to it (SC-1 governs `comments.body` and its derivations),
+ * and MOVING a per-row element means it must still appear on every row. Suppressing
+ * it on removed rows would silently drop the market question from exactly the rows
+ * whose argument the reader cannot see, i.e. where the market context matters most.
+ *
+ * ⚠ `marketTitle` is passed as a PROP rather than read off `cell`: the removed
+ * variant of `ProfileArgumentCell` carries `{ removed: true, marketSlug }` and
+ * nothing else, so reading it from the cell would be a compile error on exactly
+ * the branch that needs it — which is the union doing its job, not a nuisance. */
 function ArgumentCell({
 	cell,
 	marketId,
+	marketTitle,
 }: {
 	cell: ProfileArgumentCell;
 	marketId: string;
+	marketTitle: string;
 }): React.JSX.Element {
+	// The market line's own class string is BYTE-MATCHED to the "Replied to …"
+	// sub-line 20 lines below — same file, same role (a muted sub-line under the
+	// cell's title). Nothing is read off the mockup's `.pmkt .mq`, whose 11px /
+	// `--n5` are light-prototype VALUES.
+	const marketLine = (
+		<span
+			data-testid={`position-market-${marketId}`}
+			className="block text-xs text-n5"
+		>
+			{marketTitle}
+		</span>
+	);
 	if (cell.removed) {
 		return (
-			<span
-				data-testid={`position-arg-removed-${marketId}`}
-				className="text-xs text-n5 italic"
-			>
-				{REMOVED_STUB_TEXT}
+			<span data-testid={`position-arg-removed-${marketId}`}>
+				<span className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</span>
+				{marketLine}
 			</span>
 		);
 	}
@@ -333,6 +430,7 @@ function ArgumentCell({
 			>
 				{cell.title}
 			</Link>
+			{marketLine}
 			{cell.isReply && cell.repliedToTitle !== null && (
 				<span className="block text-xs text-n5">
 					Replied to {cell.repliedToTitle}

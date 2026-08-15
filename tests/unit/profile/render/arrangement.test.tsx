@@ -4,7 +4,9 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { IdentityCard } from "@/components/profile/IdentityCard";
+import { PositionsTable } from "@/components/profile/PositionsTable";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
+import type { ProfilePositionRow } from "@/server/profile/positions";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
@@ -45,6 +47,47 @@ const USER: ProfileUser = {
 	pfpUrl: "/pfp-placeholder.svg",
 };
 
+const M1 = "0190c0de-aaaa-7000-8000-000000000001"; // Open market
+const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // settled market
+const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
+
+const ROW_OPEN: ProfilePositionRow = {
+	marketId: M1,
+	marketSlug: "fixture-alpha",
+	marketTitle: "Market fixture-alpha",
+	marketStatus: "Open",
+	statusLabel: "Open",
+	settled: false,
+	side: "YES",
+	quantity: "10.000000000000000000",
+	staked: "25.000000000000000000",
+	current: "31.000000000000000000",
+	argument: {
+		removed: false,
+		commentId: C_OPENER,
+		title: "Opener argument alpha",
+		isReply: false,
+		postOrdinal: 1,
+		marketSlug: "fixture-alpha",
+		repliedToTitle: null,
+	},
+};
+
+/** Settled row whose episode-opening argument is content_removed (N-1a). */
+const ROW_SETTLED: ProfilePositionRow = {
+	marketId: M2,
+	marketSlug: "fixture-beta",
+	marketTitle: "Market fixture-beta",
+	marketStatus: "Resolved",
+	statusLabel: "Closed",
+	settled: true,
+	side: "NO",
+	quantity: "4.000000000000000000",
+	staked: "8.000000000000000000",
+	current: "12.000000000000000000",
+	argument: { removed: true, marketSlug: "fixture-beta" },
+};
+
 /** The index of `child` among its parent's element children. */
 function indexOf(child: Element): number {
 	const parent = child.parentElement;
@@ -52,6 +95,12 @@ function indexOf(child: Element): number {
 		throw new Error("indexOf: element has no parent");
 	}
 	return [...parent.children].indexOf(child);
+}
+
+/** The `<td>` list of one rendered position row. */
+function cellsOf(marketId: string): HTMLTableCellElement[] {
+	const row = screen.getByTestId(`position-row-${marketId}`);
+	return [...row.querySelectorAll("td")];
 }
 
 describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", () => {
@@ -99,6 +148,200 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 		// first, so the same predicate is false here.
 		expect(second?.className).not.toContain("text-n5");
 		expect(first?.className).toContain("text-n5");
+	});
+});
+
+describe("HTML-FINISH profile rows 6 · 14 · 17 — the positions grid", () => {
+	const OWNER_PAYLOAD = {
+		owner: true as const,
+		rows: [
+			{ ...ROW_OPEN, sellEligible: true },
+			{ ...ROW_SETTLED, sellEligible: false },
+		],
+	};
+
+	it("row6::status-and-sell-live-INSIDE-the-position-cell", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const positionCell = cellsOf(M1)[0];
+		if (positionCell === undefined) {
+			throw new Error("row6: the row rendered no cells");
+		}
+		// Containment, not mere presence — the whole row moves both controls from
+		// a trailing fifth column into the FIRST cell, so a `getByTestId` alone
+		// would pass on the pre-change build.
+		expect(
+			positionCell.contains(screen.getByTestId(`position-side-${M1}`)),
+		).toBe(true);
+		expect(
+			positionCell.contains(screen.getByTestId(`position-status-${M1}`)),
+			`row 6: the status badge is not inside the Position cell. It is still ` +
+				`in the deleted trailing action column.`,
+		).toBe(true);
+		expect(
+			positionCell.contains(screen.getByTestId(`sell-trigger-${M1}`)),
+		).toBe(true);
+	});
+
+	it("row6::the-status-badge-survives-on-EVERY-row-A-8", () => {
+		// A-8 STRUCK "drop the per-row status token" on tier 1 (SPEC.1 §23:
+		// "status Open / Closed by market state"). The mockup shows `Closed` only
+		// on closed rows; both statuses must carry a badge here.
+		//
+		// ⚠ TWO RENDERS, NOT ONE, and the reason is the item-11 status filter:
+		// `PositionsTable` derives its initial status from the rows and shows ONE
+		// status at a time, so a single render of a mixed payload can never have
+		// both rows on screen. The first draft of this guard asserted both from
+		// one render and RED-ed — recorded because that red was the guard being
+		// wrong about the surface, not the surface being wrong.
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		expect(screen.getByTestId(`position-status-${M1}`).textContent).toBe(
+			"Open",
+		);
+		cleanup();
+		render(
+			<PositionsTable
+				payload={{
+					owner: true,
+					rows: [{ ...ROW_SETTLED, sellEligible: false }],
+				}}
+			/>,
+		);
+		expect(screen.getByTestId(`position-status-${M2}`).textContent).toBe(
+			"Closed",
+		);
+	});
+
+	it("row6::there-is-no-trailing-action-column", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const headers = [
+			...screen.getByTestId("positions-table").querySelectorAll("th"),
+		];
+		expect(headers.length).toBe(5);
+		// The LAST header is `Current`, not an empty action slot. This is the
+		// assertion that catches a re-added action column.
+		expect(headers[4]?.textContent).toBe("Current");
+		const cells = cellsOf(M1);
+		expect(cells.length).toBe(5);
+		expect(cells[4]?.textContent).toContain("31");
+	});
+
+	it("row14::the-empty-arrow-track-is-FOURTH-of-five-not-fifth", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const headers = [
+			...screen.getByTestId("positions-table").querySelectorAll("th"),
+		];
+		expect(headers.map((h) => h.textContent)).toEqual([
+			"Position",
+			"Argument",
+			"Staked",
+			"",
+			"Current",
+		]);
+		// And the ROW's arrow cell sits in the same slot, carrying the glyph.
+		const arrow = cellsOf(M1)[3];
+		expect(arrow?.textContent).toBe("→");
+		expect(arrow?.getAttribute("aria-hidden")).toBe("true");
+	});
+
+	it("row14::POSITIVE-CONTROL-the-pre-change-header-order-fails", () => {
+		// ⚠ PROOF BY REVERSAL over the REAL pre-change order. The build's empty
+		// `<th>` was FIFTH; the same equality is false against it.
+		const before = ["Position", "Argument", "Staked", "Current", ""];
+		expect(before).not.toEqual([
+			"Position",
+			"Argument",
+			"Staked",
+			"",
+			"Current",
+		]);
+	});
+
+	it("row17::the-four-named-headers-centre-over-their-cells", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const headers = [
+			...screen.getByTestId("positions-table").querySelectorAll("th"),
+		];
+		for (const th of headers) {
+			if ((th.textContent ?? "") === "") {
+				continue; // the arrow track carries no label to centre
+			}
+			expect(
+				th.className.split(/\s+/),
+				`row 17: header "${th.textContent}" is not centred over its cell.`,
+			).toContain("text-center");
+		}
+		// The TABLE keeps `text-left` — only headers and the two value cells
+		// centre; the Argument cell's prose must stay left.
+		expect(
+			screen.getByTestId("positions-table").className.split(/\s+/),
+		).toContain("text-left");
+	});
+
+	it("row17::the-two-value-cells-stack-and-centre-their-contents", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const cells = cellsOf(M1);
+		for (const index of [2, 4]) {
+			const cell = cells[index];
+			const inner = cell?.firstElementChild;
+			if (inner == null) {
+				throw new Error(`row17: value cell ${index} has no inner element`);
+			}
+			// The mockup's `.pnum` is a CENTRED COLUMN (`:296-297`) — the slot the
+			// B-1 entry %/live % land in if the DTO ever carries them.
+			const classes = inner.className.split(/\s+/);
+			expect(classes).toContain("flex");
+			expect(classes).toContain("flex-col");
+			expect(classes).toContain("items-center");
+		}
+	});
+});
+
+describe("HTML-FINISH profile row 10 — the market question sits under the argument title", () => {
+	const VISITOR_PAYLOAD = {
+		owner: false as const,
+		rows: [ROW_OPEN, ROW_SETTLED],
+	};
+
+	it("row10::market-question-is-in-the-ARGUMENT-cell-not-the-POSITION-cell", () => {
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const cells = cellsOf(M1);
+		const positionCell = cells[0];
+		const argumentCell = cells[1];
+		const marketLine = screen.getByTestId(`position-market-${M1}`);
+		expect(marketLine.textContent).toBe("Market fixture-alpha");
+		expect(
+			argumentCell?.contains(marketLine),
+			`row 10: the market question is not in the Argument cell.`,
+		).toBe(true);
+		expect(
+			positionCell?.contains(marketLine),
+			`row 10: the market question is STILL in the Position cell — the move ` +
+				`did not happen, or it was duplicated rather than moved.`,
+		).toBe(false);
+	});
+
+	it("row10::it-sits-immediately-AFTER-the-title-link", () => {
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		const marketLine = screen.getByTestId(`position-market-${M1}`);
+		// The mockup's `.pcellt` is `[.ptitle][.pmkt]` — the question is the
+		// title's sub-line, so index 1 among the cell's element children.
+		expect(indexOf(marketLine)).toBe(1);
+		expect(marketLine.previousElementSibling?.tagName).toBe("A");
+	});
+
+	it("row10::it-renders-on-the-REMOVED-row-too", () => {
+		// `marketTitle` is `markets.title` — market metadata, not argument text —
+		// so SC-1 attaches no masking obligation, and MOVING a per-row element
+		// means it must still appear on every row. Suppressing it here would drop
+		// the market question from exactly the rows whose argument is hidden.
+		// A CLOSED-ONLY payload: the item-11 status filter derives its initial
+		// value from the rows, so the settled row is only on screen when it is
+		// the only class present.
+		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
+		const removedCell = screen.getByTestId(`position-arg-removed-${M2}`);
+		const marketLine = screen.getByTestId(`position-market-${M2}`);
+		expect(removedCell.contains(marketLine)).toBe(true);
+		expect(marketLine.textContent).toBe("Market fixture-beta");
 	});
 });
 
