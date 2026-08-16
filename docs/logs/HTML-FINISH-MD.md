@@ -365,3 +365,184 @@ Phase 3: 2026-08-16 01:28 → 02:20 UTC (C15 `5b09ef2` → C30 `0c54240`).
 ⚠ These are read off the commit timestamps. An earlier draft of this log carried
 estimated wall-clock times that were wrong by hours — corrected here rather than
 left to mislead the next session's planning.
+
+---
+
+## ROUND 2 · FOUNDER REFINEMENT PASS — complete, **nine rows, nothing halted**
+
+A second pass after the founder reviewed round 1 on staging. Three web-reviewer
+rulings were REVERSED at kickoff (OD-2, D8, C1B), and all four of round 1's
+halts are now discharged.
+
+### What landed
+
+| Commit | SHA | Rows |
+|---|---|---|
+| `feat(debate): /m/[slug] takes the widest existing container preset` | `a096f06` | **R1** (C1B) |
+| `feat(debate): the card's aggregate reads bare, and its title answers the pointer` | `2cdc89a` | **R5, R6** |
+| `fix(bookmarks): the bookmark affordance is unconditional on every card` | `e5dd4bf` | **R4** |
+| `feat(debate): the detail price bar becomes one row and its labels are live` | `d9ffb58` | **R7** (rows 7 + 8) |
+| `feat(debate): the collapsed price chart carries a time axis` | `5a9400d` | **R8** (row 5) + SPEC.1 **1.0.32** |
+| `feat(debate): the four placeholders ship with byte-carried chrome` | `074f86c` | **R2** |
+| `feat(debate): the arena advances itself, and the rail counts down to it` | `a3af859` | **R3** |
+
+**R9 was investigate-only** and is answered below. ⛔ **Nothing was built for it.**
+
+### ✅ ALL FOUR ROUND-1 HALTS DISCHARGED
+
+| Halt | Was blocked on | Discharged by |
+|---|---|---|
+| **H-C5** (row 5) | a web-authored SPEC.1 §9 amendment | ruled text supplied at kickoff; applied at all four operative sites → `5a9400d` |
+| **H-C7** (rows 7 + 8) | ONE line of allow-list | founder extended it by that one file → `d9ffb58` |
+| **H-C1B** | a ruling, or a re-measurement once staging had data | BOTH — founder ruled it in, and it was re-measured on staging → `a096f06` |
+| **H-C13** (row 14) | OD-1 re-ruled | ⛔ **STILL OUT** — §2 keeps row 14 out as its own task. Not discharged, deliberately. |
+
+### Measurements — taken BEFORE any code was written
+
+⚠ Every one of these is in a real browser against **live staging** (`070c243`) at
+`/m/sp-m15-fill`, the founder's own screenshot URL, signed in as `RedFox000`.
+
+- **R3 — the arrows are NOT broken.** Both columns hold 2 posts; both rails
+  render; `Previous` was correctly `disabled` at index 0 and `Next` live.
+  Clicking `Next` advanced the card, moved the readout `1 / 2` → `2 / 2` and the
+  fill 50% → 100%. ⇒ Correctly end-clamped. What was missing is what the BAR was
+  for — a static read-through proportion that never moved.
+- **R3 — `router.refresh()` reconciles, it does not remount.** 10 RSC responses
+  across ~38 s (≥2 poll ticks) with the paged card and its readout unchanged.
+  ⚠ **The first attempt was VACUOUS**: `document.hidden` was true, the poll was
+  suspended, and nothing fired. A sampler that observes nothing proves nothing.
+- **R4 — the bookmark cause is own-suppression.** The page rendered exactly ONE
+  bookmark button; the card missing it is `RedFox000`'s own argument.
+  `BookmarkToggle.tsx:85` returned `null` on own content (BOOKMARK-ADD-WIRE D4).
+- **R1 — the container.** At a 1440 viewport: container 1024 (capped by
+  `max-w-5xl`), headzone-left 716, headzone-right 244.
+
+### Decisions made
+
+- **R1 — `wide` is CONSUMED, never re-minted.** `PageContainer.tsx` untouched
+  (H1-b holds); `/m/[slug]` is its THIRD consumer after Profile and `/bookmarks`.
+  `page-container.test.ts`'s ruled-move enumeration goes `[2, 5]` → `[2, 5, 9]`.
+- **R4 — DISABLED on own content, not enabled, and that is FORCED.** `add.ts:62`
+  rejects a self-bookmark; an enabled icon would flip optimistically, get
+  `{ ok: false }` and silently revert — a control that can never succeed, which
+  is worse than the absence the founder objected to. Making it succeed would mean
+  a fourth `src/server/**` file, which §2 forbids outright.
+- **R3 — the cadence is `POLL_INTERVAL_MS_DEBATE_VIEW`, never d5's 20 s.**
+  "Duration" is in the value list. The reuse is argued, not merely convenient:
+  each card is shown for exactly one data-refresh window. Stagger is
+  `ADVANCE_MS / 2` — a ratio, which is composition.
+- **R3 — the arrows stop disabling and the list WRAPS.** End-clamping and
+  auto-advance cannot both be right. Accessibility cost is zero: the `disabled`
+  state announced "you are at the end", and with wrap there is no end.
+- **R3 — ←/→ only.** d5's ↑/↓ stepping is not ported: d5 `preventDefault()`s
+  every arrow because its surface does not scroll, and this page does.
+- **R8 — the axis ticks are ANCHORED TO SERIES POINTS**, not placed at fixed
+  thirds with an interpolated date. The ruling's own constraint is that every
+  timestamp rendered is already on `PricePoint.at`; interpolating would mint one
+  the series does not contain.
+- **R2 — chrome and labels ship, DATA FIELDS STAY EMPTY.** The four labels are
+  byte-carried and hexdumped; d5's `.resname`/`.ressrc` demo copy names a market
+  this build does not have and would be inventing market content (§3).
+
+### Surprises caught + fixed in-session
+
+- **⚠⚠ R5 LEFT A SPEC CONTRADICTION AND IT WAS CAUGHT ONE COMMIT LATE.** SPEC.1
+  §9 F-DEBATE-1 System (`:447`) named the aggregate footer as
+  `Support (count) : Đ / Counter (count) : Đ` — the exact form R5 replaced at
+  `2cdc89a`. That is the **O-9** defect: the build changed a render a governing
+  document describes, and no rider went with it. Fixed as a same-commit rider on
+  `5a9400d`, applied at BOTH operative sites (SPEC.1 and **design-language §3.1**)
+  per O-4. ⛔ The substance was never touched: still a read-time aggregate over
+  reply-bets, still no vote control.
+- **The R8 guard would have gone GREEN past a wrong build.** Round 1 flagged it;
+  it was real. d5 draws its ticks as DIVS outside the `<svg>` and the guard
+  asserted absence of testids inside the component, so a literal port would have
+  satisfied the letter while breaking the property. The axis is built INSIDE the
+  `<svg>` and the guard now asserts **containment**. ⚠ Non-vacuity of that check
+  was PROVEN by a throwaway probe (written, run, deleted): with a d5-shaped tick
+  div appended beside the chart, `querySelector` finds it and `svg.contains(el)`
+  returns `false`.
+- **Two FALSE REDS in the R3 tests, both looking like product defects.** A single
+  `act(() => vi.advanceTimersByTime(45_000))` silently under-counts — the timer
+  re-arms through React and `act()` flushes effects at its END, so three cadences
+  of jump produced ONE advance. It read as "the list does not wrap" and "the
+  unpicked column's bar is dead". Neither was true. Recorded in the test file.
+- **Biome rejected the first R3 draft's effect deps** (`progressKey` listed but
+  never read). ⛔ The rule was NOT disabled — AGENTS.md §11 makes that ask-first.
+  Both effects were restructured instead, and both came out better: a
+  self-running interval in `scrollers.tsx`, and a `CountdownFill` remounted by
+  key in `ScrollRail`.
+
+### R9 — the investigation, answered
+
+**There is NO per-post export.** The only export on the tree is
+`src/app/(public)/m/[slug]/export/route.ts` — market-level, ADR-0025. It composes
+`loadDebateView` + `loadExportMarketMeta` + `readContextBlock` and hands the WHOLE
+`DebateViewModel` to `serializeDebateExport`, which takes no comment scope.
+`src/server/debate-export/` exports exactly three functions and none is
+comment-addressable; nothing under it mentions `commentId`.
+
+⇒ **A per-card download is NEW FUNCTIONALITY and its own task.** It needs a
+comment-scoped serializer, a route, and a masking decision (a removed comment
+must not be exportable by direct id). ⛔ Nothing was built.
+
+⚠ Context for whoever picks it up: `BookmarkToggle.tsx`'s `CardActions` docblock
+already anticipates it — *"Wiring the ADR-0025 export remains a separate task;
+when it lands it arrives as an `<a href download>`, not as a disabled button."*
+The per-card download trigger was REMOVED at POLISH.3 PR 2 row 7 (`PD-3-15`).
+
+### Fence extensions — declared, never smuggled
+
+The kickoff pre-authorised ONE (`price-bar-presets.test.tsx`, for R7). Four more
+were taken, each named in its own commit body:
+
+| File | Row | Why no in-fence edit reaches it |
+|---|---|---|
+| `src/components/bookmarks/BookmarkToggle.tsx` | R4 | The bug IS that branch. Blast radius verified: `CardActions` has exactly ONE render consumer in `src/` (`debate/ArgProfile.tsx`) — `/bookmarks` uses `UnbookmarkButton` and Profile ships no cluster at all. |
+| `docs/design/design-language.md` | R5 rider | O-4: an amendment applied at one of two operative sites reverses nothing for a reader who reaches the other first. No guard reads the file. |
+| `docs/parked.md` | R2 | The kickoff asked for the docket row in terms. |
+| `tests/unit/debate/render/auto-advance.test.tsx` (NEW) | R3 | Three of R3's laws are about how the two columns relate; a scroller rendered alone cannot exhibit any of them. |
+
+### Reviewer cascade — NOT run, and why
+
+§5.11 routes `@code-reviewer` on `src/server/**` changes and `@security-auditor`
+after it on critical-path logic. ⛔ **Round 2 touches ZERO `src/server/**` files**
+— `limits.ts` is READ (`POLL_INTERVAL_MS_DEBATE_VIEW`) and never written. No
+§5.11 trigger fires, and the kickoff's §3 MECHANICS names no reviewer. Stated so
+the omission reads as scope, not as a skip.
+
+### Open questions
+
+- **OQ-MD2-1 · `HTML-FINISH-MD-PLACEHOLDERS` needs a strip-or-gate ruling before
+  DP.2.** Docketed at `docs/parked.md` SEQUENCE #5 with both shapes costed.
+  ⚠ Cards 3 and 4 have a THIRD exit: the moment resolver data exists they stop
+  being placeholders and become the real cards.
+- **OQ-MD2-2 · The R5 spec rider is CC-authored under the founder's R5 ruling.**
+  The kickoff supplied ruled text for R8 only. The substance was preserved and
+  only the label sentence moved, but the founder should confirm the wording.
+- **OQ-MD-9 (carried) · one duplicated pole recipe** — unchanged from round 1.
+- **Row 14 stays out** (§2), as does row 32 and rows 30/31.
+
+### Next session starts at
+
+The founder's review of round 2 on staging, and rulings on OQ-MD2-1 and
+OQ-MD2-2. ⛔ PR #341 is still a DRAFT and is NOT merged.
+
+### Context to preserve
+
+- **The verify gate needs an env prefix in this worktree.** No `.env.local`,
+  `just` sets `dotenv-load := true`, so `next build` dies collecting page data
+  for `/admin/markets/media/sign` on `DATABASE_URL is not set`. The gate runs
+  with the `tests/_setup/env.ts` PLACEHOLDERS exported inline (they must be SET,
+  not connected) plus `ZUGZWANG_ENV=preview`. ⛔ No `.env*` file is read.
+- **`just` is on the mise shims path** — a `bash` subshell does not have it
+  (round 1 recorded this; round 2 hit it again).
+- **The staging error boundary fired once during measurement**, after 15 forced
+  polls in 43 s. A reload recovered immediately. Almost certainly self-inflicted
+  load — each poll re-runs `loadDebateView`'s 13-14 sequential queries against a
+  Supavisor `pool_size 15` — against a fix landing in parallel on
+  `fix/db-pool-idle-timeout`. ⛔ NOT a branch defect; that branch was not touched.
+
+### Time
+
+Round 2: 2026-08-16 12:20 → 13:45 UTC (`a096f06` → `a3af859`).
