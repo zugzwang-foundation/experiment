@@ -176,6 +176,25 @@ const SITES: Site[] = [
 		// suppresses `align-self: stretch` and the class becomes the difference
 		// between fill-to-max-w and shrink-to-fit.
 		adds: "w-full",
+		// ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R1 — `/m/[slug]` JOINS SITES 2
+		// AND 5 ON `wide`, and it is the SAME ruling reaching a third route. The
+		// debate surface is a two-column HEADER above a two-column ARENA, and
+		// `debate`'s own `max-w-5xl` = 1024 is the width at which the header rail
+		// stops being a rail. MEASURED on staging at a 1440 viewport before the
+		// move: container 1024 (capped), headzone-left 716, headzone-right 244 —
+		// so the rail rendered at 244px on a 1440 screen and could not widen. That
+		// is the identical defect row 20 minted `wide` to fix on Profile, and the
+		// identical reason `/bookmarks` took it at round 3.
+		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
+		// read-only this round too, so `BOX_AXES` moves by preset selection alone.
+		// ⚠ `adds` above is KEPT rather than folded into `now`: it is the historical
+		// record of the one class the primitive added at `c5892bc`, and the
+		// "exactly one site adds a class" row below still counts it. `now` supplies
+		// the assertion; `before`/`adds` stay the untouched baseline.
+		now: "mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-6 py-6",
+		movedBy:
+			"HTML-FINISH-MD-1 — /m/[slug] takes the widest existing preset " +
+			"(founder-ruled 2026-08-16, round 2)",
 	},
 ];
 
@@ -307,7 +326,11 @@ describe("B2 — the container primitive moves nothing", () => {
 		// `max-w-3xl` = 768 caps the container BELOW the `lg` breakpoint at which
 		// that arena may become two columns at all. ⛔ THE LIST STAYS EXACT — this
 		// is an enumeration of ruled moves, not a permission to drift.
-		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5]);
+		// ⚠ SITE 9 JOINS THEM AT HTML-FINISH · MARKET DETAIL round 2 (R1 /
+		// HTML-FINISH-MD-1) — the third route to hit the same wall, measured at
+		// 1024 on a 1440 viewport. THREE ruled moves, all onto `wide`, all
+		// founder-ruled, each carrying its own `movedBy`.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5, 9]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({

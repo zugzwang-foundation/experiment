@@ -241,7 +241,23 @@ export function DebateView({
 	const noPosts = posts.filter((p) => p.sideAtPostTime === "NO");
 
 	return (
-		<PageContainer preset="debate" className="flex flex-col gap-5">
+		/* HTML-FINISH · MARKET DETAIL round 2 · R1 (C1B) — `/m/[slug]` TAKES THE
+		   WIDEST EXISTING PRESET. Ruling name HTML-FINISH-MD-1, founder-ruled
+		   2026-08-16 after measuring round 1 on staging: the layout is cramped.
+		   ⛔ NO WIDTH IS MINTED. `wide` already exists on `main` — minted at
+		   HTML-FINISH · PROFILE row 20, whose `max-w-[1440px] px-6` is itself
+		   byte-carried from `GlobalHeader.tsx`'s wrapper — and `/bookmarks` is
+		   already its second consumer. This is a THIRD consumer of a shipped
+		   preset, so `PageContainer.tsx` is untouched (H1-b holds).
+		   ⚠ MEASURED BEFORE, on staging at a 1440 viewport: `max-w-5xl` capped the
+		   container at 1024, giving a 244px rail beside a 716px left column and two
+		   ~480px arena columns underneath. The header is TWO columns above an arena
+		   that is also two columns, so 1024 is the width at which the rail stops
+		   being a rail. At 1440 the same fractions give a 348px rail and a 1044px
+		   left column.
+		   ⚠ `py-8` → `py-6` rides along: a preset is one indivisible box (all three
+		   axes), and `page-container.test.ts` asserts the whole class set. */
+		<PageContainer preset="wide" className="flex flex-col gap-5">
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the
 			    document is hidden or a composer is open, stopped once the market
