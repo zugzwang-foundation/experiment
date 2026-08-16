@@ -120,3 +120,57 @@ describe("the paired mounts — both sides rendered side by side", () => {
 		expect(text).not.toContain("48%");
 	});
 });
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 7 — `detail` IS ONE ROW.
+ *
+ * d5's `.barrow` is LABEL — BAR — LABEL on a single flex row (`:505`, labels
+ * flanking the bar). The build shipped `detail` as two rows — bar above, labels
+ * below — and `PriceBar.tsx` recorded that divergence as *"recorded and NOT
+ * actioned (D-J)"*, naming the mechanism adoption would take: move `detail`
+ * into the `ROW` map and delete the early return. Row 7 does exactly that, so
+ * `detail` now shares ONE render with `hero` and `card`.
+ *
+ * ⚠ THE ASSERTION IS ON STRUCTURE, NOT ON A CLASS STRING. "One row" is a claim
+ * about SIBLINGS — the two labels and the bar are children of the same node —
+ * and a `flex-row` class assertion would pass on a render that still stacked a
+ * label row underneath. O-7: `innerHTML`, never `textContent`.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 7, detail collapses to one row", () => {
+	it("the labels FLANK the bar as siblings, not a row beneath it", () => {
+		const { container } = render(<PriceBar pricing={TIE} size="detail" />);
+
+		const row = container.firstElementChild;
+		const children = Array.from(row?.children ?? []);
+
+		// Exactly three children, in d5's order: label · bar · label.
+		expect(children).toHaveLength(3);
+		expect(children[0]?.tagName).toBe("SPAN");
+		expect(children[0]?.innerHTML).toContain("YES 53%");
+		expect(children[1]?.getAttribute("role")).toBe("img");
+		expect(children[2]?.tagName).toBe("SPAN");
+		expect(children[2]?.innerHTML).toContain("NO 47%");
+
+		// The superseded two-row form, pinned as gone: a wrapper whose bar was a
+		// CHILD rather than a sibling of the labels.
+		expect(children[1]?.innerHTML).not.toContain("YES 53%");
+	});
+
+	it("detail shares the ONE render with hero and card", () => {
+		// `data-size` was emitted only by the shared render, so its presence on
+		// `detail` is the structural proof that the early return is gone — not a
+		// restatement of the assertion above.
+		const { container } = render(<PriceBar pricing={TIE} size="detail" />);
+		expect(container.firstElementChild?.getAttribute("data-size")).toBe(
+			"detail",
+		);
+
+		// Positive control: the two presets that were ALREADY on that render are
+		// unmoved, so "detail joined them" is not "they joined detail".
+		cleanup();
+		const hero = render(<PriceBar pricing={TIE} size="hero" />);
+		expect(hero.container.firstElementChild?.getAttribute("data-size")).toBe(
+			"hero",
+		);
+	});
+});

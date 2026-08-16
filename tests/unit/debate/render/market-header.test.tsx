@@ -264,18 +264,63 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		);
 	});
 
-	it("market-header::a-null-series-renders-NO-rail-at-all", () => {
+	it("market-header::a-null-series-drops-the-CHART-not-the-rail", () => {
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 
-		// ⛔ Not "an empty rail" — PD-3-09 / OD-6. The left column still stands,
-		// which is the pre-existing non-fatal contract.
-		expect(
-			container.querySelector('[data-testid="headzone-right"]'),
-		).toBeNull();
+		// ⚠ RE-DERIVED AT C6, NOT RELAXED. At C4 the chart was the rail's only
+		// occupant, so a null series meant no rail node at all. C6 moved the
+		// price bar in beside it, and `PriceBar` renders its "Pricing
+		// unavailable" stub rather than null — so on the market arm the rail is
+		// now ALWAYS occupied and a null series means "no CHART", never "no
+		// rail". The PD-3-09 property that mattered (never an EMPTY rail) is
+		// unchanged and is still pinned, one assertion down.
+		const right = container.querySelector('[data-testid="headzone-right"]');
+		expect(right).not.toBeNull();
+		expect(right?.innerHTML).not.toContain(
+			'data-testid="market-price-chart-card"',
+		);
+		// The rail is occupied, not empty — the price bar is in it.
+		expect(right?.innerHTML).toContain("YES 50%");
+		// …and the left column still stands, the pre-existing non-fatal contract.
 		expect(
 			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
 		).toContain("Attrs Strip Market Question");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 7 — the detail price bar is ONE ROW, and it
+ * is in the rail.
+ *
+ * D-J is discharged. `PriceBar.tsx` recorded the two-row detail form as a
+ * divergence from d5's one-row `.barrow` (`:505`) that was *"recorded and NOT
+ * actioned"*, naming the exact mechanism adoption would take — move `detail`
+ * into the `ROW` map, delete the early return. This pins the result.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 7, the one-row detail bar", () => {
+	it("market-header::the-price-bar-renders-in-the-rail", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const right = container.querySelector('[data-testid="headzone-right"]');
+
+		// `.hright` holds `.graph` then `.barrow f` (`d5:1007`, `:1037`).
+		expect(right?.innerHTML).toContain("YES 50%");
+		expect(right?.innerHTML).toContain("NO 50%");
+		// And it is not ALSO left behind in the reading column.
+		expect(left?.innerHTML).not.toContain("YES 50%");
+
+		// Order within the rail: chart above bar.
+		const chart = right?.innerHTML.indexOf("market-price-chart-card") ?? -1;
+		const bar = right?.innerHTML.indexOf("YES 50%") ?? -1;
+		expect(chart).toBeGreaterThan(-1);
+		expect(bar).toBeGreaterThan(chart);
 	});
 });

@@ -6,22 +6,30 @@ import { formatPricePercent } from "./format";
  * surface_discovery_v1_0.html (`:99-111`): LABEL — BAR — LABEL on one flex row,
  * gap 9px, no text inside the bar.
  *
- * `detail` is NOT in this map because it is structurally different (bar above,
- * labels below). ⚠ It was a NAMED TRANSITIONAL preset, pinned BYTE-IDENTICAL to
- * the render that shipped before this preset existed so `/m/[slug]` had a zero
- * pixel delta (OD-2). POLISH.3 has now RECONCILED it: the bar and labels carry
- * d5's 14px / 10px (surface_d5_v1_0.html:507-508), deliberately breaking that
- * pin, which was transitional by construction (PD-3-01 / D5).
+ * ✅ `detail` JOINED THIS MAP AT HTML-FINISH · MARKET DETAIL (row 7), and D-J is
+ * DISCHARGED. It was previously absent because it was structurally different —
+ * bar above, labels below — and the divergence from d5's one-row `.barrow`
+ * (`:505`, labels flanking the bar) was *"recorded and NOT actioned (D-J)"*,
+ * with that record naming the exact mechanism adopting it would take: *"move
+ * `detail` into `ROW` below and delete the early return."* That is precisely
+ * what row 7 does, so the record is superseded in place rather than deleted.
  *
- * ⚠ ONLY THE NUMBERS WERE OPEN. d5's bar is structurally a one-row `.barrow`
- * (`:505`, labels flanking the bar); this ships the two-row form still. That
- * divergence is recorded and NOT actioned (D-J) — adopting it would move
- * `detail` into `ROW` below and delete the early return, which is what keeps
- * `hero` and `card` unreachable from this change.
+ * ⛔ NO NEW VALUE ENTERS THIS FILE. `h-[14px]` and `text-[10px]` are the two
+ * numbers the deleted `detail` branch already carried — POLISH.3 put them there
+ * (PD-3-01 / D5). They move; they do not change. `hero` and `card` are
+ * untouched and remain unreachable from this change.
+ *
+ * ⚠ TWO CONSEQUENCES OF UNIFYING, BOTH DELIBERATE. Sharing the one render means
+ * `detail` now takes the shared track radius (`--r`, replacing `rounded-full`)
+ * and the shared `.blab` label recipe (bold / `.05em` / `text-ink`, replacing
+ * `font-mono text-muted-foreground`). Both are what "one row" MEANS here: the
+ * shared label string was authored from d5's own `.blab`, so `detail` is
+ * arriving at the recipe it should always have had, not acquiring a new one.
  */
 const ROW = {
 	hero: { bar: "h-[22px]", label: "text-[12px]" },
 	card: { bar: "h-[16px]", label: "text-[10.5px]" },
+	detail: { bar: "h-[14px]", label: "text-[10px]" },
 } as const;
 
 /**
@@ -60,31 +68,6 @@ export function PriceBar({
 	const yesPct = formatPricePercent(pricing, "YES");
 	const noPct = formatPricePercent(pricing, "NO");
 
-	// The market-detail render. Structurally as it shipped at V29/V30 — no
-	// `data-size`, no reordering — but NO LONGER byte-identical to the
-	// pre-preset render: POLISH.3 applied d5's 14px bar / 10px labels here
-	// (PD-3-01 / D5), breaking OD-2's pin deliberately.
-	if (size === "detail") {
-		return (
-			<div className="flex flex-col gap-1">
-				<div
-					className="flex h-[14px] w-full overflow-hidden rounded-full [border:var(--hairline)]"
-					role="img"
-					aria-label={`YES ${yesPct}, NO ${noPct}`}
-				>
-					{/* Width is a data-driven length (the price proportion) — a string
-					    percentage, not float math (CLAUDE.md §2). */}
-					<div className="h-full bg-yes" style={{ width: yesPct }} />
-					<div className="h-full flex-1 bg-no" />
-				</div>
-				<div className="flex justify-between font-mono text-[10px] text-muted-foreground">
-					<span>YES {yesPct}</span>
-					<span>NO {noPct}</span>
-				</div>
-			</div>
-		);
-	}
-
 	const s = ROW[size];
 	// `.blab` — 700, .05em, nowrap, `--ink`. `--ink` here is a text-EMPHASIS
 	// token, not a side encoding: both labels carry it, so copying it by name is
@@ -98,6 +81,9 @@ export function PriceBar({
 				role="img"
 				aria-label={`YES ${yesPct}, NO ${noPct}`}
 			>
+				{/* Width is a data-driven length (the price proportion) — a string
+				    percentage, not float math (CLAUDE.md §2). Carried over from the
+				    deleted `detail` branch, which held the only copy of this note. */}
 				<div className="h-full bg-yes" style={{ width: yesPct }} />
 				<div className="h-full flex-1 bg-no" />
 			</div>

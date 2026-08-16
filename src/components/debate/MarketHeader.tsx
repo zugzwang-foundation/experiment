@@ -86,12 +86,24 @@ export function MarketHeader({
 			// never an empty 25% box (PD-3-09). `MarketPriceChartHost` itself
 			// still returns null for an empty series, so both null paths agree.
 			right={
-				priceChart ? (
-					<MarketPriceChartHost
-						series={priceChart.series}
-						nodes={priceChart.nodes}
-					/>
-				) : null
+				<>
+					{priceChart ? (
+						<MarketPriceChartHost
+							series={priceChart.series}
+							nodes={priceChart.nodes}
+						/>
+					) : null}
+					{/* HTML-FINISH · MARKET DETAIL row 7 — the price bar is the rail's
+					    second occupant, directly under the chart, exactly as `.hright`
+					    holds `.graph` then `.barrow f` (`d5:1007`, `:1037`). The bar and
+					    the chart above it read the SAME price, so standing them in one
+					    column is what lets a reader check one against the other.
+					    ⚠ THE RAIL IS NOW ALWAYS RENDERED on the market arm: `PriceBar`
+					    returns its "Pricing unavailable" stub rather than null, so there
+					    is no market-arm state with an empty rail. A null `priceChart`
+					    now means "no CHART in the rail", not "no rail". */}
+					<PriceBar pricing={market.pricing} size="detail" />
+				</>
 			}
 			left={
 				<>
@@ -177,7 +189,6 @@ export function MarketHeader({
 							</p>
 						</div>
 					) : null}
-					<PriceBar pricing={market.pricing} size="detail" />
 				</>
 			}
 		/>
