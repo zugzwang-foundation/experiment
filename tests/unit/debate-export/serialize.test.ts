@@ -117,13 +117,6 @@ function mkPost(o: {
 	stake?: string;
 	entryPrice?: string;
 	imageUrl?: string | null;
-	/**
-	 * HTML-FINISH · MARKET DETAIL row 14 — the author's current value, the right
-	 * half of `Đ staked → Đ now`. Defaulted to `null` (the pair does not render),
-	 * so every existing call site keeps its exact shape and the byte-exact
-	 * golden is untouched.
-	 */
-	authorValue?: string | null;
 	createdAt?: string;
 	ordinal?: number;
 	aggregate?: DebatePost["aggregate"];
@@ -147,7 +140,6 @@ function mkPost(o: {
 			pfpUrl: o.pfpUrl ?? "/pfp-placeholder.svg",
 		},
 		authorStake: o.stake ?? "100.000000000000000000",
-		authorValue: o.authorValue ?? null,
 		entryPrice: o.entryPrice ?? "0.500000000000000000",
 		aggregate: o.aggregate ?? {
 			supportCount: 0,

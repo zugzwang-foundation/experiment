@@ -103,7 +103,6 @@ function presentPost(): DebatePost {
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
 		entryPrice: "0.500000000000000000",
-		authorValue: null,
 		aggregate: AGGREGATE,
 		replies: EMPTY_REPLIES,
 	};
@@ -191,57 +190,5 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 		expect(footer).not.toBeNull();
 		expect(footer?.innerHTML).toContain("Đ 1,000");
 		expect(footer?.innerHTML).toContain("Đ 2,000");
-	});
-});
-
-/**
- * HTML-FINISH · MARKET DETAIL row 14 — the `Đ staked → Đ now` pair.
- *
- * ⛔ THE GATE IS THE SERVER'S, and this file only proves the component obeys
- * it. `load-debate-view.integration.test.ts` proves the predicate itself.
- */
-describe("HTML-FINISH · MARKET DETAIL — row 14, the staked→now pair", () => {
-	const BASE = {
-		commentId: "0199a0c0-0000-7000-8000-00000000dc01",
-		author: { pseudonym: "fixture-author", pfpUrl: "" },
-		side: "YES" as const,
-		marker: "none" as const,
-		bookmarks: null,
-	};
-
-	it("dharma-spacing::both-halves-carry-the-spaced-Đ-grammar", () => {
-		const { container } = render(
-			<ArgProfile
-				{...BASE}
-				authorStake="1000.000000000000000000"
-				authorValue="1407.000000000000000000"
-			/>,
-		);
-
-		const html = container.innerHTML;
-		// Canon §107 — SPACED on both halves. The unspaced form is the defect
-		// PD-3-07 exists for, and a new site is a new place for it to reappear.
-		expect(container.textContent).toContain("Đ 1,000");
-		expect(container.textContent).toContain("Đ 1,407");
-		expect(container.textContent).not.toContain("Đ1,000");
-		expect(container.textContent).not.toContain("Đ1,407");
-		// The arrow is punctuation between two figures that already read as
-		// themselves — announcing "right arrow" adds nothing.
-		expect(html).toContain('aria-hidden="true">→');
-	});
-
-	it("dharma-spacing::a-null-value-renders-Đa-ALONE", () => {
-		const { container } = render(
-			<ArgProfile
-				{...BASE}
-				authorStake="1000.000000000000000000"
-				authorValue={null}
-			/>,
-		);
-
-		// Today's render, unchanged — which is what the narrow predicate makes
-		// the COMMON case, not the fallback.
-		expect(container.textContent).toContain("Đ 1,000");
-		expect(container.innerHTML).not.toContain("→");
 	});
 });

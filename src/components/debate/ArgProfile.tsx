@@ -18,15 +18,8 @@ import type { AuthorIdentity, Marker, Side } from "./types";
  * full icon matrix (signed-out disabled / own-argument absent / active
  * outline-or-filled). ⛔ The download trigger was REMOVED at POLISH.3 PR 2
  * row 7 (`PD-3-15`).
- * ✅ THE `→ now` HALF LANDED AT HTML-FINISH · MARKET DETAIL row 14, and D7's
- * deferral is discharged FOR IT. `Đ a → Đ now` renders when — and only when —
- * the server sends an `authorValue`, which it does under a deliberately narrow
- * predicate (marker `none` AND exactly one stake-bearing comment by that author
- * in this market; plan F-5 / OD-1, founder-ruled). ⛔ The component does NOT
- * decide this and must never infer it: an arrow drawn from a per-POST stake to
- * a per-MARKET holding is a false claim about money, and the server is where
- * the truth of it is known. `authorValue === null` ⇒ `Đ a` alone, unchanged.
- * ⚠ The `@entry%` half is still row 13's and is NOT taken here.
+ * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
+ * never `YES @ 27%` or `Đ a → Đ now`.
  *
  * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster, so it is
  * deliberately NOT the own-suppression hook. Own-suppression is a condition
@@ -42,7 +35,6 @@ export function ArgProfile({
 	side,
 	marker,
 	authorStake,
-	authorValue,
 	replyCount,
 	bookmarks,
 	showActions = true,
@@ -53,13 +45,6 @@ export function ArgProfile({
 	side: Side;
 	marker: Marker;
 	authorStake?: string;
-	/**
-	 * HTML-FINISH · MARKET DETAIL row 14 — the author's CURRENT value (Đb basis).
-	 * `undefined`/`null` ⇒ the arrow does not render and `Đ a` stands alone. The
-	 * gate is the SERVER's (see this file's docblock and
-	 * `load-debate-view.ts`'s `authorValue`); this prop only carries the answer.
-	 */
-	authorValue?: string | null;
 	replyCount?: number;
 	/** Viewer bookmark state for this market; `null` when signed out. */
 	bookmarks: BookmarkAffordance;
@@ -83,21 +68,7 @@ export function ArgProfile({
 				</div>
 				<div className="flex items-center gap-2 text-xs text-muted-foreground">
 					{authorStake !== undefined ? (
-						<span className="font-mono">
-							Đ {formatDharma(authorStake)}
-							{/* `.ppos` (`d5:966`) — `Đ 1,000 → Đ 1,407`. The arrow is
-							    `aria-hidden`: it is punctuation between two figures that
-							    already read as themselves, and announcing "right arrow"
-							    adds nothing. Canon §107 spaced `Đ ` grammar on BOTH
-							    halves — `no-raw-dharma-render` reads them. */}
-							{authorValue != null ? (
-								<>
-									{" "}
-									<span aria-hidden="true">→</span> Đ{" "}
-									{formatDharma(authorValue)}
-								</>
-							) : null}
-						</span>
+						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
 					) : null}
 					{replyCount !== undefined ? (
 						<>

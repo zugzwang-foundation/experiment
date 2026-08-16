@@ -14,8 +14,6 @@ import {
 	type Side,
 	twoSlot,
 } from "@/lib/ranking";
-import { computeSell } from "@/server/cpmm/calculate";
-import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
 import type { PricePoint } from "@/server/discovery/price-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
@@ -24,10 +22,9 @@ import type { Marker } from "@/server/positions/compute";
 import { signRead } from "@/server/storage/sign-read";
 
 import { type DebateComment, listMarketComments } from "./list-comments";
-import { getMarketPricingAndReserves } from "./market-pricing";
+import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
 import { type ChartNode, deriveMarketPriceChart } from "./price-chart";
-import { deriveUnitToWin } from "./quote";
 import { loadRankingSubstrate } from "./ranking-substrate";
 import { loadReplySubstrate } from "./reply-substrate";
 import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
@@ -120,26 +117,6 @@ export type DebatePost =
 			badge: Badge | null;
 			author: AuthorIdentity;
 			authorStake: string;
-			/**
-			 * HTML-FINISH · MARKET DETAIL row 14 — the author's CURRENT value on the
-			 * Đb basis, the right half of `Đ staked → Đ now`. `null` means the pair
-			 * does not render and `authorStake` stands alone — today's shape.
-			 *
-			 * ⛔⛔ IT IS NULL FAR MORE OFTEN THAN NOT, AND THAT IS A MONEY-TRUTH
-			 * RULING, NOT A CACHE MISS (plan F-5 / OD-1, founder-ruled). `authorStake`
-			 * is the stake on THIS POST's bet; a `positions` row is the author's NET
-			 * holding in the WHOLE market. So an author with two posts would see two
-			 * different staked figures both arrowing into the SAME total, each
-			 * implying that post alone grew to it. `viewer-context.ts` fixes the
-			 * inheritance law in terms — "one holding never shows two different
-			 * current values" — and that is its inverse.
-			 * ⇒ Populated ONLY when the claim is exactly true: the author's marker is
-			 * `none` (still holding the side they posted) AND they have exactly ONE
-			 * stake-bearing comment in this market. Otherwise `null`.
-			 * ⛔ Do NOT widen this to "whenever marker === none" without a founder
-			 * ruling. It is a claim about money, not about layout.
-			 */
-			authorValue: string | null;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
 			aggregate: ReplyAggregate;
@@ -207,27 +184,13 @@ export async function loadDebateView(
 
 	// Substrate reads. Sequential — the client may be a single-connection
 	// transaction; the per-market volume is bounded (D11, load-all v1).
-	const { comments, heldByUser } = await listMarketComments(client, {
-		marketId,
-	});
+	const comments = await listMarketComments(client, { marketId });
 	const postSubstrate = await loadRankingSubstrate(client, { marketId });
 	const replyMap = await loadReplySubstrate(client, { marketId });
-	// HTML-FINISH · MARKET DETAIL row 14 (plan F-4 / OD-4, founder-ruled) — the
-	// SAME one-row pool SELECT, now also returning the raw reserves, with
-	// `unitToWin` derived locally by the already-exported `deriveUnitToWin` (the
-	// exact call `getMarketPricingAndUnitToWin` makes internally).
-	//
-	// ⛔ THIS IS WHY THE READ BUDGET IS +1 AND NOT +2. `computeSell` needs the
-	// reserves; they WERE read here and then discarded, because the old helper
-	// returned `{pricing, unitToWin}` only. Exposing them from that helper would
-	// have meant editing `market-pricing.ts` — a FOURTH `src/server/**` file and
-	// therefore H2-a, a halt. Swapping to the sibling helper that already
-	// returns them is entirely inside the three-file fence. Same SELECT, same
-	// DTO, same values.
-	const pool = await getMarketPricingAndReserves(client, marketId);
-	const pricingAndUnitToWin = pool
-		? { pricing: pool.pricing, unitToWin: deriveUnitToWin(pool.reserves) }
-		: null;
+	const pricingAndUnitToWin = await getMarketPricingAndUnitToWin(
+		client,
+		marketId,
+	);
 	const totals = await getMarketTotals(client, marketId);
 	// HTML-FINISH · MARKET DETAIL rows 2 + 17 — THE ONE NEW STATEMENT THIS TASK
 	// SPENDS, and the whole read budget is +1 per render, so it is the only one.
@@ -278,83 +241,15 @@ export async function loadDebateView(
 	// ⚠ THE EXCEPTION, STATED BECAUSE THE READ BUDGET IS A HALT CONDITION: the
 	// helper EARLY-RETURNS when no input comment carries an image. So on a market
 	// whose images are all on REPLIES and none on posts, this call goes 0 → 1 and
-	// the render's total delta is +2, not +1. That statement is the ratified
+	// that render's total delta is +2, not +1. That statement is the ratified
 	// row's own irreducible cost — a reply's image key cannot be read without
-	// reading it — not an overage that could be optimised back inside the fence.
-	// Caught by `@code-reviewer` (MEDIUM-2); the comment was unconditional and
-	// the behaviour was not.
+	// reading it — not an overage that could be brought back inside the fence.
+	// Caught by `@code-reviewer` (MEDIUM-2): the comment was unconditional and
+	// the behaviour was not. Plan §7's table row carries the same unconditional
+	// wording and should be read with this correction.
 	// The remaining cost is +N LOCAL HMAC presigns (`signRead` — no network, no
 	// DB), which is why this rides the existing helper rather than a new read.
 	const imageUrlByComment = await mintImageUrls(client, visible);
-
-	// HTML-FINISH · MARKET DETAIL row 14 — how many stake-bearing comments each
-	// author has IN THIS MARKET. Counted in memory over the `comments` array
-	// already in hand (every comment rides a bet, INV-1, so every comment is
-	// stake-bearing). Costs no statement.
-	/**
-	 * ⛔⛔ ROW 14 RENDERS NOTHING ON A TERMINAL MARKET, AND THAT IS A PHANTOM-FIGURE
-	 * RULE THIS TREE ALREADY STATES IN TERMS — not a new decision.
-	 * `header-portfolio.ts` puts it exactly: *"a `quantity > 0` test alone would
-	 * `computeSell` against a resolved pool and report a phantom figure."*
-	 * Resolution writes neither `positions` (sole writer `positions/persist.ts`)
-	 * nor `pools`, so a holder-to-settlement keeps `quantity > 0` and keeps
-	 * `marker: "none"` forever — and `computeSell` would happily price it against
-	 * frozen open-state reserves for a position that has ALREADY settled into the
-	 * ledger via `payout_events`. A losing YES author would read `Đ 100 → Đ 55`
-	 * for a holding worth nothing, while Profile's "Current" column
-	 * (`profile/positions.ts`) showed the settled net for the same holding — one
-	 * holding, two different current values, the precise inversion of the
-	 * inheritance law this field's own docblock invokes.
-	 * ⇒ `Open` ONLY. Closed/Resolving/Frozen cannot be sold into either, so a
-	 * "now" is unactionable there as well as untrue.
-	 * ⚠ Costs NOTHING: `status` is already on `MarketSummary` and already in hand.
-	 * Caught by `@code-reviewer` (HIGH-1) and fixed in-session per H2-d; the
-	 * three sibling modules that call `computeSell` all branch on settlement the
-	 * same way (`profile/positions.ts`, `bookmarks/figures.ts`,
-	 * `dharma/header-portfolio.ts`).
-	 */
-	const marketIsOpen = args.market.status === "Open";
-
-	const commentsByAuthor = new Map<string, number>();
-	for (const c of comments) {
-		commentsByAuthor.set(c.userId, (commentsByAuthor.get(c.userId) ?? 0) + 1);
-	}
-
-	/**
-	 * The author's current value on the Đb basis — `computeSell(quantity).proceeds`,
-	 * the SAME basis `viewer-context.ts` ratified, so one holding never shows two
-	 * different current values.
-	 *
-	 * MEMOISED PER AUTHOR, not per post: `computeSell` is decimal.js at precision
-	 * 50, and this route re-renders 4×/minute/viewer under the poll. At most one
-	 * execution per distinct author per render.
-	 */
-	const valueByAuthor = new Map<string, string | null>();
-	const authorValueFor = (userId: string, postSide: Side): string | null => {
-		const cached = valueByAuthor.get(userId);
-		if (cached !== undefined) {
-			return cached;
-		}
-		const held = heldByUser.get(userId);
-		// No pool, or nothing held (sold out — marker `Exited`) ⇒ no "now" half.
-		// `computeSell` requires a POSITIVE share count and would throw otherwise.
-		// ⛔ `CpmmDecimal`, never `Number()`: a share count is NUMERIC(38,18) and
-		// CLAUDE.md §2 forbids a JS float on one. `header-portfolio.ts` makes the
-		// identical guard the identical way.
-		const value =
-			pool &&
-			held &&
-			held.side === postSide &&
-			new CpmmDecimal(held.quantity).greaterThan(0)
-				? computeSell({
-						reserves: pool.reserves,
-						side: postSide === "YES" ? "yes" : "no",
-						shares: held.quantity,
-					}).proceeds
-				: null;
-		valueByAuthor.set(userId, value);
-		return value;
-	};
 
 	// Top order over the WHOLE substrate (removed posts keep their slot/position).
 	const ordered = buildTopList(postSubstrate);
@@ -423,19 +318,6 @@ export async function loadDebateView(
 			badge: badgeFor(sub, postSubstrate),
 			author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: sub.authorStake,
-			// Row 14's gate. ALL THREE conjuncts are load-bearing:
-			//   · the market is OPEN — `marketIsOpen` above says why at length;
-			//   · `marker === "none"` — the author still holds the side they
-			//     posted, so a `Flipped` or `Exited` author never shows a "now"
-			//     that contradicts the marker chip rendered inches away;
-			//   · exactly ONE stake-bearing comment — the money-truth half (the
-			//     DTO field's own docblock says why).
-			authorValue:
-				marketIsOpen &&
-				comment.marker === "none" &&
-				commentsByAuthor.get(comment.userId) === 1
-					? authorValueFor(comment.userId, comment.sideAtPostTime)
-					: null,
 			entryPrice: sub.priceAtBet,
 			aggregate,
 			replies,
