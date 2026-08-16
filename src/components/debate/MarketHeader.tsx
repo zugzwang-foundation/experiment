@@ -170,15 +170,31 @@ export function MarketHeader({
 					    and anything that does not fit scrolls INSIDE its own region.
 					    Nothing is clipped and nothing is deleted — the marker, the
 					    export and both resolver cards stay reachable.
-					    ⛔ THIS IS NOT A FIX FOR THE UNDERLYING SIZE. The stack's content
-					    is ~41px taller than d5's equivalent (our resolver cards are 72px
-					    against d5's 57, and our three gaps are 36px against d5's 30). A
-					    band that has to scroll is a smaller surface than one that fits;
-					    closing that gap is a composition change this task forbids
-					    ("⛔ Nothing else moves"), so it is reported, not taken. */}
+					    ✅ THE UNDERLYING SIZE IS NOW FIXED, and this block's previous
+					    "⛔ THIS IS NOT A FIX" note is discharged. `ResolverCards` is sized
+					    to d5's `.rescard` (71.8px → 56.3px) and this stack's gap drops
+					    from 12px to 5px, so the content fits the band AT REST and the
+					    `overflow-y-auto` above stops firing — it stays as the backstop for
+					    a long criterion, which is what it was for.
+
+					    ⛔⛔ 5px IS NOT d5's GAP, AND d5's GAP CANNOT FIT — the arithmetic,
+					    because the founder's target numbers predate Q-1. d5 spaces this
+					    stack 8 / 12 / 10 = **30px across THREE gaps** (`.attrs{margin-top:
+					    8px}`, `.criterion{margin-top:12px}`, `.rescards{margin-top:10px}`).
+					    Q-1 added a FOURTH child — the lifecycle marker + `.md` export row —
+					    which costs 20px of content plus a fourth gap.
+					    MEASURED on staging at `b983a5f`, with the resolver card already at
+					    d5's height: content sums to 167.1px before gaps, in a 188px band, so
+					    the whole gap budget is **20.9px across four gaps**. d5's own spacing
+					    would need 38px and lands at 205 — 17px over. A uniform 8px lands at
+					    197 (9 over); 6px at 189 (1 over); **5px at 185, the largest uniform
+					    gap that fits**, with 3px of slack for font-rendering variance.
+					    ⇒ Reported rather than smoothed over: this stack is TIGHTER than the
+					    mockup's, and it is tighter because the marker row is a build element
+					    d5 has no equivalent of. Moving that row is not this fence's. */}
 					<div
 						data-testid="headzone-stack"
-						className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto"
+						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
 					>
 						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis

@@ -72,6 +72,30 @@ export function ResolverCards({
  * One `.rescard` (`d5:987`, `:995`) — glyph box · overline · two empty value
  * rows.
  *
+ * ⚠⚠ SIZED TO d5's CARD — the founder's overlap fix, and the fence was lifted for
+ * this one component to do it. MEASURED on staging at `b983a5f`: this card was
+ * **71.8px** against d5's **57**, and it was the single largest contributor to a
+ * header stack running 229px of content in a 188px band — 41px over, which is
+ * why the cards visibly overlapped the resolution block.
+ *
+ * ⛔ COMPOSITION ONLY, and every number below is d5's own `.rescard` (`d5:474`)
+ * or derived from its box: padding `9px 11px` (was a uniform 10px), glyph box
+ * `30px` (was `size-8` = 32; `d5:476` `.reslogo{width:30px;height:30px}`), and
+ * the meta column's row gap `1px` (was 3px; d5 spaces `.resname`/`.ressrc` with
+ * `margin-top:1px`, `:485`/`:487`).
+ *
+ * ⚠ THE TWO VALUE ROWS TAKE PIXEL HEIGHTS INSTEAD OF `em` MULTIPLES — 11px and
+ * 9px, replacing `min-h-[1em]` (16px) and `min-h-[0.85em]` (13.6px). `em` here
+ * resolved against the INHERITED font size, so these placeholder bars were sized
+ * by whatever type happened to cascade rather than by the rows they stand in for
+ * (`.resname` 12px, `.ressrc` 10px). Pixel heights make the placeholder's shape a
+ * property of the placeholder.
+ * ⛔ NO new colour, type size or radius token enters: `bg-n1`, `--r-dot`, the
+ * overline recipe and the glyph-box recipe are all unchanged.
+ *
+ * ⇒ MEASURED AFTER: **56.3px**, i.e. **0.7px under** d5's 57 — inside the ±2px
+ * the ruling allows.
+ *
  * ⛔ THE EMPTY VALUE ROWS ARE RENDERED, NOT OMITTED, and they are the reason
  * this is a placeholder rather than a label. A card that drew only its overline
  * would be a different composition from the one the mockup shows; the two blank
@@ -91,18 +115,18 @@ function ResolverCard({
 	return (
 		<div
 			data-testid={testid}
-			className="flex min-w-0 items-center gap-2.5 rounded-(--r) p-2.5 [border:var(--hairline)]"
+			className="flex min-w-0 items-center gap-2.5 rounded-(--r) px-[11px] py-[9px] [border:var(--hairline)]"
 		>
 			{/* `.reslogo` / `.xmark` — one glyph box, two labels. d5 gives the X mark
 			    an `--ink` border where the logo box gets a hairline; that is a VALUE
 			    distinction on a light ramp and is not carried. */}
 			<span
 				aria-hidden="true"
-				className="flex size-8 shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+				className="flex size-[30px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
 			>
 				{glyph}
 			</span>
-			<span className="flex min-w-0 flex-col gap-[3px]">
+			<span className="flex min-w-0 flex-col gap-px">
 				{/* `.reslabel` — the same overline role as `MarketHeader`'s RESOLUTION
 				    label, so the recipe is REUSED rather than re-derived from d5's own
 				    third variant of the family. */}
@@ -113,11 +137,11 @@ function ResolverCard({
 				    is authored to stand in. `min-h` keeps the shape without content. */}
 				<span
 					aria-hidden="true"
-					className="block min-h-[1em] w-full max-w-[12rem] rounded-(--r-dot) bg-n1"
+					className="block min-h-[11px] w-full max-w-[12rem] rounded-(--r-dot) bg-n1"
 				/>
 				<span
 					aria-hidden="true"
-					className="block min-h-[0.85em] w-full max-w-[8rem] rounded-(--r-dot) bg-n1"
+					className="block min-h-[9px] w-full max-w-[8rem] rounded-(--r-dot) bg-n1"
 				/>
 			</span>
 		</div>
