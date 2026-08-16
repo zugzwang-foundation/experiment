@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
+import { cn } from "@/lib/utils";
 import { formatDharma, formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
 import { COMPOSER_COPY, c3OppositeSide, formatMultiplier } from "./copy";
@@ -124,18 +125,37 @@ export function SlotHeader({
 						{/* W2.10-C (activated at A5, F-4): the click-through to the
 						    viewer's own profile, market-filter preselected (OQ-5 B).
 						    Signed-out (`ownPseudonym === null`) → non-interactive. */}
+						{/* HTML-FINISH · MARKET DETAIL row 21 — `Sell ↗` takes BUTTON
+						    SHAPE and KEEPS ITS NAVIGATION.
+						    ⛔⛔ IT STAYS AN ANCHOR. A `<button>` here would look identical
+						    and silently drop the W2.10-C click-through to the viewer's own
+						    profile with this market preselected (OQ-5 B) — which is the
+						    whole point of the control. d5 itself navigates
+						    (`:1909-1911` → `nav('profile')`), so a non-navigating button
+						    would be a regression dressed as a port, and plan H3-d makes
+						    exactly that a HALT rather than an acceptable simplification.
+						    ⇒ `buttonVariants` supplies the SHAPE; `Link` keeps the
+						    behaviour. The signed-out arm keeps the same shape and stays
+						    non-interactive, so the affordance does not appear and
+						    disappear between session states. */}
 						{ownPseudonym !== null ? (
 							<Link
 								data-testid="w210c-sell-link"
 								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
-								className="text-n4 hover:text-ink"
+								className={buttonVariants({
+									variant: "outline",
+									size: "xs",
+								})}
 							>
 								{COMPOSER_COPY.sell} ↗
 							</Link>
 						) : (
 							<span
 								aria-disabled="true"
-								className="cursor-default text-n4 select-none"
+								className={cn(
+									buttonVariants({ variant: "outline", size: "xs" }),
+									"cursor-default opacity-(--state-disabled-opacity) select-none",
+								)}
 							>
 								{COMPOSER_COPY.sell} ↗
 							</span>

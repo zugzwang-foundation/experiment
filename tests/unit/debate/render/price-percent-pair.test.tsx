@@ -167,4 +167,36 @@ describe("HTML-FINISH · MARKET DETAIL — rows 20 + 21, the slot header", () =>
 		// The superseded brand string, pinned as gone from this control.
 		expect(entry.innerHTML).not.toContain("Đ BET");
 	});
+
+	it("row-21::Sell-takes-button-shape-and-STILL-NAVIGATES", () => {
+		const { container } = render(
+			<SlotHeader
+				side="YES"
+				pricing={TIE}
+				unitToWin={null}
+				viewer={VIEWER_HOLDING}
+				marketOpen={true}
+				suspended={false}
+				composerOpen={false}
+				onToggleEntry={() => {}}
+				ownPseudonym="own-pseudonym"
+				slug="m-test"
+			/>,
+		);
+
+		const sell = container.querySelector<HTMLAnchorElement>(
+			'[data-testid="w210c-sell-link"]',
+		);
+		expect(sell).not.toBeNull();
+		// ⛔ STILL AN ANCHOR WITH ITS HREF. This is the H3-d assertion: button
+		// SHAPE, never button semantics — the W2.10-C click-through to the
+		// viewer's own profile with this market preselected is the whole point of
+		// the control, and a `<button>` would have silently dropped it.
+		expect(sell?.tagName).toBe("A");
+		expect(sell?.getAttribute("href")).toBe("/u/own-pseudonym?market=m-test");
+		// …and it now carries the button geometry rather than bare text styling.
+		const className = sell?.getAttribute("class") ?? "";
+		expect(className).toContain("inline-flex");
+		expect(className).toContain("rounded");
+	});
 });
