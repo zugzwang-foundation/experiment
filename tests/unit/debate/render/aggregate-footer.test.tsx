@@ -216,7 +216,54 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		expect(
 			container.querySelector('[data-testid="card-trigger-support"]'),
 		).toBeNull();
-		expect(container.innerHTML).toContain("Support (");
+		// ⚠ HTML-FINISH · MARKET DETAIL round 2 · R5 — this line used to read
+		// `toContain("Support (")`, which R5 deleted from the render. The
+		// assertion's JOB was non-vacuity ("the read-only footer still drew
+		// something"), and the label it happened to reach for is now gone, so it is
+		// REPOINTED at what the read-only footer actually still renders rather than
+		// deleted — dropping it would leave the `toBeNull()` above unpaired and a
+		// component that rendered NOTHING would pass this row.
+		// ⛔ Assert on `innerHTML`, never `textContent` (O-7).
+		expect(
+			container.querySelector('[data-testid="aggregate-footer"]'),
+		).not.toBe(null);
+		expect(container.innerHTML).not.toContain("Support (");
+		expect(container.innerHTML).not.toContain("Counter (");
+	});
+
+	it("aggregate-footer::row-5-the-flanking-figures-are-bare-dharma", () => {
+		// R5's positive control. The two flanking spans carry the figure ALONE —
+		// d5's `.sb2` (`:981`/`:983`) — with the word "Support"/"Counter" living on
+		// the pill above, not restated beside the number.
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={TRIGGERS}
+			/>,
+		);
+		const columns = container.querySelectorAll(
+			'[data-testid="aggregate-footer"] > span',
+		);
+		expect(columns).toHaveLength(3);
+		// Column 0 = Support side, column 2 = Counter side; the middle is the bar.
+		// `:scope > span:last-child` is the figure under each pill.
+		expect(columns[0]?.querySelector("span:last-child")?.textContent).toBe(
+			"Đ 1,000",
+		);
+		expect(columns[2]?.querySelector("span:last-child")?.textContent).toBe(
+			"Đ 2,000",
+		);
+		// The pill IS still there and still says the word — which is why dropping
+		// the prefix loses nothing.
+		expect(
+			columns[0]?.querySelector('[data-testid="card-trigger-support"]')
+				?.textContent,
+		).toBe("Support");
+		expect(
+			columns[2]?.querySelector('[data-testid="card-trigger-counter"]')
+				?.textContent,
+		).toBe("Counter");
 	});
 
 	it("aggregate-footer::pills-are-poled-by-the-RESULTING-side-on-a-YES-post", () => {

@@ -140,9 +140,35 @@ export function PostCard({
 			    to its debate. The title used to open the pop-up; that is now the
 			    `+`'s job alone. */}
 			<div className="flex items-start justify-between gap-2">
+				{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
+				    POINTER. It is the card's primary navigation (it enters post-focus)
+				    and it carried NO hover state at all, so the one control on the card
+				    that takes you somewhere looked like static text.
+				    ⛔ BOTH CLASSES ARE SHIPPED, NEITHER IS A MOCKUP VALUE.
+				    · `hover:bg-n1` is the HIGHLIGHT, byte-carried from the Profile
+				      surface — `profile/PositionsTable.tsx:672` (the selectable row)
+				      and `:984` (the option button) both already use exactly it.
+				    · `hover:underline` is the UNDERLINE, byte-carried from the Profile
+				      argument title — `profile/ArgumentList.tsx:171` and `:473`, which
+				      is the same thing this element is: a title that navigates.
+				    · `rounded-(--r-chip)` is the build's own chip radius token, so the
+				      highlight has the corner every other soft-cornered surface here
+				      has.
+				    ⚠ d5 AGREES ON THE HIGHLIGHT AND IS NOT THE SOURCE OF IT. `.rtt`
+				    hovers to `background:var(--n1)` (`d5:839-840`) — the SAME token
+				    index-wise: d5's `.rtt` sits on a white `--n0` and lifts one step to
+				    a light `--n1`; this sits on `--color-n0` #212121 and lifts one step
+				    to `--color-n1` #2a2a2a. Same relation, inverted ramp. ⛔ Its
+				    `border-radius:4px`, `padding:0 3px` and `margin:0 -3px` are VALUES
+				    and are NOT taken — which is also why no padding is added here: the
+				    highlight hugs the text block and NOTHING in the card's layout
+				    moves. d5 does not underline at all; that half is the founder's, via
+				    the Profile pattern.
+				    ⚠ NO `aria-label` IS ADDED. The visible text IS the accessible name,
+				    and an override would have to contain it to satisfy WCAG 2.5.3. */}
 				<button
 					type="button"
-					className="text-left"
+					className="rounded-(--r-chip) text-left hover:bg-n1 hover:underline"
 					onClick={() => onEnter(post.id)}
 				>
 					<h3 className="font-heading text-base leading-snug font-medium">

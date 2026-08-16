@@ -109,10 +109,25 @@ export function AggregateFooter({
 				{triggers ? (
 					<TriggerPill relation="support" postSide={postSide} {...triggers} />
 				) : null}
-				<span>
-					Support ({aggregate.supportCount}) : Đ{" "}
-					{formatDharma(aggregate.supportDharma)}
-				</span>
+				{/* HTML-FINISH · MARKET DETAIL round 2 · R5 — `Support (0) : Đ 0`
+				    becomes `Đ 0`. d5's `.sb2` under each pill is the bare figure
+				    (`d5:981`/`:983`, `Đ 3,800` / `Đ 6,200`) and nothing else.
+				    ⚠ NOTHING IS LOST FROM THE ROW. The word "Support" is the PILL
+				    directly above this figure, so the prefix restated a label that is
+				    already on screen an inch away; and the count `(N)` is carried by
+				    the author row's `Replies · N`, which sums the same two fields
+				    (`PostCard.tsx` builds `replyCount` from `supportCount +
+				    counterCount`). The prefix was pure duplication in both halves.
+				    ⚠ THE POST ARM ALREADY READS THIS WAY. `composer/ReplySplitBar.tsx`
+				    renders the bare `Đ {formatDharma(...)}` on both sides and always
+				    has, so this row makes the two bars AGREE rather than moving one of
+				    them — which is also why the post arm needs no edit, and why the
+				    allow-list-excluded `ReplySplitBar.tsx` is untouched (H1-f clear).
+				    ⚠ THE ACCESSIBLE READING IS PRESERVED BY THE PILL, not by this
+				    span: the trigger's `aria-label` names the resulting bet side in
+				    words. A screen reader meets "Support — bet YES" and then the
+				    figure, which is the same information in the same order. */}
+				<span>Đ {formatDharma(aggregate.supportDharma)}</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
 				{/* Decorative: the figures either side carry the meaning, and colour
@@ -124,7 +139,13 @@ export function AggregateFooter({
 				    proportion of. The zero-reply case is the same defect from the
 				    other side: `computeSplitBar` returns "0%", so a YES post would
 				    render a solid full-width white bar reading as "100% Counter"
-				    beside text saying Support (0) / Counter (0).
+				    beside two figures that both read `Đ 0`.
+				    ⚠ THAT SENTENCE USED TO SAY "Support (0) / Counter (0)" and round
+				    2's R5 dropped those prefixes, so it is corrected here in the same
+				    commit rather than left describing a render that no longer exists.
+				    ⛔ THE HAIRLINE MATTERS MORE NOW, NOT LESS: the two flanking
+				    figures are shorter, so the bar carries proportionally more of the
+				    row's meaning.
 				    The mockup does not have this problem because `.bar` is an
 				    OUTLINE — `d5:510` `border:1px solid var(--ink)` — and the port
 				    dropped it. Ruling A forbids porting the VALUE, not the
@@ -154,10 +175,9 @@ export function AggregateFooter({
 				{triggers ? (
 					<TriggerPill relation="counter" postSide={postSide} {...triggers} />
 				) : null}
-				<span>
-					Counter ({aggregate.counterCount}) : Đ{" "}
-					{formatDharma(aggregate.counterDharma)}
-				</span>
+				{/* Row 5's other half — see the Support span above for the whole
+				    reasoning. Both sides, one change. */}
+				<span>Đ {formatDharma(aggregate.counterDharma)}</span>
 			</span>
 		</div>
 	);
