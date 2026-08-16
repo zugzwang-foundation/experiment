@@ -162,42 +162,50 @@ export function MarketHeader({
 							</span>
 						</div>
 						{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
-			    `.overline`). The container is a TOP HAIRLINE RULE + padding
-			    (`d5:467` `margin-top:12px; border-top:var(--hairline);
-			    padding-top:10px`), NOT a boxed card; the 12px margin is already
-			    carried by this section's `gap-3`.
+					    `.overline`). The container is a TOP HAIRLINE RULE + padding
+					    (`d5:467`), NOT a boxed card; the 12px margin is carried by this
+					    stack's `gap-3`.
 
-			    ⛔ NO CLAMP, AND THAT IS A RULING, NOT AN OMISSION (§17 H-T1(c)).
-			    The mockup's `.crittext` carries `-webkit-line-clamp:2` (`d5:470-471`)
-			    and it is filed BUCKET D. `market.description` is the RESOLUTION
-			    CRITERION — the terms of the bet: (i) a bare clamp with no affordance
-			    is the exact defect class PD-0-01/R4 is REMOVING from post cards in
-			    this same PR, so introducing it on the most consequential text on the
-			    surface would be incoherent; (ii) U3 makes criteria long BY DESIGN
-			    and the mockup's demo criterion is a short stand-in; (iii) unclamped
-			    IS the status quo, so the mockup would be INTRODUCING a truncation of
-			    the bet terms. ⛔ No affordance either — "Criterion length treatment"
-			    is docketed to HEADER-3ZONE.
+					    ✅ HTML-FINISH · MARKET DETAIL row 10 — THE CLAMP IS ADOPTED, and
+					    the previous ruling is SUPERSEDED IN PLACE rather than deleted
+					    (O-4). This block used to read "⛔ NO CLAMP, AND THAT IS A RULING,
+					    NOT AN OMISSION (§17 H-T1(c))", on three grounds: (i) a bare clamp
+					    with no affordance is the defect class `PD-0-01`/`R4` was removing
+					    from post cards in that same PR; (ii) `U3` makes criteria long BY
+					    DESIGN; (iii) unclamped WAS the status quo, so adopting `d5:470-471`
+					    would be INTRODUCING a truncation of the bet terms.
+					    ⇒ The founder ruling of 2026-08-16 reverses it, and ground (i) is
+					    reversed with it — `R4` itself was overturned in the same ruling
+					    (row 24 returns the `+` glyph), so the coherence argument that
+					    grounded the no-clamp no longer holds.
 
-			    ⚠ LOCAL STYLES, NOT A PRESET (§17 H-T1(b)). `git grep -i
-			    "overline|eyebrow" -- src/` is clean, and within PR 2's fence there is
-			    exactly ONE consumer; every existing micro-label consumer is out of
-			    fence (`discovery/HeroPanels`, `composer/BetComposer` — deny-listed,
-			    `shell/IdentityCluster`, `shell/DharmaCluster`), and §5 forbids a
-			    batch spanning surfaces. The docket row carries the census.
+					    ⚠ O-9 CHECKED, NOT ASSUMED. The superseded ruling cited `§17
+					    H-T1(c)`, and that section lives in `docs/plans/POLISH-3-PR-2.md`
+					    — a PLANNING document, not a spec. SPEC.1, design-language and
+					    design-canon were each read at HEAD and none of them says anything
+					    about clamping or truncating the resolution criterion. So this
+					    reverses a plan-doc ruling by founder ruling and contradicts NO
+					    live §-text — which is why it ships with no spec rider.
 
-			    ⚠ The recipe is `.overline`'s (`d5:468-469`) and ONLY `.overline`'s.
-			    The family shares weight/transform/colour and NOTHING else — `.poslab`
-			    and `.colstk .lab` are 8px/.12em, `.reslabel` is 8px/.14em. Reading
-			    any of those and generalising across ROLES is how the earlier
-			    8px/.12em recipe was wrong. Ported BY TOKEN (`text-n4`), never the
-			    hex — Ruling A / H-HEX. */}
+					    ⚠ THE COST, RECORDED RATHER THAN SMOOTHED OVER: past two lines the
+					    terms of the bet are now unreadable ON THIS SURFACE, and this row
+					    adds no expander. "Criterion length treatment" remains docketed to
+					    `HEADER-3ZONE`, so the affordance is a decision that has been
+					    deferred, not one this row made. The full text still ships in the
+					    ADR-0025 `.md` export.
+
+					    ⚠ `line-clamp-2` is a COUNT — a composition declaration, not one of
+					    the four value classes this task may not take from the mockup.
+
+					    ⚠ LOCAL STYLES, NOT A PRESET (§17 H-T1(b)); the recipe is
+					    `.overline`'s (`d5:468-469`) and ONLY `.overline`'s. Ported BY TOKEN
+					    (`text-n4`), never the hex — Ruling A / H-HEX. */}
 						{market.description ? (
 							<div className="pt-2.5 [border-top:var(--hairline)]">
 								<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
 									Resolution
 								</div>
-								<p className="mt-[5px] text-sm text-muted-foreground">
+								<p className="mt-[5px] line-clamp-2 text-sm text-muted-foreground">
 									{market.description}
 								</p>
 							</div>

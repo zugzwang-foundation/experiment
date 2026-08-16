@@ -110,12 +110,14 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
  * gives: a `container.innerHTML` pin or a snapshot here would sweep in unrelated
  * neighbours and turn a copy guard into a tripwire.
  *
- * ⛔ THE NEGATIVE ASSERTION IS A RULING, NOT A MIRROR. `.crittext` carries
- * `-webkit-line-clamp:2` in the mockup and it is filed BUCKET D (§17 H-T1(c)):
- * `market.description` is the resolution criterion — the terms of the bet — and
- * clamping it with no affordance is the exact defect class PD-0-01/R4 is
- * removing from post cards in this same PR. Pinned so a later reader cannot
- * "restore fidelity" by adopting it.
+ * ⚠ THE NEGATIVE CLAMP ASSERTION WAS A RULING AND IT WAS REVERSED. It read:
+ * "`.crittext` carries `-webkit-line-clamp:2` in the mockup and it is filed
+ * BUCKET D (§17 H-T1(c)) … pinned so a later reader cannot restore fidelity by
+ * adopting it." The founder ruling of 2026-08-16 adopts the clamp (row 10) and
+ * overturns `R4` in the same breath, which removes the ground that sentence
+ * stood on. Superseded in place (O-4), not deleted — the record of what was
+ * ruled, and why it changed, is the point. The NO-AFFORDANCE half survives
+ * unreversed.
  */
 describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	it("market-header::overline-labels-the-criterion", () => {
@@ -160,19 +162,32 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(className).toContain("pt-2.5");
 	});
 
-	it("market-header::criterion-is-NOT-clamped-and-carries-no-affordance", () => {
+	it("market-header::criterion-clamps-to-two-lines-and-still-carries-no-affordance", () => {
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
 
 		const container = screen.getByText("Resolution").parentElement;
 
-		// H-T1(c) — bucket D. Unclamped IS the status quo; the mockup would be
-		// INTRODUCING a truncation of the bet terms.
-		expect(container?.innerHTML).not.toContain("line-clamp");
-		expect(container?.innerHTML).not.toContain("truncate");
-		// And no "more"/expand control — "criterion length treatment" is
-		// docketed to HEADER-3ZONE, not decided here.
+		// ⚠ REVERSED AT HTML-FINISH · MARKET DETAIL row 10, and the superseded
+		// assertion is recorded rather than silently swapped. This used to pin the
+		// ABSENCE of a clamp as a RULING (§17 H-T1(c), bucket D), on the ground
+		// that a bare clamp with no affordance was the defect class PD-0-01/R4 was
+		// removing in that same PR. The founder ruling of 2026-08-16 reverses
+		// BOTH: R4 is itself overturned (row 24 returns the `+` glyph), so the
+		// coherence argument that grounded the no-clamp is gone.
+		// ⚠ O-9: `§17 H-T1(c)` lives in a PLANNING document, and SPEC.1 /
+		// design-language / design-canon were each read at HEAD — none of them
+		// mentions clamping or truncating the criterion. No live §-text is
+		// contradicted, which is why the row ships with no spec rider.
+		expect(container?.innerHTML).toContain("line-clamp-2");
+
+		// ⛔ STILL NO AFFORDANCE, and that half did NOT reverse. "Criterion length
+		// treatment" remains docketed to HEADER-3ZONE, so an expander here would
+		// decide a question that is explicitly deferred.
 		expect(container?.querySelector("button")).toBeNull();
-		// The criterion text itself still renders, in full.
+
+		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
+		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-
+		// page, and for a screen reader even while the surface truncates them.
 		expect(container?.innerHTML).toContain("Resolution criterion text.");
 	});
 });
