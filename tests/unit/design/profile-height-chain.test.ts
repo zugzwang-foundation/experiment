@@ -165,6 +165,16 @@ const A1_FORBIDDEN = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
  * here, and only one of them keeps the content reachable. */
 const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
 
+/**
+ * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`),
+ * carried as a LITERAL because the mockup states it as one. It is what makes
+ * the two side-by-side panel heads the same height, and therefore what makes
+ * their two scrolling bodies start on the same line. ⛔ One string, asserted on
+ * all FOUR heads across this file and `bookmarks-height-chain.test.ts`, so the
+ * two surfaces cannot be sized one after the other (§6).
+ */
+const HEAD_FLOOR = "min-h-[52px]";
+
 /** The class list of a node in one of the two panel files, by `data-testid`. */
 function panelClasses(source: string, file: string, testid: string): string[] {
 	const m = new RegExp(
@@ -410,6 +420,93 @@ describe("profile height chain — every link, asserted by name", () => {
 		).toContain("overflow-y-auto");
 		// The window is the founder's three, named once.
 		expect(/const ROW_WINDOW = 3;/.test(pos)).toBe(true);
+	});
+
+	it("profile-height-chain::both-panel-heads-share-ONE-floor-so-the-bodies-start-level", () => {
+		// ⚠⚠ THE LAW THIS ENCODES, and it is a DIMENSION, not a decoration. The
+		// two arena panels sit side by side, so their heads must be the same
+		// height or their two scrolling bodies begin on different lines. The
+		// mockup pins that with `.colhead{min-height:52px}`
+		// (`surface_profile_v1_0.html:227-228`) applied to BOTH slots.
+		//
+		// ⛔ WITHOUT A FLOOR THE SPLIT IS INVISIBLE IN THE CLASS STRINGS, which is
+		// why it needs a guard rather than a review. Both heads carry the SAME
+		// className; the heights diverged purely on CONTENT — the positions head
+		// holds a market filter and a segmented control, the arguments head holds
+		// a bare title. Measured at a pinned 1440×777 on live staging: positions
+		// head 51px, arguments head 41px, bodies starting at y418 and y408.
+		const heads = [
+			{
+				file: POSITIONS,
+				testid: "positions-panel-head",
+				classes: panelClasses(
+					read(POSITIONS),
+					POSITIONS,
+					"positions-panel-head",
+				),
+			},
+			{
+				file: ARGUMENTS,
+				testid: "arguments-panel-head",
+				classes: panelClasses(
+					read(ARGUMENTS),
+					ARGUMENTS,
+					"arguments-panel-head",
+				),
+			},
+		];
+		const floorsOf = (classes: string[]) =>
+			classes.filter((c) => /^min-h-/.test(c)).join(" ");
+
+		// 1. Each head declares the floor.
+		for (const h of heads) {
+			expect(
+				h.classes,
+				`${h.testid} lost the \`.colhead\` floor — the two panel bodies will ` +
+					`start on different lines. Re-derive the head rather than ` +
+					deletingHint,
+			).toContain(HEAD_FLOOR);
+		}
+
+		// 2. ONE value across both, so they cannot drift to two floors that each
+		//    pass check 1 while still leaving the bodies unlevel.
+		expect(new Set(heads.map((h) => floorsOf(h.classes))).size).toBe(1);
+
+		// 3. A FLOOR, NEVER A FIXED HEIGHT. `h-[52px]` would also level the two
+		//    heads — and would CLIP the moment either gains a control. Same
+		//    `A1_FORBIDDEN` predicate the band checks use, so they cannot drift.
+		for (const h of heads) {
+			expect(
+				A1_FORBIDDEN.some((re) => h.classes.some((c) => re.test(c))),
+				`${h.testid} declares a fixed height; a head must only ever be floored`,
+			).toBe(false);
+		}
+
+		// ⚠ POSITIVE CONTROL, INLINE — a guard only ever run against a passing
+		// tree is indistinguishable from one that cannot fail (V-2: a negative
+		// assertion needs a positive control). Each mutation runs the REAL
+		// predicate over the REAL class list.
+		//   a. the floor removed → check 1 reddens
+		expect(heads[0].classes.filter((c) => c !== HEAD_FLOOR)).not.toContain(
+			HEAD_FLOOR,
+		);
+		//   b. the two floors drift apart → check 2 reddens
+		expect(
+			new Set([
+				floorsOf(heads[0].classes),
+				floorsOf(
+					heads[1].classes.map((c) => (c === HEAD_FLOOR ? "min-h-[40px]" : c)),
+				),
+			]).size,
+			"the drift mutation did not take — check 2 is inert",
+		).toBe(2);
+		//   c. a fixed height → check 3 reddens
+		expect(
+			A1_FORBIDDEN.some((re) =>
+				heads[0].classes.concat("h-[52px]").some((c) => re.test(c)),
+			),
+			"the fixed-height mutation did not take — check 3 is inert",
+		).toBe(true);
 	});
 
 	it("profile-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {

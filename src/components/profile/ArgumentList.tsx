@@ -271,9 +271,37 @@ function ArgumentsPanel({
 			aria-label="Arguments"
 			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
+			{/* ⚠⚠ PROFILE+BOOKMARKS · DIMENSIONAL PARITY — `min-h-[52px]` IS THE
+			    MOCKUP'S OWN LITERAL, and it is here to make the two side-by-side
+			    panel bodies START AT THE SAME Y.
+			    `surface_profile_v1_0.html:227-228` gives `.colhead` a
+			    `min-height:52px` and applies it to BOTH slots' heads, so the left
+			    and right `.colwrap`s begin on the same line however much each head
+			    holds. §2 says copy a literal where the mockup uses one; this is one.
+
+			    ⛔ MEASURED, NOT REASONED — this closes a real 10px misalignment.
+			    At a pinned 1440×777 on live staging the two heads were:
+			      positions head  682 × 51   (a title PLUS the market filter and the
+			                                  Open/Closed segmented control)
+			      arguments head  682 × 41   (a bare title — 12px `p-3` twice + a
+			                                  16px line box = 40, +1 hairline)
+			    ⇒ the positions body started at y418 and the arguments body at y408.
+			    Both heads carry the SAME class string, so the split was pure
+			    CONTENT — which is exactly the kind of drift a floor removes and a
+			    hand-tuned height would not.
+
+			    ⛔ A FLOOR, NEVER A HEIGHT. `min-h-*` can only GROW the shorter head;
+			    it can never clip the taller one, so a head that later gains a
+			    control still wins. §3c: a fixed height does not make content fit, it
+			    CLIPS it.
+			    ⚠ SIZED ONCE AGAINST BOTH SURFACES (§6). This exact string lands on
+			    all FOUR panel heads in the same commit — Profile's two and
+			    Bookmarks' two — because `/bookmarks` replicates this arrangement and
+			    sizing one surface's head and then the other's is the round-3 defect
+			    §6 names. */}
 			<div
 				data-testid="arguments-panel-head"
-				className="flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				{/* The market question can be long, so it wraps rather than
 				    overflowing the bar — `min-w-0` is what lets it, and the bar is

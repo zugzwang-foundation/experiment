@@ -183,9 +183,15 @@ function ReplicaPanel({
 			aria-label="Arguments"
 			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
+			{/* ⚠ `min-h-[52px]` — the mockup's `.colhead{min-height:52px}` (`:228`),
+			    the fourth of the four heads that take it in this commit. This is
+			    the head that needs it most: like Profile's arguments head it holds
+			    a bare title, so without a floor it sits ~11px shorter than the
+			    list head beside it and the two panel bodies start on different
+			    lines. See `ArgumentList.tsx` for the measurement. */}
 			<div
 				data-testid="bookmarks-replica-panel-head"
-				className="flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				<span
 					data-testid="bookmarks-replica-panel-title"

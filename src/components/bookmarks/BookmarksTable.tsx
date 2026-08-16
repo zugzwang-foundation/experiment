@@ -519,9 +519,19 @@ function BookmarksPanel({
 			aria-label="Bookmarks"
 			className="flex min-h-0 flex-col overflow-hidden rounded-[var(--r)] bg-n0 [border:var(--hairline)]"
 		>
+			{/* ⚠ `min-h-[52px]` — the mockup's `.colhead{min-height:52px}` (`:228`).
+			    ⚠ SIZED AGAINST BOTH SURFACES, NOT PORTED AFTER THE FACT (§6): this
+			    surface's two heads take the floor in the SAME commit as Profile's
+			    two, because the four carry one class string and the mockup applies
+			    `.colhead` to both slots of both modes — `/bookmarks` IS this mockup
+			    in its `sub:'bookmark'` arm (`:765-771`). Sizing Profile's head and
+			    then re-sizing this one is the defect §6 forbids by name.
+			    ⛔ NOT MEASURABLE ON STAGING THIS RUN — `/bookmarks` is auth-gated and
+			    redirects to `/sign-in`. The floor is nonetheless SAFE here by
+			    construction: `min-h-*` can only grow a head, never clip one. */}
 			<div
 				data-testid="bookmarks-panel-head"
-				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				{/* ⚠⚠ GATE C F-1 — THE `<h1>` LIVES HERE, AND IT IS THE ONLY ONE.
 				    Before this, `page.tsx` carried a pre-replication header row
