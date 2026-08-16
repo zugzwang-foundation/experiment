@@ -1968,3 +1968,73 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 **Not a defect. Not routed. No owner needed.** Recorded only so a future reader who notices the unclosed pair finds a ruling instead of filing it again.
 
 **Code touch points** (forward reference, do not act on now): `src/components/discovery/HeroPanels.tsx` — the teaser `<p class="line-clamp-3 …">`.
+
+---
+
+## POLISH-4 `PD-4-08` / `R20` — `OQ-1`, the Đa staked-basis ruling, is the R-register's first OPEN row
+
+**Originating task:** POLISH.4 PR A, commit A5 (2026-08-16). Founder ruling `OD-4`: file it as **`R20`**, state **`OPEN`**, naming what it blocks — the founder mints the number, CC files the row. The row itself lives at `docs/polish/POLISH-0.md` §0; this entry is the tracking, that one is the ruling.
+
+**The row, as ruled:**
+
+> `OQ-1` — the **Đa staked-basis** ruling — is **HELD, founder-pending**, and is
+> cited **in source** as a live constraint on three POLISH.4 components:
+> `SellModule.tsx` (module docblock) · `SlotHeader.tsx` (the `yourPositionLabel`
+> readout) · `PositionStrip.tsx` (component docblock). It blocks: **(1)** `PD-4-07`,
+> the sell module's P/L readout; **(2)** the `Đa → Đb` grammar at all three
+> components, which stay **Đb-only**; **(3)** POLISH.4's `H-OQ1` halt, which fires
+> on any row rendering `Đa` or a P/L figure. Class **S**. SPEC-FIRST — route, do
+> not build.
+
+**Why it was invisible.** `POLISH-0.md` §0 closed *"5 SCHEDULED · 14 RULED · **zero OPEN** … **Nothing in this index stops work**"*, and that was **true of its own nineteen rows and false of `.4`'s surface**. A present index was allowed to imply an absent hold. ⚠ **The inverse of `R13`'s lesson**, where a *missing source* (SPEC.CHART) was allowed to imply a missing baseline — both are the same error: **reading a document's silence as a measurement.**
+
+**⛔ CC does not author the ruling.** Tier 3 (`docs/plans/UI-A3.md`) states the law and states its own limit: *"The ruling, whenever given, is its own **web-authored SPEC.1 line** and is NOT carried by A3."* Rendering `Đa` or P/L before that line lands is a **ratified defect**, not a judgment call.
+
+**Conditional trigger.** The founder issues the Đa staked-basis ruling as a SPEC.1 line. On that event: `R20` closes, `PD-4-07` unblocks, `H-OQ1` retires, and the `Đa → Đb` grammar activates at all three components together — never one at a time, because a half-applied grammar is the round-3 defect shape.
+
+**Expected next task.** A SPEC.1 amendment task (web-authored decision text), then POLISH.4's own PR that renders it. Full context: `docs/plans/POLISH-4.md` §2.6 and `PD-4-07` / `PD-4-08` in `POLISH-register.md`.
+
+## POLISH-4 `PD-4-09` — `R11`'s disposition was scheduled against a kickoff that has passed
+
+**Originating task:** POLISH.4 PR A, commit A5 (2026-08-16). **Routed, NOT ruled — this is not `.4`'s to take.**
+
+**The row, as ruled:**
+
+> `POLISH-0.md` §0 `R11` reads *"**SCHEDULED.** Disposition set at POLISH.5
+> kickoff. `PD-0-12`."* POLISH.5's three PRs — **#331 · #333 · #340** — have all
+> merged, and **no disposition for `R11`/`PD-0-12` is recorded on `main`**.
+> POLISH.4's own Pre-recorded cell carries the row (*"the decision is
+> server-side; the render is `.5`'s"*), so `.4` must **not** treat it as
+> discharged. Class —, routed.
+
+**Root cause worth keeping.** A disposition scheduled against a **kickoff** rather than against a **commit** has **no artifact that goes red when it is skipped**. The event passed silently three times over, and the only thing that surfaced it was a fourth surface reading the index for its own reasons. ⚠ This is `O-1`'s genus one register over: *structural beats procedural* — a scheduled-at-kickoff disposition is procedural, and nothing enforces it.
+
+**Conditional trigger.** The next task that opens `R11`'s subject — the sell affordance's hidden-vs-disabled render on `/u/[pseudonym]` — or a POLISH.5 close-out sweep. ⚠ Note the stronger property already holds in the build and is not what is missing: a visitor's DTO carries no `sellEligible` field at all, so the server-side type split already forecloses the leak. **What is missing is the recorded disposition, not the behaviour.**
+
+**Expected next task.** POLISH.5's close-out, or the comprehensive founder visual pass. `.4` files the gap; it does not fill it.
+
+## POLISH-4 `PD-4-10` — the engaged-slot backlight is cited by `.4` and implements only on `.3`'s files
+
+**Originating task:** POLISH.4 PR A, commit A5 (2026-08-16). **Out of surface — `C1` / `H4`.**
+
+**The row, as ruled:**
+
+> `POLISH-0.md` §3's `.4` Tier-2 cell cites **values-log §1 item 4** (the
+> engaged-slot backlight — *"on the engaged side's own slot while the composer is
+> open opposite"*). The only implementation is `DebateColumn.tsx` (the `engaged`
+> prop and its glow branch), driven from `DebateView.tsx` — **both
+> `src/components/debate/`, not `debate/composer/`, i.e. `.3`'s surface.** The
+> item's own wording agrees: it lands on the **slot**, and *"Composer chips
+> restored to pre-glow rendering."* ⇒ `.4` cites a tier-2 item it **cannot
+> execute**. Any delta found against it is `H4` / template §4.2 `C1`.
+
+**⚠ GENERALISED AT THE HTML-FINISH FOLD, and this is the part worth keeping.** `docs/plans/POLISH-4.md` §15.3 **`P4-F1`** states it as a rule: **an arrangement row's owner is the file that DECLARES the arrangement, not the file that is arranged.** Measured at `8db535d`, both of the parity lane's named behaviour instances declare outside `.4` as well:
+
+- **the sell slide** — the fixed 50px host, its `.26 s` fade and the JS toggle are all in `src/components/profile/PositionsTable.tsx` (`.5`'s host, `H-HOST`, read-only for `.4`); `SellModule.tsx` carries no transition of its own;
+- **the composer's opposite-slot open** — `src/components/debate/DebateView.tsx` (the `opposite()` helper, the open-side guard, `composerColumn`) plus `DebateColumn.tsx`'s `engaged` branch; `BetComposer.tsx` does not choose its slot.
+
+⇒ **The composer is a guest on two hosts, and arrangement is a property of hosts.** `PD-4-10` is not a one-off; it is the shape of this surface. `.4`'s delta recon is therefore required to name an **owner** on every row and to **report** such rows with that owner rather than dropping them or re-pointing them at a file `.4` can reach.
+
+**Conditional trigger.** POLISH.3's own pass over `DebateColumn.tsx` / `DebateView.tsx`, or the comprehensive founder visual pass — whichever reaches the engaged-slot backlight first. For the two fold instances: `.5`'s pass over `PositionsTable.tsx`'s sell host, and `.3`'s over the composer slot choice.
+
+**Expected next task.** POLISH.3 (backlight, opposite-slot open) and POLISH.5 (sell host). ⛔ **Not POLISH.4's, in any of the three cases.**
