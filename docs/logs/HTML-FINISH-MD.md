@@ -128,7 +128,7 @@ a fourth `src/server/**` file is **H2-a** and halts phase 2 whole.
 
 ### Time
 
-Phase 1: 2026-08-15 23:58 UTC → 2026-08-16 ~06:00 UTC.
+Phase 1: 2026-08-15 23:58 UTC → 2026-08-16 00:32 UTC (C0 `3b8de11` → C10 `7e45d94`).
 
 ---
 
@@ -257,4 +257,111 @@ correct CLAUDE.md §1's stale 1.0.29 in the SAME commit).
 
 ### Time
 
-Phase 2: 2026-08-16 ~06:00 → ~09:15 UTC.
+Phase 2: 2026-08-16 00:42 → 01:26 UTC (C11 `e2fdfcb` → C14 `9016af9`), including the sequential reviewer cascade.
+
+---
+
+## PHASE 3 · CARDS + OVERLAYS — complete
+
+### What landed
+
+| # | Commit | SHA | Rows |
+|---|---|---|---|
+| C15 | `docs(spec): SPEC.1 §9 — the two-slot preview leaves the market-view card` | `5b09ef2` | 25 (spec) |
+| C16 | `feat(debate): the teaser and reply preview leave the market-view card` | `2cbd1c7` | 25 |
+| C17 | `feat(debate): the resolver-card structural slot` | `e6268f0` | 3 |
+| C18 | `feat(debate): the resolution criterion clamps to two lines` | `af87d65` | 10 |
+| C19 | `feat(debate): the title enters post-focus and a + glyph opens the pop-up` | `b8bd20b` | 23, 24 |
+| C20 | `feat(debate): Support/Counter triggers return to the card footer` | `aa9f5b9` | 22 |
+| C21 | `feat(debate): the author row becomes one line and the chip carries entry price` | `3ea43e4` | 12, 13 |
+| C22 | `feat(debate): the focused post shows a teaser and a + expand` | `f811151` | 15 |
+| C23 | `feat(debate): the scrollers take a vertical rail` | `3ac25ce` | 18, 19, 29 |
+| C24 | `feat(debate): the market-arm entry trigger reads Buy` | `a24bbbf` | 20 |
+| C25 | `feat(debate): the held-side Sell affordance takes button shape` | `883b514` | 21 |
+| C26 | `feat(debate): the reply card takes the mockup's anatomy` | `b66018e` | 26 |
+| C27 | `feat(debate): reply cards open a pop-up and their images open the lightbox` | `bc9404b` | 27, 34 |
+| C28 | `feat(debate): the pop-up head takes the mockup's cluster and resets its scroll` | `7d5121f` | 33, 35 |
+| C29 | `feat(debate): entering a post resets the page scroll` | `92e4cc6` | 36 |
+| C30 | `feat(debate): author pseudonyms link to their profile` | `0c54240` | 42 |
+
+**Rows landed: 3, 10, 12, 13, 15, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 33, 34, 35, 36, 42.**
+**Rows halted: none in phase 3.** ⇒ H3-a…H3-f all clear.
+
+### Decisions made
+
+1. **H3-a was DISCHARGED, not dodged.** The kickoff supplied the SPEC.1 §9
+   decision text verbatim; CC applied it at all four operative sites (O-4) and
+   authored none of it. `tests/unit/ranking/replies.test.ts` is green
+   **unamended**, which is the amendment's own central claim.
+2. **H3-e never fired, by design.** Row 27's `ReplyPopup` takes
+   `PresentReply | null` — `Extract<DebateReply, {removed:false}>` — so a
+   removed reply is unpassable at the type level. Widening `PostPopup`'s union
+   is the thing H3-e halts on, and a separate component avoids it entirely.
+3. **Four hand-rolled author rows collapsed into one `ArgProfile`** across rows
+   12, 26 and 33. That is why row 42 was ONE change reaching five surfaces.
+4. **`FocusMarketCard` carries no sparkline** — the locked composition
+   (design-language §3.2) struck it, and its "identical everywhere" clause is
+   retained and load-bearing.
+5. **Row 18/19's rail keeps its `aria-live` readout.** d5's rail announces
+   nothing; a literal port would have deleted the position announcement.
+
+### Surprises caught + fixed in-session
+
+- **The side-badge census fired FOUR times in one PR, in both directions.**
+  ArgProfile left the base map (row 13 varies the preset by prop), ReplyCard
+  dropped one site (row 26), `dialogs.tsx` gained one (row 27) and then lost
+  both (row 33). Every move is recorded beside its cause; the non-vacuity floor
+  was lowered 13 → 12 **with grounds** because the inventory genuinely shrank.
+- **⛔⛔ THE CENSUS COULD NOT SEE ROW 13's WIRING, and that is the sharpest
+  finding of the phase.** `wiredDetail` scans `<SideBadge …/>` MARKUP, but
+  `ArgProfile` owns the badge and varies it by PROP — so the literal `detail`
+  lives on `ArgProfile`'s call site (`chipSize="detail"`), and the filter would
+  have returned `[]` and stayed GREEN while a `detail` chip shipped. The census
+  now scans BOTH channels. Satisfying the letter of a guard while breaking the
+  property it names is not a pass — the same trap this run refused at row 5.
+- **`O-7`'s default inverted exactly once** (`reply-card::the-pseudonym-renders-ONCE`).
+  Row 42 made the pseudonym a link, so `innerHTML` contains it inside the `href`
+  and a correct render counts 2. The count moved to `textContent` — the subject
+  there is how many times the reader SEES the name — with the markup half
+  asserted separately.
+- **Row 35's defect only appears on the SECOND open.** `DialogContent` is
+  `overflow-y-auto` and shadcn keeps the node mounted, so a mount-only reset
+  would fire once and never again — the shape of the bug rather than its fix.
+
+### Open questions
+
+- **OQ-MD-8 · Two composer strings still say `Đ BET`.** Row 20 relabelled the
+  colhead to `Buy`, but `COMPOSER_COPY.header` ("Place your Đ BET") and
+  `.submit` ("PLACE Đ BET") live in `composer/copy.ts`, which §11 excludes. So
+  the colhead reads `Buy` and opens a composer that still says `Đ BET`. ⇒ One
+  commit, with a fence that includes `composer/copy.ts`.
+- **OQ-MD-9 · One duplicated pole recipe.** Row 22's card pills re-state
+  `ReplySplitBar`'s `TriggerPill` CSS because that component is file-private and
+  its file is allow-list-excluded. The SIDE DERIVATION is shared
+  (`deriveReplySide` / `isEntryDisabled`), so the two cannot disagree about
+  which side a relation produces — only the styling can drift. ⇒ Unifying needs
+  `composer/ReplySplitBar.tsx` in the fence.
+
+### Next session starts at
+
+The founder's rulings on **OQ-MD-1 … OQ-MD-9**. The three build-blocking ones
+are OQ-MD-1 (row 5, needs a web-authored §9 amendment), OQ-MD-2 (rows 7 + 8,
+need one allow-list line — the work is built and was green) and OQ-MD-4 (row 14,
+needs OD-1 re-ruled with the removal-oracle cost in the record).
+
+### Context to preserve
+
+- **AGENTS.md §3 and §9 were updated in the close-out commit** (§15.2): the
+  `debate/` component list gains five components, and `tests/unit/design/` now
+  holds FOUR height chains. Descriptive drift, folded here rather than deferred
+  to a SYNC, because §3 explicitly enumerates the tree.
+- **CLAUDE.md §1's SPEC.1 version was corrected 1.0.29 → 1.0.31** as a
+  same-commit rider on C15, never as a follow-up.
+
+### Time
+
+Phase 3: 2026-08-16 01:28 → 02:20 UTC (C15 `5b09ef2` → C30 `0c54240`).
+
+⚠ These are read off the commit timestamps. An earlier draft of this log carried
+estimated wall-clock times that were wrong by hours — corrected here rather than
+left to mislead the next session's planning.
