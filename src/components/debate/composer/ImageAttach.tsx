@@ -5,8 +5,22 @@ import { useRef } from "react";
 import { IMAGE_UPLOADS_ALLOWED_MIME } from "@/server/config/limits";
 import { STATE_COPY } from "./copy";
 
-/** The affordance's ONE accessible name, held across every phase. */
+/**
+ * The GROUP's name — the column as a whole, held across every phase.
+ *
+ * ⛔ DISTINCT FROM `PICK_LABEL` BY CONSTRUCTION, and the two are different
+ * objects: a `role=group` names the region, a `button` names the action. When
+ * the a11y fix moved this label onto the `<fieldset>`, the pick control was
+ * left deriving its name from its own contents — "Image Shown whole · any
+ * orientation" in the idle phase, and the FILENAME while attaching, so the
+ * control's name changed under the user mid-interaction. Restoring an explicit
+ * one also keeps `getByLabelText(ATTACH_LABEL)` resolving to exactly one node;
+ * `attach-phases.test.tsx` asserts both the distinctness and the singleness,
+ * so collapsing them back to one string reddens.
+ */
 const ATTACH_LABEL = "Attach an image";
+/** The pick CONTROL's own name — stable across idle / busy / error. */
+const PICK_LABEL = "Choose an image file";
 /** Canon §6 composer register, verbatim. */
 const CAPTION = "Shown whole · any orientation";
 
@@ -141,6 +155,7 @@ export function ImageAttach({
 					<button
 						type="button"
 						disabled={disabled || state.phase === "attaching"}
+						aria-label={PICK_LABEL}
 						onClick={() => inputRef.current?.click()}
 						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 					>

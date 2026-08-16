@@ -559,7 +559,15 @@ export function BetComposer(props: {
 										</span>
 										{/* `.amtval` — flex-END, so the glued `Đ` sits against
 										    the digits and MOVES with them as the field's width
-										    tracks its content (`stakeFieldWidth`). */}
+										    tracks its content (`stakeFieldWidth`).
+										    ⚠ `ch` TRACKS THE DIGITS EXACTLY ONLY BECAUSE THIS
+										    FIELD IS `font-mono`. The `ch` unit is the width of
+										    the `0` glyph, so a proportional face makes `Nch`
+										    stop matching N digits and the `Đ` drifts off the
+										    number — and nothing goes red, because jsdom performs
+										    no layout and the width string is unchanged. Dropping
+										    `font-mono` below is therefore a silent break of R2,
+										    not a restyle. */}
 										<span className="flex min-w-0 items-baseline justify-end gap-1">
 											<span className="text-sm text-n5">Đ</span>
 											<Input

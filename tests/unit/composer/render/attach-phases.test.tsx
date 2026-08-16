@@ -34,7 +34,10 @@ import {
 
 afterEach(cleanup);
 
+/** The GROUP's name (the `<fieldset>` column). */
 const ATTACH_LABEL = "Attach an image";
+/** The pick CONTROL's own name — a different object, and deliberately not the same string. */
+const PICK_LABEL = "Choose an image file";
 const noop = () => {};
 
 function renderPhase(state: ImageAttachState, disabled = false) {
@@ -118,6 +121,51 @@ describe("ImageAttach — the error is announced, not swallowed by a button", ()
 		// be reachable rather than sitting inside a disabled control.
 		renderPhase({ phase: "error", message: "Too large." }, true);
 		expect(statusOutsideAnyButton().textContent).toContain("Too large.");
+	});
+});
+
+describe("ImageAttach — the group and the control are named separately", () => {
+	// The a11y fix moved the affordance's label onto the <fieldset>. That left
+	// the pick control deriving its name from its own contents — "Image Shown
+	// whole · any orientation" idle, and the FILENAME while attaching, so the
+	// control's accessible name changed under the user mid-interaction. A group
+	// names a region; a button names an action; they are different objects and
+	// a button may carry its own.
+	const namedPhases: Array<[string, ImageAttachState]> = [
+		["none", { phase: "none" }],
+		["attaching", { phase: "attaching", name: "chart.png" }],
+		["error", { phase: "error", message: "Too large." }],
+	];
+
+	for (const [name, state] of namedPhases) {
+		it(`attach::${name}-phase-gives-the-pick-control-its-own-stable-name`, () => {
+			renderPhase(state);
+			const pick = screen.getByLabelText(PICK_LABEL);
+			expect(pick.tagName).toBe("BUTTON");
+			// Stable across phases: the filename never becomes the control's name.
+			expect(pick.getAttribute("aria-label")).toBe(PICK_LABEL);
+			// It is INSIDE the group, not the group itself.
+			expect(column().contains(pick)).toBe(true);
+			expect(pick).not.toBe(column());
+		});
+	}
+
+	it("attach::the-group-name-and-the-control-name-are-distinct-and-unambiguous", () => {
+		// Collapsing the two back to one string would make getByLabelText
+		// ambiguous and reintroduce the derived-name defect — so assert BOTH the
+		// distinctness and that each resolves to exactly one node.
+		expect(PICK_LABEL).not.toBe(ATTACH_LABEL);
+		renderPhase({ phase: "none" });
+		expect(screen.getAllByLabelText(ATTACH_LABEL)).toHaveLength(1);
+		expect(screen.getAllByLabelText(PICK_LABEL)).toHaveLength(1);
+	});
+
+	it("attach::attached-phase-has-no-pick-control-to-name", () => {
+		// The pick control is absent once a file is attached, so its label must
+		// not linger — Remove is the only action in that phase.
+		renderPhase({ phase: "attached", uploadId: "u1", name: "chart.png" });
+		expect(screen.queryByLabelText(PICK_LABEL)).toBeNull();
+		expect(screen.getAllByLabelText("Remove image")).toHaveLength(1);
 	});
 });
 
