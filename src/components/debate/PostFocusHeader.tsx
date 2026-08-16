@@ -130,15 +130,29 @@ export function PostFocusHeader({
 								</>
 							)}
 
-							<ReplySplitBar
-								postSide={post.sideAtPostTime}
-								aggregate={post.aggregate}
-								heldSide={heldSide}
-								marketOpen={marketOpen}
-								suspended={suspended}
-								activeRelation={activeRelation}
-								onToggleRelation={onToggleRelation}
-							/>
+							{/* HTML-FINISH · MARKET DETAIL row 16 — `.pfoot{margin-top:auto;
+							    flex:0 0 auto}` (`d5:856`), with the mockup's own reason at
+							    `:978`: "pinned to bottom so bottoms align with image +
+							    thumbnail". `mt-auto` in a flex column consumes the free
+							    space ABOVE the item, so a short argument no longer leaves
+							    the split bar floating halfway up beside a full-height
+							    image. `shrink-0` is `flex:0 0 auto` — the bar keeps its
+							    height when the stack is squeezed.
+							    ⛔ `ReplySplitBar.tsx` IS NOT TOUCHED. Row 16 is PLACEMENT,
+							    and placement is this container's business; the bar's
+							    internals are allow-list-excluded, and needing to edit them
+							    would be H1-f — a halt, not an edit. It was not needed. */}
+							<div data-testid="post-focus-foot" className="mt-auto shrink-0">
+								<ReplySplitBar
+									postSide={post.sideAtPostTime}
+									aggregate={post.aggregate}
+									heldSide={heldSide}
+									marketOpen={marketOpen}
+									suspended={suspended}
+									activeRelation={activeRelation}
+									onToggleRelation={onToggleRelation}
+								/>
+							</div>
 						</div>
 					</div>
 				</Card>

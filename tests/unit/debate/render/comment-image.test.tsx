@@ -201,4 +201,20 @@ describe("HTML-FINISH · MARKET DETAIL — row 11, the image is a left sibling",
 		// Non-vacuity: the stack still rendered.
 		expect(without.container.innerHTML).toContain("Fixture argument title.");
 	});
+
+	it("comment-image::row-16-pins-the-split-bar-to-the-stack-foot", () => {
+		// `.pfoot{margin-top:auto;flex:0 0 auto}` (`d5:856`) — "pinned to bottom
+		// so bottoms align with image + thumbnail" (`d5:978`).
+		const { container } = renderFocus("https://example.invalid/focus-image");
+
+		const foot = container.querySelector('[data-testid="post-focus-foot"]');
+		expect(foot).not.toBeNull();
+		const cls = foot?.getAttribute("class") ?? "";
+		expect(cls).toContain("mt-auto");
+		expect(cls).toContain("shrink-0");
+
+		// It is the LAST child of the stack — `mt-auto` on a non-final child
+		// pins nothing.
+		expect(foot?.parentElement?.lastElementChild).toBe(foot);
+	});
 });
