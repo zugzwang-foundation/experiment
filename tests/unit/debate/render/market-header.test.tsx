@@ -174,3 +174,45 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(container?.innerHTML).toContain("Resolution criterion text.");
 	});
 });
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 6 — the left column's READING ORDER.
+ *
+ * The mockup's `.hstack` orders its `vm` children `.question` → `.attrs` →
+ * `.criterion` → `.rescards` (`d5:958-985`). The build rendered the attrs strip
+ * LAST, below the chart and the price bar. The row is about order and nothing
+ * else, so this asserts order and nothing else.
+ *
+ * ⚠ WHY THIS IS NOT THE WHOLE-CONTAINER ASSERTION THIS FILE'S HEADER FORBIDS.
+ * The caution above is against snapshots and `container.innerHTML` EQUALITY —
+ * shapes that go red when an unrelated neighbour moves. This compares the
+ * INDEX of three markers that are each this component's own subject, so C4's
+ * chart move and C6's price-bar move pass straight through it. A pin that
+ * cannot survive its own plan's next two commits is a tripwire, not a guard.
+ *
+ * ⚠ O-7 — `innerHTML`, never `textContent`. Order is a property of the markup.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () => {
+	it("market-header::question-then-attrs-then-criterion", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const html = left?.innerHTML ?? "";
+		expect(html).not.toBe("");
+
+		const question = html.indexOf("Attrs Strip Market Question");
+		const attrs = html.indexOf("Đ 150 staked");
+		const criterion = html.indexOf("Resolution criterion text.");
+
+		// All three present — an absent marker indexes to -1 and would otherwise
+		// satisfy the ordering below by accident.
+		expect(question).toBeGreaterThan(-1);
+		expect(attrs).toBeGreaterThan(-1);
+		expect(criterion).toBeGreaterThan(-1);
+
+		expect(question).toBeLessThan(attrs);
+		expect(attrs).toBeLessThan(criterion);
+	});
+});

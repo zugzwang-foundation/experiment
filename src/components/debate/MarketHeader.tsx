@@ -99,6 +99,29 @@ export function MarketHeader({
 							</a>
 						</div>
 					</div>
+					{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
+					    THE QUESTION AND THE CRITERION. The mockup's `.hstack` orders its
+					    `vm` children `.question` → `.attrs` → `.criterion` → `.rescards`
+					    (`d5:958-985`); this strip used to render LAST, below the chart and
+					    the price bar. Reading order is the whole substance of the row: the
+					    market's size is context for the question, and the criterion — the
+					    terms of the bet — is the thing you read last and most carefully.
+					    ⛔ ORDER ONLY. The strip's own composition is untouched: the same
+					    three spans, the same `flex flex-wrap` container, the same spaced
+					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
+					    `market-header.test.tsx`. `.attrs`'s bold numerals and `·`
+					    separators are a different row's subject and are not taken here. */}
+					<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+						<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+						<span>
+							{market.totals.postCount}{" "}
+							{noun(market.totals.postCount, "post", "posts")}
+						</span>
+						<span>
+							{market.totals.replyCount}{" "}
+							{noun(market.totals.replyCount, "reply", "replies")}
+						</span>
+					</div>
 					{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
 			    `.overline`). The container is a TOP HAIRLINE RULE + padding
 			    (`d5:467` `margin-top:12px; border-top:var(--hairline);
@@ -150,17 +173,6 @@ export function MarketHeader({
 						/>
 					) : null}
 					<PriceBar pricing={market.pricing} size="detail" />
-					<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-						<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
-						<span>
-							{market.totals.postCount}{" "}
-							{noun(market.totals.postCount, "post", "posts")}
-						</span>
-						<span>
-							{market.totals.replyCount}{" "}
-							{noun(market.totals.replyCount, "reply", "replies")}
-						</span>
-					</div>
 				</>
 			}
 		/>
