@@ -9,13 +9,25 @@ import { ReplyCard } from "./ReplyCard";
 import type { ReplyGroups } from "./types";
 
 /**
- * A post card's reply section (RANKING.md §7.1) — the two-slot default (top
- * Support + top Counter, computed server-side) with an in-place expand to the
- * full stake-sorted list. Edge cases ride `twoSlot`: one side empty → two from
- * the other; a single reply → it alone, no expand; zero → the widget is not
+ * ⛔⛔ NO LONGER MOUNTED BY ANY SURFACE. `PostCard` stopped rendering this at
+ * HTML-FINISH · MARKET DETAIL row 25, under the SPEC.1 **1.0.31** amendment: the
+ * two-slot default is a SELECTION rule and no longer renders on the market-view
+ * post card. Reply content surfaces on entering post-focus, whose full
+ * stake-sorted per-side list IS the expansion §9 names.
+ *
+ * ⚠ THE FILE IS KEPT DELIBERATELY, NOT ORPHANED BY OVERSIGHT. Two suites render
+ * it directly (`tests/unit/debate/render/reply-preview.test.tsx` and
+ * `bookmark-toggle.test.tsx`), and the ADR-0032 remount defect recorded below is
+ * LIVE DOCKET — deleting the component would delete the record of a defect
+ * nobody has fixed. If post-focus ever wants an in-place two-slot affordance,
+ * this is the shipped, guarded implementation of it.
+ *
+ * WHAT IT IS: a two-slot reply section (RANKING.md §7.1) — the two-slot default
+ * (top Support + top Counter, computed server-side) with an in-place expand to
+ * the full stake-sorted list. Edge cases ride `twoSlot`: one side empty → two
+ * from the other; a single reply → it alone, no expand; zero → the widget is not
  * rendered. Each reply carries its own frozen side badge (D3 placement is by own
- * side). This is the "two-slot expand" read affordance (§7); the per-side
- * paged reply-scroller is the post-view surface.
+ * side). The per-side paged reply-scroller is the post-view surface.
  *
  * ⚠ RULED CONSEQUENCE OF THE ROW-13 PARTITION (POLISH.3 PR 2 C7, founder-ruled
  * 2026-08-16 — RECORDED, NOT FIXED). Expanding changes the TYPE at position 0
@@ -130,9 +142,15 @@ export function ReplyPreview({
 					) : null}
 				</>
 			) : (
-				/* The two-slot default is SPEC-MANDATED and §2 explicitly does NOT
-				   remove it. Its edge cases ride `twoSlot` unchanged: one side empty →
-				   two from the other; a single reply → it alone, no expand. */
+				/* ⚠ AMENDED AT SPEC.1 1.0.31 (row 25). The two-slot default is still
+				   SPEC-MANDATED **as a selection rule** — `ReplyGroups.twoSlot` is on
+				   the read model and `src/lib/ranking`'s `rankReplies`/`twoSlot` are
+				   untouched — but §9 no longer renders it on the MARKET-VIEW CARD.
+				   The previous wording ("§2 explicitly does NOT remove it") named a
+				   scope that has since been superseded, and is corrected here rather
+				   than left to contradict the spec it cites (O-9).
+				   Its edge cases ride `twoSlot` unchanged: one side empty → two from
+				   the other; a single reply → it alone, no expand. */
 				replies.twoSlot.map((reply) => (
 					<ReplyCard
 						key={reply.id}

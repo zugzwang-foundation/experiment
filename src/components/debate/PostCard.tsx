@@ -11,14 +11,24 @@ import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
 import { RemovedPlaceholder } from "./placeholders";
-import { ReplyPreview } from "./ReplyPreview";
 import type { DebatePost, PresentPost } from "./types";
 
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
- * the argprofile · lane badge · title (opens the pop-up) · teaser · image · a
- * "Read more" link to the full body · the aggregate footer · the two-slot reply
- * preview · an "Open debate" focus toggle. ⛔ The disabled `Đ BET` and
+ * the argprofile · lane badge · title (opens the pop-up) · image · a
+ * "Read more" link to the full body · the aggregate footer · an "Open debate"
+ * focus toggle.
+ *
+ * ⛔ THE TEASER AND THE TWO-SLOT REPLY PREVIEW LEFT THIS CARD at HTML-FINISH ·
+ * MARKET DETAIL row 25, under the SPEC.1 1.0.31 amendment (§9 preamble,
+ * F-DEBATE-1 System + Acceptance, and the two §17 rows). The card presents ONE
+ * ARGUMENT; it does not present replies to it. Reply content surfaces on
+ * entering post-focus, whose full stake-sorted per-side list IS the expansion §9
+ * names — so the expansion is discharged by entering the post, not by an in-card
+ * control. ⚠ THE SELECTION RULE IS UNTOUCHED: `ReplyGroups.twoSlot` is still on
+ * the read model and `src/lib/ranking`'s `rankReplies`/`twoSlot` are unchanged.
+ * Rendering replies at both zoom levels duplicated the same content twice.
+ * ⛔ The disabled `Đ BET` and
  * `Support / Counter` write triggers were REMOVED at POLISH.3 PR 2 rows 1-2
  * (`PD-0-02`, R1) — redundancy plus the thesis ground that argument should be
  * deliberate, not reflexive. A REMOVED post
@@ -60,13 +70,13 @@ export function PostCard({
 					aggregate={post.aggregate}
 					postSide={post.sideAtPostTime}
 				/>
-				{/* A removed POST keeps its surviving replies (§6 — the thread stays
-				    intact), so its live replies keep their own affordances. */}
-				<ReplyPreview
-					replies={post.replies}
-					bookmarks={bookmarks}
-					onOpenImage={onOpenImage}
-				/>
+				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
+				    integrity), and row 25 does not touch that: what changed is only
+				    WHERE they surface. They are reached through `Open debate →`
+				    below, which the removed branch KEEPS for exactly this reason
+				    (plan F-3) — deleting it here would strand a removed post and its
+				    live replies behind no path at all, since `page.tsx`'s `?post=`
+				    falls back silently for a removed target. */}
 				<Button
 					variant="ghost"
 					size="xs"
@@ -103,9 +113,6 @@ export function PostCard({
 					{post.title}
 				</h3>
 			</button>
-			{post.teaser ? (
-				<p className="text-sm text-muted-foreground">{post.teaser}</p>
-			) : null}
 			{post.imageUrl ? (
 				<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
 			) : null}
@@ -137,11 +144,6 @@ export function PostCard({
 			<AggregateFooter
 				aggregate={post.aggregate}
 				postSide={post.sideAtPostTime}
-			/>
-			<ReplyPreview
-				replies={post.replies}
-				bookmarks={bookmarks}
-				onOpenImage={onOpenImage}
 			/>
 
 			<Button

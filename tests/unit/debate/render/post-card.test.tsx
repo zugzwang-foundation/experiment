@@ -149,3 +149,99 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(readMore?.innerHTML).not.toContain("<svg");
 	});
 });
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 25 — the teaser and the two-slot reply
+ * preview LEAVE the market-view card (SPEC.1 **1.0.31**, §9 preamble +
+ * F-DEBATE-1 System/Acceptance + the two §17 rows).
+ *
+ * ⛔ THE SELECTION RULE IS NOT UNDER TEST HERE AND DID NOT CHANGE.
+ * `ReplyGroups.twoSlot` is still on the read model and
+ * `tests/unit/ranking/replies.test.ts` still pins the ordering, unamended. What
+ * this guard pins is the SURFACE: the card presents one argument, not the
+ * replies to it.
+ *
+ * ⚠ BOTH BRANCHES, because both are market-view post cards. The removed branch
+ * additionally keeps `Open debate →` (plan F-3) — without it a removed post and
+ * its surviving replies would be reachable by no path at all, since `page.tsx`
+ * falls back silently for a removed `?post=` target.
+ *
+ * ⚠ O-7 — `innerHTML`, never `textContent`.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + replies", () => {
+	it("post-card::no-teaser-on-the-card", () => {
+		const { container } = renderCard();
+
+		// The fixture's teaser string, pinned as absent. The BODY still exists on
+		// the DTO and the pop-up still renders it — this is a card-composition
+		// change, not a data change.
+		expect(container.innerHTML).not.toContain("Fixture teaser.");
+		// Non-vacuity: the card DID render, with its title.
+		expect(container.innerHTML).toContain("Fixture argument title.");
+	});
+
+	it("post-card::no-reply-preview-on-either-branch", () => {
+		const withReplies = presentPost();
+		const reply = {
+			removed: false as const,
+			id: "0199a0c0-0000-7000-8000-00000000ee01",
+			side: "YES" as const,
+			createdAt: "2026-07-30T00:00:00.000Z",
+			body: "Fixture reply body that must not appear on the card.",
+			marker: "none" as const,
+			author: { pseudonym: "fixture-replier", pfpUrl: "" },
+			stake: "10.000000000000000000",
+			entryPrice: "0.500000000000000000",
+			imageUrl: null,
+		};
+		withReplies.replies = {
+			support: [reply],
+			counter: [],
+			twoSlot: [reply],
+		};
+
+		const present = render(
+			<PostCard
+				post={withReplies}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+			/>,
+		);
+		// ⛔ The BODY's absence, not the row's — the reply is still ON the DTO
+		// (the read model is untouched); it simply must not render here.
+		expect(present.container.innerHTML).not.toContain(
+			"Fixture reply body that must not appear on the card.",
+		);
+		expect(
+			present.container.querySelector('[data-testid="reply-group-support"]'),
+		).toBeNull();
+
+		// The removed branch is a market-view card too.
+		cleanup();
+		const removed = render(
+			<PostCard
+				post={{
+					removed: true,
+					id: withReplies.id,
+					ordinal: 1,
+					sideAtPostTime: "YES",
+					createdAt: "2026-07-30T00:00:00.000Z",
+					aggregate: AGGREGATE,
+					replies: withReplies.replies,
+				}}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+			/>,
+		);
+		expect(removed.container.innerHTML).not.toContain(
+			"Fixture reply body that must not appear on the card.",
+		);
+		// …and it KEEPS its way in (plan F-3). Deleting this would strand a
+		// removed post and every surviving reply under it.
+		expect(removed.container.innerHTML).toContain("Open debate");
+	});
+});

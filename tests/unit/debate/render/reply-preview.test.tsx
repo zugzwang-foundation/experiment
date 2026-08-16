@@ -25,9 +25,13 @@ import type { DebateReply, ReplyGroups } from "@/components/debate/types";
  * already there and adds NO `DebateViewModel` field (ADR-0034 D-1 does not
  * fire).
  *
- * ⚠ `PostCard` renders `ReplyPreview` at TWO call sites (`:57` removed branch,
- * `:132` present branch) — ONE edit, two render paths. This guard renders the
- * component directly, so it pins the edit rather than either path.
+ * ⚠ SUPERSEDED AT HTML-FINISH · MARKET DETAIL row 25 (SPEC.1 1.0.31): `PostCard`
+ * renders `ReplyPreview` at ZERO call sites. It used to render it at TWO (the
+ * removed branch and the present branch), and that is why this guard renders the
+ * component DIRECTLY — which is also why the guard survives the removal
+ * unamended, still pinning the row-13 partition on the component itself.
+ * ⚠ This suite and `bookmark-toggle.test.tsx` are now the component's ONLY
+ * consumers; see `ReplyPreview.tsx`'s own docblock for why the file is kept.
  *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
