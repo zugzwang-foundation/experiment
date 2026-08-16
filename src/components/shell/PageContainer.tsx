@@ -67,6 +67,45 @@ export const CONTAINER_PRESETS = {
 	 * source line carries it), and nothing else.
 	 */
 	wide: "mx-auto w-full max-w-[1440px] px-6 py-6",
+	/**
+	 * ⚠⚠ HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY — `/m/[slug]`'s
+	 * one-screen frame, minted on the founder ruling of 2026-08-17: "It's a one
+	 * page view — there should be no scroll down. The dimensions of the whole
+	 * market detail page are not matching — it should be exact."
+	 *
+	 * ⛔ FULL BLEED, AND THAT IS THE SINGLE LARGEST MEASURED DELTA ON THE ROUTE.
+	 * Measured at a pinned 1800×971 viewport, mockup beside staging: d5's
+	 * `.content` spans the whole window inside a 28px inset — headzone 1744px =
+	 * **96.9%** of the viewport — while `wide` capped the container at 1440px, so
+	 * the same band measured 1392px = **77.3%**. A −19.6pp width delta that every
+	 * region inside inherits: text stack −20.2pp, question −29.6pp, resolver cards
+	 * −10.1pp each, arena −19.6pp, both slots −9.8pp. Relative to their own
+	 * container those regions were already correct — the container was the defect.
+	 *
+	 * ⛔ THE TWO VALUES ARE d5's OWN, from `.content{padding:16px 28px 16px}`:
+	 * `px-7` = 28px, `py-4` = 16px. Not chosen, not rounded from something else.
+	 *
+	 * ⚠ `max-w-none` DECLARES THE AXIS, it does not omit it. Full bleed is a
+	 * POSITION on the max-width axis, and `page-container.test.ts`'s
+	 * "every preset carries all three axes — none may be half-declared" is right
+	 * to demand one: an omitted axis and a deliberate `none` look identical in a
+	 * class list and mean different things. `DISCOVERY (/) TAKES NO CONTAINER`
+	 * above is the precedent for a full-bleed `(public)` surface; this is the
+	 * first one that still wants the inset and the padding.
+	 * ⚠ `mx-auto` IS KEPT even though `max-w-none` makes it inert. I first left it
+	 * out as noise; the axis guard rejected that, and it was RIGHT to — the preset
+	 * shape is uniform across all six precisely so a reader can compare them
+	 * without checking which axes each one happens to declare, and "inert here"
+	 * stops being true the day this preset gains a cap. Loosening a guard to suit
+	 * one preset would have been the wrong half of that trade.
+	 *
+	 * ⚠ THE HEIGHT IS NOT HERE. This preset owns the three container axes only
+	 * (max-width · inset · padding), exactly as the docblock requires. The
+	 * `100dvh` band and its `overflow-hidden` are CONTENT layout and travel in
+	 * `DebateView`'s `className`, which is where every other per-surface layout
+	 * declaration already lives.
+	 */
+	screen: "mx-auto w-full max-w-none px-7 py-4",
 } as const;
 
 export type ContainerPreset = keyof typeof CONTAINER_PRESETS;

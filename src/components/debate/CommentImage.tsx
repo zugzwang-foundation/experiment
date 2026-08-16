@@ -9,16 +9,68 @@
 export function CommentImage({
 	url,
 	onOpen,
+	fill = false,
 }: {
 	url: string;
 	onOpen: (url: string) => void;
+	/**
+	 * ⚠⚠ THE `.argimg` ARM — d5's post-CARD image slot (`d5:648-651`), and the
+	 * fix for the founder's measured "post image renders ~¼ size, left-aligned".
+	 *
+	 * d5 gives a card's attachment the card's whole leftover height and CENTRES
+	 * it: `.argimg{flex:1 1 auto;min-height:0;display:flex;align-items:center;
+	 * justify-content:center}` wrapping `.media{height:100%;width:auto;
+	 * max-width:100%;max-height:100%}`. Measured in the mockup at 1800: the image
+	 * is 479 × 439 in an 833 × 598 card — 73% of the card's HEIGHT.
+	 * Measured on staging at `5349ae9`: 160 × 90, flush left, because the shipped
+	 * render was `block w-fit` around `max-h-[var(--imgmax)]` — a 160px cap.
+	 *
+	 * ⇒ `fill` swaps the `w-fit` box for a centred flex cell and the 160px cap for
+	 * `max-h-[40vh]`, so the image is bounded by THE VIEWPORT rather than by a
+	 * 160px constant — see the measurement note below for why not by the card.
+	 *
+	 * ⛔ STILL BOTH-AXES-BOUNDED, so T2 / canon §107 ("shown whole · any
+	 * orientation") is untouched: `max-h-[40vh]` + `max-w-full` with no fixed
+	 * dimension preserves the intrinsic aspect and never upscales a small image.
+	 * d5's own `height:100%` WOULD upscale, and that half is deliberately not
+	 * taken — it is the one part of `.media` that fights the promise to the author.
+	 *
+	 * ⚠⚠ THE BOUND IS THE CELL AGAIN, AND THE `40vh` STOPGAP IS DISCHARGED. This
+	 * read: "d5's card is `flex:1 1 auto` inside a `height:100vh;overflow:hidden`
+	 * screen, so 'the card's leftover height' is a real quantity there. THIS ROUTE
+	 * HAS NO SUCH QUANTITY … so the arena is sized BY its content, and a
+	 * `height:100%` image inside it is circular. ⇒ The bound is a FRACTION OF THE
+	 * VIEWPORT." That was the correct call against a content-height page, and it
+	 * measured ~266 × 244 where d5 has 476 × 436.
+	 *
+	 * ⇒ The founder's 2026-08-17 parity ruling makes the page a fixed-height grid,
+	 * so "the card's leftover height" IS a real quantity here now and `max-h-full`
+	 * resolves against it. The image goes back to being height-driven off the card
+	 * exactly as `.media{height:100%;width:auto;max-width:100%;max-height:100%}`
+	 * (`d5:649`) has it — which is also the only way it can hit d5's measured 44.9%
+	 * of viewport height, since a viewport fraction and a card fraction are only
+	 * ever equal by coincidence.
+	 *
+	 * ⚠ DEFAULT `false` KEEPS THE FOCUS-HEADER ARM BYTE-IDENTICAL. `.hpimg`
+	 * (`d5:787`) is a fixed side slot, not a growing cell, and `PostFocusHeader`
+	 * renders it inside its own `shrink-0` wrapper.
+	 */
+	fill?: boolean;
 }) {
 	return (
 		<button
 			type="button"
 			onClick={() => onOpen(url)}
 			aria-label="Open attached image"
-			className="block w-fit"
+			// ⚠ `h-full` PASSES THE CELL'S HEIGHT DOWN to the `<img>`, whose
+			// `max-h-full` is a PERCENTAGE and resolves to `none` unless every
+			// ancestor between it and the definite height carries one. The
+			// `.argimg` cell in `PostCard` is the flex item that has it.
+			className={
+				fill
+					? "flex h-full max-w-full items-center justify-center"
+					: "block w-fit"
+			}
 		>
 			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
 			    GET URL (D9), not a static asset — next/image optimization would
@@ -49,8 +101,79 @@ export function CommentImage({
 			<img
 				src={url}
 				alt="Argument attachment"
-				className="max-h-[var(--imgmax)] max-w-full rounded-[var(--imgr)] [border:var(--hairline)]"
+				className={`max-w-full rounded-[var(--imgr)] [border:var(--hairline)] ${
+					fill ? "max-h-full" : "max-h-[var(--imgmax)]"
+				}`}
 			/>
 		</button>
+	);
+}
+
+/**
+ * HTML-FINISH · MARKET DETAIL round 2 · R2 — THE POST-IMAGE PLACEHOLDER, the
+ * second of the four the founder ruled in on 2026-08-16 (the OD-2 reversal).
+ *
+ * d5's `.media.rdt` box carrying `<span class="ph">POST IMAGE · 640:586</span>`
+ * — the literal it substitutes into `.argimg` (`d5:1682`) and into the
+ * post-focus `.hpimg` (`d5:1491-1492`) for every card with no real attachment.
+ *
+ * ⛔ THE LABEL IS BYTE-CARRIED, hexdumped from `d5:1243`: middle dot U+00B7 at
+ * bytes `c2 b7`, and the literal aspect string `640:586`. ⛔ No copy is authored
+ * and none is paraphrased — `640:586` is d5's own demo aspect and means nothing
+ * for a real post, which is precisely why it is carried rather than replaced:
+ * inventing a truer-sounding caption would be authoring product copy.
+ *
+ * ⛔ IT IS NOT `aria-hidden`, and it carries no `alt`-like name either — it is a
+ * `<div>` with visible text, so a screen reader reads exactly what a sighted
+ * reviewer sees. Hiding it would make the placeholder invisible to the one
+ * audience most likely to be confused by it.
+ *
+ * ⚠⚠ REVIEW-SURFACE ONLY. Docketed at `docs/parked.md`
+ * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate all four before the DP.2
+ * production promote. A real participant must never meet this box.
+ *
+ * ⚠ TOPOLOGY AND LABEL ONLY. d5's `8.5px` / `.16em` / `var(--n5)` / `640/586`
+ * aspect are VALUES; the box reuses the glyph-box recipe already shipped in
+ * `MarketMediaPanel` (itself byte-carried from `discovery/MarketCard.tsx`) and
+ * the same `--imgr` / hairline pair `CommentImage` uses above, so no new type
+ * size, colour or radius enters the build.
+ */
+export function PostImagePlaceholder({
+	fill = false,
+}: {
+	/**
+	 * ⚠ THE `.argimg` ARM — the same swap `CommentImage` documents above, and the
+	 * other half of the founder's "~¼ size, left-aligned" measurement: the box was
+	 * `aspect-[16/9] w-full max-w-[var(--imgmax)]`, so it rendered 160 × 90 flush
+	 * left on staging while the mockup's fills the card and centres. The 160px
+	 * WIDTH cap goes from both arms: in the post-focus arm it left a 160px box
+	 * sitting inside the 1/3-width slot `PostFocusHeader` gives it, which is the
+	 * same defect one component over.
+	 *
+	 * ⛔ THE ASPECT BECOMES `640/586` IN THIS ARM, AND THAT IS THE LABEL'S OWN
+	 * NUMBER. d5's box is `.media.rdt{aspect-ratio:640/586}` (`d5:653`) and the
+	 * caption it carries literally reads `640:586` — so the shipped `16/9` box was
+	 * a placeholder whose shape contradicted its own text. Not a value taken from
+	 * the mockup so much as the value already printed inside the component.
+	 *
+	 * ⚠ `h-full w-auto` here, unlike `CommentImage`: a placeholder has no
+	 * intrinsic content to distort, so d5's `height:100%` is safe on it — the
+	 * upscaling objection applies only to a real attachment. With the `640/586`
+	 * aspect this reproduces d5's own box: at the pinned 1800×971 the mockup's
+	 * `.media.rdt` measures 476 × 436, height-driven off a 597px card.
+	 */
+	fill?: boolean;
+}) {
+	return (
+		<div
+			data-testid="post-image-placeholder"
+			className={
+				fill
+					? "flex aspect-[640/586] h-full max-h-full w-auto max-w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+					: "flex aspect-[16/9] w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+			}
+		>
+			POST IMAGE · 640:586
+		</div>
 	);
 }

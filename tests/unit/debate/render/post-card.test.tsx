@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
@@ -36,6 +36,14 @@ vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
 vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
+
+/** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
+ * These suites assert bookmarks / spacing / card composition, never the
+ * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
+ * keeps the viewer state REQUIRED at the component (a trigger without its
+ * F-3 gate invites a bet the viewer cannot place) without pretending this
+ * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
+const noopReply = () => {};
 
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
@@ -78,6 +86,10 @@ function renderCard() {
 			onEnter={noop}
 			onOpenPopup={noop}
 			onOpenImage={noop}
+			onReplyToPost={noopReply}
+			heldSide={null}
+			marketOpen
+			suspended={false}
 		/>,
 	);
 }
@@ -114,38 +126,266 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(offender).toBeUndefined();
 	});
 
-	it("post-card::read-more-replaces-the-plus-full-affordance", () => {
-		// Row 3 · PD-0-01 · R4 RULED — ADOPT "Read more". The OLD form is a
-		// `<Plus />` icon + the word "Full"; asserting only the new copy would
-		// pass on a card that rendered BOTH.
+	it("post-card::the-plus-glyph-replaces-Read-more", () => {
+		// ⚠ ROW 24 REVERSES R4, and the superseded assertion is recorded rather
+		// than silently swapped. R4 (2026-08-12) ruled `<Plus /> Full` → a
+		// `Read more` TEXT LINK and removed the glyph outright. The founder ruling
+		// of 2026-08-16 reverses it: the glyph returns, `Read more` goes.
 		const { container } = renderCard();
 		const buttons = buttonsIn(container);
 
-		const readMore = buttons.find((b) => b.innerHTML.includes("Read more"));
-		expect(readMore).toBeDefined();
+		const plus = buttons.find(
+			(b) => b.getAttribute("aria-label") === "Show more",
+		);
+		expect(plus).toBeDefined();
+		expect(plus?.innerHTML).toContain("+");
 
-		// The superseded label is gone from every control on the card.
+		// Both superseded labels pinned as gone — asserting only the new form
+		// would pass on a card that rendered BOTH.
+		expect(buttons.some((b) => b.innerHTML.includes("Read more"))).toBe(false);
 		expect(buttons.some((b) => b.innerHTML.includes("Full"))).toBe(false);
 	});
 
-	it("post-card::read-more-is-a-text-link-carrying-the-ported-tokens", () => {
-		// Row 3, second half. CD-A's `#989898` / `#FAFAFA` ARE `--color-n5` /
-		// `--color-ink`, so the port is BY TOKEN. A raw hex here also reddens
-		// `no-raw-hex-view-layer.test.ts` (Ruling A / H-HEX).
+	it("post-card::the-glyph-carries-an-aria-label-and-WCAG-2.5.3-still-holds", () => {
+		// ⚠ THE ACCESSIBILITY ARGUMENT INVERTED WITH THE CONTROL, which is why
+		// this is not simply "R4 undone". R4 dropped the `aria-label` DELIBERATELY:
+		// "Read the full argument" does not CONTAIN the visible text "Read more",
+		// and an accessible name that omits its visible label fails WCAG 2.5.3
+		// (Label in Name). A GLYPH has no visible label, so 2.5.3 does not apply
+		// and an `aria-label` becomes REQUIRED rather than forbidden — the concern
+		// is answered, not dismissed.
+		// ⛔ The label is BYTE-CARRIED from `d5:1077`'s own control, not authored.
 		const { container } = renderCard();
 
-		const readMore = buttonsIn(container).find((b) =>
-			b.innerHTML.includes("Read more"),
+		const plus = buttonsIn(container).find(
+			(b) => b.getAttribute("aria-label") === "Show more",
 		);
-		expect(readMore).toBeDefined();
-
-		const className = readMore?.getAttribute("class") ?? "";
+		expect(plus).toBeDefined();
+		// The ported tokens survive the control swap (Ruling A / H-HEX — a raw hex
+		// here also reddens `no-raw-hex-view-layer`).
+		const className = plus?.getAttribute("class") ?? "";
 		expect(className).toContain("text-n5");
 		expect(className).toContain("hover:text-ink");
+	});
 
-		// "text LINK" — CD-A ratified copy, not an icon button. Asserted on the
-		// element that carries the row's subject, so C11's `Download` deletion
-		// (a different element entirely) cannot move it.
-		expect(readMore?.innerHTML).not.toContain("<svg");
+	it("post-card::row-23-the-title-enters-post-focus-and-Open-debate-is-gone", () => {
+		// Row 23 — d5's `.rtitle.plust` (`:1077`): the title carries
+		// `enterPost(…)`, the `+` carries `openPostPop(…)`. Two destinations, one
+		// row, and no third control duplicating either.
+		const onEnter = vi.fn();
+		const onOpenPopup = vi.fn();
+		const { container } = render(
+			<PostCard
+				post={presentPost()}
+				bookmarks={VIEWER}
+				onEnter={onEnter}
+				onOpenPopup={onOpenPopup}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		const title = container.querySelector("h3")?.closest("button");
+		expect(title).not.toBeNull();
+		fireEvent.click(title as HTMLButtonElement);
+		expect(onEnter).toHaveBeenCalledWith(presentPost().id);
+		// ⛔ It does NOT also open the pop-up — that is the `+`'s job alone.
+		expect(onOpenPopup).not.toHaveBeenCalled();
+
+		// `Open debate` is gone from the PRESENT branch…
+		expect(container.innerHTML).not.toContain("Open debate");
+	});
+
+	it("post-card::row-6-the-title-hovers-highlighted-AND-underlined", () => {
+		// HTML-FINISH · MARKET DETAIL round 2 · R6. The title is the card's primary
+		// navigation and had no hover state at all.
+		//
+		// ⛔ BOTH HALVES ARE ASSERTED, and that is the point of the row: the founder
+		// asked for highlighted AND underlined, and a build that shipped only the
+		// underline (the Profile title's own pattern, the obvious half to reach for)
+		// would look finished and be half the ruling. Two assertions, not one.
+		//
+		// ⚠ Asserted on the ATTRIBUTE, never on computed style: jsdom performs no
+		// layout and resolves no Tailwind, so `getComputedStyle` here would report
+		// the absence of everything and pass a component that shipped nothing (O-7's
+		// genus — assert on the markup that carries the meaning).
+		const { container } = render(
+			<PostCard
+				post={presentPost()}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		const title = container.querySelector("h3")?.closest("button");
+		expect(title).not.toBeNull();
+		const cls = title?.getAttribute("class") ?? "";
+		expect(cls.split(/\s+/)).toContain("hover:bg-n1");
+		expect(cls.split(/\s+/)).toContain("hover:underline");
+
+		// ⛔ THE HIGHLIGHT IS THE RAMP TOKEN, NOT A PORTED MOCKUP VALUE. d5's
+		// `.rtt:hover` is `background:var(--n1)` on a LIGHT ramp; carrying the raw
+		// hex or a literal radius would be the H1-c/H3-b class this task forbids.
+		expect(cls).not.toContain("#");
+		expect(cls).not.toContain("[4px]");
+
+		// ⛔ NO LAYOUT MOVED. d5 pads the highlight (`padding:0 3px;margin:0 -3px`)
+		// and those are values; this row adds no padding at all, so a future edit
+		// that quietly introduces one is caught here rather than on staging.
+		for (const c of cls.split(/\s+/)) {
+			expect(
+				/^-?[pm][xy]?-/.test(c),
+				`title carries no spacing class: ${c}`,
+			).toBe(false);
+		}
+	});
+
+	it("post-card::the-REMOVED-branch-keeps-Open-debate", () => {
+		// ⛔ …and the removed branch KEEPS it (plan F-3). A removed post has no
+		// title to click and `page.tsx` falls back silently for a removed `?post=`
+		// target, so without this control a removed post and every surviving reply
+		// under it would be reachable by NO path at all.
+		const onEnter = vi.fn();
+		const { container } = render(
+			<PostCard
+				post={{
+					removed: true,
+					id: presentPost().id,
+					ordinal: 1,
+					sideAtPostTime: "YES",
+					createdAt: "2026-07-30T00:00:00.000Z",
+					aggregate: AGGREGATE,
+					replies: EMPTY_REPLIES,
+				}}
+				bookmarks={VIEWER}
+				onEnter={onEnter}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		expect(container.innerHTML).toContain("Open debate");
+		const open = buttonsIn(container).find((b) =>
+			b.innerHTML.includes("Open debate"),
+		);
+		fireEvent.click(open as HTMLButtonElement);
+		expect(onEnter).toHaveBeenCalledWith(presentPost().id);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 25 — the teaser and the two-slot reply
+ * preview LEAVE the market-view card (SPEC.1 **1.0.31**, §9 preamble +
+ * F-DEBATE-1 System/Acceptance + the two §17 rows).
+ *
+ * ⛔ THE SELECTION RULE IS NOT UNDER TEST HERE AND DID NOT CHANGE.
+ * `ReplyGroups.twoSlot` is still on the read model and
+ * `tests/unit/ranking/replies.test.ts` still pins the ordering, unamended. What
+ * this guard pins is the SURFACE: the card presents one argument, not the
+ * replies to it.
+ *
+ * ⚠ BOTH BRANCHES, because both are market-view post cards. The removed branch
+ * additionally keeps `Open debate →` (plan F-3) — without it a removed post and
+ * its surviving replies would be reachable by no path at all, since `page.tsx`
+ * falls back silently for a removed `?post=` target.
+ *
+ * ⚠ O-7 — `innerHTML`, never `textContent`.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + replies", () => {
+	it("post-card::no-teaser-on-the-card", () => {
+		const { container } = renderCard();
+
+		// The fixture's teaser string, pinned as absent. The BODY still exists on
+		// the DTO and the pop-up still renders it — this is a card-composition
+		// change, not a data change.
+		expect(container.innerHTML).not.toContain("Fixture teaser.");
+		// Non-vacuity: the card DID render, with its title.
+		expect(container.innerHTML).toContain("Fixture argument title.");
+	});
+
+	it("post-card::no-reply-preview-on-either-branch", () => {
+		const withReplies = presentPost();
+		const reply = {
+			removed: false as const,
+			id: "0199a0c0-0000-7000-8000-00000000ee01",
+			side: "YES" as const,
+			createdAt: "2026-07-30T00:00:00.000Z",
+			body: "Fixture reply body that must not appear on the card.",
+			marker: "none" as const,
+			author: { pseudonym: "fixture-replier", pfpUrl: "" },
+			stake: "10.000000000000000000",
+			entryPrice: "0.500000000000000000",
+			imageUrl: null,
+		};
+		withReplies.replies = {
+			support: [reply],
+			counter: [],
+			twoSlot: [reply],
+		};
+
+		const present = render(
+			<PostCard
+				post={withReplies}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+		// ⛔ The BODY's absence, not the row's — the reply is still ON the DTO
+		// (the read model is untouched); it simply must not render here.
+		expect(present.container.innerHTML).not.toContain(
+			"Fixture reply body that must not appear on the card.",
+		);
+		expect(
+			present.container.querySelector('[data-testid="reply-group-support"]'),
+		).toBeNull();
+
+		// The removed branch is a market-view card too.
+		cleanup();
+		const removed = render(
+			<PostCard
+				post={{
+					removed: true,
+					id: withReplies.id,
+					ordinal: 1,
+					sideAtPostTime: "YES",
+					createdAt: "2026-07-30T00:00:00.000Z",
+					aggregate: AGGREGATE,
+					replies: withReplies.replies,
+				}}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+		expect(removed.container.innerHTML).not.toContain(
+			"Fixture reply body that must not appear on the card.",
+		);
+		// …and it KEEPS its way in (plan F-3). Deleting this would strand a
+		// removed post and every surviving reply under it.
+		expect(removed.container.innerHTML).toContain("Open debate");
 	});
 });

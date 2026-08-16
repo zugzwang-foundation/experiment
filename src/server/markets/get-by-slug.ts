@@ -10,9 +10,17 @@ import type { MarketStatus } from "./transitions";
 /**
  * The public read-projection of a market addressed by its slug — the DTO every
  * participant `(public)/` surface renders against. Mapped in the server layer,
- * never a raw drizzle row exposed past the boundary (AGENTS.md §6). Five
+ * never a raw drizzle row exposed past the boundary (AGENTS.md §6). SIX
  * columns: the public-read shape SHELL/UI.0's `/m/[slug]` scaffold needs (the
  * pool / position / debate fields arrive with the surfaces that need them).
+ *
+ * HTML-FINISH · MARKET DETAIL row 2 — `mediaVideoUrl` is the sixth, added so
+ * the header can surface the admin-set outbound video (ADR-0026: a link that
+ * opens in a NEW TAB; never an embedded player, never a stored asset).
+ * ⚠ COSTS ZERO STATEMENTS: it is one more column on the row this query already
+ * reads, not another round-trip. The task's whole read budget is +1 per render
+ * and it is spent elsewhere (the `market_media` default-image read), so this
+ * field had to be free or not happen.
  */
 export type MarketSummary = {
 	id: string;
@@ -20,6 +28,8 @@ export type MarketSummary = {
 	title: string;
 	description: string | null;
 	status: MarketStatus;
+	/** ADR-0026 — the outbound video URL, or `null`. Opens in a new tab. */
+	mediaVideoUrl: string | null;
 };
 
 /**
@@ -42,6 +52,7 @@ export async function getMarketBySlug(
 			title: markets.title,
 			description: markets.description,
 			status: markets.status,
+			mediaVideoUrl: markets.mediaVideoUrl,
 		})
 		.from(markets)
 		.where(and(eq(markets.slug, slug), ne(markets.status, "Draft")))

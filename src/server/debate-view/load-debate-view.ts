@@ -14,6 +14,7 @@ import {
 	type Side,
 	twoSlot,
 } from "@/lib/ranking";
+import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
 import type { PricePoint } from "@/server/discovery/price-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 import { safeCaptureMessage } from "@/server/observability/safe-capture";
@@ -73,6 +74,14 @@ export type DebateReply =
 			stake: string;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
+			/**
+			 * HTML-FINISH · MARKET DETAIL row 26 — the reply's own attached image,
+			 * presigned for read (D9). NON-REMOVED ONLY, and that is the masking
+			 * boundary at the type level: a removed reply has no `imageUrl` field to
+			 * populate, so its media URL cannot serialize into the client payload
+			 * even by mistake.
+			 */
+			imageUrl: string | null;
 	  };
 
 /** A post's replies, ranked + partitioned by relation, plus the two-slot default. */
@@ -115,6 +124,16 @@ export type DebatePost =
 	  };
 
 export type DebateMarketHeader = MarketSummary & {
+	/**
+	 * HTML-FINISH · MARKET DETAIL rows 2 + 17 — the market's DEFAULT
+	 * `market_media` image, presigned for read (ADR-0026). Feeds the market arm's
+	 * media panel AND the post arm's market card, which are the same image at two
+	 * zoom levels — so ONE read serves both and row 17 costs nothing on top of
+	 * row 2. `null` on the defensive arm only: markets always carry media (§15
+	 * F-ADMIN-1 + the `market_media_one_default_per_market_uq` backstop), so this
+	 * is a missing row or a presign failure degrading to no image.
+	 */
+	mediaImageUrl: string | null;
 	pricing: { yes: string; no: string } | null;
 	/** UI.A2 §3.2 (SG-3 additive) — per-side `computeBuy(stake:"1").shares`, the A3 strip's `TO WIN Đ1 → Đx` substrate; rides the header's one pool read. */
 	unitToWin: { yes: string; no: string } | null;
@@ -173,6 +192,23 @@ export async function loadDebateView(
 		marketId,
 	);
 	const totals = await getMarketTotals(client, marketId);
+	// HTML-FINISH · MARKET DETAIL rows 2 + 17 — THE ONE NEW STATEMENT THIS TASK
+	// SPENDS, and the whole read budget is +1 per render, so it is the only one.
+	// Read-only reuse of Discovery's already-exported helper: the SAME
+	// `market_media` default-image projection and the SAME presign seam, so the
+	// market's image is one derivation across both surfaces rather than two that
+	// can drift. ⛔ Nothing under `src/server/discovery/**` is written.
+	//
+	// ⚠ THE MULTIPLIER IS WHY THIS IS COUNTED AT ALL. `DebatePoll` re-invokes
+	// this read every `POLL_INTERVAL_MS_DEBATE_VIEW` (15 s) = 4 renders per
+	// minute per viewer, against `src/db/index.ts`'s `max: 10` pool and a
+	// 15-slot session pooler. +1 read is +4 statements/minute/viewer; a per-post
+	// read would have been +4N.
+	//
+	// ⚠ It serves BOTH the market arm's media panel and the post arm's market
+	// card — the same image at two zoom levels — so row 17 rides row 2's read
+	// and adds nothing.
+	const mediaImageUrl = await getDefaultMarketMediaUrl(client, marketId);
 
 	const commentById = new Map(comments.map((c) => [c.id, c]));
 
@@ -190,13 +226,30 @@ export async function loadDebateView(
 		client,
 		visible.map((c) => c.userId),
 	);
-	// Only POSTS render an image (the DebateReply view-model carries none), so
-	// only post images are minted — a reply image presign would be wasted work
-	// (D9 per-render minting cost).
-	const imageUrlByComment = await mintImageUrls(
-		client,
-		visible.filter((c) => c.parentCommentId === null),
-	);
+	// HTML-FINISH · MARKET DETAIL row 26 — replies render an image too, so the
+	// mint is no longer narrowed to top-level comments.
+	//
+	// ⛔ SC-1 (CLAUDE.md §5.14). ONLY the `parentCommentId === null` filter is
+	// dropped. `visible` — `comments.filter(c => !removedSet.has(c.id))` — is
+	// NOT touched, so a removed reply's image URL is never minted, exactly as a
+	// removed post's never is. Masking is a property of every read that can
+	// reach content, and this is one.
+	//
+	// ⚠ COSTS +0 STATEMENTS **WHENEVER ANY POST CARRIES AN IMAGE**, which is the
+	// general case: `mintImageUrls` already issues ONE batched `image_uploads`
+	// SELECT and widening the input only widens that `inArray`.
+	// ⚠ THE EXCEPTION, STATED BECAUSE THE READ BUDGET IS A HALT CONDITION: the
+	// helper EARLY-RETURNS when no input comment carries an image. So on a market
+	// whose images are all on REPLIES and none on posts, this call goes 0 → 1 and
+	// that render's total delta is +2, not +1. That statement is the ratified
+	// row's own irreducible cost — a reply's image key cannot be read without
+	// reading it — not an overage that could be brought back inside the fence.
+	// Caught by `@code-reviewer` (MEDIUM-2): the comment was unconditional and
+	// the behaviour was not. Plan §7's table row carries the same unconditional
+	// wording and should be read with this correction.
+	// The remaining cost is +N LOCAL HMAC presigns (`signRead` — no network, no
+	// DB), which is why this rides the existing helper rather than a new read.
+	const imageUrlByComment = await mintImageUrls(client, visible);
 
 	// Top order over the WHOLE substrate (removed posts keep their slot/position).
 	const ordered = buildTopList(postSubstrate);
@@ -231,6 +284,7 @@ export async function loadDebateView(
 			commentById,
 			removedSet,
 			authorMap,
+			imageUrlByComment,
 		);
 
 		// Defensive 0 only on the unreachable no-comment branch (the substrate
@@ -304,6 +358,7 @@ export async function loadDebateView(
 	return {
 		market: {
 			...args.market,
+			mediaImageUrl,
 			pricing: pricingAndUnitToWin?.pricing ?? null,
 			unitToWin: pricingAndUnitToWin?.unitToWin ?? null,
 			totals,
@@ -353,6 +408,15 @@ export async function loadRemovedSet(
  * One batched key read (`comments_image_uploads_idx` → `image_uploads.id`), then
  * a local HMAC presign per image. A presign failure degrades that comment to no
  * image — a single unavailable object must not 500 the whole read render.
+ *
+ * ⚠ POSTS **AND** REPLIES since HTML-FINISH · MARKET DETAIL row 26. It was
+ * narrowed to top-level comments while `DebateReply` carried no image field;
+ * that field now exists, so the narrowing would simply withhold a reply's own
+ * attachment. The batched read is unchanged — one SELECT either way.
+ *
+ * ⛔ THE CALLER PASSES `visible`, NEVER `comments`. This helper does not mask
+ * and must never be asked to: masking is decided once, in `loadDebateView`, and
+ * a second implementation is a second place for it to diverge (SC-1).
  */
 async function mintImageUrls(
 	client: DebateViewReader,
@@ -417,11 +481,18 @@ function buildReplyGroups(
 	commentById: Map<string, DebateComment>,
 	removedSet: Set<string>,
 	authorMap: Map<string, AuthorIdentity>,
+	imageUrlByComment: Map<string, string>,
 ): ReplyGroups {
 	const ranked = rankReplies(replyMap.get(post.id) ?? [], post.parentSide);
 	const slot = twoSlot(ranked);
 	const toReply = (sub: ReplySubstrate): DebateReply =>
-		buildReply(sub, commentById.get(sub.id), removedSet.has(sub.id), authorMap);
+		buildReply(
+			sub,
+			commentById.get(sub.id),
+			removedSet.has(sub.id),
+			authorMap,
+			imageUrlByComment,
+		);
 	return {
 		support: ranked.support.map(toReply),
 		counter: ranked.counter.map(toReply),
@@ -435,6 +506,7 @@ function buildReply(
 	comment: DebateComment | undefined,
 	removed: boolean,
 	authorMap: Map<string, AuthorIdentity>,
+	imageUrlByComment: Map<string, string>,
 ): DebateReply {
 	if (removed || !comment) {
 		return {
@@ -454,5 +526,6 @@ function buildReply(
 		author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 		stake: sub.stake,
 		entryPrice: sub.priceAtBet,
+		imageUrl: imageUrlByComment.get(sub.id) ?? null,
 	};
 }

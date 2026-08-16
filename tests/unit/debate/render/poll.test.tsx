@@ -263,7 +263,7 @@ describe("F-DEBATE-4 — suspension (RULING C)", () => {
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 
 		// Open the market-view composer slot the way a participant does.
-		const entry = screen.getByLabelText("Đ BET YES");
+		const entry = screen.getByLabelText("Buy YES");
 		fireEvent.click(entry);
 		expect(entry.getAttribute("aria-expanded")).toBe("true");
 

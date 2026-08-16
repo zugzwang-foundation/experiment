@@ -35,7 +35,13 @@ import type { DebatePost, ReplyGroups } from "@/components/debate/types";
  *
  * Laws under test:
  *  - signed out (`bookmarks === null`) → today's DISABLED icon, verbatim.
- *  - own argument → NO bookmark control at all (not a disabled one).
+ *  - own argument → the DISABLED "your own argument" icon.
+ *    ⚠⚠ THIS LINE USED TO READ "NO bookmark control at all (not a disabled
+ *    one)", which is the exact OPPOSITE, and HTML-FINISH · MARKET DETAIL round 2
+ *    R4 reversed it by founder ruling of 2026-08-16 — measured on staging, where
+ *    one card carried the icon and its neighbour did not with nothing on screen
+ *    to explain the difference. It is corrected here rather than left describing
+ *    a matrix this file no longer asserts.
  *  - other's, unsaved → active "Bookmark"; other's, saved → active "Remove
  *    bookmark", filled.
  *  - own-ness OUTRANKS saved-ness (@security-auditor forward obligation 2).
@@ -57,6 +63,18 @@ vi.mock("@/server/bookmarks/remove", () => ({
 }));
 
 afterEach(cleanup);
+
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
+/** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
+ * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
+ * (O-1) without pretending this file tests the lightbox. */
+const noopImage = () => {};
 beforeEach(() => {
 	addBookmarkAction.mockReset();
 	removeBookmarkAction.mockReset();
@@ -142,20 +160,64 @@ describe("BOOKMARK-ADD-WIRE — the bookmark icon matrix", () => {
 		expect(button.getAttribute("aria-disabled")).toBe("true");
 	});
 
-	it("bookmark-toggle::own-argument-renders-no-control", () => {
-		// NOTHING, not a disabled icon: only someone else's argument is
-		// bookmarkable (D4). The absence is the assertion.
+	it("bookmark-toggle::own-argument-renders-the-DISABLED-icon", () => {
+		// ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R4 REVERSES D4's RENDER, and the
+		// superseded assertion is recorded rather than silently swapped. This test
+		// was `own-argument-renders-no-control` and asserted
+		// `querySelectorAll("button")).toHaveLength(0)` — NOTHING at all. The
+		// founder ruled against that on 2026-08-16 after seeing it on staging: one
+		// card carried the icon and its neighbour did not, with nothing on screen
+		// to explain why. The affordance is now unconditional.
+		//
+		// ⛔ DISABLED, NOT ACTIVE, and the row below is what pins that. `add.ts:62`
+		// rejects a self-bookmark, so an enabled control here could never succeed.
 		const { container } = render(
 			<BookmarkToggle commentId={MINE} bookmarks={SIGNED_IN} />,
 		);
 
-		expect(container.querySelectorAll("button")).toHaveLength(0);
+		const button = screen.getByRole("button", {
+			name: "Bookmark — your own argument",
+		});
+		expect((button as HTMLButtonElement).disabled).toBe(true);
+		expect(button.getAttribute("aria-disabled")).toBe("true");
+		// EXACTLY ONE control — the unconditional icon, not the icon PLUS something.
+		expect(container.querySelectorAll("button")).toHaveLength(1);
+		// ⛔ It is not secretly the active control wearing a different name: no
+		// `aria-pressed` (that is the toggle's own attribute) and no filled glyph.
+		expect(button.getAttribute("aria-pressed")).toBeNull();
+		expect(button.querySelector(".fill-current")).toBeNull();
+	});
+
+	it("bookmark-toggle::own-cell-is-DISTINCT-from-the-signed-out-cell", () => {
+		// R4's two inert cells share one branch, so the ONE thing that must still
+		// differ is the accessible name — the two refusals have different remedies
+		// and a screen-reader user has to be able to tell them apart. Without this
+		// row a single shared label would pass every other assertion in the file.
+		const { unmount } = render(
+			<BookmarkToggle commentId={MINE} bookmarks={SIGNED_IN} />,
+		);
+		expect(
+			screen.queryByRole("button", { name: "Bookmark — sign in to use" }),
+		).toBeNull();
+		unmount();
+
+		render(<BookmarkToggle commentId={OTHERS} bookmarks={null} />);
+		expect(
+			screen.queryByRole("button", { name: "Bookmark — your own argument" }),
+		).toBeNull();
 	});
 
 	it("bookmark-toggle::own-outranks-saved", () => {
 		// @security-auditor forward obligation 2: the own-check runs BEFORE the
 		// saved-check, so a defensively-possible self-bookmark row can never
-		// surface an active icon on the viewer's own argument.
+		// surface an ACTIVE icon on the viewer's own argument.
+		//
+		// ⚠ R4 MAKES THIS ROW MORE LOAD-BEARING, NOT LESS. Before R4 the own cell
+		// rendered nothing, so a botched ordering produced a visible control where
+		// there had been none — loud. Now both cells render a button, so a botched
+		// ordering produces a control that merely looks slightly different: an
+		// ENABLED "Remove bookmark" on the viewer's own argument. This is the only
+		// thing standing between a self-bookmarked row and that button.
 		const bookmarks: BookmarkAffordance = {
 			saved: new Set([MINE]),
 			own: new Set([MINE]),
@@ -164,7 +226,14 @@ describe("BOOKMARK-ADD-WIRE — the bookmark icon matrix", () => {
 			<BookmarkToggle commentId={MINE} bookmarks={bookmarks} />,
 		);
 
-		expect(container.querySelectorAll("button")).toHaveLength(0);
+		const button = container.querySelector("button");
+		expect((button as HTMLButtonElement).disabled).toBe(true);
+		expect(button?.getAttribute("aria-label")).toBe(
+			"Bookmark — your own argument",
+		);
+		expect(
+			screen.queryByRole("button", { name: "Remove bookmark" }),
+		).toBeNull();
 	});
 
 	it("bookmark-toggle::others-unsaved-renders-active-add", () => {
@@ -261,17 +330,26 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 		}
 	});
 
-	it("card-actions::own-argument-renders-no-cluster-controls", () => {
-		// ⚠ RENAMED AT ROW 7. The old name was `own-argument-keeps-the-download-
-		// trigger`, which is now FALSE — a name is an assertion, and a stale one is
-		// a false receipt a reader greps and believes without opening the body.
-		// The law it guarded survives: `showActions` is NOT the own-suppression
-		// hook. Own-suppression is a condition inside `BookmarkToggle`.
+	it("card-actions::own-argument-renders-the-inert-cluster", () => {
+		// ⚠ RENAMED TWICE, and both renames are recorded because a test name is an
+		// assertion and a stale one is a false receipt a reader greps and believes.
+		// Row 7 renamed it from `own-argument-keeps-the-download-trigger`; round 2's
+		// R4 renames it again from `own-argument-renders-no-cluster-controls`, which
+		// became false the moment the own cell started rendering an icon.
+		//
+		// The law it guards is unchanged and still worth pinning: `showActions` is
+		// NOT the own-suppression hook — own-ness is a condition inside
+		// `BookmarkToggle`, and the cluster itself is caller-side layout.
 		render(<CardActions commentId={MINE} bookmarks={SIGNED_IN} />);
 
 		expect(
 			screen.queryByRole("button", { name: "Download — sign in to use" }),
 		).toBeNull();
+		// R4 — the cluster now draws the DISABLED own-argument icon here, so the
+		// card is never bare. Neither ACTIVE label may appear.
+		expect(
+			screen.getByRole("button", { name: "Bookmark — your own argument" }),
+		).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Remove bookmark" }),
@@ -310,6 +388,10 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -328,6 +410,10 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -396,6 +482,10 @@ describe("BOOKMARK-ADD-WIRE — icon state follows the comment, not the mount", 
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 		expect(
@@ -423,6 +513,7 @@ function presentReply(id: string) {
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		imageUrl: null,
 	};
 }
 
@@ -480,7 +571,14 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 	it("reply-card::present-reply-renders-the-bookmark-affordance", () => {
 		// ⚠ RENAMED AT ROW 7 — "the full cluster" was a two-control claim, and the
 		// cluster is now one control.
-		render(<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />);
+		render(
+			<ReplyCard
+				reply={presentReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
+		);
 
 		expect(
 			screen.getByRole("button", { name: "Remove bookmark" }),
@@ -501,7 +599,12 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		unmount();
 
 		const { container: replyContainer } = render(
-			<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />,
+			<ReplyCard
+				reply={presentReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
 		);
 		const fromReplyCard = clusterHtml(replyContainer);
 
@@ -527,7 +630,12 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		// below is by ELEMENT TYPE + ARIA ROLE + FOCUSABILITY, and it is the shape
 		// that survives the next affordance we add.
 		const { container } = render(
-			<ReplyCard reply={removedReply(OTHERS)} bookmarks={SIGNED_IN} />,
+			<ReplyCard
+				reply={removedReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
 		);
 
 		// Non-vacuity first: prove the removed branch actually rendered, so an
@@ -552,6 +660,8 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				replies={[presentReply(OTHERS), presentReply(SECOND)]}
 				side="YES"
 				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		expect(
@@ -577,6 +687,8 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 			<ReplyPreview
 				replies={{ support: twoSlot, counter: [], twoSlot }}
 				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -586,11 +698,28 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		expect(screen.getByRole("button", { name: "Bookmark" })).toBeTruthy();
 	});
 
-	it("reply-card::own-reply-renders-no-bookmark-and-no-download", () => {
-		// ⚠ RENAMED AT ROW 7. Own-suppression reaches the reply surface too; with
-		// the download trigger removed the own-reply cluster now renders nothing.
-		render(<ReplyCard reply={presentReply(MINE)} bookmarks={SIGNED_IN} />);
+	it("reply-card::own-reply-renders-the-inert-icon-not-an-active-one", () => {
+		// ⚠ RENAMED TWICE — row 7, then round 2's R4. The old name promised "no
+		// bookmark", which R4 reversed.
+		//
+		// ⛔ THIS IS THE "BOTH ARMS" HALF OF R4, and it is not redundant with the
+		// post-card row. The founder's ruling was "unconditional on every card,
+		// BOTH ARMS": the market arm draws `PostCard` and the post arm draws
+		// `ReplyCard`, and the two reach `CardActions` by different routes. A fix
+		// that only reached the post card would satisfy the screenshot and leave
+		// the reply column asymmetric.
+		render(
+			<ReplyCard
+				reply={presentReply(MINE)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
+		);
 
+		expect(
+			screen.getByRole("button", { name: "Bookmark — your own argument" }),
+		).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
 		expect(
 			screen.queryByRole("button", { name: "Remove bookmark" }),
@@ -598,5 +727,37 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		expect(
 			screen.queryByRole("button", { name: "Download — sign in to use" }),
 		).toBeNull();
+	});
+
+	it("reply-card::removed-reply-STILL-renders-no-cluster-after-R4", () => {
+		// ⛔⛔ THE MASKING RE-CHECK, AND IT IS NOT DUPLICATION. R4 changed the cell
+		// that used to be the component's ONE `return null`, so the obvious way to
+		// get it wrong is to make an icon appear on a branch that must stay bare.
+		// A removed argument is exactly that branch (SC-1 / @security-auditor
+		// forward obligation 1), and the reply path has NO type-level lock — its
+		// removed variant still carries an `id`, so a cluster there would compile.
+		//
+		// The full property-shaped sweep lives in
+		// `reply-card::removed-reply-renders-no-cluster` above; this row exists to
+		// name R4's own new label as absent, because that sweep predates the label
+		// and a reader auditing R4 needs to see it pinned by name.
+		const { container } = render(
+			<ReplyCard
+				reply={removedReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
+		);
+
+		// Non-vacuity: the removed branch really rendered.
+		expect(screen.getByText(REMOVED_STUB_TEXT)).toBeTruthy();
+		expect(
+			screen.queryByRole("button", { name: "Bookmark — your own argument" }),
+		).toBeNull();
+		expect(
+			screen.queryByRole("button", { name: "Bookmark — sign in to use" }),
+		).toBeNull();
+		expect(container.querySelectorAll("button")).toHaveLength(0);
 	});
 });

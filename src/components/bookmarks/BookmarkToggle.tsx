@@ -29,18 +29,47 @@ export type BookmarkAffordance = {
  * matrix (plan §4), so every newly-wired surface renders identical states:
  *
  * | signed out (`bookmarks === null`) | the DISABLED "sign in to use" icon, verbatim as shipped |
- * | signed in · own argument          | NOTHING — only someone else's argument is bookmarkable |
+ * | signed in · own argument          | the DISABLED "your own argument" icon — R4, see below |
  * | signed in · other's, not saved    | active outline icon → `addBookmarkAction` |
  * | signed in · other's, saved        | active FILLED icon → `removeBookmarkAction` |
+ *
+ * ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R4 — THE OWN-ARGUMENT CELL USED TO
+ * RENDER `null`, AND THE FOUNDER RULED AGAINST IT ON 2026-08-16 after seeing it
+ * on staging: *"it renders on one card and not the other"*. MEASURED at
+ * `/m/sp-m15-fill` signed in as `RedFox000` — the YES card is that viewer's own
+ * argument and drew NO affordance; the NO card is `BlueWolf011`'s and drew one.
+ * The whole page held exactly ONE bookmark button. That asymmetry reads as a
+ * broken render, because nothing on screen explains why one card has a control
+ * and its neighbour does not. The affordance is now UNCONDITIONAL: every card,
+ * both arms, always an icon.
+ *
+ * ⛔ DISABLED, NOT ENABLED, AND THAT IS FORCED — not a softening of the ruling.
+ * `add.ts:62` rejects a self-bookmark at the write boundary with
+ * `self_bookmark_forbidden` (D-3: a bookmark is a pointer at SOMEONE ELSE's
+ * argument). An ENABLED icon here would flip optimistically, get `{ ok: false }`,
+ * and silently revert — a control that cannot ever succeed, which is strictly
+ * worse than the absence the founder objected to. Making it succeed instead
+ * would mean editing `src/server/bookmarks/add.ts`, and round 2 §2 forbids a
+ * fourth `src/server/**` file outright. ⇒ Rendered always; actionable only where
+ * the server would accept it.
+ *
+ * ⚠ THE OWN-CELL REUSES THE SHIPPED DISABLED RENDER — same `variant`, same
+ * `size`, same `disabled` + `aria-disabled` pair, same outline glyph. Only the
+ * accessible name differs, because the two refusals have different remedies:
+ * signing in fixes one and nothing fixes the other.
  *
  * A REMOVED argument renders no cluster at all; that is enforced by the call
  * sites (structurally for posts — `ArgProfile` cannot be constructed on the
  * removed union variant, which carries no `author`/`marker` — and by branch
- * placement for replies), never by a check in here.
+ * placement for replies), never by a check in here. ⛔ R4 DOES NOT TOUCH THAT:
+ * it changes what the PRESENT branch draws, so no masking surface moves and
+ * SC-1 does not fire (no read over `comments.body` is added or edited).
  *
  * The own-check runs BEFORE the saved-check on purpose: `add.ts:62` rejects a
  * self-bookmark, but if a row ever existed defensively, own-ness must still win
- * so a viewer can never be shown an active icon on their own argument.
+ * so a viewer can never be shown an ACTIVE icon on their own argument. R4 makes
+ * that ordering MORE load-bearing, not less — it is now the only thing standing
+ * between a self-bookmarked row and a live "Remove bookmark" button.
  *
  * Optimistic, with revert on failure (D5). Both actions RETURN typed failures
  * and never throw by contract, so the caller MUST branch on `{ ok }` — but the
@@ -68,22 +97,28 @@ export function BookmarkToggle({
 	);
 	const [pending, startTransition] = useTransition();
 
-	if (bookmarks === null) {
+	// THE TWO INERT CELLS, RENDERED BY ONE BRANCH (R4) so they cannot drift apart
+	// in anything but their accessible name — which is the ONLY thing that should
+	// differ, because the two refusals have different remedies. `null` here means
+	// "this viewer may act on this comment"; a string is the reason they may not.
+	const inert =
+		bookmarks === null
+			? "Bookmark — sign in to use"
+			: bookmarks.own.has(commentId)
+				? "Bookmark — your own argument"
+				: null;
+	if (inert !== null) {
 		return (
 			<Button
 				variant="ghost"
 				size="icon-xs"
 				disabled
 				aria-disabled="true"
-				aria-label="Bookmark — sign in to use"
+				aria-label={inert}
 			>
 				<Bookmark />
 			</Button>
 		);
-	}
-
-	if (bookmarks.own.has(commentId)) {
-		return null;
 	}
 
 	const onClick = () => {

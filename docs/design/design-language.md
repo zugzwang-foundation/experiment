@@ -146,7 +146,7 @@ The shared kit. **Thesis-load-bearing primitives** carry intent + states + conte
 
 **Support/Counter aggregate**
 - *Intent:* the weight of replies that **support vs. counter** a post (post-relative — see §6).
-- *Form:* `Support (count) : Đ  /  Counter (count) : Đ` — a **read-only** read-time aggregate.
+- *Form:* a split bar flanked by the two bare `Đ` figures, with the words carried by the Support/Counter trigger pills above them — a **read-only** read-time aggregate. *(Amended 2026-08-16, HTML-FINISH · MARKET DETAIL round 2 R5, founder-ruled. Read `Support (count) : Đ  /  Counter (count) : Đ`. The per-side prefix restated the pill directly above each figure, while the header row carries the TOTAL as `Replies · N`. ⚠ The PER-SIDE counts no longer render on the card — the two Đ figures and the split bar carry the per-side weight visually, and the exact per-side counts remain on the read model (`ReplyAggregate.supportCount` / `.counterCount`), unchanged. ⛔ The **Rule** below is UNCHANGED and is the load-bearing half. Applied here as well as at SPEC.1 §9 F-DEBATE-1 per **O-4** — an amendment applied at one of two operative sites reverses nothing for a reader who reaches the other first.)*
 - *Rule:* **there is no vote control.** No up/down arrows, no `↑N ↓M`. Friendly-fire is removed entirely. Support/Counter are computed, never cast.
 
 **Mandatory comment field** *(INV-1)*
