@@ -39,11 +39,27 @@ export type ImageAttachState =
  *
  * ⛔ NO VALUE IS CARRIED OUT OF THE MOCKUP (`H-VALUE`). The mockup is a
  * light-mode pre-BRIDGE prototype and its ramp is INVERTED against the shipped
- * dark true-neutral system. Every class below is byte-carried from this file's
- * own shipped render (`[border:var(--hairline)]`, `bg-n1`, `text-n5`,
- * `text-n4`, `text-[10px]`, `rounded-(--r-chip)`) or from the ratified
- * `--imgr` image radius. The mockup's `1px dashed var(--n3)` edge and its
- * `minmax(210px, …)` track floor are REFUSED, not ported.
+ * dark true-neutral system. Provenance, stated per class rather than as one
+ * sweeping claim — an earlier draft of this block asserted "every class below
+ * is byte-carried from this file's own shipped render", which was FALSE for
+ * six of them and is the `V-3` shape: a pre-verification that reads as checked
+ * and does not resolve (`@code-reviewer`, MEDIUM):
+ *   · from THIS FILE at `8db535d` — `[border:var(--hairline)]`, `bg-n1`,
+ *     `text-n5`, `text-n4`, `text-[10px]`, `rounded-(--r-chip)`, `truncate`,
+ *     `min-w-0`, `font-mono text-ink`, `font-semibold text-ink`;
+ *   · from the RATIFIED token set — `rounded-(--imgr)` (values-log §3 item 2);
+ *   · from SHIPPED CODE TREE-WIDE, not from d5 — `p-3`, `h-full`, `flex-1`,
+ *     `gap-2`, `text-center`, `max-w-full`, `min-h-0`, `w-full`, `max-h-full`;
+ *   · PROPORTIONS, which are arrangement, not values — `aspect-[4/5]`,
+ *     `max-h-full` (d5's `max-height:calc(100% - 22px)` MINUS its `22px`).
+ * REFUSED, not ported: d5's `1px dashed var(--n3)` edge (the panel takes the
+ * shipped hairline), its `minmax(210px, …)` track floor, its `22px` height
+ * offset, and its literal `IMAGE` placeholder label — the state carries no
+ * preview data, so that string would claim a preview that does not exist.
+ * ⚠ `max-w-40` was ALSO refused after review: it exists in shipped code only
+ * as this file's old FILENAME truncation cap, so re-roling it as a 160px
+ * preview cap would be byte-carrying a string without its role, and it
+ * silently swapped d5's height-based containment for a width-based one.
  */
 export function ImageAttach({
 	state,
@@ -57,14 +73,18 @@ export function ImageAttach({
 	onRemove: () => void;
 }) {
 	const inputRef = useRef<HTMLInputElement | null>(null);
-	// `.attach` — the panel chrome, identical in every phase so the column does
-	// not resize as the state moves through pick → busy → attached.
+	// `.attach` — the panel chrome, one shape in every phase so the column does
+	// not resize as the state moves through pick → busy → attached → error.
+	// `min-w-0` is LOAD-BEARING: a fieldset's UA `min-inline-size:min-content`
+	// would otherwise refuse to shrink inside the grid track.
 	const panel =
 		"flex h-full min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
-	// `.imgprev` — the 4:5 preview box (d5). A PROPORTION, which is arrangement;
-	// its surface + radius are byte-carried from this file's shipped render.
+	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
+	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
+	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
+	// preview from driving the composer's height off the grid row.
 	const preview =
-		"flex aspect-[4/5] w-full max-w-40 items-center justify-center rounded-(--imgr) bg-n1 text-[10px] text-n4";
+		"aspect-[4/5] max-h-full min-h-0 w-full rounded-(--imgr) bg-n1";
 	// `.acap` — the caption, INSIDE the panel (d5), not a sibling of it.
 	const caption = <span className="text-[10px] text-n4">{CAPTION}</span>;
 	return (
@@ -85,61 +105,65 @@ export function ImageAttach({
 					e.target.value = "";
 				}}
 			/>
-			{state.phase === "attached" ? (
-				// A GROUPING element, not a <button>: the Remove control lives in this
-				// panel and a nested button is invalid markup. `<fieldset>` is the
-				// semantic group (biome `useSemanticElements`); its `aria-label` still
-				// names the column, so the affordance keeps ONE accessible name across
-				// every phase. `panel` carries `min-w-0`, which is load-bearing here —
-				// a fieldset's UA `min-inline-size:min-content` would otherwise refuse
-				// to shrink inside the grid track.
-				<fieldset aria-label={ATTACH_LABEL} className={panel}>
-					<span aria-hidden="true" className={preview} />
-					<span className="flex max-w-full items-center gap-1">
-						<span className="min-w-0 truncate font-mono text-ink">
-							{state.name}
+			{/* ⛔ THE COLUMN IS A GROUP, NEVER THE BUTTON ITSELF, AND THE LIVE
+			    REGION IS THE REASON. ARIA's presentational-children rule strips the
+			    roles of a `button`'s descendants, so a `role="status"` nested inside
+			    the pick control is NOT monitored — and the control's `aria-label`
+			    excludes the message from its accessible name as well. Making the
+			    whole panel one `<button>` therefore silences every attach failure
+			    (`error_image_oversize`, gate-down, sign reject) for a screen-reader
+			    user, which is the one channel those codes have. ⇒ `<fieldset>` is
+			    the column (biome `useSemanticElements`), the pick control FILLS it
+			    so the target stays panel-sized (d5 `.attach{cursor:pointer}`), and
+			    the status region is the control's SIBLING inside the group.
+			    Caught by `@code-reviewer` (HIGH) on the first draft of this file. */}
+			<fieldset aria-label={ATTACH_LABEL} className={panel}>
+				{state.phase === "attached" ? (
+					<>
+						<span aria-hidden="true" className={preview} />
+						<span className="flex max-w-full items-center gap-1">
+							<span className="min-w-0 truncate font-mono text-ink">
+								{state.name}
+							</span>
+							<button
+								type="button"
+								onClick={onRemove}
+								disabled={disabled}
+								aria-label="Remove image"
+								className="rounded-(--r-chip) px-1 text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+							>
+								×
+							</button>
 						</span>
-						<button
-							type="button"
-							onClick={onRemove}
-							disabled={disabled}
-							aria-label="Remove image"
-							className="rounded-(--r-chip) px-1 text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring)"
-						>
-							×
-						</button>
-					</span>
-					{caption}
-				</fieldset>
-			) : (
-				// Pick / busy / error — the WHOLE panel is the target (d5
-				// `.attach{cursor:pointer}`), not a small button beside a caption.
-				<button
-					type="button"
-					disabled={disabled || state.phase === "attaching"}
-					aria-label={ATTACH_LABEL}
-					onClick={() => inputRef.current?.click()}
-					className={`${panel} transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)`}
-				>
-					<span aria-hidden="true" className={preview} />
-					<span className="text-n5">
-						{state.phase === "attaching" ? `${state.name}…` : "Image"}
-					</span>
-					{caption}
-					{state.phase === "error" && (
-						<span
-							role="status"
-							aria-live="polite"
-							className="rounded-(--r-chip) bg-n1 px-2 py-1 text-[11px]"
-						>
-							{state.message !== "" && (
-								<span className="font-semibold text-ink">{state.message} </span>
-							)}
-							<span className="text-n5">{STATE_COPY.gateDown.body}</span>
+						{caption}
+					</>
+				) : (
+					<button
+						type="button"
+						disabled={disabled || state.phase === "attaching"}
+						onClick={() => inputRef.current?.click()}
+						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+					>
+						<span aria-hidden="true" className={preview} />
+						<span className="text-n5">
+							{state.phase === "attaching" ? `${state.name}…` : "Image"}
 						</span>
-					)}
-				</button>
-			)}
+						{caption}
+					</button>
+				)}
+				{state.phase === "error" && (
+					<span
+						role="status"
+						aria-live="polite"
+						className="rounded-(--r-chip) bg-n1 px-2 py-1 text-[11px]"
+					>
+						{state.message !== "" && (
+							<span className="font-semibold text-ink">{state.message} </span>
+						)}
+						<span className="text-n5">{STATE_COPY.gateDown.body}</span>
+					</span>
+				)}
+			</fieldset>
 		</>
 	);
 }
