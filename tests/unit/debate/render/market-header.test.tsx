@@ -216,3 +216,66 @@ describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () =
 		expect(attrs).toBeLessThan(criterion);
 	});
 });
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 4 — the price chart occupies the RAIL.
+ *
+ * The mockup's `.hright` holds exactly `.graph` + `.barrow f` in the market arm
+ * (`d5:1007`, `:1037`). The chart used to render in the LEFT column, between
+ * the criterion and the price bar, which put the market's shape inside the
+ * reading column instead of beside it.
+ *
+ * ⚠ THE NULL PATH IS PART OF THE ROW, not a separate concern. A null
+ * `priceChart` was already non-fatal — the rest of the header stands
+ * (`price-chart.test.tsx` pins that). Now it also means NO RAIL NODE, because
+ * an empty 25% column is visible empty chrome (PD-3-09). Both halves are
+ * asserted so a later commit cannot satisfy one by breaking the other.
+ *
+ * ⚠ Declared locally rather than imported, following `price-chart.test.tsx`:
+ * the shape is two fields and a local literal keeps this file free of a server
+ * module path it does not otherwise need.
+ */
+type PricePointFixture = { at: string; yes: string };
+
+const CHART_SERIES: PricePointFixture[] = [
+	{ at: "2026-07-01T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-07-02T00:00:00.000Z", yes: "0.600000000000000000" },
+];
+
+describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", () => {
+	it("market-header::the-chart-renders-in-the-rail-not-the-left-column", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const right = container.querySelector('[data-testid="headzone-right"]');
+
+		expect(right).not.toBeNull();
+		// The collapsed card is IN the rail …
+		expect(right?.innerHTML).toContain('data-testid="market-price-chart-card"');
+		// … and is NOT still in the reading column. Asserting only the first half
+		// would pass on a header that rendered the chart TWICE.
+		expect(left?.innerHTML).not.toContain(
+			'data-testid="market-price-chart-card"',
+		);
+	});
+
+	it("market-header::a-null-series-renders-NO-rail-at-all", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+
+		// ⛔ Not "an empty rail" — PD-3-09 / OD-6. The left column still stands,
+		// which is the pre-existing non-fatal contract.
+		expect(
+			container.querySelector('[data-testid="headzone-right"]'),
+		).toBeNull();
+		expect(
+			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+		).toContain("Attrs Strip Market Question");
+	});
+});

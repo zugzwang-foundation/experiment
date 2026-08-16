@@ -75,10 +75,24 @@ export function MarketHeader({
 }) {
 	return (
 		<HeadZone
-			// The rail lands at C4 (the chart) and C6 (the price bar). Until then
-			// this arm is one column and the surface does not move — `null` renders
-			// no rail at all rather than an empty 25% box (PD-3-09).
-			right={null}
+			// HTML-FINISH · MARKET DETAIL row 4 — THE PRICE CHART IS THE RAIL'S
+			// content. The mockup's `.hright` holds exactly `.graph` + `.barrow f`
+			// in the market arm (`d5:1007`, `:1037`); the chart used to render in
+			// the left column between the criterion and the price bar, which put
+			// the market's shape INSIDE the reading column instead of beside it.
+			// ⚠ `null` WHEN THE SERIES READ FAILED, and that is the pre-existing
+			// contract, not a new one: a null `priceChart` is non-fatal and the
+			// rest of the header stands. It now also means NO RAIL — one column,
+			// never an empty 25% box (PD-3-09). `MarketPriceChartHost` itself
+			// still returns null for an empty series, so both null paths agree.
+			right={
+				priceChart ? (
+					<MarketPriceChartHost
+						series={priceChart.series}
+						nodes={priceChart.nodes}
+					/>
+				) : null
+			}
 			left={
 				<>
 					<div className="flex items-start justify-between gap-3">
@@ -162,15 +176,6 @@ export function MarketHeader({
 								{market.description}
 							</p>
 						</div>
-					) : null}
-					{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
-			    ONLY when non-null: a null series read is non-fatal (web Gate-C
-			    error-state), the rest of the header stands. */}
-					{priceChart ? (
-						<MarketPriceChartHost
-							series={priceChart.series}
-							nodes={priceChart.nodes}
-						/>
 					) : null}
 					<PriceBar pricing={market.pricing} size="detail" />
 				</>
