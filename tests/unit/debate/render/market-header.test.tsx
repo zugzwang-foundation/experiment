@@ -291,15 +291,20 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 });
 
 /**
- * HTML-FINISH · MARKET DETAIL row 7 — the detail price bar is ONE ROW, and it
- * is in the rail.
+ * HTML-FINISH · MARKET DETAIL — the price bar occupies the RAIL, under the
+ * chart.
  *
- * D-J is discharged. `PriceBar.tsx` recorded the two-row detail form as a
- * divergence from d5's one-row `.barrow` (`:505`) that was *"recorded and NOT
- * actioned"*, naming the exact mechanism adoption would take — move `detail`
- * into the `ROW` map, delete the early return. This pins the result.
+ * `.hright` holds `.graph` then `.barrow f` (`d5:1007`, `:1037`). The bar and
+ * the chart read the SAME price, so standing them in one column is what lets a
+ * reader check one against the other.
+ *
+ * ⚠ THIS IS THE PLACEMENT HALF ONLY. Row 7 — collapsing `detail` to d5's
+ * one-row `.barrow` — was BACKED OUT: `PriceBar`'s detail render is byte-pinned
+ * by `tests/unit/discovery/render/price-bar-presets.test.tsx`, which is outside
+ * this task's ratified allow-list. Placement is `MarketHeader`'s and is in
+ * scope; the bar's internal shape is not. See `PriceBar.tsx`'s docblock.
  */
-describe("HTML-FINISH · MARKET DETAIL — row 7, the one-row detail bar", () => {
+describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () => {
 	it("market-header::the-price-bar-renders-in-the-rail", () => {
 		const { container } = render(
 			<MarketHeader
@@ -311,7 +316,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 7, the one-row detail bar", () =>
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		const right = container.querySelector('[data-testid="headzone-right"]');
 
-		// `.hright` holds `.graph` then `.barrow f` (`d5:1007`, `:1037`).
 		expect(right?.innerHTML).toContain("YES 50%");
 		expect(right?.innerHTML).toContain("NO 50%");
 		// And it is not ALSO left behind in the reading column.
