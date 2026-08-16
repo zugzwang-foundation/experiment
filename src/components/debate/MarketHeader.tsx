@@ -154,10 +154,33 @@ export function MarketHeader({
 					{/* `.hstack` (`d5:462`) — everything that is not the media.
 					    ⚠ `min-h-0` is this node's link in the one-screen chain: without
 					    it the stack refuses to shrink below its content and pushes the
-					    declared band taller. */}
-					<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
-						<div className="flex items-start justify-between gap-3">
-							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
+					    declared band taller.
+
+					    ⚠⚠ `overflow-y-auto` IS AN ACCOMMODATION Q-1 FORCED, AND IT IS
+					    REPORTED RATHER THAN ABSORBED. This stack ALREADY overflowed its
+					    own band before Q-1: measured on staging at `c13aa54`,
+					    `scrollHeight` 197 against `clientHeight` 188, so the resolver
+					    cards were spilling 9px PAST the headzone and over the arena
+					    beneath it. I did not catch that in the parity pass — the phase-1
+					    table measured each region's own box and never asked whether the
+					    children summed to the parent.
+					    ⇒ Q-1 adds a row, which widens that spill. The containment is the
+					    mechanism ALREADY RULED for this surface one component over
+					    (`DebateColumn`'s `.colwrap`, `d5:568`): the page never scrolls,
+					    and anything that does not fit scrolls INSIDE its own region.
+					    Nothing is clipped and nothing is deleted — the marker, the
+					    export and both resolver cards stay reachable.
+					    ⛔ THIS IS NOT A FIX FOR THE UNDERLYING SIZE. The stack's content
+					    is ~41px taller than d5's equivalent (our resolver cards are 72px
+					    against d5's 57, and our three gaps are 36px against d5's 30). A
+					    band that has to scroll is a smaller surface than one that fits;
+					    closing that gap is a composition change this task forbids
+					    ("⛔ Nothing else moves"), so it is reported, not taken. */}
+					<div
+						data-testid="headzone-stack"
+						className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto"
+					>
+						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
 							    (`white-space:nowrap;overflow:hidden;text-overflow:ellipsis`,
 							    ruled at D5-02 / v0.9: "Market title → single line (no wrap;
@@ -172,32 +195,18 @@ export function MarketHeader({
 							    `.md` export carries it in full. This follows the founder's
 							    own adoption of `.crittext`'s 2-line clamp one block down —
 							    the two rulings would otherwise contradict each other. */}
-							{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
+						{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
 							    `.hstack`, and `truncate` only ellipsises what it is given. As a
 							    shrink-to-fit flex item beside the badge cluster the heading
 							    measured 501px against d5's 674px at the pinned 1440×777
 							    (−12.0pp), so it truncated far earlier than the mockup does and
 							    left the row's spare width unused. */}
-							<h1
-								title={market.title}
-								className="min-w-0 flex-1 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
-							>
-								{market.title}
-							</h1>
-							<div className="flex shrink-0 items-center gap-2">
-								<LifecycleBadge status={market.status} />
-								{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
-					    plain anchor, no client boundary, works signed-out. */}
-								<a
-									download
-									href={`/m/${market.slug}/export`}
-									aria-label="Download this debate as Markdown"
-									className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-								>
-									Download .md
-								</a>
-							</div>
-						</div>
+						<h1
+							title={market.title}
+							className="truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+						>
+							{market.title}
+						</h1>
 						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
 					    THE QUESTION AND THE CRITERION. The mockup's `.hstack` orders its
 					    `vm` children `.question` → `.attrs` → `.criterion` → `.rescards`
@@ -235,6 +244,34 @@ export function MarketHeader({
 								{market.totals.replyCount}{" "}
 								{noun(market.totals.replyCount, "reply", "replies")}
 							</span>
+						</div>
+						{/* ⚠⚠ Q-1 — THE LIFECYCLE MARKER AND THE `.md` EXPORT MOVE OFF THE
+						    QUESTION'S ROW, founder-ruled. They sat beside the `<h1>` as a
+						    `shrink-0` flex sibling and took 146px of it: measured at the
+						    pinned 1440×777 the heading was 528px against d5's 674px
+						    (36.6% vs 46.8%, −10.2pp) — the last region outside ±2pp, and
+						    the only one whose cause was build-only chrome rather than
+						    geometry. d5 has nothing in that row at all.
+						    ⛔ NEITHER IS DELETED, and both stay reachable: `Download .md`
+						    is the ADR-0025 export and the badge is the INV-4 read-only
+						    marker. They move one row down, below `.attrs`, and keep their
+						    own accessible names.
+						    ⚠ ORDER ONLY. Neither element's own composition changes — same
+						    `LifecycleBadge`, same anchor, same `download` attribute, same
+						    label. `market-header.test.tsx` asserts both by role and text,
+						    not by position, so the guard reads them unchanged. */}
+						<div className="flex flex-wrap items-center gap-2">
+							<LifecycleBadge status={market.status} />
+							{/* EXPORT.1 — native download of the debate `.md` (server-mediated
+							    GET); plain anchor, no client boundary, works signed-out. */}
+							<a
+								download
+								href={`/m/${market.slug}/export`}
+								aria-label="Download this debate as Markdown"
+								className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+							>
+								Download .md
+							</a>
 						</div>
 						{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
 					    `.overline`). The container is a TOP HAIRLINE RULE + padding
