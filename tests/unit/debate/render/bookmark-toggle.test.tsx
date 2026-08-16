@@ -57,6 +57,12 @@ vi.mock("@/server/bookmarks/remove", () => ({
 }));
 
 afterEach(cleanup);
+
+/** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
+ * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
+ * (O-1) without pretending this file tests the lightbox. */
+const noopImage = () => {};
 beforeEach(() => {
 	addBookmarkAction.mockReset();
 	removeBookmarkAction.mockReset();
@@ -423,6 +429,7 @@ function presentReply(id: string) {
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		imageUrl: null,
 	};
 }
 
@@ -480,7 +487,13 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 	it("reply-card::present-reply-renders-the-bookmark-affordance", () => {
 		// ⚠ RENAMED AT ROW 7 — "the full cluster" was a two-control claim, and the
 		// cluster is now one control.
-		render(<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />);
+		render(
+			<ReplyCard
+				reply={presentReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+			/>,
+		);
 
 		expect(
 			screen.getByRole("button", { name: "Remove bookmark" }),
@@ -501,7 +514,11 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		unmount();
 
 		const { container: replyContainer } = render(
-			<ReplyCard reply={presentReply(OTHERS)} bookmarks={SIGNED_IN} />,
+			<ReplyCard
+				reply={presentReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+			/>,
 		);
 		const fromReplyCard = clusterHtml(replyContainer);
 
@@ -527,7 +544,11 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 		// below is by ELEMENT TYPE + ARIA ROLE + FOCUSABILITY, and it is the shape
 		// that survives the next affordance we add.
 		const { container } = render(
-			<ReplyCard reply={removedReply(OTHERS)} bookmarks={SIGNED_IN} />,
+			<ReplyCard
+				reply={removedReply(OTHERS)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+			/>,
 		);
 
 		// Non-vacuity first: prove the removed branch actually rendered, so an
@@ -552,6 +573,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				replies={[presentReply(OTHERS), presentReply(SECOND)]}
 				side="YES"
 				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
 			/>,
 		);
 		expect(
@@ -577,6 +599,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 			<ReplyPreview
 				replies={{ support: twoSlot, counter: [], twoSlot }}
 				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
 			/>,
 		);
 
@@ -589,7 +612,13 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 	it("reply-card::own-reply-renders-no-bookmark-and-no-download", () => {
 		// ⚠ RENAMED AT ROW 7. Own-suppression reaches the reply surface too; with
 		// the download trigger removed the own-reply cluster now renders nothing.
-		render(<ReplyCard reply={presentReply(MINE)} bookmarks={SIGNED_IN} />);
+		render(
+			<ReplyCard
+				reply={presentReply(MINE)}
+				bookmarks={SIGNED_IN}
+				onOpenImage={noopImage}
+			/>,
+		);
 
 		expect(screen.queryByRole("button", { name: "Bookmark" })).toBeNull();
 		expect(

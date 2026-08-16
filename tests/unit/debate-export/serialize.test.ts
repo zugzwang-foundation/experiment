@@ -64,6 +64,13 @@ function mkReply(o: {
 	stake?: string;
 	entryPrice?: string;
 	createdAt?: string;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 26 — a reply's own attached image. Optional
+	 * here and defaulted to `null` below, so every existing call site keeps its
+	 * exact shape; the serializer assertions are about ADR-0025's text-only
+	 * output, and this field must never appear in it.
+	 */
+	imageUrl?: string | null;
 }): DebateReply {
 	return {
 		removed: false,
@@ -78,6 +85,7 @@ function mkReply(o: {
 		},
 		stake: o.stake ?? "10.000000000000000000",
 		entryPrice: o.entryPrice ?? "0.500000000000000000",
+		imageUrl: o.imageUrl ?? null,
 	};
 }
 
@@ -666,5 +674,53 @@ describe("formatDharmaExportGrouped — export-only thousands grouping", () => {
 		expect(formatDharmaExportGrouped("1234.560000000000000000")).toBe(
 			"1,234.56",
 		);
+	});
+});
+
+// ── HTML-FINISH · MARKET DETAIL row 26 — the export stays TEXT-ONLY ──────────
+
+describe("serializeDebateExport — media never reaches the .md", () => {
+	it("debate-export::a-replys-image-url-is-NOT-serialized", () => {
+		// ⛔ VERIFIED AT BUILD, NOT ASSUMED. Row 26 put an `imageUrl` on
+		// `DebateReply`'s non-removed variant, and rows 2/17 put `mediaImageUrl`
+		// and `mediaVideoUrl` on the market header. ADR-0025's export is TEXT-ONLY,
+		// so none of the three may appear — but "the serializer does not read a
+		// field it was never told about" is exactly the kind of claim that is true
+		// until someone adds a generic field walk. This pins it.
+		//
+		// ⚠ A PRESIGNED URL IS NOT INERT. It is a live, short-TTL credential for
+		// an R2 object; a `.md` a participant downloads and shares would carry it
+		// out of the session. So this is a leak assertion, not a formatting one.
+		const SECRET = "https://signed.example/REPLY-IMAGE-MUST-NOT-APPEAR";
+		const VIDEO = "https://video.example/MARKET-VIDEO-MUST-NOT-APPEAR";
+		const MEDIA = "https://signed.example/MARKET-IMAGE-MUST-NOT-APPEAR";
+
+		const out = run(
+			mkModel(
+				[
+					mkPost({
+						side: "YES",
+						replies: {
+							support: [mkReply({ side: "YES", imageUrl: SECRET })],
+							counter: [],
+							twoSlot: [mkReply({ side: "YES", imageUrl: SECRET })],
+						},
+					}),
+				],
+				{ mediaVideoUrl: VIDEO, mediaImageUrl: MEDIA },
+			),
+			mkMeta(),
+		);
+
+		expect(out).not.toContain(SECRET);
+		expect(out).not.toContain(VIDEO);
+		expect(out).not.toContain(MEDIA);
+		// No markdown/HTML image syntax anywhere in a text-only export.
+		expect(out).not.toContain("![");
+		expect(out).not.toContain("<img");
+
+		// Non-vacuity: the reply itself DID serialize, so the absences above are
+		// about the media and not about an empty document.
+		expect(out).toContain("A staked reply argument.");
 	});
 });

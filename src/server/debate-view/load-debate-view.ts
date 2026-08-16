@@ -74,6 +74,14 @@ export type DebateReply =
 			stake: string;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
+			/**
+			 * HTML-FINISH · MARKET DETAIL row 26 — the reply's own attached image,
+			 * presigned for read (D9). NON-REMOVED ONLY, and that is the masking
+			 * boundary at the type level: a removed reply has no `imageUrl` field to
+			 * populate, so its media URL cannot serialize into the client payload
+			 * even by mistake.
+			 */
+			imageUrl: string | null;
 	  };
 
 /** A post's replies, ranked + partitioned by relation, plus the two-slot default. */
@@ -218,13 +226,20 @@ export async function loadDebateView(
 		client,
 		visible.map((c) => c.userId),
 	);
-	// Only POSTS render an image (the DebateReply view-model carries none), so
-	// only post images are minted — a reply image presign would be wasted work
-	// (D9 per-render minting cost).
-	const imageUrlByComment = await mintImageUrls(
-		client,
-		visible.filter((c) => c.parentCommentId === null),
-	);
+	// HTML-FINISH · MARKET DETAIL row 26 — replies render an image too, so the
+	// mint is no longer narrowed to top-level comments.
+	//
+	// ⛔ SC-1 (CLAUDE.md §5.14). ONLY the `parentCommentId === null` filter is
+	// dropped. `visible` — `comments.filter(c => !removedSet.has(c.id))` — is
+	// NOT touched, so a removed reply's image URL is never minted, exactly as a
+	// removed post's never is. Masking is a property of every read that can
+	// reach content, and this is one.
+	//
+	// ⚠ COSTS +0 STATEMENTS. `mintImageUrls` already issues ONE batched
+	// `image_uploads` SELECT; widening the input widens that `inArray`. The real
+	// cost is +N LOCAL HMAC presigns (`signRead` — no network, no DB), which is
+	// why this rides the existing helper instead of gaining its own read.
+	const imageUrlByComment = await mintImageUrls(client, visible);
 
 	// Top order over the WHOLE substrate (removed posts keep their slot/position).
 	const ordered = buildTopList(postSubstrate);
@@ -259,6 +274,7 @@ export async function loadDebateView(
 			commentById,
 			removedSet,
 			authorMap,
+			imageUrlByComment,
 		);
 
 		// Defensive 0 only on the unreachable no-comment branch (the substrate
@@ -382,6 +398,15 @@ export async function loadRemovedSet(
  * One batched key read (`comments_image_uploads_idx` → `image_uploads.id`), then
  * a local HMAC presign per image. A presign failure degrades that comment to no
  * image — a single unavailable object must not 500 the whole read render.
+ *
+ * ⚠ POSTS **AND** REPLIES since HTML-FINISH · MARKET DETAIL row 26. It was
+ * narrowed to top-level comments while `DebateReply` carried no image field;
+ * that field now exists, so the narrowing would simply withhold a reply's own
+ * attachment. The batched read is unchanged — one SELECT either way.
+ *
+ * ⛔ THE CALLER PASSES `visible`, NEVER `comments`. This helper does not mask
+ * and must never be asked to: masking is decided once, in `loadDebateView`, and
+ * a second implementation is a second place for it to diverge (SC-1).
  */
 async function mintImageUrls(
 	client: DebateViewReader,
@@ -446,11 +471,18 @@ function buildReplyGroups(
 	commentById: Map<string, DebateComment>,
 	removedSet: Set<string>,
 	authorMap: Map<string, AuthorIdentity>,
+	imageUrlByComment: Map<string, string>,
 ): ReplyGroups {
 	const ranked = rankReplies(replyMap.get(post.id) ?? [], post.parentSide);
 	const slot = twoSlot(ranked);
 	const toReply = (sub: ReplySubstrate): DebateReply =>
-		buildReply(sub, commentById.get(sub.id), removedSet.has(sub.id), authorMap);
+		buildReply(
+			sub,
+			commentById.get(sub.id),
+			removedSet.has(sub.id),
+			authorMap,
+			imageUrlByComment,
+		);
 	return {
 		support: ranked.support.map(toReply),
 		counter: ranked.counter.map(toReply),
@@ -464,6 +496,7 @@ function buildReply(
 	comment: DebateComment | undefined,
 	removed: boolean,
 	authorMap: Map<string, AuthorIdentity>,
+	imageUrlByComment: Map<string, string>,
 ): DebateReply {
 	if (removed || !comment) {
 		return {
@@ -483,5 +516,6 @@ function buildReply(
 		author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 		stake: sub.stake,
 		entryPrice: sub.priceAtBet,
+		imageUrl: imageUrlByComment.get(sub.id) ?? null,
 	};
 }

@@ -4,6 +4,7 @@ import {
 } from "@/components/bookmarks/BookmarkToggle";
 
 import { PositionMarker, SideBadge } from "./badges";
+import { CommentImage } from "./CommentImage";
 import { formatDharma } from "./format";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebateReply } from "./types";
@@ -31,10 +32,18 @@ import type { DebateReply } from "./types";
 export function ReplyCard({
 	reply,
 	bookmarks,
+	onOpenImage,
 }: {
 	reply: DebateReply;
 	/** Viewer bookmark state for this market; `null` when signed out. */
 	bookmarks: BookmarkAffordance;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 26 — opens the reply's attached image in
+	 * the read-only lightbox, the same host `PostFocusHeader` and `PostCard`
+	 * already use. Threaded rather than owned so there is ONE lightbox on the
+	 * surface, not one per card.
+	 */
+	onOpenImage: (url: string) => void;
 }) {
 	if (reply.removed) {
 		return (
@@ -58,6 +67,15 @@ export function ReplyCard({
 					<CardActions commentId={reply.id} bookmarks={bookmarks} />
 				</div>
 			</div>
+			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.
+			    ⛔ ON THE NON-REMOVED BRANCH ONLY. A removed reply's variant has no
+			    `imageUrl` field at all, so this cannot compile in the branch above —
+			    unlike the bookmark cluster beside it, whose placement this file
+			    already records as deliberate-but-not-type-enforced. Here the type
+			    system does carry it (SC-1). */}
+			{reply.imageUrl ? (
+				<CommentImage url={reply.imageUrl} onOpen={onOpenImage} />
+			) : null}
 			<p className="text-sm whitespace-pre-line">{reply.body}</p>
 			<span className="text-xs text-muted-foreground">
 				{reply.author.pseudonym}

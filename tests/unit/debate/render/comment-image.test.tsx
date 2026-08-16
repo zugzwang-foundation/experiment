@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { CommentImage } from "@/components/debate/CommentImage";
 import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
+import { ReplyCard } from "@/components/debate/ReplyCard";
 import type {
 	DebateMarketHeader,
 	DebatePost,
@@ -239,5 +240,90 @@ describe("HTML-FINISH · MARKET DETAIL — row 11, the image is a left sibling",
 		// It is the LAST child of the stack — `mt-auto` on a non-final child
 		// pins nothing.
 		expect(foot?.parentElement?.lastElementChild).toBe(foot);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 26 (image half) — a REPLY carries its own
+ * attachment, and it is the SECOND mount site this row opens.
+ *
+ * ⛔ THE REMOVED BRANCH IS TYPE-ENFORCED HERE, unlike the bookmark cluster
+ * beside it: `DebateReply`'s removed variant has no `imageUrl` field at all, so
+ * an image in that branch does not compile. The render assertion below is the
+ * belt; the type is the braces. Server-side, the URL is never even minted —
+ * pinned by `load-debate-view.integration.test.ts`.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () => {
+	const noopOpen = () => {};
+
+	function presentReply(imageUrl: string | null) {
+		return {
+			removed: false as const,
+			id: "0199a0c0-0000-7000-8000-00000000db01",
+			side: "YES" as const,
+			createdAt: "2026-07-30T00:00:00.000Z",
+			body: "Fixture reply body.",
+			marker: "none" as const,
+			author: { pseudonym: "fixture-replier", pfpUrl: "" },
+			stake: "10.000000000000000000",
+			entryPrice: "0.500000000000000000",
+			imageUrl,
+		};
+	}
+
+	it("comment-image::a-reply-with-an-image-mounts-it", () => {
+		const { container } = render(
+			<ReplyCard
+				reply={presentReply("https://example.invalid/reply-image")}
+				bookmarks={VIEWER}
+				onOpenImage={noopOpen}
+			/>,
+		);
+
+		const img = container.querySelector("img");
+		expect(img?.getAttribute("src")).toBe(
+			"https://example.invalid/reply-image",
+		);
+		// It rides the SAME `CommentImage` as the post path — same T2 geometry,
+		// same lightbox affordance, not a second image component.
+		expect(img?.getAttribute("class")).toContain("max-h-[var(--imgmax)]");
+		expect(
+			container.querySelector('button[aria-label="Open attached image"]'),
+		).not.toBeNull();
+	});
+
+	it("comment-image::a-reply-without-one-mounts-nothing", () => {
+		const { container } = render(
+			<ReplyCard
+				reply={presentReply(null)}
+				bookmarks={VIEWER}
+				onOpenImage={noopOpen}
+			/>,
+		);
+
+		expect(container.querySelector("img")).toBeNull();
+		// Non-vacuity: the reply itself rendered.
+		expect(container.innerHTML).toContain("Fixture reply body.");
+	});
+
+	it("comment-image::a-REMOVED-reply-renders-no-image-and-no-body", () => {
+		// ⛔ SC-1 at the render. The removed variant carries neither field, so
+		// this asserts the BODY's absence as well as the image's — a row-level
+		// "it still renders something" check would not.
+		const { container } = render(
+			<ReplyCard
+				reply={{
+					removed: true,
+					id: "0199a0c0-0000-7000-8000-00000000db02",
+					side: "YES",
+					createdAt: "2026-07-30T00:00:00.000Z",
+				}}
+				bookmarks={VIEWER}
+				onOpenImage={noopOpen}
+			/>,
+		);
+
+		expect(container.querySelector("img")).toBeNull();
+		expect(container.innerHTML).not.toContain("Fixture reply body.");
 	});
 });

@@ -56,6 +56,12 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
+ * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
+ * (O-1) without pretending this file tests the lightbox. */
+const noopImage = () => {};
+
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 const AGGREGATE = {
@@ -77,6 +83,7 @@ function presentReply(): DebateReply {
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5000.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		imageUrl: null,
 	};
 }
 
@@ -134,7 +141,11 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 	it("dharma-spacing::site-2-the-reply-card-stake-is-spaced", () => {
 		// Site 2 · `ReplyCard.tsx:55 (ReplyCard → stake span)` · lands at C10.
 		const { container } = render(
-			<ReplyCard reply={presentReply()} bookmarks={VIEWER} />,
+			<ReplyCard
+				reply={presentReply()}
+				bookmarks={VIEWER}
+				onOpenImage={noopImage}
+			/>,
 		);
 
 		const stake = container.querySelector(STAKE_SPAN);

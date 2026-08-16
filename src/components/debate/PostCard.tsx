@@ -62,7 +62,11 @@ export function PostCard({
 				/>
 				{/* A removed POST keeps its surviving replies (§6 — the thread stays
 				    intact), so its live replies keep their own affordances. */}
-				<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
+				<ReplyPreview
+					replies={post.replies}
+					bookmarks={bookmarks}
+					onOpenImage={onOpenImage}
+				/>
 				<Button
 					variant="ghost"
 					size="xs"
@@ -134,7 +138,11 @@ export function PostCard({
 				aggregate={post.aggregate}
 				postSide={post.sideAtPostTime}
 			/>
-			<ReplyPreview replies={post.replies} bookmarks={bookmarks} />
+			<ReplyPreview
+				replies={post.replies}
+				bookmarks={bookmarks}
+				onOpenImage={onOpenImage}
+			/>
 
 			<Button
 				variant="ghost"

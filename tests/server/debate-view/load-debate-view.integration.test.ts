@@ -511,6 +511,80 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		);
 	});
 
+	// ── 4b. The SAME rule on REPLIES — the path row 26 opened ──────────────────
+	it("removed REPLY: signRead NEVER called for its r2 key; present reply: image URL minted", async () => {
+		// ⛔ SC-1 (CLAUDE.md §5.14). HTML-FINISH · MARKET DETAIL row 26 widened
+		// `mintImageUrls` from posts-only to every VISIBLE comment, which is the
+		// first time a reply's media key reaches the presign at all. Test 4 above
+		// proves the rule for posts and CANNOT see this path — it seeds only
+		// top-level comments, so it would stay green with reply masking entirely
+		// absent. That is exactly the "second body-read path" SC-1 was minted from.
+		const market = await seedMarket("masking-reply-image");
+		const parentAuthor = await seedUser({ tag: "rimg-parent" });
+		const u1 = await seedUser({ tag: "rimg-removed" });
+		const u2 = await seedUser({ tag: "rimg-present" });
+
+		const removedImg = await seedImageUpload(u1);
+		const presentImg = await seedImageUpload(u2);
+
+		const parent = await seedCommentWithBet({
+			userId: parentAuthor,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Parent post for the reply-image case.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		const removedReply = await seedCommentWithBet({
+			userId: u1,
+			marketId: market.id,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "Removed reply with an image — never serialize.",
+			parentCommentId: parent,
+			imageUploadsId: removedImg.id,
+			createdAt: new Date("2026-09-15T00:00:02Z"),
+		});
+		await seedCommentWithBet({
+			userId: u2,
+			marketId: market.id,
+			side: "NO",
+			stake: "30.000000000000000000",
+			body: "Present reply with an image.",
+			parentCommentId: parent,
+			imageUploadsId: presentImg.id,
+			createdAt: new Date("2026-09-15T00:00:03Z"),
+		});
+		await removeComment(removedReply);
+
+		const vm = await loadDebateView(testDb, { market });
+		const payload = JSON.stringify(vm);
+
+		// ⛔ THE BODY'S ABSENCE, NOT THE ROW'S (SC-1). A row-level assertion
+		// ("the removed reply is not in the list") would pass on a build that
+		// excluded the row from one read and leaked its body from another.
+		expect(payload).not.toContain("Removed reply with an image");
+		// …and the same for its MEDIA, which is the field this row added.
+		expect(payload).not.toContain(removedImg.r2Key);
+		expect(mockSignRead).not.toHaveBeenCalledWith(
+			removedImg.r2Key,
+			expect.anything(),
+		);
+
+		// Positive control — the present reply's image IS minted and surfaced, so
+		// the absences above are not merely "replies never get images".
+		expect(mockSignRead).toHaveBeenCalledWith(
+			presentImg.r2Key,
+			expect.anything(),
+		);
+		expect(payload).toContain(`https://signed.example/${presentImg.r2Key}`);
+
+		// The removed reply keeps its slot (ADR-0020/0021 thread integrity) and
+		// carries no content keys at all.
+		walkAssertNoLeak(vm);
+	});
+
 	// ── 5. Decoupling — a banned author is NOT masked ──────────────────────────
 	it("a banned author's NON-removed comment is fully present (ban removes voice, not content)", async () => {
 		const market = await seedMarket("masking-banned");

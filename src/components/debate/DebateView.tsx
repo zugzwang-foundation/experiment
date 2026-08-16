@@ -317,6 +317,7 @@ export function DebateView({
 											side={side}
 											replies={repliesForSide(selectedPost, side)}
 											bookmarks={bookmarks}
+											onOpenImage={setLightboxUrl}
 										/>
 									)}
 								</DebateColumn>

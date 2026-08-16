@@ -53,10 +53,18 @@ import type { ReplyGroups } from "./types";
 export function ReplyPreview({
 	replies,
 	bookmarks,
+	onOpenImage,
 }: {
 	replies: ReplyGroups;
 	/** BOOKMARK-ADD-WIRE — pass-through to each listed `ReplyCard`. */
 	bookmarks: BookmarkAffordance;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 26 — pass-through to each listed
+	 * `ReplyCard`, whose attached image opens the shared lightbox. REQUIRED, not
+	 * optional: a defaulted no-op would render a click target that silently does
+	 * nothing, which is worse than a compile error (O-1).
+	 */
+	onOpenImage: (url: string) => void;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	// Row 13 (PD-3-10) — TIER 1, SPEC.1 §9 F-DEBATE-1: the affordance expands
@@ -94,7 +102,11 @@ export function ReplyPreview({
 						>
 							{replies.support.map((reply) => (
 								<li key={reply.id}>
-									<ReplyCard reply={reply} bookmarks={bookmarks} />
+									<ReplyCard
+										reply={reply}
+										bookmarks={bookmarks}
+										onOpenImage={onOpenImage}
+									/>
 								</li>
 							))}
 						</ul>
@@ -107,7 +119,11 @@ export function ReplyPreview({
 						>
 							{replies.counter.map((reply) => (
 								<li key={reply.id}>
-									<ReplyCard reply={reply} bookmarks={bookmarks} />
+									<ReplyCard
+										reply={reply}
+										bookmarks={bookmarks}
+										onOpenImage={onOpenImage}
+									/>
 								</li>
 							))}
 						</ul>
@@ -118,7 +134,12 @@ export function ReplyPreview({
 				   remove it. Its edge cases ride `twoSlot` unchanged: one side empty →
 				   two from the other; a single reply → it alone, no expand. */
 				replies.twoSlot.map((reply) => (
-					<ReplyCard key={reply.id} reply={reply} bookmarks={bookmarks} />
+					<ReplyCard
+						key={reply.id}
+						reply={reply}
+						bookmarks={bookmarks}
+						onOpenImage={onOpenImage}
+					/>
 				))
 			)}
 			{hasMore ? (

@@ -113,11 +113,14 @@ export function ReplyScroller({
 	replies,
 	side,
 	bookmarks,
+	onOpenImage,
 }: {
 	replies: DebateReply[];
 	side: Side;
 	/** BOOKMARK-ADD-WIRE — pass-through to the paged `ReplyCard`. */
 	bookmarks: BookmarkAffordance;
+	/** HTML-FINISH · MARKET DETAIL row 26 — pass-through to the reply's image. */
+	onOpenImage: (url: string) => void;
 }) {
 	const [index, setIndex] = useState(0);
 	if (replies.length === 0) {
@@ -127,7 +130,11 @@ export function ReplyScroller({
 	const reply = replies[clamped];
 	return (
 		<div className="flex flex-col gap-2">
-			<ReplyCard reply={reply} bookmarks={bookmarks} />
+			<ReplyCard
+				reply={reply}
+				bookmarks={bookmarks}
+				onOpenImage={onOpenImage}
+			/>
 			{replies.length > 1 ? (
 				<ScrollerNav
 					index={clamped}

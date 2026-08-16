@@ -37,6 +37,12 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
+ * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
+ * (O-1) without pretending this file tests the lightbox. */
+const noopImage = () => {};
+
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 
 /** Neutral fixture prose — no invented market content (CLAUDE.md §3). */
@@ -51,6 +57,7 @@ function reply(id: string, side: "YES" | "NO", body: string): DebateReply {
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		imageUrl: null,
 	};
 }
 
@@ -84,7 +91,13 @@ const GROUPS: ReplyGroups = {
 };
 
 function renderPreview() {
-	return render(<ReplyPreview replies={GROUPS} bookmarks={VIEWER} />);
+	return render(
+		<ReplyPreview
+			replies={GROUPS}
+			bookmarks={VIEWER}
+			onOpenImage={noopImage}
+		/>,
+	);
 }
 
 function expand() {
