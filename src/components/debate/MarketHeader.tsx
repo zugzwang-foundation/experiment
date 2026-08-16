@@ -201,9 +201,24 @@ export function MarketHeader({
 							    measured 501px against d5's 674px at the pinned 1440×777
 							    (−12.0pp), so it truncated far earlier than the mockup does and
 							    left the row's spare width unused. */}
+						{/* ⛔⛔ `shrink-0` IS LOAD-BEARING AND ITS ABSENCE MADE THE QUESTION
+						    INVISIBLE. Measured on staging at `6190a90`: the `<h1>` rendered
+						    698px wide and **0px TALL**. `truncate` carries `overflow:hidden`,
+						    which sets this item's automatic minimum size to 0 — so once Q-1's
+						    extra row pushed the stack's content (203px) past its band (174px),
+						    flex-shrink squeezed the ONE child that could be squeezed down to
+						    nothing. Every sibling survived at full height because
+						    `overflow:visible` leaves their automatic minimum at their content.
+						    ⇒ The market question, the most important text on the surface, was
+						    gone. `shrink-0` makes the stack absorb its overflow by SCROLLING,
+						    which is what `overflow-y-auto` above is for, instead of by
+						    crushing whichever child happens to be crushable.
+						    ⚠ A class-string reading could not have found this: every class
+						    involved was correct in isolation. It took a box measurement in a
+						    browser. */}
 						<h1
 							title={market.title}
-							className="truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+							className="shrink-0 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
 						>
 							{market.title}
 						</h1>
