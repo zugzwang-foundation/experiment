@@ -349,11 +349,52 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		const chart = screen.getByTestId("profile-chart");
 		expect(chart.tagName.toLowerCase()).toBe("svg");
 		expect(byPrefix(chart, "graph-node-")).toHaveLength(FULL.nodes.length);
+
+		// POLISH.5 item 14 — the r=5 disc's `fill` is the ONE genuinely
+		// side-keyed expression in `GraphNodeMark`, and it was asserted at
+		// NEITHER pole while both poles were already on screen (`FULL.nodes` is
+		// two-poled by fixture, so this costs no new fixture).
+		//
+		// ⛔ ON THE `fill` ATTRIBUTE, NEVER ON `data-side`. The node also carries
+		// `data-side`, and an assertion written against it would pass while
+		// proving nothing about colour — that is the attribute item 13 removes
+		// from `FlipMarker` precisely because attributes can lie.
+		//
+		// ⛔⛔ AND THE LITERAL TOKEN STRING, NEVER A RESOLVED COLOUR.
+		// `--graph-no` and `--color-no` are BOTH `#fafafa`, so a resolved-colour
+		// assertion cannot distinguish the POLE family from the GRAPH family on
+		// the NO arm — it would pass just as happily against `var(--graph-no)`,
+		// and this guard would silently stop proving what it exists to prove.
+		// jsdom returns the attribute as the authored string, so the literal is
+		// both the sound instrument and the natural one (AGENTS.md §9: no
+		// jest-dom — assert with `getAttribute`).
+		const POLE_FILL = {
+			YES: "var(--color-yes)",
+			NO: "var(--color-no)",
+		} as const;
+
+		const fills: (string | null)[] = [];
 		for (const node of FULL.nodes) {
 			const el = screen.getByTestId(`graph-node-${node.id}`);
 			expect(chart.contains(el)).toBe(true);
 			expect(carriesPosition(el)).toBe(true);
+
+			const disc = el.querySelector('circle[r="5"]');
+			if (disc === null) {
+				throw new Error(`no r=5 disc under graph-node-${node.id}`);
+			}
+			expect(disc.getAttribute("fill")).toBe(POLE_FILL[node.side]);
+			fills.push(disc.getAttribute("fill"));
 		}
+
+		// Non-vacuity in BOTH directions: both poles were genuinely on screen,
+		// AND the fill VARIED across them. A FIXED fill — the Route 3 defect
+		// this closes — satisfies a one-pole assertion and collapses this set
+		// to a single member.
+		expect(new Set(FULL.nodes.map((n) => n.side))).toEqual(
+			new Set(["YES", "NO"]),
+		);
+		expect(new Set(fills).size).toBe(2);
 	});
 
 	it("flip-marker-not-a-node", () => {
@@ -370,5 +411,103 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(nodeEls).toHaveLength(m1Nodes.length);
 		expect(nodeEls).not.toContain(marker);
 		expect(marker.closest('[data-testid^="graph-node-"]')).toBeNull();
+	});
+
+	it("flip-marker-carries-no-data-side", () => {
+		// POLISH.5 item 13. `FlipMarker` strokes `--graph-yes` (rim) and
+		// `--graph-no` (swap arrows) UNCONDITIONALLY, and its geometry carries no
+		// side term — NO PIXEL in this marker depends on the side. So the
+		// attribute was not encoding nothing; it was encoding something no pixel
+		// ever showed. Nor is the value lost by removing it: every marker has a
+		// sibling `segment-${marketId}-${episodeIndex}` — same join key, rendered
+		// unconditionally — that still carries `data-side`. Its own docblock
+		// already says it is "a marker, NOT a node".
+		//
+		// THE RULE, and it is why this guard has three arms: `data-side` STAYS
+		// where the element's render IS side-keyed and GOES where it is not.
+		// `Segment` keys its stroke class on `seg.side`; `GraphNodeMark` keys
+		// its fill on `node.side`. Asserting only the removal would prove half —
+		// these three arms together prove it was SURGICAL.
+		//
+		// One per-market render reaches all three families: M1 has an exited
+		// episode (the marker), two segments, and one own node.
+		render(<ProfileChart series={FULL} selection={M1} mode="expanded" />);
+
+		// ARM 1 — the marker carries NO `data-side`. `hasAttribute` is the
+		// deliberate instrument: it also rejects a `data-side=""` that
+		// `getAttribute(...) !== null` would let through.
+		const marker = screen.getByTestId(`flip-marker-${M1}-0`);
+		expect(marker.hasAttribute("data-side")).toBe(false);
+
+		// ARM 2 — `segment-*` still carries it. The VALUES are asserted by
+		// `segment-stroke-by-side` above, at both poles and against the stroke
+		// token; this arm asserts only that the attribute SURVIVED, so the two
+		// cases do not duplicate one another.
+		expect(
+			screen.getByTestId(`segment-${M1}-0`).hasAttribute("data-side"),
+		).toBe(true);
+		expect(
+			screen.getByTestId(`segment-${M1}-1`).hasAttribute("data-side"),
+		).toBe(true);
+
+		// ARM 3 — `graph-node-*` still carries it. Asserted by no test of THIS
+		// component before this one: `node-on-line-placement` deliberately
+		// asserts the FILL (item 14) and never the attribute, so without this
+		// arm the removal could silently over-reach into the node primitive.
+		// (`tests/unit/debate/render/price-chart.test.tsx` does assert
+		// `data-side` on a `graph-node-*` — but that is `MarketPriceChart`, a
+		// different component sharing the testid prefix, and it would stay
+		// green through any over-reach here.)
+		const nodes = byPrefix(document.body, "graph-node-");
+		expect(nodes.length).toBeGreaterThanOrEqual(1);
+		for (const node of nodes) {
+			expect(node.hasAttribute("data-side")).toBe(true);
+		}
+	});
+
+	it("y-gridline-intervals-cumulative-only", () => {
+		// POLISH.5 item 16 / `OD-9` — the TWO CUMULATIVE ARMS ONLY: 5 intervals
+		// collapsed, 10 expanded, as UNLABELLED gridlines over the fixed
+		// 0..`yMax` domain. Each line is one interval's UPPER bound, so N
+		// intervals draw N lines and the COUNT is what this asserts.
+		//
+		// ⛔ THIS CASE ASSERTS NOTHING ABOUT THE PER-MARKET VIEW — not a count,
+		// not a presence, not an absence. That view autoscales through `niceMax`
+		// and its interval count is UNRULED; a "zero gridlines there" assertion
+		// would silently convert an unruled question into a ruled one, and the
+		// next plan would inherit a decision no founder made.
+		//
+		// Two renders, each read through its OWN container: `screen` spans the
+		// whole body and would see both at once, making both counts wrong.
+		const { container: collapsed } = render(
+			<ProfileGraphCard series={FULL} onExpand={vi.fn()} />,
+		);
+		// Non-vacuity: the chart branch rendered, not the empty branch.
+		expect(within(collapsed).getByTestId("line-networth")).toBeTruthy();
+		expect(byPrefix(collapsed, "grid-y-")).toHaveLength(5);
+
+		const { container: expanded } = render(
+			<ProfileChart series={FULL} selection="cumulative" mode="expanded" />,
+		);
+		expect(within(expanded).getByTestId("line-freedharma")).toBeTruthy();
+		const lines = byPrefix(expanded, "grid-y-");
+		expect(lines).toHaveLength(10);
+
+		// DISTINCT positions, not N copies at one y — the count alone passes on
+		// an implementation that stacks all ten lines on top of each other.
+		expect(new Set(lines.map((l) => l.getAttribute("y1"))).size).toBe(10);
+
+		// UNLABELLED, and inside the chart: each gridline is a bare <line>
+		// carrying no text of its own, AND the chart's ONLY text is the two
+		// endpoint labels. The per-line check alone would miss a `<text>`
+		// rendered as a SIBLING of the lines. Labels would print Đ figures and
+		// would have to route through `formatDharma`.
+		const chart = within(expanded).getByTestId("profile-chart");
+		for (const line of lines) {
+			expect(line.tagName.toLowerCase()).toBe("line");
+			expect(chart.contains(line)).toBe(true);
+			expect(line.textContent).toBe("");
+		}
+		expect(chart.querySelectorAll("text")).toHaveLength(2);
 	});
 });
