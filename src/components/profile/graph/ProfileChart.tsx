@@ -317,7 +317,10 @@ function FlipMarker({
  *   components (the W2.6 port)"), and the `--color-*` fill was written once at
  *   file creation and never revisited. Recorded here, not settled here.
  * - The rim (that disc's stroke) and the r=2 core are BOTH `--graph-yes`, FIXED
- *   on every side. Its NAME says YES; its VALUE is a mid-grey (#737373).
+ *   on every side. Its NAME says YES; its VALUE is a mid-grey (#737373), minted
+ *   that way because the YES pole IS the ground colour — globals.css says so at
+ *   the `--graph-*` block: "YES is a deliberately off-ramp grey (the black pole
+ *   cannot render on the dark ground)".
  *
  * ⚠ AND THEY DO NOT COMPOSE THE WAY THE NAMES SUGGEST. `--color-yes` equals
  * `--color-ground` (#181818) and both charts sit on `bg-n0` (#212121), so a YES
