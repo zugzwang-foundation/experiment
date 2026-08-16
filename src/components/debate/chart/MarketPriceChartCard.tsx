@@ -43,9 +43,17 @@ export function MarketPriceChartCard({
 			type="button"
 			data-testid="market-price-chart-card"
 			onClick={onExpand}
-			className="block w-full rounded-[var(--r)] bg-n0 p-3 text-left"
+			className="flex h-full w-full flex-col rounded-[var(--r)] bg-n0 p-3 text-left"
 		>
-			<div className="aspect-[2/1] w-full">
+			{/* ⚠⚠ FILLS ITS SLOT — `.graph{flex:1 1 auto;min-height:0}` (`d5:493`).
+			    It was `aspect-[2/1] w-full`, which is WIDTH-driven and therefore
+			    ignores the rail it sits in: measured on staging at 1440×777 the card
+			    rendered 182px tall inside a 146px rail, so the price bar below it
+			    was pushed clean outside the headzone band. On a fixed-height page
+			    that is not a cosmetic overlap — it is content leaving its box.
+			    ⚠ Sole consumer is `MarketPriceChartHost`, itself used only by
+			    `MarketHeader`, so filling cannot regress another surface. */}
+			<div className="min-h-0 w-full flex-1">
 				<MarketPriceChart series={series} mode="collapsed" />
 			</div>
 			{/* The ONE non-decorative element (SPEC.1 §9 Accessibility): the SVG is

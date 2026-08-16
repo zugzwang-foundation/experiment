@@ -58,16 +58,24 @@ export function HeadZone({
 }) {
 	return (
 		<section
-			// ⚠⚠ THE BAND IS DECLARED AS A FRACTION OF THE CONTAINER, not as d5's
-			// literal `188px`. `.headzone{flex:0 0 188px}` (`d5:447`) inside a
-			// `.content` whose inner height is 879px at the pinned 1800×971 →
-			// **21.4%**. A percentage basis reproduces 188px at that viewport AND
-			// holds the proportion at every other one, which is what the mockup's
-			// own fixed px cannot do. `shrink-0` is the `0 0` half of `flex:0 0`.
+			// ⚠⚠ THE BAND IS A FRACTION OF THE VIEWPORT — not d5's literal `188px`,
+			// and NOT a percentage of the container. `.headzone{flex:0 0 188px}`
+			// (`d5:447`) is 188/777 = **24.2%** of the viewport at the pinned
+			// 1440×777.
+			// ⛔ A CONTAINER PERCENTAGE WAS TRIED FIRST AND IS WRONG, MEASURED: at
+			// 1800×971 the container's content box is 877px, so d5's band is 21.4%
+			// of it; at 1440×777 that box is 683px and the SAME 188px band is 27.5%.
+			// One number cannot be both — a container percentage drifts with the
+			// container's own padding and chrome, while a viewport percentage is the
+			// ratio the mockup's fixed px actually encodes. Shipping 21.4% measured
+			// the band at 146px on staging: a −5.4pp miss that dragged the media
+			// panel (−5.2pp) and the arena (+5.1pp) with it.
+			// ⚠ `dvh`, not `vh` — same reason as the container's own band.
+			// `shrink-0` is the `0 0` half of `flex:0 0`.
 			// ⚠ `gap-5` = 20px is d5's `.headzone{gap:20px}` (`:447`), the gap
 			// between the text column and the chart rail.
 			data-testid="headzone"
-			className="flex min-h-0 shrink-0 basis-[21.4%] flex-col gap-5 lg:flex-row"
+			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 lg:flex-row"
 		>
 			<div
 				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)

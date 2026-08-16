@@ -127,13 +127,13 @@ export function ScrollRail({
 			// 609px viewport — present, correct, and off the bottom of the screen. A
 			// control you have to scroll to find reads as missing, which is half of the
 			// founder's "cards do not step".
-			className="flex shrink-0 flex-col items-center gap-2 self-center"
+			className="flex w-[14px] shrink-0 flex-col items-center gap-[9px] self-center"
 		>
 			<button
 				type="button"
 				onClick={onPrev}
 				aria-label={`Previous ${noun}`}
-				className="flex size-6 shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className="flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
 			>
 				<ChevronUp />
 			</button>
@@ -143,10 +143,17 @@ export function ScrollRail({
 			<span
 				data-testid="scroll-rail-track"
 				aria-hidden="true"
-				// ⚠ THE TRACK NEEDS ITS OWN EXTENT now that the rail no longer
-				// stretches. `h-24` is the build's own scale step, NOT d5's `92px`;
-				// `max-h-full` keeps it inside a card shorter than the rail.
-				className="h-24 max-h-full w-[3px] overflow-hidden rounded-[1px] bg-n2"
+				// ⚠⚠ THE RAIL CARRIES d5's LITERALS, per the founder's 2026-08-17
+				// parity ruling ("Where d5 uses a literal (rail width, 640:586 image
+				// aspect), copy the literal"): `.pscroll` 14px wide with `gap:9px`
+				// (`d5:887`, `:890`), `.psbtn` 14 × 13, `.psload` 5 × 92 with
+				// `border-radius:3px` (`:893`). Measured in the mockup: rail 14 × 136.
+				// ⚠ THE 24px HIT TARGETS ARE REVERTED, and their reason is DISCHARGED
+				// rather than overruled: the arrows were hard to hit because the page
+				// SCROLLED and the lower one sat below the fold. On a one-screen page
+				// both are always in view, so widening them was treating a symptom of
+				// the height chain.
+				className="h-[92px] max-h-full w-[5px] overflow-hidden rounded-[3px] bg-n2"
 			>
 				{/* ⛔ `key={progressKey}` IS THE RESTART, and it replaces an effect that
 				    listed `progressKey` as a dependency without reading it — an extra
@@ -162,7 +169,7 @@ export function ScrollRail({
 				type="button"
 				onClick={onNext}
 				aria-label={`Next ${noun}`}
-				className="flex size-6 shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className="flex h-[13px] w-[14px] shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
 			>
 				<ChevronDown />
 			</button>
@@ -201,7 +208,7 @@ function CountdownFill({ durationMs }: { durationMs: number | null }) {
 	return (
 		<span
 			data-testid="scroll-rail-fill"
-			className="block w-[3px] rounded-[1px] bg-ink"
+			className="block w-[5px] rounded-[3px] bg-ink"
 			// ⚠ The transition is exactly ONE TICK long, so the coarse state machine
 			// above renders as d5's continuous linear sweep. `linear` is the mockup's
 			// own easing and is a CURVE, not a value.

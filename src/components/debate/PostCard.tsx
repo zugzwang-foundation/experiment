@@ -143,7 +143,7 @@ export function PostCard({
 			    One row, two destinations — read the whole argument in place, or go
 			    to its debate. The title used to open the pop-up; that is now the
 			    `+`'s job alone. */}
-			<div className="flex items-start justify-between gap-2">
+			<div className="relative">
 				{/* HTML-FINISH · MARKET DETAIL round 2 · R6 — THE TITLE ANSWERS THE
 				    POINTER. It is the card's primary navigation (it enters post-focus)
 				    and it carried NO hover state at all, so the one control on the card
@@ -170,12 +170,25 @@ export function PostCard({
 				    the Profile pattern.
 				    ⚠ NO `aria-label` IS ADDED. The visible text IS the accessible name,
 				    and an override would have to contain it to satisfy WCAG 2.5.3. */}
+				{/* ⚠⚠ THE TITLE IS A BLOCK SPANNING THE CARD — `.rtitle` (`d5:841`)
+				    is a block, and `.plust{position:relative;padding-right:19px}`
+				    (`:597`) reserves a gutter for the `+` OVERLAID on it rather than
+				    a flex sibling that steals width. Measured at the pinned
+				    1440×777: d5's title box is 628px (43.6% of viewport) and the
+				    shrink-to-fit button was 104px (5.8%) — the widest single delta
+				    in the phase-1 table, and it also made the card's primary
+				    navigation a click target the width of its text rather than its
+				    row. `pr-5` is d5's 19px gutter at the nearest scale step.
+				    ⚠ `line-clamp-2` is `.rtitle`'s own `-webkit-line-clamp:2`
+				    (`:842`). On a one-screen page an unclamped title is what pushes
+				    the card past its column; the full argument stays one click away
+				    on the `+`, and the column scrolls as the backstop. */}
 				<button
 					type="button"
-					className="rounded-(--r-chip) text-left hover:bg-n1 hover:underline"
+					className="block w-full rounded-(--r-chip) pr-5 text-left hover:bg-n1 hover:underline"
 					onClick={() => onEnter(post.id)}
 				>
-					<h3 className="font-heading text-base leading-snug font-medium">
+					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
 						{post.title}
 					</h3>
 				</button>
@@ -195,7 +208,7 @@ export function PostCard({
 					size="xs"
 					onClick={() => onOpenPopup(post)}
 					aria-label="Show more"
-					className="shrink-0 text-n5 hover:text-ink"
+					className="absolute right-0 bottom-0 text-n5 hover:text-ink"
 				>
 					+
 				</Button>
