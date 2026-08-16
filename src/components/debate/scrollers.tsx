@@ -67,6 +67,10 @@ export function PostScroller({
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
+	onReplyToPost,
+	heldSide,
+	marketOpen,
+	suspended,
 }: {
 	posts: DebatePost[];
 	side: Side;
@@ -75,6 +79,11 @@ export function PostScroller({
 	onEnter: (id: string) => void;
 	onOpenPopup: (post: PresentPost) => void;
 	onOpenImage: (url: string) => void;
+	/** HTML-FINISH · MARKET DETAIL row 22 — pass-through to the card's pills. */
+	onReplyToPost: (id: string, relation: "support" | "counter") => void;
+	heldSide: Side | null;
+	marketOpen: boolean;
+	suspended: boolean;
 }) {
 	const [index, setIndex] = useState(0);
 	if (posts.length === 0) {
@@ -90,6 +99,10 @@ export function PostScroller({
 				onEnter={onEnter}
 				onOpenPopup={onOpenPopup}
 				onOpenImage={onOpenImage}
+				onReplyToPost={onReplyToPost}
+				heldSide={heldSide}
+				marketOpen={marketOpen}
+				suspended={suspended}
 			/>
 			{posts.length > 1 ? (
 				<ScrollerNav

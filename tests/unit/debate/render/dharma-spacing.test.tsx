@@ -56,6 +56,14 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
+ * These suites assert bookmarks / spacing / card composition, never the
+ * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
+ * keeps the viewer state REQUIRED at the component (a trigger without its
+ * F-3 gate invites a bet the viewer cannot place) without pretending this
+ * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
+const noopReply = () => {};
+
 /** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
  * These suites assert bookmarks / spacing / partitioning, never the image, so
  * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
@@ -183,6 +191,10 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 

@@ -171,6 +171,31 @@ export function DebateView({
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 	};
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 22 — a market-view card's Support/Counter
+	 * pill ENTERS that post and opens the relation there.
+	 *
+	 * ⛔ IT DOES NOT OPEN A COMPOSER ON THE CARD, and that is what honours `R1`'s
+	 * thesis ground while restoring the mockup's affordance. R1 removed these
+	 * controls because "entering post-focus to argue means reading the post
+	 * first, and mandatory commentary is meant to make argument deliberate, not
+	 * reflexive." Landing the reader ON the argument with the composer open keeps
+	 * that true — what R1 forbade was arguing WITHOUT reading.
+	 *
+	 * ⚠ It sets both pieces of state in one go rather than calling `enterPost`
+	 * and then opening: `enterPost` CLEARS `openReply` by design, so composing
+	 * the two would race and the composer would never appear.
+	 */
+	const replyToPost = (id: string, relation: "support" | "counter") => {
+		if (composerBusy) {
+			return;
+		}
+		setSelectedPostId(id);
+		setOpenSide(null);
+		setOpenReply(relation);
+		const target = posts.find((p) => p.id === id);
+		syncPostParam(target ? target.ordinal : null);
+	};
 	const exitPost = () => {
 		if (composerBusy) {
 			return;
@@ -359,6 +384,10 @@ export function DebateView({
 										onEnter={enterPost}
 										onOpenPopup={setPopupPost}
 										onOpenImage={setLightboxUrl}
+										onReplyToPost={replyToPost}
+										heldSide={heldSide}
+										marketOpen={marketOpen}
+										suspended={suspended}
 									/>,
 								)}
 							</DebateColumn>

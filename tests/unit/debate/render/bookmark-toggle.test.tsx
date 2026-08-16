@@ -316,6 +316,10 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -334,6 +338,10 @@ describe("BOOKMARK-ADD-WIRE — the cluster on the card surfaces", () => {
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -402,6 +410,10 @@ describe("BOOKMARK-ADD-WIRE — icon state follows the comment, not the mount", 
 				onEnter={() => {}}
 				onOpenPopup={() => {}}
 				onOpenImage={() => {}}
+				onReplyToPost={() => {}}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 		expect(

@@ -37,6 +37,14 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
+ * These suites assert bookmarks / spacing / card composition, never the
+ * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
+ * keeps the viewer state REQUIRED at the component (a trigger without its
+ * F-3 gate invites a bet the viewer cannot place) without pretending this
+ * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
+const noopReply = () => {};
+
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 const AGGREGATE = {
@@ -78,6 +86,10 @@ function renderCard() {
 			onEnter={noop}
 			onOpenPopup={noop}
 			onOpenImage={noop}
+			onReplyToPost={noopReply}
+			heldSide={null}
+			marketOpen
+			suspended={false}
 		/>,
 	);
 }
@@ -169,6 +181,10 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 				onEnter={onEnter}
 				onOpenPopup={onOpenPopup}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -204,6 +220,10 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 				onEnter={onEnter}
 				onOpenPopup={noop}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 
@@ -273,6 +293,10 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 		// ⛔ The BODY's absence, not the row's — the reply is still ON the DTO
@@ -301,6 +325,10 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 		expect(removed.container.innerHTML).not.toContain(

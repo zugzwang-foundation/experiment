@@ -9,7 +9,7 @@ import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
 import { RemovedPlaceholder } from "./placeholders";
-import type { DebatePost, PresentPost } from "./types";
+import type { DebatePost, PresentPost, Side } from "./types";
 
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
@@ -41,6 +41,10 @@ export function PostCard({
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
+	onReplyToPost,
+	heldSide,
+	marketOpen,
+	suspended,
 }: {
 	post: DebatePost;
 	/**
@@ -54,7 +58,27 @@ export function PostCard({
 	onEnter: (id: string) => void;
 	onOpenPopup: (post: PresentPost) => void;
 	onOpenImage: (url: string) => void;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter trigger
+	 * pills. ⚠ It ENTERS THE POST and opens the relation there; it does NOT open
+	 * a composer on the card. That is what honours `R1`'s thesis ground while
+	 * restoring the mockup's affordance: the reader still lands on the argument
+	 * before writing about it.
+	 */
+	onReplyToPost: (id: string, relation: "support" | "counter") => void;
+	/** Viewer state the pills need to apply the F-3 gate. Never optional — a
+	 * trigger without its gate invites a bet the viewer cannot place. */
+	heldSide: Side | null;
+	marketOpen: boolean;
+	suspended: boolean;
 }) {
+	const triggers = {
+		heldSide,
+		marketOpen,
+		suspended,
+		onReply: (relation: "support" | "counter") =>
+			onReplyToPost(post.id, relation),
+	};
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 
 	if (post.removed) {
@@ -64,9 +88,15 @@ export function PostCard({
 				<RemovedPlaceholder />
 				{/* The removed variant keeps its frozen side (§6 — thread integrity),
 				    so the split bar stays correctly poled on a removed post too. */}
+				{/* ⚠ The removed branch gets the triggers too: replying to a removed
+				    argument is LEGAL (§6 edge) and its surviving replies are live —
+				    `ReplySplitBar` renders on the removed variant for the same
+				    reason. Withholding them here would silently retire a legal
+				    action. */}
 				<AggregateFooter
 					aggregate={post.aggregate}
 					postSide={post.sideAtPostTime}
+					triggers={triggers}
 				/>
 				{/* ⚠ A removed POST STILL KEEPS ITS SURVIVING REPLIES (§6 — thread
 				    integrity), and row 25 does not touch that: what changed is only
@@ -153,6 +183,7 @@ export function PostCard({
 			<AggregateFooter
 				aggregate={post.aggregate}
 				postSide={post.sideAtPostTime}
+				triggers={triggers}
 			/>
 		</Card>
 	);
