@@ -74,18 +74,26 @@ export function DebateColumn({
 			// `AggregateFooter`'s `style={{ width: supportPct }}` and `ScrollRail`'s
 			// `style={{ height }}`, both already shipped — so an inline declaration
 			// is in-pattern rather than an escape hatch.
-			// ⚠ TWO CLASS-BASED ATTEMPTS FAILED SILENTLY IN THE BROWSER, both
-			// measured on staging, both reported here rather than quietly replaced:
-			//   · `[&>*:last-child]:-translate-y-[5px]` — the element carried
-			//     `--tw-translate-y: calc(5px * -1)` while `.translate` computed
-			//     `0px`. The custom property landed; the shorthand it feeds did not.
-			//   · `[&>*:last-child]:[transform:translateY(-5px)]` — `.transform`
-			//     computed `matrix(1, 0, 0, 1, 0, 0)`, the IDENTITY. The rule
-			//     applied and the translation was not in it.
-			// In both cases the class was in the DOM and the box did not move, which
-			// is precisely the failure mode a class-string assertion cannot see.
-			// ⇒ One declaration, on the property that paints, with nothing between
-			// it and the element.
+			// ⚠⚠ AND THERE IS NO TRANSITION ON IT — d5's `.16s ease` is DROPPED, for
+			// a reason worth more than the easing. Chasing this 5px offset produced
+			// three "it does not apply" diagnoses in a row, and ALL THREE WERE MY
+			// MEASUREMENT, not the code:
+			//   · probe 1 read `.transform` on a Tailwind v4 `-translate-y-*`, which
+			//     reads `none` whether or not the utility applied — a probe that
+			//     cannot fail for the reason being tested.
+			//   · probes 2 and 3 read a transform mid-transition in a tab where
+			//     `document.hidden === true`. A hidden tab fires no
+			//     `requestAnimationFrame`, so CSS transitions never advance: the
+			//     computed value sits at its START value forever. That is why
+			//     `translateY(-40px)` set BY HAND still computed to the identity
+			//     matrix, and why `transition: none` made the very same declaration
+			//     apply instantly.
+			// ⇒ An untransitioned inline transform is correct in a visible tab AND
+			// verifiable in a hidden one. Given the choice between an easing curve I
+			// cannot verify and a lift I can, the lift wins. The elevation beside it
+			// carries the same signal and has worked throughout.
+			// ⚠ THE `--elev-3` SHADOW WAS NEVER BROKEN. Every one of those three
+			// reports was about the transform alone.
 			style={picked ? { transform: "translateY(-5px)" } : undefined}
 			// HTML-FINISH · MARKET DETAIL row 1 — `min-h-0` is this column's link in
 			// the height chain (`tests/unit/design/debate-height-chain.test.ts`). A
@@ -97,7 +105,7 @@ export function DebateColumn({
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""
-			} transition-transform duration-150${
+			}${
 				// `.slot.picked .panel.vm{box-shadow:0 6px 16px …}` (`d5:896`); the
 				// paired `translateY(-5px)` is the inline style above.
 				// ⚠ d5 lifts the PANEL and this lifts the whole COLUMN, header
