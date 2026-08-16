@@ -5,6 +5,7 @@ import type { PricePoint } from "@/server/discovery/price-series";
 import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
 import { formatDharma } from "./format";
 import { HeadZone } from "./HeadZone";
+import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
 import type { DebateMarketHeader } from "./types";
 
@@ -106,26 +107,37 @@ export function MarketHeader({
 				</>
 			}
 			left={
-				<>
-					<div className="flex items-start justify-between gap-3">
-						<h1 className="text-xl font-semibold tracking-tight">
-							{market.title}
-						</h1>
-						<div className="flex shrink-0 items-center gap-2">
-							<LifecycleBadge status={market.status} />
-							{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
+				/* HTML-FINISH · MARKET DETAIL row 2 — `.hleft` IS A ROW (`d5:448`),
+				   holding `.mmedia` then `.hstack`. The market arm's media panel takes
+				   the same slot the post arm gives the focused post's image, so the two
+				   arms swap contents inside one identical frame. */
+				<div className="flex gap-4">
+					<MarketMediaPanel
+						imageUrl={market.mediaImageUrl}
+						videoUrl={market.mediaVideoUrl}
+						title={market.title}
+					/>
+					{/* `.hstack` (`d5:462`) — everything that is not the media. */}
+					<div className="flex min-w-0 flex-1 flex-col gap-3">
+						<div className="flex items-start justify-between gap-3">
+							<h1 className="text-xl font-semibold tracking-tight">
+								{market.title}
+							</h1>
+							<div className="flex shrink-0 items-center gap-2">
+								<LifecycleBadge status={market.status} />
+								{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
 					    plain anchor, no client boundary, works signed-out. */}
-							<a
-								download
-								href={`/m/${market.slug}/export`}
-								aria-label="Download this debate as Markdown"
-								className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-							>
-								Download .md
-							</a>
+								<a
+									download
+									href={`/m/${market.slug}/export`}
+									aria-label="Download this debate as Markdown"
+									className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+								>
+									Download .md
+								</a>
+							</div>
 						</div>
-					</div>
-					{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
+						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
 					    THE QUESTION AND THE CRITERION. The mockup's `.hstack` orders its
 					    `vm` children `.question` → `.attrs` → `.criterion` → `.rescards`
 					    (`d5:958-985`); this strip used to render LAST, below the chart and
@@ -137,18 +149,18 @@ export function MarketHeader({
 					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
 					    `market-header.test.tsx`. `.attrs`'s bold numerals and `·`
 					    separators are a different row's subject and are not taken here. */}
-					<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-						<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
-						<span>
-							{market.totals.postCount}{" "}
-							{noun(market.totals.postCount, "post", "posts")}
-						</span>
-						<span>
-							{market.totals.replyCount}{" "}
-							{noun(market.totals.replyCount, "reply", "replies")}
-						</span>
-					</div>
-					{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
+						<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+							<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+							<span>
+								{market.totals.postCount}{" "}
+								{noun(market.totals.postCount, "post", "posts")}
+							</span>
+							<span>
+								{market.totals.replyCount}{" "}
+								{noun(market.totals.replyCount, "reply", "replies")}
+							</span>
+						</div>
+						{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
 			    `.overline`). The container is a TOP HAIRLINE RULE + padding
 			    (`d5:467` `margin-top:12px; border-top:var(--hairline);
 			    padding-top:10px`), NOT a boxed card; the 12px margin is already
@@ -179,17 +191,18 @@ export function MarketHeader({
 			    any of those and generalising across ROLES is how the earlier
 			    8px/.12em recipe was wrong. Ported BY TOKEN (`text-n4`), never the
 			    hex — Ruling A / H-HEX. */}
-					{market.description ? (
-						<div className="pt-2.5 [border-top:var(--hairline)]">
-							<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
-								Resolution
+						{market.description ? (
+							<div className="pt-2.5 [border-top:var(--hairline)]">
+								<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
+									Resolution
+								</div>
+								<p className="mt-[5px] text-sm text-muted-foreground">
+									{market.description}
+								</p>
 							</div>
-							<p className="mt-[5px] text-sm text-muted-foreground">
-								{market.description}
-							</p>
-						</div>
-					) : null}
-				</>
+						) : null}
+					</div>
+				</div>
 			}
 		/>
 	);

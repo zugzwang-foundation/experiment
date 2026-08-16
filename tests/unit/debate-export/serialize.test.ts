@@ -179,6 +179,10 @@ function mkModel(
 			title: "Will the test pass before the freeze?",
 			description: "Resolves YES if the suite is green.",
 			status: "Open",
+			// HTML-FINISH · MARKET DETAIL rows 2 + 17 — additive header fields.
+			// ADR-0025's export is TEXT-ONLY; neither reaches the `.md`.
+			mediaVideoUrl: null,
+			mediaImageUrl: null,
 			pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 			// UI.A2 additive header field — NOT serialized (debate-export.md §10).
 			unitToWin: null,

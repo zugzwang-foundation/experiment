@@ -46,6 +46,8 @@ const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 	title: "Attrs Strip Market Question",
 	description: "Resolution criterion text.",
 	status: "Open",
+	mediaVideoUrl: null,
+	mediaImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {

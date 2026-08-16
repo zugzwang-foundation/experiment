@@ -224,8 +224,13 @@ export function DebateView({
 			    `tests/unit/design/debate-height-chain.test.ts`. */}
 			{selectedPost ? (
 				<>
+					{/* HTML-FINISH · MARKET DETAIL row 17 — `market` is threaded so the
+					    post arm's rail can render the market card. Row 1 stopped
+					    `MarketHeader` rendering in this arm, so without this the post
+					    arm carries no market context at all. */}
 					<PostFocusHeader
 						post={selectedPost}
+						market={market}
 						bookmarks={bookmarks}
 						heldSide={heldSide}
 						marketOpen={marketOpen}

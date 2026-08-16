@@ -68,6 +68,8 @@ const market: DebateMarketHeader = {
 	title: "Fixture market question.",
 	description: "Fixture resolution criterion.",
 	status: "Open",
+	mediaVideoUrl: null,
+	mediaImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {
@@ -109,6 +111,7 @@ function renderPostArm() {
 	return render(
 		<PostFocusHeader
 			post={presentPost()}
+			market={market}
 			bookmarks={VIEWER}
 			heldSide={null}
 			marketOpen
@@ -190,7 +193,8 @@ describe("the arm split — each arm renders through the shared frame", () => {
 	});
 
 	it("head-zone::the-two-arms-are-DISJOINT", () => {
-		// The whole finding in one assertion: `vm` and `vp` never co-render.
+		// The whole finding in one assertion: the `vm` and `vp` element SETS never
+		// co-render.
 		const marketArm = render(<MarketHeader market={market} priceChart={null} />)
 			.container.innerHTML;
 		cleanup();
@@ -199,11 +203,24 @@ describe("the arm split — each arm renders through the shared frame", () => {
 		// The market arm carries no post content …
 		expect(marketArm).not.toContain("Fixture argument title.");
 		expect(marketArm).not.toContain("Fixture body.");
-		// … and the post arm carries no market content. This is the assertion
-		// that would have failed before row 1, when `MarketHeader` rendered above
-		// the ternary and BOTH were on screen in post view.
-		expect(postArm).not.toContain("Fixture market question.");
+
+		// … and the post arm carries no market HEADER. This is the assertion that
+		// would have failed before row 1, when `MarketHeader` rendered above the
+		// ternary and the whole thing was on screen in post view.
 		expect(postArm).not.toContain("Fixture resolution criterion.");
+		expect(postArm).not.toContain("Resolution");
+		expect(postArm).not.toContain("<h1");
+
+		// ⚠ RE-DERIVED AT C11, NOT RELAXED — and the distinction is the row.
+		// This assertion used to read `expect(postArm).not.toContain("Fixture
+		// market question.")`. Row 17 puts the market card in the post arm's rail
+		// ON PURPOSE: once row 1 stopped `MarketHeader` rendering here, the post arm
+		// had NO market context at all, and the card is what restores it (and is
+		// also the exit). So the market's TITLE is now expected in the post arm —
+		// what must stay out is the market HEADER, asserted above. Pinning the
+		// title's absence would forbid row 17 rather than guard row 1.
+		expect(postArm).toContain("Fixture market question.");
+		expect(postArm).toContain('data-testid="focus-market-card"');
 	});
 
 	it("head-zone::row-9-is-NOT-deleted-it-is-market-arm-scoped", () => {

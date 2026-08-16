@@ -1,18 +1,16 @@
 "use client";
 
-import { ChevronLeft } from "lucide-react";
-
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
+import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { RemovedPlaceholder } from "./placeholders";
-import type { DebatePost, Side } from "./types";
+import type { DebateMarketHeader, DebatePost, Side } from "./types";
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
@@ -34,6 +32,7 @@ import type { DebatePost, Side } from "./types";
  */
 export function PostFocusHeader({
 	post,
+	market,
 	bookmarks,
 	heldSide,
 	marketOpen,
@@ -44,6 +43,12 @@ export function PostFocusHeader({
 	onOpenImage,
 }: {
 	post: DebatePost;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 17 — the market this post belongs to,
+	 * threaded so the rail can render it as a card. The post arm otherwise has no
+	 * market context at all once `MarketHeader` stops rendering beside it (row 1).
+	 */
+	market: DebateMarketHeader;
 	/**
 	 * BOOKMARK-ADD-WIRE — viewer bookmark state for this market; `null` when
 	 * signed out. Reaches only the non-removed branch's `ArgProfile`; the removed
@@ -61,21 +66,22 @@ export function PostFocusHeader({
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
 		<HeadZone
-			// Row 17 (`.mcard`, C11) is the rail's only occupant. `null` until then —
-			// an empty rail is visible empty chrome (PD-3-09).
-			right={null}
+			// HTML-FINISH · MARKET DETAIL row 17 — `.mcard` (`d5:1021`) is the post
+			// arm's whole rail, and it IS THE EXIT. See `FocusMarketCard` for why
+			// building it inert would make post-focus a trap: `?post=` syncs with
+			// `history.replaceState`, never `pushState`, so browser Back does not
+			// leave post view, and this card replaces the only other way out.
+			right={
+				<FocusMarketCard
+					title={market.title}
+					imageUrl={market.mediaImageUrl}
+					pricing={market.pricing}
+					totals={market.totals}
+					onExit={onExit}
+				/>
+			}
 			left={
 				<Card className="gap-3 p-4">
-					<Button
-						variant="ghost"
-						size="xs"
-						className="self-start"
-						onClick={onExit}
-						aria-label="Back to the market"
-					>
-						<ChevronLeft /> Back to market
-					</Button>
-
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of

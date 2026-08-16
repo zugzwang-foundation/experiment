@@ -29,6 +29,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 		description:
 			"Resolves YES if Mumbai Metro Line 3 (Aqua Line, Colaba–SEEPZ) records a 7-day rolling average of at least 1,000,000 daily riders at any point on or before the freeze (2026-11-05 23:59 IST), per MMRC published ridership figures. Resolves NO otherwise. Voids only if MMRC ceases publishing ridership data before resolution.",
 		status: "Open",
+		// HTML-FINISH · MARKET DETAIL rows 2 + 17 — additive header fields, NOT
+		// serialized: ADR-0025's export is TEXT-ONLY, so neither the market's media
+		// image nor its outbound video appears in the `.md`. Present here because
+		// the DTO requires them; `serialize.test.ts` asserts their ABSENCE from the
+		// output rather than trusting this comment.
+		mediaVideoUrl: null,
+		mediaImageUrl: null,
 		pricing: { yes: "0.540000000000000000", no: "0.460000000000000000" },
 		// UI.A2 additive header field — NOT serialized (debate-export.md §10 field
 		// set); illustrative values only (NO is the cheap side at p_no = 0.46).

@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { CommentImage } from "@/components/debate/CommentImage";
 import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
-import type { DebatePost, ReplyGroups } from "@/components/debate/types";
+import type {
+	DebateMarketHeader,
+	DebatePost,
+	ReplyGroups,
+} from "@/components/debate/types";
 
 /**
  * POLISH.3 PR 2 · C1 — the post-image geometry guard (plan §7; §6 row T2,
@@ -151,10 +155,29 @@ function focusedPost(imageUrl: string | null): DebatePost {
 	};
 }
 
+/** The market the focused post belongs to — row 17's rail needs it. */
+const MARKET: DebateMarketHeader = {
+	id: "0190c0de-4444-7000-8000-000000000004",
+	slug: "comment-image-fixture-market",
+	title: "Fixture market question.",
+	description: "Fixture resolution criterion.",
+	status: "Open",
+	mediaVideoUrl: null,
+	mediaImageUrl: null,
+	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
+	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
+	totals: {
+		dharmaStaked: "150.000000000000000000",
+		postCount: 3,
+		replyCount: 5,
+	},
+};
+
 function renderFocus(imageUrl: string | null) {
 	return render(
 		<PostFocusHeader
 			post={focusedPost(imageUrl)}
+			market={MARKET}
 			bookmarks={VIEWER}
 			heldSide={null}
 			marketOpen
