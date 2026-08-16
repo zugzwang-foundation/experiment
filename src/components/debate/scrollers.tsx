@@ -1,59 +1,14 @@
 "use client";
 
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
-import { Button } from "@/components/ui/button";
 
 import { PostCard } from "./PostCard";
 import { EmptySideCTA } from "./placeholders";
 import { ReplyCard } from "./ReplyCard";
+import { ScrollRail } from "./ScrollRail";
 import type { DebatePost, DebateReply, PresentPost, Side } from "./types";
-
-/** Prev/next pager shared by the post- and reply-scrollers (§4 scroller buttons). */
-function ScrollerNav({
-	index,
-	total,
-	noun,
-	onPrev,
-	onNext,
-}: {
-	index: number;
-	total: number;
-	noun: string;
-	onPrev: () => void;
-	onNext: () => void;
-}) {
-	return (
-		<div className="flex items-center justify-between gap-2">
-			<Button
-				variant="outline"
-				size="icon-xs"
-				onClick={onPrev}
-				disabled={index === 0}
-				aria-label={`Previous ${noun}`}
-			>
-				<ChevronLeft />
-			</Button>
-			<span
-				className="font-mono text-xs text-muted-foreground"
-				aria-live="polite"
-			>
-				{index + 1} / {total}
-			</span>
-			<Button
-				variant="outline"
-				size="icon-xs"
-				onClick={onNext}
-				disabled={index === total - 1}
-				aria-label={`Next ${noun}`}
-			>
-				<ChevronRight />
-			</Button>
-		</div>
-	);
-}
 
 /**
  * The market-view post-scroller (§4) — pages a single side's posts (Top order,
@@ -92,20 +47,26 @@ export function PostScroller({
 	const clamped = Math.min(index, posts.length - 1);
 	const post = posts[clamped];
 	return (
-		<div className="flex flex-col gap-2">
-			<PostCard
-				post={post}
-				bookmarks={bookmarks}
-				onEnter={onEnter}
-				onOpenPopup={onOpenPopup}
-				onOpenImage={onOpenImage}
-				onReplyToPost={onReplyToPost}
-				heldSide={heldSide}
-				marketOpen={marketOpen}
-				suspended={suspended}
-			/>
+		// HTML-FINISH · MARKET DETAIL row 18 — d5's `.pscroll` is a VERTICAL rail
+		// BESIDE the card (`:887`), replacing the horizontal prev/next strip that
+		// sat under it. `items-stretch` is what lets the rail's track fill the
+		// card's height rather than needing d5's fixed `92px`.
+		<div className="flex items-stretch gap-2">
+			<div className="flex min-w-0 flex-1 flex-col gap-2">
+				<PostCard
+					post={post}
+					bookmarks={bookmarks}
+					onEnter={onEnter}
+					onOpenPopup={onOpenPopup}
+					onOpenImage={onOpenImage}
+					onReplyToPost={onReplyToPost}
+					heldSide={heldSide}
+					marketOpen={marketOpen}
+					suspended={suspended}
+				/>
+			</div>
 			{posts.length > 1 ? (
-				<ScrollerNav
+				<ScrollRail
 					index={clamped}
 					total={posts.length}
 					noun="post"
@@ -142,14 +103,17 @@ export function ReplyScroller({
 	const clamped = Math.min(index, replies.length - 1);
 	const reply = replies[clamped];
 	return (
-		<div className="flex flex-col gap-2">
-			<ReplyCard
-				reply={reply}
-				bookmarks={bookmarks}
-				onOpenImage={onOpenImage}
-			/>
+		// Row 19 — `.rps` (`:917`) is the same rail at the reply mount point.
+		<div className="flex items-stretch gap-2">
+			<div className="flex min-w-0 flex-1 flex-col gap-2">
+				<ReplyCard
+					reply={reply}
+					bookmarks={bookmarks}
+					onOpenImage={onOpenImage}
+				/>
+			</div>
 			{replies.length > 1 ? (
-				<ScrollerNav
+				<ScrollRail
 					index={clamped}
 					total={replies.length}
 					noun="reply"
