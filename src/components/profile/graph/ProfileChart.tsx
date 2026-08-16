@@ -289,9 +289,9 @@ function FlipMarker({
 	);
 }
 
-/** One own post/reply node — a side-keyed disc inside a FIXED grey rim, with a
- * FIXED grey core. Placement is `netWorthValue` (cumulative) or `marketValue`
- * (per-market).
+/** One own post/reply node — a disc whose FILL is side-keyed, carrying a FIXED
+ * grey rim (its own stroke) and a FIXED grey core. Placement is `netWorthValue`
+ * (cumulative) or `marketValue` (per-market).
  *
  * ⛔ NOT the W2.6 "R2" primitive, which this docblock claimed until POLISH.5
  * item 12. R2 is a CROWD-SPLIT ring — "black/white ring = crowd split", "Ring
@@ -311,17 +311,25 @@ function FlipMarker({
  *   Support/Counter relation (AGENTS.md §8; design-language.md §1 "Binding
  *   resolved"). ⚠ The sibling MARKET-chart node is ruled onto `--graph-*`
  *   instead (design-canon.md §10 `C-CHART-1` item 2) — a ruling its own text
- *   scopes to `MarketPriceChart`, so the two differ by decision, not by drift.
+ *   scopes to `MarketPriceChart`. ⛔ Do NOT read that scoping as a decision FOR
+ *   the pole family here: this fill is UNRULED BUILT STATE. The slice that
+ *   built this directory specified `--graph-*` (UI-A5.md, slice 5 "Graph
+ *   components (the W2.6 port)"), and the `--color-*` fill was written once at
+ *   file creation and never revisited. Recorded here, not settled here.
  * - The rim (that disc's stroke) and the r=2 core are BOTH `--graph-yes`, FIXED
  *   on every side. Its NAME says YES; its VALUE is a mid-grey (#737373).
  *
  * ⚠ AND THEY DO NOT COMPOSE THE WAY THE NAMES SUGGEST. `--color-yes` equals
- * `--color-ground` (#181818) and both charts sit on `bg-n0` (#212121), so on a
- * YES node the disc is very nearly invisible: what actually changes between the
- * poles is the ANNULUS between core and rim — ground-dark on YES, white on NO.
- * The always-visible grey core is the documented fix for precisely that, not a
- * side effect of the token (DESIGN-W2_6-graph-prototype-record.md §3 — it
- * "rescues mostly-black YES nodes that otherwise vanished").
+ * `--color-ground` (#181818) and both charts sit on `bg-n0` (#212121), so a YES
+ * node's FILL is very nearly invisible against the panel — ≈1.09:1, the same
+ * pairing POLISH.3 PR 2 filed and fixed on the split-bar track. What actually
+ * separates the poles is the ANNULUS between core and rim: ground-dark on YES,
+ * white on NO. The always-visible grey core is carried forward from the
+ * prototype as a legibility device, not a side effect of the token — but for a
+ * RELATED, DIFFERENT case: there, "the always-visible grey core rescues
+ * mostly-black YES nodes that otherwise vanished ON THE BLACK YES LINE"
+ * (DESIGN-W2_6-graph-prototype-record.md §9). This build has no black YES line,
+ * because `--graph-yes` is grey for that very reason.
  *
  * ⚠ The families COINCIDE ON NO (`--graph-no` and `--color-no` are both
  * #fafafa) and DIFFER ON YES, so a RESOLVED-colour assertion cannot tell them

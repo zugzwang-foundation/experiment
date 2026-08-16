@@ -415,9 +415,13 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 
 	it("flip-marker-carries-no-data-side", () => {
 		// POLISH.5 item 13. `FlipMarker` strokes `--graph-yes` (rim) and
-		// `--graph-no` (swap arrows) UNCONDITIONALLY, on every side — it has no
-		// side-keyed render at all, so `data-side` was encoding nothing and is
-		// removed. Its own docblock already says it is "a marker, NOT a node".
+		// `--graph-no` (swap arrows) UNCONDITIONALLY, and its geometry carries no
+		// side term — NO PIXEL in this marker depends on the side. So the
+		// attribute was not encoding nothing; it was encoding something no pixel
+		// ever showed. Nor is the value lost by removing it: every marker has a
+		// sibling `segment-${marketId}-${episodeIndex}` — same join key, rendered
+		// unconditionally — that still carries `data-side`. Its own docblock
+		// already says it is "a marker, NOT a node".
 		//
 		// THE RULE, and it is why this guard has three arms: `data-side` STAYS
 		// where the element's render IS side-keyed and GOES where it is not.
