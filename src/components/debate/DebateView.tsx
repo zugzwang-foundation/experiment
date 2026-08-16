@@ -12,7 +12,7 @@ import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
 import { DebatePoll } from "./DebatePoll";
-import { ImageLightbox, PostPopup } from "./dialogs";
+import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
 import { PostScroller, ReplyScroller } from "./scrollers";
@@ -21,6 +21,7 @@ import type {
 	DebateReply,
 	DebateViewModel,
 	PresentPost,
+	PresentReply,
 	Side,
 	ViewerMarketContext,
 } from "./types";
@@ -83,6 +84,11 @@ export function DebateView({
 		initialPostId,
 	);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
+	// HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up, a SEPARATE state
+	// slot from the post pop-up. ⛔ Not one widened slot: `PresentReply` is what
+	// makes a removed reply unpassable at the type level (H3-e / SC-1), and a
+	// shared slot would have had to be a union that admits both.
+	const [popupReply, setPopupReply] = useState<PresentReply | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 	// UI.A3 — the market-view Đ BET composer: at most ONE open (side-slot rule:
 	// betting side S renders the composer in the OPPOSITE slot; opening the
@@ -344,6 +350,7 @@ export function DebateView({
 											replies={repliesForSide(selectedPost, side)}
 											bookmarks={bookmarks}
 											onOpenImage={setLightboxUrl}
+											onOpenPopup={setPopupReply}
 										/>
 									)}
 								</DebateColumn>
@@ -398,6 +405,7 @@ export function DebateView({
 			)}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
+			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />
 			<ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
 		</PageContainer>
 	);

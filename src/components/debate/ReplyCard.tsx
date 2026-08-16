@@ -1,10 +1,12 @@
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 
+import { Button } from "@/components/ui/button";
+
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
 import { RemovedPlaceholder } from "./placeholders";
-import type { DebateReply } from "./types";
+import type { DebateReply, PresentReply } from "./types";
 
 /**
  * A depth-1 reply row (design-language §3.1 "Reply"). ✅ HTML-FINISH · MARKET
@@ -33,6 +35,7 @@ export function ReplyCard({
 	reply,
 	bookmarks,
 	onOpenImage,
+	onOpenPopup,
 }: {
 	reply: DebateReply;
 	/** Viewer bookmark state for this market; `null` when signed out. */
@@ -44,6 +47,12 @@ export function ReplyCard({
 	 * surface, not one per card.
 	 */
 	onOpenImage: (url: string) => void;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 27 — the `+` opens this reply's full
+	 * argument in the reply pop-up. ⛔ It receives a `PresentReply`, so a removed
+	 * reply cannot reach the pop-up even by mistake (H3-e / SC-1).
+	 */
+	onOpenPopup: (reply: PresentReply) => void;
 }) {
 	if (reply.removed) {
 		return (
@@ -91,7 +100,26 @@ export function ReplyCard({
 			    ⚠ The trailing pseudonym line is GONE: it is in the `ArgProfile`
 			    head above now, and rendering it twice was the drift this row
 			    removes. */}
-			<p className="text-sm whitespace-pre-line">{reply.body}</p>
+			<div className="flex items-start justify-between gap-2">
+				<p className="text-sm whitespace-pre-line">{reply.body}</p>
+				{/* HTML-FINISH · MARKET DETAIL row 27 — d5's `.rtitle.plust` `+`
+				    (`:1551`), the same control the post card carries at row 24 and the
+				    focused post at row 15, so one glyph means one thing everywhere.
+				    ⛔ NON-REMOVED BRANCH ONLY — `ReplyCard` records that this
+				    placement is deliberate and NOT type-enforced for the cluster; for
+				    the pop-up it IS type-enforced, because `onOpenPopup` takes a
+				    `PresentReply` and `reply` is narrowed here.
+				    ⛔ Label byte-carried from the mockup (`aria-label="Show more"`). */}
+				<Button
+					variant="ghost"
+					size="xs"
+					onClick={() => onOpenPopup(reply)}
+					aria-label="Show more"
+					className="shrink-0 text-n5 hover:text-ink"
+				>
+					+
+				</Button>
+			</div>
 		</div>
 	);
 }

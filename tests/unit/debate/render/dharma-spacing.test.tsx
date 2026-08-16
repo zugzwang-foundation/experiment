@@ -56,6 +56,12 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
 /** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
  * These suites assert bookmarks / spacing / card composition, never the
  * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
@@ -153,6 +159,7 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 				reply={presentReply()}
 				bookmarks={VIEWER}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 

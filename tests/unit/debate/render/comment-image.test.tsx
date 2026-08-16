@@ -53,6 +53,12 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
 const noop = () => {};
 
 function renderImage() {
@@ -286,6 +292,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 				reply={presentReply("https://example.invalid/reply-image")}
 				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -307,6 +314,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 				reply={presentReply(null)}
 				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -329,6 +337,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 				}}
 				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 

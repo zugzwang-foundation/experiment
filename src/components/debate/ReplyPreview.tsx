@@ -6,7 +6,7 @@ import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 
 import { ReplyCard } from "./ReplyCard";
-import type { ReplyGroups } from "./types";
+import type { PresentReply, ReplyGroups } from "./types";
 
 /**
  * ⛔⛔ NO LONGER MOUNTED BY ANY SURFACE. `PostCard` stopped rendering this at
@@ -66,6 +66,7 @@ export function ReplyPreview({
 	replies,
 	bookmarks,
 	onOpenImage,
+	onOpenPopup,
 }: {
 	replies: ReplyGroups;
 	/** BOOKMARK-ADD-WIRE — pass-through to each listed `ReplyCard`. */
@@ -77,6 +78,8 @@ export function ReplyPreview({
 	 * nothing, which is worse than a compile error (O-1).
 	 */
 	onOpenImage: (url: string) => void;
+	/** HTML-FINISH · MARKET DETAIL row 27 — pass-through to the reply's `+`. */
+	onOpenPopup: (reply: PresentReply) => void;
 }) {
 	const [expanded, setExpanded] = useState(false);
 	// Row 13 (PD-3-10) — TIER 1, SPEC.1 §9 F-DEBATE-1: the affordance expands
@@ -118,6 +121,7 @@ export function ReplyPreview({
 										reply={reply}
 										bookmarks={bookmarks}
 										onOpenImage={onOpenImage}
+										onOpenPopup={onOpenPopup}
 									/>
 								</li>
 							))}
@@ -135,6 +139,7 @@ export function ReplyPreview({
 										reply={reply}
 										bookmarks={bookmarks}
 										onOpenImage={onOpenImage}
+										onOpenPopup={onOpenPopup}
 									/>
 								</li>
 							))}
@@ -157,6 +162,7 @@ export function ReplyPreview({
 						reply={reply}
 						bookmarks={bookmarks}
 						onOpenImage={onOpenImage}
+						onOpenPopup={onOpenPopup}
 					/>
 				))
 			)}

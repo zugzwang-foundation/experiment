@@ -117,7 +117,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-seven-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-eight-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -152,6 +152,11 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		//   `ArgProfile`, which owns the badge now. The REMOVED branch keeps its
 		//   own `SideBadge` — a removed reply has no author, so it cannot render
 		//   an `ArgProfile` — which is why the count is 1 and not 0.
+		//
+		// · Row 27 ADDED one back: `dialogs.tsx` gains a second UNSIZED site when
+		//   `ReplyPopup` joins `PostPopup` in that file. So the same PR moved this
+		//   map in BOTH directions, which is precisely why the map — and not a
+		//   count — is the fence.
 		//
 		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
 		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
@@ -193,9 +198,9 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/ReplyCard.tsx": 1,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
-			"src/components/debate/dialogs.tsx": 1,
+			"src/components/debate/dialogs.tsx": 2,
 		});
-		expect(base).toHaveLength(7);
+		expect(base).toHaveLength(8);
 	});
 
 	it("the-sized-sites-are-exactly-the-map-below", () => {

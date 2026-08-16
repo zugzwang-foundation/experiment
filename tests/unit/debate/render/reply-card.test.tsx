@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
@@ -25,6 +25,12 @@ vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
 vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
+
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
 
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const noop = () => {};
@@ -52,6 +58,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				reply={presentReply()}
 				bookmarks={VIEWER}
 				onOpenImage={noop}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		const html = container.innerHTML;
@@ -76,6 +83,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				reply={presentReply()}
 				bookmarks={VIEWER}
 				onOpenImage={noop}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		const occurrences = (container.innerHTML.match(/fixture-replier/g) ?? [])
@@ -91,6 +99,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				reply={presentReply()}
 				bookmarks={VIEWER}
 				onOpenImage={noop}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		expect(container.innerHTML).not.toContain("Replies ·");
@@ -108,6 +117,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				})}
 				bookmarks={VIEWER}
 				onOpenImage={noop}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		expect(container.innerHTML).toContain("NO @ 55%");
@@ -128,6 +138,7 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				}}
 				bookmarks={VIEWER}
 				onOpenImage={noop}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -136,5 +147,81 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 		expect(container.querySelector('button[aria-label="Bookmark"]')).toBeNull();
 		// The frozen side badge is still there — the slot survives.
 		expect(container.innerHTML).toContain("NO");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL rows 27 + 34 — the reply's `+` pop-up and its
+ * image lightbox.
+ *
+ * ⛔⛔ H3-e IS WHY THE POP-UP IS ITS OWN COMPONENT. The plan halts row 27 if it
+ * "requires widening `PostPopup`'s union in a way that would let a REMOVED reply
+ * reach it." `ReplyPopup` takes `PresentReply | null` —
+ * `Extract<DebateReply, { removed: false }>` — so a removed reply is UNPASSABLE
+ * at the type level and tracks the masking union automatically. The trigger also
+ * lives on the non-removed branch only, so the two controls agree.
+ */
+describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
+	it("reply-card::the-plus-opens-the-pop-up-with-THIS-reply", () => {
+		const onOpenPopup = vi.fn();
+		const reply = presentReply();
+		const { container } = render(
+			<ReplyCard
+				reply={reply}
+				bookmarks={VIEWER}
+				onOpenImage={noop}
+				onOpenPopup={onOpenPopup}
+			/>,
+		);
+
+		const plus = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.getAttribute("aria-label") === "Show more",
+		);
+		expect(plus).toBeDefined();
+		fireEvent.click(plus as HTMLButtonElement);
+		expect(onOpenPopup).toHaveBeenCalledWith(reply);
+	});
+
+	it("reply-card::a-REMOVED-reply-offers-NO-plus", () => {
+		// ⛔ SC-1 / H3-e at the render. Belt: the branch placement. Braces: the
+		// type — `onOpenPopup` takes a `PresentReply`, so the removed branch
+		// could not call it even if a `+` were added there.
+		const { container } = render(
+			<ReplyCard
+				reply={{
+					removed: true,
+					id: "0199a0c0-0000-7000-8000-00000000ef03",
+					side: "NO",
+					createdAt: "2026-07-30T00:00:00.000Z",
+				}}
+				bookmarks={VIEWER}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
+		);
+		expect(
+			Array.from(container.querySelectorAll("button")).some(
+				(b) => b.getAttribute("aria-label") === "Show more",
+			),
+		).toBe(false);
+	});
+
+	it("reply-card::row-34-the-image-opens-the-lightbox", () => {
+		const onOpenImage = vi.fn();
+		const { container } = render(
+			<ReplyCard
+				reply={presentReply({ imageUrl: "https://example.invalid/r.png" })}
+				bookmarks={VIEWER}
+				onOpenImage={onOpenImage}
+				onOpenPopup={noop}
+			/>,
+		);
+
+		const open = container.querySelector<HTMLButtonElement>(
+			'button[aria-label="Open attached image"]',
+		);
+		expect(open).not.toBeNull();
+		fireEvent.click(open as HTMLButtonElement);
+		expect(onOpenImage).toHaveBeenCalledWith("https://example.invalid/r.png");
 	});
 });

@@ -41,6 +41,12 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
 /** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
  * These suites assert bookmarks / spacing / partitioning, never the image, so
  * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
@@ -100,6 +106,7 @@ function renderPreview() {
 			replies={GROUPS}
 			bookmarks={VIEWER}
 			onOpenImage={noopImage}
+			onOpenPopup={noopPopup}
 		/>,
 	);
 }

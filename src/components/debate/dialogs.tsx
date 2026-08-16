@@ -11,7 +11,7 @@ import {
 import { AggregateFooter } from "./AggregateFooter";
 import { LaneBadge, PositionMarker, SideBadge } from "./badges";
 import { formatDharma } from "./format";
-import type { PresentPost } from "./types";
+import type { PresentPost, PresentReply } from "./types";
 
 /**
  * The post pop-up (DEBATE.4 §4) — a read-only dialog showing a post's FULL body
@@ -118,6 +118,77 @@ export function PostPopup({
 							aggregate={post.aggregate}
 							postSide={post.sideAtPostTime}
 						/>
+					</>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 27 — the REPLY pop-up: a read-only dialog
+ * showing a reply's full argument, opened by the `+` on a reply card.
+ *
+ * ⛔⛔ A SEPARATE COMPONENT, NOT A WIDENED `PostPopup` UNION — and that is what
+ * makes plan **H3-e** not fire. H3-e halts row 27 if the reply pop-up "requires
+ * widening `PostPopup`'s union in a way that would let a REMOVED reply reach
+ * it." Widening `PresentPost | null` to accept replies would have meant either a
+ * union that admits `DebateReply` (removed variant included) or a structural
+ * type loose enough to accept one. Taking `PresentReply | null` instead makes a
+ * removed reply UNPASSABLE at the type level — the leak is a compile error, and
+ * `PresentReply` is `Extract<DebateReply, { removed: false }>`, so it tracks the
+ * masking union automatically rather than restating it.
+ * ⚠ SC-1: the `+` trigger lives on `ReplyCard`'s non-removed branch ONLY, which
+ * `ReplyCard` records is a deliberate branch placement.
+ *
+ * ⚠ IT IS NOT A COPY OF `PostPopup`. A reply has no title, no lane badge and no
+ * reply aggregate of its own (`REPLY_DEPTH_MAX = 1`), so those are absent
+ * because they do not exist — not because they were forgotten.
+ */
+export function ReplyPopup({
+	reply,
+	onClose,
+}: {
+	reply: PresentReply | null;
+	onClose: () => void;
+}) {
+	return (
+		<Dialog
+			open={reply !== null}
+			onOpenChange={(open) => {
+				if (!open) {
+					onClose();
+				}
+			}}
+		>
+			<DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto">
+				{reply ? (
+					<>
+						<DialogHeader>
+							{/* A reply has no title column, so its ACCESSIBLE name is the
+							    author + side rather than an invented heading. ⛔ No copy is
+							    authored for it. */}
+							<DialogTitle className="sr-only">
+								{reply.author.pseudonym} — {reply.side}
+							</DialogTitle>
+							<DialogDescription className="flex flex-wrap items-center gap-1.5">
+								<SideBadge side={reply.side} price={reply.entryPrice} />
+								<PositionMarker marker={reply.marker} />
+								<span>{reply.author.pseudonym}</span>
+								<span aria-hidden="true">·</span>
+								{/* Canon §107's SPACED grammar — the ruled form. */}
+								<span className="font-mono">Đ {formatDharma(reply.stake)}</span>
+							</DialogDescription>
+						</DialogHeader>
+						{reply.imageUrl ? (
+							// biome-ignore lint/performance/noImgElement: short-TTL presigned R2 URL (D9), not a static asset.
+							<img
+								src={reply.imageUrl}
+								alt="Argument attachment"
+								className="max-h-[60vh] w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
+							/>
+						) : null}
+						<p className="text-sm whitespace-pre-line">{reply.body}</p>
 					</>
 				) : null}
 			</DialogContent>

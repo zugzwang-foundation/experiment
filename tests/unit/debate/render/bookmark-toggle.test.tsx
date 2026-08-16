@@ -58,6 +58,12 @@ vi.mock("@/server/bookmarks/remove", () => ({
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
 /** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
  * These suites assert bookmarks / spacing / partitioning, never the image, so
  * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
@@ -504,6 +510,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				reply={presentReply(OTHERS)}
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -530,6 +537,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				reply={presentReply(OTHERS)}
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		const fromReplyCard = clusterHtml(replyContainer);
@@ -560,6 +568,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				reply={removedReply(OTHERS)}
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -586,6 +595,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				side="YES"
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 		expect(
@@ -612,6 +622,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				replies={{ support: twoSlot, counter: [], twoSlot }}
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 
@@ -629,6 +640,7 @@ describe("BOOKMARK-ADD-WIRE — the reply card cluster", () => {
 				reply={presentReply(MINE)}
 				bookmarks={SIGNED_IN}
 				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
 			/>,
 		);
 

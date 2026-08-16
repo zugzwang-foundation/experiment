@@ -8,7 +8,13 @@ import { PostCard } from "./PostCard";
 import { EmptySideCTA } from "./placeholders";
 import { ReplyCard } from "./ReplyCard";
 import { ScrollRail } from "./ScrollRail";
-import type { DebatePost, DebateReply, PresentPost, Side } from "./types";
+import type {
+	DebatePost,
+	DebateReply,
+	PresentPost,
+	PresentReply,
+	Side,
+} from "./types";
 
 /**
  * The market-view post-scroller (§4) — pages a single side's posts (Top order,
@@ -88,6 +94,7 @@ export function ReplyScroller({
 	side,
 	bookmarks,
 	onOpenImage,
+	onOpenPopup,
 }: {
 	replies: DebateReply[];
 	side: Side;
@@ -95,6 +102,8 @@ export function ReplyScroller({
 	bookmarks: BookmarkAffordance;
 	/** HTML-FINISH · MARKET DETAIL row 26 — pass-through to the reply's image. */
 	onOpenImage: (url: string) => void;
+	/** HTML-FINISH · MARKET DETAIL row 27 — pass-through to the reply's `+`. */
+	onOpenPopup: (reply: PresentReply) => void;
 }) {
 	const [index, setIndex] = useState(0);
 	if (replies.length === 0) {
@@ -110,6 +119,7 @@ export function ReplyScroller({
 					reply={reply}
 					bookmarks={bookmarks}
 					onOpenImage={onOpenImage}
+					onOpenPopup={onOpenPopup}
 				/>
 			</div>
 			{replies.length > 1 ? (
