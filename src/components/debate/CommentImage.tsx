@@ -54,3 +54,43 @@ export function CommentImage({
 		</button>
 	);
 }
+
+/**
+ * HTML-FINISH · MARKET DETAIL round 2 · R2 — THE POST-IMAGE PLACEHOLDER, the
+ * second of the four the founder ruled in on 2026-08-16 (the OD-2 reversal).
+ *
+ * d5's `.media.rdt` box carrying `<span class="ph">POST IMAGE · 640:586</span>`
+ * — the literal it substitutes into `.argimg` (`d5:1682`) and into the
+ * post-focus `.hpimg` (`d5:1491-1492`) for every card with no real attachment.
+ *
+ * ⛔ THE LABEL IS BYTE-CARRIED, hexdumped from `d5:1243`: middle dot U+00B7 at
+ * bytes `c2 b7`, and the literal aspect string `640:586`. ⛔ No copy is authored
+ * and none is paraphrased — `640:586` is d5's own demo aspect and means nothing
+ * for a real post, which is precisely why it is carried rather than replaced:
+ * inventing a truer-sounding caption would be authoring product copy.
+ *
+ * ⛔ IT IS NOT `aria-hidden`, and it carries no `alt`-like name either — it is a
+ * `<div>` with visible text, so a screen reader reads exactly what a sighted
+ * reviewer sees. Hiding it would make the placeholder invisible to the one
+ * audience most likely to be confused by it.
+ *
+ * ⚠⚠ REVIEW-SURFACE ONLY. Docketed at `docs/parked.md`
+ * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate all four before the DP.2
+ * production promote. A real participant must never meet this box.
+ *
+ * ⚠ TOPOLOGY AND LABEL ONLY. d5's `8.5px` / `.16em` / `var(--n5)` / `640/586`
+ * aspect are VALUES; the box reuses the glyph-box recipe already shipped in
+ * `MarketMediaPanel` (itself byte-carried from `discovery/MarketCard.tsx`) and
+ * the same `--imgr` / hairline pair `CommentImage` uses above, so no new type
+ * size, colour or radius enters the build.
+ */
+export function PostImagePlaceholder() {
+	return (
+		<div
+			data-testid="post-image-placeholder"
+			className="flex aspect-[16/9] w-full max-w-[var(--imgmax)] items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+		>
+			POST IMAGE · 640:586
+		</div>
+	);
+}

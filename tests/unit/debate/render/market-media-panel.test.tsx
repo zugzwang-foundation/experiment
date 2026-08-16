@@ -11,14 +11,26 @@ import { MarketMediaPanel } from "@/components/debate/MarketMediaPanel";
  *
  * THREE PROPERTIES, and each exists for a different failure:
  *
- *  1. **The mockup's caption is never shipped.** `.mmedia .cap` reads "MARKET
- *     MEDIA — IMG / VIDEO", which is the mockup describing its own placeholder.
- *     Shipping it would put a build-time note in front of every participant —
- *     `PD-3-09` / `OD-6` verbatim.
- *  2. **No media ⇒ no panel**, never an empty box. Same ruling, other direction.
+ *  1. ⚠⚠ **The mockup's caption IS shipped, on the empty arm only** — REVERSED at
+ *     round 2 · R2 (founder-ruled 2026-08-16, the OD-2 reversal). Properties 1
+ *     and 2 used to read: "**The mockup's caption is never shipped.** `.mmedia
+ *     .cap` reads 'MARKET MEDIA — IMG / VIDEO' … Shipping it would put a
+ *     build-time note in front of every participant — `PD-3-09` / `OD-6`
+ *     verbatim." and "**No media ⇒ no panel**, never an empty box." Visible
+ *     placeholder chrome is now REQUIRED, and the caption is byte-carried from
+ *     `d5:953` (em dash U+2014, hexdumped).
+ *  2. ⛔ **AND IT APPEARS ONLY WHERE THERE IS NOTHING ELSE TO SHOW.** A panel
+ *     with real media must NOT carry it — that arm is not a placeholder and a
+ *     caption over a real image would be the `PD-3-09` defect for real. The two
+ *     arms are asserted separately below, which is what makes this a scoped
+ *     reversal rather than a blanket one.
  *  3. **The video is OUTBOUND** (ADR-0026): a new-tab link, never an embedded
  *     player, and never a same-tab navigation that would drop the reader out of
  *     the debate.
+ *
+ * ⚠⚠ REVIEW-SURFACE ONLY. Docketed at `docs/parked.md`
+ * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate before the DP.2 production
+ * promote.
  *
  * ⚠ O-7 — `innerHTML`, never `textContent`. Two of the three claims are about
  * elements and attributes, which `textContent` erases entirely.
@@ -33,24 +45,39 @@ const VIDEO = "https://example.invalid/watch?v=fixture";
 const TITLE = "Fixture market question.";
 
 describe("MarketMediaPanel — row 2", () => {
-	it("market-media::no-media-renders-NO-panel", () => {
+	it("market-media::no-media-renders-THE-PLACEHOLDER", () => {
 		const { container } = render(
 			<MarketMediaPanel imageUrl={null} videoUrl={null} title={TITLE} />,
 		);
 
-		// ⛔ Not an empty box — PD-3-09 / OD-6.
-		expect(container.innerHTML).toBe("");
+		// ⚠ The superseded assertion was `expect(container.innerHTML).toBe("")`.
+		// R2 requires visible chrome here.
+		expect(
+			container.querySelector('[data-testid="market-media-placeholder"]'),
+		).not.toBeNull();
+		// ⛔ BYTE-CARRIED FROM `d5:953`, EM DASH U+2014 (bytes e2 80 94). A hyphen
+		// would be a paraphrase, not a carry, and this literal is what catches it.
+		expect(container.innerHTML).toContain("MARKET MEDIA — IMG / VIDEO");
+		// The `.playmark` ring ships with it — the caption alone is a different
+		// composition from the mockup's centred column.
+		expect(container.querySelector("svg")).not.toBeNull();
 	});
 
-	it("market-media::the-mockups-placeholder-caption-is-NEVER-shipped", () => {
+	it("market-media::a-REAL-media-panel-carries-NO-placeholder-caption", () => {
 		const { container } = render(
 			<MarketMediaPanel imageUrl={IMAGE} videoUrl={VIDEO} title={TITLE} />,
 		);
 
-		// The mockup's own words, pinned as absent. This is the assertion that
-		// stops a later "restore fidelity" pass from porting `.cap` verbatim.
+		// ⛔ THE HALF OF THE OLD RULING THAT SURVIVES, AND THE SCOPE OF THE
+		// REVERSAL. R2 put the caption on the EMPTY arm; a caption over a real
+		// image would be `PD-3-09` for real — a build-time note printed across
+		// live content. This is the assertion that stops a later "restore fidelity"
+		// pass from porting `.cap` onto both arms.
 		expect(container.innerHTML).not.toContain("MARKET MEDIA");
 		expect(container.innerHTML).not.toContain("IMG / VIDEO");
+		expect(
+			container.querySelector('[data-testid="market-media-placeholder"]'),
+		).toBeNull();
 	});
 
 	it("market-media::an-image-alone-renders-a-panel-and-no-link", () => {

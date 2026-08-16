@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { CommentImage } from "@/components/debate/CommentImage";
+import { PostCard } from "@/components/debate/PostCard";
 import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
+import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { ReplyCard } from "@/components/debate/ReplyCard";
 import type {
 	DebateMarketHeader,
@@ -343,5 +345,166 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 
 		expect(container.querySelector("img")).toBeNull();
 		expect(container.innerHTML).not.toContain("Fixture reply body.");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL round 2 · R2 — the POST-IMAGE PLACEHOLDER, the
+ * second of the four the founder ruled in on 2026-08-16 (the OD-2 reversal).
+ *
+ * ⛔⛔ THE MASKING PROPERTY IS THE LOAD-BEARING ONE HERE, and it is the exact
+ * hazard this row creates. A placeholder that renders on EVERY card without an
+ * image would render beside a REMOVED post too — and a "POST IMAGE" box next to
+ * a withheld argument announces that the withheld argument HAD an attachment,
+ * which is an inference about removed content leaking off the masked payload.
+ * `SC-1`'s own framing catches it: what must be asserted is that the removed
+ * branch draws nothing, not merely that the present branch draws something.
+ *
+ * ⚠ It is structurally impossible on the POST path — the removed union variant
+ * carries no `imageUrl` field, so `post.imageUrl` does not typecheck in that
+ * branch — but "impossible by type" is what the ELSE arm silently defeats: an
+ * `else` needs no field at all. Hence the assertions below on both arms of both
+ * surfaces.
+ */
+/** HTML-FINISH · MARKET DETAIL round 2 · R2 — the REMOVED post variant. It
+ * carries NO `imageUrl` field at the type level, which is exactly what makes the
+ * placeholder's `else` arm the thing that needs a guard: an `else` needs no
+ * field, so the type system stops helping precisely where R2 adds a branch. */
+function removedPost(): DebatePost {
+	return {
+		removed: true,
+		id: "0199a0c0-0000-7000-8000-00000000da04",
+		ordinal: 2,
+		sideAtPostTime: "YES",
+		createdAt: "2026-07-30T00:00:00.000Z",
+		aggregate: {
+			supportCount: 0,
+			counterCount: 0,
+			supportDharma: "0.000000000000000000",
+			counterDharma: "0.000000000000000000",
+		},
+		replies: EMPTY_REPLIES,
+	};
+}
+
+const PH_URL = "https://example.invalid/post-attachment.png";
+
+describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", () => {
+	it("post-image-placeholder::a-present-post-with-no-image-draws-the-box", () => {
+		const { container } = render(
+			<PostCard
+				post={focusedPost(null)}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noop}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).not.toBeNull();
+		// ⛔ BYTE-CARRIED FROM `d5:1243`: MIDDLE DOT U+00B7 (bytes c2 b7) and d5's
+		// own demo aspect string. A hyphen, a bullet, or a "truer" caption would be
+		// authored copy; this literal is what catches all three.
+		expect(container.innerHTML).toContain("POST IMAGE · 640:586");
+	});
+
+	it("post-image-placeholder::a-post-WITH-an-image-draws-no-box", () => {
+		const { container } = render(
+			<PostCard
+				post={focusedPost(PH_URL)}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noop}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		expect(container.querySelector("img")?.getAttribute("src")).toBe(PH_URL);
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
+		expect(container.innerHTML).not.toContain("POST IMAGE");
+	});
+
+	it("post-image-placeholder::a-REMOVED-post-draws-NO-box-SC-1", () => {
+		// ⛔ THE MASKING GUARD. A removed post must not carry an image slot in any
+		// form: its attachment was withheld server-side, and reserving space for one
+		// tells the reader it existed.
+		const { container } = render(
+			<PostCard
+				post={removedPost()}
+				bookmarks={VIEWER}
+				onEnter={noop}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+				onReplyToPost={noop}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+			/>,
+		);
+
+		// Non-vacuity: the removed branch really rendered.
+		expect(container.innerHTML).toContain(REMOVED_STUB_TEXT);
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
+		expect(container.innerHTML).not.toContain("POST IMAGE");
+	});
+
+	it("post-image-placeholder::the-post-focus-arm-matches-BOTH-ways", () => {
+		// "Both arms" is the founder's own scope for R2's siblings, and the
+		// post-focus header reaches the placeholder by a different branch shape
+		// (`post.removed ? null : post.imageUrl ? … : …`) than the card does.
+		const { container, unmount } = render(
+			<PostFocusHeader
+				post={focusedPost(null)}
+				market={MARKET}
+				bookmarks={VIEWER}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="post-image-placeholder"]'),
+		).not.toBeNull();
+		unmount();
+
+		const { container: removed } = render(
+			<PostFocusHeader
+				post={removedPost()}
+				market={MARKET}
+				bookmarks={VIEWER}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
+		);
+		expect(removed.innerHTML).toContain(REMOVED_STUB_TEXT);
+		expect(
+			removed.querySelector('[data-testid="post-image-placeholder"]'),
+		).toBeNull();
+		expect(removed.innerHTML).not.toContain("POST IMAGE");
 	});
 });

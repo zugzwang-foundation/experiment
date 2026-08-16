@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
-import { CommentImage } from "./CommentImage";
+import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
@@ -103,7 +103,16 @@ export function PostFocusHeader({
 					    body, which pushed the argument down the column on every post that
 					    carried one. */}
 					<div className="flex gap-4">
-						{!post.removed && post.imageUrl ? (
+						{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 fills the
+						    post-focus `.hpimg` with its `POST IMAGE · 640:586` box
+						    (`d5:1491-1492`) whenever the focused post has no real
+						    attachment; the founder ruled that chrome IN.
+						    ⚠ THE REMOVED CASE STILL DRAWS NOTHING, deliberately: a removed
+						    post's variant has no `imageUrl` field at the type level, and
+						    an image slot beside a withheld argument would announce that
+						    it had an attachment. Hence `!post.removed` gates BOTH arms
+						    rather than only the real-image one. */}
+						{post.removed ? null : post.imageUrl ? (
 							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
 							// sized by its own content. `CommentImage` already renders
 							// `block w-fit` around a height-bounded image, so `shrink-0` is
@@ -118,7 +127,11 @@ export function PostFocusHeader({
 							<div className="shrink-0">
 								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
 							</div>
-						) : null}
+						) : (
+							<div className="w-1/3 shrink-0">
+								<PostImagePlaceholder />
+							</div>
+						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}

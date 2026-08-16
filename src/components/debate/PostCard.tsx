@@ -7,7 +7,7 @@ import { Card } from "@/components/ui/card";
 import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
-import { CommentImage } from "./CommentImage";
+import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebatePost, PresentPost, Side } from "./types";
 
@@ -196,9 +196,19 @@ export function PostCard({
 					+
 				</Button>
 			</div>
+			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
+			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real
+			    attachment (`d5:1682`), and the founder ruled that chrome IN. Where
+			    this branch used to render `null`, it now renders the placeholder.
+			    ⚠ THE REMOVED BRANCH ABOVE GETS NOTHING, and that is masking, not an
+			    oversight: a removed post's variant carries no `imageUrl` field at
+			    all, so drawing an image slot there would announce that a withheld
+			    argument HAD an attachment. */}
 			{post.imageUrl ? (
 				<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
-			) : null}
+			) : (
+				<PostImagePlaceholder />
+			)}
 
 			{/* Row 23 — `Open debate` is GONE from the present branch: the title
 			    above carries that destination now, and two controls for one
