@@ -114,10 +114,19 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 	it("census-is-alive", () => {
 		// A glob that silently matched nothing passes vacuously (N1). If this
 		// floor ever trips, the matcher broke — not the inventory.
-		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
+		//
+		// ⚠ LOWERED 13 → 12 AT HTML-FINISH · MARKET DETAIL row 33, with grounds,
+		// because the inventory genuinely SHRANK: `dialogs.tsx`'s two hand-built
+		// badges went away when both pop-ups adopted the shared `ArgProfile`
+		// cluster, which owns one badge for all of them. A floor that outruns the
+		// real inventory is a guard that reddens on correct code, and this file's
+		// own docstring says such a guard "gets suppressed within a week".
+		// ⛔ It is still a NON-VACUITY floor, not a count: the set-equality map
+		// below is what actually fences membership.
+		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(12);
 	});
 
-	it("exactly-eight-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-six-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -153,10 +162,13 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		//   own `SideBadge` — a removed reply has no author, so it cannot render
 		//   an `ArgProfile` — which is why the count is 1 and not 0.
 		//
-		// · Row 27 ADDED one back: `dialogs.tsx` gains a second UNSIZED site when
-		//   `ReplyPopup` joins `PostPopup` in that file. So the same PR moved this
-		//   map in BOTH directions, which is precisely why the map — and not a
-		//   count — is the fence.
+		// · Row 27 ADDED one back: `dialogs.tsx` gained a second UNSIZED site when
+		//   `ReplyPopup` joined `PostPopup` in that file …
+		// · … and row 33 then removed BOTH, when the two pop-ups adopted the same
+		//   `ArgProfile` cluster the card and the focused post use. `dialogs.tsx`
+		//   leaves this map entirely.
+		// ⇒ ONE PR moved this map in both directions and then off a file, which is
+		//   precisely why the MAP — and never a count — is the fence.
 		//
 		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
 		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
@@ -198,9 +210,8 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/ReplyCard.tsx": 1,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
-			"src/components/debate/dialogs.tsx": 2,
 		});
-		expect(base).toHaveLength(8);
+		expect(base).toHaveLength(6);
 	});
 
 	it("the-sized-sites-are-exactly-the-map-below", () => {

@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useRef } from "react";
+
 import {
 	Dialog,
 	DialogContent,
@@ -9,9 +11,34 @@ import {
 } from "@/components/ui/dialog";
 
 import { AggregateFooter } from "./AggregateFooter";
-import { LaneBadge, PositionMarker, SideBadge } from "./badges";
-import { formatDharma } from "./format";
+import { ArgProfile } from "./ArgProfile";
+import { LaneBadge } from "./badges";
 import type { PresentPost, PresentReply } from "./types";
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 35 — a pop-up opens SCROLLED TO THE TOP.
+ * d5 does it in `fillPop` (`:1641`): `var sc = document.querySelector('.pmscroll');
+ * if(sc){ sc.scrollTop = 0; }`.
+ *
+ * ⚠ WHY IT IS NEEDED AT ALL: `DialogContent` is `overflow-y-auto` and the SAME
+ * node is reused for every post, so the scroll position of the LAST long
+ * argument survives into the next one — a reader opens a short reply and lands
+ * halfway down it, or below its text entirely. The defect only appears on the
+ * second open, which is why no one meets it while building the first.
+ *
+ * ⚠ Keyed on the OPEN transition, not on mount: shadcn's `Dialog` keeps the
+ * content mounted between opens, so a mount-only reset would fire once and never
+ * again — the exact shape of the bug.
+ */
+function useScrollTopOnOpen(open: boolean) {
+	const ref = useRef<HTMLDivElement>(null);
+	useEffect(() => {
+		if (open && ref.current) {
+			ref.current.scrollTop = 0;
+		}
+	}, [open]);
+	return ref;
+}
 
 /**
  * The post pop-up (DEBATE.4 §4) — a read-only dialog showing a post's FULL body
@@ -26,6 +53,7 @@ export function PostPopup({
 	post: PresentPost | null;
 	onClose: () => void;
 }) {
+	const scrollRef = useScrollTopOnOpen(post !== null);
 	return (
 		<Dialog
 			open={post !== null}
@@ -41,47 +69,45 @@ export function PostPopup({
 			    merges via `cn`, so `max-w-[720px]` here wins by tailwind-merge.
 			    ⛔ `ui/dialog.tsx` is NOT on §8's allow-list and is NOT edited — the
 			    primitive keeps its default for every other dialog in the app. */}
-			<DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto">
+			<DialogContent
+				ref={scrollRef}
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+			>
 				{post ? (
 					<>
 						<DialogHeader>
 							<DialogTitle>{post.title}</DialogTitle>
-							{/* Rows 12 · 11 · 10 (PD-3-14 · PD-3-13 · PD-3-12). The pop-up was
-							    built as a BODY READER rather than as the card's expanded form, so
-							    every non-body element the card carries was simply not ported. All
-							    of them are ALREADY on `PresentPost` and the card reads each one
-							    unconditionally on the present branch — nothing is fetched here and
-							    ⚠ ADR-0034 D-1 DOES NOT FIRE: no field is added.
-
-							    Row 12 · TIER 1 — the frozen `SideBadge` replaces the bare
-							    interpolated `{post.sideAtPostTime}` text node. INV-3 is expressed
-							    in the UI THROUGH this primitive, so the remedy is to render it,
-							    not to restyle a string.
-							    ⛔ UNSIZED, deliberately: `side-badge.test.tsx`'s
-							    `detail-stays-unwired…` assertion pins `detail` at ZERO for
-							    POLISH.3, and a `size="detail"` would redden a second, unplanned
-							    assertion in a file this same commit already edits.
-
-							    Row 11 · TIER 1 — the author's stake `a`, SPEC.1 §9 F-DEBATE-1:
-							    "each post renders the author's stake at its header". Class F, not
-							    V — "no stake, no voice" is the thesis the stake display carries.
-							    Written in canon §107's SPACED grammar: this is NEW copy, so it is
-							    written in the ruled form rather than adding a fifth unspaced site.
-
-							    Row 10 — the position marker and the lane badge. `marker` is
-							    REQUIRED on this variant and `"none"` is a SENTINEL, never a
-							    missing field, so `PositionMarker` renders nothing rather than
-							    breaking. The footer, its third member, sits below the body where
-							    the card also puts it. */}
-							<DialogDescription className="flex flex-wrap items-center gap-1.5">
-								<SideBadge side={post.sideAtPostTime} />
-								<PositionMarker marker={post.marker} />
-								<span>{post.author.pseudonym}</span>
-								<span aria-hidden="true">·</span>
-								<span className="font-mono">
-									Đ {formatDharma(post.authorStake)}
-								</span>
-								<LaneBadge badge={post.badge} />
+							{/* HTML-FINISH · MARKET DETAIL row 33 — the pop-up head takes the
+							    mockup's CLUSTER. d5's `fillPop` (`:1628-1637`) writes
+							    `pm-author` · `pm-chip` (SIDE @ entry%) · `pm-stake` ·
+							    `pm-reps` — the same author row the card and the focused post
+							    render, so it is `ArgProfile` here too rather than a fourth
+							    hand-rolled copy.
+							    ⚠ `showActions={false}`: the bookmark cluster belongs on the
+							    CARD, where the reader is choosing between arguments. Inside a
+							    pop-up they have already chosen, and the card they opened it
+							    from still carries it. `showActions` is a caller-side layout
+							    switch and was designed for exactly this.
+							    ⚠ SUPERSEDES the PD-3-14 / PD-3-13 / PD-3-12 rows' hand-built
+							    strip (bare side badge · marker · pseudonym · `·` · stake ·
+							    lane badge). Every element they added survives — they arrive
+							    through the shared row now, plus the avatar and the entry price
+							    the strip never had. The lane badge is NOT part of that row, so
+							    it stays beside it. */}
+							<DialogDescription asChild>
+								<div className="flex flex-wrap items-center gap-1.5">
+									<ArgProfile
+										commentId={post.id}
+										author={post.author}
+										side={post.sideAtPostTime}
+										marker={post.marker}
+										entryPrice={post.entryPrice}
+										authorStake={post.authorStake}
+										bookmarks={null}
+										showActions={false}
+									/>
+									<LaneBadge badge={post.badge} />
+								</div>
 							</DialogDescription>
 						</DialogHeader>
 						{post.imageUrl ? (
@@ -152,6 +178,7 @@ export function ReplyPopup({
 	reply: PresentReply | null;
 	onClose: () => void;
 }) {
+	const scrollRef = useScrollTopOnOpen(reply !== null);
 	return (
 		<Dialog
 			open={reply !== null}
@@ -161,7 +188,10 @@ export function ReplyPopup({
 				}
 			}}
 		>
-			<DialogContent className="max-h-[90vh] max-w-[720px] overflow-y-auto">
+			<DialogContent
+				ref={scrollRef}
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+			>
 				{reply ? (
 					<>
 						<DialogHeader>
@@ -171,13 +201,22 @@ export function ReplyPopup({
 							<DialogTitle className="sr-only">
 								{reply.author.pseudonym} — {reply.side}
 							</DialogTitle>
-							<DialogDescription className="flex flex-wrap items-center gap-1.5">
-								<SideBadge side={reply.side} price={reply.entryPrice} />
-								<PositionMarker marker={reply.marker} />
-								<span>{reply.author.pseudonym}</span>
-								<span aria-hidden="true">·</span>
-								{/* Canon §107's SPACED grammar — the ruled form. */}
-								<span className="font-mono">Đ {formatDharma(reply.stake)}</span>
+							{/* Row 33 — the same cluster as the post pop-up, for the same
+							    reason. A reply has no lane badge (that is a post-ranking
+							    artifact), so it renders the row alone. */}
+							<DialogDescription asChild>
+								<div>
+									<ArgProfile
+										commentId={reply.id}
+										author={reply.author}
+										side={reply.side}
+										marker={reply.marker}
+										entryPrice={reply.entryPrice}
+										authorStake={reply.stake}
+										bookmarks={null}
+										showActions={false}
+									/>
+								</div>
 							</DialogDescription>
 						</DialogHeader>
 						{reply.imageUrl ? (
