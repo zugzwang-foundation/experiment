@@ -169,3 +169,177 @@ One session, 2026-08-16. Six commits, one PR.
 **What I am least sure of is the B/C split's boundary, not its order.** `PD-4-05` (`c2Strip`) went to B because it is a source-shape removal and no value moves; `PD-4-06` went to B because its deliverable is a three-file zero-movement proof, which is a behaviour claim about code that does not change. Both are defensible and neither is obvious. If the founder reads B as *arrangement only*, both belong elsewhere and it is a one-line move in §4.
 
 **What I did not do.** I did not run the delta recon, I did not touch a single `src/` or `tests/` file, and I did not verify anything about how this surface *renders* — no browser, no measurement, no compiled CSS. Every prior pass in this family records that resolved geometry is provable only in a browser and that jsdom cannot see it. **PR A contains no claim about geometry**, which is the only reason that absence is acceptable here; PR B and PR C will not have that excuse.
+
+---
+---
+
+# POLISH.4 · PR B — LAYOUT + BEHAVIOUR · session log
+
+**Branch** `polish/4-composer` · **base** `origin/main` @ `32a5dee` (`POLISH.4 PR A — THE RECORD + the HTML-FINISH fold (#344)`) — rebased onto it after #344 merged; cut originally at `8db535d`.
+**PR** [#345](https://github.com/zugzwang-foundation/experiment/pull/345). ⛔ **DO NOT MERGE — the founder reviews on staging.**
+
+**`src/components/debate/composer/**` + `tests/unit/composer/**` only. Zero `src/server/`, zero schema, zero migration, zero wire-shape change.** Full reviewer cascade run **sequentially** per `H-CASCADE`: `@test-writer` → `@code-reviewer` → `@security-auditor`. `ultrathink` on every prompt; ⛔ no `ultracode`, no dynamic workflow, no parallel fan-out (plan §0.2).
+
+⚠ **This section is a SECOND SESSION of ONE TASK, not a seventh document.** Plan §5's `docs/**` allow-list names the **path** `docs/logs/POLISH-4.md`, not a section within it. Founder-ruled at the Gate C relay, after this session halted on the ambiguity rather than minting `POLISH-4-PR-B.md` (§5: *"a seventh document is a halt, not an edit"*).
+
+---
+
+## 1 · What landed
+
+Six commits — **five code commits totalling 897 insertions / 129 deletions across 8 files**, plus this log. All eight files are inside plan §5's allow-list; **zero outside**.
+
+| # | SHA | Commit | Rows | Stat |
+|---|---|---|---|---|
+| **B0** | `2be6041` | `test(composer): RED first — d5 grid · travelling Đ · grouped counters · c2Strip` | the four REDs | 4 files, +421 |
+| **B1** | `81ee095` | `refactor(composer): remove the dead c2Strip export — OD-3` | `PD-4-05` | 1 file, −3 |
+| **B2** | `d7caa9a` | `feat(composer): d5 composer parity — two-column grid, travelling Đ, counters` | **R1 · R2 · R3** | 2 files, +227 −123 |
+| **B3** | `62052cc` | `fix(composer): the attach error must be announced — @code-reviewer HIGH` | cascade HIGH ×2 | 2 files, +238 −63 |
+| **B4** | `a494366` | `fix(composer): the pick control takes its own name — Gate C item 3` | Gate C 3 + the `font-mono` rider | 3 files, +73 −2 |
+| **B5** | *this* | `chore(polish): log session — POLISH.4 PR B` | — | this file |
+
+Files touched: `BetComposer.tsx` · `ImageAttach.tsx` · `copy.ts` · `tests/unit/composer/render/{attach-phases,c2-strip-removal,composer-grid,counters-grouped,stake-width}.test.tsx`.
+
+**`SlotHeader.tsx` and `suspended-modal.test.tsx` were NOT touched** — annexed to #341 (`H-SLOT` / `H-SUSPENDED`). `profile/PositionsTable.tsx` NOT touched (`H-HOST`). All three were **read** and reported.
+
+### The four rows
+
+| Row | Change | Baseline |
+|---|---|---|
+| **R1** | The argument region becomes d5's two-column `.compgrid` — image attach full-height left, title → body → money footblock right | tier 4 · `.compgrid`/`.attach`/`.compright` + the mockup's own CSS header *"composer: PORTRAIT attach FULL MODULE HEIGHT · title/body/money right"* |
+| **R2** | The **Đ travels with the digits** — the stake field's width tracks its content in `ch`, floored at 2 | tier 4 · `sizeAmt()` + *"width JS-managed: tracks content so Đ travels with the digits"* |
+| **R3** | Both counters group thousands (`0 / 4,998 · optional`) | **tier 2** · `design-canon.md` §6 composer register `158 / 2,200 · optional` |
+| **R4** | `copy.ts::c2Strip` removed | plan §15.1 **`OD-3` RATIFIED** + the mandatory `c2Sentence` positive control (§8 row 5) |
+
+---
+
+## 2 · `PD-4-06` — the three-file zero-movement proof
+
+**This is the row's whole deliverable** (plan §4: *"`PD-4-06` (zero code; its deliverable is the three-file zero-movement proof, §8 row 9)"*), and until this section it had nowhere to live.
+
+**⇒ CLASSIFIER, stated first** (`H-CLASSIFIER`): the substring `rate_limited`, anywhere under `src/components/debate/composer/**`. Spans both string families — the `p4_rate_limited` composer **state name** and the bare `rate_limited` **key-outcome** value.
+
+**Re-measured at PR head, not inherited from plan §1.3:**
+
+| Leg | Plan §1.3 @ `35da436` | PR head | |
+|---|---|---|---|
+| total sites | 8 | **8** | ✅ |
+| distinct files | 5 | **5** | ✅ |
+| `p4_rate_limited` | 5 | **5** | ✅ |
+| bare `rate_limited` | 3 | **3** | ✅ |
+
+The five files: `state-map.ts` · `idempotency.ts` · `BetComposer.tsx` · `SellModule.tsx` · `ErrorStrip.tsx`.
+
+**The three census files named at §8 row 9 — `git diff origin/main -- <file>` is EMPTY for all three:**
+
+| File | vs `origin/main` |
+|---|---|
+| `tests/unit/composer/idempotency.test.ts` | **UNCHANGED** |
+| `tests/unit/composer/state-map.test.ts` | **UNCHANGED** |
+| `tests/unit/composer/render/error-strip.test.tsx` | **UNCHANGED** |
+
+⇒ **The disposition holds: `duplicate-of-known` / not-a-defect.** The routed defect class (*raw codes render to users*) does not reproduce here — no composer code path **renders** a code; every one of the eight sites only **compares** one. `BetComposer.tsx` is in the five and *was* edited by this PR, so the interesting leg is the negative one: its single `case "p4_rate_limited":` arm is byte-unchanged, and the three suites that would have caught a move did not move either. **Nothing moved, and the three files are the evidence.**
+
+⚠ This is plan §14's `O-10` candidate — *a routed item inherits its **location**, not its **defect class***. Second instance recorded at `P4-F3`; still **not numbered**, `O-space` mints are the founder's.
+
+---
+
+## 3 · `ImageAttach` consumer census — re-counted AT PR HEAD (§8.1)
+
+**Why it was owed:** `ImageAttach` now returns a **fragment** instead of a wrapping `<div>`, which changes the DOM contract for every consumer — the panel must land somewhere two sibling nodes are acceptable. §8.1 requires the inventory re-counted at PR head, never at plan time (*"minted from an inventory that went 9 → 13 inside one PR"*), and PR #345 opened without reporting it.
+
+**Method — four passes, because one grep is not a census.** A bare `grep ImageAttach` is polluted by three unrelated identifiers: the server-side `resolveImageAttachment`, the client logic module `composer/image-attach.ts` (lowercase, a different file), and its `ImageAttachResult` type.
+
+| Pass | Query | Result |
+|---|---|---|
+| A | imports of the **component module** (`from "./ImageAttach"` / `@/components/debate/composer/ImageAttach`) | **2** — `BetComposer.tsx:36` · `attach-phases.test.tsx:9` |
+| B | JSX mounts `<ImageAttach` | **2** — `BetComposer.tsx:507` · `attach-phases.test.tsx:42` |
+| C | the bare identifier, minus its own file and the three decoys | same 2, plus prose-only mentions in two docblocks |
+| D | `dynamic(` / `React.lazy` / `lazy(` under `src/components/`, a barrel `composer/index.ts`, any `export … from … ImageAttach` | **zero, zero, zero** |
+
+⇒ **`BetComposer.tsx` is the ONLY `src/` consumer** — one import, one mount, and that mount is a direct child of the `.compgrid`, which is exactly where the fragment's two children are meant to land. The one test consumer renders it standalone into a plain container, where sibling nodes are trivially fine. **No other consumer needs checking; the "fragment landing outside a grid" case has no site.**
+
+⚠ **The residual risk is not a consumer, it is a class.** The fragment's guarantee that the hidden `<input type="file">` generates no grid track rests entirely on its `className="hidden"` — `@code-reviewer` MEDIUM: `composer-grid.test.tsx::columnsOf` filters that input out **unconditionally**, so its "exactly two columns" assertion could not fail if the class were dropped. `attach-phases.test.tsx` now pins the class directly, which is what restores the guard's falsifiability.
+
+---
+
+## 4 · Surprises caught + fixed in-session
+
+**1 · I silenced the image-error announcement, and the mockup is what led me there.** d5's `.attach{cursor:pointer}` makes the whole panel the pick target, so my first draft made the panel one `<button>` with the error strip inside it. **ARIA's presentational-children rule strips the roles of a `button`'s descendants**, so `role="status" aria-live="polite"` in that position is not a live region at all — and the button's `aria-label` excludes the message from its accessible name as well. Net: `error_image_oversize`, gate-down and sign-reject had **no channel** to a screen-reader user, and at `8db535d` they did. Every other live region on this surface is a non-interactive element; I had made this file the sole exception. Caught by `@code-reviewer` (HIGH), fixed at `62052cc`: the column is `<fieldset aria-label>`, the pick control **fills** it so the target stays panel-sized, the status region is the control's **sibling**. `attach-phases.test.tsx::statusOutsideAnyButton` walks every ancestor and fails if one is a `BUTTON`. **The chain matters: a faithful arrangement port produced an a11y regression, and only an independent read found it.**
+
+**2 · The fix produced its own defect, one layer down.** Moving the label to the group left the pick button deriving its name from its contents — *"Image Shown whole · any orientation"* idle, and **the filename while attaching**, so the control's accessible name changed under the user mid-interaction. Caught at Gate C, fixed at `a494366` with a distinct `PICK_LABEL` and assertions on both the distinctness and the singleness. **Two rounds, two defects, same three lines of markup.**
+
+**3 · `max-w-40` was a value I had no attestation for.** It exists in shipped code only as this file's *filename* truncation cap; re-roling it as a 160px preview cap byte-carries a string **without its role**, and it silently swapped d5's height-based containment for a width-based one. `@code-reviewer` HIGH. Refused; d5's `max-height:calc(100% - 22px)` now ports as `max-h-full` — mechanism kept, `22px` refused.
+
+**4 · My own docblock was the `V-3` shape.** It claimed *"every class below is byte-carried from this file's own shipped render"* — **false for six of them** (`p-3`, `h-full`, `flex-1`, `text-center`, `max-w-full`, `aspect-[4/5]`). A pre-verification that reads as checked and does not resolve, which is precisely what plan §2.3 fires on. Rewritten to state provenance **per class in four arms**, with the refusals enumerated.
+
+**5 · The one I did NOT ship, and it is the most valuable.** d5 removed the reply header's post title at v0.11, and the build's own docblock cites the superseded **v0.10** — a clean-looking delta with the build's own comment appearing to confirm it. **Tier-3 `UI-A3.md` requires that title in three separate places.** Tier 3 governs over tier 4; the build is CORRECT. This is the **DISCOVERY `G-1` shape** — deleting an element a governing document names — which cost a SPEC.1 amendment on a live branch. It was caught by `O-9`'s cheap tell and nothing else: *the prose contained a `§`, so the document was read at HEAD before the edit was saved.*
+
+---
+
+## 5 · Verification
+
+| Gate | Result |
+|---|---|
+| `pgrep -f 'node.*vitest'` before **every** run | **none** each time — no concurrent runner, so no RED was false (`H12`) |
+| **RED baseline**, captured before any fix was written (§9's single `H9` exception) | **4 files failed · 9 tests failed** |
+| `just verify` (typecheck → biome → `next build`) | **EXIT=0** |
+| `pnpm vitest run` — full suite, backgrounded, run **directly** (not via `just`, which points at the cloud DB) | ✅ **EXIT=0** — **351 files passed \| 1 skipped (352)** · **3216 passed \| 1 skipped \| 4 todo (3221)** |
+| `git status --porcelain` at close | clean |
+
+Every gate ran as its own statement with `echo EXIT=$?` **last** — a trailing command owns the compound exit whether the joiner is a pipe or a `;`.
+
+⚠ **`just verify` needed a placeholder env and that is env-only, not a regression.** This worktree has no `.env.local`, so `next build` died at page-data collection on `DATABASE_URL is not set`. Fixed by exporting the `tests/_setup/env.ts` placeholder set — **vars SET, not connected**; no `.env*` file was read, written or copied.
+
+⛔ **RESOLVED GEOMETRY IS NOT PROVEN AND PR B DOES NOT GET PR A's EXCUSE.** jsdom performs no layout. The suites pin the **arrangement** — two tracks, which child is which, every labelled control surviving — and assert **nothing** about how the tracks resolve, whether the attach column is genuinely full height, or how the grid behaves at the debate arena's half-width. `.next/static/css` was empty locally, so no compiled-CSS read was available either. `@code-reviewer` MEDIUM notes `tests/unit/design/` has `bookmarks-`, `profile-` and `discovery-height-chain` guards and **no debate/composer one**; `max-h-full` on the preview is the mitigation, the browser pass is the proof.
+
+---
+
+## 6 · Decisions made
+
+1. **Tier 3 beats tier 4 — the reply header's post title STAYS.** Recorded at §4 item 5. The build's `v0.10` docblock citation is stale and was **left alone**: correcting it is prose that cites a governing document, i.e. an `O-9` rider, and the row it would ride does not exist.
+2. **The verb line is NOT truncated to one line.** d5's `white-space:nowrap` clause and the post-title removal are halves of the **same** v0.11 note, and tier 3 overrode the other half. Cherry-picking the survivor is the `S2` error.
+3. **The submit button is NOT stacked into two lines.** It would mean not rendering `COMPOSER_COPY.submit` as one unit — a §7 no-edit symbol, held by canon §7 item 3 (the `Đ BET` wordmark, **app-wide**) and re-affirmed at `P4-F3`.
+4. **The title field is NOT converted to a textarea.** d5's equal-flex-height clause needs it; the conversion reddens `suspended-modal.test.tsx` — **`H-SUSPENDED`**, annexed to #341.
+5. **`SellModule.tsx` untouched.** d5 carries **no** sell module (*"sell stays profile-only per D4-12"*), so there is no d5-derived delta. `P4-F1` reproduced at head, not re-derived: the sell slide's `h-[50px]` box, its `.26s` fade and its toggle are declared in `profile/PositionsTable.tsx` — `.5`'s, `H-HOST`. *(It also has no ESC close route, only a Cancel button — reported, not built: inventing one from d5's `.mod` handler would apply a baseline the module does not sit under.)*
+6. **d5's `.footblock` border rule NOT ported.** d5 puts a `border-top` above a `.pm` block that has **no border of its own**; the shipped amount block already **is** a bordered box, so porting the rule would double an edge the shipped design had replaced. A faithful port of the wrong half.
+7. **`H-VALUE` refusals, enumerated:** `minmax(210px,40%)` → the proportion alone (`grid-cols-[2fr_3fr]`, d5's own 40/60 with no pixel in it) · `1px dashed var(--n3)` → the shipped hairline · the `22px` height offset → `max-h-full` · `max-w-40` → dropped · d5's literal `IMAGE` placeholder → **not rendered** (the state carries no preview data, so the string would claim a preview that does not exist).
+8. **`groupCount` duplicates `format.ts::groupInteger` deliberately.** That helper is **private** and its file is deny-list `D5`; exporting it is `H4`. Duplicating one regex beats widening the fence. *(`@code-reviewer` `POLISH-4 L-1` names a third option — `formatDharma` is already imported from that same module — and agrees duplication is right: coupling character counts to Đ rounding would be worse.)*
+9. **R2 takes the mockup's JS mechanism, not `field-sizing-content`.** The CSS-native route is the `O-1` structural choice on paper and is already shipped on `ui/textarea.tsx` — but where it is unsupported the field silently reverts and the Đ stops travelling, with nothing to detect it. Chosen deliberately and recorded at the call site, with the `font-mono` dependency named beside it (the `ch` unit is the width of the `0` glyph; a proportional face breaks the tracking silently).
+10. **The shell comparison was run against `~/Downloads`, and declared.** The kickoff cited `docs/design/mockups/DESIGN_integration-shell_v1_0.html`; **that path does not exist in the repo**. `O-6` declaration made, bearing stated, run continued. `SRC.d5` decodes to md5 `34619dacee472a245cb6e8678b509219` — **byte-identical** to the repo copy, so no "use the repo's" call was needed.
+
+---
+
+## 7 · Open questions
+
+1. **⛔ The YES pole cannot render on the dark ground, and it is not `.4`'s to fix.** The founder flagged `ReplySplitBar`'s Support/Counter pills as both-outlined. Measured by rendering the shipped component: **the class IS applied**, keyed on the resulting bet side exactly as d5 keys it — hypothesis (a) falsified. The fill is invisible because **`--color-yes: #181818` is byte-identical to `--color-ground: #181818`** (1.00:1; ~1.10:1 against the `--color-n0` card). The repo has already conceded this twice at founder level — `--graph-yes: #737373` carries the comment *"the black pole cannot render on the dark ground"*, and `TriggerPill`'s *"black-pill exception: 0.5px n2 edge"* exists for exactly this reason. **Routed, no value proposed** — it reaches every filled-YES-pole surface and any remedy is `H-SYSTEM` / `D7`. ⚠ On this measurement exactly **one** pill reads outlined at a time; two readings produce *"both"* — (i) both triggers **disabled**, where the opacity token washes the white pill toward the ground, or (ii) the sighting was on `AggregateFooter` (`.3`'s, `D5`), whose docblock records that `POLISH-3.md` R1 **removed** its `.rbtn2` pills.
+2. **A `debate/composer` height-chain guard does not exist.** Three sibling surfaces have one. Named, not built — it is a `tests/unit/design/` file, outside §5's allow-list.
+3. **`onPickImage` does not re-check `inFlight` after its `await`** (`@security-auditor` SURPRISE, out of this diff). A submit racing a slow attach ships without `imageUploadsId`; the attach resolves and a retry under the held key ships a body that now carries it. **Not exploitable** — the server fingerprints the canonical body onto the durable receipt, so a same-key/different-fingerprint replay is a hard 409, never cached; INV-1/2/3/4 hold on both branches. **UX only.** Cheap fix: add `image.phase === "attaching"` to `submitDisabled`. Deliberately not taken (§5.4).
+4. **`POLISH-4 L-1`** (`@security-auditor`, pre-existing): the image **sign** path passes the server's own `error.message` through, while the **place** path deliberately refuses it for fixed client copy. Safe today (the route hardcodes both strings) — but this PR moved that render site into an `aria-live` region, so a future diagnostic would be *announced*.
+5. **Five new test files are not in §5's by-name list** ("19 of 21", enumerated by name). §5.6/§9 plainly require new REDs, so the reading is right — but it is a reading (`@code-reviewer` `POLISH-4 L-7`), and the next surface's plan should say which it means.
+
+---
+
+## 8 · Next session starts at
+
+**PR C — VALUES.** `PD-4-04`: mint the `OD-2` **named micro-label preset**, defaulted **byte-identical** to today's render (§8.1's zero-delta obligation is the whole of what keeps `OD-2` inside `H-SYSTEM`), over the **eight** composer sites in **three** tiers. ⛔ Do **not** adopt `.3`'s tier — its stated precedent does not resolve (§1.2). `POLISH.1`'s four `shell/` sites stay **OUT** and get their own row, so the `MICRO-LABEL-TIER` docket row is **still not discharged whole** and must not be marked so.
+
+**Exact next action:** re-read plan §15.1 `OD-2` and §8.1, then re-count the micro-label consumer inventory **at PR C head** — never at plan time — before writing a line.
+
+⚠ **PR C is blocked on a founder choice, not on work:** the preset makes the tier *addressable*; it does not *choose* it. §7 open question 3 of the PR A log is still the live question.
+
+---
+
+## 9 · Context to preserve
+
+- **The mockup is a light-mode pre-BRIDGE prototype and its ramp is INVERTED.** Take STRUCTURE and BEHAVIOUR from it; take VALUES from shipped code and canon. Every value that shipped here is byte-carried from the file being edited or from shipped code tree-wide, and the refusals are enumerated at §6 item 7.
+- **Tier 3 governs tier 4, and the composer has TWO live instances of it** — the P/L readout (`PD-4-07`, plan §2.5) and now the reply header's post title (§4 item 5). Before deleting anything the mockup dropped, grep `UI-A3.md`.
+- **`P4-F1` held everywhere it was tested.** The composer is a *guest* on two hosts and arrangement is a property of hosts. Every arrangement lever this session wanted that sat outside the fence — the sell slide, the opposite-slot open, the engaged-slot backlight — was declared in `.3`'s or `.5`'s files.
+- **The a11y ↔ fidelity seam is real and it bit twice in one file.** d5's *"the whole panel is the target"* is an arrangement instruction that, taken literally, destroys a live region and then a control's accessible name. Port the affordance, not the element type.
+- **`ImageAttach` has exactly one `src/` consumer** (§3). If that ever stops being true, the fragment return is the first thing to re-check.
+- **`just verify` needs the placeholder env in this worktree** — there is no `.env.local`. Vars SET, not connected; never read a real `.env*`.
+
+---
+
+## 10 · Time
+
+One session, 2026-08-16 → 2026-08-17. Six commits, one PR, one full reviewer cascade plus a Gate C round.
