@@ -79,19 +79,31 @@ export function DebateColumn({
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""
-			} [&>*:last-child]:transition [&>*:last-child]:duration-150${
+			} [&>*:last-child]:transition-transform [&>*:last-child]:duration-150${
 				// `.slot.picked .panel.vm{transform:translateY(-5px);
 				// box-shadow:0 6px 16px …}` (`d5:896`) with its own `.16s ease`.
-				// ⚠ `transition`, NOT `transition-transform`: Tailwind v4 emits
-				// `-translate-y-*` on the `translate` PROPERTY, not on `transform`, so
-				// `transition-transform` animates nothing and the lift snaps. Verified
-				// in the browser — `getComputedStyle(el).transform` reads `none` while
-				// `.translate` reads `0px -5px`.
+				// ⛔⛔ THE LIFT IS WRITTEN AS `transform` DIRECTLY, and that is a
+				// MEASURED correction, not a style preference. Tailwind v4's
+				// `-translate-y-*` does not set `transform` at all — it sets the
+				// `translate` PROPERTY via `--tw-translate-x/y`. Through this
+				// `[&>*:last-child]:` arbitrary variant that indirection does not
+				// resolve: measured on staging, the element carried
+				// `--tw-translate-y: calc(5px * -1)` while `getComputedStyle(el)
+				// .translate` still read `0px`. The custom properties landed and the
+				// shorthand they feed did not, so the card never moved.
+				// ⚠ MY OWN FIRST READING OF THIS WAS WRONG IN THE OTHER DIRECTION and
+				// is recorded rather than quietly dropped: an earlier probe read
+				// `.transform` (which is `none` for a v4 translate utility whether or
+				// not it applied) and I reported the lift working off `.translate`
+				// reading `0px -5px`. Two probes, two different answers, and only the
+				// direct `transform` declaration is unambiguous — so that is what
+				// ships. `transition-transform` now animates the property that is
+				// actually being set.
 				// The LIFT rides the column's body (the scroller, this node's last
 				// child, which is the card); the ELEVATION rides the column box,
 				// because the body has no surface of its own to cast from.
 				picked
-					? " rounded-(--r) shadow-(--elev-3) [&>*:last-child]:-translate-y-[5px]"
+					? " rounded-(--r) shadow-(--elev-3) [&>*:last-child]:[transform:translateY(-5px)]"
 					: ""
 			}`}
 		>
