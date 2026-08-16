@@ -1,6 +1,6 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PageContainer } from "@/components/shell/PageContainer";
@@ -106,6 +106,25 @@ export function DebateView({
 	// enter/exit) no-ops — a mid-request unmount + re-open would mint a
 	// fresh key over a possibly-committing bet.
 	const [composerBusy, setComposerBusy] = useState(false);
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE PICKED COLUMN (d5's `picked`,
+	 * `:1683`). The reader's chosen side stops auto-advancing; the OTHER side
+	 * keeps running (`:1744` — "picked side is manual (loader off); the OTHER side
+	 * keeps auto-scrolling").
+	 *
+	 * ⛔⛔ IT LIVES HERE AND NOT IN THE SCROLLERS, AND IT HAS TO. Picking is
+	 * MUTUALLY EXCLUSIVE across the two columns — choosing YES releases NO — and
+	 * the two scrollers are siblings that cannot see each other. Owning it in
+	 * either one would mean a column reaching across to its peer. This is the
+	 * smallest node that contains both, and it is already the arena's owner.
+	 *
+	 * ⚠ ONE SLOT SERVES BOTH ARMS, deliberately. The market arm picks a POST
+	 * column and the post arm picks a REPLY column, and the two never coexist —
+	 * the ternary below renders exactly one arena. d5 runs two separate scripts
+	 * for the two arms and duplicates the whole state machine; one slot plus the
+	 * arm-swap reset below is the same behaviour without the second copy.
+	 */
+	const [pickedSide, setPickedSide] = useState<Side | null>(null);
 
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
@@ -130,6 +149,70 @@ export function DebateView({
 		}
 		setOpenSide((cur) => (cur === side ? null : side));
 	};
+
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE SURFACE IS FROZEN while a
+	 * composer or a pop-up is open. d5's `locked` / `inDefault()` (`:1756-1771`):
+	 * "any sub-view hides controls + freezes both sides until back to plain market
+	 * view".
+	 *
+	 * ⛔ IT FREEZES **BOTH** COLUMNS, not just the one hosting the composer. The
+	 * composer already replaces its own column's scroller, so freezing only that
+	 * one would be a no-op; the point is that a reader typing an argument must not
+	 * have the OTHER column shuffling beside them. The lightbox counts for the
+	 * same reason — it covers the surface, and a card that moves underneath it has
+	 * moved somewhere the reader cannot see.
+	 */
+	const frozen =
+		openSide !== null ||
+		openReply !== null ||
+		popupPost !== null ||
+		popupReply !== null ||
+		lightboxUrl !== null;
+
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — ←/→ PICK A SIDE. d5's `onKey`
+	 * (`:1789-1803`, `:1889-1895`): ArrowLeft picks the left column, ArrowRight
+	 * the right.
+	 *
+	 * ⛔ ONLY ←/→, AND d5's ↑/↓ STEPPING IS DELIBERATELY NOT PORTED. d5
+	 * `preventDefault()`s every arrow key because its own surface does not scroll;
+	 * this page does, and swallowing ↑/↓ would take the page's own scrolling away
+	 * from every keyboard user to add a shortcut nobody asked for. The founder's
+	 * ruling names ←/→ and this builds exactly that.
+	 *
+	 * ⛔ NEVER WHILE TYPING. The guard is d5's own (`:1461`) — a composer is a
+	 * `<textarea>`, and stealing ← from an author mid-argument would move the
+	 * surface under them while they are trying to move the caret. `frozen` already
+	 * covers the composer-open case; the target guard is the belt for any future
+	 * input this surface grows.
+	 *
+	 * ⚠ `preventDefault` ONLY on the two keys actually handled, so nothing else
+	 * about arrow-key behaviour on this page changes.
+	 */
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
+				return;
+			}
+			if (frozen) {
+				return;
+			}
+			const target = e.target as HTMLElement | null;
+			if (
+				target !== null &&
+				(target.tagName === "TEXTAREA" ||
+					target.tagName === "INPUT" ||
+					target.isContentEditable)
+			) {
+				return;
+			}
+			e.preventDefault();
+			setPickedSide(e.key === "ArrowLeft" ? "YES" : "NO");
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [frozen]);
 
 	/** The body of one market-view pole column: composer/auth-gate when this
 	 * column is the OPPOSITE slot of the open bet side; the post scroller
@@ -192,6 +275,12 @@ export function DebateView({
 		setSelectedPostId(id);
 		setOpenReply(null);
 		setOpenSide(null);
+		// R3 — the arm swap releases the picked column. d5 does the same on entering
+		// and on leaving a post (`:1869-1870`): the pick names a COLUMN, and the
+		// post arm's columns are different columns holding different content, so
+		// carrying the pick across would silently freeze a column the reader never
+		// chose.
+		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 		resetPageScroll();
@@ -218,6 +307,8 @@ export function DebateView({
 		setSelectedPostId(id);
 		setOpenSide(null);
 		setOpenReply(relation);
+		// R3 — same arm swap, same release.
+		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
 		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
@@ -231,6 +322,8 @@ export function DebateView({
 		setSelectedPostId(null);
 		setOpenReply(null);
 		setOpenSide(null);
+		// R3 — leaving post-focus releases the picked column too (d5 `:1870`).
+		setPickedSide(null);
 		syncPostParam(null);
 	};
 	const selectedPost = selectedPostId
@@ -389,6 +482,17 @@ export function DebateView({
 											bookmarks={bookmarks}
 											onOpenImage={setLightboxUrl}
 											onOpenPopup={setPopupReply}
+											// R3 — the post arm's own auto-advance. d5 runs a
+											// SECOND, structurally identical timer over the reply
+											// columns (`:1816-1901`); one hook serves both here.
+											// `stagger` on NO only, so the two columns advance
+											// one-after-another rather than flipping together.
+											auto={{
+												picked: pickedSide === side,
+												frozen,
+												onPick: () => setPickedSide(side),
+												stagger: side === "NO",
+											}}
 										/>
 									)}
 								</DebateColumn>
@@ -448,6 +552,18 @@ export function DebateView({
 										heldSide={heldSide}
 										marketOpen={marketOpen}
 										suspended={suspended}
+										// R3 — auto-advance. `stagger` on NO only: d5 offsets
+										// the second side by half a cadence so the two columns
+										// advance one-after-another (`:1742` — "NO leads by
+										// 10s"). ⚠ The pick is MUTUALLY EXCLUSIVE by
+										// construction — `pickedSide` is one slot, so choosing
+										// one column releases the other with no cross-talk.
+										auto={{
+											picked: pickedSide === side,
+											frozen,
+											onPick: () => setPickedSide(side),
+											stagger: side === "NO",
+										}}
 									/>,
 								)}
 							</DebateColumn>
