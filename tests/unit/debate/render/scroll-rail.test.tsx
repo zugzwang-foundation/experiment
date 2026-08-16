@@ -150,14 +150,23 @@ describe("ScrollRail — rows 18 + 19", () => {
 		).toBe(false);
 	});
 
-	it("scroll-rail::carries-NO-d5-length", () => {
-		// ⛔ The one surviving rule. d5's rail is `92px` tall, `5px` wide,
-		// `gap:9px`, `right:2px` — none of those may appear. The fill's
-		// `w-[3px] rounded-[1px]` is BYTE-CARRIED from `shell/RadioSlot.tsx`,
-		// already on `main`, which is why it is the one length that may.
-		// ⚠ R3 adds a DURATION to the value classes that must not be carried: d5's
-		// cadence is 20s and the build's comes from `POLL_INTERVAL_MS_DEBATE_VIEW`.
-		// A rail rendering a 20000ms transition would be that leak.
+	it("scroll-rail::carries-d5s-LENGTHS-but-never-its-DURATION", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED FROM WHAT IT SAID, by founder ruling, and
+		// the superseded version is recorded rather than deleted (O-4). It read:
+		// "⛔ The one surviving rule. d5's rail is `92px` tall, `5px` wide,
+		// `gap:9px`, `right:2px` — none of those may appear," and it forbade all
+		// four while requiring the byte-carried `w-[3px]`.
+		//
+		// ⇒ HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY, founder-ruled
+		// 2026-08-17: "Where d5 uses a literal (rail width, 640:586 image aspect),
+		// copy the literal." The rail is named in the ruling, so its lengths are
+		// now REQUIRED: 14px wide, `gap:9px`, a 5 × 92 track.
+		//
+		// ⛔ THE DURATION HALF SURVIVES UNCHANGED, and it is the half that was
+		// always load-bearing: d5's cadence is 20s and the build's comes from
+		// `POLL_INTERVAL_MS_DEBATE_VIEW`. A rail rendering a 20000ms transition
+		// would still be a leak, because a DURATION is not a dimension and the
+		// parity ruling is about geometry only.
 		const { container } = render(
 			<ScrollRail
 				index={0}
@@ -169,16 +178,16 @@ describe("ScrollRail — rows 18 + 19", () => {
 			/>,
 		);
 		const html = container.innerHTML;
-		for (const forbidden of [
-			"92px",
-			"5px",
-			"gap-[9px]",
-			"right-[2px]",
-			"20000",
-		]) {
+		// The geometry d5 declares, now carried verbatim.
+		for (const required of ["w-[14px]", "gap-[9px]", "h-[92px]", "w-[5px]"]) {
+			expect(html).toContain(required);
+		}
+		// ⛔ Still forbidden: d5's ABSOLUTE positioning offset (the rail sits in
+		// normal flow here, beside the card, not overlaid on the slot) and any
+		// cadence value.
+		for (const forbidden of ["right-[2px]", "20000"]) {
 			expect(html).not.toContain(forbidden);
 		}
-		expect(html).toContain("w-[3px]");
 	});
 });
 

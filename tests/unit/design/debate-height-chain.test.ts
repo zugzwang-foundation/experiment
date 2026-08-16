@@ -203,12 +203,18 @@ describe("debate height chain — the headzone band does not grow", () => {
 		expect(classes).toContain("min-h-0");
 		expect(classes).toContain("flex");
 		expect(classes.filter((c) => FORBIDDEN_HEIGHT.test(c))).toEqual([]);
-		// ⚠ THE BAND IS DECLARED AS A FRACTION, never as d5's literal `188px`.
-		// `.headzone{flex:0 0 188px}` inside a `.content` whose inner height is
-		// 879px at the pinned 1800×971 → 21.4%. A percentage basis reproduces the
-		// mockup at that viewport AND holds the proportion at every other one,
-		// which the mockup's own fixed px cannot do.
-		expect(classes.some((c) => /^basis-\[\d+(\.\d+)?%\]$/.test(c))).toBe(true);
+		// ⚠ THE BAND IS A FRACTION OF THE VIEWPORT, never d5's literal `188px` and
+		// never a percentage of the CONTAINER. `.headzone{flex:0 0 188px}` is
+		// 188/777 = 24.2% of the viewport at the pinned 1440×777.
+		// ⛔ `dvh`, NOT `%`, and this assertion was written the wrong way first: a
+		// container percentage is 21.4% at 1800×971 and 27.5% at 1440×777 for the
+		// SAME 188px band, because it drifts with the container's own padding and
+		// chrome. Shipping the percentage measured 146px on staging. A viewport
+		// fraction is the ratio d5's fixed px actually encodes, so the unit is
+		// pinned here and not just the shape.
+		expect(classes.some((c) => /^basis-\[\d+(\.\d+)?dvh\]$/.test(c))).toBe(
+			true,
+		);
 	});
 
 	it("debate-height::both-headzone-columns-may-shrink-below-their-content", () => {
