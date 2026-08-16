@@ -269,6 +269,7 @@ export function DebateView({
 						}}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
+						onOpenPopup={setPopupPost}
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {

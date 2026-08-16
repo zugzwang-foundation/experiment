@@ -2,7 +2,7 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
@@ -12,6 +12,7 @@ import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
 import type {
 	DebateMarketHeader,
 	DebatePost,
+	PresentPost,
 	ReplyGroups,
 } from "@/components/debate/types";
 
@@ -120,6 +121,7 @@ function renderPostArm() {
 			onToggleRelation={noop}
 			onExit={noop}
 			onOpenImage={noop}
+			onOpenPopup={noop}
 		/>,
 	);
 }
@@ -187,9 +189,12 @@ describe("the arm split — each arm renders through the shared frame", () => {
 
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		expect(left).not.toBeNull();
-		// `vp` content — the focused post's title and body.
+		// `vp` content — the focused post's title and teaser.
+		// ⚠ RE-DERIVED AT ROW 15: the focused post renders a TEASER with a `+`
+		// into the pop-up, not the whole body inline. The arm-split property this
+		// asserts is unchanged; only the marker moved.
 		expect(left?.innerHTML).toContain("Fixture argument title.");
-		expect(left?.innerHTML).toContain("Fixture body.");
+		expect(left?.innerHTML).toContain("Fixture teaser.");
 	});
 
 	it("head-zone::the-two-arms-are-DISJOINT", () => {
@@ -268,5 +273,82 @@ describe("the mount site — read off the source, because jsdom cannot see it", 
 		// "stopped permanently" would last only until the reader opened a post.
 		// Row 1 moved the header in; it must never sweep the poll in with it.
 		expect(poll).toBeLessThan(ternary);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 15 — the focused post shows a TEASER with a
+ * `+` expand, not the whole body inline.
+ *
+ * The post-focus arm is where you read the argument and then reply, so a long
+ * argument that pushes the reply columns below the fold defeats the surface. The
+ * full body is one click away in the pop-up and still ships whole in the
+ * ADR-0025 `.md` export — this defers it, it does not withhold it.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", () => {
+	it("head-zone::the-focused-post-renders-its-teaser-not-its-body", () => {
+		const { container } = renderPostArm();
+		const left = container.querySelector('[data-testid="headzone-left"]');
+
+		expect(left?.innerHTML).toContain("Fixture teaser.");
+		// The full body no longer renders INLINE — it is the pop-up's now.
+		expect(left?.innerHTML).not.toContain("Fixture body.");
+		// Non-vacuity: the title still renders in full.
+		expect(left?.innerHTML).toContain("Fixture argument title.");
+	});
+
+	it("head-zone::the-plus-opens-the-pop-up-with-this-post", () => {
+		const onOpenPopup = vi.fn();
+		const { container } = render(
+			<PostFocusHeader
+				post={presentPost()}
+				market={market}
+				bookmarks={VIEWER}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={onOpenPopup}
+			/>,
+		);
+
+		const plus = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.getAttribute("aria-label") === "Show more",
+		);
+		expect(plus).toBeDefined();
+		fireEvent.click(plus as HTMLButtonElement);
+		expect(onOpenPopup).toHaveBeenCalledWith(presentPost());
+	});
+
+	it("head-zone::a-bodyless-post-hides-the-teaser-but-KEEPS-the-plus", () => {
+		// d5 marks this case "hidden-but-reserved when bodyless" (`:972`).
+		// `deriveTitleTeaser` makes the teaser the SECOND paragraph, so a
+		// single-paragraph argument has none — and the `+` must survive, because
+		// the full body exists either way and the control is the only path to it.
+		const post = { ...presentPost(), teaser: "" } as PresentPost;
+		const { container } = render(
+			<PostFocusHeader
+				post={post}
+				market={market}
+				bookmarks={VIEWER}
+				heldSide={null}
+				marketOpen
+				suspended={false}
+				activeRelation={null}
+				onToggleRelation={noop}
+				onExit={noop}
+				onOpenImage={noop}
+				onOpenPopup={noop}
+			/>,
+		);
+
+		expect(container.innerHTML).not.toContain("Fixture teaser.");
+		const plus = Array.from(container.querySelectorAll("button")).find(
+			(b) => b.getAttribute("aria-label") === "Show more",
+		);
+		expect(plus).toBeDefined();
 	});
 });

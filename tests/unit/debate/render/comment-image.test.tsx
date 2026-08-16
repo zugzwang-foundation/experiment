@@ -187,6 +187,7 @@ function renderFocus(imageUrl: string | null) {
 			onToggleRelation={noop}
 			onExit={noop}
 			onOpenImage={noop}
+			onOpenPopup={noop}
 		/>,
 	);
 }
@@ -201,14 +202,22 @@ describe("HTML-FINISH · MARKET DETAIL — row 11, the image is a left sibling",
 		const html = row?.innerHTML ?? "";
 		const image = html.indexOf("<img");
 		const title = html.indexOf("Fixture argument title.");
-		const body = html.indexOf("Fixture body.");
+		const teaser = html.indexOf("Fixture teaser.");
 
 		expect(image).toBeGreaterThan(-1);
 		expect(title).toBeGreaterThan(-1);
 		// The mount-site claim: the image comes BEFORE the whole stack, not
 		// between the title and the body as it used to.
 		expect(image).toBeLessThan(title);
-		expect(title).toBeLessThan(body);
+		// ⚠ RE-DERIVED AT ROW 15, NOT RELAXED. This tail used to read
+		// `expect(title).toBeLessThan(body)` against the full body, which the
+		// focused post rendered inline. Row 15 replaced that with a TEASER plus a
+		// `+` into the pop-up, so the body is no longer in this subtree at all and
+		// the old assertion would index to -1. The property under test is
+		// unchanged — the image precedes the argument stack — and the marker moved
+		// with the render.
+		expect(teaser).toBeGreaterThan(-1);
+		expect(title).toBeLessThan(teaser);
 	});
 
 	it("comment-image::the-image-slot-does-not-grow-and-is-absent-when-there-is-none", () => {

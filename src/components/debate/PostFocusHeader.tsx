@@ -1,6 +1,7 @@
 "use client";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
 import { ArgProfile } from "./ArgProfile";
@@ -10,7 +11,12 @@ import { ReplySplitBar } from "./composer/ReplySplitBar";
 import { FocusMarketCard } from "./FocusMarketCard";
 import { HeadZone } from "./HeadZone";
 import { RemovedPlaceholder } from "./placeholders";
-import type { DebateMarketHeader, DebatePost, Side } from "./types";
+import type {
+	DebateMarketHeader,
+	DebatePost,
+	PresentPost,
+	Side,
+} from "./types";
 
 /**
  * The focused-post header (DEBATE.4 §4 post-view) — the entered post shown in
@@ -41,6 +47,7 @@ export function PostFocusHeader({
 	onToggleRelation,
 	onExit,
 	onOpenImage,
+	onOpenPopup,
 }: {
 	post: DebatePost;
 	/**
@@ -62,6 +69,12 @@ export function PostFocusHeader({
 	onToggleRelation: (relation: "support" | "counter") => void;
 	onExit: () => void;
 	onOpenImage: (url: string) => void;
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 15 — the `+` beside the teaser opens the
+	 * post pop-up, the same host the market-view card's `+` uses. ⛔ One pop-up
+	 * on the surface, not one per zoom level.
+	 */
+	onOpenPopup: (post: PresentPost) => void;
 }) {
 	const replyCount = post.aggregate.supportCount + post.aggregate.counterCount;
 	return (
@@ -134,7 +147,42 @@ export function PostFocusHeader({
 									<h2 className="font-heading text-lg leading-snug font-medium">
 										{post.title}
 									</h2>
-									<p className="text-sm whitespace-pre-line">{post.body}</p>
+									{/* HTML-FINISH · MARKET DETAIL row 15 — d5's `.tease` (`:972`):
+									    a body TEASER with a `+` opening the full argument in the
+									    pop-up. The focused post used to render the whole body
+									    inline, which pushed the reply columns below the fold on
+									    any long argument — post-focus is where you READ the
+									    argument and then reply, so the reply surface has to stay
+									    reachable.
+									    ⚠ THE FULL BODY IS NOT LOST — one click away in the
+									    pop-up, and still whole in the ADR-0025 `.md` export. This
+									    defers it; it does not withhold it.
+									    ⚠ `deriveTitleTeaser` makes the teaser the SECOND
+									    paragraph, so a single-paragraph argument has none. d5
+									    marks that case "hidden-but-reserved when bodyless" — the
+									    TEXT hides, the `+` does NOT, because the full body exists
+									    either way and the control is the only path to it. */}
+									<div className="flex items-start justify-between gap-2">
+										{post.teaser ? (
+											<p className="text-sm whitespace-pre-line text-muted-foreground">
+												{post.teaser}
+											</p>
+										) : (
+											<span />
+										)}
+										{/* Byte-carried from the mockup's own control (`d5:972`,
+										    `aria-label="Show more"`) — the same string the card's
+										    `+` carries, because it is the same action. */}
+										<Button
+											variant="ghost"
+											size="xs"
+											onClick={() => onOpenPopup(post)}
+											aria-label="Show more"
+											className="shrink-0 text-n5 hover:text-ink"
+										>
+											+
+										</Button>
+									</div>
 								</>
 							)}
 
