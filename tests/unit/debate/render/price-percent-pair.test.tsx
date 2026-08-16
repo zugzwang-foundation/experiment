@@ -120,3 +120,51 @@ describe("the paired mounts — both sides rendered side by side", () => {
 		expect(text).not.toContain("48%");
 	});
 });
+
+/**
+ * HTML-FINISH · MARKET DETAIL rows 20 + 21 — the slot header's two affordances.
+ *
+ * Row 20: the entry reads `Buy`, the MOCKUP'S OWN string (`d5:1052`, `:1221`),
+ * reversing the bucket-D strike that kept `Đ BET`.
+ * Row 21: `Sell ↗` takes BUTTON SHAPE while KEEPING navigation. ⛔ A button that
+ * did not navigate would be a regression, not a port — d5 itself navigates
+ * (`:1909-1911` → `nav('profile')`), and H3-d makes losing the navigation a halt
+ * rather than an acceptable simplification.
+ */
+describe("HTML-FINISH · MARKET DETAIL — rows 20 + 21, the slot header", () => {
+	const VIEWER_HOLDING = {
+		position: {
+			side: "YES" as const,
+			quantity: "10.000000000000000000",
+			currentValue: "12.000000000000000000",
+		},
+		balance: "100.000000000000000000",
+		spendableToday: "100.000000000000000000",
+		bookmarkedCommentIds: [],
+		ownCommentIds: [],
+	};
+
+	it("row-20::the-entry-reads-Buy-and-its-aria-label-agrees", () => {
+		render(
+			<SlotHeader
+				side="YES"
+				pricing={TIE}
+				unitToWin={null}
+				viewer={null}
+				marketOpen={true}
+				suspended={false}
+				composerOpen={false}
+				onToggleEntry={() => {}}
+				ownPseudonym={null}
+				slug="m-test"
+			/>,
+		);
+
+		const entry = screen.getByRole("button", { name: "Buy YES" });
+		// The VISIBLE label and the accessible name still agree — WCAG 2.5.3
+		// (Label in Name) survives the relabel because both moved together.
+		expect(entry.innerHTML).toContain("Buy");
+		// The superseded brand string, pinned as gone from this control.
+		expect(entry.innerHTML).not.toContain("Đ BET");
+	});
+});

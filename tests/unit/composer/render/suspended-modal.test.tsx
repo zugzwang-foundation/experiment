@@ -131,7 +131,7 @@ describe("BetComposer suspended modal (R-4)", () => {
 				slug="m-test"
 			/>,
 		);
-		const entry = screen.getByRole("button", { name: "Đ BET YES" });
+		const entry = screen.getByRole("button", { name: "Buy YES" });
 		expect(entry.hasAttribute("disabled")).toBe(true);
 		expect(entry.getAttribute("aria-disabled")).toBe("true");
 		fireEvent.click(entry);
@@ -153,9 +153,7 @@ describe("BetComposer suspended modal (R-4)", () => {
 			/>,
 		);
 		expect(
-			screen
-				.getByRole("button", { name: "Đ BET YES" })
-				.hasAttribute("disabled"),
+			screen.getByRole("button", { name: "Buy YES" }).hasAttribute("disabled"),
 		).toBe(false);
 	});
 });

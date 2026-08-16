@@ -12,11 +12,29 @@ import { isEntryDisabled } from "./gating";
 /**
  * UI.A3 slice 2 — the market-view slot header, rebuilt to the ratified
  * geometry (values-log §1 item 6 / R-5/R-6 — log values over mockup px):
- * band padding 8px 14px · `Đ BET` outline-sm 13px `7px 14px` minHeight 34 ·
+ * band padding 8px 14px · the entry button outline-sm 13px `7px 14px`
+ * minHeight 34 ·
  * price cluster 19px (word 600 / percent 800), thumb 16px, 5px gap. d5
  * order: entry · To-win readout · price cluster · position/Sell readout.
  *
- * The `Đ BET` entry is LIVE for everyone (C1's disabled era ends here):
+ * HTML-FINISH · MARKET DETAIL row 20 — THE ENTRY READS `Buy`. It read
+ * `Đ BET`, which POLISH.3 PR 2 filed BUCKET D (mockup superseded) on canon W2.8
+ * grounds. The founder ruling of 2026-08-16 reverses that strike, and `Buy` is
+ * the MOCKUP'S OWN string (`d5:1052`, `:1221`, uppercased there by `.tradebtn`)
+ * — byte-carried, never authored. The `aria-label` moves with it, so the
+ * accessible name and the visible label still agree (WCAG 2.5.3).
+ *
+ * ⚠ `Sell` WAS NOT RELABELLED, and that asymmetry is the mockup's, not an
+ * oversight — POLISH.3 PR 2's bucket-D row records it in terms.
+ *
+ * ⚠⚠ TWO STRINGS THIS TASK CANNOT REACH STILL SAY `Đ BET`:
+ * `COMPOSER_COPY.header` ("Place your Đ BET") and `.submit` ("PLACE Đ BET") in
+ * `composer/copy.ts`, which is allow-list-EXCLUDED. So the colhead now reads
+ * `Buy` and opens a composer that still says `Đ BET` — a real, user-visible
+ * inconsistency, REPORTED rather than silently absorbed, and fixable in one
+ * commit whose fence includes `composer/copy.ts`.
+ *
+ * The entry is LIVE for everyone (C1's disabled era ends here):
  * signed-out opens the auth-gate slot variant; the F-3 predicate disables
  * the opposite pole for a holder (RESULTING side ≠ held side — tooltip +
  * aria carry the C3 batch string); a non-Open market renders the W2.8
@@ -70,12 +88,12 @@ export function SlotHeader({
 					disabled={entryDisabled}
 					aria-disabled={entryDisabled}
 					aria-expanded={composerOpen}
-					aria-label={c3 ?? `Đ BET ${side}`}
+					aria-label={c3 ?? `Buy ${side}`}
 					title={c3 ?? undefined}
 					onClick={onToggleEntry}
 					className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]"
 				>
-					Đ BET
+					Buy
 				</Button>
 				{unit !== null && (
 					<span className="hidden items-center gap-1 text-xs text-n5 lg:flex">
