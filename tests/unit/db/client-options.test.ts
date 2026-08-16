@@ -89,12 +89,27 @@ describe("db client — postgres.js pool options", () => {
 		expect(options.max_lifetime).toBeLessThan(1800);
 	});
 
-	it("db-client::pins-pool-max-and-prepare", () => {
-		// Unchanged by this fix, pinned so the pool arithmetic behind the
-		// timeouts above cannot drift silently: `max` is PER INSTANCE and a
-		// Vercel instance is per DEPLOYMENT, against a 15-slot tenant pool.
-		expect(options.max).toBe(10);
-		// `prepare: false` — Supavisor compatibility (ADR-0024 §Decision #8).
+	it("db-client::pins-pool-max-at-4 (the load-bearing control)", () => {
+		// `max` is PER INSTANCE and a Vercel instance is per DEPLOYMENT, against
+		// a 15-slot Supavisor tenant pool. This — not the timeouts — is what
+		// actually bounds occupancy, because a suspended Fluid instance runs no
+		// timers (measured: 620 s idle against a 20 s idle_timeout).
+		expect(options.max).toBe(4);
+	});
+
+	it("db-client::pool-max-leaves-room-for-three-instances", () => {
+		// The arithmetic, asserted rather than only described: at least three
+		// concurrent instances must fit inside the tenant pool. At the previous
+		// `max: 10`, two already wanted 20 against 15. If someone raises `max`
+		// past 5 this goes RED and forces the pool ceiling back into the room.
+		const SUPAVISOR_TENANT_POOL_SIZE = 15;
+		const max = options.max ?? Number.POSITIVE_INFINITY;
+		expect(max * 3).toBeLessThanOrEqual(SUPAVISOR_TENANT_POOL_SIZE);
+	});
+
+	it("db-client::pins-prepare-false", () => {
+		// Supavisor compatibility (ADR-0024 §Decision #8), and a precondition
+		// for any future move to the :6543 transaction pooler.
 		expect(options.prepare).toBe(false);
 	});
 });
