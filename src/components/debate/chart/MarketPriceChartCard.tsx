@@ -43,7 +43,7 @@ export function MarketPriceChartCard({
 			type="button"
 			data-testid="market-price-chart-card"
 			onClick={onExpand}
-			className="flex h-full w-full flex-col rounded-[var(--r)] bg-n0 p-3 text-left"
+			className="flex min-h-0 w-full flex-1 flex-col rounded-[var(--r)] bg-n0 p-3 text-left"
 		>
 			{/* ⚠⚠ FILLS ITS SLOT — `.graph{flex:1 1 auto;min-height:0}` (`d5:493`).
 			    It was `aspect-[2/1] w-full`, which is WIDTH-driven and therefore
@@ -52,7 +52,11 @@ export function MarketPriceChartCard({
 			    was pushed clean outside the headzone band. On a fixed-height page
 			    that is not a cosmetic overlap — it is content leaving its box.
 			    ⚠ Sole consumer is `MarketPriceChartHost`, itself used only by
-			    `MarketHeader`, so filling cannot regress another surface. */}
+			    `MarketHeader`, so filling cannot regress another surface.
+			    ⚠ `flex-1 min-h-0` ON THE BUTTON, NOT `h-full` — measured. `h-full` is
+			    100% of the RAIL and ignores the price bar sharing it, so the first
+			    attempt still rendered 182px inside a 188px rail. `flex-1` takes what
+			    the price bar and the gap leave: 161px against d5's 160. */}
 			<div className="min-h-0 w-full flex-1">
 				<MarketPriceChart series={series} mode="collapsed" />
 			</div>

@@ -172,9 +172,15 @@ export function MarketHeader({
 							    `.md` export carries it in full. This follows the founder's
 							    own adoption of `.crittext`'s 2-line clamp one block down —
 							    the two rulings would otherwise contradict each other. */}
+							{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
+							    `.hstack`, and `truncate` only ellipsises what it is given. As a
+							    shrink-to-fit flex item beside the badge cluster the heading
+							    measured 501px against d5's 674px at the pinned 1440×777
+							    (−12.0pp), so it truncated far earlier than the mockup does and
+							    left the row's spare width unused. */}
 							<h1
 								title={market.title}
-								className="truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+								className="min-w-0 flex-1 truncate text-[21px] leading-[1.24] font-bold tracking-normal"
 							>
 								{market.title}
 							</h1>
