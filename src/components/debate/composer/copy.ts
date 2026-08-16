@@ -71,9 +71,6 @@ export const C1_PROTECTIVE_LANDING = {
 export function c2Sentence(args: { floor: string; spendable: string }): string {
 	return `Đ ${formatDharma(args.spendable)} spendable today — below the Đ ${formatDharma(args.floor)} minimum.`;
 }
-export function c2Strip(args: { floor: string; spendable: string }): string {
-	return `Min Đ ${formatDharma(args.floor)} — Đ ${formatDharma(args.spendable)} spendable today`;
-}
 
 /**
  * C3 — the F-3 opposite-side disabled tooltip + aria text (embedded batch,
