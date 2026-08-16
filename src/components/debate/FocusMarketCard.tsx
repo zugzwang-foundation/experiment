@@ -52,7 +52,13 @@ export function FocusMarketCard({
 			data-testid="focus-market-card"
 			onClick={onExit}
 			aria-label="Back to the market"
-			className="flex w-full flex-col gap-3 rounded-(--r) p-3 text-left [border:var(--hairline)]"
+			// ⚠ `.mcard{flex:1 1 auto;min-height:0}` (`d5:802`) — the card FILLS the
+			// post arm's rail, exactly as the market arm's chart fills its own.
+			// Measured on staging at eaafd86: 134px in a 188px rail (17.2% vs d5's
+			// 24.2%, −7.0pp), because the card was content-sized and this build
+			// carries no sparkline to pad it out. Filling closes the delta without
+			// re-opening the sparkline ruling (SPEC.1 1.0.30), which stays struck.
+			className="flex min-h-0 w-full flex-1 flex-col gap-3 rounded-(--r) p-3 text-left [border:var(--hairline)]"
 		>
 			{/* `.qrow` — thumb + question. The locked composition's first element. */}
 			<span className="flex items-center gap-3">
