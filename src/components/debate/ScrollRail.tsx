@@ -117,7 +117,17 @@ export function ScrollRail({
 	return (
 		<div
 			data-testid="scroll-rail"
-			className="flex shrink-0 flex-col items-center gap-2 self-stretch"
+			// ⚠⚠ `self-center`, NOT `self-stretch` — d5's own arrangement, and a
+			// REACHABILITY fix rather than a cosmetic one. d5's rail is
+			// `position:absolute;top:50%;transform:translateY(-50%)` over a `92px`
+			// track (`:887`, `:893`): SHORT and CENTRED on the card, so both arrows sit
+			// within a few dozen pixels of the card's middle.
+			// The build stretched it to the card's full height instead. Measured on
+			// staging after the image grew: the `Next post` button sat at y=750 in a
+			// 609px viewport — present, correct, and off the bottom of the screen. A
+			// control you have to scroll to find reads as missing, which is half of the
+			// founder's "cards do not step".
+			className="flex shrink-0 flex-col items-center gap-2 self-center"
 		>
 			<button
 				type="button"
@@ -133,7 +143,10 @@ export function ScrollRail({
 			<span
 				data-testid="scroll-rail-track"
 				aria-hidden="true"
-				className="w-[3px] flex-1 overflow-hidden rounded-[1px] bg-n2"
+				// ⚠ THE TRACK NEEDS ITS OWN EXTENT now that the rail no longer
+				// stretches. `h-24` is the build's own scale step, NOT d5's `92px`;
+				// `max-h-full` keeps it inside a card shorter than the rail.
+				className="h-24 max-h-full w-[3px] overflow-hidden rounded-[1px] bg-n2"
 			>
 				{/* ⛔ `key={progressKey}` IS THE RESTART, and it replaces an effect that
 				    listed `progressKey` as a dependency without reading it — an extra

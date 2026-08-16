@@ -79,9 +79,14 @@ export function DebateColumn({
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""
-			} [&>*:last-child]:transition-transform [&>*:last-child]:duration-150${
+			} [&>*:last-child]:transition [&>*:last-child]:duration-150${
 				// `.slot.picked .panel.vm{transform:translateY(-5px);
 				// box-shadow:0 6px 16px …}` (`d5:896`) with its own `.16s ease`.
+				// ⚠ `transition`, NOT `transition-transform`: Tailwind v4 emits
+				// `-translate-y-*` on the `translate` PROPERTY, not on `transform`, so
+				// `transition-transform` animates nothing and the lift snaps. Verified
+				// in the browser — `getComputedStyle(el).transform` reads `none` while
+				// `.translate` reads `0px -5px`.
 				// The LIFT rides the column's body (the scroller, this node's last
 				// child, which is the card); the ELEVATION rides the column box,
 				// because the body has no surface of its own to cast from.
