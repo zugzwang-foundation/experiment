@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
@@ -343,5 +343,164 @@ describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () =
 		const bar = right?.innerHTML.indexOf("YES 50%") ?? -1;
 		expect(chart).toBeGreaterThan(-1);
 		expect(bar).toBeGreaterThan(chart);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL round 2 · R7 (rows 7 + 8) — the ONE-ROW bar and
+ * its LIVE percent labels.
+ *
+ * Round 1 built both, measured them green, and backed them out: `detail`'s
+ * markup is byte-pinned by `tests/unit/discovery/render/price-bar-presets.test.tsx`
+ * and that file sat outside the task's allow-list. The founder extended the
+ * allow-list by that one file on 2026-08-16.
+ *
+ * ⛔ THE GATE IS THE SUBJECT HERE, not the arrangement. The arrangement is pinned
+ * byte-for-byte by the Discovery-side baseline; what THAT file cannot see is the
+ * F-3 gating, because it renders `PriceBar` with no `pick` at all. A label that
+ * opened the composer on a Closed market, for a suspended session, or on the
+ * pole opposite the viewer's holding would be a BYPASS around `SlotHeader`'s
+ * gate — `DebateView`'s composer host opens off `openSide` alone and checks none
+ * of the three itself.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels", () => {
+	const OPEN = { heldSide: null, marketOpen: true, suspended: false };
+
+	function renderWithPick(
+		state: {
+			heldSide: "YES" | "NO" | null;
+			marketOpen: boolean;
+			suspended: boolean;
+		},
+		onPick: (side: "YES" | "NO") => void,
+	) {
+		return render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				pick={{ ...state, onPick }}
+			/>,
+		);
+	}
+
+	it("market-header::row-8-each-label-picks-its-OWN-side", () => {
+		// ⛔ BOTH SIDES, and not because two assertions look thorough: a handler
+		// wired `onPick("YES")` at both ends renders identically and passes any
+		// single-sided test, while silently making the NO label buy YES.
+		const onPick = vi.fn();
+		const { container } = renderWithPick(OPEN, onPick);
+
+		const yes = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-YES"]',
+		);
+		const no = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-NO"]',
+		);
+		expect(yes).not.toBeNull();
+		expect(no).not.toBeNull();
+
+		fireEvent.click(yes as HTMLButtonElement);
+		expect(onPick).toHaveBeenLastCalledWith("YES");
+		fireEvent.click(no as HTMLButtonElement);
+		expect(onPick).toHaveBeenLastCalledWith("NO");
+		expect(onPick).toHaveBeenCalledTimes(2);
+	});
+
+	it("market-header::row-8-the-label-text-is-unchanged-by-becoming-a-control", () => {
+		// The bar must READ the same whether or not the viewer can act on it —
+		// the percent is the information, the affordance is an extra.
+		const { container } = renderWithPick(OPEN, () => {});
+		expect(
+			container.querySelector('[data-testid="price-label-YES"]')?.textContent,
+		).toBe("YES 50%");
+		expect(
+			container.querySelector('[data-testid="price-label-NO"]')?.textContent,
+		).toBe("NO 50%");
+	});
+
+	it("market-header::row-8-WCAG-2.5.3-the-accessible-name-is-the-visible-text", () => {
+		// ⛔ NO `aria-label` OVERRIDE. The visible run is `YES 50%`, so any
+		// accessible name would have to CONTAIN it — "Buy YES" does not, and
+		// "Buy YES — 50%" does not either. The affordance rides `title`, which does
+		// not displace the accessible name on an element that has text content.
+		const { container } = renderWithPick(OPEN, () => {});
+		const yes = container.querySelector('[data-testid="price-label-YES"]');
+		expect(yes?.getAttribute("aria-label")).toBeNull();
+		expect(yes?.getAttribute("title")).toBe("Buy YES");
+	});
+
+	it("market-header::row-8-a-closed-market-disables-BOTH-labels", () => {
+		// INV-4 read-only. `SlotHeader` already refuses here; this control opens the
+		// same composer and must refuse identically.
+		const onPick = vi.fn();
+		const { container } = renderWithPick(
+			{ ...OPEN, marketOpen: false },
+			onPick,
+		);
+
+		for (const side of ["YES", "NO"]) {
+			const el = container.querySelector<HTMLButtonElement>(
+				`[data-testid="price-label-${side}"]`,
+			);
+			expect(el?.disabled).toBe(true);
+			expect(el?.getAttribute("aria-disabled")).toBe("true");
+		}
+	});
+
+	it("market-header::row-8-a-suspended-session-disables-BOTH-labels", () => {
+		const { container } = renderWithPick(
+			{ ...OPEN, suspended: true },
+			() => {},
+		);
+		expect(
+			container.querySelector<HTMLButtonElement>(
+				'[data-testid="price-label-YES"]',
+			)?.disabled,
+		).toBe(true);
+		expect(
+			container.querySelector<HTMLButtonElement>(
+				'[data-testid="price-label-NO"]',
+			)?.disabled,
+		).toBe(true);
+	});
+
+	it("market-header::row-8-a-holder-may-only-pick-their-OWN-pole", () => {
+		// ⛔ THE ASYMMETRIC CASE — the one a blanket `disabled={!marketOpen}` passes
+		// and gets wrong. F-3: holding YES, the NO label must refuse and the YES
+		// label must stay live, carrying the SAME C3 batch string the colhead entry
+		// and the card pills carry, so one refusal reads one way everywhere.
+		const { container } = renderWithPick(
+			{ ...OPEN, heldSide: "YES" },
+			() => {},
+		);
+
+		const yes = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-YES"]',
+		);
+		const no = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-NO"]',
+		);
+		expect(yes?.disabled).toBe(false);
+		expect(no?.disabled).toBe(true);
+		expect(no?.getAttribute("title")).toBe(
+			"You hold YES. Exit your position to bet NO.",
+		);
+	});
+
+	it("market-header::row-8-WITHOUT-pick-the-labels-are-inert-text", () => {
+		// Non-vacuity for every row above, and the Discovery contract in one line:
+		// both Discovery sites render `PriceBar` with no `pick`, so their labels
+		// must stay plain `<span>`s and gain no interactive affordance at all.
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="price-label-YES"]'),
+		).toBeNull();
+		const right = container.querySelector('[data-testid="headzone-right"]');
+		expect(right?.innerHTML).toContain("YES 50%");
 	});
 });

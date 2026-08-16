@@ -398,7 +398,21 @@ export function DebateView({
 				</>
 			) : (
 				<>
-					<MarketHeader market={market} priceChart={priceChart} />
+					{/* HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the rail bar's
+					    percent labels open the composer for that side, exactly as the
+					    colhead `Buy` does (`d5:1038`/`:1040` → `pick('yes')`/`pick('no')`
+					    → `openMod`). ⛔ `toggleEntry` IS THE SAME HANDLER `SlotHeader`
+					    gets, deliberately: two controls for one action must produce one
+					    behaviour, including toggle-to-close and the `composerBusy`
+					    no-op. ⛔ The F-3 viewer state travels WITH it — the composer host
+					    below opens off `openSide` alone and checks none of these three
+					    conditions itself, so a label that skipped them would be a bypass
+					    around the gate rather than a second door to it. */}
+					<MarketHeader
+						market={market}
+						priceChart={priceChart}
+						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
+					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => (
 							<DebateColumn

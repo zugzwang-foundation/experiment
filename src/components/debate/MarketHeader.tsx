@@ -8,7 +8,7 @@ import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
 import { ResolverCards } from "./ResolverCards";
-import type { DebateMarketHeader } from "./types";
+import type { DebateMarketHeader, Side } from "./types";
 
 const TERMINAL: ReadonlySet<string> = new Set([
 	"Closed",
@@ -71,9 +71,24 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 export function MarketHeader({
 	market,
 	priceChart,
+	pick,
 }: {
 	market: DebateMarketHeader;
 	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the rail bar's clickable
+	 * percent labels. Threaded straight through to `PriceBar`; this component
+	 * neither derives nor gates it, because the viewer state it carries is
+	 * `DebateView`'s and duplicating the F-3 gate here would be a second place for
+	 * it to drift. See `PriceBar` for why the handler and the gate travel as one
+	 * object.
+	 */
+	pick?: {
+		heldSide: Side | null;
+		marketOpen: boolean;
+		suspended: boolean;
+		onPick: (side: Side) => void;
+	};
 }) {
 	return (
 		<HeadZone
@@ -103,8 +118,13 @@ export function MarketHeader({
 					    ⚠ THE RAIL IS NOW ALWAYS RENDERED on the market arm: `PriceBar`
 					    returns its "Pricing unavailable" stub rather than null, so there
 					    is no market-arm state with an empty rail. A null `priceChart`
-					    now means "no CHART in the rail", not "no rail". */}
-					<PriceBar pricing={market.pricing} size="detail" />
+					    now means "no CHART in the rail", not "no rail".
+					    ✅ ROUND 2 · R7 — the bar is now the ONE-ROW `.barrow` d5 draws
+					    (`d5:1037-1041`) and its percent labels are LIVE (`.blab.click`,
+					    `pick('yes')` / `pick('no')`). `pick` is `undefined` on any
+					    consumer that has no viewer state, and the labels fall back to
+					    plain text. */}
+					<PriceBar pricing={market.pricing} size="detail" pick={pick} />
 				</>
 			}
 			left={
