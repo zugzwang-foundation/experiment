@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // DEBATE.4 §8 tests-first — THE SAFETY-CRITICAL GATE (plan §6, the removal-masking
@@ -30,18 +31,35 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
-const { mockSignRead } = vi.hoisted(() => ({
+const { mockSignRead, mockMintReadUrl } = vi.hoisted(() => ({
 	mockSignRead: vi.fn(async (key: string) => `https://signed.example/${key}`),
+	mockMintReadUrl: vi.fn(
+		async (bucket: string, key: string) =>
+			`https://signed.example/${bucket}/${key}`,
+	),
 }));
 
 vi.mock("@/server/storage/sign-read", () => ({
 	signRead: mockSignRead,
 }));
 
+// ⚠ A SECOND, DIFFERENT SEAM. Market media is signed through
+// `storage/r2.ts`'s `mintReadUrl("market-media", …)`, NOT through `signRead`,
+// which is hardcoded to the participant `"uploads"` bucket and must not serve
+// admin market media (ADR-0026 / SPEC.2 §12.1). Mocking only `sign-read` leaves
+// the market-media arm unstubbed, where it throws for want of R2 credentials
+// and `getDefaultMarketMediaUrl` degrades it to `null` — which is exactly how
+// the first version of the test below failed, and exactly why
+// `@code-reviewer` MEDIUM-4 flagged this arm as uncovered.
+vi.mock("@/server/storage/r2", () => ({
+	mintReadUrl: mockMintReadUrl,
+}));
+
 import {
 	bets,
 	comments,
 	imageUploads,
+	marketMedia,
 	markets,
 	modActions,
 	pools,
@@ -104,6 +122,10 @@ async function seedMarket(slug: string): Promise<MarketSummary> {
 			description: markets.description,
 			status: markets.status,
 		});
+	// ⚠ The `.returning()` above must project EVERY `MarketSummary` column. The
+	// assertion below compiles either way (the target is assignable to the
+	// source), so a missing column would silently produce `undefined` where the
+	// DTO promises `string | null` — `@code-reviewer` LOW-3.
 	const m = market as MarketSummary;
 	await testDb
 		.insert(pools)
@@ -665,6 +687,100 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 			expect(e.marker).toBe("none");
 			expect(e.authorValue).toBeNull();
 		}
+	});
+
+	// ── 4d. Row 14 — NO phantom "now" once the market is terminal ──────────────
+	it("authorValue is NULL on a non-Open market (no computeSell against a settled pool)", async () => {
+		// ⛔⛔ THE PHANTOM-FIGURE RULE, which this tree already states in terms:
+		// `dharma/header-portfolio.ts` — "a `quantity > 0` test alone would
+		// `computeSell` against a resolved pool and report a phantom figure."
+		// Resolution writes neither `positions` nor `pools`, so a
+		// holder-to-settlement keeps `quantity > 0` AND `marker: "none"` forever.
+		// Without the status conjunct a losing author reads `Đ 100 → Đ 55` for a
+		// holding worth nothing, while Profile's "Current" column shows the
+		// settled net for the SAME holding — one holding, two current values.
+		//
+		// ⚠ Every other case in this file seeds `status: "Open"`, so none of them
+		// can see this. Caught by `@code-reviewer` HIGH-1, fixed in-session.
+		const market = await seedMarket("author-value-terminal");
+		const solo = await seedUser({ tag: "avt-solo" });
+
+		const post = await seedCommentWithBet({
+			userId: solo,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Single-comment author on a market that later resolved.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		await testDb.insert(positions).values({
+			userId: solo,
+			marketId: market.id,
+			side: "YES",
+			quantity: "120.000000000000000000",
+		});
+
+		// Control: while OPEN, this author is exactly the case 4c populates.
+		const open = await loadDebateView(testDb, { market });
+		expect(findPost(open, post).authorValue).not.toBeNull();
+
+		// …and the moment the market leaves Open, the "now" half is withheld —
+		// the holding is unchanged, the marker is unchanged, only the status moved.
+		await testDb
+			.update(markets)
+			.set({ status: "Resolved" })
+			.where(eq(markets.id, market.id));
+
+		const resolved = await loadDebateView(testDb, {
+			market: { ...market, status: "Resolved" },
+		});
+		const e = findPost(resolved, post);
+		expect(e.removed).toBe(false);
+		expect(e.marker).toBe("none");
+		expect(e.authorValue).toBeNull();
+		// The staked half is untouched — this withholds a claim, never a figure
+		// the author actually put in.
+		expect(e.authorStake).toBe("100.000000000000000000");
+	});
+
+	// ── 4e. The one statement this task spent — the market media read ──────────
+	it("mediaImageUrl is the DEFAULT market_media row, presigned for read", async () => {
+		// ⚠ The task's ENTIRE read budget is this one statement, and nothing under
+		// tests/server covered it — `@code-reviewer` MEDIUM-4. It goes through
+		// `signReadMarketMedia` → `mintReadUrl("market-media", …)`, a DIFFERENT
+		// bucket arm from the `signRead("uploads")` seam this file mocks, so the
+		// render tests prove the component and nothing proved the read.
+		const market = await seedMarket("market-media-read");
+
+		await testDb.insert(marketMedia).values([
+			{
+				marketId: market.id,
+				r2ObjectKey: `m/${market.id}/not-default.png`,
+				displayOrder: 1,
+				isDefault: false,
+			},
+			{
+				marketId: market.id,
+				r2ObjectKey: `m/${market.id}/default.png`,
+				displayOrder: 0,
+				isDefault: true,
+			},
+		]);
+
+		const vm = await loadDebateView(testDb, { market });
+
+		// The DEFAULT row, not merely "a" row — the non-default one is the
+		// discriminator, so a read that dropped the `is_default` predicate fails.
+		expect(vm.market.mediaImageUrl).toContain(`m/${market.id}/default.png`);
+		expect(vm.market.mediaImageUrl).not.toContain("not-default");
+		// …signed against the `market-media` bucket arm, never the participant
+		// `uploads` one.
+		expect(mockMintReadUrl).toHaveBeenCalledWith(
+			"market-media",
+			`m/${market.id}/default.png`,
+			expect.anything(),
+		);
 	});
 
 	// ── 5. Decoupling — a banned author is NOT masked ──────────────────────────

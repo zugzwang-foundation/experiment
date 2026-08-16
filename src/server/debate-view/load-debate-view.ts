@@ -15,6 +15,7 @@ import {
 	twoSlot,
 } from "@/lib/ranking";
 import { computeSell } from "@/server/cpmm/calculate";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
 import type { PricePoint } from "@/server/discovery/price-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
@@ -271,16 +272,49 @@ export async function loadDebateView(
 	// removed post's never is. Masking is a property of every read that can
 	// reach content, and this is one.
 	//
-	// ⚠ COSTS +0 STATEMENTS. `mintImageUrls` already issues ONE batched
-	// `image_uploads` SELECT; widening the input widens that `inArray`. The real
-	// cost is +N LOCAL HMAC presigns (`signRead` — no network, no DB), which is
-	// why this rides the existing helper instead of gaining its own read.
+	// ⚠ COSTS +0 STATEMENTS **WHENEVER ANY POST CARRIES AN IMAGE**, which is the
+	// general case: `mintImageUrls` already issues ONE batched `image_uploads`
+	// SELECT and widening the input only widens that `inArray`.
+	// ⚠ THE EXCEPTION, STATED BECAUSE THE READ BUDGET IS A HALT CONDITION: the
+	// helper EARLY-RETURNS when no input comment carries an image. So on a market
+	// whose images are all on REPLIES and none on posts, this call goes 0 → 1 and
+	// the render's total delta is +2, not +1. That statement is the ratified
+	// row's own irreducible cost — a reply's image key cannot be read without
+	// reading it — not an overage that could be optimised back inside the fence.
+	// Caught by `@code-reviewer` (MEDIUM-2); the comment was unconditional and
+	// the behaviour was not.
+	// The remaining cost is +N LOCAL HMAC presigns (`signRead` — no network, no
+	// DB), which is why this rides the existing helper rather than a new read.
 	const imageUrlByComment = await mintImageUrls(client, visible);
 
 	// HTML-FINISH · MARKET DETAIL row 14 — how many stake-bearing comments each
 	// author has IN THIS MARKET. Counted in memory over the `comments` array
 	// already in hand (every comment rides a bet, INV-1, so every comment is
 	// stake-bearing). Costs no statement.
+	/**
+	 * ⛔⛔ ROW 14 RENDERS NOTHING ON A TERMINAL MARKET, AND THAT IS A PHANTOM-FIGURE
+	 * RULE THIS TREE ALREADY STATES IN TERMS — not a new decision.
+	 * `header-portfolio.ts` puts it exactly: *"a `quantity > 0` test alone would
+	 * `computeSell` against a resolved pool and report a phantom figure."*
+	 * Resolution writes neither `positions` (sole writer `positions/persist.ts`)
+	 * nor `pools`, so a holder-to-settlement keeps `quantity > 0` and keeps
+	 * `marker: "none"` forever — and `computeSell` would happily price it against
+	 * frozen open-state reserves for a position that has ALREADY settled into the
+	 * ledger via `payout_events`. A losing YES author would read `Đ 100 → Đ 55`
+	 * for a holding worth nothing, while Profile's "Current" column
+	 * (`profile/positions.ts`) showed the settled net for the same holding — one
+	 * holding, two different current values, the precise inversion of the
+	 * inheritance law this field's own docblock invokes.
+	 * ⇒ `Open` ONLY. Closed/Resolving/Frozen cannot be sold into either, so a
+	 * "now" is unactionable there as well as untrue.
+	 * ⚠ Costs NOTHING: `status` is already on `MarketSummary` and already in hand.
+	 * Caught by `@code-reviewer` (HIGH-1) and fixed in-session per H2-d; the
+	 * three sibling modules that call `computeSell` all branch on settlement the
+	 * same way (`profile/positions.ts`, `bookmarks/figures.ts`,
+	 * `dharma/header-portfolio.ts`).
+	 */
+	const marketIsOpen = args.market.status === "Open";
+
 	const commentsByAuthor = new Map<string, number>();
 	for (const c of comments) {
 		commentsByAuthor.set(c.userId, (commentsByAuthor.get(c.userId) ?? 0) + 1);
@@ -304,8 +338,14 @@ export async function loadDebateView(
 		const held = heldByUser.get(userId);
 		// No pool, or nothing held (sold out — marker `Exited`) ⇒ no "now" half.
 		// `computeSell` requires a POSITIVE share count and would throw otherwise.
+		// ⛔ `CpmmDecimal`, never `Number()`: a share count is NUMERIC(38,18) and
+		// CLAUDE.md §2 forbids a JS float on one. `header-portfolio.ts` makes the
+		// identical guard the identical way.
 		const value =
-			pool && held && held.side === postSide && Number(held.quantity) > 0
+			pool &&
+			held &&
+			held.side === postSide &&
+			new CpmmDecimal(held.quantity).greaterThan(0)
 				? computeSell({
 						reserves: pool.reserves,
 						side: postSide === "YES" ? "yes" : "no",
@@ -383,13 +423,17 @@ export async function loadDebateView(
 			badge: badgeFor(sub, postSubstrate),
 			author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: sub.authorStake,
-			// Row 14's gate, and BOTH halves are load-bearing. `marker === "none"`
-			// means the author still holds the side they posted, so a `Flipped` or
-			// `Exited` author never shows a "now" that contradicts the marker chip
-			// rendered inches away. The one-comment condition is the money-truth
-			// half (see the DTO field's own docblock).
+			// Row 14's gate. ALL THREE conjuncts are load-bearing:
+			//   · the market is OPEN — `marketIsOpen` above says why at length;
+			//   · `marker === "none"` — the author still holds the side they
+			//     posted, so a `Flipped` or `Exited` author never shows a "now"
+			//     that contradicts the marker chip rendered inches away;
+			//   · exactly ONE stake-bearing comment — the money-truth half (the
+			//     DTO field's own docblock says why).
 			authorValue:
-				comment.marker === "none" && commentsByAuthor.get(comment.userId) === 1
+				marketIsOpen &&
+				comment.marker === "none" &&
+				commentsByAuthor.get(comment.userId) === 1
 					? authorValueFor(comment.userId, comment.sideAtPostTime)
 					: null,
 			entryPrice: sub.priceAtBet,
