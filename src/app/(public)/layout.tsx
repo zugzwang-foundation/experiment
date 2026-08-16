@@ -104,7 +104,35 @@ export default async function PublicLayout({
 			    the floor lets the page GROW and SCROLL when content exceeds the
 			    viewport (RULED A1) instead of clipping it. The mockup's
 			    `overflow:hidden` on html/body is a fixed-viewport prototype
-			    affordance and is deliberately NOT adopted. */}
+			    affordance and is deliberately NOT adopted.
+
+			    ⚠⚠ A1 IS REVERSED FOR TWO ROUTES, BY NAME — and this note exists
+			    because the paragraph above states the SUPERSEDED position and a
+			    reader reaches it FIRST. O-9's neighbour discipline (O-5): a
+			    durable amendment is applied at every site that states the
+			    position it supersedes; an amendment recorded only where the
+			    change landed reverses nothing for the reader who starts here.
+
+			      `/u/[pseudonym]`  — `u/[pseudonym]/page.tsx:140`
+			      `/bookmarks`      — `bookmarks/page.tsx:107`
+
+			    Both declare `lg:h-[calc(100vh-60px-2px)] lg:flex-none` on their
+			    OWN `PageContainer`, so at `lg`+ each occupies exactly the
+			    viewport below the header with every overflowing region scrolling
+			    INSIDE itself. The mockup they are built to
+			    (`surface_profile_v1_0.html:168,170`) IS a fixed-viewport
+			    prototype — `html,body{height:100%;overflow:hidden}` plus a
+			    `100vh` `.screen` — and for those two routes the founder ruled
+			    that one-screen design IN.
+
+			    ⛔ THIS ELEMENT IS UNCHANGED AND THE RULE ABOVE STILL STANDS FOR
+			    EVERY OTHER `(public)` SURFACE. The reversal is scoped to each
+			    route's own container; the floor here governs the rest, and a
+			    surface that has not been ruled one-screen must keep it, because a
+			    fixed height WITHOUT an internal scroller clips. Do not
+			    generalise this exemption without a ruling that names the route.
+			    ⚠ Each route's chain is asserted node by node in
+			    `tests/unit/design/{profile,bookmarks}-height-chain.test.ts`. */}
 			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
 				{children}
 			</main>
