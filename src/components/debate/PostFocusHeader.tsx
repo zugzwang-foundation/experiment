@@ -76,44 +76,71 @@ export function PostFocusHeader({
 						<ChevronLeft /> Back to market
 					</Button>
 
-					{post.removed ? (
-						<>
-							<SideBadge side={post.sideAtPostTime} />
-							<RemovedPlaceholder />
-						</>
-					) : (
-						<>
-							<div className="flex items-start justify-between gap-2">
-								<ArgProfile
-									commentId={post.id}
-									author={post.author}
-									side={post.sideAtPostTime}
-									marker={post.marker}
-									authorStake={post.authorStake}
-									replyCount={replyCount}
-									bookmarks={bookmarks}
-								/>
-								<LaneBadge badge={post.badge} />
-							</div>
-							<h2 className="font-heading text-lg leading-snug font-medium">
-								{post.title}
-							</h2>
-							{post.imageUrl ? (
+					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
+					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
+					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
+					    the text stack, occupying the same slot the market arm gives
+					    `.mmedia`. It used to render INLINE, between the title and the
+					    body, which pushed the argument down the column on every post that
+					    carried one. */}
+					<div className="flex gap-4">
+						{!post.removed && post.imageUrl ? (
+							// `.hpimg{flex:0 0 auto}` — does not grow, does not shrink,
+							// sized by its own content. `CommentImage` already renders
+							// `block w-fit` around a height-bounded image, so `shrink-0` is
+							// the whole port.
+							// ⛔ `aspect-ratio:16/9` + `overflow:hidden` are NOT taken. That
+							// pair CROPS, and T2 (§17 H-T2, RULED 2026-08-13) binds BOTH
+							// axes as bounds so the image is "shown whole · any orientation"
+							// (canon §107, the promise to the author). d5 AGREES: its own
+							// comment at `:955` reads "shown whole at its own aspect; flag 1
+							// paused", so the cropping rule is the paused variant, not the
+							// ratified one. `CommentImage` is untouched.
+							<div className="shrink-0">
 								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
-							) : null}
-							<p className="text-sm whitespace-pre-line">{post.body}</p>
-						</>
-					)}
+							</div>
+						) : null}
 
-					<ReplySplitBar
-						postSide={post.sideAtPostTime}
-						aggregate={post.aggregate}
-						heldSide={heldSide}
-						marketOpen={marketOpen}
-						suspended={suspended}
-						activeRelation={activeRelation}
-						onToggleRelation={onToggleRelation}
-					/>
+						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
+						    column`) — everything that is not the image. */}
+						<div className="flex min-w-0 flex-1 flex-col gap-3">
+							{post.removed ? (
+								<>
+									<SideBadge side={post.sideAtPostTime} />
+									<RemovedPlaceholder />
+								</>
+							) : (
+								<>
+									<div className="flex items-start justify-between gap-2">
+										<ArgProfile
+											commentId={post.id}
+											author={post.author}
+											side={post.sideAtPostTime}
+											marker={post.marker}
+											authorStake={post.authorStake}
+											replyCount={replyCount}
+											bookmarks={bookmarks}
+										/>
+										<LaneBadge badge={post.badge} />
+									</div>
+									<h2 className="font-heading text-lg leading-snug font-medium">
+										{post.title}
+									</h2>
+									<p className="text-sm whitespace-pre-line">{post.body}</p>
+								</>
+							)}
+
+							<ReplySplitBar
+								postSide={post.sideAtPostTime}
+								aggregate={post.aggregate}
+								heldSide={heldSide}
+								marketOpen={marketOpen}
+								suspended={suspended}
+								activeRelation={activeRelation}
+								onToggleRelation={onToggleRelation}
+							/>
+						</div>
+					</div>
 				</Card>
 			}
 		/>
