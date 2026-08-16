@@ -167,6 +167,24 @@ export function DebateView({
 		}
 		history.replaceState(null, "", url);
 	};
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 36 — ENTERING A POST RESETS THE PAGE
+	 * SCROLL. d5 does the same on its scroll container (`:1605`:
+	 * `var c = document.querySelector('.content'); if(c){ c.scrollTop = 0; }`).
+	 *
+	 * ⚠ WHY IT IS NEEDED: the market↔post switch is a STATE toggle, not a
+	 * navigation, so the browser has no reason to move the viewport. A reader
+	 * scrolled down a long market view clicks a post title and the arm swaps
+	 * BENEATH them — they land mid-page in a post they have not seen the top of,
+	 * with the argument they just chose above the fold.
+	 *
+	 * ⚠ `behavior: "instant"`, not smooth: the content under the viewport has
+	 * ALREADY been replaced, so animating the scroll animates past content that
+	 * no longer relates to where it is going.
+	 */
+	const resetPageScroll = () => {
+		window.scrollTo({ top: 0, behavior: "instant" });
+	};
 	const enterPost = (id: string) => {
 		if (composerBusy) {
 			return;
@@ -176,6 +194,7 @@ export function DebateView({
 		setOpenSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
+		resetPageScroll();
 	};
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 22 — a market-view card's Support/Counter
@@ -201,6 +220,9 @@ export function DebateView({
 		setOpenReply(relation);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
+		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
+		// arm swap and the same reason.
+		resetPageScroll();
 	};
 	const exitPost = () => {
 		if (composerBusy) {
