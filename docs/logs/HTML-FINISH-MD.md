@@ -543,7 +543,78 @@ OQ-MD2-2. ⛔ PR #341 is still a DRAFT and is NOT merged.
   Supavisor `pool_size 15` — against a fix landing in parallel on
   `fix/db-pool-idle-timeout`. ⛔ NOT a branch defect; that branch was not touched.
 
-### ⛔ H-R2-STAGING — the staging SITE did not pick up the advance
+### ✅ H-R2-STAGING — RESOLVED IN-SESSION, and the fix is a PUSH-ORDER rule
+
+**Final state: `staging.zugzwangworld.com` serves `f2eb49d`, the branch HEAD.**
+`/api/health` → `{"status":"ok","env":"staging","canary":"f2eb49d…","region":"bom1","db":"ok","migrations":"ok"}`.
+
+**What went wrong the first time, and the rule that comes out of it.** The branch
+was pushed FIRST, so Vercel built `ref=htmlfinish/market-detail` @ `4cd1c15`; the
+`staging` push of the IDENTICAL SHA seconds later produced NO second deployment —
+deduplicated on the commit SHA — so no `ref=staging` deployment existed for the
+domain to follow, and it kept serving `070c243` for 25+ minutes.
+
+⇒ ⚠⚠ **PUSH `staging` BEFORE THE BRANCH, or push only one of them.** Confirmed by
+the fix: the log commit `f2eb49d` reached `staging` at a SHA no branch deployment
+had claimed, a `ref=staging` deployment was created, and the domain flipped within
+~2 minutes. Round 1 did not hit this because its final SHA reached `staging`
+without a same-SHA branch deployment landing first.
+
+⛔ **What was NOT done, deliberately:** forcing an unrelated commit onto `staging`
+to break the dedup. That makes `staging` diverge from the branch SHA, which the
+next lease and the O-4 restore both rest on.
+
+✅ The O-4 restore point is unaffected: `bc18245786fd04fde0e90f5618f479428586113b`.
+
+### ⛔⛔ H-R2-POOL — STAGING'S DB PATH IS DOWN, AND IT IS NOT THIS BRANCH
+
+**The nine rows COULD NOT be visually verified on staging**, and the reason is
+infrastructure, proven rather than assumed.
+
+Every DB-backed route renders the error boundary. From the Vercel runtime logs:
+
+```
+GET /m/sp-m15-fill 500
+  Error: Failed query: select "id","slug","title","description","status",
+                       "media_video_url" from "markets" where slug = $1 …
+  [cause]: (EMAXCONNSESSION) max clients reached in session mode
+           — max clients are limited to pool_size: 15
+  code: 'XX000', severity_local: 'FATAL'
+```
+
+**Four independent facts put it outside round 2's diff:**
+
+1. The failing query is **`getMarketBySlug`'s first `select`** — the very first
+   statement on the route, in a file this round never touched.
+2. The cause is `EMAXCONNSESSION` at the **Supavisor pooler**, a connection-limit
+   FATAL, not an application error.
+3. **Better Auth's own session read fails identically**, with nothing to do with
+   the debate view.
+4. ⛔ **Discovery (`/`) fails the same way**, and Discovery has ZERO round-2
+   changes. An outage that reaches an untouched route is not this branch's.
+
+⚠ It also fired on `070c243` — the PRE-round-2 build — during the R3 measurement,
+after 15 forced polls in 43 s.
+
+⚠⚠ **AND `curl` SAID 200 THREE TIMES WHILE THE PAGE WAS BROKEN.** Next streams:
+the HTML shell goes out with a 200 and the RSC render throws afterwards, so the
+status code cannot see it. A curl status check is a FALSE RECEIPT for this class
+of failure — the browser and the runtime logs are the real gauges. Recorded
+because it very nearly ended the session on a wrong all-clear.
+
+**Contributing load, declared:** the R3 measurement forced ~15 polls, and each
+poll re-runs `loadDebateView`'s 13-14 sequential queries; the new deployment then
+added cold instances. But the ceiling is `pool_size: 15` shared across staging AND
+every preview, and Vercel Fluid SUSPENDS instances so `postgres.js` idle timers
+never fire to release slots.
+
+⇒ **This is exactly what `fix/db-pool-idle-timeout` is for**, and the kickoff
+forbids touching that branch or `src/db/index.ts`. ⛔ Neither was touched.
+
+**What it takes:** land the pool fix, or wake/kill the suspended instances to free
+the slots. Then re-verify the nine rows on staging.
+
+### (superseded) H-R2-STAGING — the staging SITE did not pick up the advance
 
 `origin/staging` IS at `4cd1c15` (force-pushed under a verified lease) and
 `Staging Migrate` returned success on it. But `staging.zugzwangworld.com` is
