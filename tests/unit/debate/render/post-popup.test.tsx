@@ -73,6 +73,7 @@ function presentPost(side: Side): PresentPost {
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		authorValue: null,
 		aggregate: AGGREGATE,
 		replies: { support: [], counter: [], twoSlot: [] },
 	};

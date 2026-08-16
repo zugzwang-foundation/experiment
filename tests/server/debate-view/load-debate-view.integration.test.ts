@@ -45,6 +45,7 @@ import {
 	markets,
 	modActions,
 	pools,
+	positions,
 	users,
 } from "@/db/schema";
 // The RED import: greenfield aggregator under test (the masking gate).
@@ -583,6 +584,87 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		// The removed reply keeps its slot (ADR-0020/0021 thread integrity) and
 		// carries no content keys at all.
 		walkAssertNoLeak(vm);
+	});
+
+	// ── 4c. Row 14 — the author's `Đ staked → Đ now` gate ──────────────────────
+	it("authorValue renders ONLY for a single-comment author still holding their side", async () => {
+		// ⛔⛔ THIS IS A MONEY-TRUTH ASSERTION, not a layout one (plan F-5 / OD-1,
+		// founder-ruled). `authorStake` is the stake on THIS POST's bet;
+		// `positions.quantity` is the author's NET holding in the WHOLE market. An
+		// author with two posts would otherwise see two different staked figures
+		// both arrowing into the SAME total, each implying that post alone grew to
+		// it — the inverse of the inheritance law `viewer-context.ts` fixes in
+		// terms ("one holding never shows two different current values").
+		const market = await seedMarket("author-value-gate");
+		const solo = await seedUser({ tag: "av-solo" });
+		const multi = await seedUser({ tag: "av-multi" });
+
+		const soloPost = await seedCommentWithBet({
+			userId: solo,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Single-comment author, still holding YES.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		const multiPostA = await seedCommentWithBet({
+			userId: multi,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Two-comment author, first post.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:02Z"),
+		});
+		const multiPostB = await seedCommentWithBet({
+			userId: multi,
+			marketId: market.id,
+			side: "YES",
+			stake: "50.000000000000000000",
+			body: "Two-comment author, second post.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:03Z"),
+		});
+
+		// Both authors hold YES, so `marker` is `none` for all three posts — the
+		// ONLY thing separating them is the comment count.
+		await testDb.insert(positions).values([
+			{
+				userId: solo,
+				marketId: market.id,
+				side: "YES",
+				quantity: "120.000000000000000000",
+			},
+			{
+				userId: multi,
+				marketId: market.id,
+				side: "YES",
+				quantity: "150.000000000000000000",
+			},
+		]);
+
+		const vm = await loadDebateView(testDb, { market });
+
+		const eSolo = findPost(vm, soloPost);
+		expect(eSolo.removed).toBe(false);
+		expect(eSolo.marker).toBe("none");
+		// Populated, and on the RATIFIED Đb basis — `computeSell(quantity).proceeds`,
+		// the same basis `viewer-context.ts` uses, so one holding never shows two
+		// different current values.
+		expect(eSolo.authorValue).not.toBeNull();
+		expect(typeof eSolo.authorValue).toBe("string");
+
+		// ⛔ THE GATE. Same market, same side, same `marker: "none"`, same held
+		// row — and NULL, purely because this author has two stake-bearing
+		// comments here. Asserting only the positive case above would pass on a
+		// build with no gate at all.
+		for (const id of [multiPostA, multiPostB]) {
+			const e = findPost(vm, id);
+			expect(e.removed).toBe(false);
+			expect(e.marker).toBe("none");
+			expect(e.authorValue).toBeNull();
+		}
 	});
 
 	// ── 5. Decoupling — a banned author is NOT masked ──────────────────────────

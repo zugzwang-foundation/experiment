@@ -79,6 +79,7 @@ function presentPost(side: Side): DebatePost {
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		authorValue: null,
 		aggregate: AGGREGATE,
 		replies: EMPTY_REPLIES,
 	};

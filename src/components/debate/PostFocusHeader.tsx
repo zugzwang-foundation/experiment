@@ -124,6 +124,7 @@ export function PostFocusHeader({
 											side={post.sideAtPostTime}
 											marker={post.marker}
 											authorStake={post.authorStake}
+											authorValue={post.authorValue}
 											replyCount={replyCount}
 											bookmarks={bookmarks}
 										/>

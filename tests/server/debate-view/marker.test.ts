@@ -281,9 +281,12 @@ describe("DEBATE.5 F-DEBATE-2 / F-DEBATE-3 — debate-view marker read-loader", 
 		]);
 
 		const count = { selects: 0 };
-		const result = await listMarketComments(countingClient(count), {
-			marketId,
-		});
+		const { comments: result } = await listMarketComments(
+			countingClient(count),
+			{
+				marketId,
+			},
+		);
 
 		// (a) Three comments, OLDEST-FIRST, each with the correct marker.
 		expect(result.length).toBe(3);
@@ -348,7 +351,7 @@ describe("DEBATE.5 F-DEBATE-2 / F-DEBATE-3 — debate-view marker read-loader", 
 			quantity: "275.000000000000000000",
 		});
 
-		const result = await listMarketComments(testDb, { marketId });
+		const { comments: result } = await listMarketComments(testDb, { marketId });
 
 		expect(result.length).toBe(1);
 		// The frozen badge and the live marker are DISTINCT fields: the badge is
@@ -394,7 +397,9 @@ describe("DEBATE.5 F-DEBATE-2 / F-DEBATE-3 — debate-view marker read-loader", 
 		await sellPosition({ userId: authorA, marketId, shares: heldQtyA });
 
 		// (i) Loader BEFORE resolution (market still Open): A Exited, B none.
-		const beforeResolve = await listMarketComments(testDb, { marketId });
+		const { comments: beforeResolve } = await listMarketComments(testDb, {
+			marketId,
+		});
 		const markerByUser = new Map(
 			beforeResolve.map((c) => [c.userId, c.marker]),
 		);
@@ -437,7 +442,9 @@ describe("DEBATE.5 F-DEBATE-2 / F-DEBATE-3 — debate-view marker read-loader", 
 
 		// (v) Loader AGAIN (market now Resolved): A STILL Exited, B STILL none —
 		// the marker is frozen by construction.
-		const afterResolve = await listMarketComments(testDb, { marketId });
+		const { comments: afterResolve } = await listMarketComments(testDb, {
+			marketId,
+		});
 		const markerByUserAfter = new Map(
 			afterResolve.map((c) => [c.userId, c.marker]),
 		);

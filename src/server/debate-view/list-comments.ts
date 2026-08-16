@@ -31,6 +31,27 @@ export type DebateComment = {
 };
 
 /**
+ * What `listMarketComments` returns: the comment read-model, plus the author
+ * held-position map that read 2 already builds.
+ *
+ * ⚠ HTML-FINISH · MARKET DETAIL row 14 — WHY A SECOND FIELD RATHER THAN A
+ * COLUMN ON `DebateComment`. Row 14 renders an author's `Đ staked → Đ now`, and
+ * the "now" half needs that author's held SHARE QUANTITY to run `computeSell`.
+ * Hanging it on `DebateComment` would have deleted the exposure boundary that
+ * type's docblock names in terms — "a leak is a compile error" — by putting the
+ * raw holding on the very object the aggregator maps into client DTOs. Returned
+ * as a SEPARATE map instead: `loadDebateView` consumes it and forwards a
+ * computed value, never the holding, and `DebateComment` stays exactly as
+ * documented. The map is not new work — read 2 already builds it to compute
+ * markers; this stops throwing it away.
+ */
+export type MarketCommentsRead = {
+	comments: DebateComment[];
+	/** author id → their CURRENT held side + quantity in this market (`quantity > 0`). */
+	heldByUser: Map<string, { side: "YES" | "NO"; quantity: string }>;
+};
+
+/**
  * List a market's comments as the debate-view read-model (F-DEBATE-2 /
  * F-DEBATE-3): a flat, OLDEST-FIRST list, each comment carrying a live marker
  * = `computeMarker(comment.side_at_post_time, <that author's current held
@@ -57,7 +78,7 @@ export type DebateComment = {
 export async function listMarketComments(
 	client: DebateViewReader,
 	args: { marketId: string },
-): Promise<DebateComment[]> {
+): Promise<MarketCommentsRead> {
 	// Read 1 — the market's comments, oldest-first. Project exactly the
 	// DebateComment substrate (no `SELECT *`; no vestigial columns).
 	const rows = await client
@@ -77,7 +98,7 @@ export async function listMarketComments(
 	// Empty market → skip the held-sides read entirely (an empty `inArray`
 	// would degenerate to `WHERE false` / a driver edge). No comments, no read.
 	if (rows.length === 0) {
-		return [];
+		return { comments: [], heldByUser: new Map() };
 	}
 
 	// Read 2 — the SINGLE set-based held-sides read for every listed author in
@@ -88,7 +109,16 @@ export async function listMarketComments(
 	// by `computeMarker` and never returned (the exposure boundary).
 	const authorIds = [...new Set(rows.map((r) => r.userId))];
 	const heldRows = await client
-		.select({ userId: positions.userId, side: positions.side })
+		.select({
+			userId: positions.userId,
+			side: positions.side,
+			// HTML-FINISH · MARKET DETAIL row 14 — one more column on the row this
+			// read ALREADY returns for every author in this market. +0 statements:
+			// no second query, no per-comment `getHeldPosition`. ⛔ Never loop
+			// `getHeldPosition` — this file's own note below says why, and the
+			// 15 s poll would make it +4N statements/minute/viewer.
+			quantity: positions.quantity,
+		})
 		.from(positions)
 		.where(
 			and(
@@ -98,7 +128,10 @@ export async function listMarketComments(
 			),
 		);
 
-	const heldByUser = new Map<string, "YES" | "NO">();
+	const heldByUser = new Map<
+		string,
+		{ side: "YES" | "NO"; quantity: string }
+	>();
 	for (const h of heldRows) {
 		if (heldByUser.has(h.userId)) {
 			// Defense-in-depth (mirrors read.ts ≤1 + the nightly D3 belt): the
@@ -110,10 +143,11 @@ export async function listMarketComments(
 				`>1 held position for (user=${h.userId}, market=${args.marketId}) — single-side structural guard absent`,
 			);
 		}
-		heldByUser.set(h.userId, h.side);
+		heldByUser.set(h.userId, { side: h.side, quantity: h.quantity });
 	}
 
-	return rows.map((r) => ({
+	// NB: `comments` is the drizzle TABLE import above — the local is `mapped`.
+	const mapped = rows.map((r) => ({
 		id: r.id,
 		parentCommentId: r.parentCommentId,
 		userId: r.userId,
@@ -123,7 +157,9 @@ export async function listMarketComments(
 		createdAt: r.createdAt,
 		marker: computeMarker({
 			sideAtPostTime: r.sideAtPostTime,
-			heldSide: heldByUser.get(r.userId) ?? null,
+			heldSide: heldByUser.get(r.userId)?.side ?? null,
 		}),
 	}));
+
+	return { comments: mapped, heldByUser };
 }

@@ -65,6 +65,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			author: { pseudonym: "CrimsonHawk207", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "560.000000000000000000",
 			entryPrice: "0.470000000000000000",
+			authorValue: null,
 			aggregate: {
 				supportCount: 2,
 				counterCount: 1,
@@ -136,6 +137,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			author: { pseudonym: "GoldenLynx288", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "500.000000000000000000",
 			entryPrice: "0.500000000000000000",
+			authorValue: null,
 			aggregate: {
 				supportCount: 1,
 				counterCount: 1,
@@ -195,6 +197,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			author: { pseudonym: "AmberFox042", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "320.000000000000000000",
 			entryPrice: "0.450000000000000000",
+			authorValue: null,
 			aggregate: {
 				supportCount: 0,
 				counterCount: 1,
@@ -288,6 +291,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			author: { pseudonym: "TealOwl118", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "150.000000000000000000",
 			entryPrice: "0.550000000000000000",
+			authorValue: null,
 			aggregate: {
 				supportCount: 0,
 				counterCount: 1,
@@ -331,6 +335,7 @@ export const mumbaiMetroModel: DebateViewModel = {
 			author: { pseudonym: "IndigoWolf355", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "95.000000000000000000",
 			entryPrice: "0.520000000000000000",
+			authorValue: null,
 			aggregate: {
 				supportCount: 1,
 				counterCount: 0,
