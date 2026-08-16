@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import {
 	type BookmarkAffordance,
 	CardActions,
@@ -98,9 +100,28 @@ export function ArgProfile({
 			    that does not exist (CLAUDE.md §5.2). The chip's GEOMETRY is the one
 			    thing that varies, and it varies through `chipSize`. */}
 			<div className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-				<span className="truncate text-sm font-medium text-ink">
+				{/* HTML-FINISH · MARKET DETAIL row 42 — the pseudonym navigates to that
+				    author's Profile. SPEC.1 `:1628` already rules exactly this for the
+				    Discovery hero ("an author pseudonym click navigates to that
+				    author's **Profile (§23)**"), so this extends a ruled behaviour to
+				    the surface that shows the most pseudonyms rather than inventing
+				    one. d5 navigates from its author name too (`:1909-1911` →
+				    `nav('profile')`).
+				    ⚠ ONE CHANGE REACHES EVERY SITE, which is the dividend of rows 12,
+				    26 and 33 collapsing four author rows into this one: the post card,
+				    the focused post, the reply card and both pop-ups all get it, and
+				    none of them can drift away from it.
+				    ⚠ `encodeURIComponent` — a pseudonym is user-facing identity, not a
+				    slug, and the route takes it as a path segment.
+				    ⚠ The accessible name is the pseudonym itself, so no `aria-label`
+				    is added: an override would have to CONTAIN the visible text to
+				    satisfy WCAG 2.5.3, and the visible text already says it. */}
+				<Link
+					href={`/u/${encodeURIComponent(author.pseudonym)}`}
+					className="truncate text-sm font-medium text-ink hover:underline"
+				>
 					{author.pseudonym}
-				</span>
+				</Link>
 				<Sep />
 				<SideBadge side={side} price={entryPrice} size={chipSize} />
 				<PositionMarker marker={marker} />

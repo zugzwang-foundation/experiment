@@ -86,8 +86,16 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 				onOpenPopup={noopPopup}
 			/>,
 		);
-		const occurrences = (container.innerHTML.match(/fixture-replier/g) ?? [])
-			.length;
+		// ⚠ COUNTED OVER `textContent`, AND THIS IS THE ONE PLACE O-7's DEFAULT
+		// INVERTS. O-7 says assert on `innerHTML` because `textContent` flattens
+		// the markup away — true whenever the markup IS the subject. Here the
+		// subject is how many times the reader SEES the name, and since row 42
+		// made the pseudonym a link, `innerHTML` also contains it inside the
+		// `href`, reporting 2 for a correct render. The markup half is asserted
+		// separately, one test down.
+		const occurrences = (
+			(container.textContent ?? "").match(/fixture-replier/g) ?? []
+		).length;
 		expect(occurrences).toBe(1);
 	});
 
@@ -223,5 +231,63 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 		expect(open).not.toBeNull();
 		fireEvent.click(open as HTMLButtonElement);
 		expect(onOpenImage).toHaveBeenCalledWith("https://example.invalid/r.png");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 42 — an author pseudonym navigates to that
+ * author's Profile.
+ *
+ * ⚠ NOT A NEW BEHAVIOUR, AN EXTENDED ONE. SPEC.1 `:1628` already rules exactly
+ * this for the Discovery hero: "an author pseudonym click navigates to that
+ * author's **Profile (§23)**". d5 navigates from its author name too
+ * (`:1909-1911` → `nav('profile')`). Row 42 applies the ruled behaviour to the
+ * surface that shows the most pseudonyms.
+ *
+ * ⚠ ONE CHANGE REACHED EVERY SITE — the dividend of rows 12, 26 and 33
+ * collapsing four author rows into one `ArgProfile`. The post card, the focused
+ * post, the reply card and BOTH pop-ups get it, and none of them can drift away
+ * from it. It is asserted here because the reply card is the site that had its
+ * own hand-rolled head longest.
+ */
+describe("ReplyCard — row 42, the pseudonym links to the profile", () => {
+	it("reply-card::the-pseudonym-is-a-link-to-the-author-profile", () => {
+		const { container } = render(
+			<ReplyCard
+				reply={presentReply()}
+				bookmarks={VIEWER}
+				onOpenImage={noop}
+				onOpenPopup={noopPopup}
+			/>,
+		);
+
+		const link = container.querySelector<HTMLAnchorElement>(
+			'a[href="/u/fixture-replier"]',
+		);
+		expect(link).not.toBeNull();
+		// The accessible name IS the visible text — no `aria-label` override, so
+		// WCAG 2.5.3 (Label in Name) holds by construction rather than by care.
+		expect(link?.textContent).toBe("fixture-replier");
+		expect(link?.getAttribute("aria-label")).toBeNull();
+	});
+
+	it("reply-card::a-REMOVED-reply-links-to-nobody", () => {
+		// ⛔ SC-1. The removed variant carries no author at all, so there is no
+		// pseudonym to link and no `ArgProfile` to render one — structural, not a
+		// conditional. A link here would leak the author of withheld content.
+		const { container } = render(
+			<ReplyCard
+				reply={{
+					removed: true,
+					id: "0199a0c0-0000-7000-8000-00000000ef04",
+					side: "NO",
+					createdAt: "2026-07-30T00:00:00.000Z",
+				}}
+				bookmarks={VIEWER}
+				onOpenImage={noop}
+				onOpenPopup={noopPopup}
+			/>,
+		);
+		expect(container.querySelector('a[href^="/u/"]')).toBeNull();
 	});
 });
