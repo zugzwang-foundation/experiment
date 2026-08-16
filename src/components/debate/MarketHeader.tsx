@@ -7,6 +7,7 @@ import { formatDharma } from "./format";
 import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
+import { ResolverCards } from "./ResolverCards";
 import type { DebateMarketHeader } from "./types";
 
 const TERMINAL: ReadonlySet<string> = new Set([
@@ -201,6 +202,13 @@ export function MarketHeader({
 								</p>
 							</div>
 						) : null}
+						{/* HTML-FINISH · MARKET DETAIL row 3 — `.rescards` (`d5:986`), the
+						    last `vm` child of `.hstack`, after the criterion. It renders
+						    NOTHING today and that is the ruling (OD-2), not an omission:
+						    `markets` carries no resolver name, logo, source or handle, and
+						    empty card chrome would reproduce PD-3-09 / OD-6 verbatim. The
+						    slot is real in the composition; see `ResolverCards.tsx`. */}
+						<ResolverCards market={market} />
 					</div>
 				</div>
 			}
