@@ -37,7 +37,13 @@ export function DebateColumn({
 	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	return (
 		<div
-			className={`flex flex-1 flex-col gap-3 ${
+			// HTML-FINISH · MARKET DETAIL row 1 — `min-h-0` is this column's link in
+			// the height chain (`tests/unit/design/debate-height-chain.test.ts`). A
+			// flex item's automatic minimum size is its CONTENT, so without it the
+			// column refuses to shrink below what it holds, the arena band pushes
+			// past its own `flex-1 min-h-0`, and the band silently reverts to
+			// content height. Nothing errors; the page just gets taller.
+			className={`flex min-h-0 flex-1 flex-col gap-3 ${
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""

@@ -203,10 +203,27 @@ export function DebateView({
 				marketOpen={marketOpen}
 				composerOpen={openSide !== null || openReply !== null}
 			/>
-			<MarketHeader market={market} priceChart={priceChart} />
 
+			{/* HTML-FINISH · MARKET DETAIL row 1 — THE HEADZONE IS INSIDE THE
+			    TERNARY. `MarketHeader` used to render ABOVE this switch and
+			    `PostFocusHeader` stacked underneath it, which made the header
+			    arm-BLIND; the mockup's headzone swaps its whole CONTENTS between
+			    arms (`vm` ⇄ `vp`) and only the two-column frame persists, so no
+			    `vp` element could ever land in a header column. Each arm now owns
+			    its own `HeadZone`.
+			    ⛔ `DebatePoll` STAYS ABOVE IT — see its own comment: inside the
+			    ternary the post toggle would remount it and reset `stopped` /
+			    `wasSuspended`.
+			    ⚠ EACH ARM IS A FRAGMENT, NOT A WRAPPER DIV. The headzone band and
+			    the arena band must be SIBLING children of the container or the
+			    arena's `flex-1 min-h-0` resolves against a wrapper instead of the
+			    container and the height chain is broken at that link — invisibly,
+			    since a broken chain merely reverts to content height. The post
+			    arm's former `flex flex-col gap-4` wrapper is therefore gone and
+			    its band gap is the container's `gap-5`. Pinned node by node in
+			    `tests/unit/design/debate-height-chain.test.ts`. */}
 			{selectedPost ? (
-				<div className="flex flex-col gap-4">
+				<>
 					<PostFocusHeader
 						post={selectedPost}
 						bookmarks={bookmarks}
@@ -223,7 +240,7 @@ export function DebateView({
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
 					/>
-					<div className="flex gap-4">
+					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {
 							// v0.10: the reply composer — Support OR Counter — opens in
 							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
@@ -301,44 +318,47 @@ export function DebateView({
 							);
 						})}
 					</div>
-				</div>
+				</>
 			) : (
-				<div className="flex gap-4">
-					{(["YES", "NO"] as const).map((side) => (
-						<DebateColumn
-							key={side}
-							side={side}
-							pricing={market.pricing}
-							engaged={openSide === side}
-							header={
-								<SlotHeader
-									side={side}
-									pricing={market.pricing}
-									unitToWin={market.unitToWin}
-									viewer={viewer}
-									marketOpen={marketOpen}
-									suspended={suspended}
-									composerOpen={openSide === side}
-									onToggleEntry={() => toggleEntry(side)}
-									ownPseudonym={ownPseudonym}
-									slug={market.slug}
-								/>
-							}
-						>
-							{marketColumnBody(
-								side,
-								<PostScroller
-									side={side}
-									posts={side === "YES" ? yesPosts : noPosts}
-									bookmarks={bookmarks}
-									onEnter={enterPost}
-									onOpenPopup={setPopupPost}
-									onOpenImage={setLightboxUrl}
-								/>,
-							)}
-						</DebateColumn>
-					))}
-				</div>
+				<>
+					<MarketHeader market={market} priceChart={priceChart} />
+					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
+						{(["YES", "NO"] as const).map((side) => (
+							<DebateColumn
+								key={side}
+								side={side}
+								pricing={market.pricing}
+								engaged={openSide === side}
+								header={
+									<SlotHeader
+										side={side}
+										pricing={market.pricing}
+										unitToWin={market.unitToWin}
+										viewer={viewer}
+										marketOpen={marketOpen}
+										suspended={suspended}
+										composerOpen={openSide === side}
+										onToggleEntry={() => toggleEntry(side)}
+										ownPseudonym={ownPseudonym}
+										slug={market.slug}
+									/>
+								}
+							>
+								{marketColumnBody(
+									side,
+									<PostScroller
+										side={side}
+										posts={side === "YES" ? yesPosts : noPosts}
+										bookmarks={bookmarks}
+										onEnter={enterPost}
+										onOpenPopup={setPopupPost}
+										onOpenImage={setLightboxUrl}
+									/>,
+								)}
+							</DebateColumn>
+						))}
+					</div>
+				</>
 			)}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />

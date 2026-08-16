@@ -4,6 +4,7 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
 import { formatDharma } from "./format";
+import { HeadZone } from "./HeadZone";
 import { PriceBar } from "./PriceBar";
 import type { DebateMarketHeader } from "./types";
 
@@ -51,6 +52,19 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
  * unbuilt work to every participant. The record that market media and resolver
  * cards are still unbuilt survives at `docs/polish/POLISH-0.md` §3 and
  * `docs/parked.md`'s `MEDIA.2-GOLIVE`; the carousel itself is MEDIA.2's.
+ *
+ * HTML-FINISH · MARKET DETAIL row 1 — THIS IS THE HEADZONE'S MARKET ARM, and it
+ * is now rendered INSIDE the market↔post ternary rather than above it. Every
+ * element below is a `vm` element in the mockup (`.question` · `.attrs` ·
+ * `.criterion` · `.graph` · `.barrow f`); the post arm's `vp` set is
+ * `PostFocusHeader`'s. The two are disjoint and they SWAP — see `HeadZone.tsx`.
+ *
+ * ⇒ CONSEQUENCE, DECLARED: the lifecycle marker and `Download .md` become
+ * MARKET-ARM ONLY, exactly like every other `vm` element beside them. ⛔ Neither
+ * is DELETED — row 9 is a reverse delta the founder has not ruled, and OD-3
+ * keeps all five. The ADR-0025 export stays reachable and the INV-4 read-only
+ * marker stays rendered wherever the market itself is the subject; in post-focus
+ * the reader's market context is the row-17 market card, one click from exit.
  */
 export function MarketHeader({
 	market,
@@ -60,24 +74,32 @@ export function MarketHeader({
 	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
 }) {
 	return (
-		<section className="flex flex-col gap-3">
-			<div className="flex items-start justify-between gap-3">
-				<h1 className="text-xl font-semibold tracking-tight">{market.title}</h1>
-				<div className="flex shrink-0 items-center gap-2">
-					<LifecycleBadge status={market.status} />
-					{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
+		<HeadZone
+			// The rail lands at C4 (the chart) and C6 (the price bar). Until then
+			// this arm is one column and the surface does not move — `null` renders
+			// no rail at all rather than an empty 25% box (PD-3-09).
+			right={null}
+			left={
+				<>
+					<div className="flex items-start justify-between gap-3">
+						<h1 className="text-xl font-semibold tracking-tight">
+							{market.title}
+						</h1>
+						<div className="flex shrink-0 items-center gap-2">
+							<LifecycleBadge status={market.status} />
+							{/* EXPORT.1 — native download of the debate `.md` (server-mediated GET);
 					    plain anchor, no client boundary, works signed-out. */}
-					<a
-						download
-						href={`/m/${market.slug}/export`}
-						aria-label="Download this debate as Markdown"
-						className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-					>
-						Download .md
-					</a>
-				</div>
-			</div>
-			{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
+							<a
+								download
+								href={`/m/${market.slug}/export`}
+								aria-label="Download this debate as Markdown"
+								className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+							>
+								Download .md
+							</a>
+						</div>
+					</div>
+					{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
 			    `.overline`). The container is a TOP HAIRLINE RULE + padding
 			    (`d5:467` `margin-top:12px; border-top:var(--hairline);
 			    padding-top:10px`), NOT a boxed card; the 12px margin is already
@@ -108,37 +130,39 @@ export function MarketHeader({
 			    any of those and generalising across ROLES is how the earlier
 			    8px/.12em recipe was wrong. Ported BY TOKEN (`text-n4`), never the
 			    hex — Ruling A / H-HEX. */}
-			{market.description ? (
-				<div className="pt-2.5 [border-top:var(--hairline)]">
-					<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
-						Resolution
-					</div>
-					<p className="mt-[5px] text-sm text-muted-foreground">
-						{market.description}
-					</p>
-				</div>
-			) : null}
-			{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
+					{market.description ? (
+						<div className="pt-2.5 [border-top:var(--hairline)]">
+							<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
+								Resolution
+							</div>
+							<p className="mt-[5px] text-sm text-muted-foreground">
+								{market.description}
+							</p>
+						</div>
+					) : null}
+					{/* UI.19 §9 — the market-detail price chart, above PriceBar. Rendered
 			    ONLY when non-null: a null series read is non-fatal (web Gate-C
 			    error-state), the rest of the header stands. */}
-			{priceChart ? (
-				<MarketPriceChartHost
-					series={priceChart.series}
-					nodes={priceChart.nodes}
-				/>
-			) : null}
-			<PriceBar pricing={market.pricing} size="detail" />
-			<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-				<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
-				<span>
-					{market.totals.postCount}{" "}
-					{noun(market.totals.postCount, "post", "posts")}
-				</span>
-				<span>
-					{market.totals.replyCount}{" "}
-					{noun(market.totals.replyCount, "reply", "replies")}
-				</span>
-			</div>
-		</section>
+					{priceChart ? (
+						<MarketPriceChartHost
+							series={priceChart.series}
+							nodes={priceChart.nodes}
+						/>
+					) : null}
+					<PriceBar pricing={market.pricing} size="detail" />
+					<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+						<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+						<span>
+							{market.totals.postCount}{" "}
+							{noun(market.totals.postCount, "post", "posts")}
+						</span>
+						<span>
+							{market.totals.replyCount}{" "}
+							{noun(market.totals.replyCount, "reply", "replies")}
+						</span>
+					</div>
+				</>
+			}
+		/>
 	);
 }
