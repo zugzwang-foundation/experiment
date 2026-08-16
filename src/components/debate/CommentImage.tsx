@@ -26,13 +26,31 @@ export function CommentImage({
 	 * render was `block w-fit` around `max-h-[var(--imgmax)]` — a 160px cap.
 	 *
 	 * ⇒ `fill` swaps the `w-fit` box for a centred flex cell and the 160px cap for
-	 * `max-h-full`, so the image is bounded by THE CARD rather than by a constant.
+	 * `max-h-[40vh]`, so the image is bounded by THE VIEWPORT rather than by a
+	 * 160px constant — see the measurement note below for why not by the card.
 	 *
 	 * ⛔ STILL BOTH-AXES-BOUNDED, so T2 / canon §107 ("shown whole · any
-	 * orientation") is untouched: `max-h-full` + `max-w-full` with no fixed
+	 * orientation") is untouched: `max-h-[40vh]` + `max-w-full` with no fixed
 	 * dimension preserves the intrinsic aspect and never upscales a small image.
 	 * d5's own `height:100%` WOULD upscale, and that half is deliberately not
 	 * taken — it is the one part of `.media` that fights the promise to the author.
+	 *
+	 * ⚠⚠ WHY A VIEWPORT FRACTION AND NOT `100%` OF THE CELL — MEASURED, AND THE
+	 * FIRST ATTEMPT AT THIS FIX GOT IT WRONG. d5's card is `flex:1 1 auto` inside a
+	 * `height:100vh;overflow:hidden` screen, so "the card's leftover height" is a
+	 * real quantity there. THIS ROUTE HAS NO SUCH QUANTITY: `(public)/layout.tsx`
+	 * rules `min-h-*` never `h-*` so the surface can grow and scroll, and measured
+	 * on staging the content (567px) ALREADY exceeds the `100vh-62` floor (547px)
+	 * — so the arena is sized BY its content, and a `height:100%` image inside it
+	 * is circular. The first attempt shipped exactly that and measured 147 × 135:
+	 * better than 160 × 90, still not "large".
+	 * ⇒ The bound is a FRACTION OF THE VIEWPORT, which is the same kind of
+	 * declaration `HeadZone` already prefers over the mockup's `340px`
+	 * (`lg:w-1/4`): it scales with the screen, it is deterministic at every
+	 * viewport, and it does not depend on a definite height this route declines to
+	 * have. At the measured 609px viewport it renders ~266 × 244 in a 537-wide
+	 * cell — against the mockup's 57%-of-card-width, which is the proportion being
+	 * matched.
 	 *
 	 * ⚠ DEFAULT `false` KEEPS THE FOCUS-HEADER ARM BYTE-IDENTICAL. `.hpimg`
 	 * (`d5:787`) is a fixed side slot, not a growing cell, and `PostFocusHeader`
@@ -45,15 +63,13 @@ export function CommentImage({
 			type="button"
 			onClick={() => onOpen(url)}
 			aria-label="Open attached image"
-			// ⚠ `h-full`, not `flex-1`: the `.argimg` CELL is the flex item (its
-			// wrapper in `PostCard` carries `flex-1 min-h-0`), and the `<img>`'s
-			// `max-h-full` below is a PERCENTAGE — it resolves to `none` unless
-			// every ancestor between it and the definite height passes that height
-			// down. `h-full` is that pass-through.
+			// ⚠ NO HEIGHT ON THE BUTTON. The bound lives on the `<img>` as
+			// `max-h-[40vh]`, which needs no definite height above it — that is the
+			// whole point of the viewport fraction (see the `fill` docblock). This
+			// wrapper only has to stop being `w-fit`, so the image can centre in the
+			// `.argimg` cell instead of hugging its left edge.
 			className={
-				fill
-					? "flex h-full max-w-full items-center justify-center"
-					: "block w-fit"
+				fill ? "flex max-w-full items-center justify-center" : "block w-fit"
 			}
 		>
 			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
@@ -86,7 +102,7 @@ export function CommentImage({
 				src={url}
 				alt="Argument attachment"
 				className={`max-w-full rounded-[var(--imgr)] [border:var(--hairline)] ${
-					fill ? "max-h-full" : "max-h-[var(--imgmax)]"
+					fill ? "max-h-[40vh]" : "max-h-[var(--imgmax)]"
 				}`}
 			/>
 		</button>
@@ -129,7 +145,10 @@ export function PostImagePlaceholder({
 	 * ⚠ THE `.argimg` ARM — the same swap `CommentImage` documents above, and the
 	 * other half of the founder's "~¼ size, left-aligned" measurement: the box was
 	 * `aspect-[16/9] w-full max-w-[var(--imgmax)]`, so it rendered 160 × 90 flush
-	 * left on staging while the mockup's fills the card and centres.
+	 * left on staging while the mockup's fills the card and centres. The 160px
+	 * WIDTH cap goes from both arms: in the post-focus arm it left a 160px box
+	 * sitting inside the 1/3-width slot `PostFocusHeader` gives it, which is the
+	 * same defect one component over.
 	 *
 	 * ⛔ THE ASPECT BECOMES `640/586` IN THIS ARM, AND THAT IS THE LABEL'S OWN
 	 * NUMBER. d5's box is `.media.rdt{aspect-ratio:640/586}` (`d5:653`) and the
@@ -148,8 +167,8 @@ export function PostImagePlaceholder({
 			data-testid="post-image-placeholder"
 			className={
 				fill
-					? "flex aspect-[640/586] h-full max-h-full w-auto max-w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
-					: "flex aspect-[16/9] w-full max-w-[var(--imgmax)] items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+					? "flex aspect-[640/586] h-[40vh] max-h-full w-auto max-w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+					: "flex aspect-[16/9] w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
 			}
 		>
 			POST IMAGE · 640:586
