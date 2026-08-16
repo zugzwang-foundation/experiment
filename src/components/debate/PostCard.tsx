@@ -1,7 +1,5 @@
 "use client";
 
-import { Maximize2 } from "lucide-react";
-
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -15,9 +13,9 @@ import type { DebatePost, PresentPost } from "./types";
 
 /**
  * One post in a side column's post-scroller (DEBATE.4 §4). A PRESENT post shows
- * the argprofile · lane badge · title (opens the pop-up) · image · a
- * "Read more" link to the full body · the aggregate footer · an "Open debate"
- * focus toggle.
+ * the argprofile · lane badge · title (enters post-focus) · image · a
+ * `+` glyph opening the full body in a pop-up · the aggregate footer. The
+ * TITLE enters post-focus (row 23); the `+` reads in place (row 24).
  *
  * ⛔ THE TEASER AND THE TWO-SLOT REPLY PREVIEW LEFT THIS CARD at HTML-FINISH ·
  * MARKET DETAIL row 25, under the SPEC.1 1.0.31 amendment (§9 preamble,
@@ -104,57 +102,58 @@ export function PostCard({
 				<LaneBadge badge={post.badge} />
 			</div>
 
-			<button
-				type="button"
-				className="text-left"
-				onClick={() => onOpenPopup(post)}
-			>
-				<h3 className="font-heading text-base leading-snug font-medium">
-					{post.title}
-				</h3>
-			</button>
-			{post.imageUrl ? (
-				<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
-			) : null}
-
-			<div className="flex flex-wrap items-center gap-1.5">
-				{/* Row 3 (PD-0-01) — R4 RULED 2026-08-12: ADOPT CD-A's "Read more" TEXT
-				    LINK. `Read more` had zero occurrences repo-wide.
-				    ⚠ The icon goes with the copy. "Text link" is the ratified form, so
-				    the Plus glyph is REMOVED rather than relabelled — keeping an icon
-				    beside the new copy would preserve the affordance CD-A retired.
-				    ⚠ The `aria-label` is removed DELIBERATELY, not dropped. It read
-				    "Read the full argument", which does not CONTAIN the visible text
-				    "Read more" — an accessible name that omits the visible label is a
-				    WCAG 2.5.3 (Label in Name) failure. With self-describing text the
-				    visible string IS the accessible name, which is the stronger form.
-				    ✅ CD-A's `#989898` / `#FAFAFA` ARE `--color-n5` / `--color-ink`, so
-				    the port is BY TOKEN — a raw hex here reddens no-raw-hex-view-layer
-				    (Ruling A / H-HEX). */}
+			{/* HTML-FINISH · MARKET DETAIL rows 23 + 24 — d5's `.rtitle.plust`
+			    (`:1077`): the TITLE enters post-focus (`onclick="enterPost(…)"`) and
+			    a `+` glyph beside it opens the pop-up (`onclick="openPostPop(…)"`).
+			    One row, two destinations — read the whole argument in place, or go
+			    to its debate. The title used to open the pop-up; that is now the
+			    `+`'s job alone. */}
+			<div className="flex items-start justify-between gap-2">
+				<button
+					type="button"
+					className="text-left"
+					onClick={() => onEnter(post.id)}
+				>
+					<h3 className="font-heading text-base leading-snug font-medium">
+						{post.title}
+					</h3>
+				</button>
+				{/* Row 24 — `R4` REVERSED by the founder ruling of 2026-08-16, and the
+				    WCAG concern that motivated R4 is ANSWERED rather than dismissed.
+				    R4 removed the Plus glyph for a `Read more` text link and
+				    deliberately dropped the `aria-label`, because "Read the full
+				    argument" does not CONTAIN the visible text "Read more" — a WCAG
+				    2.5.3 (Label in Name) failure. With a glyph there IS no visible
+				    label, so 2.5.3 does not apply and an `aria-label` becomes REQUIRED
+				    rather than forbidden. ⛔ The label is BYTE-CARRIED from the
+				    mockup's own control (`d5:1077`, `aria-label="Show more"`), never
+				    authored. ✅ `text-n5 hover:text-ink` is kept from the R4 render —
+				    CD-A's `#989898`/`#FAFAFA` BY TOKEN (Ruling A / H-HEX). */}
 				<Button
 					variant="ghost"
 					size="xs"
 					onClick={() => onOpenPopup(post)}
-					className="text-n5 hover:text-ink"
+					aria-label="Show more"
+					className="shrink-0 text-n5 hover:text-ink"
 				>
-					Read more
+					+
 				</Button>
 			</div>
+			{post.imageUrl ? (
+				<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
+			) : null}
 
+			{/* Row 23 — `Open debate` is GONE from the present branch: the title
+			    above carries that destination now, and two controls for one
+			    navigation is the redundancy this row removes. ⛔ The REMOVED branch
+			    KEEPS it (plan F-3) — a removed post has no title to click, and
+			    `page.tsx` falls back silently for a removed `?post=` target, so
+			    deleting it there would leave a removed post and every surviving
+			    reply under it reachable by no path at all. */}
 			<AggregateFooter
 				aggregate={post.aggregate}
 				postSide={post.sideAtPostTime}
 			/>
-
-			<Button
-				variant="ghost"
-				size="xs"
-				className="self-start"
-				onClick={() => onEnter(post.id)}
-				aria-label="Open this debate"
-			>
-				<Maximize2 /> Open debate
-			</Button>
 		</Card>
 	);
 }

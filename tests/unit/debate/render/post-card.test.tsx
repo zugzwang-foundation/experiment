@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
@@ -114,39 +114,105 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		expect(offender).toBeUndefined();
 	});
 
-	it("post-card::read-more-replaces-the-plus-full-affordance", () => {
-		// Row 3 · PD-0-01 · R4 RULED — ADOPT "Read more". The OLD form is a
-		// `<Plus />` icon + the word "Full"; asserting only the new copy would
-		// pass on a card that rendered BOTH.
+	it("post-card::the-plus-glyph-replaces-Read-more", () => {
+		// ⚠ ROW 24 REVERSES R4, and the superseded assertion is recorded rather
+		// than silently swapped. R4 (2026-08-12) ruled `<Plus /> Full` → a
+		// `Read more` TEXT LINK and removed the glyph outright. The founder ruling
+		// of 2026-08-16 reverses it: the glyph returns, `Read more` goes.
 		const { container } = renderCard();
 		const buttons = buttonsIn(container);
 
-		const readMore = buttons.find((b) => b.innerHTML.includes("Read more"));
-		expect(readMore).toBeDefined();
+		const plus = buttons.find(
+			(b) => b.getAttribute("aria-label") === "Show more",
+		);
+		expect(plus).toBeDefined();
+		expect(plus?.innerHTML).toContain("+");
 
-		// The superseded label is gone from every control on the card.
+		// Both superseded labels pinned as gone — asserting only the new form
+		// would pass on a card that rendered BOTH.
+		expect(buttons.some((b) => b.innerHTML.includes("Read more"))).toBe(false);
 		expect(buttons.some((b) => b.innerHTML.includes("Full"))).toBe(false);
 	});
 
-	it("post-card::read-more-is-a-text-link-carrying-the-ported-tokens", () => {
-		// Row 3, second half. CD-A's `#989898` / `#FAFAFA` ARE `--color-n5` /
-		// `--color-ink`, so the port is BY TOKEN. A raw hex here also reddens
-		// `no-raw-hex-view-layer.test.ts` (Ruling A / H-HEX).
+	it("post-card::the-glyph-carries-an-aria-label-and-WCAG-2.5.3-still-holds", () => {
+		// ⚠ THE ACCESSIBILITY ARGUMENT INVERTED WITH THE CONTROL, which is why
+		// this is not simply "R4 undone". R4 dropped the `aria-label` DELIBERATELY:
+		// "Read the full argument" does not CONTAIN the visible text "Read more",
+		// and an accessible name that omits its visible label fails WCAG 2.5.3
+		// (Label in Name). A GLYPH has no visible label, so 2.5.3 does not apply
+		// and an `aria-label` becomes REQUIRED rather than forbidden — the concern
+		// is answered, not dismissed.
+		// ⛔ The label is BYTE-CARRIED from `d5:1077`'s own control, not authored.
 		const { container } = renderCard();
 
-		const readMore = buttonsIn(container).find((b) =>
-			b.innerHTML.includes("Read more"),
+		const plus = buttonsIn(container).find(
+			(b) => b.getAttribute("aria-label") === "Show more",
 		);
-		expect(readMore).toBeDefined();
-
-		const className = readMore?.getAttribute("class") ?? "";
+		expect(plus).toBeDefined();
+		// The ported tokens survive the control swap (Ruling A / H-HEX — a raw hex
+		// here also reddens `no-raw-hex-view-layer`).
+		const className = plus?.getAttribute("class") ?? "";
 		expect(className).toContain("text-n5");
 		expect(className).toContain("hover:text-ink");
+	});
 
-		// "text LINK" — CD-A ratified copy, not an icon button. Asserted on the
-		// element that carries the row's subject, so C11's `Download` deletion
-		// (a different element entirely) cannot move it.
-		expect(readMore?.innerHTML).not.toContain("<svg");
+	it("post-card::row-23-the-title-enters-post-focus-and-Open-debate-is-gone", () => {
+		// Row 23 — d5's `.rtitle.plust` (`:1077`): the title carries
+		// `enterPost(…)`, the `+` carries `openPostPop(…)`. Two destinations, one
+		// row, and no third control duplicating either.
+		const onEnter = vi.fn();
+		const onOpenPopup = vi.fn();
+		const { container } = render(
+			<PostCard
+				post={presentPost()}
+				bookmarks={VIEWER}
+				onEnter={onEnter}
+				onOpenPopup={onOpenPopup}
+				onOpenImage={noop}
+			/>,
+		);
+
+		const title = container.querySelector("h3")?.closest("button");
+		expect(title).not.toBeNull();
+		fireEvent.click(title as HTMLButtonElement);
+		expect(onEnter).toHaveBeenCalledWith(presentPost().id);
+		// ⛔ It does NOT also open the pop-up — that is the `+`'s job alone.
+		expect(onOpenPopup).not.toHaveBeenCalled();
+
+		// `Open debate` is gone from the PRESENT branch…
+		expect(container.innerHTML).not.toContain("Open debate");
+	});
+
+	it("post-card::the-REMOVED-branch-keeps-Open-debate", () => {
+		// ⛔ …and the removed branch KEEPS it (plan F-3). A removed post has no
+		// title to click and `page.tsx` falls back silently for a removed `?post=`
+		// target, so without this control a removed post and every surviving reply
+		// under it would be reachable by NO path at all.
+		const onEnter = vi.fn();
+		const { container } = render(
+			<PostCard
+				post={{
+					removed: true,
+					id: presentPost().id,
+					ordinal: 1,
+					sideAtPostTime: "YES",
+					createdAt: "2026-07-30T00:00:00.000Z",
+					aggregate: AGGREGATE,
+					replies: EMPTY_REPLIES,
+				}}
+				bookmarks={VIEWER}
+				onEnter={onEnter}
+				onOpenPopup={noop}
+				onOpenImage={noop}
+			/>,
+		);
+
+		expect(container.innerHTML).toContain("Open debate");
+		const open = buttonsIn(container).find((b) =>
+			b.innerHTML.includes("Open debate"),
+		);
+		fireEvent.click(open as HTMLButtonElement);
+		expect(onEnter).toHaveBeenCalledWith(presentPost().id);
 	});
 });
 
