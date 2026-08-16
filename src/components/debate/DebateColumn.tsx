@@ -69,6 +69,24 @@ export function DebateColumn({
 			// anywhere on the page, so nothing here is mouse-only.
 			data-debate-column={side}
 			data-picked={picked ? "true" : undefined}
+			// ⛔⛔ THE LIFT IS AN INLINE STYLE, AND THAT IS THE THIRD SHAPE IT TOOK.
+			// It is a one-off, state-driven value — the same category as
+			// `AggregateFooter`'s `style={{ width: supportPct }}` and `ScrollRail`'s
+			// `style={{ height }}`, both already shipped — so an inline declaration
+			// is in-pattern rather than an escape hatch.
+			// ⚠ TWO CLASS-BASED ATTEMPTS FAILED SILENTLY IN THE BROWSER, both
+			// measured on staging, both reported here rather than quietly replaced:
+			//   · `[&>*:last-child]:-translate-y-[5px]` — the element carried
+			//     `--tw-translate-y: calc(5px * -1)` while `.translate` computed
+			//     `0px`. The custom property landed; the shorthand it feeds did not.
+			//   · `[&>*:last-child]:[transform:translateY(-5px)]` — `.transform`
+			//     computed `matrix(1, 0, 0, 1, 0, 0)`, the IDENTITY. The rule
+			//     applied and the translation was not in it.
+			// In both cases the class was in the DOM and the box did not move, which
+			// is precisely the failure mode a class-string assertion cannot see.
+			// ⇒ One declaration, on the property that paints, with nothing between
+			// it and the element.
+			style={picked ? { transform: "translateY(-5px)" } : undefined}
 			// HTML-FINISH · MARKET DETAIL row 1 — `min-h-0` is this column's link in
 			// the height chain (`tests/unit/design/debate-height-chain.test.ts`). A
 			// flex item's automatic minimum size is its CONTENT, so without it the
@@ -79,32 +97,18 @@ export function DebateColumn({
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""
-			} [&>*:last-child]:transition-transform [&>*:last-child]:duration-150${
-				// `.slot.picked .panel.vm{transform:translateY(-5px);
-				// box-shadow:0 6px 16px …}` (`d5:896`) with its own `.16s ease`.
-				// ⛔⛔ THE LIFT IS WRITTEN AS `transform` DIRECTLY, and that is a
-				// MEASURED correction, not a style preference. Tailwind v4's
-				// `-translate-y-*` does not set `transform` at all — it sets the
-				// `translate` PROPERTY via `--tw-translate-x/y`. Through this
-				// `[&>*:last-child]:` arbitrary variant that indirection does not
-				// resolve: measured on staging, the element carried
-				// `--tw-translate-y: calc(5px * -1)` while `getComputedStyle(el)
-				// .translate` still read `0px`. The custom properties landed and the
-				// shorthand they feed did not, so the card never moved.
-				// ⚠ MY OWN FIRST READING OF THIS WAS WRONG IN THE OTHER DIRECTION and
-				// is recorded rather than quietly dropped: an earlier probe read
-				// `.transform` (which is `none` for a v4 translate utility whether or
-				// not it applied) and I reported the lift working off `.translate`
-				// reading `0px -5px`. Two probes, two different answers, and only the
-				// direct `transform` declaration is unambiguous — so that is what
-				// ships. `transition-transform` now animates the property that is
-				// actually being set.
-				// The LIFT rides the column's body (the scroller, this node's last
-				// child, which is the card); the ELEVATION rides the column box,
-				// because the body has no surface of its own to cast from.
-				picked
-					? " rounded-(--r) shadow-(--elev-3) [&>*:last-child]:[transform:translateY(-5px)]"
-					: ""
+			} transition-transform duration-150${
+				// `.slot.picked .panel.vm{box-shadow:0 6px 16px …}` (`d5:896`); the
+				// paired `translateY(-5px)` is the inline style above.
+				// ⚠ d5 lifts the PANEL and this lifts the whole COLUMN, header
+				// included. Declared as a deviation: the panel is `{children}` here
+				// and a parent cannot class its own children without either an
+				// arbitrary variant (which is what failed twice above) or a wrapper
+				// div, and a wrapper would insert an unwired link into the height
+				// chain `debate-height-chain.test.ts` exists to protect. Lifting the
+				// column reads the same — the chosen side rises — for none of that
+				// risk.
+				picked ? " rounded-(--r) shadow-(--elev-3)" : ""
 			}`}
 		>
 			{header ?? (
