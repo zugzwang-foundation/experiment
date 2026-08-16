@@ -46,6 +46,34 @@ import { createQuoteReader, type QuoteResult } from "./quote-reader";
 import { buildPlaceRequest } from "./requests";
 import { keyOutcomeFor, mapWireError } from "./state-map";
 
+/**
+ * Canon §6's counter format groups thousands (`158 / 2,200 · optional`), and
+ * the mockup's own `fmt` uses this exact expression. `format.ts::groupInteger`
+ * is the shipped sibling but is PRIVATE to a file outside this surface's
+ * fence (`debate/format.ts` is `.3`'s, deny-list `D5`), so exporting it is
+ * `H4`; the one-line regex is duplicated here rather than widening the fence.
+ */
+function groupCount(n: number): string {
+	return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
+/**
+ * The mockup's `sizeAmt()`: the stake field's width tracks its own content, in
+ * `ch`, floored at 2 — which is what makes the glued `Đ` TRAVEL with the
+ * digits instead of sitting at a fixed offset (d5's source comment: *"width
+ * JS-managed: tracks content so Đ travels with the digits"*).
+ *
+ * ⚠ `field-sizing-content` (already shipped on `ui/textarea.tsx`) is the
+ * CSS-native alternative and would be the `O-1` structural choice, but its
+ * support is partial — where it is unsupported the field silently falls back
+ * to its default size and the Đ stops travelling, with nothing to detect it.
+ * The mockup's mechanism is deterministic and jsdom-observable; it is taken
+ * deliberately, not by default.
+ */
+function stakeFieldWidth(value: string): string {
+	return `${Math.max(2, value.length)}ch`;
+}
+
 export function BetComposer(props: {
 	marketId: string;
 	slug: string;
@@ -457,106 +485,144 @@ export function BetComposer(props: {
 				<div className="mb-1 text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
 					{COMPOSER_COPY.argumentLabel}
 				</div>
-				<div className="flex flex-col gap-2">
-					<div>
-						<Input
-							value={title}
-							maxLength={TITLE_MAX_CHARS}
-							disabled={floorAbove || inFlight}
-							aria-label="Argument title"
-							onChange={(e) => {
-								// F-5: the title is newline-free (paste belt; the input
-								// itself cannot hold newlines).
-								setTitle(e.target.value.replace(/[\n\r]/g, " "));
-								onEdit();
-							}}
-						/>
-						<div className="mt-0.5 text-right text-[10px] text-n4">
-							{title.length} / {TITLE_MAX_CHARS}
-						</div>
-					</div>
-					<div>
-						<Textarea
-							value={extended}
-							maxLength={extendedMax}
-							disabled={floorAbove || inFlight}
-							aria-label="Argument body"
-							className="min-h-24"
-							onChange={(e) => {
-								setExtended(e.target.value);
-								onEdit();
-							}}
-						/>
-						<div className="mt-0.5 text-right text-[10px] text-n4">
-							{extended.length} / {extendedMax}
-							{COMPOSER_COPY.optionalSuffix}
-						</div>
-					</div>
+				{/* `.compgrid` (d5) — TWO COLUMNS: the image attach panel at full
+				    height on the left, title → body → the money footblock on the
+				    right. The mockup's own CSS section header states it in terms:
+				    "composer: PORTRAIT attach FULL MODULE HEIGHT · title/body/money
+				    right". Fenced by SYMBOL (`O-8`).
+
+				    ⛔ THE TRACK FLOOR IS REFUSED, NOT PORTED. d5 declares
+				    `minmax(210px,40%) 1fr`; `210px` is a VALUE out of a light-mode
+				    pre-BRIDGE prototype and `H-VALUE` forbids carrying it. What
+				    ships is the PROPORTION alone — 2fr/3fr is d5's own 40/60 split
+				    expressed without a pixel. `gap-3` is byte-carried from this
+				    file's own shipped amount row, not from the mockup.
+
+				    ⚠ RESOLVED GEOMETRY IS NOT PROVEN HERE. jsdom performs no
+				    layout, so the render suites pin the ARRANGEMENT (two tracks,
+				    which child is which) and say nothing about how the columns
+				    actually resolve. That is a browser read against the compiled
+				    CSS and it is the founder's staging pass. */}
+				<div className="grid grid-cols-[2fr_3fr] items-stretch gap-3">
 					<ImageAttach
 						state={image}
 						disabled={floorAbove || inFlight}
 						onPick={onPickImage}
 						onRemove={onRemoveImage}
 					/>
-				</div>
-			</div>
-
-			{/* Amount + To-win (the pm block) + submit */}
-			<div className={dimmed}>
-				<div className="flex items-stretch gap-3">
-					<div className="flex flex-1 flex-col rounded-(--r-chip) px-3 py-2 [border:var(--hairline)]">
-						<div className="flex items-center justify-between">
-							<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
-								{COMPOSER_COPY.amountLabel}
-							</span>
-							<span className="flex items-baseline gap-1">
-								<span className="text-sm text-n5">Đ</span>
-								<Input
-									value={amount}
-									inputMode="decimal"
-									disabled={floorAbove || inFlight}
-									aria-label="Stake amount"
-									onChange={(e) => {
-										setAmount(e.target.value);
-										onEdit();
-									}}
-									onBlur={() => {
-										// T3: normalize the display to the clamped value.
-										if (isPositiveAmount(amount)) {
-											setAmount(assess.clampedAmount);
-										}
-									}}
-									className={`h-auto w-28 border-none p-0 text-right font-mono text-[22px] font-extrabold tabular-nums shadow-none [border:none] ${
-										assess.overCap ? "text-n4" : ""
-									}`}
-								/>
-							</span>
+					{/* `.compright` (d5) */}
+					<div className="flex min-w-0 flex-col gap-2">
+						<div>
+							<Input
+								value={title}
+								maxLength={TITLE_MAX_CHARS}
+								disabled={floorAbove || inFlight}
+								aria-label="Argument title"
+								onChange={(e) => {
+									// F-5: the title is newline-free (paste belt; the input
+									// itself cannot hold newlines).
+									setTitle(e.target.value.replace(/[\n\r]/g, " "));
+									onEdit();
+								}}
+							/>
+							<div className="mt-0.5 text-right text-[10px] text-n4">
+								{groupCount(title.length)} / {groupCount(TITLE_MAX_CHARS)}
+							</div>
 						</div>
-						<div className="my-1.5 border-t border-n2" />
-						<div className="flex items-center justify-between">
-							<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
-								{COMPOSER_COPY.toWinLabel}
-							</span>
-							<span aria-live="polite" className="font-mono text-sm text-ink">
-								{toWin !== null ? `Đ ${toWin}` : "—"}
-							</span>
+						<div>
+							<Textarea
+								value={extended}
+								maxLength={extendedMax}
+								disabled={floorAbove || inFlight}
+								aria-label="Argument body"
+								className="min-h-24"
+								onChange={(e) => {
+									setExtended(e.target.value);
+									onEdit();
+								}}
+							/>
+							<div className="mt-0.5 text-right text-[10px] text-n4">
+								{groupCount(extended.length)} / {groupCount(extendedMax)}
+								{COMPOSER_COPY.optionalSuffix}
+							</div>
+						</div>
+
+						{/* `.footblock` (d5) — the money row is the right column's
+						    FOOTER, so it sits at the column's foot rather than
+						    floating under the body. */}
+						<div className="mt-auto">
+							<div className="flex items-stretch gap-3">
+								<div className="flex flex-1 flex-col rounded-(--r-chip) px-3 py-2 [border:var(--hairline)]">
+									<div className="flex items-center justify-between">
+										<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+											{COMPOSER_COPY.amountLabel}
+										</span>
+										{/* `.amtval` — flex-END, so the glued `Đ` sits against
+										    the digits and MOVES with them as the field's width
+										    tracks its content (`stakeFieldWidth`).
+										    ⚠ `ch` TRACKS THE DIGITS EXACTLY ONLY BECAUSE THIS
+										    FIELD IS `font-mono`. The `ch` unit is the width of
+										    the `0` glyph, so a proportional face makes `Nch`
+										    stop matching N digits and the `Đ` drifts off the
+										    number — and nothing goes red, because jsdom performs
+										    no layout and the width string is unchanged. Dropping
+										    `font-mono` below is therefore a silent break of R2,
+										    not a restyle. */}
+										<span className="flex min-w-0 items-baseline justify-end gap-1">
+											<span className="text-sm text-n5">Đ</span>
+											<Input
+												value={amount}
+												inputMode="decimal"
+												disabled={floorAbove || inFlight}
+												aria-label="Stake amount"
+												style={{ width: stakeFieldWidth(amount) }}
+												onChange={(e) => {
+													setAmount(e.target.value);
+													onEdit();
+												}}
+												onBlur={() => {
+													// T3: normalize the display to the clamped value.
+													if (isPositiveAmount(amount)) {
+														setAmount(assess.clampedAmount);
+													}
+												}}
+												className={`h-auto border-none p-0 text-right font-mono text-[22px] font-extrabold tabular-nums shadow-none [border:none] ${
+													assess.overCap ? "text-n4" : ""
+												}`}
+											/>
+										</span>
+									</div>
+									<div className="my-1.5 border-t border-n2" />
+									<div className="flex items-center justify-between">
+										<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+											{COMPOSER_COPY.toWinLabel}
+										</span>
+										<span
+											aria-live="polite"
+											className="font-mono text-sm text-ink"
+										>
+											{toWin !== null ? `Đ ${toWin}` : "—"}
+										</span>
+									</div>
+								</div>
+								<Button
+									type="button"
+									disabled={submitDisabled}
+									aria-disabled={submitDisabled}
+									onClick={submit}
+									className="h-auto min-h-[34px] self-end px-4 py-[7px] text-[13px]"
+								>
+									{COMPOSER_COPY.submit}
+								</Button>
+							</div>
+
+							{/* W2.10-D: over-cap = typing allowed, submit disabled, strip. */}
+							{assess.overCap && (
+								<div className="mt-1.5 text-xs text-n5">{overCapStrip()}</div>
+							)}
 						</div>
 					</div>
-					<Button
-						type="button"
-						disabled={submitDisabled}
-						aria-disabled={submitDisabled}
-						onClick={submit}
-						className="h-auto min-h-[34px] self-end px-4 py-[7px] text-[13px]"
-					>
-						{COMPOSER_COPY.submit}
-					</Button>
 				</div>
-
-				{/* W2.10-D: over-cap = typing allowed, submit disabled, strip shown. */}
-				{assess.overCap && (
-					<div className="mt-1.5 text-xs text-n5">{overCapStrip()}</div>
-				)}
 			</div>
 
 			<ErrorStrip status={status} />

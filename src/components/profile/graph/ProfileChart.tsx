@@ -49,6 +49,22 @@ export function ProfileChart({
 		? series.nodes.filter((n) => n.marketId === selection)
 		: series.nodes;
 
+	// `OD-9` — Y-AXIS INTERVALS, THE TWO CUMULATIVE ARMS ONLY. Both run the
+	// fixed 0..`series.yMax` domain, ruled at 5 intervals collapsed and 10
+	// expanded (DESIGN-W2_6-profile-graph-CLOSE-OUT.md §3 item 2).
+	//
+	// ⛔ The PER-MARKET view autoscales through `niceMax` and its interval count
+	// is UNRULED, so it draws NONE and this component makes no claim about it.
+	// Zero here means "not ruled", never "ruled zero".
+	const gridIntervals = perMarket ? 0 : mode === "expanded" ? 10 : 5;
+	// The interval UPPER bounds, in Đ. N intervals over 0..yMax yield N bounds,
+	// which is why N intervals draw N lines. Each value is distinct, so it also
+	// serves as the React key without keying on an array index.
+	const gridBounds = Array.from(
+		{ length: gridIntervals },
+		(_, i) => (series.yMax * (i + 1)) / gridIntervals,
+	);
+
 	return (
 		<svg
 			data-testid="profile-chart"
@@ -57,6 +73,32 @@ export function ProfileChart({
 			aria-hidden="true"
 			className="h-full w-full"
 		>
+			{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound, so
+			    N intervals draw N lines; value 0 sits at the plot floor and NOTHING
+			    draws it — there is no baseline rule, and the X labels below encode
+			    dates, not the Y zero. Drawn FIRST so they paint behind every series.
+			    Spanned
+			    by the same `xPx` endpoints the axis labels use, so item 16 adds no
+			    geometry primitive and `geometry.ts` is read, never written. Labels
+			    would print Đ figures and would have to route through `formatDharma`;
+			    unlabelled is the ratified reading and needs no data. */}
+			{gridBounds.map((bound, i) => {
+				const gy = yPx(String(bound), series.yMax);
+				return (
+					<line
+						key={bound}
+						data-testid={`grid-y-${i + 1}`}
+						x1={xPx(series.windowStart, startMs, endMs)}
+						x2={xPx(series.windowEnd, startMs, endMs)}
+						y1={gy}
+						y2={gy}
+						stroke="var(--color-n2)"
+						strokeWidth="1"
+						vectorEffect="non-scaling-stroke"
+					/>
+				);
+			})}
+
 			{/* X endpoint labels — exactly two (Sep 15 · Nov 5), no interior ticks. */}
 			<text
 				data-testid="axis-x-start"
@@ -217,7 +259,6 @@ function FlipMarker({
 	return (
 		<g
 			data-testid={`flip-marker-${seg.marketId}-${seg.episodeIndex}`}
-			data-side={seg.side}
 			transform={`translate(${xPx(last.at, startMs, endMs)},${yPx(last.value, yMax)})`}
 		>
 			<circle
@@ -248,8 +289,55 @@ function FlipMarker({
 	);
 }
 
-/** One own post/reply node — the grey core + side ring (the R2 node primitive).
- * Placement is `netWorthValue` (cumulative) or `marketValue` (per-market). */
+/** One own post/reply node — a disc whose FILL is side-keyed, carrying a FIXED
+ * grey rim (its own stroke) and a FIXED grey core. Placement is `netWorthValue`
+ * (cumulative) or `marketValue` (per-market).
+ *
+ * ⛔ NOT the W2.6 "R2" primitive, which this docblock claimed until POLISH.5
+ * item 12. R2 is a CROWD-SPLIT ring — "black/white ring = crowd split", "Ring
+ * orientation = R2: BLACK = YES-money on EVERY node"
+ * (DESIGN-W2_6-profile-graph-CLOSE-OUT.md §3 item 5). This rim is ONE FIXED
+ * GREY and encodes nothing, and `GraphNode` carries neither a stake nor a crowd
+ * field — so R2 is not merely unbuilt here, it is unrenderable from this DTO.
+ * Its market twin is docketed as `CHART-NODE-RING`; the profile half is routed,
+ * not settled here (`P5-D20b`, defined at `docs/plans/POLISH-5.md` §3.1).
+ *
+ * ⚠ TWO TOKEN FAMILIES MEET HERE AND ONLY ONE IS SIDE-KEYED — read each token's
+ * NAME and its VALUE separately, because here they disagree:
+ *
+ * - The r=5 disc's `fill` is this node's only side-keyed COLOUR expression:
+ *   `--color-yes` (#181818) for YES, `--color-no` (#fafafa) for NO — the POLE
+ *   family, carrying the locked binding: the poles name the SIDE, never the
+ *   Support/Counter relation (AGENTS.md §8; design-language.md §1 "Binding
+ *   resolved"). ⚠ The sibling MARKET-chart node is ruled onto `--graph-*`
+ *   instead (design-canon.md §10 `C-CHART-1` item 2) — a ruling its own text
+ *   scopes to `MarketPriceChart`. ⛔ Do NOT read that scoping as a decision FOR
+ *   the pole family here: this fill is UNRULED BUILT STATE. The slice that
+ *   built this directory specified `--graph-*` (UI-A5.md, slice 5 "Graph
+ *   components (the W2.6 port)"), and the `--color-*` fill was written once at
+ *   file creation and never revisited. Recorded here, not settled here.
+ * - The rim (that disc's stroke) and the r=2 core are BOTH `--graph-yes`, FIXED
+ *   on every side. Its NAME says YES; its VALUE is a mid-grey (#737373), minted
+ *   that way because the YES pole IS the ground colour — globals.css says so at
+ *   the `--graph-*` block: "YES is a deliberately off-ramp grey (the black pole
+ *   cannot render on the dark ground)".
+ *
+ * ⚠ AND THEY DO NOT COMPOSE THE WAY THE NAMES SUGGEST. `--color-yes` equals
+ * `--color-ground` (#181818) and both charts sit on `bg-n0` (#212121), so a YES
+ * node's FILL is very nearly invisible against the panel — ≈1.09:1, the same
+ * pairing POLISH.3 PR 2 filed and fixed on the split-bar track. What actually
+ * separates the poles is the ANNULUS between core and rim: ground-dark on YES,
+ * white on NO. The always-visible grey core is carried forward from the
+ * prototype as a legibility device, not a side effect of the token — but for a
+ * RELATED, DIFFERENT case: there, "the always-visible grey core rescues
+ * mostly-black YES nodes that otherwise vanished ON THE BLACK YES LINE"
+ * (DESIGN-W2_6-graph-prototype-record.md §9). This build has no black YES line,
+ * because `--graph-yes` is grey for that very reason.
+ *
+ * ⚠ The families COINCIDE ON NO (`--graph-no` and `--color-no` are both
+ * #fafafa) and DIFFER ON YES, so a RESOLVED-colour assertion cannot tell them
+ * apart on the NO arm. The fill's guard asserts the LITERAL token string —
+ * graph.test.tsx, "node-on-line-placement". */
 function GraphNodeMark({
 	node,
 	x,
