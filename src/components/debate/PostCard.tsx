@@ -125,6 +125,7 @@ export function PostCard({
 					author={post.author}
 					side={post.sideAtPostTime}
 					marker={post.marker}
+					entryPrice={post.entryPrice}
 					authorStake={post.authorStake}
 					replyCount={replyCount}
 					bookmarks={bookmarks}

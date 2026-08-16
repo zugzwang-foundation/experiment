@@ -123,6 +123,8 @@ export function PostFocusHeader({
 											author={post.author}
 											side={post.sideAtPostTime}
 											marker={post.marker}
+											entryPrice={post.entryPrice}
+											chipSize="detail"
 											authorStake={post.authorStake}
 											replyCount={replyCount}
 											bookmarks={bookmarks}
