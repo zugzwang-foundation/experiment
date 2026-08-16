@@ -2026,3 +2026,23 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 **Not a defect. Not routed. No owner needed.** Recorded only so a future reader who notices the unclosed pair finds a ruling instead of filing it again.
 
 **Code touch points** (forward reference, do not act on now): `src/components/discovery/HeroPanels.tsx` — the teaser `<p class="line-clamp-3 …">`.
+
+---
+
+## DEBATE-IMAGE-PRESIGN-TTL-OUTLIVES-REMOVAL — HARDEN Tier 1 (moderation pipeline)
+
+**Originating task:** HTML-FINISH · MARKET DETAIL Gate C (2026-08-17). Surfaced while auditing the debate read path; not caused by this branch — C12 widened its blast radius by presigning reply images too.
+
+**Deferred work.** Presigned comment-image URLs are minted **per render at 3600s for EVERY visible comment** (posts AND replies since C12) and ship to the client. **Removal does not revoke within the TTL** — a viewer who loaded the page keeps a working URL to a moderated image for the rest of the hour. Touches the moderation pipeline ⇒ **HARDEN Tier 1**.
+
+**Why deferred.** Revocation is not a render-layer fix. The presign is a local HMAC over an R2 object key (`signRead`, no network round-trip), so there is nothing server-side to invalidate — shortening the window or narrowing who gets a URL are the only levers short of moving to a proxied read, which is a storage-architecture decision rather than a moderation one. ⚠ **Masking itself is NOT affected and is not what this row is about**: `loadDebateView` withholds the `imageUrl` field entirely on a removed variant at the type level, so no NEW viewer can obtain a URL after removal. The exposure is bounded to URLs already handed out before the moderator acted.
+
+**Candidate fixes.** A shorter TTL for replies specifically; lazy per-focused-post minting so a market render does not mint a URL for every reply on every post; or a proxied read that can check `mod_actions` at request time.
+
+**Interlock, already recorded.** `src/server/config/limits.ts:252-258` already flags that `listMarketComments` carries no `LIMIT`, and names **a cap or keyset on it as a HARDEN.6 PREREQUISITE**. That cap bounds how many URLs a single render mints, so the two items want sequencing together rather than separately.
+
+**Conditional trigger.** HARDEN Tier 1 moderation pass, OR any incident where a removed image stayed reachable after moderation.
+
+**Expected next task.** HARDEN.* moderation hardening (TBD), sequenced with the HARDEN.6 `listMarketComments` cap.
+
+**Code touch points** (forward reference, do not act on now): `src/server/debate-view/load-debate-view.ts` — `READ_URL_TTL_SECONDS` (`:36`) and `mintImageUrls` (`:421`, called at `:252`); `src/server/storage/sign-read.ts`; `src/server/config/limits.ts:252-258`.
