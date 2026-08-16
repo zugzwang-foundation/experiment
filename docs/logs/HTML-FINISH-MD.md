@@ -566,10 +566,30 @@ next lease and the O-4 restore both rest on.
 
 ✅ The O-4 restore point is unaffected: `bc18245786fd04fde0e90f5618f479428586113b`.
 
+### ✅ ALL NINE ROWS VERIFIED ON LIVE STAGING
+
+The pool recovered once the redeploy replaced the suspended instances, so
+`H-R2-POOL` blocked the check only temporarily. Measured on
+`staging.zugzwangworld.com/m/sp-m15-fill` @ `65fce26`, signed in as `RedFox000`
+— the founder's own screenshot URL and session.
+
+| Row | Measured |
+|---|---|
+| **R1** | container `max-w-[1440px] px-6 py-6`, **width 1440** at a 1440 viewport — was **1024** before |
+| **R2** | 2 × `post-image-placeholder`, `resolver-card`, `x-official-card` all present. ⚠ `market-media-placeholder` absent **and that is correct** — this market HAS media, so the panel renders the real thing; the empty arm is pinned separately by the guard |
+| **R3** | both rails counting, then over 18 s: fills `3.3% → 8.3%` and `18.3% → 23.3%`, readouts `2/2 → 1/2` — ⛔ **it WRAPPED**, and the two columns stayed ~15 points apart, so the stagger holds |
+| **R4** | **TWO** bookmark buttons — `Bookmark — your own argument` (disabled) and `Bookmark`. ⇒ The founder's asymmetry is GONE |
+| **R5** | `Support (` absent from the entire document |
+| **R6** | ⛔ proven against the REAL COMPILED CSS, not the class attribute: `.hover\:bg-n1:hover { background-color: var(--color-n1) }` and `.hover\:underline:hover { text-decoration-line: underline }` both EXIST in the served stylesheet, the title matches both selectors, and its resting state is transparent / no-decoration — so the hover is a real change, not a no-op class |
+| **R7** | one-row bar; both labels are `BUTTON`s. `YES 98%` live, `title="Buy YES"`; `NO 2%` **disabled** carrying the C3 string *"You hold YES. Exit your position to bet NO."* — the F-3 gate firing correctly on a real holder |
+| **R8** | 2 ticks + 3 labels — `Aug 6`, `Aug 14`, `Aug 15`, all real series dates |
+| **R9** | investigate-only; nothing built |
+
 ### ⛔⛔ H-R2-POOL — STAGING'S DB PATH IS DOWN, AND IT IS NOT THIS BRANCH
 
-**The nine rows COULD NOT be visually verified on staging**, and the reason is
-infrastructure, proven rather than assumed.
+⚠ **This BLOCKED the visual check above for ~20 minutes, then cleared when the
+redeploy replaced the suspended instances.** It is recorded because it will
+recur, and because the diagnosis is worth keeping.
 
 Every DB-backed route renders the error boundary. From the Vercel runtime logs:
 
