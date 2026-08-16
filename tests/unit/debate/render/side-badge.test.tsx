@@ -117,7 +117,7 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
 	});
 
-	it("exactly-eight-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-seven-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -141,6 +141,17 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// absorbed. `detail` STILL holds its zero: row 12's badge is UNSIZED, which
 		// is why only the base map moves and the seam-preset assertion below is
 		// untouched.
+		//
+		// ⚠ AND NINE, THEN EIGHT, ON 2026-08-16 — HTML-FINISH · MARKET DETAIL,
+		// two rows in the same PR and for opposite reasons.
+		// · Row 13 moved `ArgProfile.tsx`'s ONE site out of `base`: it now varies
+		//   the preset by prop (`size={chipSize}`), so the markup classifier reads
+		//   it as sized even though it renders `base` at every card and reply site.
+		// · Row 26 moved ONE of `ReplyCard.tsx`'s TWO sites out of the census
+		//   entirely: the reply card's hand-rolled head was replaced by
+		//   `ArgProfile`, which owns the badge now. The REMOVED branch keeps its
+		//   own `SideBadge` — a removed reply has no author, so it cannot render
+		//   an `ArgProfile` — which is why the count is 1 and not 0.
 		//
 		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
 		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
@@ -179,12 +190,12 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 			"src/components/debate/DebateColumn.tsx": 1,
 			"src/components/debate/PostCard.tsx": 1,
 			"src/components/debate/PostFocusHeader.tsx": 1,
-			"src/components/debate/ReplyCard.tsx": 2,
+			"src/components/debate/ReplyCard.tsx": 1,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
 			"src/components/debate/dialogs.tsx": 1,
 		});
-		expect(base).toHaveLength(8);
+		expect(base).toHaveLength(7);
 	});
 
 	it("the-sized-sites-are-exactly-the-map-below", () => {
