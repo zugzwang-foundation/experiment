@@ -543,6 +543,36 @@ OQ-MD2-2. ⛔ PR #341 is still a DRAFT and is NOT merged.
   Supavisor `pool_size 15` — against a fix landing in parallel on
   `fix/db-pool-idle-timeout`. ⛔ NOT a branch defect; that branch was not touched.
 
+### ⛔ H-R2-STAGING — the staging SITE did not pick up the advance
+
+`origin/staging` IS at `4cd1c15` (force-pushed under a verified lease) and
+`Staging Migrate` returned success on it. But `staging.zugzwangworld.com` is
+still serving `070c243`, measured ~25 min after the push:
+
+```
+staging.zugzwangworld.com/api/health   canary 070c243…
+experiment-kb7h3go87-….vercel.app      canary 4cd1c15…   ← READY, env staging, db ok
+```
+
+⇒ **The build is fine; only the DOMAIN ALIAS did not move.** Cause is a PUSH-ORDER
+artifact: the branch was pushed first, so Vercel built `ref=htmlfinish/market-detail`
+@ `4cd1c15`, and the `staging` push of the identical SHA seconds later produced no
+second deployment — deduplicated on the commit SHA. No `ref=staging` deployment
+exists at that SHA, so the domain still follows the `070c243` one.
+
+⛔ Not fixed from the session: no alias/redeploy tool is available and the Vercel
+CLI is not installed. ⛔ Forcing a NEW commit onto `staging` would work and was
+deliberately NOT done — it makes `staging` diverge from the branch SHA, which the
+next lease and the O-4 restore both rest on. Operator's call.
+
+**One step, either:** alias `experiment-kb7h3go87-zugzwang-worlds-projects.vercel.app`
+to the staging domain, or redeploy the `staging` branch at `4cd1c15`.
+
+⚠ **NEXT ROUND: push `staging` BEFORE the branch**, or push only one. That
+ordering is what caused the dedup.
+
+✅ The O-4 restore point is unaffected: `bc18245786fd04fde0e90f5618f479428586113b`.
+
 ### Time
 
-Round 2: 2026-08-16 12:20 → 13:45 UTC (`a096f06` → `a3af859`).
+Round 2: 2026-08-16 12:20 → 14:20 UTC (`a096f06` → `4cd1c15`).
