@@ -140,6 +140,10 @@ The third was the most substantively wrong of the three and appeared in neither 
 
 **Still open, and NOT discharged by #278:** SPEC.1 §18's out-of-scope catalogue appears to still list four shipped modes. Different document, different lane — **DESIGN.SPEC, not POLISH's to fix.** Verify against §9's annotation before treating it as anything.
 
+**⛔ `DESIGN_W2_10_sell-and-clamp_mockup-v0_1.html` HAS NO CLOSE-OUT.** *(Declared at POLISH.4 PR A, commit A4 — plan §11 Rider 2. Measured, not recalled: every other `DESIGN_W2_*` mockup in `docs/design/mockups/` has a paired `CLOSE-OUT.md` — W2_1, W2_2, W2_4-5-14, W2_6, W2_8, W2_11, W2_13. **W2_10 is the sole exception.**)* It is simultaneously the **sole tier-4 baseline for the sell module**, whose `.4` tier-2 row leans on rulings a close-out normally ratifies (*"sell is never clamped; cap clamp buy-only"*). ⚠ **The mockup's own panel E is captioned** *"for the consolidated-doc updates + close-out (**authored after sign-off**)"* — the close-out was anticipated and never written. **And the gap has teeth:** panel E's *"Copy — add"* row names **`"Profit / Loss" (sell)`**, which the build does not render; three tiers disagree about whether that is a defect, and **tier 3 governs — the build is CORRECT** (`PD-4-07`, blocked by `H-OQ1`). A close-out would have recorded that supersession; its absence is exactly what would let a delta recon file the correct build as a defect.
+
+⛔ **THIS IS A DECLARED GAP, NOT AN INVESTIGATION.** `.4` does **not** author the missing close-out, does not reconstruct it, and does not treat panel E as ratified. **CC never authors web-owned design ratification text.**
+
 ---
 
 ## §3 · The inventory
