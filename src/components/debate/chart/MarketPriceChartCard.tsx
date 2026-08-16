@@ -7,8 +7,20 @@ import { fmtUtcDay } from "./geometry";
 import { MarketPriceChart } from "./MarketPriceChart";
 
 /** The collapsed in-header price chart — the whole card is the expand control
- * (mirroring the §23 profile card), holding the two lines only (no axis, no
- * nodes) plus the accessible summary. */
+ * (mirroring the §23 profile card), holding the two lines, the SPEC.1 1.0.32
+ * time axis (two interior ticks, three date labels — no nodes) and the
+ * accessible summary.
+ *
+ * ⚠ THIS DOCBLOCK USED TO SAY "the two lines only (no axis, no nodes)". The axis
+ * half was reversed by SPEC.1 1.0.32 (HTML-FINISH · MARKET DETAIL round 2 · R8);
+ * corrected here in the same commit rather than left contradicting the component
+ * one import away.
+ *
+ * ⛔ THE `sr-only` SUMMARY IS NOT DUPLICATED BY THE AXIS AND IS NOT REDUNDANT.
+ * The SVG stays `aria-hidden`, so the axis is VISUAL ONLY — the summary below is
+ * still the sole accessible channel, and it already carries both domain
+ * endpoints. The axis adds no new data (§9: it "introduces no new data and no
+ * new read"), so there is nothing new for the summary to announce. */
 export function MarketPriceChartCard({
 	series,
 	onExpand,

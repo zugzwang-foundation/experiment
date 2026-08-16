@@ -128,25 +128,139 @@ function parsePoints(attr: string): [number, number][] {
 
 describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", () => {
 	// ── 1. Collapsed = two lines, NO axis, NO nodes (F-DEBATE-5 acceptance) ─────
-	it("collapsed-renders-no-axis", () => {
-		render(<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />);
+	/**
+	 * ⚠⚠ THIS ROW WAS `collapsed-renders-no-axis` AND IT IS REVERSED BY SPEC.1
+	 * 1.0.32 (HTML-FINISH · MARKET DETAIL round 2 · R8, founder-ruled 2026-08-16).
+	 * The superseded body asserted `queryByTestId("axis-x-start") === null` and
+	 * `…("axis-x-end") === null`, with the expanded render as its positive
+	 * control. The collapsed chart is now the market's primary price surface in
+	 * the header rail, and a price series without a time axis is not readable.
+	 *
+	 * ⛔⛔ AND IT IS STRENGTHENED, NOT MERELY INVERTED — this is the whole point,
+	 * and the reason round 1 reported the row instead of shipping it.
+	 *
+	 * THE HOLE: d5 draws its `.xtick` / `.xlab` as absolutely-positioned DIVS
+	 * *over* the graph (`d5:496-499`), OUTSIDE the `<svg>`. The old guard asserted
+	 * the ABSENCE of two testids; a faithful port of d5's structure would have
+	 * carried different testids on DOM siblings of the chart and sailed past it
+	 * GREEN while the property the assertion NAMED — "collapsed has no axis" — was
+	 * false on screen. Satisfying the letter of a guard while breaking the
+	 * property it names is the "fix the guard, not the code" inversion in
+	 * disguise, and an inverted-but-otherwise-identical assertion would inherit
+	 * the identical hole in the other direction: an axis built as sibling divs
+	 * would pass a bare `getByTestId` too, because `screen` queries the whole
+	 * document body.
+	 *
+	 * ⇒ SO CONTAINMENT IS ASSERTED, NOT JUST PRESENCE. Every tick and label must
+	 * be a DESCENDANT OF THE `<svg>`, which is what makes this guard actually
+	 * about the chart rather than about the page.
+	 */
+	it("collapsed-renders-the-time-axis", () => {
+		const { container } = render(
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+		);
 
 		// Non-vacuity: the chart rendered (its svg + both lines are present).
-		expect(screen.getByTestId("market-price-chart")).toBeTruthy();
+		const svg = screen.getByTestId("market-price-chart");
+		expect(svg).toBeTruthy();
 		expect(screen.getByTestId("line-yes")).toBeTruthy();
 		expect(screen.getByTestId("line-no")).toBeTruthy();
 
-		// Collapsed carries NO time axis and NO post nodes (Slice 1).
-		expect(screen.queryByTestId("axis-x-start")).toBeNull();
-		expect(screen.queryByTestId("axis-x-end")).toBeNull();
-		expect(byPrefix(document.body, "graph-node-")).toHaveLength(0);
+		// TWO interior ticks and THREE date labels — the ruled composition.
+		const ticks = ["axis-x-tick-first", "axis-x-tick-second"];
+		const labels = [
+			"axis-x-label-first",
+			"axis-x-label-second",
+			"axis-x-label-end",
+		];
+		for (const id of [...ticks, ...labels]) {
+			const el = container.querySelector(`[data-testid="${id}"]`);
+			expect(el, `collapsed axis is missing ${id}`).not.toBeNull();
+			// ⛔ THE CONTAINMENT ASSERTION — see the docblock. A `.xtick` div beside
+			// the chart, d5's own structure, would satisfy a presence check and fail
+			// this one.
+			expect(
+				svg.contains(el),
+				`${id} must be INSIDE the <svg>, not a DOM sibling of the chart`,
+			).toBe(true);
+		}
 
-		// Positive control — the axis CAN render (expanded mode), so its absence
+		// EXACTLY two and three — a third tick or a fourth label is a different
+		// composition from the one §9 ruled, and "at least one" would not see it.
+		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(2);
+		expect(byPrefix(container, "axis-x-label-")).toHaveLength(3);
+	});
+
+	it("collapsed-axis-labels-are-REAL-series-timestamps", () => {
+		// ⛔ SPEC.1 1.0.32's own constraint, asserted rather than trusted: the axis
+		// "introduces no new data … every timestamp it renders is already carried
+		// on `PricePoint.at`". The tempting implementation puts ticks at fixed
+		// 33.3%/66.6% fractions and labels them with an INTERPOLATED instant
+		// (`start + (end − start)/3`) — which for this fixture would print a
+		// Sep 16 and a Sep 18 that appear nowhere in the series. Every rendered day
+		// must be one of the three the series actually carries.
+		const { container } = render(
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+		);
+		const realDays = new Set(["Sep 15", "Sep 17", "Sep 20"]);
+		const rendered = byPrefix(container, "axis-x-label-").map(
+			(el) => el.textContent ?? "",
+		);
+		expect(rendered).toHaveLength(3);
+		for (const day of rendered) {
+			expect(realDays.has(day), `${day} is not a PricePoint.at day`).toBe(true);
+		}
+		// The end label is the LAST point, always — it is the domain's right edge.
+		expect(
+			container.querySelector('[data-testid="axis-x-label-end"]')?.textContent,
+		).toBe("Sep 20");
+	});
+
+	it("collapsed-renders-NO-axis-on-a-degenerate-domain", () => {
+		// The unbet market: one seed point, so `buildLine` draws a flat line by
+		// duplicating one value at both edges and every point shares x = 0. Ticks
+		// would stack on the left edge and all three labels would print the same
+		// day three times. §9's amendment says so in terms.
+		const { container } = render(
+			<MarketPriceChartCard series={SINGLE} onExpand={vi.fn()} />,
+		);
+		// Non-vacuity: the chart itself still rendered, lines and all.
+		expect(screen.getByTestId("market-price-chart")).toBeTruthy();
+		expect(screen.getByTestId("line-yes")).toBeTruthy();
+		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(0);
+		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
+	});
+
+	it("collapsed-renders-no-nodes", () => {
+		// ⛔ THE SURVIVING HALF OF THE OLD ROW, SPLIT OUT AND KEPT. 1.0.32 reversed
+		// the axis pin and left the NODES pin untouched, and the two were welded
+		// into one assertion — where reversing either would have silently carried
+		// the other out with it. §17 now carries them as two rows for the same
+		// reason.
+		const { container } = render(
+			<MarketPriceChartCard series={SERIES} onExpand={vi.fn()} />,
+		);
+		expect(byPrefix(container, "graph-node-")).toHaveLength(0);
+
+		// Positive control — nodes CAN render (expanded mode), so their absence
 		// above is meaningful, not vacuous.
 		cleanup();
-		render(<MarketPriceChart series={SERIES} mode="expanded" />);
+		render(<MarketPriceChart series={SERIES} nodes={NODES} mode="expanded" />);
+		expect(byPrefix(document.body, "graph-node-").length).toBeGreaterThan(0);
+	});
+
+	it("expanded-axis-is-UNTOUCHED-by-the-collapsed-amendment", () => {
+		// 1.0.32's "UNCHANGED" clause, pinned. The expanded overlay keeps its two
+		// ENDPOINT labels and gains none of the collapsed axis's ticks — the
+		// amendment was scoped to one mode and a shared helper leaking across would
+		// be invisible without this row.
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="expanded" />,
+		);
 		expect(screen.getByTestId("axis-x-start")).toBeTruthy();
 		expect(screen.getByTestId("axis-x-end")).toBeTruthy();
+		expect(byPrefix(container, "axis-x-tick-")).toHaveLength(0);
+		expect(byPrefix(container, "axis-x-label-")).toHaveLength(0);
 	});
 
 	// ── 1b. INV-3 side binding — the YES line strokes `--graph-yes`, the NO line
