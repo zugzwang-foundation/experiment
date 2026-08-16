@@ -177,7 +177,16 @@ export function PostFocusHeader({
 									    either way and the control is the only path to it. */}
 									<div className="flex items-start justify-between gap-2">
 										{post.teaser ? (
-											<p className="text-sm whitespace-pre-line text-muted-foreground">
+											/* ⚠⚠ `line-clamp-2` — `.tease .tx{-webkit-line-clamp:2}`
+											   (`d5:607`), and the mockup calls it a "2-line body
+											   TEASER" at `:971`. It was missing, so the WHOLE second
+											   paragraph rendered: measured on staging at `5349ae9`,
+											   a real fixture argument filled ~330px of the header and
+											   pushed the reply arena entirely below the fold. A
+											   teaser that is not clamped is not a teaser — it is the
+											   body, which is exactly what row 15 moved into the
+											   pop-up. */
+											<p className="line-clamp-2 text-sm whitespace-pre-line text-muted-foreground">
 												{post.teaser}
 											</p>
 										) : (

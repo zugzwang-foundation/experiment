@@ -118,7 +118,11 @@ export function PostCard({
 	}
 
 	return (
-		<Card className="gap-2.5 p-3">
+		/* `.panel{flex:1 1 auto;min-height:0}` (`d5:572`) — the card FILLS its
+		   column, which is what gives `.argimg` below a height to take a share of.
+		   Without it the card is content-sized, `.argimg`'s `flex-1` has nothing to
+		   distribute, and the image falls back to its intrinsic size. */
+		<Card className="min-h-0 flex-1 gap-2.5 p-3">
 			<div className="flex items-start justify-between gap-2">
 				<ArgProfile
 					commentId={post.id}
@@ -204,11 +208,26 @@ export function PostCard({
 			    oversight: a removed post's variant carries no `imageUrl` field at
 			    all, so drawing an image slot there would announce that a withheld
 			    argument HAD an attachment. */}
-			{post.imageUrl ? (
-				<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
-			) : (
-				<PostImagePlaceholder />
-			)}
+			{/* ⚠⚠ `.argimg` (`d5:648`) — THE CELL, and the founder's measured defect.
+			    `flex:1 1 auto;min-height:0;display:flex;align-items:center;
+			    justify-content:center`: the attachment takes the card's whole
+			    leftover height and sits CENTRED in it. Measured in the mockup — the
+			    image is 73% of the card's height and horizontally centred; measured
+			    on staging at `5349ae9` — 160 × 90, flush left, because there was no
+			    cell at all and the image carried a 160px cap.
+			    ⛔ THE CELL IS WHERE THE HEIGHT LIVES, not the image. `max-h-full` on
+			    an `<img>` is a percentage and resolves to `none` without a definite
+			    height above it; this node is the flex item that has one, which is why
+			    `Card` and the scroller wrapper gained `flex-1 min-h-0` in the same
+			    commit. Break any of those three and the image silently reverts to
+			    intrinsic size — the exact failure mode being fixed. */}
+			<div className="flex min-h-0 flex-1 items-center justify-center">
+				{post.imageUrl ? (
+					<CommentImage url={post.imageUrl} onOpen={onOpenImage} fill />
+				) : (
+					<PostImagePlaceholder fill />
+				)}
+			</div>
 
 			{/* Row 23 — `Open debate` is GONE from the present branch: the title
 			    above carries that destination now, and two controls for one

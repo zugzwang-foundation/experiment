@@ -134,7 +134,16 @@ export function ArgProfile({
 				{replyCount !== undefined ? (
 					<>
 						<Sep />
-						<span>Replies · {replyCount}</span>
+						{/* `.repmeta` (`d5:580`) — `font-weight:700;letter-spacing:.12em;
+						    text-transform:uppercase;color:var(--ink)`, with `.repn`
+						    (`:579`) setting the COUNT back to 13px / no tracking. The row
+						    read `Replies · 0` in sentence case at the muted weight, which
+						    is the one field in this line the mockup deliberately promotes
+						    to ink. */}
+						<span className="text-[9.5px] font-bold tracking-[0.12em] text-ink uppercase">
+							Replies ·{" "}
+							<span className="text-[13px] tracking-normal">{replyCount}</span>
+						</span>
 					</>
 				) : null}
 			</div>

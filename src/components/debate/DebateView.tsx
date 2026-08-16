@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, useEffect, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PageContainer } from "@/components/shell/PageContainer";
@@ -126,6 +132,45 @@ export function DebateView({
 	 */
 	const [pickedSide, setPickedSide] = useState<Side | null>(null);
 
+	/**
+	 * ⚠⚠ THE COLUMNS' `step` FUNCTIONS, REGISTERED UP. d5's `onKey` calls
+	 * `step(side, ±1)` (`d5:1792-1793`, `:1891`) — the keyboard STEPS CARDS, and
+	 * that is the half this build never had. Paging state lives in each scroller's
+	 * `usePagedColumn`, and the two scrollers are siblings that cannot see each
+	 * other or the key handler, so each publishes its stepper here on mount.
+	 *
+	 * ⛔ A REF, NOT STATE. Registering must not re-render — a render would rebuild
+	 * the callback, which would re-register, which would render again.
+	 * ⚠ Cleared on unregister so a column that unmounts (composer opens over it,
+	 * arm swaps) cannot be stepped through a stale closure.
+	 */
+	const stepRefs = useRef<Record<Side, ((delta: number) => void) | null>>({
+		YES: null,
+		NO: null,
+	});
+	/**
+	 * d5's `lastSide` (`:1683`) — the most recently chosen column. With nothing
+	 * picked, ↑/↓ resume THAT column rather than doing nothing (`d5:1801`).
+	 */
+	const lastSideRef = useRef<Side | null>(null);
+
+	// ⚠ ONE STABLE CALLBACK PER SIDE, not one closure built inside the `.map`.
+	// The scroller's register effect lists this in its deps, so a fresh function
+	// per render would unregister and re-register on every render — including the
+	// ones the countdown bar causes.
+	const registerYes = useCallback((step: ((delta: number) => void) | null) => {
+		stepRefs.current.YES = step;
+	}, []);
+	const registerNo = useCallback((step: ((delta: number) => void) | null) => {
+		stepRefs.current.NO = step;
+	}, []);
+
+	/** d5's `pickSide` (`:1746`) — choosing a column also makes it the `lastSide`. */
+	const pickSide = useCallback((side: Side) => {
+		setPickedSide(side);
+		lastSideRef.current = side;
+	}, []);
+
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
 	const heldSide = viewer?.position?.side ?? null;
@@ -171,28 +216,52 @@ export function DebateView({
 		lightboxUrl !== null;
 
 	/**
-	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — ←/→ PICK A SIDE. d5's `onKey`
-	 * (`:1789-1803`, `:1889-1895`): ArrowLeft picks the left column, ArrowRight
-	 * the right.
+	 * ⚠⚠ THE FOUNDER'S TWO KEYBOARD REPORTS, AND WHAT THEY ACTUALLY WERE.
+	 * Measured on live staging at `5349ae9`, both columns, real key events:
+	 * pressing → paused the RIGHT column's countdown and started the LEFT one
+	 * moving; pressing ↑ or ↓ did nothing at all. That is the whole of both
+	 * complaints, and neither was a mis-mapping:
 	 *
-	 * ⛔ ONLY ←/→, AND d5's ↑/↓ STEPPING IS DELIBERATELY NOT PORTED. d5
-	 * `preventDefault()`s every arrow key because its own surface does not scroll;
-	 * this page does, and swallowing ↑/↓ would take the page's own scrolling away
-	 * from every keyboard user to add a shortcut nobody asked for. The founder's
-	 * ruling names ←/→ and this builds exactly that.
+	 *   · "cards do not step" — LITERALLY TRUE. The old handler called
+	 *     `setPickedSide` and NOTHING ELSE. No arrow key stepped a card, because
+	 *     ↑/↓ were deliberately not ported and ←/→ only ever picked.
+	 *   · "←/→ are REVERSED" — the KEYS were mapped correctly (← → left/YES,
+	 *     exactly `d5:1794`), but picking a column STOPS it while the other keeps
+	 *     auto-advancing. With no visible pick state, the only thing a reader
+	 *     could see was the OTHER column starting to move. Correct code, and it
+	 *     read backwards, which is O-3: a true refusal reported with a misleading
+	 *     cause is a defect.
 	 *
-	 * ⛔ NEVER WHILE TYPING. The guard is d5's own (`:1461`) — a composer is a
-	 * `<textarea>`, and stealing ← from an author mid-argument would move the
-	 * surface under them while they are trying to move the caret. `frozen` already
-	 * covers the composer-open case; the target guard is the belt for any future
-	 * input this surface grows.
+	 * ⇒ BOTH ARE FIXED BY PORTING `onKey` AS WRITTEN (`d5:1789-1803`, mirrored at
+	 * `:1889-1895`) rather than a description of it, plus making the pick VISIBLE
+	 * (see `DebateColumn`'s `picked`). ↑/↓ step the chosen column; ←/→ choose one;
+	 * with nothing chosen yet, ↑/↓ resume `lastSide`.
 	 *
-	 * ⚠ `preventDefault` ONLY on the two keys actually handled, so nothing else
-	 * about arrow-key behaviour on this page changes.
+	 * ⛔ THE SUPERSEDED RULING, RECORDED RATHER THAN DELETED (O-4). This block
+	 * used to read: "⛔ ONLY ←/→, AND d5's ↑/↓ STEPPING IS DELIBERATELY NOT
+	 * PORTED … this page scrolls, and swallowing ↑/↓ would take the page's own
+	 * scrolling away from every keyboard user to add a shortcut nobody asked for."
+	 * The founder DID ask for it, and the concern is answered rather than
+	 * dismissed: ↑/↓ are swallowed ONLY when a column is actually chosen — either
+	 * picked now, or picked earlier this session. Until the reader has touched a
+	 * column, ↑/↓ scroll the page exactly as they always did, and clicking off the
+	 * arena releases the pick and hands scrolling straight back.
+	 *
+	 * ⛔ NEVER WHILE TYPING (d5's own guard, `:1461`): a composer is a `<textarea>`
+	 * and stealing ← mid-argument would move the surface under an author trying to
+	 * move the caret. `frozen` already covers composer-open; the target check is
+	 * the belt for any future input.
+	 *
+	 * ⚠ `preventDefault` ONLY on a key this handler actually consumes.
 	 */
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
+			if (
+				e.key !== "ArrowLeft" &&
+				e.key !== "ArrowRight" &&
+				e.key !== "ArrowUp" &&
+				e.key !== "ArrowDown"
+			) {
 				return;
 			}
 			if (frozen) {
@@ -207,12 +276,79 @@ export function DebateView({
 			) {
 				return;
 			}
+			if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+				e.preventDefault();
+				pickSide(e.key === "ArrowLeft" ? "YES" : "NO");
+				return;
+			}
+			// ↑/↓ — step the chosen column. `pickedSide` if one is chosen, else the
+			// last one the reader touched (d5 `:1801`). With neither, this key is
+			// NOT consumed and the page scrolls, which is the whole answer to the
+			// superseded objection above.
+			const target_side = pickedSide ?? lastSideRef.current;
+			if (target_side === null) {
+				return;
+			}
+			const step = stepRefs.current[target_side];
+			if (step === undefined || step === null) {
+				return;
+			}
 			e.preventDefault();
-			setPickedSide(e.key === "ArrowLeft" ? "YES" : "NO");
+			// Touching a column takes it off the timer, exactly as the rail arrows
+			// do (`d5:1780-1781` — `pickSide(side); step(side, ±1)`).
+			pickSide(target_side);
+			step(e.key === "ArrowUp" ? -1 : 1);
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
-	}, [frozen]);
+	}, [frozen, pickedSide, pickSide]);
+
+	/**
+	 * ⚠⚠ d5's TWO CLICK BEHAVIOURS, IN ONE DELEGATED LISTENER — which is how d5
+	 * itself does it (`:1782-1788`, mirrored at `:1886-1888`):
+	 *
+	 *   · a click INSIDE a column PICKS it — `slots[side].addEventListener(
+	 *     'click', …)` — except when it lands on a control, because that click
+	 *     belongs to the control (d5's own exclusion list is
+	 *     `.rtt,.argimg,button,a,.pscroll`).
+	 *   · a click OUTSIDE both columns RELEASES the pick — `if(ev.target.closest(
+	 *     '.slot')) return; unpick();`. Without the release a pick, once made, is
+	 *     permanent and the surface the reader froze never thaws.
+	 *
+	 * ⛔ DELEGATED RATHER THAN AN `onClick` PROP, and that is not merely
+	 * convenient. A column CONTAINS buttons and links, so it can be neither a
+	 * `<button>` (invalid nesting) nor a static element carrying a click handler
+	 * (`noStaticElementInteractions` / `useKeyWithClickEvents` reject it, and they
+	 * are right to — a click-only affordance on a `<div>` is invisible to the
+	 * keyboard). Here the keyboard path is ←/→, which reaches both columns from
+	 * anywhere on the page, so nothing about the pick is mouse-only.
+	 */
+	useEffect(() => {
+		const onDocClick = (e: MouseEvent) => {
+			if (frozen) {
+				return;
+			}
+			const target = e.target as HTMLElement | null;
+			if (target === null) {
+				return;
+			}
+			const column = target.closest("[data-debate-column]");
+			if (column === null) {
+				setPickedSide(null);
+				return;
+			}
+			// d5's exclusion list — a click on a control is that control's.
+			if (target.closest("button,a,input,textarea,label") !== null) {
+				return;
+			}
+			const side = column.getAttribute("data-debate-column");
+			if (side === "YES" || side === "NO") {
+				pickSide(side);
+			}
+		};
+		document.addEventListener("click", onDocClick);
+		return () => document.removeEventListener("click", onDocClick);
+	}, [frozen, pickSide]);
 
 	/** The body of one market-view pole column: composer/auth-gate when this
 	 * column is the OPPOSITE slot of the open bet side; the post scroller
@@ -431,6 +567,7 @@ export function DebateView({
 									side={side}
 									pricing={market.pricing}
 									engaged={resultingSide === side && side !== composerColumn}
+									picked={pickedSide === side}
 									header={
 										<PositionStrip
 											side={side}
@@ -490,8 +627,9 @@ export function DebateView({
 											auto={{
 												picked: pickedSide === side,
 												frozen,
-												onPick: () => setPickedSide(side),
+												onPick: () => pickSide(side),
 												stagger: side === "NO",
+												registerStep: side === "YES" ? registerYes : registerNo,
 											}}
 										/>
 									)}
@@ -524,6 +662,7 @@ export function DebateView({
 								side={side}
 								pricing={market.pricing}
 								engaged={openSide === side}
+								picked={pickedSide === side}
 								header={
 									<SlotHeader
 										side={side}
@@ -561,8 +700,9 @@ export function DebateView({
 										auto={{
 											picked: pickedSide === side,
 											frozen,
-											onPick: () => setPickedSide(side),
+											onPick: () => pickSide(side),
 											stagger: side === "NO",
+											registerStep: side === "YES" ? registerYes : registerNo,
 										}}
 									/>,
 								)}

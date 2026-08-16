@@ -92,14 +92,25 @@ export function SlotHeader({
 					aria-label={c3 ?? `Buy ${side}`}
 					title={c3 ?? undefined}
 					onClick={onToggleEntry}
-					className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]"
+					// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
+					// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
+					// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
+					// button's 13px / `7px 14px` / 34px geometry is the values-log §1
+					// item 6 ruling and is deliberately NOT replaced by d5's 10px.
+					className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
 				>
 					Buy
 				</Button>
 				{unit !== null && (
-					<span className="hidden items-center gap-1 text-xs text-n5 lg:flex">
+					/* ⚠ `.poslab` (`d5:556`) — `font-weight:800;letter-spacing:.12em;
+					   text-transform:uppercase`. The market arm read `To win` in
+					   sentence case while the POST arm's `PositionStrip` — the same band,
+					   one arm over — already rendered `TO WIN` uppercase from the same
+					   mockup rule. The recipe is byte-carried from that shipped component
+					   rather than re-derived, so the two arms cannot drift again. */
+					<span className="hidden items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase lg:flex">
 						<span>{COMPOSER_COPY.toWinLabel}</span>
-						<span className="font-mono text-ink">
+						<span className="font-mono text-xs tracking-normal text-ink normal-case">
 							Đ 1 <span aria-hidden="true">→</span> Đ {formatMultiplier(unit)}
 						</span>
 					</span>
@@ -115,10 +126,11 @@ export function SlotHeader({
 			<span className="flex items-center gap-2 text-xs">
 				{viewer?.position && viewer.position.side === side ? (
 					<>
-						<span className="flex items-center gap-1 text-n5">
+						{/* `.poslab` again — same rule, same recipe as `TO WIN` above. */}
+						<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 							<span>{COMPOSER_COPY.yourPositionLabel}</span>
 							{/* Đb-ONLY until the Đa staked-basis SPEC.1 line lands (OQ-1 HELD). */}
-							<span className="font-mono text-ink">
+							<span className="font-mono text-xs tracking-normal text-ink normal-case">
 								Đ {formatDharma(viewer.position.currentValue)}
 							</span>
 						</span>
@@ -142,10 +154,11 @@ export function SlotHeader({
 							<Link
 								data-testid="w210c-sell-link"
 								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
-								className={buttonVariants({
-									variant: "outline",
-									size: "xs",
-								})}
+								className={cn(
+									buttonVariants({ variant: "outline", size: "xs" }),
+									// `.sellbtn` (`d5:559`) — uppercase, `.06em`.
+									"tracking-[0.06em] uppercase",
+								)}
 							>
 								{COMPOSER_COPY.sell} ↗
 							</Link>
@@ -154,7 +167,7 @@ export function SlotHeader({
 								aria-disabled="true"
 								className={cn(
 									buttonVariants({ variant: "outline", size: "xs" }),
-									"cursor-default opacity-(--state-disabled-opacity) select-none",
+									"cursor-default tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
 								)}
 							>
 								{COMPOSER_COPY.sell} ↗
@@ -162,7 +175,12 @@ export function SlotHeader({
 						)}
 					</>
 				) : (
-					<span className="text-n4">{COMPOSER_COPY.noPosition}</span>
+					/* `NO ACTIVE POSITION` — d5 renders it through `.poslab` too
+					   (`d5:1223`, the empty-position slot), so it carries the same
+					   uppercase overline treatment as the two labels above. */
+					<span className="text-[10px] font-bold tracking-[0.1em] text-n4 uppercase">
+						{COMPOSER_COPY.noPosition}
+					</span>
 				)}
 			</span>
 		</div>

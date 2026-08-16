@@ -123,7 +123,7 @@ export function ScrollRail({
 				type="button"
 				onClick={onPrev}
 				aria-label={`Previous ${noun}`}
-				className="shrink-0 text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className="flex size-6 shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
 			>
 				<ChevronUp />
 			</button>
@@ -149,7 +149,7 @@ export function ScrollRail({
 				type="button"
 				onClick={onNext}
 				aria-label={`Next ${noun}`}
-				className="shrink-0 text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
+				className="flex size-6 shrink-0 items-center justify-center text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring) [&_svg]:size-3.5"
 			>
 				<ChevronDown />
 			</button>

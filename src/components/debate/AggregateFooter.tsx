@@ -105,7 +105,12 @@ export function AggregateFooter({
 			data-testid="aggregate-footer"
 			className="flex items-start gap-2 text-xs text-muted-foreground"
 		>
-			<span className="flex shrink-0 flex-col items-start gap-1">
+			{/* `.sidewrap` (`d5:585`) — `align-items:center`, on BOTH sides
+			    (`.sidewrap.r{align-items:center}`, `:586`). d5's own comment says it
+			    in terms: "v1.8: Đ centred under its pill". The shipped render flushed
+			    the figures to the OUTER edges, so each amount sat under the card's
+			    corner instead of under the pill it belongs to. */}
+			<span className="flex shrink-0 flex-col items-center gap-1">
 				{triggers ? (
 					<TriggerPill relation="support" postSide={postSide} {...triggers} />
 				) : null}
@@ -168,10 +173,13 @@ export function AggregateFooter({
 				</span>
 				<span>
 					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
-					staked
+					{/* `.sb2.mid` (`d5:620`) — `letter-spacing:.1em;
+					    text-transform:uppercase`. The figure stays cased; the WORD is
+					    the overline. */}
+					<span className="tracking-[0.1em] uppercase">staked</span>
 				</span>
 			</span>
-			<span className="flex shrink-0 flex-col items-end gap-1">
+			<span className="flex shrink-0 flex-col items-center gap-1">
 				{triggers ? (
 					<TriggerPill relation="counter" postSide={postSide} {...triggers} />
 				) : null}

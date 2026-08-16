@@ -60,6 +60,22 @@ export function MarketMediaPanel({
 	/** The market question — the panel's own accessible context, never rendered. */
 	title: string;
 }) {
+	/**
+	 * ⚠⚠ MEASURED DEFECT, FIXED HERE: THE PANEL WAS 19.4px WIDE ON STAGING.
+	 * `frame` used to carry `w-1/3` and was applied to the `MarketThumb` /
+	 * fallback CHILD, while the wrapper `<div data-testid="market-media-panel">`
+	 * carried no sizing at all. The wrapper is a flex item of `.hleft`, so it
+	 * shrank to its content — and its content was a percentage OF THAT WRAPPER.
+	 * A percentage width resolving against a box that is itself sized by its
+	 * content collapses, and the panel rendered as a 19.4 × 202 sliver: present
+	 * in the DOM, invisible on the page. Measured on live staging at `5349ae9`
+	 * (`getBoundingClientRect` → `{w: 19.4, h: 202.1}`), which is the same defect
+	 * class as the 324×578 PFP.
+	 *
+	 * ⇒ THE FRAME IS NOW ON THE OUTER ELEMENT IN ALL THREE BRANCHES, and the
+	 * media inside fills it (`size-full`). The wrapper is the thing `.hleft`
+	 * measures, so the wrapper is the thing that has to declare a width.
+	 */
 	const frame =
 		"aspect-[16/9] w-1/3 shrink-0 overflow-hidden rounded-[var(--imgr)]";
 
@@ -100,10 +116,13 @@ export function MarketMediaPanel({
 	// The `IMG` glyph box — byte-carried from `discovery/MarketCard.tsx`'s
 	// fallback, which is the shipped, design-ratified null placeholder for a
 	// market image. Nothing new is invented for the missing-media arm.
+	// ⚠ It fills the FRAME now rather than re-declaring it: the frame is the
+	// wrapper's, so a second `w-1/3` here would be the percentage-of-itself that
+	// collapsed the panel in the first place.
 	const fallback = (
 		<div
 			aria-hidden="true"
-			className={`${frame} flex items-center justify-center bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4`}
+			className="flex size-full items-center justify-center bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4"
 		>
 			IMG
 		</div>
@@ -116,13 +135,17 @@ export function MarketMediaPanel({
 			// is the accessible content. `discovery/MarketCard.tsx` makes the same
 			// call at the same pairing, and its `alt=""` is byte-carried here.
 			alt=""
-			className={`${frame} object-cover`}
+			className="size-full object-cover"
 			fallback={fallback}
 		/>
 	);
 
 	if (videoUrl === null) {
-		return <div data-testid="market-media-panel">{media}</div>;
+		return (
+			<div data-testid="market-media-panel" className={frame}>
+				{media}
+			</div>
+		);
 	}
 
 	return (
@@ -135,9 +158,9 @@ export function MarketMediaPanel({
 			// The plan's one permitted new-string category (§1) — an `aria-label`
 			// on a control whose glyph carries the same meaning.
 			aria-label="Play video"
-			className="relative block w-1/3 shrink-0"
+			className={`relative block ${frame}`}
 		>
-			<div className="w-full [&>*]:w-full">{media}</div>
+			{media}
 			{/* `.playmark` (`d5:951`) — the outbound-video affordance, centred over
 			    the media. Stroked with `currentColor` so it binds to the text
 			    ramp rather than carrying a hex (Ruling A / H-HEX). */}

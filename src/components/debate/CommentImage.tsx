@@ -9,16 +9,52 @@
 export function CommentImage({
 	url,
 	onOpen,
+	fill = false,
 }: {
 	url: string;
 	onOpen: (url: string) => void;
+	/**
+	 * ⚠⚠ THE `.argimg` ARM — d5's post-CARD image slot (`d5:648-651`), and the
+	 * fix for the founder's measured "post image renders ~¼ size, left-aligned".
+	 *
+	 * d5 gives a card's attachment the card's whole leftover height and CENTRES
+	 * it: `.argimg{flex:1 1 auto;min-height:0;display:flex;align-items:center;
+	 * justify-content:center}` wrapping `.media{height:100%;width:auto;
+	 * max-width:100%;max-height:100%}`. Measured in the mockup at 1800: the image
+	 * is 479 × 439 in an 833 × 598 card — 73% of the card's HEIGHT.
+	 * Measured on staging at `5349ae9`: 160 × 90, flush left, because the shipped
+	 * render was `block w-fit` around `max-h-[var(--imgmax)]` — a 160px cap.
+	 *
+	 * ⇒ `fill` swaps the `w-fit` box for a centred flex cell and the 160px cap for
+	 * `max-h-full`, so the image is bounded by THE CARD rather than by a constant.
+	 *
+	 * ⛔ STILL BOTH-AXES-BOUNDED, so T2 / canon §107 ("shown whole · any
+	 * orientation") is untouched: `max-h-full` + `max-w-full` with no fixed
+	 * dimension preserves the intrinsic aspect and never upscales a small image.
+	 * d5's own `height:100%` WOULD upscale, and that half is deliberately not
+	 * taken — it is the one part of `.media` that fights the promise to the author.
+	 *
+	 * ⚠ DEFAULT `false` KEEPS THE FOCUS-HEADER ARM BYTE-IDENTICAL. `.hpimg`
+	 * (`d5:787`) is a fixed side slot, not a growing cell, and `PostFocusHeader`
+	 * renders it inside its own `shrink-0` wrapper.
+	 */
+	fill?: boolean;
 }) {
 	return (
 		<button
 			type="button"
 			onClick={() => onOpen(url)}
 			aria-label="Open attached image"
-			className="block w-fit"
+			// ⚠ `h-full`, not `flex-1`: the `.argimg` CELL is the flex item (its
+			// wrapper in `PostCard` carries `flex-1 min-h-0`), and the `<img>`'s
+			// `max-h-full` below is a PERCENTAGE — it resolves to `none` unless
+			// every ancestor between it and the definite height passes that height
+			// down. `h-full` is that pass-through.
+			className={
+				fill
+					? "flex h-full max-w-full items-center justify-center"
+					: "block w-fit"
+			}
 		>
 			{/* biome-ignore lint/performance/noImgElement: a short-TTL presigned R2
 			    GET URL (D9), not a static asset — next/image optimization would
@@ -49,7 +85,9 @@ export function CommentImage({
 			<img
 				src={url}
 				alt="Argument attachment"
-				className="max-h-[var(--imgmax)] max-w-full rounded-[var(--imgr)] [border:var(--hairline)]"
+				className={`max-w-full rounded-[var(--imgr)] [border:var(--hairline)] ${
+					fill ? "max-h-full" : "max-h-[var(--imgmax)]"
+				}`}
 			/>
 		</button>
 	);
@@ -84,11 +122,35 @@ export function CommentImage({
  * the same `--imgr` / hairline pair `CommentImage` uses above, so no new type
  * size, colour or radius enters the build.
  */
-export function PostImagePlaceholder() {
+export function PostImagePlaceholder({
+	fill = false,
+}: {
+	/**
+	 * ⚠ THE `.argimg` ARM — the same swap `CommentImage` documents above, and the
+	 * other half of the founder's "~¼ size, left-aligned" measurement: the box was
+	 * `aspect-[16/9] w-full max-w-[var(--imgmax)]`, so it rendered 160 × 90 flush
+	 * left on staging while the mockup's fills the card and centres.
+	 *
+	 * ⛔ THE ASPECT BECOMES `640/586` IN THIS ARM, AND THAT IS THE LABEL'S OWN
+	 * NUMBER. d5's box is `.media.rdt{aspect-ratio:640/586}` (`d5:653`) and the
+	 * caption it carries literally reads `640:586` — so the shipped `16/9` box was
+	 * a placeholder whose shape contradicted its own text. Not a value taken from
+	 * the mockup so much as the value already printed inside the component.
+	 *
+	 * ⚠ `h-full w-auto` here, unlike `CommentImage`: a placeholder has no
+	 * intrinsic content to distort, so d5's `height:100%` is safe on it — the
+	 * upscaling objection applies only to a real attachment.
+	 */
+	fill?: boolean;
+}) {
 	return (
 		<div
 			data-testid="post-image-placeholder"
-			className="flex aspect-[16/9] w-full max-w-[var(--imgmax)] items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+			className={
+				fill
+					? "flex aspect-[640/586] h-full max-h-full w-auto max-w-full items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+					: "flex aspect-[16/9] w-full max-w-[var(--imgmax)] items-center justify-center rounded-[var(--imgr)] bg-n1 px-2 text-center font-mono text-[8.5px] tracking-[0.16em] text-n4 [border:var(--hairline)]"
+			}
 		>
 			POST IMAGE · 640:586
 		</div>

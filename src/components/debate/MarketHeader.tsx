@@ -27,6 +27,19 @@ const TERMINAL: ReadonlySet<string> = new Set([
 const noun = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
 /**
+ * `.attrs .sep` (`d5:502`) — the middle dot between the three stat fields:
+ * `color:var(--n3)`, normal weight against the bold figures, `margin:0 6px`.
+ * `aria-hidden` for the same reason `ArgProfile`'s `Sep` carries it.
+ */
+function AttrSep() {
+	return (
+		<span aria-hidden="true" className="mx-1.5 font-normal text-n3">
+			·
+		</span>
+	);
+}
+
+/**
  * The market lifecycle / resolution marker (INV-4 / design-language §3.1). A
  * terminal market (Closed/Resolving/Resolved/Voided/Frozen) reads as locked —
  * "read-only" — paired with the literal status (never colour alone, §8).
@@ -141,7 +154,25 @@ export function MarketHeader({
 					{/* `.hstack` (`d5:462`) — everything that is not the media. */}
 					<div className="flex min-w-0 flex-1 flex-col gap-3">
 						<div className="flex items-start justify-between gap-3">
-							<h1 className="text-xl font-semibold tracking-tight">
+							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
+							    line-height:1.24`, and SINGLE LINE with an ellipsis
+							    (`white-space:nowrap;overflow:hidden;text-overflow:ellipsis`,
+							    ruled at D5-02 / v0.9: "Market title → single line (no wrap;
+							    ellipsis if it ever overflows)"). The shipped heading was
+							    20px / 600 with `tracking-tight`, i.e. lighter, smaller and
+							    NEGATIVELY tracked where the mockup is heavier and neutral.
+							    ⚠⚠ THE TRUNCATION IS A REAL COST AND IT IS REPORTED, NOT
+							    SMOOTHED OVER: at a narrow viewport a long question is cut
+							    with no in-place way to read the rest. `title` carries the
+							    full string for pointer users and the accessible name is
+							    unaffected (the text node is whole in the DOM); the ADR-0025
+							    `.md` export carries it in full. This follows the founder's
+							    own adoption of `.crittext`'s 2-line clamp one block down —
+							    the two rulings would otherwise contradict each other. */}
+							<h1
+								title={market.title}
+								className="truncate text-[21px] leading-[1.24] font-bold tracking-normal"
+							>
 								{market.title}
 							</h1>
 							<div className="flex shrink-0 items-center gap-2">
@@ -170,12 +201,27 @@ export function MarketHeader({
 					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
 					    `market-header.test.tsx`. `.attrs`'s bold numerals and `·`
 					    separators are a different row's subject and are not taken here. */}
-						<div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+						{/* ⚠ `.attrs` (`d5:500-502`) — `font-size:12px;font-weight:700;
+						    color:var(--ink)`, its three fields joined by a `.sep` middle dot
+						    (`color:var(--n3);font-weight:400;margin:0 6px`). The shipped
+						    strip was `text-muted-foreground` at normal weight with the
+						    fields merely SPACED, so `Đ 1,681 staked 4 posts 1 reply` ran
+						    together as one grey sentence.
+						    ⛔ THE `·` IS THE MOCKUP'S OWN GLYPH (U+00B7), and it is
+						    `aria-hidden` for the reason `ArgProfile`'s `Sep` already
+						    states: it is punctuation, and announcing it between every
+						    field makes the row unlistenable.
+						    ⚠ THE PD-3-08 PLURAL RULE IS UNTOUCHED — same `noun()`, same
+						    three fields, same order. Only weight, colour and the
+						    separators change. */}
+						<div className="flex flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
 							<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+							<AttrSep />
 							<span>
 								{market.totals.postCount}{" "}
 								{noun(market.totals.postCount, "post", "posts")}
 							</span>
+							<AttrSep />
 							<span>
 								{market.totals.replyCount}{" "}
 								{noun(market.totals.replyCount, "reply", "replies")}
@@ -225,7 +271,10 @@ export function MarketHeader({
 								<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
 									Resolution
 								</div>
-								<p className="mt-[5px] line-clamp-2 text-sm text-muted-foreground">
+								{/* `.crittext` (`d5:470`) — `font-size:11px;line-height:1.5;
+								    color:var(--n6)`. It shipped at `text-sm` (14px), which is
+								    the same size as the body copy it is meant to sit under. */}
+								<p className="mt-[5px] line-clamp-2 text-[11px] leading-[1.5] text-muted-foreground">
 									{market.description}
 								</p>
 							</div>

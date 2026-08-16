@@ -146,6 +146,37 @@ function usePagedColumn(total: number, paused: boolean, stagger: boolean) {
 	};
 }
 
+/**
+ * Hands this column's `step` up to whoever owns the keyboard (`DebateView`), so
+ * ↑/↓ can page the column the reader chose — d5's `step(side, ±1)`
+ * (`:1792-1793`).
+ *
+ * ⛔ THE LIVE `step` GOES THROUGH A REF, NOT THROUGH THE DEPENDENCY LIST.
+ * `usePagedColumn` returns a NEW `step` closure every render, so listing it
+ * would unregister and re-register on every single render — including the ones
+ * the countdown causes. The published callback is stable and reads the current
+ * closure at CALL time, which is also what keeps it from stepping off a stale
+ * `total` after a poll changes the list length.
+ *
+ * ⚠ Registering `null` on unmount is not tidiness: a column replaced by an open
+ * composer, or swapped out by the market↔post toggle, must not still be
+ * reachable from a key press.
+ */
+function useRegisterStep(
+	step: (delta: number) => void,
+	register: ((step: ((delta: number) => void) | null) => void) | undefined,
+) {
+	const live = useRef(step);
+	live.current = step;
+	useEffect(() => {
+		if (register === undefined) {
+			return;
+		}
+		register((delta) => live.current(delta));
+		return () => register(null);
+	}, [register]);
+}
+
 /** Shared props for both scrollers' R3 wiring. */
 type ColumnAuto = {
 	/** This column is the one the reader picked — its timer stops (d5 `picked`). */
@@ -156,6 +187,14 @@ type ColumnAuto = {
 	onPick: () => void;
 	/** This column starts half a cadence ahead, so the two do not flip together. */
 	stagger: boolean;
+	/**
+	 * ⚠⚠ PUBLISHES THIS COLUMN'S STEPPER SO ↑/↓ CAN REACH IT. d5's `onKey` calls
+	 * `step(side, ±1)` directly because its state is module-scoped; here the state
+	 * is per-scroller and the key handler is two levels up, so the stepper is
+	 * handed up on mount and cleared on unmount. Without this, ↑/↓ have nothing to
+	 * call — which is exactly what the founder measured as "cards do not step".
+	 */
+	registerStep: (step: ((delta: number) => void) | null) => void;
 };
 
 /**
@@ -203,6 +242,16 @@ export function PostScroller({
 		auto === undefined || auto.picked || auto.frozen,
 		auto?.stagger ?? false,
 	);
+	// ⚠⚠ THE RAILS FACE EACH OTHER ACROSS THE CENTRE GUTTER. d5 pins the LEFT
+	// column's rail to its RIGHT edge and the RIGHT column's to its LEFT
+	// (`.slot.l .pscroll{right:2px}` / `.slot.r .pscroll{left:2px}`, `d5:888-889`).
+	// The build put BOTH after the card, so the NO column's rail sat against the
+	// far page edge — measured on staging at `5349ae9`, its `Next post` button
+	// was at x=1223 in a 1254px viewport and y=627 in a 609px one, i.e. jammed
+	// into the corner and below the fold. That is a material part of "cards do not
+	// step": the control was there, and it was not reachable.
+	const railFirst = side === "NO";
+	useRegisterStep(step, auto?.registerStep);
 	if (posts.length === 0) {
 		return <EmptySideCTA side={side} />;
 	}
@@ -212,7 +261,16 @@ export function PostScroller({
 		// BESIDE the card (`:887`), replacing the horizontal prev/next strip that
 		// sat under it. `items-stretch` is what lets the rail's track fill the
 		// card's height rather than needing d5's fixed `92px`.
-		<div className="flex items-stretch gap-2">
+		//
+		// ⚠⚠ `flex-1 min-h-0` IS NEW AND IT IS LOAD-BEARING: it is what gives
+		// `PostCard`'s `.argimg` cell a height to take a share of. Without it this
+		// wrapper is content-sized and the image reverts to intrinsic size — the
+		// founder's measured "~¼ size" defect, one link up the chain.
+		<div
+			className={`flex min-h-0 flex-1 items-stretch gap-2 ${
+				railFirst ? "flex-row-reverse" : ""
+			}`}
+		>
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<PostCard
 					post={post}
@@ -285,13 +343,21 @@ export function ReplyScroller({
 		auto === undefined || auto.picked || auto.frozen,
 		auto?.stagger ?? false,
 	);
+	// `.rps` mirrors `.pscroll` exactly — `.slot.l .rps{right:2px}` /
+	// `.slot.r .rps{left:2px}` (`d5:920-921`). Same rail, same gutter, same reason.
+	const railFirst = side === "NO";
+	useRegisterStep(step, auto?.registerStep);
 	if (replies.length === 0) {
 		return <EmptySideCTA side={side} />;
 	}
 	const reply = replies[index];
 	return (
 		// Row 19 — `.rps` (`:917`) is the same rail at the reply mount point.
-		<div className="flex items-stretch gap-2">
+		<div
+			className={`flex min-h-0 flex-1 items-stretch gap-2 ${
+				railFirst ? "flex-row-reverse" : ""
+			}`}
+		>
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<ReplyCard
 					reply={reply}
