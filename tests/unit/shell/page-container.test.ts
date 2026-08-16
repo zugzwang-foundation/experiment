@@ -191,10 +191,31 @@ const SITES: Site[] = [
 		// record of the one class the primitive added at `c5892bc`, and the
 		// "exactly one site adds a class" row below still counts it. `now` supplies
 		// the assertion; `before`/`adds` stay the untouched baseline.
-		now: "mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-6 py-6",
+		// ⚠⚠ SITE 9 MOVES A SECOND TIME, and the previous move is superseded IN
+		// PLACE rather than deleted (O-4). Round 2 took `wide` (`mx-auto flex
+		// w-full max-w-[1440px] flex-col gap-5 px-6 py-6`) to widen a cramped
+		// 1024px container. The founder's DIMENSIONAL PARITY ruling of 2026-08-17
+		// — "It's a one page view — there should be no scroll down. The dimensions
+		// of the whole market detail page are not matching — it should be exact" —
+		// supersedes it on BOTH axes:
+		//   · WIDTH: `max-w-[1440px]` is gone. Measured at a pinned 1800×971,
+		//     mockup beside staging, d5's `.content` is full-bleed inside a 28px
+		//     inset — headzone 96.9% of viewport — while the capped container gave
+		//     77.3%. A −19.6pp delta every region inside inherited.
+		//   · HEIGHT: the container now DECLARES one screen and hides its own
+		//     overflow. The route's `min-h-* never h-*` rule (A1) is reversed for
+		//     this route by the same ruling; `(public)/layout.tsx`'s comment
+		//     recording it is corrected in the same commit, and the layout's own
+		//     floor is untouched because it still governs every other surface.
+		// ⛔ THE OVERFLOW IS NOT DELETED, IT IS RELOCATED — `DebateColumn`'s
+		// `.colwrap` scrolls internally, so a long argument and a removed-content
+		// placeholder stay reachable. A fixed height that clips would be a failure,
+		// not a pass.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden",
 		movedBy:
-			"HTML-FINISH-MD-1 — /m/[slug] takes the widest existing preset " +
-			"(founder-ruled 2026-08-16, round 2)",
+			"HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY — /m/[slug] is a " +
+			"fixed-height one-screen full-bleed grid (founder-ruled 2026-08-17); " +
+			"supersedes HTML-FINISH-MD-1's move onto `wide` (2026-08-16)",
 	},
 ];
 
@@ -467,12 +488,22 @@ describe("B2 — the container primitive moves nothing", () => {
 		// claim: the mint was ADDITIVE. Its `max-w-[1440px] px-6` is byte-carried
 		// from `GlobalHeader.tsx:91`, the widest surface wrapper on `main`; its
 		// `py-6` is `reading`'s. Nothing here is read off a mockup.
+		//
+		// ⚠⚠ `screen` is the SIXTH, minted at HTML-FINISH · MARKET DETAIL ·
+		// DIMENSIONAL PARITY on the founder ruling of 2026-08-17. ADDITIVE AGAIN —
+		// the five above it are byte-unchanged, and `/m/[slug]` is its only
+		// consumer. ⛔ Its two values are d5's own `.content{padding:16px 28px}`:
+		// `px-7` = 28px, `py-4` = 16px. `max-w-none` is a DECLARED position on the
+		// max-width axis, not an omission — full bleed is what closed the −19.6pp
+		// width delta measured at a pinned 1800×971 (d5 headzone 96.9% of viewport
+		// vs the capped container's 77.3%).
 		expect(CONTAINER_PRESETS).toEqual({
 			reading: "mx-auto w-full max-w-3xl px-4 py-6",
 			debate: "mx-auto w-full max-w-5xl px-6 py-8",
 			auth: "mx-auto w-full max-w-md px-4 py-8",
 			notice: "mx-auto w-full max-w-3xl px-4 py-24",
 			wide: "mx-auto w-full max-w-[1440px] px-6 py-6",
+			screen: "mx-auto w-full max-w-none px-7 py-4",
 		});
 	});
 

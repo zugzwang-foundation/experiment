@@ -58,19 +58,42 @@ export function HeadZone({
 }) {
 	return (
 		<section
+			// ⚠⚠ THE BAND IS DECLARED AS A FRACTION OF THE CONTAINER, not as d5's
+			// literal `188px`. `.headzone{flex:0 0 188px}` (`d5:447`) inside a
+			// `.content` whose inner height is 879px at the pinned 1800×971 →
+			// **21.4%**. A percentage basis reproduces 188px at that viewport AND
+			// holds the proportion at every other one, which is what the mockup's
+			// own fixed px cannot do. `shrink-0` is the `0 0` half of `flex:0 0`.
+			// ⚠ `gap-5` = 20px is d5's `.headzone{gap:20px}` (`:447`), the gap
+			// between the text column and the chart rail.
 			data-testid="headzone"
-			className="flex min-h-0 shrink-0 flex-col gap-4 lg:flex-row"
+			className="flex min-h-0 shrink-0 basis-[21.4%] flex-col gap-5 lg:flex-row"
 		>
 			<div
+				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)
+				// — a ROW, not a stack. Its two children are the media panel and the
+				// text stack; `MarketHeader`/`PostFocusHeader` supply that row.
 				data-testid="headzone-left"
-				className="flex min-w-0 flex-1 flex-col gap-3"
+				className="flex min-h-0 min-w-0 flex-1 flex-col gap-3"
 			>
 				{left}
 			</div>
 			{right === null ? null : (
 				<div
+					// ⛔⛔ THE RAIL IS d5's LITERAL `340px`, AND THE PREVIOUS RULING IS
+					// REVERSED. This read `lg:w-1/4` under a rule that a fixed track
+					// was the defect; the founder's 2026-08-17 parity ruling names
+					// rail width as one of the literals to copy, and the measurement
+					// agrees: at the pinned 1800×971 d5's `.hright{flex:0 0 340px}` is
+					// 18.9% of the viewport while `w-1/4` of the headzone gave 19.3% —
+					// close in the rail itself, but it took its width from a container
+					// that was ALSO wrong, and the two errors were cancelling. With
+					// the container corrected to full-bleed, `w-1/4` of 1744px would
+					// be 436px — 5.7pp too wide, squeezing the text stack.
+					// ⚠ `shrink-0` unconditionally now, not `lg:shrink-0`: a fixed
+					// basis that is allowed to shrink is not a fixed basis.
 					data-testid="headzone-right"
-					className="flex min-w-0 flex-col gap-3 lg:w-1/4 lg:shrink-0"
+					className="flex w-[340px] min-w-0 shrink-0 flex-col gap-3"
 				>
 					{right}
 				</div>

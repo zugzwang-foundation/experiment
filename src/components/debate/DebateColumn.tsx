@@ -119,20 +119,48 @@ export function DebateColumn({
 				picked ? " rounded-(--r) shadow-(--elev-3)" : ""
 			}`}
 		>
-			{header ?? (
-				<>
-					<div className="flex items-center justify-between gap-2 rounded-md p-2 [border:var(--hairline)]">
-						<div className="flex items-center gap-1.5">
-							<SideBadge side={side} />
-							<span className="font-mono text-xs text-muted-foreground">
-								{pct}
-							</span>
+			{/* `.colhead{flex:0 0 auto}` (`d5:532`) — the head never shrinks, so the
+			    column's slack always comes out of the body below it. */}
+			<div className="shrink-0">
+				{header ?? (
+					<>
+						<div className="flex items-center justify-between gap-2 rounded-md p-2 [border:var(--hairline)]">
+							<div className="flex items-center gap-1.5">
+								<SideBadge side={side} />
+								<span className="font-mono text-xs text-muted-foreground">
+									{pct}
+								</span>
+							</div>
 						</div>
-					</div>
-					<p className="text-xs text-muted-foreground">No active position</p>
-				</>
-			)}
-			{children}
+						<p className="text-xs text-muted-foreground">No active position</p>
+					</>
+				)}
+			</div>
+			{/* ⚠⚠ `.colwrap` (`d5:568`) — `flex:1 1 auto;min-height:0;overflow-y:auto`.
+			    THIS IS THE ONLY SCROLLING REGION ON THE SURFACE, and it is what makes
+			    the one-screen page correct rather than merely short.
+
+			    ⛔ A FIXED-HEIGHT PAGE DOES NOT MAKE CONTENT FIT — IT CLIPS IT. The
+			    founder's 2026-08-17 ruling takes the page's own scrollbar away, so
+			    the overflow has to go somewhere or content simply disappears. d5
+			    puts it here, and so does this: the card below fills the column and
+			    absorbs slack through its image cell, but when the fixed rows (author
+			    row, title, split bar) exceed the column on their own — a long
+			    argument title, a `Removed by moderator` placeholder (ADR-0020/0021),
+			    a tall reply card — the card grows past this box and THIS box
+			    scrolls. Nothing is ever clipped out of reach.
+
+			    ⚠ `min-h-0` IS WHAT MAKES `overflow-y-auto` DO ANYTHING. Without it
+			    this flex item's automatic minimum size is its content, so it would
+			    grow to fit the card instead of scrolling it — and the page, having
+			    been told it is exactly one screen, would clip the difference
+			    silently. The two declarations are one mechanism, not two. */}
+			<div
+				data-testid="column-scroll"
+				className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+			>
+				{children}
+			</div>
 		</div>
 	);
 }

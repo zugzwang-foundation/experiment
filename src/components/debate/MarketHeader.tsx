@@ -145,14 +145,17 @@ export function MarketHeader({
 				   holding `.mmedia` then `.hstack`. The market arm's media panel takes
 				   the same slot the post arm gives the focused post's image, so the two
 				   arms swap contents inside one identical frame. */
-				<div className="flex gap-4">
+				<div className="flex min-h-0 flex-1 gap-4">
 					<MarketMediaPanel
 						imageUrl={market.mediaImageUrl}
 						videoUrl={market.mediaVideoUrl}
 						title={market.title}
 					/>
-					{/* `.hstack` (`d5:462`) — everything that is not the media. */}
-					<div className="flex min-w-0 flex-1 flex-col gap-3">
+					{/* `.hstack` (`d5:462`) — everything that is not the media.
+					    ⚠ `min-h-0` is this node's link in the one-screen chain: without
+					    it the stack refuses to shrink below its content and pushes the
+					    declared band taller. */}
+					<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
 						<div className="flex items-start justify-between gap-3">
 							{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis

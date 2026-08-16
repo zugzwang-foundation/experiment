@@ -23,15 +23,20 @@ import { MarketThumb } from "@/components/discovery/MarketThumb";
  * (`HTML-FINISH-MD-PLACEHOLDERS`): **strip or gate all four placeholders before
  * the DP.2 production promote.**
  *
- * ⚠ GEOMETRY DIVERGES FROM d5, AND THE REASON IS THIS ROUTE'S HEIGHT CHAIN.
- * `.mmedia` is `flex:0 0 auto;aspect-ratio:16/9;height:100%;width:auto`, which
- * needs a DEFINITE height on the headzone to resolve a width. `/m/[slug]`
- * deliberately has no such height — it is not the profile, it carries no
- * one-screen ruling, and `tests/unit/design/debate-height-chain.test.ts` forbids
- * adding one. So the panel takes its width as a FRACTION and derives its height
- * from the aspect, which is deterministic at every viewport instead of
- * depending on a bound that does not exist. `shrink-0` is the surviving half of
- * `flex:0 0 auto`.
+ * ✅ GEOMETRY IS NOW d5's EXACTLY, AND THE DIVERGENCE THAT USED TO LIVE HERE IS
+ * DISCHARGED. This block read: "`.mmedia` is `flex:0 0 auto;aspect-ratio:16/9;
+ * height:100%;width:auto`, which needs a DEFINITE height on the headzone to
+ * resolve a width. `/m/[slug]` deliberately has no such height — it is not the
+ * profile, it carries no one-screen ruling, and the height-chain guard forbids
+ * adding one. So the panel takes its width as a FRACTION."
+ *
+ * ⇒ The founder's 2026-08-17 parity ruling gives this route exactly that
+ * definite height, so `height:100%;width:auto` resolves and the panel is
+ * height-driven off the band, like the mockup's. MEASURED at a pinned 1800×971:
+ * d5's panel is 334 × 188 (18.6% × 19.4%); `w-1/3` gave 343 × 195 — close by
+ * luck at one viewport and wrong by construction, because a WIDTH fraction plus
+ * an aspect determines the HEIGHT, which then has nothing to do with the band it
+ * sits in. `shrink-0` is the `flex:0 0` half.
  *
  * ⚠ `aspect-[16/9]` is a SHAPE declaration, not one of the four value classes
  * the task forbids taking from the mockup (colour, radius, px, type size,
@@ -77,7 +82,7 @@ export function MarketMediaPanel({
 	 * measures, so the wrapper is the thing that has to declare a width.
 	 */
 	const frame =
-		"aspect-[16/9] w-1/3 shrink-0 overflow-hidden rounded-[var(--imgr)]";
+		"aspect-[16/9] h-full w-auto shrink-0 overflow-hidden rounded-[var(--imgr)]";
 
 	// ✅ R2 — NOTHING TO SHOW NOW DRAWS THE MOCKUP'S PLACEHOLDER, where it used to
 	// `return null`. `.mmedia`'s empty state is a centred column: the `.playmark`

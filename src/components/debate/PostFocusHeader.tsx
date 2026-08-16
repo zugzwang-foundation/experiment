@@ -94,7 +94,10 @@ export function PostFocusHeader({
 				/>
 			}
 			left={
-				<Card className="gap-3 p-4">
+				/* ⚠ The focused post's card FILLS the headzone band, so `.hpimg` beside
+				   it can be height-driven exactly as the market arm's `.mmedia` is.
+				   `min-h-0` is its link in the one-screen chain. */
+				<Card className="min-h-0 flex-1 gap-3 p-4">
 					{/* HTML-FINISH · MARKET DETAIL row 11 — `.hleft` IS A ROW, NOT A
 					    STACK (`d5:448`, `flex:1 1 auto;min-width:0;display:flex;gap:16px`).
 					    The focused post's image is `.hpimg` (`:956`) — a LEFT SIBLING of
@@ -102,7 +105,7 @@ export function PostFocusHeader({
 					    `.mmedia`. It used to render INLINE, between the title and the
 					    body, which pushed the argument down the column on every post that
 					    carried one. */}
-					<div className="flex gap-4">
+					<div className="flex min-h-0 flex-1 gap-4">
 						{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 fills the
 						    post-focus `.hpimg` with its `POST IMAGE · 640:586` box
 						    (`d5:1491-1492`) whenever the focused post has no real
@@ -128,14 +131,17 @@ export function PostFocusHeader({
 								<CommentImage url={post.imageUrl} onOpen={onOpenImage} />
 							</div>
 						) : (
-							<div className="w-1/3 shrink-0">
-								<PostImagePlaceholder />
+							<div className="aspect-[16/9] h-full w-auto shrink-0">
+								{/* `.hpimg{aspect-ratio:16/9;height:100%;width:auto}` (`d5:787`)
+								    — the same height-driven frame the market arm gives
+								    `.mmedia`, now that the band has a definite height. */}
+								<PostImagePlaceholder fill />
 							</div>
 						)}
 
 						{/* `.hstack` (`d5:462`, `flex:1 1 auto;min-width:0;flex-direction:
 						    column`) — everything that is not the image. */}
-						<div className="flex min-w-0 flex-1 flex-col gap-3">
+						<div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
 							{post.removed ? (
 								<>
 									<SideBadge side={post.sideAtPostTime} />

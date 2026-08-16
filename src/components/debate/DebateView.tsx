@@ -470,23 +470,47 @@ export function DebateView({
 	const noPosts = posts.filter((p) => p.sideAtPostTime === "NO");
 
 	return (
-		/* HTML-FINISH · MARKET DETAIL round 2 · R1 (C1B) — `/m/[slug]` TAKES THE
-		   WIDEST EXISTING PRESET. Ruling name HTML-FINISH-MD-1, founder-ruled
-		   2026-08-16 after measuring round 1 on staging: the layout is cramped.
-		   ⛔ NO WIDTH IS MINTED. `wide` already exists on `main` — minted at
-		   HTML-FINISH · PROFILE row 20, whose `max-w-[1440px] px-6` is itself
-		   byte-carried from `GlobalHeader.tsx`'s wrapper — and `/bookmarks` is
-		   already its second consumer. This is a THIRD consumer of a shipped
-		   preset, so `PageContainer.tsx` is untouched (H1-b holds).
-		   ⚠ MEASURED BEFORE, on staging at a 1440 viewport: `max-w-5xl` capped the
-		   container at 1024, giving a 244px rail beside a 716px left column and two
-		   ~480px arena columns underneath. The header is TWO columns above an arena
-		   that is also two columns, so 1024 is the width at which the rail stops
-		   being a rail. At 1440 the same fractions give a 348px rail and a 1044px
-		   left column.
-		   ⚠ `py-8` → `py-6` rides along: a preset is one indivisible box (all three
-		   axes), and `page-container.test.ts` asserts the whole class set. */
-		<PageContainer preset="wide" className="flex flex-col gap-5">
+		/* ⚠⚠ THE ONE-SCREEN BAND — HTML-FINISH · MARKET DETAIL · DIMENSIONAL
+		   PARITY, founder-ruled 2026-08-17: "It's a one page view — there should
+		   be no scroll down. The dimensions of the whole market detail page are
+		   not matching — it should be exact."
+
+		   ⛔ THIS REVERSES `A1` FOR THIS ROUTE, and the superseded ruling is
+		   recorded rather than deleted (O-4). `(public)/layout.tsx` ruled "⛔
+		   `min-h-*`, never `h-*`, and NO `min-h-0` anywhere in the chain: the
+		   floor lets the page GROW and SCROLL when content exceeds the viewport
+		   (RULED A1) instead of clipping it. The mockup's `overflow:hidden` on
+		   html/body is a fixed-viewport prototype affordance and is deliberately
+		   NOT adopted." The founder has overruled that FOR `/m/[slug]`. That
+		   comment is corrected in this same commit; ⛔ the layout's own `min-h-*`
+		   floor is UNTOUCHED, because it still governs every other `(public)`
+		   surface and this ruling names one route.
+
+		   ⛔ A FIXED HEIGHT CLIPS — IT DOES NOT MAKE CONTENT FIT. What makes this
+		   correct rather than broken is that the overflow lives INSIDE, exactly as
+		   it does in d5: `.colwrap{overflow-y:auto}` (`d5:568`) is the one
+		   scrolling region, and it is ported at `DebateColumn`. A long argument, a
+		   removed-by-moderator placeholder (ADR-0020/0021) and a tall card all
+		   stay reachable by scrolling THE COLUMN. Nothing is clipped out of
+		   existence.
+
+		   ⚠ `100dvh`, NOT `100vh` — the DYNAMIC viewport unit, so a mobile URL bar
+		   collapsing does not leave the band taller than the window it is meant to
+		   equal. ⚠ The subtrahend is unchanged and still the header's border-box
+		   written as its two shipped contributors: `60px` is `GlobalHeader`'s
+		   `h-[60px]` inner row, `2px` its `border-y`.
+
+		   ⚠ `gap-3` = 12px is d5's `.arena{margin-top:12px}` (`:523`), replacing
+		   the 20px `gap-5`. With the headzone band at its measured fraction this
+		   is what reproduces d5's arena height exactly.
+
+		   ⚠ `min-h-0` ON THE CONTAINER ITSELF is the first link: without it this
+		   flex item's automatic minimum size is its CONTENT, and a tall arena
+		   would push the band past the height it just declared. */
+		<PageContainer
+			preset="screen"
+			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden"
+		>
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the
 			    document is hidden or a composer is open, stopped once the market

@@ -63,7 +63,12 @@ export function ReplyCard({
 		);
 	}
 	return (
-		<div className="flex flex-col gap-1.5 rounded-md p-2 [border:var(--hairline)]">
+		/* ⚠ `.rpanel{flex:1 1 auto;min-height:0}` (`d5:832`) — the reply card FILLS
+		   its column, so the post arm's arena is the same filled two-column band the
+		   market arm's is, rather than two short boxes floating at the top. It can
+		   still grow past the column on a long argument, and `DebateColumn`'s
+		   `.colwrap` scrolls when it does. */
+		<div className="flex min-h-0 flex-1 flex-col gap-1.5 rounded-md p-2 [border:var(--hairline)]">
 			{/* HTML-FINISH · MARKET DETAIL row 26 — d5's `.rcardhead` (`:1545-1548`)
 			    is avatar · pseudonym | side chip with entry price | staked · card
 			    actions, which is EXACTLY the row `ArgProfile` renders after row 12
