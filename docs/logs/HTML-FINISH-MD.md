@@ -129,3 +129,132 @@ a fourth `src/server/**` file is **H2-a** and halts phase 2 whole.
 ### Time
 
 Phase 1: 2026-08-15 23:58 UTC → 2026-08-16 ~06:00 UTC.
+
+---
+
+## PHASE 2 · SERVER — complete, with row 14 halted
+
+### What landed
+
+| # | Commit | SHA | Rows |
+|---|---|---|---|
+| C11 | `feat(debate-view): market media + outbound video reach the header` | `e2fdfcb` | 2, 17 |
+| C12 | `feat(debate-view): reply images ride the existing batched presign` | `2184822` | 26-image (+34) |
+| C13 | `feat(debate-view): the author's current value rides the held-sides read` | `d8b8885` | 14 — **reverted** |
+| — | `fix(debate-view): no phantom "now" on a terminal market` | `f2ac776` | reviewer fixes — **reverted** |
+| C13c | `revert(debate-view): row 14 halts — @security-auditor HIGH, a removal oracle` | `969a4a0` | ✗ 14 |
+
+**Rows landed: 2, 17, 26-image** (and row 34, the reply-image lightbox, one
+commit early — `CommentImage` IS the lightbox affordance, so splitting it would
+have shipped a dead click target).
+**Rows halted: 14.**
+
+### The read budget — **+1 exactly**
+
+`get-by-slug`'s `mediaVideoUrl` is +0 (one more column on a row already read).
+C11's `getDefaultMarketMediaUrl` is the **one** new statement, and it serves
+BOTH row 2 and row 17 — the same image at two zoom levels. C12 is +0 in the
+general case.
+
+⚠ **One exception, stated because the budget is a halt condition.**
+`mintImageUrls` early-returns when no input comment carries an image, so a
+market whose images are all on **replies** and none on posts goes 0 → 1 and that
+render's delta is **+2**. That statement is the ratified row's own irreducible
+cost — a reply's image key cannot be read without reading it — not an overage
+that could be brought back inside the fence. `@code-reviewer` MEDIUM-2; plan §7's
+table row carries the same unconditional wording and should be read with this
+correction.
+
+⚠ **H2-a never fired.** Exactly three `src/server/**` files, verified per commit
+by both reviewers. The F-4 swap that existed to avoid a fourth file went out
+with row 14, so `getMarketPricingAndUnitToWin` is un-orphaned again.
+
+### Decisions made
+
+1. **`FocusMarketCard` carries NO sparkline** — the locked market-card
+   composition (design-language §3.2) struck it at HTML-FINISH · DISCOVERY with
+   the paired SPEC.1 1.0.30 amendment, which deliberately RETAINED "must be
+   identical everywhere" as its load-bearing half. d5's `.mcard` still draws one.
+   Applying an existing ruling, not making a new one.
+2. **The market card IS the exit** (F-2). `?post=` syncs with
+   `history.replaceState`, never `pushState`, so browser Back does not leave post
+   view; this card replaced the only other way out. Its accessible name is
+   byte-carried from the button it supersedes.
+3. **The mockup's `.mmedia .cap` placeholder caption is not shipped** — it is the
+   mockup describing itself, and rendering it is PD-3-09 / OD-6 verbatim.
+4. **Row 14 halted rather than re-ruled.** See Open questions.
+
+### Surprises caught + fixed in-session
+
+- **`@code-reviewer` HIGH-1 — a phantom "now" on terminal markets.** Row 14's
+  gate tested `marker` and the comment count but never market STATUS. Resolution
+  writes neither `positions` nor `pools`, so a holder-to-settlement keeps
+  `quantity > 0` and `marker: "none"` forever — a losing author would have read
+  `Đ 100 → Đ 55` for a holding worth nothing, while Profile showed the settled
+  net for the same holding. Fixed in-session (`Open` only), then went out with
+  the row-14 revert. The rule is `header-portfolio.ts`'s, stated in terms.
+- **MEDIUM-4 reproduced itself.** The new market-media test FAILED on its first
+  run because that read signs through `mintReadUrl("market-media", …)`, a
+  different bucket arm from the `signRead("uploads")` seam the suite mocks — the
+  uncovered arm the finding was about.
+- **A guard re-derived, not relaxed.** `head-zone::the-two-arms-are-DISJOINT`
+  asserted the market TITLE was absent from the post arm; row 17 puts it there
+  on purpose. It now pins the market HEADER's absence and the card's presence.
+  Pinning the title's absence would have forbidden row 17 rather than guarded
+  row 1.
+
+### Open questions
+
+- **OQ-MD-4 · Row 14 needs OD-1 re-ruled, with a cost that was not in the
+  record.** `@security-auditor` HIGH: the ruled NARROW predicate counts over the
+  removal-INCLUSIVE comment list, and publishing its nullness makes
+  `authorValue === null` a deterministic oracle for *"this author has a comment
+  you cannot see."* The other two conjuncts are both readable off the same
+  payload, pseudonyms are unique and ride every visible entry, and removed
+  entries ship structurally — so on a market with one removal, an unauthenticated
+  GET attributes the moderation action completely.
+  ⚠ Every fix is the founder's ruled decision: widen OD-1 (the kickoff forbids
+  it in terms), count over `visible` (re-opens F-5's false money claim), or make
+  the right half a per-post figure (changes what the arrow means).
+  ⚠ **The plan's own SC-1 discharge for C13 was incomplete** — it cleared
+  `positions` ("carries no body"), and the masking surface was never
+  `positions`; it was the derived per-author COUNT over the comments read. SC-1's
+  own framing catches it: a count is a read.
+- **OQ-MD-5 · Presigned-URL scope (MEDIUM, reported not fixed).** Every visible
+  comment's image URL is now minted per render at 3600s and ships to the client,
+  so one request hands a visitor hour-valid GET credentials for every image in
+  the market — including replies they never open — and removal does not revoke
+  within the TTL. Candidate fixes (lazy per-focused-post minting, or a shorter
+  reply TTL) are design calls, and `limits.ts` already flags that a cap on
+  `listMarketComments` is a HARDEN.6 **prerequisite**.
+- **OQ-MD-6 · The `.md` export pays for media work it discards (MEDIUM).**
+  `GET /m/[slug]/export` is public, unauthenticated, `force-dynamic`, `no-store`
+  and not rate-limited (`proxy.ts` matches `/admin/:path*` only), and it now runs
+  the `market_media` read plus N+1 presigns whose output `serializeDebateExport`
+  throws away. Candidate fix: make media minting opt-in on the aggregator.
+- **OQ-MD-7 · SURPRISE, pre-existing, explicitly out of fence.** Presigned
+  comment-image URLs embed the raw `users.id` (`u/<userId>/<uploadId>`), so a
+  page load yields a `pseudonym → users.id` map for every author who attached an
+  image. Pre-existing for posts; this task widens it to replies. Not exploitable
+  today, but it survives pseudonym retirement unless objects are re-keyed.
+
+### Next session starts at
+
+**Phase 3, C15** — the SPEC.1 §9 amendment (the kickoff supplies the ruled text
+verbatim; apply it at all four operative sites per O-4, bump to 1.0.31, and
+correct CLAUDE.md §1's stale 1.0.29 in the SAME commit).
+⛔ Phase-3 halts do NOT cascade — one row's halt never suppresses another.
+
+### Context to preserve
+
+- **The reviewer cascade ran SEQUENTIALLY**, `@code-reviewer` then
+  `@security-auditor`, each with directed scope and the plan passed in. Neither
+  ran a DB-touching command, per the false-red hazard.
+- **Out-of-fence findings live in `claude-progress.md`** (gitignored, never
+  staged): the `limits.ts` / `BookmarkToggle.tsx` stale round-trip counts — ⚠ the
+  INVERSE of O-9, a code change that falsifies a prose measurement under a fence
+  that forbids correcting it.
+
+### Time
+
+Phase 2: 2026-08-16 ~06:00 → ~09:15 UTC.
