@@ -64,7 +64,8 @@ export function IdentityCard({
 			    1440×777 by a fixed-size same-origin iframe, on the shipped surface
 			    with real data, with the frame removed and the mockup's tile density
 			    applied (labels 8px/800/0.12em uppercase, values 14px/800, tile
-			    padding 9/13, tile gap 10, `leading-normal` on both):
+			    padding 9/13, tile gap 10, and the leading STATED on both — see the
+			    `leading-[1.2]` note below, which corrects this table's first pass):
 
 			      vw     idcol NEEDS   box (188)   overflow   PFP
 			      1024       189          188         +1       56  (square not applied)
@@ -164,10 +165,16 @@ export function IdentityCard({
 					    mockup's own unset line-height: Tailwind's `text-*` steps each
 					    ship a paired leading, and inheriting `text-sm`'s 20px on a 20px
 					    glyph is what silently added a line's worth of height to every
-					    row in this band. */}
+					    row in this band.
+					    ⛔ `leading-[1.2]`, NOT `leading-normal` — MEASURED. Tailwind's
+					    `leading-normal` is `line-height:1.5`, not the CSS `normal`
+					    KEYWORD (~1.2 from the font's metrics) that the mockup gets by
+					    leaving line-height unset. At 1.5 this glyph measured 30px and
+					    the row 30 against the mockup's 28; at 1.2 it is 24 and the row
+					    is the 28px action button, which is the mockup's exactly. */}
 					<span
 						data-testid="identity-pseudonym"
-						className="min-w-0 text-[20px] leading-normal font-extrabold text-ink"
+						className="min-w-0 text-[20px] leading-[1.2] font-extrabold text-ink"
 					>
 						{user.pseudonym}
 					</span>

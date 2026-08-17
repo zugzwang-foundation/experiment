@@ -116,7 +116,7 @@ export function ProfileTiles({
 					{tiles.argumentsCount.total}{" "}
 					<span
 						data-testid="tile-arguments-breakdown"
-						className="text-[10px] leading-normal font-bold text-n4"
+						className="text-[10px] leading-[1.2] font-bold text-n4"
 					>
 						({tiles.argumentsCount.posts} Posts | {tiles.argumentsCount.replies}{" "}
 						Replies)
@@ -161,13 +161,20 @@ function Tile({
 		//   .tl     margin-top:3px              (`:209`)  →  gap-[3px] on the tile
 		//   .tl     8px/800/.12em/uppercase/n4  (`:208`)  →  text-[8px] … tracking-[0.12em]
 		//
-		// ⛔ `leading-normal` ON BOTH SPANS IS LOAD-BEARING, NOT TIDINESS. Every
-		// Tailwind `text-*` step ships a PAIRED line-height, and the arbitrary
-		// `text-[Npx]` form does NOT reset it — so `text-[8px]` inherited
-		// `text-xs`'s 16px leading and `text-[14px]` inherited `text-sm`'s 20px.
-		// MEASURED: with the font sizes taken but the leading left alone the block
-		// still needed 190 against the 188 box; setting both to the mockup's own
-		// unset `normal` brought it to 174. The font sizes alone do not close it.
+		// ⛔ THE LEADING IS LOAD-BEARING, NOT TIDINESS. Every Tailwind `text-*` step
+		// ships a PAIRED line-height, and the arbitrary `text-[Npx]` form does NOT
+		// reset it — so `text-[8px]` inherited `text-xs`'s 16px leading and
+		// `text-[14px]` inherited `text-sm`'s 20px. MEASURED: with the font sizes
+		// taken but the leading left alone the block needed 190 against the 188 box.
+		// ⛔⛔ AND IT IS `leading-[1.2]`, NOT `leading-normal` — MEASURED ON STAGING,
+		// AND THIS IS A TRAP WORTH THE LINE. Tailwind's `leading-normal` is
+		// `line-height: 1.5`; it is NOT the CSS `normal` KEYWORD, which resolves to
+		// roughly 1.2 from the font's own metrics. The mockup leaves line-height
+		// UNSET, so its `.tv` at 14px measures 17px and its `.tl` at 8px measures 9 —
+		// ratios of ~1.2. Shipping `leading-normal` bought 21px and 12px instead, so
+		// every tile came out 68 against the mockup's 58 and the band filled to
+		// exactly 188 of 188 with no slack. `leading-[1.2]` lands the tile on 58 and
+		// the grid on the mockup's 126 — Δ 0 — and hands 20px back to the band.
 		// ⚠ `text-[8px]` is the mockup's literal for THIS label. The neighbouring
 		// micro-label register in this repo is `text-[8.5px]` (`DharmaCluster.tsx`,
 		// `MarketCard.tsx`, `HeroPanels.tsx`) and the mockup's own column headers
@@ -177,10 +184,10 @@ function Tile({
 			data-testid={testid}
 			className="justify-center gap-[3px] px-[13px] py-[9px]"
 		>
-			<span className="text-[14px] leading-normal font-extrabold text-ink tabular-nums">
+			<span className="text-[14px] leading-[1.2] font-extrabold text-ink tabular-nums">
 				{children}
 			</span>
-			<span className="text-[8px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
+			<span className="text-[8px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 				{label}
 			</span>
 		</Card>

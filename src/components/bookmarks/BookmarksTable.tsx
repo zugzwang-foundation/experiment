@@ -287,7 +287,7 @@ export function BookmarksTable({
 					e.preventDefault();
 					stepRow(e.key === "ArrowUp" ? -1 : 1);
 				}}
-				className="w-full text-left text-sm"
+				className="w-full table-fixed text-left text-sm"
 			>
 				{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
 				    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
@@ -307,13 +307,31 @@ export function BookmarksTable({
 				    ⚠ THE PADDING FOLLOWS: `px-2 pt-0 pb-2` is the mockup's `0 12px 8px`, which
 				    is what makes the header row 19px instead of 33 and puts the overline right
 				    above the rule it labels. */}
+				{/* ⚠⚠ PROFILE-FULL — THE COLUMN TRACK IS THE MOCKUP'S, AND IT IS LOAD-BEARING
+				    NOW RATHER THAN COSMETIC. The mockup's row grid is
+				    `grid-template-columns:96px 1fr 78px 16px 118px` (`:262`) — four FIXED tracks
+				    with the argument taking the slack. This was an auto-laid `<table>`, and
+				    MEASURED ON STAGING it gave Position 97 · Argument 389 · Staked 55 · arrow 31
+				    · Current 86: the Argument column had taken 91px the two value columns
+				    needed, and once the Current cell gained its P/L delta the figure BROKE
+				    MID-VALUE — `Đ` on one line and `448` on the next, with the row at 102px.
+				    That is a defect the delta surfaced rather than caused: the column was
+				    always too narrow, and nothing had been wide enough to prove it.
+				    ⛔ `table-fixed` IS WHAT MAKES THE WIDTHS BIND. Without it a `<th>` width is
+				    a HINT the auto layout may overrule from cell content — which is exactly how
+				    Current ended up at 86 against a 118px request. With it the four literals
+				    hold and Argument becomes the `1fr`, which is the mockup's own topology.
+				    ⚠ AND THE VALUE CELLS TAKE `whitespace-nowrap` — belt to the braces. A Đ
+				    figure and its delta are ONE quantity; breaking them across lines is never
+				    the right degrade, so the cell is told not to, and the 118px track is what
+				    means it never has to. */}
 				<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
 					<tr>
-						<th className="px-2 pt-0 pb-2 text-center">Position</th>
+						<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 						<th className="px-2 pt-0 pb-2 text-center">Argument</th>
-						<th className="px-2 pt-0 pb-2 text-center">Staked</th>
-						<th className="px-2 pt-0 pb-2" />
-						<th className="px-2 pt-0 pb-2 text-center">Current</th>
+						<th className="w-[78px] px-2 pt-0 pb-2 text-center">Staked</th>
+						<th className="w-[16px] px-2 pt-0 pb-2" />
+						<th className="w-[118px] px-2 pt-0 pb-2 text-center">Current</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -433,7 +451,7 @@ function BookmarkRow({
 			    them on a removed row is a COMPILE error, not a judgement call. The
 			    cell renders nothing rather than a fabricated zero: the author's
 			    stake on a removed argument is not zero, it is unknown here. */}
-			<td className="p-2 text-center tabular-nums text-ink">
+			<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 				<span className="flex flex-col items-center">
 					{item.removed ? null : <>Đ {formatDharma(item.staked)}</>}
 				</span>
@@ -460,7 +478,7 @@ function BookmarkRow({
 			    ⚠ THE REMOVED VARIANT CARRIES NEITHER FIGURE, so it carries no delta:
 			    `staked`/`current` exist only on the non-removed arm, and a delta
 			    between two unknowns is not zero. */}
-			<td className="p-2 text-center tabular-nums text-ink">
+			<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 				<span className="flex flex-col items-center">
 					{item.removed ? null : (
 						<span className="inline-flex items-baseline gap-1.5">
