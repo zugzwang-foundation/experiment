@@ -1,5 +1,9 @@
 import Link from "next/link";
 
+import {
+	type BookmarkAffordance,
+	CardActions,
+} from "@/components/bookmarks/BookmarkToggle";
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import {
 	computeSplitBar,
@@ -16,6 +20,7 @@ import type {
 } from "@/server/profile/arguments";
 import type { ProfileUser } from "@/server/profile/resolve";
 
+import { ArgumentBody } from "./ArgumentBody";
 import { PROFILE_COPY } from "./copy";
 import type { ProfileSelection } from "./selection";
 
@@ -56,10 +61,25 @@ export function ArgumentList({
 	items,
 	owner,
 	author,
+	bookmarks = null,
 	selection = null,
 }: {
 	items: ProfileArgumentItem[];
 	owner: boolean;
+	/**
+	 * PROFILE REFINEMENT · R4 — the viewer's bookmark affordance for these
+	 * arguments, for the shipped `CardActions` cluster on each card head.
+	 *
+	 * ⚠ DEFAULTS TO `null` (= signed out), which is the honest default rather than a
+	 * convenient one: a call site that passes nothing genuinely knows nothing about
+	 * the viewer, and `null` makes the icon render its shipped DISABLED "sign in to
+	 * use" cell. That is what every render suite gets, and it is true of them.
+	 * ⛔ OPTIONAL, unlike `author` above, and the asymmetry is deliberate: omitting
+	 * `author` would silently drop a whole identity cluster, whereas omitting this
+	 * degrades one control to a state that already exists and is already correct for
+	 * an unknown viewer.
+	 */
+	bookmarks?: BookmarkAffordance;
 	/**
 	 * HTML-FINISH row 4 — the head cluster's avatar + pseudonym. Every argument
 	 * on this surface is authored by the PROFILE USER (that is what the list is),
@@ -148,7 +168,7 @@ export function ArgumentList({
 						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
 					</Card>
 				) : (
-					<ReplicaCard item={picked} author={author} />
+					<ReplicaCard item={picked} author={author} bookmarks={bookmarks} />
 				)}
 			</ArgumentsPanel>
 		);
@@ -173,7 +193,7 @@ export function ArgumentList({
 							data-testid={`argument-${item.id}`}
 							className="gap-2 p-3"
 						>
-							<PresentHead item={item} author={author} />
+							<PresentHead item={item} author={author} bookmarks={bookmarks} />
 							<Link
 								data-testid={`argument-title-${item.id}`}
 								href={`/m/${item.marketSlug}?post=${item.ordinal}`}
@@ -189,13 +209,20 @@ export function ArgumentList({
 						    already in this file — the "Replied to …" context below clamps
 						    with no `title`. The removed variant carries no `teaser` field
 						    at all, so a leak here is a COMPILE error (SC-1). */}
+							{/* ⚠⚠ PROFILE REFINEMENT · R4 — THE TEASER GAINS THE MOCKUP'S `+`.
+							    The clamped paragraph is unchanged (same testid, same classes);
+							    what is new is the control beside it that reveals the rest. The
+							    AM-1 note above bans a `title` attribute and that ban still
+							    holds — see `ArgumentBody` for why an explicit, labelled,
+							    keyboard-reachable control is a different object from the
+							    tooltip D13 ruled out, and for why it expands in place rather
+							    than opening the mockup's modal. */}
 							{item.teaser !== "" && (
-								<p
-									data-testid={`argument-teaser-${item.id}`}
-									className="line-clamp-2 text-xs text-n5"
-								>
-									{item.teaser}
-								</p>
+								<ArgumentBody
+									id={item.id}
+									teaser={item.teaser}
+									body={item.body}
+								/>
 							)}
 							{item.kind === "reply" && item.repliedToTitle !== null && (
 								<p
@@ -396,14 +423,27 @@ function RemovedHead({
  * (`:624-628`). Shared by the list card and item 7's replica — see `RemovedHead`
  * above for why sharing is a requirement rather than a tidy-up.
  *
- * ⛔ THE CARD-ACTIONS CLUSTER IS DATA-BLOCKED AND SHIPS NOTHING. `CardActions`
- * (BookmarkToggle.tsx:135) requires a `BookmarkAffordance`; `ProfileArgumentItem`
- * carries none, and the only reader that produces one — `loadViewerMarketContext`
- * — is MARKET-scoped while this list is cross-market. The three reachable
- * substitutes are all defects: `null` prints "sign in to use" to a signed-in
- * viewer; an empty `saved` set prints an UNSAVED icon on an argument the viewer
- * has saved; and both lie. `src/server/**` is out of bounds for this task, so
- * the cluster is RECORDED as data-blocked and NOT approximated.
+ * ⛔⛔ THE CARD-ACTIONS CLUSTER WAS RECORDED HERE AS DATA-BLOCKED. IT IS NOT, AND
+ * PROFILE REFINEMENT · R4 DISCHARGES IT. The note read: "`CardActions` requires a
+ * `BookmarkAffordance`; `ProfileArgumentItem` carries none, and the only reader
+ * that produces one — `loadViewerMarketContext` — is MARKET-scoped while this list
+ * is cross-market." Every clause of that is true. The conclusion was still wrong,
+ * because the search stopped at one producer: **`loadBookmarks` is the other, and
+ * it is viewer-scoped and CROSS-MARKET** — it is the loader `/bookmarks` itself
+ * runs, `(client, {viewerId}) => BookmarkItem[]`, with no market argument and an
+ * `id` on every variant. That is exactly the missing set.
+ *
+ * ⇒ AND THE `own` HALF IS EXACT HERE RATHER THAN APPROXIMATED, which is the part
+ * that makes this honest instead of merely possible. Every argument in this list is
+ * authored by the profile user (the page's own docblock states it), so own-ness is
+ * not a lookup at all: it is `viewer === profileUser`. On an OWNER's profile every
+ * card is their own argument and every icon is the shipped DISABLED "your own
+ * argument" cell — which is CORRECT by D-3 (a bookmark points at someone else's
+ * argument) and needs no bookmark read whatsoever. Only a signed-in VISITOR needs
+ * `saved`, and only then is the extra read issued. See the page for that split.
+ * ⛔ SO NONE OF THE THREE DEFECTIVE SUBSTITUTES IS TAKEN: `null` is passed only
+ * when the viewer really is signed out, and `saved` is only ever empty when it
+ * really is.
  *
  * ⚠ NO GAP IS INTRODUCED: `gap-2` is the class this row already carried AND the
  * mockup's `.rchead{gap:8px}` (`:321`) — the same number from both directions.
@@ -411,9 +451,11 @@ function RemovedHead({
 function PresentHead({
 	item,
 	author,
+	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
+	bookmarks: BookmarkAffordance;
 }) {
 	return (
 		<div className="flex flex-wrap items-center gap-2">
@@ -470,6 +512,17 @@ function PresentHead({
 					</span>
 				</>
 			)}
+			{/* ⚠⚠ PROFILE REFINEMENT · R4 — THE CLUSTER, no longer data-blocked (see
+			    the block above for the producer the earlier note missed). `ml-auto`
+			    inside `CardActions` pushes it to the row's end, which is the mockup's
+			    `.cardacts{margin-left:auto}` (`:330`).
+			    ⛔ THE SHIPPED CLUSTER, NOT A SECOND ONE — the same `CardActions` the
+			    debate post and reply cards render, so the bookmark's four states
+			    cannot drift between surfaces.
+			    ⚠ `download` IS OPT-IN AND PASSED HERE. It defaults to `false`, so
+			    `/m/[slug]`'s two call sites are untouched and D3's ruling still holds
+			    there; R4 names this surface, so this surface asks for it. */}
+			<CardActions commentId={item.id} bookmarks={bookmarks} download />
 		</div>
 	);
 }
@@ -493,10 +546,19 @@ function PresentHead({
  * border, no label. ⛔ Deliberately not a grey box: a permanent placeholder
  * states "an image is missing" on every argument, most of which have none.
  *
- * ⛔ NO `+` AFFORDANCE ON THE TITLE. The mockup's `.rtitle .plus` (`:346`, wired
- * at `:630`) opens the full-argument pop-up; A-6 struck its shape, R4 ruled
- * "Read more", and it is a duplicate of the known PD-0-01. The body is rendered
- * IN FULL here instead, which is what the pop-up existed to reach.
+ * ⛔ NO `+` AFFORDANCE ON THE REPLICA'S TITLE, AND THAT SURVIVES PROFILE
+ * REFINEMENT · R4 — for the reason this note already gave rather than for the old
+ * one. The mockup's `.rtitle .plus` (`:346`, wired at `:630`) opens the
+ * full-argument pop-up; A-6 struck its shape and it duplicated the known PD-0-01.
+ * ⇒ R4 asks for the `+` and it IS built — on the argument-LIST card, where the
+ * teaser is clamped to two lines and there is genuinely more to reveal (see
+ * `ArgumentBody`). It is NOT built here, because this card renders the body IN FULL
+ * already: a control whose whole job is to show the rest of the text would reveal
+ * nothing, and a control that does nothing visible is worse than an absent one.
+ * That is the same test R4 applies to the download affordance, one step removed.
+ * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — bookmark + disabled
+ * download, threaded through `bookmarks`. Only the `+` is surface-specific, because
+ * only the `+` depends on whether the text is clamped.
  *
  * ⚠ TITLE-THEN-WHOLE-BODY IS THE SHIPPED SHAPE, NOT A DUPLICATION BUG.
  * `deriveTitleTeaser` (`load-debate-view.ts:402-411`) takes the title FROM the
@@ -508,9 +570,18 @@ function PresentHead({
 function ReplicaCard({
 	item,
 	author,
+	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
+	/**
+	 * R4 — threaded through to the head cluster. ⚠ THE REPLICA GETS THE CLUSTER BUT
+	 * NOT THE `+`: it renders the body IN FULL already (see this component's own
+	 * note), so a control whose job is to reveal the rest of the text would reveal
+	 * nothing. A control that does nothing visible is the defect R4's own download
+	 * clause is careful about, one step removed.
+	 */
+	bookmarks: BookmarkAffordance;
 }) {
 	return (
 		<Card
@@ -520,7 +591,7 @@ function ReplicaCard({
 			// below take the leftover instead of the card growing past the panel.
 			className="min-h-0 flex-1 gap-2 p-3"
 		>
-			<PresentHead item={item} author={author} />
+			<PresentHead item={item} author={author} bookmarks={bookmarks} />
 			<Link
 				data-testid={`argument-replica-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}

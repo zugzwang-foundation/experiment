@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark } from "lucide-react";
+import { Bookmark, Download } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -163,7 +163,7 @@ export function BookmarkToggle({
  * `ArgProfile` byte-for-byte, and duplicated markup in two files is exactly how
  * that drifts.
  *
- * ⛔ THE DOWNLOAD TRIGGER IS REMOVED (POLISH.3 PR 2 row 7, `PD-3-15`; D3 RULED
+ * ⛔ THE DOWNLOAD TRIGGER WAS REMOVED (POLISH.3 PR 2 row 7, `PD-3-15`; D3 RULED
  * 2026-08-12, the same disposition as R1's two card controls). It was a THIRD
  * permanently-disabled control rendering on every post and every reply, and no
  * register row had named it — canon §10 item 2's "wire the icon or remove it"
@@ -171,13 +171,37 @@ export function BookmarkToggle({
  * shared control inherited the disabled state on a surface the rule never
  * named. Wiring the ADR-0025 export remains a separate task; when it lands it
  * arrives as an `<a href download>`, not as a disabled button.
+ *
+ * ⚠⚠ PROFILE REFINEMENT · R4 — IT COMES BACK, BUT ONLY WHERE IT IS ASKED FOR, AND
+ * THE D3 RULING ABOVE IS WHY IT IS OPT-IN RATHER THAN UNCONDITIONAL. D3's
+ * objection was precise and still stands: a permanently-disabled third control on
+ * every post and every reply of `/m/[slug]` is chrome nobody named. The founder has
+ * now named it — for the PROFILE's argument cards — and R4 says to render it
+ * disabled and say so, since a per-card export still does not exist (investigated
+ * at MARKET DETAIL R9; `m/[slug]/export` is market-level, ADR-0025).
+ * ⇒ SO THE PROP DEFAULTS TO `false` AND `/m/[slug]` PASSES NOTHING. Every existing
+ * call site — `ArgProfile`, `ReplyCard` — renders BYTE-IDENTICALLY, which is what
+ * keeps D3's ruling intact on the surface it was made about while satisfying R4 on
+ * the surface that asked. That is also acceptance 7's requirement: the shared
+ * component is what changes, and `/m/[slug]` must not.
+ * ⛔ DISABLED, NOT HIDDEN, AND NOT A ROUTE. R4 forbids building one, and a
+ * per-comment export would need a new server read besides. The control states that
+ * the affordance exists and is not yet reachable — the same posture, and the same
+ * shipped disabled render, as the two inert bookmark cells above.
  */
 export function CardActions({
 	commentId,
 	bookmarks,
+	download = false,
 }: {
 	commentId: string;
 	bookmarks: BookmarkAffordance;
+	/**
+	 * R4 — render the (permanently disabled) download affordance beside the
+	 * bookmark. ⛔ DEFAULT `false`: `/m/[slug]`'s two call sites pass nothing and
+	 * are unchanged, so D3's ruling still holds there.
+	 */
+	download?: boolean;
 }) {
 	return (
 		<div className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -198,6 +222,27 @@ export function CardActions({
 				commentId={commentId}
 				bookmarks={bookmarks}
 			/>
+			{/* R4 — the mockup's second `.cardacts` glyph (`:628`). It reuses the
+			    SHIPPED disabled render the two inert bookmark cells above use — same
+			    `variant`, same `size`, same `disabled` + `aria-disabled` pair — so the
+			    three inert states on this surface are one treatment rather than three
+			    lookalikes.
+			    ⛔ THE LABEL SAYS WHY IT CANNOT BE USED, which is the pattern those two
+			    cells established: "sign in to use" and "your own argument" each name
+			    their own remedy, and this one names the absence of an export. A bare
+			    `aria-label="Download"` on a control that can never fire would be a
+			    promise the surface cannot keep. */}
+			{download && (
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					disabled
+					aria-disabled="true"
+					aria-label="Download — no per-argument export exists yet"
+				>
+					<Download />
+				</Button>
+			)}
 		</div>
 	);
 }

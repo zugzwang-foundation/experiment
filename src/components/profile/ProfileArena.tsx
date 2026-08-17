@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
 import type { ProfilePositionsPayload } from "@/server/profile/owner-view";
 import type { ProfileUser } from "@/server/profile/resolve";
@@ -42,12 +43,20 @@ export function ProfileArena({
 	argumentItems,
 	owner,
 	author,
+	bookmarks = null,
 	initialMarketSlug,
 }: {
 	positions: ProfilePositionsPayload;
 	argumentItems: ProfileArgumentItem[];
 	owner: boolean;
 	author: ProfileUser;
+	/**
+	 * PROFILE REFINEMENT · R4 — the viewer's bookmark affordance, passed straight
+	 * through to `ArgumentList`. This holder adds nothing to it; it is here only
+	 * because the panels are its children. Defaults to `null` (signed out), the
+	 * same honest default `ArgumentList` documents.
+	 */
+	bookmarks?: BookmarkAffordance;
 	initialMarketSlug?: string;
 }): React.JSX.Element {
 	const [selection, setSelection] = useState<ProfileSelection | null>(null);
@@ -63,6 +72,7 @@ export function ProfileArena({
 				items={argumentItems}
 				owner={owner}
 				author={author}
+				bookmarks={bookmarks}
 				selection={selection}
 			/>
 		</>

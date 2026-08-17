@@ -194,9 +194,23 @@ type StruckRow = {
  * to `arrangement.test.tsx`'s `itemD` pins, which assert the rendered cell string
  * EXACTLY (`Đ 31(+Đ6)`, `Đ 3,226(−Đ11,034)`) including sign and grouping.
  *
- * ⛔ NOTHING ELSE IN THIS REGISTRY MOVED. Row 11 and every A/B/C/D row below are
- * untouched: they are struck on SPEC.1 §23 READINGS, not on a missing amendment,
- * and no ruling this round touched them.
+ * ⚠⚠ AND A-6 HAS LEFT TOO, AT PROFILE REFINEMENT · R4 — the `+` icon button as
+ * the full-argument affordance. It was STRUCK "as to the control's SHAPE"
+ * (PD-0-01: `<Plus /> Full` where CD-A ratified `Read more`), and TWO rulings have
+ * since passed over it. The founder reversed the shape on `/m/[slug]` on
+ * 2026-08-16 — `PostCard.tsx:205-212` ships a `+` glyph with
+ * `aria-label="Show more"`, byte-carried from the mockup — and R4 now asks for the
+ * same control on the profile's argument cards. A registry entry asserting the
+ * ABSENCE of a control that ships on two surfaces would fail as soon as it was
+ * built, which is what it just did.
+ * ⇒ DELETED, NOT DOCTORED. Its positive coverage moved to where the control lives:
+ * `panel-filter.test.tsx` asserts the `+` is absent from the REPLICA card (where
+ * the body is already full and it would reveal nothing) while the head cluster is
+ * present — so the one place it must NOT appear is still guarded.
+ *
+ * ⛔ NOTHING ELSE IN THIS REGISTRY MOVED. Row 11's own entry and every A/B/C/D row
+ * below are untouched: they are struck on SPEC.1 §23 READINGS, not on a missing
+ * amendment or a superseded shape ruling, and no ruling this round touched them.
  */
 const STRUCK: StruckRow[] = [
 	{
@@ -249,12 +263,6 @@ const STRUCK: StruckRow[] = [
 		// on it and be silenced by weakening the rule.
 		detect: (h) => /Đ[^<]*<[^>]*>\s*→\s*<\/[^>]*>\s*Đ/.test(h),
 		control: 'Đ 240 <span class="arrow">→</span> Đ 310',
-	},
-	{
-		id: "A-6 — a `+` icon button as the full-argument affordance",
-		why: "STRUCK as to the control's SHAPE. PD-0-01: `<Plus /> Full` where CD-A ratified 'Read more'. The affordance itself is row 11, which is HELD.",
-		detect: (h) => /<button[^>]*>\s*\+\s*<\/button>/.test(h),
-		control: '<button class="plus">+</button>',
 	},
 	{
 		id: "A-7 — removing the 'Replied to …' line from the positions cell",

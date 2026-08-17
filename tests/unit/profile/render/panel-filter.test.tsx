@@ -273,14 +273,29 @@ describe("item 7 — the replica card's parts", () => {
 
 	it("replica::the-title-carries-NO-`+`-affordance", () => {
 		// The mockup's `.rtitle .plus` (`:346`, wired `:630`) opens the
-		// full-argument pop-up. A-6 struck its shape, R4 ruled "Read more", and it
-		// duplicates the known PD-0-01 — and the body is rendered in full here,
-		// which is what the pop-up existed to reach.
+		// full-argument pop-up — and the body is rendered in full HERE, which is what
+		// the pop-up existed to reach, so there is nothing for it to reveal.
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R4 — THE CLAIM IS UNCHANGED, THE MEASUREMENT IS
+		// NARROWED. This asserted the replica card held NO buttons at all, which was
+		// a true but incidental way to say "no `+`": the card had no controls of any
+		// kind. R4 gives it the shipped head cluster (bookmark + disabled download),
+		// so an all-buttons assertion now fails for a reason that has nothing to do
+		// with the `+`. It reads the `+` specifically instead.
+		// ⛔ AND THE `+` IS STILL DELIBERATELY ABSENT HERE, not merely unbuilt: it IS
+		// built, on the argument-LIST card where the teaser is clamped and there is
+		// something to reveal. On this card it would reveal nothing.
 		renderPost();
 		const card = screen.getByTestId(`argument-replica-${C_POST}`);
-		expect(
-			[...card.querySelectorAll("button")].map((b) => b.textContent),
-		).toEqual([]);
+		const labels = [...card.querySelectorAll("button")].map(
+			(b) => `${b.textContent ?? ""}|${b.getAttribute("aria-label") ?? ""}`,
+		);
+		expect(labels.some((l) => l.startsWith("+"))).toBe(false);
+		expect(labels.some((l) => l.includes("Show more"))).toBe(false);
+		// …and the cluster IS here, so the narrowing did not quietly drop coverage of
+		// what the card should carry.
+		expect(labels.some((l) => l.includes("Bookmark"))).toBe(true);
+		expect(labels.some((l) => l.includes("Download"))).toBe(true);
 	});
 });
 
