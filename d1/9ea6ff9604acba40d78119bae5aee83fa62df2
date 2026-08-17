@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+A Second Number Appears
+
+The header gains a second figure beside the balance: what everything you currently hold is worth. Both have to come from the same source, because two numbers assembled from different reads can disagree with each other between one page load and the next. That requirement is written into the tests before any of the code that satisfies it exists.
