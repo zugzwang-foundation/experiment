@@ -1,0 +1,21 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Price Of Yes Is How Much No
+
+The price of YES doesn't measure how much anyone wants YES. It measures how much NO is left.
+
+Two pools. Buy YES and you take some out, so what remains gets scarcer and dearer. Price is scarcity, and scarcity is a subtraction. There is no opinion anywhere in the arithmetic.
+
+Two details worth having.
+
+Every fraction rounds against you. Shares you receive, money you're paid — floored, always down. The difference is a fraction of a trillionth and it stays in the pool. Round in the user's favour enough times and the pool owes more than it holds. This direction can't do that.
+
+And the maths library is pinned to one exact build, with no room to move. Not "10.6 or later" — 10.6.0, that one. Because a routine upgrade could quietly change how a square root rounds, and every price in the system would shift underneath markets nobody touched.
+
+It's the engine's first outside dependency. It gets no latitude at all.
