@@ -193,9 +193,24 @@ function ReplicaPanel({
 				data-testid="bookmarks-replica-panel-head"
 				className="flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
+				{/* ⚠⚠ PROFILE-FULL — THE RIGHT HEAD IS `.chttl.mkt`, A DIFFERENT REGISTER
+				    FROM THE LEFT ONE. The mockup gives this slot `font-size:13px;
+				    font-weight:700; letter-spacing:.01em` with `text-transform:none`
+				    (`:229-231`) — deliberately NOT the left head's uppercase overline, because
+				    what lands here is a market QUESTION: a sentence, and setting a sentence in
+				    an 11px tracked overline would make it unreadable. Two heads, two
+				    registers, and that asymmetry is the mockup's point rather than an
+				    inconsistency to tidy away.
+				    ⛔ THE WRAP STAYS UNCLAMPED. The mockup 2-line-clamps this (`:231`); a
+				    clamped market question is one the reader cannot finish, so `min-w-0` on a
+				    `flex-wrap` bar is kept instead — the note above this records that call and
+				    it is unchanged.
+				    ⚠ WHAT THIS SLOT SHOWS IS ALREADY THE MOCKUP'S: the selected row's market
+				    title (`selection.marketTitle`, whose own type comment names mockup
+				    `:650`). Only its TYPE was still the left head's. */}
 				<span
 					data-testid="bookmarks-replica-panel-title"
-					className="min-w-0 text-xs font-medium text-ink"
+					className="min-w-0 text-[13px] leading-[1.3] font-bold tracking-[0.01em] text-ink"
 				>
 					{title}
 				</span>
