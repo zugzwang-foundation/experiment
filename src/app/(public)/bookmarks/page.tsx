@@ -152,6 +152,20 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    broken.
 			    ⛔ NOTHING IN THE BAND IS BLOCKED. Every region is viewer-keyed and
 			    every loader exists; no region renders empty and none is flagged. */}
+			{/* ⚠⚠ D-1 · 256 IS THE RULED-UNREACHABLE BAND, AND THIS SURFACE INHERITS
+			    IT FOR THE SAME MEASURED REASON. The mockup's `.headzone` is
+			    `flex:0 0 188px` (`:189`); a 188px band leaves the identity card 172px
+			    of content box, and it needs 240 at 1024–1280 (the tile LABEL wraps to
+			    a second line at every tile width ≤158px) and 200 at 1440.
+			    ⚠ THAT ARITHMETIC IS THIS SURFACE'S TOO, not a borrowed one: this
+			    route renders the SAME `IdentityCard` with the SAME six tiles, so the
+			    same wrap happens at the same widths. Measured here signed-in at a
+			    pinned 1440×777: band 256, identity card 684×256, pfp 56×56 — the same
+			    boxes Profile reports.
+			    ⛔ Do not "fix" this to 188: forcing it CLIPS, and clipping to hit a
+			    number is a failure (§1). The full table and the ruling live on
+			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block; the PFP half is
+			    on `IdentityCard.tsx`. */}
 			<div
 				data-testid="bookmarks-headzone"
 				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
