@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Committed Before Being Read
+
+The auth surfaces rebuilt in one continuous run of eight commits, the first of which is the plan itself — committed verbatim, checksummed against the supplied file, proven identical rather than eyeballed. The reviewers who gate the rest of the run are handed that document and read it out of the repository. If it is not there, they read nothing.
