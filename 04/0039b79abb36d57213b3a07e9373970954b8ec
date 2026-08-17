@@ -1,0 +1,27 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Nobody Wrote It Down
+
+In June the project brought in a different model to do the work. Three weeks later it lost access to it and went back.
+
+In July it tried again — and this time wrote down the date it would stop, before starting. Not "we'll see how it goes." An expiry, agreed up front, logged as an obligation somebody would later have to discharge.
+
+| | |
+|---|---|
+| 16 July | window opens, three days |
+| 17 July | the log still says three days |
+| 18 July | closed |
+
+Nothing anywhere says why.
+
+Not the commit. Not the contract file, the maintenance log, the rulings ledger, or the session log written that same day. Five records note it ended early. None says what ended it.
+
+An explanation was sitting one file away — a sentence about the June outage that would have fitted beautifully. The write-up on the day marked it as June's and left it there, rather than refresh it into a claim about July.
+
+The reason was available. It just wasn't the right one.
