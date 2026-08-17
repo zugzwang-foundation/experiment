@@ -27,9 +27,11 @@ export { BOOKMARKS_EMPTY_COPY } from "@/components/bookmarks/BookmarksTable";
 /**
  * The /bookmarks surface (ADR-0032 D-5 / D-6; plan §3.3), composed into the
  * ADR-0023 `(public)/` shell. The session user's saved pointers at OTHER
- * authors' arguments, rendered in FORCED-VISITOR mode: list titled "Bookmarks,"
- * a "Your bookmarks" chip, NO Sell mount ever (every item is someone else's
- * content by D-3), each card's bookmark icon ACTIVE (un-bookmark).
+ * authors' arguments, rendered in FORCED-VISITOR mode: list titled "Bookmarks",
+ * NO Sell mount ever (every item is someone else's content by D-3), each card's
+ * bookmark icon ACTIVE (un-bookmark). ⚠ The `"Your bookmarks"` chip this
+ * sentence used to name is DELETED (PROFILE OVERLAP R3) — the head title, the
+ * route and the filled bookmark control in the identity band already say it.
  *
  * AUTH-GATED: there is no anonymous bookmark set, so an anonymous visitor is
  * redirected to /sign-in. `viewerId` is ALWAYS `session.user.id` — never a
@@ -138,18 +140,23 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    ⚠ `owner` IS TRUE AND THAT IS NOT A GUESS: `/bookmarks` is auth-gated
 			    and `viewerId` is always `session.user.id`, so the viewer IS the user
 			    whose band this is. The visitor arm cannot occur on this route.
-			    ⚠ ROUND 5 — `showViewChip={false}`. Founder-ruled: this surface shows
+			    ⚠ ROUND 5 — `showViewChip={false}`. Founder-ruled: this surface showed
 			    ONE chip, the panel head's "Your bookmarks", which is what the
 			    mockup's bookmark mode does (`:768`). Without it the identity card's
 			    own chip read "Viewing as owner" beside it — two chips describing the
-			    same view in different words. ⛔ The suppression is SCOPED to this
+			    same view in different words. ⚠ BOTH ARE NOW GONE (R5 removed the
+			    identity chip, PROFILE OVERLAP R3 the head chip), so this paragraph is
+			    a record of how the count reached zero rather than a live rule.
+			    ⛔ The suppression was SCOPED to this
 			    call site; `IdentityCard`'s default is unchanged, so Profile renders
 			    byte-identically.
-			    ⚠ ONE WART, NAMED NOT HIDDEN: `IdentityCard`'s owner arm renders a
-			    Bookmark icon linking to `/bookmarks`, so on THIS route it is a
-			    self-link. `src/components/profile/**` is read-only here, so it is
-			    reported rather than special-cased — and a self-link is inert, not
-			    broken.
+			    ⚠ THE ONE WART NAMED HERE AT ROUND 3 IS FIXED, NOT STILL REPORTED. It
+			    read: "`IdentityCard`'s owner arm renders a Bookmark icon linking to
+			    `/bookmarks`, so on THIS route it is a self-link … reported rather than
+			    special-cased". PROFILE REFINEMENT · R2 makes that control the two-state
+			    MODE SWITCH: on this route it renders FILLED and points back at the
+			    viewer's own profile. The self-link is gone because the control now has a
+			    second state to be in.
 			    ⛔ NOTHING IN THE BAND IS BLOCKED. Every region is viewer-keyed and
 			    every loader exists; no region renders empty and none is flagged. */}
 			{/* ⚠⚠ D-1 · 256 IS THE RULED-UNREACHABLE BAND, AND THIS SURFACE INHERITS
@@ -166,9 +173,20 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    number is a failure (§1). The full table and the ruling live on
 			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block; the PFP half is
 			    on `IdentityCard.tsx`. */}
+			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS ANSWERED AND THIS SURFACE INHERITS THE
+			    ANSWER, exactly as it inherited the refusal. The band is the mockup's
+			    188, the row TRACK is declared (a single implicit row is content-sized
+			    and the graph's `viewBox` SVG floored it at 256 — see Profile's block
+			    for the measurement), and the two gaps take the mockup's 16px.
+			    ⚠ THE ARITHMETIC IS THIS SURFACE'S OWN, not a borrowed one: this route
+			    renders the SAME `IdentityCard` with the SAME six tiles, so the same
+			    fit holds at the same widths. Measured signed-in at a pinned 1440×777.
+			    ⛔ THE PAIR MOVES TOGETHER. §3 says the two surfaces must never be
+			    sized one after the other; moving only one would re-open exactly that
+			    drift. */}
 			<div
 				data-testid="bookmarks-headzone"
-				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+				className="grid gap-4 lg:h-[188px] lg:grid-cols-2 lg:grid-rows-[188px]"
 			>
 				{/* ⚠ `resolveProfileUser` returns `ProfileUser | null` and the null is
 				    kept rather than asserted away. It cannot occur for an onboarded
@@ -177,14 +195,42 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				    the identity genuinely could not be resolved, and the honest render
 				    for that is NOTHING, not a fabricated card. The empty cell holds
 				    the grid so the graph stays in its own column. */}
+				{/* ⚠ PROFILE-FULL — `showViewChip` IS RETIRED, and this call site is why
+				    the prop existed. The chip no longer lives in the identity block on
+				    EITHER surface: it was a head control in the mockup (`.viewchip`,
+				    `:425`) and this route rendered its own twin in the panel head.
+				    ⚠ AND AT PROFILE OVERLAP R3 THAT TWIN IS DELETED TOO, so there is no
+				    view chip on this surface at all. The suppression has nothing left to
+				    suppress — there is no second chip to collide with,
+				    and Profile now carries its chip in the same place.
+				    ⛔ THE COMMENT SITS ABOVE THE TERNARY, not inside its branch. A JSX
+				    comment placed inside `) : ( … )` is a second child of a slot that
+				    takes exactly one expression — a parse error, not a style nit.
+				    ⚠ AND IT CANNOT QUOTE ITS OWN DELIMITER: writing the closing
+				    comment token inline ends the block early and spills the remaining
+				    prose into the tree as text. Same failure, one line further on. */}
 				{viewer === null ? (
 					<div data-testid="bookmarks-identity-unresolved" />
 				) : (
+					/* ⚠⚠ PROFILE REFINEMENT · R2 — THIS ROUTE IS THE MOCKUP'S BOOKMARK
+					   MODE, and the toggle is told so. The band's bookmark control renders
+					   FILLED here and points back at the profile, which is the second half
+					   of the two-state switch the profile's own control starts.
+					   ⛔ `profileHref` COMES FROM THE RESOLVED VIEWER, never from a param:
+					   this route has no `[pseudonym]` segment and must not grow one, and
+					   `viewer` is `resolveProfileUser(session.pseudonym)` — the same row
+					   the band is already drawing. So the way back is the viewer's OWN
+					   profile by construction, and it cannot point at anyone else's.
+					   ⚠ THE ONE WART NAMED AT ROUND 3 IS NOW FIXED RATHER THAN REPORTED:
+					   that note said the owner arm's bookmark icon "is a self-link on THIS
+					   route, so it is reported rather than special-cased". It is no longer
+					   a self-link — it is the way out. */
 					<IdentityCard
 						user={viewer}
 						owner={true}
 						tiles={tiles}
-						showViewChip={false}
+						bookmarksActive
+						profileHref={`/u/${encodeURIComponent(viewer.pseudonym)}`}
 					/>
 				)}
 				<ProfileGraph series={graph} />
@@ -198,9 +244,11 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    selection and returns a FRAGMENT, so both panels stay DIRECT children
 			    of this grid and remain its two columns — and this band keeps its
 			    className here, where the C7 height-chain guard reads it. */}
+			{/* ⚠ PROFILE-FULL — `gap-4`, the mockup's `.arena{gap:16px}` (`:221`),
+			    byte-carried from Profile's arena band in the same commit. */}
 			<div
 				data-testid="bookmarks-arena"
-				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+				className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2"
 			>
 				<BookmarksArena items={items} />
 			</div>

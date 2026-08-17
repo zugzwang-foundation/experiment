@@ -21,7 +21,8 @@ import { describe, expect, it } from "vitest";
  *                   (owned by `(public)/layout.tsx`, out of scope here)
  *   PageContainer   flex-1 min-h-0 flex-col                   ← below `lg`
  *                   + lg:h-[calc(100vh-60px-2px)] lg:flex-none ← THE BOUND
- *   headzone        lg:h-[256px], no flex-1     ← declared, does NOT grow
+ *   headzone        lg:h-[188px] + lg:grid-rows-[188px]
+ *                                               ← declared, does NOT grow
  *   arena band      flex-1 min-h-0              ← takes ALL the leftover
  *   both panels     min-h-0 flex-col            ← may be shorter than content
  *   both bodies     flex-1 min-h-0 overflow-y-auto ← where the scroll happens
@@ -225,11 +226,25 @@ describe("bookmarks height chain — every link, asserted by name", () => {
 				"They must be the same figure or main either grows or is starved.",
 		).toContain("min-h-[calc(100vh-60px-2px)]");
 		// The headzone's declared height — the other half of what makes the arena
-		// definite. ⚠ 256 is Profile's DERIVED worst case, and this surface renders
-		// the SAME IdentityCard with the SAME six tiles.
+		// definite. ⚠⚠ PROFILE-FULL — THE FIGURE IS THE MOCKUP'S 188 NOW, and this
+		// surface renders the SAME IdentityCard with the SAME six tiles, so the same
+		// fit holds at the same widths. The PREDICATE is unchanged: an `lg:`-scoped
+		// exact-value pin on the same node. 256 was derived under a fence that
+		// excluded the identity block's frame and its type sizes; with the `<Card>`
+		// padding gone and the mockup's tile density taken, the column needs 174 at
+		// 1440 inside a 188 box.
 		expect(classesOf(page, PAGE, "bookmarks-headzone")).toContain(
-			"lg:h-[256px]",
+			"lg:h-[188px]",
 		);
+		// ⛔ AND THE ROW TRACK. A single implicit grid row is content-sized, and the
+		// graph's `<svg viewBox … preserveAspectRatio="none">` floors it: measured
+		// with the height alone, band 188 but row 256 and PFP 256. Declaring the
+		// track makes it definite. Profile's guard pins the same pair.
+		expect(
+			classesOf(page, PAGE, "bookmarks-headzone"),
+			"the band declares a height but no ROW TRACK, so its implicit row is " +
+				"still content-sized and the graph's intrinsic ratio floors it.",
+		).toContain("lg:grid-rows-[188px]");
 	});
 
 	it("bookmarks-height-chain::no-UNPREFIXED-height-so-the-stacked-layout-still-grows", () => {

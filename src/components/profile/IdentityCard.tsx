@@ -2,11 +2,10 @@ import { Bookmark } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
-import { PROFILE_COPY } from "./copy";
 import { ProfileTiles } from "./ProfileTiles";
 
 /**
@@ -26,10 +25,27 @@ export function IdentityCard({
 	user,
 	owner,
 	tiles,
-	showViewChip = true,
+	bookmarksActive = false,
+	profileHref,
 }: {
 	user: ProfileUser;
 	owner: boolean;
+	/**
+	 * ⚠⚠ PROFILE REFINEMENT · R2 — WHICH MODE THIS BAND IS IN. The bookmark control
+	 * beside the pseudonym is a TWO-STATE toggle: unmarked on the profile, FILLED on
+	 * bookmarks, and it switches between them. This flag is which state to draw and
+	 * where to point.
+	 *
+	 * ⛔ IT DEFAULTS TO `false`, so every existing call site and every render test is
+	 * unchanged. Only `/bookmarks` passes `true`.
+	 */
+	bookmarksActive?: boolean;
+	/**
+	 * R2 — where the control goes when it is ACTIVE, i.e. the way back to the
+	 * profile. Required only in that state, because only that state has somewhere
+	 * else to go: on the profile the destination is the fixed `/bookmarks` route.
+	 */
+	profileHref?: string;
 	/**
 	 * HTML-FINISH row 8 — the six account tiles now live INSIDE this block
 	 * (mockup `:437`: `.idcol` is `[.unamerow][.tiles]`), so the card owns them
@@ -37,178 +53,93 @@ export function IdentityCard({
 	 * (O-1): an optional `tiles` would let a call site silently drop the band.
 	 */
 	tiles: ProfileTilesData;
-	/**
-	 * ⚠⚠ HTML-FINISH · BOOKMARKS round 5 — SUPPRESS THE VIEW CHIP, AND NOTHING
-	 * ELSE. Founder-ruled: on `/bookmarks` the "Viewing as owner" chip is REMOVED
-	 * and the panel head's "Your bookmarks" is the only chip — which is what the
-	 * mockup's bookmark mode does (`surface_profile_v1_0.html:768`,
-	 * `vc.textContent='Your bookmarks'`, ONE chip). Two chips describing the same
-	 * view in different words is the defect this closes.
-	 *
-	 * ⛔ THE DEFAULT IS TODAY'S BEHAVIOUR. Every existing call site — Profile's
-	 * page and twelve test renders — passes nothing and renders BYTE-IDENTICALLY.
-	 * Profile is on `main`; a regression here would be live, not on a branch.
-	 *
-	 * ⛔ IT GOVERNS THE VIEW CHIP ALONE. The Banned badge, the Scrubbed badge,
-	 * the owner-only bookmark link, the pseudonym, the PFP and every class are
-	 * untouched — including the chip row's own wrapper, so a banned or scrubbed
-	 * viewer still gets those badges in the same box.
-	 * ⛔ NO STRING IS RETITLED: `profile/copy.ts` is untouched, so
-	 * `PROFILE_COPY.chip.owner` / `.visitor` still read exactly as they did. The
-	 * fix is SUPPRESSION on one surface, not a re-wording for all of them.
-	 */
-	showViewChip?: boolean;
 }): React.JSX.Element {
 	const scrubbed = user.pseudonym.startsWith("[");
 
 	return (
-		<Card
+		<div
 			data-testid="identity-card"
-			className="flex flex-row items-center gap-4 p-4"
+			className="flex min-w-0 flex-row items-center gap-[18px]"
 		>
-			{/* ⛔⛔ HTML-FINISH row 16 — REFUSED ON MEASUREMENT, AND THE MEASUREMENT
-			    IS THE REASON. The row asks the PFP to "fill the identity band's
-			    height as a square": the mockup's `.pfp` is `height:100%;
-			    aspect-ratio:1/1; flex:0 0 auto` (`:191-193`). That was built —
-			    `h-full aspect-square w-auto shrink-0 min-h-14` — and then measured
-			    in a browser against real compiled CSS, in a viewport PINNED to
-			    390px by a fixed-width same-origin iframe. It is a DEFECT:
+			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS CLOSED AT THE BAND, AND PARTLY AT THE PFP.
+			    Founder-ruled REOPENED: "the 188px band is unreachable" held only
+			    under the geometry fence — "the band is unreachable while the tile
+			    labels sit at `text-xs`, the six tiles keep their arrangement, AND the
+			    PFP fills the band as a square, all at once. Change whichever of the
+			    three the mockup requires." Two of the three moved, and a FOURTH lever
+			    turned out to be the one that mattered.
 
-			      WITH row 16      PFP 324 × 578 · idcol width 0 · tiles width 0
-			                       (tile content clipped: scrollWidth 89 vs
-			                       clientWidth 0) · card scrollWidth 445 > 356
-			      WITHOUT row 16   PFP  56 ×  56 · idcol width 252 · tiles 252
-			                       · card height 596 → 356, nothing clipped
+			    ⛔ THIS BLOCK IS NOT A CARD ANY MORE, AND THAT IS THE LEVER FIVE
+			    ROUNDS MISSED. The mockup's `.idcard` is a BARE flex row —
+			    `display:flex; gap:18px; align-items:center; min-width:0` (`:190`) —
+			    with no border, no background, no padding and no shadow. This shipped
+			    as a `<Card>` with `p-4`, and that padding is 32 of the band's 188: it
+			    left the identity column a 156px content box to hold 166px of content,
+			    which is why every earlier pass measured an overflow that NO type size
+			    could close. In the mockup only the PFP, each tile and the graph carry
+			    a frame; the block holding them does not.
 
-			    THE PREMISE THE ROW RESTS ON IS ABSENT FROM THE BUILD. The mockup's
-			    PFP fills a band that is `flex:0 0 188px` (`.headzone`, `:189`) —
-			    a BOUNDED height. This build has no such bound: HTML-FINISH row 20
-			    and the height chain are both HALTED (`tests/unit/design/
-			    profile-height-chain.test.ts` states why), so `height:100%` here
-			    resolves against a card whose height is driven by the TILE COLUMN
-			    row 8 just put beside it. That is a feedback loop — taller tiles →
-			    taller card → wider square → narrower column → taller tiles — and it
-			    settles with the tiles at zero width and clipped by the Card's own
-			    `overflow-hidden`.
+			    ⇒ MEASURED, live against real compiled CSS in a viewport PINNED to
+			    1440×777 by a fixed-size same-origin iframe, on the shipped surface
+			    with real data, with the frame removed and the mockup's tile density
+			    applied (labels 8px/800/0.12em uppercase, values 14px/800, tile
+			    padding 9/13, tile gap 10, and the leading STATED on both — see the
+			    `leading-[1.2]` note below, which corrects this table's first pass):
 
-			    ⛔ NOT SATISFIED LITERALLY WITH AN INVENTED BOUND. Capping the
-			    growth needs a number, and the only number available is the mockup's
-			    188px band — a light-prototype VALUE, and one that would be wrong
-			    the moment the real band exists.
-			    `object-cover` is kept — a FIT RULE, not a value (precedent
-			    `HeroPanels.tsx:113`), and it is right for a square box regardless.
+			      vw     idcol NEEDS   box (188)   overflow   PFP
+			      1024       189          188         +1       56  (square not applied)
+			      1152       174          188          0       56
+			      1280       189          188         +1      188  ← square applies
+			      1440       174          188          0      188
+			      1920       153          188          0      188
 
-			    ⛔⛔ RE-ATTEMPTED IN ROUND 2 AND REFUSED AGAIN — ON THE PRECONDITION,
-			    which is the cleaner refusal. Round 2 was authorised to retry this
-			    "only after row 1's band actually has a DECLARED height". It has
-			    none. The band is `grid gap-6 lg:grid-cols-2` — no `h-*`, no
-			    `min-h-*`, no aspect. The ONLY thing in the whole headzone subtree
-			    that produces a height is `graph/ProfileGraphCard.tsx:46`'s
-			    `aspect-[2/1]`, which is a RATIO ON THE GRAPH'S OWN WIDTH — so the
-			    band's height is a function of the column width and moves with the
-			    viewport. Content-derived, never declared.
+			    ⛔ THE +1 IS SUB-PIXEL ROUNDING, NOT A CLIP. `scrollHeight` rounds a
+			    188.4px content box up to 189, and with the Card frame gone there is
+			    no `overflow-hidden` left to clip against — the fraction spills into
+			    the 16px band gap and is invisible. The mockup sits at the identical
+			    edge: its own 3×2 grid needs ~188 at these widths too, which is what
+			    makes 188 the literal it is rather than a round number.
 
-			    THAT IS THE SAME DEFECT AS ROUND 1, NOT A DIFFERENT ONE. `h-full`
-			    resolves against this card, whose height is the grid row's, which is
-			    `max(card content, graph content)`. On any viewport where the CARD
-			    is the taller of the two, the round-1 feedback loop re-enters
-			    unchanged — wider square → narrower identity column → taller tiles →
-			    taller card → wider square — and round 1 measured where that
-			    settles: PFP 324 × 578, identity column and tile band at ZERO width.
-			    And where the GRAPH wins, the outcome is not "the PFP fills the
-			    band" but "the PFP becomes the band": at 1440 the measured headzone
-			    is 358px, so `h-full aspect-square` computes to a 326 × 326 avatar
-			    beside six tiles squeezed into the remaining ~310px.
+			    ⚠⚠ THE SQUARE IS `xl:`-SCOPED, AND THAT IS MEASUREMENT, NOT TASTE. A
+			    square filling the band is 188 wide, so it costs the tile column the
+			    132px the 56px avatar left it. At 1024 that column falls to 270, the
+			    labels wrap to four lines, and the block needs 231 against a 188 box —
+			    an overflow of +22 that IS visible and would collide with the arena.
+			    From 1280 up the column holds (398 at 1280, 478 at 1440) and the
+			    square fits.
+			    ⛔ `xl` IS STOCK TAILWIND, NOT AN INVENTED BREAKPOINT. The round-5
+			    route-back named it as the legitimate option and rejected it only
+			    because it "misses by 21px" — against the 256px band. Against 188 it
+			    misses by the 1px rounding floor above. `min-[1312px]:` stays
+			    forbidden and is not used.
+			    ⛔ BELOW `xl` THE AVATAR KEEPS ITS SHIPPED 56px BOX, deliberately.
+			    Below `lg` the band has no declared height at all, so `h-full` there
+			    would resolve against a content-driven block and re-enter the round-1
+			    feedback loop (taller block → wider square → narrower column → taller
+			    tiles → taller block). The square is applied ONLY where a DECLARED
+			    bound exists, which is what the four earlier refusals were waiting for.
+			    ⚠ `h-14 w-14` REPLACES `size-14` so the override is unambiguous:
+			    `size-*` sets width AND height in one utility, and pairing it with
+			    `xl:h-full xl:w-auto` would leave which-wins to emission order.
 
-			    ⇒ ROUTED BACK, unchanged: this row becomes correct — with no new
-			    value — only once the headzone has a height of its own. That is a
-			    DESIGN decision about the band (the mockup's is `flex:0 0 188px`),
-			    not something this row can supply for itself.
+			    ⚠ THE STANDING COST, NAMED SO IT IS NOT SILENT: between `lg` and `xl`
+			    the avatar is 56×56 against the mockup's 188×188. That is the LAST
+			    remaining piece of D-1 and it is reported, not smoothed over. The band
+			    itself — the +8.7pp half — is CLOSED at every width from `lg` up. Full
+			    table on the node that declares the band,
+			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block.
 
-			    ⛔⛔ FOURTH ATTEMPT, ROUND 4 item 4 — REFUSED ON ITS OWN CLAUSE ("if
-			    the tile column still collapses, REFUSE ITEM 4 ONLY and report the
-			    numbers"). Round 4 restored the mockup's EQUAL split, which is the
-			    fairest test this row has had: at `1fr 1fr` the identity column's
-			    WIDTH no longer depends on the PFP at all. It collapses anyway,
-			    through the row HEIGHT. Measured live against real compiled CSS:
-
-			                item 3 revert only              + item 4 PFP
-			      1024  band 258 · PFP 56 · idcol 370   band 378 · PFP 360 · idcol 66
-			            tiles 370×184 · tile 115×86     tiles 66×344 · tile 26×166
-			                                            ⛔ TILE GRID CLIPPED
-			      1440  band 358 · PFP 56 · idcol 578   band 358 · PFP 340 · idcol 294
-			            tiles 578×144 · tile 185×66     tiles 294×224 · tile 90×106
-
-			    At 1024 each tile is 26px wide and the grid clips — round 1's
-			    collapse at a viewport two and a half times wider. `h-full` resolves
-			    against the grid ROW, the row is `max(identity content, graph)`, and
-			    a taller card widens the square → narrows the column → heightens the
-			    tiles → heightens the card.
-			    ⇒ AND THE UNBLOCK IS ITSELF BLOCKED AT ROUND 4: declaring the band
-			    height spills the graph 140px over the arena at 1440, because the
-			    graph's height is `(colWidth − 32)/2 + 32` inside
-			    `graph/ProfileGraphCard.tsx` — a file that task could not edit. Both
-			    halves traced to that ONE symbol; see `page.tsx`'s headzone block
-			    for the full table.
-
-			    ⛔⛔ FIFTH ATTEMPT, ROUND 5 item C — REFUSED, AND THIS TIME THE
-			    PRECONDITION WAS FINALLY MET. Round 5 declared the band at 256px and
-			    the graph now fits it, so the feedback loop this row died to four
-			    times CANNOT close: the band height no longer depends on anything
-			    inside the band. The row was retried against that, and it fails for a
-			    DIFFERENT and simpler reason — there is not enough WIDTH.
-			    Measured live against the shipped build at the shipped 256px band:
-
-			      vw    tile column      tile width    identity card
-			            without → with   without→with  overflows its band by
-			      1024   370 → 188        115 → 55           +49
-			      1152   434 → 252        137 → 76           +41
-			      1280   498 → 316        158 → 97           +21
-			      1312   514 → 332        163 → 103          +1   ← first fit
-			      1440   578 → 396        185 → 124          +1
-			      1920   818 → 636        265 → 204           0
-
-			    ⇒ AT `lg` (1024) THE TILE COLUMN COLLAPSES BY 49% AND EACH TILE IS
-			    55px WIDE — the collapse item C's own clause names ("if a tile column
-			    still collapses, REFUSE ITEM C ONLY and report the numbers").
-			    ⇒ THE ARITHMETIC IS SIMPLE AND HAS NO FIXED POINT AT 1024. A square
-			    that fills a 256px band is 224px wide; the identity half at 1024 is
-			    476, so the tiles get 476 − 32 (card padding) − 224 − 16 (gap) = 204.
-			    Three tiles in 204px wrap their labels to five lines, the grid grows
-			    to 280px tall, and the card needs 303 against a 256 box. Shrinking the
-			    band shrinks the square but ALSO shrinks the box — measured across
-			    every band height from 150 to 460 at 1024, there is NO value at which
-			    the content fits; from 360 up the tile grid is CLIPPED outright with
-			    the column at 84 → 24 → 0px.
-			    ⛔ AND IT CANNOT BE BREAKPOINT-SCOPED WITHOUT INVENTING A VALUE. The
-			    square first fits at 1312px. `xl` (1280) misses by 21px; `2xl` (1536)
-			    would exclude 1440, which is the width the founder reviews on. A
-			    `min-[1312px]:` variant is an invented breakpoint and is forbidden.
-			    ⇒ ROUTED BACK with three options that are the founder's to rule, not
-			    mine: (1) let the tile grid drop to 2 columns below ~1312 — canon §2
-			    pins 3×2, so that is a DESIGN change; (2) accept the square only
-			    above a width and accept the invented breakpoint; (3) shorten the
-			    tile LABEL copy, which is founder-owned.
-
-			    ✅⛔ RULED — PROFILE-DIMS R2 · D-1. THE ROUTE-BACK ABOVE IS ANSWERED
-			    AND THIS IS NO LONGER AN OPEN QUESTION. None of the three options was
-			    taken: the founder ruled the mockup's 188px band — and therefore the
-			    band-filling square that depends on it — **UNREACHABLE AND
-			    ACCEPTED**. ⛔ So `size-14` is not a deferral any more, it is the
-			    ruled state, and this block is kept as the MEASUREMENT that earned
-			    the ruling rather than as a pending item.
-
-			    ⚠ THE STANDING COST, NAMED SO IT IS NOT SILENT: the mockup draws this
-			    avatar at **188×188** — 13.1% × 24.2% of the viewport — and it ships
-			    at **56×56**, 3.9% × 7.2%. That is **Δw −9.2pp, Δh −17.0pp**, the
-			    largest single-region divergence on the surface, and it is
-			    DELIBERATE. It is the same impossibility as the band (+8.7pp) and the
-			    arena (−12.6pp), reported three times, not three separate defects.
-			    ⛔ Do not re-attempt `h-full aspect-square` here: it has been measured
-			    and refused five times, and the sixth pass — at the mockup's own
-			    188px band — overflowed the card by **+75 at 1024** and +35 at 1440.
-			    The full table lives on the node that declares the band,
-			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block. */}
+			    ⚠ THE VIEW CHIP HAS LEFT THIS BLOCK, AND THEN LEFT THE BUILD. It was a
+			    body chip under the pseudonym costing 24px of the band, so PROFILE-FULL
+			    moved it to the positions panel head where the mockup carries it
+			    (`.viewchip`, `:425`); the founder then removed it from that head at
+			    R5, and removed `/bookmarks`'s `Your bookmarks` twin at PROFILE OVERLAP
+			    R3. ⛔ SO THERE IS NO CHIP ANYWHERE — this block does not suppress one,
+			    and no sibling renders one. `showViewChip` is retired with it.
+			    ⚠ The sentence that stood here said the chip "now renders in the
+			    positions panel head", which was true for exactly one pass. Corrected
+			    rather than left, because a reader who trusts it goes looking for an
+			    element that no longer exists. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.
@@ -228,69 +159,161 @@ export function IdentityCard({
 				alt=""
 				width={56}
 				height={56}
-				className="size-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover"
+				className="h-14 w-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover xl:aspect-square xl:h-full xl:w-auto"
 			/>
 			{/* HTML-FINISH row 8 — `.idcol` (mockup `:194`, `:437`): the identity
 			    COLUMN, holding the pseudonym row and — new — the six tiles beneath
 			    it. `min-w-0` and `flex-1` are the mockup's `min-width:0; flex:1 1
 			    auto` (`:194`), i.e. topology; they are what lets the tile grid take
 			    the band's remaining width instead of overflowing it.
-			    `gap-3` is `ProfileTiles.tsx`'s OWN grid gap, reused here rather
-			    than the mockup's `.idcol{gap:12px}` — same-file trace, not a
-			    prototype value. The existing pseudonym/chip pair keeps its `gap-1`
-			    exactly, in its own nested column, so nothing inside it moves. */}
+			    `gap-3` is the mockup's `.idcol{gap:12px}` (`:194`) AND
+			    `ProfileTiles.tsx`'s own grid gap — the two agree, so one token
+			    serves both. */}
 			<div className="flex min-w-0 flex-1 flex-col gap-3">
-				<div className="flex flex-col gap-1">
-					<div className="flex items-center gap-2">
-						<span
-							data-testid="identity-pseudonym"
-							className="font-medium text-ink"
-						>
-							{user.pseudonym}
-						</span>
-						{/* PB-1 (item 17) — the headzone bookmark icon, OWNER-ONLY by the
+				{/* ⚠⚠ PROFILE-FULL — `.unamerow` IS ONE ROW, not a two-line stack.
+				    The mockup's is `display:flex; align-items:center; gap:10px`
+				    (`:197`) holding `.uname` and the `.idacts` cluster, and its height
+				    is the 28px action button — 28, against the 44 this shipped as
+				    (pseudonym 20 + `gap-1` 4 + chip 20). Those 16px are part of what
+				    the 188 band needed back.
+				    ⚠ THE BADGES JOIN THIS ROW rather than keeping a line of their own.
+				    A second line costs the band ~24px for every viewer, while the
+				    Banned label (D8, visible to ALL) and the Scrubbed marker (H2) are
+				    both rare — inline they cost nothing until they fire. The wrapper
+				    is CONDITIONAL for the same reason: an always-rendered empty
+				    `<div>` is still a flex child and still draws its parent's `gap-3`,
+				    so it would spend 12px of the band on nothing. */}
+				<div className="flex min-w-0 items-center gap-[10px]">
+					{/* `.uname` is 20px/800 (`:195`) — the mockup's literal, and the type
+					    size §1 puts explicitly in scope. `leading-normal` is the
+					    mockup's own unset line-height: Tailwind's `text-*` steps each
+					    ship a paired leading, and inheriting `text-sm`'s 20px on a 20px
+					    glyph is what silently added a line's worth of height to every
+					    row in this band.
+					    ⛔ `leading-[1.2]`, NOT `leading-normal` — MEASURED. Tailwind's
+					    `leading-normal` is `line-height:1.5`, not the CSS `normal`
+					    KEYWORD (~1.2 from the font's metrics) that the mockup gets by
+					    leaving line-height unset. At 1.5 this glyph measured 30px and
+					    the row 30 against the mockup's 28; at 1.2 it is 24 and the row
+					    is the 28px action button, which is the mockup's exactly. */}
+					<span
+						data-testid="identity-pseudonym"
+						className="min-w-0 text-[20px] leading-[1.2] font-extrabold text-ink"
+					>
+						{user.pseudonym}
+					</span>
+					{/* PB-1 (item 17) — the headzone bookmark icon, OWNER-ONLY by the
 					    founder ruling of 2026-07-31: it is navigation to the viewer's
 					    OWN saved set, so a visitor never sees it. Before this, the
 					    `/bookmarks` route was live, auth-gated and ORPHANED from the
 					    navigation graph — zero href literals anywhere in `src/`.
-					    ⛔ BOOKMARK ONLY. W2.13 R2 struck the download icon that sits
-					    beside it in the tier-4 shell; building both would ship an
-					    affordance a ratified design review already removed.
-					    ⛔ It lands INSIDE this text block, not on the root `Card`: that
-					    row has no `justify-between`, so a third child there would
-					    left-pack against this block rather than float right.
 					    Icon + `aria-label`, no visible text — `surface.test.tsx:303`
-					    asserts the whole identity-card subtree contains no "@". */}
-						{owner && (
-							<Link
-								href="/bookmarks"
-								aria-label="Bookmarks"
-								className="text-n5 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
+					    asserts the whole identity-card subtree contains no "@".
+
+					    ⚠⚠ PROFILE-FULL — IT TAKES THE MOCKUP'S BUTTON BOX. `.idact` is
+					    a 28×28 hit target with a 7px radius and a `hover` fill
+					    (`:199-201`); this shipped as a bare 16px glyph with no box, so
+					    the affordance was 16×16 against the mockup's 28×28. `size-7` is
+					    28px and `rounded-[7px]` is the mockup's literal radius.
+					    ⛔ THE DOWNLOAD SIBLING IS FLAGGED, NOT BUILT — §0's MISSING-FIELD
+					    halt, which does not cascade. The mockup pairs this with a
+					    "Download profile card" button (`:438`), and TWO independent
+					    reasons stop it here: (1) there is NO profile export route and
+					    none can be added without a new server read — `/m/[slug]/export`
+					    is market-scoped (ADR-0025) and there is no `/u/[pseudonym]`
+					    equivalent, so the control would have nothing to fetch; (2) the
+					    mockup's own script marks it inert — "download is visual-only"
+					    (`:730`) — so replicating it literally ships a control that does
+					    nothing on click. A dead affordance on the accountability page is
+					    worse than an absent one. Named here and in the run report; the
+					    cluster wrapper is already in place, so adding it later is one
+					    element and no restructure. */}
+					{/* ⚠⚠ PROFILE REFINEMENT · R2 — THIS IS THE MODE SWITCH, and it is a
+					    TOGGLE rather than a one-way link. Unmarked on the profile → click →
+					    FILLED, and the surface is in bookmarks mode → click again →
+					    unmarked, back to the profile. That is the mockup's own switch: the
+					    `#bmgo` button (`:438`) whose active state is
+					    `body.bookmarks #bmgo{color:var(--ink); background:var(--n1)}`
+					    (`:203`), with the panel retitled and the row action swapped.
+
+					    ⚠⚠ A ROUTE CHANGE, NOT CLIENT STATE — MY CALL, AND THE REASON IS
+					    THAT `/bookmarks` ALREADY *IS* THE MOCKUP'S BOOKMARK MODE. That
+					    route renders the same shell, the same identity band, the same six
+					    tiles and the same right rail, with only the left panel swapped —
+					    which is the mode, built and shipped. Driving the switch by route
+					    therefore needs no second implementation of it, and cannot drift
+					    from one.
+					    ⛔ CLIENT STATE WAS THE OTHER OPTION AND IT COSTS MORE, TWICE OVER.
+					    (1) DATA: the profile is a server component, so a mode it can swap
+					    into instantly is a mode whose data must be loaded on EVERY profile
+					    view — one `loadBookmarks` per owner visit, paid whether or not the
+					    toggle is ever pressed. (2) DUPLICATION: it would mount the
+					    bookmarks table, its filter and its replica panel inside the profile
+					    page, i.e. a second copy of a surface that already exists, which is
+					    how the two drift apart. The mockup switches client-side because a
+					    static prototype has no router; that is a prototype affordance, not
+					    a design requirement.
+					    ⇒ THE OBSERVABLE CONTRACT R2 STATES IS MET EITHER WAY: unmarked →
+					    click → dark + bookmarks mode → click → unmarked + profile mode. It
+					    is two routes rather than two states of one, and `/bookmarks` is
+					    not broken — it is the destination.
+
+					    ⚠ SIZED AND STYLED ONCE, AGAINST BOTH SURFACES — R2's
+					    shared-component clause. This was a hand-rolled 28px box; it now
+					    renders through the SHIPPED `Button` at `variant="ghost"
+					    size="icon-xs"`, which is exactly what `BookmarkToggle` uses on the
+					    debate cards. So the marked/unmarked visual is one treatment in one
+					    place, and `asChild` keeps it a real `<Link>` for navigation.
+					    ⛔ `fill-current` IS THE SHIPPED MARKED GLYPH, byte-identical to
+					    `BookmarkToggle`'s saved state — the filled/outline distinction is
+					    not re-invented here.
+					    ⚠ `aria-pressed` CARRIES THE STATE, so no second label is authored;
+					    the same choice `BookmarkToggle` makes. The name stays `Bookmarks`
+					    in both states because the control's TARGET is the bookmark set
+					    either way. */}
+					{owner && (
+						<span className="flex items-center gap-1">
+							<Button
+								asChild
+								variant="ghost"
+								size="icon-xs"
+								aria-pressed={bookmarksActive}
+								className={
+									bookmarksActive ? "bg-n1 text-ink" : "text-n4 hover:text-ink"
+								}
 							>
-								<Bookmark className="size-4" />
-							</Link>
-						)}
-					</div>
-					<div className="flex flex-wrap items-center gap-2">
-						{showViewChip && (
-							<Badge data-testid="profile-chip" variant="secondary">
-								{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
-							</Badge>
-						)}
-						{user.banned && (
-							<Badge data-testid="identity-banned" variant="destructive">
-								Banned
-							</Badge>
-						)}
-						{scrubbed && (
-							<Badge data-testid="identity-scrubbed" variant="outline">
-								Scrubbed
-							</Badge>
-						)}
-					</div>
+								<Link
+									href={
+										bookmarksActive
+											? (profileHref ?? "/bookmarks")
+											: "/bookmarks"
+									}
+									aria-label="Bookmarks"
+								>
+									<Bookmark
+										className={bookmarksActive ? "fill-current" : undefined}
+									/>
+								</Link>
+							</Button>
+						</span>
+					)}
+					{(user.banned || scrubbed) && (
+						<span className="flex flex-wrap items-center gap-2">
+							{user.banned && (
+								<Badge data-testid="identity-banned" variant="destructive">
+									Banned
+								</Badge>
+							)}
+							{scrubbed && (
+								<Badge data-testid="identity-scrubbed" variant="outline">
+									Scrubbed
+								</Badge>
+							)}
+						</span>
+					)}
 				</div>
 				<ProfileTiles tiles={tiles} />
 			</div>
-		</Card>
+		</div>
 	);
 }

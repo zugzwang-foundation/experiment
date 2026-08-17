@@ -568,19 +568,41 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(asVisitor.rowIds).toEqual(asOwner.rowIds);
 		expect(asVisitor.argIds).toEqual(asOwner.argIds);
 
-		// The FIRST of the identity card's two owner deltas: the view chip. The
-		// second — item 17's bookmark link — has its own two-armed guard above
+		// The FIRST of the two owner deltas: the view chip. The second — item 17's
+		// bookmark link — has its own two-armed guard above
 		// (`owner-only-bookmark-affordance-on-the-identity-card`).
-		const ownerCard = render(
-			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R5 — THE CHIP IS GONE, SO THIS READS THE VIEWER
+		// CONTEXT INSTEAD OF A CHIP. The founder ruled the `Viewing as owner` chip
+		// out, and it had been this assertion's proxy for "the owner arm rendered".
+		// Deleting the chip must not delete the CLAIM — the owner/visitor
+		// distinction is still a real branch and still needs a guard — so the guard
+		// re-points at the other thing that branch decides: the empty-state copy,
+		// which `payload.owner` selects directly.
+		// ⛔ THIS IS STRICTLY BETTER, NOT A CONSOLATION. A chip's text was a render
+		// of the flag; the empty copy IS the flag's consequence, so a wiring bug
+		// that fed the wrong `owner` through now fails here for the right reason
+		// rather than because a decorative span read wrong.
+		// ⚠ AND IT IS ASSERTED ON THE EMPTY-ROWS ARM, deliberately: that arm mounts
+		// the panel with no `controls` at all, which is where an owner-dependent
+		// render is easiest to lose.
+		const ownerHead = render(
+			<PositionsTable payload={{ owner: true, rows: [] }} />,
 		);
-		expect(text(screen.getByTestId("profile-chip"))).toBe(
-			PROFILE_COPY.chip.owner,
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsOwner,
 		);
-		ownerCard.unmount();
-		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
-		expect(text(screen.getByTestId("profile-chip"))).toBe(
-			PROFILE_COPY.chip.visitor,
+		ownerHead.unmount();
+		render(<PositionsTable payload={{ owner: false, rows: [] }} />);
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsVisitor,
+		);
+		// …and the two arms actually DIFFER, so the pair above cannot both pass on a
+		// component that ignores `owner` entirely.
+		expect(PROFILE_COPY.empty.positionsOwner).not.toBe(
+			PROFILE_COPY.empty.positionsVisitor,
 		);
 	});
 

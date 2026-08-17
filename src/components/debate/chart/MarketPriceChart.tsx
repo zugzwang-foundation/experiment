@@ -68,7 +68,32 @@ export function MarketPriceChart({
 			    `price-chart.test.tsx::collapsed-renders-no-axis` GREEN — the guard
 			    asserts the absence of testids inside this component, and DOM siblings
 			    of the chart carry none of them. Building it here keeps the axis under
-			    the guard that names it. */}
+			    the guard that names it.
+
+			    ⚠⚠ AND `ProfileChart` HAS NOW DONE THE OPPOSITE, SO READ THE TRAP ABOVE
+			    AS A SCOPING HAZARD RATHER THAN A BAN. PROFILE OVERLAP R2 moved that
+			    chart's two endpoint labels OUT of its `<svg>` and into HTML, because
+			    `preserveAspectRatio="none"` scales user space non-uniformly and text
+			    goes with it. The hazard is answered there by RETURNING the labels from
+			    the component's own tree rather than making them a sibling of it — a
+			    component-scoped query still finds them, which is the property this
+			    block was protecting.
+
+			    ⚠⚠ AND THIS AXIS CARRIES A MILDER VERSION OF THE SAME DISTORTION —
+			    SURFACED, NOT FIXED. Measured on staging at a pinned 1440×777, canary
+			    `53ae009`: this card's `<svg>` renders **316×137** against the 640×320
+			    viewBox, so `scaleX 0.4938` / `scaleY 0.4282` — an anisotropy of
+			    **1.153**. All three date labels render at **0.494 of their natural
+			    width and 0.556 of their natural height**, i.e. a declared 10px type
+			    lands at ~5.6px and is ~15% narrower than tall. The profile's was
+			    **2.09** anisotropic, an order of magnitude worse, which is why that one
+			    was reported and this one has not been.
+			    ⛔ NOT FIXED HERE ON PURPOSE. `/m/[slug]` is a finished surface and the
+			    pass that found this was fenced to re-measure it at ZERO DRIFT; changing
+			    a label's rendered size is drift. Raised for the founder rather than
+			    absorbed — the disposition canon already uses for a cost it has decided
+			    to carry. The fix, if it is wanted, is the one `ProfileChart` now
+			    carries. */}
 			{mode === "collapsed" && (
 				<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
 			)}

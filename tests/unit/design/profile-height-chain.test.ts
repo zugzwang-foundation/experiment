@@ -20,7 +20,8 @@ import { describe, expect, it } from "vitest";
  *                     (owned by `(public)/layout.tsx`, out of scope here)
  *   PageContainer     flex-1 min-h-0 flex-col                   ← below `lg`
  *                     + lg:h-[calc(100vh-60px-2px)] lg:flex-none ← THE BOUND (R5 A)
- *   headzone band     lg:h-[256px], no flex-1       ← declared, does NOT grow (R5 B)
+ *   headzone band     lg:h-[188px] + lg:grid-rows-[188px], no flex-1
+ *                                                   ← declared, does NOT grow
  *   arena band        flex-1 min-h-0                ← takes ALL the leftover
  *   both panels       min-h-0 flex-col              ← may be shorter than content
  *   both panel bodies flex-1 min-h-0 overflow-y-auto ← where the scroll happens
@@ -87,6 +88,7 @@ const CONTAINER = "src/components/shell/PageContainer.tsx";
 const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
 const POSITIONS = "src/components/profile/PositionsTable.tsx";
 const ARGUMENTS = "src/components/profile/ArgumentList.tsx";
+const ROW_THIRDS = "src/components/profile/row-thirds.ts";
 
 /** The className on the profile's `<PageContainer>` tag, as written on disk. */
 function containerExtras(source: string): string {
@@ -131,7 +133,9 @@ function bandClasses(source: string, testid: string): string[] {
  * occupies exactly the viewport below the header, and every region that can
  * overflow scrolls inside itself. That reverses A-5 FOR THIS SURFACE, so the
  * chain is now deliberately BOUNDED at two nodes — the container at
- * `lg:h-[calc(100vh-60px-2px)]` and the headzone at `lg:h-[256px]`.
+ * `lg:h-[calc(100vh-60px-2px)]` and the headzone at `lg:h-[188px]` (the
+ * mockup's own `.headzone{flex:0 0 188px}`, reached at PROFILE-FULL once the
+ * identity block lost its `<Card>` frame — see `IdentityCard.tsx`'s D-1 block).
  *
  * ⚠⚠ THE PROPERTY A1 ACTUALLY PROTECTS IS NOT "NO HEIGHT" — IT IS "NOTHING IS
  * LOST". A bound with a scroll container is not a clip: the content past the
@@ -350,7 +354,32 @@ describe("profile height chain — every link, asserted by name", () => {
 		).toContain("min-h-[calc(100vh-60px-2px)]");
 		// The headzone's declared height, pinned here too — it is the other half of
 		// what makes the arena's height definite.
-		expect(bandClasses(page, "profile-headzone")).toContain("lg:h-[256px]");
+		//
+		// ⚠⚠ PROFILE-FULL — THE FIGURE IS NOW THE MOCKUP'S 188, AND THE PREDICATE IS
+		// UNCHANGED. This guard asserts that the band declares an `lg:`-scoped
+		// DEFINITE height; only the number it names has moved, because D-1 was
+		// reopened and answered. 256 was derived under a fence that excluded the
+		// identity block's frame and the tile type sizes — with the `<Card>` padding
+		// gone and the mockup's tile density taken, the identity column needs 174 at
+		// 1440 inside a 188 box. ⛔ This is NOT the guard being relaxed to fit the
+		// code: the assertion is still an exact-value pin, still `toContain`, still
+		// on the same node. Re-derive it from a fresh measurement if the band moves
+		// again; do not loosen it to a prefix match.
+		expect(bandClasses(page, "profile-headzone")).toContain("lg:h-[188px]");
+		// ⛔ AND THE ROW TRACK, which is the half that is easy to drop and impossible
+		// to see. A single IMPLICIT grid row is content-sized: `align-content:stretch`
+		// can GROW it to the container's declared height but never SHRINK it below
+		// its content, and the graph's `<svg viewBox … preserveAspectRatio="none">`
+		// contributes an intrinsic ratio height. MEASURED with the height alone:
+		// band 188, row 256, PFP 256 — the declared band was simply overflowed.
+		// Declaring the TRACK makes it definite, which is also what lets the PFP's
+		// `xl:h-full` resolve against 188 instead of against its own content.
+		expect(
+			bandClasses(page, "profile-headzone"),
+			"the band declares a height but no ROW TRACK, so its single implicit row " +
+				"is still content-sized and the graph's intrinsic ratio floors it — " +
+				"measured at 256 against a declared 188.",
+		).toContain("lg:grid-rows-[188px]");
 	});
 
 	it("profile-height-chain::every-bounded-region-hands-overflow-to-a-SCROLL-container", () => {
@@ -419,11 +448,51 @@ describe("profile height chain — every link, asserted by name", () => {
 		// is the mockup's own EARLIER one, from its changelog: v0.11 — "the rows
 		// container is height-capped to exactly the first three rows (JS measures
 		// the 3rd row's bottom) … No row content is clipped."
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R1 — THE PARAGRAPH ABOVE IS NOW HALF TRUE, and the
+		// half that changed is the PAGE, not the mockup. Its measurement was taken
+		// when this route was free to grow; round 5 bounded it at `lg`+, so the panel
+		// body DOES now have a definite height (429px at 1440×777) and a third of its
+		// rows region measures **128px** — the mockup's own row height, arrived at by
+		// arithmetic rather than copied. So `calc(100%/3)` is ported after all, as a
+		// computed px value; the v0.11 cap survives alongside it for the growable
+		// case below `lg`. Both live in one effect, split on one condition.
 		const pos = read(POSITIONS);
 		// It is a BOUND…
 		expect(pos).toContain("style.maxHeight");
-		// …never a fixed height, on the node the chain hands the scroll to.
-		expect(pos).not.toContain("style.height");
+		// …never a fixed height ON THE NODE THE CHAIN HANDS THE SCROLL TO.
+		// ⚠⚠ SCOPED TO `body`, AND THAT IS A FALSE-POSITIVE FIX RATHER THAN A
+		// RELAXATION. This read `not.toContain("style.height")` over the WHOLE FILE,
+		// so it fired on R1's `row.style.height` — a different node with the opposite
+		// effect. The property being protected is that the PANEL is bounded and never
+		// fixed, because a fixed panel clips a fourth row instead of scrolling to it.
+		// A `<tr>`'s height cannot clip anything: it is a FLOOR, which is precisely
+		// why R1 needs a `line-clamp` as its other half. So the check now names the
+		// node it always meant, and the thing it forbids is still forbidden.
+		expect(pos).not.toContain("body.style.height");
+		// …and the row heights that DO exist are on ROWS, never on the body — asserted
+		// where they now live.
+		// ⚠ PROFILE REFINEMENT · R1 (shared) — THE ROW-THIRD MOVED OUT OF THIS FILE.
+		// It was inline in `PositionsTable`; the bookmarks table needed the identical
+		// rule (measured: positions `[128,128,128]` against bookmarks `[136,92]`), and
+		// two copies of the arithmetic would drift. So it lives in `row-thirds.ts` and
+		// both tables call it. This check follows the code rather than pinning a
+		// location the code has left.
+		const thirds = read(ROW_THIRDS);
+		expect(thirds).toContain("row.style.height");
+		expect(thirds).not.toContain("body.style.height");
+		// ⚠ PROFILE OVERLAP · R1 — THE ARITHMETIC MUST STAY OUT OF THE EFFECT, and
+		// this is the only place that can say so. jsdom has no layout, so nothing
+		// inside the hook is reachable by any test; the decision therefore lives in
+		// the pure `rowThird`, which `row-third.test.ts` holds to the figures
+		// measured on the mockup and on staging. If the sums ever migrate back
+		// inline they become untestable again — which is how a share the rows could
+		// not honour shipped green in the first place.
+		expect(thirds).toContain("export function rowThird(");
+		expect(thirds).toContain("rowThird({");
+		// …and the positions table still CONSUMES it, so the rule is not merely
+		// present somewhere — it is wired to this panel.
+		expect(pos).toContain("useEqualRowThirds(");
 		// …and the scroll container it caps still declares its overflow, so the
 		// capped rows remain reachable.
 		expect(

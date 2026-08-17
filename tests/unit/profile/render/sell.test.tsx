@@ -159,48 +159,65 @@ describe("UI.A5 Slice 7 — owner-only Sell mount (SPEC.1 §23 F-PROF-3)", () =>
 		).toContain("Closed");
 	});
 
-	it("sell-host-is-fixed-height-and-does-not-reflow", () => {
-		// POLISH.5 item 10 (P5-D13). Canon §5's Profile row ratifies the
-		// mechanism: "the replica footer is a fixed 50px box … the sell module
-		// replaces it over .26s — fixed height ⇒ never reflows."
+	it("sell-host-is-canon-s-50px-box-and-is-ABSENT-until-opened", () => {
+		// Canon §5 (Profile), as amended at PROFILE OVERLAP R1: "on Sell a 50 px
+		// host mounts under the row and the sell module fades into it over .26 s;
+		// the host is present ONLY WHILE THE MODULE IS IN IT."
 		//
-		// ⚠ A MOUNT ASSERTION CANNOT SEE A REFLOW. `owner-sell-mount` above
-		// proves the module appears, and it passed identically on the shipped
-		// behaviour this item fixes — where opening Sell INSERTED a `<tr>` and
-		// pushed every following row down. The reflow is the law under test.
+		// ⛔⛔ THIS TEST REPLACES `sell-host-is-fixed-height-and-does-not-reflow`,
+		// WHICH ASSERTED THE OPPOSITE LAW — that the box is "reserved whether or
+		// not the module is open" and that the row inventory is IDENTICAL either
+		// side of the toggle. That law is REVERSED, not relaxed: the reservation
+		// spent 51px per sellable row inside a region the three-row window divides
+		// by the DATA rows only, so the owner arm overflowed its own panel by
+		// 150px at a pinned 1440×777 while every row height measured equal. The
+		// old test could not see that, because it asserted an inventory rather
+		// than a fit — which is why the new assertions below are about PRESENCE
+		// and the guard on FIT lives in `profile-height-chain`.
+		// ⚠ WHAT IS GIVEN UP IS ASSERTED, not left implicit: the row inventory now
+		// GROWS on open. That is the reflow canon used to forbid, and it is here on
+		// purpose.
 		render(
 			<PositionsTable
 				payload={{ owner: true, rows: [OPEN_SELLABLE, SETTLED_UNSELLABLE] }}
 			/>,
 		);
 
-		// THE HOST EXISTS BEFORE THE CLICK. This is the whole mechanism: the box
-		// is reserved whether or not the module is open.
-		const host = screen.getByTestId(`sell-host-${M1}`);
-		expect(host.getAttribute("class") ?? "").toContain("h-[50px]");
+		// ⛔ NOTHING IS RESERVED. No host, no host row, no module — on a row that
+		// IS sellable, which is the case the old law rendered a blank band into.
+		expect(screen.queryByTestId(`sell-host-${M1}`)).toBeNull();
+		expect(screen.queryByTestId(`sell-row-${M1}`)).toBeNull();
 		expect(screen.queryByTestId("sell-module")).toBeNull();
-
-		// The row inventory is IDENTICAL either side of the toggle — the literal
-		// non-reflow claim, not a proxy for it.
 		const rowsBefore = document.querySelectorAll("tbody tr").length;
-		fireEvent.click(screen.getByTestId(`sell-trigger-${M1}`));
-		expect(screen.getByTestId("sell-module")).toBeTruthy();
-		expect(document.querySelectorAll("tbody tr").length).toBe(rowsBefore);
 
-		// …and the host is still the same fixed box, not one that grew to fit.
+		fireEvent.click(screen.getByTestId(`sell-trigger-${M1}`));
+
+		// The module arrives, inside canon's 50px box…
+		expect(screen.getByTestId("sell-module")).toBeTruthy();
 		expect(
 			screen.getByTestId(`sell-host-${M1}`).getAttribute("class") ?? "",
 		).toContain("h-[50px]");
+		// …and the host row takes NO border, which is item 6's predicate, MOVED
+		// here from `selection.test.tsx` because this is the only suite that can
+		// reach the open state (it stubs the heavy `SellModule`). A bordered host
+		// would read as a row of its own, and the module already carries edges.
+		expect(screen.getByTestId(`sell-row-${M1}`).className).not.toContain(
+			"[border:",
+		);
+		// …and the table is exactly ONE row longer. The literal statement of what
+		// the reversal costs: the rows below move down by that host.
+		expect(document.querySelectorAll("tbody tr").length).toBe(rowsBefore + 1);
 
-		// ⛔ NO host on a non-sellable row — reserving 50px under a row that can
-		// never sell would be dead space, not a fixed footer.
-		// ⚠ THE POSITIVE CONTROL IS LOAD-BEARING HERE. `M2` is the Closed market,
-		// and this fixture's DERIVED default (Gate C S-1) is `Open`, so asserting
-		// its host absent at mount would pass because THE ROW IS NOT RENDERED —
-		// not because a non-sellable row gets no host. Without the switch and the
-		// row assertion below, deleting `sellable &&` from the host `<tr>` leaves
-		// this whole suite green while shipping a blank 50px strip under every
-		// Closed and every visitor row.
+		// …and closing it takes the host back out, so the band cannot persist.
+		fireEvent.click(screen.getByTestId(`sell-trigger-${M1}`));
+		expect(screen.queryByTestId(`sell-row-${M1}`)).toBeNull();
+		expect(document.querySelectorAll("tbody tr").length).toBe(rowsBefore);
+
+		// ⛔ NO host on a non-sellable row either — the row must be RENDERED for
+		// that to mean anything, so the filter is switched first. ⚠ Without this
+		// switch the assertion would pass because `M2` is Closed and this
+		// fixture's derived default (Gate C S-1) is `Open`, i.e. the row is not
+		// on screen at all — a green test proving nothing.
 		setStatusFilter("Closed");
 		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-host-${M2}`)).toBeNull();

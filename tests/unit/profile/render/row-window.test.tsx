@@ -72,11 +72,17 @@ describe("item 8 — the window is a BOUND, never a clip", () => {
 	});
 
 	it("window::the-cap-is-written-to-maxHeight-and-never-to-height", () => {
-		// A `style.height` would fix the panel and clip a fourth row instead of
+		// A `style.height` ON THE PANEL would fix it and clip a fourth row instead of
 		// letting it scroll. Read from the shipped source, because the write only
 		// happens under real layout.
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R1 — SCOPED TO `body`. The unscoped substring fired
+		// on R1's per-ROW height, which is a different node with the opposite effect:
+		// a `<tr>` height is a FLOOR and cannot clip, whereas fixing the panel would
+		// make row four unreachable. The claim is unchanged and the forbidden thing is
+		// still forbidden — the check just names the node it always meant.
 		expect(SOURCE).toContain("style.maxHeight");
-		expect(SOURCE).not.toContain("style.height");
+		expect(SOURCE).not.toContain("body.style.height");
 	});
 
 	it("window::the-window-is-THREE-and-is-named-once", () => {

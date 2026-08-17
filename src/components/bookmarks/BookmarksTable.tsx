@@ -3,9 +3,13 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatDharma } from "@/components/debate/format";
+import {
+	displayPositionProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
-import { Badge } from "@/components/ui/badge";
+import { useDocumentRowStepper } from "@/components/profile/row-stepper";
+import { useEqualRowThirds } from "@/components/profile/row-thirds";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
@@ -49,6 +53,15 @@ import { UnbookmarkButton } from "./UnbookmarkButton";
  * action and takes the place Profile gives Sell — the affordance the card list
  * carried, kept rather than lost in the move to a table.
  */
+/**
+ * PROFILE REFINEMENT · R1 — how many rows fill the panel before the rest scroll. The
+ * founder's three, and the same three the mockup's
+ * `.rows .prow{flex:0 0 calc(100% / 3)}` (`:273`) divides its own panel into.
+ * ⚠ NAMED HERE because this file had no such constant; `PositionsTable` names its own
+ * identically, and both hand it to the shared `useEqualRowThirds`.
+ */
+const ROW_WINDOW = 3;
+
 export function BookmarksTable({
 	items,
 	onSelect,
@@ -87,6 +100,18 @@ export function BookmarksTable({
 	// One entry per rendered row, for `scrollIntoView` + focus on an arrow step.
 	// A ref, not state: moving focus must not re-render.
 	const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+	/**
+	 * ⚠⚠ PROFILE REFINEMENT · R1 — THE ROW THIRD REACHES THIS TABLE TOO. R1 names the
+	 * POSITION rows; these are their twin, and the mockup's bookmark mode reuses the
+	 * very same `.prow` with the very same `flex: 0 0 33.3333%`. MEASURED on staging
+	 * before it was shared: positions `[128, 128, 128]` against bookmarks `[136, 92]`
+	 * — equalising one surface and leaving the other ragged is the drift the pair is
+	 * supposed to be immune to.
+	 * ⛔ THE ARITHMETIC IS NOT RESTATED HERE — `row-thirds.ts` owns it, and carries the
+	 * measurement, why the mockup has no clamp, and why the CSS form fails.
+	 */
+	const bodyRef = useRef<HTMLDivElement | null>(null);
+	const tableRef = useRef<HTMLTableElement | null>(null);
 
 	// Canon §5 rules the dismissal grammar for a popover on this surface family:
 	// "ESC / click-out closes". Byte-carried from `PositionsTable.tsx`, both
@@ -131,12 +156,29 @@ export function BookmarksTable({
 		(i) => market === "all" || i.marketSlug === market,
 	);
 
+	useEqualRowThirds({
+		bodyRef,
+		tableRef,
+		testidPrefix: "bookmark-row-",
+		rowWindow: ROW_WINDOW,
+		rowCount: visible.length,
+	});
+
 	// ⚠ THE SELECTION IS DERIVED AGAINST THE VISIBLE SET, NOT STORED AS TRUTH —
 	// Profile's rule. A pick the filter has hidden simply stops counting; it is
 	// REMEMBERED rather than destroyed, so switching the filter back restores it.
 	// Derivation, not an effect: an effect would render one frame with a
 	// selection that is no longer on screen.
-	const selectedRow = visible.find((i) => i.id === selectedId) ?? null;
+	// ⚠⚠ PROFILE REFINEMENT · R3 — THE FIRST VISIBLE ROW IS THE FALLBACK, byte-carried
+	// from `PositionsTable`'s derivation in the same round. R3 asks for default-select
+	// in BOTH modes, and since R2 makes bookmarks mode a ROUTE rather than client
+	// state, "the other mode" IS this component — so it takes the identical rule.
+	// ⛔ ONE EXPRESSION, SAME THREE CASES: mount, a filter that hides the pick, and an
+	// empty list (`visible[0]` is `undefined` ⇒ `null` ⇒ the existing empty state, no
+	// phantom row). A derivation rather than an effect, so it can never render one
+	// frame with a selection that is no longer on screen.
+	const selectedRow =
+		visible.find((i) => i.id === selectedId) ?? visible[0] ?? null;
 
 	// C6 — REPORT THE DERIVED SELECTION UPWARD. The deps are PRIMITIVES, never
 	// `selectedRow` itself: the row object is rebuilt on every render, so
@@ -156,8 +198,11 @@ export function BookmarksTable({
 	}, [pickedId, pickedMarketTitle, onSelect]);
 
 	/** Click the selected row again to clear it — Profile's `pick()`. */
+	// ⚠ PROFILE REFINEMENT · R3 — THE TOGGLE IS RETIRED HERE TOO, for the reason
+	// `PositionsTable` records: with a first-row fallback, clearing re-derives to row
+	// one, which makes a second click a no-op on row one and a jump elsewhere.
 	const pick = (id: string) => {
-		setSelectedId((current) => (current === id ? null : id));
+		setSelectedId(id);
 	};
 
 	/** Up/Down step through the CURRENTLY VISIBLE rows and WRAP,
@@ -172,7 +217,21 @@ export function BookmarksTable({
 		if (visible.length === 0) {
 			return;
 		}
-		const at = visible.findIndex((i) => i.id === selectedId);
+		// ⚠⚠ PROFILE OVERLAP · R4 — THE ANCHOR IS THE *DERIVED* ROW, NOT THE STORED
+		// PICK, and that one word was half the row. The stored id means "the reader
+		// has chosen"; it is `null` at mount, so this read fell to `at < 0` and
+		// entered at index 0 — which is the row R3 already has selected. The first
+		// arrow therefore re-selected where it stood and NOTHING MOVED; the second
+		// finally stepped. MEASURED on staging from a fresh load, with focus placed
+		// inside the table so the keys were arriving: two ArrowDowns, no movement.
+		// ⇒ Stepping has to start from what is on screen, and the only thing that
+		// knows that is `selectedRow` — the same derivation the panel is handed and
+		// the highlight is drawn from. Reading it here is what makes the keyboard's
+		// notion of "current" and the selection ONE fact instead of two.
+		// ⚠ `at < 0` survives and is still reachable: an empty visible set returns
+		// above, but a derived `null` on a non-empty set does not, so entering at
+		// index 0 stays the answer for it.
+		const at = selectedRow === null ? -1 : visible.indexOf(selectedRow);
 		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
 		const target = visible[next];
 		if (target === undefined) {
@@ -185,10 +244,21 @@ export function BookmarksTable({
 		}
 		el?.focus({ preventScroll: true });
 	};
+	// ⚠⚠ PROFILE OVERLAP · R4 — AND THE KEYS HAVE TO ARRIVE. The handler on the
+	// `<table>` below only fires while focus is already inside it, and at load
+	// focus is on `<body>`, so the stepper above was unreachable from a fresh page
+	// however correct its arithmetic. This is the arm that reaches it; every
+	// condition it stands down on — a caret, page scrolling, focus taken
+	// elsewhere, focus already in the table — is written out in that module,
+	// including why the old "never bind to `document`" ruling is answered rather
+	// than overruled.
+	// ⛔ `enabled` yields the keys while the market popover is open: canon §5 says
+	// Up/Down yield there, and its options are a list of their own.
+	useDocumentRowStepper({ tableRef, step: stepRow, enabled: !filterOpen });
 
 	if (items.length === 0) {
 		return (
-			<BookmarksPanel>
+			<BookmarksPanel bodyRef={bodyRef}>
 				<EmptyBlock
 					message={BOOKMARKS_EMPTY_COPY.msg}
 					messageTestId="bookmarks-empty"
@@ -200,6 +270,7 @@ export function BookmarksTable({
 
 	return (
 		<BookmarksPanel
+			bodyRef={bodyRef}
 			controls={
 				/* ⛔ THE LABEL AND ITS CARET ARE BYTE-CARRIED, NOT AUTHORED — canon §6
 				   pins `Select market ▾` verbatim, and the caret is `e2 96 be`,
@@ -269,14 +340,33 @@ export function BookmarksTable({
 			    column widths without an explicit px track template, and every such
 			    template available is a light-prototype VALUE).
 			    `bg-n0` is the panel's own background: a sticky header over scrolling
-			    rows must be opaque or the rows read through it. */}
+			    rows must be opaque or the rows read through it.
+			    ⚠⚠ AND OPAQUE IS NOT ENOUGH — PROFILE OVERLAP R1, ported from the
+			    positions table, where the mechanism is written out in full. A sticky
+			    `top:0` resolves against the scroll container's CONTENT box, so this
+			    body's `p-3` leaves 12px of scrollable space above the header that the
+			    header does not cover, and rows appear in it. The shadow is the header
+			    claiming that strip; its offset is bound to the padding by token
+			    (`var(--spacing) * 3`), never typed as 12px.
+			    ⛔ IT IS FIXED HERE AND NOT ONLY THERE for the reason the row-third is
+			    shared: this panel is the same shell with the same padding and the same
+			    sticky header, so a fix on one surface only is drift waiting to be
+			    reported as a second bug. */}
 			{/* ⛔ THE KEY HANDLER IS SCOPED TO THE TABLE, NOT TO `document` —
 			    Profile's ruling, and the reason is this surface's own: the page
 			    GROWS AND SCROLLS below `lg`, so a document-level ArrowDown that
 			    prevents default would kill keyboard scrolling of the whole route.
 			    Bound here, the keys are live exactly while focus is inside the
-			    table. */}
+			    table. 			    ⚠⚠ AND SINCE PROFILE OVERLAP R4 IT IS NOT THE ONLY BINDING, on this
+			    surface for the same reason as on Profile: focus starts on `<body>`, so
+			    this handler never fired from a fresh load and ↑/↓ did nothing until
+			    something was clicked. `useDocumentRowStepper` above adds the document
+			    arm, and it stands down whenever the page has scrolling to lose — the
+			    objection above is answered, not overruled — and whenever the target is
+			    already inside this table, which is what stops one press stepping twice.
+			    */}
 			<table
+				ref={tableRef}
 				data-testid="bookmarks-table"
 				onKeyDown={(e) => {
 					if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
@@ -285,15 +375,51 @@ export function BookmarksTable({
 					e.preventDefault();
 					stepRow(e.key === "ArrowUp" ? -1 : 1);
 				}}
-				className="w-full text-left text-sm"
+				className="w-full table-fixed text-left text-sm"
 			>
-				<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
+				{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
+				    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
+				    text-transform:uppercase; color:var(--n4)` with `padding:0 12px 8px`
+				    (`:267-268`) — a micro overline register, not body text. This shipped at
+				    `text-xs text-n5` in sentence case, so it read as a fifth row of CONTENT
+				    rather than as a label for the four below it.
+				    ⛔ `uppercase` IS A CSS TRANSFORM, SO NO STRING IS RETYPED — each `<th>`'s
+				    DOM `textContent` is still `Position` / `Argument` / `Staked` / `Current`,
+				    which is what the row-14 column-ORDER guards read. A retyped literal would
+				    have moved the assertion; a transform cannot.
+				    ⚠ `text-[8.5px]` is the mockup's own figure HERE (its tile labels are 8px —
+				    that split is the mockup's and is kept), and it is the shipped micro-label
+				    idiom in this repo: `DharmaCluster.tsx`, `MarketCard.tsx`, `HeroPanels.tsx`.
+				    `leading-normal` because an arbitrary `text-[…]` inherits the previous
+				    step's paired line-height — the miss that cost the tile grid 16px.
+				    ⚠ THE PADDING FOLLOWS: `px-2 pt-0 pb-2` is the mockup's `0 12px 8px`, which
+				    is what makes the header row 19px instead of 33 and puts the overline right
+				    above the rule it labels. */}
+				{/* ⚠⚠ PROFILE-FULL — THE COLUMN TRACK IS THE MOCKUP'S, AND IT IS LOAD-BEARING
+				    NOW RATHER THAN COSMETIC. The mockup's row grid is
+				    `grid-template-columns:96px 1fr 78px 16px 118px` (`:262`) — four FIXED tracks
+				    with the argument taking the slack. This was an auto-laid `<table>`, and
+				    MEASURED ON STAGING it gave Position 97 · Argument 389 · Staked 55 · arrow 31
+				    · Current 86: the Argument column had taken 91px the two value columns
+				    needed, and once the Current cell gained its P/L delta the figure BROKE
+				    MID-VALUE — `Đ` on one line and `448` on the next, with the row at 102px.
+				    That is a defect the delta surfaced rather than caused: the column was
+				    always too narrow, and nothing had been wide enough to prove it.
+				    ⛔ `table-fixed` IS WHAT MAKES THE WIDTHS BIND. Without it a `<th>` width is
+				    a HINT the auto layout may overrule from cell content — which is exactly how
+				    Current ended up at 86 against a 118px request. With it the four literals
+				    hold and Argument becomes the `1fr`, which is the mockup's own topology.
+				    ⚠ AND THE VALUE CELLS TAKE `whitespace-nowrap` — belt to the braces. A Đ
+				    figure and its delta are ONE quantity; breaking them across lines is never
+				    the right degrade, so the cell is told not to, and the 118px track is what
+				    means it never has to. */}
+				<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 					<tr>
-						<th className="p-2 text-center">Position</th>
-						<th className="p-2 text-center">Argument</th>
-						<th className="p-2 text-center">Staked</th>
-						<th className="p-2" />
-						<th className="p-2 text-center">Current</th>
+						<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
+						<th className="px-2 pt-0 pb-2 text-center">Argument</th>
+						<th className="w-[78px] px-2 pt-0 pb-2 text-center">Staked</th>
+						<th className="w-[16px] px-2 pt-0 pb-2" />
+						<th className="w-[118px] px-2 pt-0 pb-2 text-center">Current</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -376,10 +502,30 @@ function BookmarkRow({
 					onPick(item.id);
 				}
 			}}
-			className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+			// ⚠⚠ PROFILE REFINEMENT · R6 — THE SELECTED ROW TAKES THE RADIUS TOKEN,
+			// byte-carried from `PositionsTable`. R6 names the POSITION row, and this is
+			// its twin: the two surfaces are one shell with the left panel swapped, and
+			// rounding one highlighted row while leaving the other square would be the
+			// exact drift §3 forbids. The mockup rounds `.prow.sel` in BOTH modes,
+			// because bookmark mode reuses the same row element.
+			// ⛔ AN OUTLINE, NOT A HEAVIER BORDER — `border-collapse:collapse` ignores
+			// `border-radius`, so the swap this replaces had nowhere for a radius to
+			// land. Full reasoning at `PositionsTable`'s row.
+			// ⚠⚠ PROFILE OVERLAP · R1 — AND NOW BOTH ARMS OUTLINE, for the same reason
+			// the selected one already did. The unselected row was a square `1/1/1/1`
+			// hairline box inside a panel at 8 and beside a selected row at 8, and a
+			// radius alone cannot fix it: injected live, `border-radius: 8px` left the
+			// corners square because the collapsing model ignores it. So the hairline
+			// becomes an outline at `-1px` and the radius moves to the base, where it
+			// serves both arms. ⛔ ONE outline per arm — two arbitrary utilities for one
+			// property resolve by stylesheet emission order, not by the order written.
+			// ⚠ `outline-none` goes with the border: it only ever suppressed the UA
+			// focus ring, and any author outline beats a UA-origin one. The focus
+			// affordance was always the shadow. Full reasoning at `PositionsTable`.
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) ${
 				isSelected
-					? "bg-n1 [border:var(--ring-active)]"
-					: "[border:var(--hairline)] hover:bg-n1"
+					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
 			}`}
 		>
 			{/* THE POSITION CELL — `PositionsTable.tsx`'s `.poscell`: a centred
@@ -392,7 +538,10 @@ function BookmarkRow({
 				<span className="flex flex-col items-center gap-[5px]">
 					<span
 						data-testid={`bookmark-side-${item.id}`}
-						className="flex items-center gap-[5px] text-xs"
+						// ⚠ PROFILE-FULL — `.pside` is 11px/800 (`:283`), moved in lockstep
+						// with Profile's side word (§3: the two surfaces are never sized one
+						// after the other). This was `text-xs` at weight 400.
+						className="flex items-center gap-[5px] text-[11px] leading-[1.2] font-extrabold"
 					>
 						{item.side === "YES" ? "Yes" : "No"}
 						<ThumbGlyph side={item.side} size={12} />
@@ -410,7 +559,7 @@ function BookmarkRow({
 			    them on a removed row is a COMPILE error, not a judgement call. The
 			    cell renders nothing rather than a fabricated zero: the author's
 			    stake on a removed argument is not zero, it is unknown here. */}
-			<td className="p-2 text-center tabular-nums text-ink">
+			<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 				<span className="flex flex-col items-center">
 					{item.removed ? null : <>Đ {formatDharma(item.staked)}</>}
 				</span>
@@ -423,9 +572,41 @@ function BookmarkRow({
 			<td aria-hidden="true" className="p-2 text-center font-normal text-n4">
 				→
 			</td>
-			<td className="p-2 text-center tabular-nums text-ink">
+			{/* ⚠⚠ PROFILE-FULL — THE CURRENT CELL CARRIES ITS P/L DELTA, byte-carried
+			    from `PositionsTable.tsx`'s Current cell in lockstep (§3). The mockup's
+			    bookmark mode reuses the SAME `.pnum` cell as its profile mode
+			    (`:558`), so this is the same box by construction.
+			    ⛔ SPEC.1 §10.8 (1.0.33) admits this as its THIRD displayed-space
+			    identity; `displayPositionProfitLossSigned` rounds both operands to what
+			    this row prints before subtracting, so the visible arithmetic is true.
+			    ⚠ THE FIGURES ARE THE BOOKMARKED AUTHOR'S, not the viewer's — the
+			    author-keyed semantic this file's header records. So the delta is that
+			    AUTHOR's P/L on the side their argument is frozen to, which is what the
+			    two figures it reconciles already were.
+			    ⚠ THE REMOVED VARIANT CARRIES NEITHER FIGURE, so it carries no delta:
+			    `staked`/`current` exist only on the non-removed arm, and a delta
+			    between two unknowns is not zero. */}
+			<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 				<span className="flex flex-col items-center">
-					{item.removed ? null : <>Đ {formatDharma(item.current)}</>}
+					{item.removed ? null : (
+						<span className="inline-flex items-baseline gap-1.5">
+							Đ {formatDharma(item.current)}
+							{(() => {
+								const pl = displayPositionProfitLossSigned(
+									item.staked,
+									item.current,
+								);
+								return pl.magnitude === "" ? null : (
+									<span
+										data-testid={`bookmark-pl-${item.id}`}
+										className="text-[10.5px] leading-[1.2] font-bold text-n5"
+									>
+										({pl.sign}Đ{pl.magnitude})
+									</span>
+								);
+							})()}
+						</span>
+					)}
 				</span>
 			</td>
 		</tr>
@@ -456,7 +637,10 @@ function BookmarkArgumentCell({
 		<Link
 			data-testid={`bookmark-market-${item.id}`}
 			href={`/m/${item.marketSlug}`}
-			className="block text-xs text-n5 hover:underline"
+			// ⚠ PROFILE-FULL — `.pmkt .mq`'s 11px/600 (`:291-292`), in lockstep with
+			// Profile's sub-lines. The COLOUR is untouched: the mockup's ramp is
+			// inverted against this build's, so `text-n5` stays the dark system's own.
+			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
 		>
 			{item.marketTitle}
 		</Link>
@@ -464,23 +648,73 @@ function BookmarkArgumentCell({
 	if (item.removed) {
 		return (
 			<span data-testid={`bookmark-arg-removed-${item.id}`}>
-				<span className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</span>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+					{REMOVED_STUB_TEXT}
+				</span>
 				{marketLine}
 			</span>
 		);
 	}
 	return (
 		<span data-testid={`bookmark-arg-${item.id}`} className="text-ink">
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-3` HERE, NOT PROFILE'S 4, AND
+			    THE DIFFERENCE IS ARITHMETIC RATHER THAN TASTE. Both clamps are derived
+			    the same way — the 128px third minus whatever else the cell carries,
+			    divided by this element's own 18.9px line box — but this cell carries
+			    ONE MORE BLOCK than Profile's: the parent reference (`Replied to …`),
+			    which SPEC.1 §23 requires for a reply-bet and recon A-7 struck the
+			    removal of. Two blocks leave room for four title lines; three leave room
+			    for three.
+			    ⇒ MEASURED, AND THIS IS WHY IT MOVED: at `line-clamp-4` the rows came out
+			    `[136, 128]` on staging — both DECLARED 128, but a `<tr>` height is a
+			    FLOOR, so the row carrying a 4-line title AND a 2-line parent reference
+			    outgrew it by 8px. At 3 the content fits under the floor and the rows are
+			    equal, which is the whole point of the third.
+			    ⛔ NOT A DIFFERENT RULE, AND NOT AN INVENTED NUMBER: same budget, same
+			    line box, one more subtrahend. A shared clamp CONSTANT would have been
+			    the wrong kind of sharing — it would make the two surfaces agree on a
+			    figure while disagreeing on the thing the figure is for. */}
 			<Link
 				data-testid={`bookmark-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}
-				className="hover:underline"
+				// ⚠ PROFILE-FULL — `.ptitle` is 14px/700/1.35 (`:288`), in lockstep
+				// with Profile's argument title.
+				className="line-clamp-3 text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{item.title}
 			</Link>
 			{marketLine}
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-2`, AND IT IS THE MOCKUP'S OWN
+			    VALUE FOR THIS EXACT ELEMENT. The mockup's parent reference is `.parline`
+			    and it declares `-webkit-line-clamp: 2` (`:376`) with the comment "fit the
+			    fixed 50px footer". This line shipped UNCLAMPED, and MEASURED on staging
+			    it was the actual reason a row outgrew its third: 3 unclamped lines (45px)
+			    where the budget allows 2 (30px).
+			    ⇒ THE ARITHMETIC, so the next reader can check it: the 128px third minus
+			    16 of cell padding, minus a 3-line title (57) and the market line (15),
+			    leaves 40px for the reference — two lines at this element's 15px line box.
+			    ⛔ SO THE TITLE CLAMP AND THIS ONE ARE ONE FIX, NOT TWO. Clamping the
+			    title alone moved the row 136 → 133 and left it unequal, because the title
+			    was never what overflowed. Both are needed and neither is sufficient.
+			    ⚠ NOT AN INVENTED NUMBER, and worth saying because §23 REQUIRES this
+			    reference for a reply-bet (recon A-7 struck its removal): the value is the
+			    mockup's declared clamp for the same element, and a clamp is a display
+			    treatment, not a removal — the whole parent title stays one click away on
+			    the thread it links to.
+			    ⛔⛔ AND `block` IS REMOVED, WHICH IS WHY THIS NEEDED A SECOND PASS.
+			    `line-clamp-2` works by setting `display:-webkit-box`, and the class list
+			    also carried `block` — two utilities for ONE property, resolved by
+			    stylesheet emission order rather than by the order written here. `block`
+			    won, `-webkit-box` never applied, and the clamp was INERT: MEASURED with
+			    `line-clamp-2` present and the line still 45px / 3 lines.
+			    ⇒ `line-clamp-*` ALREADY makes the element a block-level box, so `block`
+			    was redundant before it was harmful. Same emission-order trap `AGENTS.md`
+			    §8 records for `table-fixed`, and the same one the Sell button hit with
+			    `size="xs"` — third instance this round. The tell never changes: two
+			    utilities, one property, and a computed style that reads correct while the
+			    layout disagrees. */}
 			{item.kind === "reply" && item.repliedToTitle !== null && (
-				<span className="block text-xs text-n5">
+				<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {item.repliedToTitle}
 				</span>
 			)}
@@ -508,9 +742,16 @@ function BookmarkArgumentCell({
  */
 function BookmarksPanel({
 	controls,
+	bodyRef,
 	children,
 }: {
 	controls?: React.ReactNode;
+	/**
+	 * ⚠ PROFILE REFINEMENT · R1 — the scroll container the row-third is measured
+	 * against, handed down exactly as `PositionsPanel` hands its own down: the panel
+	 * owns the box, the table owns the rows, and the measurement needs both.
+	 */
+	bodyRef?: React.Ref<HTMLDivElement>;
 	children: React.ReactNode;
 }): React.JSX.Element {
 	return (
@@ -549,26 +790,41 @@ function BookmarksPanel({
 				    structural divergence to match a sibling surface.
 				    ⚠ THE CLASSES ARE THE PANEL-TITLE CLASSES, byte-identical to the
 				    `<span>` they replace and to Profile's — so the element changes and
-				    not one pixel does. */}
-				<h1 className="text-xs font-medium text-ink">Bookmarks</h1>
-				{/* ⚠⚠ ROUND 5 — THE TWO-CHIP QUESTION IS RESOLVED, AND THIS IS THE
-				    SURVIVING CHIP. It arrived here at F-1 because it shared the removed
-				    page-level row with the `<h1>`; the founder has now ruled that it
-				    STAYS and that `IdentityCard`'s "Viewing as owner" is REMOVED on
-				    this surface — which is what the mockup's bookmark mode does
-				    (`surface_profile_v1_0.html:768`, `vc.textContent='Your bookmarks'`,
-				    ONE chip). The suppression rides a new optional prop whose default
-				    is today's behaviour, so Profile is untouched; see
-				    `IdentityCard.tsx`'s `showViewChip`.
-				    ⛔ NO STRING WAS RETITLED — `profile/copy.ts` is untouched. */}
-				<Badge data-testid="bookmarks-view-chip" variant="outline">
-					Your bookmarks
-				</Badge>
+				    not one pixel does.
+
+				    ⚠⚠ PROFILE-FULL — THOSE PANEL-TITLE CLASSES ARE NOW `.chttl`'s OVERLINE
+				    (11px/800/.12em uppercase, `:235`), moved in lockstep with Profile's so
+				    the two stay byte-identical. The mockup's bookmark mode retitles this
+				    exact element — `.chttl` → `Bookmarks` (`:767`) — so it is the same box
+				    by construction rather than by resemblance.
+				    ⛔ STILL AN `<h1>`: the register is a TREATMENT, and DOC-1 says a
+				    shared treatment never ratifies a shared file shape. `uppercase` is a
+				    transform, so this heading's accessible name is still `Bookmarks`. */}
+				<h1 className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
+					Bookmarks
+				</h1>
+				{/* ⛔⛔ THE `Your bookmarks` CHIP IS DELETED — founder-ruled at PROFILE
+				    OVERLAP R3, the same ruling that removed `Viewing as owner` from the
+				    identity block one pass earlier. Not hidden, not suppressed by a prop:
+				    the element and its testid are gone.
+				    ⚠ WHAT THAT ENDS, recorded because two rounds of work lived in it. The
+				    chip arrived here at F-1 from a removed page-level row; round 5 then
+				    ruled it the surface's SURVIVING chip and retired Profile's in its
+				    favour; PROFILE-FULL gave it the mockup's `.viewchip` register
+				    (dashed n4, 9px/800/.12em). The mockup does render it in bookmark mode
+				    (`surface_profile_v1_0.html:768`) — so this is a deliberate divergence
+				    from the mockup, not a missed port, and it is the founder's to make.
+				    ⚠ THE PANEL SAYS IT ALREADY. The head is titled `BOOKMARKS`, the route
+				    is `/bookmarks`, and the bookmark control in the identity band is
+				    FILLED — three statements of the same fact, of which the chip was the
+				    fourth. ⛔ `showViewChip` was already retired before this and stays
+				    retired; there is no prop left whose only job was this element. */}
 				{controls}
 			</div>
 			<div
 				data-testid="bookmarks-panel-body"
 				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+				ref={bodyRef}
 			>
 				{children}
 			</div>
