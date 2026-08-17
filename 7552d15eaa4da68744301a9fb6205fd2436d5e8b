@@ -1,0 +1,19 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Database Says No
+
+The promise was that nothing here gets rewritten. Bets, comments, the ledger — written once, never edited, never deleted.
+
+Until now that was a promise. Code could break it. A stray line, a well-meaning fix, an admin with a good reason.
+
+This moved it below the code. Twenty-six triggers across thirteen tables, installed in the database itself. An attempt to change one of those rows isn't caught by the application and politely refused — it's rejected by the storage, underneath everything the application can reach.
+
+There's a nice detail in the rules. Setting a value to what it already is gets through, because it changes nothing. A second attempt to set the same field is refused. Not "don't edit history" — history can happen once.
+
+Also here: six of the decision documents this commit cites by number don't exist yet. One was on disk. The thinking had been done, agreed, and built before anybody wrote it down.
