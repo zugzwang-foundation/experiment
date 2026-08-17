@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Defect Did Not Exist
+
+A defect was reported to the founder: a precondition check appeared to be computing against a missing reference and passing anyway. It was not. The command had been handed two arguments where it takes one, and its complaint about that was read as the reference being absent. The correction is recorded at greater length than the original claim, because a wrong diagnosis delivered confidently costs more than the thing it was about.
