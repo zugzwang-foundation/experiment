@@ -1,0 +1,17 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Zero Deletions
+
+There used to be a way to agree with someone for free. A small thumbs-up on a post, costing nothing, feeding into how posts got ranked.
+
+It was killed — because a free signal is one anybody can manufacture in bulk, and the whole premise here is that opinions cost something.
+
+Here's the odd part. The document describing the old design was not edited. Not one character. The commit that removed the feature added thirty-five lines and deleted zero — a block on top saying which parts below are now wrong, everything below left exactly as written.
+
+The rule for the product is that you never rewrite what already happened. Somewhere along the way the project started applying it to itself.
