@@ -564,13 +564,31 @@ export function PositionsTable({
 					    `bg-n0` is the panel's own background, already on the section —
 					    a sticky header over scrolling rows must be opaque or the rows
 					    read through it. */}
-					<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
+					{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
+					    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
+					    text-transform:uppercase; color:var(--n4)` with `padding:0 12px 8px`
+					    (`:267-268`) — a micro overline register, not body text. This shipped at
+					    `text-xs text-n5` in sentence case, so it read as a fifth row of CONTENT
+					    rather than as a label for the four below it.
+					    ⛔ `uppercase` IS A CSS TRANSFORM, SO NO STRING IS RETYPED — each `<th>`'s
+					    DOM `textContent` is still `Position` / `Argument` / `Staked` / `Current`,
+					    which is what the row-14 column-ORDER guards read. A retyped literal would
+					    have moved the assertion; a transform cannot.
+					    ⚠ `text-[8.5px]` is the mockup's own figure HERE (its tile labels are 8px —
+					    that split is the mockup's and is kept), and it is the shipped micro-label
+					    idiom in this repo: `DharmaCluster.tsx`, `MarketCard.tsx`, `HeroPanels.tsx`.
+					    `leading-normal` because an arbitrary `text-[…]` inherits the previous
+					    step's paired line-height — the miss that cost the tile grid 16px.
+					    ⚠ THE PADDING FOLLOWS: `px-2 pt-0 pb-2` is the mockup's `0 12px 8px`, which
+					    is what makes the header row 19px instead of 33 and puts the overline right
+					    above the rule it labels. */}
+					<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
 						<tr>
-							<th className="p-2 text-center">Position</th>
-							<th className="p-2 text-center">Argument</th>
-							<th className="p-2 text-center">Staked</th>
-							<th className="p-2" />
-							<th className="p-2 text-center">Current</th>
+							<th className="px-2 pt-0 pb-2 text-center">Position</th>
+							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
+							<th className="px-2 pt-0 pb-2 text-center">Staked</th>
+							<th className="px-2 pt-0 pb-2" />
+							<th className="px-2 pt-0 pb-2 text-center">Current</th>
 						</tr>
 					</thead>
 					<tbody>
@@ -969,7 +987,21 @@ function PositionsPanel({
 				data-testid="positions-panel-head"
 				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
-				<span className="text-xs font-medium text-ink">Positions</span>
+				{/* ⚠⚠ PROFILE-FULL — THE PANEL TITLE IS `.chttl`'s OVERLINE. The mockup's
+				    left colhead title is `font-size:11px; font-weight:800;
+				    letter-spacing:.12em; text-transform:uppercase` (`:235`); this shipped
+				    at `text-xs font-medium` in sentence case, which made the panel's NAME
+				    look like the first line of its content.
+				    ⛔ NOT THE SAME REGISTER AS THE RIGHT HEAD, deliberately. The mockup
+				    gives the right colhead `.chttl.mkt` — 13px/700, `text-transform:none`
+				    (`:229-231`) — because that slot holds a market QUESTION, a sentence,
+				    not a label. Two heads, two registers, and flattening them into one
+				    would lose the distinction the mockup is drawing.
+				    ⛔ `uppercase` IS A TRANSFORM: `textContent` is still `Positions`, so
+				    every consumer that reads this head by text keeps its handle. */}
+				<span className="text-[11px] leading-normal font-extrabold tracking-[0.12em] text-ink uppercase">
+					Positions
+				</span>
 				{/* ⚠⚠ PROFILE-FULL — THE VIEW CHIP MOVES HERE FROM THE IDENTITY BODY.
 				    The mockup carries it as a head control — `.viewchip` in `.nav`
 				    (`:425`), not a chip under the pseudonym — and as a body chip it was

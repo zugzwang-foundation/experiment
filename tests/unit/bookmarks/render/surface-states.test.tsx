@@ -401,14 +401,46 @@ describe("GATE C F-1 — `Bookmarks` renders exactly once", () => {
 
 	it("f1::the-heading-keeps-the-PANEL-TITLE-classes-so-nothing-moves", async () => {
 		// The element changed from `<span>` to `<h1>`; the class string did not.
+		//
+		// ⚠⚠ PROFILE-FULL — RE-POINTED, AND DELIBERATELY MADE STRONGER RATHER THAN
+		// JUST UPDATED. The property this guard protects is not "the classes are
+		// `text-xs font-medium text-ink`" — it is "this heading and Profile's panel
+		// title are the SAME treatment, so the two surfaces cannot be styled one
+		// after the other" (§3). The literal list was only the mechanism, and a
+		// literal has to be edited in two places every time the register moves,
+		// which is exactly how the pair drifts.
+		// ⇒ Profile's title classes are now READ OFF THE SHIPPED FILE and compared.
+		// The guard can no longer pass while the two have diverged, and it needs no
+		// edit the next time the register changes — it only fails if they disagree.
 		vi.mocked(loadBookmarks).mockResolvedValue([]);
 		render(await BookmarksPage());
 		const h1 = screen.getByTestId("bookmarks-panel-head").querySelector("h1");
-		expect(h1?.className.split(/\s+/)).toEqual([
-			"text-xs",
-			"font-medium",
-			"text-ink",
-		]);
+
+		const positionsSource = readFileSync(
+			join(process.cwd(), "src/components/profile/PositionsTable.tsx"),
+			"utf8",
+		);
+		// The `Positions` panel title, as written on disk. Anchored on the literal
+		// text so it cannot match the market filter or the view chip beside it.
+		const profileTitle =
+			/<span className="([^"]*)">\s*Positions\s*<\/span>/.exec(
+				positionsSource,
+			)?.[1];
+		expect(
+			profileTitle,
+			"could not find Profile's `Positions` panel title on disk — if the head " +
+				"was restructured, re-derive this guard rather than deleting it.",
+		).toBeDefined();
+
+		expect(h1?.className.split(/\s+/).sort()).toEqual(
+			(profileTitle ?? "").split(/\s+/).sort(),
+		);
+		// …and non-vacuity: the pair actually carries the OVERLINE register, not
+		// just the same empty string. `uppercase` is the load-bearing one — it is
+		// what makes a panel NAME read as a label rather than as its first line.
+		for (const c of ["text-[11px]", "font-extrabold", "uppercase"]) {
+			expect(h1?.className.split(/\s+/)).toContain(c);
+		}
 	});
 
 	it("f1::no-page-level-header-row-survives-above-the-panel", async () => {

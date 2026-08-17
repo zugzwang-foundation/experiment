@@ -286,13 +286,31 @@ export function BookmarksTable({
 				}}
 				className="w-full text-left text-sm"
 			>
-				<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
+				{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
+				    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
+				    text-transform:uppercase; color:var(--n4)` with `padding:0 12px 8px`
+				    (`:267-268`) — a micro overline register, not body text. This shipped at
+				    `text-xs text-n5` in sentence case, so it read as a fifth row of CONTENT
+				    rather than as a label for the four below it.
+				    ⛔ `uppercase` IS A CSS TRANSFORM, SO NO STRING IS RETYPED — each `<th>`'s
+				    DOM `textContent` is still `Position` / `Argument` / `Staked` / `Current`,
+				    which is what the row-14 column-ORDER guards read. A retyped literal would
+				    have moved the assertion; a transform cannot.
+				    ⚠ `text-[8.5px]` is the mockup's own figure HERE (its tile labels are 8px —
+				    that split is the mockup's and is kept), and it is the shipped micro-label
+				    idiom in this repo: `DharmaCluster.tsx`, `MarketCard.tsx`, `HeroPanels.tsx`.
+				    `leading-normal` because an arbitrary `text-[…]` inherits the previous
+				    step's paired line-height — the miss that cost the tile grid 16px.
+				    ⚠ THE PADDING FOLLOWS: `px-2 pt-0 pb-2` is the mockup's `0 12px 8px`, which
+				    is what makes the header row 19px instead of 33 and puts the overline right
+				    above the rule it labels. */}
+				<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
 					<tr>
-						<th className="p-2 text-center">Position</th>
-						<th className="p-2 text-center">Argument</th>
-						<th className="p-2 text-center">Staked</th>
-						<th className="p-2" />
-						<th className="p-2 text-center">Current</th>
+						<th className="px-2 pt-0 pb-2 text-center">Position</th>
+						<th className="px-2 pt-0 pb-2 text-center">Argument</th>
+						<th className="px-2 pt-0 pb-2 text-center">Staked</th>
+						<th className="px-2 pt-0 pb-2" />
+						<th className="px-2 pt-0 pb-2 text-center">Current</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -548,8 +566,19 @@ function BookmarksPanel({
 				    structural divergence to match a sibling surface.
 				    ⚠ THE CLASSES ARE THE PANEL-TITLE CLASSES, byte-identical to the
 				    `<span>` they replace and to Profile's — so the element changes and
-				    not one pixel does. */}
-				<h1 className="text-xs font-medium text-ink">Bookmarks</h1>
+				    not one pixel does.
+
+				    ⚠⚠ PROFILE-FULL — THOSE PANEL-TITLE CLASSES ARE NOW `.chttl`'s OVERLINE
+				    (11px/800/.12em uppercase, `:235`), moved in lockstep with Profile's so
+				    the two stay byte-identical. The mockup's bookmark mode retitles this
+				    exact element — `.chttl` → `Bookmarks` (`:767`) — so it is the same box
+				    by construction rather than by resemblance.
+				    ⛔ STILL AN `<h1>`: the register is a TREATMENT, and DOC-1 says a
+				    shared treatment never ratifies a shared file shape. `uppercase` is a
+				    transform, so this heading's accessible name is still `Bookmarks`. */}
+				<h1 className="text-[11px] leading-normal font-extrabold tracking-[0.12em] text-ink uppercase">
+					Bookmarks
+				</h1>
 				{/* ⚠⚠ ROUND 5 — THE TWO-CHIP QUESTION IS RESOLVED, AND THIS IS THE
 				    SURVIVING CHIP. It arrived here at F-1 because it shared the removed
 				    page-level row with the `<h1>`; the founder has now ruled that it
