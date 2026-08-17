@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Found Open In Review
+
+The administrative surface gets built: the pages, the actions behind them, and a scheduled job closing markets when their time runs out. The part worth keeping is the last commit in the sequence, where a review found the pages listing markets could be read without an administrator's session at all. It was fixed inside the same piece of work that introduced it.
