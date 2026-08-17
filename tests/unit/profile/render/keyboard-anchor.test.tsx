@@ -199,28 +199,52 @@ describe("R4 — the mount selection is the keyboard's anchor (positions)", () =
 		expect(posPicked()).toEqual([1]);
 	});
 
-	it("anchor::a-SCROLLABLE-page-keeps-the-key", () => {
-		// ⛔⛔ THE OBJECTION THE OLD RULING RAISED, ANSWERED RATHER THAN OVERRULED:
-		// "a document-level ArrowDown would kill keyboard scrolling of the whole
-		// route". It stands down where there is scrolling to take.
-		// ⚠ THE CONDITION IS DEFINED, NOT OBSERVED, and that is stated rather than
-		// hidden: jsdom reports every dimension as zero, so a scrollable page cannot
-		// arise here on its own. What this pins is that the predicate is READ at
-		// keypress time — a version that decided once at mount would pass every
-		// other test in this file and fail this one.
+	it("anchor::a-list-scrolled-OFF-SCREEN-keeps-the-key", () => {
+		// ⛔⛔ THE OLD RULING, NARROWED — and this guard replaces one that pinned the
+		// WRONG narrowing. The first attempt stood down whenever the page could
+		// scroll at all, which is a clean answer to "a document ArrowDown would kill
+		// keyboard scrolling of the route" and made the feature a function of window
+		// height: measured at a pinned 1440×777 the profile page is 886 tall, the arm
+		// stood down, and ↑/↓ did nothing from a fresh load. A condition that
+		// disables the row in its own acceptance case is not a safeguard.
+		// ⇒ The question is whether the list is IN FRONT OF THE READER. On screen,
+		// the arrows are the list's; scrolled away, they go back to the page.
+		// ⚠ THE RECT IS DEFINED, NOT OBSERVED, and that is the point of the test as
+		// much as the behaviour: jsdom performs no layout, so an off-screen table
+		// cannot arise here. What is pinned is that the rect is read AT KEYPRESS and
+		// that an UNMEASURED rect does not disqualify — a naive `bottom <= 0` reads
+		// jsdom's zeros as "off screen" and silently disables the arm in every other
+		// test in this file.
 		render(<PositionsTable payload={PAYLOAD} />);
-		Object.defineProperty(document.documentElement, "scrollHeight", {
-			configurable: true,
-			value: 5000,
-		});
+		const table = screen.getByTestId("positions-table");
+		// ⚠ THE RECT IS BUILT BY HAND, NOT SPREAD FROM A `DOMRect`. Its members are
+		// prototype getters, so `{...new DOMRect(…)}` is an EMPTY object — the first
+		// attempt at this test read `height: undefined`, concluded "unmeasured", and
+		// passed the press straight through. A stub that silently stubs nothing is
+		// worse than no stub.
+		const off = vi.spyOn(table, "getBoundingClientRect").mockReturnValue({
+			x: 0,
+			y: -800,
+			width: 700,
+			height: 400,
+			top: -800,
+			bottom: -400,
+			left: 0,
+			right: 700,
+			toJSON: () => ({}),
+		} as DOMRect);
+		const viewport = vi
+			.spyOn(window, "innerHeight", "get")
+			.mockReturnValue(777);
 		try {
 			pressOnDocument("ArrowDown");
 			expect(posPicked()).toEqual([1]);
 		} finally {
-			Reflect.deleteProperty(document.documentElement, "scrollHeight");
+			off.mockRestore();
+			viewport.mockRestore();
 		}
-		// …and with the page back inside its viewport the same press works, which is
-		// what makes the check above about the predicate and not about a dead arm.
+		// …and with the list back on screen the same press steps, which is what makes
+		// the check above about the predicate rather than about a dead arm.
 		pressOnDocument("ArrowDown");
 		expect(posPicked()).toEqual([2]);
 	});

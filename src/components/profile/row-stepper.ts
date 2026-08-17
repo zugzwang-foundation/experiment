@@ -45,15 +45,21 @@ function ownsArrowKeys(target: EventTarget | null): boolean {
  * row it was already on; it is fixed in the two tables, where the derivation
  * lives.
  *
- * ⛔⛔ THE OLD RULING IT REVERSES, AND WHY THE REVERSAL IS SAFE. Both tables
+ * ⛔⛔ THE OLD RULING IT REVERSES, AND HOW FAR THE REVERSAL GOES. Both tables
  * carry a docblock saying a document-level ArrowDown "would kill keyboard
- * scrolling of the whole route", which is true and is the reason the handler was
- * scoped to the table in the first place. It is answered rather than overruled:
- * this arm STANDS DOWN whenever there is page scrolling to steal. That is not a
- * heuristic about breakpoints — it is `scrollHeight > clientHeight`, the exact
- * predicate the row-third uses for "the region is definite", read at keypress
- * time. Where the page cannot scroll, an arrow key means nothing to the page and
- * everything to the list; where it can, the page keeps it.
+ * scrolling of the whole route", which is true and is why the handler was scoped
+ * to the table in the first place. It is NARROWED rather than fully answered, and
+ * the honest statement of the trade is: while the rows are on screen and nobody
+ * has taken focus, ↑/↓ step the list instead of scrolling the page. Every other
+ * scroll affordance is untouched — wheel, trackpad, PageUp/PageDown, Home/End,
+ * space, the scrollbar — and the surface's primary control is the list, which is
+ * what the mockup binds these keys to unconditionally. Once the list is scrolled
+ * out of view the page takes the keys back.
+ * ⚠ THE FIRST ATTEMPT TRIED TO GIVE UP NOTHING AND GAVE UP THE ROW INSTEAD: it
+ * stood down whenever the page could scroll at all, which made ↑/↓ a function of
+ * window height. Measured at a pinned 1440×777 the profile page is 886 tall, so
+ * it stood down on the very surface R4 is about. A condition that disables the
+ * feature in its own acceptance case is not a safeguard.
  *
  * ⛔ AND IT STANDS DOWN WHENEVER ANYTHING ELSE COULD PLAUSIBLY WANT THE KEY:
  * a caret, a role with its own arrow grammar, focus inside the table (the
@@ -111,9 +117,33 @@ export function useDocumentRowStepper({
 			) {
 				return;
 			}
-			const doc = document.documentElement;
-			if (doc.scrollHeight > doc.clientHeight + 1) {
-				// The page can scroll, so the arrow belongs to the page.
+			// ⛔⛔ THE STAND-DOWN IS "THE LIST IS NOT ON SCREEN", AND THE FIRST
+			// ATTEMPT AT IT WAS WRONG IN A WAY ONLY STAGING COULD SHOW. It read
+			// `scrollHeight > clientHeight` — the page cannot scroll, so nothing is
+			// taken — which is a clean answer to the old ruling's objection and made
+			// the feature CONDITIONAL ON WINDOW HEIGHT. Measured at the pinned
+			// 1440×777 the profile page is **886** tall against a 777 viewport, so the
+			// arm stood down and ↑/↓ did nothing from a fresh load: R4's own
+			// acceptance, failed by its own guard.
+			// ⇒ The question that actually matters is not whether the page could
+			// scroll but whether the thing being steered is IN FRONT OF THE READER.
+			// While the rows are on screen the arrows belong to them; once the list
+			// has been scrolled away, the page takes them back. That holds at load on
+			// every width — which is the state R4 is about — and it still hands the
+			// keys back in the case where keeping them would be most confusing.
+			// ⚠ AN UNMEASURED RECT IS NOT AN ABSENT ONE. jsdom performs no layout and
+			// returns zeros for everything, and a naive `bottom <= 0` reads that as
+			// "off screen" and disables the arm in every render test. So the rect has
+			// to be KNOWN before it can disqualify anything.
+			const rect = table.getBoundingClientRect();
+			const viewportH =
+				window.innerHeight || document.documentElement.clientHeight;
+			const measured = rect.height > 0 || rect.width > 0;
+			if (
+				measured &&
+				viewportH > 0 &&
+				(rect.bottom <= 0 || rect.top >= viewportH)
+			) {
 				return;
 			}
 			e.preventDefault();
