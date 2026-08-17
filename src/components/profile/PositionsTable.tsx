@@ -1401,9 +1401,21 @@ function ArgumentCell({
 			    reference for a reply-bet (recon A-7 struck its removal): the value is the
 			    mockup's declared clamp for the same element, and a clamp is a display
 			    treatment, not a removal — the whole parent title stays one click away on
-			    the thread it links to. */}
+			    the thread it links to.
+			    ⛔⛔ AND `block` IS REMOVED, WHICH IS WHY THIS NEEDED A SECOND PASS.
+			    `line-clamp-2` works by setting `display:-webkit-box`, and the class list
+			    also carried `block` — two utilities for ONE property, resolved by
+			    stylesheet emission order rather than by the order written here. `block`
+			    won, `-webkit-box` never applied, and the clamp was INERT: MEASURED with
+			    `line-clamp-2` present and the line still 45px / 3 lines.
+			    ⇒ `line-clamp-*` ALREADY makes the element a block-level box, so `block`
+			    was redundant before it was harmful. Same emission-order trap `AGENTS.md`
+			    §8 records for `table-fixed`, and the same one the Sell button hit with
+			    `size="xs"` — third instance this round. The tell never changes: two
+			    utilities, one property, and a computed style that reads correct while the
+			    layout disagrees. */}
 			{cell.isReply && cell.repliedToTitle !== null && (
-				<span className="block line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
+				<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {cell.repliedToTitle}
 				</span>
 			)}
