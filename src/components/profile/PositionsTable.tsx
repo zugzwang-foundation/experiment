@@ -349,7 +349,7 @@ export function PositionsTable({
 	// still returns exactly this string; no `sub` is passed on this surface.
 	if (rows.length === 0) {
 		return (
-			<PositionsPanel owner={owner}>
+			<PositionsPanel>
 				<EmptyBlock
 					message={
 						owner
@@ -364,7 +364,6 @@ export function PositionsTable({
 
 	return (
 		<PositionsPanel
-			owner={owner}
 			bodyRef={bodyRef}
 			controls={
 				<>
@@ -1034,18 +1033,21 @@ export function PositionsTable({
  * own background.
  */
 function PositionsPanel({
-	owner,
 	controls,
 	bodyRef,
 	children,
 }: {
 	/**
-	 * ⚠⚠ PROFILE-FULL — THE VIEW CHIP IS A HEAD CONTROL, and it is rendered HERE
-	 * rather than passed through `controls` so BOTH arms carry it: the empty-rows
-	 * arm above mounts this panel with no controls at all, and a profile with zero
-	 * positions must still say whose view this is.
+	 * ⚠ PROFILE REFINEMENT · R5 — THE `owner` PROP IS GONE WITH THE CHIP. It
+	 * existed for exactly one reason: the chip had to render on BOTH arms,
+	 * including the empty-rows arm that mounts this panel with no `controls` at
+	 * all. With the chip deleted this panel makes no owner/visitor distinction of
+	 * its own, so carrying the flag would be a prop nothing reads — and a prop
+	 * nothing reads is the next reader's false lead.
+	 * ⛔ `payload.owner` IS UNTOUCHED in the component above: it still gates
+	 * `sellEligibleOf` and still picks the empty-state copy. The viewer context is
+	 * not what was removed; one render of it was.
 	 */
-	owner: boolean;
 	controls?: React.ReactNode;
 	/**
 	 * ROUND 4 item 8 — the scroll container the three-row window caps. It lives
@@ -1094,53 +1096,24 @@ function PositionsPanel({
 				<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
 					Positions
 				</span>
-				{/* ⚠⚠ PROFILE-FULL — THE VIEW CHIP MOVES HERE FROM THE IDENTITY BODY.
-				    The mockup carries it as a head control — `.viewchip` in `.nav`
-				    (`:425`), not a chip under the pseudonym — and as a body chip it was
-				    costing the identity band 24px (20 chip + 4 gap) of the 188 the
-				    band had to reach. It is the same chip, re-homed and re-typed.
-
-				    ⚠ THE HEAD, NOT THE GLOBAL `<header>` — a DELIBERATE, REPORTED
-				    DEVIATION from the mockup's literal placement, taken for two
-				    reasons. (1) This build ALREADY puts this exact chip in a panel head
-				    on `/bookmarks` (`bookmarks-view-chip`, `BookmarksTable.tsx`), so
-				    the panel head is this surface's own established home for it and the
-				    two modes stay symmetric — which is what §3 asks for. (2) The global
-				    header is a SHARED server component mounted by `(public)/layout.tsx`
-				    for every route, and a layout cannot receive a page's data: putting
-				    a route-specific, ownership-dependent chip there needs a client
-				    portal into a header slot, which would render nothing on the server
-				    and pop in at hydration on the one page whose whole job is
-				    accountability. The chip is in a head either way; this head is the
-				    one that can be server-rendered.
-
-				    ⚠ THE TYPE IS `.viewchip`'s OWN (`:183-184`): 9px/800/.12em
-				    uppercase, a DASHED n4 hairline, n5 text, `--r` radius, 5/10
-				    padding. The dashed border is the mockup's own distinction between
-				    an annotation and a control — every real control on this surface
-				    carries a solid one.
-				    ⛔ NO STRING IS AUTHORED: `PROFILE_COPY.chip.owner` / `.visitor` are
-				    unchanged, and the mockup's `· V toggles` suffix is NOT carried — it
-				    names a prototype hotkey that toggles owner/visitor in the mockup
-				    only. This build has no such hotkey, so shipping the words would
-				    advertise a control that does not exist (the same class of
-				    prototype-only affordance as the mockup's `html,body{overflow:hidden}`,
-				    struck at recon A-5).
-
-				    ⚠ A `<span>`, NOT THE SHARED `Badge`. `.viewchip` is a span in the
-				    mockup, and `Badge`'s base variant hard-codes `h-5`, `rounded-4xl`,
-				    `px-2 py-0.5` and `text-xs` — four of the five properties this chip
-				    needs to set. Overriding them from a `className` puts the outcome at
-				    the mercy of utility emission order for two same-property pairs
-				    (`rounded-*`, and `h-5` against the padding), which is exactly the
-				    kind of silent, order-dependent win this surface has been bitten by
-				    before. A span states the whole box. */}
-				<span
-					data-testid="profile-chip"
-					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-[1.2] font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
-				>
-					{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
-				</span>
+				{/* ⚠⚠ PROFILE REFINEMENT · R5 — THE `VIEWING AS OWNER` CHIP IS DELETED,
+				    NOT HIDDEN. Founder-ruled out. It shipped in the round immediately
+				    before this one, moved here out of the identity body because it was
+				    costing that band 24px — and the founder has now ruled the chip itself
+				    out, which supersedes the placement argument entirely rather than
+				    relocating it again. The whole `<span>`, its testid and its copy
+				    reference are gone from the tree; `display:none` would leave a node for
+				    a scan to find and a reader to wonder about.
+				    ⛔ NOTHING ELSE KEYED OFF IT, and that was checked rather than assumed:
+				    the only reader was `surface.test.tsx`, which asserted the chip TEXT as
+				    the proxy for "the owner arm rendered". That assertion is re-pointed at
+				    the viewer context itself — `payload.owner`, through the empty-state
+				    copy which is the other thing that branch decides — so the owner/visitor
+				    distinction is still guarded, by the value rather than by a chip.
+				    ⚠ `PROFILE_COPY.chip` is left in `copy.ts` UNTOUCHED: it is web-authored
+				    string data, this row removes a render and not a ratified string, and
+				    `/bookmarks` still renders its own `bookmarks-view-chip` (which R5 does
+				    not name). ⇒ Deleting the copy would be a second, unasked decision. */}
 				{controls}
 			</div>
 			{/* HTML-FINISH row 3 — THE PANEL-SCOPED SCROLL. `flex-1 min-h-0

@@ -572,31 +572,37 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// bookmark link — has its own two-armed guard above
 		// (`owner-only-bookmark-affordance-on-the-identity-card`).
 		//
-		// ⚠⚠ PROFILE-FULL — THE CHIP IS READ OUT OF THE POSITIONS PANEL HEAD NOW,
-		// not out of the identity card. It was a body chip under the pseudonym and
-		// cost the identity band 24px of the 188 it had to reach; the mockup carries
-		// it as a head control (`.viewchip`, `:425`). So it is still an owner delta
-		// and still carries the SAME two `PROFILE_COPY` strings — only its host
-		// moved, and the assertion follows it there rather than being dropped.
-		// ⛔ IT IS ASSERTED ON THE EMPTY-ROWS ARM DELIBERATELY: that arm mounts the
-		// panel with no `controls` at all, so a chip rendered through `controls`
-		// would silently vanish for a profile with zero positions. Reading it here
-		// proves it survives the arm where it is easiest to lose.
+		// ⚠⚠ PROFILE REFINEMENT · R5 — THE CHIP IS GONE, SO THIS READS THE VIEWER
+		// CONTEXT INSTEAD OF A CHIP. The founder ruled the `Viewing as owner` chip
+		// out, and it had been this assertion's proxy for "the owner arm rendered".
+		// Deleting the chip must not delete the CLAIM — the owner/visitor
+		// distinction is still a real branch and still needs a guard — so the guard
+		// re-points at the other thing that branch decides: the empty-state copy,
+		// which `payload.owner` selects directly.
+		// ⛔ THIS IS STRICTLY BETTER, NOT A CONSOLATION. A chip's text was a render
+		// of the flag; the empty copy IS the flag's consequence, so a wiring bug
+		// that fed the wrong `owner` through now fails here for the right reason
+		// rather than because a decorative span read wrong.
+		// ⚠ AND IT IS ASSERTED ON THE EMPTY-ROWS ARM, deliberately: that arm mounts
+		// the panel with no `controls` at all, which is where an owner-dependent
+		// render is easiest to lose.
 		const ownerHead = render(
 			<PositionsTable payload={{ owner: true, rows: [] }} />,
 		);
-		expect(text(screen.getByTestId("profile-chip"))).toBe(
-			PROFILE_COPY.chip.owner,
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsOwner,
 		);
-		expect(
-			screen
-				.getByTestId("positions-panel-head")
-				.contains(screen.getByTestId("profile-chip")),
-		).toBe(true);
 		ownerHead.unmount();
 		render(<PositionsTable payload={{ owner: false, rows: [] }} />);
-		expect(text(screen.getByTestId("profile-chip"))).toBe(
-			PROFILE_COPY.chip.visitor,
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+		expect(text(screen.getByTestId("positions-empty"))).toBe(
+			PROFILE_COPY.empty.positionsVisitor,
+		);
+		// …and the two arms actually DIFFER, so the pair above cannot both pass on a
+		// component that ignores `owner` entirely.
+		expect(PROFILE_COPY.empty.positionsOwner).not.toBe(
+			PROFILE_COPY.empty.positionsVisitor,
 		);
 	});
 
