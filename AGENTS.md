@@ -294,6 +294,7 @@ tests/
 - **Canonical SHA** for landed work is the **squash-merge SHA on `main`**; feature-branch SHAs are ephemeral.
 - **Commit identity:** `Zugzwang/world <zugzwangworld@proton.me>`, git username `Chrollo`.
 - **No `Co-authored-by` trailer.** Foundation commits are single-author — the operational identity above; never append a `Co-authored-by` line. When cherry-picking or replaying a commit that already carries one, strip it at commit time (`git commit --amend` to drop the trailer) before pushing — the squash-merge dialog is a backstop, not the primary control (see `docs/logs/SYNC.10.md`, where a trailer leaked into a squash body).
+- **The `Instructions for AI` block** sits **after the body and before any trailers** — so on a commit that carries a trailer the order is body → blank line → block → blank line → trailer. Every commit has it, no exemption by type, and its text is constant. **`CLAUDE.md` §5.13.1 is the governing rule and the single home of the text** — read it there and copy it from there; never retype it from memory and never restate it in this file. Commits predating that rule carry their reasoning as a `git note` rather than in the message (README, *Why a commit exists*).
 
 ---
 
