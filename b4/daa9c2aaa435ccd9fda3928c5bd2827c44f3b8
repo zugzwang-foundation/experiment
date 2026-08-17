@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Every Commit Accounted For
+
+The whole build written up for somebody outside to audit: a system map, a chronicle in fourteen chapters, an operations section. What makes it more than a document is the checking — two hundred and eighteen commits, each appearing exactly once in the chronicle, verified by machine in both directions. It also probed the live sites while being written, and recorded what it found: the two environments were three and twenty-six commits behind.
