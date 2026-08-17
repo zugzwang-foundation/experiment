@@ -88,6 +88,7 @@ const CONTAINER = "src/components/shell/PageContainer.tsx";
 const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
 const POSITIONS = "src/components/profile/PositionsTable.tsx";
 const ARGUMENTS = "src/components/profile/ArgumentList.tsx";
+const ROW_THIRDS = "src/components/profile/row-thirds.ts";
 
 /** The className on the profile's `<PageContainer>` tag, as written on disk. */
 function containerExtras(source: string): string {
@@ -469,8 +470,20 @@ describe("profile height chain — every link, asserted by name", () => {
 		// why R1 needs a `line-clamp` as its other half. So the check now names the
 		// node it always meant, and the thing it forbids is still forbidden.
 		expect(pos).not.toContain("body.style.height");
-		// …and the row heights that DO exist are on rows, never on the body.
-		expect(pos).toContain("row.style.height");
+		// …and the row heights that DO exist are on ROWS, never on the body — asserted
+		// where they now live.
+		// ⚠ PROFILE REFINEMENT · R1 (shared) — THE ROW-THIRD MOVED OUT OF THIS FILE.
+		// It was inline in `PositionsTable`; the bookmarks table needed the identical
+		// rule (measured: positions `[128,128,128]` against bookmarks `[136,92]`), and
+		// two copies of the arithmetic would drift. So it lives in `row-thirds.ts` and
+		// both tables call it. This check follows the code rather than pinning a
+		// location the code has left.
+		const thirds = read(ROW_THIRDS);
+		expect(thirds).toContain("row.style.height");
+		expect(thirds).not.toContain("body.style.height");
+		// …and the positions table still CONSUMES it, so the rule is not merely
+		// present somewhere — it is wired to this panel.
+		expect(pos).toContain("useEqualRowThirds(");
 		// …and the scroll container it caps still declares its overflow, so the
 		// capped rows remain reachable.
 		expect(

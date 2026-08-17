@@ -23,6 +23,7 @@ import type {
 } from "@/server/profile/positions";
 
 import { PROFILE_COPY } from "./copy";
+import { useEqualRowThirds } from "./row-thirds";
 import {
 	initialMarketIdOf,
 	initialStatusFilter,
@@ -272,6 +273,13 @@ export function PositionsTable({
 	// second guard inside `measure()`. At `lg`+ the profile is a one-screen
 	// layout (item A) and the panel's height comes from the viewport, so the
 	// window would subtract from the list rather than bound it.
+	useEqualRowThirds({
+		bodyRef,
+		tableRef,
+		testidPrefix: "position-row-",
+		rowWindow: ROW_WINDOW,
+		rowCount: visible.length,
+	});
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
@@ -279,88 +287,20 @@ export function PositionsTable({
 			return;
 		}
 		/**
-		 * ⚠⚠ PROFILE REFINEMENT · R1 — EVERY ROW IS ONE THIRD OF THE ROWS REGION, so
-		 * three of them measure the same whatever their argument says.
+		 * ⚠⚠ PROFILE REFINEMENT · R1 — EVERY ROW IS ONE THIRD OF THE ROWS REGION.
 		 *
-		 * ⛔ THE MOCKUP HAS NO TEXT CLAMP HERE, AND THAT WAS MEASURED BEFORE ANYTHING
-		 * WAS BUILT. R1 offered three candidate mechanisms — a `-webkit-line-clamp`,
-		 * a character budget, or a fixed row height — and the mockup's is the THIRD.
-		 * Measured in a browser on `surface_profile_v1_0.html` at a pinned 1440×777:
-		 * its `#rows` box is 385px, every `.prow` is `flex: 0 0 33.3333%`, all three
-		 * rows are **128px**, and every `.ptitle` computes `-webkit-line-clamp: none`
-		 * while rendering 3, 2 and **4** lines respectively. Equal rows, unequal text,
-		 * no clamp: the row height is doing all of the work.
-		 *
-		 * ⇒ AND THE RULE LANDS ON THE MOCKUP'S OWN FIGURE WITHOUT BEING GIVEN IT. One
-		 * third of THIS panel's rows region — `(body.clientHeight − its padding −
-		 * thead)/3` — measures **128px** on staging at the same viewport, against the
-		 * mockup's 128. Nothing read a `128` off the mockup; the arithmetic arrived
-		 * there, which is the corroboration that `calc(100%/3)` is the right port.
-		 *
-		 * ⚠ WHY JS AND NOT `height: 33.3333%`. That was tried first and MEASURED to
-		 * fail: with the table at `height:100%` and each `<tr>` at `33.3333%`, the
-		 * rows came out `[95, 107, 95]` — a percentage row height in a table resolves
-		 * against a table box that is itself content-driven, and a `<tr>` height is a
-		 * MINIMUM either way. A definite px value is what actually binds, so the third
-		 * is computed here, in the effect that already measures this panel.
-		 *
-		 * ⛔ IT GATES ON THE REGION BEING DEFINITE — the SAME `doc.scrollHeight`
-		 * question the window cap below asks, and deliberately the same one. At `lg`+
-		 * the page does not scroll, the panel's height comes from the viewport, and a
-		 * third of it is a real number. Below `lg` the page grows, so the body's height
-		 * is content-driven, a third of it would be a function of the rows it is being
-		 * applied to, and the inline heights are CLEARED instead of chasing their own
-		 * tail. The two halves of this effect therefore split on one condition:
-		 * definite ⇒ equalise rows; growable ⇒ window the panel.
-		 *
-		 * ⚠ THE HEIGHT IS A FLOOR, WHICH IS WHY THE CLAMP IN `ArgumentCell` IS ITS
-		 * OTHER HALF. A `<tr>`'s `height` cannot cap content, so a long enough argument
-		 * would still push past the third — see that clamp for the line budget and how
-		 * it was derived. Together they make the equality structural rather than
-		 * incidental: measured with a deliberately 6-line argument injected into row 2,
-		 * the rows stayed `[128, 128, 128]`.
+		 * ⛔ THE RULE MOVED TO `row-thirds.ts` AND IS NOT RESTATED HERE. R1 names the
+		 * POSITION rows, but the bookmark rows are their twin — same shell, and the
+		 * mockup's bookmark mode reuses the very same `.prow`. MEASURED before it was
+		 * shared: positions `[128, 128, 128]` against bookmarks `[136, 92]`. Two copies
+		 * of the arithmetic would drift, so there is one. That module carries the
+		 * measurement, why the mockup has no clamp, why the CSS form fails, and why it
+		 * gates on the PAGE rather than on a breakpoint literal.
+		 * ⚠ THE CAP HALF IS STILL LOCAL: a `<tr>` height is a FLOOR, so the clamp on the
+		 * argument title in `ArgumentCell` is what stops a long argument outgrowing the
+		 * third. Both halves are needed; only the equalising half is shared.
 		 */
-		const equaliseRows = () => {
-			const rows = table.querySelectorAll<HTMLTableRowElement>(
-				'tbody > tr[data-testid^="position-row-"]',
-			);
-			if (rows.length === 0) {
-				return;
-			}
-			const doc = document.documentElement;
-			if (doc.scrollHeight > doc.clientHeight + 1) {
-				// Growable page ⇒ no definite region to take a third of.
-				for (const row of rows) {
-					if (row.style.height !== "") {
-						row.style.height = "";
-					}
-				}
-				return;
-			}
-			const cs = getComputedStyle(body);
-			const padY =
-				(Number.parseFloat(cs.paddingTop) || 0) +
-				(Number.parseFloat(cs.paddingBottom) || 0);
-			const head = table.querySelector("thead");
-			const headH = head ? head.getBoundingClientRect().height : 0;
-			// `Math.floor`, never round: a third that rounds UP puts three rows past
-			// the region and re-introduces the scroll this is meant to sit inside.
-			const third = Math.floor((body.clientHeight - padY - headH) / ROW_WINDOW);
-			if (third <= 0) {
-				// jsdom (no layout) and a not-yet-measured panel both land here.
-				return;
-			}
-			const next = `${third}px`;
-			for (const row of rows) {
-				// Write only on a real change — the observer below watches the table,
-				// and resizing rows resizes the table.
-				if (row.style.height !== next) {
-					row.style.height = next;
-				}
-			}
-		};
 		const measure = () => {
-			equaliseRows();
 			if (visible.length < ROW_WINDOW) {
 				// Fewer rows than the window — nothing to window, and the panel goes
 				// back to its natural height rather than keeping a stale cap.

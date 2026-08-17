@@ -8,6 +8,7 @@ import {
 	formatDharma,
 } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
+import { useEqualRowThirds } from "@/components/profile/row-thirds";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
@@ -51,6 +52,15 @@ import { UnbookmarkButton } from "./UnbookmarkButton";
  * action and takes the place Profile gives Sell — the affordance the card list
  * carried, kept rather than lost in the move to a table.
  */
+/**
+ * PROFILE REFINEMENT · R1 — how many rows fill the panel before the rest scroll. The
+ * founder's three, and the same three the mockup's
+ * `.rows .prow{flex:0 0 calc(100% / 3)}` (`:273`) divides its own panel into.
+ * ⚠ NAMED HERE because this file had no such constant; `PositionsTable` names its own
+ * identically, and both hand it to the shared `useEqualRowThirds`.
+ */
+const ROW_WINDOW = 3;
+
 export function BookmarksTable({
 	items,
 	onSelect,
@@ -89,6 +99,18 @@ export function BookmarksTable({
 	// One entry per rendered row, for `scrollIntoView` + focus on an arrow step.
 	// A ref, not state: moving focus must not re-render.
 	const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
+	/**
+	 * ⚠⚠ PROFILE REFINEMENT · R1 — THE ROW THIRD REACHES THIS TABLE TOO. R1 names the
+	 * POSITION rows; these are their twin, and the mockup's bookmark mode reuses the
+	 * very same `.prow` with the very same `flex: 0 0 33.3333%`. MEASURED on staging
+	 * before it was shared: positions `[128, 128, 128]` against bookmarks `[136, 92]`
+	 * — equalising one surface and leaving the other ragged is the drift the pair is
+	 * supposed to be immune to.
+	 * ⛔ THE ARITHMETIC IS NOT RESTATED HERE — `row-thirds.ts` owns it, and carries the
+	 * measurement, why the mockup has no clamp, and why the CSS form fails.
+	 */
+	const bodyRef = useRef<HTMLDivElement | null>(null);
+	const tableRef = useRef<HTMLTableElement | null>(null);
 
 	// Canon §5 rules the dismissal grammar for a popover on this surface family:
 	// "ESC / click-out closes". Byte-carried from `PositionsTable.tsx`, both
@@ -132,6 +154,14 @@ export function BookmarksTable({
 	const visible = items.filter(
 		(i) => market === "all" || i.marketSlug === market,
 	);
+
+	useEqualRowThirds({
+		bodyRef,
+		tableRef,
+		testidPrefix: "bookmark-row-",
+		rowWindow: ROW_WINDOW,
+		rowCount: visible.length,
+	});
 
 	// ⚠ THE SELECTION IS DERIVED AGAINST THE VISIBLE SET, NOT STORED AS TRUTH —
 	// Profile's rule. A pick the filter has hidden simply stops counting; it is
@@ -202,7 +232,7 @@ export function BookmarksTable({
 
 	if (items.length === 0) {
 		return (
-			<BookmarksPanel>
+			<BookmarksPanel bodyRef={bodyRef}>
 				<EmptyBlock
 					message={BOOKMARKS_EMPTY_COPY.msg}
 					messageTestId="bookmarks-empty"
@@ -214,6 +244,7 @@ export function BookmarksTable({
 
 	return (
 		<BookmarksPanel
+			bodyRef={bodyRef}
 			controls={
 				/* ⛔ THE LABEL AND ITS CARET ARE BYTE-CARRIED, NOT AUTHORED — canon §6
 				   pins `Select market ▾` verbatim, and the caret is `e2 96 be`,
@@ -291,6 +322,7 @@ export function BookmarksTable({
 			    Bound here, the keys are live exactly while focus is inside the
 			    table. */}
 			<table
+				ref={tableRef}
 				data-testid="bookmarks-table"
 				onKeyDown={(e) => {
 					if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
@@ -609,9 +641,16 @@ function BookmarkArgumentCell({
  */
 function BookmarksPanel({
 	controls,
+	bodyRef,
 	children,
 }: {
 	controls?: React.ReactNode;
+	/**
+	 * ⚠ PROFILE REFINEMENT · R1 — the scroll container the row-third is measured
+	 * against, handed down exactly as `PositionsPanel` hands its own down: the panel
+	 * owns the box, the table owns the rows, and the measurement needs both.
+	 */
+	bodyRef?: React.Ref<HTMLDivElement>;
 	children: React.ReactNode;
 }): React.JSX.Element {
 	return (
@@ -700,6 +739,7 @@ function BookmarksPanel({
 			<div
 				data-testid="bookmarks-panel-body"
 				className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
+				ref={bodyRef}
 			>
 				{children}
 			</div>
