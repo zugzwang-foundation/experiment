@@ -2117,3 +2117,25 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 **Expected next task.** HARDEN.* moderation hardening (TBD), sequenced with the HARDEN.6 `listMarketComments` cap.
 
 **Code touch points** (forward reference, do not act on now): `src/server/debate-view/load-debate-view.ts` — `READ_URL_TTL_SECONDS` (`:36`) and `mintImageUrls` (`:421`, called at `:252`); `src/server/storage/sign-read.ts`; `src/server/config/limits.ts:252-258`.
+
+---
+
+## ITEM-ID-NAMESPACE — the same short code names different things in different task families, and it is live
+
+**Originating task:** JOURNEY-22 overnight recon (2026-08-18), PART F1. Read-only census over all 345 commit subjects and bodies; nothing minted, no rule proposed.
+
+**The measurement.** **332 distinct item-ID tokens are used by two or more different task families**, out of 660 distinct tokens seen. Token classes counted: a single capital letter plus a number (`A1`, `D-5`), and a short prefixed code (`OQ-7`, `PD-3`). Worst offenders by colliding-family count: `A4` and `Q1` at **twelve families each**, then `A1` `D2` `D4` at eleven, `A6` `C1` `D1` `D3` `P1` at ten, `OQ-2` `Q2` `R1` `W2` at nine.
+
+**Two collisions were already known and both were found by accident** — `D` across at least six namespaces, `OQ-7` across at least seven referents — each surfaced while doing something else. The census says they are not outliers. They are the median case.
+
+⚠ **Reading caveat, and it matters before anyone acts on the counts.** The top three rows of the census are **document references, not item IDs**: `SPEC.2` (20 families), `SPEC.1` (18), `INV-1` (10). Wide use of those is correct usage — they are cited everywhere because everything cites them — and counting them as collisions overstates the problem. `R2` is a genuine three-way: the object store, plus an item ID in at least two families. Strip the document references and the real collision space is the single-capital-plus-number set (`A1` `A2` `A4` `A6` `B1` `C1` `D1` `D2` `D3` `D4` `P1` `Q1` `Q2` `R1` `W2`) and the `OQ-n` set.
+
+**Why this is live and not historical.** POLISH and PRIMITIVES both mint and cite codes in this space today, as do the HTML-FINISH runs. A citation written this week is as ambiguous as one written in May — `A4` resolves to twelve different things depending on which task a reader thinks they are in, and nothing in the token says which.
+
+**Why it is parked rather than fixed here.** A naming scheme is a cross-cutting convention change affecting every plan, every register and every close-out already written. `CLAUDE.md` §8 already carries the `L-n` and `GC-n` precedents, where the same defect was ruled one prefix at a time, after the fact. This needs **an ADR with the full ritual** — scope, options, migration posture for existing citations, and a decision about whether historical documents are rewritten or left — not an overnight mint.
+
+**Conditional trigger.** Any citation that resolves to the wrong item, or the next time a bare code has to be disambiguated by hand in review.
+
+**Expected next task.** A dedicated ADR (next free number per `ls docs/adr/`), scoped and ratified before any renaming.
+
+**Evidence.** Full census table — every colliding token, its family count, and one example subject per family — in the JOURNEY-22 run report, `zz_J22_report_2026-08-18T0108.md` §PART F1.
