@@ -481,6 +481,15 @@ describe("profile height chain — every link, asserted by name", () => {
 		const thirds = read(ROW_THIRDS);
 		expect(thirds).toContain("row.style.height");
 		expect(thirds).not.toContain("body.style.height");
+		// ⚠ PROFILE OVERLAP · R1 — THE ARITHMETIC MUST STAY OUT OF THE EFFECT, and
+		// this is the only place that can say so. jsdom has no layout, so nothing
+		// inside the hook is reachable by any test; the decision therefore lives in
+		// the pure `rowThird`, which `row-third.test.ts` holds to the figures
+		// measured on the mockup and on staging. If the sums ever migrate back
+		// inline they become untestable again — which is how a share the rows could
+		// not honour shipped green in the first place.
+		expect(thirds).toContain("export function rowThird(");
+		expect(thirds).toContain("rowThird({");
 		// …and the positions table still CONSUMES it, so the rule is not merely
 		// present somewhere — it is wired to this panel.
 		expect(pos).toContain("useEqualRowThirds(");
