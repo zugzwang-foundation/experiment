@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Claiming It Twice
+
+An adversarial review found a picture could be attached that had already been spoken for — used by an earlier argument, or already finished with for some other reason. Two guards close it. The lookup now refuses anything that has reached an end state, and the attachment is claimed in a way that fails outright if somebody else claimed it first. The failure looks identical to every other bad request, deliberately.
