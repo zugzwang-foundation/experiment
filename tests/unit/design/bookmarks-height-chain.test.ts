@@ -203,7 +203,16 @@ describe("bookmarks height chain — every link, asserted by name", () => {
 			extras,
 			"C7: the container declares no one-screen bound, so `<main>` grows with " +
 				"its content and the page scrolls.",
-		).toContain("lg:h-[calc(100vh-60px-2px)]");
+		).toContain("lg:h-[calc(100dvh-60px-2px)]");
+		// ⚠⚠ PROFILE-DIMS R2 · D-4 — `100dvh`, AND NEVER `100vh`. Same property
+		// `debate-height-chain.test.ts` pins by name and the same one Profile's
+		// chain now pins: a collapsing mobile chrome makes `100vh` taller than the
+		// visible screen. ⛔ Scoped to THIS container's classes — the shell's floor
+		// below is still `100vh` and must stay readable as such.
+		expect(
+			extras.filter((c) => /100vh/.test(c)),
+			"C7: this container declares `100vh`. Use `100dvh`.",
+		).toEqual([]);
 		expect(
 			extras,
 			"C7: the bound is inert without `lg:flex-none` — `flex-1`'s 0% basis " +

@@ -135,9 +135,49 @@ export default async function ProfilePage({
 		   zero unreachable there too. An `overflow-y-auto` safety was tried and
 		   REJECTED: it buys nothing measurable and trades a page scrollbar nobody
 		   sees at realistic heights for an inner one. */
+		/* ⚠⚠ PROFILE-DIMS R2 · D-4 — THIS ROUTE TAKES THE `screen` PRESET.
+		   Founder-ruled, and it is the SAME ruling `/m/[slug]` already runs on:
+		   full bleed, `max-w-none px-7 py-4`.
+		   ⛔ CONSUMED, NEVER RE-MINTED. `screen` already exists at
+		   `PageContainer.tsx:108` — it arrived with #341 — so this round authors no
+		   preset and leaves all six byte-identical. Site 5's row in
+		   `page-container.test.ts` moves WITH this change, in the same commit, via
+		   that guard's own `now`/`movedBy` mechanism.
+
+		   ⛔ WHY `wide` WAS WRONG, AND WHAT I COULD AND COULD NOT MEASURE. `wide`
+		   caps at `max-w-[1440px]`; the mockup's `.content` is full bleed inside a
+		   28px inset (`:186`). At the pinned 1440 the cap is nearly invisible — the
+		   container measured 1392 against the mockup's 1384 — but it BINDS above
+		   it, and site 9's preset docblock records the measurement: at 1800 the
+		   same band is 1744 (96.9%) full-bleed against 1392 (77.3%) capped, a
+		   −19.6pp delta every region inside inherits.
+		   ⚠ I COULD NOT OBSERVE THAT DIRECTLY — `screen.availWidth` on this display
+		   is 1440, so a viewport wider than the cap cannot be produced in a real
+		   browser here. That is a MEASUREMENT GAP, not evidence the cap is
+		   harmless, and D-4 rules it either way.
+		   ⇒ AT THE PINNED VIEWPORT THE EFFECT IS MEASURABLE AND IS AN IMPROVEMENT:
+		   1392 → 1384, i.e. 96.7% → 96.1% of the viewport, and the mockup's is
+		   96.1% — Δ 0.0pp.
+
+		   ⚠ `gap-3`, NOT `gap-6` — the mockup's own literal: `.arena` carries
+		   `margin-top:12px` (`:222`), and `/m/[slug]` pairs `screen` with `gap-3`
+		   (`DebateView.tsx:512`). This hands 12px back to the arena band.
+
+		   ⚠ `100dvh`, NOT `100vh` — the dynamic viewport unit, so a collapsing
+		   mobile browser chrome cannot leave the bound taller than the visible
+		   screen. `/m/[slug]` declares `h-[calc(100dvh-60px-2px)]` and its guard
+		   carries a test named `the-page-declares-100dvh-and-NEVER-100vh`; this
+		   route was the outlier. ⛔ THE FIGURE IS UNCHANGED — still `<main>`'s own
+		   `60px + 2px` — so the arithmetic above still holds exactly.
+
+		   ⛔ THE `lg:` SCOPING IS KEPT, AND IS DELIBERATELY NOT A COPY OF
+		   `/m/[slug]`. That route bounds UNPREFIXED; this one must not, for the
+		   reason the block above records — below `lg` the two bands stack and the
+		   page must stay free to grow and scroll. D-4 rules the PRESET (the three
+		   container axes), never another surface's content className. */
 		<PageContainer
-			preset="wide"
-			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+			preset="screen"
+			className="flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none"
 		>
 			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
 			    five full-width sections stacked in one column. Canon §2 (Profile):

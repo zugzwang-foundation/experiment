@@ -322,7 +322,20 @@ describe("profile height chain — every link, asserted by name", () => {
 			extras,
 			"item A: the container declares no one-screen bound, so `<main>` grows " +
 				"with its content and the page scrolls.",
-		).toContain("lg:h-[calc(100vh-60px-2px)]");
+		).toContain("lg:h-[calc(100dvh-60px-2px)]");
+		// ⚠⚠ PROFILE-DIMS R2 · D-4 — `100dvh`, AND NEVER `100vh`, ON THIS CONTAINER.
+		// The dynamic viewport unit, so a collapsing mobile browser chrome cannot
+		// leave the bound taller than the screen. `/m/[slug]` was ruled onto it
+		// first and `debate-height-chain.test.ts` pins the same property by name
+		// (`the-page-declares-100dvh-and-NEVER-100vh`); this route was the outlier.
+		// ⛔ THE CHECK IS SCOPED TO THE CONTAINER'S OWN CLASSES, deliberately: the
+		// SHELL's floor below is still `100vh` and must stay readable as such.
+		expect(
+			extras.filter((c) => /100vh/.test(c)),
+			"item A: this container declares `100vh`. Use `100dvh` — a collapsing " +
+				"mobile chrome makes `100vh` taller than the visible screen, which is " +
+				"a bound that scrolls the page it exists to stop scrolling.",
+		).toEqual([]);
 		expect(
 			extras,
 			"item A: the bound is inert without `lg:flex-none` — `flex-1`'s 0% " +
