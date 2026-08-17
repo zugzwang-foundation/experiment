@@ -140,18 +140,35 @@ describe("item 5 — the row is selectable by pointer", () => {
 describe("item 5 — Up/Down step the selection, wrapping", () => {
 	const table = () => screen.getByTestId("positions-table");
 
-	it("selection::ArrowDown-from-nothing-enters-at-the-first-row", () => {
-		// The mockup's `at < 0 ? 0` (`:745`) — from no selection BOTH directions
-		// enter at index 0, which is why this is asserted for Up as well below.
+	it("selection::ArrowDown-steps-OFF-row-one-on-the-FIRST-press", () => {
+		// ⛔⛔ RE-POINTED at PROFILE OVERLAP R4, AND THIS GUARD WAS ASSERTING THE
+		// DEFECT. It read `ArrowDown-from-nothing-enters-at-the-first-row` and
+		// expected row ONE to be picked after one press — faithful to the mockup's
+		// `at < 0 ? 0` (`:745`), but "nothing" stopped being a state the moment R3
+		// selected row one at mount. The stepper's anchor still read the STORED
+		// pick, `null` until a click, so it fell to `at < 0` and re-selected the row
+		// it was already on: THE FIRST PRESS MOVED NOTHING, and this test called
+		// that correct. Measured on staging, focus inside the table, two ArrowDowns,
+		// no movement.
+		// ⇒ The anchor is now the DERIVED row, so one press means one step. The
+		// mockup's arithmetic is unchanged — `at < 0 ? 0` still governs the case it
+		// was written for, an empty derivation, which is now the only way to have
+		// no anchor.
 		render(<PositionsTable payload={PAYLOAD} />);
-		fireEvent.keyDown(table(), { key: "ArrowDown" });
 		expect(isPicked(1)).toBe(true);
+		fireEvent.keyDown(table(), { key: "ArrowDown" });
+		expect(isPicked(2)).toBe(true);
+		expect(isPicked(1)).toBe(false);
 	});
 
-	it("selection::ArrowUp-from-nothing-ALSO-enters-at-the-first-row", () => {
+	it("selection::ArrowUp-on-the-FIRST-press-wraps-to-the-last-row", () => {
+		// The other half of the same reversal: from row one, back is the LAST row.
+		// This read `ALSO-enters-at-the-first-row`, i.e. it too expected a press
+		// that changed nothing.
 		render(<PositionsTable payload={PAYLOAD} />);
 		fireEvent.keyDown(table(), { key: "ArrowUp" });
-		expect(isPicked(1)).toBe(true);
+		expect(isPicked(3)).toBe(true);
+		expect(isPicked(1)).toBe(false);
 	});
 
 	it("selection::ArrowDown-steps-forward-and-WRAPS-past-the-last", () => {
@@ -185,13 +202,18 @@ describe("item 5 — Up/Down step the selection, wrapping", () => {
 	});
 
 	it("selection::the-step-moves-FOCUS-with-the-selection", () => {
-		// Without this the second arrow press never reaches the handler, because
-		// the handler is scoped to the table rather than to `document`.
+		// Focus follows the pick so the NEXT arrow keeps arriving at the table's own
+		// handler. ⚠ PROFILE OVERLAP R4 — that used to be the only route in, which
+		// is why a fresh page could not be stepped at all; `row-stepper.ts` now
+		// carries the first press. This still matters after it: once focus is inside,
+		// the document arm stands down and this handler owns every press.
+		// ⚠ THE ROW NUMBERS MOVED WITH THE ANCHOR, not the claim — press one now
+		// lands on row TWO, because row one is where it started.
 		render(<PositionsTable payload={PAYLOAD} />);
 		fireEvent.keyDown(table(), { key: "ArrowDown" });
-		expect(document.activeElement).toBe(rowEl(1));
-		fireEvent.keyDown(table(), { key: "ArrowDown" });
 		expect(document.activeElement).toBe(rowEl(2));
+		fireEvent.keyDown(table(), { key: "ArrowDown" });
+		expect(document.activeElement).toBe(rowEl(3));
 	});
 
 	it("selection::the-roving-tab-stop-follows-the-selection", () => {

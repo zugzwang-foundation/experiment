@@ -8,6 +8,7 @@ import {
 	formatDharma,
 } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
+import { useDocumentRowStepper } from "@/components/profile/row-stepper";
 import { useEqualRowThirds } from "@/components/profile/row-thirds";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
@@ -216,7 +217,21 @@ export function BookmarksTable({
 		if (visible.length === 0) {
 			return;
 		}
-		const at = visible.findIndex((i) => i.id === selectedId);
+		// ⚠⚠ PROFILE OVERLAP · R4 — THE ANCHOR IS THE *DERIVED* ROW, NOT THE STORED
+		// PICK, and that one word was half the row. The stored id means "the reader
+		// has chosen"; it is `null` at mount, so this read fell to `at < 0` and
+		// entered at index 0 — which is the row R3 already has selected. The first
+		// arrow therefore re-selected where it stood and NOTHING MOVED; the second
+		// finally stepped. MEASURED on staging from a fresh load, with focus placed
+		// inside the table so the keys were arriving: two ArrowDowns, no movement.
+		// ⇒ Stepping has to start from what is on screen, and the only thing that
+		// knows that is `selectedRow` — the same derivation the panel is handed and
+		// the highlight is drawn from. Reading it here is what makes the keyboard's
+		// notion of "current" and the selection ONE fact instead of two.
+		// ⚠ `at < 0` survives and is still reachable: an empty visible set returns
+		// above, but a derived `null` on a non-empty set does not, so entering at
+		// index 0 stays the answer for it.
+		const at = selectedRow === null ? -1 : visible.indexOf(selectedRow);
 		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
 		const target = visible[next];
 		if (target === undefined) {
@@ -229,6 +244,17 @@ export function BookmarksTable({
 		}
 		el?.focus({ preventScroll: true });
 	};
+	// ⚠⚠ PROFILE OVERLAP · R4 — AND THE KEYS HAVE TO ARRIVE. The handler on the
+	// `<table>` below only fires while focus is already inside it, and at load
+	// focus is on `<body>`, so the stepper above was unreachable from a fresh page
+	// however correct its arithmetic. This is the arm that reaches it; every
+	// condition it stands down on — a caret, page scrolling, focus taken
+	// elsewhere, focus already in the table — is written out in that module,
+	// including why the old "never bind to `document`" ruling is answered rather
+	// than overruled.
+	// ⛔ `enabled` yields the keys while the market popover is open: canon §5 says
+	// Up/Down yield there, and its options are a list of their own.
+	useDocumentRowStepper({ tableRef, step: stepRow, enabled: !filterOpen });
 
 	if (items.length === 0) {
 		return (
@@ -331,7 +357,14 @@ export function BookmarksTable({
 			    GROWS AND SCROLLS below `lg`, so a document-level ArrowDown that
 			    prevents default would kill keyboard scrolling of the whole route.
 			    Bound here, the keys are live exactly while focus is inside the
-			    table. */}
+			    table. 			    ⚠⚠ AND SINCE PROFILE OVERLAP R4 IT IS NOT THE ONLY BINDING, on this
+			    surface for the same reason as on Profile: focus starts on `<body>`, so
+			    this handler never fired from a fresh load and ↑/↓ did nothing until
+			    something was clicked. `useDocumentRowStepper` above adds the document
+			    arm, and it stands down whenever the page has scrolling to lose — the
+			    objection above is answered, not overruled — and whenever the target is
+			    already inside this table, which is what stops one press stepping twice.
+			    */}
 			<table
 				ref={tableRef}
 				data-testid="bookmarks-table"

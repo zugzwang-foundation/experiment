@@ -23,6 +23,7 @@ import type {
 } from "@/server/profile/positions";
 
 import { PROFILE_COPY } from "./copy";
+import { useDocumentRowStepper } from "./row-stepper";
 import { useEqualRowThirds } from "./row-thirds";
 import {
 	initialMarketIdOf,
@@ -391,7 +392,21 @@ export function PositionsTable({
 		if (visible.length === 0) {
 			return;
 		}
-		const at = visible.findIndex((r) => r.marketId === selectedMarketId);
+		// ⚠⚠ PROFILE OVERLAP · R4 — THE ANCHOR IS THE *DERIVED* ROW, NOT THE STORED
+		// PICK, and that one word was half the row. The stored id means "the reader
+		// has chosen"; it is `null` at mount, so this read fell to `at < 0` and
+		// entered at index 0 — which is the row R3 already has selected. The first
+		// arrow therefore re-selected where it stood and NOTHING MOVED; the second
+		// finally stepped. MEASURED on staging from a fresh load, with focus placed
+		// inside the table so the keys were arriving: two ArrowDowns, no movement.
+		// ⇒ Stepping has to start from what is on screen, and the only thing that
+		// knows that is `selectedRow` — the same derivation the panel is handed and
+		// the highlight is drawn from. Reading it here is what makes the keyboard's
+		// notion of "current" and the selection ONE fact instead of two.
+		// ⚠ `at < 0` survives and is still reachable: an empty visible set returns
+		// above, but a derived `null` on a non-empty set does not, so entering at
+		// index 0 stays the answer for it.
+		const at = selectedRow === null ? -1 : visible.indexOf(selectedRow);
 		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
 		const target = visible[next];
 		if (target === undefined) {
@@ -404,6 +419,17 @@ export function PositionsTable({
 		}
 		el?.focus({ preventScroll: true });
 	};
+	// ⚠⚠ PROFILE OVERLAP · R4 — AND THE KEYS HAVE TO ARRIVE. The handler on the
+	// `<table>` below only fires while focus is already inside it, and at load
+	// focus is on `<body>`, so the stepper above was unreachable from a fresh page
+	// however correct its arithmetic. This is the arm that reaches it; every
+	// condition it stands down on — a caret, page scrolling, focus taken
+	// elsewhere, focus already in the table — is written out in that module,
+	// including why the old "never bind to `document`" ruling is answered rather
+	// than overruled.
+	// ⛔ `enabled` yields the keys while the market popover is open: canon §5 says
+	// Up/Down yield there, and its options are a list of their own.
+	useDocumentRowStepper({ tableRef, step: stepRow, enabled: !filterOpen });
 
 	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
 	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
@@ -586,6 +612,17 @@ export function PositionsTable({
 					// route. Bound here, the keys are live exactly while focus is
 					// inside the table — the BEHAVIOUR the mockup describes, without
 					// the side effect its own page could not have.
+					// ⚠⚠ AND SINCE PROFILE OVERLAP R4 IT IS NOT THE ONLY BINDING.
+					// Scoping to the table is the reason ↑/↓ did nothing from a fresh
+					// load: focus starts on `<body>`, so this handler never fired and
+					// the stepper was unreachable without a click.
+					// `useDocumentRowStepper` above adds the document arm — and the
+					// objection this block raises is ANSWERED rather than overruled:
+					// that arm stands down whenever `scrollHeight > clientHeight`, so
+					// the keyboard scrolling of a growable route is never taken. ⛔ It
+					// also stands down when the target is inside this table, which is
+					// what keeps one press from stepping twice. This handler still owns
+					// every press that arrives with focus already in here.
 					onKeyDown={(e) => {
 						if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
 							return;

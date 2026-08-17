@@ -434,9 +434,13 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", () => {
 		// The founder's own verification step: arrows step rows, wrap, and the
 		// panel follows. Both halves are asserted from the panel's side.
+		// ⚠ PROFILE OVERLAP R4 — THE PANEL STARTS ON THE FIRST ROW, so the first
+		// press moves to the SECOND. This used to open on the first press because
+		// the stepper anchored on the stored pick and re-selected row one; the panel
+		// therefore appeared to "follow" a press that had moved nothing. The claim
+		// is unchanged and the sequence is one row earlier.
 		mount();
 		const table = screen.getByTestId("positions-table");
-		fireEvent.keyDown(table, { key: "ArrowDown" });
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		fireEvent.keyDown(table, { key: "ArrowDown" });
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();

@@ -139,15 +139,23 @@ describe("C5 — the row is selectable by pointer", () => {
 });
 
 describe("C5 — Up/Down step the selection, wrapping", () => {
-	it("selection::both-directions-enter-at-the-first-row-from-nothing", () => {
-		// Profile's `at < 0 ? 0`.
+	it("selection::the-FIRST-press-steps-off-row-one-in-both-directions", () => {
+		// ⛔⛔ RE-POINTED at PROFILE OVERLAP R4, AND THIS GUARD WAS ASSERTING THE
+		// DEFECT — the same one, on the same day, as Profile's. It read
+		// `both-directions-enter-at-the-first-row-from-nothing` and expected row ONE
+		// after one press. "Nothing" stopped being a state when R3 selected row one
+		// at mount, but the stepper's anchor still read the STORED pick, so it fell
+		// to `at < 0` and re-picked where it stood: the first press moved nothing and
+		// this test called it correct. ⇒ The anchor is the DERIVED row now, so down
+		// is row two and up wraps to the last.
 		render(<BookmarksTable items={ITEMS} />);
-		fireEvent.keyDown(table(), { key: "ArrowDown" });
 		expect(isPicked(1)).toBe(true);
+		fireEvent.keyDown(table(), { key: "ArrowDown" });
+		expect(isPicked(2)).toBe(true);
 		cleanup();
 		render(<BookmarksTable items={ITEMS} />);
 		fireEvent.keyDown(table(), { key: "ArrowUp" });
-		expect(isPicked(1)).toBe(true);
+		expect(isPicked(3)).toBe(true);
 	});
 
 	it("selection::ArrowDown-WRAPS-past-the-last", () => {
@@ -177,13 +185,16 @@ describe("C5 — Up/Down step the selection, wrapping", () => {
 	});
 
 	it("selection::focus-moves-with-the-selection", () => {
-		// Without this the SECOND arrow press never reaches the handler, because
-		// the handler is scoped to the table rather than to `document`.
+		// Focus follows the pick so the NEXT press keeps arriving at the table's own
+		// handler. ⚠ PROFILE OVERLAP R4 — that used to be the only way in at all,
+		// which is why a fresh page could not be stepped; `row-stepper.ts` carries
+		// the first press now and stands down once focus is inside. ⚠ The row numbers
+		// moved with the anchor, not the claim.
 		render(<BookmarksTable items={ITEMS} />);
 		fireEvent.keyDown(table(), { key: "ArrowDown" });
-		expect(document.activeElement).toBe(rowEl(1));
-		fireEvent.keyDown(table(), { key: "ArrowDown" });
 		expect(document.activeElement).toBe(rowEl(2));
+		fireEvent.keyDown(table(), { key: "ArrowDown" });
+		expect(document.activeElement).toBe(rowEl(3));
 	});
 
 	it("selection::the-roving-tab-stop-follows-the-selection", () => {
@@ -301,9 +312,12 @@ describe("C6 — the arena's two panels share one selection", () => {
 	});
 
 	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS-and-wraps", () => {
+		// ⚠ PROFILE OVERLAP R4 — the panel starts on row one, so the first press
+		// moves to the SECOND. It used to open on the first press because the
+		// stepper re-selected row one, i.e. the panel appeared to follow a press
+		// that had moved nothing. Same claim, sequence one row earlier.
 		mount();
 		const t = screen.getByTestId("bookmarks-table");
-		fireEvent.keyDown(t, { key: "ArrowDown" });
 		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
 		fireEvent.keyDown(t, { key: "ArrowDown" });
 		expect(screen.getByTestId(`bookmark-replica-${ID(2)}`)).toBeTruthy();
