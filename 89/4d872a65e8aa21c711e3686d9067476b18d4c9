@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Whole Numbers For People
+
+Every amount a person sees is rounded to whole units, and only at the moment of display. The engine, the ledger, the read models and every message between them keep full precision, as do the exported file and the eventual public dataset. Rounding is a property of the view and of nothing else. Negative zero is guarded by name, because it is a real thing a computer produces and a nonsense thing to show anybody.
