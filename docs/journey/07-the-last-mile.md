@@ -1,5 +1,5 @@
 # Act VII — The Last Mile
-*n286–345 · 3 – 17 August 2026*
+*n286–346 · 3 – 18 August 2026*
 
 By the start of August the thing works. Bets settle, arguments rank, the pages look like the drawings. What's left is the last mile — every surface compared against its mockup, one at a time, until they match.
 
@@ -489,5 +489,29 @@ The market page has two modes, and everything inside its header swaps between th
 `PROFILE + BOOKMARKS · dimensional parity R2 — the 52px colhead floor` · 17 August 2026 · week 17
 
 Four panel headings sat ten pixels out of line, because two of them hold controls and two hold only a title. The fix is a minimum height, which can only ever lift the shorter one — a fixed height would have clipped the taller. The measurement was taken again on this branch rather than inherited from the attempt before it, which had been closed unmerged.
+
+---
+
+### Correct Five Times
+`PROFILE + BOOKMARKS · FULL HTML-FINISH` · 18 August 2026 · week 17
+
+Something on a page would not fit. It was ruled impossible five separate times.
+
+Every one of those five was measured, and every one was right. Nobody guessed —
+each refusal was a real number against a real constraint, and each concluded
+correctly that within the question it had been handed there was no answer.
+
+The question had a boundary. It covered how large the text could be and how the
+pieces sat beside each other. It did not cover the box holding them.
+
+That box had a border and some padding. Thirty-two pixels, about a sixth of the
+whole thing. The design being copied never gave it either — it frames the
+contents and not the holder, and reading that as decoration is what cost four
+rounds.
+
+Take the frame away and the space appears. It had been there the whole time,
+outside the boundary of every question that went looking for it.
+
+Five right answers. One wrong fence.
 
 ---
