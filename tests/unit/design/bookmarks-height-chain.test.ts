@@ -96,6 +96,15 @@ const UNPREFIXED_HEIGHT = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
 /** A clipping overflow on the vertical path — what turns a bound into a clip. */
 const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
 
+/**
+ * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`).
+ * ⚠ THE SAME LITERAL `profile-height-chain.test.ts` PINS, and that is the point:
+ * `/bookmarks` IS that mockup in its `sub:'bookmark'` arm (`:765-771`), so the
+ * two surfaces' four panel heads take one floor in one commit. Sizing one
+ * surface and then re-sizing the other is the drift §3 forbids by name.
+ */
+const HEAD_FLOOR = "min-h-[52px]";
+
 /** Every link, as (name, classes, required). The table IS the assertion. */
 function chainLinks(): Array<{
 	name: string;
@@ -276,6 +285,69 @@ describe("bookmarks height chain — every link, asserted by name", () => {
 		const arena = classesOf(page, PAGE, "bookmarks-arena");
 		expect(arena).toContain("flex-1");
 		expect(arena).toContain("min-h-0");
+	});
+
+	it("bookmarks-height-chain::both-panel-heads-share-ONE-floor-so-the-bodies-start-level", () => {
+		// ⚠⚠ THE LAW. The two arena panels sit side by side, so their heads must be
+		// one height or their scrolling bodies begin on different lines. The mockup
+		// pins it with `.colhead{min-height:52px}` on BOTH slots (`:227-228`).
+		//
+		// ⚠ MEASURED ON THIS SURFACE, NOT INHERITED FROM PROFILE. A session was
+		// available this round, so `/bookmarks` was loaded signed-in at a pinned
+		// 1440×777 and its own split measured: list head **51**, replica head
+		// **41**, bodies at y418 vs y408. (The previous round could only infer this
+		// surface from Profile's identical class strings; this one measured it.)
+		const heads = [
+			{
+				testid: "bookmarks-panel-head",
+				classes: classesOf(read(TABLE), TABLE, "bookmarks-panel-head"),
+			},
+			{
+				testid: "bookmarks-replica-panel-head",
+				classes: classesOf(
+					read(REPLICA),
+					REPLICA,
+					"bookmarks-replica-panel-head",
+				),
+			},
+		];
+		const floorsOf = (cs: string[]) =>
+			cs.filter((c) => /^min-h-/.test(c)).join(" ");
+
+		for (const h of heads) {
+			expect(
+				h.classes,
+				`${h.testid} lost the \`.colhead\` floor — the two panel bodies will ` +
+					`start on different lines.`,
+			).toContain(HEAD_FLOOR);
+		}
+		expect(new Set(heads.map((h) => floorsOf(h.classes))).size).toBe(1);
+		for (const h of heads) {
+			expect(
+				UNPREFIXED_HEIGHT.some((re) => h.classes.some((c) => re.test(c))),
+				`${h.testid} declares a fixed height; a head must only ever be floored`,
+			).toBe(false);
+		}
+
+		// ⚠ POSITIVE CONTROLS, INLINE — each runs the REAL predicate.
+		expect(heads[0].classes.filter((c) => c !== HEAD_FLOOR)).not.toContain(
+			HEAD_FLOOR,
+		);
+		expect(
+			new Set([
+				floorsOf(heads[0].classes),
+				floorsOf(
+					heads[1].classes.map((c) => (c === HEAD_FLOOR ? "min-h-[40px]" : c)),
+				),
+			]).size,
+			"the drift mutation did not take — check 2 is inert",
+		).toBe(2);
+		expect(
+			UNPREFIXED_HEIGHT.some((re) =>
+				heads[0].classes.concat("h-[52px]").some((c) => re.test(c)),
+			),
+			"the fixed-height mutation did not take — check 3 is inert",
+		).toBe(true);
 	});
 
 	it("bookmarks-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {

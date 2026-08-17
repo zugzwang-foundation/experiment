@@ -165,6 +165,16 @@ const A1_FORBIDDEN = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
  * here, and only one of them keeps the content reachable. */
 const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
 
+/**
+ * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`),
+ * carried as a LITERAL because the mockup states it as one. It is what makes
+ * the two side-by-side panel heads one height, and therefore what makes their
+ * two scrolling bodies start on the same line. ⛔ ONE string, asserted on all
+ * FOUR heads across this file and `bookmarks-height-chain.test.ts`, so the two
+ * surfaces can never be sized one after the other (§3).
+ */
+const HEAD_FLOOR = "min-h-[52px]";
+
 /** The class list of a node in one of the two panel files, by `data-testid`. */
 function panelClasses(source: string, file: string, testid: string): string[] {
 	const m = new RegExp(
@@ -410,6 +420,84 @@ describe("profile height chain — every link, asserted by name", () => {
 		).toContain("overflow-y-auto");
 		// The window is the founder's three, named once.
 		expect(/const ROW_WINDOW = 3;/.test(pos)).toBe(true);
+	});
+
+	it("profile-height-chain::both-panel-heads-share-ONE-floor-so-the-bodies-start-level", () => {
+		// ⚠⚠ THE LAW, and it is a DIMENSION rather than a decoration. The two arena
+		// panels sit side by side, so their heads must be one height or their two
+		// scrolling bodies begin on different lines. The mockup pins that with
+		// `.colhead{min-height:52px}` (`:227-228`) applied to BOTH slots.
+		//
+		// ⛔ MEASURED AT A PINNED 1440×777 ON LIVE STAGING, IN BOTH AUTH STATES —
+		// signed out AND signed in, positions head 51 against arguments head 41,
+		// bodies at y418 vs y408. Both heads carry the SAME class string, so the
+		// split is pure CONTENT: one head holds a market filter and a segmented
+		// control, the other a bare title. Nothing in a class list shows that,
+		// which is why it needs a guard rather than a review.
+		const heads = [
+			{
+				testid: "positions-panel-head",
+				classes: panelClasses(
+					read(POSITIONS),
+					POSITIONS,
+					"positions-panel-head",
+				),
+			},
+			{
+				testid: "arguments-panel-head",
+				classes: panelClasses(
+					read(ARGUMENTS),
+					ARGUMENTS,
+					"arguments-panel-head",
+				),
+			},
+		];
+		const floorsOf = (cs: string[]) =>
+			cs.filter((c) => /^min-h-/.test(c)).join(" ");
+
+		// 1. Each head declares the floor.
+		for (const h of heads) {
+			expect(
+				h.classes,
+				`${h.testid} lost the \`.colhead\` floor — the two panel bodies will ` +
+					`start on different lines. Re-derive the head rather than ` +
+					deletingHint,
+			).toContain(HEAD_FLOOR);
+		}
+		// 2. ONE value across both, so two DIFFERENT floors cannot each pass check 1
+		//    while still leaving the bodies unlevel.
+		expect(new Set(heads.map((h) => floorsOf(h.classes))).size).toBe(1);
+		// 3. A FLOOR, NEVER A FIXED HEIGHT — `h-[52px]` would level the heads too,
+		//    and would CLIP the moment either gains a control. Reuses this file's
+		//    own `A1_FORBIDDEN` predicate, so the two checks cannot drift apart.
+		for (const h of heads) {
+			expect(
+				A1_FORBIDDEN.some((re) => h.classes.some((c) => re.test(c))),
+				`${h.testid} declares a fixed height; a head must only ever be floored`,
+			).toBe(false);
+		}
+
+		// ⚠ POSITIVE CONTROLS, INLINE. A guard only ever run against a passing tree
+		// is indistinguishable from one that cannot fail. Each mutation runs the
+		// REAL predicate over the REAL class list.
+		expect(heads[0].classes.filter((c) => c !== HEAD_FLOOR)).not.toContain(
+			HEAD_FLOOR,
+		);
+		expect(
+			new Set([
+				floorsOf(heads[0].classes),
+				floorsOf(
+					heads[1].classes.map((c) => (c === HEAD_FLOOR ? "min-h-[40px]" : c)),
+				),
+			]).size,
+			"the drift mutation did not take — check 2 is inert",
+		).toBe(2);
+		expect(
+			A1_FORBIDDEN.some((re) =>
+				heads[0].classes.concat("h-[52px]").some((c) => re.test(c)),
+			),
+			"the fixed-height mutation did not take — check 3 is inert",
+		).toBe(true);
 	});
 
 	it("profile-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {

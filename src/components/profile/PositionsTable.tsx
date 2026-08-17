@@ -930,9 +930,14 @@ function PositionsPanel({
 			    here rather than on the trigger — see the ⛔ at the trigger for the
 			    measurement that moved it. The mockup's `.colhead` is
 			    `position:relative` for exactly this reason (`:227`). */}
+			{/* ⚠ `min-h-[52px]` — the mockup's `.colhead{min-height:52px}` (`:228`),
+			    landed on all four panel heads in one commit so the two side-by-side
+			    bodies start level. Measured 51 here against the arguments head's 41
+			    at a pinned 1440×777, in BOTH auth states. It can only GROW a head,
+			    never clip one. Full measurement on `ArgumentList.tsx`'s copy. */}
 			<div
 				data-testid="positions-panel-head"
-				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				<span className="text-xs font-medium text-ink">Positions</span>
 				{controls}
