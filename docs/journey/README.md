@@ -53,3 +53,5 @@ Every commit in this repository carries its reasoning. Commits from 17 August 20
 git fetch origin "refs/notes/*:refs/notes/*"
 git log --notes=commits
 ```
+
+The repository's own [`README.md`](../../README.md) carries the same fetch path for a reader who arrives at a commit rather than at this document.

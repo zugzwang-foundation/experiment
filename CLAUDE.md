@@ -179,6 +179,8 @@ there is a note, that is the one you want.
 
 That is why the block reads *Where there is a note* and not *the note*: the sentence has to hold on both sides of the line. On a pre-convention commit there is a note, and it is the one you want; from this commit onward there is not, and the message is already the whole account. One constant text, true either way — which is what lets it stay constant at all.
 
+**One commit sits on both sides of that line, and it is the best evidence this section has.** `6272d5b` merged **eight minutes** before this convention did — but on a branch cut while the convention branch already existed, so whoever wrote it read the rule out of that branch's `CLAUDE.md` and applied it unprompted. Its message carries the block **twenty-nine times**, once per squashed commit, byte-identical every time. It predates the *merge*, not the *practice*. It also carries a note, because it postdates the journey corpus — which makes it the only commit in the repository holding both. That is the whole argument for putting a rule in a file somebody is already reading rather than in a prompt somebody has to remember to supply: it started being received before anything ratified it.
+
 **Consequence:** every commit message is now multi-line, so the `-F /tmp/commit-msg.txt` path above is the only path — a bare `git commit -m` can no longer produce a conforming message.
 
 ### 5.14 Standing review checks

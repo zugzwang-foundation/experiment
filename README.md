@@ -13,3 +13,5 @@ Commits predating the `Instructions for AI` convention (`CLAUDE.md` §5.13.1) ke
 git fetch origin "refs/notes/*:refs/notes/*"   # re-run to pick up notes added since
 git log --notes=commits                        # show them inline in the log
 ```
+
+The same text, read front to back instead of one commit at a time, is [`docs/journey/README.md`](docs/journey/README.md) — an account of the build in eight acts, one entry per commit.
