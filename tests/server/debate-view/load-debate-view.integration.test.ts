@@ -30,18 +30,35 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
-const { mockSignRead } = vi.hoisted(() => ({
+const { mockSignRead, mockMintReadUrl } = vi.hoisted(() => ({
 	mockSignRead: vi.fn(async (key: string) => `https://signed.example/${key}`),
+	mockMintReadUrl: vi.fn(
+		async (bucket: string, key: string) =>
+			`https://signed.example/${bucket}/${key}`,
+	),
 }));
 
 vi.mock("@/server/storage/sign-read", () => ({
 	signRead: mockSignRead,
 }));
 
+// ⚠ A SECOND, DIFFERENT SEAM. Market media is signed through `storage/r2.ts`'s
+// `mintReadUrl("market-media", …)`, NOT through `signRead`, which is hardcoded
+// to the participant `"uploads"` bucket and must not serve admin market media
+// (ADR-0026 / SPEC.2 §12.1). Mocking only `sign-read` leaves the market-media
+// arm unstubbed, where it throws for want of R2 credentials and
+// `getDefaultMarketMediaUrl` degrades it to `null` — which is exactly how the
+// first version of the test below failed, and exactly why `@code-reviewer`
+// MEDIUM-4 flagged this arm as uncovered.
+vi.mock("@/server/storage/r2", () => ({
+	mintReadUrl: mockMintReadUrl,
+}));
+
 import {
 	bets,
 	comments,
 	imageUploads,
+	marketMedia,
 	markets,
 	modActions,
 	pools,
@@ -103,6 +120,10 @@ async function seedMarket(slug: string): Promise<MarketSummary> {
 			description: markets.description,
 			status: markets.status,
 		});
+	// ⚠ The `.returning()` above must project EVERY `MarketSummary` column. The
+	// assertion below compiles either way (the target is assignable to the
+	// source), so a missing column silently produces `undefined` where the DTO
+	// promises `string | null` — `@code-reviewer` LOW-3.
 	const m = market as MarketSummary;
 	await testDb
 		.insert(pools)
@@ -508,6 +529,119 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 		);
 		expect(ePresent.imageUrl).toBe(
 			`https://signed.example/${presentImg.r2Key}`,
+		);
+	});
+
+	// ── 4b. The SAME rule on REPLIES — the path row 26 opened ──────────────────
+	it("removed REPLY: signRead NEVER called for its r2 key; present reply: image URL minted", async () => {
+		// ⛔ SC-1 (CLAUDE.md §5.14). HTML-FINISH · MARKET DETAIL row 26 widened
+		// `mintImageUrls` from posts-only to every VISIBLE comment, which is the
+		// first time a reply's media key reaches the presign at all. Test 4 above
+		// proves the rule for posts and CANNOT see this path — it seeds only
+		// top-level comments, so it would stay green with reply masking entirely
+		// absent. That is exactly the "second body-read path" SC-1 was minted from.
+		const market = await seedMarket("masking-reply-image");
+		const parentAuthor = await seedUser({ tag: "rimg-parent" });
+		const u1 = await seedUser({ tag: "rimg-removed" });
+		const u2 = await seedUser({ tag: "rimg-present" });
+
+		const removedImg = await seedImageUpload(u1);
+		const presentImg = await seedImageUpload(u2);
+
+		const parent = await seedCommentWithBet({
+			userId: parentAuthor,
+			marketId: market.id,
+			side: "YES",
+			stake: "100.000000000000000000",
+			body: "Parent post for the reply-image case.",
+			parentCommentId: null,
+			createdAt: new Date("2026-09-15T00:00:01Z"),
+		});
+		const removedReply = await seedCommentWithBet({
+			userId: u1,
+			marketId: market.id,
+			side: "YES",
+			stake: "40.000000000000000000",
+			body: "Removed reply with an image — never serialize.",
+			parentCommentId: parent,
+			imageUploadsId: removedImg.id,
+			createdAt: new Date("2026-09-15T00:00:02Z"),
+		});
+		await seedCommentWithBet({
+			userId: u2,
+			marketId: market.id,
+			side: "NO",
+			stake: "30.000000000000000000",
+			body: "Present reply with an image.",
+			parentCommentId: parent,
+			imageUploadsId: presentImg.id,
+			createdAt: new Date("2026-09-15T00:00:03Z"),
+		});
+		await removeComment(removedReply);
+
+		const vm = await loadDebateView(testDb, { market });
+		const payload = JSON.stringify(vm);
+
+		// ⛔ THE BODY'S ABSENCE, NOT THE ROW'S (SC-1). A row-level assertion
+		// ("the removed reply is not in the list") would pass on a build that
+		// excluded the row from one read and leaked its body from another.
+		expect(payload).not.toContain("Removed reply with an image");
+		// …and the same for its MEDIA, which is the field this row added.
+		expect(payload).not.toContain(removedImg.r2Key);
+		expect(mockSignRead).not.toHaveBeenCalledWith(
+			removedImg.r2Key,
+			expect.anything(),
+		);
+
+		// Positive control — the present reply's image IS minted and surfaced, so
+		// the absences above are not merely "replies never get images".
+		expect(mockSignRead).toHaveBeenCalledWith(
+			presentImg.r2Key,
+			expect.anything(),
+		);
+		expect(payload).toContain(`https://signed.example/${presentImg.r2Key}`);
+
+		// The removed reply keeps its slot (ADR-0020/0021 thread integrity) and
+		// carries no content keys at all.
+		walkAssertNoLeak(vm);
+	});
+
+	// ── 4c. The one statement this task spent — the market media read ──────────
+	it("mediaImageUrl is the DEFAULT market_media row, presigned for read", async () => {
+		// ⚠ The task's ENTIRE read budget is this one statement, and nothing under
+		// tests/server covered it — `@code-reviewer` MEDIUM-4. It goes through
+		// `signReadMarketMedia` → `mintReadUrl("market-media", …)`, a DIFFERENT
+		// bucket arm from the `signRead("uploads")` seam this file mocks, so the
+		// render tests prove the component and nothing proved the read.
+		const market = await seedMarket("market-media-read");
+
+		await testDb.insert(marketMedia).values([
+			{
+				marketId: market.id,
+				r2ObjectKey: `m/${market.id}/not-default.png`,
+				displayOrder: 1,
+				isDefault: false,
+			},
+			{
+				marketId: market.id,
+				r2ObjectKey: `m/${market.id}/default.png`,
+				displayOrder: 0,
+				isDefault: true,
+			},
+		]);
+
+		const vm = await loadDebateView(testDb, { market });
+
+		// The DEFAULT row, not merely "a" row — the non-default sibling is the
+		// discriminator, so a read that dropped the `is_default` predicate fails.
+		expect(vm.market.mediaImageUrl).toContain(`m/${market.id}/default.png`);
+		expect(vm.market.mediaImageUrl).not.toContain("not-default");
+		// …signed against the `market-media` bucket arm, never the participant
+		// `uploads` one.
+		expect(mockMintReadUrl).toHaveBeenCalledWith(
+			"market-media",
+			`m/${market.id}/default.png`,
+			expect.anything(),
 		);
 	});
 

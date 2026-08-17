@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
+import { AggregateFooter } from "@/components/debate/AggregateFooter";
 import { PostCard } from "@/components/debate/PostCard";
 import type { DebatePost, ReplyGroups, Side } from "@/components/debate/types";
 
@@ -51,6 +52,14 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
+ * These suites assert bookmarks / spacing / card composition, never the
+ * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
+ * keeps the viewer state REQUIRED at the component (a trigger without its
+ * F-3 gate invites a bet the viewer cannot place) without pretending this
+ * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
+const noopReply = () => {};
+
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
@@ -94,6 +103,10 @@ function renderFooter(side: Side) {
 			onEnter={noop}
 			onOpenPopup={noop}
 			onOpenImage={noop}
+			onReplyToPost={noopReply}
+			heldSide={null}
+			marketOpen
+			suspended={false}
 		/>,
 	);
 	const footer = container.querySelector('[data-testid="aggregate-footer"]');
@@ -165,5 +178,199 @@ describe("POLISH.3 PR 2 — T3, the market-view split bar's visual half", () => 
 		expect(classOf(renderFooter("NO"), "aggregate-split-track")).toContain(
 			"[border:var(--hairline)]",
 		);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 22 — the `.rbtn2` Support/Counter TRIGGER
+ * pills return to the card footer (`d5:1100`, `:1102`). `R1` reversed by the
+ * founder ruling of 2026-08-16.
+ *
+ * ⛔⛔ THE POLE ASSERTIONS ARE EXTENDED, NEVER RELAXED. The four existing
+ * assertions above (two poles × two post sides) cover the split BAR; the pills
+ * are pole-bearing too, and by the SAME rule — Support inherits the post's side,
+ * Counter takes the opposite, so on a NO post the Support pill is the NO pole.
+ * A fixed pole on a per-side element is exactly the "Route 3" blind spot
+ * `side-pole-binding.test.ts` documents itself as unable to see, which is why
+ * these live here as render assertions.
+ *
+ * ⛔ AND THE F-3 GATE IS PINNED WITH THEM. A trigger whose RESULTING side is not
+ * the viewer's held side must be DISABLED — a live pill there invites a bet the
+ * viewer cannot place, and the failure would be silent: the pill renders, the
+ * pole is right, and only the click fails.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () => {
+	const TRIGGERS = {
+		heldSide: null,
+		marketOpen: true,
+		suspended: false,
+		onReply: () => {},
+	};
+
+	it("aggregate-footer::no-triggers-prop-renders-the-read-only-footer", () => {
+		// The pills are OPTIONAL, so every consumer without viewer state keeps
+		// today's render. Non-vacuity for the assertions below.
+		const { container } = render(
+			<AggregateFooter aggregate={AGGREGATE} postSide="YES" />,
+		);
+		expect(
+			container.querySelector('[data-testid="card-trigger-support"]'),
+		).toBeNull();
+		// ⚠ HTML-FINISH · MARKET DETAIL round 2 · R5 — this line used to read
+		// `toContain("Support (")`, which R5 deleted from the render. The
+		// assertion's JOB was non-vacuity ("the read-only footer still drew
+		// something"), and the label it happened to reach for is now gone, so it is
+		// REPOINTED at what the read-only footer actually still renders rather than
+		// deleted — dropping it would leave the `toBeNull()` above unpaired and a
+		// component that rendered NOTHING would pass this row.
+		// ⛔ Assert on `innerHTML`, never `textContent` (O-7).
+		expect(
+			container.querySelector('[data-testid="aggregate-footer"]'),
+		).not.toBe(null);
+		expect(container.innerHTML).not.toContain("Support (");
+		expect(container.innerHTML).not.toContain("Counter (");
+	});
+
+	it("aggregate-footer::row-5-the-flanking-figures-are-bare-dharma", () => {
+		// R5's positive control. The two flanking spans carry the figure ALONE —
+		// d5's `.sb2` (`:981`/`:983`) — with the word "Support"/"Counter" living on
+		// the pill above, not restated beside the number.
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={TRIGGERS}
+			/>,
+		);
+		const columns = container.querySelectorAll(
+			'[data-testid="aggregate-footer"] > span',
+		);
+		expect(columns).toHaveLength(3);
+		// Column 0 = Support side, column 2 = Counter side; the middle is the bar.
+		// `:scope > span:last-child` is the figure under each pill.
+		expect(columns[0]?.querySelector("span:last-child")?.textContent).toBe(
+			"Đ 1,000",
+		);
+		expect(columns[2]?.querySelector("span:last-child")?.textContent).toBe(
+			"Đ 2,000",
+		);
+		// The pill IS still there and still says the word — which is why dropping
+		// the prefix loses nothing.
+		expect(
+			columns[0]?.querySelector('[data-testid="card-trigger-support"]')
+				?.textContent,
+		).toBe("Support");
+		expect(
+			columns[2]?.querySelector('[data-testid="card-trigger-counter"]')
+				?.textContent,
+		).toBe("Counter");
+	});
+
+	it("aggregate-footer::pills-are-poled-by-the-RESULTING-side-on-a-YES-post", () => {
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={TRIGGERS}
+			/>,
+		);
+
+		// Support inherits YES → the YES pole; Counter opposes → the NO pole.
+		const support = container.querySelector(
+			'[data-testid="card-trigger-support"]',
+		);
+		const counter = container.querySelector(
+			'[data-testid="card-trigger-counter"]',
+		);
+		expect(support?.getAttribute("class")).toContain("bg-yes");
+		expect(counter?.getAttribute("class")).toContain("bg-no");
+		// The accessible name names the RESULTING BET SIDE, never the relation
+		// alone — AGENTS.md §8: the poles name the SIDE, never Support/Counter.
+		expect(support?.getAttribute("aria-label")).toBe("Support — bet YES");
+		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet NO");
+	});
+
+	it("aggregate-footer::pills-INVERT-on-a-NO-post", () => {
+		// THE assertion a fixed-pole implementation fails. Same relations, other
+		// post side, opposite poles.
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="NO"
+				triggers={TRIGGERS}
+			/>,
+		);
+
+		const support = container.querySelector(
+			'[data-testid="card-trigger-support"]',
+		);
+		const counter = container.querySelector(
+			'[data-testid="card-trigger-counter"]',
+		);
+		expect(support?.getAttribute("class")).toContain("bg-no");
+		expect(counter?.getAttribute("class")).toContain("bg-yes");
+		expect(support?.getAttribute("aria-label")).toBe("Support — bet NO");
+		expect(counter?.getAttribute("aria-label")).toBe("Counter — bet YES");
+	});
+
+	it("aggregate-footer::F-3-disables-the-trigger-that-opposes-the-held-side", () => {
+		// The viewer holds YES on a YES post: Support resolves to YES (allowed),
+		// Counter resolves to NO (forbidden — one held side per market).
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={{ ...TRIGGERS, heldSide: "YES" }}
+			/>,
+		);
+
+		const support = container.querySelector<HTMLButtonElement>(
+			'[data-testid="card-trigger-support"]',
+		);
+		const counter = container.querySelector<HTMLButtonElement>(
+			'[data-testid="card-trigger-counter"]',
+		);
+		expect(support?.disabled).toBe(false);
+		expect(counter?.disabled).toBe(true);
+		// The C3 batch string carries the refusal in BOTH channels, identical to
+		// the focused-post bar — one refusal, one wording, wherever it is met.
+		expect(counter?.getAttribute("title")).toBeTruthy();
+		expect(counter?.getAttribute("aria-label")).toBe(
+			counter?.getAttribute("title"),
+		);
+	});
+
+	it("aggregate-footer::a-closed-market-disables-both", () => {
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={{ ...TRIGGERS, marketOpen: false }}
+			/>,
+		);
+		for (const relation of ["support", "counter"]) {
+			const pill = container.querySelector<HTMLButtonElement>(
+				`[data-testid="card-trigger-${relation}"]`,
+			);
+			expect(pill?.disabled).toBe(true);
+		}
+	});
+
+	it("aggregate-footer::clicking-a-pill-reports-its-relation", () => {
+		const onReply = vi.fn();
+		const { container } = render(
+			<AggregateFooter
+				aggregate={AGGREGATE}
+				postSide="YES"
+				triggers={{ ...TRIGGERS, onReply }}
+			/>,
+		);
+
+		fireEvent.click(
+			container.querySelector(
+				'[data-testid="card-trigger-counter"]',
+			) as HTMLButtonElement,
+		);
+		expect(onReply).toHaveBeenCalledWith("counter");
 	});
 });

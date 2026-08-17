@@ -90,6 +90,13 @@ function dialogContent(baseElement: HTMLElement): Element {
 	return node as Element;
 }
 
+// ⚠ RE-DERIVED AT HTML-FINISH · MARKET DETAIL rows 13 + 33, never relaxed.
+// Row 33 replaced the pop-up's hand-built strip with the SHARED `ArgProfile`
+// cluster, and row 13 put the author's entry price ON the side chip. The badge
+// is still rendered, still frozen, still poled — its ACCESSIBLE NAME now also
+// carries the price ("YES side, entry price 50%"), so the exact-match selectors
+// below became prefix matches. The properties under test are unchanged: the
+// primitive renders, at both poles, unsized.
 describe("POLISH.3 PR 2 — PostPopup geometry, omissions, stake and side badge", () => {
 	it("post-popup::geometry-is-720px-wide-and-90vh-tall", () => {
 		// Row 14 · PD-0-03 · R5 geometry half. CD-A ratified 720px / 90vh; the
@@ -181,7 +188,7 @@ describe("POLISH.3 PR 2 — PostPopup geometry, omissions, stake and side badge"
 		);
 		expect(description).not.toBeNull();
 		expect(
-			description?.querySelector('[aria-label="YES side"]'),
+			description?.querySelector('[aria-label^="YES side"]'),
 		).not.toBeNull();
 	});
 
@@ -193,7 +200,9 @@ describe("POLISH.3 PR 2 — PostPopup geometry, omissions, stake and side badge"
 			'[data-slot="dialog-description"]',
 		);
 		expect(description).not.toBeNull();
-		expect(description?.querySelector('[aria-label="NO side"]')).not.toBeNull();
+		expect(
+			description?.querySelector('[aria-label^="NO side"]'),
+		).not.toBeNull();
 	});
 
 	it("post-popup::side-badge-is-UNSIZED-and-rides-the-CHIP-base-preset", () => {
@@ -212,9 +221,56 @@ describe("POLISH.3 PR 2 — PostPopup geometry, omissions, stake and side badge"
 
 		const { baseElement } = renderPopup("YES");
 		const badge = dialogContent(baseElement).querySelector(
-			'[aria-label="YES side"]',
+			'[aria-label^="YES side"]',
 		);
 
 		expect(badge?.getAttribute("class")).toBe(referenceClass);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL rows 33 + 35 — the pop-up's head cluster and its
+ * scroll reset.
+ */
+describe("HTML-FINISH · MARKET DETAIL — rows 33 + 35", () => {
+	it("post-popup::the-head-is-the-SHARED-cluster", () => {
+		// Row 33 — d5's `fillPop` (`:1628-1637`) writes author · chip (SIDE @
+		// entry%) · stake, which is the row `ArgProfile` renders everywhere else.
+		// The avatar and the entry price are what the hand-built strip never had.
+		const { baseElement } = renderPopup("YES");
+		const html = dialogContent(baseElement).innerHTML;
+
+		expect(html).toContain("@");
+		expect(html).toContain("|");
+		// ⛔ NO bookmark cluster in the pop-up: the reader has already chosen, and
+		// the card they opened it from still carries it. `showActions={false}` is
+		// a caller-side layout switch designed for exactly this.
+		expect(
+			dialogContent(baseElement).querySelector('button[aria-label="Bookmark"]'),
+		).toBeNull();
+	});
+
+	it("post-popup::opens-scrolled-to-the-TOP", () => {
+		// Row 35 — d5 resets `.pmscroll`'s `scrollTop` on every fill (`:1641`).
+		// ⚠ THE DEFECT ONLY APPEARS ON THE SECOND OPEN, which is why it survives
+		// hand-testing: `DialogContent` is `overflow-y-auto` and shadcn keeps the
+		// node mounted between opens, so the previous long argument's scroll
+		// position carries into the next one and a reader lands halfway down a
+		// short reply. A mount-only reset would fire once and never again — the
+		// exact shape of the bug — so the effect keys on the OPEN transition.
+		const { baseElement, rerender } = render(
+			<PostPopup post={presentPost("YES")} onClose={noop} />,
+		);
+		const content = dialogContent(baseElement) as HTMLElement;
+
+		// Simulate the reader having scrolled the first argument.
+		content.scrollTop = 400;
+		expect(content.scrollTop).toBe(400);
+
+		// Close, then open again on a different post — the second-open case.
+		rerender(<PostPopup post={null} onClose={noop} />);
+		rerender(<PostPopup post={presentPost("NO")} onClose={noop} />);
+
+		expect((dialogContent(baseElement) as HTMLElement).scrollTop).toBe(0);
 	});
 });

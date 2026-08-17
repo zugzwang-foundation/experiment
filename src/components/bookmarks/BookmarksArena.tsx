@@ -6,7 +6,7 @@ import type { BookmarkItem } from "@/server/bookmarks/list";
 
 import { BookmarkReplicaPanel } from "./BookmarkReplica";
 import { BookmarksTable } from "./BookmarksTable";
-import type { BookmarkSelection } from "./selection";
+import { type BookmarkSelection, initialBookmarkSelection } from "./selection";
 
 /**
  * HTML-FINISH · BOOKMARKS round 3 · C6 — THE ARENA'S TWO PANELS, SHARING ONE
@@ -29,7 +29,15 @@ export function BookmarksArena({
 }: {
 	items: BookmarkItem[];
 }): React.JSX.Element {
-	const [selection, setSelection] = useState<BookmarkSelection | null>(null);
+	// ⚠⚠ PROFILE REFINEMENT · R3 (SSR half) — SEEDED, NOT NULL, for the reason
+	// `selection.ts` records: the table's first-row fallback is reported upward by an
+	// effect, effects do not run on the server, so a null seed painted an empty
+	// replica panel on load and switched after hydration. The seed uses the shared
+	// derivation rather than reaching for `items[0]` here.
+	// ⚠ THE EFFECT STILL OWNS EVERY LATER CHANGE — this is the initial value only.
+	const [selection, setSelection] = useState<BookmarkSelection | null>(() =>
+		initialBookmarkSelection(items),
+	);
 
 	return (
 		<>

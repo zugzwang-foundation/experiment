@@ -104,7 +104,21 @@ export default async function PublicLayout({
 			    the floor lets the page GROW and SCROLL when content exceeds the
 			    viewport (RULED A1) instead of clipping it. The mockup's
 			    `overflow:hidden` on html/body is a fixed-viewport prototype
-			    affordance and is deliberately NOT adopted. */}
+			    affordance and is deliberately NOT adopted.
+
+			    ⚠⚠ A1 IS REVERSED FOR `/m/[slug]` ONLY, founder-ruled 2026-08-17:
+			    "It's a one page view — there should be no scroll down. The
+			    dimensions of the whole market detail page are not matching — it
+			    should be exact." That route's container now declares
+			    `h-[calc(100dvh-60px-2px)]` with `overflow-hidden` and hides its
+			    own overflow inside `DebateColumn`'s `.colwrap` scroller, so
+			    nothing is clipped — see `debate-height-chain.test.ts`, which now
+			    REQUIRES the band it used to forbid.
+			    ⛔ THIS ELEMENT IS UNCHANGED AND THE RULE ABOVE STILL STANDS FOR
+			    EVERY OTHER `(public)` SURFACE. The ruling names one route; a
+			    surface that has not been ruled one-screen must keep the floor,
+			    because a fixed height without an internal scroller CLIPS. Do not
+			    generalise this exemption without a ruling that names the route. */}
 			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
 				{children}
 			</main>

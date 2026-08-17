@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative } from "node:path";
 
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -114,10 +114,19 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 	it("census-is-alive", () => {
 		// A glob that silently matched nothing passes vacuously (N1). If this
 		// floor ever trips, the matcher broke — not the inventory.
-		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(13);
+		//
+		// ⚠ LOWERED 13 → 12 AT HTML-FINISH · MARKET DETAIL row 33, with grounds,
+		// because the inventory genuinely SHRANK: `dialogs.tsx`'s two hand-built
+		// badges went away when both pop-ups adopted the shared `ArgProfile`
+		// cluster, which owns one badge for all of them. A floor that outruns the
+		// real inventory is a guard that reddens on correct code, and this file's
+		// own docstring says such a guard "gets suppressed within a week".
+		// ⛔ It is still a NON-VACUITY floor, not a count: the set-equality map
+		// below is what actually fences membership.
+		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(12);
 	});
 
-	it("exactly-nine-sites-pass-no-size-and-ride-CHIP-base", () => {
+	it("exactly-six-sites-pass-no-size-and-ride-CHIP-base", () => {
 		const base = sideBadgeSites.filter((site) => !site.sized);
 		// Set equality, never a bare count (N5) — a count of 10 is also satisfied
 		// by ten sites in the wrong files.
@@ -141,6 +150,25 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// absorbed. `detail` STILL holds its zero: row 12's badge is UNSIZED, which
 		// is why only the base map moves and the seam-preset assertion below is
 		// untouched.
+		//
+		// ⚠ AND NINE, THEN EIGHT, ON 2026-08-16 — HTML-FINISH · MARKET DETAIL,
+		// two rows in the same PR and for opposite reasons.
+		// · Row 13 moved `ArgProfile.tsx`'s ONE site out of `base`: it now varies
+		//   the preset by prop (`size={chipSize}`), so the markup classifier reads
+		//   it as sized even though it renders `base` at every card and reply site.
+		// · Row 26 moved ONE of `ReplyCard.tsx`'s TWO sites out of the census
+		//   entirely: the reply card's hand-rolled head was replaced by
+		//   `ArgProfile`, which owns the badge now. The REMOVED branch keeps its
+		//   own `SideBadge` — a removed reply has no author, so it cannot render
+		//   an `ArgProfile` — which is why the count is 1 and not 0.
+		//
+		// · Row 27 ADDED one back: `dialogs.tsx` gained a second UNSIZED site when
+		//   `ReplyPopup` joined `PostPopup` in that file …
+		// · … and row 33 then removed BOTH, when the two pop-ups adopted the same
+		//   `ArgProfile` cluster the card and the focused post use. `dialogs.tsx`
+		//   leaves this map entirely.
+		// ⇒ ONE PR moved this map in both directions and then off a file, which is
+		//   precisely why the MAP — and never a count — is the fence.
 		//
 		// ⚠ AND TEN UNTIL 2026-08-15. `BookmarkCard.tsx`'s two sites wire
 		// `profile` per PD-6-03 — POLISH.6 item 3, the SAME tier-4 baseline
@@ -176,25 +204,24 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// count-shaped sweep cannot find a count-free name. ⇒ It is not numbers
 		// that rot; it is any name making a factual claim.
 		expect(countByFile(base)).toEqual({
-			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/debate/DebateColumn.tsx": 1,
 			"src/components/debate/PostCard.tsx": 1,
 			"src/components/debate/PostFocusHeader.tsx": 1,
-			"src/components/debate/ReplyCard.tsx": 2,
+			"src/components/debate/ReplyCard.tsx": 1,
 			"src/components/debate/composer/BetComposer.tsx": 1,
 			"src/components/debate/composer/SellModule.tsx": 1,
-			"src/components/debate/dialogs.tsx": 1,
 		});
-		expect(base).toHaveLength(9);
+		expect(base).toHaveLength(6);
 	});
 
-	it("the-sized-sites-are-the-bookmark-card-the-discovery-hero-and-the-profile-list", () => {
+	it("the-sized-sites-are-exactly-the-map-below", () => {
 		// The positive control beside the assertion above (N3): the classifier
 		// does distinguish the two kinds, so "ten unsized" is not just "the
 		// matcher never sees a size".
 		const sized = sideBadgeSites.filter((site) => site.sized);
 		expect(countByFile(sized)).toEqual({
 			"src/components/bookmarks/BookmarkCard.tsx": 2,
+			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/discovery/HeroPanels.tsx": 1,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
@@ -497,10 +524,43 @@ describe("SideBadge — the detail and profile seam presets", () => {
 		// get its OWN ruling. So `detail` keeps its zero and only `profile`
 		// moves to an enumerated set — the guard still has teeth in both
 		// directions: a THIRD surface wiring `profile` reddens the map below.
+		// ⚠⚠ THE ZERO IS SPENT — HTML-FINISH · MARKET DETAIL row 13, ruled at the
+		// plan (§4: "wire `size='detail'` at exactly ONE site — the post-focus
+		// author row"). The wall this block predicted for POLISH.3 was finally hit
+		// by MARKET DETAIL, and the adoption is RULED and enumerated here rather
+		// than absorbed.
+		//
+		// ⛔⛔ AND THE WIRING ARRIVED THROUGH A CHANNEL THIS FILTER COULD NOT SEE,
+		// which is the finding worth more than the row. `ArgProfile` owns the
+		// badge and varies it by PROP — `<SideBadge size={chipSize} />` — so the
+		// literal `detail` lives on `ArgProfile`'s OWN call site
+		// (`chipSize="detail"`), not on any `<SideBadge>` tag. The regex below
+		// scans `<SideBadge …/>` markup only, so it would have returned `[]` and
+		// stayed GREEN while a `detail` chip shipped. Satisfying the letter of a
+		// guard while breaking the property it names is not a pass.
+		// ⇒ The census now scans BOTH channels. `wiredDetail` keeps the direct
+		// one; `wiredDetailIndirect` is the prop channel, enumerated to its one
+		// ruled site. A SECOND site in either reddens this.
 		const wiredDetail = sideBadgeSites.filter((site) =>
 			/size\s*=\s*["{]?\s*["']?detail/.test(site.markup),
 		);
 		expect(wiredDetail).toEqual([]);
+
+		const wiredDetailIndirect = readdirSync(join(ROOT, "src"), {
+			recursive: true,
+			withFileTypes: true,
+		})
+			.filter((e) => e.isFile() && /\.tsx?$/.test(e.name))
+			.map((e) => ({
+				file: relative(ROOT, join(e.parentPath, e.name)),
+				source: readFileSync(join(e.parentPath, e.name), "utf8"),
+			}))
+			.filter(({ source }) =>
+				/chipSize\s*=\s*["{]?\s*["']?detail/.test(source),
+			);
+		expect(countByFile(wiredDetailIndirect)).toEqual({
+			"src/components/debate/PostFocusHeader.tsx": 1,
+		});
 
 		const wiredProfile = sideBadgeSites.filter((site) =>
 			/size\s*=\s*["{]?\s*["']?profile/.test(site.markup),

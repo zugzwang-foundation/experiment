@@ -458,6 +458,14 @@ describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED"
 		// 16px steps: zero breaks. Re-measured with `Đ 999,999` in every tile:
 		// still 255 at 1024 — the tile grid's height is driven by its fixed LABEL
 		// copy, not by value widths.
+		// ⚠⚠ PROFILE-FULL — THE FIGURE IS THE MOCKUP'S 188. D-1 was reopened
+		// ("change whichever of the three the mockup requires") and answered: the
+		// identity block lost its `<Card>` frame — the mockup's `.idcard` is a BARE
+		// flex row (`:190`) — and the tiles took the mockup's density. That 32px of
+		// `p-4` was the whole obstacle: it left a 156px content box holding 166px of
+		// content, which no type size could close. The column now needs 174 at 1440
+		// inside a 188 box. ⛔ The predicate is UNCHANGED: still an exact-value
+		// `toEqual` on the band's `lg:h-*` set.
 		const declared = headzoneClasses().filter((c) => /^lg:h-\[/.test(c));
 		expect(
 			declared,
@@ -465,7 +473,13 @@ describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED"
 				`so the arena gets the remaining space — that is the founder's hard ` +
 				`command, and it is what makes the square PFP's feedback loop ` +
 				`impossible to close.`,
-		).toEqual(["lg:h-[256px]"]);
+		).toEqual(["lg:h-[188px]"]);
+		// ⛔ AND THE ROW TRACK — the half that is invisible when dropped. A single
+		// IMPLICIT row is content-sized, so `align-content:stretch` can grow it to
+		// the container height but never shrink it below content; the graph's
+		// `<svg viewBox … preserveAspectRatio="none">` then floors it. MEASURED with
+		// the height alone: band 188, row 256, PFP 256.
+		expect(headzoneClasses()).toContain("lg:grid-rows-[188px]");
 	});
 
 	it("item3::the-height-is-lg-SCOPED-so-the-stacked-layout-is-not-crushed", () => {
@@ -622,14 +636,19 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 			if (first === undefined || second === undefined) {
 				throw new Error("row15: a tile has fewer than two element children");
 			}
-			// The LABEL is the muted `text-n5` span; the VALUE is the emphasised
-			// `text-ink` one. Asserted by CLASS ROLE rather than by reading the
-			// strings, so the guard cannot be greened by re-typing a label.
+			// The LABEL is the muted span; the VALUE is the emphasised `text-ink`
+			// one. Asserted by CLASS ROLE rather than by reading the strings, so the
+			// guard cannot be greened by re-typing a label.
+			// ⚠ PROFILE-FULL — THE MUTED TOKEN IS `text-n4` NOW, not `text-n5`. The
+			// mockup's `.tl` is `color:var(--n4)` (`:209`) and the label took its
+			// whole register (8px/800/.12em/uppercase/n4) in the same change. Still a
+			// ramp token, so the monochrome census is untouched; still the LABEL's
+			// role, so this guard's predicate is unchanged.
 			expect(
 				second.className,
 				`row 15: the second child of a tile must be the LABEL span. Got ` +
 					`"${second.className}" — the label/value order has flipped back.`,
-			).toContain("text-n5");
+			).toContain("text-n4");
 			expect(first.className).toContain("text-ink");
 		}
 	});
@@ -641,7 +660,7 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 		// predicate over a deliberately label-first fragment.
 		const { container } = render(
 			<div data-testid="control-tile">
-				<span className="text-xs text-n5">Wallet value</span>
+				<span className="text-[8px] text-n4">Wallet value</span>
 				<span className="font-medium text-ink tabular-nums">Đ 500</span>
 			</div>,
 		);
@@ -650,10 +669,10 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 			throw new Error("row15 control: fixture did not render");
 		}
 		const [first, second] = [...tile.children];
-		// The real guard demands `text-n5` SECOND; the pre-change order has it
+		// The real guard demands the muted label SECOND; the pre-change order has it
 		// first, so the same predicate is false here.
-		expect(second?.className).not.toContain("text-n5");
-		expect(first?.className).toContain("text-n5");
+		expect(second?.className).not.toContain("text-n4");
+		expect(first?.className).toContain("text-n4");
 	});
 });
 
@@ -1061,128 +1080,91 @@ describe("HTML-FINISH profile row 10 — the market question sits under the argu
 	});
 });
 
-describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays fixed", () => {
+describe("HTML-FINISH profile row 16 — the band-height square, BUILT at `xl`+", () => {
 	/**
-	 * ⛔ THIS GUARD ASSERTS THE REFUSAL, NOT THE ROW.
+	 * ⚠⚠⚠ PROFILE-FULL — THIS BLOCK IS INVERTED, AND ITS OWN PREDECESSOR ASKED FOR
+	 * THAT. The version that stood here asserted the REFUSAL — that the PFP kept a
+	 * fixed 56px box — and closed with: "When the height chain lands, DELETE this
+	 * block and build the row — that is the intended end state, not this one." The
+	 * band is now the mockup's 188 and the row is built, so these assertions follow
+	 * the ruling instead of the refusal. ⛔ This is not a guard relaxed to fit the
+	 * code: it is the SAME property (where a percentage height may resolve) pinned
+	 * on the other side of a founder ruling, and the unprefixed forms it forbade
+	 * are still forbidden below.
 	 *
-	 * Row 16 ("the PFP fills the identity band's height as a square") was BUILT
-	 * — `h-full aspect-square w-auto shrink-0 min-h-14`, all topology, all
-	 * traced — and then measured in a browser against real compiled CSS at a
-	 * viewport PINNED to 390px by a fixed-width same-origin iframe:
+	 * WHY FIVE ROUNDS COULD NOT, AND WHAT ACTUALLY CHANGED. Rounds 1–4 refused
+	 * because the band had no declared height, so `height:100%` fed a loop — taller
+	 * card → wider square → narrower column → taller tiles → taller card — which
+	 * settled at PFP 324×578 with the tile grid clipped to zero width. Round 5
+	 * declared the band at 256 and refused again, on WIDTH: a square filling 256 is
+	 * 224 wide, the 1024 half is 476, so the tiles got 204, wrapped to five label
+	 * lines, and the card needed 303 against a 256 box. Both refusals were measured
+	 * and both were correct at the time.
 	 *
-	 *   WITH row 16     PFP 324 × 578 · idcol width 0 · tiles width 0 (content
-	 *                   clipped, scrollWidth 89 vs clientWidth 0) · identity
-	 *                   card scrollWidth 445 > clientWidth 356
-	 *   WITHOUT row 16  PFP  56 ×  56 · idcol 252 · tiles 252 · nothing clipped
+	 * ⇒ AND THE UNBLOCK WAS NOT A TYPE SIZE EITHER. The identity block shipped as a
+	 * `<Card>` with `p-4`; the mockup's `.idcard` is a BARE flex row with no border,
+	 * background or padding (`:190`). Removing the frame returns 32px and the
+	 * mockup's tile density returns the rest. MEASURED live against real compiled
+	 * CSS at a viewport pinned to 1440×777 by a fixed-size same-origin iframe, on
+	 * the shipped surface with real data:
 	 *
-	 * The row's PREMISE is absent from this build. The mockup's PFP fills a band
-	 * that is `flex:0 0 188px` (`.headzone`, `:189`) — BOUNDED. Here the height
-	 * chain is halted (see `tests/unit/design/profile-height-chain.test.ts`), so
-	 * `height:100%` resolves against a card sized by the tile column row 8 put
-	 * beside it: taller tiles → taller card → wider square → narrower column →
-	 * taller tiles, settling with the tiles at zero width.
+	 *   vw     idcol needs (with square)   box   overflow   square applied?
+	 *   1024            231                188      +22     NO  ← this is why `xl:`
+	 *   1280            189                188       +1     yes
+	 *   1440            174                188        0     yes
+	 *   1920            153                188        0     yes
 	 *
-	 * ⛔⛔ RE-ATTEMPTED A THIRD TIME AT THE FOUNDER EYE PASS (item 4), AFTER
-	 * item 3 shrank the band — AND REFUSED AGAIN, on new and stronger evidence.
-	 * The retry was authorised "only after item 3 gives the band a height". Item
-	 * 3 gives it a LOWER CONTENT-DERIVED height, not a declared one, and measured
-	 * live at two container widths with item 3 in place:
+	 * ⛔ SO THE SCOPE IS THE MEASUREMENT, NOT A PREFERENCE. Below `xl` the avatar
+	 * keeps its shipped 56px box — at 1024 the square costs the tile column the
+	 * 132px the small avatar left it, the labels wrap to four lines, and the +22
+	 * would collide with the arena. Below `lg` the band declares no height at all,
+	 * so an unprefixed form would re-enter the round-1 loop outright.
+	 * ⛔ `xl` IS STOCK TAILWIND, NOT AN INVENTED BREAKPOINT. The round-5 route-back
+	 * named it as the legitimate option and rejected it only because it "misses by
+	 * 21px" — against the 256px band. Against 188 it misses by the 1px sub-pixel
+	 * rounding floor. `min-[1312px]:` remains forbidden and is not used.
 	 *
-	 *            item 3 alone            item 3 + item 4
-	 *   1440     band 290 · idcol 715    band 290 · PFP 272x272 · idcol 499
-	 *   1024     band 258 · idcol 465    band 338 · PFP 320x320 · idcol 201
-	 *
-	 * ⇒ AT 1024 ITEM 4 CANCELS ITEM 3. The band goes 258 -> 338 — taller than the
-	 * 290 item 3 achieves at 1440, and 80px taller than item 3's own result — the
-	 * identity column collapses 465 -> 201, and the tiles grow 43% taller (184 ->
-	 * 264) as they wrap into it. The founder's mark 3 was "the band is too tall";
-	 * item 4 makes it taller. The PFP is also LARGER at the NARROWER width
-	 * (320 > 272), which is the feedback loop's signature: wider square ->
-	 * narrower column -> taller tiles -> taller card -> wider square.
-	 * ⇒ The literal round-2 refusal condition (324x578, zero-width column) is NOT
-	 * reproduced — but §7's conditional is: the premise "item 3 gives the band a
-	 * height" is false, and satisfying item 4 literally would undo item 3.
-	 * ⇒ Only a DECLARED band height breaks the loop, and the founder ruled the
-	 * mockup's pixel band out. ROUTED BACK, unchanged.
-	 *
-	 * ⛔⛔ RE-ATTEMPTED A FOURTH TIME AT ROUND 4 — REFUSED ON THE ROW'S OWN
-	 * CLAUSE ("if the tile column still collapses, REFUSE ITEM 4 ONLY and report
-	 * the numbers"), AND THE COLUMN STILL COLLAPSES. Round 4 restored the
-	 * mockup's equal split, so this is the FAIREST test the row has had: the
-	 * identity column's width no longer depends on the PFP at all — `1fr 1fr` is
-	 * fixed — and the loop closes anyway, through the ROW HEIGHT.
-	 *
-	 *              item 3 revert only              + item 4 PFP
-	 *   1024   band 258 · PFP 56 · idcol 370   band 378 · PFP 360 · idcol 66
-	 *          tiles 370x184 · tile 115x86     tiles 66x344 · tile 26x166
-	 *                                          ⛔ TILE GRID CLIPPED
-	 *   1440   band 358 · PFP 56 · idcol 578   band 358 · PFP 340 · idcol 294
-	 *          tiles 578x144 · tile 185x66     tiles 294x224 · tile 90x106
-	 *
-	 * ⇒ AT 1024 EACH TILE IS 26px WIDE AND THE GRID IS CLIPPED — the round-1
-	 * collapse, reproduced at a viewport two and a half times wider. The band
-	 * grows 258 -> 378 (+120) and the identity column falls 370 -> 66 (-82%).
-	 * The mechanism is unchanged and is NOT about the column ratio: `h-full`
-	 * resolves against the grid ROW, the row is `max(identity content, graph)`,
-	 * and a taller card widens the square, which narrows the column, which
-	 * heightens the tiles, which heightens the card.
-	 * ⇒ Only a DECLARED band height breaks it, and round 4 measured that the
-	 * declaration itself is blocked — it spills the graph 140px over the arena
-	 * at 1440 (see the item 3 block above). Both halves are now blocked by the
-	 * SAME symbol: `graph/ProfileGraphCard.tsx`'s `aspect-[2/1]`.
-	 *
-	 * ⚠ THE ASSERTIONS BELOW ARE DELIBERATELY THE INVERSE OF WHAT THIS FILE
-	 * ASSERTED BEFORE MEASUREMENT. They exist so the row is not re-applied from
-	 * the mockup by the next reader, who will see `.pfp{height:100%}` and no
-	 * reason it was declined. When the height chain lands, DELETE this block and
-	 * build the row — that is the intended end state, not this one.
+	 * ⚠ THE REMAINING COST IS NAMED, NOT HIDDEN: between `lg` and `xl` the avatar
+	 * is 56×56 against the mockup's 188×188. That is the last open piece of D-1.
 	 */
-	it("row16::the-pfp-keeps-its-fixed-box-while-the-band-is-unbounded", () => {
+	it("row16::the-square-is-declared-and-is-xl-SCOPED", () => {
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		const pfp = screen.getByTestId("identity-card").querySelector("img");
 		if (pfp === null) {
 			throw new Error("row16: the identity card renders no <img>");
 		}
 		const classes = pfp.className.split(/\s+/);
-		expect(classes).toContain("size-14");
-		// ⛔ The unbounded trio. Any ONE of these re-introduces the measured
-		// defect.
-		// ⚠⚠ THE REASON CHANGED AT ROUND 5 AND THE ASSERTION DID NOT. Rounds 1–4
-		// refused this row because the band had no declared height, so a square
-		// PFP fed a loop: taller card → wider square → narrower column → taller
-		// tiles. ROUND 5 CLOSED THAT — the band is `lg:h-[256px]` and the graph
-		// fits it, so the loop cannot close. The row was retried against the
-		// shipped band and fails for a DIFFERENT reason: there is not enough
-		// WIDTH at `lg`. Measured live at the shipped 256px band:
-		//
-		//   vw    tile column        tile width      identity card overflows by
-		//   1024   370 → 188          115 → 55            +49
-		//   1152   434 → 252          137 → 76            +41
-		//   1280   498 → 316          158 → 97            +21
-		//   1312   514 → 332          163 → 103           +1   ← first fit
-		//   1440   578 → 396          185 → 124           +1
-		//
-		// A square filling a 256px band is 224 wide; the 1024 half is 476, so the
-		// tiles get 204px, wrap to five label lines, and the grid grows to 280px
-		// against a 256px box. Shrinking the band shrinks the square AND the box —
-		// swept 150→460 at 1024: no value fits, and from 360 the grid is CLIPPED
-		// with the column at 84 → 24 → 0px. The square first fits at 1312, which
-		// is not a shipped breakpoint: `xl` (1280) misses by 21px and `2xl` (1536)
-		// would exclude 1440, the width the founder reviews on.
-		// ⇒ ROUTED BACK. Unblocking it is a DESIGN call (2-column tiles below
-		// ~1312, an invented breakpoint, or shorter tile labels) — not one this
-		// task can take.
-		for (const c of ["h-full", "aspect-square", "w-auto", "min-h-14"]) {
+		// The square itself, at `xl`+ — the three utilities that together make
+		// `.pfp`'s `height:100%; aspect-ratio:1/1; flex:0 0 auto` (`:191-193`).
+		for (const c of ["xl:h-full", "xl:w-auto", "xl:aspect-square"]) {
 			expect(
 				classes,
-				`row 16 / item C was REFUSED ON MEASUREMENT and \`${c}\` has come ` +
-					`back. At 1024 this renders the tile column at 188px — each tile ` +
-					`55px wide — and overflows the declared 256px band by 49px. The ` +
-					`band height is no longer the blocker; the identity half's WIDTH ` +
-					`is. Re-derive this guard from a fresh measurement rather than ` +
-					`deleting it.`,
+				`row 16: the band-height square needs \`${c}\`. The band is declared at ` +
+					`188 and its ROW TRACK with it, so a percentage height here resolves ` +
+					`against a definite box instead of feeding the round-1 loop.`,
+			).toContain(c);
+		}
+		// …and the FALLBACK box below `xl`, which is what keeps 1024–1279 from
+		// overflowing the band by +22.
+		expect(classes).toContain("h-14");
+		expect(classes).toContain("w-14");
+		// ⛔ NEVER UNPREFIXED — the half of the old refusal that survives verbatim.
+		// An unprefixed `h-full`/`aspect-square` applies below `lg` too, where the
+		// band has NO declared height; that is exactly the measured defect of
+		// rounds 1–4.
+		for (const c of ["h-full", "w-auto", "aspect-square", "min-h-14"]) {
+			expect(
+				classes,
+				`row 16: \`${c}\` is UNPREFIXED. Below \`lg\` the band declares no ` +
+					`height, so it resolves against a content-driven block and re-enters ` +
+					`the feedback loop measured at PFP 324×578 with the tile grid ` +
+					`clipped to zero width.`,
 			).not.toContain(c);
 		}
+		// ⛔ `size-14` IS GONE DELIBERATELY, not incidentally: it sets width AND
+		// height in ONE utility, so pairing it with `xl:h-full xl:w-auto` would leave
+		// two same-property overrides to emission order. `h-14 w-14` states both.
+		expect(classes).not.toContain("size-14");
 	});
 
 	it("row16::the-BAND-precondition-this-row-waited-for-is-now-MET", () => {
@@ -1197,7 +1179,7 @@ describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays f
 		const cls =
 			/"profile-headzone"[\s\S]{0,160}?className="([^"]*)"/.exec(page)?.[1] ??
 			"";
-		expect(cls.split(/\s+/)).toContain("lg:h-[256px]");
+		expect(cls.split(/\s+/)).toContain("lg:h-[188px]");
 	});
 
 	it("row16::the-intrinsic-ratio-hint-attributes-survive", () => {
@@ -1208,21 +1190,33 @@ describe("HTML-FINISH profile row 16 — REFUSED ON MEASUREMENT; the box stays f
 		expect(pfp?.getAttribute("height")).toBe("56");
 	});
 
-	it("row16::POSITIVE-CONTROL-the-refusal-check-detects-the-measured-defect", () => {
-		// ⚠ PROOF BY REVERSAL over the REAL class string that was measured at
-		// 324×578. The guard above must be false against it, or it asserts
-		// nothing.
+	it("row16::POSITIVE-CONTROL-the-unprefixed-check-still-detects-the-measured-defect", () => {
+		// ⚠ PROOF BY REVERSAL, and it is the part of this block that did NOT change
+		// when the row was built. The class string below is the REAL one measured at
+		// PFP 324×578 with the tile column at zero width; the unprefixed check must
+		// be false against it, or it asserts nothing.
 		const measuredDefect =
 			"aspect-square h-full min-h-14 w-auto shrink-0 rounded-[var(--imgr)] bg-n1 object-cover".split(
 				/\s+/,
 			);
-		const trio = ["h-full", "aspect-square", "w-auto", "min-h-14"];
-		expect(trio.every((c) => measuredDefect.includes(c))).toBe(true);
-		expect(measuredDefect).not.toContain("size-14");
-		// …and the shipped list does NOT trip it, so the check discriminates.
+		const unprefixed = ["h-full", "aspect-square", "w-auto", "min-h-14"];
+		expect(unprefixed.every((c) => measuredDefect.includes(c))).toBe(true);
+		// …and the SHIPPED list does not trip it, so the check discriminates. This
+		// is the discriminating case that matters now: the shipped list contains
+		// `xl:h-full` and `xl:aspect-square`, and the guard must NOT read those as
+		// the unprefixed forms — a substring test would, an exact class-token test
+		// does not.
 		const shipped =
-			"size-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover".split(/\s+/);
-		expect(trio.some((c) => shipped.includes(c))).toBe(false);
+			"h-14 w-14 shrink-0 rounded-[var(--imgr)] bg-n1 object-cover xl:aspect-square xl:h-full xl:w-auto".split(
+				/\s+/,
+			);
+		expect(unprefixed.some((c) => shipped.includes(c))).toBe(false);
+		// …while the `xl:` forms ARE present in it, so the two halves of the guard
+		// above cannot both be vacuous.
+		for (const c of ["xl:h-full", "xl:w-auto", "xl:aspect-square"]) {
+			expect(shipped).toContain(c);
+		}
+		expect(shipped).not.toContain("size-14");
 	});
 });
 
@@ -1442,12 +1436,21 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 	});
 
 	it("itemD::the-rendered-strings-are-exactly-the-mockup's-shape", () => {
-		// The mockup reads `Đ 240 → Đ 310` (`:556`, `:558`). The fixture's own
-		// figures, in that shape.
+		// The mockup reads `Đ 240 → Đ 310 (+Đ70)` (`:556`, `:558`). The fixture's
+		// own figures, in that shape.
+		// ⚠⚠ PROFILE-FULL — THE CURRENT CELL NOW CARRIES ITS P/L DELTA, so this
+		// assertion follows the mockup one step further rather than being loosened.
+		// It is still an EXACT full-cell `textContent` pin — the delta is asserted
+		// as part of the string, not excluded from it, so a wrong sign, a wrong
+		// magnitude or a stray space all still red.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		const { staked, current } = valueCells();
 		expect((staked?.textContent ?? "").trim()).toBe("Đ 25");
-		expect((current?.textContent ?? "").trim()).toBe("Đ 31");
+		expect((current?.textContent ?? "").trim()).toBe("Đ 31(+Đ6)");
+		// …and the delta is the DISPLAYED-space difference of the two cells beside
+		// it, which is the §10.8 identity this amendment admits: 31 − 25 = 6, true
+		// of the figures actually on screen.
+		expect((current?.textContent ?? "").trim()).toContain("+Đ6");
 	});
 
 	it("itemD::the-ARROW-track-between-them-takes-no-glyph", () => {
@@ -1478,7 +1481,11 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 		);
 		const { staked, current } = valueCells();
 		expect((staked?.textContent ?? "").trim()).toBe("Đ 14,260");
-		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226");
+		// ⚠ PROFILE-FULL — the delta rides the Current cell, and it is GROUPED by
+		// the same `groupInteger` the two operands use: 3,226 − 14,260 = −11,034.
+		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried from the
+		// mockup's `plShort()` (`:677`), the same glyph the Net P/L tile emits.
+		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226(−Đ11,034)");
 	});
 
 	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {

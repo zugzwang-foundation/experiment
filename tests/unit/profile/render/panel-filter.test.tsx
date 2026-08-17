@@ -273,14 +273,29 @@ describe("item 7 — the replica card's parts", () => {
 
 	it("replica::the-title-carries-NO-`+`-affordance", () => {
 		// The mockup's `.rtitle .plus` (`:346`, wired `:630`) opens the
-		// full-argument pop-up. A-6 struck its shape, R4 ruled "Read more", and it
-		// duplicates the known PD-0-01 — and the body is rendered in full here,
-		// which is what the pop-up existed to reach.
+		// full-argument pop-up — and the body is rendered in full HERE, which is what
+		// the pop-up existed to reach, so there is nothing for it to reveal.
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R4 — THE CLAIM IS UNCHANGED, THE MEASUREMENT IS
+		// NARROWED. This asserted the replica card held NO buttons at all, which was
+		// a true but incidental way to say "no `+`": the card had no controls of any
+		// kind. R4 gives it the shipped head cluster (bookmark + disabled download),
+		// so an all-buttons assertion now fails for a reason that has nothing to do
+		// with the `+`. It reads the `+` specifically instead.
+		// ⛔ AND THE `+` IS STILL DELIBERATELY ABSENT HERE, not merely unbuilt: it IS
+		// built, on the argument-LIST card where the teaser is clamped and there is
+		// something to reveal. On this card it would reveal nothing.
 		renderPost();
 		const card = screen.getByTestId(`argument-replica-${C_POST}`);
-		expect(
-			[...card.querySelectorAll("button")].map((b) => b.textContent),
-		).toEqual([]);
+		const labels = [...card.querySelectorAll("button")].map(
+			(b) => `${b.textContent ?? ""}|${b.getAttribute("aria-label") ?? ""}`,
+		);
+		expect(labels.some((l) => l.startsWith("+"))).toBe(false);
+		expect(labels.some((l) => l.includes("Show more"))).toBe(false);
+		// …and the cluster IS here, so the narrowing did not quietly drop coverage of
+		// what the card should carry.
+		expect(labels.some((l) => l.includes("Bookmark"))).toBe(true);
+		expect(labels.some((l) => l.includes("Download"))).toBe(true);
 	});
 });
 
@@ -376,30 +391,56 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 			/>,
 		);
 
-	it("arena::a-click-on-a-row-filters-the-panel-to-its-argument", () => {
+	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED AT THE FRONT. This opened by asserting
+		// the FULL LIST was on screen at mount and that a click then filtered it. R3
+		// rules the opposite: the rail must show a full post on load, because a rail
+		// of stubs was the defect. So the arena now mounts already filtered to the
+		// first row's argument, under that row's market question.
 		mount();
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
-		fireEvent.click(screen.getByTestId(`position-row-${M_POST}`));
+		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the post");
 	});
 
-	it("arena::DESELECT-returns-the-full-list-and-the-header-word", () => {
+	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", () => {
+		// The half of the original claim that survives unchanged: a pick still drives
+		// the panel. Asserted on the row that is NOT the mount default, so it is a
+		// real transition rather than a no-op.
 		mount();
-		const row = screen.getByTestId(`position-row-${M_POST}`);
+		fireEvent.click(screen.getByTestId(`position-row-${M_REPLY}`));
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market question for the reply");
+	});
+
+	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. This asserted that a second click
+		// DESELECTED and returned the full list under the header word `Arguments`.
+		// R3 retires deselect: the panel always holds a selection, so clearing would
+		// re-derive to the first visible row — making a second click a no-op on row
+		// one and a jump-to-row-one elsewhere. The full-list arm is not dead (a
+		// zero-row filter and every call site that passes no selection still reach
+		// it); it is simply no longer where a second click goes.
+		mount();
+		const row = screen.getByTestId(`position-row-${M_REPLY}`);
 		fireEvent.click(row);
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		fireEvent.click(row);
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
-		expect(screen.getByTestId(`argument-${C_REPLY}`)).toBeTruthy();
-		expect(panelTitle()).toBe("Arguments");
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(screen.queryByTestId("argument-list")).toBeNull();
+		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
 	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", () => {
 		// The founder's own verification step: arrows step rows, wrap, and the
 		// panel follows. Both halves are asserted from the panel's side.
+		// ⚠ PROFILE OVERLAP R4 — THE PANEL STARTS ON THE FIRST ROW, so the first
+		// press moves to the SECOND. This used to open on the first press because
+		// the stepper anchored on the stored pick and re-selected row one; the panel
+		// therefore appeared to "follow" a press that had moved nothing. The claim
+		// is unchanged and the sequence is one row earlier.
 		mount();
 		const table = screen.getByTestId("positions-table");
-		fireEvent.keyDown(table, { key: "ArrowDown" });
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		fireEvent.keyDown(table, { key: "ArrowDown" });
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();

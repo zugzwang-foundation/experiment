@@ -72,7 +72,25 @@ function headerZ(): number {
  * overlay and content ARE two of the overlays this guard claims to cover. An
  * earlier draft matched only `"…"` and `{"…"}` and so saw two of the four
  * overlay layers while reporting itself healthy (@code-reviewer, POLISH-1b H3).
+ *
+ * ⚠⚠ PROFILE-FULL — THE DETECTOR IS TOKEN-SCOPED NOW, AND THIS IS A FALSE-POSITIVE
+ * FIX, NOT A RELAXATION. It tested `/\bfixed\b/` against the whole class STRING,
+ * and `-` is a word boundary — so Tailwind's `table-fixed`, a `table-layout`
+ * utility with no positioning behaviour whatsoever, registered as a
+ * document-level overlay. It fired the moment the positions table took the
+ * mockup's fixed column track, reporting "declares a z-index on its fixed layer:
+ * expected 0 to be greater than 0" about a `<table>`.
+ * ⇒ The predicate now matches a CLASS TOKEN that IS the positioning utility —
+ * exactly `fixed`, or a variant-prefixed `…:fixed` — so `md:fixed` and
+ * `group-hover:fixed` still count and `table-fixed` / `inset-fixed` do not.
+ * ⛔ IT IS STRICTLY MORE PRECISE. Nothing that was a real overlay stops being
+ * one: `EXPECTED_OVERLAY_FILES` below is unchanged and still pinned, so a regex
+ * that lost a genuine layer would fail rather than pass on a smaller set — which
+ * is the check that makes this tightening safe to make at all.
  */
+const FIXED_TOKEN = /(^|:)fixed$/;
+const hasFixedToken = (classes: string): boolean =>
+	classes.split(/\s+/).some((c) => FIXED_TOKEN.test(c));
 function fixedOverlayClassStrings(): { file: string; classes: string }[] {
 	const found: { file: string; classes: string }[] = [];
 	for (const dir of SCAN_DIRS) {
@@ -83,7 +101,7 @@ function fixedOverlayClassStrings(): { file: string; classes: string }[] {
 				/className=(?:"([^"]+)"|\{\s*(?:cn\(\s*)?"([^"]+)")/g,
 			)) {
 				const classes = m[1] ?? m[2] ?? "";
-				if (/\bfixed\b/.test(classes)) found.push({ file, classes });
+				if (hasFixedToken(classes)) found.push({ file, classes });
 			}
 		}
 	}
@@ -109,7 +127,11 @@ describe("B3 — the header is sticky and every overlay stacks above it", () => 
 		// sticky, NOT fixed — fixed would drop the header out of flow and force
 		// offset compensation on everything below (ADR-0023 §Patch, Mechanism).
 		expect(classes).toContain("sticky");
-		expect(classes).not.toContain("fixed");
+		// ⚠ THE SAME TOKEN PREDICATE the scan uses, not a substring test: a
+		// `toContain("fixed")` here would fire on `table-fixed` too, which is the
+		// false positive fixed above. The claim is that the header is not
+		// POSITIONED fixed.
+		expect(hasFixedToken(classes)).toBe(false);
 		expect(classes).toContain("top-0");
 		// Opaque fill is load-bearing once content passes beneath.
 		expect(classes).toContain("bg-n0");

@@ -1,6 +1,12 @@
 "use client";
 
-import { type ReactNode, useState } from "react";
+import {
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PageContainer } from "@/components/shell/PageContainer";
@@ -12,7 +18,7 @@ import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
 import { DebatePoll } from "./DebatePoll";
-import { ImageLightbox, PostPopup } from "./dialogs";
+import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
 import { PostScroller, ReplyScroller } from "./scrollers";
@@ -21,6 +27,7 @@ import type {
 	DebateReply,
 	DebateViewModel,
 	PresentPost,
+	PresentReply,
 	Side,
 	ViewerMarketContext,
 } from "./types";
@@ -83,6 +90,11 @@ export function DebateView({
 		initialPostId,
 	);
 	const [popupPost, setPopupPost] = useState<PresentPost | null>(null);
+	// HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up, a SEPARATE state
+	// slot from the post pop-up. ⛔ Not one widened slot: `PresentReply` is what
+	// makes a removed reply unpassable at the type level (H3-e / SC-1), and a
+	// shared slot would have had to be a union that admits both.
+	const [popupReply, setPopupReply] = useState<PresentReply | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 	// UI.A3 — the market-view Đ BET composer: at most ONE open (side-slot rule:
 	// betting side S renders the composer in the OPPOSITE slot; opening the
@@ -100,6 +112,64 @@ export function DebateView({
 	// enter/exit) no-ops — a mid-request unmount + re-open would mint a
 	// fresh key over a possibly-committing bet.
 	const [composerBusy, setComposerBusy] = useState(false);
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE PICKED COLUMN (d5's `picked`,
+	 * `:1683`). The reader's chosen side stops auto-advancing; the OTHER side
+	 * keeps running (`:1744` — "picked side is manual (loader off); the OTHER side
+	 * keeps auto-scrolling").
+	 *
+	 * ⛔⛔ IT LIVES HERE AND NOT IN THE SCROLLERS, AND IT HAS TO. Picking is
+	 * MUTUALLY EXCLUSIVE across the two columns — choosing YES releases NO — and
+	 * the two scrollers are siblings that cannot see each other. Owning it in
+	 * either one would mean a column reaching across to its peer. This is the
+	 * smallest node that contains both, and it is already the arena's owner.
+	 *
+	 * ⚠ ONE SLOT SERVES BOTH ARMS, deliberately. The market arm picks a POST
+	 * column and the post arm picks a REPLY column, and the two never coexist —
+	 * the ternary below renders exactly one arena. d5 runs two separate scripts
+	 * for the two arms and duplicates the whole state machine; one slot plus the
+	 * arm-swap reset below is the same behaviour without the second copy.
+	 */
+	const [pickedSide, setPickedSide] = useState<Side | null>(null);
+
+	/**
+	 * ⚠⚠ THE COLUMNS' `step` FUNCTIONS, REGISTERED UP. d5's `onKey` calls
+	 * `step(side, ±1)` (`d5:1792-1793`, `:1891`) — the keyboard STEPS CARDS, and
+	 * that is the half this build never had. Paging state lives in each scroller's
+	 * `usePagedColumn`, and the two scrollers are siblings that cannot see each
+	 * other or the key handler, so each publishes its stepper here on mount.
+	 *
+	 * ⛔ A REF, NOT STATE. Registering must not re-render — a render would rebuild
+	 * the callback, which would re-register, which would render again.
+	 * ⚠ Cleared on unregister so a column that unmounts (composer opens over it,
+	 * arm swaps) cannot be stepped through a stale closure.
+	 */
+	const stepRefs = useRef<Record<Side, ((delta: number) => void) | null>>({
+		YES: null,
+		NO: null,
+	});
+	/**
+	 * d5's `lastSide` (`:1683`) — the most recently chosen column. With nothing
+	 * picked, ↑/↓ resume THAT column rather than doing nothing (`d5:1801`).
+	 */
+	const lastSideRef = useRef<Side | null>(null);
+
+	// ⚠ ONE STABLE CALLBACK PER SIDE, not one closure built inside the `.map`.
+	// The scroller's register effect lists this in its deps, so a fresh function
+	// per render would unregister and re-register on every render — including the
+	// ones the countdown bar causes.
+	const registerYes = useCallback((step: ((delta: number) => void) | null) => {
+		stepRefs.current.YES = step;
+	}, []);
+	const registerNo = useCallback((step: ((delta: number) => void) | null) => {
+		stepRefs.current.NO = step;
+	}, []);
+
+	/** d5's `pickSide` (`:1746`) — choosing a column also makes it the `lastSide`. */
+	const pickSide = useCallback((side: Side) => {
+		setPickedSide(side);
+		lastSideRef.current = side;
+	}, []);
 
 	const { market, posts, priceChart } = model;
 	const marketOpen = market.status === "Open";
@@ -124,6 +194,161 @@ export function DebateView({
 		}
 		setOpenSide((cur) => (cur === side ? null : side));
 	};
+
+	/**
+	 * HTML-FINISH · MARKET DETAIL round 2 · R3 — THE SURFACE IS FROZEN while a
+	 * composer or a pop-up is open. d5's `locked` / `inDefault()` (`:1756-1771`):
+	 * "any sub-view hides controls + freezes both sides until back to plain market
+	 * view".
+	 *
+	 * ⛔ IT FREEZES **BOTH** COLUMNS, not just the one hosting the composer. The
+	 * composer already replaces its own column's scroller, so freezing only that
+	 * one would be a no-op; the point is that a reader typing an argument must not
+	 * have the OTHER column shuffling beside them. The lightbox counts for the
+	 * same reason — it covers the surface, and a card that moves underneath it has
+	 * moved somewhere the reader cannot see.
+	 */
+	const frozen =
+		openSide !== null ||
+		openReply !== null ||
+		popupPost !== null ||
+		popupReply !== null ||
+		lightboxUrl !== null;
+
+	/**
+	 * ⚠⚠ THE FOUNDER'S TWO KEYBOARD REPORTS, AND WHAT THEY ACTUALLY WERE.
+	 * Measured on live staging at `5349ae9`, both columns, real key events:
+	 * pressing → paused the RIGHT column's countdown and started the LEFT one
+	 * moving; pressing ↑ or ↓ did nothing at all. That is the whole of both
+	 * complaints, and neither was a mis-mapping:
+	 *
+	 *   · "cards do not step" — LITERALLY TRUE. The old handler called
+	 *     `setPickedSide` and NOTHING ELSE. No arrow key stepped a card, because
+	 *     ↑/↓ were deliberately not ported and ←/→ only ever picked.
+	 *   · "←/→ are REVERSED" — the KEYS were mapped correctly (← → left/YES,
+	 *     exactly `d5:1794`), but picking a column STOPS it while the other keeps
+	 *     auto-advancing. With no visible pick state, the only thing a reader
+	 *     could see was the OTHER column starting to move. Correct code, and it
+	 *     read backwards, which is O-3: a true refusal reported with a misleading
+	 *     cause is a defect.
+	 *
+	 * ⇒ BOTH ARE FIXED BY PORTING `onKey` AS WRITTEN (`d5:1789-1803`, mirrored at
+	 * `:1889-1895`) rather than a description of it, plus making the pick VISIBLE
+	 * (see `DebateColumn`'s `picked`). ↑/↓ step the chosen column; ←/→ choose one;
+	 * with nothing chosen yet, ↑/↓ resume `lastSide`.
+	 *
+	 * ⛔ THE SUPERSEDED RULING, RECORDED RATHER THAN DELETED (O-4). This block
+	 * used to read: "⛔ ONLY ←/→, AND d5's ↑/↓ STEPPING IS DELIBERATELY NOT
+	 * PORTED … this page scrolls, and swallowing ↑/↓ would take the page's own
+	 * scrolling away from every keyboard user to add a shortcut nobody asked for."
+	 * The founder DID ask for it, and the concern is answered rather than
+	 * dismissed: ↑/↓ are swallowed ONLY when a column is actually chosen — either
+	 * picked now, or picked earlier this session. Until the reader has touched a
+	 * column, ↑/↓ scroll the page exactly as they always did, and clicking off the
+	 * arena releases the pick and hands scrolling straight back.
+	 *
+	 * ⛔ NEVER WHILE TYPING (d5's own guard, `:1461`): a composer is a `<textarea>`
+	 * and stealing ← mid-argument would move the surface under an author trying to
+	 * move the caret. `frozen` already covers composer-open; the target check is
+	 * the belt for any future input.
+	 *
+	 * ⚠ `preventDefault` ONLY on a key this handler actually consumes.
+	 */
+	useEffect(() => {
+		const onKey = (e: KeyboardEvent) => {
+			if (
+				e.key !== "ArrowLeft" &&
+				e.key !== "ArrowRight" &&
+				e.key !== "ArrowUp" &&
+				e.key !== "ArrowDown"
+			) {
+				return;
+			}
+			if (frozen) {
+				return;
+			}
+			const target = e.target as HTMLElement | null;
+			if (
+				target !== null &&
+				(target.tagName === "TEXTAREA" ||
+					target.tagName === "INPUT" ||
+					target.isContentEditable)
+			) {
+				return;
+			}
+			if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+				e.preventDefault();
+				pickSide(e.key === "ArrowLeft" ? "YES" : "NO");
+				return;
+			}
+			// ↑/↓ — step the chosen column. `pickedSide` if one is chosen, else the
+			// last one the reader touched (d5 `:1801`). With neither, this key is
+			// NOT consumed and the page scrolls, which is the whole answer to the
+			// superseded objection above.
+			const target_side = pickedSide ?? lastSideRef.current;
+			if (target_side === null) {
+				return;
+			}
+			const step = stepRefs.current[target_side];
+			if (step === undefined || step === null) {
+				return;
+			}
+			e.preventDefault();
+			// Touching a column takes it off the timer, exactly as the rail arrows
+			// do (`d5:1780-1781` — `pickSide(side); step(side, ±1)`).
+			pickSide(target_side);
+			step(e.key === "ArrowUp" ? -1 : 1);
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+	}, [frozen, pickedSide, pickSide]);
+
+	/**
+	 * ⚠⚠ d5's TWO CLICK BEHAVIOURS, IN ONE DELEGATED LISTENER — which is how d5
+	 * itself does it (`:1782-1788`, mirrored at `:1886-1888`):
+	 *
+	 *   · a click INSIDE a column PICKS it — `slots[side].addEventListener(
+	 *     'click', …)` — except when it lands on a control, because that click
+	 *     belongs to the control (d5's own exclusion list is
+	 *     `.rtt,.argimg,button,a,.pscroll`).
+	 *   · a click OUTSIDE both columns RELEASES the pick — `if(ev.target.closest(
+	 *     '.slot')) return; unpick();`. Without the release a pick, once made, is
+	 *     permanent and the surface the reader froze never thaws.
+	 *
+	 * ⛔ DELEGATED RATHER THAN AN `onClick` PROP, and that is not merely
+	 * convenient. A column CONTAINS buttons and links, so it can be neither a
+	 * `<button>` (invalid nesting) nor a static element carrying a click handler
+	 * (`noStaticElementInteractions` / `useKeyWithClickEvents` reject it, and they
+	 * are right to — a click-only affordance on a `<div>` is invisible to the
+	 * keyboard). Here the keyboard path is ←/→, which reaches both columns from
+	 * anywhere on the page, so nothing about the pick is mouse-only.
+	 */
+	useEffect(() => {
+		const onDocClick = (e: MouseEvent) => {
+			if (frozen) {
+				return;
+			}
+			const target = e.target as HTMLElement | null;
+			if (target === null) {
+				return;
+			}
+			const column = target.closest("[data-debate-column]");
+			if (column === null) {
+				setPickedSide(null);
+				return;
+			}
+			// d5's exclusion list — a click on a control is that control's.
+			if (target.closest("button,a,input,textarea,label") !== null) {
+				return;
+			}
+			const side = column.getAttribute("data-debate-column");
+			if (side === "YES" || side === "NO") {
+				pickSide(side);
+			}
+		};
+		document.addEventListener("click", onDocClick);
+		return () => document.removeEventListener("click", onDocClick);
+	}, [frozen, pickSide]);
 
 	/** The body of one market-view pole column: composer/auth-gate when this
 	 * column is the OPPOSITE slot of the open bet side; the post scroller
@@ -161,6 +386,24 @@ export function DebateView({
 		}
 		history.replaceState(null, "", url);
 	};
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 36 — ENTERING A POST RESETS THE PAGE
+	 * SCROLL. d5 does the same on its scroll container (`:1605`:
+	 * `var c = document.querySelector('.content'); if(c){ c.scrollTop = 0; }`).
+	 *
+	 * ⚠ WHY IT IS NEEDED: the market↔post switch is a STATE toggle, not a
+	 * navigation, so the browser has no reason to move the viewport. A reader
+	 * scrolled down a long market view clicks a post title and the arm swaps
+	 * BENEATH them — they land mid-page in a post they have not seen the top of,
+	 * with the argument they just chose above the fold.
+	 *
+	 * ⚠ `behavior: "instant"`, not smooth: the content under the viewport has
+	 * ALREADY been replaced, so animating the scroll animates past content that
+	 * no longer relates to where it is going.
+	 */
+	const resetPageScroll = () => {
+		window.scrollTo({ top: 0, behavior: "instant" });
+	};
 	const enterPost = (id: string) => {
 		if (composerBusy) {
 			return;
@@ -168,8 +411,45 @@ export function DebateView({
 		setSelectedPostId(id);
 		setOpenReply(null);
 		setOpenSide(null);
+		// R3 — the arm swap releases the picked column. d5 does the same on entering
+		// and on leaving a post (`:1869-1870`): the pick names a COLUMN, and the
+		// post arm's columns are different columns holding different content, so
+		// carrying the pick across would silently freeze a column the reader never
+		// chose.
+		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
 		syncPostParam(target ? target.ordinal : null);
+		resetPageScroll();
+	};
+	/**
+	 * HTML-FINISH · MARKET DETAIL row 22 — a market-view card's Support/Counter
+	 * pill ENTERS that post and opens the relation there.
+	 *
+	 * ⛔ IT DOES NOT OPEN A COMPOSER ON THE CARD, and that is what honours `R1`'s
+	 * thesis ground while restoring the mockup's affordance. R1 removed these
+	 * controls because "entering post-focus to argue means reading the post
+	 * first, and mandatory commentary is meant to make argument deliberate, not
+	 * reflexive." Landing the reader ON the argument with the composer open keeps
+	 * that true — what R1 forbade was arguing WITHOUT reading.
+	 *
+	 * ⚠ It sets both pieces of state in one go rather than calling `enterPost`
+	 * and then opening: `enterPost` CLEARS `openReply` by design, so composing
+	 * the two would race and the composer would never appear.
+	 */
+	const replyToPost = (id: string, relation: "support" | "counter") => {
+		if (composerBusy) {
+			return;
+		}
+		setSelectedPostId(id);
+		setOpenSide(null);
+		setOpenReply(relation);
+		// R3 — same arm swap, same release.
+		setPickedSide(null);
+		const target = posts.find((p) => p.id === id);
+		syncPostParam(target ? target.ordinal : null);
+		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
+		// arm swap and the same reason.
+		resetPageScroll();
 	};
 	const exitPost = () => {
 		if (composerBusy) {
@@ -178,6 +458,8 @@ export function DebateView({
 		setSelectedPostId(null);
 		setOpenReply(null);
 		setOpenSide(null);
+		// R3 — leaving post-focus releases the picked column too (d5 `:1870`).
+		setPickedSide(null);
 		syncPostParam(null);
 	};
 	const selectedPost = selectedPostId
@@ -188,7 +470,47 @@ export function DebateView({
 	const noPosts = posts.filter((p) => p.sideAtPostTime === "NO");
 
 	return (
-		<PageContainer preset="debate" className="flex flex-col gap-5">
+		/* ⚠⚠ THE ONE-SCREEN BAND — HTML-FINISH · MARKET DETAIL · DIMENSIONAL
+		   PARITY, founder-ruled 2026-08-17: "It's a one page view — there should
+		   be no scroll down. The dimensions of the whole market detail page are
+		   not matching — it should be exact."
+
+		   ⛔ THIS REVERSES `A1` FOR THIS ROUTE, and the superseded ruling is
+		   recorded rather than deleted (O-4). `(public)/layout.tsx` ruled "⛔
+		   `min-h-*`, never `h-*`, and NO `min-h-0` anywhere in the chain: the
+		   floor lets the page GROW and SCROLL when content exceeds the viewport
+		   (RULED A1) instead of clipping it. The mockup's `overflow:hidden` on
+		   html/body is a fixed-viewport prototype affordance and is deliberately
+		   NOT adopted." The founder has overruled that FOR `/m/[slug]`. That
+		   comment is corrected in this same commit; ⛔ the layout's own `min-h-*`
+		   floor is UNTOUCHED, because it still governs every other `(public)`
+		   surface and this ruling names one route.
+
+		   ⛔ A FIXED HEIGHT CLIPS — IT DOES NOT MAKE CONTENT FIT. What makes this
+		   correct rather than broken is that the overflow lives INSIDE, exactly as
+		   it does in d5: `.colwrap{overflow-y:auto}` (`d5:568`) is the one
+		   scrolling region, and it is ported at `DebateColumn`. A long argument, a
+		   removed-by-moderator placeholder (ADR-0020/0021) and a tall card all
+		   stay reachable by scrolling THE COLUMN. Nothing is clipped out of
+		   existence.
+
+		   ⚠ `100dvh`, NOT `100vh` — the DYNAMIC viewport unit, so a mobile URL bar
+		   collapsing does not leave the band taller than the window it is meant to
+		   equal. ⚠ The subtrahend is unchanged and still the header's border-box
+		   written as its two shipped contributors: `60px` is `GlobalHeader`'s
+		   `h-[60px]` inner row, `2px` its `border-y`.
+
+		   ⚠ `gap-3` = 12px is d5's `.arena{margin-top:12px}` (`:523`), replacing
+		   the 20px `gap-5`. With the headzone band at its measured fraction this
+		   is what reproduces d5's arena height exactly.
+
+		   ⚠ `min-h-0` ON THE CONTAINER ITSELF is the first link: without it this
+		   flex item's automatic minimum size is its CONTENT, and a tall arena
+		   would push the band past the height it just declared. */
+		<PageContainer
+			preset="screen"
+			className="flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden"
+		>
 			{/* F-DEBATE-4 — the polled-on-view refresh. Renders nothing; re-invokes
 			    this page's own server read on an interval, suspended while the
 			    document is hidden or a composer is open, stopped once the market
@@ -203,12 +525,34 @@ export function DebateView({
 				marketOpen={marketOpen}
 				composerOpen={openSide !== null || openReply !== null}
 			/>
-			<MarketHeader market={market} priceChart={priceChart} />
 
+			{/* HTML-FINISH · MARKET DETAIL row 1 — THE HEADZONE IS INSIDE THE
+			    TERNARY. `MarketHeader` used to render ABOVE this switch and
+			    `PostFocusHeader` stacked underneath it, which made the header
+			    arm-BLIND; the mockup's headzone swaps its whole CONTENTS between
+			    arms (`vm` ⇄ `vp`) and only the two-column frame persists, so no
+			    `vp` element could ever land in a header column. Each arm now owns
+			    its own `HeadZone`.
+			    ⛔ `DebatePoll` STAYS ABOVE IT — see its own comment: inside the
+			    ternary the post toggle would remount it and reset `stopped` /
+			    `wasSuspended`.
+			    ⚠ EACH ARM IS A FRAGMENT, NOT A WRAPPER DIV. The headzone band and
+			    the arena band must be SIBLING children of the container or the
+			    arena's `flex-1 min-h-0` resolves against a wrapper instead of the
+			    container and the height chain is broken at that link — invisibly,
+			    since a broken chain merely reverts to content height. The post
+			    arm's former `flex flex-col gap-4` wrapper is therefore gone and
+			    its band gap is the container's `gap-5`. Pinned node by node in
+			    `tests/unit/design/debate-height-chain.test.ts`. */}
 			{selectedPost ? (
-				<div className="flex flex-col gap-4">
+				<>
+					{/* HTML-FINISH · MARKET DETAIL row 17 — `market` is threaded so the
+					    post arm's rail can render the market card. Row 1 stopped
+					    `MarketHeader` rendering in this arm, so without this the post
+					    arm carries no market context at all. */}
 					<PostFocusHeader
 						post={selectedPost}
+						market={market}
 						bookmarks={bookmarks}
 						heldSide={heldSide}
 						marketOpen={marketOpen}
@@ -222,8 +566,9 @@ export function DebateView({
 						}}
 						onExit={exitPost}
 						onOpenImage={setLightboxUrl}
+						onOpenPopup={setPopupPost}
 					/>
-					<div className="flex gap-4">
+					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {
 							// v0.10: the reply composer — Support OR Counter — opens in
 							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
@@ -246,6 +591,7 @@ export function DebateView({
 									side={side}
 									pricing={market.pricing}
 									engaged={resultingSide === side && side !== composerColumn}
+									picked={pickedSide === side}
 									header={
 										<PositionStrip
 											side={side}
@@ -295,53 +641,103 @@ export function DebateView({
 											side={side}
 											replies={repliesForSide(selectedPost, side)}
 											bookmarks={bookmarks}
+											onOpenImage={setLightboxUrl}
+											onOpenPopup={setPopupReply}
+											// R3 — the post arm's own auto-advance. d5 runs a
+											// SECOND, structurally identical timer over the reply
+											// columns (`:1816-1901`); one hook serves both here.
+											// `stagger` on NO only, so the two columns advance
+											// one-after-another rather than flipping together.
+											auto={{
+												picked: pickedSide === side,
+												frozen,
+												onPick: () => pickSide(side),
+												stagger: side === "NO",
+												registerStep: side === "YES" ? registerYes : registerNo,
+											}}
 										/>
 									)}
 								</DebateColumn>
 							);
 						})}
 					</div>
-				</div>
+				</>
 			) : (
-				<div className="flex gap-4">
-					{(["YES", "NO"] as const).map((side) => (
-						<DebateColumn
-							key={side}
-							side={side}
-							pricing={market.pricing}
-							engaged={openSide === side}
-							header={
-								<SlotHeader
-									side={side}
-									pricing={market.pricing}
-									unitToWin={market.unitToWin}
-									viewer={viewer}
-									marketOpen={marketOpen}
-									suspended={suspended}
-									composerOpen={openSide === side}
-									onToggleEntry={() => toggleEntry(side)}
-									ownPseudonym={ownPseudonym}
-									slug={market.slug}
-								/>
-							}
-						>
-							{marketColumnBody(
-								side,
-								<PostScroller
-									side={side}
-									posts={side === "YES" ? yesPosts : noPosts}
-									bookmarks={bookmarks}
-									onEnter={enterPost}
-									onOpenPopup={setPopupPost}
-									onOpenImage={setLightboxUrl}
-								/>,
-							)}
-						</DebateColumn>
-					))}
-				</div>
+				<>
+					{/* HTML-FINISH · MARKET DETAIL round 2 · R7 (row 8) — the rail bar's
+					    percent labels open the composer for that side, exactly as the
+					    colhead `Buy` does (`d5:1038`/`:1040` → `pick('yes')`/`pick('no')`
+					    → `openMod`). ⛔ `toggleEntry` IS THE SAME HANDLER `SlotHeader`
+					    gets, deliberately: two controls for one action must produce one
+					    behaviour, including toggle-to-close and the `composerBusy`
+					    no-op. ⛔ The F-3 viewer state travels WITH it — the composer host
+					    below opens off `openSide` alone and checks none of these three
+					    conditions itself, so a label that skipped them would be a bypass
+					    around the gate rather than a second door to it. */}
+					<MarketHeader
+						market={market}
+						priceChart={priceChart}
+						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
+					/>
+					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
+						{(["YES", "NO"] as const).map((side) => (
+							<DebateColumn
+								key={side}
+								side={side}
+								pricing={market.pricing}
+								engaged={openSide === side}
+								picked={pickedSide === side}
+								header={
+									<SlotHeader
+										side={side}
+										pricing={market.pricing}
+										unitToWin={market.unitToWin}
+										viewer={viewer}
+										marketOpen={marketOpen}
+										suspended={suspended}
+										composerOpen={openSide === side}
+										onToggleEntry={() => toggleEntry(side)}
+										ownPseudonym={ownPseudonym}
+										slug={market.slug}
+									/>
+								}
+							>
+								{marketColumnBody(
+									side,
+									<PostScroller
+										side={side}
+										posts={side === "YES" ? yesPosts : noPosts}
+										bookmarks={bookmarks}
+										onEnter={enterPost}
+										onOpenPopup={setPopupPost}
+										onOpenImage={setLightboxUrl}
+										onReplyToPost={replyToPost}
+										heldSide={heldSide}
+										marketOpen={marketOpen}
+										suspended={suspended}
+										// R3 — auto-advance. `stagger` on NO only: d5 offsets
+										// the second side by half a cadence so the two columns
+										// advance one-after-another (`:1742` — "NO leads by
+										// 10s"). ⚠ The pick is MUTUALLY EXCLUSIVE by
+										// construction — `pickedSide` is one slot, so choosing
+										// one column releases the other with no cross-talk.
+										auto={{
+											picked: pickedSide === side,
+											frozen,
+											onPick: () => pickSide(side),
+											stagger: side === "NO",
+											registerStep: side === "YES" ? registerYes : registerNo,
+										}}
+									/>,
+								)}
+							</DebateColumn>
+						))}
+					</div>
+				</>
 			)}
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
+			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />
 			<ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
 		</PageContainer>
 	);

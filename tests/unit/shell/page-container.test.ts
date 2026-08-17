@@ -96,10 +96,19 @@ const SITES: Site[] = [
 		// the same figure `<main>`'s own floor uses.
 		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
 		// read-only this round, so `BOX_AXES` moves by preset selection alone.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		// ⚠⚠ MOVED AGAIN AT PROFILE-DIMS R2 · D-4 — onto `screen`, byte-carried
+		// from Profile's call site in the SAME commit. `/bookmarks` takes the
+		// Profile arrangement, so it takes Profile's frame; moving only one of the
+		// pair would re-open exactly the drift §3 forbids. `gap-3` is the mockup's
+		// `.arena{margin-top:12px}` and `100dvh` replaces `100vh` for the reason
+		// `/m/[slug]`'s guard pins by name.
+		// ⛔ STILL CONSUMED, NEVER RE-MINTED — `screen` already existed (#341), so
+		// `BOX_AXES` moves by preset SELECTION alone and no preset was authored.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none",
 		movedBy:
 			"HTML-FINISH · BOOKMARKS round 3 — full replication of Profile " +
-			"(founder-ruled 2026-08-15)",
+			"(founder-ruled 2026-08-15); PROFILE-DIMS R2 · D-4 — takes the `screen` " +
+			"preset with Profile (founder-ruled 2026-08-17)",
 	},
 	{
 		site: 3,
@@ -142,10 +151,23 @@ const SITES: Site[] = [
 		// must stay free to grow and scroll, so `BOX_AXES` is untouched at every
 		// width and the three container axes still move only where row 20 moved
 		// them.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		// ⚠⚠ MOVED AGAIN AT PROFILE-DIMS R2 · D-4 — off `wide` and onto `screen`,
+		// the SAME preset and the SAME ruling `/m/[slug]` (site 9) already runs on.
+		// `wide` capped the container at `max-w-[1440px]`; the mockup's `.content`
+		// is full bleed inside a 28px inset. At the pinned 1440 that cap is nearly
+		// invisible (1392 vs the mockup's 1384) but it BINDS above it — site 9's
+		// docblock records −19.6pp at 1800. `gap-3` is the mockup's
+		// `.arena{margin-top:12px}`; `100dvh` replaces `100vh` so a collapsing
+		// mobile chrome cannot leave the bound taller than the screen.
+		// ⛔ CONSUMED, NEVER RE-MINTED: `screen` arrived with #341, so this move is
+		// preset SELECTION only and `CONTAINER_PRESETS` is untouched.
+		// ⛔ THE `lg:` SCOPING IS DELIBERATELY NOT SITE 9's. That route bounds
+		// unprefixed; below `lg` these two stack and must stay free to grow.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none",
 		movedBy:
 			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2); " +
-			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5)",
+			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5); " +
+			"PROFILE-DIMS R2 · D-4 — takes the `screen` preset (founder-ruled 2026-08-17)",
 	},
 	{
 		site: 6,
@@ -176,6 +198,46 @@ const SITES: Site[] = [
 		// suppresses `align-self: stretch` and the class becomes the difference
 		// between fill-to-max-w and shrink-to-fit.
 		adds: "w-full",
+		// ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R1 — `/m/[slug]` JOINS SITES 2
+		// AND 5 ON `wide`, and it is the SAME ruling reaching a third route. The
+		// debate surface is a two-column HEADER above a two-column ARENA, and
+		// `debate`'s own `max-w-5xl` = 1024 is the width at which the header rail
+		// stops being a rail. MEASURED on staging at a 1440 viewport before the
+		// move: container 1024 (capped), headzone-left 716, headzone-right 244 —
+		// so the rail rendered at 244px on a 1440 screen and could not widen. That
+		// is the identical defect row 20 minted `wide` to fix on Profile, and the
+		// identical reason `/bookmarks` took it at round 3.
+		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
+		// read-only this round too, so `BOX_AXES` moves by preset selection alone.
+		// ⚠ `adds` above is KEPT rather than folded into `now`: it is the historical
+		// record of the one class the primitive added at `c5892bc`, and the
+		// "exactly one site adds a class" row below still counts it. `now` supplies
+		// the assertion; `before`/`adds` stay the untouched baseline.
+		// ⚠⚠ SITE 9 MOVES A SECOND TIME, and the previous move is superseded IN
+		// PLACE rather than deleted (O-4). Round 2 took `wide` (`mx-auto flex
+		// w-full max-w-[1440px] flex-col gap-5 px-6 py-6`) to widen a cramped
+		// 1024px container. The founder's DIMENSIONAL PARITY ruling of 2026-08-17
+		// — "It's a one page view — there should be no scroll down. The dimensions
+		// of the whole market detail page are not matching — it should be exact" —
+		// supersedes it on BOTH axes:
+		//   · WIDTH: `max-w-[1440px]` is gone. Measured at a pinned 1800×971,
+		//     mockup beside staging, d5's `.content` is full-bleed inside a 28px
+		//     inset — headzone 96.9% of viewport — while the capped container gave
+		//     77.3%. A −19.6pp delta every region inside inherited.
+		//   · HEIGHT: the container now DECLARES one screen and hides its own
+		//     overflow. The route's `min-h-* never h-*` rule (A1) is reversed for
+		//     this route by the same ruling; `(public)/layout.tsx`'s comment
+		//     recording it is corrected in the same commit, and the layout's own
+		//     floor is untouched because it still governs every other surface.
+		// ⛔ THE OVERFLOW IS NOT DELETED, IT IS RELOCATED — `DebateColumn`'s
+		// `.colwrap` scrolls internally, so a long argument and a removed-content
+		// placeholder stay reachable. A fixed height that clips would be a failure,
+		// not a pass.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex h-[calc(100dvh-60px-2px)] min-h-0 flex-col gap-3 overflow-hidden",
+		movedBy:
+			"HTML-FINISH · MARKET DETAIL · DIMENSIONAL PARITY — /m/[slug] is a " +
+			"fixed-height one-screen full-bleed grid (founder-ruled 2026-08-17); " +
+			"supersedes HTML-FINISH-MD-1's move onto `wide` (2026-08-16)",
 	},
 ];
 
@@ -307,7 +369,11 @@ describe("B2 — the container primitive moves nothing", () => {
 		// `max-w-3xl` = 768 caps the container BELOW the `lg` breakpoint at which
 		// that arena may become two columns at all. ⛔ THE LIST STAYS EXACT — this
 		// is an enumeration of ruled moves, not a permission to drift.
-		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5]);
+		// ⚠ SITE 9 JOINS THEM AT HTML-FINISH · MARKET DETAIL round 2 (R1 /
+		// HTML-FINISH-MD-1) — the third route to hit the same wall, measured at
+		// 1024 on a 1440 viewport. THREE ruled moves, all onto `wide`, all
+		// founder-ruled, each carrying its own `movedBy`.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5, 9]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({
@@ -444,12 +510,22 @@ describe("B2 — the container primitive moves nothing", () => {
 		// claim: the mint was ADDITIVE. Its `max-w-[1440px] px-6` is byte-carried
 		// from `GlobalHeader.tsx:91`, the widest surface wrapper on `main`; its
 		// `py-6` is `reading`'s. Nothing here is read off a mockup.
+		//
+		// ⚠⚠ `screen` is the SIXTH, minted at HTML-FINISH · MARKET DETAIL ·
+		// DIMENSIONAL PARITY on the founder ruling of 2026-08-17. ADDITIVE AGAIN —
+		// the five above it are byte-unchanged, and `/m/[slug]` is its only
+		// consumer. ⛔ Its two values are d5's own `.content{padding:16px 28px}`:
+		// `px-7` = 28px, `py-4` = 16px. `max-w-none` is a DECLARED position on the
+		// max-width axis, not an omission — full bleed is what closed the −19.6pp
+		// width delta measured at a pinned 1800×971 (d5 headzone 96.9% of viewport
+		// vs the capped container's 77.3%).
 		expect(CONTAINER_PRESETS).toEqual({
 			reading: "mx-auto w-full max-w-3xl px-4 py-6",
 			debate: "mx-auto w-full max-w-5xl px-6 py-8",
 			auth: "mx-auto w-full max-w-md px-4 py-8",
 			notice: "mx-auto w-full max-w-3xl px-4 py-24",
 			wide: "mx-auto w-full max-w-[1440px] px-6 py-6",
+			screen: "mx-auto w-full max-w-none px-7 py-4",
 		});
 	});
 

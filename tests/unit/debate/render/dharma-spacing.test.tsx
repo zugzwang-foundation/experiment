@@ -56,6 +56,26 @@ vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
 
 afterEach(cleanup);
 
+/** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
+ * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
+ * pinned. */
+const noopPopup = () => {};
+
+/** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
+ * These suites assert bookmarks / spacing / card composition, never the
+ * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
+ * keeps the viewer state REQUIRED at the component (a trigger without its
+ * F-3 gate invites a bet the viewer cannot place) without pretending this
+ * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
+const noopReply = () => {};
+
+/** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
+ * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
+ * (O-1) without pretending this file tests the lightbox. */
+const noopImage = () => {};
+
 const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 const AGGREGATE = {
@@ -77,6 +97,7 @@ function presentReply(): DebateReply {
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5000.000000000000000000",
 		entryPrice: "0.500000000000000000",
+		imageUrl: null,
 	};
 }
 
@@ -134,7 +155,12 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 	it("dharma-spacing::site-2-the-reply-card-stake-is-spaced", () => {
 		// Site 2 · `ReplyCard.tsx:55 (ReplyCard → stake span)` · lands at C10.
 		const { container } = render(
-			<ReplyCard reply={presentReply()} bookmarks={VIEWER} />,
+			<ReplyCard
+				reply={presentReply()}
+				bookmarks={VIEWER}
+				onOpenImage={noopImage}
+				onOpenPopup={noopPopup}
+			/>,
 		);
 
 		const stake = container.querySelector(STAKE_SPAN);
@@ -172,6 +198,10 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
+				onReplyToPost={noopReply}
+				heldSide={null}
+				marketOpen
+				suspended={false}
 			/>,
 		);
 

@@ -4,7 +4,10 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { SellModule } from "@/components/debate/composer/SellModule";
-import { formatDharma } from "@/components/debate/format";
+import {
+	displayPositionProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -20,7 +23,13 @@ import type {
 } from "@/server/profile/positions";
 
 import { PROFILE_COPY } from "./copy";
-import type { ProfileSelection } from "./selection";
+import { useDocumentRowStepper } from "./row-stepper";
+import { useEqualRowThirds } from "./row-thirds";
+import {
+	initialMarketIdOf,
+	initialStatusFilter,
+	type ProfileSelection,
+} from "./selection";
 
 /**
  * ROUND 4 item 8 — how many position rows fill the panel before the rest
@@ -78,8 +87,12 @@ export function PositionsTable({
 }): React.JSX.Element {
 	const owner = payload.owner;
 	const rows = payload.rows;
-	const initialMarketId =
-		rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all";
+	// ⚠ PROFILE REFINEMENT · R3 (SSR half) — these two derivations moved into
+	// `selection.ts` so the ARENA can seed its initial selection from the same
+	// definitions. Two copies of "which rows are visible at mount" would drift, and
+	// the drift would be invisible: the table would highlight one row while the
+	// panel showed another. See that module for why the flash made this necessary.
+	const initialMarketId = initialMarketIdOf(rows, initialMarketSlug);
 	const [market, setMarket] = useState(initialMarketId);
 	// ⚠ POLISH.5 Gate C S-1 — the default is DERIVED, not fixed. A fixed `Open`
 	// is permanently empty for anyone whose held markets are all non-Open, and
@@ -89,13 +102,9 @@ export function PositionsTable({
 	// link to a market whose only position is Closed would otherwise still land
 	// on a blank table. ⚠ The canon inventory is UNCHANGED — two options, `All`
 	// still gone. Only which one is selected at mount moves.
-	const [status, setStatus] = useState(() => {
-		const scoped =
-			initialMarketId === "all"
-				? rows
-				: rows.filter((r) => r.marketId === initialMarketId);
-		return scoped.some((r) => r.statusLabel === "Open") ? "Open" : "Closed";
-	});
+	const [status, setStatus] = useState<"Open" | "Closed">(() =>
+		initialStatusFilter(rows, initialMarketId),
+	);
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
 	// ⚠ ROUND 4 item 5 — THE SELECTED ROW. The mockup keeps this in one module
@@ -105,10 +114,20 @@ export function PositionsTable({
 	// index because its row array never changes; ours is re-filtered by two
 	// controls, so an index would silently point at a different row the moment a
 	// filter moved.
-	// ⛔ IT STARTS AT NULL, NOT AT THE FIRST ROW. The mockup auto-selects
-	// (`refresh()`, `:571` — "the replica always shows an argument"); the founder
-	// ruled the opposite for this build — the full argument list IS the empty
-	// state — so nothing is selected until the reader picks.
+	// ⛔⛔ IT STILL STARTS AT NULL, BUT NULL NO LONGER MEANS "NOTHING SELECTED" —
+	// PROFILE REFINEMENT · R3 REVERSED THE RULING THIS COMMENT RECORDED. It used to
+	// read: "the founder ruled the opposite for this build — the full argument list
+	// IS the empty state — so nothing is selected until the reader picks." The
+	// founder has now ruled the mockup's way: the panel loads with the FIRST row
+	// selected and the rail shows that argument in full, because a rail of stubs on
+	// load was the defect. The mockup's own note is the one that governs again —
+	// `refresh()` (`:571`): "the list auto-selects the first visible row … the
+	// replica always shows an argument".
+	// ⚠ THE STATE STILL STARTS AT NULL DELIBERATELY, and that is not a leftover: it
+	// means "the reader has not chosen", which is a different fact from "row one is
+	// chosen" and is what lets the FALLBACK below re-aim at the first VISIBLE row
+	// every time a filter moves. Seeding the state with row one's id instead would
+	// pin a stale id the moment the filter changed.
 	const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 	// One entry per rendered position row, for `scrollIntoView` + focus on an
 	// arrow step. A ref, not state: moving focus must not re-render.
@@ -179,8 +198,21 @@ export function PositionsTable({
 	// is unavailable, so a hidden selection simply stops counting and the panel
 	// returns to the list. Derivation, not an effect: an effect would render one
 	// frame with a selection that is no longer on screen.
+	// ⚠⚠ PROFILE REFINEMENT · R3 — THE FIRST VISIBLE ROW IS THE FALLBACK, and this
+	// ONE expression is the whole of R3. It covers every case the row names —
+	// mount, filter change, and (once bookmarks mode exists) mode switch — because
+	// all three are the same question: the stored pick is not in `visible`, so what
+	// is selected? The answer is now "the first row that is" instead of "nothing".
+	// ⛔ A DERIVATION, NOT AN EFFECT. An effect that watched `visible` and wrote
+	// state would render one frame with the OLD selection — the empty rail this row
+	// exists to remove, just one frame long — and would need its own guard against
+	// looping. Falling back at read time cannot be out of date.
+	// ⚠ THE EMPTY LIST FALLS OUT FOR FREE: `visible[0]` is `undefined`, so this is
+	// `null` and the existing empty state renders. No phantom row, no crash — the
+	// case R3 warns about is handled by the shape of the expression rather than by
+	// a branch.
 	const selectedRow =
-		visible.find((r) => r.marketId === selectedMarketId) ?? null;
+		visible.find((r) => r.marketId === selectedMarketId) ?? visible[0] ?? null;
 
 	// ROUND 4 item 7 — REPORT THE DERIVED SELECTION UPWARD. The deps are all
 	// PRIMITIVES, never `selectedRow` itself: the row object is rebuilt on every
@@ -242,12 +274,33 @@ export function PositionsTable({
 	// second guard inside `measure()`. At `lg`+ the profile is a one-screen
 	// layout (item A) and the panel's height comes from the viewport, so the
 	// window would subtract from the list rather than bound it.
+	useEqualRowThirds({
+		bodyRef,
+		tableRef,
+		testidPrefix: "position-row-",
+		rowWindow: ROW_WINDOW,
+		rowCount: visible.length,
+	});
 	useEffect(() => {
 		const body = bodyRef.current;
 		const table = tableRef.current;
 		if (body === null || table === null) {
 			return;
 		}
+		/**
+		 * ⚠⚠ PROFILE REFINEMENT · R1 — EVERY ROW IS ONE THIRD OF THE ROWS REGION.
+		 *
+		 * ⛔ THE RULE MOVED TO `row-thirds.ts` AND IS NOT RESTATED HERE. R1 names the
+		 * POSITION rows, but the bookmark rows are their twin — same shell, and the
+		 * mockup's bookmark mode reuses the very same `.prow`. MEASURED before it was
+		 * shared: positions `[128, 128, 128]` against bookmarks `[136, 92]`. Two copies
+		 * of the arithmetic would drift, so there is one. That module carries the
+		 * measurement, why the mockup has no clamp, why the CSS form fails, and why it
+		 * gates on the PAGE rather than on a breakpoint literal.
+		 * ⚠ THE CAP HALF IS STILL LOCAL: a `<tr>` height is a FLOOR, so the clamp on the
+		 * argument title in `ArgumentCell` is what stops a long argument outgrowing the
+		 * third. Both halves are needed; only the equalising half is shared.
+		 */
 		const measure = () => {
 			if (visible.length < ROW_WINDOW) {
 				// Fewer rows than the window — nothing to window, and the panel goes
@@ -307,11 +360,23 @@ export function PositionsTable({
 		return () => observer.disconnect();
 	}, [visible.length]);
 
-	/** `pick(i)` (`:679`) — click the selected row again to clear it. The mockup
-	 * has no deselect because it always holds one; here deselect is the way back
-	 * to the full argument list, so the click TOGGLES. */
+	/** `pick(i)` (`:679`) — select a row.
+	 *
+	 * ⚠⚠ PROFILE REFINEMENT · R3 — THE TOGGLE IS RETIRED. It used to clear the
+	 * selection on a second click, and the reason given was that "deselect is the
+	 * way back to the full argument list". R3 removes that destination: the panel
+	 * now always holds a selection, so clearing it would immediately re-derive to
+	 * the first visible row — which makes a second click a silent no-op on row one
+	 * and a jump-to-row-one everywhere else. That is worse than not offering it.
+	 * ⛔ THE MOCKUP HAS NO DESELECT EITHER, for exactly this reason: it always holds
+	 * one (`:679` sets `sel = i` unconditionally).
+	 * ⚠ THE COST, NAMED: the UNFILTERED full argument list is no longer reachable
+	 * from this panel, because it is no longer a state the panel can be in. That is
+	 * an information change and it is the founder's call — R3 rules the rail must
+	 * show a full post on load. The list is still what renders when a filter yields
+	 * zero rows, and every argument remains reachable one row-click at a time. */
 	const pick = (marketId: string) => {
-		setSelectedMarketId((current) => (current === marketId ? null : marketId));
+		setSelectedMarketId(marketId);
 	};
 
 	/** `stepRow(dir)` (`:741-749`) — Up/Down step through the CURRENTLY VISIBLE
@@ -327,7 +392,21 @@ export function PositionsTable({
 		if (visible.length === 0) {
 			return;
 		}
-		const at = visible.findIndex((r) => r.marketId === selectedMarketId);
+		// ⚠⚠ PROFILE OVERLAP · R4 — THE ANCHOR IS THE *DERIVED* ROW, NOT THE STORED
+		// PICK, and that one word was half the row. The stored id means "the reader
+		// has chosen"; it is `null` at mount, so this read fell to `at < 0` and
+		// entered at index 0 — which is the row R3 already has selected. The first
+		// arrow therefore re-selected where it stood and NOTHING MOVED; the second
+		// finally stepped. MEASURED on staging from a fresh load, with focus placed
+		// inside the table so the keys were arriving: two ArrowDowns, no movement.
+		// ⇒ Stepping has to start from what is on screen, and the only thing that
+		// knows that is `selectedRow` — the same derivation the panel is handed and
+		// the highlight is drawn from. Reading it here is what makes the keyboard's
+		// notion of "current" and the selection ONE fact instead of two.
+		// ⚠ `at < 0` survives and is still reachable: an empty visible set returns
+		// above, but a derived `null` on a non-empty set does not, so entering at
+		// index 0 stays the answer for it.
+		const at = selectedRow === null ? -1 : visible.indexOf(selectedRow);
 		const next = at < 0 ? 0 : (at + dir + visible.length) % visible.length;
 		const target = visible[next];
 		if (target === undefined) {
@@ -340,6 +419,17 @@ export function PositionsTable({
 		}
 		el?.focus({ preventScroll: true });
 	};
+	// ⚠⚠ PROFILE OVERLAP · R4 — AND THE KEYS HAVE TO ARRIVE. The handler on the
+	// `<table>` below only fires while focus is already inside it, and at load
+	// focus is on `<body>`, so the stepper above was unreachable from a fresh page
+	// however correct its arithmetic. This is the arm that reaches it; every
+	// condition it stands down on — a caret, page scrolling, focus taken
+	// elsewhere, focus already in the table — is written out in that module,
+	// including why the old "never bind to `document`" ruling is answered rather
+	// than overruled.
+	// ⛔ `enabled` yields the keys while the market popover is open: canon §5 says
+	// Up/Down yield there, and its options are a list of their own.
+	useDocumentRowStepper({ tableRef, step: stepRow, enabled: !filterOpen });
 
 	// Item 8 (P5-D11) — the empty adopts W2.11 P1 at ONE message tier (D3(a)).
 	// The testid moves onto the leaf's MESSAGE NODE, so a `textContent` read
@@ -522,6 +612,17 @@ export function PositionsTable({
 					// route. Bound here, the keys are live exactly while focus is
 					// inside the table — the BEHAVIOUR the mockup describes, without
 					// the side effect its own page could not have.
+					// ⚠⚠ AND SINCE PROFILE OVERLAP R4 IT IS NOT THE ONLY BINDING.
+					// Scoping to the table is the reason ↑/↓ did nothing from a fresh
+					// load: focus starts on `<body>`, so this handler never fired and
+					// the stepper was unreachable without a click.
+					// `useDocumentRowStepper` above adds the document arm — and the
+					// objection this block raises is ANSWERED rather than overruled:
+					// that arm stands down whenever `scrollHeight > clientHeight`, so
+					// the keyboard scrolling of a growable route is never taken. ⛔ It
+					// also stands down when the target is inside this table, which is
+					// what keeps one press from stepping twice. This handler still owns
+					// every press that arrives with focus already in here.
 					onKeyDown={(e) => {
 						if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
 							return;
@@ -529,7 +630,7 @@ export function PositionsTable({
 						e.preventDefault();
 						stepRow(e.key === "ArrowUp" ? -1 : 1);
 					}}
-					className="w-full text-left text-sm"
+					className="w-full table-fixed text-left text-sm"
 				>
 					{/* HTML-FINISH row 14 — THE ARROW TRACK MOVES BETWEEN THE TWO VALUE
 					    COLUMNS. The mockup's grid is `Position | Argument | Staked | ␣ |
@@ -562,20 +663,79 @@ export function PositionsTable({
 					    real `<table>`, its column algorithm, and its semantics.
 					    `bg-n0` is the panel's own background, already on the section —
 					    a sticky header over scrolling rows must be opaque or the rows
-					    read through it. */}
-					<thead className="sticky top-0 z-10 bg-n0 text-xs text-n5">
+					    read through it.
+					    ⚠⚠ AND OPAQUE IS NOT ENOUGH — PROFILE OVERLAP R1. Chrome resolves a
+					    sticky `top:0` against the scroll container's CONTENT box, so the
+					    container's own `p-3` leaves 12px of SCROLLABLE space above the
+					    header that the header does not cover. Rows scroll into that strip
+					    and appear ABOVE the column titles, inside the panel frame — measured
+					    on staging (body top 331, header top 343) and confirmed by paint, not
+					    by reasoning about paint: a zoom of the strip showed the selected
+					    row's rounded top edge sitting over it.
+					    ⇒ The shadow is the header claiming that strip. Zero blur, zero
+					    spread, offset up by exactly the padding — a copy of its own opaque
+					    box, and because the header is `sticky z-10` it paints above the
+					    plain rows. ⛔ THE OFFSET IS BOUND TO THE PADDING BY TOKEN, never
+					    typed as 12px: both are `var(--spacing) * 3`, so `p-3` and this move
+					    together or a guard fails.
+					    ⛔ NOT FIXED BY SHRINKING THE PADDING or by `overflow:hidden` — the
+					    first changes the region's arithmetic, the second clips a row out of
+					    a participant's own portfolio. */}
+					{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
+					    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
+					    text-transform:uppercase; color:var(--n4)` with `padding:0 12px 8px`
+					    (`:267-268`) — a micro overline register, not body text. This shipped at
+					    `text-xs text-n5` in sentence case, so it read as a fifth row of CONTENT
+					    rather than as a label for the four below it.
+					    ⛔ `uppercase` IS A CSS TRANSFORM, SO NO STRING IS RETYPED — each `<th>`'s
+					    DOM `textContent` is still `Position` / `Argument` / `Staked` / `Current`,
+					    which is what the row-14 column-ORDER guards read. A retyped literal would
+					    have moved the assertion; a transform cannot.
+					    ⚠ `text-[8.5px]` is the mockup's own figure HERE (its tile labels are 8px —
+					    that split is the mockup's and is kept), and it is the shipped micro-label
+					    idiom in this repo: `DharmaCluster.tsx`, `MarketCard.tsx`, `HeroPanels.tsx`.
+					    `leading-normal` because an arbitrary `text-[…]` inherits the previous
+					    step's paired line-height — the miss that cost the tile grid 16px.
+					    ⚠ THE PADDING FOLLOWS: `px-2 pt-0 pb-2` is the mockup's `0 12px 8px`, which
+					    is what makes the header row 19px instead of 33 and puts the overline right
+					    above the rule it labels. */}
+					{/* ⚠⚠ PROFILE-FULL — THE COLUMN TRACK IS THE MOCKUP'S, AND IT IS LOAD-BEARING
+					    NOW RATHER THAN COSMETIC. The mockup's row grid is
+					    `grid-template-columns:96px 1fr 78px 16px 118px` (`:262`) — four FIXED tracks
+					    with the argument taking the slack. This was an auto-laid `<table>`, and
+					    MEASURED ON STAGING it gave Position 97 · Argument 389 · Staked 55 · arrow 31
+					    · Current 86: the Argument column had taken 91px the two value columns
+					    needed, and once the Current cell gained its P/L delta the figure BROKE
+					    MID-VALUE — `Đ` on one line and `448` on the next, with the row at 102px.
+					    That is a defect the delta surfaced rather than caused: the column was
+					    always too narrow, and nothing had been wide enough to prove it.
+					    ⛔ `table-fixed` IS WHAT MAKES THE WIDTHS BIND. Without it a `<th>` width is
+					    a HINT the auto layout may overrule from cell content — which is exactly how
+					    Current ended up at 86 against a 118px request. With it the four literals
+					    hold and Argument becomes the `1fr`, which is the mockup's own topology.
+					    ⚠ AND THE VALUE CELLS TAKE `whitespace-nowrap` — belt to the braces. A Đ
+					    figure and its delta are ONE quantity; breaking them across lines is never
+					    the right degrade, so the cell is told not to, and the 118px track is what
+					    means it never has to. */}
+					<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 						<tr>
-							<th className="p-2 text-center">Position</th>
-							<th className="p-2 text-center">Argument</th>
-							<th className="p-2 text-center">Staked</th>
-							<th className="p-2" />
-							<th className="p-2 text-center">Current</th>
+							<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
+							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
+							<th className="w-[78px] px-2 pt-0 pb-2 text-center">Staked</th>
+							<th className="w-[16px] px-2 pt-0 pb-2" />
+							<th className="w-[118px] px-2 pt-0 pb-2 text-center">Current</th>
 						</tr>
 					</thead>
 					<tbody>
 						{visible.map((row, index) => {
 							const sellable = sellEligibleOf(row);
 							const sellOpen = sellMarketId === row.marketId;
+							// PROFILE-FULL — the row's own P/L, in DISPLAYED space so it
+							// agrees with the two figures printed beside it.
+							const pl = displayPositionProfitLossSigned(
+								row.staked,
+								row.current,
+							);
 							const isSelected = selectedRow?.marketId === row.marketId;
 							return (
 								<Fragment key={row.marketId}>
@@ -617,10 +777,82 @@ export function PositionsTable({
 									    the cost of keeping a real `<table>` — and row 3 already
 									    recorded why the table stays (two grids cannot share column
 									    widths without the mockup's five px tracks).
-									    ⚠ A ROW OWNS NO SELL HOST BORDER. The reserved 50px sell box
-									    below is deliberately unbordered — bordering an empty
-									    reserved band would draw an empty card under every sellable
-									    row. */}
+
+									    ⚠⚠ PROFILE REFINEMENT · R6 — BUT THE SELECTED ROW IS NOT SQUARE ANY
+									    MORE, AND THE PARAGRAPH ABOVE IS WHY IT WAS. That reasoning is sound
+									    about `border-radius` under `border-collapse:collapse` and it still
+									    stands — what it missed is that the MOCKUP never used a border here.
+									    `.prow.sel` is `outline:2px solid var(--ink); outline-offset:-2px;
+									    border-radius:var(--r)` (`:277`) — an OUTLINE, and an outline is painted
+									    by the element itself rather than by the collapsing border model, so it
+									    honours `border-radius` on a `<tr>`.
+									    ⇒ MEASURED, NOT REASONED: with the outline applied the row reports
+									    `borderRadius: 8px` — the `--r` token's own value — and the rounded edge
+									    was confirmed in PIXELS at a pinned 1440×777, not merely in a computed
+									    style.
+									    ⇒ SO THE COMPOSITION SPLITS THE WAY THE MOCKUP SPLITS IT: every row keeps
+									    `[border:var(--hairline)]` (the mockup's `.prow` hairline, always there),
+									    and the SELECTED row ADDS outline + `-2px` offset + radius on top (the
+									    mockup's `.prow.sel` ADDS, never swaps). The previous build SWAPPED the
+									    border for a heavier one, which is exactly why the radius had nowhere to
+									    land — the collapsing model owned the only edge it could have rounded.
+									    ⛔ STILL NOT ONE MOCKUP VALUE. The outline takes the shipped
+									    `--ring-active` rung (1.5px n4) exactly as the swapped border did, and
+									    the radius takes `--r` — the token every other rectangle on this surface
+									    already uses, which is what R6 asked for. The mockup's 2px `--ink`
+									    outline is NOT ported: `--ink` is #fafafa here, a near-white edge, the
+									    inversion `side-pole-binding` exists to prevent.
+									    ⚠ `outline-none` MOVED INTO THE UNSELECTED ARM rather than staying on the
+									    base. It suppresses the UA focus ring so
+									    `focus-visible:shadow-(--state-focus-ring)` is the only focus affordance —
+									    but on the base it is a second `outline` declaration competing with the
+									    selected arm's, and two arbitrary utilities for one property resolve by
+									    stylesheet order, not by the order they are written here.
+									    ⚠ A ROW OWNS NO SELL HOST BORDER. The 50px sell box below is
+									    deliberately unbordered. ⚠ Its ORIGINAL reason is now void — it
+									    read "bordering an empty reserved band would draw an empty card
+									    under every sellable row", and there is no empty band left to
+									    border: the host mounts only with its module. The rule SURVIVES on
+									    a different one: a bordered host would read as a row of its own,
+									    and the module inside it already carries its own edges.
+									    ⚠⚠ PROFILE OVERLAP · R1 — THE ROW'S OWN EDGE IS NOW AN OUTLINE,
+									    AND THE BORDER IS GONE. A sweep of both surfaces for closed boxes
+									    found exactly THREE sharp ones and they were all this element:
+									    every unselected row measured `border-radius 0/0/0/0` with a full
+									    `1/1/1/1` hairline, inside a panel at 8, beside tiles at 8, next to
+									    a SELECTED row at 8 — a square block containing a rounded SELL
+									    button and a rounded status tag. That is the "reads wrong against
+									    its own contents" the founder measured.
+									    ⛔ AND A RADIUS ALONE COULD NOT FIX IT, which was measured before
+									    anything was written. `border-radius: 8px` was injected on a live
+									    unselected row and the corners stayed SQUARE: the collapsing model
+									    ignores `border-radius`, so the computed style reads `8px` while the
+									    paint is a rectangle. That is the trap this branch has now hit four
+									    times — a computed style confirms a declaration EXISTS; only
+									    geometry confirms it WON.
+									    ⇒ THE MOCKUP'S OWN IDIOM IS THE FIX, and R1 authorises it in as
+									    many words ("if it outlines rather than borders, port that"):
+									    `.prow.sel` picks its row out with an OUTLINE, which the element
+									    paints itself and which therefore honours the radius. So the
+									    unselected arm takes the hairline as an outline at `-1px` offset,
+									    the selected arm keeps `--ring-active` at `-2px`, and the base
+									    carries the radius for both. Injected on all three live rows and
+									    zoomed: rounded, and heights unchanged at `[128, 128, 128]` with the
+									    region still at 0 overflow — an outline takes no layout space.
+									    ⛔ ONE OUTLINE PER ARM, NEVER TWO ON THE ELEMENT. `[outline:…]`
+									    twice would be two arbitrary utilities for one property resolving by
+									    STYLESHEET EMISSION ORDER rather than by the order written here —
+									    the failure that shipped an inert `line-clamp` one pass ago. Both
+									    live inside the ternary, so exactly one is ever present.
+									    ⚠ `outline-none` IS RETIRED WITH THE BORDER and its job is done by
+									    what replaced it: it existed only to suppress the UA `:focus-visible`
+									    ring, and any AUTHOR outline declaration beats a UA-origin one by
+									    cascade origin. The focus affordance is unchanged — it was never the
+									    outline, it is `focus-visible:shadow-(--state-focus-ring)`.
+									    ⚠ WHAT IS GIVEN UP: under the collapsing model adjacent rows shared
+									    one merged hairline; each row now draws its own. The mockup frames
+									    the REGION and divides the rows, where this build frames each row —
+									    a divergence that predates R1 and that R1 does not name. */}
 									<tr
 										data-testid={`position-row-${row.marketId}`}
 										ref={(el) => {
@@ -666,10 +898,10 @@ export function PositionsTable({
 												pick(row.marketId);
 											}
 										}}
-										className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+										className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) ${
 											isSelected
-												? "bg-n1 [border:var(--ring-active)]"
-												: "[border:var(--hairline)] hover:bg-n1"
+												? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+												: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
 										}`}
 									>
 										<td className="p-2 text-ink">
@@ -716,7 +948,11 @@ export function PositionsTable({
 											<span className="flex flex-col items-center gap-[5px]">
 												<span
 													data-testid={`position-side-${row.marketId}`}
-													className="flex items-center gap-[5px] text-xs"
+													// ⚠ PROFILE-FULL — `.pside` is 11px/800 (`:283`); this was
+													// `text-xs` at weight 400, so the SIDE — the one word that
+													// says which pole this holding is on — was the lightest
+													// thing in its own cell.
+													className="flex items-center gap-[5px] text-[11px] leading-[1.2] font-extrabold"
 												>
 													{row.side === "YES" ? "Yes" : "No"}
 													<ThumbGlyph side={row.side} size={12} />
@@ -729,11 +965,38 @@ export function PositionsTable({
 												>
 													{row.statusLabel}
 												</Badge>
+												{/* ⚠⚠ PROFILE-FULL — SELL TAKES BUTTON SHAPE. The mockup's
+												    `.sellbtn` is the most prominent control on the surface:
+												    `font-size:11.5px; font-weight:800; letter-spacing:.1em;
+												    text-transform:uppercase; padding:9px 22px; border:1.5px
+												    solid var(--ink)`, and it INVERTS on hover
+												    (`:301-304`) — measured 80×34. This shipped as
+												    `size="xs" variant="outline"`, measured 39×24 at
+												    12px/500: a third of the area, in the same register as
+												    the `Open` badge above it, so the one destructive-ish
+												    action in the row was the quietest thing in it.
+												    ⛔ `size="xs"` IS DROPPED, NOT OVERRIDDEN. That size sets
+												    `h-6`, `px-2`, `text-xs` and its own radius — four
+												    properties this needs to restate, and `h-6` against
+												    explicit padding is a same-property fight whose winner is
+												    emission order. Passing NO size uses the default and
+												    overrides its box outright.
+												    ⚠ THE BORDER IS THE EMPHASIS LADDER'S, NOT A LITERAL. The
+												    mockup's `1.5px solid var(--ink)` maps to the shipped
+												    `--ring-active` rung (1.5px solid n4, PRIMITIVES-2 D9) —
+												    a ratified composite over a ramp token, so no new width
+												    and no new colour is introduced. `--btn-fill` and
+												    `--state-hover-fill` keep the one-button system's own
+												    interior and hover, which is what the dark ramp inverts
+												    to instead of the prototype's ink-on-white flip.
+												    ⚠ `uppercase` is a transform, so the accessible name and
+												    every `textContent` read of this trigger are still
+												    `Sell`. */}
 												{sellable && (
 													<Button
 														type="button"
-														size="xs"
 														variant="outline"
+														className="h-auto rounded-(--r) px-[22px] py-[9px] text-[11.5px] leading-[1.2] font-extrabold tracking-[0.1em] uppercase [border:var(--ring-active)]"
 														data-testid={`sell-trigger-${row.marketId}`}
 														aria-expanded={sellOpen}
 														onClick={() =>
@@ -783,7 +1046,7 @@ export function PositionsTable({
 										    glyph. `SellModule` carries its own at `:268`/`:284` and is
 										    read-only this round. Two sites, both changed here — a
 										    half-applied glyph is the round-3 defect. */}
-										<td className="p-2 text-center tabular-nums text-ink">
+										<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 											<span className="flex flex-col items-center">
 												Đ {formatDharma(row.staked)}
 											</span>
@@ -803,58 +1066,99 @@ export function PositionsTable({
 										>
 											→
 										</td>
-										<td className="p-2 text-center tabular-nums text-ink">
+										{/* ⚠⚠ PROFILE-FULL — THE CURRENT CELL CARRIES ITS P/L DELTA. The
+										    mockup's Current cell is `Đ 310 (+Đ70)` — a `.val` row holding
+										    the figure and a smaller `.pl` span (`:299-300`, emitted at
+										    `:558`), and its own changelog says why: v0.18, "current value
+										    shows profit". Without it the row states two numbers and leaves
+										    the only question a holder actually has — am I up or down —
+										    to be done in the reader's head, on every row.
+										    ⛔ DERIVED IN DISPLAYED SPACE BY A FORMATTER, not subtracted
+										    here. `displayPositionProfitLossSigned` rounds both operands to
+										    what this row PRINTS before subtracting, so the three figures
+										    on screen stay self-consistent — an exact-space delta would
+										    render `Đ 499 → Đ 448 (−Đ50)` where the eye can only compute
+										    51. See that function for the §10.8 reasoning.
+										    ⛔ NO NEW SERVER FIELD: `staked` and `current` are both already
+										    on `ProfilePositionRow`, so this is a render of data the DTO
+										    carries — unlike the entry/live percentages recorded below,
+										    which it does not.
+										    ⚠ THE SPACING IS THE MOCKUP'S OWN AND IS NOT THE TILE'S:
+										    `plShort` emits `+Đ70` with no space (`:677`) while the Net P/L
+										    tile reads `+Đ 238` with one (`:672`). Both are byte-carried;
+										    the difference is deliberate density on a smaller figure.
+										    ⚠ AN EMPTY MAGNITUDE RENDERS NOTHING — the formatter's degrade
+										    for a malformed operand. A parenthesis pair with nothing in it
+										    is worse than silence. */}
+										<td className="p-2 text-center whitespace-nowrap tabular-nums text-ink">
 											<span className="flex flex-col items-center">
-												Đ {formatDharma(row.current)}
+												<span className="inline-flex items-baseline gap-1.5">
+													Đ {formatDharma(row.current)}
+													{pl.magnitude !== "" && (
+														<span
+															data-testid={`position-pl-${row.marketId}`}
+															className="text-[10.5px] leading-[1.2] font-bold text-n5"
+														>
+															({pl.sign}Đ{pl.magnitude})
+														</span>
+													)}
+												</span>
 											</span>
 										</td>
 									</tr>
-									{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
-									    row, quoted WHOLE because the omitted half is the half not built:
-									    "the replica footer is a fixed 50 px box; on Sell the footer
-									    slides down (translateY 110% + fade) and the sell module replaces
-									    it over .26 s — fixed height ⇒ never reflows."
-									    ⇒ BUILT HERE: the fixed 50px box, the .26s fade, the JS toggle.
-									    ⇒ NOT BUILT: the footer's translateY-110% exit. That clause
-									    governs a FOOTER ELEMENT the replica card has and this table does
-									    not, so there is nothing to slide away; inventing footer content
-									    to animate would be authoring design. ⚠ The consequence is
-									    user-visible and is raised for the founder rather than absorbed:
-									    the reserved box is BLANK when closed, so an owner sees an empty
-									    band under every sellable row.
-									    ⚠ THE HOST RENDERS FOR EVERY SELLABLE ROW, OPEN OR CLOSED, and
-									    reserving the box IS the mechanism: opening Sell now inserts
-									    nothing, so no row moves. The whole `<tr>` used to be conditional,
-									    so opening it pushed every following row down — which is why the
-									    comment that sat here, claiming the module "replaces the
-									    fixed-height footer" and "never reflows the table above", was FALSE
-									    the day it was written. It is true now, and it has moved here.
-									    ⛔ No host on a non-sellable row: reserving 50px under a row that
-									    can never sell would be dead space, not a fixed footer.
-									    ⛔ `:has()` is banned (canon §3 item 10) — the toggle stays JS
-									    state, exactly as before. */}
-									{sellable && (
+									{/* THE SELL HOST — canon §5's fixed 50 px box, PRESENT ONLY WHILE THE
+									    MODULE IS IN IT. Its `.26s` fade and its JS toggle are unchanged.
+									    ⛔⛔ THE RESERVATION IS REVERSED, AND THE CANON ENTRY MOVES WITH IT
+									    (`design-canon.md` §5 Profile, this commit — O-5: the correction is
+									    written INTO the operative sentence, never appended under it).
+									    Canon read "a fixed 50 px host is RESERVED under each sellable positions
+									    row … fixed height ⇒ never reflows", and the block that stood here
+									    defended the reservation as "deliberate anti-reflow behaviour". Both also
+									    RECORDED its cost — "the reserved box is BLANK when closed, so an owner
+									    sees an empty band under every sellable row" — raised for the founder and
+									    carried unabsorbed across two passes. The founder has now measured that
+									    band and ruled it out.
+									    ⚠ AND THE ARITHMETIC MADE IT UNSURVIVABLE, which is the half no review
+									    caught. The three-row window divides the region by the DATA rows only, so a
+									    reserved band is invisible to the divisor while spending 51px of what it
+									    divides. MEASURED on staging, owner arm, pinned 1440×777: region 429 − 24
+									    padding − 19 thead = **386** available against a table of 3 × (128 + 51) =
+									    **537** ⇒ **150px of overflow**, and the surplus scrolls a row up behind
+									    the sticky header. The mockup at the same pinned size: `.rows` 385, three
+									    rows 128, **gap 0**, sum 384 — it fits because it has no such band. Three
+									    rows and a per-row reservation cannot both fit; the founder ruled which goes.
+									    ⚠ WHAT IS GIVEN UP, stated rather than glossed: opening Sell now inserts
+									    51px and the rows below it move down. ⛔ NOTHING IS LOST — the panel body is
+									    the scroll container, so that is a BOUND, NOT A CLIP, the same distinction
+									    the window's own docblock draws two hundred lines up.
+									    ⇒ AND THE MOCKUP HAS NO HOST AT ALL: `.rows{gap:0}` with `.prow` adjacent
+									    hairlines and the SELL button inside the row's own `.poscell` (`:305-308`).
+									    Present-only-while-open is the closest reachable port of that.
+									    ⛔ `:has()` is still banned (canon §3 item 10) — the toggle stays JS state.
+									    ⛔ Still no host on a non-sellable row. */}
+									{sellable && sellOpen && (
 										<tr data-testid={`sell-row-${row.marketId}`}>
-											<td colSpan={5} className="p-2">
+											<td colSpan={5} className="px-2 py-0">
 												<div
 													data-testid={`sell-host-${row.marketId}`}
 													className="h-[50px]"
 												>
-													{sellOpen && (
-														<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
-															<SellModule
-																marketId={row.marketId}
-																slug={row.marketSlug}
-																position={{
-																	side: row.side,
-																	quantity: row.quantity,
-																	currentValue: row.current,
-																}}
-																onClose={() => setSellMarketId(null)}
-																onSuspended={() => setSellMarketId(null)}
-															/>
-														</div>
-													)}
+													{/* The `.26s` fade now plays on MOUNT rather than on an inner reveal: the
+													    host arrives with the module, so the enclosing `sellOpen` test that used
+													    to sit here is provably true and goes with the reservation. */}
+													<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
+														<SellModule
+															marketId={row.marketId}
+															slug={row.marketSlug}
+															position={{
+																side: row.side,
+																quantity: row.quantity,
+																currentValue: row.current,
+															}}
+															onClose={() => setSellMarketId(null)}
+															onSuspended={() => setSellMarketId(null)}
+														/>
+													</div>
 												</div>
 											</td>
 										</tr>
@@ -906,6 +1210,17 @@ function PositionsPanel({
 	bodyRef,
 	children,
 }: {
+	/**
+	 * ⚠ PROFILE REFINEMENT · R5 — THE `owner` PROP IS GONE WITH THE CHIP. It
+	 * existed for exactly one reason: the chip had to render on BOTH arms,
+	 * including the empty-rows arm that mounts this panel with no `controls` at
+	 * all. With the chip deleted this panel makes no owner/visitor distinction of
+	 * its own, so carrying the flag would be a prop nothing reads — and a prop
+	 * nothing reads is the next reader's false lead.
+	 * ⛔ `payload.owner` IS UNTOUCHED in the component above: it still gates
+	 * `sellEligibleOf` and still picks the empty-state copy. The viewer context is
+	 * not what was removed; one render of it was.
+	 */
 	controls?: React.ReactNode;
 	/**
 	 * ROUND 4 item 8 — the scroll container the three-row window caps. It lives
@@ -930,11 +1245,53 @@ function PositionsPanel({
 			    here rather than on the trigger — see the ⛔ at the trigger for the
 			    measurement that moved it. The mockup's `.colhead` is
 			    `position:relative` for exactly this reason (`:227`). */}
+			{/* ⚠ `min-h-[52px]` — the mockup's `.colhead{min-height:52px}` (`:228`),
+			    landed on all four panel heads in one commit so the two side-by-side
+			    bodies start level. Measured 51 here against the arguments head's 41
+			    at a pinned 1440×777, in BOTH auth states. It can only GROW a head,
+			    never clip one. Full measurement on `ArgumentList.tsx`'s copy. */}
 			<div
 				data-testid="positions-panel-head"
-				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
-				<span className="text-xs font-medium text-ink">Positions</span>
+				{/* ⚠⚠ PROFILE-FULL — THE PANEL TITLE IS `.chttl`'s OVERLINE. The mockup's
+				    left colhead title is `font-size:11px; font-weight:800;
+				    letter-spacing:.12em; text-transform:uppercase` (`:235`); this shipped
+				    at `text-xs font-medium` in sentence case, which made the panel's NAME
+				    look like the first line of its content.
+				    ⛔ NOT THE SAME REGISTER AS THE RIGHT HEAD, deliberately. The mockup
+				    gives the right colhead `.chttl.mkt` — 13px/700, `text-transform:none`
+				    (`:229-231`) — because that slot holds a market QUESTION, a sentence,
+				    not a label. Two heads, two registers, and flattening them into one
+				    would lose the distinction the mockup is drawing.
+				    ⛔ `uppercase` IS A TRANSFORM: `textContent` is still `Positions`, so
+				    every consumer that reads this head by text keeps its handle. */}
+				<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
+					Positions
+				</span>
+				{/* ⚠⚠ PROFILE REFINEMENT · R5 — THE `VIEWING AS OWNER` CHIP IS DELETED,
+				    NOT HIDDEN. Founder-ruled out. It shipped in the round immediately
+				    before this one, moved here out of the identity body because it was
+				    costing that band 24px — and the founder has now ruled the chip itself
+				    out, which supersedes the placement argument entirely rather than
+				    relocating it again. The whole `<span>`, its testid and its copy
+				    reference are gone from the tree; `display:none` would leave a node for
+				    a scan to find and a reader to wonder about.
+				    ⛔ NOTHING ELSE KEYED OFF IT, and that was checked rather than assumed:
+				    the only reader was `surface.test.tsx`, which asserted the chip TEXT as
+				    the proxy for "the owner arm rendered". That assertion is re-pointed at
+				    the viewer context itself — `payload.owner`, through the empty-state
+				    copy which is the other thing that branch decides — so the owner/visitor
+				    distinction is still guarded, by the value rather than by a chip.
+				    ⚠ `PROFILE_COPY.chip` is left in `copy.ts` UNTOUCHED: it is web-authored
+				    string data, this row removes a render and not a ratified string, and
+				    the copy is not what was removed. ⇒ Deleting it would be a second,
+				    unasked decision.
+				    ⚠ THE OTHER HALF OF THAT SENTENCE IS NOW STALE AND IS CORRECTED HERE: it
+				    read "`/bookmarks` still renders its own `bookmarks-view-chip` (which R5
+				    does not name)". PROFILE OVERLAP R3 names it and deletes it, so neither
+				    surface carries a view chip. The reasoning for leaving `PROFILE_COPY.chip`
+				    in place is untouched — it never depended on the twin existing. */}
 				{controls}
 			</div>
 			{/* HTML-FINISH row 3 — THE PANEL-SCOPED SCROLL. `flex-1 min-h-0
@@ -1042,11 +1399,23 @@ function ArgumentCell({
 	// navigation survives a removed opener — the market is still reachable when
 	// its argument is not, which is the point of masking content rather than
 	// rows.
+	// ⚠⚠ PROFILE-FULL — THE SUB-LINE TAKES `.pmkt .mq`'s TYPE. The block above says
+	// "Nothing is read off the mockup's `.pmkt .mq`, whose 11px / `--n5` are
+	// light-prototype VALUES" — that was true under the geometry fence, which
+	// excluded type size. §1 now puts TYPE SIZE explicitly in scope, so the 11px and
+	// the 600 weight are taken: `font-size:11px; font-weight:600; line-height:1.35`
+	// (`:291-292`).
+	// ⛔ THE COLOUR IS NOT TAKEN AND THE OLD CAUTION STILL STANDS FOR IT. The
+	// mockup's `--n5` is a mid-grey in an INVERTED light ramp; this build's `text-n5`
+	// is the dark system's own muted rung and was already correct. Size and weight
+	// are geometry; colour binds to the ramp, never to a prototype hex (§1).
+	// ⚠ STILL BYTE-MATCHED to the "Replied to …" sub-line and the removed stub below
+	// — same file, same role, one register for all three muted sub-lines.
 	const marketLine = (
 		<Link
 			data-testid={`position-market-${marketId}`}
 			href={`/m/${cell.marketSlug}`}
-			className="block text-xs text-n5 hover:underline"
+			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
 		>
 			{marketTitle}
 		</Link>
@@ -1054,7 +1423,9 @@ function ArgumentCell({
 	if (cell.removed) {
 		return (
 			<span data-testid={`position-arg-removed-${marketId}`}>
-				<span className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</span>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+					{REMOVED_STUB_TEXT}
+				</span>
 				{marketLine}
 			</span>
 		);
@@ -1063,15 +1434,74 @@ function ArgumentCell({
 	// ordinal (a reply opener carries its PARENT's ordinal, server-resolved).
 	return (
 		<span data-testid={`position-arg-${marketId}`} className="text-ink">
+			{/* ⚠⚠ PROFILE-FULL — `.ptitle` IS 14px/700/1.35 (`:288`), and the mockup's
+			    own changelog calls it "the D4/D5 card-title rule exactly" (v0.7). It
+			    inherited the table's `text-sm` at weight 400, so the argument — the
+			    thing the row is ABOUT — was set lighter than the Đ figures beside it.
+			    ⚠ 14px is what it already resolved to; the WEIGHT is the change. */}
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-4` IS THE OTHER HALF OF THE
+			    EQUAL-HEIGHT RULE, and it is DERIVED rather than chosen. A `<tr>`'s
+			    `height` is a FLOOR — it cannot cap content — so the third computed in
+			    `PositionsTable`'s effect equalises rows only while no argument outgrows
+			    it. This is what stops one from doing so.
+			    ⇒ THE BUDGET COMES OUT OF THE THIRD, NOT OFF THE MOCKUP. Measured on
+			    staging: a row with a 3-line title is 95px, so the cell's non-title
+			    content (padding + the market sub-line) is 95 − 58 = 37px. Against the
+			    128px third that leaves 91px of title, and at this element's own
+			    computed 18.9px line box that is 4.8 lines ⇒ **4**.
+			    ⚠ AND THE MOCKUP AGREES, WHICH IS WHY THIS IS A PORT AND NOT A GUESS:
+			    its own longest `.ptitle` renders at exactly **4 lines** inside its
+			    128px row (measured — 3, 2 and 4 lines across its three rows, all
+			    unclamped). The mockup declares no clamp because its dummy copy never
+			    needs one; real data does, and 4 is the line count its own geometry
+			    accommodates.
+			    ⛔ NOT 2, WHICH IS THE OTHER NUMBER IN THE FILE. The mockup declares
+			    `-webkit-line-clamp:2` on three OTHER nodes (`.rtitle .tx` `:345`,
+			    `.chttl.mkt` `:231`, `.parline` `:376`) and reaching for it here because
+			    it is the value that happens to be written down would DROP two lines the
+			    mockup visibly shows — smaller than the thing being copied, which is the
+			    opposite of a faithful port.
+			    ⚠ NOTHING IS LOST THAT WAS NOT ALREADY BOUNDED: the full argument stays
+			    one click away — the title is a link to its thread — and the row was
+			    never the place a whole argument was read. */}
 			<Link
 				href={`/m/${cell.marketSlug}?post=${cell.postOrdinal}`}
-				className="hover:underline"
+				className="line-clamp-4 text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{cell.title}
 			</Link>
 			{marketLine}
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-2`, AND IT IS THE MOCKUP'S OWN
+			    VALUE FOR THIS EXACT ELEMENT. The mockup's parent reference is `.parline`
+			    and it declares `-webkit-line-clamp: 2` (`:376`) with the comment "fit the
+			    fixed 50px footer". This line shipped UNCLAMPED, and MEASURED on staging
+			    it was the actual reason a row outgrew its third: 3 unclamped lines (45px)
+			    where the budget allows 2 (30px).
+			    ⇒ THE ARITHMETIC, so the next reader can check it: the 128px third minus
+			    16 of cell padding, minus a 3-line title (57) and the market line (15),
+			    leaves 40px for the reference — two lines at this element's 15px line box.
+			    ⛔ SO THE TITLE CLAMP AND THIS ONE ARE ONE FIX, NOT TWO. Clamping the
+			    title alone moved the row 136 → 133 and left it unequal, because the title
+			    was never what overflowed. Both are needed and neither is sufficient.
+			    ⚠ NOT AN INVENTED NUMBER, and worth saying because §23 REQUIRES this
+			    reference for a reply-bet (recon A-7 struck its removal): the value is the
+			    mockup's declared clamp for the same element, and a clamp is a display
+			    treatment, not a removal — the whole parent title stays one click away on
+			    the thread it links to.
+			    ⛔⛔ AND `block` IS REMOVED, WHICH IS WHY THIS NEEDED A SECOND PASS.
+			    `line-clamp-2` works by setting `display:-webkit-box`, and the class list
+			    also carried `block` — two utilities for ONE property, resolved by
+			    stylesheet emission order rather than by the order written here. `block`
+			    won, `-webkit-box` never applied, and the clamp was INERT: MEASURED with
+			    `line-clamp-2` present and the line still 45px / 3 lines.
+			    ⇒ `line-clamp-*` ALREADY makes the element a block-level box, so `block`
+			    was redundant before it was harmful. Same emission-order trap `AGENTS.md`
+			    §8 records for `table-fixed`, and the same one the Sell button hit with
+			    `size="xs"` — third instance this round. The tell never changes: two
+			    utilities, one property, and a computed style that reads correct while the
+			    layout disagrees. */}
 			{cell.isReply && cell.repliedToTitle !== null && (
-				<span className="block text-xs text-n5">
+				<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {cell.repliedToTitle}
 				</span>
 			)}

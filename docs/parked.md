@@ -27,6 +27,8 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 | **2** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
 | **3** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
 | **4** | **UI-6 Gate C D3 — review-feed `innerJoin(users)`** | **armed; next `review-feed.ts` touch** | Verified safe today (no users-row hard-delete path; `onDelete: restrict`). Fires on contact, not on a date. |
+| **5** | **HTML-FINISH-MD-PLACEHOLDERS — four visible placeholders ship on `/m/[slug]`** | **operator-owned, STRIP OR GATE before the DP.2 production promote** | Founder-ruled IN at HTML-FINISH · MARKET DETAIL round 2 (R2, 2026-08-16, the OD-2 reversal) so the review surface shows the mockup's full composition. They are build-time notes about unbuilt work — exactly what `PD-3-09` / `OD-6` deleted from `MarketHeader` — and **a real participant must never meet one.** |
+| **6** | **STAGING-AUTH-ONE-WAY — a staging session cannot be re-obtained in-session** | **HARDEN Tier 2** | Signing out of staging cannot be reversed in-session, so auth-gated surfaces (`/bookmarks`, and the signed-out arm of any surface) are unmeasurable by CC without a founder-supplied session. **Blocked two measurements across PROFILE round 1 and round 2.** Needs a repeatable way to obtain and drop a staging session. ⚠ Round 2 found a PARTIAL workaround for the signed-OUT half only — the same deployment's `*.vercel.app` URL is a different origin, so the session cookie is not sent (same canary, same DB, same viewport). That gives the anonymous arm without signing out; it does **not** give a session where none exists, which is the half that blocked round 1. |
 
 *Ordering rule: go-live blocker → operator-owned pre-promote → known-vacuous
 gate → dated pre-launch hardening → armed-on-touch. A row leaves this table only
@@ -37,6 +39,63 @@ operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue. Its
 strike stays one cycle so the renumbering is traceable, then it goes.*
 
 ---
+
+---
+
+## HTML-FINISH · MARKET DETAIL round 2 (R2) — the four visible placeholders
+
+**Parked:** strip or gate all four `/m/[slug]` placeholders before the **DP.2
+production promote**.
+
+**Trigger:** ⛔ **DP.2 / any production promote.** This is not armed-on-touch and
+not dated — it is a hard gate on the promote itself.
+
+**What ships today, and where:**
+
+| # | Placeholder | Component | Byte-carried label (`d5`) |
+|---|---|---|---|
+| 1 | Market media | `debate/MarketMediaPanel.tsx` (empty arm only) | `MARKET MEDIA — IMG / VIDEO` (`:953`) |
+| 2 | Post image | `debate/CommentImage.tsx` → `PostImagePlaceholder`, consumed by `PostCard` + `PostFocusHeader` | `POST IMAGE · 640:586` (`:1243`) |
+| 3 | Resolver card | `debate/ResolverCards.tsx` | `LOGO` (`:988`), `Resolver` (`:990`) |
+| 4 | X-official card | `debate/ResolverCards.tsx` | `X` (`:996`), `X — official` (`:998`) |
+
+**Why they are here rather than simply wrong.** The founder ruled on 2026-08-16
+that the review surface must show the mockup's full composition, reversing
+`OD-2` (which had these rendering `null`) and, with it, the `PD-3-09` / `OD-6`
+objection *for the review surface only*. That objection was never wrong about
+what these ARE — a build-time note about unbuilt work, rendered to whoever is
+looking — it is outranked while the surface is under review and comes back the
+moment the surface is public.
+
+**What "strip or gate" means, and why the choice is not CC's.** Two shapes are
+available and they have different costs:
+
+- **STRIP** — delete the four and restore the `null` arms. Cheapest, and it
+  loses the composition again the next time the surface is reviewed.
+- **GATE** — render them only outside production (`ZUGZWANG_ENV !== "prod"`).
+  Keeps the review value permanently, at the cost of a live env branch in four
+  render paths, which is a decision about the participant surface rather than a
+  cleanup.
+
+⚠ **Cards 3 and 4 have a THIRD exit and it is the real one.** They are empty
+because `markets` carries no resolver name, logo, source or X handle — no
+column, no migration in that task. **The moment resolver data exists they stop
+being placeholders and become the real cards**, and this row closes for them by
+being built rather than by being removed. Cards 1 and 2 have no such exit: they
+are the *absence* of media a market or a post may simply not have.
+
+**Guards that will fail if someone strips them carelessly**, so the removal is
+not silent: `market-media-panel.test.tsx::no-media-renders-THE-PLACEHOLDER`,
+`comment-image.test.tsx::post-image-placeholder::*`, and
+`resolver-cards.test.tsx::renders-BOTH-cards` +
+`::carries-the-byte-carried-chrome-labels`.
+
+⛔ **What must survive either exit:** `resolver-cards.test.tsx::ships-none-of-
+the-mockups-MARKET-CONTENT`. The four demo strings — "Brihanmumbai Municipal
+Corporation", "Monthly operational bulletins", "BMC", "@mybmc" — name a market
+this build does not have, and porting them would be inventing market content
+(CLAUDE.md §3). R2 reversed the CHROME, never that.
+
 
 ## SCAFFOLD.12 §10.b — Resend domain verification + `RESEND_FROM_EMAIL` flip
 
@@ -2038,3 +2097,23 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 **Conditional trigger.** POLISH.3's own pass over `DebateColumn.tsx` / `DebateView.tsx`, or the comprehensive founder visual pass — whichever reaches the engaged-slot backlight first. For the two fold instances: `.5`'s pass over `PositionsTable.tsx`'s sell host, and `.3`'s over the composer slot choice.
 
 **Expected next task.** POLISH.3 (backlight, opposite-slot open) and POLISH.5 (sell host). ⛔ **Not POLISH.4's, in any of the three cases.**
+
+---
+
+## DEBATE-IMAGE-PRESIGN-TTL-OUTLIVES-REMOVAL — HARDEN Tier 1 (moderation pipeline)
+
+**Originating task:** HTML-FINISH · MARKET DETAIL Gate C (2026-08-17). Surfaced while auditing the debate read path; not caused by this branch — C12 widened its blast radius by presigning reply images too.
+
+**Deferred work.** Presigned comment-image URLs are minted **per render at 3600s for EVERY visible comment** (posts AND replies since C12) and ship to the client. **Removal does not revoke within the TTL** — a viewer who loaded the page keeps a working URL to a moderated image for the rest of the hour. Touches the moderation pipeline ⇒ **HARDEN Tier 1**.
+
+**Why deferred.** Revocation is not a render-layer fix. The presign is a local HMAC over an R2 object key (`signRead`, no network round-trip), so there is nothing server-side to invalidate — shortening the window or narrowing who gets a URL are the only levers short of moving to a proxied read, which is a storage-architecture decision rather than a moderation one. ⚠ **Masking itself is NOT affected and is not what this row is about**: `loadDebateView` withholds the `imageUrl` field entirely on a removed variant at the type level, so no NEW viewer can obtain a URL after removal. The exposure is bounded to URLs already handed out before the moderator acted.
+
+**Candidate fixes.** A shorter TTL for replies specifically; lazy per-focused-post minting so a market render does not mint a URL for every reply on every post; or a proxied read that can check `mod_actions` at request time.
+
+**Interlock, already recorded.** `src/server/config/limits.ts:252-258` already flags that `listMarketComments` carries no `LIMIT`, and names **a cap or keyset on it as a HARDEN.6 PREREQUISITE**. That cap bounds how many URLs a single render mints, so the two items want sequencing together rather than separately.
+
+**Conditional trigger.** HARDEN Tier 1 moderation pass, OR any incident where a removed image stayed reachable after moderation.
+
+**Expected next task.** HARDEN.* moderation hardening (TBD), sequenced with the HARDEN.6 `listMarketComments` cap.
+
+**Code touch points** (forward reference, do not act on now): `src/server/debate-view/load-debate-view.ts` — `READ_URL_TTL_SECONDS` (`:36`) and `mintImageUrls` (`:421`, called at `:252`); `src/server/storage/sign-read.ts`; `src/server/config/limits.ts:252-258`.

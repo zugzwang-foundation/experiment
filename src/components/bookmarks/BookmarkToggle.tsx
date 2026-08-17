@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark } from "lucide-react";
+import { Bookmark, Download } from "lucide-react";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -29,18 +29,47 @@ export type BookmarkAffordance = {
  * matrix (plan §4), so every newly-wired surface renders identical states:
  *
  * | signed out (`bookmarks === null`) | the DISABLED "sign in to use" icon, verbatim as shipped |
- * | signed in · own argument          | NOTHING — only someone else's argument is bookmarkable |
+ * | signed in · own argument          | the DISABLED "your own argument" icon — R4, see below |
  * | signed in · other's, not saved    | active outline icon → `addBookmarkAction` |
  * | signed in · other's, saved        | active FILLED icon → `removeBookmarkAction` |
+ *
+ * ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R4 — THE OWN-ARGUMENT CELL USED TO
+ * RENDER `null`, AND THE FOUNDER RULED AGAINST IT ON 2026-08-16 after seeing it
+ * on staging: *"it renders on one card and not the other"*. MEASURED at
+ * `/m/sp-m15-fill` signed in as `RedFox000` — the YES card is that viewer's own
+ * argument and drew NO affordance; the NO card is `BlueWolf011`'s and drew one.
+ * The whole page held exactly ONE bookmark button. That asymmetry reads as a
+ * broken render, because nothing on screen explains why one card has a control
+ * and its neighbour does not. The affordance is now UNCONDITIONAL: every card,
+ * both arms, always an icon.
+ *
+ * ⛔ DISABLED, NOT ENABLED, AND THAT IS FORCED — not a softening of the ruling.
+ * `add.ts:62` rejects a self-bookmark at the write boundary with
+ * `self_bookmark_forbidden` (D-3: a bookmark is a pointer at SOMEONE ELSE's
+ * argument). An ENABLED icon here would flip optimistically, get `{ ok: false }`,
+ * and silently revert — a control that cannot ever succeed, which is strictly
+ * worse than the absence the founder objected to. Making it succeed instead
+ * would mean editing `src/server/bookmarks/add.ts`, and round 2 §2 forbids a
+ * fourth `src/server/**` file outright. ⇒ Rendered always; actionable only where
+ * the server would accept it.
+ *
+ * ⚠ THE OWN-CELL REUSES THE SHIPPED DISABLED RENDER — same `variant`, same
+ * `size`, same `disabled` + `aria-disabled` pair, same outline glyph. Only the
+ * accessible name differs, because the two refusals have different remedies:
+ * signing in fixes one and nothing fixes the other.
  *
  * A REMOVED argument renders no cluster at all; that is enforced by the call
  * sites (structurally for posts — `ArgProfile` cannot be constructed on the
  * removed union variant, which carries no `author`/`marker` — and by branch
- * placement for replies), never by a check in here.
+ * placement for replies), never by a check in here. ⛔ R4 DOES NOT TOUCH THAT:
+ * it changes what the PRESENT branch draws, so no masking surface moves and
+ * SC-1 does not fire (no read over `comments.body` is added or edited).
  *
  * The own-check runs BEFORE the saved-check on purpose: `add.ts:62` rejects a
  * self-bookmark, but if a row ever existed defensively, own-ness must still win
- * so a viewer can never be shown an active icon on their own argument.
+ * so a viewer can never be shown an ACTIVE icon on their own argument. R4 makes
+ * that ordering MORE load-bearing, not less — it is now the only thing standing
+ * between a self-bookmarked row and a live "Remove bookmark" button.
  *
  * Optimistic, with revert on failure (D5). Both actions RETURN typed failures
  * and never throw by contract, so the caller MUST branch on `{ ok }` — but the
@@ -68,22 +97,28 @@ export function BookmarkToggle({
 	);
 	const [pending, startTransition] = useTransition();
 
-	if (bookmarks === null) {
+	// THE TWO INERT CELLS, RENDERED BY ONE BRANCH (R4) so they cannot drift apart
+	// in anything but their accessible name — which is the ONLY thing that should
+	// differ, because the two refusals have different remedies. `null` here means
+	// "this viewer may act on this comment"; a string is the reason they may not.
+	const inert =
+		bookmarks === null
+			? "Bookmark — sign in to use"
+			: bookmarks.own.has(commentId)
+				? "Bookmark — your own argument"
+				: null;
+	if (inert !== null) {
 		return (
 			<Button
 				variant="ghost"
 				size="icon-xs"
 				disabled
 				aria-disabled="true"
-				aria-label="Bookmark — sign in to use"
+				aria-label={inert}
 			>
 				<Bookmark />
 			</Button>
 		);
-	}
-
-	if (bookmarks.own.has(commentId)) {
-		return null;
 	}
 
 	const onClick = () => {
@@ -128,7 +163,7 @@ export function BookmarkToggle({
  * `ArgProfile` byte-for-byte, and duplicated markup in two files is exactly how
  * that drifts.
  *
- * ⛔ THE DOWNLOAD TRIGGER IS REMOVED (POLISH.3 PR 2 row 7, `PD-3-15`; D3 RULED
+ * ⛔ THE DOWNLOAD TRIGGER WAS REMOVED (POLISH.3 PR 2 row 7, `PD-3-15`; D3 RULED
  * 2026-08-12, the same disposition as R1's two card controls). It was a THIRD
  * permanently-disabled control rendering on every post and every reply, and no
  * register row had named it — canon §10 item 2's "wire the icon or remove it"
@@ -136,13 +171,37 @@ export function BookmarkToggle({
  * shared control inherited the disabled state on a surface the rule never
  * named. Wiring the ADR-0025 export remains a separate task; when it lands it
  * arrives as an `<a href download>`, not as a disabled button.
+ *
+ * ⚠⚠ PROFILE REFINEMENT · R4 — IT COMES BACK, BUT ONLY WHERE IT IS ASKED FOR, AND
+ * THE D3 RULING ABOVE IS WHY IT IS OPT-IN RATHER THAN UNCONDITIONAL. D3's
+ * objection was precise and still stands: a permanently-disabled third control on
+ * every post and every reply of `/m/[slug]` is chrome nobody named. The founder has
+ * now named it — for the PROFILE's argument cards — and R4 says to render it
+ * disabled and say so, since a per-card export still does not exist (investigated
+ * at MARKET DETAIL R9; `m/[slug]/export` is market-level, ADR-0025).
+ * ⇒ SO THE PROP DEFAULTS TO `false` AND `/m/[slug]` PASSES NOTHING. Every existing
+ * call site — `ArgProfile`, `ReplyCard` — renders BYTE-IDENTICALLY, which is what
+ * keeps D3's ruling intact on the surface it was made about while satisfying R4 on
+ * the surface that asked. That is also acceptance 7's requirement: the shared
+ * component is what changes, and `/m/[slug]` must not.
+ * ⛔ DISABLED, NOT HIDDEN, AND NOT A ROUTE. R4 forbids building one, and a
+ * per-comment export would need a new server read besides. The control states that
+ * the affordance exists and is not yet reachable — the same posture, and the same
+ * shipped disabled render, as the two inert bookmark cells above.
  */
 export function CardActions({
 	commentId,
 	bookmarks,
+	download = false,
 }: {
 	commentId: string;
 	bookmarks: BookmarkAffordance;
+	/**
+	 * R4 — render the (permanently disabled) download affordance beside the
+	 * bookmark. ⛔ DEFAULT `false`: `/m/[slug]`'s two call sites pass nothing and
+	 * are unchanged, so D3's ruling still holds there.
+	 */
+	download?: boolean;
 }) {
 	return (
 		<div className="ml-auto flex shrink-0 items-center gap-0.5">
@@ -163,6 +222,27 @@ export function CardActions({
 				commentId={commentId}
 				bookmarks={bookmarks}
 			/>
+			{/* R4 — the mockup's second `.cardacts` glyph (`:628`). It reuses the
+			    SHIPPED disabled render the two inert bookmark cells above use — same
+			    `variant`, same `size`, same `disabled` + `aria-disabled` pair — so the
+			    three inert states on this surface are one treatment rather than three
+			    lookalikes.
+			    ⛔ THE LABEL SAYS WHY IT CANNOT BE USED, which is the pattern those two
+			    cells established: "sign in to use" and "your own argument" each name
+			    their own remedy, and this one names the absence of an export. A bare
+			    `aria-label="Download"` on a control that can never fire would be a
+			    promise the surface cannot keep. */}
+			{download && (
+				<Button
+					variant="ghost"
+					size="icon-xs"
+					disabled
+					aria-disabled="true"
+					aria-label="Download — no per-argument export exists yet"
+				>
+					<Download />
+				</Button>
+			)}
 		</div>
 	);
 }

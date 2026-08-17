@@ -1,12 +1,13 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
+import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileArguments } from "@/server/profile/arguments";
 import { loadProfileGraphSeries } from "@/server/profile/graph-series";
 import { buildPositionsPayload } from "@/server/profile/owner-view";
@@ -75,6 +76,52 @@ export default async function ProfilePage({
 	// visitor arm carries no `sellEligible` field (the DTO boundary).
 	const positionsPayload = buildPositionsPayload(positions, owner);
 
+	/* ⚠⚠ PROFILE REFINEMENT · R4 — THE BOOKMARK AFFORDANCE, and the SPLIT is the
+	   whole point of how it is derived.
+
+	   `ArgumentList`'s head cluster needs a `BookmarkAffordance` — `{saved, own}` or
+	   `null` for signed out. Its own docblock recorded the cluster as DATA-BLOCKED
+	   because the only producer it found, `loadViewerMarketContext`, is MARKET-scoped
+	   while this list is cross-market. `loadBookmarks` is the producer it missed: the
+	   loader `/bookmarks` runs, `(client, {viewerId})`, viewer-scoped and with no
+	   market argument at all.
+	   ⛔ CALLING AN EXISTING EXPORTED LOADER IS NOT AN EDIT TO `src/server/**` —
+	   the same standing distinction `bookmarks/page.tsx` records for the four loaders
+	   it calls. Nothing under `src/server/` is modified by this row.
+
+	   ⇒ AND THE OWNER ARM NEEDS NO READ AT ALL, which is why this is a split rather
+	   than one call. Every argument in this list is authored by the profile user, so
+	   own-ness is not a lookup — it is `viewer === profileUser`. On an owner's own
+	   profile EVERY card is their own argument, every icon is the shipped disabled
+	   "your own argument" cell (correct by D-3: a bookmark points at someone else's
+	   argument), and `saved` is never consulted because `BookmarkToggle` checks
+	   own-ness FIRST. So the common case — a participant opening their own profile —
+	   pays nothing.
+	   ⚠ THE COST, NAMED: a signed-in VISITOR on someone else's profile costs one
+	   `loadBookmarks`. That loader builds full `BookmarkItem`s where only the ids are
+	   wanted, which is wasteful — and it is the honest price of §2's ban on touching
+	   `src/server/**`, where a leaner id-only read would belong. Recorded rather than
+	   optimised around.
+	   ⛔ SIGNED OUT STAYS `null`, never an empty set: `null` is what makes the icon
+	   render "sign in to use", and an empty `saved` would instead print an UNSAVED
+	   icon — a lie about a viewer who has no bookmark set to speak of. */
+	const viewerId = session?.user?.id ?? null;
+	let bookmarks: BookmarkAffordance = null;
+	if (viewerId !== null) {
+		bookmarks = owner
+			? {
+					// Own-ness is total on one's own profile — no read needed.
+					own: new Set(argumentItems.map((i) => i.id)),
+					saved: new Set<string>(),
+				}
+			: {
+					own: new Set<string>(),
+					saved: new Set(
+						(await loadBookmarks(db, { viewerId })).map((i) => i.id),
+					),
+				};
+	}
+
 	// OQ-5 B — the W2.10-C click-through preselects the positions market filter
 	// via `?market=<slug>` (a slug, matched against the rows in PositionsTable;
 	// an unknown/repeated value falls back to "all", never rendered raw).
@@ -135,9 +182,49 @@ export default async function ProfilePage({
 		   zero unreachable there too. An `overflow-y-auto` safety was tried and
 		   REJECTED: it buys nothing measurable and trades a page scrollbar nobody
 		   sees at realistic heights for an inner one. */
+		/* ⚠⚠ PROFILE-DIMS R2 · D-4 — THIS ROUTE TAKES THE `screen` PRESET.
+		   Founder-ruled, and it is the SAME ruling `/m/[slug]` already runs on:
+		   full bleed, `max-w-none px-7 py-4`.
+		   ⛔ CONSUMED, NEVER RE-MINTED. `screen` already exists at
+		   `PageContainer.tsx:108` — it arrived with #341 — so this round authors no
+		   preset and leaves all six byte-identical. Site 5's row in
+		   `page-container.test.ts` moves WITH this change, in the same commit, via
+		   that guard's own `now`/`movedBy` mechanism.
+
+		   ⛔ WHY `wide` WAS WRONG, AND WHAT I COULD AND COULD NOT MEASURE. `wide`
+		   caps at `max-w-[1440px]`; the mockup's `.content` is full bleed inside a
+		   28px inset (`:186`). At the pinned 1440 the cap is nearly invisible — the
+		   container measured 1392 against the mockup's 1384 — but it BINDS above
+		   it, and site 9's preset docblock records the measurement: at 1800 the
+		   same band is 1744 (96.9%) full-bleed against 1392 (77.3%) capped, a
+		   −19.6pp delta every region inside inherits.
+		   ⚠ I COULD NOT OBSERVE THAT DIRECTLY — `screen.availWidth` on this display
+		   is 1440, so a viewport wider than the cap cannot be produced in a real
+		   browser here. That is a MEASUREMENT GAP, not evidence the cap is
+		   harmless, and D-4 rules it either way.
+		   ⇒ AT THE PINNED VIEWPORT THE EFFECT IS MEASURABLE AND IS AN IMPROVEMENT:
+		   1392 → 1384, i.e. 96.7% → 96.1% of the viewport, and the mockup's is
+		   96.1% — Δ 0.0pp.
+
+		   ⚠ `gap-3`, NOT `gap-6` — the mockup's own literal: `.arena` carries
+		   `margin-top:12px` (`:222`), and `/m/[slug]` pairs `screen` with `gap-3`
+		   (`DebateView.tsx:512`). This hands 12px back to the arena band.
+
+		   ⚠ `100dvh`, NOT `100vh` — the dynamic viewport unit, so a collapsing
+		   mobile browser chrome cannot leave the bound taller than the visible
+		   screen. `/m/[slug]` declares `h-[calc(100dvh-60px-2px)]` and its guard
+		   carries a test named `the-page-declares-100dvh-and-NEVER-100vh`; this
+		   route was the outlier. ⛔ THE FIGURE IS UNCHANGED — still `<main>`'s own
+		   `60px + 2px` — so the arithmetic above still holds exactly.
+
+		   ⛔ THE `lg:` SCOPING IS KEPT, AND IS DELIBERATELY NOT A COPY OF
+		   `/m/[slug]`. That route bounds UNPREFIXED; this one must not, for the
+		   reason the block above records — below `lg` the two bands stack and the
+		   page must stay free to grow and scroll. D-4 rules the PRESET (the three
+		   container axes), never another surface's content className. */
 		<PageContainer
-			preset="wide"
-			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+			preset="screen"
+			className="flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none"
 		>
 			{/* HTML-FINISH row 1 — TWO BANDS OF TWO SIDE-BY-SIDE COLUMNS, replacing
 			    five full-width sections stacked in one column. Canon §2 (Profile):
@@ -253,9 +340,99 @@ export default async function ProfilePage({
 			    measurement that proved WHERE the blocker was, and a reader who meets
 			    `lg:h-[256px]` should be able to find out why three rounds could not
 			    write it. ⛔ It is no longer a live refusal. */}
+			{/* ⚠⚠⚠ D-1 · THE MOCKUP'S 188px BAND IS UNREACHABLE, AND THAT IS AN
+			    ACCEPTED, FOUNDER-RULED COST — recorded HERE, on the node that
+			    diverges, so it is a named cost with its measurement rather than a
+			    silent divergence. (Same posture as `/m/[slug]`'s truncated market
+			    question: "THE TRUNCATION IS A REAL COST AND IT IS REPORTED, NOT
+			    SMOOTHED OVER", `MarketHeader.tsx:206`.)
+
+			    THE MOCKUP SAYS 188. `.headzone{flex:0 0 188px}` (`:189`) is a
+			    LITERAL, and §2 says copy a literal. This band is **256**.
+
+			    ⛔ IT DOES NOT FIT, AND THE MEASUREMENT IS WHY. Measured live at a
+			    pinned 1440×777, sweeping the container width across `lg`+ with the
+			    band left at its natural height:
+
+			      width   tile w × h    tiles block   unamerow   idcol NEEDS
+			      1024    115 × 86      370 × 184     44         240
+			      1152    137 × 86      434 × 184     44         240
+			      1280    158 × 86      498 × 184     44         240
+			      1440    185 × 66      578 × 144     44         200
+
+			    A 188px band leaves the identity card `188 − 16` = **172px** of
+			    content box. It needs **240 at 1024–1280** and **200 at 1440**.
+			    ⇒ MECHANISM: the tile LABEL wraps to a second line at every tile
+			    width ≤158px — every container below 1440 — taking each tile 66 → 86
+			    and the block 144 → 184. 256 is the DERIVED worst case, not a
+			    preference.
+
+			    ⛔ AND THE PFP IS THE SAME IMPOSSIBILITY, NOT A SECOND ONE. The
+			    mockup's `.pfp` is `height:100%; aspect-ratio:1/1` — a 188×188 square
+			    filling the band (13.1% × 24.2% of the viewport). This ships 56×56
+			    (3.9% × 7.2%). With the square restored at a 188 band the card
+			    overflows by **+75 at 1024**, +47 at 1152, +35 at 1280 and 1440.
+			    ⇒ Band +8.7pp, PFP −17.0pp and arena −12.6pp are ONE impossibility
+			    reported three ways, and they close together or not at all.
+
+			    ⛔ FORCING IT WOULD CLIP, AND CLIPPING TO HIT A NUMBER IS A FAILURE
+			    (§1). §3 likewise: do not shrink a card or an image below what the
+			    mockup shows to make a total work — report the conflict. The three
+			    ways out are all outside this task's fence and are the founder's:
+			    (1) let the tile grid drop to 2 columns below ~1312 — canon §2 pins
+			    3×2, a DESIGN change; (2) scope the square above a width — an
+			    invented breakpoint; (3) shorten the tile LABEL copy — §1 bans copy.
+
+			    ⚠ AND THE MOCKUP CANNOT ARBITRATE IT. It is a fixed-desktop
+			    prototype authored at ONE width, and its own tile labels are **8px**
+			    type (`.tile .tl{font-size:8px}`, `:208`) against this build's
+			    ratified `text-xs`. Its 188 is proven at exactly one viewport; this
+			    build must hold every width from `lg` up. That is §2's own warning —
+			    "its px reproduce only at that width" — landing on the single most
+			    load-bearing literal the mockup has.
+
+			    ⇒ RULED UNREACHABLE (D-1). ⛔ Do not "fix" this to 188. What the
+			    ruling DOES permit was closed in the same round: the container took
+			    the `screen` preset (width 96.7% → 96.1%, the mockup's exactly) and
+			    the band→arena gap took the mockup's 12px, handing the arena back
+			    every pixel that was available to give. */}
+			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS ANSWERED AND THE BAND IS THE MOCKUP'S 188.
+			    The block above is kept as the MEASUREMENT that earned the 256 — it is
+			    why three rounds could not write this — but 256 is no longer the ruled
+			    state, and O-5 says the correction is written INTO the operative
+			    section rather than appended after it.
+
+			    ⛔ WHAT ACTUALLY UNLOCKED IT WAS NOT A TYPE SIZE. The identity block
+			    shipped as a bordered `<Card>` with `p-4`; the mockup's `.idcard` is a
+			    BARE flex row with no frame at all (`:190`). That padding is 32 of the
+			    188, and it left a 156px content box holding 166px of content — an
+			    overflow no label size could have closed. Removing the frame plus
+			    taking the mockup's tile density (8px/800/0.12em labels, 14px/800
+			    values, `leading-normal` on both, 9/13 padding, 10px gap) brings the
+			    identity column to 174 at 1440 inside a 188 box. Full table and the
+			    per-width sweep live on `IdentityCard.tsx`'s D-1 block.
+
+			    ⛔ `lg:grid-rows-[188px]` IS REQUIRED AND IS NOT A DUPLICATE OF THE
+			    HEIGHT — MEASURED, and this is the subtle half. A single IMPLICIT grid
+			    row is content-sized; `align-content:stretch` can GROW it to a definite
+			    container height but never SHRINK it below its content. The graph's
+			    `<svg viewBox … preserveAspectRatio="none">` contributes an intrinsic
+			    ratio height, so with `lg:h-[188px]` alone the row stayed at the
+			    graph's 256 and the band's own height was simply overflowed: measured
+			    band 188, row 256, PFP 256. Declaring the TRACK makes it definite —
+			    band 188, both cells 188, and the graph does not clip at any width
+			    (`scrollHeight === clientHeight` at 1024/1152/1280/1440/1920, checked
+			    on the graph card itself).
+			    ⚠ `grid-rows-[…]` is shipped idiom — `ui/card.tsx:28` uses
+			    `grid-rows-[auto_auto]`; no new mechanism.
+
+			    ⚠ `gap-4`, NOT `gap-6` — the mockup's `.headzone{gap:16px}` (`:189`).
+			    The arena band below takes the same 16px from `.arena{gap:16px}`
+			    (`:221-222`), so the two bands stay on one gap as they do in the
+			    mockup. That hands 8px per gutter back to the panels. */}
 			<div
 				data-testid="profile-headzone"
-				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+				className="grid gap-4 lg:h-[188px] lg:grid-cols-2 lg:grid-rows-[188px]"
 			>
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
@@ -278,9 +455,11 @@ export default async function ProfilePage({
 			    it this grid's automatic minimum size is its content, so the panels
 			    would push the band past the container instead of scrolling
 			    internally, and row 3 would have no bound to divide. */}
+			{/* ⚠ PROFILE-FULL — `gap-4` is the mockup's `.arena{gap:16px}` (`:221`),
+			    matching the headzone above. 8px per gutter back to the two panels. */}
 			<div
 				data-testid="profile-arena"
-				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+				className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2"
 			>
 				{/* ROUND 4 item 7 — THE TWO PANELS SHARE ONE SELECTION, so the holder
 				    sits between this band and them. It renders a FRAGMENT: both
@@ -298,6 +477,7 @@ export default async function ProfilePage({
 					argumentItems={argumentItems}
 					owner={owner}
 					author={profileUser}
+					bookmarks={bookmarks}
 					initialMarketSlug={initialMarketSlug}
 				/>
 			</div>

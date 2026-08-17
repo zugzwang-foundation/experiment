@@ -211,6 +211,63 @@ function netProfitLossDisplayed(
  * Degrades exactly as the plain variant does — `formatDharma(netProfitLoss)`,
  * unsigned — so a malformed value is not dressed in a sign it cannot support.
  */
+/**
+ * The PER-POSITION profit/loss, signed and split — `current − staked` for ONE
+ * holding, for the positions table's Current cell: `(+Đ70)` / `(−Đ12)` beside
+ * the figure it qualifies. The mockup's own `plShort()`
+ * (`surface_profile_v1_0.html:674-678`) computes exactly this, and its
+ * `.pnum .pl` span (`:300`) is where it lands.
+ *
+ * ⛔ COMPUTED IN DISPLAYED SPACE, AND THAT IS THE WHOLE REASON THIS EXISTS
+ * RATHER THAN A SUBTRACTION AT THE CALL SITE. The row prints rounded `staked`
+ * and rounded `current`; if the delta were taken in exact space it would
+ * disagree with them on screen — `Đ 499 → Đ 448 (−Đ50)` where the eye can only
+ * ever compute 51. So both operands are rounded to what is rendered FIRST and
+ * subtracted after, which keeps `current − staked = delta` true for the three
+ * figures actually on the page. Same discipline SPEC.1 §10.8 imposes on the §23
+ * tile identity, and the same one `netProfitLossDisplayed` above follows.
+ * ⛔ THE SIGN COMES FROM THE NUMERIC VALUE, NEVER FROM A PRINTED STRING —
+ * §10.8: a displayed figure "is never read back into arithmetic, comparison,
+ * validation, clamping, or CONDITIONAL RENDERING". So the branch is
+ * `Decimal.isNegative()` on the displayed-space difference.
+ *
+ * ⚠ ZERO CARRIES NO SIGN — `isZero()` covers +0 and −0, so an unmoved position
+ * reads `(Đ0)`, never `(+Đ0)`. The MINUS is U+2212 (`e2 88 92`), byte-carried
+ * from the mockup's `plShort()`, never the ASCII hyphen `groupInteger` emits.
+ * ⚠ AND THE SPACING IS THE MOCKUP'S, WHICH IS NOT THE TILE'S: `plShort` emits
+ * `+Đ70` with NO space (`:677`), while the Net P/L tile reads `+Đ 238` with one
+ * (`:672`). Two different figures, two different densities, both the mockup's —
+ * the caller supplies the glyph, so this returns the parts and states neither.
+ *
+ * Degrades to an EMPTY magnitude on a malformed operand rather than dressing a
+ * bad value in a sign: the caller renders nothing at all in that case, which is
+ * the honest render for "this delta could not be computed".
+ */
+export function displayPositionProfitLossSigned(
+	staked: string,
+	current: string,
+): { sign: string; magnitude: string } {
+	try {
+		const st = new DisplayDecimal(staked);
+		const cur = new DisplayDecimal(current);
+		if (!st.isFinite() || !cur.isFinite()) {
+			return { sign: "", magnitude: "" };
+		}
+		const delta = cur
+			.toDecimalPlaces(0, Decimal.ROUND_HALF_UP)
+			.minus(st.toDecimalPlaces(0, Decimal.ROUND_HALF_UP));
+		if (delta.isZero()) {
+			return { sign: "", magnitude: "0" };
+		}
+		return {
+			sign: delta.isNegative() ? "−" : "+",
+			magnitude: groupInteger(delta.abs().toFixed(0)),
+		};
+	} catch {
+		return { sign: "", magnitude: "" };
+	}
+}
+
 export function displayNetProfitLossSigned(
 	walletValue: string,
 	positionsValue: string,

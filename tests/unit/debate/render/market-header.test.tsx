@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import type { DebateMarketHeader } from "@/components/debate/types";
@@ -46,6 +46,8 @@ const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 	title: "Attrs Strip Market Question",
 	description: "Resolution criterion text.",
 	status: "Open",
+	mediaVideoUrl: null,
+	mediaImageUrl: null,
 	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
 	unitToWin: { yes: "1.960000000000000000", no: "1.960000000000000000" },
 	totals: {
@@ -108,12 +110,14 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
  * gives: a `container.innerHTML` pin or a snapshot here would sweep in unrelated
  * neighbours and turn a copy guard into a tripwire.
  *
- * ⛔ THE NEGATIVE ASSERTION IS A RULING, NOT A MIRROR. `.crittext` carries
- * `-webkit-line-clamp:2` in the mockup and it is filed BUCKET D (§17 H-T1(c)):
- * `market.description` is the resolution criterion — the terms of the bet — and
- * clamping it with no affordance is the exact defect class PD-0-01/R4 is
- * removing from post cards in this same PR. Pinned so a later reader cannot
- * "restore fidelity" by adopting it.
+ * ⚠ THE NEGATIVE CLAMP ASSERTION WAS A RULING AND IT WAS REVERSED. It read:
+ * "`.crittext` carries `-webkit-line-clamp:2` in the mockup and it is filed
+ * BUCKET D (§17 H-T1(c)) … pinned so a later reader cannot restore fidelity by
+ * adopting it." The founder ruling of 2026-08-16 adopts the clamp (row 10) and
+ * overturns `R4` in the same breath, which removes the ground that sentence
+ * stood on. Superseded in place (O-4), not deleted — the record of what was
+ * ruled, and why it changed, is the point. The NO-AFFORDANCE half survives
+ * unreversed.
  */
 describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	it("market-header::overline-labels-the-criterion", () => {
@@ -158,19 +162,345 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(className).toContain("pt-2.5");
 	});
 
-	it("market-header::criterion-is-NOT-clamped-and-carries-no-affordance", () => {
+	it("market-header::criterion-clamps-to-two-lines-and-still-carries-no-affordance", () => {
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
 
 		const container = screen.getByText("Resolution").parentElement;
 
-		// H-T1(c) — bucket D. Unclamped IS the status quo; the mockup would be
-		// INTRODUCING a truncation of the bet terms.
-		expect(container?.innerHTML).not.toContain("line-clamp");
-		expect(container?.innerHTML).not.toContain("truncate");
-		// And no "more"/expand control — "criterion length treatment" is
-		// docketed to HEADER-3ZONE, not decided here.
+		// ⚠ REVERSED AT HTML-FINISH · MARKET DETAIL row 10, and the superseded
+		// assertion is recorded rather than silently swapped. This used to pin the
+		// ABSENCE of a clamp as a RULING (§17 H-T1(c), bucket D), on the ground
+		// that a bare clamp with no affordance was the defect class PD-0-01/R4 was
+		// removing in that same PR. The founder ruling of 2026-08-16 reverses
+		// BOTH: R4 is itself overturned (row 24 returns the `+` glyph), so the
+		// coherence argument that grounded the no-clamp is gone.
+		// ⚠ O-9: `§17 H-T1(c)` lives in a PLANNING document, and SPEC.1 /
+		// design-language / design-canon were each read at HEAD — none of them
+		// mentions clamping or truncating the criterion. No live §-text is
+		// contradicted, which is why the row ships with no spec rider.
+		expect(container?.innerHTML).toContain("line-clamp-2");
+
+		// ⛔ STILL NO AFFORDANCE, and that half did NOT reverse. "Criterion length
+		// treatment" remains docketed to HEADER-3ZONE, so an expander here would
+		// decide a question that is explicitly deferred.
 		expect(container?.querySelector("button")).toBeNull();
-		// The criterion text itself still renders, in full.
+
+		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
+		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-
+		// page, and for a screen reader even while the surface truncates them.
 		expect(container?.innerHTML).toContain("Resolution criterion text.");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 6 — the left column's READING ORDER.
+ *
+ * The mockup's `.hstack` orders its `vm` children `.question` → `.attrs` →
+ * `.criterion` → `.rescards` (`d5:958-985`). The build rendered the attrs strip
+ * LAST, below the chart and the price bar. The row is about order and nothing
+ * else, so this asserts order and nothing else.
+ *
+ * ⚠ WHY THIS IS NOT THE WHOLE-CONTAINER ASSERTION THIS FILE'S HEADER FORBIDS.
+ * The caution above is against snapshots and `container.innerHTML` EQUALITY —
+ * shapes that go red when an unrelated neighbour moves. This compares the
+ * INDEX of three markers that are each this component's own subject, so C4's
+ * chart move and C6's price-bar move pass straight through it. A pin that
+ * cannot survive its own plan's next two commits is a tripwire, not a guard.
+ *
+ * ⚠ O-7 — `innerHTML`, never `textContent`. Order is a property of the markup.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () => {
+	it("market-header::question-then-attrs-then-criterion", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const html = left?.innerHTML ?? "";
+		expect(html).not.toBe("");
+
+		const question = html.indexOf("Attrs Strip Market Question");
+		const attrs = html.indexOf("Đ 150 staked");
+		const criterion = html.indexOf("Resolution criterion text.");
+
+		// All three present — an absent marker indexes to -1 and would otherwise
+		// satisfy the ordering below by accident.
+		expect(question).toBeGreaterThan(-1);
+		expect(attrs).toBeGreaterThan(-1);
+		expect(criterion).toBeGreaterThan(-1);
+
+		expect(question).toBeLessThan(attrs);
+		expect(attrs).toBeLessThan(criterion);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL row 4 — the price chart occupies the RAIL.
+ *
+ * The mockup's `.hright` holds exactly `.graph` + `.barrow f` in the market arm
+ * (`d5:1007`, `:1037`). The chart used to render in the LEFT column, between
+ * the criterion and the price bar, which put the market's shape inside the
+ * reading column instead of beside it.
+ *
+ * ⚠ THE NULL PATH IS PART OF THE ROW, not a separate concern. A null
+ * `priceChart` was already non-fatal — the rest of the header stands
+ * (`price-chart.test.tsx` pins that). Now it also means NO RAIL NODE, because
+ * an empty 25% column is visible empty chrome (PD-3-09). Both halves are
+ * asserted so a later commit cannot satisfy one by breaking the other.
+ *
+ * ⚠ Declared locally rather than imported, following `price-chart.test.tsx`:
+ * the shape is two fields and a local literal keeps this file free of a server
+ * module path it does not otherwise need.
+ */
+type PricePointFixture = { at: string; yes: string };
+
+const CHART_SERIES: PricePointFixture[] = [
+	{ at: "2026-07-01T00:00:00.000Z", yes: "0.500000000000000000" },
+	{ at: "2026-07-02T00:00:00.000Z", yes: "0.600000000000000000" },
+];
+
+describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", () => {
+	it("market-header::the-chart-renders-in-the-rail-not-the-left-column", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const right = container.querySelector('[data-testid="headzone-right"]');
+
+		expect(right).not.toBeNull();
+		// The collapsed card is IN the rail …
+		expect(right?.innerHTML).toContain('data-testid="market-price-chart-card"');
+		// … and is NOT still in the reading column. Asserting only the first half
+		// would pass on a header that rendered the chart TWICE.
+		expect(left?.innerHTML).not.toContain(
+			'data-testid="market-price-chart-card"',
+		);
+	});
+
+	it("market-header::a-null-series-drops-the-CHART-not-the-rail", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+
+		// ⚠ RE-DERIVED AT C6, NOT RELAXED. At C4 the chart was the rail's only
+		// occupant, so a null series meant no rail node at all. C6 moved the
+		// price bar in beside it, and `PriceBar` renders its "Pricing
+		// unavailable" stub rather than null — so on the market arm the rail is
+		// now ALWAYS occupied and a null series means "no CHART", never "no
+		// rail". The PD-3-09 property that mattered (never an EMPTY rail) is
+		// unchanged and is still pinned, one assertion down.
+		const right = container.querySelector('[data-testid="headzone-right"]');
+		expect(right).not.toBeNull();
+		expect(right?.innerHTML).not.toContain(
+			'data-testid="market-price-chart-card"',
+		);
+		// The rail is occupied, not empty — the price bar is in it.
+		expect(right?.innerHTML).toContain("YES 50%");
+		// …and the left column still stands, the pre-existing non-fatal contract.
+		expect(
+			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+		).toContain("Attrs Strip Market Question");
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL — the price bar occupies the RAIL, under the
+ * chart.
+ *
+ * `.hright` holds `.graph` then `.barrow f` (`d5:1007`, `:1037`). The bar and
+ * the chart read the SAME price, so standing them in one column is what lets a
+ * reader check one against the other.
+ *
+ * ⚠ THIS IS THE PLACEMENT HALF ONLY. Row 7 — collapsing `detail` to d5's
+ * one-row `.barrow` — was BACKED OUT: `PriceBar`'s detail render is byte-pinned
+ * by `tests/unit/discovery/render/price-bar-presets.test.tsx`, which is outside
+ * this task's ratified allow-list. Placement is `MarketHeader`'s and is in
+ * scope; the bar's internal shape is not. See `PriceBar.tsx`'s docblock.
+ */
+describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () => {
+	it("market-header::the-price-bar-renders-in-the-rail", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const right = container.querySelector('[data-testid="headzone-right"]');
+
+		expect(right?.innerHTML).toContain("YES 50%");
+		expect(right?.innerHTML).toContain("NO 50%");
+		// And it is not ALSO left behind in the reading column.
+		expect(left?.innerHTML).not.toContain("YES 50%");
+
+		// Order within the rail: chart above bar.
+		const chart = right?.innerHTML.indexOf("market-price-chart-card") ?? -1;
+		const bar = right?.innerHTML.indexOf("YES 50%") ?? -1;
+		expect(chart).toBeGreaterThan(-1);
+		expect(bar).toBeGreaterThan(chart);
+	});
+});
+
+/**
+ * HTML-FINISH · MARKET DETAIL round 2 · R7 (rows 7 + 8) — the ONE-ROW bar and
+ * its LIVE percent labels.
+ *
+ * Round 1 built both, measured them green, and backed them out: `detail`'s
+ * markup is byte-pinned by `tests/unit/discovery/render/price-bar-presets.test.tsx`
+ * and that file sat outside the task's allow-list. The founder extended the
+ * allow-list by that one file on 2026-08-16.
+ *
+ * ⛔ THE GATE IS THE SUBJECT HERE, not the arrangement. The arrangement is pinned
+ * byte-for-byte by the Discovery-side baseline; what THAT file cannot see is the
+ * F-3 gating, because it renders `PriceBar` with no `pick` at all. A label that
+ * opened the composer on a Closed market, for a suspended session, or on the
+ * pole opposite the viewer's holding would be a BYPASS around `SlotHeader`'s
+ * gate — `DebateView`'s composer host opens off `openSide` alone and checks none
+ * of the three itself.
+ */
+describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels", () => {
+	const OPEN = { heldSide: null, marketOpen: true, suspended: false };
+
+	function renderWithPick(
+		state: {
+			heldSide: "YES" | "NO" | null;
+			marketOpen: boolean;
+			suspended: boolean;
+		},
+		onPick: (side: "YES" | "NO") => void,
+	) {
+		return render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+				pick={{ ...state, onPick }}
+			/>,
+		);
+	}
+
+	it("market-header::row-8-each-label-picks-its-OWN-side", () => {
+		// ⛔ BOTH SIDES, and not because two assertions look thorough: a handler
+		// wired `onPick("YES")` at both ends renders identically and passes any
+		// single-sided test, while silently making the NO label buy YES.
+		const onPick = vi.fn();
+		const { container } = renderWithPick(OPEN, onPick);
+
+		const yes = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-YES"]',
+		);
+		const no = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-NO"]',
+		);
+		expect(yes).not.toBeNull();
+		expect(no).not.toBeNull();
+
+		fireEvent.click(yes as HTMLButtonElement);
+		expect(onPick).toHaveBeenLastCalledWith("YES");
+		fireEvent.click(no as HTMLButtonElement);
+		expect(onPick).toHaveBeenLastCalledWith("NO");
+		expect(onPick).toHaveBeenCalledTimes(2);
+	});
+
+	it("market-header::row-8-the-label-text-is-unchanged-by-becoming-a-control", () => {
+		// The bar must READ the same whether or not the viewer can act on it —
+		// the percent is the information, the affordance is an extra.
+		const { container } = renderWithPick(OPEN, () => {});
+		expect(
+			container.querySelector('[data-testid="price-label-YES"]')?.textContent,
+		).toBe("YES 50%");
+		expect(
+			container.querySelector('[data-testid="price-label-NO"]')?.textContent,
+		).toBe("NO 50%");
+	});
+
+	it("market-header::row-8-WCAG-2.5.3-the-accessible-name-is-the-visible-text", () => {
+		// ⛔ NO `aria-label` OVERRIDE. The visible run is `YES 50%`, so any
+		// accessible name would have to CONTAIN it — "Buy YES" does not, and
+		// "Buy YES — 50%" does not either. The affordance rides `title`, which does
+		// not displace the accessible name on an element that has text content.
+		const { container } = renderWithPick(OPEN, () => {});
+		const yes = container.querySelector('[data-testid="price-label-YES"]');
+		expect(yes?.getAttribute("aria-label")).toBeNull();
+		expect(yes?.getAttribute("title")).toBe("Buy YES");
+	});
+
+	it("market-header::row-8-a-closed-market-disables-BOTH-labels", () => {
+		// INV-4 read-only. `SlotHeader` already refuses here; this control opens the
+		// same composer and must refuse identically.
+		const onPick = vi.fn();
+		const { container } = renderWithPick(
+			{ ...OPEN, marketOpen: false },
+			onPick,
+		);
+
+		for (const side of ["YES", "NO"]) {
+			const el = container.querySelector<HTMLButtonElement>(
+				`[data-testid="price-label-${side}"]`,
+			);
+			expect(el?.disabled).toBe(true);
+			expect(el?.getAttribute("aria-disabled")).toBe("true");
+		}
+	});
+
+	it("market-header::row-8-a-suspended-session-disables-BOTH-labels", () => {
+		const { container } = renderWithPick(
+			{ ...OPEN, suspended: true },
+			() => {},
+		);
+		expect(
+			container.querySelector<HTMLButtonElement>(
+				'[data-testid="price-label-YES"]',
+			)?.disabled,
+		).toBe(true);
+		expect(
+			container.querySelector<HTMLButtonElement>(
+				'[data-testid="price-label-NO"]',
+			)?.disabled,
+		).toBe(true);
+	});
+
+	it("market-header::row-8-a-holder-may-only-pick-their-OWN-pole", () => {
+		// ⛔ THE ASYMMETRIC CASE — the one a blanket `disabled={!marketOpen}` passes
+		// and gets wrong. F-3: holding YES, the NO label must refuse and the YES
+		// label must stay live, carrying the SAME C3 batch string the colhead entry
+		// and the card pills carry, so one refusal reads one way everywhere.
+		const { container } = renderWithPick(
+			{ ...OPEN, heldSide: "YES" },
+			() => {},
+		);
+
+		const yes = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-YES"]',
+		);
+		const no = container.querySelector<HTMLButtonElement>(
+			'[data-testid="price-label-NO"]',
+		);
+		expect(yes?.disabled).toBe(false);
+		expect(no?.disabled).toBe(true);
+		expect(no?.getAttribute("title")).toBe(
+			"You hold YES. Exit your position to bet NO.",
+		);
+	});
+
+	it("market-header::row-8-WITHOUT-pick-the-labels-are-inert-text", () => {
+		// Non-vacuity for every row above, and the Discovery contract in one line:
+		// both Discovery sites render `PriceBar` with no `pick`, so their labels
+		// must stay plain `<span>`s and gain no interactive affordance at all.
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="price-label-YES"]'),
+		).toBeNull();
+		const right = container.querySelector('[data-testid="headzone-right"]');
+		expect(right?.innerHTML).toContain("YES 50%");
 	});
 });

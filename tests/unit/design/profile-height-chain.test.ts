@@ -20,7 +20,8 @@ import { describe, expect, it } from "vitest";
  *                     (owned by `(public)/layout.tsx`, out of scope here)
  *   PageContainer     flex-1 min-h-0 flex-col                   ← below `lg`
  *                     + lg:h-[calc(100vh-60px-2px)] lg:flex-none ← THE BOUND (R5 A)
- *   headzone band     lg:h-[256px], no flex-1       ← declared, does NOT grow (R5 B)
+ *   headzone band     lg:h-[188px] + lg:grid-rows-[188px], no flex-1
+ *                                                   ← declared, does NOT grow
  *   arena band        flex-1 min-h-0                ← takes ALL the leftover
  *   both panels       min-h-0 flex-col              ← may be shorter than content
  *   both panel bodies flex-1 min-h-0 overflow-y-auto ← where the scroll happens
@@ -87,6 +88,7 @@ const CONTAINER = "src/components/shell/PageContainer.tsx";
 const PAGE = "src/app/(public)/u/[pseudonym]/page.tsx";
 const POSITIONS = "src/components/profile/PositionsTable.tsx";
 const ARGUMENTS = "src/components/profile/ArgumentList.tsx";
+const ROW_THIRDS = "src/components/profile/row-thirds.ts";
 
 /** The className on the profile's `<PageContainer>` tag, as written on disk. */
 function containerExtras(source: string): string {
@@ -131,7 +133,9 @@ function bandClasses(source: string, testid: string): string[] {
  * occupies exactly the viewport below the header, and every region that can
  * overflow scrolls inside itself. That reverses A-5 FOR THIS SURFACE, so the
  * chain is now deliberately BOUNDED at two nodes — the container at
- * `lg:h-[calc(100vh-60px-2px)]` and the headzone at `lg:h-[256px]`.
+ * `lg:h-[calc(100vh-60px-2px)]` and the headzone at `lg:h-[188px]` (the
+ * mockup's own `.headzone{flex:0 0 188px}`, reached at PROFILE-FULL once the
+ * identity block lost its `<Card>` frame — see `IdentityCard.tsx`'s D-1 block).
  *
  * ⚠⚠ THE PROPERTY A1 ACTUALLY PROTECTS IS NOT "NO HEIGHT" — IT IS "NOTHING IS
  * LOST". A bound with a scroll container is not a clip: the content past the
@@ -164,6 +168,16 @@ const A1_FORBIDDEN = [/^h-screen$/, /^h-dvh$/, /^h-full$/, /^h-\[/];
  * into a clip. `overflow-y-auto` and `overflow-hidden` are NOT interchangeable
  * here, and only one of them keeps the content reachable. */
 const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
+
+/**
+ * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`),
+ * carried as a LITERAL because the mockup states it as one. It is what makes
+ * the two side-by-side panel heads one height, and therefore what makes their
+ * two scrolling bodies start on the same line. ⛔ ONE string, asserted on all
+ * FOUR heads across this file and `bookmarks-height-chain.test.ts`, so the two
+ * surfaces can never be sized one after the other (§3).
+ */
+const HEAD_FLOOR = "min-h-[52px]";
 
 /** The class list of a node in one of the two panel files, by `data-testid`. */
 function panelClasses(source: string, file: string, testid: string): string[] {
@@ -312,7 +326,20 @@ describe("profile height chain — every link, asserted by name", () => {
 			extras,
 			"item A: the container declares no one-screen bound, so `<main>` grows " +
 				"with its content and the page scrolls.",
-		).toContain("lg:h-[calc(100vh-60px-2px)]");
+		).toContain("lg:h-[calc(100dvh-60px-2px)]");
+		// ⚠⚠ PROFILE-DIMS R2 · D-4 — `100dvh`, AND NEVER `100vh`, ON THIS CONTAINER.
+		// The dynamic viewport unit, so a collapsing mobile browser chrome cannot
+		// leave the bound taller than the screen. `/m/[slug]` was ruled onto it
+		// first and `debate-height-chain.test.ts` pins the same property by name
+		// (`the-page-declares-100dvh-and-NEVER-100vh`); this route was the outlier.
+		// ⛔ THE CHECK IS SCOPED TO THE CONTAINER'S OWN CLASSES, deliberately: the
+		// SHELL's floor below is still `100vh` and must stay readable as such.
+		expect(
+			extras.filter((c) => /100vh/.test(c)),
+			"item A: this container declares `100vh`. Use `100dvh` — a collapsing " +
+				"mobile chrome makes `100vh` taller than the visible screen, which is " +
+				"a bound that scrolls the page it exists to stop scrolling.",
+		).toEqual([]);
 		expect(
 			extras,
 			"item A: the bound is inert without `lg:flex-none` — `flex-1`'s 0% " +
@@ -327,7 +354,32 @@ describe("profile height chain — every link, asserted by name", () => {
 		).toContain("min-h-[calc(100vh-60px-2px)]");
 		// The headzone's declared height, pinned here too — it is the other half of
 		// what makes the arena's height definite.
-		expect(bandClasses(page, "profile-headzone")).toContain("lg:h-[256px]");
+		//
+		// ⚠⚠ PROFILE-FULL — THE FIGURE IS NOW THE MOCKUP'S 188, AND THE PREDICATE IS
+		// UNCHANGED. This guard asserts that the band declares an `lg:`-scoped
+		// DEFINITE height; only the number it names has moved, because D-1 was
+		// reopened and answered. 256 was derived under a fence that excluded the
+		// identity block's frame and the tile type sizes — with the `<Card>` padding
+		// gone and the mockup's tile density taken, the identity column needs 174 at
+		// 1440 inside a 188 box. ⛔ This is NOT the guard being relaxed to fit the
+		// code: the assertion is still an exact-value pin, still `toContain`, still
+		// on the same node. Re-derive it from a fresh measurement if the band moves
+		// again; do not loosen it to a prefix match.
+		expect(bandClasses(page, "profile-headzone")).toContain("lg:h-[188px]");
+		// ⛔ AND THE ROW TRACK, which is the half that is easy to drop and impossible
+		// to see. A single IMPLICIT grid row is content-sized: `align-content:stretch`
+		// can GROW it to the container's declared height but never SHRINK it below
+		// its content, and the graph's `<svg viewBox … preserveAspectRatio="none">`
+		// contributes an intrinsic ratio height. MEASURED with the height alone:
+		// band 188, row 256, PFP 256 — the declared band was simply overflowed.
+		// Declaring the TRACK makes it definite, which is also what lets the PFP's
+		// `xl:h-full` resolve against 188 instead of against its own content.
+		expect(
+			bandClasses(page, "profile-headzone"),
+			"the band declares a height but no ROW TRACK, so its single implicit row " +
+				"is still content-sized and the graph's intrinsic ratio floors it — " +
+				"measured at 256 against a declared 188.",
+		).toContain("lg:grid-rows-[188px]");
 	});
 
 	it("profile-height-chain::every-bounded-region-hands-overflow-to-a-SCROLL-container", () => {
@@ -396,11 +448,51 @@ describe("profile height chain — every link, asserted by name", () => {
 		// is the mockup's own EARLIER one, from its changelog: v0.11 — "the rows
 		// container is height-capped to exactly the first three rows (JS measures
 		// the 3rd row's bottom) … No row content is clipped."
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R1 — THE PARAGRAPH ABOVE IS NOW HALF TRUE, and the
+		// half that changed is the PAGE, not the mockup. Its measurement was taken
+		// when this route was free to grow; round 5 bounded it at `lg`+, so the panel
+		// body DOES now have a definite height (429px at 1440×777) and a third of its
+		// rows region measures **128px** — the mockup's own row height, arrived at by
+		// arithmetic rather than copied. So `calc(100%/3)` is ported after all, as a
+		// computed px value; the v0.11 cap survives alongside it for the growable
+		// case below `lg`. Both live in one effect, split on one condition.
 		const pos = read(POSITIONS);
 		// It is a BOUND…
 		expect(pos).toContain("style.maxHeight");
-		// …never a fixed height, on the node the chain hands the scroll to.
-		expect(pos).not.toContain("style.height");
+		// …never a fixed height ON THE NODE THE CHAIN HANDS THE SCROLL TO.
+		// ⚠⚠ SCOPED TO `body`, AND THAT IS A FALSE-POSITIVE FIX RATHER THAN A
+		// RELAXATION. This read `not.toContain("style.height")` over the WHOLE FILE,
+		// so it fired on R1's `row.style.height` — a different node with the opposite
+		// effect. The property being protected is that the PANEL is bounded and never
+		// fixed, because a fixed panel clips a fourth row instead of scrolling to it.
+		// A `<tr>`'s height cannot clip anything: it is a FLOOR, which is precisely
+		// why R1 needs a `line-clamp` as its other half. So the check now names the
+		// node it always meant, and the thing it forbids is still forbidden.
+		expect(pos).not.toContain("body.style.height");
+		// …and the row heights that DO exist are on ROWS, never on the body — asserted
+		// where they now live.
+		// ⚠ PROFILE REFINEMENT · R1 (shared) — THE ROW-THIRD MOVED OUT OF THIS FILE.
+		// It was inline in `PositionsTable`; the bookmarks table needed the identical
+		// rule (measured: positions `[128,128,128]` against bookmarks `[136,92]`), and
+		// two copies of the arithmetic would drift. So it lives in `row-thirds.ts` and
+		// both tables call it. This check follows the code rather than pinning a
+		// location the code has left.
+		const thirds = read(ROW_THIRDS);
+		expect(thirds).toContain("row.style.height");
+		expect(thirds).not.toContain("body.style.height");
+		// ⚠ PROFILE OVERLAP · R1 — THE ARITHMETIC MUST STAY OUT OF THE EFFECT, and
+		// this is the only place that can say so. jsdom has no layout, so nothing
+		// inside the hook is reachable by any test; the decision therefore lives in
+		// the pure `rowThird`, which `row-third.test.ts` holds to the figures
+		// measured on the mockup and on staging. If the sums ever migrate back
+		// inline they become untestable again — which is how a share the rows could
+		// not honour shipped green in the first place.
+		expect(thirds).toContain("export function rowThird(");
+		expect(thirds).toContain("rowThird({");
+		// …and the positions table still CONSUMES it, so the rule is not merely
+		// present somewhere — it is wired to this panel.
+		expect(pos).toContain("useEqualRowThirds(");
 		// …and the scroll container it caps still declares its overflow, so the
 		// capped rows remain reachable.
 		expect(
@@ -410,6 +502,84 @@ describe("profile height chain — every link, asserted by name", () => {
 		).toContain("overflow-y-auto");
 		// The window is the founder's three, named once.
 		expect(/const ROW_WINDOW = 3;/.test(pos)).toBe(true);
+	});
+
+	it("profile-height-chain::both-panel-heads-share-ONE-floor-so-the-bodies-start-level", () => {
+		// ⚠⚠ THE LAW, and it is a DIMENSION rather than a decoration. The two arena
+		// panels sit side by side, so their heads must be one height or their two
+		// scrolling bodies begin on different lines. The mockup pins that with
+		// `.colhead{min-height:52px}` (`:227-228`) applied to BOTH slots.
+		//
+		// ⛔ MEASURED AT A PINNED 1440×777 ON LIVE STAGING, IN BOTH AUTH STATES —
+		// signed out AND signed in, positions head 51 against arguments head 41,
+		// bodies at y418 vs y408. Both heads carry the SAME class string, so the
+		// split is pure CONTENT: one head holds a market filter and a segmented
+		// control, the other a bare title. Nothing in a class list shows that,
+		// which is why it needs a guard rather than a review.
+		const heads = [
+			{
+				testid: "positions-panel-head",
+				classes: panelClasses(
+					read(POSITIONS),
+					POSITIONS,
+					"positions-panel-head",
+				),
+			},
+			{
+				testid: "arguments-panel-head",
+				classes: panelClasses(
+					read(ARGUMENTS),
+					ARGUMENTS,
+					"arguments-panel-head",
+				),
+			},
+		];
+		const floorsOf = (cs: string[]) =>
+			cs.filter((c) => /^min-h-/.test(c)).join(" ");
+
+		// 1. Each head declares the floor.
+		for (const h of heads) {
+			expect(
+				h.classes,
+				`${h.testid} lost the \`.colhead\` floor — the two panel bodies will ` +
+					`start on different lines. Re-derive the head rather than ` +
+					deletingHint,
+			).toContain(HEAD_FLOOR);
+		}
+		// 2. ONE value across both, so two DIFFERENT floors cannot each pass check 1
+		//    while still leaving the bodies unlevel.
+		expect(new Set(heads.map((h) => floorsOf(h.classes))).size).toBe(1);
+		// 3. A FLOOR, NEVER A FIXED HEIGHT — `h-[52px]` would level the heads too,
+		//    and would CLIP the moment either gains a control. Reuses this file's
+		//    own `A1_FORBIDDEN` predicate, so the two checks cannot drift apart.
+		for (const h of heads) {
+			expect(
+				A1_FORBIDDEN.some((re) => h.classes.some((c) => re.test(c))),
+				`${h.testid} declares a fixed height; a head must only ever be floored`,
+			).toBe(false);
+		}
+
+		// ⚠ POSITIVE CONTROLS, INLINE. A guard only ever run against a passing tree
+		// is indistinguishable from one that cannot fail. Each mutation runs the
+		// REAL predicate over the REAL class list.
+		expect(heads[0].classes.filter((c) => c !== HEAD_FLOOR)).not.toContain(
+			HEAD_FLOOR,
+		);
+		expect(
+			new Set([
+				floorsOf(heads[0].classes),
+				floorsOf(
+					heads[1].classes.map((c) => (c === HEAD_FLOOR ? "min-h-[40px]" : c)),
+				),
+			]).size,
+			"the drift mutation did not take — check 2 is inert",
+		).toBe(2);
+		expect(
+			A1_FORBIDDEN.some((re) =>
+				heads[0].classes.concat("h-[52px]").some((c) => re.test(c)),
+			),
+			"the fixed-height mutation did not take — check 3 is inert",
+		).toBe(true);
 	});
 
 	it("profile-height-chain::POSITIVE-CONTROL-each-check-reddens-on-a-real-mutation", () => {

@@ -61,15 +61,23 @@ describe("getMarketBySlug — public slug resolver (SHELL/UI.0)", () => {
 			description: "Resolves YES if it rains in Mumbai on Devcon day.",
 			status: "Open",
 		});
-		// DTO carries the id (UUIDv7 string) — not a drizzle row beyond the 5 cols.
+		// DTO carries the id (UUIDv7 string) — not a drizzle row beyond the 6 cols.
 		expect(typeof dto?.id).toBe("string");
+		// ⚠ WIDENED AT HTML-FINISH · MARKET DETAIL row 2, not relaxed. The
+		// key-set assertion is the point of this test — it is what stops a
+		// `SELECT *` or a stray column from leaking a drizzle row shape past the
+		// server boundary (AGENTS.md §6). `mediaVideoUrl` is the SIXTH and it is
+		// enumerated, so the guard still fails on a seventh nobody ruled.
 		expect(Object.keys(dto ?? {}).sort()).toEqual([
 			"description",
 			"id",
+			"mediaVideoUrl",
 			"slug",
 			"status",
 			"title",
 		]);
+		// ADR-0026 — present, and null for a market with no outbound video.
+		expect(dto?.mediaVideoUrl).toBeNull();
 	});
 
 	it("returns null for an unknown slug", async () => {
