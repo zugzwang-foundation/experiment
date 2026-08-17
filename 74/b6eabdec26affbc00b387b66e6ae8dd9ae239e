@@ -1,0 +1,31 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Second Door
+
+Content removed by a moderator is not supposed to be readable by anyone
+afterwards.
+
+The main query that fetches it knew that. A second lookup in the same file —
+the one pulling the parent an argument is replying to — did not. So a live
+reply could show you the body of the removed thing it was answering. Found on
+staging by a check somebody had left running, not by anyone reading the code.
+
+The obvious repair is to add the missing condition to the second query. That
+was refused.
+
+Instead the shape changed. A removed parent now arrives as an object with
+nowhere to put a body — not an empty field, no field. Nothing downstream can
+render it because there is nothing there to render, and forgetting to check
+stops being a thing that can happen.
+
+One line in the commit is the whole idea: withholding is a property of every
+read of a body, not a property of rows.
+
+And the test asserts the body is absent, not that the row is. Those two had
+looked like the same assertion right up until they weren't.
