@@ -314,7 +314,18 @@ export function BookmarksTable({
 			    column widths without an explicit px track template, and every such
 			    template available is a light-prototype VALUE).
 			    `bg-n0` is the panel's own background: a sticky header over scrolling
-			    rows must be opaque or the rows read through it. */}
+			    rows must be opaque or the rows read through it.
+			    ⚠⚠ AND OPAQUE IS NOT ENOUGH — PROFILE OVERLAP R1, ported from the
+			    positions table, where the mechanism is written out in full. A sticky
+			    `top:0` resolves against the scroll container's CONTENT box, so this
+			    body's `p-3` leaves 12px of scrollable space above the header that the
+			    header does not cover, and rows appear in it. The shadow is the header
+			    claiming that strip; its offset is bound to the padding by token
+			    (`var(--spacing) * 3`), never typed as 12px.
+			    ⛔ IT IS FIXED HERE AND NOT ONLY THERE for the reason the row-third is
+			    shared: this panel is the same shell with the same padding and the same
+			    sticky header, so a fix on one surface only is drift waiting to be
+			    reported as a second bug. */}
 			{/* ⛔ THE KEY HANDLER IS SCOPED TO THE TABLE, NOT TO `document` —
 			    Profile's ruling, and the reason is this surface's own: the page
 			    GROWS AND SCROLLS below `lg`, so a document-level ArrowDown that
@@ -369,7 +380,7 @@ export function BookmarksTable({
 				    figure and its delta are ONE quantity; breaking them across lines is never
 				    the right degrade, so the cell is told not to, and the 118px track is what
 				    means it never has to. */}
-				<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
+				<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 					<tr>
 						<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 						<th className="px-2 pt-0 pb-2 text-center">Argument</th>

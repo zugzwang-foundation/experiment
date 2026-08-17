@@ -626,7 +626,24 @@ export function PositionsTable({
 					    real `<table>`, its column algorithm, and its semantics.
 					    `bg-n0` is the panel's own background, already on the section —
 					    a sticky header over scrolling rows must be opaque or the rows
-					    read through it. */}
+					    read through it.
+					    ⚠⚠ AND OPAQUE IS NOT ENOUGH — PROFILE OVERLAP R1. Chrome resolves a
+					    sticky `top:0` against the scroll container's CONTENT box, so the
+					    container's own `p-3` leaves 12px of SCROLLABLE space above the
+					    header that the header does not cover. Rows scroll into that strip
+					    and appear ABOVE the column titles, inside the panel frame — measured
+					    on staging (body top 331, header top 343) and confirmed by paint, not
+					    by reasoning about paint: a zoom of the strip showed the selected
+					    row's rounded top edge sitting over it.
+					    ⇒ The shadow is the header claiming that strip. Zero blur, zero
+					    spread, offset up by exactly the padding — a copy of its own opaque
+					    box, and because the header is `sticky z-10` it paints above the
+					    plain rows. ⛔ THE OFFSET IS BOUND TO THE PADDING BY TOKEN, never
+					    typed as 12px: both are `var(--spacing) * 3`, so `p-3` and this move
+					    together or a guard fails.
+					    ⛔ NOT FIXED BY SHRINKING THE PADDING or by `overflow:hidden` — the
+					    first changes the region's arithmetic, the second clips a row out of
+					    a participant's own portfolio. */}
 					{/* ⚠⚠ PROFILE-FULL — THE COLUMN HEADERS ARE OVERLINES. The mockup's
 					    `.thead` is `font-size:8.5px; font-weight:800; letter-spacing:.12em;
 					    text-transform:uppercase; color:var(--n4)` with `padding:0 12px 8px`
@@ -663,7 +680,7 @@ export function PositionsTable({
 					    figure and its delta are ONE quantity; breaking them across lines is never
 					    the right degrade, so the cell is told not to, and the 118px track is what
 					    means it never has to. */}
-					<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
+					<thead className="sticky top-0 z-10 bg-n0 shadow-[0_calc(var(--spacing)*-3)_0_0_var(--color-n0)] text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 						<tr>
 							<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
