@@ -317,9 +317,17 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 		expect(borderCount(1)).toBe(1);
 	});
 
-	it("item6::the-reserved-sell-host-row-takes-NO-border", () => {
-		// Bordering an empty reserved band would draw an empty card under every
-		// sellable row. Owner arm, so the host renders.
+	it("item6::a-sellable-row-carries-NO-empty-sell-band", () => {
+		// ⚠ RE-POINTED at PROFILE OVERLAP R1, and the claim changed shape with the
+		// law. Item 6 asked "does the reserved band draw an empty card under every
+		// sellable row?" — and the answer is now that THERE IS NO BAND to draw one:
+		// the 50px reservation is reversed, so the host arrives with its module.
+		// ⇒ The unbordered-host predicate MOVED to `sell.test.tsx`
+		// (`sell-host-is-canon-s-50px-box-and-is-ABSENT-until-opened`), which is
+		// the suite that stubs the heavy `SellModule`; opening the real one here
+		// would need this file to mock a router it has no other reason to know
+		// about. What stays here is the part this suite owns: on a row that IS
+		// sellable, nothing is reserved.
 		render(
 			<PositionsTable
 				payload={{
@@ -328,8 +336,11 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 				}}
 			/>,
 		);
-		const host = screen.getByTestId(`sell-row-${M(1)}`);
-		expect(host.className).not.toContain("[border:");
+		// ⛔ THE POSITIVE CONTROL IS LOAD-BEARING: without it, "no sell row" would
+		// pass on a row that renders no sell affordance at all.
+		expect(screen.getByTestId(`sell-trigger-${M(1)}`)).toBeTruthy();
+		expect(screen.queryByTestId(`sell-row-${M(1)}`)).toBeNull();
+		expect(screen.queryByTestId(`sell-host-${M(1)}`)).toBeNull();
 	});
 
 	it("item6::the-row-is-keyboard-operable-and-shows-a-focus-ring", () => {

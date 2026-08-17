@@ -754,10 +754,13 @@ export function PositionsTable({
 									    but on the base it is a second `outline` declaration competing with the
 									    selected arm's, and two arbitrary utilities for one property resolve by
 									    stylesheet order, not by the order they are written here.
-									    ⚠ A ROW OWNS NO SELL HOST BORDER. The reserved 50px sell box
-									    below is deliberately unbordered — bordering an empty
-									    reserved band would draw an empty card under every sellable
-									    row. */}
+									    ⚠ A ROW OWNS NO SELL HOST BORDER. The 50px sell box below is
+									    deliberately unbordered. ⚠ Its ORIGINAL reason is now void — it
+									    read "bordering an empty reserved band would draw an empty card
+									    under every sellable row", and there is no empty band left to
+									    border: the host mounts only with its module. The rule SURVIVES on
+									    a different one: a bordered host would read as a row of its own,
+									    and the module inside it already carries its own edges. */}
 									<tr
 										data-testid={`position-row-${row.marketId}`}
 										ref={(el) => {
@@ -1011,73 +1014,59 @@ export function PositionsTable({
 											</span>
 										</td>
 									</tr>
-									{/* Item 10 (P5-D13) — THE FIXED-HEIGHT SELL HOST. Canon §5's Profile
-									    row, quoted WHOLE because the omitted half is the half not built:
-									    "the replica footer is a fixed 50 px box; on Sell the footer
-									    slides down (translateY 110% + fade) and the sell module replaces
-									    it over .26 s — fixed height ⇒ never reflows."
-									    ⇒ BUILT HERE: the fixed 50px box, the .26s fade, the JS toggle.
-									    ⇒ NOT BUILT: the footer's translateY-110% exit. That clause
-									    governs a FOOTER ELEMENT the replica card has and this table does
-									    not, so there is nothing to slide away; inventing footer content
-									    to animate would be authoring design. ⚠ The consequence is
-									    user-visible and is raised for the founder rather than absorbed:
-									    the reserved box is BLANK when closed, so an owner sees an empty
-									    band under every sellable row.
-									    ⚠ THE HOST RENDERS FOR EVERY SELLABLE ROW, OPEN OR CLOSED, and
-									    reserving the box IS the mechanism: opening Sell now inserts
-									    nothing, so no row moves. The whole `<tr>` used to be conditional,
-									    so opening it pushed every following row down — which is why the
-									    comment that sat here, claiming the module "replaces the
-									    fixed-height footer" and "never reflows the table above", was FALSE
-									    the day it was written. It is true now, and it has moved here.
-									    ⛔ No host on a non-sellable row: reserving 50px under a row that
-									    can never sell would be dead space, not a fixed footer.
-									    ⛔ `:has()` is banned (canon §3 item 10) — the toggle stays JS
-									    state, exactly as before. */}
-									{/* ⚠⚠ R-1 — THE RESERVED BAND COSTS CANON'S 50px, NOT 67.
-									    Founder-ruled after a PROFILE-DIMS R2 §2b measurement: the
-									    positions table measured **242 signed-out against 500
-									    signed-in** at a pinned 1440×777, because this reserved row
-									    renders only on the owner arm and cost 67px × 3.
-									    ⛔ THE HOST WAS NEVER WRONG — `h-[50px]` below is canon §5's
-									    "fixed 50 px box" and measured exactly 50. The overshoot was
-									    THIS CELL: `p-2` added 8px top + 8px bottom, and the row's
-									    hairline 1px, so the `<tr>` came to 50 + 16 + 1 = **67**.
-									    ⇒ `px-2 py-0`: the horizontal inset is KEPT (it is what the
-									    open sell module sits inside), the vertical padding goes, and
-									    the row becomes 50 + 1 = **51**.
-									    ⛔ THE RESERVATION ITSELF IS UNTOUCHED, AND THAT IS THE WHOLE
-									    FENCE. It is deliberate anti-reflow behaviour — the block
-									    above records that the `<tr>` used to be conditional, so
-									    opening Sell pushed every later row down. §1 fences behaviour
-									    out; only the padding moved. The owner still sees a reserved
-									    band under every sellable row, and it is still blank when
-									    closed — that half stays raised for the founder, unchanged.
-									    ⛔ NOTHING CLIPS: the host keeps its own 50px, so the cell
-									    never becomes smaller than what it reserves. */}
-									{sellable && (
+									{/* THE SELL HOST — canon §5's fixed 50 px box, PRESENT ONLY WHILE THE
+									    MODULE IS IN IT. Its `.26s` fade and its JS toggle are unchanged.
+									    ⛔⛔ THE RESERVATION IS REVERSED, AND THE CANON ENTRY MOVES WITH IT
+									    (`design-canon.md` §5 Profile, this commit — O-5: the correction is
+									    written INTO the operative sentence, never appended under it).
+									    Canon read "a fixed 50 px host is RESERVED under each sellable positions
+									    row … fixed height ⇒ never reflows", and the block that stood here
+									    defended the reservation as "deliberate anti-reflow behaviour". Both also
+									    RECORDED its cost — "the reserved box is BLANK when closed, so an owner
+									    sees an empty band under every sellable row" — raised for the founder and
+									    carried unabsorbed across two passes. The founder has now measured that
+									    band and ruled it out.
+									    ⚠ AND THE ARITHMETIC MADE IT UNSURVIVABLE, which is the half no review
+									    caught. The three-row window divides the region by the DATA rows only, so a
+									    reserved band is invisible to the divisor while spending 51px of what it
+									    divides. MEASURED on staging, owner arm, pinned 1440×777: region 429 − 24
+									    padding − 19 thead = **386** available against a table of 3 × (128 + 51) =
+									    **537** ⇒ **150px of overflow**, and the surplus scrolls a row up behind
+									    the sticky header. The mockup at the same pinned size: `.rows` 385, three
+									    rows 128, **gap 0**, sum 384 — it fits because it has no such band. Three
+									    rows and a per-row reservation cannot both fit; the founder ruled which goes.
+									    ⚠ WHAT IS GIVEN UP, stated rather than glossed: opening Sell now inserts
+									    51px and the rows below it move down. ⛔ NOTHING IS LOST — the panel body is
+									    the scroll container, so that is a BOUND, NOT A CLIP, the same distinction
+									    the window's own docblock draws two hundred lines up.
+									    ⇒ AND THE MOCKUP HAS NO HOST AT ALL: `.rows{gap:0}` with `.prow` adjacent
+									    hairlines and the SELL button inside the row's own `.poscell` (`:305-308`).
+									    Present-only-while-open is the closest reachable port of that.
+									    ⛔ `:has()` is still banned (canon §3 item 10) — the toggle stays JS state.
+									    ⛔ Still no host on a non-sellable row. */}
+									{sellable && sellOpen && (
 										<tr data-testid={`sell-row-${row.marketId}`}>
 											<td colSpan={5} className="px-2 py-0">
 												<div
 													data-testid={`sell-host-${row.marketId}`}
 													className="h-[50px]"
 												>
-													{sellOpen && (
-														<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
-															<SellModule
-																marketId={row.marketId}
-																slug={row.marketSlug}
-																position={{
-																	side: row.side,
-																	quantity: row.quantity,
-																	currentValue: row.current,
-																}}
-																onClose={() => setSellMarketId(null)}
-																onSuspended={() => setSellMarketId(null)}
-															/>
-														</div>
-													)}
+													{/* The `.26s` fade now plays on MOUNT rather than on an inner reveal: the
+													    host arrives with the module, so the enclosing `sellOpen` test that used
+													    to sit here is provably true and goes with the reservation. */}
+													<div className="origin-top animate-in fade-in slide-in-from-top-2 duration-[.26s]">
+														<SellModule
+															marketId={row.marketId}
+															slug={row.marketSlug}
+															position={{
+																side: row.side,
+																quantity: row.quantity,
+																currentValue: row.current,
+															}}
+															onClose={() => setSellMarketId(null)}
+															onSuspended={() => setSellMarketId(null)}
+														/>
+													</div>
 												</div>
 											</td>
 										</tr>
