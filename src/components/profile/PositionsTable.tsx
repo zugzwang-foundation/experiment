@@ -1385,8 +1385,25 @@ function ArgumentCell({
 				{cell.title}
 			</Link>
 			{marketLine}
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-2`, AND IT IS THE MOCKUP'S OWN
+			    VALUE FOR THIS EXACT ELEMENT. The mockup's parent reference is `.parline`
+			    and it declares `-webkit-line-clamp: 2` (`:376`) with the comment "fit the
+			    fixed 50px footer". This line shipped UNCLAMPED, and MEASURED on staging
+			    it was the actual reason a row outgrew its third: 3 unclamped lines (45px)
+			    where the budget allows 2 (30px).
+			    ⇒ THE ARITHMETIC, so the next reader can check it: the 128px third minus
+			    16 of cell padding, minus a 3-line title (57) and the market line (15),
+			    leaves 40px for the reference — two lines at this element's 15px line box.
+			    ⛔ SO THE TITLE CLAMP AND THIS ONE ARE ONE FIX, NOT TWO. Clamping the
+			    title alone moved the row 136 → 133 and left it unequal, because the title
+			    was never what overflowed. Both are needed and neither is sufficient.
+			    ⚠ NOT AN INVENTED NUMBER, and worth saying because §23 REQUIRES this
+			    reference for a reply-bet (recon A-7 struck its removal): the value is the
+			    mockup's declared clamp for the same element, and a clamp is a display
+			    treatment, not a removal — the whole parent title stays one click away on
+			    the thread it links to. */}
 			{cell.isReply && cell.repliedToTitle !== null && (
-				<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
+				<span className="block line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {cell.repliedToTitle}
 				</span>
 			)}
