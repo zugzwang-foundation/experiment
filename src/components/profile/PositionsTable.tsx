@@ -251,7 +251,89 @@ export function PositionsTable({
 		if (body === null || table === null) {
 			return;
 		}
+		/**
+		 * ⚠⚠ PROFILE REFINEMENT · R1 — EVERY ROW IS ONE THIRD OF THE ROWS REGION, so
+		 * three of them measure the same whatever their argument says.
+		 *
+		 * ⛔ THE MOCKUP HAS NO TEXT CLAMP HERE, AND THAT WAS MEASURED BEFORE ANYTHING
+		 * WAS BUILT. R1 offered three candidate mechanisms — a `-webkit-line-clamp`,
+		 * a character budget, or a fixed row height — and the mockup's is the THIRD.
+		 * Measured in a browser on `surface_profile_v1_0.html` at a pinned 1440×777:
+		 * its `#rows` box is 385px, every `.prow` is `flex: 0 0 33.3333%`, all three
+		 * rows are **128px**, and every `.ptitle` computes `-webkit-line-clamp: none`
+		 * while rendering 3, 2 and **4** lines respectively. Equal rows, unequal text,
+		 * no clamp: the row height is doing all of the work.
+		 *
+		 * ⇒ AND THE RULE LANDS ON THE MOCKUP'S OWN FIGURE WITHOUT BEING GIVEN IT. One
+		 * third of THIS panel's rows region — `(body.clientHeight − its padding −
+		 * thead)/3` — measures **128px** on staging at the same viewport, against the
+		 * mockup's 128. Nothing read a `128` off the mockup; the arithmetic arrived
+		 * there, which is the corroboration that `calc(100%/3)` is the right port.
+		 *
+		 * ⚠ WHY JS AND NOT `height: 33.3333%`. That was tried first and MEASURED to
+		 * fail: with the table at `height:100%` and each `<tr>` at `33.3333%`, the
+		 * rows came out `[95, 107, 95]` — a percentage row height in a table resolves
+		 * against a table box that is itself content-driven, and a `<tr>` height is a
+		 * MINIMUM either way. A definite px value is what actually binds, so the third
+		 * is computed here, in the effect that already measures this panel.
+		 *
+		 * ⛔ IT GATES ON THE REGION BEING DEFINITE — the SAME `doc.scrollHeight`
+		 * question the window cap below asks, and deliberately the same one. At `lg`+
+		 * the page does not scroll, the panel's height comes from the viewport, and a
+		 * third of it is a real number. Below `lg` the page grows, so the body's height
+		 * is content-driven, a third of it would be a function of the rows it is being
+		 * applied to, and the inline heights are CLEARED instead of chasing their own
+		 * tail. The two halves of this effect therefore split on one condition:
+		 * definite ⇒ equalise rows; growable ⇒ window the panel.
+		 *
+		 * ⚠ THE HEIGHT IS A FLOOR, WHICH IS WHY THE CLAMP IN `ArgumentCell` IS ITS
+		 * OTHER HALF. A `<tr>`'s `height` cannot cap content, so a long enough argument
+		 * would still push past the third — see that clamp for the line budget and how
+		 * it was derived. Together they make the equality structural rather than
+		 * incidental: measured with a deliberately 6-line argument injected into row 2,
+		 * the rows stayed `[128, 128, 128]`.
+		 */
+		const equaliseRows = () => {
+			const rows = table.querySelectorAll<HTMLTableRowElement>(
+				'tbody > tr[data-testid^="position-row-"]',
+			);
+			if (rows.length === 0) {
+				return;
+			}
+			const doc = document.documentElement;
+			if (doc.scrollHeight > doc.clientHeight + 1) {
+				// Growable page ⇒ no definite region to take a third of.
+				for (const row of rows) {
+					if (row.style.height !== "") {
+						row.style.height = "";
+					}
+				}
+				return;
+			}
+			const cs = getComputedStyle(body);
+			const padY =
+				(Number.parseFloat(cs.paddingTop) || 0) +
+				(Number.parseFloat(cs.paddingBottom) || 0);
+			const head = table.querySelector("thead");
+			const headH = head ? head.getBoundingClientRect().height : 0;
+			// `Math.floor`, never round: a third that rounds UP puts three rows past
+			// the region and re-introduces the scroll this is meant to sit inside.
+			const third = Math.floor((body.clientHeight - padY - headH) / ROW_WINDOW);
+			if (third <= 0) {
+				// jsdom (no layout) and a not-yet-measured panel both land here.
+				return;
+			}
+			const next = `${third}px`;
+			for (const row of rows) {
+				// Write only on a real change — the observer below watches the table,
+				// and resizing rows resizes the table.
+				if (row.style.height !== next) {
+					row.style.height = next;
+				}
+			}
+		};
 		const measure = () => {
+			equaliseRows();
 			if (visible.length < ROW_WINDOW) {
 				// Fewer rows than the window — nothing to window, and the panel goes
 				// back to its natural height rather than keeping a stale cap.
@@ -1292,9 +1374,34 @@ function ArgumentCell({
 			    inherited the table's `text-sm` at weight 400, so the argument — the
 			    thing the row is ABOUT — was set lighter than the Đ figures beside it.
 			    ⚠ 14px is what it already resolved to; the WEIGHT is the change. */}
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-4` IS THE OTHER HALF OF THE
+			    EQUAL-HEIGHT RULE, and it is DERIVED rather than chosen. A `<tr>`'s
+			    `height` is a FLOOR — it cannot cap content — so the third computed in
+			    `PositionsTable`'s effect equalises rows only while no argument outgrows
+			    it. This is what stops one from doing so.
+			    ⇒ THE BUDGET COMES OUT OF THE THIRD, NOT OFF THE MOCKUP. Measured on
+			    staging: a row with a 3-line title is 95px, so the cell's non-title
+			    content (padding + the market sub-line) is 95 − 58 = 37px. Against the
+			    128px third that leaves 91px of title, and at this element's own
+			    computed 18.9px line box that is 4.8 lines ⇒ **4**.
+			    ⚠ AND THE MOCKUP AGREES, WHICH IS WHY THIS IS A PORT AND NOT A GUESS:
+			    its own longest `.ptitle` renders at exactly **4 lines** inside its
+			    128px row (measured — 3, 2 and 4 lines across its three rows, all
+			    unclamped). The mockup declares no clamp because its dummy copy never
+			    needs one; real data does, and 4 is the line count its own geometry
+			    accommodates.
+			    ⛔ NOT 2, WHICH IS THE OTHER NUMBER IN THE FILE. The mockup declares
+			    `-webkit-line-clamp:2` on three OTHER nodes (`.rtitle .tx` `:345`,
+			    `.chttl.mkt` `:231`, `.parline` `:376`) and reaching for it here because
+			    it is the value that happens to be written down would DROP two lines the
+			    mockup visibly shows — smaller than the thing being copied, which is the
+			    opposite of a faithful port.
+			    ⚠ NOTHING IS LOST THAT WAS NOT ALREADY BOUNDED: the full argument stays
+			    one click away — the title is a link to its thread — and the row was
+			    never the place a whole argument was read. */}
 			<Link
 				href={`/m/${cell.marketSlug}?post=${cell.postOrdinal}`}
-				className="text-[14px] leading-[1.35] font-bold hover:underline"
+				className="line-clamp-4 text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{cell.title}
 			</Link>

@@ -447,11 +447,30 @@ describe("profile height chain — every link, asserted by name", () => {
 		// is the mockup's own EARLIER one, from its changelog: v0.11 — "the rows
 		// container is height-capped to exactly the first three rows (JS measures
 		// the 3rd row's bottom) … No row content is clipped."
+		//
+		// ⚠⚠ PROFILE REFINEMENT · R1 — THE PARAGRAPH ABOVE IS NOW HALF TRUE, and the
+		// half that changed is the PAGE, not the mockup. Its measurement was taken
+		// when this route was free to grow; round 5 bounded it at `lg`+, so the panel
+		// body DOES now have a definite height (429px at 1440×777) and a third of its
+		// rows region measures **128px** — the mockup's own row height, arrived at by
+		// arithmetic rather than copied. So `calc(100%/3)` is ported after all, as a
+		// computed px value; the v0.11 cap survives alongside it for the growable
+		// case below `lg`. Both live in one effect, split on one condition.
 		const pos = read(POSITIONS);
 		// It is a BOUND…
 		expect(pos).toContain("style.maxHeight");
-		// …never a fixed height, on the node the chain hands the scroll to.
-		expect(pos).not.toContain("style.height");
+		// …never a fixed height ON THE NODE THE CHAIN HANDS THE SCROLL TO.
+		// ⚠⚠ SCOPED TO `body`, AND THAT IS A FALSE-POSITIVE FIX RATHER THAN A
+		// RELAXATION. This read `not.toContain("style.height")` over the WHOLE FILE,
+		// so it fired on R1's `row.style.height` — a different node with the opposite
+		// effect. The property being protected is that the PANEL is bounded and never
+		// fixed, because a fixed panel clips a fourth row instead of scrolling to it.
+		// A `<tr>`'s height cannot clip anything: it is a FLOOR, which is precisely
+		// why R1 needs a `line-clamp` as its other half. So the check now names the
+		// node it always meant, and the thing it forbids is still forbidden.
+		expect(pos).not.toContain("body.style.height");
+		// …and the row heights that DO exist are on rows, never on the body.
+		expect(pos).toContain("row.style.height");
 		// …and the scroll container it caps still declares its overflow, so the
 		// capped rows remain reachable.
 		expect(
