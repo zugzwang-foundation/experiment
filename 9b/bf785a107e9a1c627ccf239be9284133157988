@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Two Checks We Cannot Run
+
+Two of the environment checks needed an account tier the project does not pay for. Rather than leave them failing, or quietly pretend they were passing, they were removed and recorded as deferred, and the broad credential they used was replaced by two narrower ones scoped to a single environment each. What remains still fails closed. The gap is a line in a document instead of a check that never really ran.
