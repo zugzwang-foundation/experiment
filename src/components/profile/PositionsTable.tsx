@@ -23,7 +23,11 @@ import type {
 } from "@/server/profile/positions";
 
 import { PROFILE_COPY } from "./copy";
-import type { ProfileSelection } from "./selection";
+import {
+	initialMarketIdOf,
+	initialStatusFilter,
+	type ProfileSelection,
+} from "./selection";
 
 /**
  * ROUND 4 item 8 — how many position rows fill the panel before the rest
@@ -81,8 +85,12 @@ export function PositionsTable({
 }): React.JSX.Element {
 	const owner = payload.owner;
 	const rows = payload.rows;
-	const initialMarketId =
-		rows.find((r) => r.marketSlug === initialMarketSlug)?.marketId ?? "all";
+	// ⚠ PROFILE REFINEMENT · R3 (SSR half) — these two derivations moved into
+	// `selection.ts` so the ARENA can seed its initial selection from the same
+	// definitions. Two copies of "which rows are visible at mount" would drift, and
+	// the drift would be invisible: the table would highlight one row while the
+	// panel showed another. See that module for why the flash made this necessary.
+	const initialMarketId = initialMarketIdOf(rows, initialMarketSlug);
 	const [market, setMarket] = useState(initialMarketId);
 	// ⚠ POLISH.5 Gate C S-1 — the default is DERIVED, not fixed. A fixed `Open`
 	// is permanently empty for anyone whose held markets are all non-Open, and
@@ -92,13 +100,9 @@ export function PositionsTable({
 	// link to a market whose only position is Closed would otherwise still land
 	// on a blank table. ⚠ The canon inventory is UNCHANGED — two options, `All`
 	// still gone. Only which one is selected at mount moves.
-	const [status, setStatus] = useState(() => {
-		const scoped =
-			initialMarketId === "all"
-				? rows
-				: rows.filter((r) => r.marketId === initialMarketId);
-		return scoped.some((r) => r.statusLabel === "Open") ? "Open" : "Closed";
-	});
+	const [status, setStatus] = useState<"Open" | "Closed">(() =>
+		initialStatusFilter(rows, initialMarketId),
+	);
 	// The single open Sell expansion (one at a time — canon §5 slide).
 	const [sellMarketId, setSellMarketId] = useState<string | null>(null);
 	// ⚠ ROUND 4 item 5 — THE SELECTED ROW. The mockup keeps this in one module

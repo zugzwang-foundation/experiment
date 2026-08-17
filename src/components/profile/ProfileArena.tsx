@@ -9,7 +9,7 @@ import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentList } from "./ArgumentList";
 import { PositionsTable } from "./PositionsTable";
-import type { ProfileSelection } from "./selection";
+import { initialProfileSelection, type ProfileSelection } from "./selection";
 
 /**
  * ROUND 4 item 7 — THE ARENA'S TWO PANELS, SHARING ONE SELECTION.
@@ -59,7 +59,23 @@ export function ProfileArena({
 	bookmarks?: BookmarkAffordance;
 	initialMarketSlug?: string;
 }): React.JSX.Element {
-	const [selection, setSelection] = useState<ProfileSelection | null>(null);
+	// ⚠⚠ PROFILE REFINEMENT · R3 (SSR half) — SEEDED, NOT NULL. `PositionsTable`
+	// falls back to the first visible row in its RENDER and reports it upward in an
+	// EFFECT — and effects do not run on the server, so a `null` seed here made the
+	// SSR paint carry the full argument LIST and the header word `Arguments`, with
+	// the replica appearing only after hydration. MEASURED in the served markup:
+	// `argument-list` present, `argument-replica` absent. A rail of stubs on load is
+	// exactly the defect R3 removes, and one frame of it is still it.
+	// ⛔ THE SEED USES THE SHARED DERIVATION, never a local copy — `selection.ts`
+	// owns "which row is first at mount", including the `?market=` preselect and the
+	// DERIVED status default, and `PositionsTable` initialises its own filters from
+	// the same two helpers. One definition, so the highlighted row and the panel
+	// cannot disagree.
+	// ⚠ THE EFFECT STILL OWNS EVERY LATER CHANGE. This is the initial value only; a
+	// pick, a filter change or an arrow step all still flow up through `onSelect`.
+	const [selection, setSelection] = useState<ProfileSelection | null>(() =>
+		initialProfileSelection(positions.rows, initialMarketSlug),
+	);
 
 	return (
 		<>
