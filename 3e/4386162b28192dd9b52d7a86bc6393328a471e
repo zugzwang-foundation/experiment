@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Proved Before Trusted
+
+The model doing the work changes again, and this time the change is tested before it is believed. A session cannot test its own definitions — those load once, at the start — so a separate fresh session was run to confirm the new pin resolves and can actually use its tools. The old pin was checked too and still worked, which makes this hygiene rather than a rescue.
