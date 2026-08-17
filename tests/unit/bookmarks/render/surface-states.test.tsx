@@ -496,11 +496,18 @@ describe("ROUND 5 — one chip on /bookmarks, and Profile keeps its own", () => 
 		expect(screen.queryByTestId("profile-chip")).toBeNull();
 	});
 
-	it("chip::PROFILE still renders its chip — the default is today's behaviour", async () => {
-		// ⚠⚠ THE REGRESSION THIS EXISTS TO CATCH IS ON `main`, NOT ON THIS BRANCH.
-		// `IdentityCard` is Profile's component; the new prop defaults to `true`,
-		// so a call site that passes nothing must be byte-identical. Rendered here
-		// with Profile's own call shape.
+	it("chip::the identity BLOCK carries no view chip on either surface", async () => {
+		// ⚠⚠ RE-POINTED AT PROFILE-FULL, AND THE INVERSION IS THE POINT. This used
+		// to assert that `IdentityCard` still rendered the chip by DEFAULT, because
+		// the chip lived in the identity block and only `/bookmarks` suppressed it.
+		// The chip has now left that block on BOTH surfaces — the mockup carries it
+		// as a head control (`.viewchip`, `:425`), and as a body chip it cost the
+		// identity band 24px of the 188 it had to reach. So the assertion flips:
+		// the block renders NO chip, for any viewer, on any surface.
+		// ⛔ WHERE THE CHIP WENT IS ASSERTED WHERE IT LANDED, not here — Profile's
+		// `surface.test.tsx` reads it out of the positions panel head, and the
+		// `bookmarks-view-chip` case above reads it out of the bookmarks head. This
+		// file owns only the claim that it is no longer in the identity block.
 		const { container } = render(
 			<IdentityCard
 				user={{
@@ -520,14 +527,23 @@ describe("ROUND 5 — one chip on /bookmarks, and Profile keeps its own", () => 
 				}}
 			/>,
 		);
-		expect(leaves(container, "Viewing as owner").length).toBe(1);
-		expect(screen.getByTestId("profile-chip")).toBeTruthy();
+		expect(leaves(container, "Viewing as owner").length).toBe(0);
+		expect(screen.queryByTestId("profile-chip")).toBeNull();
+		// …and NOTHING ELSE left with it: the block still holds the pseudonym, the
+		// avatar and the six tiles.
+		expect(screen.getByTestId("identity-pseudonym").textContent).toBe(
+			"RedFox001",
+		);
+		expect(container.querySelector("img")).not.toBeNull();
+		expect(screen.getByTestId("profile-tiles")).toBeTruthy();
 	});
 
-	it("chip::the-prop-suppresses-the-VIEW-CHIP-only", async () => {
-		// ⛔ THE FENCE, ASSERTED. A banned + scrubbed user with the chip suppressed
-		// still gets both badges, in the same wrapper — the prop governs one Badge
-		// and nothing else.
+	it("chip::the-badges-are-untouched-by-the-chip-s-departure", async () => {
+		// ⛔ THE FENCE, ASSERTED. A banned + scrubbed user still gets BOTH badges.
+		// They moved into the pseudonym ROW when the chip left (a second line costs
+		// the 188 band ~24px for every viewer, while these two are rare), and their
+		// wrapper is now CONDITIONAL — so this also proves the wrapper still appears
+		// when it has something to hold.
 		const { container } = render(
 			<IdentityCard
 				user={{
@@ -545,7 +561,6 @@ describe("ROUND 5 — one chip on /bookmarks, and Profile keeps its own", () => 
 					supportReceived: "0.000000000000000000",
 					counterReceived: "0.000000000000000000",
 				}}
-				showViewChip={false}
 			/>,
 		);
 		expect(leaves(container, "Viewing as owner").length).toBe(0);

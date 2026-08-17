@@ -166,9 +166,20 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    number is a failure (§1). The full table and the ruling live on
 			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block; the PFP half is
 			    on `IdentityCard.tsx`. */}
+			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS ANSWERED AND THIS SURFACE INHERITS THE
+			    ANSWER, exactly as it inherited the refusal. The band is the mockup's
+			    188, the row TRACK is declared (a single implicit row is content-sized
+			    and the graph's `viewBox` SVG floored it at 256 — see Profile's block
+			    for the measurement), and the two gaps take the mockup's 16px.
+			    ⚠ THE ARITHMETIC IS THIS SURFACE'S OWN, not a borrowed one: this route
+			    renders the SAME `IdentityCard` with the SAME six tiles, so the same
+			    fit holds at the same widths. Measured signed-in at a pinned 1440×777.
+			    ⛔ THE PAIR MOVES TOGETHER. §3 says the two surfaces must never be
+			    sized one after the other; moving only one would re-open exactly that
+			    drift. */}
 			<div
 				data-testid="bookmarks-headzone"
-				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+				className="grid gap-4 lg:h-[188px] lg:grid-cols-2 lg:grid-rows-[188px]"
 			>
 				{/* ⚠ `resolveProfileUser` returns `ProfileUser | null` and the null is
 				    kept rather than asserted away. It cannot occur for an onboarded
@@ -177,15 +188,23 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				    the identity genuinely could not be resolved, and the honest render
 				    for that is NOTHING, not a fabricated card. The empty cell holds
 				    the grid so the graph stays in its own column. */}
+				{/* ⚠ PROFILE-FULL — `showViewChip` IS RETIRED, and this call site is why
+				    the prop existed. The chip no longer lives in the identity block on
+				    EITHER surface: it is a head control in the mockup (`.viewchip`,
+				    `:425`), and this route already rendered its own
+				    `bookmarks-view-chip` in the panel head. So the suppression has
+				    nothing left to suppress — there is no second chip to collide with,
+				    and Profile now carries its chip in the same place.
+				    ⛔ THE COMMENT SITS ABOVE THE TERNARY, not inside its branch. A JSX
+				    comment placed inside `) : ( … )` is a second child of a slot that
+				    takes exactly one expression — a parse error, not a style nit.
+				    ⚠ AND IT CANNOT QUOTE ITS OWN DELIMITER: writing the closing
+				    comment token inline ends the block early and spills the remaining
+				    prose into the tree as text. Same failure, one line further on. */}
 				{viewer === null ? (
 					<div data-testid="bookmarks-identity-unresolved" />
 				) : (
-					<IdentityCard
-						user={viewer}
-						owner={true}
-						tiles={tiles}
-						showViewChip={false}
-					/>
+					<IdentityCard user={viewer} owner={true} tiles={tiles} />
 				)}
 				<ProfileGraph series={graph} />
 			</div>
@@ -198,9 +217,11 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    selection and returns a FRAGMENT, so both panels stay DIRECT children
 			    of this grid and remain its two columns — and this band keeps its
 			    className here, where the C7 height-chain guard reads it. */}
+			{/* ⚠ PROFILE-FULL — `gap-4`, the mockup's `.arena{gap:16px}` (`:221`),
+			    byte-carried from Profile's arena band in the same commit. */}
 			<div
 				data-testid="bookmarks-arena"
-				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+				className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2"
 			>
 				<BookmarksArena items={items} />
 			</div>

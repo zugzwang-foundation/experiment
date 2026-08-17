@@ -5,7 +5,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
@@ -558,12 +557,31 @@ function BookmarksPanel({
 				    this surface — which is what the mockup's bookmark mode does
 				    (`surface_profile_v1_0.html:768`, `vc.textContent='Your bookmarks'`,
 				    ONE chip). The suppression rides a new optional prop whose default
-				    is today's behaviour, so Profile is untouched; see
-				    `IdentityCard.tsx`'s `showViewChip`.
-				    ⛔ NO STRING WAS RETITLED — `profile/copy.ts` is untouched. */}
-				<Badge data-testid="bookmarks-view-chip" variant="outline">
+				    is today's behaviour, so Profile is untouched.
+				    ⛔ NO STRING WAS RETITLED — `profile/copy.ts` is untouched.
+
+				    ⚠⚠ PROFILE-FULL — IT TAKES `.viewchip`'s REGISTER, and now Profile's
+				    chip sits in the same slot with the same classes. `showViewChip` is
+				    retired: the chip left the identity block on BOTH surfaces, so there
+				    is no longer a second chip here to suppress.
+				    ⚠ THE TYPE IS THE MOCKUP'S (`:183-184`): 9px/800/.12em uppercase, a
+				    DASHED n4 hairline, n5 text, `--r` radius, 5/10 padding. The mockup
+				    renders `Your bookmarks` through this same `.viewchip` element in
+				    bookmark mode (`:768`), so it is the same box by construction, not by
+				    resemblance — and the dashed edge is what separates an annotation
+				    from a control (every real control here carries a solid one).
+				    ⚠ A `<span>`, NOT `Badge`, for the reason recorded at Profile's copy:
+				    `Badge`'s base fixes `h-5`, `rounded-4xl`, `px-2 py-0.5` and
+				    `text-xs`, four of the five properties this chip must set, and
+				    overriding same-property pairs from a `className` leaves the winner
+				    to emission order. ⛔ The TESTID is unchanged, so every existing
+				    consumer keeps its handle. */}
+				<span
+					data-testid="bookmarks-view-chip"
+					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-normal font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
+				>
 					Your bookmarks
-				</Badge>
+				</span>
 				{controls}
 			</div>
 			<div

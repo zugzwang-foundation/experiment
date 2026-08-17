@@ -568,17 +568,33 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		expect(asVisitor.rowIds).toEqual(asOwner.rowIds);
 		expect(asVisitor.argIds).toEqual(asOwner.argIds);
 
-		// The FIRST of the identity card's two owner deltas: the view chip. The
-		// second — item 17's bookmark link — has its own two-armed guard above
+		// The FIRST of the two owner deltas: the view chip. The second — item 17's
+		// bookmark link — has its own two-armed guard above
 		// (`owner-only-bookmark-affordance-on-the-identity-card`).
-		const ownerCard = render(
-			<IdentityCard user={USER} owner={true} tiles={TILES} />,
+		//
+		// ⚠⚠ PROFILE-FULL — THE CHIP IS READ OUT OF THE POSITIONS PANEL HEAD NOW,
+		// not out of the identity card. It was a body chip under the pseudonym and
+		// cost the identity band 24px of the 188 it had to reach; the mockup carries
+		// it as a head control (`.viewchip`, `:425`). So it is still an owner delta
+		// and still carries the SAME two `PROFILE_COPY` strings — only its host
+		// moved, and the assertion follows it there rather than being dropped.
+		// ⛔ IT IS ASSERTED ON THE EMPTY-ROWS ARM DELIBERATELY: that arm mounts the
+		// panel with no `controls` at all, so a chip rendered through `controls`
+		// would silently vanish for a profile with zero positions. Reading it here
+		// proves it survives the arm where it is easiest to lose.
+		const ownerHead = render(
+			<PositionsTable payload={{ owner: true, rows: [] }} />,
 		);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.owner,
 		);
-		ownerCard.unmount();
-		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
+		expect(
+			screen
+				.getByTestId("positions-panel-head")
+				.contains(screen.getByTestId("profile-chip")),
+		).toBe(true);
+		ownerHead.unmount();
+		render(<PositionsTable payload={{ owner: false, rows: [] }} />);
 		expect(text(screen.getByTestId("profile-chip"))).toBe(
 			PROFILE_COPY.chip.visitor,
 		);

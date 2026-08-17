@@ -349,9 +349,43 @@ export default async function ProfilePage({
 			    the `screen` preset (width 96.7% → 96.1%, the mockup's exactly) and
 			    the band→arena gap took the mockup's 12px, handing the arena back
 			    every pixel that was available to give. */}
+			{/* ⚠⚠⚠ PROFILE-FULL · D-1 IS ANSWERED AND THE BAND IS THE MOCKUP'S 188.
+			    The block above is kept as the MEASUREMENT that earned the 256 — it is
+			    why three rounds could not write this — but 256 is no longer the ruled
+			    state, and O-5 says the correction is written INTO the operative
+			    section rather than appended after it.
+
+			    ⛔ WHAT ACTUALLY UNLOCKED IT WAS NOT A TYPE SIZE. The identity block
+			    shipped as a bordered `<Card>` with `p-4`; the mockup's `.idcard` is a
+			    BARE flex row with no frame at all (`:190`). That padding is 32 of the
+			    188, and it left a 156px content box holding 166px of content — an
+			    overflow no label size could have closed. Removing the frame plus
+			    taking the mockup's tile density (8px/800/0.12em labels, 14px/800
+			    values, `leading-normal` on both, 9/13 padding, 10px gap) brings the
+			    identity column to 174 at 1440 inside a 188 box. Full table and the
+			    per-width sweep live on `IdentityCard.tsx`'s D-1 block.
+
+			    ⛔ `lg:grid-rows-[188px]` IS REQUIRED AND IS NOT A DUPLICATE OF THE
+			    HEIGHT — MEASURED, and this is the subtle half. A single IMPLICIT grid
+			    row is content-sized; `align-content:stretch` can GROW it to a definite
+			    container height but never SHRINK it below its content. The graph's
+			    `<svg viewBox … preserveAspectRatio="none">` contributes an intrinsic
+			    ratio height, so with `lg:h-[188px]` alone the row stayed at the
+			    graph's 256 and the band's own height was simply overflowed: measured
+			    band 188, row 256, PFP 256. Declaring the TRACK makes it definite —
+			    band 188, both cells 188, and the graph does not clip at any width
+			    (`scrollHeight === clientHeight` at 1024/1152/1280/1440/1920, checked
+			    on the graph card itself).
+			    ⚠ `grid-rows-[…]` is shipped idiom — `ui/card.tsx:28` uses
+			    `grid-rows-[auto_auto]`; no new mechanism.
+
+			    ⚠ `gap-4`, NOT `gap-6` — the mockup's `.headzone{gap:16px}` (`:189`).
+			    The arena band below takes the same 16px from `.arena{gap:16px}`
+			    (`:221-222`), so the two bands stay on one gap as they do in the
+			    mockup. That hands 8px per gutter back to the panels. */}
 			<div
 				data-testid="profile-headzone"
-				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
+				className="grid gap-4 lg:h-[188px] lg:grid-cols-2 lg:grid-rows-[188px]"
 			>
 				{/* HTML-FINISH row 8 — THE TILES MOVE INSIDE THE IDENTITY BLOCK, to
 				    the right of the PFP and under the pseudonym row (mockup `:437`:
@@ -374,9 +408,11 @@ export default async function ProfilePage({
 			    it this grid's automatic minimum size is its content, so the panels
 			    would push the band past the container instead of scrolling
 			    internally, and row 3 would have no bound to divide. */}
+			{/* ⚠ PROFILE-FULL — `gap-4` is the mockup's `.arena{gap:16px}` (`:221`),
+			    matching the headzone above. 8px per gutter back to the two panels. */}
 			<div
 				data-testid="profile-arena"
-				className="grid min-h-0 flex-1 gap-6 lg:grid-cols-2"
+				className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2"
 			>
 				{/* ROUND 4 item 7 — THE TWO PANELS SHARE ONE SELECTION, so the holder
 				    sits between this band and them. It renders a FRAGMENT: both
