@@ -1,0 +1,24 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Nothing Was Wrong
+
+In May it was decided that everything would run in Mumbai. Database, cache, storage, the app. Written down, agreed, closed.
+
+Three of the four went to Mumbai.
+
+The app went to Washington, D.C. — because nobody typed a line saying otherwise, and Washington is where things go when nobody says. For three months every database call crossed twelve thousand kilometres and came back.
+
+| | |
+|---|---|
+| Before | 362 milliseconds per round trip |
+| After | 5 |
+
+Here's why nothing caught it. The file wasn't wrong. It was silent. There's no test for a missing line, no review that flags an absence, no health check that reads back where the thing is actually running and compares it against what was agreed. Every check passed for three months because every check reads what's written, and the problem was what wasn't.
+
+The record puts it better than I can: a silent config file is indistinguishable from a correct one.
