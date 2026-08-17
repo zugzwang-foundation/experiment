@@ -4,7 +4,10 @@ import Link from "next/link";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 import { SellModule } from "@/components/debate/composer/SellModule";
-import { formatDharma } from "@/components/debate/format";
+import {
+	displayPositionProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -595,6 +598,12 @@ export function PositionsTable({
 						{visible.map((row, index) => {
 							const sellable = sellEligibleOf(row);
 							const sellOpen = sellMarketId === row.marketId;
+							// PROFILE-FULL — the row's own P/L, in DISPLAYED space so it
+							// agrees with the two figures printed beside it.
+							const pl = displayPositionProfitLossSigned(
+								row.staked,
+								row.current,
+							);
 							const isSelected = selectedRow?.marketId === row.marketId;
 							return (
 								<Fragment key={row.marketId}>
@@ -735,7 +744,11 @@ export function PositionsTable({
 											<span className="flex flex-col items-center gap-[5px]">
 												<span
 													data-testid={`position-side-${row.marketId}`}
-													className="flex items-center gap-[5px] text-xs"
+													// ⚠ PROFILE-FULL — `.pside` is 11px/800 (`:283`); this was
+													// `text-xs` at weight 400, so the SIDE — the one word that
+													// says which pole this holding is on — was the lightest
+													// thing in its own cell.
+													className="flex items-center gap-[5px] text-[11px] leading-normal font-extrabold"
 												>
 													{row.side === "YES" ? "Yes" : "No"}
 													<ThumbGlyph side={row.side} size={12} />
@@ -748,11 +761,38 @@ export function PositionsTable({
 												>
 													{row.statusLabel}
 												</Badge>
+												{/* ⚠⚠ PROFILE-FULL — SELL TAKES BUTTON SHAPE. The mockup's
+												    `.sellbtn` is the most prominent control on the surface:
+												    `font-size:11.5px; font-weight:800; letter-spacing:.1em;
+												    text-transform:uppercase; padding:9px 22px; border:1.5px
+												    solid var(--ink)`, and it INVERTS on hover
+												    (`:301-304`) — measured 80×34. This shipped as
+												    `size="xs" variant="outline"`, measured 39×24 at
+												    12px/500: a third of the area, in the same register as
+												    the `Open` badge above it, so the one destructive-ish
+												    action in the row was the quietest thing in it.
+												    ⛔ `size="xs"` IS DROPPED, NOT OVERRIDDEN. That size sets
+												    `h-6`, `px-2`, `text-xs` and its own radius — four
+												    properties this needs to restate, and `h-6` against
+												    explicit padding is a same-property fight whose winner is
+												    emission order. Passing NO size uses the default and
+												    overrides its box outright.
+												    ⚠ THE BORDER IS THE EMPHASIS LADDER'S, NOT A LITERAL. The
+												    mockup's `1.5px solid var(--ink)` maps to the shipped
+												    `--ring-active` rung (1.5px solid n4, PRIMITIVES-2 D9) —
+												    a ratified composite over a ramp token, so no new width
+												    and no new colour is introduced. `--btn-fill` and
+												    `--state-hover-fill` keep the one-button system's own
+												    interior and hover, which is what the dark ramp inverts
+												    to instead of the prototype's ink-on-white flip.
+												    ⚠ `uppercase` is a transform, so the accessible name and
+												    every `textContent` read of this trigger are still
+												    `Sell`. */}
 												{sellable && (
 													<Button
 														type="button"
-														size="xs"
 														variant="outline"
+														className="h-auto rounded-(--r) px-[22px] py-[9px] text-[11.5px] leading-normal font-extrabold tracking-[0.1em] uppercase [border:var(--ring-active)]"
 														data-testid={`sell-trigger-${row.marketId}`}
 														aria-expanded={sellOpen}
 														onClick={() =>
@@ -822,9 +862,43 @@ export function PositionsTable({
 										>
 											→
 										</td>
+										{/* ⚠⚠ PROFILE-FULL — THE CURRENT CELL CARRIES ITS P/L DELTA. The
+										    mockup's Current cell is `Đ 310 (+Đ70)` — a `.val` row holding
+										    the figure and a smaller `.pl` span (`:299-300`, emitted at
+										    `:558`), and its own changelog says why: v0.18, "current value
+										    shows profit". Without it the row states two numbers and leaves
+										    the only question a holder actually has — am I up or down —
+										    to be done in the reader's head, on every row.
+										    ⛔ DERIVED IN DISPLAYED SPACE BY A FORMATTER, not subtracted
+										    here. `displayPositionProfitLossSigned` rounds both operands to
+										    what this row PRINTS before subtracting, so the three figures
+										    on screen stay self-consistent — an exact-space delta would
+										    render `Đ 499 → Đ 448 (−Đ50)` where the eye can only compute
+										    51. See that function for the §10.8 reasoning.
+										    ⛔ NO NEW SERVER FIELD: `staked` and `current` are both already
+										    on `ProfilePositionRow`, so this is a render of data the DTO
+										    carries — unlike the entry/live percentages recorded below,
+										    which it does not.
+										    ⚠ THE SPACING IS THE MOCKUP'S OWN AND IS NOT THE TILE'S:
+										    `plShort` emits `+Đ70` with no space (`:677`) while the Net P/L
+										    tile reads `+Đ 238` with one (`:672`). Both are byte-carried;
+										    the difference is deliberate density on a smaller figure.
+										    ⚠ AN EMPTY MAGNITUDE RENDERS NOTHING — the formatter's degrade
+										    for a malformed operand. A parenthesis pair with nothing in it
+										    is worse than silence. */}
 										<td className="p-2 text-center tabular-nums text-ink">
 											<span className="flex flex-col items-center">
-												Đ {formatDharma(row.current)}
+												<span className="inline-flex items-baseline gap-1.5">
+													Đ {formatDharma(row.current)}
+													{pl.magnitude !== "" && (
+														<span
+															data-testid={`position-pl-${row.marketId}`}
+															className="text-[10.5px] leading-normal font-bold text-n5"
+														>
+															({pl.sign}Đ{pl.magnitude})
+														</span>
+													)}
+												</span>
 											</span>
 										</td>
 									</tr>
@@ -1156,11 +1230,23 @@ function ArgumentCell({
 	// navigation survives a removed opener — the market is still reachable when
 	// its argument is not, which is the point of masking content rather than
 	// rows.
+	// ⚠⚠ PROFILE-FULL — THE SUB-LINE TAKES `.pmkt .mq`'s TYPE. The block above says
+	// "Nothing is read off the mockup's `.pmkt .mq`, whose 11px / `--n5` are
+	// light-prototype VALUES" — that was true under the geometry fence, which
+	// excluded type size. §1 now puts TYPE SIZE explicitly in scope, so the 11px and
+	// the 600 weight are taken: `font-size:11px; font-weight:600; line-height:1.35`
+	// (`:291-292`).
+	// ⛔ THE COLOUR IS NOT TAKEN AND THE OLD CAUTION STILL STANDS FOR IT. The
+	// mockup's `--n5` is a mid-grey in an INVERTED light ramp; this build's `text-n5`
+	// is the dark system's own muted rung and was already correct. Size and weight
+	// are geometry; colour binds to the ramp, never to a prototype hex (§1).
+	// ⚠ STILL BYTE-MATCHED to the "Replied to …" sub-line and the removed stub below
+	// — same file, same role, one register for all three muted sub-lines.
 	const marketLine = (
 		<Link
 			data-testid={`position-market-${marketId}`}
 			href={`/m/${cell.marketSlug}`}
-			className="block text-xs text-n5 hover:underline"
+			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
 		>
 			{marketTitle}
 		</Link>
@@ -1168,7 +1254,9 @@ function ArgumentCell({
 	if (cell.removed) {
 		return (
 			<span data-testid={`position-arg-removed-${marketId}`}>
-				<span className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</span>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+					{REMOVED_STUB_TEXT}
+				</span>
 				{marketLine}
 			</span>
 		);
@@ -1177,15 +1265,20 @@ function ArgumentCell({
 	// ordinal (a reply opener carries its PARENT's ordinal, server-resolved).
 	return (
 		<span data-testid={`position-arg-${marketId}`} className="text-ink">
+			{/* ⚠⚠ PROFILE-FULL — `.ptitle` IS 14px/700/1.35 (`:288`), and the mockup's
+			    own changelog calls it "the D4/D5 card-title rule exactly" (v0.7). It
+			    inherited the table's `text-sm` at weight 400, so the argument — the
+			    thing the row is ABOUT — was set lighter than the Đ figures beside it.
+			    ⚠ 14px is what it already resolved to; the WEIGHT is the change. */}
 			<Link
 				href={`/m/${cell.marketSlug}?post=${cell.postOrdinal}`}
-				className="hover:underline"
+				className="text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{cell.title}
 			</Link>
 			{marketLine}
 			{cell.isReply && cell.repliedToTitle !== null && (
-				<span className="block text-xs text-n5">
+				<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {cell.repliedToTitle}
 				</span>
 			)}

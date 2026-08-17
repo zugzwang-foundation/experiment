@@ -1436,12 +1436,21 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 	});
 
 	it("itemD::the-rendered-strings-are-exactly-the-mockup's-shape", () => {
-		// The mockup reads `Đ 240 → Đ 310` (`:556`, `:558`). The fixture's own
-		// figures, in that shape.
+		// The mockup reads `Đ 240 → Đ 310 (+Đ70)` (`:556`, `:558`). The fixture's
+		// own figures, in that shape.
+		// ⚠⚠ PROFILE-FULL — THE CURRENT CELL NOW CARRIES ITS P/L DELTA, so this
+		// assertion follows the mockup one step further rather than being loosened.
+		// It is still an EXACT full-cell `textContent` pin — the delta is asserted
+		// as part of the string, not excluded from it, so a wrong sign, a wrong
+		// magnitude or a stray space all still red.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		const { staked, current } = valueCells();
 		expect((staked?.textContent ?? "").trim()).toBe("Đ 25");
-		expect((current?.textContent ?? "").trim()).toBe("Đ 31");
+		expect((current?.textContent ?? "").trim()).toBe("Đ 31(+Đ6)");
+		// …and the delta is the DISPLAYED-space difference of the two cells beside
+		// it, which is the §10.8 identity this amendment admits: 31 − 25 = 6, true
+		// of the figures actually on screen.
+		expect((current?.textContent ?? "").trim()).toContain("+Đ6");
 	});
 
 	it("itemD::the-ARROW-track-between-them-takes-no-glyph", () => {
@@ -1472,7 +1481,11 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 		);
 		const { staked, current } = valueCells();
 		expect((staked?.textContent ?? "").trim()).toBe("Đ 14,260");
-		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226");
+		// ⚠ PROFILE-FULL — the delta rides the Current cell, and it is GROUPED by
+		// the same `groupInteger` the two operands use: 3,226 − 14,260 = −11,034.
+		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried from the
+		// mockup's `plShort()` (`:677`), the same glyph the Net P/L tile emits.
+		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226(−Đ11,034)");
 	});
 
 	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {

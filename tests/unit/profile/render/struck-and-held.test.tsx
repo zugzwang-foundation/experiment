@@ -176,16 +176,29 @@ type StruckRow = {
 	control: string;
 };
 
+/**
+ * ⚠⚠ PROFILE-FULL — ROW 9 HAS LEFT THIS REGISTRY, AND IT LEFT BY BEING BUILT.
+ *
+ * It read: "row 9 — inline per-holding P/L · HELD. POLISH-5.md:1429 `P5-D16` —
+ * OUT (D24): row P/L needs a SPEC.1 §10.8 amendment first." That hold was
+ * PRECISE, not bureaucratic: §10.8 admits displayed-space aggregate identities as
+ * its "sole exception" and then CLOSED the list — "Two such identities exist" —
+ * so a per-row delta derived from the two displayed figures beside it would have
+ * been a third identity the spec did not name.
+ *
+ * ⇒ THE AMENDMENT LANDED IN THE SAME COMMIT AS THE ROW (SPEC.1 1.0.33, §10.8 now
+ * reads **three**), which is what the hold was waiting for. So the row is no
+ * longer held, and a registry entry asserting its ABSENCE would now be asserting
+ * against the spec — the exact inversion this file exists to prevent in the other
+ * direction. It is deleted rather than doctored, and the positive coverage moved
+ * to `arrangement.test.tsx`'s `itemD` pins, which assert the rendered cell string
+ * EXACTLY (`Đ 31(+Đ6)`, `Đ 3,226(−Đ11,034)`) including sign and grouping.
+ *
+ * ⛔ NOTHING ELSE IN THIS REGISTRY MOVED. Row 11 and every A/B/C/D row below are
+ * untouched: they are struck on SPEC.1 §23 READINGS, not on a missing amendment,
+ * and no ruling this round touched them.
+ */
 const STRUCK: StruckRow[] = [
-	{
-		id: "row 9 — inline per-holding P/L",
-		why: "HELD. POLISH-5.md:1429 `P5-D16` — OUT (D24): row P/L needs a SPEC.1 §10.8 amendment first.",
-		// The mockup renders it as `(+Đ71)` / `(−Đ71)` beside the Current figure
-		// (`.pnum .pl`, emitted at `:558` via `plShort`). Both signs, because a
-		// detector for one sign passes on a surface that only ever shows losses.
-		detect: (h) => /\([+−-]\s?Đ\s?\d/.test(h),
-		control: '<span class="pl">(+Đ6)</span>',
-	},
 	{
 		id: "row 11 — a control that opens the full argument",
 		why: "HELD. Duplicate-of-known PD-0-01; the mockup's `+` SHAPE is separately struck at A-6.",
