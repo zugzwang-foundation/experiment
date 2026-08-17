@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Red Captured First
+
+The composer matched to its mockup. The run takes its one authorised exception deliberately: the failing tests are written and their output captured before any fix exists, so the record shows exactly what was broken rather than only that it is now fixed. Four files failing, nine tests, all written down before the first repair.
