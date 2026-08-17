@@ -498,16 +498,33 @@ describe("UI.A5 Slice 5 — profile Dharma-graph components (the W2.6 port)", ()
 		expect(new Set(lines.map((l) => l.getAttribute("y1"))).size).toBe(10);
 
 		// UNLABELLED, and inside the chart: each gridline is a bare <line>
-		// carrying no text of its own, AND the chart's ONLY text is the two
-		// endpoint labels. The per-line check alone would miss a `<text>`
-		// rendered as a SIBLING of the lines. Labels would print Đ figures and
-		// would have to route through `formatDharma`.
+		// carrying no text of its own, AND the SVG carries no text at all. The
+		// per-line check alone would miss a `<text>` rendered as a SIBLING of the
+		// lines. Labels would print Đ figures and would have to route through
+		// `formatDharma`.
+		// ⚠⚠ RE-POINTED at PROFILE OVERLAP R2, and the claim got STRICTER rather
+		// than looser. It read `toHaveLength(2)` — the two X endpoint labels were
+		// the SVG's only text, so "unlabelled gridlines" meant "exactly two". Those
+		// labels are now HTML outside the `<svg>` (a `preserveAspectRatio="none"`
+		// viewport scales glyphs non-uniformly), so the SVG's text count is ZERO and
+		// any `<text>` appearing in it is a regression by definition.
 		const chart = within(expanded).getByTestId("profile-chart");
 		for (const line of lines) {
 			expect(line.tagName.toLowerCase()).toBe("line");
 			expect(chart.contains(line)).toBe(true);
 			expect(line.textContent).toBe("");
 		}
-		expect(chart.querySelectorAll("text")).toHaveLength(2);
+		expect(chart.querySelectorAll("text")).toHaveLength(0);
+		// ⛔ AND THE LABELS ARE STILL THERE, which is the half a zero-count alone
+		// would let through: deleting them outright would also make the line above
+		// pass. They live in this component's own tree, NOT as a DOM sibling of it —
+		// the trap `MarketPriceChart` records, where a component-scoped query goes
+		// green because siblings carry none of its testids.
+		expect(byPrefix(expanded, "axis-x-")).toHaveLength(2);
+		for (const label of byPrefix(expanded, "axis-x-")) {
+			expect(label.tagName.toLowerCase()).toBe("span");
+			expect(chart.contains(label)).toBe(false);
+			expect((label.textContent ?? "").trim().length).toBeGreaterThan(0);
+		}
 	});
 });

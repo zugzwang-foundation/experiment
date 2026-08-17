@@ -65,135 +65,184 @@ export function ProfileChart({
 		(_, i) => (series.yMax * (i + 1)) / gridIntervals,
 	);
 
+	// The two X endpoint labels, in the CONTAINER's coordinates rather than the
+	// SVG's. Same numbers as before — `xPx` at each window edge — expressed as a
+	// share of the same viewBox, which is exact because the SVG stretches to fill
+	// this box: a percentage of the container IS a user unit, scaled.
+	const xStartPct = (xPx(series.windowStart, startMs, endMs) / VIEWBOX_W) * 100;
+	const xEndPct =
+		((VIEWBOX_W - xPx(series.windowEnd, startMs, endMs)) / VIEWBOX_W) * 100;
+	const labelBottomPct = (8 / VIEWBOX_H) * 100;
+
 	return (
-		<svg
-			data-testid="profile-chart"
-			viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
-			preserveAspectRatio="none"
-			aria-hidden="true"
-			className="h-full w-full"
-		>
-			{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound, so
-			    N intervals draw N lines; value 0 sits at the plot floor and NOTHING
-			    draws it — there is no baseline rule, and the X labels below encode
-			    dates, not the Y zero. Drawn FIRST so they paint behind every series.
-			    Spanned
-			    by the same `xPx` endpoints the axis labels use, so item 16 adds no
-			    geometry primitive and `geometry.ts` is read, never written. Labels
-			    would print Đ figures and would have to route through `formatDharma`;
-			    unlabelled is the ratified reading and needs no data. */}
-			{gridBounds.map((bound, i) => {
-				const gy = yPx(String(bound), series.yMax);
-				return (
-					<line
-						key={bound}
-						data-testid={`grid-y-${i + 1}`}
-						x1={xPx(series.windowStart, startMs, endMs)}
-						x2={xPx(series.windowEnd, startMs, endMs)}
-						y1={gy}
-						y2={gy}
-						stroke="var(--color-n2)"
-						strokeWidth="1"
-						vectorEffect="non-scaling-stroke"
-					/>
-				);
-			})}
-
-			{/* X endpoint labels — exactly two (Sep 15 · Nov 5), no interior ticks. */}
-			<text
-				data-testid="axis-x-start"
-				x={xPx(series.windowStart, startMs, endMs)}
-				y={VIEWBOX_H - 8}
-				className="fill-n5 text-[10px]"
-				textAnchor="start"
+		/* ⚠⚠ THE WRAPPER EXISTS FOR THE AXIS LABELS AND NOTHING ELSE — see the block
+		   above them. Both consumers already hand this component a sized box
+		   (`h-full w-full`, `aspect-[2/1]`), so `relative h-full w-full` fills it
+		   exactly as the bare `<svg>` did and nothing about the plot moves. */
+		<div className="relative h-full w-full">
+			<svg
+				data-testid="profile-chart"
+				viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+				preserveAspectRatio="none"
+				aria-hidden="true"
+				className="h-full w-full"
 			>
-				{fmtUtcDay(series.windowStart)}
-			</text>
-			<text
-				data-testid="axis-x-end"
-				x={xPx(series.windowEnd, startMs, endMs)}
-				y={VIEWBOX_H - 8}
-				className="fill-n5 text-[10px]"
-				textAnchor="end"
-			>
-				{fmtUtcDay(series.windowEnd)}
-			</text>
+				{/* Y gridlines — UNLABELLED. Each line is one interval's UPPER bound, so
+				    N intervals draw N lines; value 0 sits at the plot floor and NOTHING
+				    draws it — there is no baseline rule, and the X labels (now HTML, after
+				    the `</svg>` below) encode dates, not the Y zero. Drawn FIRST so they
+				    paint behind every series.
+				    Spanned
+				    by the same `xPx` endpoints the axis labels use, so item 16 adds no
+				    geometry primitive and `geometry.ts` is read, never written. Labels
+				    would print Đ figures and would have to route through `formatDharma`;
+				    unlabelled is the ratified reading and needs no data. */}
+				{gridBounds.map((bound, i) => {
+					const gy = yPx(String(bound), series.yMax);
+					return (
+						<line
+							key={bound}
+							data-testid={`grid-y-${i + 1}`}
+							x1={xPx(series.windowStart, startMs, endMs)}
+							x2={xPx(series.windowEnd, startMs, endMs)}
+							y1={gy}
+							y2={gy}
+							stroke="var(--color-n2)"
+							strokeWidth="1"
+							vectorEffect="non-scaling-stroke"
+						/>
+					);
+				})}
 
-			{/* CUMULATIVE / PLACEHOLDER — the net-worth line (fixed Y). */}
-			{!perMarket && (
-				<polyline
-					data-testid="line-networth"
-					points={pointsAttr(series.netWorth, startMs, endMs, series.yMax)}
-					fill="none"
-					stroke="var(--graph-no)"
-					strokeWidth="1.75"
-					strokeLinejoin="round"
-					strokeLinecap="round"
-					vectorEffect="non-scaling-stroke"
-				/>
-			)}
-
-			{/* EXPANDED-cumulative only — the free-Dharma line (cumulative-only, N-4)
-			    + own nodes on the net-worth line. */}
-			{mode === "expanded" && cumulative && (
-				<>
+				{/* CUMULATIVE / PLACEHOLDER — the net-worth line (fixed Y). */}
+				{!perMarket && (
 					<polyline
-						data-testid="line-freedharma"
-						points={pointsAttr(series.freeDharma, startMs, endMs, series.yMax)}
+						data-testid="line-networth"
+						points={pointsAttr(series.netWorth, startMs, endMs, series.yMax)}
 						fill="none"
-						stroke="var(--graph-yes)"
-						strokeWidth="1.5"
-						strokeDasharray="5 4"
+						stroke="var(--graph-no)"
+						strokeWidth="1.75"
 						strokeLinejoin="round"
 						strokeLinecap="round"
 						vectorEffect="non-scaling-stroke"
 					/>
-					{marketNodes.map((node) => (
-						<GraphNodeMark
-							key={node.id}
-							node={node}
-							x={xPx(node.at, startMs, endMs)}
-							y={yPx(node.netWorthValue, series.yMax)}
-						/>
-					))}
-				</>
-			)}
+				)}
 
-			{/* EXPANDED-per-market — segments (one polyline each; hard gap), flip
-			    markers at exits, nodes on the value line. */}
-			{perMarket && (
-				<>
-					{marketSegments.map((seg) => (
-						<Segment
-							key={`${seg.marketId}-${seg.episodeIndex}`}
-							seg={seg}
-							startMs={startMs}
-							endMs={endMs}
-							yMax={marketYMax}
+				{/* EXPANDED-cumulative only — the free-Dharma line (cumulative-only, N-4)
+				    + own nodes on the net-worth line. */}
+				{mode === "expanded" && cumulative && (
+					<>
+						<polyline
+							data-testid="line-freedharma"
+							points={pointsAttr(
+								series.freeDharma,
+								startMs,
+								endMs,
+								series.yMax,
+							)}
+							fill="none"
+							stroke="var(--graph-yes)"
+							strokeWidth="1.5"
+							strokeDasharray="5 4"
+							strokeLinejoin="round"
+							strokeLinecap="round"
+							vectorEffect="non-scaling-stroke"
 						/>
-					))}
-					{marketSegments
-						.filter((seg) => seg.exitedAt !== null)
-						.map((seg) => (
-							<FlipMarker
-								key={`flip-${seg.marketId}-${seg.episodeIndex}`}
+						{marketNodes.map((node) => (
+							<GraphNodeMark
+								key={node.id}
+								node={node}
+								x={xPx(node.at, startMs, endMs)}
+								y={yPx(node.netWorthValue, series.yMax)}
+							/>
+						))}
+					</>
+				)}
+
+				{/* EXPANDED-per-market — segments (one polyline each; hard gap), flip
+				    markers at exits, nodes on the value line. */}
+				{perMarket && (
+					<>
+						{marketSegments.map((seg) => (
+							<Segment
+								key={`${seg.marketId}-${seg.episodeIndex}`}
 								seg={seg}
 								startMs={startMs}
 								endMs={endMs}
 								yMax={marketYMax}
 							/>
 						))}
-					{marketNodes.map((node) => (
-						<GraphNodeMark
-							key={node.id}
-							node={node}
-							x={xPx(node.at, startMs, endMs)}
-							y={yPx(node.marketValue, marketYMax)}
-						/>
-					))}
-				</>
-			)}
-		</svg>
+						{marketSegments
+							.filter((seg) => seg.exitedAt !== null)
+							.map((seg) => (
+								<FlipMarker
+									key={`flip-${seg.marketId}-${seg.episodeIndex}`}
+									seg={seg}
+									startMs={startMs}
+									endMs={endMs}
+									yMax={marketYMax}
+								/>
+							))}
+						{marketNodes.map((node) => (
+							<GraphNodeMark
+								key={node.id}
+								node={node}
+								x={xPx(node.at, startMs, endMs)}
+								y={yPx(node.marketValue, marketYMax)}
+							/>
+						))}
+					</>
+				)}
+			</svg>
+
+			{/* ⚠⚠ X ENDPOINT LABELS — OUTSIDE THE SVG, AND THAT IS THE WHOLE OF R2.
+			    They were two `<text>` nodes inside a `preserveAspectRatio="none"`
+			    viewport, which scales user space NON-UNIFORMLY: the plot is supposed
+			    to stretch to whatever box it is given, and glyphs went with it.
+			    MEASURED on staging at a pinned 1440×777, collapsed card — box 652×156
+			    against a 640×320 viewBox, so `scaleX 1.019` and `scaleY 0.4875`, an
+			    anisotropy of **2.09**. The declared 10px label rendered **31.17 × 6.41**
+			    where the same string in HTML is **30.6 × 15**: the width was right to
+			    within 2%, and the HEIGHT was crushed to 43%. It read as "compressed"
+			    because a letter twice as wide as it is tall reads that way, but the axis
+			    that moved was Y, and knowing which one moved is what rules out the two
+			    fixes that treat the symptom (nudging the font size, or a `scaleX`).
+			    ⚠ ONLY THE COLLAPSED CARD WAS WRONG. The expanded overlay hands this
+			    component an `aspect-[2/1]` box — exactly the viewBox ratio — so its
+			    labels were already undistorted, and this change is a no-op there.
+			    ⇒ THE MECHANISM IS THE d5 MOCKUP'S OWN: it draws `.xlab` as absolutely
+			    positioned elements over the graph (`surface_d5_v1_0.html:497-499`,
+			    `position:absolute;bottom:3px` with a percentage `left`), never as SVG
+			    text. HTML text is laid out in CSS pixels and cannot be stretched by a
+			    viewBox.
+			    ⛔ THEY STAY INSIDE THIS COMPONENT'S OWN TREE, deliberately.
+			    `MarketPriceChart`'s docblock records the trap: a guard that scopes its
+			    query to the chart component goes GREEN when labels move to a DOM
+			    SIBLING of it, because siblings carry none of its testids. Returned from
+			    here, `render(<ProfileChart …>)` still finds them and the guard that
+			    counts exactly two `axis-x-*` still means what it says.
+			    ⚠ NO VALUE IS INVENTED: both offsets are the SAME `xPx` endpoints the
+			    plot uses, divided by the SAME viewBox width, and the 8-unit bottom
+			    inset is the `VIEWBOX_H - 8` the labels already sat at. A percentage is
+			    exact here precisely BECAUSE the SVG stretches — one user unit is one
+			    percentage point of the box, on each axis independently. */}
+			<span
+				data-testid="axis-x-start"
+				aria-hidden="true"
+				className="pointer-events-none absolute text-[10px] leading-none text-n5"
+				style={{ left: `${xStartPct}%`, bottom: `${labelBottomPct}%` }}
+			>
+				{fmtUtcDay(series.windowStart)}
+			</span>
+			<span
+				data-testid="axis-x-end"
+				aria-hidden="true"
+				className="pointer-events-none absolute text-[10px] leading-none text-n5"
+				style={{ right: `${xEndPct}%`, bottom: `${labelBottomPct}%` }}
+			>
+				{fmtUtcDay(series.windowEnd)}
+			</span>
+		</div>
 	);
 }
 
