@@ -15,6 +15,13 @@ The first is a habit that leaked. The rule for the product was always that nothi
 
 The second is that in July this project hired a different machine to do its work, wrote down the date it would let that machine go before it started, and then let it go early. Five separate records note that the arrangement ended ahead of schedule. Not one says why.
 
+One number worth carrying out of all this. A fifth of the commits behind
+this document explain nothing about themselves — no message, just a subject
+line. But they are not spread evenly. In the first three weeks it was over
+half. In the last two, one in twenty. Nobody set out to fix that; there was
+no rule about it until the very end. Somewhere in the middle, explaining
+yourself stopped being optional and nobody wrote down when.
+
 A project this obsessive left exactly one interesting question unanswered about itself. It seems fair to leave it that way.
 
 *[Forward half — what the window actually does — drafted 5 November.]*
