@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Dark One Arrives
+
+The interface stops being a placeholder. A branded dark layer is swapped in wholesale — the values themselves, the checks pinning them in place, and the contract naming which slots exist and what may fill them, all in one commit. The commit body runs to three lines and none of them explains the choice. The reasoning lives in a design document it cites by version, and nowhere in the history itself.
