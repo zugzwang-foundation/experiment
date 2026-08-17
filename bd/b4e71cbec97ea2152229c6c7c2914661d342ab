@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Eleven Behind
+
+Production had quietly fallen eleven database changes behind, because the only tool for applying them pointed somewhere else and the deploy never ran them. Applying them all at once then failed: one of the changes cannot share a transaction with the ones after it. So they are applied one at a time, each committing before the next begins, behind a guard that refuses to run unless it is pointed at the right database.
