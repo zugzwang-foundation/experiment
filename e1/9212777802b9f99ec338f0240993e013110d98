@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+It Refreshes Itself
+
+A live market's page went stale the moment you stopped touching it. Now it refreshes on an interval — deliberately by re-running the read the page already does, rather than by adding an endpoint to fetch updates. The list of endpoints had been closed at eleven, and adding a twelfth to solve a display problem was the obvious answer and the worse one.
