@@ -77,19 +77,27 @@ const isPicked = (n: number) =>
 const table = () => screen.getByTestId("bookmarks-table");
 
 describe("C5 — the row is selectable by pointer", () => {
-	it("selection::nothing-is-picked-at-mount", () => {
+	it("selection::THE-FIRST-ROW-IS-PICKED-AT-MOUNT", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED, and inverted on BOTH surfaces in one
+		// round. R3 asks for default-select "in BOTH modes (positions and
+		// bookmarks)", and since R2 makes bookmarks mode a ROUTE rather than client
+		// state, this component IS the other mode. A rail of stubs on load was the
+		// defect; the mockup's `refresh()` (`:571`) auto-selects the first visible row.
 		render(<BookmarksTable items={ITEMS} />);
-		for (const n of [1, 2, 3]) {
-			expect(isPicked(n)).toBe(false);
-		}
+		expect(isPicked(1)).toBe(true);
+		expect([1, 2, 3].filter((n) => isPicked(n))).toEqual([1]);
 	});
 
-	it("selection::click-picks-and-clicking-again-CLEARS", () => {
+	it("selection::click-picks-and-clicking-again-KEEPS", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. With a first-row fallback, clearing
+		// re-derives to row one, so a second click would be a silent no-op there and
+		// a jump-to-row-one elsewhere. The mockup has no deselect either.
 		render(<BookmarksTable items={ITEMS} />);
-		fireEvent.click(rowEl(1));
-		expect(isPicked(1)).toBe(true);
-		fireEvent.click(rowEl(1));
-		expect(isPicked(1)).toBe(false);
+		fireEvent.click(rowEl(2));
+		expect(isPicked(2)).toBe(true);
+		fireEvent.click(rowEl(2));
+		expect(isPicked(2)).toBe(true);
+		expect([1, 2, 3].filter((n) => isPicked(n))).toEqual([2]);
 	});
 
 	it("selection::picking-a-second-row-releases-the-first", () => {
@@ -103,25 +111,30 @@ describe("C5 — the row is selectable by pointer", () => {
 	it("selection::a-click-on-a-LINK-inside-the-row-does-not-pick-it", () => {
 		// The title and the market question navigate; the unbookmark button acts.
 		// One `closest("a,button")` guard covers every child.
+		// ⚠ PROFILE REFINEMENT · R3 — READ ON ROW 2. Row one is picked at mount, so the
+		// claim is "the selection did not MOVE", asserted on a row that can still fail.
 		render(<BookmarksTable items={ITEMS} />);
-		const link = rowEl(1).querySelector("a");
+		const link = rowEl(2).querySelector("a");
 		if (link === null) {
 			throw new Error("selection: the row renders no link to click");
 		}
 		fireEvent.click(link);
-		expect(isPicked(1)).toBe(false);
+		expect(isPicked(2)).toBe(false);
+		expect(isPicked(1)).toBe(true);
 	});
 
 	it("selection::a-click-on-the-UNBOOKMARK-button-does-not-pick-it", () => {
 		// The row's own action must not double as a selection gesture — a reader
 		// removing a bookmark has not asked to read it.
+		// ⚠ PROFILE REFINEMENT · R3 — READ ON ROW 2, same reason as the link case above.
 		render(<BookmarksTable items={ITEMS} />);
-		const button = rowEl(1).querySelector("button");
+		const button = rowEl(2).querySelector("button");
 		if (button === null) {
 			throw new Error("selection: the row renders no button to click");
 		}
 		fireEvent.click(button);
-		expect(isPicked(1)).toBe(false);
+		expect(isPicked(2)).toBe(false);
+		expect(isPicked(1)).toBe(true);
 	});
 });
 
@@ -154,12 +167,13 @@ describe("C5 — Up/Down step the selection, wrapping", () => {
 
 	it("selection::a-non-arrow-key-passes-through", () => {
 		// The handler sits on the table and must not swallow keys it does not own.
+		// ⚠ PROFILE REFINEMENT · R3 — the claim is "the selection did not MOVE", not
+		// "nothing is selected".
 		render(<BookmarksTable items={ITEMS} />);
+		fireEvent.click(rowEl(2));
 		fireEvent.keyDown(table(), { key: "Tab" });
 		fireEvent.keyDown(table(), { key: "a" });
-		for (const n of [1, 2, 3]) {
-			expect(isPicked(n)).toBe(false);
-		}
+		expect([1, 2, 3].filter((n) => isPicked(n))).toEqual([2]);
 	});
 
 	it("selection::focus-moves-with-the-selection", () => {
@@ -200,18 +214,29 @@ describe("C5 — the selected row RENDERS DIFFERENTLY, not just flagged", () => 
 	it("selection::THE-CLASS-STRING-CHANGES", () => {
 		// ⚠⚠ THE CENTRAL ASSERTION. A flag-only check cannot see a selection that
 		// is invisible, which is exactly the defect Profile shipped one round.
+		// ⚠ PROFILE REFINEMENT · R3 — MEASURED ON ROW 2: row one is selected at mount, so
+		// row one's before/after would compare selected with selected.
 		render(<BookmarksTable items={ITEMS} />);
-		const before = rowEl(1).className;
-		fireEvent.click(rowEl(1));
-		const after = rowEl(1).className;
+		const before = rowEl(2).className;
+		fireEvent.click(rowEl(2));
+		const after = rowEl(2).className;
 		expect(
 			after,
 			"C5: the selected row's className is unchanged — the selection is " +
 				"invisible.",
 		).not.toBe(before);
-		expect(after.split(/\s+/)).toContain("[border:var(--ring-active)]");
-		expect(after.split(/\s+/)).toContain("bg-n1");
-		expect(after.split(/\s+/)).not.toContain("[border:var(--hairline)]");
+		// ⚠⚠ PROFILE REFINEMENT · R6 — THE MECHANISM MOVED, HERE AS ON PROFILE. The
+		// swap ("rung 3 replaces rung 1") could carry no radius, because
+		// `border-collapse:collapse` ignores `border-radius`. The mockup ADDS an
+		// outline instead, which the element paints itself and which honours the
+		// radius. The hairline now SURVIVES selection — losing it is the regression.
+		const cls = after.split(/\s+/);
+		expect(cls).toContain("[outline:var(--ring-active)]");
+		expect(cls).toContain("[outline-offset:-2px]");
+		expect(cls).toContain("rounded-(--r)");
+		expect(cls).toContain("bg-n1");
+		expect(cls).toContain("[border:var(--hairline)]");
+		expect(before.split(/\s+/)).not.toContain("rounded-(--r)");
 	});
 
 	it("selection::EXACTLY-ONE-border-utility-in-either-state", () => {
@@ -240,17 +265,20 @@ describe("C6 — the arena's two panels share one selection", () => {
 	const panelTitle = () =>
 		screen.getByTestId("bookmarks-replica-panel-title").textContent ?? "";
 
-	it("arena::with-nothing-picked-the-replica-body-is-EMPTY", () => {
-		// ⚠⚠ THIS IS THE DELIBERATE DIVERGENCE FROM PROFILE. Profile's right panel
-		// FILTERS rather than replaces, because SPEC.1 §16.3 D8 / §17 make its
-		// argument list the complete record and its table drops exited markets.
-		// ⛔ That constraint does not reach /bookmarks: C-BOOKMARKS-1 forked this
-		// route and the TABLE already is the complete list, so nothing is lost by
-		// an empty panel.
+	it("arena::THE-REPLICA-OPENS-ON-THE-FIRST-ROW", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. This asserted the replica body was
+		// EMPTY at mount, which was true and was the defect: R3 rules that the rail
+		// must show a full argument on load, in BOTH modes. The note below still
+		// holds for what happens when there is genuinely nothing to show.
+		//
+		// ⚠ THE DIVERGENCE FROM PROFILE THIS USED TO RECORD IS UNCHANGED IN KIND:
+		// Profile's right panel FILTERS a complete record (SPEC.1 §16.3 D8 / §17),
+		// while this route's TABLE already is the complete list, so an empty panel
+		// loses nothing here. What changed is only that the panel is no longer empty
+		// at MOUNT — it is empty when the list is.
 		mount();
-		const body = screen.getByTestId("bookmarks-replica-panel-body");
-		expect(body.textContent).toBe("");
-		expect(panelTitle()).toBe("Arguments");
+		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market fixture-alpha");
 	});
 
 	it("arena::a-click-fills-the-replica-and-retitles-the-panel", () => {
@@ -260,12 +288,16 @@ describe("C6 — the arena's two panels share one selection", () => {
 		expect(panelTitle()).toBe("Market fixture-alpha");
 	});
 
-	it("arena::DESELECT-empties-the-panel-and-restores-the-word", () => {
+	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED, for the reason the retired toggle
+		// records: with a first-row fallback there is no empty state to return to, so
+		// clearing would re-derive to row one immediately.
 		mount();
-		fireEvent.click(rowEl(1));
-		fireEvent.click(rowEl(1));
-		expect(screen.queryByTestId(`bookmark-replica-${ID(1)}`)).toBeNull();
-		expect(panelTitle()).toBe("Arguments");
+		fireEvent.click(rowEl(2));
+		expect(screen.getByTestId(`bookmark-replica-${ID(2)}`)).toBeTruthy();
+		fireEvent.click(rowEl(2));
+		expect(screen.getByTestId(`bookmark-replica-${ID(2)}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market fixture-alpha");
 	});
 
 	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS-and-wraps", () => {
@@ -311,14 +343,21 @@ describe("C6 — the arena's two panels share one selection", () => {
 		expect(slot.className.split(/\s+/)).toContain("min-h-0");
 	});
 
-	it("arena::a-filter-that-hides-the-pick-empties-the-panel", () => {
+	it("arena::a-filter-that-hides-the-pick-RE-AIMS-the-panel", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED, and this is the case R3 calls out by
+		// name: "an empty rail after a filter is the same defect one interaction
+		// later". The hidden pick no longer empties the panel; the fallback re-aims it
+		// at the first row the filter LEFT.
 		const mixed = [item(1), item(4, "fixture-beta")];
 		render(<BookmarksArena items={mixed} />);
 		fireEvent.click(rowEl(1));
 		expect(screen.getByTestId(`bookmark-replica-${ID(1)}`)).toBeTruthy();
 		fireEvent.click(screen.getByTestId("bookmarks-market-filter"));
 		fireEvent.click(screen.getByTestId("bookmarks-market-option-fixture-beta"));
+		// The old pick is gone from the panel…
 		expect(screen.queryByTestId(`bookmark-replica-${ID(1)}`)).toBeNull();
-		expect(panelTitle()).toBe("Arguments");
+		// …and the surviving row's argument is in it, under ITS market.
+		expect(screen.getByTestId(`bookmark-replica-${ID(4)}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market fixture-beta");
 	});
 });

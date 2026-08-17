@@ -138,7 +138,16 @@ export function BookmarksTable({
 	// REMEMBERED rather than destroyed, so switching the filter back restores it.
 	// Derivation, not an effect: an effect would render one frame with a
 	// selection that is no longer on screen.
-	const selectedRow = visible.find((i) => i.id === selectedId) ?? null;
+	// ⚠⚠ PROFILE REFINEMENT · R3 — THE FIRST VISIBLE ROW IS THE FALLBACK, byte-carried
+	// from `PositionsTable`'s derivation in the same round. R3 asks for default-select
+	// in BOTH modes, and since R2 makes bookmarks mode a ROUTE rather than client
+	// state, "the other mode" IS this component — so it takes the identical rule.
+	// ⛔ ONE EXPRESSION, SAME THREE CASES: mount, a filter that hides the pick, and an
+	// empty list (`visible[0]` is `undefined` ⇒ `null` ⇒ the existing empty state, no
+	// phantom row). A derivation rather than an effect, so it can never render one
+	// frame with a selection that is no longer on screen.
+	const selectedRow =
+		visible.find((i) => i.id === selectedId) ?? visible[0] ?? null;
 
 	// C6 — REPORT THE DERIVED SELECTION UPWARD. The deps are PRIMITIVES, never
 	// `selectedRow` itself: the row object is rebuilt on every render, so
@@ -158,8 +167,11 @@ export function BookmarksTable({
 	}, [pickedId, pickedMarketTitle, onSelect]);
 
 	/** Click the selected row again to clear it — Profile's `pick()`. */
+	// ⚠ PROFILE REFINEMENT · R3 — THE TOGGLE IS RETIRED HERE TOO, for the reason
+	// `PositionsTable` records: with a first-row fallback, clearing re-derives to row
+	// one, which makes a second click a no-op on row one and a jump elsewhere.
 	const pick = (id: string) => {
-		setSelectedId((current) => (current === id ? null : id));
+		setSelectedId(id);
 	};
 
 	/** Up/Down step through the CURRENTLY VISIBLE rows and WRAP,
@@ -414,10 +426,19 @@ function BookmarkRow({
 					onPick(item.id);
 				}
 			}}
-			className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+			// ⚠⚠ PROFILE REFINEMENT · R6 — THE SELECTED ROW TAKES THE RADIUS TOKEN,
+			// byte-carried from `PositionsTable`. R6 names the POSITION row, and this is
+			// its twin: the two surfaces are one shell with the left panel swapped, and
+			// rounding one highlighted row while leaving the other square would be the
+			// exact drift §3 forbids. The mockup rounds `.prow.sel` in BOTH modes,
+			// because bookmark mode reuses the same row element.
+			// ⛔ AN OUTLINE, NOT A HEAVIER BORDER — `border-collapse:collapse` ignores
+			// `border-radius`, so the swap this replaces had nowhere for a radius to
+			// land. Full reasoning at `PositionsTable`'s row.
+			className={`cursor-pointer [border:var(--hairline)] focus-visible:shadow-(--state-focus-ring) ${
 				isSelected
-					? "bg-n1 [border:var(--ring-active)]"
-					: "[border:var(--hairline)] hover:bg-n1"
+					? "rounded-(--r) bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+					: "outline-none hover:bg-n1"
 			}`}
 		>
 			{/* THE POSITION CELL — `PositionsTable.tsx`'s `.poscell`: a centred

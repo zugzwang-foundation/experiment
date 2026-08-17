@@ -145,11 +145,13 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    same view in different words. ⛔ The suppression is SCOPED to this
 			    call site; `IdentityCard`'s default is unchanged, so Profile renders
 			    byte-identically.
-			    ⚠ ONE WART, NAMED NOT HIDDEN: `IdentityCard`'s owner arm renders a
-			    Bookmark icon linking to `/bookmarks`, so on THIS route it is a
-			    self-link. `src/components/profile/**` is read-only here, so it is
-			    reported rather than special-cased — and a self-link is inert, not
-			    broken.
+			    ⚠ THE ONE WART NAMED HERE AT ROUND 3 IS FIXED, NOT STILL REPORTED. It
+			    read: "`IdentityCard`'s owner arm renders a Bookmark icon linking to
+			    `/bookmarks`, so on THIS route it is a self-link … reported rather than
+			    special-cased". PROFILE REFINEMENT · R2 makes that control the two-state
+			    MODE SWITCH: on this route it renders FILLED and points back at the
+			    viewer's own profile. The self-link is gone because the control now has a
+			    second state to be in.
 			    ⛔ NOTHING IN THE BAND IS BLOCKED. Every region is viewer-keyed and
 			    every loader exists; no region renders empty and none is flagged. */}
 			{/* ⚠⚠ D-1 · 256 IS THE RULED-UNREACHABLE BAND, AND THIS SURFACE INHERITS
@@ -204,7 +206,26 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				{viewer === null ? (
 					<div data-testid="bookmarks-identity-unresolved" />
 				) : (
-					<IdentityCard user={viewer} owner={true} tiles={tiles} />
+					/* ⚠⚠ PROFILE REFINEMENT · R2 — THIS ROUTE IS THE MOCKUP'S BOOKMARK
+					   MODE, and the toggle is told so. The band's bookmark control renders
+					   FILLED here and points back at the profile, which is the second half
+					   of the two-state switch the profile's own control starts.
+					   ⛔ `profileHref` COMES FROM THE RESOLVED VIEWER, never from a param:
+					   this route has no `[pseudonym]` segment and must not grow one, and
+					   `viewer` is `resolveProfileUser(session.pseudonym)` — the same row
+					   the band is already drawing. So the way back is the viewer's OWN
+					   profile by construction, and it cannot point at anyone else's.
+					   ⚠ THE ONE WART NAMED AT ROUND 3 IS NOW FIXED RATHER THAN REPORTED:
+					   that note said the owner arm's bookmark icon "is a self-link on THIS
+					   route, so it is reported rather than special-cased". It is no longer
+					   a self-link — it is the way out. */
+					<IdentityCard
+						user={viewer}
+						owner={true}
+						tiles={tiles}
+						bookmarksActive
+						profileHref={`/u/${encodeURIComponent(viewer.pseudonym)}`}
+					/>
 				)}
 				<ProfileGraph series={graph} />
 			</div>
