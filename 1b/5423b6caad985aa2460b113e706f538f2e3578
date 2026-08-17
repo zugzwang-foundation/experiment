@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+It Can Only Grow
+
+Four panel headings sat ten pixels out of line, because two of them hold controls and two hold only a title. The fix is a minimum height, which can only ever lift the shorter one — a fixed height would have clipped the taller. The measurement was taken again on this branch rather than inherited from the attempt before it, which had been closed unmerged.
