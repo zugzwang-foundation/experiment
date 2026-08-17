@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Emptying Is Not Editing
+
+Two holes in a table meant to be permanent. The first: entries could arrive in the same instant with nothing to order them by, so a counter that always increases was added. The second is better. The table refused edits and refused deletions — but a command that empties a table wholesale is neither of those, and nothing was stopping it. That is now rejected at the storage layer, alongside the refusals that were already there.
