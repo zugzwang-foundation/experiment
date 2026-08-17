@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatDharma } from "@/components/debate/format";
+import {
+	displayPositionProfitLossSigned,
+	formatDharma,
+} from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
@@ -409,7 +412,10 @@ function BookmarkRow({
 				<span className="flex flex-col items-center gap-[5px]">
 					<span
 						data-testid={`bookmark-side-${item.id}`}
-						className="flex items-center gap-[5px] text-xs"
+						// ⚠ PROFILE-FULL — `.pside` is 11px/800 (`:283`), moved in lockstep
+						// with Profile's side word (§3: the two surfaces are never sized one
+						// after the other). This was `text-xs` at weight 400.
+						className="flex items-center gap-[5px] text-[11px] leading-normal font-extrabold"
 					>
 						{item.side === "YES" ? "Yes" : "No"}
 						<ThumbGlyph side={item.side} size={12} />
@@ -440,9 +446,41 @@ function BookmarkRow({
 			<td aria-hidden="true" className="p-2 text-center font-normal text-n4">
 				→
 			</td>
+			{/* ⚠⚠ PROFILE-FULL — THE CURRENT CELL CARRIES ITS P/L DELTA, byte-carried
+			    from `PositionsTable.tsx`'s Current cell in lockstep (§3). The mockup's
+			    bookmark mode reuses the SAME `.pnum` cell as its profile mode
+			    (`:558`), so this is the same box by construction.
+			    ⛔ SPEC.1 §10.8 (1.0.33) admits this as its THIRD displayed-space
+			    identity; `displayPositionProfitLossSigned` rounds both operands to what
+			    this row prints before subtracting, so the visible arithmetic is true.
+			    ⚠ THE FIGURES ARE THE BOOKMARKED AUTHOR'S, not the viewer's — the
+			    author-keyed semantic this file's header records. So the delta is that
+			    AUTHOR's P/L on the side their argument is frozen to, which is what the
+			    two figures it reconciles already were.
+			    ⚠ THE REMOVED VARIANT CARRIES NEITHER FIGURE, so it carries no delta:
+			    `staked`/`current` exist only on the non-removed arm, and a delta
+			    between two unknowns is not zero. */}
 			<td className="p-2 text-center tabular-nums text-ink">
 				<span className="flex flex-col items-center">
-					{item.removed ? null : <>Đ {formatDharma(item.current)}</>}
+					{item.removed ? null : (
+						<span className="inline-flex items-baseline gap-1.5">
+							Đ {formatDharma(item.current)}
+							{(() => {
+								const pl = displayPositionProfitLossSigned(
+									item.staked,
+									item.current,
+								);
+								return pl.magnitude === "" ? null : (
+									<span
+										data-testid={`bookmark-pl-${item.id}`}
+										className="text-[10.5px] leading-normal font-bold text-n5"
+									>
+										({pl.sign}Đ{pl.magnitude})
+									</span>
+								);
+							})()}
+						</span>
+					)}
 				</span>
 			</td>
 		</tr>
@@ -473,7 +511,10 @@ function BookmarkArgumentCell({
 		<Link
 			data-testid={`bookmark-market-${item.id}`}
 			href={`/m/${item.marketSlug}`}
-			className="block text-xs text-n5 hover:underline"
+			// ⚠ PROFILE-FULL — `.pmkt .mq`'s 11px/600 (`:291-292`), in lockstep with
+			// Profile's sub-lines. The COLOUR is untouched: the mockup's ramp is
+			// inverted against this build's, so `text-n5` stays the dark system's own.
+			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
 		>
 			{item.marketTitle}
 		</Link>
@@ -481,7 +522,9 @@ function BookmarkArgumentCell({
 	if (item.removed) {
 		return (
 			<span data-testid={`bookmark-arg-removed-${item.id}`}>
-				<span className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</span>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+					{REMOVED_STUB_TEXT}
+				</span>
 				{marketLine}
 			</span>
 		);
@@ -491,13 +534,15 @@ function BookmarkArgumentCell({
 			<Link
 				data-testid={`bookmark-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}
-				className="hover:underline"
+				// ⚠ PROFILE-FULL — `.ptitle` is 14px/700/1.35 (`:288`), in lockstep
+				// with Profile's argument title.
+				className="text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{item.title}
 			</Link>
 			{marketLine}
 			{item.kind === "reply" && item.repliedToTitle !== null && (
-				<span className="block text-xs text-n5">
+				<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {item.repliedToTitle}
 				</span>
 			)}
