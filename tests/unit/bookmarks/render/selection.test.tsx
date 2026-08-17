@@ -241,23 +241,33 @@ describe("C5 — the selected row RENDERS DIFFERENTLY, not just flagged", () => 
 		// `border-collapse:collapse` ignores `border-radius`. The mockup ADDS an
 		// outline instead, which the element paints itself and which honours the
 		// radius. The hairline now SURVIVES selection — losing it is the regression.
+		// ⚠⚠ RE-POINTED AGAIN AT PROFILE OVERLAP R1, in lockstep with Profile's.
+		// The radius is a BASE class now — R6 gave it to the selected arm only, which
+		// left every unselected row a square hairline box, and the old line
+		// `not.toContain("rounded-(--r)")` on `before` asserted precisely that.
+		// The hairline is an OUTLINE on both arms, because a border cannot round
+		// under the collapsing model.
 		const cls = after.split(/\s+/);
 		expect(cls).toContain("[outline:var(--ring-active)]");
 		expect(cls).toContain("[outline-offset:-2px]");
-		expect(cls).toContain("rounded-(--r)");
 		expect(cls).toContain("bg-n1");
-		expect(cls).toContain("[border:var(--hairline)]");
-		expect(before.split(/\s+/)).not.toContain("rounded-(--r)");
+		expect(cls).toContain("rounded-(--r)");
+		expect(before.split(/\s+/)).toContain("rounded-(--r)");
+		expect(before.split(/\s+/)).toContain("[outline:var(--hairline)]");
+		expect(cls).not.toContain("[border:var(--hairline)]");
 	});
 
-	it("selection::EXACTLY-ONE-border-utility-in-either-state", () => {
-		// Two arbitrary `[border:…]` utilities on one element resolve by
-		// stylesheet order, not by the order they are written — so the two are a
-		// conditional, never both. A regression is invisible in jsdom and picks
-		// the wrong edge in a browser.
+	it("selection::EXACTLY-ONE-outline-utility-in-either-state", () => {
+		// Two arbitrary utilities for ONE property resolve by stylesheet order, not
+		// by the order they are written — so the two are a conditional, never both.
+		// A regression is invisible in jsdom and picks the wrong edge in a browser.
+		// ⚠ RE-POINTED at PROFILE OVERLAP R1 from `[border:` to `[outline:`: the
+		// property under contention moved when the row's edge did. ⛔ Tighter, not
+		// looser — an element has exactly one outline, so a second declaration is
+		// not ambiguous, it is dead.
 		render(<BookmarksTable items={ITEMS} />);
 		const count = (n: number) =>
-			classesOf(n).filter((c) => c.startsWith("[border:")).length;
+			classesOf(n).filter((c) => c.startsWith("[outline:")).length;
 		expect(count(1)).toBe(1);
 		fireEvent.click(rowEl(1));
 		expect(count(1)).toBe(1);

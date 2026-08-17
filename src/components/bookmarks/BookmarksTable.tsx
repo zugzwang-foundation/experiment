@@ -511,10 +511,21 @@ function BookmarkRow({
 			// ⛔ AN OUTLINE, NOT A HEAVIER BORDER — `border-collapse:collapse` ignores
 			// `border-radius`, so the swap this replaces had nowhere for a radius to
 			// land. Full reasoning at `PositionsTable`'s row.
-			className={`cursor-pointer [border:var(--hairline)] focus-visible:shadow-(--state-focus-ring) ${
+			// ⚠⚠ PROFILE OVERLAP · R1 — AND NOW BOTH ARMS OUTLINE, for the same reason
+			// the selected one already did. The unselected row was a square `1/1/1/1`
+			// hairline box inside a panel at 8 and beside a selected row at 8, and a
+			// radius alone cannot fix it: injected live, `border-radius: 8px` left the
+			// corners square because the collapsing model ignores it. So the hairline
+			// becomes an outline at `-1px` and the radius moves to the base, where it
+			// serves both arms. ⛔ ONE outline per arm — two arbitrary utilities for one
+			// property resolve by stylesheet emission order, not by the order written.
+			// ⚠ `outline-none` goes with the border: it only ever suppressed the UA
+			// focus ring, and any author outline beats a UA-origin one. The focus
+			// affordance was always the shadow. Full reasoning at `PositionsTable`.
+			className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) ${
 				isSelected
-					? "rounded-(--r) bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
-					: "outline-none hover:bg-n1"
+					? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+					: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
 			}`}
 		>
 			{/* THE POSITION CELL — `PositionsTable.tsx`'s `.poscell`: a centred

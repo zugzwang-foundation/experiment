@@ -814,7 +814,45 @@ export function PositionsTable({
 									    under every sellable row", and there is no empty band left to
 									    border: the host mounts only with its module. The rule SURVIVES on
 									    a different one: a bordered host would read as a row of its own,
-									    and the module inside it already carries its own edges. */}
+									    and the module inside it already carries its own edges.
+									    ⚠⚠ PROFILE OVERLAP · R1 — THE ROW'S OWN EDGE IS NOW AN OUTLINE,
+									    AND THE BORDER IS GONE. A sweep of both surfaces for closed boxes
+									    found exactly THREE sharp ones and they were all this element:
+									    every unselected row measured `border-radius 0/0/0/0` with a full
+									    `1/1/1/1` hairline, inside a panel at 8, beside tiles at 8, next to
+									    a SELECTED row at 8 — a square block containing a rounded SELL
+									    button and a rounded status tag. That is the "reads wrong against
+									    its own contents" the founder measured.
+									    ⛔ AND A RADIUS ALONE COULD NOT FIX IT, which was measured before
+									    anything was written. `border-radius: 8px` was injected on a live
+									    unselected row and the corners stayed SQUARE: the collapsing model
+									    ignores `border-radius`, so the computed style reads `8px` while the
+									    paint is a rectangle. That is the trap this branch has now hit four
+									    times — a computed style confirms a declaration EXISTS; only
+									    geometry confirms it WON.
+									    ⇒ THE MOCKUP'S OWN IDIOM IS THE FIX, and R1 authorises it in as
+									    many words ("if it outlines rather than borders, port that"):
+									    `.prow.sel` picks its row out with an OUTLINE, which the element
+									    paints itself and which therefore honours the radius. So the
+									    unselected arm takes the hairline as an outline at `-1px` offset,
+									    the selected arm keeps `--ring-active` at `-2px`, and the base
+									    carries the radius for both. Injected on all three live rows and
+									    zoomed: rounded, and heights unchanged at `[128, 128, 128]` with the
+									    region still at 0 overflow — an outline takes no layout space.
+									    ⛔ ONE OUTLINE PER ARM, NEVER TWO ON THE ELEMENT. `[outline:…]`
+									    twice would be two arbitrary utilities for one property resolving by
+									    STYLESHEET EMISSION ORDER rather than by the order written here —
+									    the failure that shipped an inert `line-clamp` one pass ago. Both
+									    live inside the ternary, so exactly one is ever present.
+									    ⚠ `outline-none` IS RETIRED WITH THE BORDER and its job is done by
+									    what replaced it: it existed only to suppress the UA `:focus-visible`
+									    ring, and any AUTHOR outline declaration beats a UA-origin one by
+									    cascade origin. The focus affordance is unchanged — it was never the
+									    outline, it is `focus-visible:shadow-(--state-focus-ring)`.
+									    ⚠ WHAT IS GIVEN UP: under the collapsing model adjacent rows shared
+									    one merged hairline; each row now draws its own. The mockup frames
+									    the REGION and divides the rows, where this build frames each row —
+									    a divergence that predates R1 and that R1 does not name. */}
 									<tr
 										data-testid={`position-row-${row.marketId}`}
 										ref={(el) => {
@@ -860,10 +898,10 @@ export function PositionsTable({
 												pick(row.marketId);
 											}
 										}}
-										className={`cursor-pointer [border:var(--hairline)] focus-visible:shadow-(--state-focus-ring) ${
+										className={`cursor-pointer rounded-(--r) focus-visible:shadow-(--state-focus-ring) ${
 											isSelected
-												? "rounded-(--r) bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
-												: "outline-none hover:bg-n1"
+												? "bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+												: "[outline-offset:-1px] [outline:var(--hairline)] hover:bg-n1"
 										}`}
 									>
 										<td className="p-2 text-ink">

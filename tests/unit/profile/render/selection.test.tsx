@@ -276,9 +276,30 @@ describe("item 5 — the selection is derived against the VISIBLE set", () => {
 });
 
 describe("item 6 — the row is a bordered card, and the two states differ", () => {
-	it("item6::the-unselected-row-carries-the-shipped-hairline", () => {
+	it("item6::the-unselected-row-carries-the-shipped-hairline-AS-AN-OUTLINE", () => {
+		// ⚠ RE-POINTED at PROFILE OVERLAP R1. The rung is unchanged — `--hairline`,
+		// 1px n2, this file's own panel edge — but it is drawn as an OUTLINE now,
+		// because a border cannot be rounded under the collapsing model and the
+		// square row was the defect. ⛔ The old assertion is kept as its own
+		// negative: a border here would paint square corners behind the outline.
+		// ⚠ READ OFF ROW **2**, and that is not cosmetic: the hairline now lives on
+		// the UNSELECTED arm, and row one is SELECTED AT MOUNT (R3), so reading row
+		// one would look for the unselected edge on the selected row and fail for a
+		// reason that has nothing to do with the rung. The old assertion could read
+		// row one because the border sat on the BASE, present in both states — which
+		// is exactly the thing that changed.
 		render(<PositionsTable payload={PAYLOAD} />);
-		expect(classesOf(1)).toContain("[border:var(--hairline)]");
+		expect(classesOf(2)).toContain("[outline:var(--hairline)]");
+		expect(classesOf(2)).toContain("[outline-offset:-1px]");
+		expect(classesOf(2)).toContain("rounded-(--r)");
+		expect(classesOf(2)).not.toContain("[border:var(--hairline)]");
+		// ⛔ The radius is on the BASE, so the SELECTED row carries it too — that is
+		// the whole of R1 and it is asserted here rather than left to inference.
+		expect(classesOf(1)).toContain("rounded-(--r)");
+		// ⛔ `outline-none` retired WITH the border: it only ever suppressed the UA
+		// focus ring, which any author outline beats by cascade origin. Leaving it
+		// beside a real outline would be two declarations for one property.
+		expect(classesOf(2)).not.toContain("outline-none");
 	});
 
 	it("item6::THE-SELECTED-ROW-RENDERS-DIFFERENTLY-not-just-flagged", () => {
@@ -315,25 +336,41 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 		const cls = after.split(/\s+/);
 		expect(cls).toContain("[outline:var(--ring-active)]"); // rung 3, now an outline
 		expect(cls).toContain("[outline-offset:-2px]"); // the mockup's own inset
-		expect(cls).toContain("rounded-(--r)"); // R6 — the surface's radius token
 		expect(cls).toContain("bg-n1"); // the fill still arrives
-		// ⛔ THE HAIRLINE IS NOW EXPECTED TO SURVIVE, which is the inversion of the
-		// old third line. The mockup ADDS to `.prow` rather than replacing it, so a
-		// selected row that LOST its hairline would be the regression now.
-		expect(cls).toContain("[border:var(--hairline)]");
-		// …and the radius is absent while unselected, so it is the SELECTION that
-		// brings it and not a base class doing nothing.
-		expect(before.split(/\s+/)).not.toContain("rounded-(--r)");
+		// ⚠⚠ RE-POINTED AGAIN AT PROFILE OVERLAP R1, AND TWO OF THESE LINES MOVED
+		// FOR THE SAME REASON THE CODE DID.
+		// ⛔ `rounded-(--r)` IS NOW A BASE CLASS, NOT A SELECTED ONE. R6 put the
+		// radius on the selected arm alone, which left every UNSELECTED row a square
+		// hairline box inside a panel at 8 — the sharp rectangle R1 was opened on.
+		// The radius now serves both arms, so the old line
+		// `expect(before…).not.toContain("rounded-(--r)")` asserted exactly the
+		// defect and is INVERTED here rather than deleted.
+		expect(before.split(/\s+/)).toContain("rounded-(--r)");
+		expect(cls).toContain("rounded-(--r)");
+		// ⛔ AND THE HAIRLINE IS NO LONGER A BORDER AT ALL. It could not be: the
+		// collapsing model ignores `border-radius`, measured live — a row with
+		// `border-radius: 8px` injected still painted square corners. So the
+		// unselected arm's edge is the hairline as an OUTLINE, which the element
+		// paints itself and which honours the radius. Both arms outline now; neither
+		// borders. The line that asserted the border SURVIVED selection described a
+		// mechanism that no longer exists.
+		expect(cls).not.toContain("[border:var(--hairline)]");
+		expect(before.split(/\s+/)).toContain("[outline:var(--hairline)]");
+		expect(before.split(/\s+/)).toContain("[outline-offset:-1px]");
 	});
 
-	it("item6::EXACTLY-ONE-border-utility-is-present-in-either-state", () => {
-		// Two arbitrary `[border:…]` utilities on one element resolve by
-		// stylesheet order, not by the order they are written — so the two are a
-		// conditional, never both. A regression here is invisible in jsdom and
-		// picks the wrong edge in a browser.
+	it("item6::EXACTLY-ONE-outline-utility-is-present-in-either-state", () => {
+		// Two arbitrary utilities for ONE property resolve by stylesheet order, not
+		// by the order they are written — so the two are a conditional, never both.
+		// A regression here is invisible in jsdom and picks the wrong edge in a
+		// browser. ⚠ RE-POINTED at PROFILE OVERLAP R1 from `[border:` to `[outline:`
+		// because the property under contention MOVED: the row's edge is an outline
+		// on both arms now. ⛔ The predicate is the same one and it is if anything
+		// tighter — an element has exactly one outline, so two declarations here are
+		// not merely ambiguous, one of them is dead.
 		render(<PositionsTable payload={PAYLOAD} />);
 		const borderCount = (n: number) =>
-			classesOf(n).filter((c) => c.startsWith("[border:")).length;
+			classesOf(n).filter((c) => c.startsWith("[outline:")).length;
 		expect(borderCount(1)).toBe(1);
 		fireEvent.click(rowEl(1));
 		expect(borderCount(1)).toBe(1);
