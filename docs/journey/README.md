@@ -16,7 +16,7 @@ single line, because some commits genuinely have a single line in them.
 Every entry is also attached to its own commit as a git note, so this can be
 read front to back, or one commit at a time from inside the log:
 
-git fetch origin "refs/notes/:refs/notes/"
+git fetch origin "refs/notes/*:refs/notes/*"
 git log --notes
 
 
