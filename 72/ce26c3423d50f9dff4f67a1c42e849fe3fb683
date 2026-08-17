@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+Confirmed Before It Counts
+
+The monitoring stratum, finished weeks after it was started. Failures inside the betting path are now captured where they happen rather than at the top of the stack, and the outside services get the same treatment at their boundaries. The piece worth keeping is the drain that empties a queue of alarms: it sends, waits for confirmation the send landed, and only then marks the item dealt with. Marking first would lose exactly the alarms that mattered.
