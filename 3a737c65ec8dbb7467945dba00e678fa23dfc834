@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Bug Behind The Bug
+
+Sign-in was sending one format and the server only accepted another, so it refused every attempt. That fix is small. What it uncovered is not: behind the refusal sat a crash firing on every attempt to email someone a code, invisible the entire time because the first failure stopped anything from ever reaching it. Removing the outer problem is what made the inner one visible. Two bugs, and only one of them could ever have been found first.
