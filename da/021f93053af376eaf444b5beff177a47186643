@@ -1,0 +1,21 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+It Didn't Recognise Itself
+
+The test database has to be built the way the real one is — by asking the actual product to do the actual work, bet by bet. If the test could write rows directly, every check afterwards would only be confirming that the test agreed with itself.
+
+So there is a guard. It watches every write and asks who is calling. Product code, fine. Test code, refused.
+
+To do that it has to step over its own frames, or it catches itself. It recognised itself by looking for its own name in the path.
+
+Then a new file arrived with a similar name — the guard's own test. The guard stepped over that too, kept walking, landed somewhere it had been told to allow, and let through the exact write it exists to refuse.
+
+It failed silently. Nothing went red. It was caught on the first run of the very test that had broken it.
+
+The note in the fix is the lesson: recognising yourself by name is a guess about what else might be named similarly. The first thing named similarly was itself.
