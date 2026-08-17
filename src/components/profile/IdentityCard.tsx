@@ -188,7 +188,27 @@ export function IdentityCard({
 			    mine: (1) let the tile grid drop to 2 columns below ~1312 — canon §2
 			    pins 3×2, so that is a DESIGN change; (2) accept the square only
 			    above a width and accept the invented breakpoint; (3) shorten the
-			    tile LABEL copy, which is founder-owned. */}
+			    tile LABEL copy, which is founder-owned.
+
+			    ✅⛔ RULED — PROFILE-DIMS R2 · D-1. THE ROUTE-BACK ABOVE IS ANSWERED
+			    AND THIS IS NO LONGER AN OPEN QUESTION. None of the three options was
+			    taken: the founder ruled the mockup's 188px band — and therefore the
+			    band-filling square that depends on it — **UNREACHABLE AND
+			    ACCEPTED**. ⛔ So `size-14` is not a deferral any more, it is the
+			    ruled state, and this block is kept as the MEASUREMENT that earned
+			    the ruling rather than as a pending item.
+
+			    ⚠ THE STANDING COST, NAMED SO IT IS NOT SILENT: the mockup draws this
+			    avatar at **188×188** — 13.1% × 24.2% of the viewport — and it ships
+			    at **56×56**, 3.9% × 7.2%. That is **Δw −9.2pp, Δh −17.0pp**, the
+			    largest single-region divergence on the surface, and it is
+			    DELIBERATE. It is the same impossibility as the band (+8.7pp) and the
+			    arena (−12.6pp), reported three times, not three separate defects.
+			    ⛔ Do not re-attempt `h-full aspect-square` here: it has been measured
+			    and refused five times, and the sixth pass — at the mockup's own
+			    188px band — overflowed the card by **+75 at 1024** and +35 at 1440.
+			    The full table lives on the node that declares the band,
+			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.

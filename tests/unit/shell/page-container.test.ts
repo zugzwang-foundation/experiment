@@ -96,10 +96,19 @@ const SITES: Site[] = [
 		// the same figure `<main>`'s own floor uses.
 		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
 		// read-only this round, so `BOX_AXES` moves by preset selection alone.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		// ⚠⚠ MOVED AGAIN AT PROFILE-DIMS R2 · D-4 — onto `screen`, byte-carried
+		// from Profile's call site in the SAME commit. `/bookmarks` takes the
+		// Profile arrangement, so it takes Profile's frame; moving only one of the
+		// pair would re-open exactly the drift §3 forbids. `gap-3` is the mockup's
+		// `.arena{margin-top:12px}` and `100dvh` replaces `100vh` for the reason
+		// `/m/[slug]`'s guard pins by name.
+		// ⛔ STILL CONSUMED, NEVER RE-MINTED — `screen` already existed (#341), so
+		// `BOX_AXES` moves by preset SELECTION alone and no preset was authored.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none",
 		movedBy:
 			"HTML-FINISH · BOOKMARKS round 3 — full replication of Profile " +
-			"(founder-ruled 2026-08-15)",
+			"(founder-ruled 2026-08-15); PROFILE-DIMS R2 · D-4 — takes the `screen` " +
+			"preset with Profile (founder-ruled 2026-08-17)",
 	},
 	{
 		site: 3,
@@ -142,10 +151,23 @@ const SITES: Site[] = [
 		// must stay free to grow and scroll, so `BOX_AXES` is untouched at every
 		// width and the three container axes still move only where row 20 moved
 		// them.
-		now: "mx-auto flex min-h-0 w-full max-w-[1440px] flex-1 flex-col gap-6 px-6 py-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none",
+		// ⚠⚠ MOVED AGAIN AT PROFILE-DIMS R2 · D-4 — off `wide` and onto `screen`,
+		// the SAME preset and the SAME ruling `/m/[slug]` (site 9) already runs on.
+		// `wide` capped the container at `max-w-[1440px]`; the mockup's `.content`
+		// is full bleed inside a 28px inset. At the pinned 1440 that cap is nearly
+		// invisible (1392 vs the mockup's 1384) but it BINDS above it — site 9's
+		// docblock records −19.6pp at 1800. `gap-3` is the mockup's
+		// `.arena{margin-top:12px}`; `100dvh` replaces `100vh` so a collapsing
+		// mobile chrome cannot leave the bound taller than the screen.
+		// ⛔ CONSUMED, NEVER RE-MINTED: `screen` arrived with #341, so this move is
+		// preset SELECTION only and `CONTAINER_PRESETS` is untouched.
+		// ⛔ THE `lg:` SCOPING IS DELIBERATELY NOT SITE 9's. That route bounds
+		// unprefixed; below `lg` these two stack and must stay free to grow.
+		now: "mx-auto w-full max-w-none px-7 py-4 flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none",
 		movedBy:
 			"HTML-FINISH · PROFILE rows 20 + 3 (founder-ruled 2026-08-15, round 2); " +
-			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5)",
+			"ROUND 5 item A one-screen fit (founder-ruled 2026-08-15, round 5); " +
+			"PROFILE-DIMS R2 · D-4 — takes the `screen` preset (founder-ruled 2026-08-17)",
 	},
 	{
 		site: 6,

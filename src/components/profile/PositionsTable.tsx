@@ -833,9 +833,30 @@ export function PositionsTable({
 									    can never sell would be dead space, not a fixed footer.
 									    ⛔ `:has()` is banned (canon §3 item 10) — the toggle stays JS
 									    state, exactly as before. */}
+									{/* ⚠⚠ R-1 — THE RESERVED BAND COSTS CANON'S 50px, NOT 67.
+									    Founder-ruled after a PROFILE-DIMS R2 §2b measurement: the
+									    positions table measured **242 signed-out against 500
+									    signed-in** at a pinned 1440×777, because this reserved row
+									    renders only on the owner arm and cost 67px × 3.
+									    ⛔ THE HOST WAS NEVER WRONG — `h-[50px]` below is canon §5's
+									    "fixed 50 px box" and measured exactly 50. The overshoot was
+									    THIS CELL: `p-2` added 8px top + 8px bottom, and the row's
+									    hairline 1px, so the `<tr>` came to 50 + 16 + 1 = **67**.
+									    ⇒ `px-2 py-0`: the horizontal inset is KEPT (it is what the
+									    open sell module sits inside), the vertical padding goes, and
+									    the row becomes 50 + 1 = **51**.
+									    ⛔ THE RESERVATION ITSELF IS UNTOUCHED, AND THAT IS THE WHOLE
+									    FENCE. It is deliberate anti-reflow behaviour — the block
+									    above records that the `<tr>` used to be conditional, so
+									    opening Sell pushed every later row down. §1 fences behaviour
+									    out; only the padding moved. The owner still sees a reserved
+									    band under every sellable row, and it is still blank when
+									    closed — that half stays raised for the founder, unchanged.
+									    ⛔ NOTHING CLIPS: the host keeps its own 50px, so the cell
+									    never becomes smaller than what it reserves. */}
 									{sellable && (
 										<tr data-testid={`sell-row-${row.marketId}`}>
-											<td colSpan={5} className="p-2">
+											<td colSpan={5} className="px-2 py-0">
 												<div
 													data-testid={`sell-host-${row.marketId}`}
 													className="h-[50px]"
@@ -930,9 +951,14 @@ function PositionsPanel({
 			    here rather than on the trigger — see the ⛔ at the trigger for the
 			    measurement that moved it. The mockup's `.colhead` is
 			    `position:relative` for exactly this reason (`:227`). */}
+			{/* ⚠ `min-h-[52px]` — the mockup's `.colhead{min-height:52px}` (`:228`),
+			    landed on all four panel heads in one commit so the two side-by-side
+			    bodies start level. Measured 51 here against the arguments head's 41
+			    at a pinned 1440×777, in BOTH auth states. It can only GROW a head,
+			    never clip one. Full measurement on `ArgumentList.tsx`'s copy. */}
 			<div
 				data-testid="positions-panel-head"
-				className="relative flex flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
+				className="relative flex min-h-[52px] flex-wrap items-center gap-2 p-3 [border-bottom:var(--hairline)]"
 			>
 				<span className="text-xs font-medium text-ink">Positions</span>
 				{controls}

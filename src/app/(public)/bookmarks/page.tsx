@@ -102,9 +102,24 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 		   basis returns to `auto` and the height binds.
 		   ⚠ BELOW `lg` THE PAGE STILL GROWS AND SCROLLS, deliberately: the arena
 		   stacks to one column there and cannot fit a short viewport. */
+		/* ⚠⚠ PROFILE-DIMS R2 · D-4 — THIS ROUTE TAKES THE `screen` PRESET, byte-
+		   carried from Profile's call site in the SAME commit. `/bookmarks` takes
+		   the Profile arrangement, so it takes Profile's frame: the two must never
+		   be sized one after the other (§3), and moving only one of the pair would
+		   re-open exactly that drift.
+		   ⛔ CONSUMED, NEVER RE-MINTED — `screen` already exists at
+		   `PageContainer.tsx:108`. Site 2's row in `page-container.test.ts` moves
+		   WITH this change, in the same commit, via that guard's `now`/`movedBy`.
+		   ⚠ `gap-3` is the mockup's `.arena{margin-top:12px}` (`:222`); `100dvh`
+		   replaces `100vh` for the reason `/m/[slug]`'s guard pins by name — a
+		   collapsing mobile chrome must not leave the bound taller than the visible
+		   screen. The FIGURE (`60px + 2px`) is unchanged.
+		   ⛔ The `lg:` scoping is kept: below `lg` the bands stack and the page must
+		   stay free to grow. See Profile's call site for the full reasoning and the
+		   measurement. */
 		<PageContainer
-			preset="wide"
-			className="flex min-h-0 flex-1 flex-col gap-6 lg:h-[calc(100vh-60px-2px)] lg:flex-none"
+			preset="screen"
+			className="flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none"
 		>
 			{/* ⚠⚠ GATE C F-1 — THE PRE-REPLICATION HEADER ROW IS REMOVED, NOT
 			    DUPLICATED. It carried `<h1>Bookmarks</h1>` and the `Your bookmarks`
@@ -137,6 +152,20 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    broken.
 			    ⛔ NOTHING IN THE BAND IS BLOCKED. Every region is viewer-keyed and
 			    every loader exists; no region renders empty and none is flagged. */}
+			{/* ⚠⚠ D-1 · 256 IS THE RULED-UNREACHABLE BAND, AND THIS SURFACE INHERITS
+			    IT FOR THE SAME MEASURED REASON. The mockup's `.headzone` is
+			    `flex:0 0 188px` (`:189`); a 188px band leaves the identity card 172px
+			    of content box, and it needs 240 at 1024–1280 (the tile LABEL wraps to
+			    a second line at every tile width ≤158px) and 200 at 1440.
+			    ⚠ THAT ARITHMETIC IS THIS SURFACE'S TOO, not a borrowed one: this
+			    route renders the SAME `IdentityCard` with the SAME six tiles, so the
+			    same wrap happens at the same widths. Measured here signed-in at a
+			    pinned 1440×777: band 256, identity card 684×256, pfp 56×56 — the same
+			    boxes Profile reports.
+			    ⛔ Do not "fix" this to 188: forcing it CLIPS, and clipping to hit a
+			    number is a failure (§1). The full table and the ruling live on
+			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block; the PFP half is
+			    on `IdentityCard.tsx`. */}
 			<div
 				data-testid="bookmarks-headzone"
 				className="grid gap-6 lg:h-[256px] lg:grid-cols-2"
