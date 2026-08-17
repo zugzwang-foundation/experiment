@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Guard Ate The Request
+
+A check meant to keep robots out was quietly swallowing the thing it was supposed to be guarding. Sign-in codes were never sent, because the guard returned nothing where it should have returned permission to continue. One line. The fix is smaller than the test written to prove it, which drives the real endpoint rather than a stand-in — a stand-in is what let this through in the first place.
