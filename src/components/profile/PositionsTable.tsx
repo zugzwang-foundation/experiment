@@ -662,6 +662,37 @@ export function PositionsTable({
 									    the cost of keeping a real `<table>` — and row 3 already
 									    recorded why the table stays (two grids cannot share column
 									    widths without the mockup's five px tracks).
+
+									    ⚠⚠ PROFILE REFINEMENT · R6 — BUT THE SELECTED ROW IS NOT SQUARE ANY
+									    MORE, AND THE PARAGRAPH ABOVE IS WHY IT WAS. That reasoning is sound
+									    about `border-radius` under `border-collapse:collapse` and it still
+									    stands — what it missed is that the MOCKUP never used a border here.
+									    `.prow.sel` is `outline:2px solid var(--ink); outline-offset:-2px;
+									    border-radius:var(--r)` (`:277`) — an OUTLINE, and an outline is painted
+									    by the element itself rather than by the collapsing border model, so it
+									    honours `border-radius` on a `<tr>`.
+									    ⇒ MEASURED, NOT REASONED: with the outline applied the row reports
+									    `borderRadius: 8px` — the `--r` token's own value — and the rounded edge
+									    was confirmed in PIXELS at a pinned 1440×777, not merely in a computed
+									    style.
+									    ⇒ SO THE COMPOSITION SPLITS THE WAY THE MOCKUP SPLITS IT: every row keeps
+									    `[border:var(--hairline)]` (the mockup's `.prow` hairline, always there),
+									    and the SELECTED row ADDS outline + `-2px` offset + radius on top (the
+									    mockup's `.prow.sel` ADDS, never swaps). The previous build SWAPPED the
+									    border for a heavier one, which is exactly why the radius had nowhere to
+									    land — the collapsing model owned the only edge it could have rounded.
+									    ⛔ STILL NOT ONE MOCKUP VALUE. The outline takes the shipped
+									    `--ring-active` rung (1.5px n4) exactly as the swapped border did, and
+									    the radius takes `--r` — the token every other rectangle on this surface
+									    already uses, which is what R6 asked for. The mockup's 2px `--ink`
+									    outline is NOT ported: `--ink` is #fafafa here, a near-white edge, the
+									    inversion `side-pole-binding` exists to prevent.
+									    ⚠ `outline-none` MOVED INTO THE UNSELECTED ARM rather than staying on the
+									    base. It suppresses the UA focus ring so
+									    `focus-visible:shadow-(--state-focus-ring)` is the only focus affordance —
+									    but on the base it is a second `outline` declaration competing with the
+									    selected arm's, and two arbitrary utilities for one property resolve by
+									    stylesheet order, not by the order they are written here.
 									    ⚠ A ROW OWNS NO SELL HOST BORDER. The reserved 50px sell box
 									    below is deliberately unbordered — bordering an empty
 									    reserved band would draw an empty card under every sellable
@@ -711,10 +742,10 @@ export function PositionsTable({
 												pick(row.marketId);
 											}
 										}}
-										className={`cursor-pointer outline-none focus-visible:shadow-(--state-focus-ring) ${
+										className={`cursor-pointer [border:var(--hairline)] focus-visible:shadow-(--state-focus-ring) ${
 											isSelected
-												? "bg-n1 [border:var(--ring-active)]"
-												: "[border:var(--hairline)] hover:bg-n1"
+												? "rounded-(--r) bg-n1 [outline-offset:-2px] [outline:var(--ring-active)]"
+												: "outline-none hover:bg-n1"
 										}`}
 									>
 										<td className="p-2 text-ink">

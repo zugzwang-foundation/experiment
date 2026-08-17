@@ -246,10 +246,30 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 			"item 6: the selected row's className is unchanged — the selection is " +
 				"invisible, which is exactly the item-2 defect one round earlier.",
 		).not.toBe(before);
-		// …and specifically: rung 3 replaces rung 1, and the fill arrives.
-		expect(after.split(/\s+/)).toContain("[border:var(--ring-active)]");
-		expect(after.split(/\s+/)).toContain("bg-n1");
-		expect(after.split(/\s+/)).not.toContain("[border:var(--hairline)]");
+		// …and specifically, WHAT arrives. ⚠⚠ PROFILE REFINEMENT · R6 — THE
+		// MECHANISM CHANGED AND THESE THREE LINES FOLLOW IT. They used to assert a
+		// SWAP: "rung 3 replaces rung 1". The founder ruled the selected row must
+		// carry the surface's ratified radius token, and a swapped BORDER cannot —
+		// `border-collapse:collapse` ignores `border-radius`, which is why the row
+		// was square. The mockup's `.prow.sel` never used a border: it ADDS an
+		// `outline` (painted by the element, so it honours the radius) on top of the
+		// hairline every row keeps.
+		// ⛔ THE CENTRAL ASSERTION ABOVE IS UNTOUCHED — the className must still
+		// differ between the two states, which is the property this test exists for
+		// and the only thing that catches an invisible selection. What moved is the
+		// description of HOW it differs, and it moved because the code did.
+		const cls = after.split(/\s+/);
+		expect(cls).toContain("[outline:var(--ring-active)]"); // rung 3, now an outline
+		expect(cls).toContain("[outline-offset:-2px]"); // the mockup's own inset
+		expect(cls).toContain("rounded-(--r)"); // R6 — the surface's radius token
+		expect(cls).toContain("bg-n1"); // the fill still arrives
+		// ⛔ THE HAIRLINE IS NOW EXPECTED TO SURVIVE, which is the inversion of the
+		// old third line. The mockup ADDS to `.prow` rather than replacing it, so a
+		// selected row that LOST its hairline would be the regression now.
+		expect(cls).toContain("[border:var(--hairline)]");
+		// …and the radius is absent while unselected, so it is the SELECTION that
+		// brings it and not a base class doing nothing.
+		expect(before.split(/\s+/)).not.toContain("rounded-(--r)");
 	});
 
 	it("item6::EXACTLY-ONE-border-utility-is-present-in-either-state", () => {
