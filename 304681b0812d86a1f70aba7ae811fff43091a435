@@ -1,0 +1,21 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+A Rule You Have To Remember
+
+There was a rule. After finishing something, wait a day before merging it. Sleep on it, look again with fresh eyes.
+
+It did not survive its first deadline.
+
+The response was not to write the rule more firmly, or add a reminder, or resolve to try harder. The rule was deleted and replaced with a check that happens at the moment of writing — before there is anything left to be tempted about.
+
+The same week turned up the same problem somewhere else: the reviewers meant to look at database changes weren't being asked to. So they stopped being something you invoke and became something that fires on its own the moment you touch what they cover.
+
+Both fixes have one shape. A rule you have to remember is not a rule. It is an intention with good paperwork. The only ones that hold under pressure are the ones that fire without being called.
+
+The two earlier commits that rewrote this same file say nothing at all. No message, no reason. Which is a strange thing to find in the document that exists because somebody eventually decided that was a problem.
