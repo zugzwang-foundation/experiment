@@ -602,12 +602,29 @@ function BookmarkArgumentCell({
 	}
 	return (
 		<span data-testid={`bookmark-arg-${item.id}`} className="text-ink">
+			{/* ⚠⚠ PROFILE REFINEMENT · R1 — `line-clamp-3` HERE, NOT PROFILE'S 4, AND
+			    THE DIFFERENCE IS ARITHMETIC RATHER THAN TASTE. Both clamps are derived
+			    the same way — the 128px third minus whatever else the cell carries,
+			    divided by this element's own 18.9px line box — but this cell carries
+			    ONE MORE BLOCK than Profile's: the parent reference (`Replied to …`),
+			    which SPEC.1 §23 requires for a reply-bet and recon A-7 struck the
+			    removal of. Two blocks leave room for four title lines; three leave room
+			    for three.
+			    ⇒ MEASURED, AND THIS IS WHY IT MOVED: at `line-clamp-4` the rows came out
+			    `[136, 128]` on staging — both DECLARED 128, but a `<tr>` height is a
+			    FLOOR, so the row carrying a 4-line title AND a 2-line parent reference
+			    outgrew it by 8px. At 3 the content fits under the floor and the rows are
+			    equal, which is the whole point of the third.
+			    ⛔ NOT A DIFFERENT RULE, AND NOT AN INVENTED NUMBER: same budget, same
+			    line box, one more subtrahend. A shared clamp CONSTANT would have been
+			    the wrong kind of sharing — it would make the two surfaces agree on a
+			    figure while disagreeing on the thing the figure is for. */}
 			<Link
 				data-testid={`bookmark-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}
 				// ⚠ PROFILE-FULL — `.ptitle` is 14px/700/1.35 (`:288`), in lockstep
 				// with Profile's argument title.
-				className="text-[14px] leading-[1.35] font-bold hover:underline"
+				className="line-clamp-3 text-[14px] leading-[1.35] font-bold hover:underline"
 			>
 				{item.title}
 			</Link>
