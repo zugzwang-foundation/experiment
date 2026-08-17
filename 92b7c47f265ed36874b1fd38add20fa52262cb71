@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Step That Gates Itself
+
+A second environment, and a script written to stand in front of its own setup. Mixing settings entered by hand with settings a service manages for you breaks both in ways that are hard to see afterwards, so the script goes hunting for hand-entered ones and exits failing if it finds any. The step it guards cannot run until somebody has dealt with what it found.
