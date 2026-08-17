@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+The Browser's Own Broken Glyph
+
+An image address that has expired or lost its file produces the browser's own broken-image icon, and none of the three places showing pictures on the front page had any answer for that. Each checked only whether an address existed, never whether it worked. One component now owns all three states — nothing, broken, loaded — at every site, so the answer cannot vary by location.
