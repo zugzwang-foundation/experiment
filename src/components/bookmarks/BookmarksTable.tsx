@@ -325,7 +325,7 @@ export function BookmarksTable({
 				    figure and its delta are ONE quantity; breaking them across lines is never
 				    the right degrade, so the cell is told not to, and the 118px track is what
 				    means it never has to. */}
-				<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
+				<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 					<tr>
 						<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 						<th className="px-2 pt-0 pb-2 text-center">Argument</th>
@@ -433,7 +433,7 @@ function BookmarkRow({
 						// ⚠ PROFILE-FULL — `.pside` is 11px/800 (`:283`), moved in lockstep
 						// with Profile's side word (§3: the two surfaces are never sized one
 						// after the other). This was `text-xs` at weight 400.
-						className="flex items-center gap-[5px] text-[11px] leading-normal font-extrabold"
+						className="flex items-center gap-[5px] text-[11px] leading-[1.2] font-extrabold"
 					>
 						{item.side === "YES" ? "Yes" : "No"}
 						<ThumbGlyph side={item.side} size={12} />
@@ -491,7 +491,7 @@ function BookmarkRow({
 								return pl.magnitude === "" ? null : (
 									<span
 										data-testid={`bookmark-pl-${item.id}`}
-										className="text-[10.5px] leading-normal font-bold text-n5"
+										className="text-[10.5px] leading-[1.2] font-bold text-n5"
 									>
 										({pl.sign}Đ{pl.magnitude})
 									</span>
@@ -639,7 +639,7 @@ function BookmarksPanel({
 				    ⛔ STILL AN `<h1>`: the register is a TREATMENT, and DOC-1 says a
 				    shared treatment never ratifies a shared file shape. `uppercase` is a
 				    transform, so this heading's accessible name is still `Bookmarks`. */}
-				<h1 className="text-[11px] leading-normal font-extrabold tracking-[0.12em] text-ink uppercase">
+				<h1 className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
 					Bookmarks
 				</h1>
 				{/* ⚠⚠ ROUND 5 — THE TWO-CHIP QUESTION IS RESOLVED, AND THIS IS THE
@@ -670,7 +670,7 @@ function BookmarksPanel({
 				    consumer keeps its handle. */}
 				<span
 					data-testid="bookmarks-view-chip"
-					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-normal font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
+					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-[1.2] font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
 				>
 					Your bookmarks
 				</span>

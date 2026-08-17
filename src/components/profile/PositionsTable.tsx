@@ -603,7 +603,7 @@ export function PositionsTable({
 					    figure and its delta are ONE quantity; breaking them across lines is never
 					    the right degrade, so the cell is told not to, and the 118px track is what
 					    means it never has to. */}
-					<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-normal font-extrabold tracking-[0.12em] text-n4 uppercase">
+					<thead className="sticky top-0 z-10 bg-n0 text-[8.5px] leading-[1.2] font-extrabold tracking-[0.12em] text-n4 uppercase">
 						<tr>
 							<th className="w-[96px] px-2 pt-0 pb-2 text-center">Position</th>
 							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
@@ -766,7 +766,7 @@ export function PositionsTable({
 													// `text-xs` at weight 400, so the SIDE — the one word that
 													// says which pole this holding is on — was the lightest
 													// thing in its own cell.
-													className="flex items-center gap-[5px] text-[11px] leading-normal font-extrabold"
+													className="flex items-center gap-[5px] text-[11px] leading-[1.2] font-extrabold"
 												>
 													{row.side === "YES" ? "Yes" : "No"}
 													<ThumbGlyph side={row.side} size={12} />
@@ -810,7 +810,7 @@ export function PositionsTable({
 													<Button
 														type="button"
 														variant="outline"
-														className="h-auto rounded-(--r) px-[22px] py-[9px] text-[11.5px] leading-normal font-extrabold tracking-[0.1em] uppercase [border:var(--ring-active)]"
+														className="h-auto rounded-(--r) px-[22px] py-[9px] text-[11.5px] leading-[1.2] font-extrabold tracking-[0.1em] uppercase [border:var(--ring-active)]"
 														data-testid={`sell-trigger-${row.marketId}`}
 														aria-expanded={sellOpen}
 														onClick={() =>
@@ -911,7 +911,7 @@ export function PositionsTable({
 													{pl.magnitude !== "" && (
 														<span
 															data-testid={`position-pl-${row.marketId}`}
-															className="text-[10.5px] leading-normal font-bold text-n5"
+															className="text-[10.5px] leading-[1.2] font-bold text-n5"
 														>
 															({pl.sign}Đ{pl.magnitude})
 														</span>
@@ -1091,7 +1091,7 @@ function PositionsPanel({
 				    would lose the distinction the mockup is drawing.
 				    ⛔ `uppercase` IS A TRANSFORM: `textContent` is still `Positions`, so
 				    every consumer that reads this head by text keeps its handle. */}
-				<span className="text-[11px] leading-normal font-extrabold tracking-[0.12em] text-ink uppercase">
+				<span className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
 					Positions
 				</span>
 				{/* ⚠⚠ PROFILE-FULL — THE VIEW CHIP MOVES HERE FROM THE IDENTITY BODY.
@@ -1137,7 +1137,7 @@ function PositionsPanel({
 				    before. A span states the whole box. */}
 				<span
 					data-testid="profile-chip"
-					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-normal font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
+					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-[1.2] font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
 				>
 					{owner ? PROFILE_COPY.chip.owner : PROFILE_COPY.chip.visitor}
 				</span>
