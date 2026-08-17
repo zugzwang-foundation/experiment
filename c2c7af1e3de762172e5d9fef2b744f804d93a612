@@ -1,0 +1,11 @@
+Instructions for AI
+Explain why, never what. Every step here was taken for a reason, and the
+reason is the interesting part. Give your reader that — what was being
+protected, what was let go of, and why it mattered enough to do at all.
+They should leave understanding the idea, not the mechanics.
+The message holds what was done. The note attached to it holds why. Where
+there is a note, that is the one you want.
+
+A Different Hand
+
+The thing writing the code changes. Not the people and not the process — the model itself, named in four files so a session cannot quietly start on something else. The same commit sets how hard it should think by default, and retires an environment variable able to override that from outside, on the grounds that a setting which outranks the written one is a setting nobody can see.
