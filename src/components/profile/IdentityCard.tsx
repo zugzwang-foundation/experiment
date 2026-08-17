@@ -129,12 +129,17 @@ export function IdentityCard({
 			    table on the node that declares the band,
 			    `u/[pseudonym]/page.tsx`'s `profile-headzone` block.
 
-			    ⚠ THE VIEW CHIP HAS LEFT THIS BLOCK. It was a body chip under the
-			    pseudonym costing 24px of the band; the mockup carries it as a HEAD
-			    control (`.viewchip`, `:425`). It now renders in the positions panel
-			    head — see `PositionsTable.tsx` — which is where this build already
-			    put the same chip on `/bookmarks` (`bookmarks-view-chip`), so the two
-			    surfaces stay symmetric. `showViewChip` is retired with it. */}
+			    ⚠ THE VIEW CHIP HAS LEFT THIS BLOCK, AND THEN LEFT THE BUILD. It was a
+			    body chip under the pseudonym costing 24px of the band, so PROFILE-FULL
+			    moved it to the positions panel head where the mockup carries it
+			    (`.viewchip`, `:425`); the founder then removed it from that head at
+			    R5, and removed `/bookmarks`'s `Your bookmarks` twin at PROFILE OVERLAP
+			    R3. ⛔ SO THERE IS NO CHIP ANYWHERE — this block does not suppress one,
+			    and no sibling renders one. `showViewChip` is retired with it.
+			    ⚠ The sentence that stood here said the chip "now renders in the
+			    positions panel head", which was true for exactly one pass. Corrected
+			    rather than left, because a reader who trusts it goes looking for an
+			    element that no longer exists. */}
 			{/* A plain <img> (not the radix Avatar, which defers the img until load
 			    and shows only its fallback under jsdom) — the PFP is a tiny static
 			    SVG placeholder; next/image would rewrite its src and add no value.

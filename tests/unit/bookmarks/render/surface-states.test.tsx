@@ -453,19 +453,28 @@ describe("GATE C F-1 — `Bookmarks` renders exactly once", () => {
 		expect(head.contains(headings[0] as Node)).toBe(true);
 	});
 
-	it("f1::the-view-chip-still-renders-exactly-once-pending-the-ruling", async () => {
-		// ⚠ The chip is SHIPPED WHERE IT WAS relative to the title, not resolved.
-		// The two-chip question (this vs IdentityCard's "Viewing as owner") is the
-		// founder's; this only pins that moving it did not duplicate or drop it.
+	it("f1::the-view-chip-is-GONE-from-the-surface", async () => {
+		// ⛔⛔ RETIRED, NOT RELAXED — PROFILE OVERLAP R3 deleted the chip, so this
+		// case had to invert or become an assertion about a node that cannot exist.
+		// It read `f1::the-view-chip-still-renders-exactly-once-pending-the-ruling`
+		// and pinned `chips.length === 1` inside the panel head; the ruling it was
+		// pending has now landed the other way. ⚠ The predicate is UNCHANGED — the
+		// same leaf-text sweep, the same head-containment idea — and the expected
+		// count moved from 1 to 0 by decision, not by weakening.
 		vi.mocked(loadBookmarks).mockResolvedValue([]);
 		const { container } = render(await BookmarksPage());
 		const chips = [...container.querySelectorAll("*")].filter(
 			(el) => el.children.length === 0 && el.textContent === "Your bookmarks",
 		);
-		expect(chips.length).toBe(1);
-		expect(
-			screen.getByTestId("bookmarks-panel-head").contains(chips[0] as Node),
-		).toBe(true);
+		expect(chips.length).toBe(0);
+		// …and the testid with it, so nothing can re-render it under other copy.
+		expect(screen.queryByTestId("bookmarks-view-chip")).toBeNull();
+		// ⛔ THE POSITIVE CONTROL FOR AN ABSENCE ASSERTION: the head it used to live
+		// in must still be here, or "no chip" would pass on an unrendered surface.
+		expect(screen.getByTestId("bookmarks-panel-head")).toBeTruthy();
+		expect(screen.getByTestId("bookmarks-panel-head").textContent).toContain(
+			"Bookmarks",
+		);
 	});
 
 	it("f1::POSITIVE-CONTROL-the-leaf-predicate-catches-a-duplicate", () => {
@@ -496,18 +505,22 @@ describe("ROUND 5 — one chip on /bookmarks, and Profile keeps its own", () => 
 			(el) => el.children.length === 0 && el.textContent === text,
 		);
 
-	it("chip::`Your bookmarks` renders exactly ONCE on the surface", async () => {
+	it("chip::`Your bookmarks` is ABSENT from the surface", async () => {
+		// ⛔⛔ RETIRED, NOT RELAXED — the same R3 deletion, asserted from the round-5
+		// case that ratified the chip in the first place. It read
+		// `renders exactly ONCE on the surface` with the message "it is the
+		// surface's ONLY chip and lives in the panel head"; there is now no chip on
+		// this surface at all, and that is the ruling rather than a regression.
+		// ⚠ THE LEAF PREDICATE IS THE SAME ONE and it is what makes this meaningful:
+		// its own positive control above proves it can count a duplicate, so a zero
+		// here is a real zero rather than a selector that stopped matching.
 		vi.mocked(loadBookmarks).mockResolvedValue([]);
 		const { container } = render(await BookmarksPage());
-		const hits = leaves(container, "Your bookmarks");
-		expect(
-			hits.length,
-			`round 5: "Your bookmarks" renders ${hits.length} times; it is the ` +
-				`surface's ONLY chip and lives in the panel head.`,
-		).toBe(1);
-		expect(
-			screen.getByTestId("bookmarks-panel-head").contains(hits[0] as Node),
-		).toBe(true);
+		expect(leaves(container, "Your bookmarks").length).toBe(0);
+		expect(leaves(container, "Viewing as owner").length).toBe(0);
+		// ⛔ And the surface still rendered — otherwise both zeros are worthless.
+		expect(screen.getByTestId("identity-card")).toBeTruthy();
+		expect(screen.getByTestId("bookmarks-panel-head")).toBeTruthy();
 	});
 
 	it("chip::`Viewing as owner` renders ZERO times on the surface", async () => {

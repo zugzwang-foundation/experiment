@@ -792,38 +792,22 @@ function BookmarksPanel({
 				<h1 className="text-[11px] leading-[1.2] font-extrabold tracking-[0.12em] text-ink uppercase">
 					Bookmarks
 				</h1>
-				{/* ⚠⚠ ROUND 5 — THE TWO-CHIP QUESTION IS RESOLVED, AND THIS IS THE
-				    SURVIVING CHIP. It arrived here at F-1 because it shared the removed
-				    page-level row with the `<h1>`; the founder has now ruled that it
-				    STAYS and that `IdentityCard`'s "Viewing as owner" is REMOVED on
-				    this surface — which is what the mockup's bookmark mode does
-				    (`surface_profile_v1_0.html:768`, `vc.textContent='Your bookmarks'`,
-				    ONE chip). The suppression rides a new optional prop whose default
-				    is today's behaviour, so Profile is untouched.
-				    ⛔ NO STRING WAS RETITLED — `profile/copy.ts` is untouched.
-
-				    ⚠⚠ PROFILE-FULL — IT TAKES `.viewchip`'s REGISTER, and now Profile's
-				    chip sits in the same slot with the same classes. `showViewChip` is
-				    retired: the chip left the identity block on BOTH surfaces, so there
-				    is no longer a second chip here to suppress.
-				    ⚠ THE TYPE IS THE MOCKUP'S (`:183-184`): 9px/800/.12em uppercase, a
-				    DASHED n4 hairline, n5 text, `--r` radius, 5/10 padding. The mockup
-				    renders `Your bookmarks` through this same `.viewchip` element in
-				    bookmark mode (`:768`), so it is the same box by construction, not by
-				    resemblance — and the dashed edge is what separates an annotation
-				    from a control (every real control here carries a solid one).
-				    ⚠ A `<span>`, NOT `Badge`, for the reason recorded at Profile's copy:
-				    `Badge`'s base fixes `h-5`, `rounded-4xl`, `px-2 py-0.5` and
-				    `text-xs`, four of the five properties this chip must set, and
-				    overriding same-property pairs from a `className` leaves the winner
-				    to emission order. ⛔ The TESTID is unchanged, so every existing
-				    consumer keeps its handle. */}
-				<span
-					data-testid="bookmarks-view-chip"
-					className="w-fit shrink-0 rounded-(--r) border border-dashed border-n4 px-[10px] py-[5px] text-[9px] leading-[1.2] font-extrabold tracking-[0.12em] whitespace-nowrap text-n5 uppercase"
-				>
-					Your bookmarks
-				</span>
+				{/* ⛔⛔ THE `Your bookmarks` CHIP IS DELETED — founder-ruled at PROFILE
+				    OVERLAP R3, the same ruling that removed `Viewing as owner` from the
+				    identity block one pass earlier. Not hidden, not suppressed by a prop:
+				    the element and its testid are gone.
+				    ⚠ WHAT THAT ENDS, recorded because two rounds of work lived in it. The
+				    chip arrived here at F-1 from a removed page-level row; round 5 then
+				    ruled it the surface's SURVIVING chip and retired Profile's in its
+				    favour; PROFILE-FULL gave it the mockup's `.viewchip` register
+				    (dashed n4, 9px/800/.12em). The mockup does render it in bookmark mode
+				    (`surface_profile_v1_0.html:768`) — so this is a deliberate divergence
+				    from the mockup, not a missed port, and it is the founder's to make.
+				    ⚠ THE PANEL SAYS IT ALREADY. The head is titled `BOOKMARKS`, the route
+				    is `/bookmarks`, and the bookmark control in the identity band is
+				    FILLED — three statements of the same fact, of which the chip was the
+				    fourth. ⛔ `showViewChip` was already retired before this and stays
+				    retired; there is no prop left whose only job was this element. */}
 				{controls}
 			</div>
 			<div

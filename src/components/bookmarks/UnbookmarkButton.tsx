@@ -59,10 +59,15 @@ export function UnbookmarkButton({
 		   six characters where the mockup's `OPEN` is four, so at the mockup's type
 		   the word alone is ~54px and there is no padding budget left for a 16px
 		   glyph plus its gap. One of the three had to go, and the icon is the one
-		   that carries least here — the panel is titled `BOOKMARKS`, its chip reads
-		   `YOUR BOOKMARKS`, and the word `REMOVE` is unambiguous about the action;
-		   a filled bookmark on a row inside the bookmarks list restates what the
-		   surface has already said twice.
+		   that carries least here — the panel is titled `BOOKMARKS`, the route is
+		   `/bookmarks`, and the word `REMOVE` is unambiguous about the action; a
+		   filled bookmark on a row inside the bookmarks list restates what the
+		   surface has already said. ⚠ THE ARGUMENT LOST ONE OF ITS THREE LEGS at
+		   PROFILE OVERLAP R3 and still stands on two: it used to count the head's
+		   `YOUR BOOKMARKS` chip as the second statement, and that chip is deleted.
+		   The conclusion is unchanged; the count is not, and a docblock that keeps
+		   counting a deleted element is how a reader learns to distrust all of
+		   them.
 		   ⚠ WHAT IS KEPT IS THE PART THAT WAS THE POINT: the height, the 800
 		   weight, the uppercase, the tracking and the border — the mockup's button
 		   REGISTER. Only its width bows to a column the mockup itself sets. */

@@ -1247,8 +1247,13 @@ function PositionsPanel({
 				    distinction is still guarded, by the value rather than by a chip.
 				    ⚠ `PROFILE_COPY.chip` is left in `copy.ts` UNTOUCHED: it is web-authored
 				    string data, this row removes a render and not a ratified string, and
-				    `/bookmarks` still renders its own `bookmarks-view-chip` (which R5 does
-				    not name). ⇒ Deleting the copy would be a second, unasked decision. */}
+				    the copy is not what was removed. ⇒ Deleting it would be a second,
+				    unasked decision.
+				    ⚠ THE OTHER HALF OF THAT SENTENCE IS NOW STALE AND IS CORRECTED HERE: it
+				    read "`/bookmarks` still renders its own `bookmarks-view-chip` (which R5
+				    does not name)". PROFILE OVERLAP R3 names it and deletes it, so neither
+				    surface carries a view chip. The reasoning for leaving `PROFILE_COPY.chip`
+				    in place is untouched — it never depended on the twin existing. */}
 				{controls}
 			</div>
 			{/* HTML-FINISH row 3 — THE PANEL-SCOPED SCROLL. `flex-1 min-h-0

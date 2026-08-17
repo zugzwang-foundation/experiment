@@ -27,9 +27,11 @@ export { BOOKMARKS_EMPTY_COPY } from "@/components/bookmarks/BookmarksTable";
 /**
  * The /bookmarks surface (ADR-0032 D-5 / D-6; plan §3.3), composed into the
  * ADR-0023 `(public)/` shell. The session user's saved pointers at OTHER
- * authors' arguments, rendered in FORCED-VISITOR mode: list titled "Bookmarks,"
- * a "Your bookmarks" chip, NO Sell mount ever (every item is someone else's
- * content by D-3), each card's bookmark icon ACTIVE (un-bookmark).
+ * authors' arguments, rendered in FORCED-VISITOR mode: list titled "Bookmarks",
+ * NO Sell mount ever (every item is someone else's content by D-3), each card's
+ * bookmark icon ACTIVE (un-bookmark). ⚠ The `"Your bookmarks"` chip this
+ * sentence used to name is DELETED (PROFILE OVERLAP R3) — the head title, the
+ * route and the filled bookmark control in the identity band already say it.
  *
  * AUTH-GATED: there is no anonymous bookmark set, so an anonymous visitor is
  * redirected to /sign-in. `viewerId` is ALWAYS `session.user.id` — never a
@@ -138,11 +140,14 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 			    ⚠ `owner` IS TRUE AND THAT IS NOT A GUESS: `/bookmarks` is auth-gated
 			    and `viewerId` is always `session.user.id`, so the viewer IS the user
 			    whose band this is. The visitor arm cannot occur on this route.
-			    ⚠ ROUND 5 — `showViewChip={false}`. Founder-ruled: this surface shows
+			    ⚠ ROUND 5 — `showViewChip={false}`. Founder-ruled: this surface showed
 			    ONE chip, the panel head's "Your bookmarks", which is what the
 			    mockup's bookmark mode does (`:768`). Without it the identity card's
 			    own chip read "Viewing as owner" beside it — two chips describing the
-			    same view in different words. ⛔ The suppression is SCOPED to this
+			    same view in different words. ⚠ BOTH ARE NOW GONE (R5 removed the
+			    identity chip, PROFILE OVERLAP R3 the head chip), so this paragraph is
+			    a record of how the count reached zero rather than a live rule.
+			    ⛔ The suppression was SCOPED to this
 			    call site; `IdentityCard`'s default is unchanged, so Profile renders
 			    byte-identically.
 			    ⚠ THE ONE WART NAMED HERE AT ROUND 3 IS FIXED, NOT STILL REPORTED. It
@@ -192,10 +197,11 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				    the grid so the graph stays in its own column. */}
 				{/* ⚠ PROFILE-FULL — `showViewChip` IS RETIRED, and this call site is why
 				    the prop existed. The chip no longer lives in the identity block on
-				    EITHER surface: it is a head control in the mockup (`.viewchip`,
-				    `:425`), and this route already rendered its own
-				    `bookmarks-view-chip` in the panel head. So the suppression has
-				    nothing left to suppress — there is no second chip to collide with,
+				    EITHER surface: it was a head control in the mockup (`.viewchip`,
+				    `:425`) and this route rendered its own twin in the panel head.
+				    ⚠ AND AT PROFILE OVERLAP R3 THAT TWIN IS DELETED TOO, so there is no
+				    view chip on this surface at all. The suppression has nothing left to
+				    suppress — there is no second chip to collide with,
 				    and Profile now carries its chip in the same place.
 				    ⛔ THE COMMENT SITS ABOVE THE TERNARY, not inside its branch. A JSX
 				    comment placed inside `) : ( … )` is a second child of a slot that
