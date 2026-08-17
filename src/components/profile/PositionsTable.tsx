@@ -108,10 +108,20 @@ export function PositionsTable({
 	// index because its row array never changes; ours is re-filtered by two
 	// controls, so an index would silently point at a different row the moment a
 	// filter moved.
-	// ⛔ IT STARTS AT NULL, NOT AT THE FIRST ROW. The mockup auto-selects
-	// (`refresh()`, `:571` — "the replica always shows an argument"); the founder
-	// ruled the opposite for this build — the full argument list IS the empty
-	// state — so nothing is selected until the reader picks.
+	// ⛔⛔ IT STILL STARTS AT NULL, BUT NULL NO LONGER MEANS "NOTHING SELECTED" —
+	// PROFILE REFINEMENT · R3 REVERSED THE RULING THIS COMMENT RECORDED. It used to
+	// read: "the founder ruled the opposite for this build — the full argument list
+	// IS the empty state — so nothing is selected until the reader picks." The
+	// founder has now ruled the mockup's way: the panel loads with the FIRST row
+	// selected and the rail shows that argument in full, because a rail of stubs on
+	// load was the defect. The mockup's own note is the one that governs again —
+	// `refresh()` (`:571`): "the list auto-selects the first visible row … the
+	// replica always shows an argument".
+	// ⚠ THE STATE STILL STARTS AT NULL DELIBERATELY, and that is not a leftover: it
+	// means "the reader has not chosen", which is a different fact from "row one is
+	// chosen" and is what lets the FALLBACK below re-aim at the first VISIBLE row
+	// every time a filter moves. Seeding the state with row one's id instead would
+	// pin a stale id the moment the filter changed.
 	const [selectedMarketId, setSelectedMarketId] = useState<string | null>(null);
 	// One entry per rendered position row, for `scrollIntoView` + focus on an
 	// arrow step. A ref, not state: moving focus must not re-render.
@@ -182,8 +192,21 @@ export function PositionsTable({
 	// is unavailable, so a hidden selection simply stops counting and the panel
 	// returns to the list. Derivation, not an effect: an effect would render one
 	// frame with a selection that is no longer on screen.
+	// ⚠⚠ PROFILE REFINEMENT · R3 — THE FIRST VISIBLE ROW IS THE FALLBACK, and this
+	// ONE expression is the whole of R3. It covers every case the row names —
+	// mount, filter change, and (once bookmarks mode exists) mode switch — because
+	// all three are the same question: the stored pick is not in `visible`, so what
+	// is selected? The answer is now "the first row that is" instead of "nothing".
+	// ⛔ A DERIVATION, NOT AN EFFECT. An effect that watched `visible` and wrote
+	// state would render one frame with the OLD selection — the empty rail this row
+	// exists to remove, just one frame long — and would need its own guard against
+	// looping. Falling back at read time cannot be out of date.
+	// ⚠ THE EMPTY LIST FALLS OUT FOR FREE: `visible[0]` is `undefined`, so this is
+	// `null` and the existing empty state renders. No phantom row, no crash — the
+	// case R3 warns about is handled by the shape of the expression rather than by
+	// a branch.
 	const selectedRow =
-		visible.find((r) => r.marketId === selectedMarketId) ?? null;
+		visible.find((r) => r.marketId === selectedMarketId) ?? visible[0] ?? null;
 
 	// ROUND 4 item 7 — REPORT THE DERIVED SELECTION UPWARD. The deps are all
 	// PRIMITIVES, never `selectedRow` itself: the row object is rebuilt on every
@@ -392,11 +415,23 @@ export function PositionsTable({
 		return () => observer.disconnect();
 	}, [visible.length]);
 
-	/** `pick(i)` (`:679`) — click the selected row again to clear it. The mockup
-	 * has no deselect because it always holds one; here deselect is the way back
-	 * to the full argument list, so the click TOGGLES. */
+	/** `pick(i)` (`:679`) — select a row.
+	 *
+	 * ⚠⚠ PROFILE REFINEMENT · R3 — THE TOGGLE IS RETIRED. It used to clear the
+	 * selection on a second click, and the reason given was that "deselect is the
+	 * way back to the full argument list". R3 removes that destination: the panel
+	 * now always holds a selection, so clearing it would immediately re-derive to
+	 * the first visible row — which makes a second click a silent no-op on row one
+	 * and a jump-to-row-one everywhere else. That is worse than not offering it.
+	 * ⛔ THE MOCKUP HAS NO DESELECT EITHER, for exactly this reason: it always holds
+	 * one (`:679` sets `sel = i` unconditionally).
+	 * ⚠ THE COST, NAMED: the UNFILTERED full argument list is no longer reachable
+	 * from this panel, because it is no longer a state the panel can be in. That is
+	 * an information change and it is the founder's call — R3 rules the rail must
+	 * show a full post on load. The list is still what renders when a filter yields
+	 * zero rows, and every argument remains reachable one row-click at a time. */
 	const pick = (marketId: string) => {
-		setSelectedMarketId((current) => (current === marketId ? null : marketId));
+		setSelectedMarketId(marketId);
 	};
 
 	/** `stepRow(dir)` (`:741-749`) — Up/Down step through the CURRENTLY VISIBLE

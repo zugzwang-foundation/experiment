@@ -376,22 +376,44 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 			/>,
 		);
 
-	it("arena::a-click-on-a-row-filters-the-panel-to-its-argument", () => {
+	it("arena::THE-PANEL-OPENS-ON-THE-FIRST-ROW-S-ARGUMENT", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED AT THE FRONT. This opened by asserting
+		// the FULL LIST was on screen at mount and that a click then filtered it. R3
+		// rules the opposite: the rail must show a full post on load, because a rail
+		// of stubs was the defect. So the arena now mounts already filtered to the
+		// first row's argument, under that row's market question.
 		mount();
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
-		fireEvent.click(screen.getByTestId(`position-row-${M_POST}`));
+		expect(screen.queryByTestId("argument-list")).toBeNull();
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the post");
 	});
 
-	it("arena::DESELECT-returns-the-full-list-and-the-header-word", () => {
+	it("arena::a-click-on-ANOTHER-row-moves-the-panel-to-ITS-argument", () => {
+		// The half of the original claim that survives unchanged: a pick still drives
+		// the panel. Asserted on the row that is NOT the mount default, so it is a
+		// real transition rather than a no-op.
 		mount();
-		const row = screen.getByTestId(`position-row-${M_POST}`);
+		fireEvent.click(screen.getByTestId(`position-row-${M_REPLY}`));
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(panelTitle()).toBe("Market question for the reply");
+	});
+
+	it("arena::A-SECOND-CLICK-KEEPS-THE-PANEL-rather-than-emptying-it", () => {
+		// ⚠⚠ PROFILE REFINEMENT · R3 — INVERTED. This asserted that a second click
+		// DESELECTED and returned the full list under the header word `Arguments`.
+		// R3 retires deselect: the panel always holds a selection, so clearing would
+		// re-derive to the first visible row — making a second click a no-op on row
+		// one and a jump-to-row-one elsewhere. The full-list arm is not dead (a
+		// zero-row filter and every call site that passes no selection still reach
+		// it); it is simply no longer where a second click goes.
+		mount();
+		const row = screen.getByTestId(`position-row-${M_REPLY}`);
 		fireEvent.click(row);
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		fireEvent.click(row);
-		expect(screen.getByTestId("argument-list")).toBeTruthy();
-		expect(screen.getByTestId(`argument-${C_REPLY}`)).toBeTruthy();
-		expect(panelTitle()).toBe("Arguments");
+		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
+		expect(screen.queryByTestId("argument-list")).toBeNull();
+		expect(panelTitle()).toBe("Market question for the reply");
 	});
 
 	it("arena::THE-PANEL-FOLLOWS-THE-ARROW-KEYS", () => {

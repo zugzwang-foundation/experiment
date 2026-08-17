@@ -100,7 +100,16 @@ export function ArgumentList({
 	// ⚠⚠ ROUND 4 item 7 — THE PANEL FILTERS, IT DOES NOT REPLACE. A picked
 	// positions row narrows this panel to THAT argument, rendered as the mockup's
 	// replica card, under the row's MARKET QUESTION as the header (mockup `:477`,
-	// written by `renderReplica` at `:650`). Deselect returns the full list.
+	// written by `renderReplica` at `:650`).
+	// ⚠⚠ PROFILE REFINEMENT · R3 — "DESELECT RETURNS THE FULL LIST" NO LONGER
+	// HOLDS, and the sentence is corrected here rather than left to mislead. The
+	// positions table now always holds a selection (its first visible row by
+	// default), so this panel's filtered arm is the DEFAULT arm and deselect has
+	// been retired for want of a destination — see `PositionsTable`'s `pick`.
+	// ⛔ THE FULL-LIST ARM IS NOT DEAD CODE. It still renders whenever there is no
+	// selection to pass — a filter that yields zero rows, an empty positions set,
+	// and every call site that passes no `selection` at all (which is what the
+	// render suites do). It stopped being the DEFAULT; it did not stop existing.
 	// ⇒ WHY A FILTER, one line: SPEC.1 §16.3 D8 and §17 name the §23 argument
 	// list as where a complete record lives, and `positions.ts:151-158` drops
 	// fully-exited markets from the table — so this list holds arguments the
