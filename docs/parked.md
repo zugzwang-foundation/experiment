@@ -1023,6 +1023,45 @@ the strikethroughs inside it are the corrections this task made.*
 
 ---
 
+## REGISTER-APPLY — five `POLISH-register-ADDITIONS.md` rows have never been applied
+
+**Originating task:** POLISH.0 (2026-07-30). **Docketed:** SYNC-2, 2026-08-18 — ⚠ **it had
+no row here at all**, while `POLISH-TRACKER.md` cited it as the gate on POLISH.5.
+
+**Deferred work.** Apply the five rows still unapplied in
+`docs/polish/POLISH-register-ADDITIONS.md`, enumerated rather than counted because the file
+itself insists on that:
+
+| ID | What |
+|---|---|
+| `SP-1` | **P0** — staging parity blocks the §23 tile verify and all profile-surface testing |
+| `SP-2` | **DECISION** — add `CHECK (share_quantity > 0)` to `bets`. ⚠ **DDL. Full ritual + ADR. Do not build silently** |
+| `SP-3` | **DOCKET** — one bad row makes a whole profile permanently unreachable |
+| `PD-1-nn` *(proposed)* | Portfolio / Balance read as **nested** by a reader → routed POLISH.1 |
+| `DRIFT-1` | Staging fails to advance after merge |
+
+**Why this row exists at all.** The standing rule at the head of this file — *a routing
+destination named in a committed document gets a row here in the same commit* — was written
+after six such destinations were found unrouted. **`REGISTER-APPLY` was a seventh, and it
+was worse than the six: it did not merely receive work, it GATED A SURFACE.**
+`POLISH-TRACKER.md` §1 carried *"⚠ REGISTER-APPLY first"* against POLISH.5 while nothing
+anywhere defined, owned or dated it. POLISH.5 then ran to completion across three PRs
+without it.
+
+**Two of the five are no longer inert.** `SP-2` is a DDL decision that has sat unapplied
+since 2026-08-06 and needs an ADR before it can be built — the ADR ceiling has not moved
+since. `DRIFT-1`'s stated invariant (*"`git diff main..staging` is empty except during a
+deliberate hold"*) was **violated again on 2026-08-18**, its third instance, and the
+substantive fix now lives in `deploy-pipeline.md`'s staging-advance section.
+
+**Conditional trigger.** Before any further POLISH-lane work, **or** at the first touch of
+`POLISH-register-ADDITIONS.md`, whichever comes first. `SP-2` additionally fires on any
+task opening `drizzle/`.
+
+**Expected next task.** A single doc-lane pass applying `SP-1`, `SP-3` and `PD-1-nn` to
+`POLISH-register.md`; `SP-2` splits out to its own gated ADR task; `DRIFT-1` closes against
+the runbook section.
+
 ## MICRO-LABEL-TIER — normalise the uppercase micro-labels — **ROUTED TO POLISH.4**
 
 **Originating task:** PRIMITIVES-2 PR-B (2026-08-11), ruling **D8**.

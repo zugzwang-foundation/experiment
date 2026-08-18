@@ -141,6 +141,41 @@ code: '42P07',  message: 'relation "__drizzle_migrations" already exists, skippi
 
 **The health endpoint is the authority — not the migrate exit code.** `drizzle-kit migrate` can exit `0` with a migration unapplied (drizzle-orm #5769 — the silent high-water-mark skip), so a green `staging-migrate.yml` run is a **signal, not a verdict**. Only `migrations:"ok"` from `/api/health` proves the DB matches the committed set. This is the same rule §3 enforces at the production promote gate; staging earns no exemption from it for being resettable.
 
+### The staging advance — the command, and why it is a force-push
+
+`staging` is advanced to `main` by an operator-run force-push to a **pinned SHA**:
+
+```bash
+git fetch origin
+git push --force-with-lease origin <MAIN_SHA>:refs/heads/staging
+```
+
+**Why force, when a fast-forward was the documented path.** Work has more than once been
+committed directly onto `staging` and then squash-merged to `main`. The squash produces a
+tree identical to the branch's and a SHA that is not its descendant, so `staging` ends up
+holding N unsquashed commits that encode exactly what one commit on `main` encodes.
+`git diff` between them is empty; `git log` between them is not. **A fast-forward is then
+structurally impossible even though nothing has actually diverged**, and this has happened
+three times (`DRIFT-1`, and again 2026-08-18).
+
+`--force-with-lease` is the safety: it refuses if `staging` moved since the last fetch.
+
+⚠ **Read the tree before forcing, never the log.** `git diff --stat origin/main
+origin/staging` is the measurement that says whether content differs. A one-directional
+diff — deletions only — means `staging` is *behind*, not divergent, and the force-push
+loses nothing. **A two-directional diff means real content exists only on `staging` and the
+force-push would destroy it. Stop and reconcile instead.**
+
+⚠ **`O-10` applies to the SHA you force to.** Vercel dedups a SHA it has already built. If
+`<MAIN_SHA>` already has a `READY` deployment on the `main` ref, forcing `staging` to it may
+produce **no staging deployment at all**, leaving `staging.zugzwangworld.com` on the old
+build while Staging Migrate reports green. **Prefer a SHA Vercel has never seen** — in
+practice, force immediately after a merge that produced a fresh squash — and **verify the
+alias afterwards by reading `/api/health`'s `canary`, not by trusting the workflow.**
+
+**This is a manual runbook step, deliberately.** Automating it is correct and is not
+experiment-phase work; the docket carries `STAGING-AUTO-ADVANCE` for after go-live.
+
 ---
 
 ## 3. Production — migrate-before-serve
