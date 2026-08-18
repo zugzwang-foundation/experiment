@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.7** — 2026-08-14 IST. Supersedes v1.6 (2026-08-11). ⚠ **v1.6 was never entered in §0** — V-7 and V-8 were minted, defined and cited while the amendment record stayed at v1.5, which is the D4 failure this manifest names at §0. **Both blocks are entered below.**
+> **Status:** **v1.8** — 2026-08-17 IST. Supersedes v1.7 (2026-08-14). ⚠ **v1.6 was never entered in §0** — V-7 and V-8 were minted, defined and cited while the amendment record stayed at v1.5, which is the D4 failure this manifest names at §0. **Both blocks are entered below.**
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
