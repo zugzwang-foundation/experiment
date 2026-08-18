@@ -12,7 +12,7 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.34 (semver; bump major on invariant changes)
+- **Version:** 1.0.35 (semver; bump major on invariant changes)
 - **Last updated:** 2026-08-18
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
@@ -1514,6 +1514,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-08-16 | 1.0.32 | §0; §9; §17 | **The collapsed market price chart carries an x-axis — and a rider reconciling the aggregate footer's form.** **(a) THE RULED AMENDMENT.** The collapsed chart gains **two interior ticks and three date labels**. The axis is **presentational and read-only**: it introduces no new data and no new read, because every timestamp it renders is already carried on `PricePoint.at`. **UNCHANGED:** the expanded overlay's axis and its a11y summary; the chart's data contract; `C-CHART-1`'s presentational baseline; every pricing and ranking semantic. The **no nodes** half of the collapsed pin survives untouched. Applied at all four operative sites per **O-4** — §9 *Two modes* (:490), F-DEBATE-5 **System** (:515), F-DEBATE-5 **Acceptance** (:517), and the §17 row (:1260) — never as an appendix. §17's single `debate-view::price-chart-collapsed-no-axis` row is REPLACED BY TWO — `::price-chart-collapsed-time-axis` and `::price-chart-collapsed-no-nodes` — so the axis and the nodes are no longer welded into one assertion where reversing either would silently carry the other with it. Rider: the Acceptance cite named `tests/components/debate/MarketPriceChart.test.tsx`, a path that has never existed on disk; corrected to the real `tests/unit/debate/render/price-chart.test.tsx` — the same class of stale cite 1.0.25 fixed for F-DEBATE-4 and 1.0.31 for F-DEBATE-1. **(b) THE R5 RIDER, CAUGHT ONE COMMIT LATE.** F-DEBATE-1 **System** (:447) named the market-view aggregate footer as **`Support (count) : Đ / Counter (count) : Đ`**, a form HTML-FINISH · MARKET DETAIL round 2 R5 replaced with the two bare `Đ` figures at `2cdc89a` — so the spec described a render that had stopped existing one commit earlier. ⛔ **THE SUBSTANCE IS UNCHANGED**: still a read-time aggregate over reply-bets, still post-relative, still **no vote control**. Only the LABEL moved — the words are the trigger pills directly above each figure and the per-side prefix restated them, while the count is already on the header row as `Replies · N`. Applied at BOTH its operative sites per **O-4**: here and at **design-language §3.1** *Support/Counter aggregate → Form* (same commit), whose **Rule** line is untouched. **§0** → 1.0.32, last-updated 2026-08-16. No DDL, no migration, no new event type, no read-model or DTO change, no Route Handler, no ADR. | **Founder ruling, HTML-FINISH · MARKET DETAIL round 2, R8 (ruled text supplied verbatim at kickoff) and R5.** **Ground for (a), as ruled:** the collapsed card was specified without an axis *when it was a sparkline*. It is now the market's primary price surface in the header rail, and a price series without a time axis is not readable. **No new ADR:** presentational scope over an unchanged data contract. ⚠ The 1.0.30 mockup-governs precedent deliberately does **not** reach this chart and was not invoked — that precedent turns on the §22 card sparkline being DECORATIVE, whereas §9 says the opposite of this chart in terms ("Accessible text summary required — this chart is **not** `aria-hidden`, unlike the §22 sparkline"). Not decorative ⇒ the spec governed, which is exactly why round 1 HALTED this row rather than shipping it, and why it needed a founder-authored amendment to land. ⚠ **Round 1 also flagged that the natural build passes the old guard GREEN**: d5 draws its `.xtick`/`.xlab` as positioned DIVS *outside* the `<svg>` (`d5:496-499`), and the guard asserted the absence of testids *inside* the component — so a literal port would have satisfied the letter of the assertion while breaking the property it named. The axis is therefore built INSIDE the `<svg>`, and the guard was strengthened rather than merely inverted. **Ground for (b):** O-9 — the build changed a render this spec describes, and a spec left naming a form that no longer ships is the drift O-4 and O-9 exist to prevent. | — |
 | 2026-08-17 | 1.0.33 | §0; §10.8 | **§10.8's displayed-space exception admits a THIRD identity — the §23 positions table's per-holding P/L.** The enumeration was CLOSED at two ("Two such identities exist"), which is why `P5-D16` / D24 held the row-level P/L out of the build pending this amendment rather than shipping a third identity the spec did not name. It now reads **three**: the §23 Net P/L tile, the reply split bar's staked total, and the positions table's `displayed P/L = displayed Current − displayed Staked`. **Ground:** exactly the one the exception already states, in its sharpest form — the delta renders INSIDE the Current cell and one column from the Staked cell, the shortest distance between a total and its components anywhere in the product, so a reader checks the subtraction by eye. On the exact basis it would visibly contradict them: a holding displaying `Đ 499` and `Đ 448` can only ever read 51, while an exact delta may display 50. No principle is minted — the pattern, its rationale and its ≤1 Đ cost were ratified twice already; the closed COUNT is what moved. | PROFILE-FULL same-commit rider (§5.12, O-9). The mockup renders this delta at `surface_profile_v1_0.html:558` via `plShort()` (`:674-678`) and its own v0.18 changelog rules it in ("current value shows profit"); the founder reopened the surface with composition and type size in scope and directed that a doc contradicted by a ruled row be corrected in the same commit rather than blocking on it. ⚠ THE WORDING IS CC-AUTHORED and is flagged for founder review in the run report: it extends an enumeration mechanically and mints no new rule, but it is normative text in a web-owned document. Implemented by `displayPositionProfitLossSigned` (`components/debate/format.ts`), which rounds both operands before subtracting; the sign is taken from the Decimal, never from a printed string. No ADR, no DDL, no event type, no §16.1 constant, no §17 row. | — |
 | 2026-08-18 | 1.0.34 | §21 preamble, §21.6, §21.9 (new), §17 | **O1-DECK spec package.** New **§21.9** specifies the onboarding deck: two contexts (non-dismissible first-login gate, dismissible About re-show), the authenticated-AND-no-marker gate condition, the cookie marker (ADR-0037, held to the build commit), marker-written-at-completion-not-at-open, and the standing prohibition on session boundaries as re-show triggers (400-day session vs ~51-day window ⇒ a once-per-session trigger is a once-ever trigger). **§21.6** keeps its descope of the feature-guide page and the `"i"` anchor mechanism, and its *"skippable"* re-show description plus its six-card count are explicitly superseded by §21.9. **§21 preamble** six → seven in scope. **§17** nine `onboarding-deck::*` rows. | O1-DECK | ADR-0037 (held) |
+| 2026-08-18 | 1.0.35 | §21.9 | **O1-DECK build rider.** §21.9's Acceptance line gains the SPEC.2 §13.4 placement rationale for all nine `onboarding-deck::*` rows — gate rows as a pure predicate (the calling layout is an async server component with no render harness in this repo), card-module properties asserted against the module, dismissal and completion rows under jsdom — and a preceding paragraph records the copy-register byte-equality guard and the UTC date pin as a regression guard **outside** the acceptance set, carrying no §17 row by design. No §17 row is added, changed or removed; the nine rows landed at 1.0.34 and are unamended. | O1-DECK | ADR-0037 |
 
 ---
 
@@ -1655,7 +1656,32 @@ re-show deck. It is present for every viewer, authenticated or not.
 mechanism remains deferred per §21.6, and no `(i)` doorway is created,
 restored or re-pointed by this section.
 
-**Acceptance.** §17 rows `onboarding-deck::*`.
+**A copy guard sits beside the acceptance set and is not part of it.** The card
+strings are held in the ratified copy register, not in this section, and the
+register is the source of record the build copies bytes from rather than
+retyping — an ASCII apostrophe substituted for U+2019 is a defect that review
+does not catch. A regression guard therefore asserts the built card strings
+byte-for-byte against the register, and pins the two window dates against
+`FREEZE_INSTANT_UTC` formatted **in UTC**, because the freeze instant renders as
+the following day in any timezone east of Greenwich and the card would then
+contradict the freeze it describes. That guard carries no §17 row and is
+deliberately not an acceptance case.
+
+**Acceptance.** §17 rows `onboarding-deck::*`, placed by the behaviour under
+test per SPEC.2 §13.4. The three gate rows —
+`onboarding-deck::renders-for-authenticated-viewer-without-marker`,
+`onboarding-deck::absent-for-signed-out-visitor` and
+`onboarding-deck::absent-when-marker-present` — exercise the gate as a pure
+predicate rather than through a render, because the layout that calls it is an
+async server component and this repo has no harness that renders one.
+`onboarding-deck::reshow-omits-welcome-card` and
+`onboarding-deck::step-count-derives-from-array` are properties of the card
+module rather than of any render, and are asserted against it directly. The
+four remaining rows — `onboarding-deck::first-login-has-no-dismissal`,
+`onboarding-deck::first-login-final-card-closes`,
+`onboarding-deck::marker-not-written-on-open` and
+`onboarding-deck::reshow-is-dismissible` — are render assertions and run under
+jsdom.
 
 ---
 

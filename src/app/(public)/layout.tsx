@@ -1,11 +1,17 @@
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { ReactNode } from "react";
 
+import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { getHeaderBalance } from "@/server/dharma/header-balance";
 import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
+import { completeOnboardingDeckAction } from "@/server/onboarding/complete";
+import {
+	INTRO_SEEN_COOKIE,
+	shouldShowOnboardingDeck,
+} from "@/server/onboarding/gate";
 
 /**
  * Participant app shell (SHELL/UI.0) — the reusable server-component shell every
@@ -75,6 +81,19 @@ export default async function PublicLayout({
 			])
 		: [null, null];
 
+	// O1-DECK — the first-login gate (SPEC.1 §21.9, ADR-0037). Decided HERE,
+	// beside the `getSession` read that is already happening, because that is
+	// the one place both terms are already in hand. The marker is `HttpOnly`,
+	// so the client CANNOT read it — moving this decision after hydration is
+	// not a style choice that was rejected, it is a thing the cookie's own
+	// attributes forbid, and it is why ADR-0037 chose a cookie over
+	// `localStorage`.
+	const cookieStore = await cookies();
+	const showOnboardingDeck = shouldShowOnboardingDeck({
+		viewer,
+		marker: cookieStore.get(INTRO_SEEN_COOKIE)?.value,
+	});
+
 	return (
 		<div className="flex min-h-full flex-col">
 			<GlobalHeader
@@ -122,6 +141,40 @@ export default async function PublicLayout({
 			<main className="flex min-h-[calc(100vh-60px-2px)] flex-1 flex-col">
 				{children}
 			</main>
+			{/* O1-DECK — the first-login deck, a SIBLING of `<main>` and never a
+			    wrapper of it. Radix renders `DialogPortal` to `document.body`, so
+			    this node is outside the flex column entirely and cannot
+			    participate in the height chain above — which is what lets the
+			    deck be added to this layout's RENDER OUTPUT without being added
+			    to its LAYOUT CHAIN. `<main>` and its class string are untouched
+			    (four `*-height-chain` tests read this file as their source, and
+			    two live rulings sit on that element).
+
+			    MOUNTED UNCONDITIONALLY, OPENED BY PROP. `initialOpen` seeds the
+			    deck's own `useState` ONCE; the client owns `open` from then on.
+			    That is load-bearing rather than tidy: `DebatePoll` calls
+			    `router.refresh()` every 15 s on `/m/[slug]`, and a refresh
+			    re-executes this LAYOUT as well as the page. Were `open` derived
+			    from this prop on every render, a tick landing in the window
+			    between the optimistic close and the cookie being written would
+			    RE-OPEN a deck the participant had just completed — a 15-second
+			    haunting that reproduces on exactly one route. A closed Radix
+			    dialog portals nothing, so mounting it for a signed-out visitor
+			    costs one unmounted client component and no DOM.
+
+			    The completion action is passed as a PROP, not imported by the
+			    deck. This is the only site in the tree that references it, so
+			    the re-show — mounted from `RulesControl`, which reaches
+			    `/sign-in` — has no path to the marker at all. D-4 is therefore a
+			    compile-time fact rather than a runtime branch someone can flip:
+			    a signed-out visitor reading the rules on `/sign-in` cannot mint
+			    a marker that would suppress their own first-login gate later. */}
+			<OnboardingDeck
+				context="first-login"
+				initialOpen={showOnboardingDeck}
+				pseudonym={viewer?.pseudonym ?? null}
+				onComplete={completeOnboardingDeckAction}
+			/>
 		</div>
 	);
 }
