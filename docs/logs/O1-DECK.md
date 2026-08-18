@@ -95,3 +95,80 @@ then run `deploy-pipeline.md` §2.5 to return `staging` to the new `main` — co
 ## Time
 
 2026-08-18, 15:47 → 16:45 IST (~1h). Unattended throughout.
+
+---
+
+# Final entry — merged, staging returned, task closed
+
+> **2026-08-18, 17:16 → 17:55 IST.** Two attended sessions after the unattended run:
+> the Gate C completion, then this close-out.
+
+## What landed after the overnight run
+
+| Commit | |
+|---|---|
+| `2623023` | `docs(agents):` the jsdom harness note — Radix arms its outside-pointer listener a macrotask late |
+| `d0c8674` | `test(onboarding):` `complete.test.ts`, AGENTS.md `30` → `75`, and the module-scope note in `complete.ts` |
+
+**PR #355 MERGED** 2026-08-18T12:16Z, squash **`e79555c`**, seven commits.
+Tree identity verified: `git diff d0c8674 origin/main` is **EMPTY**, so the squash
+landed the tree that was reviewed and not some other one.
+
+**The Gate C findings are closed.** The one that mattered: `completeOnboardingDeckAction`
+had no test at all, so the single line standing between an anonymous caller and a
+written marker was undefended — deleting it left 368 files and 3388 tests green. It
+now has five `it()` blocks behind it, and the guard was **proven by reversal**
+rather than written red-first: the behaviour already shipped, so a correct test of
+it passes on its first run and that pass certifies nothing. Deleting
+`if (!session) return;` turned exactly one test red and left the other four green;
+restoring it turned them green again.
+
+## Staging returned to main
+
+`origin/staging` was at **`f8c55cd`** — a pre-squash branch commit — so this was the
+runbook's documented **force** case and not the fast-forward the outbound advance
+enjoyed. `deploy-pipeline.md` §2.5's content test was run before forcing:
+
+- `git merge-base --is-ancestor f8c55cd d0c8674` → **true**, and `d0c8674`'s tree is
+  byte-identical to `e79555c`'s, so staging's tree was a prior state on the path to
+  main's. **Nothing existed only on staging.**
+- The literal `main..staging` shortstat read **1 insertion / 239 deletions**, and
+  that single insertion is `AGENTS.md`'s `**75**` reverting to `**30**` — main's own
+  *modified* line, not staging content. This is the exact misreading §2.5 warns
+  about twice: a direction count cannot tell behind from diverged.
+
+Forced to `e79555c`; migrate run `32136250381` green on the matching `headSha`, with
+the two idempotent NOTICEs (`42P06`, `42P07`) and **no DDL**, as precondition (c)
+predicted. **Deploy verified at `/api/health`:** `canary e79555c…`, `env staging`,
+`db ok`, `migrations ok`, `region bom1`.
+
+⚠ **O-10 did NOT bite, and the reason refines the rule.** `e79555c` already had a
+**Ready Production** deployment when staging was forced to it, which is the
+dedup condition O-10 names. Vercel built it **again anyway** — two distinct
+deployments of one SHA, `experiment-ngd7etn42` (Production) and
+`experiment-8efogpmit` (staging). ⇒ **The dedup appears to be per-ENVIRONMENT, not
+purely per-SHA.** One observation, not a law; the outbound case that did bite was
+branch→staging, where both sides resolve to the same non-production environment.
+**Keep verifying `canary` regardless** — that is what made this knowable.
+
+## ⛔ OPEN — the ratified plan never reached `main`
+
+**`docs/plans/O1-DECK.md` is NOT on `main`.** `23dc0c3` is not an ancestor of
+`origin/main`; the plan lives only on `origin/plan/o1-deck`, which was never opened
+as a PR. The branch survives, holding two commits and exactly one file (753 lines).
+
+**This leaves a dangling reference on `main`:** `docs/logs/O1-DECK.md:5` — the file
+you are reading — cites `docs/plans/O1-DECK.md` @ `23dc0c3`, and that path does not
+resolve on `main`. The SHA still does, but only while the branch exists; delete
+`plan/o1-deck` and the citation becomes unrecoverable.
+
+⇒ **Do not delete `plan/o1-deck` until the plan is landed or the citation is
+rewritten.** Landing it is a one-file PR. Not done here: the close-out was scoped to
+report the state, and putting a ratified planning artifact on `main` is the
+founder's call, not a tidy-up.
+
+## Worktrees
+
+`zz-o1-build`, `zz-o1-plan` and `zz-o1-deck` removed at close-out. `plan/o1-deck`
+and `docs/o1-deck-spec` remain as **branches** on the remote; only their working
+copies are gone.
