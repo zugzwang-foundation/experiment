@@ -12,8 +12,8 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.33 (semver; bump major on invariant changes)
-- **Last updated:** 2026-08-16
+- **Version:** 1.0.34 (semver; bump major on invariant changes)
+- **Last updated:** 2026-08-18
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
 - **Related contracts:** `CLAUDE.md`, `AGENTS.md`, `docs/specs/SPEC.2.md` (architecture; ADR Index at SPEC.2 §22; server-only / RLS posture at SPEC.2 §18.5), `docs/adr/` (ranking math owned by `RANKING.md` per ADR-0017)
@@ -1352,6 +1352,15 @@ Flat list. Each entry: **test name → spec section it covers → invariants enf
 | `profile::marker-uses-profile-users-held-side` | §23 F-PROF-2 | — |
 | `profile::visitor-payload-excludes-sell` | §23 F-PROF-3 | — |
 | `profile::owner-sell-only-open-and-held` | §23 F-PROF-3 | — |
+| `onboarding-deck::renders-for-authenticated-viewer-without-marker` | §21.9 | — |
+| `onboarding-deck::absent-for-signed-out-visitor` | §21.9 | — |
+| `onboarding-deck::absent-when-marker-present` | §21.9 | — |
+| `onboarding-deck::first-login-has-no-dismissal` | §21.9 | — |
+| `onboarding-deck::first-login-final-card-closes` | §21.9 | — |
+| `onboarding-deck::marker-not-written-on-open` | §21.9 | — |
+| `onboarding-deck::reshow-omits-welcome-card` | §21.9 | — |
+| `onboarding-deck::reshow-is-dismissible` | §21.9 | — |
+| `onboarding-deck::step-count-derives-from-array` | §21.9 | — |
 
 A `pnpm test:invariants` script runs the INV-tagged subset in isolation. CI fails if any INV test fails or is skipped.
 
@@ -1504,6 +1513,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-08-16 | 1.0.31 | §0; §9; §17 | **The two-slot reply preview leaves the market-view card — the rule is unchanged, its SURFACE moved.** §9 *Reply ordering* preamble, F-DEBATE-1 **System** and F-DEBATE-1 **Acceptance** all restate the two-slot default as a SELECTION rule that no longer renders on the market-view post card; reply content surfaces in the **post-focus arm**, whose full stake-sorted per-side list IS the expansion §9 already named, so the expansion is discharged by entering post-focus rather than by an in-card control. §17's two `debate-view::replies-*` rows have the SURFACE they name corrected; ⛔ **their assertions are untouched**. ⚠ **NOTHING IN THE MODEL MOVED**: `ReplyGroups.twoSlot` remains on the read model, `rankReplies` and `twoSlot` in `src/lib/ranking` are untouched, selection and ordering semantics are identical, and `tests/unit/ranking/replies.test.ts` stays green UNAMENDED. Applied at all four operative sites rather than as an appendix (**O-4**: an amendments block reverses nothing a reader reaches first). Rider: F-DEBATE-1's Acceptance cite named `tests/server/debate-view/replies.test.ts`, which does not exist on disk — corrected to the real `tests/unit/ranking/` path, the same class of stale cite 1.0.25 fixed for F-DEBATE-4. **§0** → 1.0.31, last-updated → 2026-08-16. | **Founder ruling, HTML-FINISH · MARKET DETAIL row 25.** The market-view card is a summary of ONE argument; the debate is the post-focus surface. Rendering replies at both zoom levels duplicated the same content twice and cost the card the composition this surface specifies. **No new ADR**: surface composition over an unchanged read model and an unchanged ordering rule — the §22 precedent at 1.0.17 (this table, 2026-07-18: *"No new ADR: the selection rule applies ADR-0017 Driver 2 … and is recorded here"*). No DDL, no migration, no new event type, no read-model or DTO change, no Route Handler. | — |
 | 2026-08-16 | 1.0.32 | §0; §9; §17 | **The collapsed market price chart carries an x-axis — and a rider reconciling the aggregate footer's form.** **(a) THE RULED AMENDMENT.** The collapsed chart gains **two interior ticks and three date labels**. The axis is **presentational and read-only**: it introduces no new data and no new read, because every timestamp it renders is already carried on `PricePoint.at`. **UNCHANGED:** the expanded overlay's axis and its a11y summary; the chart's data contract; `C-CHART-1`'s presentational baseline; every pricing and ranking semantic. The **no nodes** half of the collapsed pin survives untouched. Applied at all four operative sites per **O-4** — §9 *Two modes* (:490), F-DEBATE-5 **System** (:515), F-DEBATE-5 **Acceptance** (:517), and the §17 row (:1260) — never as an appendix. §17's single `debate-view::price-chart-collapsed-no-axis` row is REPLACED BY TWO — `::price-chart-collapsed-time-axis` and `::price-chart-collapsed-no-nodes` — so the axis and the nodes are no longer welded into one assertion where reversing either would silently carry the other with it. Rider: the Acceptance cite named `tests/components/debate/MarketPriceChart.test.tsx`, a path that has never existed on disk; corrected to the real `tests/unit/debate/render/price-chart.test.tsx` — the same class of stale cite 1.0.25 fixed for F-DEBATE-4 and 1.0.31 for F-DEBATE-1. **(b) THE R5 RIDER, CAUGHT ONE COMMIT LATE.** F-DEBATE-1 **System** (:447) named the market-view aggregate footer as **`Support (count) : Đ / Counter (count) : Đ`**, a form HTML-FINISH · MARKET DETAIL round 2 R5 replaced with the two bare `Đ` figures at `2cdc89a` — so the spec described a render that had stopped existing one commit earlier. ⛔ **THE SUBSTANCE IS UNCHANGED**: still a read-time aggregate over reply-bets, still post-relative, still **no vote control**. Only the LABEL moved — the words are the trigger pills directly above each figure and the per-side prefix restated them, while the count is already on the header row as `Replies · N`. Applied at BOTH its operative sites per **O-4**: here and at **design-language §3.1** *Support/Counter aggregate → Form* (same commit), whose **Rule** line is untouched. **§0** → 1.0.32, last-updated 2026-08-16. No DDL, no migration, no new event type, no read-model or DTO change, no Route Handler, no ADR. | **Founder ruling, HTML-FINISH · MARKET DETAIL round 2, R8 (ruled text supplied verbatim at kickoff) and R5.** **Ground for (a), as ruled:** the collapsed card was specified without an axis *when it was a sparkline*. It is now the market's primary price surface in the header rail, and a price series without a time axis is not readable. **No new ADR:** presentational scope over an unchanged data contract. ⚠ The 1.0.30 mockup-governs precedent deliberately does **not** reach this chart and was not invoked — that precedent turns on the §22 card sparkline being DECORATIVE, whereas §9 says the opposite of this chart in terms ("Accessible text summary required — this chart is **not** `aria-hidden`, unlike the §22 sparkline"). Not decorative ⇒ the spec governed, which is exactly why round 1 HALTED this row rather than shipping it, and why it needed a founder-authored amendment to land. ⚠ **Round 1 also flagged that the natural build passes the old guard GREEN**: d5 draws its `.xtick`/`.xlab` as positioned DIVS *outside* the `<svg>` (`d5:496-499`), and the guard asserted the absence of testids *inside* the component — so a literal port would have satisfied the letter of the assertion while breaking the property it named. The axis is therefore built INSIDE the `<svg>`, and the guard was strengthened rather than merely inverted. **Ground for (b):** O-9 — the build changed a render this spec describes, and a spec left naming a form that no longer ships is the drift O-4 and O-9 exist to prevent. | — |
 | 2026-08-17 | 1.0.33 | §0; §10.8 | **§10.8's displayed-space exception admits a THIRD identity — the §23 positions table's per-holding P/L.** The enumeration was CLOSED at two ("Two such identities exist"), which is why `P5-D16` / D24 held the row-level P/L out of the build pending this amendment rather than shipping a third identity the spec did not name. It now reads **three**: the §23 Net P/L tile, the reply split bar's staked total, and the positions table's `displayed P/L = displayed Current − displayed Staked`. **Ground:** exactly the one the exception already states, in its sharpest form — the delta renders INSIDE the Current cell and one column from the Staked cell, the shortest distance between a total and its components anywhere in the product, so a reader checks the subtraction by eye. On the exact basis it would visibly contradict them: a holding displaying `Đ 499` and `Đ 448` can only ever read 51, while an exact delta may display 50. No principle is minted — the pattern, its rationale and its ≤1 Đ cost were ratified twice already; the closed COUNT is what moved. | PROFILE-FULL same-commit rider (§5.12, O-9). The mockup renders this delta at `surface_profile_v1_0.html:558` via `plShort()` (`:674-678`) and its own v0.18 changelog rules it in ("current value shows profit"); the founder reopened the surface with composition and type size in scope and directed that a doc contradicted by a ruled row be corrected in the same commit rather than blocking on it. ⚠ THE WORDING IS CC-AUTHORED and is flagged for founder review in the run report: it extends an enumeration mechanically and mints no new rule, but it is normative text in a web-owned document. Implemented by `displayPositionProfitLossSigned` (`components/debate/format.ts`), which rounds both operands before subtracting; the sign is taken from the Decimal, never from a printed string. No ADR, no DDL, no event type, no §16.1 constant, no §17 row. | — |
+| 2026-08-18 | 1.0.34 | §21 preamble, §21.6, §21.9 (new), §17 | **O1-DECK spec package.** New **§21.9** specifies the onboarding deck: two contexts (non-dismissible first-login gate, dismissible About re-show), the authenticated-AND-no-marker gate condition, the cookie marker (ADR-0037, held to the build commit), marker-written-at-completion-not-at-open, and the standing prohibition on session boundaries as re-show triggers (400-day session vs ~51-day window ⇒ a once-per-session trigger is a once-ever trigger). **§21.6** keeps its descope of the feature-guide page and the `"i"` anchor mechanism, and its *"skippable"* re-show description plus its six-card count are explicitly superseded by §21.9. **§21 preamble** six → seven in scope. **§17** nine `onboarding-deck::*` rows. | O1-DECK | ADR-0037 (held) |
 
 ---
 
@@ -1511,7 +1521,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 
 *Thesis relevance: (c) peripheral. None of these touches the engine, the ledger, `n`, K_eff, ranking, or resolution.*
 
-This section homes the **TYPE-2** product surfaces confirmed in SYNC.3.5 (refinement logs 01, 03, 04, 06, 07, 08) and folded here at SYNC.7, with §21.8 minted later at 1.0.27. **Six are in scope for v1** — §§21.1–21.5 and §21.8; the feature-guide page (§21.6) is **deferred**. Every surface in this section is **read-only or render-only**: it reads existing state (or curated static seed) and writes nothing back to the engine. None is load-bearing — none touches INV-1/2/3/4, the load-bearing ADRs (0005 / 0013 / 0014 / 0017), or the thesis rules (soulbound Dharma, mandatory commentary, no-stake-no-voice). They are placed at the document tail (after the change log, before the appendices) to keep §0–§20 numbering — and the point-in-time §-citations in the historical change-log — stable.
+This section homes the **TYPE-2** product surfaces confirmed in SYNC.3.5 (refinement logs 01, 03, 04, 06, 07, 08) and folded here at SYNC.7, with §21.8 minted later at 1.0.27. **Seven are in scope for v1** — §§21.1–21.5, §21.8 and §21.9; the feature-guide page (§21.6) is **deferred**. Every surface in this section is **read-only or render-only**: it reads existing state (or curated static seed) and writes nothing back to the engine. None is load-bearing — none touches INV-1/2/3/4, the load-bearing ADRs (0005 / 0013 / 0014 / 0017), or the thesis rules (soulbound Dharma, mandatory commentary, no-stake-no-voice). They are placed at the document tail (after the change log, before the appendices) to keep §0–§20 numbering — and the point-in-time §-citations in the historical change-log — stable.
 
 Two cross-cutting disciplines apply throughout:
 
@@ -1567,7 +1577,7 @@ An ambient **radio / music-player widget** — a custom-skinned single Play butt
 
 ### 21.6 Feature-guide page + "i" deep-link buttons — DESCOPED (deferred from v1)
 
-**Descoped from v1 — founder ruling, 2026-06-29.** The canonical "how it works" / About surface is no longer a dedicated feature-guide page. How-it-works / About content is served by the **onboarding deck** — the six-card deck (DESIGN.W2.2), **re-shown** (skippable) via an "About / Rules" tab (tab name + position finalised at design time). The feature-guide page and its "i" deep-link anchor mechanism are **deferred** — the founder has other plans for the feature guide; this is a descope, not a deletion of the idea. The corresponding design task (DESIGN.W2.12) is removed from the v1 backlog.
+**Descoped from v1 — founder ruling, 2026-06-29.** The canonical "how it works" / About surface is no longer a dedicated feature-guide page. How-it-works / About content is served by the **onboarding deck** — the six-card deck (DESIGN.W2.2), **re-shown** (skippable) via an "About / Rules" tab (tab name + position finalised at design time). The feature-guide page and its "i" deep-link anchor mechanism are **deferred** — the founder has other plans for the feature guide; this is a descope, not a deletion of the idea. The corresponding design task (DESIGN.W2.12) is removed from the v1 backlog. **The deck itself — its two contexts, its gate, and its persistence — is specified at §21.9**; this section governs only the descope of the feature-guide page and of the `"i"` deep-link anchor mechanism, both of which remain deferred. The 2026-06-29 ruling's description of the re-show as *"skippable"* is **superseded by §21.9**, which makes the first-login showing non-dismissible and the re-show dismissible; the card count is likewise superseded, the deck no longer being six cards.
 
 ### 21.7 Freeze banner / global notice region — RESERVED
 
@@ -1592,6 +1602,60 @@ For an authenticated participant, the global header's right zone carries a **Dha
 **Absence and zero are different facts.** A viewer with no `dharma_ledger` row is pre-grant or mid-signup: the cluster does not render at all, because an absent figure reads as *not yet* while a zero reads as *you are broke*. A viewer with no open positions has a Portfolio of **Đ 0**, which is rendered — zero is a true and informative quantity, not an empty state. Where the Portfolio read fails, the cluster renders Balance alone rather than disappearing: header chrome degrades, it never fails a page. The converse is presently asymmetric — the Balance read returns the same absent value for a missing ledger row and for a failed read, so a transient Balance failure hides the whole cluster including a Portfolio figure that read successfully. Accepted and docketed: distinguishing the two is a change to the Balance read, not to this surface.
 
 Both figures render through the single shared display formatter at 0 dp per §10.8. Portfolio is the Σ Đb term of that section's net-worth definition and Balance is its free-Dharma term plus any unclaimed daily credit, so the two stats sum to net worth plus that credit rather than to net worth itself.
+
+### 21.9 The onboarding deck — first-login gate and About re-show
+
+*Thesis relevance: (b) supporting. Renders no engine figure and writes no
+ledger row, but it is the ONLY user-facing surface that teaches INV-1, INV-2
+and INV-3, and the experiment's claim rests on participants understanding the
+rules they are staking under. It sets one cookie; it touches nothing else.*
+
+**The deck is a modal card sequence** shown over the dimmed application, not a
+route and not a page. Its content is the ratified card set (the O1-DECK copy
+register); its anatomy is the locked W2.2 shape — figure band, eyebrow, bold
+title, subtext — inside the W2.1 deck shell with Back, Next, a dot rail and a
+step indicator.
+
+**Two contexts, one component, one card array.**
+
+| Context | Cards | Dismissible |
+|---|---|---|
+| **First login** | The full ratified set | **NO.** No close control, no Escape, no backdrop dismissal. Forward-only to the final card, which closes the deck |
+| **About / RULES re-show** | The full set **minus the WELCOME card** | **YES.** A close control and Escape are available at every card |
+
+The re-show omits the WELCOME card because its content — the pseudonym reveal
+and the experiment window — is a first-login fact rather than reference
+material. Both contexts derive every count from the array length; a literal
+card count anywhere in the stepper is a defect.
+
+**The first-login gate.** The deck renders when, and only when, BOTH hold:
+the viewer is **authenticated**, and the seen-marker is **absent**. The
+`(public)` route group is not middleware-gated and serves signed-out visitors
+on every surface, so the authenticated condition is load-bearing and not an
+optimisation — without it the deck renders to the anonymous audience.
+
+**The marker is a browser cookie, not a user column.** ADR-0037 ratifies the
+mechanism, its attributes and its accepted limits. The marker is written when
+the participant reaches the end of the deck, **never when it opens** — a
+participant who abandons mid-deck sees it again on their next visit, which is
+the intended behaviour and matches the F-AUTH-4 cancellation posture (§13).
+
+**A session boundary is not a re-show trigger and must not be used as one.**
+The participant session is capped at 400 days with no idle timeout and no
+sliding-window refresh, against a live window of roughly 51 days (§13). A
+participant who signs in once and does not manually log out **never signs in
+again inside the experiment**. Any affordance specified as "on next login"
+would fire once, at signup, and never again. The re-show therefore requires
+its own persistent entry point.
+
+**That entry point is the RULES control in the global header.** It opens the
+re-show deck. It is present for every viewer, authenticated or not.
+
+**Scope note.** This section specifies the deck. The `(i)` deep-link anchor
+mechanism remains deferred per §21.6, and no `(i)` doorway is created,
+restored or re-pointed by this section.
+
+**Acceptance.** §17 rows `onboarding-deck::*`.
 
 ---
 
