@@ -6,6 +6,7 @@ import { DharmaCluster } from "./DharmaCluster";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
+import { RulesControl } from "./RulesControl";
 import { VisitorCounter } from "./VisitorCounter";
 
 /**
@@ -23,11 +24,27 @@ import { VisitorCounter } from "./VisitorCounter";
  * cluster absolutely centred — fixed desktop max-width 1440 / 24px side
  * padding, no responsive breakpoints (design-language §1.7).
  *
- * Left zone order Back · Home · Radio (mockup v0_2); Social/Research/RULES/
- * Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each a named
- * deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity
- * chip, then a hairline divider + the visitor counter at the far right (UI.13;
+ * Left zone order Back · Home · Radio · RULES (mockup v0_2 for the first
+ * three; RULES is a named deviation — see below). Social/Research/Đ-info are
+ * ratified omissions (OQ-3/OQ-4 zero-supplied), each a named deviation in the
+ * plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
+ * hairline divider + the visitor counter at the far right (UI.13;
  * SPEC.1 §21.1).
+ *
+ * ⇒ TIER-4 DEVIATION — **RULES placement** (O1-DECK, founder-ruled 2026-08-18,
+ * D-2). The locked W2.4/.5/.14 mockup places the tab in the CENTRE zone as a
+ * sibling of the wordmark (`mockup-v0_2:208`, close-out `:31`). It ships in the
+ * LEFT zone, after Radio. Measured at 1440 against the real compiled CSS: the
+ * mockup's placement moves the brand cluster **41.57px** left of true centre
+ * (a 73.13px control plus a 10px gap, halved — `justify-self:center` centres
+ * the TRACK, never the brand inside it), which is 19% of the cluster's own
+ * 220px width. The left zone measures **0.00px** shift with 387.77px of
+ * headroom, and it is the utility-control family this control belongs to. ⚠ The
+ * mockup did not weigh that cost and decide differently — it uses the identical
+ * `1fr auto 1fr` grid (`:37`) and carries the same displacement; it simply
+ * never measured it. A hidden equal-width counterweight in the centre zone was
+ * the other 0.00px option and was rejected: an invisible node whose purpose is
+ * also invisible.
  *
  * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
  * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
@@ -92,6 +109,7 @@ export function GlobalHeader({
 				<div className="flex items-center gap-2 justify-self-start">
 					<HeaderNav />
 					<RadioSlot />
+					<RulesControl />
 				</div>
 				<div className="justify-self-center">
 					<BrandCluster targetMs={targetMs} initialDisplay={initialDisplay} />
