@@ -103,15 +103,31 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 - **(a) Tree identity.** EMPTY proves the squash-merged tree is byte-identical to the branch that was reviewed. A squash merge can land a tree that is *not* the reviewed one — an un-pushed local commit on the source branch is enough to do it — and staging is the wrong place to discover that. Cheap to check, and it also confirms the merge you think you are advancing is the merge that happened.
 - **(b) Fast-forwardability — and what a rejection actually means.** EMPTY means
 staging carries no commit `main` lacks. ⚠ **A non-empty result is NOT by itself
-evidence of divergence, and this precondition previously said it was.** Read the
-TREE, never the log: `git diff --stat origin/main origin/staging`. A
-**one-directional** diff — deletions only in one direction — means staging is
-**BEHIND**, which is the ordinary consequence of squash-merging branch work and
-is repaired by the force-push in *The staging advance* below. A
-**two-directional** diff means real content exists only on `staging`; **that** is
-divergence, and it is the case where you stop and reconcile rather than force.
-Commit counts cannot tell these apart — 29 commits and 1 commit can encode an
-identical tree, and on 2026-08-18 they did.
+evidence of divergence, and two weaker tests have already failed here.** This
+precondition once said a rejected push means divergence; it then said a
+**two-directional** `main..staging` diff means divergence. **Neither is true.** A
+rejection follows from any non-ancestor relationship. A two-directional diff
+follows whenever `main` has *modified* lines rather than only added them — the
+ordinary shape of a documentation pass. Both mistake a symptom for the property.
+
+**The property is: does content exist ONLY on `staging`?** Answer it directly,
+against the last point `staging` was current with — normally `main`'s parent at
+the merge you are advancing past:
+
+```bash
+git diff --shortstat <BASE_SHA> origin/staging       # deletions only, ZERO insertions ⇒ staging strictly BEHIND
+git merge-base --is-ancestor <BASE_SHA> origin/main  # ⇒ and that base is inside main's history
+```
+
+**Both true ⇒ nothing exists only on `staging`, and the force-push in *The
+staging advance* below loses nothing.** Either false ⇒ real content lives only on
+`staging`: **stop and reconcile, never force.**
+
+⚠ **Do not substitute a cheaper signal for that pair.** Commit counts cannot
+separate the cases — 29 commits and 1 commit can encode an identical tree, and on
+2026-08-18 they did. Direction counts cannot either — the same day `main..staging`
+read 141 insertions against 3,381 deletions while `staging` held **zero** content
+of its own. This is the shortest test that answers the actual question.
 - **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
 
 > **An EMPTY result from (a), (b) or (c) is a REAL result — none of them can fail open.** Worth stating because the question comes up: if a ref does not resolve, `git log`/`git diff` **abort loudly** (`fatal: bad revision`, `fatal: ambiguous argument … unknown revision`) and print nothing to stdout. They cannot silently report "no commits" against a ref that is missing. The `git fetch origin --prune` above is what keeps the refs current; the checks themselves are safe.
@@ -172,11 +188,12 @@ three times (`DRIFT-1`, and again 2026-08-18).
 
 `--force-with-lease` is the safety: it refuses if `staging` moved since the last fetch.
 
-⚠ **Read the tree before forcing, never the log.** `git diff --stat origin/main
-origin/staging` is the measurement that says whether content differs. A one-directional
-diff — deletions only — means `staging` is *behind*, not divergent, and the force-push
-loses nothing. **A two-directional diff means real content exists only on `staging` and the
-force-push would destroy it. Stop and reconcile instead.**
+⚠ **Read CONTENT before forcing — never the log, never a direction count.** The
+question is whether anything exists only on `staging`, and §2.5 (b) carries the
+two-command test that answers it. A `main..staging` diff reads two-directional
+whenever `main` modified lines rather than only adding them, even when `staging`
+holds nothing of its own. **Run (b)'s test. Both legs true ⇒ the force-push loses
+nothing. Either leg false ⇒ stop and reconcile, never force.**
 
 ⚠ **`O-10` applies to the SHA you force to.** Vercel dedups a SHA it has already built. If
 `<MAIN_SHA>` already has a `READY` deployment on the `main` ref, forcing `staging` to it may
