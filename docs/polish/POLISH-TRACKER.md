@@ -8,7 +8,7 @@
 > merges the repository itself contained, and it carried **zero** mentions of HTML-FINISH —
 > the lane that moved more surfaces than any other.
 >
-> **Where its content went.** Surface state → the project tracker (`tracker_v21`). Docket
+> **Where its content went.** Surface state → the project tracker (the project tracker — operator-maintained and external to this repo; read its version off the tracker itself). Docket
 > rows → `docs/parked.md`, where they already were. Method → `POLISH-0.md`. Runbook →
 > `POLISH-SURFACE-TEMPLATE.md`. Defects → `POLISH-register.md`. **Nothing below is
 > restated in any of them, and nothing below is current.**

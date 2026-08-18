@@ -39,7 +39,7 @@ Read off `35da436`. **Highest value read, never counted.** The recon's values we
 | Register | Ceiling at `35da436` | Read from | Next free |
 |---|---|---|---|
 | ADR | **`0036`** | `docs/adr/` highest-numbered filename (`0036-vitest-context-operational-runners.md`); 35 files, `0002`/`0012` unused | `0037` |
-| O-space | **`O-9`** | `CLAUDE.md` — *"Editing prose that cites a governing document by section number…"* | `O-10` |
+| O-space | **`O-9`** | `CLAUDE.md` — *"Editing prose that cites a governing document by section number…"* | `O-10` ⚠ **SNAPSHOT, SUPERSEDED.** O-10, O-11 and O-12 are all minted as of 2026-08-18. Never mint off this cell — read the live ceiling (O-2). |
 | V-space | **`V-10`** | `docs/polish/POLISH-0_data-manifest.md` §5 | `V-11` — ⛔ **founder-mint only** |
 | Surface template §13 | **`§13.6`** | `POLISH-SURFACE-TEMPLATE.md` | `§13.7` |
 | `PD-4-nn` | **NONE — virgin** | whole-repo grep for `PD-4-`: **zero hits**, independently re-run this session | **`PD-4-01`** |

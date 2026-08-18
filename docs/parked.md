@@ -1881,6 +1881,8 @@ pnpm exec biome check docs/plans/POLISH-5.md
 
 **Expected next task.** A tooling chore PR, alongside the other not-installed gates AGENTS.md §11 already tracks (`commitlint`, the `block-main-commits` / `block-destructive` hooks, `permissions.deny`). **Owner: unassigned at minting — this docket needs one named before POLISH close-out.** Evidence: `biome.json` (`ignoreUnknown: true`) · `justfile:38` · `.github/workflows/ci.yml` · `AGENTS.md` §11 · `COMMIT-0-HALT-1.md` §3.3.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. This PR is eleven markdown files and `just verify` ran green four times having read **zero** of them. The row's own trigger names exactly this.
+
 ---
 
 ## DTO-WIDENING-PREFLIGHT — the shape-assertion finder is a rule in a template, and rules in templates get read once

@@ -101,7 +101,17 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 ```
 
 - **(a) Tree identity.** EMPTY proves the squash-merged tree is byte-identical to the branch that was reviewed. A squash merge can land a tree that is *not* the reviewed one — an un-pushed local commit on the source branch is enough to do it — and staging is the wrong place to discover that. Cheap to check, and it also confirms the merge you think you are advancing is the merge that happened.
-- **(b) Fast-forwardability.** EMPTY means staging carries no commit `main` lacks. If it is not empty the push below is **rejected as a non-fast-forward**, which reads like a tooling failure when it is a **branch-state** problem — staging diverged, and something put a commit there that never went through `main`. Prove this first and that rejection never happens; if it fires anyway, find out why staging diverged before touching anything.
+- **(b) Fast-forwardability — and what a rejection actually means.** EMPTY means
+staging carries no commit `main` lacks. ⚠ **A non-empty result is NOT by itself
+evidence of divergence, and this precondition previously said it was.** Read the
+TREE, never the log: `git diff --stat origin/main origin/staging`. A
+**one-directional** diff — deletions only in one direction — means staging is
+**BEHIND**, which is the ordinary consequence of squash-merging branch work and
+is repaired by the force-push in *The staging advance* below. A
+**two-directional** diff means real content exists only on `staging`; **that** is
+divergence, and it is the case where you stop and reconcile rather than force.
+Commit counts cannot tell these apart — 29 commits and 1 commit can encode an
+identical tree, and on 2026-08-18 they did.
 - **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
 
 > **An EMPTY result from (a), (b) or (c) is a REAL result — none of them can fail open.** Worth stating because the question comes up: if a ref does not resolve, `git log`/`git diff` **abort loudly** (`fatal: bad revision`, `fatal: ambiguous argument … unknown revision`) and print nothing to stdout. They cannot silently report "no commits" against a ref that is missing. The `git fetch origin --prune` above is what keeps the refs current; the checks themselves are safe.
@@ -111,7 +121,9 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 **The advance sequence.**
 
 ```bash
-# 1. Fast-forward staging to the merged main
+# 1. Advance staging to the merged main — see *The staging advance* below; a
+#    rejection here is usually BEHIND, not diverged, and force-with-lease is the
+#    documented repair. Read the tree before deciding.
 git push origin origin/main:staging
 
 # 2. Watch the migrate job (§2.1 reaction 1) → GREEN
