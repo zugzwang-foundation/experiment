@@ -22,7 +22,6 @@ waiting on an event that has not happened. Go-live is **2026-09-15**.
 
 | # | Row | Owner / gate | Why here |
 |---|---|---|---|
-| ~~**1**~~ | ~~**PERF-1 — Discovery serves in ~35 s**~~ **— CLOSED 2026-08-10** | — | **No longer a blocker.** Functions were in `iad1` against a Mumbai DB; ADR-0006's ratified `bom1` was never applied. Fixed: **361.6 → 5.34 ms/trip**, Discovery **35.07 → 0.692 s p50** (staging-verified). **POLISH.1–.8 are unblocked.** Kept one cycle as a strike so the reordering below is legible, then delete. |
 | **1** | **POOL-2 — `BETTER_AUTH_SECRET` may differ between Doppler `stg` and Vercel `staging`** | **operator-owned, before DP.2** | Unresolvable from a CC session — Vercel env values are write-only once set. A promote that discovers this afterwards has already signed out every production participant. |
 | **2** | **POOL-2 — the Sentry routing smoke check is a lookalike, three times over** | runbook corrected here; **probe at HARDEN** | The doc half is done at SYNC-1: `deploy-pipeline.md` **§3.0** now states the smoke's real reach and that it does **not** certify Sentry routing. What remains is the scripts-only fix + a real delivery assertion. |
 | **3** | **AUDIT-FIX-B2 OQ-2 — app-as-owner role split** | **pre-launch, before Sep 15** | The only COMPLETE TRUNCATE fix. Migration 0021's guards close the accident class, not the owner-level class. |
@@ -35,8 +34,7 @@ gate → dated pre-launch hardening → armed-on-touch. A row leaves this table 
 when it closes; a row enters it when its trigger fires.*
 
 *PERF-1 closed 2026-08-10 and **there is no GO-LIVE BLOCKER row left** — the
-operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue. Its
-strike stays one cycle so the renumbering is traceable, then it goes.*
+operator-owned `BETTER_AUTH_SECRET` check is now the head of the queue.*
 
 ---
 
@@ -391,6 +389,7 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 
 **Expected next task.** A dedicated editorial task, or absorption by the next task that opens ADR-0013 for its own reasons (it can carry the Patch record at no extra cost). **Not** PRECURSOR.5 — that ran on 2026-05-14 and is closed.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 ## AUDIT-FIX-B1 A7 — invalid-but-present Sentry DSN residual → HARDEN canary probe
 
 **Originating task:** AUDIT-FIX-B1 A7 flush-before-stamp close-out (2026-07-04); surfaced by `@code-reviewer` + `@security-auditor` on the flush delta (PR #199).
@@ -665,119 +664,6 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** Scripts-only: correct the project slug, add `SENTRY_ORG` to Doppler `stg`, and replace the `_smoke-error` assertion with one that asserts real delivery. The route rename is **not** enough on its own and should not be done alone. Evidence is in `docs/logs/POOL-1.md` §5; this entry is the tracking.
 
-## ~~PERF-1 — Discovery serves in ~35 s · **GO-LIVE BLOCKER**~~ → **CLOSED 2026-08-10**
-
-> **CLOSED — FIXED AND VERIFIED.** No longer a go-live blocker; POLISH.1–.8 are
-> unblocked. Struck rather than deleted: two numbers this row carried were wrong,
-> and the correction is worth more than the row.
-
-**Originating task:** POOL-1 / POOL-2 (2026-08-08). **Closed by PERF-1 (2026-08-10)**, PR #307 + the close-out PR.
-
-### The result
-
-Measured on **staging** (`staging.zugzwangworld.com`, `cc776bf`) — the serving
-environment and the authoritative figure. Preview is shown alongside because the
-fix was first proved there and the two agreeing is itself evidence.
-
-| | before | **after (STAGING)** | | after (preview) |
-|---|---|---|---|---|
-| **Discovery `/` p50** | 35.07 s | **0.692 s** | **51×** | 0.584 s |
-| **Profile `/u/…` p50** | 6.2 s | **0.190 s** | **33×** | 0.189 s |
-| per DB round-trip | 361.6 ms | **5.34 ms** | 68× | 5.34 ms |
-| `/api/health` (2 trips) | 0.719 s | 0.070 s | 10× | 0.070 s |
-
-Exit criterion was **Discovery p50 cold ≤ 2.0 s on staging**: met with **2.9×
-headroom**; the worst of three staging runs (0.874 s) is still inside it. Staging
-runs: 0.692 / 0.874 / 0.570 s, all `x-vercel-cache: MISS`, all
-`x-vercel-id: bom1::bom1`. Profile: 0.335 / 0.184 / 0.190 s.
-
-**Staging is ~0.11 s slower than preview on Discovery and identical on Profile.**
-Both are the same code against the same database; the delta is ordinary
-instance-to-instance variance at this scale, not a divergence — and it is recorded
-rather than smoothed over so nobody later reads 0.584 s as the staging number.
-
-**Cause.** Vercel functions executed in **`iad1`** (Washington D.C.) against a
-Supabase database in **`ap-south-1`** (Mumbai) — every statement paid a
-cross-region round trip. `x-vercel-id` read `bom1::iad1` on 17 of 17 requests.
-
-**Fix.** **ADR-0006's ratified `bom1`, finally implemented.** The region was
-ratified 2026-05-05 (§1 Web tier: *"primary region `bom1` (Mumbai)"*) and never
-applied: the project carried Vercel's `iad1` default and `vercel.json` had no
-`regions` key at all. One line. See the ADR-0006 patch record.
-
-**Batching is NOT required and was not done.** At 5.34 ms/trip the 97 statements
-cost ~0.52 s of the 0.69 s; batching to ~12 would save ~0.45 s on a page already
-clearing the bar by 2.9×. **Reconsider only on evidence** — a growing trip count
-or measured concurrency behaviour — **never reflexively.** The POOL-1 connection
-pressure also dissolves: Discovery held one slot for 35 s, now ~0.5 s — **~60×
-fewer slot-seconds**, which is the axis that exhausts the pooler.
-
-### ⛔ Two numbers this row carried were WRONG — struck, with the reason
-
-**1. ~~"41 sequential DB round-trips"~~ → 97.** It counted function CALLS, not SQL
-statements. `loadPriceSeries` issues **4** (`price-series.ts:58, 90, 110, 178`),
-`selectHeroTopPosts` **5** (`hero.ts:73, 78, 96, 106, 115`) — so the second loop is
-**9N, not 2N**. Total `1 + 3N + 9N = 97` at `DISCOVERY_GRID_SIZE = 8`.
-
-**2. ~~"warm p50 ≈ 1.1 s"~~ → THERE IS NO WARM REGIME.** Seven runs, six after the
-first, **spread 0.29 s around a flat 35 s floor**, gaps to 150 s, **no decay**. The
-1.1 s was almost certainly **TTFB**: the Suspense boundary flushes the shell and
-`LoadingSkeleton` immediately, so any time-to-first-byte measure reads ~1 s on a
-35 s request (measured TTFB at PERF-1: 0.28–2.15 s against 35 s totals).
-
-**Consequently the whole carry-verbatim thread is void.** It read: *"41 round-trips
-do not account for 35 seconds… a large one-time cold cost sits underneath and the
-trace does not explain it."* Correct arithmetic on two wrong inputs. At 97 trips ×
-361.6 ms the round-trips account for the entire 35 s; **there was no cold cost.**
-The instruction it carried — *do not assume batching is the fix* — was right, but
-for the wrong reason: batching was never the fix because the per-trip cost was.
-
-### The durable lesson — this is the part worth keeping
-
-**A ratified ADR can go unimplemented indefinitely when the config surface is
-SILENT rather than wrong.** `vercel.json` did not contain a bad region; it
-contained **no region key at all**, and an absent key is indistinguishable from a
-correct one in every diff, every CI run and every code review. Nothing failed.
-Nothing looked odd.
-
-**Every control this project has watches for CHANGE. Nothing watched for a
-decision that never landed.** CI diffs commits; `db:check-drift` compares schema
-to migrations; `/api/health` reported env, db and migration drift. All of them
-answer *"did something move?"*. None answers *"did what we ratified ever get
-built?"* — and a decision that was never implemented never moves, so it is
-invisible to all of them, permanently.
-
-It survived **three months and roughly forty PRs**, and was found only because a
-performance number was implausible enough to trace to its cause — not by any
-review, and not by any gate.
-
-**The generalisation, for any future ratified-but-unbuilt decision:** a decision
-is not implemented until something reads the *deployed reality* back and compares
-it to the *decision*. Config-as-code is necessary and nowhere near sufficient —
-`vercel.json` was config-as-code and it was silent. **Closing control:**
-`/api/health` now returns `region`, so the deployed region is readable at any time
-and against any environment; its truthfulness is pinned against `x-vercel-id`
-rather than against itself (V-2).
-
-**Second-order note, recorded so it is not misread later.** The `iad1` two-point
-regression had a fixed-overhead intercept of ≈ 0 ms; the `bom1` one is ≈ 60 ms.
-Nothing regressed — DB latency used to swamp the fixed cost and now does not.
-
-**Evidence.** ADR-0006 §Patch record 2026-08-09 · `docs/logs/POOL-1.md` §6a (struck
-in place) · PR #307 (`vercel.json` + patch record, merged `cc776bf`) · the PERF-1
-close-out PR (`/api/health` region, this row, the POOL-1 strikes) · **staging
-verified 2026-08-10 at `cc776bf`: `x-vercel-id: bom1::bom1`, health
-`canary == cc776bf`, `db: ok`, `migrations: ok`.**
-
-**⚠ One proof is still outstanding, and it is ordered, not failed.** The Layer-2
-cross-check — health's `region` field against the compute half of `x-vercel-id` on
-the same response — **cannot run yet**: the `region` field ships in *this* PR, not
-in #307, so staging does not serve it. Until it runs, `bom1::bom1` (edge-generated,
-independent of the function) is the sole authority for the region, and it agrees on
-every request measured. **Run the cross-check on the next staging advance after
-this PR merges**; it validates the new health field, not the performance fix, and
-nothing about PERF-1's result depends on it.
-
 ## N1 — Commit the two PK-only artifacts that committed docs depend on
 
 **Originating task:** SYNC-1 (2026-08-08), STEP 2.6 — the dangling-reference sweep.
@@ -795,6 +681,7 @@ nothing about PERF-1's result depends on it.
 
 **Expected next task.** A DESIGN-lane task that can take the canon ruling. Evidence: `~/Desktop/SYNC-1-recon.md` R2 (the eviction analysis that surfaced it).
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 ## N2 — Write `docs/logs/UI-phase-record.md`
 
 **Originating task:** SYNC-1 (2026-08-08), PK eviction.
@@ -881,7 +768,7 @@ curl -sS -D /tmp/h.txt https://staging.zugzwangworld.com/api/health
 
 **⚠ If it disagrees, do not "fix" the field to match.** Two sources disagreeing about the executing region is a finding about the platform contract, not a formatting problem — investigate before changing either side, and treat `x-vercel-id` as the authority because it is generated outside the function.
 
-
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ---
 
@@ -1076,6 +963,8 @@ the runbook section.
 
 **Evidence.** `docs/plans/PRIMITIVES-2.md` §3 D8 + §2's two `R11` rows (both annotated at PR-B commit 4); `src/components/discovery/HeroPanels.tsx` `REPLYHEAD_TIER` — the one site that DID land, named for the replyhead precisely so it claims none of the above.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## BORDER-STRONG-ORPHAN — a ratified token with zero consumers — **F3-BLOCKED**
@@ -1106,6 +995,8 @@ the runbook section.
 
 **Evidence.** `docs/logs/POLISH-TEMPLATE.md:88` · `docs/polish/POLISH-register.md:98` · `docs/logs/DISCOVERY-COMPLETE.md:307`, `:348` · `docs/plans/PRIMITIVES-2.md` §3 D13 + §9.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## G1-RECON-TEMPLATE — the seven recon-template requirements landed nowhere — **DOC-ONLY**
@@ -1122,6 +1013,8 @@ the runbook section.
 
 **Evidence.** `docs/logs/PRIMITIVES-1.md:52`, `:148` · `docs/plans/PRIMITIVES-2.md` §9 · PRIMITIVES-2 recon R6.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## VACUITY-RULE-TO-V-REGISTER — promote the RED-first scoping rule — **DOC-ONLY**
@@ -1137,6 +1030,8 @@ the runbook section.
 **Conditional trigger.** The next SYNC sweep, or the next task that touches `POLISH-0_data-manifest.md` §5.
 
 **Evidence.** `docs/plans/PRIMITIVES-2.md` §11 `§8-P1`; applied across four commits in PR-B (commits 1–4; 16 mutations after the reviewer pass).
+
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ---
 
@@ -1268,6 +1163,8 @@ the runbook section.
 **Conditional trigger.** **Opportunistic — fold into the next task that legitimately opens `docs/adr/`.** ⚠ Nothing executes on it and nothing is wrong on `main` without it; the only cost of leaving it is that the commit exists in one place and one place only.
 
 **Expected next task.** Any task already editing an ADR. Evidence: `POLISH-register.md` CC-3; `docs/plans/DISCOVERY-COMPLETE.md:19`.
+
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ---
 
@@ -1527,6 +1424,8 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Expected next task.** The quality lane, alongside **R15** (which extends the same guard to Tailwind palette classes) — **one visit, FIVE fixes**: R15's palette-class ban, the N5 set-equality floor, the `SCAN_DIRS` structural fix, **`PD-8-27`'s undeclared `(admin)` reach gap** (which also needs the docblock's *"the participant view layer"* claim corrected in the same edit), and `LEAK-RAIL-CLOSURE`'s residue. ⚠ **R15 NO LONGER HAS A LIVE INSTANCE** — POLISH.8 fixed it at `92c401b`, so it must be minted RED by planted-offender mutation (RULE-1 axis ①), never by finding an offender; a green first run proves nothing (H15). Evidence: `docs/logs/POLISH-7a.md` §5 · `docs/logs/POLISH-8.md` §5.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## R2-412-DEPLOY-GATE — ADR-0028's binding is mock-proven, not R2-proven — ⚠ **BLOCKS DP.2**
@@ -1656,6 +1555,8 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Expected next task.** Its own chat, full ritual, plan-then-execute with the named-reviewer cascade. **Scoped to cover the cookie lifetime as well as the affordance** — *how an admin session ends* is one property, and splitting it means two visits to the same critical-path file.
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## AUDIT-ORDER-TOTAL — unbounded and unordered admin reads
@@ -1783,6 +1684,8 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** POLISH.4, which owns the composer surfaces and `SlotHeader`, or any task with permission to change a shared debate component's prop types. Not go-live gating; it is dead code, not a defect.
 
 **Expected next task.** POLISH.4, or a small typed-props cleanup. Evidence: `DebateColumn.tsx:31`, `:49-70`; `DebateView.tsx:244`, `:308`; `docs/plans/POLISH-3.md` §5 G-1 · G-2 · §12.
+
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ---
 
@@ -2016,6 +1919,8 @@ POLISH.5 PR A's passthrough added `authorStake` + `priceAtBet` to `ProfileArgume
 
 **Source:** `@security-auditor` L-2/L-3 and `@code-reviewer` MEDIUM 1/2 on PR #331, both independently reached.
 
+**Conditional trigger.** ⚠ **NONE STATED AT AUTHORING — supplied at SYNC-2, 2026-08-18, and it is a placement not a ruling.** Next touch of the file this row names. A row with no trigger cannot fire and is indistinguishable from an abandoned one; the file's own header promises every entry carries one.
+
 ---
 
 ## OD-8-RANKING-DOCBLOCK-STILL-FALSE — routed to commit 0, not closed there, and it now has a SECOND live consumer
@@ -2036,6 +1941,8 @@ POLISH.5 PR A's passthrough added `authorStake` + `priceAtBet` to `ProfileArgume
 
 **Fix:** correct both docblocks to name the bought side. One-line each; `src/lib/**` is §6 deny-listed to POLISH.5, so it needs a task that may write it. **PR C's directed `@security-auditor` question is about precisely this docblock's accuracy** — that is the natural owner if none is assigned sooner.
 
+**Conditional trigger.** ⚠ **NONE STATED AT AUTHORING — supplied at SYNC-2, 2026-08-18, and it is a placement not a ruling.** Next touch of the file this row names. A row with no trigger cannot fire and is indistinguishable from an abandoned one; the file's own header promises every entry carries one.
+
 ---
 
 ## A11Y-HERO-PANEL-ACCESSIBLE-NAME — the hero market panel's accessible name is its entire contents
@@ -2049,6 +1956,8 @@ HTML-FINISH row 2 made the whole centre hero market panel a `<Link>` (mockup `:3
 **Why it is parked rather than fixed here.** The fix is an `aria-label` (or an `aria-labelledby` pointing at the question) on the link, plus `aria-hidden` on the decorative sub-parts — and it must land on **both** the hero panel and `MarketCard` together, which makes it a cross-surface a11y decision rather than a rider on a layout-parity pass. A11Y.0 already owns the sibling items (overlay focus management, the `alt=""` exception at `OQ-6-ALT-EXCEPTION`, WCAG 1.1.1 on the market thumb).
 
 **Code touch points** (forward reference, do not act on now): `src/components/discovery/HeroPanels.tsx` (the hero market panel `<Link>`), `src/components/discovery/MarketCard.tsx` (the card `<Link>`).
+
+**Conditional trigger.** ⚠ **NONE STATED AT AUTHORING — supplied at SYNC-2, 2026-08-18.** Routes to **A11Y.0**, and fires with it. It is presumptively that workstream's and is recorded here so it is not rediscovered as a fresh finding.
 
 ---
 
@@ -2137,6 +2046,8 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 
 **Expected next task.** POLISH.3 (backlight, opposite-slot open) and POLISH.5 (sell host). ⛔ **Not POLISH.4's, in any of the three cases.**
 
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ---
 
 ## DEBATE-IMAGE-PRESIGN-TTL-OUTLIVES-REMOVAL — HARDEN Tier 1 (moderation pipeline)
@@ -2178,3 +2089,7 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 **Expected next task.** A dedicated ADR (next free number per `ls docs/adr/`), scoped and ratified before any renaming.
 
 **Evidence.** Full census table — every colliding token, its family count, and one example subject per family — in the JOURNEY-22 run report, `zz_J22_report_2026-08-18T0108.md` §PART F1.
+
+⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
+⚠ **A live instance was measured at SYNC-2:** the bare identifier `O-10` named two different rules simultaneously — one minted in `CLAUDE.md` §8, one cited six times across three files. Resolved at SYNC-2 by minting `O-12`; the row stays open because the namespace problem is general and the ADR it calls for is unwritten.
