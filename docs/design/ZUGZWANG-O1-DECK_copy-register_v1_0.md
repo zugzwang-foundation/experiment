@@ -68,6 +68,35 @@ the social network spreads the truth freely.
 
 **Figure:** the viewer's live PFP avatar as a centred hero (`.idhero`), rounded-square at `--imgr`. Matches `.navav`. No decorative illustration.
 
+> ⚠ **BUILD ANNOTATION — O1-DECK, 2026-08-18.** *Appended, never a rewrite: the
+> note above is ratified and stands exactly as written. This records what the
+> build found, beneath it.*
+>
+> **There is no live PFP anywhere in this product.** Every surface renders one
+> static asset, `/pfp-placeholder.svg` — `server/debate-view/resolve-authors.ts`,
+> `server/profile/resolve.ts`, `server/discovery/hero.ts`,
+> `components/shell/IdentityCluster.tsx` and `(auth)/onboarding/page.tsx` each
+> hard-code it — and `users.pfp_filename`, though populated at signup, is
+> deliberately never read by any renderer. `resolve-authors.ts` says so in its
+> own words: the `pfp_filename → URL` builder is deferred to SCAFFOLD.15 / the
+> R2 `pfp` bucket, so "every author renders the placeholder".
+>
+> **Card 2 therefore ships the shared placeholder plus the pseudonym-initial
+> fallback, exactly as `IdentityCluster` renders it** — founder ruling **D-5**,
+> 2026-08-18. Three things that ruling forecloses, each of which was reachable
+> from the finding: the figure is **not dropped** (the `.idhero` slot stays
+> filled, so the card's anatomy still matches every other card's); it is **not a
+> new `FIG`** (inventing artwork for the identity card would put a second visual
+> language beside the ported SVGs); and it is **not a deck-local avatar fetch**.
+> When the real PFP lands it lands in the `resolve*.ts` resolvers that already
+> own the placeholder constant, and this card inherits it the same way every
+> other surface will — a deck-local fetch would have created a second PFP path
+> for that migration to unpick.
+>
+> Recorded here rather than only in the plan because this note is what a future
+> reader checks the card against, and a figure note that outlives its own
+> falsification is how a register stops being a source of record.
+
 **Title** — `{pseudonym}` is interpolated from the viewer, never hard-coded:
 ```
 You’re {pseudonym}

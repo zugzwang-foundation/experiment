@@ -61,8 +61,35 @@ function advanceToFinalCard(cardCount: number): void {
 	}
 }
 
+/**
+ * ⚠ RADIX ARMS ITS OUTSIDE-POINTER LISTENER INSIDE A `setTimeout(…, 0)`.
+ * `DismissableLayer` defers `ownerDocument.addEventListener("pointerdown", …)`
+ * by one macrotask, so a `pointerDown` fired synchronously after `render()`
+ * reaches NOTHING — the listener does not exist yet. Every backdrop assertion
+ * below therefore yields to the task queue first.
+ *
+ * This was not reasoned about in advance: the re-show's backdrop test was
+ * written as the positive control, went red on the first run, and the red is
+ * what surfaced the deferral. Had the control not been there, the first-login
+ * "backdrop does not close" assertion would have passed against a listener
+ * that was never armed — green, and worth nothing.
+ */
+function armDismissableLayer(): Promise<void> {
+	return new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function pressBackdrop(): void {
+	const backdrop = overlay();
+	expect(backdrop, "the dialog renders an overlay").not.toBeNull();
+	if (backdrop) {
+		fireEvent.pointerDown(backdrop);
+		fireEvent.mouseDown(backdrop);
+		fireEvent.click(backdrop);
+	}
+}
+
 describe("O1-DECK — first login: the deck cannot be dismissed", () => {
-	it("onboarding-deck::first-login-has-no-dismissal", () => {
+	it("onboarding-deck::first-login-has-no-dismissal", async () => {
 		render(
 			<OnboardingDeck
 				context="first-login"
@@ -85,13 +112,8 @@ describe("O1-DECK — first login: the deck cannot be dismissed", () => {
 		expect(content()).not.toBeNull();
 
 		// 3 · THE BACKDROP IS INERT, same mechanism via `onInteractOutside`.
-		const backdrop = overlay();
-		expect(backdrop, "the dialog renders an overlay").not.toBeNull();
-		if (backdrop) {
-			fireEvent.pointerDown(backdrop);
-			fireEvent.mouseDown(backdrop);
-			fireEvent.click(backdrop);
-		}
+		await armDismissableLayer();
+		pressBackdrop();
 		expect(content()).not.toBeNull();
 	});
 
@@ -183,16 +205,11 @@ describe("O1-DECK — the re-show: dismissible at every card", () => {
 		expect(content()).toBeNull();
 	});
 
-	it("the re-show's backdrop closes it (positive control for assertion 3)", () => {
+	it("the re-show's backdrop closes it (positive control for assertion 3)", async () => {
 		render(<OnboardingDeck context="reshow" initialOpen />);
 
-		const backdrop = overlay();
-		expect(backdrop).not.toBeNull();
-		if (backdrop) {
-			fireEvent.pointerDown(backdrop);
-			fireEvent.mouseDown(backdrop);
-			fireEvent.click(backdrop);
-		}
+		await armDismissableLayer();
+		pressBackdrop();
 		expect(content()).toBeNull();
 	});
 
