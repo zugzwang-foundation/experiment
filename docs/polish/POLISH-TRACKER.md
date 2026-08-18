@@ -1,12 +1,21 @@
-# POLISH — Phase Tracker
+# POLISH — Phase Tracker · ⛔ RETIRED 2026-08-18
 
-> **Doc:** `POLISH-TRACKER.md` · web-authored, operator-ratified, CC-committed. Authored 2026-08-10 at the POLISH-TEMPLATE task.
-> **Status:** v1.0
-> **What this is.** The **SEQUENCER** for the POLISH phase. It answers *what is next and what blocks it*. Nothing else.
-> **What this is not.** Not a method (`POLISH-0.md`), not a runbook (`POLISH-SURFACE-TEMPLATE.md`), not a defect register (`POLISH-register.md`). It cross-references all three and restates none of them.
-> **Beside, not instead of.** `tracker_v20.md` stays canonical for the project. This is a phase tracker under it.
-> **Ground:** `origin/main` @ `35d041d`, every row verified against the repo 2026-08-10.
-> **Reconciled at the PRIMITIVES-2 close-out (2026-08-11), `origin/main` @ `0ff2733`.** PRIMITIVES-2 closed (#317 `143380b` · #318 `0ff2733`); `.7a` is the next machine run; §1's `.7a` row, §3's `PD-2-32` / `PD-2-33` / `SideBadge presets` rows, §4's PRIMITIVES-2 row and §5's sequence + binding-condition block all updated against the merged tree rather than against a document asserting it.
+> **This document is HISTORY. Do not read it for state and do not update it.**
+>
+> **Retired at SYNC-2** on a founder ruling that POLISH is a **rolling refinement lane, not
+> a phase with a close**. A phase sequencer for a thing that is not a phase can only go
+> stale again, and this one already had: four of its nine status rows were falsified by
+> merges the repository itself contained, and it carried **zero** mentions of HTML-FINISH —
+> the lane that moved more surfaces than any other.
+>
+> **Where its content went.** Surface state → the project tracker (operator-maintained and external to this repo; read its version off the tracker itself). Docket
+> rows → `docs/parked.md`, where they already were. Method → `POLISH-0.md`. Runbook →
+> `POLISH-SURFACE-TEMPLATE.md`. Defects → `POLISH-register.md`. **Nothing below is
+> restated in any of them, and nothing below is current.**
+>
+> Kept rather than deleted because its gate ledger (B1–B12, C3) is the only record of how
+> those gates were discharged, and because a deleted sequencer leaves its citations
+> dangling. **A citation to this file is a citation to history.**
 
 ---
 

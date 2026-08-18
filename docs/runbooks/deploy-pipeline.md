@@ -101,7 +101,17 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 ```
 
 - **(a) Tree identity.** EMPTY proves the squash-merged tree is byte-identical to the branch that was reviewed. A squash merge can land a tree that is *not* the reviewed one — an un-pushed local commit on the source branch is enough to do it — and staging is the wrong place to discover that. Cheap to check, and it also confirms the merge you think you are advancing is the merge that happened.
-- **(b) Fast-forwardability.** EMPTY means staging carries no commit `main` lacks. If it is not empty the push below is **rejected as a non-fast-forward**, which reads like a tooling failure when it is a **branch-state** problem — staging diverged, and something put a commit there that never went through `main`. Prove this first and that rejection never happens; if it fires anyway, find out why staging diverged before touching anything.
+- **(b) Fast-forwardability — and what a rejection actually means.** EMPTY means
+staging carries no commit `main` lacks. ⚠ **A non-empty result is NOT by itself
+evidence of divergence, and this precondition previously said it was.** Read the
+TREE, never the log: `git diff --stat origin/main origin/staging`. A
+**one-directional** diff — deletions only in one direction — means staging is
+**BEHIND**, which is the ordinary consequence of squash-merging branch work and
+is repaired by the force-push in *The staging advance* below. A
+**two-directional** diff means real content exists only on `staging`; **that** is
+divergence, and it is the case where you stop and reconcile rather than force.
+Commit counts cannot tell these apart — 29 commits and 1 commit can encode an
+identical tree, and on 2026-08-18 they did.
 - **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY → this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and use §3.** This check is also the only thing that tells you **which green to expect** from the migrate job below, and it only tells you **beforehand**.
 
 > **An EMPTY result from (a), (b) or (c) is a REAL result — none of them can fail open.** Worth stating because the question comes up: if a ref does not resolve, `git log`/`git diff` **abort loudly** (`fatal: bad revision`, `fatal: ambiguous argument … unknown revision`) and print nothing to stdout. They cannot silently report "no commits" against a ref that is missing. The `git fetch origin --prune` above is what keeps the refs current; the checks themselves are safe.
@@ -111,8 +121,10 @@ git diff --stat <staging-sha>..origin/main -- drizzle/migrations/ src/db/
 **The advance sequence.**
 
 ```bash
-# 1. Fast-forward staging to the merged main
-git push origin origin/main:staging
+# 1. Advance staging to the merged main — see *The staging advance* below; a
+#    rejection here is usually BEHIND, not diverged, and force-with-lease is the
+#    documented repair. Read the tree before deciding.
+git push --force-with-lease origin origin/main:refs/heads/staging
 
 # 2. Watch the migrate job (§2.1 reaction 1) → GREEN
 gh run list --workflow=staging-migrate.yml --limit 1 \
@@ -140,6 +152,41 @@ code: '42P07',  message: 'relation "__drizzle_migrations" already exists, skippi
 **These are expected output, not errors.** They are Postgres reporting that `CREATE SCHEMA IF NOT EXISTS` / `CREATE TABLE IF NOT EXISTS` found their objects already present — drizzle's own bookkeeping, re-run against an already-initialised database. A first read mistakes them for failures because they arrive as structured error-shaped objects with a `severity` field; `severity: 'NOTICE'` is the tell. If you see these two and nothing else, the run was a **no-op** and precondition (c) should have been EMPTY. Anything beyond them — `CREATE TABLE`, `ALTER TABLE`, a new `__drizzle_migrations` row — means DDL ran, and (c) should have been NOT EMPTY. **A mismatch between the two is the signal to stop and reconcile**, not to proceed to the health curl.
 
 **The health endpoint is the authority — not the migrate exit code.** `drizzle-kit migrate` can exit `0` with a migration unapplied (drizzle-orm #5769 — the silent high-water-mark skip), so a green `staging-migrate.yml` run is a **signal, not a verdict**. Only `migrations:"ok"` from `/api/health` proves the DB matches the committed set. This is the same rule §3 enforces at the production promote gate; staging earns no exemption from it for being resettable.
+
+### The staging advance — the command, and why it is a force-push
+
+`staging` is advanced to `main` by an operator-run force-push to a **pinned SHA**:
+
+```bash
+git fetch origin
+git push --force-with-lease origin <MAIN_SHA>:refs/heads/staging
+```
+
+**Why force, when a fast-forward was the documented path.** Work has more than once been
+committed directly onto `staging` and then squash-merged to `main`. The squash produces a
+tree identical to the branch's and a SHA that is not its descendant, so `staging` ends up
+holding N unsquashed commits that encode exactly what one commit on `main` encodes.
+`git diff` between them is empty; `git log` between them is not. **A fast-forward is then
+structurally impossible even though nothing has actually diverged**, and this has happened
+three times (`DRIFT-1`, and again 2026-08-18).
+
+`--force-with-lease` is the safety: it refuses if `staging` moved since the last fetch.
+
+⚠ **Read the tree before forcing, never the log.** `git diff --stat origin/main
+origin/staging` is the measurement that says whether content differs. A one-directional
+diff — deletions only — means `staging` is *behind*, not divergent, and the force-push
+loses nothing. **A two-directional diff means real content exists only on `staging` and the
+force-push would destroy it. Stop and reconcile instead.**
+
+⚠ **`O-10` applies to the SHA you force to.** Vercel dedups a SHA it has already built. If
+`<MAIN_SHA>` already has a `READY` deployment on the `main` ref, forcing `staging` to it may
+produce **no staging deployment at all**, leaving `staging.zugzwangworld.com` on the old
+build while Staging Migrate reports green. **Prefer a SHA Vercel has never seen** — in
+practice, force immediately after a merge that produced a fresh squash — and **verify the
+alias afterwards by reading `/api/health`'s `canary`, not by trusting the workflow.**
+
+**This is a manual runbook step, deliberately.** Automating it is correct and is not
+experiment-phase work; the docket carries `STAGING-AUTO-ADVANCE` for after go-live.
 
 ---
 

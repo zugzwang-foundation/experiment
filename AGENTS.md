@@ -122,7 +122,13 @@ experiment/
 | Profile | `(public)/u/[pseudonym]/page.tsx` | `src/server/profile/` | UI-A5 |
 | Bookmarks | `(public)/bookmarks/page.tsx` | `src/server/bookmarks/` | UI-A6 · ADR-0032 |
 
-> ⚠ **Discovery is not "still to come" — it is the PERF-1 GO-LIVE BLOCKER.** Through 2026-08-08 this paragraph read *"the market-list surface under it is still to come (DESIGN.\* / UI.\*)"*, which was false from UI-A4 onward. `docs/parked.md`'s only row labelled **GO-LIVE BLOCKER** is about this exact surface serving in **~35 s** — `listOpenMarkets` issues 1 + 3N queries (`src/server/discovery/list.ts:48–63`) and `DiscoveryContent` a further 2N (`src/app/(public)/page.tsx:59–65`). A session opening PERF-1 must not be told its target does not exist. Corrected at SYNC-1.
+> ⚠ **Discovery is built and PERF-1 is CLOSED.** The surface served in ~35 s because Vercel
+> functions ran in `iad1` against a Mumbai database — ADR-0006 ratified `bom1` and it had
+> never been applied. Fixed 2026-08-10 (#307, #308): **361.6 → 5.34 ms per round trip,
+> Discovery 35.07 → 0.692 s p50**, staging-verified. There is no go-live blocker row left in
+> `docs/parked.md`. ⚠ **The fix is on `main` and on `staging`; it is NOT on what the
+> production alias serves** — `zugzwangworld.com` is pinned to a 2026-07-02 build and
+> reports `region: None`. That is a DP.2 promote, not a Discovery defect.
 
 The former `src/server/identity/` entry was reconciled away at AUDIT-FIX-A22 (SPEC.2 §3.5/§3-SSOT/Appendix A now name the built `identity-pool/consume.ts` path; nothing implies a separate `identity/` dir anymore). (`src/server/{bets,cpmm,dharma,markets,positions}/` landed across ENGINE.2–12; `src/server/resolution/` — the W-3 trio + F-ADMIN-3 trigger — landed at ENGINE.9; `src/server/markets/{transaction,create,open,close}.ts` — W-4 + the lifecycle flows — and `src/server/admin/actor.ts` landed at ENGINE.14; `src/server/markets/get-by-slug.ts` — the public slug resolver — landed at SHELL/UI.0.)
 

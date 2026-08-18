@@ -39,7 +39,7 @@ Read off `35da436`. **Highest value read, never counted.** The recon's values we
 | Register | Ceiling at `35da436` | Read from | Next free |
 |---|---|---|---|
 | ADR | **`0036`** | `docs/adr/` highest-numbered filename (`0036-vitest-context-operational-runners.md`); 35 files, `0002`/`0012` unused | `0037` |
-| O-space | **`O-9`** | `CLAUDE.md` — *"Editing prose that cites a governing document by section number…"* | `O-10` |
+| O-space | **`O-9`** | `CLAUDE.md` — *"Editing prose that cites a governing document by section number…"* | `O-10` ⚠ **SNAPSHOT, SUPERSEDED.** O-10, O-11 and O-12 are all minted as of 2026-08-18. Never mint off this cell — read the live ceiling (O-2). |
 | V-space | **`V-10`** | `docs/polish/POLISH-0_data-manifest.md` §5 | `V-11` — ⛔ **founder-mint only** |
 | Surface template §13 | **`§13.6`** | `POLISH-SURFACE-TEMPLATE.md` | `§13.7` |
 | `PD-4-nn` | **NONE — virgin** | whole-repo grep for `PD-4-`: **zero hits**, independently re-run this session | **`PD-4-01`** |
@@ -749,7 +749,15 @@ worktree clean. NOTHING ELSE.
 **Provisionally yes, on two counts — both to be confirmed at the `.4` close-out, neither authored here:**
 
 1. **`POLISH-TRACKER.md` §1 is stale on `.3`, `.5` and `.6`,** and the entire **HTML-FINISH stratum is invisible to it** (four PRs, six session logs, zero tracker mentions). A `.4` session planning off §1 alone would not know a parallel mockup-parity stratum is mid-flight on its own host surfaces. ⚠ **The tracker is operator-maintained and lives in web project knowledge — `.4` does not commit a tracker file.** Raised, not fixed.
-2. **A candidate `O-10`**, if the founder agrees the shape recurs: *a routed item inherits its **location**, not its **defect class** — re-verify that the class reproduces on the receiving surface before treating the routing as a work order.* Minted from `PD-4-06`, where eight correctly-located `rate_limited` sites carry a defect class (*raw codes render to users*) that provably does not reproduce: no composer code path renders a code, only compares one. **Not numbered here** — `O-space` mints belong to the founder's ruling, and `.4` has one instance, not the three that made `O-8` a rule.
+2. **`O-12`** — ✅ **founder-minted at SYNC-2, 2026-08-18.** *A routed item
+inherits its **location**, not its **defect class** — re-verify that the class
+reproduces on the receiving surface before treating the routing as a work order.*
+Minted from `PD-4-06`, where eight correctly-located `rate_limited` sites carry a
+defect class (*raw codes render to users*) that provably does not reproduce: no
+composer code path renders a code, only compares one. ⚠ **When this plan was
+written it was an unnumbered candidate and `.4` correctly declined to self-mint
+it** — one instance, not the three that made `O-8` a rule. The second instance
+arrived at the fold; the founder minted it at SYNC-2.
 
 **Two more, added at the fold — both records, neither authored as a fix here:**
 
@@ -831,7 +839,7 @@ Read at `docs/design/design-canon.md` §5 at the amendment ground. Reported prec
 
 ⇒ **The entry relabel is canon-recorded, and the `app-wide` half is what `.4`'s two strings are.** After #341 lands, `COMPOSER_COPY.header` / `.submit` staying `Đ BET` is **canon-correct, not a residue**. §7's no-edit row on those two symbols **stands unamended**, and `.4` files no row against them.
 
-⚠ **This is the second instance of §14's `O-10` candidate** — *a routed item inherits its **location**, not its **defect class*** — reported from a different direction than `PD-4-06`'s: there, a routing carried a class that did not reproduce; here, a **neighbouring PR's own finding** would have arrived as one. **Two instances, not three.** ⛔ Still **not numbered** — `O-space` mints belong to the founder's ruling, and `.4` does not self-mint one.
+⚠ **This is the second instance of §14's `O-12`** — *a routed item inherits its **location**, not its **defect class*** — reported from a different direction than `PD-4-06`'s: there, a routing carried a class that did not reproduce; here, a **neighbouring PR's own finding** would have arrived as one. **Two instances, not three.** ✅ **MINTED as `O-12` at SYNC-2, 2026-08-18** — `O-space` mints belong to the founder's ruling, and `.4` did not self-mint one.
 
 ---
 
