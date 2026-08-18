@@ -107,3 +107,28 @@ The applied-migrations table is **`drizzle.__drizzle_migrations`** — confirmed
 ## Time
 
 2026-08-18, 06:40 → 07:2x UTC (12:10 → 12:5x IST). Single session, four commits, one PR opened and left unmerged for Gate C.
+
+---
+
+## Gate C addendum — 2026-08-18
+
+Gate C read the whole-branch diff and PASSED it. **Open questions 1–4 above were
+ruled and fixed inside this same PR** at commits `d56beec` and the one carrying
+this addendum, so a reader of `main` should not treat them as live:
+
+1. **A.3's blockquote** — ruled an oversight in the pack. Marker restored.
+2. **`PD-3-11`'s evidence cell** — the "leave every other cell untouched"
+   instruction was itself the defect. Both cells now agree that `error.tsx`
+   shipped and `loading.tsx` did not.
+3. **`B.4` vs §2.5** — closed. §2.5 (b) now distinguishes BEHIND from diverged
+   and routes to the force-push section; step 1's command is `--force-with-lease`.
+4. **`tracker_v21`** — the pointer lost its number, here and at both `CLAUDE.md`
+   sites. A version transcribed into a second document is a defect generator;
+   this PR removed three of them and should not have added a fourth.
+
+**Questions 5, 6 and 7 remain open** and are correctly stated above.
+
+⚠ **This branch carries FIVE commits, not the four the table above lists** — the
+Gate C fix rounds landed after this log was written. The count is left uncorrected
+in place and stated here instead, because a session log that edits itself to look
+prescient is worth less than one that appends.

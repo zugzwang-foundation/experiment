@@ -124,7 +124,7 @@ identical tree, and on 2026-08-18 they did.
 # 1. Advance staging to the merged main — see *The staging advance* below; a
 #    rejection here is usually BEHIND, not diverged, and force-with-lease is the
 #    documented repair. Read the tree before deciding.
-git push origin origin/main:staging
+git push --force-with-lease origin origin/main:refs/heads/staging
 
 # 2. Watch the migrate job (§2.1 reaction 1) → GREEN
 gh run list --workflow=staging-migrate.yml --limit 1 \

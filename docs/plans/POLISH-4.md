@@ -749,7 +749,15 @@ worktree clean. NOTHING ELSE.
 **Provisionally yes, on two counts — both to be confirmed at the `.4` close-out, neither authored here:**
 
 1. **`POLISH-TRACKER.md` §1 is stale on `.3`, `.5` and `.6`,** and the entire **HTML-FINISH stratum is invisible to it** (four PRs, six session logs, zero tracker mentions). A `.4` session planning off §1 alone would not know a parallel mockup-parity stratum is mid-flight on its own host surfaces. ⚠ **The tracker is operator-maintained and lives in web project knowledge — `.4` does not commit a tracker file.** Raised, not fixed.
-2. **`O-12`** — a candidate when this was written, ✅ **founder-minted at SYNC-2, 2026-08-18** — if the founder agrees the shape recurs: *a routed item inherits its **location**, not its **defect class** — re-verify that the class reproduces on the receiving surface before treating the routing as a work order.* Minted from `PD-4-06`, where eight correctly-located `rate_limited` sites carry a defect class (*raw codes render to users*) that provably does not reproduce: no composer code path renders a code, only compares one. **Not numbered here** — `O-space` mints belong to the founder's ruling, and `.4` has one instance, not the three that made `O-8` a rule. ✅ **Minted as `O-12` at SYNC-2, 2026-08-18.**
+2. **`O-12`** — ✅ **founder-minted at SYNC-2, 2026-08-18.** *A routed item
+inherits its **location**, not its **defect class** — re-verify that the class
+reproduces on the receiving surface before treating the routing as a work order.*
+Minted from `PD-4-06`, where eight correctly-located `rate_limited` sites carry a
+defect class (*raw codes render to users*) that provably does not reproduce: no
+composer code path renders a code, only compares one. ⚠ **When this plan was
+written it was an unnumbered candidate and `.4` correctly declined to self-mint
+it** — one instance, not the three that made `O-8` a rule. The second instance
+arrived at the fold; the founder minted it at SYNC-2.
 
 **Two more, added at the fold — both records, neither authored as a fix here:**
 
