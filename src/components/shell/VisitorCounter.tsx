@@ -71,12 +71,12 @@ export function VisitorCounter() {
 			data-testid="visitor-counter"
 			data-state={dataState}
 			aria-busy={state === "loading"}
-			title="Total page visits — not participants"
+			title="Total page views — not participants"
 			className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
 		>
 			<Eye aria-hidden="true" className="size-3.5 shrink-0" />
 			<span>
-				<span className="tabular-nums">{numberText}</span> visitors
+				<span className="tabular-nums">{numberText}</span> views
 			</span>
 		</span>
 	);
