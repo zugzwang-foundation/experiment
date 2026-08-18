@@ -1,7 +1,7 @@
 # O1-DECK — The onboarding deck: first-login gate and About re-show
 
-> **Status:** drafted — awaiting founder ratification
-> **Date:** 2026-08-18
+> **Status:** **RATIFIED (amended)** — all five open decisions ruled by the founder 2026-08-18 and applied here. Ready for execute.
+> **Date:** 2026-08-18 (amended same day)
 > **Author:** Hrishikesh + Claude Code (Phase 1 tab)
 > **Critical-path?** **no** — no CLAUDE.md §1 path is touched, no DDL, no migration. But it **mints ADR-0037** and **edits two shell files carrying live rulings and an enforcing test**, so it is gated plan-then-execute, not a trivial pass.
 > **Plan PR / commit:** this file, on `plan/o1-deck`, cut from `origin/main` `c4526e2`
@@ -55,9 +55,23 @@ Every PFP on every surface today is one static asset:
 
 `users.pfpFilename` is populated at signup (`src/server/auth/index.ts:246`, `post-commit-events.ts:208`) and is **deliberately never read** by any renderer.
 
-**Decision: render `/pfp-placeholder.svg` with the pseudonym-initial `AvatarFallback`, exactly as `IdentityCluster` does.** `pseudonym` is the one field `HeaderViewer` carries, and it is the only field Card 2 needs — it is also the card's *title* (`You're {pseudonym}`). Zero DTO change, zero new read, zero new query on a first-login render.
+### ✅ D-5 — RULED. Founder, 2026-08-18, arising from this finding.
 
-**When the real PFP lands** (SCAFFOLD.15 / the R2 `pfp` bucket), it will land in the `resolve*.ts` resolvers that already own the placeholder constant, and the deck inherits it the same way every other surface will. **Building a bespoke avatar fetch for the deck now would create a second PFP path to migrate later.**
+**Card 2's figure is the shared placeholder + the pseudonym-initial fallback, exactly as `IdentityCluster` renders it. Not dropped, and not a new `FIG`.**
+
+```tsx
+<Avatar>                                   // at .idhero scale: 84×84, rounded to --imgr
+  <AvatarImage src="/pfp-placeholder.svg" alt="" />
+  <AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
+</Avatar>
+```
+
+`pseudonym` is the one field `HeaderViewer` carries, and it is the only field Card 2 needs — it is also the card's *title* (`You're {pseudonym}`). **Zero DTO change, zero new read, zero new query on a first-login render.**
+
+Three things the ruling forecloses, each of which was reachable from F-1:
+- ⛔ **Not dropped.** The card keeps a figure; the register's `.idhero` slot is filled, so the card's anatomy still matches every other card's.
+- ⛔ **Not a new `FIG` illustration.** Inventing artwork for the identity card would put a second visual language beside the six ported SVGs and would need a design pass this plan has no ruling for.
+- ⛔ **Not a bespoke avatar fetch.** When the real PFP lands (SCAFFOLD.15 / the R2 `pfp` bucket) it lands in the `resolve*.ts` resolvers that already own the placeholder constant, and the deck inherits it the same way every other surface will. A deck-local fetch would create a second PFP path for that migration to unpick.
 
 ### What is safe to add to `(public)/layout.tsx`, and what is not
 
@@ -189,13 +203,19 @@ Modal chrome, measured the same way: padding 60 (30 top + 30 bottom) · progress
 
 So the ruling is settled and this plan does not reopen it. What the plan **must not** do is hard-code `503px`: that number is a *measurement of today's strings in today's font*, and it drifts the moment a word changes. The mockup's `.card{min-height:218px}` is a **floor that all seven cards already clear** — it constrains nothing.
 
-⚠ **OPEN DECISION D-1 (founder).** 225.9px of empty space on the six short cards is a real visual cost that the register's ruling implies but does not quantify. Three options, all cheap; **my recommendation is (a)**:
+### ✅ D-1 — RULED (a) + vertical centring. Founder, 2026-08-18.
 
-| | Option | Consequence |
-|---|---|---|
-| **(a) ✅** | Card region is a flex column with `min-h-0` avoided and the **content top-aligned**; the modal grows to the tallest card once and never changes. Achieve "size to tallest" by rendering all seven cards in a CSS grid stack (`grid-area: 1/1`), with non-active cards `invisible` + `aria-hidden`. Height is then the natural max — **no magic number, and it self-corrects if copy changes.** | Whitespace collects below the short cards. All seven mount (they are static strings; no data, no cost). |
-| (b) | Fixed `min-h-[503px]` on the card region | A literal that goes stale on the next copy edit; the register's own §1 warns the strings are the source of record. |
-| (c) | Vertically centre content in the card region (`justify-center`) | Splits the whitespace above and below. Changes the mockup's top-aligned anatomy, so it needs a design ruling, not a plan decision. |
+**The card region is a CSS grid stack sized to the natural tallest card, and its content is CENTRED VERTICALLY within the region.**
+
+> *"226px pooled at the bottom is a hole; split above and below it is breathing room."*
+
+**Mechanism.** All seven cards render into one grid cell (`grid-area: 1/1`); the non-active ones are `invisible` + `aria-hidden` + `pointer-events-none`. The region's height is then the natural maximum of its children — **no literal anywhere**, and it self-corrects the moment a card's copy changes. The active card is centred on the block axis inside that region.
+
+⛔ **`min-h-[503px]` — or any other measured literal — is forbidden.** 503.1px is a measurement of today's strings in today's font; the copy register is the source of record and its §1 says the strings are what the build copies. A pinned height goes stale on the first word that changes, silently, and the register would still be correct.
+
+⚠ **Vertical centring is a deliberate departure from the mockup's top-aligned `.card` anatomy** (`.card{min-height:218px;display:flex;flex-direction:column;align-items:center}` — `align-items` is the *cross* axis there, so the mockup stacks from the top). Founder-ruled, recorded as a **named deviation** rather than absorbed: the whitespace is split ~113px above and ~113px below on the shortest card instead of pooling 225.9px underneath it.
+
+⚠ **All seven mount at once.** They are static strings with no data dependency, so the cost is DOM nodes and nothing else — no query, no fetch, no per-card state. That is what makes "size to the natural tallest" achievable without measuring anything at runtime.
 
 ## Q5 · O-a — RULES on `/sign-in`
 
@@ -213,7 +233,7 @@ So the ruling is settled and this plan does not reopen it. What the plan **must 
 
 ⚠ **Card 2 is absent from the re-show anyway** (§21.9, register §3), which removes the one card that would need a pseudonym — so the re-show has no viewer dependency at all. That is what makes this safe rather than merely acceptable.
 
-## Q6 · O-c — the measured cost of RULES in the centre zone
+## Q6 · O-c — the measured cost of RULES in the centre zone ⇒ **ruling REVERSED, left zone**
 
 ### MEASURED at 1440. The ruling costs **41.57px**.
 
@@ -240,16 +260,45 @@ The shift is exactly `(73.13 + gap) / 2` — the centre *track* stays centred; t
 
 **Headroom:** the side zones measure 180.23 (left) and 173.27 (right) against a 568px track, so **387.77px of slack per side**. B and C are safe by a very wide margin, and remain safe signed-in when the Đ cluster joins the right zone.
 
-### Reporting, not ruling
+### ⚠ D-2 — REVERSED. RULES ships in the LEFT ZONE, beside Radio. Founder, 2026-08-18.
 
-**The ruling stands.** §21.9 places the entry point in the global header; the locked W2.4/.5/.14 close-out (`:31`) places the tab in the **centre**, after the wordmark and countdown. This plan does not overturn it.
+**The measurement reopened the ruling and the founder overturned it.** RULES mounts in the left zone after `RadioSlot` — case **B**, measured shift **0.00px**. The brand mark stays at 720.00, exactly centred.
 
-What the plan owes the founder is the number, and the number is that **the brand mark sits 41.57px left of true centre at 1440** — 19% of the brand cluster's own 220px width, against a header whose docblock says the equal side tracks exist *specifically* to keep it "absolutely centred". That docblock becomes false the day RULES lands beside it.
+**Grounds, as recorded by the founder:**
 
-⚠ **OPEN DECISION D-2 (founder, not mine).** Three ways to close it:
-1. **Accept the 41.57px shift.** Then `GlobalHeader.tsx`'s docblock sentence about absolute centring must be corrected in the same commit — it is a §-free prose claim, but it is a claim about this exact mechanism, and leaving it is the O-9 shape.
-2. **Take option D** (hidden counterweight) — brand stays at 719.99, cost is a 73px invisible spacer and a wider centre track. Honest, slightly odd.
-3. **Move to the left zone (B) or right zone (C)** — 0.00px shift, but it departs the locked mockup's placement, which is a design ruling to reopen, not a build call.
+1. **41.57px is 19% of the brand cluster's own 220px width** — not a rounding error, a visible displacement of the product's primary mark.
+2. The locked mockup's centre placement predates the repo's measured centring behaviour. *(⚠ See the correction below — this ground is not accurate as stated, and it does not carry the ruling.)*
+3. **The left zone is the utility-control family, and the design's own carry-forward budgeted five controls there, of which three shipped.** Confirmed on disk: the mockup's `.zone.left` carries Back · Home · Radio · Social · Research — five — and `GlobalHeader.tsx:92-95` ships three (`HeaderNav` = Back + Home, then `RadioSlot`). RULES joins a family that already exists and has budgeted room.
+4. **The hidden counterweight (case D) was rejected** — an invisible node whose purpose is also invisible. It would sit in the tree with nothing to explain it but a comment.
+
+### ⛔ Correction to ground 2, recorded because the plan must not carry a false premise
+
+**The mockup does NOT predate the `1fr auto 1fr` grid — it uses exactly that grid.** `DESIGN_W2_4-5-14_global-header_mockup-v0_2.html:37`:
+
+```css
+display:grid;grid-template-columns:1fr auto 1fr;align-items:center;
+.zone.center{justify-self:center;}
+```
+
+The real mechanism is one level down: in the mockup, `RULES` is a child of `.brand`, *inside* `.zone center` (`:208`). So the mockup has **the identical 41.57px-class displacement** — `justify-self:center` centres the *zone*, never the brand within it. The mockup did not solve this differently; **it never measured it.**
+
+**This strengthens the ruling rather than weakening it**, and it is why the correction is recorded rather than quietly dropped: the mockup's placement was not a considered trade against a measured cost, so overturning it discards no analysis. Grounds 1, 3 and 4 carry the decision on their own.
+
+### ⇒ TIER-4 DEVIATION — recorded per the header's own convention
+
+`GlobalHeader.tsx:26-28` already keeps a named-deviation register for exactly this:
+
+> *"Left zone order Back · Home · Radio (mockup v0_2); Social/Research/RULES/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each a named deviation in the plan."*
+
+**The deviation, stated for that register:**
+
+> **RULES — placement deviates from the locked W2.4/.5/.14 mockup.** The mockup places the tab in the centre zone as a sibling of the wordmark (`mockup-v0_2:208`, close-out `:31`). It ships in the **left zone, after Radio**. Measured at 1440 against the real compiled CSS: the mockup's placement moves the brand cluster **41.57px** left of true centre (73.13px control + 10px gap, halved); the left zone measures **0.00px** shift with 387.77px of headroom. Founder-ruled 2026-08-18 (D-2).
+
+### ⇒ The docblock's absolute-centring sentence STAYS TRUE — and is NOT amended
+
+`GlobalHeader.tsx:22-23` reads *"3-zone `1fr auto 1fr` grid — equal side tracks keep the brand cluster absolutely centred"*. Under D-2 the brand stays at 720.00 and **that sentence remains true**. ⛔ **Any edit to it is struck from this plan.** An earlier draft carried one under option (a); it is gone.
+
+⚠ **But two OTHER sentences in the same docblock go false and must be corrected in the same commit.** `:26-28` lists **RULES among the ratified omissions** and states the left-zone order as *"Back · Home · Radio"*. The moment RULES ships in the left zone, both are wrong. The build commit therefore edits `GlobalHeader.tsx`'s docblock to (a) state the order as **Back · Home · Radio · RULES**, (b) remove RULES from the omissions list — Social/Research/Đ-info remain — and (c) add the deviation paragraph above. **This is truth-maintenance on prose that describes this exact mechanism (O-9), not the centring edit D-2 struck.**
 
 ## Q7 · O-b — the re-show's final-card label
 
@@ -276,13 +325,28 @@ Card 2's subtext asserts: `8 markets` (twice) and `15th September 2026` → `5th
 | Window end (a second copy) | `WINDOW_END = "2026-11-05T23:59:00.000Z"` — `graph-series.ts:32` | ❌ module-private, and **duplicates the freeze pin** |
 | Market count | **none** | — `grep -rn "MARKET_COUNT\|TOTAL_MARKETS"` → no match. `≤ 8 markets` appears only as a *bound* in two doc comments (`discovery/list.ts:58`, `DiscoveryCarousel.tsx:17`) |
 
-### Recommendation — split the answer, because the two facts are not alike
+### ✅ D-3 — RULED (b): ALL THREE ship as LITERALS, each drift-tested. Founder, 2026-08-18.
 
-**Dates → bind.** `FREEZE_INSTANT_UTC` is exported, already a header dependency, and is the single pin the whole product counts down to. The card should render its end date from it. The **start** date has no exported constant; the execute should not invent a third copy — it should export the existing pair from one home and have both `graph-series.ts` and the deck read it. ⚠ That is a small refactor of a file this plan does not otherwise touch, so it is named in the allow-list and nowhere else.
+**This differs from my recommendation, which was to bind the dates. The founder's grounds are better than mine, and they are two:**
 
-**Market count → ship the literal `8`, guarded.** Three reasons: there is no constant to bind to; a live `COUNT(*)` would put a **query on a first-login modal** and would say "7" whenever a market is still `Draft` (`getMarketBySlug` excludes Draft, ADR-0023); and the count is an editorial claim about the slate, which is founder-owned content (CLAUDE.md §3, market-content invention). **The safety net is a test, not a binding** — one assertion that the register's string and the seeded market count agree, so drift is caught at CI rather than by a participant.
+1. ⛔ **Formatting `FREEZE_INSTANT_UTC` in local time renders "6th November 2026" in IST.** The freeze is `2026-11-05T23:59:00.000Z`; IST is UTC+5:30, so `toLocaleDateString()` on an Indian device — the founder's, and a large share of the audience's — yields **the 6th**. A bound date would have shipped a card that contradicts the freeze it was bound to, on the machines most likely to see it. **Binding would have introduced the bug it was meant to prevent.**
+2. **A bound card no longer matches the copy register byte-for-byte, which is the register's entire purpose.** The register is the *string source of record* and says the build copies its bytes. A card assembled from `${format(FREEZE_INSTANT_UTC)}` is no longer comparable to it, and the byte-equality guard — the thing that catches ASCII-apostrophe corruption — stops being possible.
 
-⚠ **OPEN DECISION D-3 (founder).** The register's own warning is the reason this is flagged rather than settled: *"If the slate or the window ever changes, this card is a place the product starts lying."* The recommendation above is the cheapest defensible split; binding the count instead is a legitimate alternative if the founder prefers the modal to be self-correcting over being editorially fixed.
+**⇒ `WINDOW_START` needs no export. That refactor is STRUCK from the allow-list**; `src/server/profile/graph-series.ts` is not touched by this plan at all.
+
+### The drift test — `tests/unit/onboarding/copy-drift.test.ts`
+
+A fourth test file, carrying **no §17 row** (it is a regression guard in the `_probe-*` class, not an acceptance case). Three assertions:
+
+| # | Assertion | Strength |
+|---|---|---|
+| 1 | Every card string in `src/components/onboarding/cards.ts` matches `docs/design/ZUGZWANG-O1-DECK_copy-register_v1_0.md` **byte-for-byte** — read the register off disk, extract the fenced blocks, compare | **Real verification.** Catches retyping, ASCII `'` for U+2019, a dropped em dash, and any silent edit to either side. This is the assertion the register exists to make possible. |
+| 2 | Card 2's end date equals `FREEZE_INSTANT_UTC` **formatted in UTC** — assert the formatted value is `5th November 2026` and that the card contains it | **Real verification**, and it is precisely the guard that catches the IST bug: any future move to local-time formatting fails here. |
+| 3 | Card 2 contains `8 markets` exactly twice, and `15th September 2026` | ⚠ **A tripwire, not a verification** — see below. |
+
+⚠ **Assertion 3 cannot verify anything, and the plan says so rather than implying otherwise.** There is no machine-readable slate: `grep -rn "MARKET_COUNT\|TOTAL_MARKETS"` returns nothing, `≤ 8 markets` appears only as a *bound* in two doc comments, and the test database holds fixtures rather than the real slate — so asserting the card's `8` against a test-DB `COUNT(*)` would compare copy to fixtures and mean nothing. The start date has no constant either, and D-3 forbids minting one. **What assertion 3 buys is that the literals are pinned in a named place**, so changing the slate or the window forces a deliberate edit to a test that says why, instead of leaving the card to drift silently. That is the honest ceiling here, and it is worth having.
+
+⚠ **The byte-equality assertion (1) subsumes the byte check earlier assigned to `cards.test.ts`.** It lives here, once, not in two files.
 
 ## Q9 · The completion flow, and not flickering on a poll tick
 
@@ -341,6 +405,16 @@ The error direction is **flow-file name → §17 catalogue**. And §17's table h
 **Why row 9 is pure and not a render assertion.** *"The indicator and dot rail derive from array length — no literal count"* is a property of the card module, and the strongest form is a source scan plus an arity assertion: change the array, the step count follows. A render assertion would pass against a hard-coded `7` on a 7-card array.
 
 **Harness confirmed on disk** (`tests/unit/shell/header-nav-back.test.tsx`): `// SPDX-License-Identifier: AGPL-3.0-or-later` on line 1, `// @vitest-environment jsdom` on line 2, `@testing-library/react`, `vi.mock("next/navigation", …)`. ⛔ **There is no `jest-dom`** — assert with `getAttribute` / `textContent` / `querySelector`, never `toBeInTheDocument()`.
+
+### ⇒ THE THREE FINAL PATHS — for the web-authored §21.9 Acceptance line
+
+```
+tests/unit/onboarding/gate.test.ts
+tests/unit/onboarding/cards.test.ts
+tests/unit/onboarding/render/deck.test.tsx
+```
+
+⚠ **`tests/unit/onboarding/copy-drift.test.ts` is a FOURTH file and is deliberately NOT in that list.** It carries no §17 row — it is a regression guard in the `_probe-*` class (D-3). §13.5's MUST binds Acceptance-block names to the §17 catalogue; naming a file that asserts no §17 row would put a name in the Acceptance block with nothing in §17 to match it, which is the exact build error §13.5 defines. **The execute creates all four files; the Acceptance line names three.**
 
 ## Q11 · One PR or two?
 
@@ -413,7 +487,15 @@ The seen-marker is a browser cookie, not a `users` column — that is the whole 
 
 **Flow — first login.** Sign-in completes → `(public)` layout computes `authenticated && !marker` → deck renders non-dismissible at card 1 of 7 → Back disabled at 1, Next advances → final card reads `Enter Zugzwang` → click closes optimistically **and** fires the action → cookie written → never shown again on this browser.
 
-**Flow — re-show.** Any viewer clicks `RULES` → deck opens dismissible at card 1 of 6 (WELCOME omitted) → Escape, the close control, and backdrop all close it → final card reads `Done` → **no cookie is written** (the re-show must never write the marker; it is not a first login).
+**Flow — re-show.** Any viewer clicks `RULES` → deck opens dismissible at card 1 of 6 (WELCOME omitted) → Escape, the close control, and backdrop all close it → final card reads `Done` → **no cookie is written**.
+
+### ✅ D-4 — RULED (b). The re-show NEVER writes the marker. Founder, 2026-08-18.
+
+**One writer, one path: first-login completion only.** `completeOnboardingDeckAction` is called from the first-login context and from nowhere else — it is not wired to the re-show's `Done` at all, so there is no runtime branch to get wrong.
+
+⚠ **Why this is a ruling and not an obvious default.** The re-show is reachable **signed-out** (Q5 — the RULES control is present for every viewer). If completing it wrote the marker, a visitor could read the deck on `/sign-in`, sign up, and never see the first-login gate — the marker would suppress the very showing §21.9 makes non-dismissible. **The gate's whole guarantee is that every authenticated participant sees the rules once, undismissably**; a second writer on a signed-out path is the one thing that can silently void it.
+
+⚠ Structural, not conditional: the action is imported by the first-login mount only. A `context === "reshow"` guard *inside* the action would be a branch a future edit can flip; not importing it is a compile-time fact.
 
 **States:** card index 1..N · Back disabled at index 0 · final-card label switches on `index === N-1` · dot rail fills to the current index.
 
@@ -443,8 +525,9 @@ The seen-marker is a browser cookie, not a `users` column — that is the whole 
 | Layer | Scenarios | Rows |
 |---|---|---|
 | Unit pure (`tests/unit/onboarding/gate.test.ts`) | both conditions → show; no session → hide (marker irrelevant, both values); marker present → hide | 1, 2, 3 |
-| Unit pure (`tests/unit/onboarding/cards.test.ts`) | re-show list = full minus WELCOME; step count derives from array length (source scan for a literal + arity); **byte assertions on the U+2019 / U+2014 / U+00B7 strings** | 7, 9 |
-| Component jsdom (`tests/unit/onboarding/render/deck.test.tsx`) | first-login: no close control in the DOM, Escape does not close, backdrop does not close; final card closes and calls the action; opening calls nothing; re-show: close control present and Escape closes at every card index | 4, 5, 6, 8 |
+| Unit pure (`tests/unit/onboarding/cards.test.ts`) | re-show list = full minus WELCOME; step count derives from array length (source scan for a literal + arity) | 7, 9 |
+| Component jsdom (`tests/unit/onboarding/render/deck.test.tsx`) | first-login: no close control in the DOM, Escape does not close, backdrop does not close; final card closes and calls the action; opening calls nothing; re-show: close control present, Escape closes at every card index, and **`Done` never calls the action** (D-4) | 4, 5, 6, 8 |
+| Unit pure (`tests/unit/onboarding/copy-drift.test.ts`) — **guard, no §17 row** | card strings byte-equal to the copy register (subsumes the U+2019 / U+2014 / U+00B7 check); Card 2's end date equals `FREEZE_INSTANT_UTC` formatted **in UTC**; `8 markets` ×2 and `15th September 2026` pinned | — (D-3) |
 
 **Integration:** none. No DB write, no service-layer function. `pnpm test:integration` is unaffected.
 
@@ -479,20 +562,27 @@ The seen-marker is a browser cookie, not a `users` column — that is the whole 
 | `tests/unit/onboarding/gate.test.ts` | rows 1–3 |
 | `tests/unit/onboarding/cards.test.ts` | rows 7, 9 |
 | `tests/unit/onboarding/render/deck.test.tsx` | rows 4, 5, 6, 8 |
+| `tests/unit/onboarding/copy-drift.test.ts` | **D-3** — register byte-equality, the UTC date guard, the literal tripwires. No §17 row. |
 
 ### Modified
 
 | Path | Change | Constraint |
 |---|---|---|
 | `src/app/(public)/layout.tsx` | read cookie; compute gate; render `<OnboardingDeck>` as a sibling of `<main>` | ⛔ `<main>` and its class string are **untouchable** |
-| `src/app/(auth)/layout.tsx` | mount the re-show deck (Q5) | ⛔ re-show only; **never** the gate, never a cookie read |
-| `src/components/shell/GlobalHeader.tsx` | mount `RulesControl` in the centre zone; **correct the docblock's absolute-centring sentence** if D-2 lands on option 1 | ⛔ zone order and the §21.1 divider are untouchable |
-| `src/server/profile/graph-series.ts` | export `WINDOW_START` (or move the pair to a shared home) if D-3 binds the dates | ⛔ the graph's own behaviour is untouched — an export, not a change |
-| `docs/specs/SPEC.1.md` | §21.9 Acceptance line gains the three test paths; §0 → 1.0.35 + change-log row | same-commit rider, §5.12 |
+| `src/app/(auth)/layout.tsx` | mount the re-show deck (Q5) | ⛔ re-show only; **never** the gate, never a cookie read, never the completion action (**D-4**) |
+| `src/components/shell/GlobalHeader.tsx` | **D-2:** mount `RulesControl` in the **LEFT zone, after `RadioSlot`** (`:92-95`); docblock — state the order as Back · Home · Radio · RULES, drop RULES from the ratified-omissions list, add the tier-4 deviation paragraph | ⛔ **The absolute-centring sentence (`:22-23`) is NOT touched** — under D-2 it stays true. ⛔ The centre zone, the §21.1 divider, and the right-zone order are untouchable. |
+| `docs/design/ZUGZWANG-O1-DECK_copy-register_v1_0.md` | **APPEND-ONLY annotation** under the Card 2 figure note — see below | ⛔ **No card string is touched.** ⛔ The existing note is not rewritten. |
+| `docs/specs/SPEC.1.md` | §21.9 Acceptance line gains the three test paths (**web-authored — see §11**); §0 1.0.34 → **1.0.35** + change-log row | same-commit rider, §5.12 |
+
+### The copy-register annotation (append-only)
+
+The register's Card 2 figure note asserts *"the viewer's **live PFP avatar** as a centred hero"*. **F-1 proves that false** — no live PFP exists anywhere in the product. The build appends a dated annotation beneath that note recording the finding and the pointer, in the same commit as the code that relies on it.
+
+⛔ **Append, never rewrite.** The register is a **ratified** web-authored document; its assertions are the founder's. An annotation adds what was learned without editing what was ratified, and it keeps the byte-equality guard (D-3 assertion 1) intact by leaving every fenced card block untouched. ⚠ The annotation must land **outside** the fenced string blocks, or it breaks its own drift test.
 
 ### Explicitly NOT on the list
 
-`src/components/ui/dialog.tsx` · `src/app/globals.css` · `src/server/auth/**` · `tests/unit/design/*-height-chain.test.ts` · `tests/unit/design/tokens-monochrome.test.ts` · `docs/design/mockups/**` · any `drizzle/**` · any `src/db/**`
+`src/components/ui/dialog.tsx` · `src/app/globals.css` · `src/server/auth/**` · **`src/server/profile/graph-series.ts`** (struck under **D-3** — no `WINDOW_START` export is needed) · `tests/unit/design/*-height-chain.test.ts` · `tests/unit/design/tokens-monochrome.test.ts` · `tests/unit/shell/sticky-header.test.ts` · `tests/unit/shell/page-container.test.ts` · `docs/design/mockups/**` · any `drizzle/**` · any `src/db/**`
 
 ## 10. Edit boundary — including the tests that pin current behaviour (§13.2)
 
@@ -514,13 +604,32 @@ One PR (Q11). Four commits, RED before GREEN.
 
 | # | Commit | Contents |
 |---|---|---|
-| **1** | `test(onboarding): the gate, the card set and the deck's two dismissal policies — RED` | the three test files, failing. No `src/` change. |
+| **1** | `test(onboarding): the gate, the card set and the deck's two dismissal policies — RED` | the **four** test files, failing. No `src/` change. |
 | **2** | `feat(onboarding): the seen-marker is a cookie, and the gate is a decision the layout makes once` | **ADR-0037 verbatim** + `gate.ts` + `complete.ts` + the `(public)` layout wiring. Rows 1–3 GREEN. |
-| **3** | `feat(onboarding): one component, one card array, two contexts` | `cards.ts` + `figures.tsx` + `OnboardingDeck.tsx`. Rows 4–9 GREEN. |
-| **4** | `feat(shell): the re-show gets the entry point a session boundary cannot give it` | `RulesControl.tsx` + `GlobalHeader` + `(auth)` layout + the SPEC.1 §21.9 Acceptance rider + §0 bump. |
+| **3** | `feat(onboarding): one component, one card array, two contexts` | `cards.ts` + `figures.tsx` + `OnboardingDeck.tsx` + the copy-register annotation. Rows 4–9 GREEN; `copy-drift` GREEN. |
+| **4** | `feat(shell): the re-show gets the entry point a session boundary cannot give it` | `RulesControl.tsx` + `GlobalHeader` (left zone + docblock) + `(auth)` layout + the SPEC.1 §21.9 rider + §0 → 1.0.35. |
 
 ⚠ **ADR-0037 rides commit 2, not commit 1** — same-commit with the mechanism it governs (§5.12), which is `gate.ts` + `complete.ts`.
+⚠ **The copy-register annotation rides commit 3**, with `cards.ts` — the commit whose code depends on the finding the annotation records.
 ⚠ Every message carries the **`Instructions for AI`** block, copied from `CLAUDE.md` §5.13.1, after the body and before any trailer. No `Co-authored-by`.
+
+### ⛔ Commit 4 carries a RESERVED SLOT — web-authored text CC does not draft
+
+SPEC.1 §21.9's Acceptance line currently reads *"**Acceptance.** §17 rows `onboarding-deck::*`."* It needs the three test paths in prose per SPEC.2 §13.4 (*"File placement follows the behaviour under test and is recorded at build"*).
+
+**SPEC.1 is a web-authored prescriptive document.** ⛔ **CC does not draft that sentence.** Commit 4 halts on **S-12** until the replacement text is supplied verbatim, exactly as commit 0's blocks A1–A6 were.
+
+**What the founder needs to write it** — the three paths, final, and each already justified in Q10:
+
+```
+tests/unit/onboarding/gate.test.ts          rows 1–3  (the gate predicate, pure)
+tests/unit/onboarding/cards.test.ts         rows 7, 9 (the card set + derived step count, pure)
+tests/unit/onboarding/render/deck.test.tsx  rows 4, 5, 6, 8 (dismissal + completion, jsdom)
+```
+
+⚠ `tests/unit/onboarding/copy-drift.test.ts` is **excluded by design** — it asserts no §17 row, and naming it would put a name in an Acceptance block with nothing in §17 to match, which §13.5 defines as a build error.
+
+**Version:** SPEC.1 §0 **1.0.34 → 1.0.35**, `Last updated:` → the commit date, plus a §20 change-log row. ⚠ The §20 row is CC-authorable (it is a record of the change, not a normative claim); **the §21.9 Acceptance sentence is not**.
 
 ## 12. Stop conditions
 
@@ -537,8 +646,11 @@ One PR (Q11). Four commits, RED before GREEN.
 | **S-7** | Achieving the gate requires reading or writing anything under `src/server/auth/**`. |
 | **S-8** | The `ls docs/adr/` ceiling at execute time is not `0036` — i.e. `0037` is taken. |
 | **S-9** | SPEC.1 §0 is not `1.0.34` at execute time (something landed in between). |
-| **S-10** | D-1, D-2 or D-3 is unresolved when the commit that depends on it is reached. |
-| **S-11** | A `(auth)`-mounted deck would read the marker cookie or render non-dismissibly. |
+| **S-10** | ~~D-1, D-2 or D-3 is unresolved~~ — **DISCHARGED.** All five ruled 2026-08-18. Retained as a numbered slot so S-11/S-12 keep their identifiers. |
+| **S-11** | A `(auth)`-mounted deck would read the marker cookie, render non-dismissibly, or import `completeOnboardingDeckAction` (**D-4**). |
+| **S-12** | Commit 4 is reached without the **web-authored** §21.9 Acceptance sentence supplied verbatim. CC does not draft SPEC.1 prose. |
+| **S-13** | The copy-register edit would touch any byte inside a fenced card block, or rewrite the existing Card 2 figure note rather than appending beneath it (**D-3** assertion 1 depends on this). |
+| **S-14** | `RulesControl` would mount anywhere but the **left zone**, or `GlobalHeader.tsx:22-23`'s absolute-centring sentence would be edited (**D-2**). |
 
 ### ⚠ §13.1 — the plan run against its own stop conditions
 
@@ -553,14 +665,43 @@ One PR (Q11). Four commits, RED before GREEN.
 
 **One residual, stated rather than hidden:** S-4's allow-list governs the *execute*. The plan commit writes `docs/plans/O1-DECK.md`, which is not on it. **Carve-out, written in advance: S-4 does not fire on this plan's own commit.**
 
+### ⚠ §13.1 RE-RUN against the AMENDED plan — D-2 changed the file set
+
+The rulings moved the boundary in four places, so the self-check was executed again rather than assumed to still hold.
+
+| What moved | Effect on the plan's own commit | Verdict |
+|---|---|---|
+| **D-2** — RULES to the left zone | `GlobalHeader.tsx`'s edit changes *which* lines are touched, not *whether*. It was already on the allow-list; it stays. **No file was added or removed from `src/` by D-2.** | no new self-fire |
+| **D-3** — `graph-series.ts` **struck** from the allow-list | The set got *smaller*. A shrinking allow-list cannot create a self-fire; it can only make S-4 fire more readily at execute, which is the intent. | no new self-fire |
+| **D-3** — `copy-drift.test.ts` **added** | A new `tests/` file. The plan commit writes no `tests/` file. | no self-fire |
+| **Copy-register annotation added** | A new `docs/design/**` path on the allow-list. ⚠ **Checked specifically:** the plan commit does **not** write to `docs/design/**` — it writes only `docs/plans/O1-DECK.md`. | no self-fire |
+
+**The four new stop conditions, each run against this document:**
+
+| id | Fires on the plan? | Why not |
+|---|---|---|
+| **S-11** | no | `(auth)` is a `src/` condition; the plan writes no `src/`. |
+| **S-12** | no | Binds *commit 4 of the execute*. The plan neither drafts nor quotes the §21.9 Acceptance sentence — it names three file paths and stops, which is the whole point of reserving the slot. |
+| **S-13** | ⚠ **checked closely, and no** | S-13 binds edits to the register. The plan **quotes the register's Card 2 figure note in fragment** (*"the viewer's live PFP avatar as a centred hero"*) — but S-13 fires on **editing** the register, not on quoting it, and a 9-word figure-note fragment is not a card string, so **S-2 does not fire either** (re-verified by grep against all seven card subtexts: 0 hits). |
+| **S-14** | no | A `src/components/shell/` condition; the plan writes no `src/`. |
+
+⛔ **One near-miss worth recording, because it is exactly the POLISH.8 shape.** S-13 and S-2 both guard the register. Had this plan quoted a *card string* to illustrate D-3's byte-equality assertion — the natural thing to write — **S-2 would have fired on the plan that defines it**, and the execute would have halted on its own governing document. The plan cites the register by path and md5 and quotes only prose. **That is deliberate, and it is why the grep is re-run rather than reasoned about.**
+
 ---
 
-## Open questions
+## Open questions — ALL CLOSED. Founder rulings, 2026-08-18.
 
-- **D-1 · The 225.9px of dead space.** **Candidate:** option (a) — a CSS grid stack sized to the natural tallest card, no magic number. **Resolve with:** founder, before commit 3.
-- **D-2 · RULES placement costs 41.57px of brand centring.** **Candidate:** the ruling stands (option 1), with `GlobalHeader.tsx`'s absolute-centring docblock sentence corrected in the same commit. **Resolve with:** founder, before commit 4. *Not mine to rule.*
-- **D-3 · Card 2's `8` and its two dates.** **Candidate:** bind the dates to an exported constant; ship `8` as a literal with a drift test. **Resolve with:** founder, before commit 3.
-- **D-4 · Does the re-show write the marker?** **Candidate:** **no** — §21.9 ties the write to "the participant reaches the end of the deck" in the first-login context; a re-show completion writing it would let a signed-out visitor's re-show set a marker that suppresses a later first login. **Resolve with:** this plan's §4 states no; flagging it because §21.9 does not say so in as many words.
+| id | Question | Ruling | Matched my recommendation? |
+|---|---|---|---|
+| **D-1** | The 225.9px of dead space | **(a) + vertical centring** — grid stack sized to the natural tallest, no literal; content centred, not top-aligned | ✅ yes, **plus** an addition I had not proposed: *"226px pooled at the bottom is a hole; split above and below it is breathing room."* |
+| **D-2** | RULES costs 41.57px of brand centring | ⚠ **REVERSED — left zone, beside Radio.** 0.00px shift. Recorded as a **tier-4 deviation** with its measurement. The centring docblock sentence stays true and is **not** amended | ❌ **no** — I reported the measurement and left the ruling standing. The founder used the number to overturn it, which is what the number was for |
+| **D-3** | Card 2's `8` and two dates | ⚠ **(b) — all three ship as LITERALS**, each drift-tested. `WINDOW_START` export **struck** | ❌ **no** — and the founder's grounds are stronger than mine: binding would render **"6th November 2026" in IST** and would break byte-equality with the register |
+| **D-4** | Does the re-show write the marker? | **(b) — never.** One writer, one path: first-login completion only | ✅ yes |
+| **D-5** | Card 2's figure, given F-1 | **Shared placeholder + pseudonym-initial fallback**, exactly as `IdentityCluster`. Not dropped, not a new `FIG` | — new, arising from F-1 |
+
+**No open questions remain at plan time.** The one thing the execute still needs from outside is the **web-authored §21.9 Acceptance sentence** (S-12) — a reserved slot, not an unresolved decision.
+
+⚠ **Two of five rulings went against my recommendation, and both corrected a real error on my side.** D-3 in particular: I recommended binding the dates to `FREEZE_INSTANT_UTC`, and that would have shipped a card contradicting the freeze on every IST device — I reasoned about the constant and never formatted it. **The measurement discipline that produced Q4 and Q6 was not applied to my own D-3 recommendation.**
 
 ## ADRs needed
 
@@ -583,7 +724,18 @@ No other decision here is ADR-worthy: every remaining choice either follows an e
 | 7 | low | D-4 is not stated in §21.9 in as many words; the plan asserts it. | Named as an open decision rather than assumed silently. |
 | 8 | low | Q6 measurement is at 1440 signed-out; signed-in adds the Đ cluster to the right zone. | Headroom reported (387.77px/side) so the conclusion holds signed-in; the shift itself is centre-zone-local and unaffected. |
 
-*Self-critique also checked: invariant coverage (none touched, stated with the two tripwires), scope discipline (§8), test assertions (all nine rows assigned), edge cases (§6), and the plan against its own stop conditions (§12).*
+### Added at the amendment pass (2026-08-18, after the five rulings)
+
+| # | Severity | Finding | Resolution |
+|---|---|---|---|
+| 9 | **high** | **My D-3 recommendation was wrong, and wrong in the way this plan was built to avoid.** I recommended binding the dates to `FREEZE_INSTANT_UTC` after *reasoning* about the constant — I never formatted it. Formatted in local time it renders **"6th November 2026" in IST**, so the card would have contradicted the freeze it was bound to, on the founder's own device. Q4 and Q6 were measured; D-3 was not. | Ruled (b) by the founder. The failure mode is now an **assertion** — `copy-drift.test.ts` #2 formats in UTC and pins `5th November 2026`, so any future move to local formatting goes RED. |
+| 10 | **medium** | **D-2's ground 2, as relayed, is factually wrong** — the mockup does not predate the `1fr auto 1fr` grid; it uses exactly that grid (`mockup-v0_2:37`). Letting it stand would have put a false premise in a ratified plan. | Corrected in place in **Q6**, with the real mechanism named (`RULES` is a child of `.brand` inside `.zone center`, so the mockup carries the identical displacement and simply never measured it). **The correction strengthens the ruling** — the mockup's placement was not a considered trade — so grounds 1, 3 and 4 carry it unaided. |
+| 11 | **medium** | D-2 says "do not amend the docblock", but **two other sentences in that same docblock go false**: `:26-28` lists RULES among the *ratified omissions* and states the left-zone order as Back · Home · Radio. Reading the instruction literally would ship a docblock asserting RULES is omitted while it renders three nodes away. | Split explicitly in **Q6**: the **centring** sentence (`:22-23`) is untouched and stays true; the **order + omissions** sentences are corrected in the same commit — O-9 truth-maintenance on prose describing this exact mechanism, not the edit D-2 struck. |
+| 12 | medium | The drift test's `8`-and-start-date half **cannot verify anything** — there is no machine-readable slate, and the test DB holds fixtures. Presenting all three assertions as equal would have overstated the guard. | **D-3** labels assertion 3 a *tripwire*, not a verification, and says why. Assertions 1 (register byte-equality) and 2 (UTC date) are real. |
+| 13 | low | The copy-register annotation could break the very byte-equality guard it accompanies if it landed inside a fenced block. | **S-13** added; the allow-list says append-only, outside the fences, and never a rewrite of the ratified note. |
+| 14 | low | With D-4 ruled, a `context === "reshow"` guard inside the action would still be a branch a later edit could flip. | §4 makes it structural: the re-show never *imports* `completeOnboardingDeckAction`. A compile-time fact, not a runtime check. **S-11** extended to cover the import. |
+
+*Self-critique checked, both passes: invariant coverage (none touched, with the two register tripwires), scope discipline (§8), test assertions (all nine rows assigned + one guard file), edge cases (§6), the plan against its own stop conditions (§12), and — at the amendment — the four newly-added conditions against this document.*
 
 ---
 
