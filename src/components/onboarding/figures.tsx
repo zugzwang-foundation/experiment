@@ -39,16 +39,26 @@ import type { OnboardingFigure } from "./cards";
  * positioned layer here would be a new overlay to justify rather than a style.
  */
 
-/** `.cfig` — the 140px illustration band (W2.2 mockup `:76-78`). */
-const FIG_BAND =
-	"mb-[18px] flex h-[140px] w-full items-center justify-center rounded-(--imgr) bg-n1 [border:var(--hairline)]";
-
 /**
- * `.cfig svg`. `font-sans` sits on the SVG rather than on each `<text>`:
- * `font-family` inherits through SVG, and the mockup's own rule
+ * ⛔ THE `.cfig` BAND IS GONE (O1-DECK-R2 refinements 4 and 5). It used to be a
+ * 140px box carrying `bg-n1`, a hairline border and an `--imgr` radius, with a
+ * 110px illustration floating inside it — which put ~130px of empty grey either
+ * side of Card 1's mark and made the emptiness the most visible thing on the
+ * card. There is now **no wrapper element at all**: each figure is returned
+ * directly and centres itself in the card's own `flex flex-col items-center`,
+ * so there is no container, background, border or padding box left to remove.
+ *
+ * The art takes the height the container used to occupy — **110px → 140px** —
+ * so the figure grows 27% in linear size (62% in area) while the card's
+ * vertical rhythm is left exactly where it was. The enlargement is derived from
+ * the band it replaces rather than picked, which is why no new number appears
+ * here.
+ *
+ * `font-sans` sits on the SVG rather than on each `<text>`: `font-family`
+ * inherits through SVG, and the mockup's own rule
  * (`.cfig svg text{font-family:var(--sans)}`) is the same idea one selector up.
  */
-const FIG_SVG = "block h-[110px] w-auto max-w-[88%] font-sans";
+const FIG_SVG = "mb-[18px] block h-[140px] w-auto max-w-[88%] font-sans";
 
 function GoalFigure() {
 	// The balance: K · n on one pan outweighing C on the other.
@@ -385,32 +395,38 @@ function ReplyFigure() {
 
 function BrandHero() {
 	return (
-		<div className={FIG_BAND}>
-			{/* biome-ignore lint/performance/noImgElement: static brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
-			<img
-				src="/brand/zugzwang-mark.svg"
-				alt=""
-				width={110}
-				height={110}
-				className="block h-[110px] w-auto"
-			/>
-		</div>
+		/* biome-ignore lint/performance/noImgElement: static brand svg — next/image's optimizer refuses svg by default and buys nothing here. */
+		<img
+			src="/brand/zugzwang-mark.svg"
+			alt=""
+			width={140}
+			height={140}
+			className="mb-[18px] block h-[140px] w-auto"
+		/>
 	);
 }
 
 /**
- * `.idhero` — an 84px rounded-square frame (W2.2 mockup `:79-81`).
+ * `.idhero` — the rounded-square avatar hero (W2.2 mockup `:79-81`).
  *
- * The RADIUS AND THE BORDER LIVE ON THE FRAME, and the avatar is squared off
- * inside it. The primitive is round by default and carries its own ring, so
- * overriding both on the primitive would leave two radius utilities racing in
- * the compiled sheet; letting the frame clip via `overflow-hidden` is one
- * declaration with no ambiguity. The placeholder asset is a full-bleed square,
- * so it fills the frame edge to edge.
+ * The RADIUS LIVES ON THE FRAME, and the avatar is squared off inside it. The
+ * primitive is round by default and carries its own ring, so overriding both on
+ * the primitive would leave two radius utilities racing in the compiled sheet;
+ * letting the frame clip via `overflow-hidden` is one declaration with no
+ * ambiguity. The placeholder asset is a full-bleed square, so it fills the
+ * frame edge to edge.
+ *
+ * ⛔ ITS GREY FILL AND ITS BORDER WENT WITH THE BAND (O1-DECK-R2 refinement 4 +
+ * homogeneity). The founder's ruling is *"no container, no band background"*
+ * across all seven cards, so this one cannot keep a `bg-n1` and a 1.5px ink
+ * frame while the other six sit bare on the card. What survives is the
+ * rounded-square CLIP, which is the avatar's ratified shape (register Card 2,
+ * *"rounded-square at `--imgr`… matches `.navav`"*) rather than decoration
+ * around it. Sized to 140px to match the figure row on every other card.
  */
 function IdentityHero({ pseudonym }: { pseudonym: string | null }) {
 	return (
-		<div className="mb-[18px] flex size-[84px] items-center justify-center overflow-hidden rounded-(--imgr) bg-n1 [border:1.5px_solid_var(--color-ink)]">
+		<div className="mb-[18px] flex size-[140px] items-center justify-center overflow-hidden rounded-(--imgr)">
 			<Avatar className="size-full rounded-none after:hidden">
 				<AvatarImage
 					src="/pfp-placeholder.svg"
@@ -432,40 +448,24 @@ export function CardFigure({
 	figure: OnboardingFigure;
 	pseudonym: string | null;
 }) {
+	// Each figure is returned BARE. The card is already `flex flex-col
+	// items-center`, so the art centres itself with no wrapper — which is what
+	// makes "no figure has a container" true by construction rather than by a
+	// wrapper that merely happens to be styleless today.
 	switch (figure) {
 		case "brand":
 			return <BrandHero />;
 		case "identity":
 			return <IdentityHero pseudonym={pseudonym} />;
 		case "goal":
-			return (
-				<div className={FIG_BAND}>
-					<GoalFigure />
-				</div>
-			);
+			return <GoalFigure />;
 		case "voice":
-			return (
-				<div className={FIG_BAND}>
-					<VoiceFigure />
-				</div>
-			);
+			return <VoiceFigure />;
 		case "soulbound":
-			return (
-				<div className={FIG_BAND}>
-					<SoulboundFigure />
-				</div>
-			);
+			return <SoulboundFigure />;
 		case "side":
-			return (
-				<div className={FIG_BAND}>
-					<SideFigure />
-				</div>
-			);
+			return <SideFigure />;
 		case "reply":
-			return (
-				<div className={FIG_BAND}>
-					<ReplyFigure />
-				</div>
-			);
+			return <ReplyFigure />;
 	}
 }

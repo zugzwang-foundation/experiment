@@ -41,7 +41,12 @@ describe("O1-DECK — the card set", () => {
 		// The pseudonym interpolation is the WELCOME card's alone, so the
 		// re-show has no viewer dependency at all — that is what makes it safe
 		// to mount for a signed-out visitor on `/sign-in` (plan Q5).
-		expect(reshow.some((c) => c.title.includes("{pseudonym}"))).toBe(false);
+		// `?? ""` covers Card 1's withdrawn title (O1-DECK-R2) without weakening
+		// the claim: a card with no title string cannot carry the token, and
+		// every card that HAS one is still checked for it.
+		expect(reshow.some((c) => (c.title ?? "").includes("{pseudonym}"))).toBe(
+			false,
+		);
 	});
 
 	it("onboarding-deck::step-count-derives-from-array", () => {

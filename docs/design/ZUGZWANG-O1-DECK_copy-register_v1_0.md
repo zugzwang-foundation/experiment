@@ -1,8 +1,8 @@
-# ZUGZWANG · O1-DECK — Copy Register v1.0
+# ZUGZWANG · O1-DECK — Copy Register v1.1
 
 | | |
 |---|---|
-| **Doc** | `ZUGZWANG-O1-DECK_copy-register_v1_0.md` · web-authored · founder-ratified 2026-08-18 |
+| **Doc** | `ZUGZWANG-O1-DECK_copy-register_v1_0.md` · web-authored · founder-ratified 2026-08-18 · amended 2026-08-18 (O1-DECK-R2) |
 | **Status** | **RATIFIED.** This is the string source of record for the onboarding deck |
 | **Supersedes** | The provisional six-card copy in `docs/design/mockups/DESIGN_W2_2_onboarding-deck_mockup-v0_1.html` (`var CARDS`, lines 231–243, md5 `420c5e800a3dbe3de57662f0d8f6c102`), self-labelled *"provisional copy"* |
 | **Consumers** | The O1 build (component strings) · SPEC.1 §21.6 amendment · `DESIGN-copy-register-consolidated.md` |
@@ -32,14 +32,25 @@ in shipped copy is a defect, and it is invisible in review.
 
 Order is normative. Eyebrow scheme: `ZUGZWANG` ×1 · `WELCOME` ×1 · `THE GOAL` ×1 · `THE RULES` ×4.
 
-### Card 1 · `ZUGZWANG` · Knowledge first
+### Card 1 · *(no eyebrow)* · *(the wordmark, in place of a title)*
 
-**Figure:** the brand mark — `/brand/zugzwang-mark.svg`, rendered at hero size in the `.cfig` band. Component reuse from `BrandCluster`; no new asset.
+⚠ **AMENDED AT O1-DECK-R2, 2026-08-18.** This card previously carried the eyebrow
+`ZUGZWANG` and the title string `Knowledge first`. Both are **withdrawn** by founder
+ruling: the word appeared twice on one card, and the product's name is better said
+by its mark than spelled out beside it. SPEC.1 §21.9 records the exception.
 
-**Title:**
-```
-Knowledge first
-```
+**Figure:** the brand mark — `/brand/zugzwang-mark.svg`, at hero size, sitting
+directly on the card with **no container and no band background**.
+
+**Eyebrow:** NONE. This is the only card without one.
+
+**Title:** the **Zugzwang wordmark** — the eight-letter chessboard row, rendered
+from the same component the global header uses, at card scale, **without the
+countdown digits**. It is decorative markup and carries no text node; the card
+supplies a visually hidden heading reading `Zugzwang` in its place.
+
+⛔ **There is no title STRING on this card.** The byte-equality guard has nothing
+to compare here, and must not be made to invent one.
 
 **Subtext** — three blocks, real line breaks, not one paragraph:
 ```
@@ -261,6 +272,7 @@ anywhere in the stepper is a defect.
 | 6 | WELCOME card rewritten | Founder edit — experiment window, market count, and Dharma's role replace the grant/credit figures |
 | 7 | Comma splice fixed in Card 1's closing triad | Three independent clauses; commas → semicolons |
 | 8 | `8 market` → `8 markets`; double space removed in Card 4 | Mechanical |
+| 9 | **Card 1's eyebrow and title string withdrawn** (O1-DECK-R2) | The eyebrow read `ZUGZWANG` and the title read `Knowledge first`, so the product's name appeared twice on the card that introduces it. The mark replaces the words. Subtext unchanged |
 
 **Not changed, and deliberately so:** the eyebrow scheme, the card anatomy
 (figure band → eyebrow → title → subtext), the `FIG` illustrations, the

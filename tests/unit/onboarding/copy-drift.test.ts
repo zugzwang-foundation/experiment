@@ -47,7 +47,11 @@ const REGISTER = join(
 	"docs/design/ZUGZWANG-O1-DECK_copy-register_v1_0.md",
 );
 
-type RegisterCard = { eyebrow: string; title: string; sub: string };
+type RegisterCard = {
+	eyebrow: string | null;
+	title: string | null;
+	sub: string;
+};
 
 /**
  * Extract the ratified strings from the register's FENCED blocks.
@@ -58,6 +62,19 @@ type RegisterCard = { eyebrow: string; title: string; sub: string };
  * around the strings without either side breaking the other — and it is why
  * the build's own copy-register annotation is required to land OUTSIDE a
  * fence (plan S-13).
+ *
+ * ⛔ CARD 1 IS THE ONE RULED EXCEPTION (O1-DECK-R2; SPEC.1 §21.9). Its heading
+ * reads `*(no eyebrow)* · *(the wordmark, in place of a title)*`, it carries no
+ * backticked eyebrow, and it holds a SINGLE fence — its subtext. There is no
+ * title string on that card, and this parser must not invent one: the wordmark
+ * is markup, not copy, so there is nothing here for a byte comparison to hold.
+ *
+ * ⚠ THE FENCE COUNT IS NOW EXACT (`!== want`), where it used to be `< 2`. A
+ * card that grew a third fence used to pass silently; it no longer does. The
+ * exception is keyed to the card's POSITION rather than to "no eyebrow found",
+ * because the second form would let a genuine parse failure on any card
+ * disguise itself as the exception — which is the one way this guard could go
+ * quiet without failing.
  */
 function readRegisterCards(): RegisterCard[] {
 	const source = readFileSync(REGISTER, "utf8");
@@ -67,12 +84,23 @@ function readRegisterCards(): RegisterCard[] {
 		const fences = [...section.matchAll(/^```\n([\s\S]*?)\n```/gm)].map(
 			(m) => m[1],
 		);
-		if (eyebrow === undefined || fences.length < 2) {
+		const isException = i === 0;
+		const wantFences = isException ? 1 : 2;
+		const eyebrowAsRuled = isException
+			? eyebrow === undefined
+			: eyebrow !== undefined;
+		if (!eyebrowAsRuled || fences.length !== wantFences) {
 			throw new Error(
-				`copy register: card ${i + 1} did not parse (eyebrow=${eyebrow}, fences=${fences.length})`,
+				`copy register: card ${i + 1} did not parse (eyebrow=${eyebrow}, fences=${fences.length}, expected ${wantFences})`,
 			);
 		}
-		return { eyebrow, title: fences[0] as string, sub: fences[1] as string };
+		return isException
+			? { eyebrow: null, title: null, sub: fences[0] as string }
+			: {
+					eyebrow: eyebrow as string,
+					title: fences[0] as string,
+					sub: fences[1] as string,
+				};
 	});
 }
 
@@ -123,6 +151,9 @@ describe("O1-DECK — copy drift against the ratified register", () => {
 
 		// Compared as whole arrays so a single failure prints the offending
 		// character in context rather than "expected true to be false".
+		// Both sides carry an explicit `null` for Card 1's withdrawn slots —
+		// never `undefined`, which `toEqual` would ignore on one side and let
+		// an absent field pass as a match.
 		expect(
 			ONBOARDING_CARDS.map((c) => ({
 				eyebrow: c.eyebrow,
@@ -132,12 +163,31 @@ describe("O1-DECK — copy drift against the ratified register", () => {
 		).toEqual(registerCards);
 	});
 
+	it("Card 1 alone has no eyebrow and no title string, and the rest all do", () => {
+		// The exception is ASSERTED, not merely tolerated by the parser. Without
+		// this, silently dropping any other card's title would still satisfy the
+		// array comparison above — both sides would simply agree on the loss.
+		const [first, ...rest] = ONBOARDING_CARDS;
+		expect(first?.eyebrow).toBeNull();
+		expect(first?.title).toBeNull();
+		expect(first?.sub.length).toBeGreaterThan(0);
+		expect(rest.length).toBe(6);
+		for (const card of rest) {
+			expect(typeof card.eyebrow).toBe("string");
+			expect(typeof card.title).toBe("string");
+		}
+	});
+
 	it("carries the non-ASCII bytes the register warns about", () => {
 		// A positive control on the assertion above: if the register itself were
 		// ever flattened to ASCII, byte-equality would still pass while the
 		// product quietly lost its typography. These are the three codepoints
 		// the register's §1 names.
-		const all = ONBOARDING_CARDS.map((c) => `${c.title}\n${c.sub}`).join("\n");
+		// Card 1's null title is filtered rather than interpolated — a template
+		// literal would have put the string "null" into the corpus under test.
+		const all = ONBOARDING_CARDS.map((c) =>
+			[c.title, c.sub].filter((s) => s !== null).join("\n"),
+		).join("\n");
 		expect(all).toContain("’"); // ’ right single quotation mark
 		expect(all).toContain("—"); // — em dash
 		expect(all).toContain("·"); // · middle dot, in `K · n > C`

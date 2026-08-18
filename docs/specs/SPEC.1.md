@@ -12,7 +12,7 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.35 (semver; bump major on invariant changes)
+- **Version:** 1.0.36 (semver; bump major on invariant changes)
 - **Last updated:** 2026-08-18
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
@@ -1515,6 +1515,7 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-08-17 | 1.0.33 | §0; §10.8 | **§10.8's displayed-space exception admits a THIRD identity — the §23 positions table's per-holding P/L.** The enumeration was CLOSED at two ("Two such identities exist"), which is why `P5-D16` / D24 held the row-level P/L out of the build pending this amendment rather than shipping a third identity the spec did not name. It now reads **three**: the §23 Net P/L tile, the reply split bar's staked total, and the positions table's `displayed P/L = displayed Current − displayed Staked`. **Ground:** exactly the one the exception already states, in its sharpest form — the delta renders INSIDE the Current cell and one column from the Staked cell, the shortest distance between a total and its components anywhere in the product, so a reader checks the subtraction by eye. On the exact basis it would visibly contradict them: a holding displaying `Đ 499` and `Đ 448` can only ever read 51, while an exact delta may display 50. No principle is minted — the pattern, its rationale and its ≤1 Đ cost were ratified twice already; the closed COUNT is what moved. | PROFILE-FULL same-commit rider (§5.12, O-9). The mockup renders this delta at `surface_profile_v1_0.html:558` via `plShort()` (`:674-678`) and its own v0.18 changelog rules it in ("current value shows profit"); the founder reopened the surface with composition and type size in scope and directed that a doc contradicted by a ruled row be corrected in the same commit rather than blocking on it. ⚠ THE WORDING IS CC-AUTHORED and is flagged for founder review in the run report: it extends an enumeration mechanically and mints no new rule, but it is normative text in a web-owned document. Implemented by `displayPositionProfitLossSigned` (`components/debate/format.ts`), which rounds both operands before subtracting; the sign is taken from the Decimal, never from a printed string. No ADR, no DDL, no event type, no §16.1 constant, no §17 row. | — |
 | 2026-08-18 | 1.0.34 | §21 preamble, §21.6, §21.9 (new), §17 | **O1-DECK spec package.** New **§21.9** specifies the onboarding deck: two contexts (non-dismissible first-login gate, dismissible About re-show), the authenticated-AND-no-marker gate condition, the cookie marker (ADR-0037, held to the build commit), marker-written-at-completion-not-at-open, and the standing prohibition on session boundaries as re-show triggers (400-day session vs ~51-day window ⇒ a once-per-session trigger is a once-ever trigger). **§21.6** keeps its descope of the feature-guide page and the `"i"` anchor mechanism, and its *"skippable"* re-show description plus its six-card count are explicitly superseded by §21.9. **§21 preamble** six → seven in scope. **§17** nine `onboarding-deck::*` rows. | O1-DECK | ADR-0037 (held) |
 | 2026-08-18 | 1.0.35 | §21.9 | **O1-DECK build rider.** §21.9's Acceptance line gains the SPEC.2 §13.4 placement rationale for all nine `onboarding-deck::*` rows — gate rows as a pure predicate (the calling layout is an async server component with no render harness in this repo), card-module properties asserted against the module, dismissal and completion rows under jsdom — and a preceding paragraph records the copy-register byte-equality guard and the UTC date pin as a regression guard **outside** the acceptance set, carrying no §17 row by design. No §17 row is added, changed or removed; the nine rows landed at 1.0.34 and are unamended. | O1-DECK | ADR-0037 |
+| 2026-08-18 | 1.0.36 | §21.9 | **O1-DECK-R2 — the deck's visual pass.** §21.9's anatomy sentence gains the first card's ruled exception: the Zugzwang wordmark in place of a text title, no eyebrow, the wordmark rendered from the header's own component so the two cannot drift, and a visually hidden heading standing in for the absent text title. A new paragraph makes the deck's measure a function of its copy rather than of a fixed frame — the modal is widened until no subtext clause wraps, subject to the viewport at the ratified ramp — and removes the figure band's container, sizing each figure to the space the measure leaves. Homogeneity across the other six cards is stated normatively. No behavioural change: the gate, the two contexts, the card split, the marker and its writer are all unamended, and no §17 row moves. | O1-DECK-R2 | — |
 
 ---
 
@@ -1615,7 +1616,23 @@ rules they are staking under. It sets one cookie; it touches nothing else.*
 route and not a page. Its content is the ratified card set (the O1-DECK copy
 register); its anatomy is the locked W2.2 shape — figure band, eyebrow, bold
 title, subtext — inside the W2.1 deck shell with Back, Next, a dot rail and a
-step indicator.
+step indicator. **The first card is the deck's one deliberate exception.** It
+carries the Zugzwang wordmark in place of a text title and no eyebrow at all,
+because it is the card that names the product rather than describing one of its
+rules. The wordmark is the header's own mark rendered from the same component,
+so the two cannot drift apart; it is decorative markup, and the card carries a
+visually hidden heading in its place so the sequence is still navigable by name.
+Every other card keeps all four slots.
+
+**The deck's measure is set by its copy, not by a fixed frame.** The first card's
+subtext is a three-block statement whose clauses carry the argument, and a column
+narrow enough to break them mid-clause turns a structured claim into ragged lines
+that read as an accident. The modal's width is therefore chosen so that no subtext
+clause wraps, subject to fitting the viewport at the ratified type ramp; where those
+two cannot both hold, the viewport wins and the shortfall is recorded. The figure
+band carries no container of its own — each figure sits on the card and is sized to
+the space the measure leaves, not to a fixed box. One anatomy and one spacing rhythm
+govern all seven cards.
 
 **Two contexts, one component, one card array.**
 
