@@ -50,6 +50,10 @@ import {
  * route. This cookie carries no identity, no session material and no secret —
  * its value is the literal string `v1` — and the admin cookie's `Path=/admin`
  * isolation is untouched by it.
+ *
+ * ⛔ `"use server"` IS AT MODULE SCOPE, SO EVERY EXPORT IN THIS MODULE IS A
+ * PUBLIC ENDPOINT — a helper added to this file later becomes callable from any
+ * public page, with no diff marker anywhere saying it just became one.
  */
 export async function completeOnboardingDeckAction(): Promise<void> {
 	const session = await auth.api.getSession({ headers: await headers() });
