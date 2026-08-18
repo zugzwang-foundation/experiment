@@ -390,6 +390,7 @@ repo-side `Sec-Fetch-Site` check at the catch-all wrapper
 **Expected next task.** A dedicated editorial task, or absorption by the next task that opens ADR-0013 for its own reasons (it can carry the Patch record at no extra cost). **Not** PRECURSOR.5 — that ran on 2026-05-14 and is closed.
 
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ## AUDIT-FIX-B1 A7 — invalid-but-present Sentry DSN residual → HARDEN canary probe
 
 **Originating task:** AUDIT-FIX-B1 A7 flush-before-stamp close-out (2026-07-04); surfaced by `@code-reviewer` + `@security-auditor` on the flush delta (PR #199).
@@ -682,6 +683,7 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Expected next task.** A DESIGN-lane task that can take the canon ruling. Evidence: `~/Desktop/SYNC-1-recon.md` R2 (the eviction analysis that surfaced it).
 
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
 ## N2 — Write `docs/logs/UI-phase-record.md`
 
 **Originating task:** SYNC-1 (2026-08-08), PK eviction.

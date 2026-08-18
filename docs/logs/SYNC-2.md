@@ -128,7 +128,10 @@ this addendum, so a reader of `main` should not treat them as live:
 
 **Questions 5, 6 and 7 remain open** and are correctly stated above.
 
-⚠ **This branch carries FIVE commits, not the four the table above lists** — the
-Gate C fix rounds landed after this log was written. The count is left uncorrected
-in place and stated here instead, because a session log that edits itself to look
-prescient is worth less than one that appends.
+⚠ **This branch carries more commits than the table above lists** — the Gate C
+fix rounds landed after this log was written, and every round would have made a
+stated number wrong again. The count is left uncorrected in place and stated here
+**without a number**, because a session log that edits itself to look prescient is
+worth less than one that appends — and because a count written into an append goes
+stale exactly as fast as the count it was correcting. This paragraph originally
+said "five". It was six by the time it landed.
