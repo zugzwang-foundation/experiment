@@ -831,6 +831,47 @@ Seven markets carry a hero post on exactly ONE side; one carries none. **Zero ca
 **What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
 
 ---
+## IDENTITY-POOL-NAMESPACE — the pool is sized for 1K–10K signups against a 100,000 target
+
+**Originating task:** SYNC-3 recon, 2026-08-19. **Docketed:** SYNC-3.
+
+**The measurement.** `docs/adr/0011-pseudonym-pool-design.md` states a **50,000** namespace —
+50 colours × 100 animals = 5,000 `(colour, animal)` pairs, each with 10 number variants — and
+justifies it with *"50K namespace with **realistic ceiling at 1K–10K signups** is
+comfortable."* **The target is now 100,000 signups.** That is 10× the top of the stated range
+and 2× the entire namespace. ⚠ **The ADR's own cheap-extension path (10 → 20 numbers per pair)
+arrives at exactly 100,000** — zero headroom — and the same ADR records that *"scrubbed tuples
+shrink the effective pool over time."*
+
+**Why it is not a one-line fix.** The `50,000` figure is restated at **~20 sites across 9
+files**: `SPEC.1` §13 (five sites, including *"comfortable for any realistic experiment-scale
+signup volume"*), `SPEC.2` (four, including the asset-pipeline and the low-watermark alarm),
+`ADR-0016` (two), `SCAFFOLD.17` (five), `SCAFFOLD.2-3C`, and two handover documents. `O-5`
+binds across all of them.
+
+⚠ **ADR-0011 has NO Patch record section and has never been amended in place.** ADR-0006 has
+the precedent and the shape; this one does not.
+
+⚠ **AND THE ASSET COUNT CONTRADICTS ITSELF ON `main` TODAY, before any target change.**
+ADR-0011 `:71` yields **5,000 images** (one per `(colour, animal)` pair; ~3.5 h of Flux, and
+`:112` confirms the extension path *"skips the Flux phase entirely"*, so images are per-pair).
+`ADR-0006` agrees — *"5,000–10,000 images"*. But `SPEC.1` says *"~50,000 × 50 KB webp ≈ 2.5
+GB"* and `SPEC.2` says *"50,000 pseudonym profile pictures"* and *"generates 50,000 PNG"*.
+**That is a 10× discrepancy in the asset pipeline, and `SPEC.1` contradicts itself internally**
+— its neighbouring line correctly says *"each animal image × 10 number variants"*. **Any
+namespace amendment must resolve this first, or it will restate the wrong base.**
+
+**Conditional trigger.** ⛔ **BEFORE the identity-pool seed, and before any signup traffic** —
+`SPEC.1` §13 F-AUTH-3 returns **503 `error_identity_pool_exhausted`** when the pool empties,
+and an exhausted pool fails signups permanently rather than degrading.
+
+**Expected next task.** An ADR-0011 amendment — Patch record or superseding ADR, the founder's
+call — carrying the new construction, plus the `O-5` sweep across all ~20 sites in the same
+commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
+image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
+
+---
+
 
 ## O1-KICKOFF-INPUT — Discovery's hero at go-live: every market opens with zero posts — **route to O1's kickoff, DECIDE don't discover**
 
