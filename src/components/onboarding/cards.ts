@@ -35,8 +35,19 @@ export type OnboardingFigure =
 export type OnboardingCard = {
 	/** Also the React key — the seven figures are distinct by construction. */
 	readonly figure: OnboardingFigure;
-	readonly eyebrow: string;
-	readonly title: string;
+	/**
+	 * `null` on Card 1 ALONE — SPEC.1 §21.9's one ruled exception, and the
+	 * register carries `*(no eyebrow)*` in its heading to match. Not "empty
+	 * string": there is no eyebrow to compare, and `""` would have rendered an
+	 * empty box that still ate the 10px rhythm below it.
+	 */
+	readonly eyebrow: string | null;
+	/**
+	 * `null` on Card 1 ALONE — the Zugzwang wordmark stands in its place, and
+	 * there is **no title STRING on that card for the byte-equality guard to
+	 * compare**. The guard must not be made to invent one (register §2, O1-DECK-R2).
+	 */
+	readonly title: string | null;
 	readonly sub: string;
 };
 
@@ -56,8 +67,11 @@ export const PSEUDONYM_TOKEN = "{pseudonym}";
 export const ONBOARDING_CARDS: readonly OnboardingCard[] = [
 	{
 		figure: "brand",
-		eyebrow: "ZUGZWANG",
-		title: "Knowledge first",
+		// The deck's one exception, ruled at O1-DECK-R2: the word `ZUGZWANG`
+		// appeared twice on the card that introduces the product — once as the
+		// eyebrow, once as the mark. The mark won.
+		eyebrow: null,
+		title: null,
 		sub: `True knowledge is manipulated and bound by money,
 which makes humanity take wrong decisions without a rational debate.
 The fate of humanity should depend on true knowledge and not money.
@@ -137,7 +151,11 @@ export function reshowCards(): readonly OnboardingCard[] {
 export function cardTitle(
 	card: OnboardingCard,
 	pseudonym: string | null,
-): string {
+): string | null {
+	// Card 1 has no title string at all — the wordmark stands there instead.
+	// Returning null rather than "" keeps "there is no title" distinguishable
+	// from "the title is blank" at the one call site that has to branch.
+	if (card.title === null) return null;
 	if (!card.title.includes(PSEUDONYM_TOKEN)) return card.title;
 	return card.title.replace(PSEUDONYM_TOKEN, pseudonym ?? "").trimEnd();
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
+import { Wordmark } from "@/components/shell/Wordmark";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 import {
@@ -151,16 +151,25 @@ export function OnboardingDeck({
 				// string on screen readers that no sighted reader gets; this is the
 				// documented opt-out.
 				aria-describedby={undefined}
-				// 432px on the W2.2 register, sized by the INSTANCE — `ui/dialog.tsx`
-				// ships `max-w-lg` and merges via `cn`, so the override lands here
-				// and the primitive keeps its default for every other dialog.
-				// `max-h-[90vh] overflow-y-auto` because the deck at its tallest is
-				// ~665px and a shorter viewport must scroll it rather than clip it.
+				// ⛔ 513px IS MEASURED, NOT CHOSEN (O1-DECK-R2 refinement 1, and
+				// SPEC.1 §21.9's "the deck's measure is set by its copy"). Card 1's
+				// widest clause — "Zugzwang is a prediction market that runs like a
+				// social network for debate." — is 450.92px at Geist 13/500, so the
+				// subtext needs 451px of content width; 451 + 60px padding + 2px
+				// border = 513. Measured on a production build at 1440×777: 512
+				// still wraps a clause onto a second line, 513 does not. Widening
+				// past it buys nothing, and a wider frame than the copy needs is the
+				// fixed frame §21.9 now rules out. Sized by the INSTANCE —
+				// `ui/dialog.tsx` ships `max-w-lg` and merges via `cn`, so the
+				// override lands here and the primitive keeps its default for every
+				// other dialog.
+				// `max-h-[90vh] overflow-y-auto` because a shorter viewport must
+				// scroll the deck rather than clip it.
 				// `motion-reduce:animate-none!` is important-flagged for the same
 				// reason the mockup's own reduced-motion rule is: the primitive's
 				// `data-[state=open]:animate-in` is an attribute selector, and a
 				// media query adds no specificity to outrank it with.
-				className="grid max-h-[90vh] w-[432px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!"
+				className="grid max-h-[90vh] w-[513px] max-w-[calc(100vw-88px)] gap-0 overflow-y-auto rounded-(--r) border border-ink bg-n0 p-[30px] ring-0 motion-reduce:animate-none!"
 			>
 				<DialogTitle className="sr-only">{DIALOG_LABEL[context]}</DialogTitle>
 
@@ -219,18 +228,44 @@ export function OnboardingDeck({
 							}`}
 						>
 							<CardFigure figure={card.figure} pseudonym={pseudonym} />
-							<div className="mb-[10px] text-[9px] leading-[1.2] font-extrabold tracking-[0.14em] text-n4 uppercase">
-								{card.eyebrow}
-							</div>
-							<div className="mb-[12px] text-[21px] leading-[1.18] font-extrabold tracking-[-0.012em] text-ink">
-								{cardTitle(card, pseudonym)}
-							</div>
+							{/* ⛔ CARD 1 IS THE DECK'S ONE RULED EXCEPTION (SPEC.1
+							    §21.9): no eyebrow, and the Zugzwang wordmark where the
+							    title string would be. Every other card keeps all four
+							    slots, and this branch is the ONLY departure from one
+							    anatomy across the seven.
+
+							    The wordmark is `BrandCluster`'s own component, not a
+							    copy — that is what the spec means by "the two cannot
+							    drift apart". It is decorative markup carrying no
+							    accessible text, so the card supplies a visually hidden
+							    heading in its place and the sequence stays navigable by
+							    name rather than becoming an unnamed card. */}
+							{card.title === null ? (
+								<div className="mb-[12px]">
+									<h2 className="sr-only">Zugzwang</h2>
+									<Wordmark scale="card" />
+								</div>
+							) : (
+								<>
+									<div className="mb-[10px] text-[9px] leading-[1.2] font-extrabold tracking-[0.14em] text-n4 uppercase">
+										{card.eyebrow}
+									</div>
+									<div className="mb-[12px] text-[21px] leading-[1.18] font-extrabold tracking-[-0.012em] text-ink">
+										{cardTitle(card, pseudonym)}
+									</div>
+								</>
+							)}
 							{/* `whitespace-pre-line` preserves the real line breaks the
 							    first card's ratified subtext carries and collapses runs
 							    of spaces, so the six single-paragraph cards render
 							    exactly as they would without it. One code path, one
-							    shape, no union type for one card's benefit. */}
-							<div className="max-w-[332px] text-[13px] leading-[1.58] font-medium whitespace-pre-line text-n5">
+							    shape, no union type for one card's benefit.
+
+							    451px is the measured width at which no clause of that
+							    subtext wraps — see the modal's own note above. It is
+							    the card's full content width, so the measure is set by
+							    the copy rather than inset inside a frame. */}
+							<div className="max-w-[451px] text-[13px] leading-[1.58] font-medium whitespace-pre-line text-n5">
 								{card.sub}
 							</div>
 						</div>
