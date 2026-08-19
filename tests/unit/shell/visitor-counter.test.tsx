@@ -42,7 +42,7 @@ describe("UI.13 VisitorCounter — three render states + strict-mode guard", () 
 		expect(el.getAttribute("aria-busy")).toBe("true");
 	});
 
-	it("value state renders the grouped number + 'visitors' + eye glyph", async () => {
+	it("value state renders the grouped number + 'views' + eye glyph", async () => {
 		fetchMock.mockResolvedValue(
 			new Response(JSON.stringify({ total: 12480 }), { status: 200 }),
 		);
@@ -54,12 +54,12 @@ describe("UI.13 VisitorCounter — three render states + strict-mode guard", () 
 		);
 		const el = screen.getByTestId("visitor-counter");
 		expect(el.textContent).toContain("12,480");
-		expect(el.textContent).toContain("visitors");
+		expect(el.textContent).toContain("views");
 		// eye glyph is a decorative svg
 		expect(el.querySelector("svg")).not.toBeNull();
 	});
 
-	it("P5 silent fallback: total null → '— visitors', never an error", async () => {
+	it("P5 silent fallback: total null → '— views', never an error", async () => {
 		fetchMock.mockResolvedValue(
 			new Response(JSON.stringify({ total: null }), { status: 200 }),
 		);
@@ -71,7 +71,7 @@ describe("UI.13 VisitorCounter — three render states + strict-mode guard", () 
 		);
 		const el = screen.getByTestId("visitor-counter");
 		expect(el.textContent).toContain("—");
-		expect(el.textContent).toContain("visitors");
+		expect(el.textContent).toContain("views");
 	});
 
 	it("fetch rejection renders P5, never throws", async () => {
