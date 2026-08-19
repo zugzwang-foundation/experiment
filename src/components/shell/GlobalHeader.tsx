@@ -67,8 +67,14 @@ import { VisitorCounter } from "./VisitorCounter";
  *     never re-measured after RULES landed. The difference is 81.14px, and RULES
  *     plus its gap is 81.13px — which is how the two are known to be the same
  *     measurement taken on either side of one control.
- *   · this control at a six-digit count — the worst case — takes the left zone
- *     to **427.20px**, leaving **140.80px** of slack inside its track.
+ *   · this control at a six-digit count took the left zone to **427.20px**,
+ *     leaving **140.80px** of slack inside its track. ⚠ That was measured while
+ *     the count rendered GROUPED, where `999,999` was seven glyphs and so
+ *     genuinely the worst case. GH-STAR-COMPACT (founder-ruled 2026-08-19) made
+ *     that count render `1m`, and the widest render available to the formatter
+ *     is now `999.9k` — strictly narrower. The figure is therefore an UPPER
+ *     bound rather than the worst case, and is deliberately NOT re-measured: it
+ *     can only overstate the zone, and the conclusion it supports is slack.
  *   · brand-cluster displacement: **0.00px**. The centre track is `auto` and the
  *     two side tracks are `1fr`, so they stay equal and the cluster stays at
  *     true centre for as long as neither side zone overflows its own track.
