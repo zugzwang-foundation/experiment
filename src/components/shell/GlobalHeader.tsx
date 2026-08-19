@@ -3,6 +3,7 @@ import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 import { BrandCluster } from "./BrandCluster";
 import { formatCountdown } from "./countdown-format";
 import { DharmaCluster } from "./DharmaCluster";
+import { GitHubStarsView } from "./GitHubStars";
 import { HeaderNav } from "./HeaderNav";
 import { type HeaderViewer, IdentityCluster } from "./IdentityCluster";
 import { RadioSlot } from "./RadioSlot";
@@ -24,10 +25,10 @@ import { VisitorCounter } from "./VisitorCounter";
  * cluster absolutely centred — fixed desktop max-width 1440 / 24px side
  * padding, no responsive breakpoints (design-language §1.7).
  *
- * Left zone order Back · Home · Radio · RULES (mockup v0_2 for the first
- * three; RULES is a named deviation — see below). Social/Research/Đ-info are
- * ratified omissions (OQ-3/OQ-4 zero-supplied), each a named deviation in the
- * plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
+ * Left zone order Back · Home · Radio · GitHub · RULES (mockup v0_2 for the
+ * first three; GitHub and RULES are named deviations — see below).
+ * Social/Research/Đ-info are ratified omissions (OQ-3/OQ-4 zero-supplied), each
+ * a named deviation in the plan. Right zone = the Đ cluster, then JOIN or the identity chip, then a
  * hairline divider + the visitor counter at the far right (UI.13;
  * SPEC.1 §21.1).
  *
@@ -45,6 +46,40 @@ import { VisitorCounter } from "./VisitorCounter";
  * never measured it. A hidden equal-width counterweight in the centre zone was
  * the other 0.00px option and was rejected: an invisible node whose purpose is
  * also invisible.
+ *
+ * ⇒ TIER-4 DEVIATION — **the GitHub control** (GH-STAR, founder-ruled
+ * 2026-08-19). It does not appear in the locked W2.4/.5/.14 mockup at all:
+ * `docs/design/mockups/DESIGN_W2_4-5-14_global-header_mockup-v0_2.html` has no
+ * repo link, no star count and no fifth left-zone control. The mockup is NOT
+ * being amended — founder ruling — so THIS REGISTER IS THE RECORD, and a reader
+ * comparing the two will find the header carrying one control the mockup does
+ * not. That divergence is deliberate and is here.
+ *
+ * It ships in the LEFT zone, between Radio and RULES, because it is a utility
+ * control pointing off-site and the left zone is where this header keeps those.
+ * Measured at 1440 against the real compiled CSS, in a pinned same-origin frame,
+ * against a staging build whose `/api/health` canary was asserted equal to the
+ * measured commit in the same call as the geometry:
+ *
+ *   · left zone before this control — **261.37px** used of a **568.00px** track,
+ *     so **306.63px** of headroom. ⚠ NOT the 387.77px quoted in the RULES entry
+ *     above: that figure is the PRE-RULES reading, correct when it was taken and
+ *     never re-measured after RULES landed. The difference is 81.14px, and RULES
+ *     plus its gap is 81.13px — which is how the two are known to be the same
+ *     measurement taken on either side of one control.
+ *   · this control at a six-digit count — the worst case — takes the left zone
+ *     to **427.20px**, leaving **140.80px** of slack inside its track.
+ *   · brand-cluster displacement: **0.00px**. The centre track is `auto` and the
+ *     two side tracks are `1fr`, so they stay equal and the cluster stays at
+ *     true centre for as long as neither side zone overflows its own track.
+ *
+ * The tolerance, stated so the claim survives the arm that was not measured: the
+ * side tracks share 1136px, so the left track is `1136 − right`. This content
+ * only becomes binding once the RIGHT zone passes **708.80px**; it measures
+ * 176.03px signed-out, and the signed-in arm adds only the Đ cluster. Every
+ * control carries `shrink-0`, so that is a hard-overflow budget, not a
+ * compression budget — nothing here degrades gracefully, which is exactly why
+ * the number was re-measured rather than inherited.
  *
  * §21.1 ANTI-CONFLATION — the divider below is the register boundary, not
  * decoration. `VisitorCounter` "reads nothing from the ledger / engine" and its
@@ -65,6 +100,22 @@ import { VisitorCounter } from "./VisitorCounter";
  * `(auth)` layout mounts this header WITHOUT either fetch (signed-out by
  * definition; a mid-signup `/onboarding` user may have no `dharma_ledger` row,
  * and it avoids two reads on every OTP page load).
+ *
+ * ⛔ `stars` IS A PROP FOR A HARD STRUCTURAL REASON, NOT FOR SYMMETRY. THIS
+ * COMPONENT MUST STAY SYNC, AND NOTHING IN ITS SUBTREE MAY BE AN ASYNC
+ * COMPONENT. React's client renderer refuses an async function component
+ * outright, and `tests/unit/shell/dharma-cluster.test.tsx` renders this header
+ * directly in jsdom — so an async child does not degrade that test, it ANNIHILATES
+ * it: the whole header returns `<body><div /></body>` and assertions about
+ * `DharmaCluster`, the §21.1 divider and `VisitorCounter` all fail, none of
+ * which is anywhere near the child that caused it. Measured, not predicted: the
+ * GitHub control shipped as an async wrapper first and cost exactly that.
+ * ⇒ Any future header control needing server data takes it as a prop and the
+ * LAYOUT does the await. Both layouts are already async and already do this
+ * three times over. Unlike the Đ pair, `stars` is NOT viewer-scoped — both
+ * layouts fetch it unconditionally, so the control never silently loses its
+ * number on the `(auth)` routes, which would reproduce the very
+ * value-vs-unavailable ambiguity the control is built to keep apart.
  *
  * STICKY, NOT FIXED (POLISH-1b B3; ADR-0023 §Patch 2026-08-03, D3 ruled). The
  * header was static and in normal flow, so it scrolled away on every route —
@@ -95,10 +146,12 @@ export function GlobalHeader({
 	viewer,
 	portfolio = null,
 	spendable = null,
+	stars = null,
 }: {
 	viewer: HeaderViewer | null;
 	portfolio?: string | null;
 	spendable?: string | null;
+	stars?: number | null;
 }) {
 	const targetMs = FREEZE_INSTANT_UTC.getTime();
 	const initialDisplay = formatCountdown(Date.now(), targetMs);
@@ -109,6 +162,7 @@ export function GlobalHeader({
 				<div className="flex items-center gap-2 justify-self-start">
 					<HeaderNav />
 					<RadioSlot />
+					<GitHubStarsView stars={stars} />
 					<RulesControl />
 				</div>
 				<div className="justify-self-center">

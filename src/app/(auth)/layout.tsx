@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { auth } from "@/server/auth";
+import { readStarCount } from "@/server/github/star-count";
 
 /**
  * (auth) route-group shell — the ratified-additive OQ-1 mount (UI.A1;
@@ -31,6 +32,23 @@ export default async function AuthLayout({
 	const viewer = session
 		? { pseudonym: session.user?.pseudonym ?? null }
 		: null;
+
+	// GH-STAR — read here even though this layout deliberately skips the two Đ
+	// reads, and the asymmetry is the point rather than an oversight. Those two
+	// are viewer-scoped and these routes are signed-out by definition; the star
+	// count is not scoped to anyone. Omitting it would leave the control rendering
+	// its no-count arm on `/sign-in`, `/sign-in/otp` and `/onboarding` — which
+	// reads, to anyone looking at the header, exactly like a failed GitHub read.
+	// That is the one confusion this whole control is built to prevent, so it
+	// would be a strange thing to reintroduce for the sake of one saved call that
+	// the Data Cache is serving anyway (`next: { revalidate: 900 }` — four
+	// upstream requests an hour for the entire deployment).
+	//
+	// Awaited in the layout, not in the control, for the same structural reason
+	// `(public)` does it: `GlobalHeader` must stay sync all the way down or it
+	// stops rendering in jsdom entirely. See that file, and `GlobalHeader`'s own
+	// `stars` note.
+	const stars = await readStarCount();
 
 	return (
 		/* POLISH.7a D19 — `min-h-full` → `min-h-dvh`. ONE token, ONE node, and the
@@ -65,7 +83,7 @@ export default async function AuthLayout({
 		   ⚠ `dvh` tracks mobile browser chrome. POLISH is desktop-1440-only by G1,
 		   so that is recorded in the log and is not a finding on this surface. */
 		<div className="flex min-h-dvh flex-col">
-			<GlobalHeader viewer={viewer} />
+			<GlobalHeader viewer={viewer} stars={stars} />
 			{/* A7 seam — horizontal-center + max-width + vertical padding on the
 			    branded ground. Vertical placement is per-surface: short surfaces
 			    (sign-in, otp) add `my-auto` to center; onboarding omits it and
