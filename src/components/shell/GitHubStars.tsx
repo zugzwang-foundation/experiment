@@ -59,13 +59,65 @@ import { GITHUB_REPO_URL } from "@/server/github/star-count";
 const GITHUB_TAB =
 	"inline-flex h-[34px] shrink-0 items-center gap-2 rounded-(--r) bg-(--btn-fill) px-3 text-[12px] leading-[1.2] font-bold tracking-[0.1em] text-ink uppercase outline-none select-none [border:var(--hairline)] [transition:all_var(--dur-hover)] hover:[border:1px_solid_var(--ring)] active:bg-(--state-pressed-fill) focus-visible:shadow-(--state-focus-ring) [&_svg]:size-[15px]";
 
+/** The aria-label's figure: exact, grouped, never abbreviated. */
 const NUMBER_FORMAT = new Intl.NumberFormat("en-US");
+
+const COMPACT_FORMAT = new Intl.NumberFormat("en-US", {
+	notation: "compact",
+	maximumFractionDigits: 1,
+});
+
+/**
+ * The on-screen count (GH-STAR-COMPACT, founder-ruled 2026-08-19, reversing the
+ * grouped notation this control shipped with) — compact at or above 1,000,
+ * exact below it. That threshold is GitHub's own, matched deliberately: this
+ * control quotes a GitHub number, and a reader who clicks through has to find
+ * the same shape on the other side of the link.
+ *
+ *   `0` → `0` · `847` → `847` · `1234` → `1.2k` · `54321` → `54.3k` ·
+ *   `999999` → `1m`
+ *
+ * `Intl` rather than a hand-rolled divide-and-round: it already owns the locale,
+ * the k/m/b thresholds and the fraction-digit rule, none of which are worth
+ * reimplementing here. Lowercased HERE, at the formatter, because `Intl` emits
+ * `K`/`M` and GitHub renders `k` — the view below says why CSS cannot be the
+ * thing that does it.
+ *
+ * ⚠ IT ROUNDS, AND THE ROUNDING CROSSES MAGNITUDE BOUNDARIES. This is the part
+ * that reads as a defect on sight: `999999` renders `1m`, so a repo one star
+ * short of a million advertises a million, and `99999` renders `100k`. It is
+ * half-expand at one fraction digit, so the turn sits at `.5` of the leading
+ * unit — `1949` → `1.9k`, `1950` → `2k`. Correct and deliberate, not a
+ * fraction-digit misconfig; `tests/unit/shell/github-stars.test.tsx` pins the
+ * `1949`/`1950` pair so the boundary cannot drift in silence.
+ *
+ * ⚠ The task that ruled this stated the opposite mechanism — that `Intl`
+ * TRUNCATES, and that `1999` renders `1.9k`. It renders `2k`. The claim is not
+ * merely wrong on the pinned runtime (Node 24 / ICU 78, measured); it is
+ * self-refuting against the ruling's own examples on ANY runtime, because the
+ * only config that truncates is `roundingMode: "trunc"` and that turns `999999`
+ * into `999.9k`, contradicting the ruled `1m`. The five ruled OUTPUTS are what
+ * ship — they are exactly what this config produces — and the mechanism written
+ * above is the measured one.
+ */
+function formatStarCount(stars: number): string {
+	return COMPACT_FORMAT.format(stars).toLowerCase();
+}
 
 /**
  * The pure view. DOM text is `GitHub`; `uppercase` is its rendering, per the
  * repo's copy-register split. The count opts back out of the tab's type with
- * `normal-case tracking-normal` — letter-spacing on digits reads as a defect,
- * and there is no case to transform.
+ * `normal-case tracking-normal` — letter-spacing on digits reads as a defect.
+ *
+ * ⛔ `normal-case` IS LOAD-BEARING NOW, AND NO `textContent` ASSERTION CAN GUARD
+ * IT. It used to be housekeeping — digits carry no case, so the tab's
+ * `uppercase` had nothing to act on. Compact notation hands it a suffix: drop
+ * `normal-case` and the tab renders `1.2K`, undoing at the CSS layer the
+ * lowercasing the formatter just did. `text-transform` never touches
+ * `textContent`, so every assertion in this repo's jsdom harness would still
+ * read `1.2k` and stay green while the header shipped the wrong glyph. That is
+ * why the class is asserted as a CLASS, and why the lowercasing lives at the
+ * formatter rather than in this class string.
  */
 export function GitHubStarsView({ stars }: { stars: number | null }) {
 	const label =
@@ -93,7 +145,7 @@ export function GitHubStarsView({ stars }: { stars: number | null }) {
 					data-testid="github-stars-count"
 					className="tracking-normal normal-case tabular-nums"
 				>
-					{NUMBER_FORMAT.format(stars)}
+					{formatStarCount(stars)}
 				</span>
 			)}
 		</a>

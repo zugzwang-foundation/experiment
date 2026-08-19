@@ -44,13 +44,18 @@ describe("GH-STAR GitHubStarsView — the 0-vs-null contract", () => {
 		expect(el.getAttribute("data-state")).toBe("value");
 	});
 
-	it("stars=1234 renders a GROUPED number, never a compact `1.2k`", () => {
+	it("stars=1234 renders a COMPACT `1.2k`, never a grouped `1,234`", () => {
 		render(<GitHubStarsView stars={1234} />);
 		const el = screen.getByTestId("github-stars");
 
-		expect(el.querySelector(COUNT)?.textContent).toBe("1,234");
-		expect(el.textContent).toContain("1,234");
-		expect(el.textContent).not.toContain("1.2k");
+		expect(el.querySelector(COUNT)?.textContent).toBe("1.2k");
+		expect(el.textContent).toContain("1.2k");
+		// ⚠ The negative assertion is the one that INVERTED at GH-STAR-COMPACT;
+		// it survives pointed the other way rather than being dropped, because it
+		// is what fails if the formatter is reverted to the grouped one. The
+		// aria-label still carries `1,234` — as an attribute, which `textContent`
+		// does not read, so this stays a real assertion and not a false green.
+		expect(el.textContent).not.toContain("1,234");
 		expect(el.getAttribute("data-state")).toBe("value");
 	});
 
@@ -90,6 +95,112 @@ describe("GH-STAR GitHubStarsView — the 0-vs-null contract", () => {
 
 		expect(svg).not.toBeNull();
 		expect(svg?.getAttribute("aria-hidden")).toBe("true");
+	});
+});
+
+/**
+ * GH-STAR-COMPACT — the count is compact at or above 1,000 and exact below it,
+ * founder-ruled 2026-08-19 against GitHub's own threshold, so a reader who
+ * clicks through finds the number in the same shape on the far side of the link.
+ *
+ * ⛔ 999 AND 1000 ARE AN ACCEPTANCE PAIR AND MUST BE READ TOGETHER, for the same
+ * reason tests 1 and 3 above are. Either alone is satisfied by a formatter that
+ * is compact EVERYWHERE or exact EVERYWHERE — `999` passes against a formatter
+ * that never abbreviates, `1000` passes against one that always does. Only the
+ * pair pins the turn to 1,000 itself.
+ *
+ * The screen and the label deliberately disagree, and the last test here is what
+ * keeps them disagreeing: the width pressure that buys compact notation applies
+ * to the control, never to an announced string, so a screen-reader user is not
+ * made to trade precision for a constraint they are not under.
+ */
+describe("GH-STAR-COMPACT — the count's notation", () => {
+	const countText = () =>
+		screen.getByTestId("github-stars").querySelector(COUNT)?.textContent;
+
+	it("⭐ stars=54321 renders `54.3k` (the ruled example)", () => {
+		render(<GitHubStarsView stars={54321} />);
+
+		expect(countText()).toBe("54.3k");
+		expect(screen.getByTestId("github-stars").textContent).not.toContain(
+			"54,321",
+		);
+	});
+
+	it("stars=999 renders `999` — exact, one below the threshold", () => {
+		render(<GitHubStarsView stars={999} />);
+
+		expect(countText()).toBe("999");
+	});
+
+	it("stars=1000 renders `1k` — compact, AT the threshold", () => {
+		render(<GitHubStarsView stars={1000} />);
+
+		expect(countText()).toBe("1k");
+	});
+
+	it("⭐ the aria-label keeps the EXACT figure — `54,321`, never `54.3k`", () => {
+		render(<GitHubStarsView stars={54321} />);
+		const label =
+			screen.getByTestId("github-stars").getAttribute("aria-label") ?? "";
+
+		expect(label).toContain("54,321");
+		expect(label).not.toContain("54.3k");
+		// The plural handling predates this change and is unaffected by notation.
+		expect(label).toContain("54,321 stars");
+	});
+
+	/**
+	 * ⚠ ADDITION BEYOND THE RULED TEST LIST — AND THE EVIDENCE FOR A CORRECTION.
+	 * The GH-STAR-COMPACT kickoff stated that `Intl` compact TRUNCATES, that
+	 * `1999` therefore renders `1.9k`, and asked for that to be written into the
+	 * code as deliberate. It ROUNDS: half-expand at one fraction digit, so the
+	 * turn sits at `.5` of the leading unit. This pair is the measurement.
+	 *
+	 * The claim is self-refuting against the ruling's own examples on ANY
+	 * runtime, not merely wrong on this one: the single config that truncates is
+	 * `roundingMode: "trunc"`, and it renders `999999` as `999.9k` — contradicting
+	 * the ruled `1m`, which the last assertion here pins. Every ruled OUTPUT
+	 * ships unchanged; only the mechanism's description was corrected.
+	 */
+	it("ROUNDS half-expand — 1949 → `1.9k`, 1950 → `2k`, 999999 → `1m`", () => {
+		render(<GitHubStarsView stars={1949} />);
+		expect(countText()).toBe("1.9k");
+		cleanup();
+
+		render(<GitHubStarsView stars={1950} />);
+		expect(countText(), "a truncating formatter renders 1950 as `1.9k`").toBe(
+			"2k",
+		);
+		cleanup();
+
+		// The magnitude-boundary crossing, and the arithmetic that rules out
+		// truncation: `trunc` would render this `999.9k`.
+		render(<GitHubStarsView stars={999999} />);
+		expect(countText()).toBe("1m");
+	});
+
+	/**
+	 * ⚠ ADDITION BEYOND THE RULED TEST LIST — THE ONLY GUARD THE LOWERCASE SUFFIX
+	 * CAN HAVE. The ruling says the suffix renders lowercase; the tab's own type
+	 * register is `uppercase`, and the count escapes it via `normal-case`.
+	 *
+	 * ⛔ NO `textContent` ASSERTION IN THIS FILE CAN CATCH THAT CLASS GOING AWAY.
+	 * `text-transform` paints; it never rewrites `textContent`. So every
+	 * assertion above would keep reading `1.2k` and stay green while the header
+	 * shipped `1.2K`. Asserted as a class TOKEN, not a substring — the repo has
+	 * already been bitten once by a substring class match (`table-fixed` matching
+	 * a scan for `fixed`).
+	 */
+	it("the count opts out of the tab's `uppercase` via `normal-case`", () => {
+		render(<GitHubStarsView stars={1234} />);
+		const count = screen.getByTestId("github-stars").querySelector(COUNT);
+
+		expect(count?.textContent).toBe("1.2k");
+		expect(
+			(count?.getAttribute("class") ?? "").split(/\s+/),
+			"without `normal-case` the tab repaints the suffix as `1.2K`",
+		).toContain("normal-case");
 	});
 });
 
