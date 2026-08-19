@@ -1,7 +1,7 @@
 # POLISH — Data Manifest
 
 > **Doc:** `POLISH-0_data-manifest.md` · web-authored. Deliverable #4 of POLISH.0.
-> **Status:** **v1.8** — 2026-08-17 IST. Supersedes v1.7 (2026-08-14). ⚠ **v1.6 was never entered in §0** — V-7 and V-8 were minted, defined and cited while the amendment record stayed at v1.5, which is the D4 failure this manifest names at §0. **Both blocks are entered below.**
+> **Status:** **v1.9** — 2026-08-19 IST. Supersedes v1.8 (2026-08-17), which §0 never recorded — see H2. ⚠ **v1.6 was never entered in §0** — V-7 and V-8 were minted, defined and cited while the amendment record stayed at v1.5, which is the D4 failure this manifest names at §0. **Both blocks are entered below.**
 > **Consumed by:** **STAGING-PARITY** — this is its build target. Also read by POLISH.1–.8 to know which states are reachable.
 > **Governed by:** `POLISH-0.md` §6 (environment) and §7 (exit bar) · `docs/plans/STAGING-PARITY.md` + its Ratification Record · ADR-0035 · ADR-0036.
 
@@ -12,6 +12,13 @@
 ---
 
 ## §0 · Amendment record
+
+### v1.9 — 2026-08-19 · from VIEWS-1c
+
+| # | Amendment | Detail |
+|---|---|---|
+| **H1** | **V-14 added** — a `cancelled` CI run is not a failed one, and `gh pr checks` is not the place to read it | Founder-authored, committed **verbatim**. Ruled into V-space because it states what makes a control weaker than it looks: a green claim read off a run that is not the head's. The mechanism it names is real and local — `ci.yml`'s `concurrency: cancel-in-progress: true`. **Not cross-listed into `CLAUDE.md` §8 or `POLISH-register-ADDITIONS.md`** (E1's rule, restated at the VIEWS-1c kickoff): one register, one home. |
+| **H2** | **The v1.8 block is ABSENT from §0** — recorded here, deliberately **NOT** backfilled | V-11/V-12/V-13 were minted 2026-08-17, defined in §5 and entered in the footer, and never entered here — the same failure §0 records at **G3** for v1.6, one version later, in the document that names it. It is not corrected in passing because its content is the founder's to state, and an executing task that authors a register's own amendment history is the `D4` failure twice over. |
 
 ### v1.7 — 2026-08-14 · from POLISH.5/.6 commit 0
 
@@ -205,7 +212,7 @@ STAGING-PARITY is not done until **all six** pass from a cold rebuild.
 
 ## §5 · Inherited verification discipline — the **V-space** register
 
-**This section is the canonical home of V-1…V-13.** They are the *verification* lessons: what makes a control weaker than it looks. They are **not** L-space — L-numbers belong to `POLISH-register-ADDITIONS.md` (the PRIMITIVES-1 Gate C reviewer LOWs) and to task-scoped `@security-auditor` LOWs, which carry their task name. Cite a verification lesson as **V-n**, never as L-n.
+**This section is the canonical home of V-1…V-14.** They are the *verification* lessons: what makes a control weaker than it looks. They are **not** L-space — L-numbers belong to `POLISH-register-ADDITIONS.md` (the PRIMITIVES-1 Gate C reviewer LOWs) and to task-scoped `@security-auditor` LOWs, which carry their task name. Cite a verification lesson as **V-n**, never as L-n.
 
 V-1…V-4 came from Slice A, which found **six** controls that passed while blind to what they named; V-5 came from Slice C/D; **V-6 from POLISH-TEMPLATE; V-7 and V-8 from POLISH.7a; V-9 and V-10 from POLISH.5/.6 commit 0**. These constraints are carried into every remaining slice.
 
@@ -222,11 +229,12 @@ V-1…V-4 came from Slice A, which found **six** controls that passed while blin
 - **V-11 · A 200 from `curl` is not proof a streamed page rendered.** Next streams the shell before the render completes, so an RSC throw lands *after* the headers and the status stays 200. `/api/health` stays green alongside it. Verify a page in a browser, against the compiled CSS. *(This run: three 200s over an error boundary; and separately a `db: "error"` outage that DID surface as 500 — the two failure shapes differ and only the browser distinguishes them.)*
 - **V-12 · An animated computed style read in a hidden tab returns its START value forever.** A CDP-driven tab reports `document.hidden === true`, fires no `requestAnimationFrame`, and therefore never advances a CSS transition. Compounding it, Tailwind v4's `-translate-y-*` sets the `translate` property, so reading `.transform` reports `none` whether or not the utility applied. Assert `document.hidden === false` before believing any transition, animation or timer reading; prefer an untransitioned declaration you can verify over an eased one you cannot. *(This run: three consecutive false "the CSS does not apply" diagnoses.)*
 - **V-13 · A batch write that reports success may not have reached disk.** A multi-file script that shares one abort path with its assertions can write files 1–3, throw on file 4's anchor, and leave the run looking partially successful. `just verify` and the unit suite both stay green when the un-written change has no guard. Grep the FILE for the claimed state before gating on it; never infer from the script's exit. *(This run: three instances, surfaced only when a browser measured a 24px rail the source claimed was 14px.)*
+- **V-14 · A `cancelled` CI run is not a failed one, and `gh pr checks` is not the place to read it.** When a branch is pushed twice, the earlier run is cancelled by the later push, and `gh pr checks` can surface that cancellation as the PR's state. Read `gh run list --branch <branch>`, then `gh run view <id>`, and accept only a run whose `sha` equals the current head. Verified at VIEWS-1: run `32187050840` on `b153400` read `cancelled` while run `32187168264` on head `3c1e3ae` read `status=completed conclusion=success`. A green claim that does not name the SHA it was measured against is not evidence.
 - ⚠ **Load-bearing for Slice B:** ADR-0036 primitive 4's **no-direct-writes assertion** is what keeps gate 1 non-vacuous — if the generator could write both a `bets` row and its event, gate 1 would pass *because the generator wrote both halves*. It gets a **positive control per pattern**, a **non-empty file-set assertion**, **whitespace tolerance**, and a **mutation control at authoring time**.
 
 > ### ⚠ PROPOSED — ONE ROW, DELIBERATELY UNNUMBERED. Ground: POLISH.5 PR A / A6
 >
-> **High-water read off this register at head: `V-13`** *(was `V-10`; V-11/V-12/V-13 were founder-minted 2026-08-17 — this pointer is re-read, never carried, per **V-9**)*. ⛔ **This row is STILL NOT NUMBERED, and it does not take `V-14` here.** V-7's own text is why — *"a V-number is minted HERE or it is not minted"* — and its converse binds equally: a number written by an executing task, before the register's owner has ruled it in, is exactly the `D4` failure this section records twice. **The founder mints it or it stays unnumbered.**
+> **High-water read off this register at head: `V-14`** *(was `V-13`; V-14 was founder-authored and minted at VIEWS-1c 2026-08-19 — this pointer is re-read, never carried, per **V-9**)*. ⛔ **This row is STILL NOT NUMBERED, and it does not take `V-15` here.** V-7's own text is why — *"a V-number is minted HERE or it is not minted"* — and its converse binds equally: a number written by an executing task, before the register's owner has ruled it in, is exactly the `D4` failure this section records twice. **The founder mints it or it stays unnumbered.**
 >
 > **PROPOSED ROW —**
 >
@@ -242,4 +250,4 @@ V-1…V-4 came from Slice A, which found **six** controls that passed while blin
 
 ---
 
-*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home) · v1.5 2026-08-10 from POLISH-TEMPLATE (V-6 minted) · v1.6 2026-08-11 from POLISH.7a (**V-7 and V-8 minted**; V-7 was ruled at the correction gate and reached this register only at the close-out — see its own entry) · v1.7 2026-08-14 from POLISH.5/.6 commit 0 (**V-9 and V-10 minted**; v1.6’s amendment block BACKFILLED, having never been written). · v1.8 2026-08-17 from HTML-FINISH · MARKET DETAIL Gate C (**V-11, V-12 and V-13 minted**, founder-ratified; the PROPOSED row above stays unnumbered and its stale `V-10` high-water was re-read in the same commit). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
+*v1.0-draft 2026-07-30 · v1.1 2026-08-05 from RECON-1 · v1.2 2026-08-06 from the STAGING-PARITY Ratification Record §8 and Slice A · v1.3 2026-08-06 from Slice B · v1.4 2026-08-08 from SYNC-1 (the D.4 V-renumber, executed; §5 is V-space's canonical home) · v1.5 2026-08-10 from POLISH-TEMPLATE (V-6 minted) · v1.6 2026-08-11 from POLISH.7a (**V-7 and V-8 minted**; V-7 was ruled at the correction gate and reached this register only at the close-out — see its own entry) · v1.7 2026-08-14 from POLISH.5/.6 commit 0 (**V-9 and V-10 minted**; v1.6’s amendment block BACKFILLED, having never been written). · v1.8 2026-08-17 from HTML-FINISH · MARKET DETAIL Gate C (**V-11, V-12 and V-13 minted**, founder-ratified; the PROPOSED row above stays unnumbered and its stale `V-10` high-water was re-read in the same commit) · v1.9 2026-08-19 from VIEWS-1c (**V-14 minted**, founder-authored and committed verbatim; the PROPOSED row still stays unnumbered and its `V-13` high-water was re-read in the same commit; v1.8 has no §0 block and was not backfilled — §0 H2). Constants named in caps (`DISCOVERY_GRID_SIZE`, `LATEST_INTERLEAVE_INTERVAL`, `k_lane`) are owned by `RANKING.md` and `limits.ts` and pin at the 2026-09-01 number-tuning pass — this manifest references them, never sets them.*
