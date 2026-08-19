@@ -1,6 +1,6 @@
 # VIEWS-1 — rendered label "visitors" → "views" — execute close-out
 
-**PR #359** (OPEN, not draft — founder merges) · branch `feat/views-1-label` @ `b153400` · base `main` @ `2c8b144` · worktree `/Users/hrishikesh/code/zugzwang/wt-views1` · squash SHA TBD at merge.
+**PR #359** (OPEN, not draft — founder merges) · branch `feat/views-1-label` @ `b153400` · base `main` @ `2c8b144` · worktree `/Users/hrishikesh/code/zugzwang/wt-views1` · squash SHA `6931400`.
 
 Founder ruling 2026-08-19 from live staging: the header read **813 → 814 across a single in-session navigation**. One person, two units. The counter increments once per page load, so the number is page views; the label named people.
 
