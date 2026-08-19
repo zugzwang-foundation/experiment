@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { getHeaderBalance } from "@/server/dharma/header-balance";
 import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
+import { readStarCount } from "@/server/github/star-count";
 import { completeOnboardingDeckAction } from "@/server/onboarding/complete";
 import {
 	INTRO_SEEN_COOKIE,
@@ -81,6 +82,25 @@ export default async function PublicLayout({
 			])
 		: [null, null];
 
+	// GH-STAR — the header's GitHub star count. Awaited HERE rather than inside
+	// the control, and that is structural: `GlobalHeader` renders in jsdom in
+	// `tests/unit/shell/dharma-cluster.test.tsx`, React's client renderer refuses
+	// an async component, and an async child would take the ENTIRE header down in
+	// that test rather than just itself. The layout is already async, so the await
+	// costs nothing here and the control stays a pure sync view.
+	//
+	// UNCONDITIONAL, unlike the Đ pair above — the count is not viewer-scoped, so
+	// a signed-out visitor sees the same header a signed-in one does. It is also
+	// not a per-request read: the fetch carries `next: { revalidate: 900 }`, so
+	// this resolves from the Data Cache and reaches GitHub four times an hour
+	// across the whole deployment. That matters on `/m/[slug]`, where
+	// `DebatePoll`'s 15-second `router.refresh()` re-executes this layout (see
+	// the note above) — those ticks are cache hits, not API calls.
+	//
+	// Fail-safe like the two reads above: it resolves to `null` on any failure and
+	// never throws, and the control renders label-only rather than a wrong number.
+	const stars = await readStarCount();
+
 	// O1-DECK — the first-login gate (SPEC.1 §21.9, ADR-0037). Decided HERE,
 	// beside the `getSession` read that is already happening, because that is
 	// the one place both terms are already in hand. The marker is `HttpOnly`,
@@ -100,6 +120,7 @@ export default async function PublicLayout({
 				viewer={viewer}
 				portfolio={portfolio}
 				spendable={spendable}
+				stars={stars}
 			/>
 			{/* HTML-FINISH row 8 — the surface column fills the viewport BELOW the
 			    header, so a surface can hand its leftover vertical space to a
