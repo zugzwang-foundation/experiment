@@ -344,6 +344,7 @@ function rowFor(
 	ordinal: number,
 ): ProfilePositionRow {
 	return {
+		lots: [],
 		marketId,
 		marketSlug: slug,
 		marketTitle,

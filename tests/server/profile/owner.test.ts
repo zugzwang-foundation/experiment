@@ -35,6 +35,7 @@ const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
 
 /** Open ∧ held ∧ unsettled — the ONLY sellable class. */
 const ROW_OPEN_HELD: ProfilePositionRow = {
+	lots: [],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -58,6 +59,7 @@ const ROW_OPEN_HELD: ProfilePositionRow = {
 
 /** Resolved + settled (OQ-9 A) — never sellable. */
 const ROW_SETTLED: ProfilePositionRow = {
+	lots: [],
 	marketId: M2,
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",

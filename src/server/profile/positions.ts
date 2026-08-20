@@ -19,7 +19,11 @@ import {
 	loadRemovedSet,
 } from "@/server/debate-view/load-debate-view";
 import { eventPayloadSchemas } from "@/server/events/schemas";
-import { loadLotBasis, lotBasisOf } from "@/server/lots/basis";
+import {
+	loadLotBasis,
+	loadLotDecomposition,
+	lotBasisOf,
+} from "@/server/lots/basis";
 import type { MarketStatus } from "@/server/markets/transitions";
 
 import {
@@ -53,6 +57,37 @@ export type ProfileArgumentCell =
 			repliedToTitle: string | null;
 	  };
 
+/**
+ * ONE ARGUMENT'S SHARE of a holding — a `lots` row, rendered (LOTS-1 /
+ * ADR-0039). The row's `staked` is the Σ of `survivingBasis` over these; the
+ * row's `quantity` is the Σ of `survivingShares`. That is R2, and it is what
+ * makes this a decomposition rather than a second opinion.
+ *
+ * The `argument` field reuses the SAME masked union as the row's own cell, so a
+ * removed argument collapses to the variant carrying no title — a leak is a
+ * compile error, not a review item (SC-1).
+ */
+export type ProfilePositionLot = {
+	lotId: string;
+	/** The bet this lot IS — R1's 1:1. */
+	betId: string;
+	/** Đ staked on this argument at post time. Frozen forever (`bets.stake`). */
+	originalBasis: string;
+	/** Đ still staked here — the summand of Đa. Falls when this lot sells down. */
+	survivingBasis: string;
+	/** Shares still held from this argument — the summand of `quantity`. */
+	survivingShares: string;
+	/**
+	 * R6/R10 — `Sold`, per ARGUMENT. True IFF nothing survives. A PARTIALLY-sold
+	 * lot is false: it renders a reduced figure and NO tag, because a reduced
+	 * number is the signal and a tag would overstate it.
+	 */
+	sold: boolean;
+	/** When the argument was made — the decomposition's order. */
+	placedAt: string;
+	argument: ProfileArgumentCell;
+};
+
 /** The market-state → §23 status classification: `Open` iff the market is Open. */
 export type ProfileStatusLabel = "Open" | "Closed";
 
@@ -84,6 +119,17 @@ export type ProfilePositionRow = {
 	 */
 	current: string;
 	argument: ProfileArgumentCell;
+	/**
+	 * The per-argument decomposition of `staked` (LOTS-1 / ADR-0039). Ordered by
+	 * when each argument was made. Includes `Sold` lots: R9 makes Sold permanent,
+	 * and an argument someone staked on and then exited is part of their record
+	 * rather than an absence.
+	 *
+	 * ⚠ FI-2 is untouched by this field. `current` remains the single Đb for the
+	 * holding; no lot carries a current value, because a per-lot Đb would be a
+	 * second answer to "what is this worth now" and §23 forbids exactly that.
+	 */
+	lots: ProfilePositionLot[];
 };
 
 type BetRow = {
@@ -312,13 +358,43 @@ export async function loadProfilePositions(
 		}
 	}
 
-	// Masking input — content_removed over the opener + parent comments only
-	// (the audited enforcement point, verbatim; ban never masks).
+	// The per-argument decomposition (LOTS-1 / ADR-0039). Every lot, Sold ones
+	// included — R9 makes Sold permanent and R6 gives it a tag.
+	const lotsByMarket = await loadLotDecomposition(client, {
+		userId,
+		marketIds: marketIdList,
+	});
+	const commentIdByBetId = new Map(
+		userBets.map((b) => [b.id, b.commentId] as const),
+	);
+
+	// Masking input — content_removed over the opener + parent comments, AND
+	// every lot's own argument + ITS parent.
+	//
+	// ⚠ SC-1 (CLAUDE.md §5.14): masking is a property of every BODY READ, not of
+	// rows. The decomposition renders a title per lot, which is a second body
+	// read on this surface — so its comments must join the SAME predicate before
+	// a title can reach a DTO. They are routed through `buildArgumentCell`, whose
+	// removed variant carries no title field at all, so a leak is a compile error
+	// rather than a review item.
 	const maskingCandidates = new Set<string>(openerByMarket.values());
 	for (const openerId of openerByMarket.values()) {
 		const parent = commentById.get(openerId)?.parentCommentId;
 		if (parent) {
 			maskingCandidates.add(parent);
+		}
+	}
+	for (const lotRows of lotsByMarket.values()) {
+		for (const lot of lotRows) {
+			const commentId = commentIdByBetId.get(lot.betId);
+			if (commentId === undefined) {
+				continue;
+			}
+			maskingCandidates.add(commentId);
+			const parent = commentById.get(commentId)?.parentCommentId;
+			if (parent) {
+				maskingCandidates.add(parent);
+			}
 		}
 	}
 	const removedSet = await loadRemovedSet(client, [...maskingCandidates]);
@@ -363,6 +439,23 @@ export async function loadProfilePositions(
 				ordinalById,
 				removedSet,
 			}),
+			lots: (lotsByMarket.get(marketId) ?? []).map((lot) => ({
+				lotId: lot.lotId,
+				betId: lot.betId,
+				originalBasis: lot.originalBasis,
+				survivingBasis: lot.survivingBasis,
+				survivingShares: lot.survivingShares,
+				// R6/R10 — Sold is exactly zero surviving, never "nearly".
+				sold: !new CpmmDecimal(lot.survivingShares).greaterThan(0),
+				placedAt: lot.createdAt.toISOString(),
+				argument: buildArgumentCell({
+					openerId: commentIdByBetId.get(lot.betId) ?? null,
+					marketSlug: market.slug,
+					commentById,
+					ordinalById,
+					removedSet,
+				}),
+			})),
 		});
 	}
 

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { and, gt, inArray } from "drizzle-orm";
+import { and, asc, eq, gt, inArray } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { lots } from "@/db/schema";
@@ -122,4 +122,62 @@ export function lotBasisOf(
 	return (
 		byKey.get(lotBasisKey(userId, marketId))?.survivingBasis ?? CANONICAL_ZERO
 	);
+}
+
+/** One lot as the profile decomposition needs it — before masking is applied. */
+export type LotDecompositionRow = {
+	lotId: string;
+	betId: string;
+	marketId: string;
+	originalBasis: string;
+	survivingBasis: string;
+	survivingShares: string;
+	createdAt: Date;
+};
+
+/**
+ * Load EVERY lot for `userId` across `marketIds` — surviving **and** Sold.
+ *
+ * Distinct from `loadLotBasis`, which sums only what survives. The
+ * decomposition needs the Sold ones too, because R9 makes Sold permanent and
+ * R6 gives it a tag: an argument someone staked on and then exited is part of
+ * their record, not an absence. Hiding it would turn the surface back into the
+ * aggregate-only view this whole feature exists to replace.
+ *
+ * Ordered by `(created_at, id)` — the order the arguments were actually made,
+ * which is the only ordering a reader can check against their own memory.
+ */
+export async function loadLotDecomposition(
+	client: DbClient | DbTransaction,
+	args: { userId: string; marketIds: readonly string[] },
+): Promise<Map<string, LotDecompositionRow[]>> {
+	const byMarket = new Map<string, LotDecompositionRow[]>();
+	if (args.marketIds.length === 0) {
+		return byMarket;
+	}
+	const rows = await client
+		.select({
+			lotId: lots.id,
+			betId: lots.betId,
+			marketId: lots.marketId,
+			originalBasis: lots.originalBasis,
+			survivingBasis: lots.survivingBasis,
+			survivingShares: lots.survivingShares,
+			createdAt: lots.createdAt,
+		})
+		.from(lots)
+		.where(
+			and(
+				eq(lots.userId, args.userId),
+				inArray(lots.marketId, [...args.marketIds]),
+			),
+		)
+		.orderBy(asc(lots.createdAt), asc(lots.id));
+
+	for (const r of rows) {
+		const list = byMarket.get(r.marketId) ?? [];
+		list.push(r);
+		byMarket.set(r.marketId, list);
+	}
+	return byMarket;
 }

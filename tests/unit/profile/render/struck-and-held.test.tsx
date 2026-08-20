@@ -67,6 +67,7 @@ const TILES: ProfileTilesData = {
 };
 
 const ROW_OPEN: ProfilePositionRow = {
+	lots: [],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",

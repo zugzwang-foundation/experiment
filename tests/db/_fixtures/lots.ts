@@ -109,3 +109,37 @@ export async function seedLotPositionSale(
 			.where(eq(lots.betId, row.betId));
 	}
 }
+
+/**
+ * Sell `sharesToSell` out of ONE lot, named by its bet id — the per-lot path
+ * (ADR-0039 D-3 shape 1), for fixtures that need one argument reduced while its
+ * siblings stay exactly as they were.
+ *
+ * Routes through the shipped `sellFromLot`, so a fixture cannot drift from the
+ * engine's reduction rule.
+ */
+export async function seedLotSaleForBetId(
+	db: Db,
+	args: { betId: string; sharesToSell: string },
+): Promise<void> {
+	const [row] = await db
+		.select({
+			originalShares: lots.originalShares,
+			originalBasis: lots.originalBasis,
+			survivingShares: lots.survivingShares,
+			survivingBasis: lots.survivingBasis,
+		})
+		.from(lots)
+		.where(eq(lots.betId, args.betId));
+	if (row === undefined) {
+		throw new Error(`seedLotSaleForBetId: no lot for bet ${args.betId}`);
+	}
+	const after = sellFromLot({ lot: row, sharesToSell: args.sharesToSell });
+	await db
+		.update(lots)
+		.set({
+			survivingShares: after.survivingShares,
+			survivingBasis: after.survivingBasis,
+		})
+		.where(eq(lots.betId, args.betId));
+}

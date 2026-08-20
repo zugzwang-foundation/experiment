@@ -26,7 +26,11 @@ import { loadProfilePositions } from "@/server/profile/positions";
 import { loadProfileTiles } from "@/server/profile/tiles";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
-import { seedLotForBet, seedLotPositionSale } from "../../db/_fixtures/lots";
+import {
+	seedLotForBet,
+	seedLotPositionSale,
+	seedLotSaleForBetId,
+} from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 // UI.A5 Slice 2 §5.6 tests-first (plan §2 row 2 + §11) — F-PROF-1 cross-market
@@ -245,6 +249,11 @@ async function seedGrant(userId: string, amount: string): Promise<void> {
 		amount,
 		balanceAfter: amount,
 	});
+}
+
+/** Sell `shares` out of ONE lot, by its bet id — the per-lot fixture path. */
+async function seedLotSaleForBet(betId: string, shares: string): Promise<void> {
+	await seedLotSaleForBetId(testDb, { betId, sharesToSell: shares });
 }
 
 async function seedRemoval(commentId: string): Promise<void> {
@@ -841,5 +850,245 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		}
 		// No content leak: the stub variant carries no `title` key at all.
 		expect("title" in (cell ?? {})).toBe(false);
+	});
+});
+
+describe("LOTS-1 Slice 7 — the per-argument decomposition (ADR-0039)", () => {
+	it("decomposes Đa into its arguments, and the parts sum to the whole (R2)", async () => {
+		// Three arguments at three prices in one market. The row's `staked` must
+		// be exactly the Σ of the lots beneath it, and `quantity` exactly the Σ of
+		// their shares — otherwise the surface renders a breakdown that disagrees
+		// with the number above it, which is worse than rendering none.
+		const userA = await seedUser("lot-decomp-user", "lot-decomp");
+		const marketId = await seedMarket("m-lot-decomp", "Open");
+		await seedPool(marketId);
+
+		const stakes = ["40", "50", "500"] as const;
+		for (const [i, stake] of stakes.entries()) {
+			const commentId = await seedComment({
+				userId: userA,
+				marketId,
+				body: `Decomposition argument ${i + 1}`,
+				side: "YES",
+				createdAt: new Date(`2026-09-2${i + 1}T10:00:00Z`),
+			});
+			await seedBet({
+				userId: userA,
+				marketId,
+				side: "YES",
+				stake: dp18(stake),
+				shares: dp18(String(Number(stake) * 2)),
+				commentId,
+				createdAt: new Date(`2026-09-2${i + 1}T10:00:00Z`),
+			});
+		}
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("1180"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const row = rows[0];
+		expect(row?.lots).toHaveLength(3);
+
+		const units = (v: string): bigint => BigInt(v.replace(".", ""));
+		const basisSum = (row?.lots ?? []).reduce(
+			(acc, l) => acc + units(l.survivingBasis),
+			BigInt(0),
+		);
+		const shareSum = (row?.lots ?? []).reduce(
+			(acc, l) => acc + units(l.survivingShares),
+			BigInt(0),
+		);
+		expect(basisSum).toBe(units(row?.staked ?? "0"));
+		expect(shareSum).toBe(units(row?.quantity ?? "0"));
+	});
+
+	it("orders lots by when the argument was made", async () => {
+		const userA = await seedUser("lot-order-user", "lot-order");
+		const marketId = await seedMarket("m-lot-order", "Open");
+		await seedPool(marketId);
+		for (const [i, stake] of ["10", "20", "30"].entries()) {
+			const commentId = await seedComment({
+				userId: userA,
+				marketId,
+				body: `Ordered argument ${i + 1}`,
+				side: "YES",
+				createdAt: new Date(`2026-09-1${i + 1}T10:00:00Z`),
+			});
+			await seedBet({
+				userId: userA,
+				marketId,
+				side: "YES",
+				stake: dp18(stake),
+				shares: dp18(String(Number(stake) * 2)),
+				commentId,
+				createdAt: new Date(`2026-09-1${i + 1}T10:00:00Z`),
+			});
+		}
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("120"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const bases = (rows[0]?.lots ?? []).map((l) => l.originalBasis);
+		expect(bases).toEqual([dp18("10"), dp18("20"), dp18("30")]);
+	});
+
+	it("tags a fully-sold argument Sold, and a partially-sold one NOT (R6/R10)", async () => {
+		// R6 is precise: a partially-sold lot renders a reduced figure and NO tag.
+		// A tag there would overstate what happened; the reduced number is the
+		// signal.
+		const userA = await seedUser("lot-sold-user", "lot-sold");
+		const marketId = await seedMarket("m-lot-sold", "Open");
+		await seedPool(marketId);
+		const c1 = await seedComment({
+			userId: userA,
+			marketId,
+			body: "Argument that gets sold out",
+			side: "YES",
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		const betSold = await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: c1,
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		const c2 = await seedComment({
+			userId: userA,
+			marketId,
+			body: "Argument that is only trimmed",
+			side: "YES",
+			createdAt: new Date("2026-09-11T10:00:00Z"),
+		});
+		const betTrimmed = await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: c2,
+			createdAt: new Date("2026-09-11T10:00:00Z"),
+		});
+		// Sell all of the first and half of the second, per-lot.
+		await seedLotSaleForBet(betSold, dp18("40"));
+		await seedLotSaleForBet(betTrimmed, dp18("20"));
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("20"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const lots = rows[0]?.lots ?? [];
+		expect(lots).toHaveLength(2);
+		const sold = lots.find((l) => l.betId === betSold);
+		const trimmed = lots.find((l) => l.betId === betTrimmed);
+
+		expect(sold?.sold).toBe(true);
+		expect(sold?.survivingBasis).toBe(dp18("0"));
+		// R9 — Sold is permanent and still RENDERED: the original stake survives
+		// on the lot, so the record shows what was staked and that it was exited.
+		expect(sold?.originalBasis).toBe(dp18("100"));
+
+		expect(trimmed?.sold).toBe(false);
+		expect(trimmed?.survivingBasis).toBe(dp18("50"));
+		expect(trimmed?.originalBasis).toBe(dp18("100"));
+	});
+
+	it("MASKS a removed argument's body out of the decomposition (SC-1)", async () => {
+		// CLAUDE.md §5.14 SC-1 — the assertion is on the BODY's ABSENCE, not the
+		// row's: a row-level check would pass against a second body-read path that
+		// leaked. The lot is still present (the stake was real); only its text is
+		// un-renderable, by the union variant carrying no title field at all.
+		const userA = await seedUser("lot-mask-user", "lot-mask");
+		const marketId = await seedMarket("m-lot-mask", "Open");
+		await seedPool(marketId);
+		const secret = "REMOVED-LOT-BODY-SENTINEL-do-not-render";
+		const c1 = await seedComment({
+			userId: userA,
+			marketId,
+			body: secret,
+			side: "YES",
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: c1,
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		await seedRemoval(c1);
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("40"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		// The BODY is nowhere in the serialized payload — the SC-1 form.
+		expect(JSON.stringify(rows)).not.toContain(secret);
+		// …and the lot itself DID survive, so this is masking rather than an
+		// empty result that would pass the assertion vacuously.
+		expect(rows[0]?.lots).toHaveLength(1);
+		expect(rows[0]?.lots[0]?.argument.removed).toBe(true);
+		expect(rows[0]?.lots[0]?.originalBasis).toBe(dp18("100"));
+	});
+
+	it("keeps FI-2 intact — no lot carries a current value", async () => {
+		// §23 forbids one holding showing two different current values. The
+		// decomposition deliberately carries NO per-lot Đb: a per-argument
+		// "worth now" would be exactly that second answer.
+		const userA = await seedUser("lot-fi2-user", "lot-fi2");
+		const marketId = await seedMarket("m-lot-fi2", "Open");
+		await seedPool(marketId);
+		const c1 = await seedComment({
+			userId: userA,
+			marketId,
+			body: "FI-2 argument",
+			side: "YES",
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: c1,
+			createdAt: new Date("2026-09-10T10:00:00Z"),
+		});
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("40"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const expected = computeSell({
+			reserves: { yes: POOL, no: POOL },
+			side: lc("YES"),
+			shares: dp18("40"),
+		}).proceeds;
+		expect(rows[0]?.current).toBe(expected);
+		for (const lot of rows[0]?.lots ?? []) {
+			expect(Object.keys(lot)).not.toContain("current");
+			expect(Object.keys(lot)).not.toContain("currentValue");
+		}
 	});
 });
