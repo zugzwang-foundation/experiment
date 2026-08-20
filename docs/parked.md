@@ -732,11 +732,11 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** An operator/founder read of the two copies side by side. Evidence: `~/Desktop/SYNC-1-recon.md` R1 row 107.
 
-## N5 — SPEC.2 §22 does not know ADR-0035 or ADR-0036
+## N5 — SPEC.2 §22 does not know ADR-0035, ADR-0036 or ADR-0037
 
 **Originating task:** SYNC-1 (2026-08-08), STEP 2.7 — surfaced while correcting SPEC.2 §0, **not** in the original work order.
 
-**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0036 — 34 files.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
+**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0037 — 35 files ⚠ re-measured at SYNC-3, 2026-08-19; this row said 34 and SPEC.2's own annotation said the ceiling was 0036. Both were one behind, because `ADR-0037` landed at #355. Read `ls docs/adr/` at the moment of the fix (`O-2`) — this number will be wrong again.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
 
 **Why deferred, and why §0 was only annotated.** SYNC-1's work order authorised **SPEC.2 §0 metadata only** and instructed a STOP if the correction required a normative edit. It does: §22.1 is normative and §22.5 designates the ADR files as the single source of truth, so rewriting §0's range while §22.1 still says 33/0003–0034 would leave SPEC.2 **contradicting itself inside one document** — strictly worse than the present state. §0 therefore carries a truthful annotation naming the real ceiling and pointing here, and no number was changed.
 
@@ -831,6 +831,47 @@ Seven markets carry a hero post on exactly ONE side; one carries none. **Zero ca
 **What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
 
 ---
+## IDENTITY-POOL-NAMESPACE — the pool is sized for 1K–10K signups against a 100,000 target
+
+**Originating task:** SYNC-3 recon, 2026-08-19. **Docketed:** SYNC-3.
+
+**The measurement.** `docs/adr/0011-pseudonym-pool-design.md` states a **50,000** namespace —
+50 colours × 100 animals = 5,000 `(colour, animal)` pairs, each with 10 number variants — and
+justifies it with *"50K namespace with **realistic ceiling at 1K–10K signups** is
+comfortable."* **The target is now 100,000 signups.** That is 10× the top of the stated range
+and 2× the entire namespace. ⚠ **The ADR's own cheap-extension path (10 → 20 numbers per pair)
+arrives at exactly 100,000** — zero headroom — and the same ADR records that *"scrubbed tuples
+shrink the effective pool over time."*
+
+**Why it is not a one-line fix.** The `50,000` figure is restated at **~20 sites across 9
+files**: `SPEC.1` §13 (five sites, including *"comfortable for any realistic experiment-scale
+signup volume"*), `SPEC.2` (four, including the asset-pipeline and the low-watermark alarm),
+`ADR-0016` (two), `SCAFFOLD.17` (five), `SCAFFOLD.2-3C`, and two handover documents. `O-5`
+binds across all of them.
+
+⚠ **ADR-0011 has NO Patch record section and has never been amended in place.** ADR-0006 has
+the precedent and the shape; this one does not.
+
+⚠ **AND THE ASSET COUNT CONTRADICTS ITSELF ON `main` TODAY, before any target change.**
+ADR-0011 `:71` yields **5,000 images** (one per `(colour, animal)` pair; ~3.5 h of Flux, and
+`:112` confirms the extension path *"skips the Flux phase entirely"*, so images are per-pair).
+`ADR-0006` agrees — *"5,000–10,000 images"*. But `SPEC.1` says *"~50,000 × 50 KB webp ≈ 2.5
+GB"* and `SPEC.2` says *"50,000 pseudonym profile pictures"* and *"generates 50,000 PNG"*.
+**That is a 10× discrepancy in the asset pipeline, and `SPEC.1` contradicts itself internally**
+— its neighbouring line correctly says *"each animal image × 10 number variants"*. **Any
+namespace amendment must resolve this first, or it will restate the wrong base.**
+
+**Conditional trigger.** ⛔ **BEFORE the identity-pool seed, and before any signup traffic** —
+`SPEC.1` §13 F-AUTH-3 returns **503 `error_identity_pool_exhausted`** when the pool empties,
+and an exhausted pool fails signups permanently rather than degrading.
+
+**Expected next task.** An ADR-0011 amendment — Patch record or superseding ADR, the founder's
+call — carrying the new construction, plus the `O-5` sweep across all ~20 sites in the same
+commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
+image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
+
+---
+
 
 ## O1-KICKOFF-INPUT — Discovery's hero at go-live: every market opens with zero posts — **route to O1's kickoff, DECIDE don't discover**
 
@@ -1160,7 +1201,7 @@ the runbook section.
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-register.md` CC-3 and `docs/plans/DISCOVERY-COMPLETE.md:19` (and its halt item 10) — **both times routing work away from it**, with no row until today.
 
-**Deferred work.** Land `1b7f37f docs(adr): ADR-0006 §4 — back-reference ADR-0026's third R2 bucket`, which is **confirmed absent from `main`**. It was written on the local branch `chore/post-perf-1-docket` and never pushed; DISCOVERY-COMPLETE branched from `origin/main` explicitly and `git merge-base --is-ancestor` confirmed it absent, so it was correctly kept out of #311 rather than dragged in.
+**Deferred work.** Land `1b7f37f docs(adr): ADR-0006 §4 — back-reference ADR-0026's third R2 bucket`, which is **confirmed absent from `main`**. It was written on the branch `chore/post-perf-1-docket`. ⚠ **CORRECTED AT SYNC-3, 2026-08-19: this row said "never pushed" and the branch IS on `origin`, at exactly the `1b7f37f` this row names** — measured with `git ls-remote --heads origin`. The commit is therefore not in one place only, and this row's stated cost no longer describes the situation. What remains true, and was verified two ways: it is **absent from `main`**.
 
 **Why deferred.** It is a one-line ADR back-reference. Opening a PR for it alone costs more than the change is worth, and every task that noticed it correctly declined to absorb an out-of-scope ADR edit.
 
@@ -1169,6 +1210,8 @@ the runbook section.
 **Expected next task.** Any task already editing an ADR. Evidence: `POLISH-register.md` CC-3; `docs/plans/DISCOVERY-COMPLETE.md:19`.
 
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
+✅ **DISCHARGED at SYNC-3, 2026-08-19.** The trigger — *"fold into the next task that legitimately opens `docs/adr/`"* — fired, and this is that task. The `Two buckets → THREE` correction lands as a Patch record on ADR-0006 in this same PR, authored fresh rather than cherry-picked, so the unlanded branch commit is now redundant rather than lost.
 
 ---
 
@@ -2099,3 +2142,31 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ⚠ **A live instance was measured at SYNC-2:** the bare identifier `O-10` named two different rules simultaneously — one minted in `CLAUDE.md` §8, one cited six times across three files. Resolved at SYNC-2 by minting `O-12`; the row stays open because the namespace problem is general and the ADR it calls for is unwritten.
+
+---
+
+## LANE-PLANS-ABSENT — GH-STAR and VIEWS-1 shipped to `src/` with no plan on `main`
+
+**Originating task:** SYNC-3, 2026-08-19. **RULED: neither plan lands.**
+
+Both lanes touched `src/` — GH-STAR at #362 (9 files, +662) and #363 (4 files,
++251), VIEWS-1 at #359 and #360 — and neither has a `docs/plans/` file on
+`main`. `CLAUDE.md` §5.1 requires a plan above 30 lines or 3 files.
+
+**Why nothing was landed retroactively.** #357 set the precedent by committing
+`zz_O1-DECK_plan-full_*.md` **byte-identical** to `docs/plans/O1-DECK.md` — same
+753 lines, same md5 — and that artifact opens *"Status: RATIFIED (amended) …
+Ready for execute."* ⛔ **The GH-STAR artifact is a different class:** no Status
+line, and `## Open decisions — founder to rule, execute does not pick` with
+OD-1…OD-4 **unruled**. Its **OD-2 recommends "a short ADR-0038"** for the star
+count — a recommendation the founder **overruled**, which is why `0038` was free
+for the scale ADR. Landing it would have put a document on `main` proposing
+ADR-0038 for a header control, inside the PR that makes ADR-0038 the scale
+target. GH-STAR-COMPACT and VIEWS-1 have no plan artifact at all.
+
+**Conditional trigger.** The next lane that ships to `src/` without a plan
+reaching `main`. ⚠ **Three lanes in one range is a pattern, not an accident** —
+#357 repaired one in-range and the other two went unnoticed.
+
+**Expected next task.** A `CLAUDE.md` §5.1 rider making the plan's landing part
+of the close-out ritual rather than a separate act of remembering.
