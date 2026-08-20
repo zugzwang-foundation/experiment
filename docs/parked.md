@@ -870,6 +870,26 @@ call — carrying the new construction, plus the `O-5` sweep across all ~20 site
 commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
 image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
 
+⚠ **RULED 2026-08-20: the namespace is a HARDEN task with its own kickoff, not
+a doc sweep.** The founder supplies a 1,000-row colour×animal table; each combo
+takes the full number range. The profile-username scheme is undefined and is
+that task's first deliverable.
+
+⚠ **The first thing that task must measure, because it decides the namespace by
+a factor of 1,000 identities:** staging today zero-pads the number to three
+uniformly — `RedFox000`, not `RedFox0`, measured `distinct_digit_widths = 1`.
+**Padded ⇒ `000–999` = 1,000 variants per asset ⇒ 1,000,000 identities.
+Unpadded ⇒ `0` and `000` collide ⇒ 999.** ✅ **No migration either way** —
+`number` is `smallint NOT NULL` (max 32,767) and `(colour, animal, number)`
+stays unique. This is data and documentation, not schema.
+
+⚠ **And the shipped dev seeder does NOT build the variant shape.** On staging
+`distinct_numbers = 200 = total_rows` — the number runs 0…199 once across the
+whole table, one per pair, not 000–999 per asset. `scripts/seed-identity-pool-dev.ts:7`
+says so: *"20 colours × 10 animals × 1 number per pair = 200"*. **ADR-0011's own
+arithmetic is the variant shape; the dev seeder is not.** Whether the production
+seeder inherits the dev shape is UNMEASURED — its manifest is not in the repo.
+
 ---
 
 
@@ -2170,3 +2190,37 @@ reaching `main`. ⚠ **Three lanes in one range is a pattern, not an accident** 
 
 **Expected next task.** A `CLAUDE.md` §5.1 rider making the plan's landing part
 of the close-out ritual rather than a separate act of remembering.
+
+---
+
+## STAGING-POOL-UNDERSIZED — 185 unassigned rows against a 50/sec load profile
+
+**Originating task:** SYNC-3, 2026-08-20, measured on staging.
+
+**The measurement.** `identity_pool` on staging holds **200 rows — 15 consumed,
+185 unassigned**. The scale tracker's load profile peaks at **50 signups/sec**.
+⛔ **The pool empties in 3.7 seconds**, and the 5% low-watermark alarm fires
+about a fifth of a second before it. Past that, every signup returns
+`503 error_identity_pool_exhausted`.
+
+**Why this is not the namespace task.** The namespace *definition* is HARDEN's,
+ruled 2026-08-20. This row is the *fixture size* — a different thing, and it
+gates two rows of the scale tracker that the namespace task does not touch:
+**LOAD RUN #1 (3.5)** and **LOAD RUN #2 (4.1)**. At 185 rows both runs measure
+pool exhaustion at second four rather than signup capacity, and **the delta
+between them is the number the compute-tier decision rests on**.
+
+⚠ **It also decides what `G1` is verified against.** Fixing a deadlock that jams
+at four concurrent signups, then proving the fix against a pool that empties at
+second four, proves it against the wrong regime.
+
+**Nothing is broken.** `scripts/seed-staging.ts:2` says *"200 deterministic"* by
+design, inheriting the dev seeder. The fixture is correct for what it was built
+for and inadequate for what the load rig needs.
+
+**Conditional trigger.** ⛔ **BEFORE the load rig is built** — scale tracker row
+2.3, Week 2. Row 2.4 already owns the seeding; only the number changes.
+
+**Expected next task.** Scale tracker row 2.4, with the pool sized to exceed the
+profile. Any placeholder tuple scheme serves — staging is clean-recreate by
+ADR-0035, and the real names arrive from the HARDEN namespace task.
