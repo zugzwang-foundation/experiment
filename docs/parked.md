@@ -746,6 +746,23 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** Any task already amending SPEC.2. Evidence: `docs/specs/SPEC.2.md` §0 banner annotation + §22.1 `:2253`.
 
+✅ **DISCHARGED at SYNC-4, 2026-08-20.** Done as the normative §22.1/§22.5 rebuild this row always
+said it required, not as another running correction. Four index rows added — **0035, 0036, 0037,
+0038** — and every count then **re-measured off the amended table by grepping it, never recomputed**:
+**37 index rows · 34 accepted · 2 superseded · 1 in-flight · 36 rows with a real file · 1 `(file
+pending)` (ADR-0012)**, against **36 ADR files** measured by `ls docs/adr/`. **The §22.3
+cross-reference invariant — that the index match the files on disk — holds again**, having been
+broken since ADR-0035 landed. Corrected at every site the row named: §22.1 heading, §22 intro range,
+the inventory sentence, the status split, the numbering range, §22.5's SSOT cell, and §0's three
+mirrors (status banner, companion-files line, *Gates downstream*). SPEC.2 → **1.0.23**.
+
+⚠ **The §0 annotation that carried this row's warning is gone, deliberately** — its *"folded into
+NEITHER"* clause was true until this commit and false after it, and an annotation that outlives its
+condition is the same defect one layer up. What survives is the standing instruction to read
+`ls docs/adr/` rather than trust the line (`O-2`). ⚠ **The asset-count contradiction this row's
+second-order finding named is NOT resolved here** — it belongs to the identity-pool namespace,
+which is a HARDEN task by founder ruling; see `IDENTITY-POOL-NAMESPACE`.
+
 ## N6 — PERF-1 Layer-2: prove `/api/health`'s `region` field reports the truth
 
 **Originating task:** PERF-1 close-out (2026-08-10). Carried here as a **tracked row rather than a memory**, because it is the one proof PERF-1 could not run and the binding merge order is what prevented it — a gap that is easy to mistake for "done" once the performance numbers land.
@@ -861,15 +878,6 @@ GB"* and `SPEC.2` says *"50,000 pseudonym profile pictures"* and *"generates 50,
 — its neighbouring line correctly says *"each animal image × 10 number variants"*. **Any
 namespace amendment must resolve this first, or it will restate the wrong base.**
 
-**Conditional trigger.** ⛔ **BEFORE the identity-pool seed, and before any signup traffic** —
-`SPEC.1` §13 F-AUTH-3 returns **503 `error_identity_pool_exhausted`** when the pool empties,
-and an exhausted pool fails signups permanently rather than degrading.
-
-**Expected next task.** An ADR-0011 amendment — Patch record or superseding ADR, the founder's
-call — carrying the new construction, plus the `O-5` sweep across all ~20 sites in the same
-commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
-image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
-
 ⚠ **RULED 2026-08-20: the namespace is a HARDEN task with its own kickoff, not
 a doc sweep.** The founder supplies a 1,000-row colour×animal table; each combo
 takes the full number range. The profile-username scheme is undefined and is
@@ -889,6 +897,15 @@ whole table, one per pair, not 000–999 per asset. `scripts/seed-identity-pool-
 says so: *"20 colours × 10 animals × 1 number per pair = 200"*. **ADR-0011's own
 arithmetic is the variant shape; the dev seeder is not.** Whether the production
 seeder inherits the dev shape is UNMEASURED — its manifest is not in the repo.
+
+**Conditional trigger.** ⛔ **BEFORE the identity-pool seed, and before any signup traffic** —
+`SPEC.1` §13 F-AUTH-3 returns **503 `error_identity_pool_exhausted`** when the pool empties,
+and an exhausted pool fails signups permanently rather than degrading.
+
+**Expected next task.** An ADR-0011 amendment — Patch record or superseding ADR, the founder's
+call — carrying the new construction, plus the `O-5` sweep across all ~20 sites in the same
+commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
+image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
 
 ---
 
