@@ -4,10 +4,8 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import {
-	bets,
 	bookmarks,
 	comments,
-	events,
 	markets,
 	payoutEvents,
 	pools,
@@ -17,7 +15,6 @@ import type { PostSubstrate, ReplySubstrate } from "@/lib/ranking";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import { loadRemovedSet } from "@/server/debate-view/load-debate-view";
 import { resolveAuthors } from "@/server/debate-view/resolve-authors";
-import { eventPayloadSchemas } from "@/server/events/schemas";
 import { loadLotBasis, lotBasisOf } from "@/server/lots/basis";
 import {
 	buildPostItem,

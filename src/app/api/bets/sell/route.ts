@@ -20,6 +20,10 @@ import { IDEMPOTENCY_ERROR_CODES } from "@/server/idempotency/types";
 const sellBodySchema = z.object({
 	marketId: z.string().uuid(),
 	shares: numericString,
+	// LOTS-1 / ADR-0039 R3 — the argument being exited. OPTIONAL: omitting it is
+	// the position-level sell this route has always performed, so every existing
+	// client keeps working and keeps meaning the same thing.
+	lotId: z.string().uuid().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -29,7 +33,7 @@ export async function POST(request: Request): Promise<Response> {
 		if (!parsed.success) {
 			throw new InvalidRequestBodyError();
 		}
-		const { marketId, shares } = parsed.data;
+		const { marketId, shares, lotId } = parsed.data;
 		if (!new CpmmDecimal(shares).greaterThan(0)) {
 			throw new InvalidRequestBodyError("shares must be > 0");
 		}
@@ -61,6 +65,7 @@ export async function POST(request: Request): Promise<Response> {
 						userId: ctx.userId,
 						marketId,
 						shares,
+						lotId: lotId ?? null,
 						sellEventId,
 						syntheticBetId,
 						idempotencyKey: ctx.idempotencyKey,

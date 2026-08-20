@@ -248,6 +248,21 @@ Two sell shapes reach it:
    falls out exactly: the fraction is zero, so every lot takes the full-sale branch and
    every lot goes to `Sold`.
 
+⛔ **Attribution never vetoes the authority.** If a holding has **no** surviving
+lots, the position-level sell **proceeds and reduces nothing**. This follows
+directly from R2 — `positions` is the aggregate authority and lots are
+"attribution beneath" — and getting it backwards is dangerous rather than merely
+wrong: were the sell to refuse, any drift between `lots` and `positions` (a bug,
+a half-applied migration, a hand-seeded row) would **lock a participant out of
+exiting a position they hold**, trapping their Dharma behind a bookkeeping
+disagreement. Incomplete attribution is recoverable; a trapped position is not.
+The drift is not swallowed — `I-LOT-SUM-001` asserts the equality against live
+data, which is where a real divergence belongs.
+
+The **per-lot** path still refuses an unknown or foreign lot id, and must: there
+the lot *is* the subject of the request, so a bad id is a wrong request rather
+than missing bookkeeping.
+
 ⚠ **The pro-rata rule for the position-level path is the one mechanic R1–R10 does not
 state, and it is chosen to change nothing.** The alternatives were FIFO and
 LIFO consumption. Pro-rata is selected because it reproduces the shipped Đa arithmetic

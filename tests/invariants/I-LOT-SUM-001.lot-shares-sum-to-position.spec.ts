@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { lots, markets, pools, positions, users } from "@/db/schema";
 import { place } from "@/server/bets/place";
+import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
 
 import { testClient, testDb } from "../db/_fixtures/db";
@@ -169,6 +170,36 @@ async function positionQuantity(
 	return units(rows[0]?.quantity ?? "0.000000000000000000");
 }
 
+/** A sell through the real engine — position-level, or per-lot when `lotId` is given. */
+async function sellShares(args: {
+	userId: string;
+	marketId: string;
+	shares: string;
+	lotId?: string;
+}) {
+	return runBetTransaction(
+		{ marketId: args.marketId, flow: "F-BET-3" },
+		(ctx) =>
+			sell(ctx, {
+				userId: args.userId,
+				marketId: args.marketId,
+				shares: args.shares,
+				lotId: args.lotId ?? null,
+				sellEventId: uuidv7(),
+				syntheticBetId: uuidv7(),
+				idempotencyKey: uuidv7(),
+				bodyFingerprint: uuidv7(),
+				metadata: { ...userMetadata(args.userId), flow_id: "F-BET-3" },
+			}),
+	);
+}
+
+/** An exact 18-dp decimal string from scaled integer units. */
+function fromUnits(u: bigint): string {
+	const SCALE = BigInt(`1${"0".repeat(18)}`);
+	return `${u / SCALE}.${(u % SCALE).toString().padStart(18, "0")}`;
+}
+
 describe("I-LOT-SUM-001 — Σ surviving lot shares == positions.quantity (ADR-0039 R2)", () => {
 	afterEach(async () => {
 		await truncateTables(testClient, TABLES);
@@ -253,6 +284,68 @@ describe("I-LOT-SUM-001 — Σ surviving lot shares == positions.quantity (ADR-0
 		expect(await lotShareSum(b, marketId, "YES")).toBe(
 			await positionQuantity(b, marketId, "YES"),
 		);
+	});
+
+	it("holds after a POSITION-LEVEL partial sell through the real engine", async () => {
+		// The case the invariant exists for. Until LOTS-1 Slice 5 the engine moved
+		// `positions` and left `lots` untouched, so this equality broke on the
+		// FIRST sell any participant ever made.
+		const userId = await seedUser("lotsum8", "5000");
+		const marketId = await seedOpenMarketWithPool("lot-sum-8");
+		await placeBet({ userId, marketId, side: "YES", stake: "100" });
+		await placeBet({ userId, marketId, side: "YES", stake: "300" });
+
+		const before = await positionQuantity(userId, marketId, "YES");
+		await sellShares({
+			userId,
+			marketId,
+			shares: fromUnits(before / BigInt(3)),
+		});
+
+		const after = await positionQuantity(userId, marketId, "YES");
+		expect(after).toBeLessThan(before);
+		expect(await lotShareSum(userId, marketId, "YES")).toBe(after);
+	});
+
+	it("holds after a PER-LOT sell that empties ONE argument and leaves the rest", async () => {
+		const userId = await seedUser("lotsum9", "5000");
+		const marketId = await seedOpenMarketWithPool("lot-sum-9");
+		const first = await placeBet({
+			userId,
+			marketId,
+			side: "YES",
+			stake: "100",
+		});
+		await placeBet({ userId, marketId, side: "YES", stake: "300" });
+
+		const [target] = await testDb
+			.select()
+			.from(lots)
+			.where(eq(lots.betId, first.betId));
+		await sellShares({
+			userId,
+			marketId,
+			shares: target?.survivingShares ?? "0",
+			lotId: target?.id,
+		});
+
+		// One lot Sold, one untouched, and the aggregate still exact.
+		expect(await lotShareSum(userId, marketId, "YES")).toBe(
+			await positionQuantity(userId, marketId, "YES"),
+		);
+	});
+
+	it("holds after a FULL exit — every lot Sold, both sides of the equality zero", async () => {
+		const userId = await seedUser("lotsum10", "5000");
+		const marketId = await seedOpenMarketWithPool("lot-sum-10");
+		await placeBet({ userId, marketId, side: "YES", stake: "40" });
+		await placeBet({ userId, marketId, side: "YES", stake: "50" });
+
+		const qty = await positionQuantity(userId, marketId, "YES");
+		await sellShares({ userId, marketId, shares: fromUnits(qty) });
+
+		expect(await positionQuantity(userId, marketId, "YES")).toBe(BigInt(0));
+		expect(await lotShareSum(userId, marketId, "YES")).toBe(BigInt(0));
 	});
 
 	it("STORAGE BACKSTOP: a lot cannot be pushed above its original shares (23514)", async () => {

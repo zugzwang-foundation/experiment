@@ -276,6 +276,26 @@ export class ParentCommentNotFoundError extends BetProductError {
 	}
 }
 
+/**
+ * LOTS-1 / ADR-0039 R3 → 404. The named lot does not exist, or does not belong
+ * to this user in this market.
+ *
+ * ⚠ Deliberately NOT the error for a lot that exists and is Sold. That case is
+ * `InsufficientSharesError` (held 0 < requested n), because the two mean
+ * different things to whoever is reading: "that is not your argument" versus
+ * "you have already exited that argument". Collapsing them would also leak
+ * whether a stranger's lot id is real, by answering differently for a lot that
+ * exists-but-is-empty than for one that does not exist.
+ */
+export class LotNotFoundError extends BetProductError {
+	static readonly httpStatus = 404;
+	static readonly code = "lot_not_found";
+	constructor() {
+		super("lot not found");
+		this.name = "LotNotFoundError";
+	}
+}
+
 /** Malformed request body (bad shape / non-positive stake|shares) → 400. */
 export class InvalidRequestBodyError extends BetProductError {
 	static readonly httpStatus = 400;

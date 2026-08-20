@@ -32,8 +32,6 @@ import {
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type ProfileReader = DbClient | DbTransaction;
 
-const CANONICAL_ZERO = "0.000000000000000000";
-
 /**
  * The N-1a argument cell — the FINAL SideEpisode's OPENING argument (the
  * comment riding the episode-opening bet). A `content_removed` opener collapses
@@ -134,9 +132,11 @@ function walkMarket(
  * bet, but there is no surviving held position and nothing to value): OQ-3 A —
  * "an exited market carries no positions row; its record lives in the argument
  * list + graph." (Surfaced for Gate C: the closed-row domain is held-to-
- * settlement, not every payout.) Per holding: `staked` = the current episode's
- * Đa (episodes.ts), and the `argument` cell is that episode's opening comment
- * (N-1a). Read-only; no write, no store (§23).
+ * settlement, not every payout.) Per holding: `staked` = Đa, which since
+ * LOTS-1 is **Σ `lots.surviving_basis`** (`lots/basis.ts`, ADR-0039 D-4) and no
+ * longer the episode walk's `stakedBasis`; the `argument` cell is still the
+ * current episode's opening comment (N-1a), which is the one thing the walk is
+ * kept here for. Read-only; no write, no store (§23).
  */
 export async function loadProfilePositions(
 	client: ProfileReader,
