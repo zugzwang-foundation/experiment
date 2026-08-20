@@ -8,5 +8,6 @@ export * from "./dharma";
 export * from "./events";
 export * from "./identity";
 export * from "./image-uploads";
+export * from "./lots";
 export * from "./markets";
 export * from "./system";

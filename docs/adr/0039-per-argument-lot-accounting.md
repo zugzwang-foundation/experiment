@@ -344,7 +344,10 @@ is the signal, and a tag would overstate it.
 **One migration, `0025_lots`** (head verified `0024_bookmarks` by reading
 `drizzle/migrations/meta/_journal.json` on `origin/main` — never from memory, O-2).
 
-Forward: `CREATE TABLE lots (…)` with the eight CHECKs inline, then the five indexes.
+Forward: `CREATE TABLE lots (…)` with the **seven** CHECKs inline, then the three
+FKs and the five indexes (of which `lots_bet_id_uq` is the UNIQUE that carries R1
+— it is an index, not a CHECK; the constraint table above lists eight rows because
+it lists that UNIQUE alongside the seven CHECKs).
 It is **purely additive** — no `ALTER` on any live table, no column drop, no data
 movement — so it satisfies the ADR-0024 expand/contract rule trivially and is safe under
 migrate-before-serve: old code ignores a table it does not know about.
