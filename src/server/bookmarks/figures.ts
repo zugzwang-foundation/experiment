@@ -2,12 +2,6 @@ import "server-only";
 
 import { computeSell } from "@/server/cpmm/calculate";
 import { type CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
-import {
-	type BuyTrade,
-	computeEpisodes,
-	mergeTradeStream,
-	type SellTrade,
-} from "@/server/profile/episodes";
 
 // UI-A6 §4.3 + §4.5 (FI-2 cross-surface figure identity). The Đa/Đb + marker
 // rule for ONE bookmarked comment, keyed to its AUTHOR A on (market M, frozen
@@ -15,59 +9,32 @@ import {
 // figures MUST be byte-identical to A's own Profile positions figures (SPEC.1
 // §23 FI-2 — one holding, one value, across surfaces).
 //
-// The identity is achieved by SAME-SOURCE derivation (§4.5a): the `buys` and
-// `sells` fed here are sourced EXACTLY as `loadProfilePositions` sources them
-// (buys from `bets`; sells from `events` `bet.sold`, `payload.sharesSold` /
-// `payload.side`), and `walkMarket` below MIRRORS `positions.ts::walkMarket`
-// byte-for-byte (web ruled diff-and-test over extraction — plan §4.5 note). Do
-// NOT invent a different sell-source. The `list.test.ts::bookmark-figures-
-// match-author-profile` identity test locks this against `loadProfilePositions`.
-
-/** The `bets`-row shape the walk consumes — mirrors `positions.ts` BetRow. */
-export type BookmarkBetRow = {
-	id: string;
-	side: "YES" | "NO";
-	stake: string;
-	shareQuantity: string;
-	createdAt: Date;
-};
+// The identity is achieved by SAME-SOURCE derivation (§4.5a). Until LOTS-1 that
+// meant re-deriving Đa here from the author's buys and sells through a
+// byte-for-byte MIRROR of `positions.ts::walkMarket` (web ruled diff-and-test
+// over extraction — plan §4.5 note), with a test locking the two together.
+//
+// LOTS-1 / ADR-0039 D-4 removes the mirror rather than maintaining it. Đa is now
+// Σ `lots.surviving_basis` — a stored column, read by `loadLotBasis` for the
+// AUTHOR (never the viewer) — so both surfaces read ONE number from ONE place
+// instead of computing the same number twice and testing that they agree. Two
+// implementations that must match is a thing to keep true; one source is not.
+//
+// The `list.test.ts::bookmark-figures-match-author-profile` identity test still
+// locks the pair, and now passes for a structural reason rather than an
+// arithmetic coincidence.
 
 /** A's current position in M (quantity > 0), or undefined if exited. */
 export type BookmarkHeld = { side: "YES" | "NO"; quantity: string } | undefined;
 
 export type BookmarkFigures = {
-	/** Đa — the current SideEpisode's staked basis; 0 unless held on S. */
+	/** Đa — Σ surviving lot basis (ADR-0039 D-4); 0 unless held on S. */
 	staked: string;
 	/** Đb — settled net Σ payout, else `computeSell` proceeds; 0 unless held on S. */
 	current: string;
 };
 
 const CANONICAL_ZERO = "0.000000000000000000";
-
-/**
- * Build the merged per-(author, market) trade stream and walk its episodes.
- * The load-bearing logic mirrors `src/server/profile/positions.ts::walkMarket`
- * — the SAME BuyTrade mapping + the SAME `mergeTradeStream` (which owns the N-3
- * tie-break: `created_at` asc, cross-source tie = buy-before-sell) +
- * `computeEpisodes` (both shared exports from `episodes.ts`). The explicit
- * return annotation pins the parity against inference drift; the only signature
- * delta is the param row type (`BookmarkBetRow` vs `BetRow`), which the mapping
- * flattens away — so the walk output is identical for the same (A, M) trades.
- */
-function walkMarket(
-	betRows: BookmarkBetRow[],
-	sells: SellTrade[],
-): ReturnType<typeof computeEpisodes> {
-	const buys: BuyTrade[] = betRows.map((b) => ({
-		source: "buy",
-		id: b.id,
-		at: b.createdAt,
-		side: b.side,
-		stake: b.stake,
-		shares: b.shareQuantity,
-	}));
-	return computeEpisodes(mergeTradeStream(buys, sells));
-}
 
 /**
  * The §4.3 five-case rule for Đa/Đb. Đa/Đb are computed IFF A holds a position
@@ -85,26 +52,27 @@ export function computeBookmarkFigures(args: {
 	side: "YES" | "NO";
 	/** heldBy(A, M) — A's live position in M (quantity > 0), or undefined. */
 	held: BookmarkHeld;
-	/** A's buys in M (Q9) — same columns as `positions.ts` userBets. */
-	buys: BookmarkBetRow[];
-	/** A's `bet.sold` sells in M (Q10) — same source as `positions.ts` soldEvents. */
-	sells: SellTrade[];
+	/**
+	 * Đa for (A, M) — Σ `lots.surviving_basis`, read by `loadLotBasis` for the
+	 * AUTHOR A. Canonical zero when A holds nothing. Passed in rather than read
+	 * here so this stays pure and the list read batches ONE query for the whole
+	 * page (LOTS-1 / ADR-0039 D-4).
+	 */
+	lotBasis: string;
 	/** M's live pool reserves (Q6) — the open-holding Đb basis. */
 	reserves: { yes: string; no: string } | undefined;
 	/** Σ payout_events.amount for (A, M) (Q8); undefined ⇒ no settlement (open). */
 	settledNet: InstanceType<typeof CpmmDecimal> | undefined;
 }): BookmarkFigures {
-	const { side, held, buys, sells, reserves, settledNet } = args;
+	const { side, held, lotBasis, reserves, settledNet } = args;
 
 	// Đa/Đb only when A holds a position on the card's frozen side S.
 	if (held === undefined || held.side !== side) {
 		return { staked: CANONICAL_ZERO, current: CANONICAL_ZERO };
 	}
 
-	// Đa — the FINAL SideEpisode's staked basis (the current S episode).
-	const walk = walkMarket(buys, sells);
-	const finalEpisode = walk.episodes.at(-1);
-	const staked = finalEpisode?.stakedBasis ?? CANONICAL_ZERO;
+	// Đa — Σ surviving lot basis for A in M (ADR-0039 D-4).
+	const staked = lotBasis;
 
 	// Đb — net Σ payout for a settled (held-to-settlement) holding; else the
 	// live `computeSell` proceeds against the pool (open holding).

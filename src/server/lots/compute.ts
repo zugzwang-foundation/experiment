@@ -286,7 +286,13 @@ export function allocateProRata(args: {
  * this is a plain integer sum in units, and the empty holding is canonical zero
  * rather than `"0"` or `NaN`.
  */
-export function sumLots(lots: readonly LotState[]): {
+export function sumLots(
+	// Only the two surviving columns are read, so the parameter asks for only
+	// those two. That lets a DB read hand its rows straight in without carrying
+	// the immutable originals along, and keeps ONE summation in the tree rather
+	// than a tested one here and an untested re-implementation at the read.
+	lots: readonly Pick<LotState, "survivingShares" | "survivingBasis">[],
+): {
 	survivingShares: string;
 	survivingBasis: string;
 } {

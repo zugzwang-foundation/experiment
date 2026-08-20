@@ -68,6 +68,7 @@ import { computeMarker } from "@/server/positions/compute";
 import { loadProfilePositions } from "@/server/profile/positions";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { seedLotForBet, seedLotPositionSale } from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const POOL = "100.000000000000000000";
@@ -163,6 +164,16 @@ async function seedBet(args: {
 		commentId: args.commentId,
 		createdAt: args.createdAt,
 	});
+	// LOTS-1 / ADR-0039 D-2 — a hand-seeded bet with no lot is not a smaller
+	// real bet, it is one whose Đa is zero. Mint what `place()` would have.
+	await seedLotForBet(testDb, {
+		betId: id,
+		userId: args.userId,
+		marketId: args.marketId,
+		side: args.side,
+		shares: args.shares,
+		stake: args.stake,
+	});
 	return id;
 }
 
@@ -206,6 +217,15 @@ async function seedSell(args: {
 		payloadVersion: 1,
 		metadata: {},
 		createdAt: args.createdAt,
+	});
+	// LOTS-1 / ADR-0039 D-3 — a simulated sell must reduce the LOTS too, or
+	// Đa keeps the pre-sell basis while positions.quantity drops (the drift
+	// I-LOT-SUM-001 forbids). Routed through the shipped pro-rata allocator,
+	// so the fixture and the engine reduce lots by the same rule.
+	await seedLotPositionSale(testDb, {
+		userId: args.userId,
+		marketId: args.marketId,
+		sharesSold: args.sharesSold,
 	});
 }
 

@@ -19,6 +19,7 @@ import {
 	loadRemovedSet,
 } from "@/server/debate-view/load-debate-view";
 import { eventPayloadSchemas } from "@/server/events/schemas";
+import { loadLotBasis, lotBasisOf } from "@/server/lots/basis";
 import type { MarketStatus } from "@/server/markets/transitions";
 
 import {
@@ -67,7 +68,16 @@ export type ProfilePositionRow = {
 	settled: boolean;
 	side: "YES" | "NO";
 	quantity: string;
-	/** Đa — the current SideEpisode's staked basis (episodes.ts authority). */
+	/**
+	 * Đa — the holding's staked basis: **Σ `lots.surviving_basis` over its
+	 * surviving lots** (LOTS-1 / ADR-0039 D-4, `lots/basis.ts` authority).
+	 *
+	 * Was the final SideEpisode's `stakedBasis` (`episodes.ts`) until LOTS-1.
+	 * The two agree on the position-level sell path by construction and diverge
+	 * once a PER-LOT sell targets lots of unequal price — which is the point of
+	 * the feature, not a drift. `episodes.ts` still runs here, for the episode
+	 * OPENER below; it is simply no longer the basis authority.
+	 */
 	staked: string;
 	/**
 	 * The single §10.8 current value — Đb `computeSell(quantity).proceeds`
@@ -275,10 +285,19 @@ export async function loadProfilePositions(
 		}
 	}
 
+	// Đa — Σ surviving lot basis (LOTS-1 / ADR-0039 D-4). The `episodes.ts` walk
+	// is NO LONGER the basis authority; it keeps only the job below, which lots
+	// cannot do (the episode OPENER).
+	const lotBasis = await loadLotBasis(client, {
+		userIds: [userId],
+		marketIds: marketIdList,
+	});
+
 	// Walk each relevant market's episodes ONCE; the current episode's opener is
-	// the N-1a argument-cell substrate + the masking candidate.
+	// the N-1a argument-cell substrate + the masking candidate. This is the walk's
+	// remaining job here — `openingTradeId` is a fact about WHICH BET opened the
+	// current holding, and no per-lot column carries it.
 	const openerByMarket = new Map<string, string>();
-	const stakedByMarket = new Map<string, string>();
 	for (const marketId of marketIdList) {
 		const walk = walkMarket(
 			betsByMarket.get(marketId) ?? [],
@@ -286,7 +305,6 @@ export async function loadProfilePositions(
 		);
 		const finalEpisode = walk.episodes.at(-1);
 		if (finalEpisode) {
-			stakedByMarket.set(marketId, finalEpisode.stakedBasis);
 			openerByMarket.set(
 				marketId,
 				openerCommentOf(finalEpisode, betsByMarket.get(marketId)),
@@ -314,7 +332,7 @@ export async function loadProfilePositions(
 		if (market === undefined || held === undefined) {
 			continue;
 		}
-		const staked = stakedByMarket.get(marketId) ?? CANONICAL_ZERO;
+		const staked = lotBasisOf(lotBasis, userId, marketId);
 
 		const settled = settledNet.has(marketId);
 		const current = settled

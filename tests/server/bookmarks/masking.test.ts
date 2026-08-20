@@ -46,6 +46,7 @@ import { type BookmarkItem, loadBookmarks } from "@/server/bookmarks/list";
 import { computeSell } from "@/server/cpmm/calculate";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
+import { seedLotForBet } from "../../db/_fixtures/lots";
 import { truncateTables } from "../../db/_fixtures/truncate";
 
 const POOL = "100.000000000000000000";
@@ -113,8 +114,9 @@ async function seedBet(args: {
 	commentId: string;
 	createdAt: Date;
 }): Promise<void> {
+	const id = uuidv7();
 	await testDb.insert(bets).values({
-		id: uuidv7(),
+		id,
 		userId: args.userId,
 		marketId: args.marketId,
 		side: args.side,
@@ -123,6 +125,15 @@ async function seedBet(args: {
 		priceAtBet: "0.500000000000000000",
 		commentId: args.commentId,
 		createdAt: args.createdAt,
+	});
+	// LOTS-1 / ADR-0039 D-2 — see the note in the sibling suites' seedBet.
+	await seedLotForBet(testDb, {
+		betId: id,
+		userId: args.userId,
+		marketId: args.marketId,
+		side: args.side,
+		shares: args.shares,
+		stake: args.stake,
 	});
 }
 
