@@ -92,4 +92,8 @@ cache failing.** No change is authorised here; it is named so a load run watches
 
 ## Spec impact
 
-`SPEC.2` §22 index gains this row in the same commit. No `SPEC.1` change.
+⚠ **`SPEC.2` §22 does NOT yet carry a row for this ADR, and that is deliberate.**
+`N5` in `docs/parked.md` owns the §22 index and states the fix is a normative
+§22.1/§22.5 edit — adding one row without rebuilding the counts around it makes
+the index worse, not better. **ADR-0038 is therefore the FOURTH ADR in that
+backlog**, after 0035, 0036 and 0037. No `SPEC.1` change.

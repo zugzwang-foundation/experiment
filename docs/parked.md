@@ -736,7 +736,7 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Originating task:** SYNC-1 (2026-08-08), STEP 2.7 — surfaced while correcting SPEC.2 §0, **not** in the original work order.
 
-**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0037 — 35 files ⚠ **re-measured at SYNC-3, 2026-08-19; this row said 34 and SPEC.2's own annotation said the ceiling was 0036. Both were one behind, because `ADR-0037` landed at #355.** Read `ls docs/adr/` at the moment of the fix (`O-2`) — this number will be wrong again.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
+**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0037 — 35 files ⚠ re-measured at SYNC-3, 2026-08-19; this row said 34 and SPEC.2's own annotation said the ceiling was 0036. Both were one behind, because `ADR-0037` landed at #355. Read `ls docs/adr/` at the moment of the fix (`O-2`) — this number will be wrong again.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
 
 **Why deferred, and why §0 was only annotated.** SYNC-1's work order authorised **SPEC.2 §0 metadata only** and instructed a STOP if the correction required a normative edit. It does: §22.1 is normative and §22.5 designates the ADR files as the single source of truth, so rewriting §0's range while §22.1 still says 33/0003–0034 would leave SPEC.2 **contradicting itself inside one document** — strictly worse than the present state. §0 therefore carries a truthful annotation naming the real ceiling and pointing here, and no number was changed.
 
@@ -1211,7 +1211,7 @@ the runbook section.
 
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
-✅ **DISCHARGED at SYNC-3, 2026-08-19.** The trigger — *"fold into the next task that legitimately opens `docs/adr/`"* — fired, and this is that task. The `Two buckets → THREE` correction lands as a Patch record on ADR-0006 in the same commit as this line, authored fresh rather than cherry-picked, so the unlanded branch commit is now redundant rather than lost.
+✅ **DISCHARGED at SYNC-3, 2026-08-19.** The trigger — *"fold into the next task that legitimately opens `docs/adr/`"* — fired, and this is that task. The `Two buckets → THREE` correction lands as a Patch record on ADR-0006 in this same PR, authored fresh rather than cherry-picked, so the unlanded branch commit is now redundant rather than lost.
 
 ---
 
@@ -2142,3 +2142,31 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ⚠ **A live instance was measured at SYNC-2:** the bare identifier `O-10` named two different rules simultaneously — one minted in `CLAUDE.md` §8, one cited six times across three files. Resolved at SYNC-2 by minting `O-12`; the row stays open because the namespace problem is general and the ADR it calls for is unwritten.
+
+---
+
+## LANE-PLANS-ABSENT — GH-STAR and VIEWS-1 shipped to `src/` with no plan on `main`
+
+**Originating task:** SYNC-3, 2026-08-19. **RULED: neither plan lands.**
+
+Both lanes touched `src/` — GH-STAR at #362 (9 files, +662) and #363 (4 files,
++251), VIEWS-1 at #359 and #360 — and neither has a `docs/plans/` file on
+`main`. `CLAUDE.md` §5.1 requires a plan above 30 lines or 3 files.
+
+**Why nothing was landed retroactively.** #357 set the precedent by committing
+`zz_O1-DECK_plan-full_*.md` **byte-identical** to `docs/plans/O1-DECK.md` — same
+753 lines, same md5 — and that artifact opens *"Status: RATIFIED (amended) …
+Ready for execute."* ⛔ **The GH-STAR artifact is a different class:** no Status
+line, and `## Open decisions — founder to rule, execute does not pick` with
+OD-1…OD-4 **unruled**. Its **OD-2 recommends "a short ADR-0038"** for the star
+count — a recommendation the founder **overruled**, which is why `0038` was free
+for the scale ADR. Landing it would have put a document on `main` proposing
+ADR-0038 for a header control, inside the PR that makes ADR-0038 the scale
+target. GH-STAR-COMPACT and VIEWS-1 have no plan artifact at all.
+
+**Conditional trigger.** The next lane that ships to `src/` without a plan
+reaching `main`. ⚠ **Three lanes in one range is a pattern, not an accident** —
+#357 repaired one in-range and the other two went unnoticed.
+
+**Expected next task.** A `CLAUDE.md` §5.1 rider making the plan's landing part
+of the close-out ritual rather than a separate act of remembering.
