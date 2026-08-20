@@ -40,6 +40,19 @@ export function SellModule(props: {
 	marketId: string;
 	slug: string;
 	position: NonNullable<ViewerMarketContext["position"]>;
+	/**
+	 * LOTS-1 / ADR-0039 R3 — the ARGUMENT being exited, when this module was
+	 * opened from one. Forwarded verbatim to the sell route, which reduces that
+	 * lot alone. Omitted (the default) is the position-level sell this module has
+	 * always performed, so every existing mount is untouched.
+	 *
+	 * ⚠ `position.quantity` and `position.currentValue` are the LOT's when a lot
+	 * is named, not the holding's — the caller narrows them, because the amount
+	 * field's ceiling and its "sell all" seed must both describe what is actually
+	 * being sold. Passing a lot id with holding-wide figures would offer to sell
+	 * more of an argument than exists.
+	 */
+	lotId?: string;
 	onClose: () => void;
 	/** P2 terminal reached (banned): the host disables entry controls. */
 	onSuspended: () => void;
@@ -159,7 +172,11 @@ export function SellModule(props: {
 		const next = dispatchKey({ type: "SUBMIT" });
 		setStatus({ phase: "in_flight" });
 		const { url, init } = buildSellRequest({
-			body: { marketId: props.marketId, shares },
+			body: {
+				marketId: props.marketId,
+				shares,
+				...(props.lotId === undefined ? {} : { lotId: props.lotId }),
+			},
 			idempotencyKey: next.key,
 		});
 		let outcome: Awaited<ReturnType<typeof parseWireResponse>>;

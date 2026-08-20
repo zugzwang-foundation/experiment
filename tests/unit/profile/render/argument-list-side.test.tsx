@@ -312,15 +312,38 @@ describe("ArgumentList — item 4, the author's stake on the post replica", () =
 		expect(container.innerHTML).not.toContain("50.000000000000000000");
 	});
 
-	it("reply-carries-no-author-stake", () => {
-		// POST VARIANT ONLY. A reply's `stake` is the §3.6 ranking ruler, not the
-		// author's basis (§0.5's name collision) — conflating them would put a
-		// different figure on the card. The reply branch renders no stake node.
+	it("reply-carries-its-own-stake", () => {
+		// ⚠ THIS TEST WAS INVERTED AT LOTS-1 (RECON-1 R-01), and the inversion is
+		// the point rather than a fixture repair.
+		//
+		// It used to assert that a reply renders NO stake node, on the reasoning
+		// that "a reply's `stake` is the §3.6 ranking ruler, not the author's
+		// basis". Measured consequence: a participant whose basis is entirely
+		// reply-bets saw no component of it anywhere on their own profile — 12 of
+		// 39 held positions on staging were majority-reply and two were 100%. The
+		// figure was already on the DTO and already shipped in the RSC payload;
+		// only the render was withheld.
+		//
+		// That a number also feeds ranking is not a reason to hide it from the
+		// person who staked it. The debate view has rendered reply stakes all
+		// along (`ReplyCard` → `ArgProfile`); this was the surface that did not.
+		const { container } = render(
+			<ArgumentList items={[replyItem("NO")]} owner={false} author={AUTHOR} />,
+		);
+		const stake = container.querySelector('[data-testid^="argument-stake-"]');
+		expect(stake).not.toBeNull();
+		expect(stake?.textContent).toContain("Đ");
+	});
+
+	it("reply-still-carries-no-replies-count", () => {
+		// The POST-only gate was correct for `Replies · N` and is retained:
+		// replies attract nothing by design (§9), so a reply has no count to show.
+		// Only the STAKE was wrongly bundled behind that gate.
 		const { container } = render(
 			<ArgumentList items={[replyItem("NO")]} owner={false} author={AUTHOR} />,
 		);
 		expect(
-			container.querySelector('[data-testid^="argument-stake-"]'),
+			container.querySelector('[data-testid^="argument-replies-"]'),
 		).toBeNull();
 	});
 
