@@ -607,12 +607,24 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 	});
 
 	// ── 4c. The one statement this task spent — the market media read ──────────
-	it("mediaImageUrl is the DEFAULT market_media row, presigned for read", async () => {
+	it("mediaImageUrl is the lowest-display_order NON-default market_media row, presigned for read (MEDIA-SECOND-ROW Slice 1)", async () => {
 		// ⚠ The task's ENTIRE read budget is this one statement, and nothing under
 		// tests/server covered it — `@code-reviewer` MEDIUM-4. It goes through
 		// `signReadMarketMedia` → `mintReadUrl("market-media", …)`, a DIFFERENT
 		// bucket arm from the `signRead("uploads")` seam this file mocks, so the
 		// render tests prove the component and nothing proved the read.
+		//
+		// ⚠ MEDIA-SECOND-ROW Slice 1 (2026-08-21): this call moved from
+		// `getDefaultMarketMediaUrl` to `getSecondaryMarketMediaUrl` — the panel
+		// now reads the lowest-`display_order` NON-default row, falling back to
+		// the `is_default` row only when it is the market's sole row (see the
+		// dedicated `market-media-selection.integration.test.ts` suite for the
+		// selection rule itself; this test's job is only to prove
+		// `loadDebateView` actually calls the new function, not the old one, and
+		// that it's still one statement). The fixture below is unchanged from
+		// before this slice — same two rows, same discriminator — only the
+		// EXPECTED row flipped, because the row this read is supposed to resolve
+		// flipped.
 		const market = await seedMarket("market-media-read");
 
 		await testDb.insert(marketMedia).values([
@@ -632,15 +644,16 @@ describe("DEBATE.4 §6 — loadDebateView removal-masking gate (body/author neve
 
 		const vm = await loadDebateView(testDb, { market });
 
-		// The DEFAULT row, not merely "a" row — the non-default sibling is the
-		// discriminator, so a read that dropped the `is_default` predicate fails.
-		expect(vm.market.mediaImageUrl).toContain(`m/${market.id}/default.png`);
-		expect(vm.market.mediaImageUrl).not.toContain("not-default");
+		// The NON-default row, not merely "a" row — the default sibling is the
+		// discriminator, so a read that reverted to `getDefaultMarketMediaUrl`
+		// (or dropped the `is_default ASC` ordering) fails.
+		expect(vm.market.mediaImageUrl).toContain(`m/${market.id}/not-default.png`);
+		expect(vm.market.mediaImageUrl).not.toContain("/default.png");
 		// …signed against the `market-media` bucket arm, never the participant
 		// `uploads` one.
 		expect(mockMintReadUrl).toHaveBeenCalledWith(
 			"market-media",
-			`m/${market.id}/default.png`,
+			`m/${market.id}/not-default.png`,
 			expect.anything(),
 		);
 	});
