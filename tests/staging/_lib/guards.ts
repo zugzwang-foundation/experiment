@@ -238,6 +238,20 @@ export const TRUNCATE_SET: readonly string[] = [
 	"bet_receipts",
 	// Bucket C — mutable read models and market state.
 	"positions",
+	// LOTS-1 / ADR-0039. Added because the accounting test that guards this set
+	// fired: a table in none of the three lists is FORGOTTEN, not deliberate.
+	//
+	// It could not go anywhere else. `NOT_TRUNCATED_UNRATIFIED` is documented —
+	// and tested — as holding only tables with NO outbound FK, which survive
+	// structurally rather than by omission; `lots` has three, and `bets` is in
+	// this set, so `TRUNCATE … CASCADE` empties `lots` whether it is named here
+	// or not. Naming it makes the reset explicit instead of incidental.
+	//
+	// ⚠ This is NOT the widening the note above warns about. That warning is
+	// about moving an EXISTING table out of the unratified list — changing a
+	// ratified decision. `lots` postdates STAGING-PARITY Q3 entirely, so the
+	// ratified set cannot have ruled on it, and CASCADE reaches it regardless.
+	"lots",
 	"markets",
 	"pools",
 	"market_media",

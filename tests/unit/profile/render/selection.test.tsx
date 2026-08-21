@@ -36,6 +36,7 @@ const M = (n: number) => `0190c0de-0000-7000-8000-00000000000${n}`;
 
 function openRow(n: number): ProfilePositionRow {
 	return {
+		lots: [],
 		marketId: M(n),
 		marketSlug: `fixture-${n}`,
 		marketTitle: `Market fixture-${n}`,

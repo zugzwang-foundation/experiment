@@ -21,8 +21,8 @@ import type {
 	ProfileArgumentCell,
 	ProfilePositionRow,
 } from "@/server/profile/positions";
-
 import { PROFILE_COPY } from "./copy";
+import { LotBreakdown } from "./LotBreakdown";
 import { useDocumentRowStepper } from "./row-stepper";
 import { useEqualRowThirds } from "./row-thirds";
 import {
@@ -1136,6 +1136,29 @@ export function PositionsTable({
 									    Present-only-while-open is the closest reachable port of that.
 									    ⛔ `:has()` is still banned (canon §3 item 10) — the toggle stays JS state.
 									    ⛔ Still no host on a non-sellable row. */}
+									{/* LOTS-1 / ADR-0039 — the per-argument decomposition of THIS
+									    holding, under the row it decomposes.
+									    ⚠ SELECTED ROW ONLY. Every row carries its lots in the
+									    payload, but rendering all of them at once would bury the
+									    table under its own detail; the selected row is already the
+									    one whose argument the panel beside it is showing, so this
+									    keeps the reader's attention in one place.
+									    ⛔ The gate is `isSelected`, NOT `sellable` — a VISITOR sees
+									    the decomposition too. §23's owner-vs-visitor payload law
+									    makes the record public; only the affordance is owner-only,
+									    which is why `sellable` is passed down rather than tested
+									    here. */}
+									{isSelected && row.lots.length > 0 && (
+										<tr data-testid={`lots-row-${row.marketId}`}>
+											<td colSpan={5} className="px-2 py-0">
+												<LotBreakdown
+													marketId={row.marketId}
+													lots={row.lots}
+													sellable={sellable}
+												/>
+											</td>
+										</tr>
+									)}
 									{sellable && sellOpen && (
 										<tr data-testid={`sell-row-${row.marketId}`}>
 											<td colSpan={5} className="px-2 py-0">

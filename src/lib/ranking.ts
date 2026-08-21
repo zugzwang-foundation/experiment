@@ -340,6 +340,37 @@ export function badgeFor(
 
 // ── Reply ranking (depth = 1) — stake desc within side (RANKING.md §7) ───────
 
+/**
+ * ⚠ **DEFERRED, KNOWN, AND RECORDED HERE BECAUSE A DEFERRAL THAT LIVES ONLY IN A
+ * REPORT IS NOT RECORDED — ADR-0039 R4/R5 (PHASE-0).**
+ *
+ * R4 and R5 are one ruling with two halves, and only one half is built. Under
+ * ADR-0039 D-5 the reply-lane summand becomes the replier's **surviving lot
+ * basis** rather than the frozen `bets.stake`, at both the aggregate
+ * (`support_dharma` / `counter_dharma`) and here at the ordering ruler. The
+ * aggregate half has landed; `compareReply` below still sorts on `stake`.
+ *
+ * The visible consequence: **a replier who sells their lot down loses the weight
+ * they lent the parent, but keeps their slot in the reply lane.** A fully-sold
+ * reply — one contributing zero to the attracted total it is ranked above others
+ * for — can still hold the top Support or Counter position, and the two-slot
+ * default (`twoSlot`) will surface it as the best argument on that side. The
+ * ordering says *conviction once expressed* while the number beside it says
+ * *conviction currently held*, and a reader has no way to tell which they are
+ * looking at.
+ *
+ * NOT fixed here, deliberately: `ReplySubstrate.stake` is the substrate contract
+ * fed by three byte-equivalent read sites (`debate-view/ranking-substrate.ts`,
+ * `profile/arguments.ts`, `bookmarks/list.ts`), and moving the ruler means
+ * changing what all three select and re-baselining `RANKING.md` §7. That is the
+ * ranking lane's work, with its own before/after ordering baseline; doing it
+ * inside a fix pass would be a silent re-ranking of every debate.
+ *
+ * Whoever picks it up: substitute `SUM(l.surviving_basis)` joined
+ * `lots ON lots.bet_id = rb.id` at all three sites, carry the same value into
+ * `ReplySubstrate`, and expect the lane order to CHANGE for any market where a
+ * reply has been partially sold — that change is the fix, not a regression.
+ */
 function compareReply(a: ReplySubstrate, b: ReplySubstrate): number {
 	const byStake = new RankingDecimal(b.stake).cmp(a.stake); // stake descending
 	if (byStake !== 0) return byStake;

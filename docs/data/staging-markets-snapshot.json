@@ -1,0 +1,323 @@
+{
+	"capturedAt": "2026-08-21T17:03:01.320Z",
+	"source": {
+		"host": "aws-1-ap-south-1.pooler.supabase.com",
+		"database": "postgres",
+		"user": "postgres"
+	},
+	"counts": {
+		"markets": 8,
+		"pools": 8,
+		"market_media": 16
+	},
+	"markets": [
+		{
+			"id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
+			"slug": "mumbai-bmc-pink-october-disclosure",
+			"title": "Mumbai · Will BMC report 10,000 Pink October breast cancer tests?",
+			"description": "Will BMC publicly disclose on X by 5 November 2026 that at least 10,000 women were screened for breast cancer in BMC public health facilities in Mumbai during Pink October 2026 (1–31 October)?\n\nResolves YES if @mybmc posts, within the window, a figure of 10,000 or more women screened for breast cancer at BMC facilities in Greater Mumbai during 1–31 October 2026. BMC must state the figure itself, in text or a legible image.\n\nResolves NO in every other case — silence, a lower figure, a target or projection, a non-numeric claim, a relayed figure, a repost without comment, any other account, or any surface other than X. This resolves on the disclosure, not the screening: if BMC screens the women and posts no figure, it resolves NO.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:10.942Z"
+		},
+		{
+			"id": "01a01181-c07c-765a-9664-c065540c173d",
+			"slug": "oktoberfest-munich-beer-volume",
+			"title": "Oktoberfest · Will the 7.5M litre beer record be broken?",
+			"description": "Will oktoberfest.de's preliminary final report for Oktoberfest 2026 state a total beer figure above 7.5 million litres for the official 16-day festival, 19 September to 4 October 2026?\n\nResolves YES if that report states a figure above 7.5 million litres. It prints to 0.1 million granularity, so the lowest qualifying figure is 7.6 million. The record itself, 7.5 million, does not qualify.\n\nResolves NO in every other case — 7.5 million or lower, a non-numeric statement, a figure scoped to one tent, one brewery or the Oide Wiesn alone, any other publisher including the mid-term Halbzeitbilanz and all media, or no qualifying report. This resolves on the printed figure, not on how much beer is drunk.\n\nTrading closes 4 October 2026, 23:59 Munich time. Settlement 5 November.",
+			"status": "Open",
+			"resolution_deadline": "2026-10-04T21:59:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:12.152Z"
+		},
+		{
+			"id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
+			"slug": "chess-fide-tiebreak-response",
+			"title": "Chess · Will FIDE answer Zugzwang's tiebreak proposal?",
+			"description": "Will FIDE respond publicly on X by 5 November 2026 to Zugzwang's published proposal to abolish rapid and blitz tiebreaks from the World Chess Championship match?\n\nResolves YES if @FIDE_chess publishes a post, within the window, containing the word Zugzwang, or linking to, quote-posting or reproducing any post in the Zugzwang thread. There is no test of substance — a refusal or a dismissal resolves YES exactly as agreement would.\n\nResolves NO in every other case — silence, a repost without comment, any other account including FIDE officials and every national federation, or any surface other than X. Publication of the 2026 Match Regulations does not resolve this market, whatever it says. If the thread's root post is removed by anyone, this resolves NO.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:13.427Z"
+		},
+		{
+			"id": "01a01181-ca40-725f-895c-270b2190c3ee",
+			"slug": "bitcoin-price-50k",
+			"title": "Bitcoin · Will BTC ever go below $50,000 by 5 Nov 2026?",
+			"description": "Will Bitcoin trade below USD 50,000 at any point between 15 September and 5 November 2026, as measured by the published daily low of Bitcoin (BTC) on CoinMarketCap?\n\nResolves YES if the daily low published by CoinMarketCap is below USD 50,000 on any of the 52 UTC calendar dates in that window. Below means strictly less than USD 50,000.00 — a published low of exactly USD 50,000.00 does not qualify.\n\nResolves NO in every other case — a price below USD 50,000 that appears only on a single exchange, only in a futures, perpetual, options or oracle price, only on another index, or only outside the window. The first qualifying daily low resolves YES irreversibly; a later recovery does not un-trigger it.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:14.902Z"
+		},
+		{
+			"id": "01a01181-d035-714a-b735-5d282576d0a3",
+			"slug": "math-erdos-contribution-response",
+			"title": "Math · Will 3 Erdos problems be solved by 5th November 2026?",
+			"description": "Will Thomas Bloom, owner and maintainer of erdosproblems.com, publicly confirm on X that at least three distinct Erdős problems, open on 15 September 2026, have been solved, proved or disproved by 5 November 2026?\n\nResolves YES if posts by @thomasfbloom on X identify at least three distinct Erdős problems by number and state of each that it is solved, proved or disproved. Each counts once, and each must have been listed as open on erdosproblems.com at market open.\n\nResolves NO in every other case — fewer than three, partial progress, an improved bound, reporting someone else's claim, or silence. A status change on the site itself, a comment on its forum, or any other account or surface resolves nothing; only Bloom posting on X does.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:16.212Z"
+		},
+		{
+			"id": "01a01181-d508-7288-b996-36ec427a9d2f",
+			"slug": "claude-bundle-response",
+			"title": "Claude · Will an official Claude account reply to Zugzwang by 5 Nov 2026?",
+			"description": "Will @AnthropicAI, @claudeai or @ClaudeDevs publicly reply to, quote-post, or name the Zugzwang thread presenting the Bundle feature specification, between 15 September and 5 November 2026?\n\nResolves YES if a post by one of those three accounts is a reply to any post in the thread, a quote-post of one, or a standalone post naming Zugzwang. What the post says is never read: approval, rejection, dismissal and a legal objection all resolve YES identically.\n\nResolves NO in every other case — silence, likes, bookmarks, reposts without comment, any private channel, any other Anthropic account or surface, and any post by an Anthropic employee or officer in any capacity. If Anthropic ships automatic chat grouping without posting, that alone resolves NO.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:17.432Z"
+		},
+		{
+			"id": "01a01181-da63-738b-a3ea-8da89299bc53",
+			"slug": "yc-paper-club-response",
+			"title": "YCombinator · Will YC reply to Zugzwang's paper by 5 Nov 2026?",
+			"description": "Will @ycombinator reply to or quote-post any post in the Zugzwang thread submitting its research paper to YC Paper Club, on X, between 15 September and 5 November 2026?\n\nResolves YES if a post by @ycombinator is a reply to any post in the Zugzwang Paper Club thread, or a quote-post of one. What the post says is never read: approval, rejection and dismissal all resolve YES identically.\n\nResolves NO in every other case, and this market is deliberately narrow. A standalone post naming Zugzwang resolves NO. A Paper Club recap or announcement naming Zugzwang resolves NO. The paper being selected, scheduled or presented resolves NO absent a qualifying post — the outcome the submission wants is not the criterion. So do likes, any other account, and silence.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:18.757Z"
+		},
+		{
+			"id": "01a01181-df3a-747f-b154-e79a4a416b51",
+			"slug": "github-zugzwang-repo-stars",
+			"title": "GitHub · Will the Zugzwang repo reach 100,000 stars?",
+			"description": "Will the Zugzwang repository reach 100,000 GitHub stars by 5 November 2026?\n\nDeclared: the Zugzwang Foundation owns this repository, is publicly campaigning for the YES outcome, and is also the sole resolver.\n\nResolves YES if the star count for zugzwang-foundation/experiment is observed at 100,000 or more at any point in the window, as published by GitHub on the repository page or its REST API, and preserved by an independent archive capture timestamped inside the window. A count that crosses and later falls back still resolves YES.\n\nResolves NO in every other case — no qualifying observation, stars on a fork or mirror, any other GitHub metric, third-party star trackers, or a reading with no independent capture. Anyone may produce an observation.\n\nDeadline 5 November 2026, 23:45 UTC.",
+			"status": "Open",
+			"resolution_deadline": "2026-11-05T23:45:00.000Z",
+			"resolved_at": null,
+			"resolution_outcome": null,
+			"media_video_url": null,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:20.397Z"
+		}
+	],
+	"pools": [
+		{
+			"id": "01a01181-e624-7891-a15b-6b17cfb3b9be",
+			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
+			"yes_reserves": "10000.000000000000000000",
+			"no_reserves": "10000.000000000000000000",
+			"created_at": "2026-08-17T20:55:20.712Z"
+		},
+		{
+			"id": "01a01181-e755-74f0-bafa-983e44792a10",
+			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
+			"yes_reserves": "10000.000000000000000000",
+			"no_reserves": "10000.000000000000000000",
+			"created_at": "2026-08-17T20:55:21.012Z"
+		},
+		{
+			"id": "01a01181-e8a4-7dfa-b90f-0e92e9235e61",
+			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
+			"yes_reserves": "10000.000000000000000000",
+			"no_reserves": "10000.000000000000000000",
+			"created_at": "2026-08-17T20:55:21.302Z"
+		},
+		{
+			"id": "01a01181-ea2a-79be-a601-ebf85610a1ef",
+			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
+			"yes_reserves": "10000.000000000000000000",
+			"no_reserves": "10000.000000000000000000",
+			"created_at": "2026-08-17T20:55:21.698Z"
+		},
+		{
+			"id": "01a01181-eb6a-74a6-8e72-b3355e8362ad",
+			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
+			"yes_reserves": "9980.039920159680638724",
+			"no_reserves": "10020.000000000000000000",
+			"created_at": "2026-08-17T20:55:22.052Z"
+		},
+		{
+			"id": "01a01181-ecaa-7116-abe8-37a4d3d0e554",
+			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
+			"yes_reserves": "9990.009990009990009991",
+			"no_reserves": "10010.000000000000000000",
+			"created_at": "2026-08-17T20:55:22.372Z"
+		},
+		{
+			"id": "01a01181-ee0d-771d-bbc1-3d08b7bf753e",
+			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
+			"yes_reserves": "9852.216748768472906405",
+			"no_reserves": "10150.000000000000000000",
+			"created_at": "2026-08-17T20:55:22.702Z"
+		},
+		{
+			"id": "01a01181-ef57-7912-9040-8d9752270049",
+			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
+			"yes_reserves": "9756.239052787191828629",
+			"no_reserves": "10249.851347321353106872",
+			"created_at": "2026-08-17T20:55:23.052Z"
+		}
+	],
+	"market_media": [
+		{
+			"id": "01a01181-c018-7b35-b469-cc609d33045b",
+			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
+			"r2_object_key": "m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a01181-bb3c-7443-bc4d-3ac9c9c837d7.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:10.942Z"
+		},
+		{
+			"id": "01a02370-ff6d-7be5-9060-c64be711012b",
+			"market_id": "01a01181-bb3c-7443-bc4d-35938c65bde9",
+			"r2_object_key": "m/01a01181-bb3c-7443-bc4d-35938c65bde9/01a02370-fead-73de-87ae-ac7c023511f8.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.117Z"
+		},
+		{
+			"id": "01a01181-c4f5-7db7-a789-2a737b3c80d8",
+			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
+			"r2_object_key": "m/01a01181-c07c-765a-9664-c065540c173d/01a01181-c07c-765a-9664-c51443d18741.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:12.152Z"
+		},
+		{
+			"id": "01a02370-ff61-70c3-a2b7-1406b9896158",
+			"market_id": "01a01181-c07c-765a-9664-c065540c173d",
+			"r2_object_key": "m/01a01181-c07c-765a-9664-c065540c173d/01a02370-fead-73de-87ae-aa1b2628b887.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.104Z"
+		},
+		{
+			"id": "01a01181-c9f0-7e99-90f2-a3ad88d9d9c1",
+			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
+			"r2_object_key": "m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a01181-c54b-71b9-a77f-d922fe9fa1ec.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:13.427Z"
+		},
+		{
+			"id": "01a02370-ff2a-704d-8b66-c2f82dfab2b3",
+			"market_id": "01a01181-c54b-71b9-a77f-d6e11d373a69",
+			"r2_object_key": "m/01a01181-c54b-71b9-a77f-d6e11d373a69/01a02370-fead-73de-87ae-9a4dd08b48db.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.050Z"
+		},
+		{
+			"id": "01a01181-cfd1-7caf-b282-8c5fd865f0b2",
+			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
+			"r2_object_key": "m/01a01181-ca40-725f-895c-270b2190c3ee/01a01181-ca40-725f-895c-28376ec9d2fe.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:14.902Z"
+		},
+		{
+			"id": "01a02370-ff1e-7082-8d34-9c5a467606f1",
+			"market_id": "01a01181-ca40-725f-895c-270b2190c3ee",
+			"r2_object_key": "m/01a01181-ca40-725f-895c-270b2190c3ee/01a02370-fead-73de-87ae-944e9e7b5515.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.025Z"
+		},
+		{
+			"id": "01a01181-d4ae-7674-9e88-e855992b0918",
+			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
+			"r2_object_key": "m/01a01181-d035-714a-b735-5d282576d0a3/01a01181-d035-714a-b735-61bf2fd26c5d.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:16.212Z"
+		},
+		{
+			"id": "01a02370-ff57-742e-8f10-177d6b556f53",
+			"market_id": "01a01181-d035-714a-b735-5d282576d0a3",
+			"r2_object_key": "m/01a01181-d035-714a-b735-5d282576d0a3/01a02370-fead-73de-87ae-a78500f73a81.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.094Z"
+		},
+		{
+			"id": "01a01181-d9d6-73a0-8f21-aee38ff1a161",
+			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
+			"r2_object_key": "m/01a01181-d508-7288-b996-36ec427a9d2f/01a01181-d508-7288-b996-38044d147135.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:17.432Z"
+		},
+		{
+			"id": "01a02370-ff34-7689-ba7f-641de743b11a",
+			"market_id": "01a01181-d508-7288-b996-36ec427a9d2f",
+			"r2_object_key": "m/01a01181-d508-7288-b996-36ec427a9d2f/01a02370-fead-73de-87ae-9fdbf8e7fa25.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.060Z"
+		},
+		{
+			"id": "01a01181-decc-7171-a75d-026fdcbdd589",
+			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
+			"r2_object_key": "m/01a01181-da63-738b-a3ea-8da89299bc53/01a01181-da63-738b-a3ea-9270f9f87ba9.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:18.757Z"
+		},
+		{
+			"id": "01a02370-ff7e-7b86-bd37-db54a1f5361b",
+			"market_id": "01a01181-da63-738b-a3ea-8da89299bc53",
+			"r2_object_key": "m/01a01181-da63-738b-a3ea-8da89299bc53/01a02370-fead-73de-87ae-b35295fac49b.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.134Z"
+		},
+		{
+			"id": "01a01181-e515-7588-bf31-4105534f71d5",
+			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
+			"r2_object_key": "m/01a01181-df3a-747f-b154-e79a4a416b51/01a01181-df3a-747f-b154-eb03baee542f.png",
+			"display_order": 0,
+			"is_default": true,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-17T20:55:20.397Z"
+		},
+		{
+			"id": "01a02370-ff4c-7adf-9129-28c1b401149f",
+			"market_id": "01a01181-df3a-747f-b154-e79a4a416b51",
+			"r2_object_key": "m/01a01181-df3a-747f-b154-e79a4a416b51/01a02370-fead-73de-87ae-a04ecdbc9359.webp",
+			"display_order": 1,
+			"is_default": false,
+			"created_by": "admin-singleton",
+			"created_at": "2026-08-21T08:30:03.084Z"
+		}
+	]
+}

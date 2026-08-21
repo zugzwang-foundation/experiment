@@ -474,21 +474,33 @@ function PresentHead({
 			    `aria-label="Author Flipped"` the hand-roll lacked (PD-0-10's root
 			    cause: primitive duplication). */}
 			<PositionMarker marker={item.marker} />
-			{/* Item 4 (P5-D06a) — the author's own opening stake, canon §3 item 11's
-			    head. POST VARIANT ONLY: a reply's `stake` is the §3.6 ranking ruler, a
-			    different figure (§0.5). D21 struck the `→ current` half, so the stake
-			    ships alone. Routed through `formatDharma` — `authorStake` is a
-			    MONEY_ID and a bare `{item.authorStake}` reddens
-			    no-raw-dharma-render. */}
+			{/* Item 4 (P5-D06a) — the author's own stake on THIS argument, canon §3
+			    item 11's head. Routed through `formatDharma` — the stake is a MONEY_ID
+			    and a bare `{item.authorStake}` reddens no-raw-dharma-render.
+
+			    ⚠ LOTS-1 (RECON-1 R-01) — THIS NOW RENDERS FOR REPLIES TOO. It was
+			    gated to posts on the reasoning that "a reply's `stake` is the §3.6
+			    ranking ruler, a different figure". Measured consequence of that gate:
+			    a participant whose basis is entirely reply-bets saw NO component of
+			    it anywhere on their own profile — 12 of 39 held positions on staging
+			    were majority-reply, and two were 100%. The number was already on the
+			    DTO and already in the RSC payload; only the render was withheld.
+
+			    That a figure also feeds ranking is not a reason to hide it from its
+			    author. Both union variants carry a stake — a post's `authorStake`, a
+			    reply's `stake` — so the only real difference was the field name. */}
+			<HeadSeparator />
+			<span
+				data-testid={`argument-stake-${item.id}`}
+				className="text-n6 text-xs"
+			>
+				Đ {formatDharma(item.kind === "post" ? item.authorStake : item.stake)}
+			</span>
+			{/* `Replies · N` stays POST-ONLY — replies attract nothing by design
+			    (§9), so a reply has no count to show. That gate was always correct;
+			    it was only ever the STAKE that was wrongly bundled behind it. */}
 			{item.kind === "post" && (
 				<>
-					<HeadSeparator />
-					<span
-						data-testid={`argument-stake-${item.id}`}
-						className="text-n6 text-xs"
-					>
-						Đ {formatDharma(item.authorStake)}
-					</span>
 					<HeadSeparator />
 					{/* HTML-FINISH row 12 — `Replies · N` MOVES INTO THE HEAD, beside the
 					    stake. Canon §3 item 11 places it "inline with enlarged count

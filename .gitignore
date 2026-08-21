@@ -49,6 +49,14 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 claude-progress.md
+# Harness-created git worktrees nested INSIDE the repo. Git already skips them
+# via `.git/info/exclude`, but that file is per-clone and un-committed, and
+# Biome reads `.gitignore` (`vcs.useIgnoreFile`), not git's exclude chain — so a
+# nested worktree carries its own `biome.json` into `biome check .`, which then
+# refuses with "Found a nested root configuration". That breaks `just verify`
+# AND the lefthook pre-push hook for every session in the tree, which is a gate
+# that fails closed on an artifact of the tooling rather than on the code.
+.claude/worktrees/
 
 # === Supabase CLI runtime ===
 # Local Supabase state (.branches, .temp, snippets). When `supabase/migrations/`

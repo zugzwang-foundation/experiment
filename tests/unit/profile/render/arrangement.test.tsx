@@ -57,6 +57,7 @@ const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // settled market
 const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
 
 const ROW_OPEN: ProfilePositionRow = {
+	lots: [],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -80,6 +81,7 @@ const ROW_OPEN: ProfilePositionRow = {
 
 /** Settled row whose episode-opening argument is content_removed (N-1a). */
 const ROW_SETTLED: ProfilePositionRow = {
+	lots: [],
 	marketId: M2,
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",

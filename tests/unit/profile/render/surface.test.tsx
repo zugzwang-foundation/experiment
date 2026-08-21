@@ -164,6 +164,7 @@ const TILES: ProfileTilesData = {
 };
 
 const ROW_OPEN: ProfilePositionRow = {
+	lots: [],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -187,6 +188,7 @@ const ROW_OPEN: ProfilePositionRow = {
 
 /** Settled row whose episode-opening argument is content_removed (N-1a). */
 const ROW_SETTLED: ProfilePositionRow = {
+	lots: [],
 	marketId: M2,
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",

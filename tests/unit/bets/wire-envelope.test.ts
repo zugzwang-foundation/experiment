@@ -8,11 +8,15 @@ import {
 	CommentTooLongError,
 	InsufficientDharmaError,
 	InsufficientSharesError,
+	LotNotFoundError,
 	MarketNotOpenError,
 	OppositeSideHeldError,
 	PositionNotHeldError,
 	toWireError,
 } from "@/server/bets/errors";
+// LOTS-1 / ADR-0039 — the lot core's two module-local sentinels, on the same
+// footing as the positions pair below: `extends Error`, not `BetProductError`.
+import { LotInputError, LotOversellError } from "@/server/lots/errors";
 // AUDIT-FIX-B3 A3 — the two positions sentinels the sell path can surface to the
 // user (`extends Error`, NOT `BetProductError`). `toWireError` gains explicit maps
 // for both (import from `@/server/positions/errors`; no runtime cycle — positions
@@ -297,5 +301,76 @@ describe("toWireError — A3 oversell + positions sentinels (plan §3.6 rows 7/8
 
 		expect(status).toBe(500);
 		expect(body.error.code).toBe("error_internal");
+	});
+});
+
+// PHASE-0 / LOTS-1 · ADR-0039 — the lot sentinels' wire map.
+//
+// The A3 sweep above closed exactly this hole for `positions` and the lot slice
+// re-opened it: `LotOversellError` and `LotInputError` had ZERO occurrences in
+// `toWireError`, so both fell through to 500 `error_internal`. A 500 is UNCACHED
+// by design (`runBetEndpoint` caches only `< 500`), which is right for a
+// transient fault and precisely wrong for a deterministic one — the client
+// retries a failure that cannot succeed, paying a full W-1 transaction each
+// time, and learns nothing from the answer.
+//
+// Neither maps to a NEW code. F-BET-3's reachable set is a spec surface and this
+// slice has already widened it once (404 `lot_not_found`); these two mean things
+// the catalogue can already say.
+describe("toWireError — LOTS-1 lot sentinels (ADR-0039)", () => {
+	it("wire-envelope::lot-oversell-maps-400-insufficient-shares", () => {
+		// The lot-level backstop, `PositionOversellError`'s twin one layer down.
+		// Unreachable except by bug now that the per-lot arm pre-checks and the
+		// position arm clamps — but a backstop that trips must still read as what
+		// it is rather than as a server fault.
+		const err = new LotOversellError(
+			"lot oversell: 10.000000000000000000 requested, 5.000000000000000000 surviving",
+		);
+		const { status, body, retryAfterHeader } = toWireError(err);
+
+		expect(status).toBe(400);
+		expect(body.error.code).toBe("insufficient_shares");
+		// 400 → cached, deterministic; retry_after only ever on 429/503.
+		expect(body.error.retry_after).toBeUndefined();
+		expect(retryAfterHeader).toBeUndefined();
+	});
+
+	it("wire-envelope::lot-input-error-maps-400-invalid-request-body", () => {
+		// "That is not a quantity" — distinct from oversell, which is "more than
+		// exists". Deterministic in the request, so 400 and therefore cached: the
+		// retry is answered from the cache rather than re-running the transaction
+		// to fail identically.
+		const err = new LotInputError(
+			'not a NUMERIC(38,18) decimal string: sharesToSell="abc"',
+		);
+		const { status, body } = toWireError(err);
+
+		expect(status).toBe(400);
+		expect(body.error.code).toBe("error_invalid_request_body");
+		expect(body.error.retry_after).toBeUndefined();
+	});
+
+	it("wire-envelope::lot-not-found-404 (the fifth reachable F-BET-3 code)", () => {
+		// `LotNotFoundError` IS a `BetProductError`, so it was already carried by
+		// the generic block — pinned here because this slice widened F-BET-3's
+		// reachable set with it, and an unpinned spec surface is one nobody
+		// notices moving.
+		const { status, body } = toWireError(new LotNotFoundError());
+
+		expect(LotNotFoundError.httpStatus).toBe(404);
+		expect(LotNotFoundError.code).toBe("lot_not_found");
+		expect(status).toBe(404);
+		expect(body.error.code).toBe("lot_not_found");
+		expect(body.error.retry_after).toBeUndefined();
+	});
+
+	it("wire-envelope::lot-sentinels-are-not-BetProductError (the reason the maps are needed)", () => {
+		// The control. If either class ever became a `BetProductError`, the
+		// generic block would carry it and the explicit maps above would be dead
+		// code that still passed — so the tests would keep certifying a mechanism
+		// that had quietly stopped being the one doing the work.
+		expect(new LotOversellError("x")).not.toBeInstanceOf(LotNotFoundError);
+		expect(Object.getPrototypeOf(LotOversellError)).toBe(Error);
+		expect(Object.getPrototypeOf(LotInputError)).toBe(Error);
 	});
 });

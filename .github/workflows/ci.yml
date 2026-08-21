@@ -1,5 +1,5 @@
 # .github/workflows/ci.yml
-# Zugzwang CI gate — runs on every PR to main.
+# Zugzwang CI gate — runs on EVERY pull request, whatever it targets.
 # Scope: install -> lint/format check -> typecheck -> tests.
 # Out of scope (HARDEN.* / post-experiment): e2e, build, secret scan,
 # dependency audit, coverage, bundle/perf budgets, matrix testing.
@@ -7,8 +7,27 @@
 name: CI
 
 on:
+  # NO `branches:` filter, and its absence is the fix (PHASE-0).
+  #
+  # This said `branches: [main]`, which reads as "gate what reaches main" and
+  # behaves as "gate NOTHING until the last moment". A stacked lane — slice
+  # branches opening PRs against an integration branch, which is how every
+  # multi-slice task here is built — got no CI at all. The work was reviewed,
+  # merged and built upon while the only automated check that could have
+  # contradicted it never ran once.
+  #
+  # It is not hypothetical: a red integration test lived on the LOTS-1 `s2`
+  # branch for TWO further slices, and both were written against it. The cost of
+  # a defect is roughly the number of slices built on top before anyone sees it,
+  # and this filter guaranteed that number was as large as the lane was long.
+  #
+  # Running on every PR trades some duplicated minutes on the final
+  # integration→main PR for finding a break on the slice that introduced it,
+  # while it is still one slice. That is the whole trade, and it is not close.
+  #
+  # Branch protection is unaffected — it requires the `ci` check on merges to
+  # `main` exactly as before. This only widens where `ci` also runs.
   pull_request:
-    branches: [main]
 
 # Cancel stale runs when a PR is force-pushed or has new commits.
 concurrency:

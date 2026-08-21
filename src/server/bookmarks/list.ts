@@ -4,10 +4,8 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import {
-	bets,
 	bookmarks,
 	comments,
-	events,
 	markets,
 	payoutEvents,
 	pools,
@@ -17,16 +15,15 @@ import type { PostSubstrate, ReplySubstrate } from "@/lib/ranking";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import { loadRemovedSet } from "@/server/debate-view/load-debate-view";
 import { resolveAuthors } from "@/server/debate-view/resolve-authors";
-import { eventPayloadSchemas } from "@/server/events/schemas";
+import { loadLotBasis, lotBasisOf } from "@/server/lots/basis";
 import {
 	buildPostItem,
 	buildReplyItem,
 	type MarketMeta,
 	type ProfileArgumentItem,
 } from "@/server/profile/arguments";
-import type { SellTrade } from "@/server/profile/episodes";
 
-import { type BookmarkBetRow, computeBookmarkFigures } from "./figures";
+import { computeBookmarkFigures } from "./figures";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type BookmarkReader = DbClient | DbTransaction;
@@ -93,7 +90,7 @@ type ReplyRow = {
  * keyed to the ITEM'S AUTHOR (not the viewer) — the read applies no viewer
  * filter (D-3 write guard + UI hiding is the self-bookmark contract).
  *
- * Fully batched — 13 IN-list-scoped queries, O(1) round-trips, no N+1 and no
+ * Fully batched — 12 IN-list-scoped queries, O(1) round-trips, no N+1 and no
  * per-item `loadProfilePositions` (plan steer 2). Read-only; no store (§23).
  */
 export async function loadBookmarks(
@@ -131,7 +128,6 @@ export async function loadBookmarks(
 		.where(inArray(comments.id, orderedCommentIds));
 	const substrateById = new Map(substrateRows.map((c) => [c.id, c]));
 	const authorIds = [...new Set(substrateRows.map((c) => c.userId))];
-	const authorIdSet = new Set(authorIds);
 	const marketIds = [...new Set(substrateRows.map((c) => c.marketId))];
 	const postIds = substrateRows
 		.filter((c) => c.parentCommentId === null)
@@ -159,10 +155,22 @@ export async function loadBookmarks(
 					COUNT(rb.id) FILTER (
 						WHERE rc.side_at_post_time <> p.side_at_post_time
 					) AS counter_count,
-					COALESCE(SUM(rb.stake) FILTER (
+					-- LOTS-1 / ADR-0039 R4+R5 — the attracted-value aggregates key off SURVIVING
+					-- LOT BASIS, not the frozen bets.stake. A replier who sells their lot
+					-- down withdraws the weight they lent the parent, which is what R5 names.
+					-- The historical figure is not lost: bets.stake is Bucket-A immutable and
+					-- still readable; it simply stops being what this aggregate reports.
+					--
+					-- ⚠ COALESCE FALLS BACK TO THE FROZEN STAKE when a reply-bet has no lot.
+					-- Unreachable under R8 (every bet mints a lot), but the alternative on an
+					-- unreachable row is to silently score a real contribution as ZERO — the
+					-- same class of error as letting missing bookkeeping veto a sell (S5). An
+					-- unknown surviving amount is better read as "all of it survives", which
+					-- is exactly the pre-LOTS-1 behaviour.
+					COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 						WHERE rc.side_at_post_time = p.side_at_post_time
 					), 0) AS support_dharma,
-					COALESCE(SUM(rb.stake) FILTER (
+					COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 						WHERE rc.side_at_post_time <> p.side_at_post_time
 					), 0) AS counter_dharma
 				FROM ${comments} p
@@ -175,6 +183,7 @@ export async function loadBookmarks(
 				) pb ON true
 				LEFT JOIN ${comments} rc ON rc.parent_comment_id = p.id
 				LEFT JOIN bets rb ON rb.comment_id = rc.id
+				LEFT JOIN lots rl ON rl.bet_id = rb.id
 				WHERE p.id IN (${sql.join(
 					postIds.map((id) => sql`${id}::uuid`),
 					sql`, `,
@@ -293,71 +302,23 @@ export async function loadBookmarks(
 	// share_quantity/created_at feed the BuyTrade); `comment_id` is carried for
 	// byte-parity (the episode walk ignores it), and `user_id` is the
 	// cross-author grouping key (positions.ts scopes by one user and needs
-	// neither). One read, no per-item query — the true 13-query O(1) shape.
-	const betRows = await client
-		.select({
-			id: bets.id,
-			userId: bets.userId,
-			marketId: bets.marketId,
-			side: bets.side,
-			stake: bets.stake,
-			shareQuantity: bets.shareQuantity,
-			commentId: bets.commentId,
-			createdAt: bets.createdAt,
-		})
-		.from(bets)
-		.where(
-			and(inArray(bets.userId, authorIds), inArray(bets.marketId, marketIds)),
-		);
-	const buysByAuthorMarket = new Map<string, BookmarkBetRow[]>();
-	for (const b of betRows) {
-		const key = amKey(b.userId, b.marketId);
-		const list = buysByAuthorMarket.get(key) ?? [];
-		list.push({
-			id: b.id,
-			side: b.side,
-			stake: b.stake,
-			shareQuantity: b.shareQuantity,
-			createdAt: b.createdAt,
-		});
-		buysByAuthorMarket.set(key, list);
-	}
+	// neither). One read, no per-item query — the true O(1) shape.
+	//
+	// Q9 — the authors' Đa: Σ `lots.surviving_basis` per (A, M). ONE batched read
+	// for the whole page, scoped to the bookmarked AUTHORS (never the viewer —
+	// design-canon ruling 1: a bookmarked card shows the AUTHOR's figures).
+	const lotBasisByAuthorMarket = await loadLotBasis(client, {
+		userIds: authorIds,
+		marketIds,
+	});
 
-	// Q10 — the authors' SELLS. Sell-source MIRRORS `positions.ts` soldEvents
-	// EXACTLY (§4.5a — `events` `bet.sold`, `payload.sharesSold`/`payload.side`,
-	// `eventId` as trade id, `createdAt` as `at`); the ONLY cross-author delta is
-	// `payload.userId ∈ A[]` + group by (A, M). Do NOT invent a `bets`-sell.
-	const soldEvents = await client
-		.select({
-			payload: events.payload,
-			createdAt: events.createdAt,
-			eventId: events.eventId,
-		})
-		.from(events)
-		.where(
-			and(
-				eq(events.aggregateType, "market"),
-				inArray(events.aggregateId, marketIds),
-				eq(events.eventType, "bet.sold"),
-			),
-		);
-	const sellsByAuthorMarket = new Map<string, SellTrade[]>();
-	for (const ev of soldEvents) {
-		const payload = eventPayloadSchemas["bet.sold"].parse(ev.payload);
-		if (!authorIdSet.has(payload.userId)) {
-			continue;
-		}
-		const key = amKey(payload.userId, payload.marketId);
-		const list = sellsByAuthorMarket.get(key) ?? [];
-		list.push({
-			source: "sell",
-			id: ev.eventId,
-			at: ev.createdAt,
-			side: payload.side,
-			shares: payload.sharesSold,
-		});
-		sellsByAuthorMarket.set(key, list);
-	}
+	// Q10 — RETIRED by LOTS-1 / ADR-0039 D-4. It fetched the authors' `bet.sold`
+	// events so this file could re-walk their episodes and re-derive Đa through a
+	// byte-for-byte mirror of `positions.ts::walkMarket`. Đa is a stored column
+	// now, so the sell stream, the buys query that fed the same walk, and the
+	// mirror itself are all gone — two queries removed, one added. The numbering
+	// of Q11-Q13 is left alone deliberately: renumbering three unrelated comment
+	// blocks would be churn in a diff that is supposed to be about Đa.
 
 	// Q11 — §9 ordinal domain + parent/opener bodies: ALL top-level comments in
 	// the touched markets (removed INCLUDED — append-only ⇒ permanent).
@@ -508,8 +469,7 @@ export async function loadBookmarks(
 		const figures = computeBookmarkFigures({
 			side,
 			held,
-			buys: buysByAuthorMarket.get(amKey(authorId, marketId)) ?? [],
-			sells: sellsByAuthorMarket.get(amKey(authorId, marketId)) ?? [],
+			lotBasis: lotBasisOf(lotBasisByAuthorMarket, authorId, marketId),
 			reserves: reservesByMarket.get(marketId),
 			settledNet: settledNetByAuthorMarket.get(amKey(authorId, marketId)),
 		});

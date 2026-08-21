@@ -54,11 +54,21 @@ export function buildPlaceRequest(args: {
 
 /**
  * `POST /api/bets/sell` (SPEC.1 F-BET-3). Comment-free by design (canon §3.4:
- * selling is the only comment-free action); the body is exactly
- * `{marketId, shares}` — no stake key exists on the sell wire (SG-2).
+ * selling is the only comment-free action); no stake key exists on the sell
+ * wire (SG-2).
+ *
+ * The body is `{marketId, shares}`, plus an OPTIONAL `lotId` since LOTS-1
+ * (ADR-0039 R3) naming the single argument being exited. Omitted is the
+ * position-level sell, which is what every pre-LOTS-1 caller means.
+ *
+ * ⚠ **The body is rebuilt key-by-key rather than spread, deliberately** — it is
+ * what keeps an accidental extra field out of a money request. That also means
+ * a new wire key is only really added once it appears HERE: a caller passing
+ * `lotId` before this function knew the name had it silently dropped, and the
+ * request looked completely normal on the way out.
  */
 export function buildSellRequest(args: {
-	body: { marketId: string; shares: string };
+	body: { marketId: string; shares: string; lotId?: string };
 	idempotencyKey: string;
 }): { url: string; init: RequestInit } {
 	return {
@@ -72,6 +82,7 @@ export function buildSellRequest(args: {
 			body: JSON.stringify({
 				marketId: args.body.marketId,
 				shares: args.body.shares,
+				...(args.body.lotId === undefined ? {} : { lotId: args.body.lotId }),
 			}),
 		},
 	};

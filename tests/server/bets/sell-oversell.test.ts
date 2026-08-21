@@ -235,4 +235,67 @@ describe("AUDIT-FIX-B3 A3 — sell oversell → cached 400 (not uncached 500)", 
 		const { heldSideOrNull } = await import("@/server/positions/read");
 		expect(await heldSideOrNull(testDb, { userId, marketId })).toBeNull();
 	});
+
+	it("sell-oversell::explicit-null-lotId-is-a-position-level-sell-not-a-400", async () => {
+		// PHASE-0 / LOTS-1. `lotId` is `string | null` behind this route and both
+		// call sites normalise `?? null`, so `null` is what "no particular
+		// argument" MEANS everywhere inside. The schema said `.optional()`, which
+		// admits only ABSENT — so a client round-tripping the shape it was handed
+		// got a 400 for a body that said exactly the right thing.
+		//
+		// And the 400 is the expensive part, not the rejection: `safeParse`
+		// failure throws a bare `InvalidRequestBodyError` with no field detail, so
+		// the message does not name `lotId`; and a 400 is CACHED under the
+		// idempotency key, so the corrected request must be reissued under a FRESH
+		// key or it replays the same refusal. An unhelpful error the client cannot
+		// retry its way out of.
+		const userId = await seedUser("nulllot", "nulllot");
+		const marketId = await seedOpenMarketWithPool("nulllot-market");
+		await seedHeldPosition(userId, marketId, "5.000000000000000000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await sellPOST(
+			req(
+				{ marketId, shares: "2.000000000000000000", lotId: null },
+				"nulllot-key",
+			),
+		);
+
+		expect(res.status).toBe(200);
+		const payload = await res.json();
+		expect(payload.ok).toBe(true);
+
+		// It behaved as the POSITION-level sell, which is the whole claim: the
+		// held quantity moved by the full amount. (No lots exist — the position is
+		// seeded directly — so this also rides the no-lots arm.)
+		const positionRows = await testDb
+			.select({ quantity: positions.quantity })
+			.from(positions)
+			.where(
+				and(eq(positions.userId, userId), eq(positions.marketId, marketId)),
+			);
+		expect(positionRows[0]?.quantity).toBe("3.000000000000000000");
+	});
+
+	it("sell-oversell::a-malformed-lotId-is-still-rejected (the control)", async () => {
+		// The control for the test above. `.nullish()` widens the schema by
+		// exactly one value; it must not have turned the field into "anything
+		// goes", or the previous test would be passing against no validation at
+		// all rather than against a correctly-widened one.
+		const userId = await seedUser("badlot", "badlot");
+		const marketId = await seedOpenMarketWithPool("badlot-market");
+		await seedHeldPosition(userId, marketId, "5.000000000000000000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await sellPOST(
+			req(
+				{ marketId, shares: "2.000000000000000000", lotId: "not-a-uuid" },
+				"badlot-key",
+			),
+		);
+
+		expect(res.status).toBe(400);
+		const payload = await res.json();
+		expect(payload.error.code).toBe("error_invalid_request_body");
+	});
 });
