@@ -1526,6 +1526,28 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 
 **Expected next task.** A staging exercise, not a build: one deliberate double-write against real R2, the 412 captured, the gate retired in `AUDIT-FIX-A1`'s log and here. Evidence: `docs/logs/AUDIT-FIX-A1.md`; ADR-0028; `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12, ground 3.
 
+⚠ **Update, CONTENT.2 close-out (2026-08-21): the backend capability this
+row is waiting on is now demonstrated — the gate itself still stands.**
+MEDIA-DETAIL-PROBE-2's opportunity item ran exactly the deliberate
+double-write this row's "Expected next task" describes, against real R2, on
+a throwaway key under the `market-media` bucket: `IfNoneMatch: "*"`,
+write 1 → `200`, write 2 → **real `412 PreconditionFailed`**, key deleted
+after (`docs/logs/CONTENT-2-TILES.md` §"R2 honours If-None-Match" carries
+the full transcript). **This establishes R2 itself honours the create-once
+conditional at the storage layer — the open question this row names.**
+
+**It does not retire the gate**, because the gate's own text names a
+specific path — the **participant `uploads`** bucket's conditional write
+(`signRead("uploads", ...)` → `mintPutUrl` with `opts.ifNoneMatch: true`,
+the moderated-bytes-are-served-bytes binding ADR-0028 protects) — and this
+probe ran against the separate, differently-credentialed `market-media`
+bucket arm, which is documented mutable BY DESIGN (`r2.ts:119`,
+ADR-0026/0027) and carries no create-once semantics to test in the first
+place. Same backend, same account, different bucket, different
+credentials, different conditional — the probe is evidence the *mechanism*
+works on this backend, not proof the *uploads-path binding itself* has been
+exercised. **Gate stands**, cross-referenced rather than closed.
+
 ---
 
 ## DMARC-ALIGNMENT — DMARC stands on DKIM alone — founder decision, pre-go-live
@@ -2287,5 +2309,27 @@ media under `m/<marketId>/` arguably does not.
 **The predicate:** is the minted read URL byte-identical across two renders of
 the same key? What host does it point at? Is any Cache-Control set on the
 objects (every load so far has set none)?
+
+⚠ **Third signal, CONTENT.2 close-out (2026-08-21): the predicate's own
+question is now answered, not open.** Checked across every upload this whole
+task arc made — the original 8 tiles, the PR-2 recomposite, the
+MEDIA-DETAIL-PROBE swaps, and the Slice 2/3 second-row rows — **zero of them
+ever set `Cache-Control`.** Not disabled, not overridden: never present in
+any `PutObjectCommand`, and `mintPutUrl` (`r2.ts:119-148`) carries no
+parameter for one. So caching for every market-media object today is
+whatever the requesting browser's own heuristics and Vercel's own edge
+defaults decide **unprompted** — no explicit posture anywhere in this
+system states or controls it. **Traced two things in this task arc back to
+exactly this absence, both of which had the surface shape of a caching
+defect and were not one:** the V-1 pre-deploy check (`docs/logs/
+CONTENT-2-TILES.md` §"the deploy gap") read as "did the write fail" before
+the canary comparison correctly placed it as a deploy-lag gap, not a stale
+cache; and the presign-determinism finding (same-probe B1/B2) reads as
+inconsistent behavior — a different URL every render — until the SigV4
+mechanics are read, at which point it is exactly the intended behavior of
+a system with no cache layer to begin with, not a bug in one. **Two
+distinct shapes, one missing predicate underneath both**, is the reading
+that turns this signal into a routing decision rather than a third loose
+observation.
 
 **Conditional trigger.** The read-path / caching workstream — NOT a media task.
