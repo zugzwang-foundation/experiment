@@ -155,9 +155,42 @@ founder-authored and is reproduced **verbatim**; it is the normative part of thi
 
 A new table in a new schema domain file `src/db/schema/lots.ts` (domain-per-file,
 ADR-0008). **Bucket C**, for the same reason `positions` is: `surviving_shares` and
-`surviving_basis` mutate on every sell that names the lot. It is *not* Bucket A — the
-append-only guarantee it needs is directional monotonicity (R9), which is a CHECK, not
-a trigger.
+`surviving_basis` mutate on every sell that names the lot. It is *not* Bucket A — a
+Bucket-A trigger forbids UPDATE, which is the opposite of what this table needs.
+
+**What the CHECKs actually give, stated precisely (corrected at PHASE-0).** An earlier
+version of this paragraph justified the choice by claiming the monotone CHECKs were
+*stronger* than comparing against the previous value, which storage supposedly could
+not see. **Both halves of that were false, and the second was falsifiable by reading
+`0003`** — the Bucket-B trigger functions compare `OLD` and `NEW` row images routinely;
+that is the entire mechanism of the whitelisted-transition pattern. Storage sees the
+previous value whenever a trigger is asked to look. And `new ≤ old` implies
+`new ≤ original` while the converse does not, so the comparison that was dismissed is
+the strictly stronger one. The justification argued for the right decision backwards,
+which is worse than arguing for a wrong one: it makes the weaker guarantee sound
+sufficient and forecloses the question.
+
+The true statement is narrower and worth having in these words:
+
+- **The CHECKs bound RANGE, not DIRECTION.** `surviving_shares <= original_shares`
+  says a lot is never larger than it was minted. It does **not** say a lot never GROWS:
+  an UPDATE raising `surviving_shares` from 5 back to 20 against an original of 20
+  satisfies every CHECK on the table. Nothing at the storage layer refuses it.
+- **R9's monotonicity is therefore APPLICATION-enforced**, by `sellFromLot` being the
+  only function that computes a new surviving value and `planLotSale` / `applyLotSale`
+  being the only path that writes one. That is a real guarantee and it is the one in
+  force — it is simply not a storage guarantee, and this ADR should not have implied
+  otherwise.
+- **R9's PERMANENCE is storage-enforced, by migration `0026`.** A lot that reached zero
+  could still be DELETEd, and a DELETE breaks R2 in the one direction the CHECKs are
+  structurally blind to: they bound each surviving row from both ends, so they cannot
+  see a summand that is no longer there. `lots_no_delete` (row-level `BEFORE DELETE`)
+  closes it. Deliberately not a `bucket_%` name and deliberately not a TRUNCATE guard —
+  see the migration-shape section below.
+- **The UPDATE-monotonicity trigger** — an `OLD`/`NEW` comparison rejecting any UPDATE
+  that raises `surviving_shares` — is the piece that would move R9's first half into
+  storage too. It is **DOCKETED, not built**, and named here so the gap is a known
+  quantity rather than a claim nobody re-examined.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -351,7 +384,7 @@ is the signal, and a tag would overstate it.
 | **INV-2** — Dharma non-transferable, no overdraft | **none** | No lot column holds Dharma-as-balance. `dharma_ledger` is untouched; `CHECK (balance_after >= 0)` is untouched; no transfer surface is created. `surviving_basis` is a *cost record*, never a spendable balance, and no code path reads it as one. |
 | **INV-3** — comments side-bound at post time | **none, and reinforced** | Selling a lot writes only `lots` (and `positions`/`dharma_ledger`/`events`/`pools` as today). `comments.side_at_post_time` is not read or written by any lot path. R9 restates this: selling never alters a comment; re-entry mints a new comment via a new bet. |
 | **INV-4** — resolutions append-only | **none** | D-6 attribution is derived at read time from existing rows. No `resolution_events` or `payout_events` row is added, updated or deleted. |
-| **NEW (invariant-class, not INV-1…4)** — **Σ surviving lot shares == `positions.quantity`**, per `(user, market, side)` | **minted** | The decomposition is exhaustive or it is a lie. Application-level: every write path that touches `positions` touches lots in the same transaction with the same delta. Storage-level backstop: the per-lot CHECKs bound each summand, and the R2 equality is asserted by `I-LOT-SUM-001` over the live DB. Cross-checked at the same seam as the existing D1 nightly position-drift cron. |
+| **NEW (invariant-class, not INV-1…4)** — **Σ surviving lot shares == `positions.quantity`**, per `(user, market, side)` | **minted** | The decomposition is exhaustive or it is a lie. Application-level: every write path that touches `positions` touches lots in the same transaction with the same delta. Storage-level backstop: the per-lot CHECKs bound each summand, plus `lots_no_delete` (migration 0026), which closes the one direction the CHECKs are blind to — a summand that is no longer there. **Corrected at PHASE-0:** this cell previously said the R2 equality is asserted by `I-LOT-SUM-001` "over the live DB". It is not. That spec seeds its own rows into a local ephemeral Postgres and truncates after; it proves the RULE and observes NOTHING, and can no more see staging or production than any other unit of the suite. The same false backstop claim sat in `src/server/lots/persist.ts` and is corrected there in the same commit (O-5: an amendment is applied at every site stating the superseded position). **What is genuinely owed is a live-environment check** — the staging gates are where it belongs, beside conservation and durable-receipt integrity — reading Σ `lots.surviving_shares` against `positions.quantity` per `(user, market, side)` on a real database and failing RED on a difference. Until it exists, drift in a live environment is undetected, and the D1 nightly position-drift cron is the nearest existing seam, not a substitute. |
 | `positions_one_held_side_idx` | **unchanged** | Lots carry `side` but constrain nothing about it; the single-held-side guard remains the only authority. |
 
 ### Migration shape
@@ -388,6 +421,45 @@ or TRUNCATE trigger, and `tests/db/_fixtures/truncate.ts`'s `TRUNCATE_GUARDS` li
 **not** extended. A `TRUNCATE bets CASCADE` in a teardown reaches `lots` through the FK
 and succeeds, which is the intended behaviour.
 
+**A second migration, `0026_lots_no_delete`** (PHASE-0), carrying the R9 permanence
+guard argued for in D-1: one function and one row-level `BEFORE DELETE` reject on
+`lots`. Purely additive, so it satisfies ADR-0024's expand/contract rule trivially, and
+no code path in the repo deletes a lot, so nothing predating it is affected.
+
+Two properties of that guard are load-bearing and are ruled here rather than left to a
+source comment:
+
+- **The trigger is named `lots_no_delete`, NOT `bucket_%`.** The staging reset's G-4
+  catalogue selects `WHERE tgname LIKE 'bucket_%'` and pins the row count
+  (`EXPECTED_GUARD_CATALOG_ROWS`). A `bucket_`-prefixed name would enrol this guard in
+  the §6 append-only contract and assert a bucket family covering exactly one table,
+  while `lots` is Bucket C and its rows legitimately change. The count therefore stays
+  where it is — **verified against the live catalogue, not assumed**. The cost is that
+  a guard outside the catalogue is one G-4 does not check remains enabled;
+  `tests/unit/staging/guard-list-parity.test.ts` takes that job instead and pins the
+  non-catalogue set to exactly this one trigger.
+- **It is row-level only, so TRUNCATE is unaffected.** Postgres fires no row-level
+  trigger on TRUNCATE, so `TRUNCATE bets CASCADE` still empties `lots` and the teardown
+  and staging-reset paths are untouched. Asserted through the real `truncateTables()`
+  helper in `tests/db/triggers/lots-no-delete.spec.ts`, because the claim is about the
+  path the operator actually takes and not one that resembles it.
+
+**`TRUNCATE_SET` — ruled here, having previously lived only in a source comment.**
+`lots` **is** named in `tests/staging/_lib/guards.ts`'s `TRUNCATE_SET` (the staging
+reset's own table list), which is a *different* list from the
+`tests/db/_fixtures/truncate.ts` `TRUNCATE_GUARDS` this section rules on above. The
+paragraph above said what `lots` is NOT in and was silent on what it IS in, which left
+the decision recorded nowhere but in the comment on the line that made it — the shape
+`O-5` rules against, and the shape that makes a reader unable to tell a decision from
+an oversight. The ruling: **`lots` belongs in `TRUNCATE_SET`.** It could not go
+anywhere else — `NOT_TRUNCATED_UNRATIFIED` is documented and tested as holding only
+tables with no outbound FK, which survive structurally rather than by omission, and
+`lots` has three; `bets` is already in the set, so `TRUNCATE … CASCADE` empties `lots`
+whether it is named or not. Naming it makes the reset explicit instead of incidental.
+This is **not** a widening of the STAGING-PARITY Q3 ratified set: that warning concerns
+moving an EXISTING table out of the unratified list, and `lots` postdates Q3 entirely,
+so the ratified set cannot have ruled on it either way.
+
 ### The schedule cost — stated, not resolved
 
 Building this to the standard the four critical paths require is **17–22
@@ -410,15 +482,31 @@ and is deliberately left open here.**
 
 ### Spec riders owed (web-owned; named, not authored)
 
-Two amendments are owed and are **not** written by this ADR, because their text is
-founder-owned:
+Three amendments are owed. Two are **not** written by this ADR, because their text is
+founder-owned; the third was discharged at PHASE-0 and is marked so.
 
 1. **SPEC.1 §23 — the Đa paragraph.** It currently defines Đa as episode-scoped and
    pro-rata-reduced. D-4 redefines it as Σ surviving lot basis, and D-4's worked example
    shows the two are not the same function. The §2 *SideEpisode* entry stays correct;
-   only its role changes (segmentation and opener, no longer basis).
-2. **SPEC.2 §22.1 — the ADR index**, plus the §0 count and ceiling annotation, which
+   only its role changes (segmentation and opener, no longer basis). **STILL OWED.**
+2. **SPEC.1 §7 — F-BET-3's shape.** Added at PHASE-0; it was missing from this list and
+   should not have been. This slice **widens F-BET-3's reachable error set** with a
+   fifth code, `404 lot_not_found` — the first 404 on that flow, and a new terminal
+   state a client must handle — and it adds an optional `lotId` to the request body,
+   so the flow now has two shapes (the position-level sell it always was, and a per-lot
+   sell) behind one endpoint. A reachable error set is a client contract, not an
+   implementation detail: a flow's spec entry is where an integrator learns what can
+   come back. **STILL OWED** — founder-authored, like §23.
+   *Two related changes are deliberately NOT part of this rider, because they mint no
+   new code:* `LotOversellError` maps onto the existing `400 insufficient_shares` and
+   `LotInputError` onto the existing `400 error_invalid_request_body` (PHASE-0). Both
+   previously fell through to an uncached `500 error_internal`, which is a defect fix
+   within the catalogue rather than a widening of it — reusing codes that already mean
+   these things is what keeps this rider to the one change that is genuinely new.
+3. **SPEC.2 §22.1 — the ADR index**, plus the §0 count and ceiling annotation, which
    SYNC-4 rebuilt normatively on 2026-08-20 and which this ADR moves by one.
+   **DISCHARGED at PHASE-0** (SPEC.2 1.0.24), together with the §5 inventory, §5.2/§5.3
+   counts, §19.3 dataset row and Appendix A/B riders that were owed with it.
 
 Recorded here per CLAUDE.md §5.12 and O-9: editing prose that cites a governing section
 is a same-commit-rider trigger, and the honest discharge of a rider you may not author
