@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IMAGE_UPLOADS_ALLOWED_MIME } from "@/server/config/limits";
 import { STATE_COPY } from "./copy";
@@ -87,6 +87,81 @@ export function ImageAttach({
 	onRemove: () => void;
 }) {
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	// POLISH-4-PREVIEW — the LOCAL preview of the file the user just picked.
+	//
+	// ⛔ WHY THIS EXISTS AT ALL. The R2 object is immutable from first write
+	// (ADR-0028 primitive 1) and the comment that carries it is append-only
+	// (INV-4). A mis-picked image is therefore permanent AND public, and this
+	// slot is the last place a human can catch it. Until now the slot proved
+	// only that SOME file was picked — it showed a truncated filename over an
+	// empty box, which confirms the act and not the content.
+	//
+	// It is deliberately NOT lifted into `ImageAttachState`. The composer owns
+	// the ATTACH lifecycle (sign → PUT → uploadId); the preview is a property of
+	// the local `File` and never leaves the browser, so widening the shared state
+	// would push a client-only concern through a seam that exists for the wire.
+	// Keeping it here is also what makes one edit serve both composers — post and
+	// reply mount the same `BetComposer`, which imports this component once.
+	//
+	// `previewRef` shadows the state ON PURPOSE: the unmount cleanup below must
+	// revoke whatever URL is live at teardown, and a cleanup closing over
+	// `previewUrl` would capture a stale one.
+	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+	const previewRef = useRef<string | null>(null);
+	// ONE mutator owns EVERY revoke. Because it always releases the outgoing URL
+	// before adopting the next, replacement cannot leak — there is no ordering a
+	// caller could get wrong, which is the whole reason the revoke does not live
+	// at the call sites.
+	const setPreview = useCallback((next: string | null) => {
+		if (previewRef.current !== null) {
+			URL.revokeObjectURL(previewRef.current);
+		}
+		previewRef.current = next;
+		setPreviewUrl(next);
+	}, []);
+	// Teardown — and, with it, SUCCESSFUL SUBMIT. On success the composer calls
+	// `props.onClose()`, and both mount sites render `BetComposer` conditionally
+	// on the very state that closes (`DebateView` post: `openSide`; reply:
+	// `openReply`), so a successful place unmounts this component. That makes the
+	// submit-time release structural rather than a hook someone must remember to
+	// add — the two paths are one path.
+	useEffect(
+		() => () => {
+			if (previewRef.current !== null) {
+				URL.revokeObjectURL(previewRef.current);
+				previewRef.current = null;
+			}
+		},
+		[],
+	);
+	// Any phase that is not holding a file drops the preview. This is both the
+	// CLEAR path (Remove → `none`) and the FAILURE path (→ `error`) — a failed
+	// attach must not leave an image on screen implying it succeeded.
+	//
+	// ⚠ THIS ENFORCES AN INVARIANT, IT DOES NOT WATCH A TRANSITION, and the
+	// difference is load-bearing. Keyed on `state.phase` alone the effect fires
+	// only when the phase CHANGES — so a preview minted while the phase happened
+	// to stay put would survive indefinitely, and the component would be relying
+	// on the parent to flip a value in order to clean up after itself.
+	// `previewUrl` is in the deps so the rule "a preview exists only while
+	// attaching or attached" is re-checked whenever EITHER side moves.
+	//
+	// The reachable case: `BetComposer.onPickImage` returns EARLY when `inFlight`
+	// (`BetComposer.tsx:242-244`) and never moves the phase. The pick control is
+	// disabled in flight, but the native file dialog is ASYNCHRONOUS — it can be
+	// opened before the composer goes in flight and resolved after, so the change
+	// event lands in a parent that drops it. Pinned by
+	// `attach-preview.test.tsx::preview::a-pick-the-composer-drops-does-not-strand-an-image`,
+	// which reddens if these deps are narrowed back.
+	useEffect(() => {
+		if (
+			previewUrl !== null &&
+			state.phase !== "attaching" &&
+			state.phase !== "attached"
+		) {
+			setPreview(null);
+		}
+	}, [state.phase, previewUrl, setPreview]);
 	// `.attach` — the panel chrome, one shape in every phase so the column does
 	// not resize as the state moves through pick → busy → attached → error.
 	// `min-w-0` is LOAD-BEARING: a fieldset's UA `min-inline-size:min-content`
@@ -101,6 +176,45 @@ export function ImageAttach({
 		"aspect-[4/5] max-h-full min-h-0 w-full rounded-(--imgr) bg-n1";
 	// `.acap` — the caption, INSIDE the panel (d5), not a sibling of it.
 	const caption = <span className="text-[10px] text-n4">{CAPTION}</span>;
+	// The slot's CONTENT — the same node at both render sites below, so the
+	// preview is present while `attaching` too and never waits on the PUT.
+	//
+	// ⚠ `object-contain` IS THE CAPTION'S DOING, not a new design call. `CAPTION`
+	// is canon §6 verbatim — "Shown whole · any orientation" — and an image in a
+	// fixed 4:5 box must either crop or letterbox. "Shown whole" forecloses the
+	// crop and "any orientation" forecloses a portrait-only fit; the `<img>`
+	// default (`fill`) would DISTORT and contradict both halves. `bg-n1` is the
+	// box's own surface and becomes the letterbox ground, so nothing new is
+	// coloured (the monochrome census is untouched — no token added or referenced).
+	//
+	// ⛔ The mockup is SILENT here: d5's `.imgprev` is an empty box centring the
+	// literal string `IMAGE` at all four occurrences, with no populated variant.
+	// So the BOX is carried from d5 and the FIT is carried from the caption; the
+	// refusal recorded above (d5's `IMAGE` label, declined because "the state
+	// carries no preview data") is left standing — that string still describes an
+	// EMPTY slot, and the empty slot still renders exactly as it did.
+	const previewBox =
+		previewUrl === null ? (
+			<span aria-hidden="true" className={preview} />
+		) : (
+			// A local `blob:` object URL for a file that exists only in this tab —
+			// next/image would route a client-only source through the server
+			// optimizer, which cannot resolve it (the `MarketThumb` / `CommentImage`
+			// precedent for non-static sources).
+			// biome-ignore lint/performance/noImgElement: client-only blob: URL — the optimizer cannot resolve it.
+			<img
+				alt=""
+				aria-hidden="true"
+				src={previewUrl}
+				// Requirement 7 — a non-image or unreadable pick degrades to the empty
+				// box rather than the browser's broken-image glyph. The client MIME
+				// guard rejects most of these into `error` a moment later anyway, but
+				// this covers the window before that and anything it does not catch.
+				// Same shape as `MarketThumb`'s `onError` fallback.
+				onError={() => setPreview(null)}
+				className={`${preview} object-contain`}
+			/>
+		);
 	return (
 		<>
 			<input
@@ -113,6 +227,10 @@ export function ImageAttach({
 				onChange={(e) => {
 					const file = e.target.files?.[0];
 					if (file) {
+						// Drawn on SELECT, before `onPick` and therefore before the
+						// sign/PUT round trip ever starts — the confirmation must not
+						// wait on the network it exists to be checked ahead of.
+						setPreview(URL.createObjectURL(file));
 						onPick(file);
 					}
 					// Allow re-picking the same file after an error/remove.
@@ -134,7 +252,7 @@ export function ImageAttach({
 			<fieldset aria-label={ATTACH_LABEL} className={panel}>
 				{state.phase === "attached" ? (
 					<>
-						<span aria-hidden="true" className={preview} />
+						{previewBox}
 						<span className="flex max-w-full items-center gap-1">
 							<span className="min-w-0 truncate font-mono text-ink">
 								{state.name}
@@ -159,7 +277,7 @@ export function ImageAttach({
 						onClick={() => inputRef.current?.click()}
 						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 					>
-						<span aria-hidden="true" className={preview} />
+						{previewBox}
 						<span className="text-n5">
 							{state.phase === "attaching" ? `${state.name}…` : "Image"}
 						</span>
