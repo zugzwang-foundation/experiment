@@ -406,8 +406,22 @@ because it is *checkable*: a back-fill would need a source of per-argument attri
 for positions built before lots existed, and none exists — the information was never
 recorded. Verified: the live window opens 2026-09-15, production has never served
 participants (its alias serves a 2026-07-02 build), and staging is wiped as part of this
-task. **If any environment is later found to hold `bets` rows with no matching `lots`
-row, that is a halt condition, not a back-fill trigger.**
+task. **A `bets` row whose `created_at` is at or after the moment this migration applied
+in that environment — readable per-database from `drizzle.__drizzle_migrations.created_at`
+for `folderMillis` 1787261127286 — and which has no matching `lots` row, is a halt
+condition, never a back-fill trigger.** Bets older than that instant are expected to have
+no lot, and always will.
+
+> ⚠ **Corrected at MERGE-1, and the scope is the whole point of it.** This paragraph said
+> *"if any environment is later found to hold `bets` rows with no matching `lots` row"*,
+> unscoped — which is satisfied by **every pre-existing bet the instant the migration
+> applies**, because R8 is precisely the decision not to give those rows a lot.
+> **Staging tripped it on contact.** A halt that fires on the state the migration was
+> designed to create is not a halt; it is noise that teaches the operator to ignore the
+> alarm, on the one environment anybody was watching. `0025_lots.sql:26-42` already
+> carries the scoped form, and `docs/specs/SPEC.2.md` §5.1 row 26 already carries it too —
+> this ADR was the site left stating the superseded version, and it is the one a reader
+> reaches first.
 
 **Down path.** `DROP TABLE IF EXISTS lots;` — sufficient and complete, because the
 migration is additive and touches nothing else. It is recorded as a commented `-- DOWN`

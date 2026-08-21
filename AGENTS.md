@@ -198,7 +198,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 23 tables live across 11 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
+- **One file may hold several related tables.** 24 tables live across 12 table-bearing files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media). *(`src/db/schema/` holds 14 files; `_enums.ts` and `index.ts` declare no table, which is why the footer's "24 tables / 14 schema files" and this line's 12 are both right. Re-measured at MERGE-1 — this read "23 tables across 11 files" while six other lines in this file were moved at PHASE-0 and the footer already said 24.)*
 
 ### Reply-as-bet schema reality
 
@@ -209,7 +209,8 @@ const placeBetSchema = z.object({
 
 - **Bucket A — fully append-only** (10 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events, bet_receipts). Protected by `0003_append_only_triggers.sql` (row-level UPDATE/DELETE) + `0021`/`0022` (statement-level TRUNCATE, ADR-0030); `bet_receipts` (AUDIT-FIX-B3 / ADR-0031) ships all three guards in `0022` reusing the shared functions. Reject UPDATE/DELETE/TRUNCATE at the storage layer.
 - **Bucket B — append-only with whitelisted column transition(s)** (3 tables: identity-pool, image-uploads, system-state). Each permits a one-shot `NULL→timestamp` transition on a whitelisted column — e.g. `system_state.frozen_at` flips once then is immutable (`image_uploads` transitions `terminal_state` + `terminal_at` together). All other column changes, every DELETE, and every TRUNCATE are rejected at the storage layer (TRUNCATE statement-level, ADR-0030).
-- **Bucket C — mutable** (e.g. `positions`).
+- **Bucket C — mutable** (e.g. `positions`, `bookmarks`, `lots`).
+  - ⚠ **`lots` is Bucket C and carries a DELETE guard, which no bucket name covers** (ADR-0039 D-1, SPEC.2 §5.2; added at MERGE-1, where this line still read *"e.g. `positions`"* alone). Its shape is narrower than either family: the row may CHANGE — that is what `surviving_shares` is for — in ONE direction, forever, and may never LEAVE. Calling it Bucket A would assert UPDATE is forbidden, the opposite of true. So migration `0026` gives it a row-level `BEFORE DELETE` reject named `lots_no_delete` **deliberately outside the `bucket_%` family**, so it enters neither the §6 append-only contract nor the staging reset's guard catalogue — both of which it would misdescribe. **The protected count is unchanged at thirteen**, and `EXPECTED_GUARD_CATALOG_ROWS` stays 78.
 
 ### Migrations (`drizzle/migrations/`)
 

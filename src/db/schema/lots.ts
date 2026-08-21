@@ -27,8 +27,13 @@ import { markets } from "./markets";
 // `lots` is deliberately NOT added to `tests/db/_fixtures/truncate.ts`'s
 // TRUNCATE_GUARDS — a teardown's `TRUNCATE bets CASCADE` reaches `lots` through
 // the FK and must succeed. The append-only property this table DOES need is
-// directional (R9: a lot never grows, and Sold is permanent), and that is a
-// CHECK, not a trigger.
+// TWO-part, and the two parts are enforced in different places: R9's DIRECTION
+// (a lot never grows) is APPLICATION-enforced, because the CHECKs below bound
+// RANGE and not direction; R9's PERMANENCE (Sold is a state, not a removal) is
+// STORAGE-enforced, by `0026`'s row-level `lots_no_delete` BEFORE DELETE
+// trigger. Corrected at MERGE-1: this sentence read "and that is a CHECK, not a
+// trigger", which is wrong on both halves — see the CHECK block below and
+// ADR-0039 D-1.
 //
 // INV surface (ADR-0039 §Invariant impact): INV-1 reinforced (above); INV-2
 // untouched — `surviving_basis` is a COST RECORD, never a spendable balance,
@@ -137,9 +142,25 @@ export const lots = pgTable(
 			"lots_surviving_basis_non_negative",
 			sql`${table.survivingBasis} >= 0`,
 		),
-		// R9 — Sold is permanent, and a lot never grows. Monotonicity is enforced
-		// against the immutable originals, which is strictly stronger than
-		// comparing against the previous value (which storage cannot see).
+		// R9's RANGE bound — and ONLY that. `surviving <= original` says a lot is
+		// never larger than it was minted. It does NOT say a lot never GROWS: an
+		// UPDATE raising `surviving_shares` from 5 back to 20 against an original
+		// of 20 satisfies both CHECKs, and nothing at the storage layer refuses
+		// it. So R9's MONOTONICITY is APPLICATION-enforced — `sellFromLot` is the
+		// only function that computes a new surviving value, and
+		// `planLotSale`/`applyLotSale` the only path that writes one — while R9's
+		// PERMANENCE is storage-enforced by `0026`'s `lots_no_delete`. The
+		// UPDATE-monotonicity trigger that would move the first half into storage
+		// too is DOCKETED, not built (ADR-0039 D-1).
+		//
+		// ⚠ Corrected at MERGE-1. This comment claimed the comparison against the
+		// immutable originals was "strictly stronger than comparing against the
+		// previous value (which storage cannot see)". Both halves were false, and
+		// backwards: `new <= old` IMPLIES `new <= original` and the converse does
+		// not, so the dismissed comparison is the stronger one; and storage sees
+		// the previous value whenever a trigger is asked to look — `0003`'s
+		// Bucket-B functions compare OLD/NEW row images routinely, which is the
+		// entire mechanism of the whitelisted-transition pattern.
 		check(
 			"lots_surviving_shares_monotone",
 			sql`${table.survivingShares} <= ${table.originalShares}`,

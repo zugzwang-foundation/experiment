@@ -108,6 +108,24 @@ words (D-1's *"the append-only guarantee it needs is directional monotonicity
 it actually lives — but the quotation mismatch is flagged rather than silently
 reconciled, in case the quoted version exists in a draft outside the repo.
 
+> ⛔ **ANSWERED AND FALSIFIED at MERGE-1 — annotated, not rewritten.** The string
+> is in the repo, at `src/db/schema/lots.ts:140–142`, and the kickoff quoted it
+> accurately. The search that said otherwise was line-scoped, and the sentence
+> wraps: `strictly stronger than` ends one comment line, `comparing against the
+> previous value` begins the next, so no line-oriented `grep` can match it.
+> `rg -U`, or a bare `rg -n "strictly stronger"`, finds it at once.
+>
+> The consequence is the one O-5 exists to name: the amendment went to ADR-0039
+> and the site that actually states the superseded position was left standing —
+> **and so was a second copy of it**, at `src/db/schema/lots.ts:30–31`, in the
+> very words this Q1 quotes as living "somewhere else". Both are corrected at
+> MERGE-1. Two further copies sit in committed migrations (`0025:15–16`,
+> `0026:3–4`) where the append-only rule forbids editing; those are reported for
+> a ruling rather than touched.
+>
+> Kept verbatim above because a log records what a session believed at the time.
+> The correction attaches to it; it does not replace it.
+
 **Q2 · The UPDATE-monotonicity trigger is docketed, not built** (ratified, R-B).
 The CHECKs bound RANGE, not DIRECTION: an UPDATE raising `surviving_shares` 5 → 20
 against an original of 20 satisfies every constraint on the table. R9's

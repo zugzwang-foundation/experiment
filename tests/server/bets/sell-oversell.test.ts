@@ -247,8 +247,18 @@ describe("AUDIT-FIX-B3 A3 — sell oversell → cached 400 (not uncached 500)", 
 		// failure throws a bare `InvalidRequestBodyError` with no field detail, so
 		// the message does not name `lotId`; and a 400 is CACHED under the
 		// idempotency key, so the corrected request must be reissued under a FRESH
-		// key or it replays the same refusal. An unhelpful error the client cannot
-		// retry its way out of.
+		// key to be heard at all. An unhelpful error the client cannot retry its
+		// way out of.
+		//
+		// ⚠ Corrected at MERGE-1: this said the corrected request "replays the
+		// same refusal", and it does not. Correcting the body changes its bytes,
+		// so `computeBodyFingerprint` no longer matches the cached one and the
+		// lookup returns `mismatch` (idempotency/cache.ts:203-206), which the
+		// endpoint answers as 409 `error_idempotency_key_reused`
+		// (bets/endpoint.ts:250-258) — never the stale 400. The conclusion above
+		// is unchanged and the reason for it is worse: a client that reads
+		// key-reused as "pick a new key" has been handed the one instruction that
+		// turns a refused sell into a second executed one.
 		const userId = await seedUser("nulllot", "nulllot");
 		const marketId = await seedOpenMarketWithPool("nulllot-market");
 		await seedHeldPosition(userId, marketId, "5.000000000000000000");
