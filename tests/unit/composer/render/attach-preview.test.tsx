@@ -9,6 +9,7 @@ import {
 } from "@testing-library/react";
 import { useEffect, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { EMPTY_SLOT_COPY } from "@/components/debate/composer/copy";
 import {
 	ImageAttach,
 	type ImageAttachState,
@@ -221,7 +222,7 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		// one, not narrower.
 		//
 		// The pick-button branch renders `${state.name}…` directly under the box
-		// while attaching. Guarding only `attached` would print `add image` above
+		// while attaching. Guarding only `attached` would print `Add Image` above
 		// `chart.png…` — the slot inviting an attach that is mid-flight one line
 		// below it.
 		const { container } = mount();
@@ -235,7 +236,7 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		expect(previewImg()).toBeNull();
 		const column = screen.getByLabelText("Attach an image");
 		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
-		expect(column.innerHTML).not.toContain("add image");
+		expect(column.innerHTML).not.toContain(EMPTY_SLOT_COPY.action);
 		// The in-flight filename still shows — the upload was not cancelled.
 		expect(column.innerHTML).toContain("chart.png");
 		// And the box is still a 4:5 box, so the column does not collapse.
@@ -249,7 +250,7 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		// `onError` clears the object URL, and it can fire once the phase is
 		// already `attached` — a file that signed and PUT fine but will not decode
 		// in this browser. The empty slot now carries a figure ending in
-		// `add image`; keying that figure on the URL alone would print an
+		// `Add Image`; keying that figure on the URL alone would print an
 		// invitation to attach directly above the filename that IS attached, and
 		// its Remove control. The box would be arguing with the row beneath it.
 		//
@@ -266,7 +267,7 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		const column = screen.getByLabelText("Attach an image");
 		// No figure — and specifically not its instruction line.
 		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
-		expect(column.innerHTML).not.toContain("add image");
+		expect(column.innerHTML).not.toContain(EMPTY_SLOT_COPY.action);
 		// The attachment itself is untouched: the filename and Remove still stand.
 		expect(column.innerHTML).toContain("chart.png");
 		expect(screen.getAllByLabelText("Remove image")).toHaveLength(1);
@@ -298,7 +299,7 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		const column = screen.getByLabelText("Attach an image");
 		// THE box, not A 4:5 element: no figure, and none of its instruction text.
 		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
-		expect(column.innerHTML).not.toContain("add image");
+		expect(column.innerHTML).not.toContain(EMPTY_SLOT_COPY.action);
 		// The empty 4:5 box is back — the slot never collapses.
 		expect(column.innerHTML).toMatch(/aspect-\[4\/5\]/);
 		// And the URL it had minted was released rather than stranded.

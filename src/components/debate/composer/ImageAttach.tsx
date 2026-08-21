@@ -45,24 +45,37 @@ const PICK_LABEL = "Choose an image file";
  *
  * ⚠ THE WORDS ARE THE PAYLOAD; THE DRAWING IS SUPPORT. At the real rendered
  * width (~250px) the viewBox scales 1.25×, so the headline lands near 16px and
- * `add image` near 14px. The scale occupies the top ~43% and no more: when the
+ * `Add Image` near 14px. The scale occupies the top ~43% and no more: when the
  * two competed for room the drawing was the one that gave way, because a
  * participant who cannot read the sentence has been shown nothing.
  *
- * ⚠ `add image` IS THE ONLY AFFORDANCE TEXT LEFT. Canon §6's caption
- * `Shown whole · any orientation` sat under this box and was deleted in the
- * same commit; the label `Image` outside the box names the field, not the
- * action. So this line is the sole thing telling a participant the box can be
- * clicked. It is given real vertical separation from the headline (42 user
- * units — more than twice the headline's own line gap) so it reads as an
- * instruction rather than a fourth line of the sentence, and it takes `ink`,
- * the same fill as the headline, so nothing about its priority is hedged.
+ * ⚠ `Add Image` IS THE ONLY AFFORDANCE TEXT LEFT. Canon §6's caption
+ * `Shown whole · any orientation` sat under this box and was deleted; the label
+ * `Image` outside the box names the field, not the action. So this line is the
+ * sole thing telling a participant the box can be clicked. It is given real
+ * vertical separation from the headline (42 user units — more than twice the
+ * headline's own line gap) so it reads as an instruction rather than a fourth
+ * line of the sentence, and it takes the SAME fill as the headline, so nothing
+ * about its priority is hedged. Title Case is part of that: it reads as a
+ * control's label rather than as more of the sentence above it.
  *
- * ⚠ TOKENS ONLY — no hex literal appears here. Two fills are deliberately one
- * step BRIGHTER than `GoalFigure`'s: the deck draws on a lighter card, this
- * draws on `bg-n1` (#2a2a2a), and n4 against that surface falls to roughly
- * 3:1. The capital circle and its letters take `n5` instead. Same drawing, same
- * monochrome ramp, read on the surface it actually sits on.
+ * ⚠ TOKENS ONLY — no hex literal appears here, and THE WHOLE FIGURE SITS ONE
+ * RUNG DOWN THE RAMP FROM WHERE IT STARTED (`ink`→`n6`, `n6`→`n5`, `n5`→`n4`).
+ * It is a PLACEHOLDER: it occupies the space a participant's own image will
+ * take, so it must not carry the weight of real content. Drawn at `ink` it read
+ * as the brightest thing in the composer — louder than the argument being typed
+ * beside it — which is the wrong claim for something that exists to be replaced.
+ *
+ * ⛔ ONE UNIFORM STEP, NOT A RE-PICK PER ELEMENT, and that is what keeps this
+ * safe: every internal relationship — structure over label, knowledge side solid
+ * over capital side hollow, headline over eyebrow — is preserved exactly, so the
+ * figure recedes without being redesigned. Computed against `bg-n1` (#2a2a2a),
+ * not eyeballed: headline and `Add Image` at `n6` = **7.64:1**, `K · n` at `n5`
+ * = **4.98:1** — both clear the 4.5:1 AA floor, so the step costs no legibility
+ * where legibility is the point. `ink` was 13.75:1, which is the number that
+ * made it read as foreground rather than as a placeholder. Only decoration
+ * reaches `n4` (3.07:1) — the hangers, the capital circle and its two small
+ * labels, and the eyebrow — none of which must be read to use the control.
  *
  * `aria-hidden` is on the `<svg>` per the a11y contract at the top of this
  * file: the pick control owns the accessible name, and text inside this figure
@@ -79,7 +92,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				y1="53"
 				x2="162"
 				y2="31"
-				stroke="var(--color-ink)"
+				stroke="var(--color-n6)"
 				strokeWidth="2"
 			/>
 			<line
@@ -87,21 +100,21 @@ function EmptySlotFigure({ className }: { className: string }) {
 				y1="42"
 				x2="100"
 				y2="86"
-				stroke="var(--color-ink)"
+				stroke="var(--color-n6)"
 				strokeWidth="2"
 			/>
-			<polygon points="90,96 110,96 100,86" fill="var(--color-ink)" />
-			<circle cx="100" cy="42" r="3" fill="var(--color-ink)" />
+			<polygon points="90,96 110,96 100,86" fill="var(--color-n6)" />
+			<circle cx="100" cy="42" r="3" fill="var(--color-n6)" />
 			{/* Left pan — seven dots, solid: knowledge has mass. */}
 			<line
 				x1="38"
 				y1="53"
 				x2="38"
 				y2="64"
-				stroke="var(--color-n5)"
+				stroke="var(--color-n4)"
 				strokeWidth="1.5"
 			/>
-			<g fill="var(--color-ink)">
+			<g fill="var(--color-n6)">
 				<circle cx="28" cy="70" r="4" />
 				<circle cx="38" cy="70" r="4" />
 				<circle cx="48" cy="70" r="4" />
@@ -116,7 +129,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				textAnchor="middle"
 				fontSize="11"
 				fontWeight="800"
-				fill="var(--color-n6)"
+				fill="var(--color-n5)"
 			>
 				K · n
 			</text>
@@ -126,7 +139,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				y1="31"
 				x2="162"
 				y2="43"
-				stroke="var(--color-n5)"
+				stroke="var(--color-n4)"
 				strokeWidth="1.5"
 			/>
 			<circle
@@ -134,7 +147,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				cy="58"
 				r="13"
 				fill="none"
-				stroke="var(--color-n5)"
+				stroke="var(--color-n4)"
 				strokeWidth="2"
 			/>
 			<text
@@ -143,7 +156,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				textAnchor="middle"
 				fontSize="13"
 				fontWeight="800"
-				fill="var(--color-n5)"
+				fill="var(--color-n4)"
 			>
 				C
 			</text>
@@ -153,7 +166,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				textAnchor="middle"
 				fontSize="9.5"
 				fontWeight="700"
-				fill="var(--color-n5)"
+				fill="var(--color-n4)"
 			>
 				capital
 			</text>
@@ -165,7 +178,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				fontSize="8.5"
 				fontWeight="700"
 				letterSpacing="1.4"
-				fill="var(--color-n5)"
+				fill="var(--color-n4)"
 			>
 				{EMPTY_SLOT_COPY.eyebrow}
 			</text>
@@ -175,7 +188,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				textAnchor="middle"
 				fontSize="13"
 				fontWeight="700"
-				fill="var(--color-ink)"
+				fill="var(--color-n6)"
 			>
 				{headOne}
 			</text>
@@ -185,7 +198,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				textAnchor="middle"
 				fontSize="13"
 				fontWeight="700"
-				fill="var(--color-ink)"
+				fill="var(--color-n6)"
 			>
 				{headTwo}
 			</text>
@@ -197,7 +210,7 @@ function EmptySlotFigure({ className }: { className: string }) {
 				fontSize="11"
 				fontWeight="700"
 				letterSpacing="0.6"
-				fill="var(--color-ink)"
+				fill="var(--color-n6)"
 			>
 				{EMPTY_SLOT_COPY.action}
 			</text>
@@ -392,7 +405,7 @@ export function ImageAttach({
 	// ⚠ THREE ARMS, NOT TWO, AND THE MIDDLE ONE IS THE REACHABLE EDGE. "No
 	// preview URL" and "no file picked" are DIFFERENT conditions, and they come
 	// apart wherever the `onError` fallback below clears the URL because a picked
-	// file will not decode. The figure ends in `add image`; rendering it on
+	// file will not decode. The figure ends in `Add Image`; rendering it on
 	// `previewUrl === null` alone would print that invitation directly above the
 	// filename sitting one line below — the slot contradicting the row underneath
 	// it, offering an action already taken.
