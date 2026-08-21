@@ -15,6 +15,7 @@ import {
 	CANONICAL_ZERO,
 	mintLot,
 	sellFromLot,
+	sumLots,
 } from "./compute";
 
 /**
@@ -103,6 +104,10 @@ export type PlannedLotSale = {
  *   `Σ surviving lot shares` still equals `positions.quantity` afterwards (R2).
  *   `shares == positions.quantity` is the R3 "sell all" case and falls out:
  *   every lot takes the full-sale branch and every lot ends Sold.
+ *   ⚠ This arm CLAMPS to `Σ surviving` and never refuses. Zero lots and
+ *   not-enough lots are the same situation — `lots` disagreeing with
+ *   `positions` — and R2 makes `positions` the authority in both. See the two
+ *   blocks in the body; they are one ruling, not two.
  *
  * Lots are ordered by `(created_at, id)` — deterministic, and the order matters
  * because `allocateProRata`'s largest-remainder tiebreak is positional.
@@ -136,11 +141,25 @@ export async function planLotSale(
 					eq(lots.id, args.lotId),
 					eq(lots.userId, args.userId),
 					eq(lots.marketId, args.marketId),
+					// SIDE, and it belongs here for the same reason it is in the
+					// position arm below. Without it a lot id from the participant's
+					// OTHER side in this market resolves, and the sale reduces a YES
+					// lot to pay for a NO exit — attribution silently charged to an
+					// argument the participant never sold out of. INV-3 freezes a
+					// comment to its side at post time; a lot is that same argument's
+					// accounting, so it inherits the binding rather than re-deciding
+					// it. `side` here is `held.side` (bets/sell.ts), so this is the
+					// sale's side, never a client-supplied one.
+					//
+					// Two arms of one function had one predicate between them. That
+					// is a divergence, not a missing feature.
+					eq(lots.side, args.side),
 				),
 			)
 			.limit(1);
-		// Scoped by user AND market, so another participant's lot id is "not
-		// found" rather than "forbidden" — the id itself stays unconfirmable.
+		// Scoped by user AND market AND side, so another participant's lot id —
+		// or one of the caller's own on the wrong side — is "not found" rather
+		// than "forbidden": the id itself stays unconfirmable.
 		if (row === undefined) {
 			throw new LotNotFoundError();
 		}
@@ -195,9 +214,25 @@ export async function planLotSale(
 		// failure than incomplete attribution, and it is the failure the naive
 		// reading produces.
 		//
-		// So: nothing to attribute, nothing to reduce, sell continues. The drift
-		// itself is not swallowed — `I-LOT-SUM-001` asserts the equality against
-		// live data, which is where a real divergence should surface.
+		// So: nothing to attribute, nothing to reduce, sell continues.
+		//
+		// ⚠ **AND THE DRIFT IS CURRENTLY UNDETECTED IN A LIVE ENVIRONMENT. THAT
+		// IS OWED WORK, NOT A COVERED CASE.** This comment used to claim
+		// "`I-LOT-SUM-001` asserts the equality against live data, which is where
+		// a real divergence should surface." That is false, and it is the more
+		// dangerous kind of false: it reads as a backstop. `I-LOT-SUM-001` seeds
+		// its own rows into a local ephemeral Postgres and truncates after — it
+		// can no more observe staging or production than any other unit of the
+		// suite can. It proves the RULE. It observes NOTHING.
+		//
+		// The decision below is still right, and nothing here changes it: an
+		// attribution layer must not veto its authority. But "we chose to
+		// continue" and "we would find out" are different claims, and only the
+		// first one is true today. What is owed is a live-environment check —
+		// the staging gates are where it belongs, alongside conservation and
+		// durable-receipt integrity — that reads Σ `lots.surviving_shares`
+		// against `positions.quantity` per (user, market, side) on a real
+		// database and fails RED on a difference.
 		//
 		// ⚠ The PER-LOT path above still refuses, and must: there the lot IS the
 		// subject of the request, so a bad or empty id is a wrong request rather
@@ -205,9 +240,45 @@ export async function planLotSale(
 		return [];
 	}
 
+	// THE CLAMP — and it is the SAME ruling as the empty-rows arm above, applied
+	// to the case that arm does not cover.
+	//
+	// `rows.length === 0` is only the total drift. PARTIAL drift — some lots, but
+	// summing to less than `positions.quantity` — lands here instead, and until
+	// this clamp it hit `allocateProRata`'s `target > total` guard and threw. So
+	// the participant holding 100 shares against 60 shares of lots could not exit
+	// AT ALL: `positions` says they own it, `lots` disagrees, and the attribution
+	// layer won. That is precisely the veto R2 forbids, reached by the one path
+	// the empty-rows reasoning left open. Zero lots was handled and "not quite
+	// enough lots" was not, which is the harder case to notice and the likelier
+	// one to occur.
+	//
+	// So: allocate `min(requested, Σ surviving)` and let the unattributable
+	// remainder pass unattributed. The position-level exit is what the
+	// participant asked for and `positions` is the authority for it;
+	// `bets/sell.ts` has already refused anything exceeding `positions.quantity`,
+	// so the only quantity this can silently drop is one that had no lot to
+	// charge in the first place.
+	//
+	// ⚠ `allocateProRata` KEEPS its throw and must. It is the pure core, its
+	// guard is a caller-bug assertion, and clamping there would erase the signal
+	// for every caller including a genuinely wrong one. The rule is that
+	// `planLotSale` never hands it an impossible target — not that the target
+	// stops being impossible.
+	//
+	// Σ is taken through the shipped `sumLots` rather than re-summed here: a
+	// second summation is a second implementation, and it would agree right up
+	// until the moment it mattered.
+	const survivingTotal = sumLots(rows).survivingShares;
+	const allocatable = new CpmmDecimal(args.sharesToSell).greaterThan(
+		survivingTotal,
+	)
+		? survivingTotal
+		: args.sharesToSell;
+
 	const allocation = allocateProRata({
 		lots: rows,
-		sharesToSell: args.sharesToSell,
+		sharesToSell: allocatable,
 	});
 
 	const planned: PlannedLotSale[] = [];

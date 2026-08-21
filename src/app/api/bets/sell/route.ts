@@ -23,7 +23,17 @@ const sellBodySchema = z.object({
 	// LOTS-1 / ADR-0039 R3 — the argument being exited. OPTIONAL: omitting it is
 	// the position-level sell this route has always performed, so every existing
 	// client keeps working and keeps meaning the same thing.
-	lotId: z.string().uuid().optional(),
+	//
+	// `.nullish()`, NOT `.optional()`. The internal type is `string | null` and
+	// BOTH call sites normalise with `?? null`, so `null` is what a
+	// position-level sell means everywhere behind this line — but `.optional()`
+	// admits only ABSENT, and a client serialising the shape it was handed
+	// (`{marketId, shares, lotId: null}`) was rejected. Rejected badly, at that:
+	// `safeParse` failure throws a bare `InvalidRequestBodyError` with no field
+	// detail, so the participant is told "invalid body" about a body that says
+	// exactly what they meant — AND the 400 is CACHED under the idempotency key,
+	// so the correction has to be reissued under a fresh key to be heard at all.
+	lotId: z.string().uuid().nullish(),
 });
 
 export async function POST(request: Request): Promise<Response> {

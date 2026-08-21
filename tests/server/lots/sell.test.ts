@@ -478,6 +478,53 @@ describe("LOTS-1 Slice 5 — attribution never vetoes the authority (R2)", () =>
 		expect(await lotRows(userId)).toHaveLength(0);
 	});
 
+	it("a POSITION-level sell still works when the lots sum to LESS than the sale", async () => {
+		// ⚠ THE PARTIAL-DRIFT CASE, and it is the one the empty-holding test above
+		// does NOT cover. Zero lots was handled; "some lots, but not enough" fell
+		// through to `allocateProRata`'s `target > total` guard and threw — so a
+		// participant whose lots had drifted BELOW their position could not exit
+		// at all. Same trapped Dharma, same veto R2 forbids, reached by the path
+		// the empty-rows reasoning left open. It is also the likelier drift:
+		// losing every lot takes a catastrophe, losing some takes a bug.
+		//
+		// Driven through a REAL bet so the lot is one the engine minted, then
+		// shrunk to manufacture the drift. `lots` is Bucket C, so the UPDATE is
+		// legal — which is exactly why the drift is reachable in the first place.
+		const userId = await seedUser("lotsell13", "5000");
+		const marketId = await seedOpenMarketWithPool("lot-sell-13");
+		await placeBet({ userId, marketId, side: "YES", stake: "100" });
+
+		const before = await positionQty(userId, marketId);
+		const [lot] = await lotRows(userId);
+		await testDb
+			.update(lots)
+			.set({
+				survivingShares: "1.000000000000000000",
+				survivingBasis: "0.500000000000000000",
+			})
+			.where(eq(lots.id, lot?.id ?? ""));
+
+		// 2 > the 1 share of lots that survives, and well under the position.
+		const result = await doSell({
+			userId,
+			marketId,
+			shares: "2.000000000000000000",
+		});
+
+		expect(result.sharesSold).toBe("2.000000000000000000");
+		// The AUTHORITY moved by the full requested amount...
+		expect(await positionQty(userId, marketId)).toBe(
+			before - units("2.000000000000000000"),
+		);
+		// ...and the attribution gave everything it had, which is all it can do.
+		// The remaining 1 share is unattributable and passes unattributed —
+		// deliberately, exactly as the no-lots arm lets the whole sale pass.
+		const after = await lotRows(userId);
+		expect(after).toHaveLength(1);
+		expect(after[0]?.survivingShares).toBe("0.000000000000000000");
+		expect(after[0]?.survivingBasis).toBe("0.000000000000000000");
+	});
+
 	it("a PER-LOT sell still refuses an unknown lot — there the lot IS the request", async () => {
 		const userId = await seedUser("lotsell12", "5000");
 		const marketId = await seedOpenMarketWithPool("lot-sell-12");
