@@ -407,8 +407,17 @@ export function badgeFor(
  * bet would score ZERO — silently deleting a real contribution — where all
  * shipped sites use `COALESCE(lots.surviving_basis, bets.stake)` and read an
  * unknown surviving amount as "all of it survives". Every bet mints its lot in
- * the same transaction (R8), so the fallback should never fire; it is there
- * because the failure it prevents would be invisible if it did.
+ * the same transaction (R8), so the fallback should never fire.
+ *
+ * ⚠ **BOTH failures are invisible, and the fallback is right anyway.** An earlier
+ * draft justified it by saying the failure it prevents would be the silent one.
+ * Neither announces itself: a row scored zero looks exactly like a genuine full
+ * exit, and a row riding the fallback looks exactly like an untouched argument —
+ * `sold` false, original equal to current, no tag, no strikethrough. The fallback
+ * is right because DELETING a real argument's weight is the worse of two silent
+ * errors, not because it is the louder one. Which is also why a lot-less row is
+ * now the ONE class that holds ranking weight regardless of exit; nothing
+ * detects it, and R8 forbids the back-fill that would repair it.
  *
  * ⚠ The lane order CHANGES for any market where a reply has been sold down.
  * **That change is the fix, not a regression** — a shipped ordering assertion
