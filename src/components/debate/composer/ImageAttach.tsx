@@ -390,20 +390,36 @@ export function ImageAttach({
 	// the box says what it is for, in words the participant has already read.
 	//
 	// ⚠ THREE ARMS, NOT TWO, AND THE MIDDLE ONE IS THE REACHABLE EDGE. "No
-	// preview URL" and "no image attached" are DIFFERENT conditions, and they
-	// come apart in exactly one place: the `onError` fallback below clears the
-	// URL when a picked file will not decode, and it can fire while the phase is
-	// already `attached`. Rendering the figure on `previewUrl === null` alone
-	// would then put "add image" beside the attached filename and its Remove
-	// control — the slot contradicting the row underneath it, inviting an action
-	// that has already been taken. So the figure is shown only when nothing is
-	// attached; the degraded attached case falls back to the plain box this file
-	// shipped before, which says nothing rather than something false.
-	// Caught by `empty-slot-figure.test.tsx::the-attached-phase-shows-no-figure`.
+	// preview URL" and "no file picked" are DIFFERENT conditions, and they come
+	// apart wherever the `onError` fallback below clears the URL because a picked
+	// file will not decode. The figure ends in `add image`; rendering it on
+	// `previewUrl === null` alone would print that invitation directly above the
+	// filename sitting one line below — the slot contradicting the row underneath
+	// it, offering an action already taken.
+	//
+	// ⛔ THE RULE, NOT A PHASE LIST: the figure appears only when NOTHING IS IN
+	// HAND. `none` and `error` are the empty states — nothing picked, or a pick
+	// that was rejected and must be retried — and there the invitation is exactly
+	// right. `attaching` and `attached` both mean a file IS in hand, and there it
+	// is wrong regardless of whether the preview survived. `fileInHand` states
+	// that rule once so a fourth phase cannot be added without answering it.
+	//
+	// ⚠ `attaching` IS THE LIKELIER WINDOW OF THE TWO, and guarding only
+	// `attached` (as the first cut did) missed it. Decode is attempted on FIRST
+	// PAINT — the instant the `<img>` mounts, which is the instant the file is
+	// picked — and the PUT is still in flight then, so the phase is `attaching`
+	// for the whole upload. A file carrying a valid image MIME that nonetheless
+	// will not decode passes the client MIME guard untouched and never reaches
+	// `error`. The pick-button branch renders `${state.name}…` beneath the box in
+	// that phase, so the contradiction is not only possible there, it is the
+	// common case. Caught at Gate C; pinned by
+	// `attach-preview.test.tsx::preview::a-decode-failure-while-attaching-does-not-invite-a-second-add`
+	// and its `-attached-` twin.
 	const emptyBox = <span aria-hidden="true" className={preview} />;
+	const fileInHand = state.phase === "attaching" || state.phase === "attached";
 	const previewBox =
 		previewUrl === null ? (
-			state.phase === "attached" ? (
+			fileInHand ? (
 				emptyBox
 			) : (
 				<EmptySlotFigure className={preview} />

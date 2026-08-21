@@ -167,17 +167,33 @@ describe("a populated preview replaces the figure entirely", () => {
 		expect(figure()).toBeNull();
 	});
 
-	it("empty-slot::the-figure-is-present-in-the-non-populated-phases", () => {
-		// `attaching` and `error` have no preview URL either, so the box is still
-		// the empty box and still says what it is for.
+	it("empty-slot::the-figure-is-present-only-when-nothing-is-in-hand", () => {
+		// ⛔ THIS TEST USED TO PIN THE DEFECT AS INTENDED. It listed `attaching`
+		// alongside `error` and asserted the figure SHOULD render in both — so the
+		// suite actively defended printing `add image` above an in-flight filename.
+		// A wrong expectation is worse than a missing one: it makes the fix look
+		// like the regression.
+		//
+		// The rule is about what is IN HAND, not about whether a preview URL
+		// happens to exist. `none` and `error` are the empty states — nothing
+		// picked, or a pick rejected and awaiting a retry — and there the
+		// invitation is right. `error` keeps it deliberately: retry is exactly what
+		// that phase needs, and no filename renders there to contradict it.
 		for (const state of [
-			{ phase: "attaching", name: "chart.png" },
+			{ phase: "none" },
 			{ phase: "error", message: "Too large." },
 		] as ImageAttachState[]) {
 			renderPhase(state);
 			expect(figure()).not.toBeNull();
 			cleanup();
 		}
+	});
+
+	it("empty-slot::the-attaching-phase-shows-no-figure", () => {
+		// The other half of `fileInHand`. A file is picked and uploading; the box
+		// must not invite a second one, whatever became of its preview.
+		renderPhase({ phase: "attaching", name: "chart.png" });
+		expect(figure()).toBeNull();
 	});
 });
 

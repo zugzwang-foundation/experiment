@@ -209,6 +209,39 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		expect(previewImg()?.getAttribute("aria-hidden")).toBe("true");
 	});
 
+	it("preview::a-decode-failure-while-attaching-does-not-invite-a-second-add", () => {
+		// ⛔ THE LIKELIER HALF OF THE SAME EDGE, and the one the first fix missed.
+		//
+		// Decode is attempted on FIRST PAINT — the moment the `<img>` mounts, which
+		// is the moment the file is picked. The PUT is still in flight then, so the
+		// phase is `attaching`, not `attached`, for the whole upload. A file with a
+		// valid image MIME that nonetheless will not decode (truncated, malformed,
+		// a format this browser refuses) sails past the client MIME guard and sits
+		// in `attaching` the entire time. So this window is WIDER than the attached
+		// one, not narrower.
+		//
+		// The pick-button branch renders `${state.name}…` directly under the box
+		// while attaching. Guarding only `attached` would print `add image` above
+		// `chart.png…` — the slot inviting an attach that is mid-flight one line
+		// below it.
+		const { container } = mount();
+		pick(container, "chart.png");
+		// No `advance` — the harness's own `onPick` sets `attaching`, exactly as
+		// `BetComposer.onPickImage` does synchronously before its await.
+		expect(previewImg()).not.toBeNull();
+
+		fireEvent.error(previewImg() as HTMLImageElement);
+
+		expect(previewImg()).toBeNull();
+		const column = screen.getByLabelText("Attach an image");
+		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
+		expect(column.innerHTML).not.toContain("add image");
+		// The in-flight filename still shows — the upload was not cancelled.
+		expect(column.innerHTML).toContain("chart.png");
+		// And the box is still a 4:5 box, so the column does not collapse.
+		expect(column.innerHTML).toMatch(/aspect-\[4\/5\]/);
+	});
+
 	it("preview::a-decode-failure-while-attached-does-not-invite-a-second-add", () => {
 		// ⛔ THE REACHABLE EDGE WHERE "no preview URL" AND "nothing attached" COME
 		// APART, walked end to end rather than rendered as a state.
@@ -244,6 +277,16 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 	it("preview::an-unreadable-file-falls-back-to-the-empty-box", () => {
 		// Requirement 7 — no crash, and no broken-image glyph. `MarketThumb`'s
 		// `onError` fallback, same shape.
+		//
+		// ⛔ THIS TEST ONCE CERTIFIED THE DEFECT IT WAS WRITTEN TO CATCH, and the
+		// reason is worth keeping. It asserted only that the column's innerHTML
+		// still matched `aspect-[4/5]` — but `EmptySlotFigure` is rendered with
+		// `className={preview}`, and `preview` CONTAINS that class. Empty box and
+		// figure share it, so the assertion could not tell them apart and passed
+		// green while the figure was wrongly rendering. `V-4`: a check that matches
+		// a property both artifacts share verifies nothing about which one arrived.
+		// The class assertion is kept — it still guards the column not collapsing —
+		// but the identity of what fills the box is now asserted directly.
 		const { container } = mount();
 		pick(container, "not-really.png");
 		const img = previewImg();
@@ -252,10 +295,12 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 		fireEvent.error(img as HTMLImageElement);
 
 		expect(previewImg()).toBeNull();
+		const column = screen.getByLabelText("Attach an image");
+		// THE box, not A 4:5 element: no figure, and none of its instruction text.
+		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
+		expect(column.innerHTML).not.toContain("add image");
 		// The empty 4:5 box is back — the slot never collapses.
-		expect(screen.getByLabelText("Attach an image").innerHTML).toMatch(
-			/aspect-\[4\/5\]/,
-		);
+		expect(column.innerHTML).toMatch(/aspect-\[4\/5\]/);
 		// And the URL it had minted was released rather than stranded.
 		expect(revokeSpy).toHaveBeenCalledWith(minted[0]);
 	});
