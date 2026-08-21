@@ -140,9 +140,10 @@ export function rateLimitedBanner(secondsLeft: number): string {
  *
  * ⚠ `action` IS AN INSTRUCTION, NOT A CAPTION, and the distinction is why it is
  * separated from the two above rather than treated as a third line of the same
- * block. The canon §6 caption `Shown whole · any orientation` is deleted in the
- * same commit, so this is the ONLY text telling a participant the box is
- * clickable. It carries the affordance alone.
+ * block. The canon §6 caption `Shown whole · any orientation` is deleted, so
+ * this is the ONLY text telling a participant the box is clickable. It carries
+ * the affordance alone — which is also why it is Title Case while the two lines
+ * above it are a sentence: it reads as a control's label, not as more prose.
  */
 export const EMPTY_SLOT_COPY = {
 	eyebrow: "THE GOAL",
@@ -157,7 +158,7 @@ export const EMPTY_SLOT_COPY = {
 	 * The break falls at the sentence's own clause boundary, not mid-phrase.
 	 */
 	headlineLines: ["Knowledge, at scale,", "beats capital."],
-	action: "add image",
+	action: "Add Image",
 } as const;
 
 /** W2.11 P2 modal contents (verbatim). */

@@ -19,7 +19,7 @@ import {
  * string quietly returns, so it is asserted explicitly rather than assumed from
  * the fact that we deleted it once.
  *
- * ⚠ `add image` GETS ITS OWN ASSERTIONS BECAUSE IT IS AN AFFORDANCE, NOT COPY.
+ * ⚠ `Add Image` GETS ITS OWN ASSERTIONS BECAUSE IT IS AN AFFORDANCE, NOT COPY.
  * With canon §6's caption deleted, it is the only text telling a participant the
  * box can be clicked — so its presence, and its separation from the headline,
  * are behaviour rather than decoration. A future edit that folds it into the
@@ -170,7 +170,7 @@ describe("a populated preview replaces the figure entirely", () => {
 	it("empty-slot::the-figure-is-present-only-when-nothing-is-in-hand", () => {
 		// ⛔ THIS TEST USED TO PIN THE DEFECT AS INTENDED. It listed `attaching`
 		// alongside `error` and asserted the figure SHOULD render in both — so the
-		// suite actively defended printing `add image` above an in-flight filename.
+		// suite actively defended printing `Add Image` above an in-flight filename.
 		// A wrong expectation is worse than a missing one: it makes the fix look
 		// like the regression.
 		//
