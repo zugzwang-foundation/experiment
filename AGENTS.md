@@ -72,6 +72,7 @@ experiment/
 │   │   ├── (public)/               # the participant surface — layout.tsx + not-found.tsx (shell, SHELL/UI.0)
 │   │   │                           #   page.tsx                     — DISCOVERY, the market list (UI-A4). LIVE.
 │   │   │                           #   m/[slug]/page.tsx            — the debate view
+│   │   │                           #   m/[slug]/error.tsx           — the debate route error boundary
 │   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
 │   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
 │   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
@@ -88,7 +89,15 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   shadcn primitives: avatar, badge, button, card, dialog, input, separator, skeleton, textarea
+│   │   └── ui/                     #   13 files, and they are NOT all shadcn. NINE shadcn
+│   │                               #   primitives: avatar, badge, button, card, dialog,
+│   │                               #   input, separator, skeleton, textarea. FOUR are
+│   │                               #   project-authored and canon-ratified — empty-block
+│   │                               #   (P1), loading-block (P7), error-block (the
+│   │                               #   route-boundary family; canon §10 C-STATES-1 rules
+│   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
+│   │                               #   item 13, pinned by component name and props).
+│   │                               #   Don't reach for a shadcn generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,

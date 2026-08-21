@@ -732,11 +732,11 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 
 **Expected next task.** An operator/founder read of the two copies side by side. Evidence: `~/Desktop/SYNC-1-recon.md` R1 row 107.
 
-## N5 — SPEC.2 §22 does not know ADR-0035 or ADR-0036
+## N5 — SPEC.2 §22 does not know ADR-0035, ADR-0036 or ADR-0037
 
 **Originating task:** SYNC-1 (2026-08-08), STEP 2.7 — surfaced while correcting SPEC.2 §0, **not** in the original work order.
 
-**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0036 — 34 files.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
+**Deferred work.** Fold **ADR-0035** (guarded staging reset) and **ADR-0036** (Vitest-context operational runners) into SPEC.2 **§22.1** (the index), **§22.5** (the SSOT counts), and the §0 metadata that mirrors them. Today `§22.1` self-describes as *"The 33-row index"* with an inventory of *"33 ADRs — 32 ADR files + ADR-0012 in-flight"* and states *"the numbering runs 0001, (0002 skipped), 0003–0034."* **On disk the numbering runs 0001, (0002 skipped), 0003–0037 — 35 files ⚠ re-measured at SYNC-3, 2026-08-19; this row said 34 and SPEC.2's own annotation said the ceiling was 0036. Both were one behind, because `ADR-0037` landed at #355. Read `ls docs/adr/` at the moment of the fix (`O-2`) — this number will be wrong again.** §0's `ADRs 0003–0034 (32)` mirrors the same stale figure in three places (the status banner, the companion-files line, the *Gates downstream* row).
 
 **Why deferred, and why §0 was only annotated.** SYNC-1's work order authorised **SPEC.2 §0 metadata only** and instructed a STOP if the correction required a normative edit. It does: §22.1 is normative and §22.5 designates the ADR files as the single source of truth, so rewriting §0's range while §22.1 still says 33/0003–0034 would leave SPEC.2 **contradicting itself inside one document** — strictly worse than the present state. §0 therefore carries a truthful annotation naming the real ceiling and pointing here, and no number was changed.
 
@@ -745,6 +745,23 @@ F-AUTH-3 (`identity-pool/consume.ts`) and F-AUTH-4 (`auth/tos-accept.ts`) open p
 **Conditional trigger.** The next SPEC.2 amendment of any kind — it is a §22 count reconciliation, the same shape as the one BOOKMARK-ADD-WIRE performed, and rides that commit at near-zero cost. Also fires if a task needs SPEC.2's ADR index to be authoritative.
 
 **Expected next task.** Any task already amending SPEC.2. Evidence: `docs/specs/SPEC.2.md` §0 banner annotation + §22.1 `:2253`.
+
+✅ **DISCHARGED at SYNC-4, 2026-08-20.** Done as the normative §22.1/§22.5 rebuild this row always
+said it required, not as another running correction. Four index rows added — **0035, 0036, 0037,
+0038** — and every count then **re-measured off the amended table by grepping it, never recomputed**:
+**37 index rows · 34 accepted · 2 superseded · 1 in-flight · 36 rows with a real file · 1 `(file
+pending)` (ADR-0012)**, against **36 ADR files** measured by `ls docs/adr/`. **The §22.3
+cross-reference invariant — that the index match the files on disk — holds again**, having been
+broken since ADR-0035 landed. Corrected at every site the row named: §22.1 heading, §22 intro range,
+the inventory sentence, the status split, the numbering range, §22.5's SSOT cell, and §0's three
+mirrors (status banner, companion-files line, *Gates downstream*). SPEC.2 → **1.0.23**.
+
+⚠ **The §0 annotation that carried this row's warning is gone, deliberately** — its *"folded into
+NEITHER"* clause was true until this commit and false after it, and an annotation that outlives its
+condition is the same defect one layer up. What survives is the standing instruction to read
+`ls docs/adr/` rather than trust the line (`O-2`). ⚠ **The asset-count contradiction this row's
+second-order finding named is NOT resolved here** — it belongs to the identity-pool namespace,
+which is a HARDEN task by founder ruling; see `IDENTITY-POOL-NAMESPACE`.
 
 ## N6 — PERF-1 Layer-2: prove `/api/health`'s `region` field reports the truth
 
@@ -831,6 +848,67 @@ Seven markets carry a hero post on exactly ONE side; one carries none. **Zero ca
 **What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
 
 ---
+## IDENTITY-POOL-NAMESPACE — the pool is sized for 1K–10K signups against a 100,000 target
+
+**Originating task:** SYNC-3 recon, 2026-08-19. **Docketed:** SYNC-3.
+
+**The measurement.** `docs/adr/0011-pseudonym-pool-design.md` states a **50,000** namespace —
+50 colours × 100 animals = 5,000 `(colour, animal)` pairs, each with 10 number variants — and
+justifies it with *"50K namespace with **realistic ceiling at 1K–10K signups** is
+comfortable."* **The target is now 100,000 signups.** That is 10× the top of the stated range
+and 2× the entire namespace. ⚠ **The ADR's own cheap-extension path (10 → 20 numbers per pair)
+arrives at exactly 100,000** — zero headroom — and the same ADR records that *"scrubbed tuples
+shrink the effective pool over time."*
+
+**Why it is not a one-line fix.** The `50,000` figure is restated at **~20 sites across 9
+files**: `SPEC.1` §13 (five sites, including *"comfortable for any realistic experiment-scale
+signup volume"*), `SPEC.2` (four, including the asset-pipeline and the low-watermark alarm),
+`ADR-0016` (two), `SCAFFOLD.17` (five), `SCAFFOLD.2-3C`, and two handover documents. `O-5`
+binds across all of them.
+
+⚠ **ADR-0011 has NO Patch record section and has never been amended in place.** ADR-0006 has
+the precedent and the shape; this one does not.
+
+⚠ **AND THE ASSET COUNT CONTRADICTS ITSELF ON `main` TODAY, before any target change.**
+ADR-0011 `:71` yields **5,000 images** (one per `(colour, animal)` pair; ~3.5 h of Flux, and
+`:112` confirms the extension path *"skips the Flux phase entirely"*, so images are per-pair).
+`ADR-0006` agrees — *"5,000–10,000 images"*. But `SPEC.1` says *"~50,000 × 50 KB webp ≈ 2.5
+GB"* and `SPEC.2` says *"50,000 pseudonym profile pictures"* and *"generates 50,000 PNG"*.
+**That is a 10× discrepancy in the asset pipeline, and `SPEC.1` contradicts itself internally**
+— its neighbouring line correctly says *"each animal image × 10 number variants"*. **Any
+namespace amendment must resolve this first, or it will restate the wrong base.**
+
+⚠ **RULED 2026-08-20: the namespace is a HARDEN task with its own kickoff, not
+a doc sweep.** The founder supplies a 1,000-row colour×animal table; each combo
+takes the full number range. The profile-username scheme is undefined and is
+that task's first deliverable.
+
+⚠ **The first thing that task must measure, because it decides the namespace by
+a factor of 1,000 identities:** staging today zero-pads the number to three
+uniformly — `RedFox000`, not `RedFox0`, measured `distinct_digit_widths = 1`.
+**Padded ⇒ `000–999` = 1,000 variants per asset ⇒ 1,000,000 identities.
+Unpadded ⇒ `0` and `000` collide ⇒ 999.** ✅ **No migration either way** —
+`number` is `smallint NOT NULL` (max 32,767) and `(colour, animal, number)`
+stays unique. This is data and documentation, not schema.
+
+⚠ **And the shipped dev seeder does NOT build the variant shape.** On staging
+`distinct_numbers = 200 = total_rows` — the number runs 0…199 once across the
+whole table, one per pair, not 000–999 per asset. `scripts/seed-identity-pool-dev.ts:7`
+says so: *"20 colours × 10 animals × 1 number per pair = 200"*. **ADR-0011's own
+arithmetic is the variant shape; the dev seeder is not.** Whether the production
+seeder inherits the dev shape is UNMEASURED — its manifest is not in the repo.
+
+**Conditional trigger.** ⛔ **BEFORE the identity-pool seed, and before any signup traffic** —
+`SPEC.1` §13 F-AUTH-3 returns **503 `error_identity_pool_exhausted`** when the pool empties,
+and an exhausted pool fails signups permanently rather than degrading.
+
+**Expected next task.** An ADR-0011 amendment — Patch record or superseding ADR, the founder's
+call — carrying the new construction, plus the `O-5` sweep across all ~20 sites in the same
+commit, plus the asset-count resolution. **Not a doc-lane task alone:** the seeder and the
+image set are real work, and `SCAFFOLD.17`'s verification asserts `count(*) = 50000`.
+
+---
+
 
 ## O1-KICKOFF-INPUT — Discovery's hero at go-live: every market opens with zero posts — **route to O1's kickoff, DECIDE don't discover**
 
@@ -1160,7 +1238,7 @@ the runbook section.
 
 **Originating task:** POLISH-TEMPLATE (2026-08-10). Named twice on `main` — `POLISH-register.md` CC-3 and `docs/plans/DISCOVERY-COMPLETE.md:19` (and its halt item 10) — **both times routing work away from it**, with no row until today.
 
-**Deferred work.** Land `1b7f37f docs(adr): ADR-0006 §4 — back-reference ADR-0026's third R2 bucket`, which is **confirmed absent from `main`**. It was written on the local branch `chore/post-perf-1-docket` and never pushed; DISCOVERY-COMPLETE branched from `origin/main` explicitly and `git merge-base --is-ancestor` confirmed it absent, so it was correctly kept out of #311 rather than dragged in.
+**Deferred work.** Land `1b7f37f docs(adr): ADR-0006 §4 — back-reference ADR-0026's third R2 bucket`, which is **confirmed absent from `main`**. It was written on the branch `chore/post-perf-1-docket`. ⚠ **CORRECTED AT SYNC-3, 2026-08-19: this row said "never pushed" and the branch IS on `origin`, at exactly the `1b7f37f` this row names** — measured with `git ls-remote --heads origin`. The commit is therefore not in one place only, and this row's stated cost no longer describes the situation. What remains true, and was verified two ways: it is **absent from `main`**.
 
 **Why deferred.** It is a one-line ADR back-reference. Opening a PR for it alone costs more than the change is worth, and every task that noticed it correctly declined to absorb an out-of-scope ADR edit.
 
@@ -1169,6 +1247,8 @@ the runbook section.
 **Expected next task.** Any task already editing an ADR. Evidence: `POLISH-register.md` CC-3; `docs/plans/DISCOVERY-COMPLETE.md:19`.
 
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
+
+✅ **DISCHARGED at SYNC-3, 2026-08-19.** The trigger — *"fold into the next task that legitimately opens `docs/adr/`"* — fired, and this is that task. The `Two buckets → THREE` correction lands as a Patch record on ADR-0006 in this same PR, authored fresh rather than cherry-picked, so the unlanded branch commit is now redundant rather than lost.
 
 ---
 
@@ -2099,3 +2179,65 @@ HTML-FINISH row 7 wraps the hero post's argument text in straight ASCII quotes (
 ⚠ **TRIGGER FIRED, ROW UNPAID** — noted at SYNC-2, 2026-08-18. Recorded so the row is not read as still waiting.
 
 ⚠ **A live instance was measured at SYNC-2:** the bare identifier `O-10` named two different rules simultaneously — one minted in `CLAUDE.md` §8, one cited six times across three files. Resolved at SYNC-2 by minting `O-12`; the row stays open because the namespace problem is general and the ADR it calls for is unwritten.
+
+---
+
+## LANE-PLANS-ABSENT — GH-STAR and VIEWS-1 shipped to `src/` with no plan on `main`
+
+**Originating task:** SYNC-3, 2026-08-19. **RULED: neither plan lands.**
+
+Both lanes touched `src/` — GH-STAR at #362 (9 files, +662) and #363 (4 files,
++251), VIEWS-1 at #359 and #360 — and neither has a `docs/plans/` file on
+`main`. `CLAUDE.md` §5.1 requires a plan above 30 lines or 3 files.
+
+**Why nothing was landed retroactively.** #357 set the precedent by committing
+`zz_O1-DECK_plan-full_*.md` **byte-identical** to `docs/plans/O1-DECK.md` — same
+753 lines, same md5 — and that artifact opens *"Status: RATIFIED (amended) …
+Ready for execute."* ⛔ **The GH-STAR artifact is a different class:** no Status
+line, and `## Open decisions — founder to rule, execute does not pick` with
+OD-1…OD-4 **unruled**. Its **OD-2 recommends "a short ADR-0038"** for the star
+count — a recommendation the founder **overruled**, which is why `0038` was free
+for the scale ADR. Landing it would have put a document on `main` proposing
+ADR-0038 for a header control, inside the PR that makes ADR-0038 the scale
+target. GH-STAR-COMPACT and VIEWS-1 have no plan artifact at all.
+
+**Conditional trigger.** The next lane that ships to `src/` without a plan
+reaching `main`. ⚠ **Three lanes in one range is a pattern, not an accident** —
+#357 repaired one in-range and the other two went unnoticed.
+
+**Expected next task.** A `CLAUDE.md` §5.1 rider making the plan's landing part
+of the close-out ritual rather than a separate act of remembering.
+
+---
+
+## STAGING-POOL-UNDERSIZED — 185 unassigned rows against a 50/sec load profile
+
+**Originating task:** SYNC-3, 2026-08-20, measured on staging.
+
+**The measurement.** `identity_pool` on staging holds **200 rows — 15 consumed,
+185 unassigned**. The scale tracker's load profile peaks at **50 signups/sec**.
+⛔ **The pool empties in 3.7 seconds**, and the 5% low-watermark alarm fires
+about a fifth of a second before it. Past that, every signup returns
+`503 error_identity_pool_exhausted`.
+
+**Why this is not the namespace task.** The namespace *definition* is HARDEN's,
+ruled 2026-08-20. This row is the *fixture size* — a different thing, and it
+gates two rows of the scale tracker that the namespace task does not touch:
+**LOAD RUN #1 (3.5)** and **LOAD RUN #2 (4.1)**. At 185 rows both runs measure
+pool exhaustion at second four rather than signup capacity, and **the delta
+between them is the number the compute-tier decision rests on**.
+
+⚠ **It also decides what `G1` is verified against.** Fixing a deadlock that jams
+at four concurrent signups, then proving the fix against a pool that empties at
+second four, proves it against the wrong regime.
+
+**Nothing is broken.** `scripts/seed-staging.ts:2` says *"200 deterministic"* by
+design, inheriting the dev seeder. The fixture is correct for what it was built
+for and inadequate for what the load rig needs.
+
+**Conditional trigger.** ⛔ **BEFORE the load rig is built** — scale tracker row
+2.3, Week 2. Row 2.4 already owns the seeding; only the number changes.
+
+**Expected next task.** Scale tracker row 2.4, with the pool sized to exceed the
+profile. Any placeholder tuple scheme serves — staging is clean-recreate by
+ADR-0035, and the real names arrive from the HARDEN namespace task.
