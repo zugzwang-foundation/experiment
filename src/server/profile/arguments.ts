@@ -167,10 +167,22 @@ export async function loadProfileArguments(
 			COUNT(rb.id) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 			) AS counter_count,
-			COALESCE(SUM(rb.stake) FILTER (
+			-- LOTS-1 / ADR-0039 R4+R5 — the attracted-value aggregates key off SURVIVING
+			-- LOT BASIS, not the frozen bets.stake. A replier who sells their lot
+			-- down withdraws the weight they lent the parent, which is what R5 names.
+			-- The historical figure is not lost: bets.stake is Bucket-A immutable and
+			-- still readable; it simply stops being what this aggregate reports.
+			--
+			-- ⚠ COALESCE FALLS BACK TO THE FROZEN STAKE when a reply-bet has no lot.
+			-- Unreachable under R8 (every bet mints a lot), but the alternative on an
+			-- unreachable row is to silently score a real contribution as ZERO — the
+			-- same class of error as letting missing bookkeeping veto a sell (S5). An
+			-- unknown surviving amount is better read as "all of it survives", which
+			-- is exactly the pre-LOTS-1 behaviour.
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
 			), 0) AS support_dharma,
-			COALESCE(SUM(rb.stake) FILTER (
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 			), 0) AS counter_dharma
 		FROM ${comments} p
@@ -183,6 +195,7 @@ export async function loadProfileArguments(
 		) pb ON true
 		LEFT JOIN ${comments} rc ON rc.parent_comment_id = p.id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
+		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.user_id = ${userId} AND p.parent_comment_id IS NULL
 		GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body, pb.stake, pb.price_at_bet
 	`);
