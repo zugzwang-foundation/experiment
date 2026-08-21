@@ -182,9 +182,13 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 	});
 
 	it("preview::is-shown-whole-and-lands-inside-the-4-5-slot-box", () => {
-		// The caption this slot ships — canon §6, "Shown whole · any orientation" —
-		// forecloses a crop, so the fit must be `object-contain`. And the 4:5 box is
-		// the slot itself (d5 `.imgprev`), pinned in every phase by
+		// `object-contain`, and the reason no longer rests on a caption. Canon §6's
+		// "Shown whole · any orientation" used to sit under this box and carry the
+		// argument; POLISH-4-EMPTYSLOT deleted it, and the obligation outlived the
+		// words. A fixed 4:5 box must crop or letterbox, and the bytes here are
+		// immutable from first write (ADR-0028) inside an append-only comment
+		// (INV-4) — so a crop nobody chose becomes permanent and public. Letterbox.
+		// The 4:5 box is the slot itself (d5 `.imgprev`), pinned in every phase by
 		// `attach-phases.test.tsx`; the image must land INSIDE it, not replace it.
 		const { container } = mount();
 		pick(container);
@@ -203,6 +207,38 @@ describe("ImageAttach — the preview draws on SELECT, not on upload", () => {
 
 		expect(previewImg()?.getAttribute("alt")).toBe("");
 		expect(previewImg()?.getAttribute("aria-hidden")).toBe("true");
+	});
+
+	it("preview::a-decode-failure-while-attached-does-not-invite-a-second-add", () => {
+		// ⛔ THE REACHABLE EDGE WHERE "no preview URL" AND "nothing attached" COME
+		// APART, walked end to end rather than rendered as a state.
+		//
+		// `onError` clears the object URL, and it can fire once the phase is
+		// already `attached` — a file that signed and PUT fine but will not decode
+		// in this browser. The empty slot now carries a figure ending in
+		// `add image`; keying that figure on the URL alone would print an
+		// invitation to attach directly above the filename that IS attached, and
+		// its Remove control. The box would be arguing with the row beneath it.
+		//
+		// So: the preview goes, the figure does NOT arrive, and the slot falls
+		// back to the plain box — silent rather than wrong.
+		const { container, advance } = mount();
+		pick(container);
+		advance({ phase: "attached", uploadId: "u1", name: "chart.png" });
+		expect(previewImg()).not.toBeNull();
+
+		fireEvent.error(previewImg() as HTMLImageElement);
+
+		expect(previewImg()).toBeNull();
+		const column = screen.getByLabelText("Attach an image");
+		// No figure — and specifically not its instruction line.
+		expect(column.querySelector("svg[viewBox='0 0 200 250']")).toBeNull();
+		expect(column.innerHTML).not.toContain("add image");
+		// The attachment itself is untouched: the filename and Remove still stand.
+		expect(column.innerHTML).toContain("chart.png");
+		expect(screen.getAllByLabelText("Remove image")).toHaveLength(1);
+		// And the box is still a 4:5 box, so the column does not collapse.
+		expect(column.innerHTML).toMatch(/aspect-\[4\/5\]/);
 	});
 
 	it("preview::an-unreadable-file-falls-back-to-the-empty-box", () => {

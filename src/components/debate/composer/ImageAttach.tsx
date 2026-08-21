@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { IMAGE_UPLOADS_ALLOWED_MIME } from "@/server/config/limits";
-import { STATE_COPY } from "./copy";
+import { EMPTY_SLOT_COPY, STATE_COPY } from "./copy";
 
 /**
  * The GROUP's name — the column as a whole, held across every phase.
@@ -11,18 +11,199 @@ import { STATE_COPY } from "./copy";
  * ⛔ DISTINCT FROM `PICK_LABEL` BY CONSTRUCTION, and the two are different
  * objects: a `role=group` names the region, a `button` names the action. When
  * the a11y fix moved this label onto the `<fieldset>`, the pick control was
- * left deriving its name from its own contents — "Image Shown whole · any
- * orientation" in the idle phase, and the FILENAME while attaching, so the
- * control's name changed under the user mid-interaction. Restoring an explicit
- * one also keeps `getByLabelText(ATTACH_LABEL)` resolving to exactly one node;
+ * left deriving its name from its own contents — the label, the caption that
+ * used to sit under it, and the FILENAME while attaching — so the control's
+ * name changed under the user mid-interaction. Restoring an explicit one also
+ * keeps `getByLabelText(ATTACH_LABEL)` resolving to exactly one node;
  * `attach-phases.test.tsx` asserts both the distinctness and the singleness,
  * so collapsing them back to one string reddens.
+ *
+ * ⚠ The derived-name hazard OUTLIVES the caption that first caused it, which is
+ * why this label is not now redundant: the figure inside the box carries its
+ * own text, and an `aria-hidden` on that SVG is what keeps it out of the
+ * control's accessible name. Drop either guard and the name starts moving again.
  */
 const ATTACH_LABEL = "Attach an image";
 /** The pick CONTROL's own name — stable across idle / busy / error. */
 const PICK_LABEL = "Choose an image file";
-/** Canon §6 composer register, verbatim. */
-const CAPTION = "Shown whole · any orientation";
+
+/**
+ * THE EMPTY SLOT'S CONTENTS — the thesis figure, in the box that used to be
+ * empty.
+ *
+ * ⛔ THE DRAWING IS REUSED, NOT AUTHORED. Every mark below is carried from the
+ * O1 deck's Card-3 figure, `onboarding/figures.tsx` `GoalFigure` — the beam on
+ * its triangular fulcrum tilted so the knowledge side sits LOWER, the seven
+ * filled dots labelled `K · n`, the outlined circle holding `C` labelled
+ * `capital`, the 2 / 1.5 stroke weights, and the hierarchy that renders the
+ * knowledge side solid and the capital side hollow. Stated per element rather
+ * than as one sweeping claim, because the one thing that is NOT carried is the
+ * LAYOUT: `GoalFigure` is landscape (`viewBox 220×120`, 1.83:1) and this box is
+ * 4:5 portrait. Dropping it in unchanged would letterbox it to roughly a third
+ * of the available height — so the composition is re-laid for portrait while
+ * the vocabulary is left alone. Nothing here is a new drawing.
+ *
+ * ⚠ THE WORDS ARE THE PAYLOAD; THE DRAWING IS SUPPORT. At the real rendered
+ * width (~250px) the viewBox scales 1.25×, so the headline lands near 16px and
+ * `add image` near 14px. The scale occupies the top ~43% and no more: when the
+ * two competed for room the drawing was the one that gave way, because a
+ * participant who cannot read the sentence has been shown nothing.
+ *
+ * ⚠ `add image` IS THE ONLY AFFORDANCE TEXT LEFT. Canon §6's caption
+ * `Shown whole · any orientation` sat under this box and was deleted in the
+ * same commit; the label `Image` outside the box names the field, not the
+ * action. So this line is the sole thing telling a participant the box can be
+ * clicked. It is given real vertical separation from the headline (42 user
+ * units — more than twice the headline's own line gap) so it reads as an
+ * instruction rather than a fourth line of the sentence, and it takes `ink`,
+ * the same fill as the headline, so nothing about its priority is hedged.
+ *
+ * ⚠ TOKENS ONLY — no hex literal appears here. Two fills are deliberately one
+ * step BRIGHTER than `GoalFigure`'s: the deck draws on a lighter card, this
+ * draws on `bg-n1` (#2a2a2a), and n4 against that surface falls to roughly
+ * 3:1. The capital circle and its letters take `n5` instead. Same drawing, same
+ * monochrome ramp, read on the surface it actually sits on.
+ *
+ * `aria-hidden` is on the `<svg>` per the a11y contract at the top of this
+ * file: the pick control owns the accessible name, and text inside this figure
+ * must not leak into it.
+ */
+function EmptySlotFigure({ className }: { className: string }) {
+	const [headOne, headTwo] = EMPTY_SLOT_COPY.headlineLines;
+	return (
+		<svg viewBox="0 0 200 250" aria-hidden="true" className={className}>
+			{/* ── the balance ──────────────────────────────────────────────── */}
+			{/* Beam: left (knowledge) end LOWER — the thesis, drawn. */}
+			<line
+				x1="38"
+				y1="53"
+				x2="162"
+				y2="31"
+				stroke="var(--color-ink)"
+				strokeWidth="2"
+			/>
+			<line
+				x1="100"
+				y1="42"
+				x2="100"
+				y2="86"
+				stroke="var(--color-ink)"
+				strokeWidth="2"
+			/>
+			<polygon points="90,96 110,96 100,86" fill="var(--color-ink)" />
+			<circle cx="100" cy="42" r="3" fill="var(--color-ink)" />
+			{/* Left pan — seven dots, solid: knowledge has mass. */}
+			<line
+				x1="38"
+				y1="53"
+				x2="38"
+				y2="64"
+				stroke="var(--color-n5)"
+				strokeWidth="1.5"
+			/>
+			<g fill="var(--color-ink)">
+				<circle cx="28" cy="70" r="4" />
+				<circle cx="38" cy="70" r="4" />
+				<circle cx="48" cy="70" r="4" />
+				<circle cx="33" cy="79" r="4" />
+				<circle cx="43" cy="79" r="4" />
+				<circle cx="28" cy="88" r="4" />
+				<circle cx="38" cy="88" r="4" />
+			</g>
+			<text
+				x="38"
+				y="104"
+				textAnchor="middle"
+				fontSize="11"
+				fontWeight="800"
+				fill="var(--color-n6)"
+			>
+				K · n
+			</text>
+			{/* Right pan — one hollow circle: capital is lighter here. */}
+			<line
+				x1="162"
+				y1="31"
+				x2="162"
+				y2="43"
+				stroke="var(--color-n5)"
+				strokeWidth="1.5"
+			/>
+			<circle
+				cx="162"
+				cy="58"
+				r="13"
+				fill="none"
+				stroke="var(--color-n5)"
+				strokeWidth="2"
+			/>
+			<text
+				x="162"
+				y="63"
+				textAnchor="middle"
+				fontSize="13"
+				fontWeight="800"
+				fill="var(--color-n5)"
+			>
+				C
+			</text>
+			<text
+				x="162"
+				y="86"
+				textAnchor="middle"
+				fontSize="9.5"
+				fontWeight="700"
+				fill="var(--color-n5)"
+			>
+				capital
+			</text>
+			{/* ── the words ────────────────────────────────────────────────── */}
+			<text
+				x="100"
+				y="136"
+				textAnchor="middle"
+				fontSize="8.5"
+				fontWeight="700"
+				letterSpacing="1.4"
+				fill="var(--color-n5)"
+			>
+				{EMPTY_SLOT_COPY.eyebrow}
+			</text>
+			<text
+				x="100"
+				y="161"
+				textAnchor="middle"
+				fontSize="13"
+				fontWeight="700"
+				fill="var(--color-ink)"
+			>
+				{headOne}
+			</text>
+			<text
+				x="100"
+				y="179"
+				textAnchor="middle"
+				fontSize="13"
+				fontWeight="700"
+				fill="var(--color-ink)"
+			>
+				{headTwo}
+			</text>
+			{/* The instruction. Separated, not stacked — see the docblock. */}
+			<text
+				x="100"
+				y="221"
+				textAnchor="middle"
+				fontSize="11"
+				fontWeight="700"
+				letterSpacing="0.6"
+				fill="var(--color-ink)"
+			>
+				{EMPTY_SLOT_COPY.action}
+			</text>
+		</svg>
+	);
+}
 
 /** The affordance's render state (owned by the composer). */
 export type ImageAttachState =
@@ -32,11 +213,19 @@ export type ImageAttachState =
 	| { phase: "error"; message: string };
 
 /**
- * UI.A3 slice 5 — the composer's optional-image affordance (canon §6:
- * `Image` · `Shown whole · any orientation`). The composer owns the state +
- * the attach orchestration (image-attach.ts); this renders pick / busy /
- * attached / error (the §4 image-codes P3 lands INLINE here — never a
- * composer-level strip). Error messages are the wire's own display strings.
+ * UI.A3 slice 5 — the composer's optional-image affordance (canon §6 label
+ * `Image`). The composer owns the state + the attach orchestration
+ * (image-attach.ts); this renders pick / busy / attached / error (the §4
+ * image-codes P3 lands INLINE here — never a composer-level strip). Error
+ * messages are the wire's own display strings.
+ *
+ * ⚠ CANON §6 ALSO CARRIES A CAPTION, `Shown whole · any orientation`, AND IT IS
+ * NO LONGER SHIPPED HERE. It was deleted at POLISH-4-EMPTYSLOT so the empty box
+ * could carry the thesis figure instead of a line describing how a picture that
+ * is not there would be fitted. `design-canon.md:123` still lists it, so canon
+ * and code now disagree on this one string by DECISION, not by drift — the
+ * amendment is owed and is web-authored (prescriptive docs are not CC's to
+ * edit). Do not "restore" it to close the gap.
  *
  * POLISH.4 PR B — THE PANEL IS THE COMPOSER GRID'S LEFT COLUMN, and the whole
  * panel is the pick target. Tier-4 `surface_d5_v1_0.html` (md5
@@ -44,7 +233,8 @@ export type ImageAttachState =
  * (`height:100%`, `cursor:pointer`) holding a `4:5` `.imgprev` over the
  * `.acap` caption, sitting in the FIRST track of `.compgrid` (d5 `.attach` /
  * `.imgprev` / `.acap`; markup at the `.compgrid` block). Fenced by SYMBOL
- * per `O-8`.
+ * per `O-8`. The `.acap` half of that composition is the caption above and is
+ * now gone; the `.imgprev` box it names is unchanged.
  *
  * ⚠ RENDERS AS A FRAGMENT, DELIBERATELY. The panel must be a DIRECT child of
  * the grid or it is not a column — a wrapper `<div>` here would make the grid
@@ -174,28 +364,50 @@ export function ImageAttach({
 	// preview from driving the composer's height off the grid row.
 	const preview =
 		"aspect-[4/5] max-h-full min-h-0 w-full rounded-(--imgr) bg-n1";
-	// `.acap` — the caption, INSIDE the panel (d5), not a sibling of it.
-	const caption = <span className="text-[10px] text-n4">{CAPTION}</span>;
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//
-	// ⚠ `object-contain` IS THE CAPTION'S DOING, not a new design call. `CAPTION`
-	// is canon §6 verbatim — "Shown whole · any orientation" — and an image in a
-	// fixed 4:5 box must either crop or letterbox. "Shown whole" forecloses the
-	// crop and "any orientation" forecloses a portrait-only fit; the `<img>`
-	// default (`fill`) would DISTORT and contradict both halves. `bg-n1` is the
-	// box's own surface and becomes the letterbox ground, so nothing new is
-	// coloured (the monochrome census is untouched — no token added or referenced).
+	// ⚠ `object-contain` STANDS ON ITS OWN, and it has to now. It used to be
+	// justified by the caption beneath the box — canon §6's "Shown whole · any
+	// orientation" — which POLISH-4-EMPTYSLOT deletes. Deleting the words does
+	// not change the obligation they described: a FIXED 4:5 box must either crop
+	// the image or letterbox it, and cropping is not a neutral default here.
+	// The bytes about to be written are immutable from first write (ADR-0028
+	// primitive 1) inside a comment that is append-only (INV-4), so a crop the
+	// participant did not choose becomes permanent and public along with them.
+	// Letterboxing shows the whole of what they picked; a crop silently decides
+	// which part of it they meant. That is the argument, and it survives the
+	// caption. The `<img>` default (`fill`) would DISTORT and is wrong on both
+	// counts. `bg-n1` is the box's own surface and becomes the letterbox ground,
+	// so nothing new is coloured — no token added or referenced.
 	//
-	// ⛔ The mockup is SILENT here: d5's `.imgprev` is an empty box centring the
-	// literal string `IMAGE` at all four occurrences, with no populated variant.
-	// So the BOX is carried from d5 and the FIT is carried from the caption; the
-	// refusal recorded above (d5's `IMAGE` label, declined because "the state
-	// carries no preview data") is left standing — that string still describes an
-	// EMPTY slot, and the empty slot still renders exactly as it did.
+	// ⛔ d5's `.imgprev` is an EMPTY box centring the literal string `IMAGE` at
+	// all four occurrences, with no populated variant — so the BOX is carried
+	// from d5 and the FIT is reasoned above. The empty arm no longer renders
+	// nothing: it renders `EmptySlotFigure`, which is why the refusal recorded
+	// in the header docblock (d5's `IMAGE` label, declined because "the state
+	// carries no preview data") is now discharged rather than merely standing —
+	// the box says what it is for, in words the participant has already read.
+	//
+	// ⚠ THREE ARMS, NOT TWO, AND THE MIDDLE ONE IS THE REACHABLE EDGE. "No
+	// preview URL" and "no image attached" are DIFFERENT conditions, and they
+	// come apart in exactly one place: the `onError` fallback below clears the
+	// URL when a picked file will not decode, and it can fire while the phase is
+	// already `attached`. Rendering the figure on `previewUrl === null` alone
+	// would then put "add image" beside the attached filename and its Remove
+	// control — the slot contradicting the row underneath it, inviting an action
+	// that has already been taken. So the figure is shown only when nothing is
+	// attached; the degraded attached case falls back to the plain box this file
+	// shipped before, which says nothing rather than something false.
+	// Caught by `empty-slot-figure.test.tsx::the-attached-phase-shows-no-figure`.
+	const emptyBox = <span aria-hidden="true" className={preview} />;
 	const previewBox =
 		previewUrl === null ? (
-			<span aria-hidden="true" className={preview} />
+			state.phase === "attached" ? (
+				emptyBox
+			) : (
+				<EmptySlotFigure className={preview} />
+			)
 		) : (
 			// A local `blob:` object URL for a file that exists only in this tab —
 			// next/image would route a client-only source through the server
@@ -267,7 +479,6 @@ export function ImageAttach({
 								×
 							</button>
 						</span>
-						{caption}
 					</>
 				) : (
 					<button
@@ -281,7 +492,6 @@ export function ImageAttach({
 						<span className="text-n5">
 							{state.phase === "attaching" ? `${state.name}…` : "Image"}
 						</span>
-						{caption}
 					</button>
 				)}
 				{state.phase === "error" && (
