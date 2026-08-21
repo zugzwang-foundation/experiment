@@ -12,6 +12,36 @@
 
 ---
 
+## Patch record
+
+**P1 (2026-08-21, MEDIA-SECOND-ROW Slice 1).** In-place Patch record per
+CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession). **The
+load-bearing decisions are unchanged**: `market_media` stays the storage
+model, `is_default` stays the exactly-one-per-market fallback row (driver
+#5's storage half), the pick-from-pool resolution chain's design (driver
+#3 — not yet built; see below) is unaffected, and the video affordance
+(driver #6) is untouched. **Corrected:**
+driver #5's display half and driver #7's carousel description no longer
+describe the Market-Detail header as built. The header renders a single
+image — the lowest-`display_order` NON-default `market_media` row, falling
+back to the `is_default` row when it is the market's sole row (every market
+today) — not an auto-advancing carousel cycling every row. This is a
+**display narrowing on the participant header only**: the storage model
+carries every row exactly as before, `market_media_one_default_per_market_uq`
+still enforces exactly-one-default, and this Patch record touches nothing
+about the admin upload UI or the composer pick-from-pool affordance
+(driver #9b/c) — an admin can still upload N images with one marked
+default. *(Note, not this Patch's subject: driver #3's pick-from-pool
+resolution chain, `comments.market_media_id`, is itself not yet in schema
+— SPEC.2 §5.1 row 4 marks it build-deferred as of migration head `0023`.
+This Patch neither builds it nor blocks it; "untouched" means unaffected
+by Slice 1, not "shipped".)* **The carousel is deferred, not dropped** — see
+`docs/plans/MEDIA-SECOND-ROW.md` §"Explicitly NOT this slice". Paired
+same-commit with SPEC.1 §9 / §15 F-ADMIN-1 (same narrowing, same wording
+discipline).
+
+---
+
 ## Context and Problem Statement
 
 Market media is **admin-curated, per-market context** — a small set of images (a chart, a news still, an explainer frame) plus a single explainer video — created by the operator **before** a market goes live and shown publicly on the Market Detail surface. It does double duty: (1) a header **carousel** of those images plus an outbound link to the operator's YouTube explainer; (2) a **pick-pool** — the same images are selectable inside the post/reply composer, so a participant who has a text argument but no relevant picture of their own can attach one, and if they attach nothing the market's **default** image fills the render slot. Image attachment on a comment is therefore **optional** (the slot always renders via a fallback chain), **not** mandatory.
@@ -59,11 +89,11 @@ This ADR does **not** decide:
 
 4. **Admin-moderated at upload (safety-critical).** **Superseded in part by ADR-0027:** admin market-media uploads are no longer moderated (operator-curated content); the admin-context moderation caller is not built. Admin market-media bytes run through the **same** image moderation (CSAM hash + general classifier) as participant uploads — but at **admin-upload time, pre-live**, via an **admin-context** moderation path. The current `precommitModerate()` is participant-session-bound; this ADR mints the requirement for an admin-context variant that moderates the bytes **without** a participant session (the build task owns the exact factoring). Because admin media is **pre-vetted**, a participant **pick** attaches an already-clean asset with **no post-time image-moderation round-trip** — the pick path is moderation-free **by construction**. This is simultaneously the **safety** property (a participant cannot route unvetted bytes into a comment by picking) and the **latency** property (picking is the *fast* image path — no upload, no moderation wait). A participant's **own** upload still runs the full pipeline (F-COMMENT-3, unchanged); a comment's **text** always runs text moderation regardless of image source (unchanged). The pipeline is never weakened — this ADR only adds a new, trusted-context **caller** of it.
 
-5. **Default = one `is_default` row; markets always have media.** Exactly one `market_media` row per market carries `is_default = true`; it backs the render-fallback in #3. Carousel order is `display_order`. Markets **always** have media (the admin sets it pre-live), so there is **no empty-state path** — the header always renders a carousel and a default always exists.
+5. **Default = one `is_default` row; markets always have media.** Exactly one `market_media` row per market carries `is_default = true`; it backs the render-fallback in #3. Storage order is `display_order`. Markets **always** have media (the admin sets it pre-live), so there is **no empty-state path** — the header always renders an image and a default always exists. *(Corrected by Patch record P1: the header renders a single image per §7 below, not a carousel of every row — the "always renders / default always exists" property is unchanged, only the render being described moved from a carousel to one image.)*
 
 6. **Video = single outbound YouTube link.** A single nullable `markets.media_video_url` column. The play affordance on the header **opens the URL in a new tab** — the video is hosted on YouTube and reached by **outbound link**, **not embedded** and **not self-hosted**. This resolves the legacy *"MARKET MEDIA — IMG / VIDEO"* placeholder into a precise treatment: **a carousel of images plus one outbound video-link button**, not videos *inside* the carousel. It is categorically distinct from the radio music player (SPEC.1 §21.5), which is an *in-app* YouTube IFrame embed for background audio; §21.5 is untouched and its embed-vs-self-host question does not apply here.
 
-7. **Participant display (Market Detail header).** The dashed `MarketHeader.tsx` placeholder is replaced by an auto-advancing **carousel** of the market's images (`display_order`) plus the outbound **video-link** button. The recursive market→post shell is **unchanged**: in post-view the same slot still shows the *post's* single image (`image_uploads_id`), not the market carousel. The carousel/video pixels are owned by the design-mockup → display-build task (see #9).
+7. **Participant display (Market Detail header).** The dashed `MarketHeader.tsx` placeholder is replaced by a single image (the lowest-`display_order` non-default `market_media` row, falling back to the `is_default` row) plus the outbound **video-link** button. *(Corrected by Patch record P1, 2026-08-21: this driver originally specified an auto-advancing carousel of every row in `display_order`. MEDIA-SECOND-ROW Slice 1 narrows the display to one image; the carousel is deferred, not dropped — see the Patch record above.)* The recursive market→post shell is **unchanged**: in post-view the same slot still shows the *post's* single image (`image_uploads_id`), not the market's own image. The display pixels are owned by the design-mockup → display-build task (see #9).
 
 8. **Latency posture (operator steer — baked in).** All participant-facing market-media reads are **CDN-served** (R2 CDN — the existing pattern, the same one serving the pseudonym images) and **ride the existing market read**: the media set, which row `is_default`, and `media_video_url` load **with the market header** in the read that already runs for the Market Detail page — **no extra round-trip** on header render. The picker reads the same small, indexed, already-loaded pool. The default fallback is a read-time lookup of an already-loaded row. Assets are pre-set pre-live, so **nothing is generated at request time**. Combined with the moderation-free pick path (#4), the net runtime cost added to participant hot paths is **zero round-trips**.
 
@@ -104,4 +134,4 @@ This ADR does **not** decide:
 
 ---
 
-*ADR-0026 ratifies the market-media model: an admin-owned, separately-stored, pre-moderated per-market image pool that drives a Market-Detail header carousel and doubles as an optional composer pick-source with a default fallback, plus a single outbound YouTube explainer link — with the admin/participant boundary, the moderation guardrail, and low participant latency preserved by construction. The decision body and the constraints minted in §Decision Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy.*
+*ADR-0026 ratifies the market-media model: an admin-owned, separately-stored, pre-moderated per-market image pool that drives the Market-Detail header display (a single image per Patch record P1 — the eventual carousel is deferred, not dropped) and doubles as an optional composer pick-source with a default fallback, plus a single outbound YouTube explainer link — with the admin/participant boundary, the moderation guardrail, and low participant latency preserved by construction. The decision body and the constraints minted in §Decision Outcome are immutable; superseding requires a new ADR with a same-commit SPEC.2 update per the SPEC.2 §0 versioning policy. Patch records amend consumer-surface scoping only, per CLAUDE.md §5.12.

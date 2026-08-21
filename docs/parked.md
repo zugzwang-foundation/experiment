@@ -843,7 +843,7 @@ Seven markets carry a hero post on exactly ONE side; one carries none. **Zero ca
 
 **2 · The market that sorts FIRST is the emptiest.** Discovery orders `created_at DESC` and caps at `DISCOVERY_GRID_SIZE`. `sp-m4-new` ("brand new") has **no** hero posts on either side, so a first-time viewer lands on the both-sides-empty hero. *(⚠ Correction to the scoping brief, verified from the served payload: `sp-m4-new` sorts **LAST** of the eight, not first — index 0 is `sp-m16-fill`. The concern is real but the ordering claim was inverted; the emptiest market is at the END of the carousel, not its opening frame.)*
 
-**3 · All 8 `market_media` R2 objects are absent** — every minted URL returns `404 NoSuchKey`. Rows in the DB, objects never uploaded. This is what makes **PD-2-32** (a real production defect: a minted URL that later 404s has no degradation path) visible on staging. Fixing the fixture would HIDE PD-2-32 without fixing it — **land PD-2-32 first, then re-pin the fixtures.**
+**3 · All 8 `market_media` R2 objects are absent** — every minted URL returns `404 NoSuchKey`. Rows in the DB, objects never uploaded. This is what makes **PD-2-32** (a real production defect: a minted URL that later 404s has no degradation path) visible on staging. Fixing the fixture would HIDE PD-2-32 without fixing it — **land PD-2-32 first, then re-pin the fixtures.** ✅ **DISCHARGED 2026-08-20** — all 8 `market_media` objects loaded to their existing `r2_object_key`s and HEAD/GET-verified serving `200` (CONTENT.2-TILES tile-load task); PD-2-32 itself is unaffected (still the real production defect, landed separately) and this item's own condition — objects present, not 404ing — now holds.
 
 **What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
 
@@ -1525,6 +1525,28 @@ The third site, the hero POST image at `src/components/discovery/HeroPanels.tsx:
 **Conditional trigger.** ⚠ **BEFORE DP.2.** It is a **third** DP.2 gate and it is **not** in DP.2's recorded blocker list — POOL-2 (resolved 2026-08-11) and `ProfileTradeStreamError` (recorded live, evidence stale since STAGING-PARITY Slices A–D) are the two that are. ⚠ **DP.2's blocker list needs a sweep, not just this row.**
 
 **Expected next task.** A staging exercise, not a build: one deliberate double-write against real R2, the 412 captured, the gate retired in `AUDIT-FIX-A1`'s log and here. Evidence: `docs/logs/AUDIT-FIX-A1.md`; ADR-0028; `docs/adr/0021-reactive-moderation-no-held-queue.md` · Patch record 2026-08-12, ground 3.
+
+⚠ **Update, CONTENT.2 close-out (2026-08-21): the backend capability this
+row is waiting on is now demonstrated — the gate itself still stands.**
+MEDIA-DETAIL-PROBE-2's opportunity item ran exactly the deliberate
+double-write this row's "Expected next task" describes, against real R2, on
+a throwaway key under the `market-media` bucket: `IfNoneMatch: "*"`,
+write 1 → `200`, write 2 → **real `412 PreconditionFailed`**, key deleted
+after (`docs/logs/CONTENT-2-TILES.md` §"R2 honours If-None-Match" carries
+the full transcript). **This establishes R2 itself honours the create-once
+conditional at the storage layer — the open question this row names.**
+
+**It does not retire the gate**, because the gate's own text names a
+specific path — the **participant `uploads`** bucket's conditional write
+(`signRead("uploads", ...)` → `mintPutUrl` with `opts.ifNoneMatch: true`,
+the moderated-bytes-are-served-bytes binding ADR-0028 protects) — and this
+probe ran against the separate, differently-credentialed `market-media`
+bucket arm, which is documented mutable BY DESIGN (`r2.ts:119`,
+ADR-0026/0027) and carries no create-once semantics to test in the first
+place. Same backend, same account, different bucket, different
+credentials, different conditional — the probe is evidence the *mechanism*
+works on this backend, not proof the *uploads-path binding itself* has been
+exercised. **Gate stands**, cross-referenced rather than closed.
 
 ---
 
@@ -2241,3 +2263,73 @@ for and inadequate for what the load rig needs.
 **Expected next task.** Scale tracker row 2.4, with the pool sized to exceed the
 profile. Any placeholder tuple scheme serves — staging is clean-recreate by
 ADR-0035, and the real names arrive from the HARDEN namespace task.
+
+---
+## MEDIA-DISPLAYORDER-CARRIER — display_order is written by the admin form and read by one query
+
+**Originating task:** MEDIA-SECOND-ROW Slice 1 (2026-08-21).
+
+Before this slice `display_order` was written on the admin create path and read
+by NOTHING — `getDefaultMarketMediaUrl` filtered `is_default = true` and never
+ordered by it. A market with five media rows rendered one and silently
+discarded four. This slice makes row 1 reachable: the panel reads the
+lowest-display_order non-default row. **Rows beyond that remain unreachable.**
+
+⚠ **Operator constraint at production market creation: upload exactly TWO
+images per market.** Mark either one default via the radio button — the panel
+takes whichever is not default (verified: `create-market-form.tsx:78-86,
+108, 159-167` computes isDefault independently of upload order). A third
+image and beyond renders nowhere.
+
+**Closes when** the ADR-0026 carousel (SPEC.1 §9, narrowed by this slice) is
+built. Evidence: `docs/plans/MEDIA-SECOND-ROW.md` items 1, 4, 8.
+
+---
+## MEDIA-CACHE-POSTURE — presigned market-media URLs may defeat every cache — ⚠ ROUTE TO THE READ-PATH LANE
+
+**Originating task:** MEDIA-DETAIL-PROBE (2026-08-21), observed not theorised.
+
+The github market-media object rendered twice on one Discovery load with TWO
+separately-presigned URLs. If each render mints a fresh signature the query
+string differs per render — so no browser cache hits and no edge cache hits,
+and every page load re-downloads every image. At the 2,000,000 page-load
+target this is the dominant image cost, and it affects every presigned image
+surface, not just market media.
+
+⚠ ADR-0026 Driver 8 states market media is CDN-served. A presigned S3-API URL
+does not traverse the Cloudflare edge. **The posture and the implementation
+may not agree** — unverified either way.
+
+⚠ **The design question underneath:** market media is public, anonymous,
+unauthenticated content on a page requiring no session. Presigning protects
+bytes that are already public while costing every cache hit on the busiest
+surface. Participant uploads under `u/<userId>/` genuinely need it; admin
+media under `m/<marketId>/` arguably does not.
+
+**The predicate:** is the minted read URL byte-identical across two renders of
+the same key? What host does it point at? Is any Cache-Control set on the
+objects (every load so far has set none)?
+
+⚠ **Third signal, CONTENT.2 close-out (2026-08-21): the predicate's own
+question is now answered, not open.** Checked across every upload this whole
+task arc made — the original 8 tiles, the PR-2 recomposite, the
+MEDIA-DETAIL-PROBE swaps, and the Slice 2/3 second-row rows — **zero of them
+ever set `Cache-Control`.** Not disabled, not overridden: never present in
+any `PutObjectCommand`, and `mintPutUrl` (`r2.ts:119-148`) carries no
+parameter for one. So caching for every market-media object today is
+whatever the requesting browser's own heuristics and Vercel's own edge
+defaults decide **unprompted** — no explicit posture anywhere in this
+system states or controls it. **Traced two things in this task arc back to
+exactly this absence, both of which had the surface shape of a caching
+defect and were not one:** the V-1 pre-deploy check (`docs/logs/
+CONTENT-2-TILES.md` §"the deploy gap") read as "did the write fail" before
+the canary comparison correctly placed it as a deploy-lag gap, not a stale
+cache; and the presign-determinism finding (same-probe B1/B2) reads as
+inconsistent behavior — a different URL every render — until the SigV4
+mechanics are read, at which point it is exactly the intended behavior of
+a system with no cache layer to begin with, not a bug in one. **Two
+distinct shapes, one missing predicate underneath both**, is the reading
+that turns this signal into a routing decision rather than a third loose
+observation.
+
+**Conditional trigger.** The read-path / caching workstream — NOT a media task.
