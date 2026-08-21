@@ -5,7 +5,7 @@
 | **Status** | v1.0.0-draft (shape locked; numeric constants pin at the 2026-09-01 number-tuning pass) |
 | **License** | AGPL-3.0-or-later — © The Zugzwang Authors |
 | **Authoritative ADR** | ADR-0017 (Ranking Modes & the "Top" Composite) — supersedes ADR-0009 |
-| **Patch records consumed** | ADR-0017 P1 (friendly-fire removed entirely), P2 (latest interleave), P3 (filter modes retired from the v1 surface; lane-dominance badges) |
+| **Patch records consumed** | ADR-0017 P1 (friendly-fire removed entirely), P2 (latest interleave), P3 (filter modes retired from the v1 surface; lane-dominance badges) · **ADR-0039 R4/R5/R6** (every ranking input keys off surviving lot basis; the figure follows the ruler) |
 | **Companion specs** | SPEC.1 §9 (product surface), SPEC.2 §5.4 (read-model classification + the four aggregates) |
 | **Implementation** | `src/lib/ranking.ts` (pure TypeScript, no IO) · `src/lib/ranking.config.ts` (tunables) |
 | **Authored at** | DEBATE.8 |
@@ -54,8 +54,8 @@ Every top-level **post** exposes **four base signals**, tracked per side, plus i
 |---|---|---|
 | `support_count` | number of reply-bets on the post's **own** side | reply-bets joined to the post, counted where reply side = post side |
 | `counter_count` | number of reply-bets on the **opposing** side | reply-bets joined to the post, counted where reply side ≠ post side |
-| `support_dharma` | total Dharma staked across **support-side** reply-bets | `SUM(bets.stake)` over support-side reply-bets |
-| `counter_dharma` | total Dharma staked across **counter-side** reply-bets | `SUM(bets.stake)` over counter-side reply-bets |
+| `support_dharma` | Dharma **still staked** across **support-side** reply-bets | `SUM(COALESCE(lots.surviving_basis, bets.stake))` over support-side reply-bets |
+| `counter_dharma` | Dharma **still staked** across **counter-side** reply-bets | `SUM(COALESCE(lots.surviving_basis, bets.stake))` over counter-side reply-bets |
 | `age` | `now − created_at`; `now` frozen to the resolution timestamp for resolved markets (INV-4) | `comments.created_at`, `now` parameter |
 
 Derived quantities used throughout:
@@ -66,19 +66,32 @@ D   = support_dharma + counter_dharma          // VALUE     — committed Dharma
 b   = min(support_count, counter_count)
       / max(support_count, counter_count)       // BALANCE   — 0 (blowout) … 1 (dead even); undefined iff n = 0
 lop = 1 − b                                     // DOMINANCE — inverse of balance
-a   = the author's own stake on the post        // author conviction; read from the post's own entry bet
+a   = the author's SURVIVING basis on the post  // author conviction CURRENTLY HELD — the post's own
+                                                // entry bet's lots.surviving_basis (COALESCE → bets.stake)
 ```
+
+**Every stake in this table is a SURVIVING basis, not a frozen one** (ADR-0039 R4, as amended at RANK-1). `bets.stake` records what was committed when the argument was made and is Bucket-A immutable, so it is never lost; it simply stops being what any ranking input reports. Where a stake appears below — `a` in §3.4 and §8, the reply-lane ruler in §7, the profile rulers in §3.6 — read it as *conviction currently held*, and expect the order to move when a participant exits.
+
+**Why the whole model moved at once.** The frozen reading was buyable and refundable: the CPMM is fee-less, so a large bet placed to seize a slot could be exited for dust while the slot it bought stayed seized forever. Closing one ruler and leaving another open would only move the same capture one lane over — so all three moved together. **If the money can leave, the rank it bought leaves with it.**
+
+⛔ **THAT SENTENCE IS TRUE OF THE STAKE INPUTS AND IS NOT YET TRUE OF THE MODEL, and the difference is a live capture surface.** Three ranking inputs are **counts**, not stakes — traction `n`, the dominance split `lop`, and the contestation badge lane `n^b` — and `support_count` / `counter_count` are plain `COUNT(...)` over reply-bets with **no survival predicate**. `bets` and `comments` are Bucket A, so a count can never move by any mechanism in the system, including moderation (RANKING.md is explicit that removed items remain counted).
+
+The consequence, found by the RANK-1 security pass and stated here rather than left for someone to rediscover: with no self-reply guard and no per-post reply cap, one account can post at the post floor, reply to its own post enough times to clear `floor_lane(n)` and the `floor_split` gate, take the market's **#1 `topOrder` slot outright** via the sole-clearer sentinel (§3.3) — and then sell everything. The stake decays to zero and the counts do not, so the slot is held permanently for dust. It is the same capture RANK-1 closes, one axis over, for a larger prize.
+
+**It is NOT closed, and closing it is a ranking-semantics decision, not a patch.** The mechanical shape would be to filter the counts on survival the way the sums are filtered — but that would mean an argument someone made and then exited stops being *counted as having been made*, which is a different claim from *stops carrying weight*, and R9 says Sold is permanent precisely because the argument still happened. Until that is ruled, read the sentence above as scoped to the stake rulers.
 
 ### 2.1 Read-time join (how the substrate is computed)
 
-The four aggregates derive **entirely from existing columns** — `bets.stake`, `bets.side`, `comments.side_at_post_time`, `comments.parent_comment_id`. There is **no frozen `stake_at_post_time` column** (the superseded ADR-0009 model used one; this model does not need it — value is aggregated from reply-bets at read time).
+The four aggregates derive **entirely from existing columns** — `lots.surviving_basis` over `bets.stake`, `bets.side`, `comments.side_at_post_time`, `comments.parent_comment_id`. The lot reach is `lots.bet_id = bets.id`, a **1:1 unique-index lookup** (`lots_bet_id_uq`), so it can never fan an aggregate out. There is **no frozen `stake_at_post_time` column** (the superseded ADR-0009 model used one; this model does not need it — value is aggregated from reply-bets at read time).
 
 A reply's stake lives on its **bet row** (`bets.stake`), not on its comment row. The comment↔bet link is the circular pair: `bets.comment_id` is **NOT NULL and populated**; `comments.bet_id` is **deliberately NULL** (structurally — the comment is inserted before its bet exists, and the append-only discipline forbids back-filling it; INV-1 is enforced via `bets.comment_id` NOT NULL + transaction atomicity, see SPEC.2 §14.1). Therefore the aggregation join runs **`bets → comments` via `bets.comment_id = comments.id`**, never via the empty `comments.bet_id`.
 
 - **Per-side grouping** (the four signals) groups a post's reply-comments by `(parent_comment_id, side_at_post_time)` — served by the index **`comments_ranking_idx (parent_comment_id, side_at_post_time)`**.
 - **Dharma sums** reach each reply's stake through **`bets.comment_id`** — served by the index **`bets_comment_id_idx (comment_id)`**.
 
-Both indexes already exist (initial schema). **Support vs Counter** is determined at read time: a reply-bet is *Support* when its side equals the parent post's `side_at_post_time`, *Counter* otherwise. **Author stake `a`** reads the post's own entry bet (the bet the post itself rides).
+Both indexes already exist (initial schema). **Support vs Counter** is determined at read time: a reply-bet is *Support* when its side equals the parent post's `side_at_post_time`, *Counter* otherwise. **Author stake `a`** reads the post's own entry bet (the bet the post itself rides), then that bet's surviving lot basis.
+
+**The `COALESCE(lots.surviving_basis, bets.stake)` fallback is deliberate and stays.** Every bet mints its lot inside the same W-1 transaction (ADR-0039 R8), so a lot-less bet does not arise. But the fallback's job is what happens if one ever did: without it, an unknown surviving amount would score as **zero** — silently deleting a real contribution from the model — where with it, the row scores as *all of it survives*, which is exactly the pre-LOTS-1 behaviour. Reading "unknown" as "nothing" is the worse failure of the two, and it is the failure that would be invisible.
 
 See §11 for the full read-time / performance contract.
 
@@ -129,16 +142,18 @@ Notes that make this precise and reproducible:
 - **`SENTINEL_MAX` means "ranks above every finite ratio," not a large magic number.** A genuine 500× landslide must not accidentally outrank a true sole leader; encode the sentinel as a rank class above all finite ratios, broken among co-sentinels by §3.4. (`+1`-cushion denominators — `v / (v2 + 1)` — were considered and rejected: they muddy the legible "3× the next post" story and still need a floor.)
 - **The dominance-split lane** ranks `lop`. Its floor (`floor_lane(split)`) is a minimum-lopsidedness threshold, and it is additionally gated by `n ≥ floor_split` so a 2-vs-0 post cannot read as maximal lopsidedness — lopsidedness only counts on meaningful volume.
 - **Graceful degradation is automatic.** When no post dominates any lane (early or sleepy market), every post's `Top_score` is its best *real* ratio (or `BELOW_FLOOR`), and the order degrades smoothly from "landslide winners" to "the nearest thing to one" to "the cold-start order." **Top never renders empty.** A single loud voice in an otherwise-empty market legitimately tops Top — that is honest, not a capital exploit (ADR-0017 Driver 2).
-- **All-sub-floor markets** (every post below every floor) order purely by the §3.4 tie chain — i.e. by **author conviction `a`** first. This is the cold-start seed in action (§8): a high-conviction new post is never invisible.
+- **All-sub-floor markets** (every post below every floor) order purely by the §3.4 tie chain — i.e. by **author conviction `a`** first, `a` being the conviction **still held** (§3.4). This is the cold-start seed in action (§8): a high-conviction new post is never invisible — and an *abandoned* one does not stay visible on the strength of money that has already left.
 
-### 3.4 Ties — author stake, then earlier-wins
+### 3.4 Ties — author stake **still held**, then earlier-wins
 
 When two posts share a `Top_score` (including co-sentinels and all-sub-floor posts), order by:
 
-1. **Author stake `a`** — higher conviction ranks higher;
+1. **Author stake `a`** — higher conviction ranks higher, where `a` is the author's **surviving lot basis** on the post's own entry bet (`COALESCE(lots.surviving_basis, bets.stake)`), **not** the frozen `bets.stake`;
 2. then **earlier-wins** — the earlier-posted post ranks higher (first-posted, by `created_at`; UUIDv7 IDs make this a free natural sort per ADR-0016).
 
-Earlier-wins (not newer-first) is chosen to keep **every tie-break in the system uniform** with the reply rule (§7) and to preserve the audit-stable property: a resolved market's frozen order never shifts as clocks tick. Ties on a continuous ratio are rare regardless.
+Earlier-wins (not newer-first) is chosen to keep **every tie-break in the system uniform** with the reply rule (§7) and to preserve the audit-stable property: a *resolved* market's order never shifts as clocks tick — resolution closes the market to writes, so no lot can move after it. Ties on a continuous ratio are rare regardless.
+
+⚠ **This tiebreak is load-bearing far more often than "tiebreak" suggests, which is why RANK-1 moved it.** §3.3 already says that in an all-sub-floor market — every post below every floor, i.e. the ordinary state of a young market — the entire order is decided *here*, by `a` alone. Under the frozen reading, the top of such a market was purchasable and then refundable: place the largest opening bet, take the top slot, exit for dust, keep the slot. It was found adversarially at MERGE-1, and it is named in no earlier document — §3.4 was not on the list of rulers ADR-0039 R4 originally addressed. Its regression test is `tests/server/lots/rank-capture.test.ts` ("ruler (ii)").
 
 ### 3.5 No fade on Top (the decay decision ADR-0017 left open)
 
@@ -153,8 +168,8 @@ A deliberate consequence, stated plainly: a signal like reply-volume `n` is **fa
 
 When a visitor views a user's profile, that user's arguments are listed in ranking order — but the **simplest** form of it, not the full market-relative Top (which compares posts *within one market* and behaves oddly on a small cross-market profile pool). The profile order is:
 
-1. The user's **top-level posts**, ordered by the **value signal `D`** (total Dharma the post attracted, `support_dharma + counter_dharma`), descending; then
-2. the user's **replies**, ordered by **their own stake** (the reply-bet's `bets.stake`), descending;
+1. The user's **top-level posts**, ordered by the **value signal `D`** (Dharma the post has attracted *and still holds*, `support_dharma + counter_dharma`), descending — ties by the §3.4 chain, so a profile's post order rests on surviving basis on **both** rulers; then
+2. the user's **replies**, ordered by **their own surviving basis** (`COALESCE(lots.surviving_basis, bets.stake)` on the reply-bet — **not** the frozen `bets.stake`), descending;
 3. **posts above replies** in the combined list.
 
 Posts and replies are measured on different rulers by design (a post is ranked by what it *attracted*; a reply is a leaf that attracts nothing, so its only signal is its own stake) — hence replies always sit below posts. The order is **viewer-independent** (the same for the owner and any visitor; the owner additionally sees their own SELL controls layered on, a UI concern, not an ordering one — ADR-0017's "same order for every reader"). The **latest interleave does NOT apply** to the profile — a profile is a body of work, not a live market feed, so the momentum-burial problem (§4) does not arise.
@@ -258,18 +273,25 @@ With no selector in v1 this ordering is dormant, but it is retained for a future
 
 ---
 
-## §7 — Reply ranking (depth = 1) — by stake, within side
+## §7 — Reply ranking (depth = 1) — by stake **still held**, within side
 
 `REPLY_DEPTH_MAX = 1` (flat replies, locked — SPEC.1 §16.1 / ADR-0017). With flat replies the other axes do not exist at the reply level: a reply has no children, so **no traction and no split**; a reply *is* a bet, so **stake is the only signal it emits**. The reply metric is therefore not a *choice* — it is the only rankable number a flat reply carries.
 
 ```
 reply ranking (depth = 1):
   1. Partition replies by side (Support pool, Counter pool — relative to the parent post's side).
-  2. Within each side, sort by reply stake (Đ, = bets.stake) descending.
-  3. Tie-break: earlier posting time wins at equal stake (first-posted ranks higher; UUIDv7 natural order).
+  2. Within each side, sort by the reply's SURVIVING BASIS
+     (Đ, = COALESCE(lots.surviving_basis, bets.stake)) descending — NOT frozen bets.stake.
+  3. Tie-break: earlier posting time wins at equal basis (first-posted ranks higher; UUIDv7 natural order).
   4. The two-slot debate-view default surfaces the TOP reply of EACH side;
-     a "show all replies" affordance expands each side's full stake-sorted list.
+     a "show all replies" affordance expands each side's full basis-sorted list.
 ```
+
+⚠ **Step 2 read `bets.stake` until RANK-1, and that made the two-slot default purchasable.** A reply-bet large enough to top its side lane put its author in front of every visitor as the best argument on that side; exiting the lot returned the stake (the CPMM is fee-less) while `bets.stake` — Bucket-A immutable — held the slot open indefinitely, on every post, in every market. ADR-0039 R4 had already ruled this lane onto surviving basis; only the **aggregate** half of that ruling shipped at LOTS-1, and the ordering half stayed frozen for one release. **A fully-exited reply now sorts last in its lane and renders `Đ 0` with a `Sold` tag** (§7.3), so the ordering and the figure beside it finally say the same thing. Regression test: `tests/server/lots/rank-capture.test.ts` ("ruler (i)").
+
+### 7.3 What a reply's figure shows once it has moved
+
+The number rendered beside a reply is the **same value the lane sorts on** — deliberately, so a reader can never be looking at an ordering justified by one quantity and a figure reporting another. Per ADR-0039 R6: a **partially**-sold reply renders its reduced figure with the original **struck through** beside it, and no tag; a reply with nothing left renders `Đ 0` and the `Sold` tag (predicate: `lots.surviving_shares = 0`). The historical commitment survives in the strikethrough and in Bucket-A `bets.stake` — nothing is erased, it is simply no longer what ranks.
 
 ### 7.1 Two-slot edge cases
 
@@ -285,10 +307,12 @@ With depth = 1, stake is the only signal a flat reply emits, so **the reply rank
 
 ## §8 — Author stake (`a`) — seed and tiebreaker, not a mode
 
-`a` (the author's own stake on the post, read from the post's entry bet) is **not** a mode. It plays two roles:
+`a` (the author's stake **still held** on the post — the surviving lot basis of the post's entry bet, `COALESCE(lots.surviving_basis, bets.stake)`) is **not** a mode. It plays two roles:
 
 - **Cold-start seed.** A brand-new post with zero replies has no `n` and no `D`, so it is ordered by author conviction `a` until reply-bets arrive and the real lane values take over (operationally: such a post is `BELOW_FLOOR` on every lane in §3.3, so the §3.4 tie chain — `a` first — orders it). A high-conviction new post is never invisible.
 - **Tiebreaker.** When two posts tie on an order's metric, higher `a` wins, then recency (§3.4).
+
+**Both roles are about conviction the author is still carrying** (RANK-1). Reading `a` off the frozen `bets.stake` made the seed permanent: a post seeded by an opening bet that was subsequently exited kept the visibility that bet bought, at no cost, forever. The seed is meant to say *someone is behind this before anyone has replied* — a claim that stops being true the moment they exit, and the number now stops with it.
 
 ---
 
@@ -397,3 +421,4 @@ Lane-by-lane (second place is the next-highest post *that clears the floor* in t
 |---|---|---|---|
 | v1.0.0-draft | 2026-06-23 | HMH (web-authored, founder-ratified) | Initial authoring at DEBATE.8. Specifies the full ADR-0017 model — per-side data model and read-time join; Top (lanes, ratio-to-#2 margin, floor/SENTINEL_MAX, the single continuous ordering formula synthesising the floor + continuous-order decisions, author-stake/earlier-wins ties, no-fade-on-Top); the latest interleave (P2); lane-dominance badges replacing the v1 selector (P3); the computed-but-unexposed filter modes and the Contested zero-reply guard; reply ranking (depth-1, stake-within-side, two-slot edges); author-stake seed/tiebreaker; shared gravity; determinism/freeze/auditability; the read-time/performance contract (keeps comments_ranking_idx); the placeholder-constant table; and an abstract worked example. Numeric constants deferred to the 2026-09-01 number-tuning pass (→ v1.0.0). |
 | v1.0.0-draft | 2026-06-23 | HMH (founder-ratified, OD-1(A)) | DEBATE.8 execution reconciliation (Gate-2 OD-1(A)): §5.1(2)/(3) + §5.2 clarified so the **badge lanes `{n, D, n^b}`** are distinct from the **Top-order lanes `{n, D, lop}`** on the balance axis — a post may top the order via one lane yet wear a badge from another (no longer "consistent by construction" on the third axis). §13 worked example reconciled: order unchanged (P1, P2, P3, P4), but P1's badge corrected **Most Debated → Contested** (its `n^b` margin ≈ 9.0× beats its traction 3.33×); `floor_lane = 3` (for `n^b`) added to the illustrative constants. No shape change to Top; the model lands at `src/lib/ranking.ts` + `ranking.config.ts` this stratum. |
+| v1.0.0-draft | 2026-08-22 | RANK-1 (ADR-0039 R4 as amended; ruling web-authored) | **Every ranking input now keys off SURVIVING LOT BASIS, not frozen `bets.stake`.** Reconciles the whole document to ADR-0039 R4 after a confirmed exploit: a fee-less CPMM made a top slot buyable and then refundable for dust, permanently, on every post in every market. Amended §2 (substrate table + the `a` definition + the `COALESCE(lots.surviving_basis, bets.stake)` fallback and why it stays), §3.3 (the all-sub-floor note), **§3.4 (the tie chain)**, §3.6 (both profile rulers), **§7 (the reply-lane ruler)** + new §7.3 (the figure follows the ruler — reduced-with-strikethrough, `Sold` at exactly zero, ADR-0039 R6), and §8 (`a` as conviction still held). ⚠ §2's aggregate rows had said `SUM(bets.stake)` since DEBATE.8 and were **already** stale — LOTS-1 shipped the aggregate half of R4 in code without amending this file; that drift is absorbed here. No shape change: the lanes, margins, floors, interleave and badges are untouched — only what a "stake" *is*. Regression tests: `tests/server/lots/rank-capture.test.ts`, plus a decay assertion at each of the three read sites. |

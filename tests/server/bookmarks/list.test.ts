@@ -761,8 +761,24 @@ describe("UI-A6 Slice 3 — loadBookmarks cross-author read (F-BM-2)", () => {
 		// userC's parent post P). Exercises buildReplyItem cross-author + figure-
 		// attach on a reply: kind="reply", repliedToTitle = P's derived title, the
 		// reply's own `stake` ruler, AND §4.3 figures for A on (M, reply-side) —
-		// byte-identical to A's Profile. A partial sell makes Đa DISTINCT from the
-		// reply-bet ruler, so `staked` cannot be a stray echo of `stake`.
+		// byte-identical to A's Profile. Đa is DISTINCT from the reply-bet ruler,
+		// so `staked` cannot be a stray echo of `stake`.
+		//
+		// ⚠ RANK-1 — **THE FIXTURE GAINED A SECOND ARGUMENT, AND THAT IS THE POINT.**
+		// This test's distinctness used to come for free: `stake` was the FROZEN
+		// `bets.stake` (40) while Đa was the post-sell basis (30), so a partial sell
+		// alone separated them. RANK-1 makes `stake` the SURVIVING basis too — and in
+		// a holding with exactly ONE lot, Đa and that lot's basis are the same number
+		// BY DEFINITION. Left as it was, this assertion would have gone from proving
+		// something to proving nothing, while still passing once relaxed to `toBe`.
+		//
+		// So A now holds TWO NO arguments in M: Đa sums both, `stake` reads only the
+		// bookmarked one. That is where an echo bug would actually live after RANK-1,
+		// and it is the only fixture shape that can still catch one.
+		//   lot 1 (the bookmarked reply): 20 shares, basis 40
+		//   lot 2 (a second reply by A):  20 shares, basis 20
+		//   sell 10 shares → pro-rata 5 each → 15/20 surviving on both
+		//   ⇒ lot 1 basis 30 · lot 2 basis 15 · Đa = 45 · position quantity 30
 		const viewer = await seedUser("rep-viewer", "rep-viewer");
 		const author = await seedUser("rep-author", "rep-author");
 		const parentAuthor = await seedUser("rep-parent", "rep-parent");
@@ -806,21 +822,42 @@ describe("UI-A6 Slice 3 — loadBookmarks cross-author read (F-BM-2)", () => {
 			commentId: reply,
 			createdAt: new Date("2026-09-02T10:00:00Z"),
 		});
-		// Partial sell (5 of 20) → the NO episode basis (Đa) reduces pro-rata to
-		// 40 × 15/20 = 30, DISTINCT from the reply ruler (stake 40). Position → 15.
+		// A's SECOND NO argument on P — 20 shares, basis 20. It is never bookmarked
+		// and never asserted on directly; it exists so Đa spans more than the one
+		// lot `stake` reads (see the note above).
+		const secondReply = await seedComment({
+			userId: author,
+			marketId,
+			body: "A second counter reply by A",
+			side: "NO",
+			parentCommentId: parentPost,
+			createdAt: new Date("2026-09-02T11:00:00Z"),
+		});
+		await seedBet({
+			userId: author,
+			marketId,
+			side: "NO",
+			stake: dp18("20"),
+			shares: dp18("20"),
+			commentId: secondReply,
+			createdAt: new Date("2026-09-02T11:00:00Z"),
+		});
+		// Partial sell (10 of 40) → allocated pro-rata over EQUAL share counts, so
+		// each lot gives up 5 and each ends 15/20 surviving. Đa = 30 + 15 = 45;
+		// the bookmarked reply's own basis is 30. Position → 30.
 		await seedSell({
 			userId: author,
 			marketId,
 			side: "NO",
-			sharesSold: dp18("5"),
-			proceeds: dp18("2"),
+			sharesSold: dp18("10"),
+			proceeds: dp18("4"),
 			createdAt: new Date("2026-09-03T10:00:00Z"),
 		});
 		await seedPosition({
 			userId: author,
 			marketId,
 			side: "NO",
-			quantity: dp18("15"),
+			quantity: dp18("30"),
 		});
 
 		await seedBookmark({
@@ -845,12 +882,18 @@ describe("UI-A6 Slice 3 — loadBookmarks cross-author read (F-BM-2)", () => {
 
 		// The buildReplyItem shape.
 		expect(item.repliedToTitle).toBe(deriveTitleTeaser(PARENT_BODY).title);
-		expect(item.stake).toBe(dp18("40")); // the reply-bet's OWN stake (the ruler)
+		// RANK-1 — the ruler is the reply-bet's SURVIVING basis (40 × 15/20 = 30),
+		// NOT the frozen `bets.stake` of 40 this line asserted before. The change of
+		// number IS the fix: a slot bought with 40 and partly refunded is ranked on
+		// what is still behind it.
+		expect(item.stake).toBe(dp18("30"));
 
 		// §4.3 figures for A on (M, NO) — byte-identical to A's Profile.
-		expect(item.staked).toBe(profileRow.staked); // Đa = 30 (post-partial-sell)
+		expect(item.staked).toBe(profileRow.staked); // Đa = 45 (both surviving lots)
 		expect(item.current).toBe(profileRow.current);
-		expect(item.staked).not.toBe(item.stake); // Đa (30) ≠ the reply ruler (40)
+		// Đa (45, both surviving NO lots) ≠ the reply ruler (30, this lot alone).
+		expect(item.staked).toBe(dp18("45"));
+		expect(item.staked).not.toBe(item.stake);
 		expect(item.marker).toBe("none"); // A holds NO on a NO reply.
 	});
 

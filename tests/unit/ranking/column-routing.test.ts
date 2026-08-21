@@ -37,12 +37,20 @@ const CFG = DEFAULT_RANKING_CONFIG;
 function reply(
 	over: Partial<ReplySubstrate> & Pick<ReplySubstrate, "id" | "side">,
 ): ReplySubstrate {
-	return {
+	const built: ReplySubstrate = {
 		stake: "50",
+		stakeOriginal: "50",
+		sold: false,
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		priceAtBet: "0.5",
 		...over,
 	};
+	// RANK-1 — `stake` is now SURVIVING basis, `stakeOriginal` the frozen one.
+	// They are equal unless a case explicitly states otherwise; see the post
+	// factory note on why an original below the survivor is not a legal fixture.
+	return over.stakeOriginal === undefined
+		? { ...built, stakeOriginal: built.stake }
+		: built;
 }
 
 /**

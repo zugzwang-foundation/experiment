@@ -84,6 +84,9 @@ function mkReply(o: {
 			pfpUrl: o.pfpUrl ?? "/pfp-placeholder.svg",
 		},
 		stake: o.stake ?? "10.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		stakeOriginal: o.stake ?? "10.000000000000000000",
+		sold: false,
 		entryPrice: o.entryPrice ?? "0.500000000000000000",
 		imageUrl: o.imageUrl ?? null,
 	};
@@ -140,6 +143,9 @@ function mkPost(o: {
 			pfpUrl: o.pfpUrl ?? "/pfp-placeholder.svg",
 		},
 		authorStake: o.stake ?? "100.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: o.stake ?? "100.000000000000000000",
+		authorSold: false,
 		entryPrice: o.entryPrice ?? "0.500000000000000000",
 		aggregate: o.aggregate ?? {
 			supportCount: 0,

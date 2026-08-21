@@ -36,7 +36,7 @@ const CFG = DEFAULT_RANKING_CONFIG;
 function post(
 	over: Partial<PostSubstrate> & Pick<PostSubstrate, "id">,
 ): PostSubstrate {
-	return {
+	const built: PostSubstrate = {
 		parentSide: "YES",
 		supportCount: 0,
 		counterCount: 0,
@@ -44,9 +44,19 @@ function post(
 		counterDharma: "0",
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		authorStake: "0",
+		authorStakeOriginal: "0",
+		authorSold: false,
 		priceAtBet: "0.5",
 		...over,
 	};
+	// RANK-1 — `authorStake` is now SURVIVING basis and `authorStakeOriginal` the
+	// frozen one. Unless a case explicitly states an original (an argument sold
+	// down), the two are equal: a fixture where the original is SMALLER than what
+	// survives is unrepresentable in the database (`lots_surviving_basis_monotone`),
+	// and a fixture the storage layer would reject teaches nothing.
+	return over.authorStakeOriginal === undefined
+		? { ...built, authorStakeOriginal: built.authorStake }
+		: built;
 }
 
 // ── §13 worked example ───────────────────────────────────────────────────────

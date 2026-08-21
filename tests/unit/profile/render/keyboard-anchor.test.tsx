@@ -109,6 +109,9 @@ function item(n: number): BookmarkItem {
 		body: `Saved argument ${n}\n\nNeutral fixture body.`,
 		marker: "none",
 		authorStake: "12.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: "12.000000000000000000",
+		authorSold: false,
 		priceAtBet: "0.310000000000000000",
 		createdAt: "2026-07-01T00:00:00.000Z",
 		aggregate: {
