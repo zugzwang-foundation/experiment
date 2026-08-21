@@ -72,6 +72,7 @@ experiment/
 │   │   ├── (public)/               # the participant surface — layout.tsx + not-found.tsx (shell, SHELL/UI.0)
 │   │   │                           #   page.tsx                     — DISCOVERY, the market list (UI-A4). LIVE.
 │   │   │                           #   m/[slug]/page.tsx            — the debate view
+│   │   │                           #   m/[slug]/error.tsx           — the debate route error boundary
 │   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
 │   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
 │   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
@@ -88,7 +89,15 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   shadcn primitives: avatar, badge, button, card, dialog, input, separator, skeleton, textarea
+│   │   └── ui/                     #   13 files, and they are NOT all shadcn. NINE shadcn
+│   │                               #   primitives: avatar, badge, button, card, dialog,
+│   │                               #   input, separator, skeleton, textarea. FOUR are
+│   │                               #   project-authored and canon-ratified — empty-block
+│   │                               #   (P1), loading-block (P7), error-block (the
+│   │                               #   route-boundary family; canon §10 C-STATES-1 rules
+│   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
+│   │                               #   item 13, pinned by component name and props).
+│   │                               #   Don't reach for a shadcn generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
@@ -227,6 +236,7 @@ const placeBetSchema = z.object({
 - Middleware: `logging`, `origin-allowlist`, `rate-limit`, `envelope` (the §4.4 wire helpers for non-bet Route Handlers — attributed duplication of the bets-private copies, AUDIT-FIX-B7b A29; unification rides ENGINE.8 Q4). Idempotency store + lock in `idempotency/` + `upstash/`. Moderation is `moderation/precommit.ts` (OpenAI **before** the bet tx, guarded by a Redis SETNX reservation; fail-closed on terminal — ADR-0014). Rate-limit fails **open**; idempotency fails **closed** (ADR-0015).
 - **Better Auth custom `users` columns:** the drizzle adapter persists only fields in Better Auth's user model (6 core + `user.additionalFields`). Any custom `users` column written through a `databaseHook`/`mapProfileToUser` **must** be declared in `user.additionalFields` (`type:"string"`, `required:false`, `input:false` for server-only/identity fields) or it is silently stripped before INSERT — the cause of the `unable_to_create_user`/`23502` null-`pseudonym` signup bug (FIX-AUTH-SIGNUP). `input:false` also blocks client identity-spoofing at `parseInputData`.
 - **Better Auth `session.expiresIn` → cookie `Max-Age` 400-day ceiling:** `expiresIn` is fed straight into the session-cookie `maxAge` by Better Auth's `setSessionCookie`, and the better-call cookie serializer **throws** when `maxAge > 34,560,000 s` (400 days). The throw fires at **cookie-serialization time on sign-in, not at token creation**, surfacing as an uncaught 500 for onboarded/returning users (first-time signup is deferred by the `session.create.before` onboarding gate, which masks it). Cap `expiresIn` at `SESSION_MAX_AGE_SEC = 60*60*24*400`; modern browsers (Chrome 104+) clamp `Max-Age`/`Expires` to the same 400-day ceiling regardless (FIX-AUTH-LOGIN / ADR-0004 Patch P1; SPEC.2 §8.2).
+- **`nextCookies()` (from `better-auth/next-js`) MUST be the last entry in `plugins:`** — Better Auth's own runtime warns otherwise. It's what lets an `auth.api.*` call made from a Server Action (not a route handler) actually set a cookie the browser receives: its `after` hook replays any Set-Cookie the call produced onto `next/headers`'s `cookies()`, since a bare programmatic `auth.api.*` call has no HTTP response of its own to carry one. ADR-0004's Flow-constraints table named this pattern and routed it here; landed at AUTH-DBL-1, the first caller (`src/server/auth/tos-accept.ts`'s `acceptTosAction`) that needed it wired in. For an endpoint that must stay in-process-only (never reachable over HTTP), give its `createAuthEndpoint(...)` options `metadata: { SERVER_ONLY: true }` — better-call excludes it from the router's route table entirely (not just a request-time 404), so `auth.api.<name>(...)` still works while `POST /api/auth/<path>` 404s. Stronger than a `disabledPaths` denylist, which is a separate request-time string match that can diverge from the router's own path-matching.
 
 ---
 

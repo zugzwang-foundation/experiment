@@ -9,7 +9,7 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §23 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
-| **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1) |
+| **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1)<br>2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets — see §Patch record (SYNC-3) |
 
 ---
 
@@ -458,6 +458,32 @@ execution does not exist. Batching is therefore **not** required: Discovery serv
 would save ~0.45 s on a page already clearing the bar by 3.4×. Reconsider it only on
 evidence — a growing trip count or measured concurrency behaviour — never
 reflexively. No batching lands in this change.
+
+## Patch record — 2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets
+
+**Two corrections, one commit.**
+
+**1 · The `≤5k concurrent` sizing basis is superseded by ADR-0038.** The experiment's target
+is now 100,000 signups and 2,000,000 page loads with no cost ceiling for the live window.
+⚠ **The `≤5k concurrent` figure itself is not falsified** — concurrency and cumulative loads
+are different units, and the arithmetic still fits. **What is superseded is its use as the
+justification for four sizing decisions**: Small compute, pay-per-request Upstash, no
+Cloudflare proxy, and the $70–90/mo steady-state estimate. Those four cells are load-
+proportional; the concurrency number that justified them is not. Read ADR-0038 for the
+authorised set.
+
+**2 · §4 says "Two buckets" and the live type has THREE.** `src/server/storage/r2.ts` declares
+`type R2Bucket = "uploads" | "pfp" | "market-media"` — ADR-0026 added the third arm and this
+ADR was never back-referenced. ⚠ **The correction was written on 2026-08-10, on the branch
+`chore/post-perf-1-docket`, and has been unlanded since.** `docs/parked.md`'s
+`ADR-0006-DISCIPLINE` row describes that commit as *"never pushed"*; it is on `origin` at
+`1b7f37f`. Both halves of that row are corrected in the same commit as this patch.
+
+**The immutable set is untouched.** The decision body, the Vercel-Cron-only-for-HTTP-fanout
+discipline, the failure-mode profile and the single-region posture all stand. ADR-0038 scopes
+the cost and sizing sections only, which is the route this ADR's own closing constraint
+prescribes for crossing the $500/mo ceiling.
+
 
 ---
 

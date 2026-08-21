@@ -17,12 +17,24 @@ Both dashboard readings came back, and they close the questions §12 left open.
 not the binding limit and never was. The binding limit is the tier default, and
 it is the number the pooler names in its own error text (§2).
 
-### RULED · do NOT upsize compute
+### ~~RULED · do NOT upsize compute~~ → ⛔ **PREMISE DISCHARGED 2026-08-10. DO NOT APPLY.**
 
-Raising the tier raises the ceiling **without shortening a 35-second page**.
-That masks PERF-1 until production — where load is higher and the same defect
-surfaces at the worst possible moment. **Fix duration; the ceiling stops binding
-on its own.**
+> ~~Raising the tier raises the ceiling **without shortening a 35-second page**. That masks
+> PERF-1 until production — where load is higher and the same defect surfaces at the worst
+> possible moment. **Fix duration; the ceiling stops binding on its own.**~~
+
+⚠ **STRUCK, not deleted.** The ruling was correct and it was **entirely instrumental to
+PERF-1 being unfixed** — all three of its clauses name that premise: a 35-second page exists,
+upsizing would mask it, and *"the ceiling stops binding on its own"* once duration is fixed.
+**PERF-1 closed on 2026-08-10. The 35-second page does not exist** — 361.6 → 5.34 ms per
+round trip, Discovery 35.07 → 0.692 s p50, staging-verified. §6 of this same file was struck
+at that close-out; **this section was not, and it is the section a reader reaches first.**
+
+**The prohibition therefore does not bind.** Compute sizing is now governed by **ADR-0038**,
+which authorises tiers through Large and requires a **measured** number before XL. ⚠ **This
+is a strike, not a licence:** ADR-0038's own decision 2 says nothing is bought before a load
+run produces a number for it. The reason not to upsize blindly changed; the reason to measure
+first did not.
 
 ### RULED · `max` stays at 10 — now for the correct reason
 
