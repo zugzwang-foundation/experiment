@@ -1,11 +1,15 @@
 import { type BetterAuthPlugin, betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { APIError } from "better-auth/api";
+import { APIError, createAuthEndpoint } from "better-auth/api";
+import { setSessionCookie } from "better-auth/cookies";
+import { nextCookies } from "better-auth/next-js";
 import { emailOTP } from "better-auth/plugins/email-otp";
 import { v7 as uuidv7 } from "uuid";
+import { z } from "zod";
 import { db } from "@/db";
 import * as schema from "@/db/schema";
 import { sendVerificationOTP } from "@/server/auth/email-otp";
+import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
 import {
 	emitPseudonymAssignedEvent,
 	emitSignedInEvent,
@@ -194,6 +198,123 @@ const zugzwangOtpGate = {
 	hooks: { before: otpGateBeforeHooks },
 } as unknown as BetterAuthPlugin;
 
+// === Custom plugin: complete session issuance after F-AUTH-4 ================
+//
+// AUTH-DBL-1 fix. SPEC.1 §13 F-AUTH-4 "Response: Session cookie issued. User
+// redirected to the post-signup landing page" — and ADR-0004's own
+// session-deferral section: "session creation re-attempts and succeeds"
+// after F-AUTH-4. `acceptTosAction` (tos-accept.ts) commits the ToS-
+// acceptance evidence in its own transaction but, as a Server Action, has
+// no HTTP endpoint context to call Better Auth's `setSessionCookie` with —
+// that primitive requires a real `createAuthEndpoint` ctx (signed-cookie
+// helpers, `ctx.context.authCookies`), which only exists inside a real
+// Better Auth endpoint invocation. This endpoint IS that re-attempt: called
+// via `auth.api.issueOnboardingSession(...)` strictly AFTER the evidence tx
+// has committed (never inside it — I2), it re-derives the userId from the
+// SAME signed `onboarding_ref` token `acceptTosAction` already verified
+// (never a client-supplied bare userId — trust must come from the
+// unforgeable HMAC token, not a body-supplied id). Once verified, it calls
+// `internalAdapter.createSession`, which re-invokes `session.create.before`
+// (createSessionGate) for real. The gate PREDICATE is untouched — I1: this
+// can only succeed when pseudonym + tos_accepted_at are genuinely both set,
+// exactly as it always required.
+//
+// `metadata: { SERVER_ONLY: true }` below means better-call never adds this
+// path to its router's route table at all (`better-call/dist/router.mjs`:
+// `if (endpoint.options?.metadata?.SERVER_ONLY) continue;`, in the SAME loop
+// that registers every other endpoint) — stronger than a path-string
+// denylist checked at request time, since there is no route to
+// mis-normalize or re-derive a match against. Only the in-process
+// `auth.api.issueOnboardingSession(...)` call this file's own
+// `tos-accept.ts` makes still works — `toAuthEndpoints` (the `auth.api.*`
+// path) never consults the router at all. Without this, a leaked
+// `onboarding_ref` would let a caller with network access mint a full
+// participant session over HTTP with no credential beyond the token; there
+// is no legitimate reason for anything outside this codebase to ever call
+// this path directly.
+const issueOnboardingSession = createAuthEndpoint(
+	"/onboarding/issue-session",
+	{
+		method: "POST",
+		body: z.object({ onboardingRef: z.string() }),
+		metadata: { SERVER_ONLY: true },
+	},
+	async (ctx) => {
+		const verified = verifyOnboardingRef(ctx.body.onboardingRef);
+		if (!verified) {
+			throw new APIError("UNAUTHORIZED", {
+				message: "onboarding_ref_invalid",
+			});
+		}
+
+		// Load the user BEFORE creating the session — if this throws, no
+		// `sessions` row is left orphaned without a cookie.
+		const user = await ctx.context.internalAdapter.findUserById(
+			verified.userId,
+		);
+		if (!user) {
+			throw new APIError("INTERNAL_SERVER_ERROR", {
+				message: "failed_to_load_user",
+			});
+		}
+
+		// AUTH-DBL-1 review finding (HIGH): `onboarding_ref` is deliberately
+		// NOT single-use — SPEC.1 §13 line 796's tab-race no-op branch
+		// re-verifies it and must succeed too. `acceptTosAction` therefore
+		// calls this endpoint on every no-op replay for up to the token's
+		// full 10-minute TTL. REUSE any still-active session for this user
+		// instead of unconditionally minting one: this is what makes SPEC.1
+		// §13 line 796 literally true ("returns the EXISTING session
+		// cookie... No double-write") instead of creating a fresh
+		// `sessions` row (and a fresh append-only `user.*_signed_in` events
+		// row — unprunable, K_eff-relevant) on every replay. Only the FIRST
+		// call for a given user reaches `createSession` below, so
+		// `session.create.before`/`.after` (the gate, and the sign-in event
+		// emit) each still fire exactly once per real acceptance.
+		const existingSessions = await ctx.context.internalAdapter.listSessions(
+			verified.userId,
+			{ onlyActiveSessions: true },
+		);
+		// `internalAdapter.createSession` derives `ipAddress`/`userAgent`
+		// from the request headers Better Auth's own AsyncLocalStorage
+		// context carries (`getCurrentAuthContext()` inside
+		// `internal-adapter.mjs`) — populated FROM whatever `headers` the
+		// caller passed to `auth.api.issueOnboardingSession(...)`.
+		// `tos-accept.ts` forwards the real incoming request's `headers()`,
+		// so a real IP/UA lands on the `sessions` row and the
+		// `user.*_signed_in` event exactly as a normal sign-in would carry
+		// them (SPEC.2 §3.7) — not the empty-string default a headerless
+		// in-process call would otherwise produce.
+		//
+		// `createWithHooks` only returns a falsy value when a `before` hook
+		// returns literal `false`; `createSessionGate` throws instead
+		// (ONBOARDING_REQUIRED), which already propagates out of this call.
+		// The `!session` guard below is therefore a defensive belt, not a
+		// reachable branch.
+		const session =
+			existingSessions[0] ??
+			(await ctx.context.internalAdapter.createSession(verified.userId));
+		if (!session) {
+			throw new APIError("INTERNAL_SERVER_ERROR", {
+				message: "failed_to_create_session",
+			});
+		}
+
+		await setSessionCookie(ctx, { session, user });
+		return ctx.json({ success: true });
+	},
+);
+
+// Not cast through `unknown as BetterAuthPlugin` (unlike `zugzwangOtpGate`
+// above) — the cast would erase `endpoints`' type and break
+// `auth.api.issueOnboardingSession(...)`'s inference at the `tos-accept.ts`
+// call site. The plain object shape already satisfies `BetterAuthPlugin`
+// structurally.
+const zugzwangOnboardingSession = {
+	id: "zugzwang-onboarding-session",
+	endpoints: { issueOnboardingSession },
+};
+
 // SCAFFOLD.8 LD-11(c) — per-environment trustedOrigins, comma-separated
 // in BETTER_AUTH_TRUSTED_ORIGINS. prod: `https://zugzwangworld.com`;
 // staging: `https://staging.zugzwangworld.com`; preview: unset (falls
@@ -302,7 +423,22 @@ export const auth = betterAuth({
 			},
 		},
 	},
-	plugins: [emailOTP({ sendVerificationOTP }), zugzwangOtpGate],
+	// `nextCookies()` MUST be last (Better Auth's own runtime guard warns
+	// otherwise) — its `after` hook replays any Set-Cookie an `auth.api.*`
+	// call produces onto `next/headers`' `cookies()`, which is what lets
+	// `issueOnboardingSession` (called from the `acceptTosAction` Server
+	// Action, not a route handler) actually reach the browser. ADR-0004's
+	// Flow-constraints table (line 286) routed "`nextCookies()` last-in-array"
+	// to AGENTS.md as a stack-level pattern ("this ADR does not enumerate
+	// them") but that AGENTS.md pass never happened; AUTH-DBL-1 is the first
+	// caller that needed it wired in, and lands the AGENTS.md §7 line in the
+	// same commit.
+	plugins: [
+		emailOTP({ sendVerificationOTP }),
+		zugzwangOtpGate,
+		zugzwangOnboardingSession,
+		nextCookies(),
+	],
 	databaseHooks: {
 		user: {
 			create: {
