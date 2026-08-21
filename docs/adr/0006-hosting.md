@@ -9,7 +9,7 @@
 | **Frame document** | SPEC.2 §1.4 #5 (delegation), §4 (System Context), §22 (Operational Runbook Pointers), §23 (ADR Index) |
 | **Supersedes** | — |
 | **Superseded-by** | — |
-| **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1)<br>2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets — see §Patch record (SYNC-3) |
+| **Patch records** | 2026-08-09 · the ratified `bom1` region was never applied to the Vercel project — see §Patch record (PERF-1)<br>2026-08-19 · the sizing premise changed, and §4 undercounted its own buckets — see §Patch record (SYNC-3)<br>2026-08-22 · re-verified post-LOTS-1, and the Discovery gauge corrected — see §Patch record (PERF-1-CLOSE) |
 
 ---
 
@@ -484,6 +484,52 @@ discipline, the failure-mode profile and the single-region posture all stand. AD
 the cost and sizing sections only, which is the route this ADR's own closing constraint
 prescribes for crossing the $500/mo ceiling.
 
+## Patch record — 2026-08-22 · re-verified post-LOTS-1, and the Discovery gauge corrected (PERF-1-CLOSE)
+
+**This patch changes no decision and closes nothing that was still open.** PERF-1 (the region
+mismatch) was already closed 2026-08-10 (`docs/parked.md:36`) and the patch record above already
+narrates that closure with evidence. What this patch adds is a **second, independent
+re-verification** taken 2026-08-22, after the LOTS-1 arc (`lots` table, migration `0025_lots`)
+and CLOSE-1's docket landed on `origin/staging` — a region fix verified against one tree is a
+claim about that tree, not a standing guarantee, and nothing had re-checked it since.
+
+**The region fix still holds, checked three independent ways, on the SHA staging serves today
+(`b851858ed1225d520d5abd0a666b8a1cb2eed5a3`):**
+1. `vercel.json:3` — `"regions": ["bom1"]` — present at that exact commit (`git show
+   b851858:vercel.json`), byte-identical to HEAD.
+2. `x-vercel-id`'s compute segment read `bom1` on **22 of 22** requests taken across this
+   measurement.
+3. `/api/health`'s `region` field read `"bom1"`, agreeing with (2) on every request.
+
+Vercel `bom1` and Supabase `ap-south-1` are confirmed the same metro (Mumbai) under different
+per-vendor naming schemes — not a mismatch, per §"Decision Outcome" item 2 above.
+
+**A gauge error in the prior re-measurement (`zz_PERF-1-MEASURE_2026-08-22T0345.md`) is
+corrected here, not there** — O-5 (`CLAUDE.md` §8) puts the correction where the number is
+read, not in an addendum nobody reaches first. `/`'s hero (the eight-market top-YES/top-NO
+computation, `selectHeroTopPosts`) sits inside `<Suspense fallback={<LoadingSkeleton />}>`
+(`src/app/(public)/page.tsx:51-53`). TTFB on a suspended route measures the SHELL — the
+`<Suspense>` boundary's own commit — not the hero. **`total` is the honest Discovery figure.**
+The prior report's headline (82.7ms warm-median TTFB) was the shell; that same run's honest
+number was `total` = 279.1ms median / 367.1ms max, and it was never stated as the headline.
+`/u/[pseudonym]` and `/m/[slug]` carry no `Suspense` anywhere in their render trees (`grep -rn
+"Suspense"` across both component trees: zero hits) — TTFB is the correct gauge for both,
+unchanged.
+
+**Re-measured 2026-08-22, post-LOTS-1 (canary `b851858…`) — full figures and the before/after
+table are in the PERF-1-CLOSE session report.** Headline: Discovery's `total` (the correct
+gauge) warm-median moved 279.1ms → 556.8ms between the two same-day runs. The deployed SHA
+changed between them (LOTS-1/CLOSE-1 landed in the interval), so this is not read as noise —
+but it is also not diagnosed further here, because diagnosis is query-load work, and query load
+is explicitly **not** what PERF-1 measured or what this patch verifies.
+
+**What PERF-1 has never measured, and does not measure here either.** Every figure in both
+re-measurements — this one and the 2026-08-22T0345 one — was taken against a staging database
+holding on the order of 10 `comments` and 10 `bets` **in total**, across all eight markets
+combined. Discovery's eight per-market hero computations each ran over roughly one row. PERF-1
+closed a region mismatch; it was never scoped to, and still has not measured, query load under
+realistic volume. That is `PERF-2` (`docs/parked.md`), owned by SCALE S-5, not by a bespoke
+seeder against this ADR.
 
 ---
 
