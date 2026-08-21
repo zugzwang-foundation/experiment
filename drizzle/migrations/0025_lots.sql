@@ -21,9 +21,25 @@
 -- before lots existed, and that information was never recorded. Verified at
 -- authoring time WITHOUT touching production: the live window opens
 -- 2026-09-15 (CLAUDE.md §1) and the prod alias still serves a 2026-07-02 build
--- (AGENTS.md:139), so no participant has ever placed a bet. If any environment
--- is later found holding `bets` rows with no matching `lots` row, that is a
--- HALT condition — not a back-fill trigger.
+-- (AGENTS.md:139), so no participant has ever placed a bet.
+--
+-- THE HALT CONDITION IS SCOPED TO BETS PLACED AFTER THIS MIGRATION, and the
+-- scope is the whole point of it. "Any `bets` row with no matching `lots` row"
+-- is satisfied by every pre-existing bet the instant this file applies —
+-- staging tripped it on contact — because R8 is precisely the decision NOT to
+-- give those rows a lot. A halt that fires on the state the migration was
+-- designed to create is not a halt; it is noise that teaches the operator to
+-- ignore the alarm, and it would have gone off on the one environment anybody
+-- was watching.
+--
+-- What is actually alarming is a bet minted by code that was supposed to mint
+-- a lot with it and did not. So: a `bets` row whose `created_at` is at or after
+-- the moment this migration applied in that environment — readable per-database
+-- from `drizzle.__drizzle_migrations.created_at` for `folderMillis`
+-- 1787261127286 — and which has no matching `lots` row, is a HALT condition.
+-- Never a back-fill trigger: back-filling would invent the per-argument
+-- attribution R8 exists to say was never recorded. Bets older than that instant
+-- are expected to have no lot, and always will.
 --
 -- MINTS the invariant-class rule R2, tested by `I-LOT-SUM-001`:
 --   Σ lots.surviving_shares == positions.quantity, per (user_id, market_id, side)
@@ -73,9 +89,16 @@ CREATE INDEX "lots_user_id_idx" ON "lots" USING btree ("user_id");
 -- That single statement is the complete reversal, and it is complete precisely
 -- because this migration is additive: it creates one table and touches nothing
 -- else, so dropping that table restores the prior schema exactly. The three
--- FKs, five indexes and eight CHECKs all live on `lots` and go with it; no
+-- FKs, five indexes and seven CHECKs all live on `lots` and go with it; no
 -- other table gained a column, a constraint or a trigger here, so none needs
 -- unwinding.
+--
+-- It reads as eight only if you count `lots_bet_id_uq` twice. That UNIQUE is
+-- already one of the five indexes; ADR-0039's constraint table lists it
+-- alongside the seven CHECKs because the table is about what constrains the
+-- row, not about what kind of object does the constraining. The ADR was
+-- corrected at s1→s2 and this sentence was not, which is the whole lesson:
+-- a count restated in a second place is a count that goes stale in one of them.
 --
 -- WHY IT IS A COMMENT AND NOT AN ARTIFACT. This repo's migrations are
 -- forward-only and append-only (AGENTS.md §6: never edit a committed
