@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { bets, comments, lots, markets, users } from "@/db/schema";
+import { EXPECTED_GUARD_CATALOG_ROWS } from "../../staging/_lib/guards";
 import { testClient, testDb } from "../_fixtures/db";
 import { truncateTables } from "../_fixtures/truncate";
 
@@ -114,8 +115,20 @@ describe("lots — R9 no-delete trigger (0026)", () => {
 		expect(before).toHaveLength(1);
 
 		// The real teardown helper, not a hand-rolled TRUNCATE: the thing under
-		// test is that the path `pnpm staging:reset` and every suite teardown
-		// already take still works, so it has to be that exact path.
+		// test is that the path every suite teardown already takes still works,
+		// so it has to be that exact path.
+		//
+		// ⚠ Corrected at MERGE-1. This said the path was `pnpm staging:reset`'s,
+		// and it is not. `truncateTables` is `tests/db/_fixtures/truncate.ts`;
+		// the staging reset runs `runGuardedReset` over `TRUNCATE_SET` from
+		// `tests/staging/_lib/guards.ts`, whose own header opens with "WHY THIS
+		// IS NOT tests/db/_fixtures/truncate.ts" and which ADR-0035 primitive 7
+		// rules a separate artifact with a separate requirement set. The staging
+		// half IS covered, in the file that owns it —
+		// `tests/integration/staging-reset-mechanism.integration.test.ts` drives
+		// the real `runGuardedReset(testClient, TRUNCATE_SET)` and `"lots"` is in
+		// that set. So the claim was wrong about WHICH file proves it, not about
+		// whether it is proven.
 		await truncateTables(testClient, ["bets", "comments", "markets", "users"]);
 
 		const after = await testDb.select({ id: lots.id }).from(lots);
@@ -143,6 +156,10 @@ describe("lots — R9 no-delete trigger (0026)", () => {
 			    AND ns.nspname = 'public'
 			    AND t.tgname LIKE 'bucket_%'`,
 		);
-		expect(catalog?.n).toBe("78");
+		// Imported, not retyped. A count restated in a second place is a count
+		// that goes stale in one of them — 0025_lots.sql:100-101's own lesson,
+		// and this file was the third copy of 78 when it was written (the
+		// constant, guard-list-parity's derivation, and a literal here).
+		expect(catalog?.n).toBe(String(EXPECTED_GUARD_CATALOG_ROWS));
 	});
 });
