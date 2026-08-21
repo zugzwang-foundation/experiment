@@ -843,7 +843,7 @@ Seven markets carry a hero post on exactly ONE side; one carries none. **Zero ca
 
 **2 · The market that sorts FIRST is the emptiest.** Discovery orders `created_at DESC` and caps at `DISCOVERY_GRID_SIZE`. `sp-m4-new` ("brand new") has **no** hero posts on either side, so a first-time viewer lands on the both-sides-empty hero. *(⚠ Correction to the scoping brief, verified from the served payload: `sp-m4-new` sorts **LAST** of the eight, not first — index 0 is `sp-m16-fill`. The concern is real but the ordering claim was inverted; the emptiest market is at the END of the carousel, not its opening frame.)*
 
-**3 · All 8 `market_media` R2 objects are absent** — every minted URL returns `404 NoSuchKey`. Rows in the DB, objects never uploaded. This is what makes **PD-2-32** (a real production defect: a minted URL that later 404s has no degradation path) visible on staging. Fixing the fixture would HIDE PD-2-32 without fixing it — **land PD-2-32 first, then re-pin the fixtures.**
+**3 · All 8 `market_media` R2 objects are absent** — every minted URL returns `404 NoSuchKey`. Rows in the DB, objects never uploaded. This is what makes **PD-2-32** (a real production defect: a minted URL that later 404s has no degradation path) visible on staging. Fixing the fixture would HIDE PD-2-32 without fixing it — **land PD-2-32 first, then re-pin the fixtures.** ✅ **DISCHARGED 2026-08-20** — all 8 `market_media` objects loaded to their existing `r2_object_key`s and HEAD/GET-verified serving `200` (CONTENT.2-TILES tile-load task); PD-2-32 itself is unaffected (still the real production defect, landed separately) and this item's own condition — objects present, not 404ing — now holds.
 
 **What a fix must preserve.** The set is engine-DRIVEN (`generate.staging.test.ts` calls `place`/`openMarket`/etc. and writes nothing itself, ADR-0036), so the shape changes by driving MORE bets on the opposite side of existing posts — not by inserting rows. The six verification gates and the coverage inventory re-pin together.
 
@@ -2241,3 +2241,51 @@ for and inadequate for what the load rig needs.
 **Expected next task.** Scale tracker row 2.4, with the pool sized to exceed the
 profile. Any placeholder tuple scheme serves — staging is clean-recreate by
 ADR-0035, and the real names arrive from the HARDEN namespace task.
+
+---
+## MEDIA-DISPLAYORDER-CARRIER — display_order is written by the admin form and read by one query
+
+**Originating task:** MEDIA-SECOND-ROW Slice 1 (2026-08-21).
+
+Before this slice `display_order` was written on the admin create path and read
+by NOTHING — `getDefaultMarketMediaUrl` filtered `is_default = true` and never
+ordered by it. A market with five media rows rendered one and silently
+discarded four. This slice makes row 1 reachable: the panel reads the
+lowest-display_order non-default row. **Rows beyond that remain unreachable.**
+
+⚠ **Operator constraint at production market creation: upload exactly TWO
+images per market.** Mark either one default via the radio button — the panel
+takes whichever is not default (verified: `create-market-form.tsx:78-86,
+108, 159-167` computes isDefault independently of upload order). A third
+image and beyond renders nowhere.
+
+**Closes when** the ADR-0026 carousel (SPEC.1 §9, narrowed by this slice) is
+built. Evidence: `docs/plans/MEDIA-SECOND-ROW.md` items 1, 4, 8.
+
+---
+## MEDIA-CACHE-POSTURE — presigned market-media URLs may defeat every cache — ⚠ ROUTE TO THE READ-PATH LANE
+
+**Originating task:** MEDIA-DETAIL-PROBE (2026-08-21), observed not theorised.
+
+The github market-media object rendered twice on one Discovery load with TWO
+separately-presigned URLs. If each render mints a fresh signature the query
+string differs per render — so no browser cache hits and no edge cache hits,
+and every page load re-downloads every image. At the 2,000,000 page-load
+target this is the dominant image cost, and it affects every presigned image
+surface, not just market media.
+
+⚠ ADR-0026 Driver 8 states market media is CDN-served. A presigned S3-API URL
+does not traverse the Cloudflare edge. **The posture and the implementation
+may not agree** — unverified either way.
+
+⚠ **The design question underneath:** market media is public, anonymous,
+unauthenticated content on a page requiring no session. Presigning protects
+bytes that are already public while costing every cache hit on the busiest
+surface. Participant uploads under `u/<userId>/` genuinely need it; admin
+media under `m/<marketId>/` arguably does not.
+
+**The predicate:** is the minted read URL byte-identical across two renders of
+the same key? What host does it point at? Is any Cache-Control set on the
+objects (every load so far has set none)?
+
+**Conditional trigger.** The read-path / caching workstream — NOT a media task.
