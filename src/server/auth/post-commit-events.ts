@@ -47,12 +47,23 @@ import { insertEvent } from "@/server/events/insert";
 // OAuth redirect callback, `/sign-in/email-otp` for the email-OTP plugin's
 // sign-in endpoint. The `startsWith("/callback/")` belt also covers a
 // concrete path if a future Better Auth version stores it resolved.
-function classifySignInPath(path: string | undefined): "oauth" | "otp" | null {
+//
+// AUTH-DBL-1: `/onboarding/issue-session` (`src/server/auth/index.ts`'s
+// `issueOnboardingSession`) is the session a first-time user's F-AUTH-1/
+// F-AUTH-2 attempt deferred to F-AUTH-4 — it's still that original sign-in
+// completing, just on a second call, so it still owns one of the two
+// existing event types. The path alone can't say which: resolved to
+// "deferred" here, then reclassified in `emitSignedInEvent` once the user
+// row (already fetched, already carrying `googleId`) is in hand.
+function classifySignInPath(
+	path: string | undefined,
+): "oauth" | "otp" | "deferred" | null {
 	if (!path) return null;
 	if (path === "/callback/:id" || path.startsWith("/callback/")) {
 		return "oauth";
 	}
 	if (path === "/sign-in/email-otp") return "otp";
+	if (path === "/onboarding/issue-session") return "deferred";
 	return null;
 }
 
@@ -113,9 +124,17 @@ export async function emitSignedInEvent(
 			return;
 		}
 
+		// AUTH-DBL-1: resolve the deferred F-AUTH-4 completion to whichever
+		// original flow created this account — `googleId` is only ever set
+		// by the F-AUTH-1 `mapProfileToUser` mapper (never client-writable,
+		// `input:false`), so its presence is the same discriminator the
+		// `oauth` branch below already relies on.
+		const resolvedFlow =
+			flow === "deferred" ? (userRow.googleId ? "oauth" : "otp") : flow;
+
 		const metadata = {
 			request_id: "unknown",
-			flow_id: flow === "oauth" ? "F-AUTH-1" : "F-AUTH-2",
+			flow_id: resolvedFlow === "oauth" ? "F-AUTH-1" : "F-AUTH-2",
 			user_id: userRow.id,
 			actor_id: userRow.id,
 			idempotency_key: null,
@@ -123,7 +142,7 @@ export async function emitSignedInEvent(
 			user_agent: sessionRow.userAgent || "unknown",
 		};
 
-		if (flow === "oauth") {
+		if (resolvedFlow === "oauth") {
 			if (!userRow.googleId) {
 				// OTP-created user account-linked to Google: google_id was
 				// never back-filled. Payload requires a string — skip, never

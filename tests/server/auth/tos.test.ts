@@ -81,6 +81,26 @@ vi.mock("@/server/dharma/grant", () => ({
 	grantInitialDharma: mockGrantInitialDharma,
 }));
 
+// AUTH-DBL-1: `acceptTosAction` now imports the `auth` singleton to call
+// `auth.api.issueOnboardingSession(...)` after the tx commits. Constructing
+// the REAL `betterAuth({...})` instance against this file's bare `mockDb`
+// (no `insert`, a bare `select`, no full drizzle query-builder shape) is
+// NOT viable — `internalAdapter` reaches into shapes `mockDb` doesn't have,
+// which surfaces as a swallowed `TypeError` inside this suite's own
+// try/catch (confirmed empirically before this mock was added). The module
+// mock keeps this suite at the same mocked-DB layer as everything else in
+// it; the DB-backed real-`auth` twin is
+// tests/integration/auth-dbl-1-first-login-session.integration.test.ts.
+const { mockIssueOnboardingSession } = vi.hoisted(() => ({
+	mockIssueOnboardingSession: vi.fn(async (..._args: unknown[]) => ({
+		success: true,
+	})),
+}));
+
+vi.mock("@/server/auth", () => ({
+	auth: { api: { issueOnboardingSession: mockIssueOnboardingSession } },
+}));
+
 import { acceptTosAction } from "@/server/auth/tos-accept";
 import {
 	PRIVACY_VERSION_HASH,
@@ -96,6 +116,7 @@ beforeEach(() => {
 	mockVerifyOnboardingRef.mockReset();
 	mockCookiesGet.mockReset();
 	mockHeadersGet.mockReset();
+	mockIssueOnboardingSession.mockClear();
 	mockDb.transaction.mockImplementation(
 		(cb: (t: typeof mockDb._tx) => unknown) => cb(mockDb._tx),
 	);
@@ -528,5 +549,109 @@ describe("ToS acceptance — initial-grant producer wiring (ENGINE.13)", () => {
 		}
 		expect(mockDb.transaction).toHaveBeenCalled();
 		expect(mockGrantInitialDharma).not.toHaveBeenCalled();
+	});
+});
+
+// AUTH-DBL-1 — session-issuance wiring at the mocked layer, mirroring the
+// ENGINE.13 grant-wiring suite above: `auth.api.issueOnboardingSession`
+// fires on BOTH the first-acceptance branch AND the tab-race no-op branch
+// (SPEC.1 §13 line 796 — the second tab's Continue click "returns the
+// existing session cookie" too), and never on the checkbox early-return,
+// the missing/invalid/expired cookie redirects, or the missing-row branch.
+// The DB-backed, real-`auth` twin is
+// tests/integration/auth-dbl-1-first-login-session.integration.test.ts.
+describe("ToS acceptance — session issuance wiring (AUTH-DBL-1)", () => {
+	const userId = "01234567-89ab-cdef-0123-456789abcdef";
+
+	function armHappyPathContext(): void {
+		mockCookiesGet.mockImplementation((name: string) =>
+			name === "onboarding_ref"
+				? { name: "onboarding_ref", value: "signed-ref-token" }
+				: undefined,
+		);
+		mockHeadersGet.mockImplementation((h: string) => {
+			if (h === "x-forwarded-for") return "1.2.3.4";
+			if (h === "user-agent") return "Mozilla/5.0 (test browser)";
+			return null;
+		});
+	}
+
+	it("tos::issue-session-called-once-on-first-acceptance", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce({
+			id: userId,
+			pseudonym: "RedFox001",
+			tosAcceptedAt: null,
+		});
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// NEXT_REDIRECT throw on success.
+		}
+
+		expect(mockIssueOnboardingSession).toHaveBeenCalledTimes(1);
+		const call = mockIssueOnboardingSession.mock.calls[0]?.[0] as {
+			body: { onboardingRef: string };
+			headers: Headers;
+		};
+		expect(call.body).toEqual({ onboardingRef: "signed-ref-token" });
+		// The real IP/UA — never a headerless in-process call (SPEC.2 §3.7).
+		expect(call.headers.get("x-forwarded-for")).toBe("1.2.3.4");
+		expect(call.headers.get("user-agent")).toBe("Mozilla/5.0 (test browser)");
+	});
+
+	it("tos::issue-session-called-once-on-tab-race-no-op [SPEC.1 line 796]", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce({
+			id: userId,
+			pseudonym: "RedFox001",
+			tosAcceptedAt: new Date("2026-05-15T12:00:00Z"),
+		});
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect after the no-op tx.
+		}
+
+		expect(mockIssueOnboardingSession).toHaveBeenCalledTimes(1);
+	});
+
+	it("tos::issue-session-not-called-on-missing-users-row", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+		mockDb._tx.query.users.findFirst.mockResolvedValueOnce(undefined);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect after the no-op tx.
+		}
+
+		expect(mockIssueOnboardingSession).not.toHaveBeenCalled();
+	});
+
+	it("tos::issue-session-not-called-on-checkbox-early-return", async () => {
+		armHappyPathContext();
+		mockVerifyOnboardingRef.mockReturnValueOnce({ userId });
+
+		await acceptTosAction(fd(false));
+
+		expect(mockIssueOnboardingSession).not.toHaveBeenCalled();
+	});
+
+	it("tos::issue-session-not-called-on-missing-cookie-redirect", async () => {
+		mockCookiesGet.mockReturnValue(undefined);
+
+		try {
+			await acceptTosAction(fd());
+		} catch {
+			// redirect to /sign-in.
+		}
+
+		expect(mockIssueOnboardingSession).not.toHaveBeenCalled();
 	});
 });

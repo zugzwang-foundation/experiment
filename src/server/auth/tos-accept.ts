@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { v7 as uuidv7 } from "uuid";
 import { db } from "@/db";
 import { users } from "@/db/schema/auth";
+import { auth } from "@/server/auth";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
 import {
 	PRIVACY_VERSION_HASH,
@@ -13,6 +14,7 @@ import {
 } from "@/server/auth/tos-versions";
 import { grantInitialDharma } from "@/server/dharma/grant";
 import { insertEvent } from "@/server/events/insert";
+import { safeCaptureException } from "@/server/observability/safe-capture";
 
 // F-AUTH-4 ToS acceptance Server Action per SPEC.1 §13 + SPEC.2 §3.5 line
 // 281 + plan §4 step 3. Verifies the signed `onboarding_ref` cookie, opens
@@ -36,9 +38,19 @@ import { insertEvent } from "@/server/events/insert";
 //     Continue is not the boundary)
 //   - SERIALIZABLE conflict → Postgres aborts the loser; client retries
 //
-// On success: clear the `onboarding_ref` cookie + redirect to `/`. The
-// next request hits Better Auth's session-create path; with
-// `tos_accepted_at` now set, the session-deferral hook permits issuance.
+// On success (AUTH-DBL-1 fix): AFTER the evidence tx has committed — never
+// inside it, per I2 — issue the participant session via
+// `auth.api.issueOnboardingSession` (src/server/auth/index.ts), then clear
+// the `onboarding_ref` cookie and redirect to `/`. SPEC.1 §13 F-AUTH-4
+// "Response: Session cookie issued. User redirected to the post-signup
+// landing page" — previously this action redirected home WITHOUT a
+// session, silently deferring issuance to a second, manual sign-in
+// (AUTH-DBL-1). The gate PREDICATE this relies on (session-gate.ts) is
+// unchanged — I1: the new call only succeeds because pseudonym +
+// tos_accepted_at are now genuinely both set, exactly as the gate always
+// required. If issuance itself fails for any reason, the fallback is the
+// PRE-FIX behaviour (redirect home unauthenticated, sign in again) — never
+// a crash on top of already-committed ToS evidence.
 //
 // ENGINE.13: the equal initial Dharma grant (ADR-0018 + SPEC.1 §10.1)
 // joins the FIRST-ACCEPTANCE branch of this same transaction — after the
@@ -131,7 +143,13 @@ export async function acceptTosAction(
 		user_agent: ua,
 	};
 
-	await db.transaction(async (tx) => {
+	// Whether a real users row was found (first-acceptance OR tab-race
+	// no-op — either way there is a real user to issue a session for).
+	// False only on the missing-row branch, where there is nobody to
+	// create a session for. The transaction's own return value (not a
+	// mutated closure variable) — no staleness hazard if a retry loop is
+	// ever added here.
+	const userExists = await db.transaction(async (tx) => {
 		// Per plan §5 failure mode #11 + SPEC.1 line 703: `SELECT … FOR
 		// UPDATE` acquires a row-level lock so concurrent tabs serialize
 		// through this point. The second tab BLOCKS on this SELECT until
@@ -145,8 +163,8 @@ export async function acceptTosAction(
 			where: eq(users.id, userId),
 			columns: { id: true, pseudonym: true, tosAcceptedAt: true },
 		});
-		if (!row) return; // User row missing — silent no-op
-		if (row.tosAcceptedAt !== null) return; // Tab-race idempotent no-op
+		if (!row) return false; // User row missing — silent no-op
+		if (row.tosAcceptedAt !== null) return true; // Tab-race idempotent no-op
 
 		// Five-column acceptance evidence in one tx per SPEC.2 §3.5 line 281.
 		// Raw SQL via tx.execute so the column-name surface is explicit and
@@ -186,17 +204,55 @@ export async function acceptTosAction(
 			},
 			metadata,
 		});
+		return true;
 	});
+
+	// AUTH-DBL-1 — issue the session now that the evidence tx has
+	// committed (I2: strictly after, never inside it). Re-derives the
+	// userId from the SAME onboarding_ref token verified above — the
+	// endpoint independently re-verifies it and re-runs the unchanged gate
+	// predicate (I1) via a real `internalAdapter.createSession` call, so
+	// this cannot grant a session to a still-unonboarded user. Best-effort:
+	// on any failure, fall through to the pre-fix behaviour (redirect home
+	// unauthenticated) rather than crash on top of already-committed ToS
+	// evidence — the user can still sign in again manually.
+	if (userExists) {
+		try {
+			// Built explicitly from the already-extracted `ip`/`ua` (not
+			// `headerStore` itself — Better Auth constructs a real `Headers`
+			// from whatever is passed here, which throws on `next/headers`'
+			// `ReadonlyHeaders` in some runtimes) so the session/sign-in-event
+			// IP+UA are real, not the empty-string default a headerless
+			// in-process call would otherwise leave (SPEC.2 §3.7 — the
+			// audit-trail fields are canonical, not best-effort).
+			await auth.api.issueOnboardingSession({
+				body: { onboardingRef: refToken },
+				headers: new Headers({
+					"x-forwarded-for": ip,
+					"user-agent": ua,
+				}),
+			});
+		} catch (err) {
+			// Fail-open per SPEC.2 §17.5 (the AUDIT-FIX-B1 posture): never let
+			// an observability call — or this best-effort session issuance
+			// itself — take down a request that already committed real ToS
+			// evidence. Routed through Sentry (not console.error alone) so a
+			// silent regression back to the two-click bug this fix closes is
+			// actually visible, not just locally logged.
+			console.error("onboarding_session_issue_failed", err);
+			safeCaptureException(err, {
+				tags: { kind: "onboarding_session_issue_failed" },
+			});
+		}
+	}
 
 	// Clear the onboarding_ref cookie — ToS is now accepted; subsequent
 	// sign-in attempts use the regular session-create path. Match the
 	// emission Path so the browser actually clears it.
 	cookieStore.delete({ name: ONBOARDING_REF_COOKIE, path: "/onboarding" });
 
-	// Next.js redirect — user is currently anonymous (no participant
-	// cookie yet). Hitting `/` triggers middleware-or-page-level
-	// redirect to `/sign-in` where the user re-authenticates; session-
-	// gate now passes (pseudonym set + tos_accepted_at set). Two-click
-	// UX trade-off documented; auto-re-sign-in deferred (not in plan).
+	// Redirect to the post-signup landing page (SPEC.1 §13 F-AUTH-4
+	// Response). The session cookie issued above (when issuance succeeded)
+	// makes this an authenticated request from here on.
 	redirect("/");
 }
