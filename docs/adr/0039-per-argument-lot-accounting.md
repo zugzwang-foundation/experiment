@@ -392,8 +392,9 @@ answer when nothing did.
 ### D-5 · Ranking (R4) and attracted-value decay (R5)
 
 `support_dharma` / `counter_dharma` are today read-time `SUM(rb.stake) FILTER (…)`
-aggregates over the frozen `bets.stake`, at three byte-equivalent sites
-(`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`).
+aggregates over the frozen `bets.stake`, at two byte-equivalent sites
+(`debate-view/ranking-substrate.ts`, `profile/arguments.ts`) — a third,
+`bookmarks/list.ts`, was unwired product-wide at ADR-0040.
 Under R4/R5 the summand becomes the replier's **surviving lot basis** for that reply —
 `SUM(COALESCE(l.surviving_basis, rb.stake)) FILTER (…)`, joined `lots ON lots.bet_id =
 rb.id`. A replier who sells their lot down therefore withdraws the weight they lent the
