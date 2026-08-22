@@ -1,12 +1,11 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+import { getRequestSession } from "@/app/(public)/_lib/session";
 import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
-import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileGraphSeries } from "@/server/profile/graph-series";
 import { loadProfilePositions } from "@/server/profile/positions";
@@ -36,13 +35,32 @@ export { BOOKMARKS_EMPTY_COPY } from "@/components/bookmarks/BookmarksTable";
  * AUTH-GATED: there is no anonymous bookmark set, so an anonymous visitor is
  * redirected to /sign-in. `viewerId` is ALWAYS `session.user.id` — never a
  * client-supplied value — and `loadBookmarks` scopes the read `WHERE
- * user_id = $viewer`, so a viewer only ever sees their OWN bookmarks. UNCACHED /
- * dynamic v1 (§7 S1 — `cacheComponents` absent; the retrofit rides the named
- * foundational follow-up). Content masking + author scrub are applied inside
- * `loadBookmarks` before any DTO crosses to the client (D-7).
+ * user_id = $viewer`, so a viewer only ever sees their OWN bookmarks. UNCACHED —
+ * this whole route is personal data (S-4 Phase A T4/T5), so it has no cache
+ * boundary to retrofit; `instant = false` (below) only defers the framework's
+ * instant-navigation validation for its unwrapped `headers()`/session read,
+ * pending the S-4 Phase C/D Suspense hoist. Content masking + author scrub
+ * are applied inside `loadBookmarks` before any DTO crosses to the client
+ * (D-7).
+ *
+ * ⚠ KNOWN GAP, ACCEPTED (S-4 Phase B, tech-lead ruling): the `redirect()`
+ * below no longer produces a clean HTTP 307 for a signed-out visitor. Once
+ * `cacheComponents` is on, ANY route without a Suspense boundary around its
+ * runtime read streams its response (`x-nextjs-postponed: 1`) even when the
+ * build labels it plain Dynamic — so by the time the redirect is discovered,
+ * a `200` has already gone out, and Next falls back to a `<meta
+ * http-equiv="refresh">` + client-side nav instead of a protocol-level
+ * redirect. Real browsers still land on `/sign-in` correctly; a non-JS
+ * client (curl, a crawler, an old bot) sees a ~1s-delayed meta-refresh, not
+ * an instant 307. Closes when the S-4 Phase C/D Suspense hoist lands on this
+ * route — verify via `curl -D -` for a real `307`/`Location` header, not
+ * just a 200.
  */
+export const instant = false;
+
 export default async function BookmarksPage(): Promise<React.JSX.Element> {
-	const session = await auth.api.getSession({ headers: await headers() });
+	// S-4 Phase D — deduped against the layout's read (`_lib/session.ts`).
+	const session = await getRequestSession();
 	const viewerId = session?.user?.id;
 	if (!viewerId) {
 		redirect("/sign-in");

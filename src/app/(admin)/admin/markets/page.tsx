@@ -8,12 +8,17 @@ import { requireAdminPage } from "@/server/admin/page-guards";
 import { FREEZE_INSTANT_UTC } from "@/server/markets/create";
 
 // UI.6 S1 — the Markets tab (extends ENGINE.15 S3's thin list). Server
-// Component, `force-dynamic` (fresh-on-view), Layer-2 admin auth re-validated at
-// entry. Adds the two-tab nav, the live needs-resolution count (the §6.1
-// pre-freeze obligation surface), and the freeze countdown. The terminal
-// actions (Close / Resolve / Void / Correct) live on `[marketId]/page.tsx`
-// (S2) — this list links through to them.
-export const dynamic = "force-dynamic";
+// Component, fresh-on-view (dynamic by default, no `'use cache'`), Layer-2
+// admin auth re-validated at entry. Adds the two-tab nav, the live
+// needs-resolution count (the §6.1 pre-freeze obligation surface), and the
+// freeze countdown. The terminal actions (Close / Resolve / Void / Correct)
+// live on `[marketId]/page.tsx` (S2) — this list links through to them.
+//
+// S-4 Phase B — `instant = false`: `requireAdminPage` reads `cookies()` and
+// this page reads `searchParams`, both unwrapped; either errors the
+// `cacheComponents` prerender build otherwise. Deferred, not restructured —
+// admin is outside S-4's scope (CLAUDE.md §1).
+export const instant = false;
 
 export default async function AdminMarketsPage(props: {
 	searchParams: Promise<{ ok?: string; error?: string }>;

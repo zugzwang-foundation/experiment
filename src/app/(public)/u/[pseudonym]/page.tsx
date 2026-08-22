@@ -1,12 +1,11 @@
-import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { getRequestSession } from "@/app/(public)/_lib/session";
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
-import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileArguments } from "@/server/profile/arguments";
 import { loadProfileGraphSeries } from "@/server/profile/graph-series";
@@ -30,10 +29,15 @@ import { loadProfileTiles } from "@/server/profile/tiles";
  * Owner detection is `session.user.id === profileUser.id` — the owner deltas
  * are the identity chip + the owner-only Sell mount (F-PROF-3, via the
  * `buildPositionsPayload` owner arm). Public-read (not middleware-gated);
- * UNCACHED / dynamic v1 (§7 S1 — `cacheComponents` is absent; the retrofit
- * rides the named foundational follow-up). `params`/`searchParams` are Promises
- * (Next 16).
+ * UNCACHED v1 still — the S-4 Phase C/D cache retrofit (subject-scoped on
+ * `profileUser.id`, S-4 Phase A T4/T5) hasn't landed yet. `instant = false`
+ * (below) only defers the framework's instant-navigation validation for this
+ * route's unwrapped `headers()`/session read, since `cacheComponents` is now
+ * on (S-4 Phase B) but this segment isn't restructured for it yet.
+ * `params`/`searchParams` are Promises (Next 16).
  */
+export const instant = false;
+
 export default async function ProfilePage({
 	params,
 	searchParams,
@@ -69,7 +73,8 @@ export default async function ProfilePage({
 		positions,
 	});
 
-	const session = await auth.api.getSession({ headers: await headers() });
+	// S-4 Phase D — deduped against the layout's read (`_lib/session.ts`).
+	const session = await getRequestSession();
 	const owner = session?.user?.id === profileUser.id;
 
 	// F-PROF-3: the Sell affordance exists ONLY on the owner payload arm; the

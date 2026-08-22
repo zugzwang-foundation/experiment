@@ -17,7 +17,9 @@ import {
 
 // GET /m/[slug]/quote — the composer's interactive preview (UI.A2 §3.2; the
 // cpmm.md §6.4 bundle with the §16.1 clamp surfaced). The `/m/[slug]/export`
-// sibling shape: slug-resolved, force-dynamic, no-store.
+// sibling shape: slug-resolved, no-store. Neither carries `dynamic` since S-4
+// Phase B (redundant under `cacheComponents` — both stay uncached anyway,
+// since each does an unconditional runtime read `'use cache'` never wraps).
 //
 // Session-gated (ratified OQ-5a): the quote is act-surface substrate — its
 // only consumer is the signed-in composer, not public content. The 401
@@ -33,8 +35,6 @@ import {
 // slippage-tolerance abort exists by design. READ-ONLY: no write of any
 // kind, ever (the plan-§1 INV-2 row). Reserves are NOT echoed in the DTO
 // (quotes are derivable outputs; the raw pool pair stays server-side).
-
-export const dynamic = "force-dynamic";
 
 // Query contract (§3.2): side ∈ YES|NO; EXACTLY ONE of stake (buy quote) /
 // shares (sell quote); each a `numericString` > 0. Violation → 400

@@ -1,14 +1,18 @@
 import "server-only";
 
 import { desc, eq } from "drizzle-orm";
-
+import { cacheLife, cacheTag } from "next/cache";
 import type { DbClient, DbTransaction } from "@/db";
+import { db } from "@/db";
 import { markets } from "@/db/schema";
 import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
+import type { Reserves } from "@/server/cpmm/calculate";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 
+import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
 import { getDefaultMarketMediaUrl } from "./media";
+import { loadPriceSeries, type PricePoint } from "./price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -93,4 +97,89 @@ export async function listOpenMarkets(
 		});
 	}
 	return listings;
+}
+
+/**
+ * S-4 Phase C — the Discovery market-id set, cached. `listOpenMarkets` above is
+ * UNCHANGED and untouched (its own `list.test.ts` suite is unverifiable in this
+ * environment — no local Postgres); this is a NEW, additive read for the live
+ * page composition, covering only the `markets` SELECT `listOpenMarkets` also
+ * does — no pricing, no totals, no media. Cached: the Open-markets SET doesn't
+ * need per-viewer freshness (a just-opened market appearing a few minutes late
+ * is not a correctness issue), busts on `openMarket`/`closeMarket` via
+ * `revalidateTag("discovery", ...)`.
+ *
+ * ⚠ NO `client` PARAMETER, unlike every other reader in this file — a `'use
+ * cache'` function's key is its serialized arguments, and a Drizzle client
+ * isn't a meaningful cache key input. Imports `db` directly instead; this is
+ * inherent to how Cache Components works, not a departure from this file's DI
+ * convention someone should "fix" back.
+ */
+export type DiscoveryMarketId = { id: string; slug: string; title: string };
+
+export async function getCachedDiscoveryMarketIds(): Promise<
+	DiscoveryMarketId[]
+> {
+	"use cache";
+	cacheLife("minutes");
+	cacheTag("discovery");
+
+	return db
+		.select({ id: markets.id, slug: markets.slug, title: markets.title })
+		.from(markets)
+		.where(eq(markets.status, "Open"))
+		.orderBy(desc(markets.createdAt))
+		.limit(DISCOVERY_GRID_SIZE);
+}
+
+/** One market's cached Discovery data — everything the pack calls "shared"
+ * (totals, media, chart geometry, hero posts) EXCEPT price. */
+export type CachedMarketDiscoveryData = {
+	totals: { dharmaStaked: string; postCount: number; replyCount: number };
+	imageUrl: string | null;
+	series: PricePoint[];
+	topPosts: HeroTopPosts;
+};
+
+/**
+ * S-4 Phase C — one market's cached Discovery block, KEYED ON `reserves`.
+ *
+ * The caller (`DiscoveryContent`, `(public)/page.tsx`) fetches `reserves` LIVE
+ * via `getMarketPricingAndReserves` every render, then passes it in here. Since
+ * the cache key IS that exact value, a hit can only occur when reserves are
+ * PROVABLY unchanged since the last write — a bet moving the pool changes the
+ * key and forces a miss. This is why `selectHeroTopPosts`'s `currentValue`
+ * (the Đb execution-value figure, `computeSell(reserves, ...)`) is safe to let
+ * ride this cache even though R3 (CLAUDE.md-adjacent S-4 pack decision) says
+ * price/reserves are "never cached": it is never STALE, by construction, which
+ * is the property R3 actually protects — not literal cache-boundary avoidance.
+ * Flagged explicitly for a Gate C ruling on whether this satisfies R3's intent
+ * (see the Phase C plan / session log).
+ *
+ * ⚠ MUST NOT call `getMarketPricingAndReserves` (or read `reserves` any other
+ * way) internally — that would defeat the whole mechanism by letting a stale
+ * reserves value hide behind a fresh-looking cache key the caller didn't
+ * actually observe. `reserves` is a parameter for exactly this reason, never
+ * fetched here.
+ *
+ * `selectHeroTopPosts`'s call here is BYTE-IDENTICAL to how `listOpenMarkets`
+ * already calls it — no signature change, no behavior change to that
+ * safety-critical (masking) function, whose own test suite is unverifiable in
+ * this environment.
+ */
+export async function getCachedMarketDiscoveryData(
+	marketId: string,
+	reserves: Reserves | null,
+): Promise<CachedMarketDiscoveryData> {
+	"use cache";
+	cacheLife("minutes");
+	cacheTag("discovery");
+	cacheTag(`market:${marketId}`);
+
+	const totals = await getMarketTotals(db, marketId);
+	const imageUrl = await getDefaultMarketMediaUrl(db, marketId);
+	const series = await loadPriceSeries(db, marketId);
+	const topPosts = await selectHeroTopPosts(db, marketId, reserves);
+
+	return { totals, imageUrl, series, topPosts };
 }

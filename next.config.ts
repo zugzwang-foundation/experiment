@@ -12,6 +12,25 @@ const buildGitSha = (() => {
 })();
 
 const nextConfig: NextConfig = {
+	// S-4 Phase B — Cache Components on. Enables `'use cache'`/`cacheLife`/
+	// `cacheTag` (S-4 Phase C/D) and Partial Prerendering by default. This
+	// commit caches nothing and changes no behavior: every route still
+	// exporting `dynamic` was migrated off it in the same commit (redundant
+	// under this flag — Next.js: "all pages are dynamic by default"), and
+	// every segment not yet restructured for the framework's
+	// instant-navigation validation carries `instant = false` as the
+	// equivalent opt-out (requires Next >=16.3.2 — `next` was bumped from
+	// 16.2.4 in this same commit for exactly this; 16.2.4 silently ignored
+	// `instant` and the build failed on 14 routes, not the 10 originally
+	// scoped — see docs/logs S-4 Phase B).
+	cacheComponents: true,
+	// The 16.3.x `next dev`/`next build` auto-appends an "agentRules" block to
+	// AGENTS.md on every run (generate-agent-files.js) — undesired here: this
+	// repo's AGENTS.md is a hand-authored, tightly governed document (CLAUDE.md
+	// §7) with its own maintenance discipline, not a file the framework should
+	// silently mutate. Disabled at the same commit that bumped Next to 16.3.2
+	// (S-4 Phase B), before the feature could leave a footprint.
+	agentRules: false,
 	env: {
 		BUILD_TIMESTAMP: buildTimestamp,
 		BUILD_GIT_SHA: buildGitSha,

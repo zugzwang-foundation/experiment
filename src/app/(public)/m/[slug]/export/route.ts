@@ -16,15 +16,19 @@ import { getMarketBySlug } from "@/server/markets/get-by-slug";
 // filename, vs `health/route.ts`'s `Response.json`.
 //
 // Uncached, per-request fresh (SPEC.2 §3.3 R-1 / ADR-0025 §1) — a cache is a
-// window in which just-removed content could keep serving, so `force-dynamic` +
-// `Cache-Control: no-store`. Every request re-runs `loadDebateView`, which
-// re-reads the `content_removed` set, so masking is always current.
+// window in which just-removed content could keep serving, so no `'use cache'`
+// anywhere in this route's call path (S-4 Phase A/B — `loadDebateView` must
+// stay wrapped ONLY here, never behind the cached segment the market page
+// gets in Phase C/D) + `Cache-Control: no-store`. `force-dynamic` is dropped
+// as of S-4 Phase B (redundant/build-breaking under `cacheComponents` — see
+// next.config.ts); this handler stays dynamic by default because it does an
+// unconditional runtime read, so masking freshness is unaffected. Every
+// request re-runs `loadDebateView`, which re-reads the `content_removed` set,
+// so masking is always current.
 //
 // Masking is INHERITED: it serializes only the masked `DebateViewModel` from
 // `loadDebateView`, never the `DebateComment` intermediate — reimplemented
 // nowhere here (debate-export.md §10).
-
-export const dynamic = "force-dynamic";
 
 export async function GET(
 	_req: Request,

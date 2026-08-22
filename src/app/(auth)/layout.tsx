@@ -22,7 +22,17 @@ import { readStarCount } from "@/server/github/star-count";
  * an import + call, not an auth-code change. `/onboarding` renders
  * signed-out (the session-create gate defers pre-onboarding sessions) —
  * accepted, plan §4.1/§6.
+ *
+ * S-4 Phase B — `instant = false`: this layout's `cookies()`/`headers()`
+ * session read is unwrapped, same shape as `(public)/layout.tsx`. Under
+ * `cacheComponents` (S-4 Phase B, `next.config.ts`) that errors the
+ * prerender build for all three routes this layout wraps (`/sign-in`,
+ * `/sign-in/otp`, `/onboarding`). Deferred, not restructured — these routes
+ * are outside S-4's scope (CLAUDE.md §1); this is the minimum change that
+ * keeps the build green.
  */
+export const instant = false;
+
 export default async function AuthLayout({
 	children,
 }: {

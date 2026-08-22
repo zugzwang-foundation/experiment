@@ -16,7 +16,12 @@ import { requireAdminPage, requireUuidParam } from "@/server/admin/page-guards";
 // parallel path left (R-5). The Draft "Seed" affordance (F-ADMIN-2) is OUT OF
 // SCOPE and untouched — it keeps its inline server-action + `?ok=`/`?error=`
 // redirect surface (the only remaining producer of those params here).
-export const dynamic = "force-dynamic";
+//
+// S-4 Phase B — `instant = false`: `requireAdminPage` (`cookies()`) plus this
+// page's own `params`/`searchParams` are all read unwrapped; any one of them
+// errors the `cacheComponents` prerender build otherwise. Deferred, not
+// restructured — admin is outside S-4's scope (CLAUDE.md §1).
+export const instant = false;
 
 export default async function MarketDetailPage(props: {
 	params: Promise<{ marketId: string }>;

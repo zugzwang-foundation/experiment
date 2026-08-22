@@ -100,11 +100,31 @@ describe("V13 reserves never cross the client boundary", () => {
 
 	it("the-page-keeps-reserves-in-a-server-local-binding", () => {
 		const page = read("src/app/(public)/page.tsx");
-		// Destructured from the listing and passed straight into the hero read…
-		expect(page).toContain("const { card, reserves } of listings");
-		expect(page).toContain("selectHeroTopPosts(db, card.id, reserves)");
-		// …and never pushed onto the view that crosses to the carousel.
-		expect(page).not.toContain("reserves,\n");
+		// ⚠ REWRITTEN AT S-4 PHASE C/D — the PROPERTY is unchanged, the shape it
+		// takes is not. Reserves used to be destructured from `listOpenMarkets`'s
+		// listing and handed to `selectHeroTopPosts`. They are now read LIVE per
+		// market and handed to the cached block, which calls the hero read
+		// inside itself.
+		//
+		// What must remain true, and is what this guard actually protects:
+		// reserves are a server-local binding that reaches a server function and
+		// NOTHING ELSE. `DiscoveryCard` crosses into `DiscoveryCarousel`
+		// (`"use client"`), so a reserve that ended up on the card would
+		// serialize an internal `pools` row into the browser.
+
+		// Read live, into a local — never onto the view.
+		expect(page).toContain("getMarketPricingAndReserves(db, m.id)");
+		// …and passed to the cached server function as an argument. Matched
+		// whitespace-insensitively on purpose: pinning exact indentation here
+		// would make this guard fail on a Biome reformat, which is noise rather
+		// than a leak.
+		expect(page.replace(/\s+/g, " ")).toContain(
+			"getCachedMarketDiscoveryData( m.id, priced?.reserves ?? null, )",
+		);
+		// …and NEVER onto the card that crosses the client boundary. `pricing`
+		// (a derived, public price) does ride the card; the raw reserves do not.
+		expect(page).not.toMatch(/reserves\s*[,:]\s*$/m);
 		expect(page).not.toContain("card.reserves");
+		expect(page).not.toContain("reserves: priced");
 	});
 });

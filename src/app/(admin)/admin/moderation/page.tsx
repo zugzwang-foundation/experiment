@@ -9,13 +9,18 @@ import { loadReviewFeed } from "@/server/admin/moderation/review-feed";
 import { requireAdminPage } from "@/server/admin/page-guards";
 
 // UI.6 S3 — the Moderation tab's live review feed (F-ADMIN-4 partial). Server
-// Component, `force-dynamic` (polled-on-view, no websocket), Layer-2 admin auth
-// re-validated at entry (requireAdminPage) BEFORE the reader — mirroring the
-// audit page (an outer `(admin)` layout would loop the in-group login). The
-// reader returns every LIVE row (Track-C) minus the removed set; the 200-cap
-// truncation surfaces a visible indicator + a "load older" cursor link
-// (pagination is not a filter — the operator always reaches older rows, D-4).
-export const dynamic = "force-dynamic";
+// Component, fresh-on-view (polled-on-view, no websocket; dynamic by default,
+// no `'use cache'`), Layer-2 admin auth re-validated at entry
+// (requireAdminPage) BEFORE the reader — mirroring the audit page (an outer
+// `(admin)` layout would loop the in-group login). The reader returns every
+// LIVE row (Track-C) minus the removed set; the 200-cap truncation surfaces a
+// visible indicator + a "load older" cursor link (pagination is not a filter
+// — the operator always reaches older rows, D-4).
+//
+// S-4 Phase B — `instant = false`: `requireAdminPage` (`cookies()`) plus this
+// page's own `searchParams` cursor are read unwrapped; either errors the
+// `cacheComponents` prerender build otherwise. Deferred, not restructured —
+// admin is outside S-4's scope (CLAUDE.md §1).
 
 // µs-precision UTC cursor: `YYYY-MM-DDTHH:MM:SS.ffffffZ` (6 fractional digits).
 const CURSOR_TS_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/;
@@ -58,6 +63,8 @@ function parseBefore(
 	}
 	return { createdAt, id };
 }
+
+export const instant = false;
 
 export default async function ModerationPage(props: {
 	searchParams: Promise<{ before?: string }>;
