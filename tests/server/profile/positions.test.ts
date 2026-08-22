@@ -21,6 +21,7 @@ import {
 	users,
 } from "@/db/schema";
 import { computeSell } from "@/server/cpmm/calculate";
+import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { deriveTitleTeaser } from "@/server/debate-view/load-debate-view";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { loadProfileTiles } from "@/server/profile/tiles";
@@ -745,6 +746,117 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		expect(rows.filter((r) => r.marketId === mHeld).length).toBe(1);
 		// And the lot-less zero row is still refused.
 		expect(rows.filter((r) => r.marketId === mEmpty).length).toBe(0);
+	});
+
+	it("a-FLIPPED-market-reports-the-HELD-side-not-the-exited-one", async () => {
+		// ⛔⛔ THE ROW DOMAIN'S SHARPEST EDGE, AND IT WAS A LIVE DEFECT UNTIL
+		// @code-reviewer CRITICAL-1. `positions` is UNIQUE on
+		// `(user_id, market_id, SIDE)`; the partial `positions_one_held_side_idx`
+		// narrows that to at most one row with `quantity > 0`, NOT to one row per
+		// market. So a participant who fully exits one pole and re-enters the other
+		// has BOTH rows — and a flip is a first-class move (`positions/read.ts`).
+		//
+		// The old `quantity > 0` domain made the collision impossible. RF-13's
+		// widening brings it back, and a market-keyed map is LAST-WRITE-WINS over a
+		// SELECT with no ORDER BY. When the ZERO row won, a live holding rendered
+		// at `Đ 0`, dropped out of the Positions-value tile, and lost its Sell
+		// control — locking a participant out of exiting a position they hold, by
+		// scan order.
+		//
+		// ⚠⚠ THE FIXTURE IS A **NO → YES** FLIP, AND THE DIRECTION IS THE WHOLE
+		// POINT. A first attempt at this test used YES → NO and PASSED AGAINST THE
+		// DEFECT: with the held row returned last, last-write-wins happened to land
+		// on the right one, so the "control" proved nothing. The exited row has to
+		// come LAST under BOTH plausible orders —
+		//   · SEQ SCAN  → insertion order, so the held row is inserted FIRST;
+		//   · INDEX SCAN on `positions_user_market_side_idx` → `(user, market,
+		//     side)` with `sideEnum` ordered ["YES","NO"], so NO sorts last.
+		// Held = YES, exited = NO satisfies both. The wrong implementation is now
+		// the one that looks right.
+		const userA = await seedUser("flip-user", "flip");
+		const marketId = await seedMarket("m-flip", "Open");
+		await seedPool(marketId);
+
+		// The NO argument, made first and later exited in full.
+		const cNo = await seedComment({
+			userId: userA,
+			marketId,
+			body: "The NO argument, later exited",
+			side: "NO",
+			createdAt: new Date("2026-09-18T10:00:00Z"),
+		});
+		const bNo = await seedBet({
+			userId: userA,
+			marketId,
+			side: "NO",
+			stake: dp18("100"),
+			shares: dp18("40"),
+			commentId: cNo,
+			createdAt: new Date("2026-09-18T10:00:00Z"),
+		});
+		// ⚠ A REAL `bet.sold` EVENT, not just a zeroed lot. `computeEpisodes` walks
+		// the merged trade stream and REFUSES a buy on the opposite side while an
+		// episode is open ("buy on YES while holding NO") — so zeroing the lot
+		// alone leaves the walk seeing an un-exited NO position and a YES buy on
+		// top of it. The exit has to exist in the STREAM as well as in the books,
+		// which is what the engine would have written. ⚠ At this moment the NO lot
+		// is the only one, so the helper's pro-rata reduction lands entirely on it.
+		void bNo;
+		await seedSell({
+			userId: userA,
+			marketId,
+			side: "NO",
+			sharesSold: dp18("40"),
+			proceeds: dp18("20"),
+			createdAt: new Date("2026-09-18T11:00:00Z"),
+		});
+
+		// The YES argument, entered after the exit and still held.
+		const cYes = await seedComment({
+			userId: userA,
+			marketId,
+			body: "The YES argument, still held",
+			side: "YES",
+			createdAt: new Date("2026-09-19T10:00:00Z"),
+		});
+		await seedBet({
+			userId: userA,
+			marketId,
+			side: "YES",
+			stake: dp18("60"),
+			shares: dp18("30"),
+			commentId: cYes,
+			createdAt: new Date("2026-09-19T10:00:00Z"),
+		});
+
+		// ⛔ HELD ROW INSERTED FIRST, exited row second — see the block above.
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "YES",
+			quantity: dp18("30"),
+		});
+		await seedPosition({
+			userId: userA,
+			marketId,
+			side: "NO",
+			quantity: dp18("0"),
+		});
+
+		const rows = await loadProfilePositions(testDb, { userId: userA });
+		const row = rows.find((r) => r.marketId === marketId);
+		expect(row).toBeDefined();
+		// ⛔ THE HELD SIDE, its real quantity, and a NON-ZERO current.
+		expect(row?.side).toBe("YES");
+		expect(row?.quantity).toBe(dp18("30"));
+		expect(new CpmmDecimal(row?.current ?? "0").greaterThan(0)).toBe(true);
+		// ⚠ AND EXACTLY ONE ROW for the market — the two position rows collapse to
+		// one holding, they do not double it.
+		expect(rows.filter((r) => r.marketId === marketId).length).toBe(1);
+		// Both arguments survive on the record, each on its OWN side — which is
+		// what `lots.side` is for: the exited NO argument is not relabelled YES.
+		expect(row?.lots.length).toBe(2);
+		expect(row?.lots.map((l) => l.side).sort()).toEqual(["NO", "YES"]);
 	});
 
 	it("fully-exited-then-settled-yields-a-row-valued-at-its-payout", async () => {

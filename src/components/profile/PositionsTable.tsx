@@ -203,8 +203,19 @@ export function PositionsTable({
 		() => rows.filter((r) => market === "all" || r.marketId === market),
 		[rows, market],
 	);
+	// ⚠ COUNTED IN TILES, NOT IN LOTS. A holding rendered by the whole-holding
+	// fallback has ZERO surviving lots and ONE Open tile; counting lots would put
+	// both tabs at 0 and hand RF-14's "both empty" branch to someone whose
+	// position is sitting one tab away — the lying empty state `copy.ts` warns
+	// about, reached by arithmetic instead of by copy.
 	const openCount = useMemo(
-		() => scoped.reduce((n, r) => n + r.lots.filter(isOpenLot).length, 0),
+		() =>
+			scoped.reduce(
+				(n, r) =>
+					n +
+					(usesWholeHoldingFallback(r) ? 1 : r.lots.filter(isOpenLot).length),
+				0,
+			),
 		[scoped],
 	);
 	const closedCount = useMemo(
@@ -698,6 +709,17 @@ export function PositionsTable({
 						if (e.key !== "ArrowUp" && e.key !== "ArrowDown") {
 							return;
 						}
+						// ⛔ STAND DOWN INSIDE THE MONEY FIELD. `useDocumentRowStepper`
+						// already refuses editable targets and explicitly defers
+						// inside-table presses to THIS handler — which did not check, so
+						// an arrow pressed inside an armed `tile-sell-amount-*` would
+						// `preventDefault()`, step the selection and pull focus OUT of a
+						// live money input while the row stayed armed. Harmless before
+						// POSREV-1, because no row contained an input; now every sellable
+						// tile can. Same `closest` idiom the click handler uses.
+						if ((e.target as HTMLElement).closest("input")) {
+							return;
+						}
 						e.preventDefault();
 						stepRow(e.key === "ArrowUp" ? -1 : 1);
 					}}
@@ -914,8 +936,14 @@ function TileRow({
 			data-testid={`position-tile-${tile.key}`}
 			ref={(el) => {
 				registerRef(el);
+				// ⚠ RELEASED, NOT ONLY SET. Without the else-arm a tile that stops
+				// being armed (or unmounts on a tab switch) leaves a detached node in
+				// the ref, and the click-outside test would then run `contains` against
+				// something no longer in the document.
 				if (armed) {
 					sell.armedRowRef.current = el;
+				} else if (sell.armedRowRef.current === el) {
+					sell.armedRowRef.current = null;
 				}
 			}}
 			// ⚠ `aria-current`, NOT `aria-selected`, AND THAT IS A BLOCKED ROUTE

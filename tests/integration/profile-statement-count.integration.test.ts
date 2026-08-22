@@ -17,7 +17,7 @@ import { resolveProfileUser } from "@/server/profile/resolve";
 import { loadProfileTiles } from "@/server/profile/tiles";
 
 import { testClient, testDb } from "../db/_fixtures/db";
-import { seedLotForBet } from "../db/_fixtures/lots";
+import { seedLotForBet, seedLotSaleForBetId } from "../db/_fixtures/lots";
 import { truncateTables } from "../db/_fixtures/truncate";
 
 /**
@@ -141,12 +141,23 @@ async function seedUser(pseudonym: string): Promise<string> {
 	return id;
 }
 
-/** One held market: market + pool + comment + bet (+ its lot) + position. */
+/**
+ * One market the user has a position row in: market + pool + comment + bet
+ * (+ its lot) + position.
+ *
+ * ⚠⚠ `exited: true` SEEDS THE RF-13 ROW — position at zero, lot fully sold — and
+ * without at least one of those the pin measures the domain as it was BEFORE the
+ * widening. Every fixture here originally held a positive quantity, so the
+ * widened predicate admitted exactly the rows the old one did and the plan's §6
+ * contract ("the widening lengthens the `IN` lists and adds no statement") was
+ * never exercised. Caught by @code-reviewer HIGH-2.
+ */
 async function seedHeldMarket(args: {
 	userId: string;
 	slug: string;
 	stake: string;
 	shares: string;
+	exited?: boolean;
 }): Promise<string> {
 	const marketId = uuidv7();
 	await testDb.insert(markets).values({
@@ -189,11 +200,21 @@ async function seedHeldMarket(args: {
 		shares: args.shares,
 		stake: args.stake,
 	});
+	if (args.exited === true) {
+		// The lot is sold out and the position sits at zero — the shape RF-13
+		// admits and the old `quantity > 0` predicate dropped. Routed through the
+		// shipped pure core so the fixture reduces the lot by the same rule the
+		// engine does.
+		await seedLotSaleForBetId(testDb, {
+			betId,
+			sharesToSell: args.shares,
+		});
+	}
 	await testDb.insert(positions).values({
 		userId: args.userId,
 		marketId,
 		side: "YES",
-		quantity: args.shares,
+		quantity: args.exited === true ? dp18("0") : args.shares,
 	});
 	return marketId;
 }
@@ -235,6 +256,10 @@ describe("profile page load — statement count is FLAT in markets held", () => 
 				slug: `count-eight-${i}`,
 				stake: dp18("50"),
 				shares: dp18("80"),
+				// ⚠ TWO OF THE EIGHT ARE FULLY EXITED — the rows RF-13 admits and the
+				// old domain dropped. They are what makes this an M=8 measurement of
+				// the WIDENED predicate rather than of the one it replaced.
+				exited: i >= 6,
 			});
 		}
 		const atEight = await countProfileLoad("counteight");
@@ -256,6 +281,7 @@ describe("profile page load — statement count is FLAT in markets held", () => 
 				slug: `count-pin-${i}`,
 				stake: dp18("50"),
 				shares: dp18("80"),
+				exited: i >= 6,
 			});
 		}
 		const issued = await countProfileLoad("countpin");

@@ -70,6 +70,23 @@ export function useInlineSell() {
 	const armedRowRef = useRef<HTMLTableRowElement | null>(null);
 	const dwellRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	/**
+	 * ⛔⛔ THE KEY IS READ THROUGH A REF, NOT OFF THE RENDER'S CLOSURE.
+	 * `confirm` is a `useCallback`; a `keyState` captured in its dependency list
+	 * is the value as of the render that produced the handler, and two submits
+	 * inside one frame would then both mint under the same state. The shipped
+	 * composers (`SellModule.tsx:74-81`, `BetComposer.tsx:128-131`) use exactly
+	 * this ref-backed dispatcher for the same reason.
+	 */
+	const keyRef = useRef(keyState);
+	keyRef.current = keyState;
+	const dispatchKey = useCallback((event: Parameters<typeof reduceKey>[1]) => {
+		const next = reduceKey(keyRef.current, event);
+		keyRef.current = next;
+		setKeyState(next);
+		return next;
+	}, []);
+
 	const cancel = useCallback(() => {
 		setArmedLotId(null);
 		setDraft(null);
@@ -82,6 +99,32 @@ export function useInlineSell() {
 		setArmedLotId(lotId);
 		setDraft(null);
 		setFailed(false);
+		// ⛔⛔ A FRESH KEY PER SELL INTENT, AND WITHOUT THIS THE SECOND SELL ON A
+		// PAGE CAN NEVER SUCCEED.
+		//
+		// `reduceKey` mints a new key ONLY on `EDIT` out of a `fresh_*` pending
+		// state, or on `COUNTDOWN_EXPIRED` — and a successful outcome lands on
+		// `pending: "none"`, where `EDIT` deliberately does NOT rotate ("one key
+		// per intent — pre-submit edits never rotate"). So a hook that lives as
+		// long as the table would carry ONE key across every tile and every
+		// market: sell A under key K, then sell B under the same K with a
+		// different body, and the fingerprint mismatch returns 409
+		// `error_idempotency_key_reused`. That lands `pending:
+		// "refresh_then_edit"`, which without a `REFRESHED` dispatch is terminal —
+		// the button would read `Retry` forever for a request that can never
+		// succeed, which is O-3's misleading-cause defect exactly.
+		//
+		// ⚠ THE SHIPPED `SellModule` NEVER HIT THIS because it is MOUNTED PER
+		// EXPANSION and remounts with a fresh `initialKeyState()` every time it
+		// opens. Its key rotation was component identity, not reducer behaviour.
+		// This hook outlives its controls, so the intent boundary has to be stated
+		// rather than inherited — and ARMING is that boundary.
+		// ⚠ MINTED ONCE and written to BOTH, or the ref and the state would carry
+		// two different keys and which one went on the wire would depend on whether
+		// a render had happened yet.
+		const fresh = initialKeyState();
+		keyRef.current = fresh;
+		setKeyState(fresh);
 	}, []);
 
 	/**
@@ -95,6 +138,9 @@ export function useInlineSell() {
 	 * here would ask the reader to solve a problem the field already solved.
 	 */
 	const edit = useCallback((value: string, seedExact: string) => {
+		// A keystroke means the reader is trying again; a `Retry` left over from a
+		// previous refusal is stale the moment they touch the field.
+		setFailed(false);
 		if (value === "") {
 			setDraft("");
 			return;
@@ -194,15 +240,15 @@ export function useInlineSell() {
 					dharmaIn: amount,
 				});
 			} catch {
-				// A non-positive or malformed amount — the field is mid-edit. Refuse
-				// quietly; the participant has not asked for anything yet.
-				setFailed(true);
+				// ⚠ A NON-POSITIVE OR MALFORMED AMOUNT IS A SILENT NO-OP, NOT A
+				// FAILURE. The field is mid-edit — an empty box, a lone ".". Painting
+				// `Retry` here would report a refusal for a request that was never
+				// sent, which is O-3's misleading-cause defect on a money control.
 				return;
 			}
 			setBusy(true);
 			setFailed(false);
-			const next = reduceKey(keyState, { type: "SUBMIT" });
-			setKeyState(next);
+			const next = dispatchKey({ type: "SUBMIT" });
 			const { url, init } = buildSellRequest({
 				body: {
 					marketId: args.marketId,
@@ -215,7 +261,7 @@ export function useInlineSell() {
 				const res = await fetch(url, init);
 				const outcome = await parseWireResponse(res);
 				if (outcome.kind === "success") {
-					setKeyState(reduceKey(next, { type: "OUTCOME", outcome: "success" }));
+					dispatchKey({ type: "OUTCOME", outcome: "success" });
 					setBusy(false);
 					setArmedLotId(null);
 					setDraft(null);
@@ -229,6 +275,13 @@ export function useInlineSell() {
 					// figures (§10.8) and never "close to zero".
 					if (shares === args.maxShares) {
 						setSoldLotId(tileKey);
+						// ⚠ CLEAR THE PREVIOUS ONE FIRST. Overwriting the handle leaves the
+						// old timeout live, and it would still fire `setSoldLotId(null)` +
+						// `router.refresh()` — possibly in the middle of the second sale it
+						// knows nothing about.
+						if (dwellRef.current !== null) {
+							clearTimeout(dwellRef.current);
+						}
 						dwellRef.current = setTimeout(() => {
 							setSoldLotId(null);
 							router.refresh();
@@ -241,26 +294,24 @@ export function useInlineSell() {
 					}
 					return;
 				}
-				setKeyState(
-					reduceKey(next, {
-						type: "OUTCOME",
-						outcome:
-							outcome.kind === "malformed"
-								? outcome.status >= 500
-									? "transient"
-									: "terminal"
-								: keyOutcomeFor({ kind: "error", code: outcome.code }),
-					}),
-				);
+				dispatchKey({
+					type: "OUTCOME",
+					outcome:
+						outcome.kind === "malformed"
+							? outcome.status >= 500
+								? "transient"
+								: "terminal"
+							: keyOutcomeFor({ kind: "error", code: outcome.code }),
+				});
 				setBusy(false);
 				setFailed(true);
 			} catch {
-				setKeyState(reduceKey(next, { type: "OUTCOME", outcome: "transient" }));
+				dispatchKey({ type: "OUTCOME", outcome: "transient" });
 				setBusy(false);
 				setFailed(true);
 			}
 		},
-		[busy, draft, keyState, router],
+		[busy, draft, dispatchKey, router],
 	);
 
 	return {

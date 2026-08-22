@@ -29,16 +29,31 @@ import { CANONICAL_ZERO, sumLots } from "./compute";
  * `lots_surviving_idx` partial index). A Sold lot contributes canonical zero to
  * the basis anyway — `lots_sold_zeroes_basis` guarantees it — so the predicate
  * is an index choice rather than a correctness one; but it also means a
- * fully-exited holding yields NO entry rather than a zero one, which matches
- * its consumer: `loadProfilePositions` filters its domain to `quantity > 0`.
+ * fully-exited holding yields NO entry rather than a zero one.
+ * ⚠ THAT USED TO BE JUSTIFIED BY ITS CONSUMER — "`loadProfilePositions` filters
+ * its domain to `quantity > 0`" — and since POSREV-1 RF-13 it does NOT: the
+ * profile now renders exited holdings so their arguments stay on the record. The
+ * behaviour here is unchanged and still correct, because `lotBasisOf` falls
+ * through to `CANONICAL_ZERO` for a missing key, which is the right Đa for a
+ * holding with nothing surviving. Only the reason was stale.
  * (UNWIRE-1: the other consumer this comment used to name, the bookmark
  * module's `computeBookmarkFigures`, is deleted along with it.)
  *
  * **At most one side can survive per (user, market)**, so grouping by the pair
- * is sound: `positions_one_held_side_idx` permits only one held side, and a
+ * is sound HERE: `positions_one_held_side_idx` permits only one held side, and a
  * flip requires a full exit first — which Sells every lot on the side left
- * behind. The side is therefore not part of the key here, exactly as
- * `loadProfilePositions`' own `heldByMarket` map is keyed on market alone.
+ * behind. This function's `gt(survivingShares, 0)` predicate is what keeps that
+ * true of ITS key, so the side is not part of it.
+ * ⛔⛔ THE SAME ARGUMENT DOES **NOT** TRANSFER TO A MAP OVER `positions` ROWS,
+ * and this comment used to end by claiming it did ("exactly as
+ * `loadProfilePositions`' own `heldByMarket` map is keyed on market alone").
+ * `positions` is UNIQUE on `(user, market, SIDE)`; only the PARTIAL index limits
+ * it to one HELD row. A flipped participant therefore has two `positions` rows
+ * in one market, and a market-keyed map over them is last-write-wins unless it
+ * prefers the held one explicitly — which `loadProfilePositions` now does, and
+ * which it had to be taught at POSREV-1 when RF-13 stopped filtering the exited
+ * rows out. A sound claim about THIS function was being read as a claim about a
+ * different one.
  */
 
 /** `${userId}::${marketId}` — the aggregate key. */

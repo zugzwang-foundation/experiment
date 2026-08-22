@@ -380,6 +380,151 @@ describe("RF-6 — only one tile arms at a time", () => {
 	});
 });
 
+describe("§3.2 — ONE IDEMPOTENCY KEY PER SELL INTENT", () => {
+	const key = (call: unknown[]): string => {
+		const headers = (call[1] as RequestInit).headers as Record<string, string>;
+		const k = Object.keys(headers).find((h) =>
+			h.toLowerCase().includes("idempotency"),
+		);
+		return k === undefined ? "" : (headers[k] ?? "");
+	};
+
+	it("sell::a-SECOND-sell-uses-a-DIFFERENT-key", async () => {
+		// ⛔⛔ WITHOUT THIS, THE SECOND SELL ON A PAGE CAN NEVER SUCCEED, and the
+		// failure is invisible in every other test here because they all sell once.
+		//
+		// `reduceKey` mints a new key ONLY on `EDIT` out of a `fresh_*` pending
+		// state, or on `COUNTDOWN_EXPIRED`. A SUCCESSFUL outcome lands on
+		// `pending: "none"`, where `EDIT` deliberately does NOT rotate — "one key
+		// per intent — pre-submit edits never rotate". So a hook that outlives its
+		// controls carries ONE key across every tile: sell A under K, then sell B
+		// under the same K with a DIFFERENT body, and the canonical-JSON
+		// fingerprint mismatch returns 409 `error_idempotency_key_reused` — which
+		// lands `pending: "refresh_then_edit"`, a state this component never
+		// leaves. The button would read `Retry` forever for a request that cannot
+		// succeed.
+		//
+		// ⚠ THE SHIPPED `SellModule` NEVER HIT THIS: it is mounted per expansion
+		// and remounts with a fresh key each time it opens. Its rotation was
+		// component identity, not reducer behaviour — so the precedent looked safe
+		// and did not transfer.
+		const twoLots: ProfilePositionsPayload = {
+			owner: true,
+			rows: [
+				{
+					...ROW_OPEN,
+					lots: [lot(L1), lot(L2, { lotId: L2 })],
+					quantity: dp18("20"),
+					sellEligible: true,
+				},
+			],
+		};
+		render(<PositionsTable payload={twoLots} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() => expect(lastBody).not.toBeNull());
+
+		fireEvent.click(screen.getByTestId(`tile-sell-${L2}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L2}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		const k1 = key(calls[0] as unknown[]);
+		const k2 = key(calls[1] as unknown[]);
+		expect(k1).not.toBe("");
+		expect(k2).not.toBe("");
+		// ⛔ THE ASSERTION. Two intents, two keys.
+		expect(k2).not.toBe(k1);
+		// …and the second request really did name the second argument, so this is
+		// two distinct sells rather than one sent twice.
+		expect(lastBody?.lotId).toBe(L2);
+	});
+
+	it("sell::re-arming-the-SAME-tile-also-re-keys", async () => {
+		// Arming is the intent boundary, not the tile. Someone who sells part of an
+		// argument and immediately sells more of it is making a second request with
+		// a different body, and it needs its own key for exactly the same reason.
+		render(<PositionsTable payload={OWNER} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.change(screen.getByTestId(`tile-sell-amount-${L1}`), {
+			target: { value: "5" },
+		});
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() => expect(lastBody).not.toBeNull());
+
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		expect(key(calls[1] as unknown[])).not.toBe(key(calls[0] as unknown[]));
+	});
+});
+
+describe("the whole-holding fallback — a held position is never unreachable", () => {
+	/** A holding whose lots are ALL SOLD while the position is still held. */
+	const DRIFTED: ProfilePositionsPayload = {
+		owner: true,
+		rows: [
+			{
+				...ROW_OPEN,
+				// ⚠ NOT an empty array — `loadLotDecomposition` returns SOLD lots too,
+				// so the drift shape has lots and no SURVIVING one.
+				lots: [
+					lot(L1, {
+						survivingShares: dp18("0"),
+						survivingBasis: dp18("0"),
+						sold: true,
+					}),
+				],
+				quantity: dp18("10"),
+				sellEligible: true,
+			},
+		],
+	};
+
+	it("fallback::all-lots-sold-but-still-held-renders-an-OPEN-tile-with-SELL", () => {
+		// ⛔⛔ THE SECOND SHAPE OF THE SAME VETO, and the narrow predicate
+		// (`lots.length === 0`) missed it. `planLotSale`'s own lot query filters
+		// `surviving_shares > 0`, so "lots exist, all zeroed, position still held"
+		// IS its `rows.length === 0` arm — the one whose comment reads "an
+		// attribution layer must never be able to veto the authority it describes."
+		// Under the narrow predicate this row produced no Open tile and no
+		// fallback, the tab derivation sent the reader to Closed, and the only
+		// tiles there carry no Sell column. The holding was reachable nowhere that
+		// could exit it.
+		render(<PositionsTable payload={DRIFTED} />);
+		// The tab derivation must land on Open, not Closed.
+		expect(
+			screen.getByTestId("positions-status-open").getAttribute("aria-pressed"),
+		).toBe("true");
+		// One fallback tile, keyed by MARKET (it names no argument), with a Sell.
+		expect(screen.getByTestId(`position-tile-${M1}`)).toBeTruthy();
+		expect(screen.getByTestId(`tile-sell-${M1}`)).toBeTruthy();
+	});
+
+	it("fallback::its-sell-OMITS-lotId-so-it-sells-the-POSITION", async () => {
+		// ⛔ `undefined`, never `null`. `buildSellRequest` drops the key entirely;
+		// `{marketId,shares}` and `{marketId,shares,lotId:null}` canonicalize to
+		// DIFFERENT fingerprints, and a retry reaching for the fuller form would
+		// come back 409 `error_idempotency_key_reused` — the one answer that turns
+		// a completed sell into a second executed one.
+		render(<PositionsTable payload={DRIFTED} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${M1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${M1}`));
+		await waitFor(() => expect(lastBody).not.toBeNull());
+		expect("lotId" in (lastBody ?? {})).toBe(false);
+		expect(lastBody?.shares).toBe(dp18("10"));
+	});
+});
+
 describe("RF-7 — a FULL exit dwells on `Sold` before it leaves", () => {
 	it("sell::the-tile-says-Sold-in-place-rather-than-vanishing", async () => {
 		// ⚠ NOT DECORATION. Without the beat, someone presses a money button and

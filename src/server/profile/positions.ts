@@ -237,11 +237,40 @@ export async function loadProfilePositions(
 		})
 		.from(positions)
 		.where(eq(positions.userId, userId));
+	// ⛔⛔ A MARKET CAN HAVE **TWO** POSITION ROWS, AND THE HELD ONE MUST WIN.
+	//
+	// `positions` is UNIQUE on `(user_id, market_id, SIDE)` — the partial
+	// `positions_one_held_side_idx` narrows that to at most one row with
+	// `quantity > 0`, not to one row per market. So a participant who fully exits
+	// YES and re-enters NO has BOTH `(YES, 0)` and `(NO, n)`, and a flip is a
+	// first-class move (`positions/read.ts::canEnter`).
+	//
+	// The old `quantity > 0` filter made that collision impossible; widening the
+	// domain to admit exited rows brings it back. A plain `set()` per market is
+	// LAST-WRITE-WINS over a SELECT with no `ORDER BY`, so which row survived
+	// would be decided by scan order — and when the ZERO row won, a live holding
+	// would render at `Đ 0`, drop out of the Positions-value tile, and lose its
+	// Sell control (`isSellEligible` requires `quantity > 0`). A participant would
+	// be locked out of exiting a position they hold, by a rendering accident.
+	//
+	// ⇒ The held row wins EXPLICITLY, which makes the outcome independent of the
+	// plan. It is also unambiguous: `positions_one_held_side_idx` guarantees at
+	// most one held row, so "prefer held" can never have to choose between two.
+	// ⚠ Every other per-market map in the tree filters `quantity > 0` first — see
+	// `dharma/header-portfolio.ts`, `profile/arguments.ts`, `positions/read.ts`.
+	// This one cannot, because RF-13 needs the exited rows; it orders instead.
 	const positionByMarket = new Map<
 		string,
 		{ side: "YES" | "NO"; quantity: string }
 	>();
 	for (const p of positionRows) {
+		const existing = positionByMarket.get(p.marketId);
+		const existingHeld =
+			existing !== undefined &&
+			new CpmmDecimal(existing.quantity).greaterThan(0);
+		if (existingHeld) {
+			continue;
+		}
 		positionByMarket.set(p.marketId, { side: p.side, quantity: p.quantity });
 	}
 	if (positionByMarket.size === 0) {
