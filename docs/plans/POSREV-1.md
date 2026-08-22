@@ -75,7 +75,17 @@ an unedited seed lands the lot on exactly zero. The route already takes
 | `src/components/profile/ArgumentList.tsx` | S2, S9 | `SplitBar` — stack labels over figures (RF-2a); zero-state track + neutral palette (RF-2b/c) |
 | `src/app/(public)/u/[pseudonym]/page.tsx` | S9 | headzone — **only if a dead band is MEASURED** (D-5) |
 
-**Not touched:** `src/server/lots/**`, `src/server/bets/**`, `src/server/resolution/**`,
+**Also touched — AMENDED after execute, and each with its trigger** (§5.4: the map
+is a contract, so a departure is written into it rather than left to the diff):
+
+| File | Slice | Why it had to move |
+|---|---|---|
+| `src/server/lots/basis.ts` | S1 | **RF-12 requires the ARGUMENT's own side on every tile**, and `positions.side` is Bucket C — on a flipped holding it would relabel past arguments as the pole the participant later moved to. `lots.side` is immutable at mint; adding it is **one more column on a statement already issued**. ⚠ This file was listed "Not touched" when the plan was written and that was wrong, not the change. |
+| `src/components/profile/partition.ts` | S3–4 | NEW — `argumentCurrentExact`. Foreseen by the plan's §4 D-2 but never added to the map. |
+| `src/components/profile/row-thirds.ts` | S3–4 | RF-10's `extraHeadSelector`: sticky group headers are chrome, so the three tiles divide what is left. |
+| `src/components/debate/composer/split-bar.ts` | S9 | RF-2(b) needs `hasStake`; `supportPct` alone cannot distinguish "nothing staked" from "all Counter". Purely additive. |
+
+**Not touched:** `src/server/bets/**`, `src/server/resolution/**`,
 `src/server/dharma/**`, `src/server/positions/**`, `src/db/schema/**`,
 `drizzle/migrations/**`, `SellModule.tsx`, `sell-convert.ts`, `requests.ts`,
 `api/bets/sell/route.ts`. **No migration. No DDL. No new dependency.**

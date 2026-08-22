@@ -247,7 +247,16 @@ const ROW_SETTLED: ProfilePositionRow = {
 	statusLabel: "Closed",
 	settled: true,
 	side: "NO",
-	quantity: "4.000000000000000000",
+	// ⚠⚠ ZERO, AND THE FIXTURE WAS INCONSISTENT UNTIL POSREV-1'S REVIEW. This row's
+	// only argument is fully EXITED, and `I-LOT-SUM-001` says Σ surviving lot
+	// shares == `positions.quantity` — so a sold-out holding cannot also hold 4.
+	// The old render never noticed, because nothing read the two together. The
+	// whole-holding fallback does: "no surviving lot AND a positive quantity" is
+	// exactly the lots↔positions DRIFT shape, so an invariant-violating fixture
+	// now (correctly) renders an extra Open tile and reddens these tests. Making
+	// the fixture obey the invariant is the fix; loosening the predicate would be
+	// deleting a real guard to accommodate an impossible row.
+	quantity: "0.000000000000000000",
 	staked: "8.000000000000000000",
 	current: "12.000000000000000000",
 	argument: { removed: true, marketSlug: "fixture-beta" },

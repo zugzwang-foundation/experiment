@@ -128,9 +128,26 @@ function isPositiveAmount(value: string): boolean {
  */
 export function usesWholeHoldingFallback(row: {
 	quantity: string;
-	lots: readonly unknown[];
+	lots: readonly { survivingShares: string }[];
 }): boolean {
-	return row.lots.length === 0 && isPositiveAmount(row.quantity);
+	// ⛔⛔ THE PREDICATE IS "NO SURVIVING LOT", NOT "NO LOTS AT ALL", AND THE
+	// DIFFERENCE IS A WHOLE CLASS OF DRIFT.
+	//
+	// It read `row.lots.length === 0` — but `loadLotDecomposition` returns SOLD
+	// lots too, so a holding whose lots have all been zeroed while
+	// `positions.quantity` stayed positive has a NON-EMPTY `lots` array and no
+	// surviving one. That is precisely the shape `planLotSale` handles at its
+	// `rows.length === 0` arm — its own lot query filters
+	// `surviving_shares > 0`, so "lots exist, all zeroed, position still held"
+	// IS that arm, the one whose comment reads "an attribution layer must never
+	// be able to veto the authority it describes."
+	//
+	// Under the narrow predicate such a row produced no Open tile, no fallback,
+	// and `rowHasTileIn(row, "Open") === false` — so the tab derivation sent the
+	// reader to Closed, where the sold tiles render with no Sell column at all.
+	// The holding was reachable nowhere that could exit it. Same veto as before,
+	// one shape further in.
+	return !row.lots.some(isOpenLot) && isPositiveAmount(row.quantity);
 }
 
 /** Does this row contribute at least one tile to `status`? */
