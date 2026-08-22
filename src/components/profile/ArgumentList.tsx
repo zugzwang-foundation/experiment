@@ -692,27 +692,29 @@ function AuthorHead({ author }: { author: ProfileUser }) {
  * total enlarged + ink (`.stkn`)". The mockup emits it at `:609-613` as
  * `[Support chip + Đ] [bar + total] [Counter chip + Đ]`.
  *
- * ⚠ THE FILL MAPPING IS RATIFIED, NOT CHOSEN, and the governing clause is the
- * one the recon's own quote truncated. `design-language.md:180` ends: "*(The
- * reply stake bar's exact fill mapping follows the locked v1.0 surface.)*" The
- * locked surface is this mockup, whose `.bar{background:var(--n0)}` +
- * `.fill{background:var(--ink)}` (`:362-364`) is a FIXED bright-track /
- * dark-fill pair, not a side-keyed one. The shipped `ReplySplitBar.tsx:70,73`
- * already renders exactly that relationship in the dark system — `bg-no`
- * (#fafafa, bright) track under a `bg-yes` (#181818, dark) fill — so this reuses
- * the shipped idiom byte-for-byte rather than porting a light-theme colour.
+ * ⚠⚠ **THE FILL MAPPING LEFT THE POLES AT POSREV-1 RF-2(c), AND THE RESIDUAL
+ * THIS DOCBLOCK ROUTED TO THE FOUNDER IS THEREBY DISCHARGED.** What stood here
+ * was: `design-language.md:180`'s "*(The reply stake bar's exact fill mapping
+ * follows the locked v1.0 surface.)*" pointed at a mockup whose
+ * `.bar{background:var(--n0)}` + `.fill{background:var(--ink)}` (`:362-364`) is
+ * a FIXED bright-track / dark-fill pair, and `ReplySplitBar.tsx:70,73` renders
+ * exactly that in the dark system — `bg-no` track under a `bg-yes` fill. Ported
+ * faithfully; wrong anyway, for a reason the port could not see.
  *
- * ⚠⚠ THE RESIDUAL IS RECORDED, NOT HIDDEN. Support inherits the POST's side, so
- * on a NO-side post the Support share paints in the YES pole — the "route 3"
- * exposure `HeroPanels.tsx:325-346` fixed for Discovery by making both segments
- * side-keyed. Correcting it here is NOT free: a side-keyed colour expression in
- * this file makes `side-pole-binding.test.ts` RED on its closed-inventory
- * assertion, and greening it means adding this file to that guard's
- * `PERMITTED_FILES` — which is that guard's own documented extension mechanism
- * ("POLISH.3/.5/.6 will add legitimate pole sites … each such addition must be
- * a DECISION") but sits OUTSIDE this task's write allow-list. So the bar ships
- * on the ratified fixed mapping and the correction is ROUTED to the founder as
- * a widening. ⛔ It is NOT worked around by hiding the binding from the guard.
+ * ⛔ THE RESIDUAL IT RECORDED WAS REAL AND IS NOW CLOSED. Support inherits the
+ * POST's side, so on a NO-side post the Support share painted in the YES pole —
+ * the "route 3" exposure `side-pole-binding.test.ts` names as a KNOWN GAP its
+ * own matcher cannot reach, because no side value appears in the expression at
+ * all. The correction it proposed was to make both segments SIDE-KEYED, which
+ * would have needed this file added to that guard's `PERMITTED_FILES` and was
+ * routed to the founder as a widening.
+ *
+ * ⇒ **THE FOUNDER RULED THE OTHER WAY, AND IT IS THE BETTER ANSWER.** RF-2(c):
+ * Support/Counter is a DIFFERENT RELATION from the bet side and must not borrow
+ * the side encoding at all. So the bar moves onto the neutral ramp — which does
+ * not merely fix the render, it removes the class of error, because a track that
+ * names no pole cannot invert one. No widening is needed and the guard's
+ * inventory is untouched.
  *
  * `displaySplitTotal`, not `computeSplitBar.totalDharma`: SPEC.1 §10.8 names
  * "the reply split bar's staked total" as one of the TWO displayed-space
@@ -726,7 +728,7 @@ function SplitBar({
 	id: string;
 	aggregate: ProfileArgumentAggregate;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -770,11 +772,41 @@ function SplitBar({
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
+				{/* ⚠⚠ POSREV-1 RF-2(b) + RF-2(c) — THE TRACK AND FILL LEAVE THE POLES.
+				    This was a `bg-no` (#fafafa) track under a `bg-yes` (#181818) fill,
+				    carried from the shipped `ReplySplitBar` idiom. Two defects, one
+				    cause.
+				    ⛔ (c) THE POLES ENCODE THE BET SIDE UNDER INV-3, AND THIS BAR IS
+				    NOT ABOUT SIDES. Support inherits the POST's side, so on a NO-side
+				    post the Support share painted in the YES pole — the "route 3"
+				    exposure `side-pole-binding.test.ts` documents as a KNOWN GAP its
+				    own matcher cannot see, because no side value appears in the
+				    expression at all. Moving to the neutral ramp does not merely fix
+				    the render; it removes the class of error, since a neutral track
+				    cannot invert a pole it does not name.
+				    ⛔ (b) AND IT MADE THE EMPTY STATE READ AS ITS OPPOSITE. At Đ 0
+				    Support / Đ 0 Counter the fill is zero-width, so the whole bar was
+				    the TRACK — which, being the Counter pole, read as 100% Counter.
+				    "Nothing is not everything." At zero the fill span is not rendered
+				    at all, so an empty track is an empty track.
+				    ⚠ THE ZERO TEST IS `hasStake`, NOT the percentage: `supportPct` is
+				    `"0%"` both for "nothing staked" and for "all Counter", which are
+				    opposite facts, so a renderer keying on it alone MUST paint them the
+				    same. See `computeSplitBar`.
+				    ⚠ `bg-n2` is the hairline's own rung and `bg-n6` the bright end of
+				    the ramp — shipped tokens, no new value, and neither names a side. */}
 				<span
-					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-no"
+					data-testid={`argument-split-track-${id}`}
+					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-n2"
 					aria-hidden="true"
 				>
-					<span className="block h-full bg-yes" style={{ width: supportPct }} />
+					{hasStake && (
+						<span
+							data-testid={`argument-split-fill-${id}`}
+							className="block h-full bg-n6"
+							style={{ width: supportPct }}
+						/>
+					)}
 				</span>
 				{/* `.stkn` — canon §3 item 11's "split-bar staked total enlarged +
 				    ink". `<b className="text-sm text-ink">` is ReplySplitBar.tsx:76. */}

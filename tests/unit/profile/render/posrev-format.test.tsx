@@ -217,3 +217,59 @@ describe("POSREV-1 RF-2(a) — Support/Counter stack over their figures", () => 
 		]);
 	});
 });
+
+describe("POSREV-1 RF-2(b)+(c) — the bar leaves the poles and empties honestly", () => {
+	function renderBar(support: string, counter: string) {
+		return render(
+			<ArgumentList
+				items={[post(support, counter)]}
+				owner={false}
+				author={USER}
+			/>,
+		);
+	}
+
+	it("the track is NEUTRAL, never the NO pole", () => {
+		// ⛔ ASSERTED BY TOKEN NAME, because "it looks grey" and "it is not the NO
+		// pole" are different claims and only the second one is the rule. `bg-no`
+		// IS #fafafa — it encodes the bet SIDE under INV-3, and Support/Counter is
+		// a different relation entirely.
+		renderBar(dp18("300"), dp18("100"));
+		const track = screen.getByTestId(`argument-split-track-${C1}`);
+		expect(track.className.split(/\s+/)).toContain("bg-n2");
+		expect(track.className).not.toContain("bg-no");
+		expect(track.className).not.toContain("bg-ink");
+	});
+
+	it("the fill is NEUTRAL, never the YES pole", () => {
+		renderBar(dp18("300"), dp18("100"));
+		const fill = screen.getByTestId(`argument-split-fill-${C1}`);
+		expect(fill.className.split(/\s+/)).toContain("bg-n6");
+		expect(fill.className).not.toContain("bg-yes");
+		// …and it still carries the proportion, so the palette change did not
+		// quietly take the bar's meaning with it.
+		expect(fill.getAttribute("style")).toContain("75%");
+	});
+
+	it("at Đ 0 / Đ 0 there is NO FILL AT ALL — nothing is not everything", () => {
+		// ⚠⚠ THE DEFECT, EXACTLY. The old track WAS the Counter pole, so a bar with
+		// nothing in it painted entirely in Counter's colour and read as 100%
+		// Counter. The fix is structural rather than chromatic: at zero the fill
+		// span is not rendered, so there is nothing to misread.
+		renderBar(dp18("0"), dp18("0"));
+		expect(screen.getByTestId(`argument-split-track-${C1}`)).toBeTruthy();
+		expect(screen.queryByTestId(`argument-split-fill-${C1}`)).toBeNull();
+	});
+
+	it("CONTROL — at Đ 0 Support / Đ 100 Counter the fill EXISTS at zero width", () => {
+		// ⛔⛔ THE ROW THAT MAKES THE ONE ABOVE MEAN ANYTHING. Both states have
+		// `supportPct === "0%"`, and they are OPPOSITE facts: "nothing has been
+		// staked" versus "everything staked is Counter". A guard that only checked
+		// the zero-zero case would pass on a build that had simply stopped
+		// rendering the fill whenever it was empty — losing the second state's
+		// meaning to fix the first. Here the fill is PRESENT, at width zero.
+		renderBar(dp18("0"), dp18("100"));
+		const fill = screen.getByTestId(`argument-split-fill-${C1}`);
+		expect(fill.getAttribute("style")).toContain("0%");
+	});
+});

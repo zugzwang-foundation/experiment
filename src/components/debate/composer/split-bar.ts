@@ -6,16 +6,27 @@ import { ComposerDecimal } from "./sell-convert";
  * Đ total STAKED ─ Đ n COUNTER`, canon §6 grammar + the d5 bar fill).
  * Read-time aggregates over reply-bets (ADR-0017) — exact decimal strings
  * via the composer decimal clone, never JS floats (CLAUDE.md §2).
+ *
+ * ⚠⚠ **`hasStake` EXISTS BECAUSE `supportPct` CANNOT TELL TWO STATES APART.**
+ * It is `"0%"` both when nothing has been staked at all and when everything
+ * staked is Counter — and those are opposite facts. A renderer keying on the
+ * percentage alone therefore has to paint them identically, which is how a bar
+ * with nothing in it came to read as *entirely* Counter (POSREV-1 RF-2b:
+ * "Nothing is not everything"). The flag is what lets a caller draw an EMPTY
+ * TRACK for the first and a zero-width fill for the second.
+ *
+ * ⛔ PURELY ADDITIVE. `ReplySplitBar` reads neither field it did not read
+ * before, so the debate surface is untouched by this.
  */
 export function computeSplitBar(args: {
 	supportDharma: string;
 	counterDharma: string;
-}): { totalDharma: string; supportPct: string } {
+}): { totalDharma: string; supportPct: string; hasStake: boolean } {
 	const support = new ComposerDecimal(args.supportDharma);
 	const total = support.plus(args.counterDharma);
 	if (!total.greaterThan(0)) {
 		// No reply-bets yet — the division-by-zero belt.
-		return { totalDharma: total.toFixed(), supportPct: "0%" };
+		return { totalDharma: total.toFixed(), supportPct: "0%", hasStake: false };
 	}
 	// Integer-TRUNCATED fill: a full bar must mean literally zero counter
 	// Dharma (never rounds up past 100).
@@ -23,7 +34,11 @@ export function computeSplitBar(args: {
 		.times(100)
 		.dividedBy(total)
 		.toFixed(0, ComposerDecimal.ROUND_DOWN);
-	return { totalDharma: total.toFixed(), supportPct: `${pct}%` };
+	return {
+		totalDharma: total.toFixed(),
+		supportPct: `${pct}%`,
+		hasStake: true,
+	};
 }
 
 /**
