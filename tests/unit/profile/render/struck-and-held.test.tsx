@@ -284,12 +284,17 @@ const STRUCK: StruckRow[] = [
 		control: "<tr><td>a row with no status badge</td></tr>",
 	},
 	{
-		id: "A-9 — the headzone bookmark icon shown to every viewer",
-		why: "STRUCK. Founder ruling 2026-07-31: OWNER-ONLY — it is navigation to the viewer's OWN private saved set.",
-		// The surface string carries the OWNER arm then the VISITOR arm, so
-		// exactly ONE bookmark link may appear across the pair.
-		detect: (h) => (h.match(/aria-label="Bookmarks"/g) ?? []).length !== 1,
-		control: '<a aria-label="Bookmarks"></a><a aria-label="Bookmarks"></a>',
+		// UNWIRE-1 — supersedes the retired "A-9 — the headzone bookmark icon
+		// shown to every viewer" row, which asserted exactly ONE bookmark link
+		// across the owner+visitor pair (the OWNER-ONLY founder ruling of
+		// 2026-07-31). The bookmark module is unwired product-wide (SUB-2): the
+		// icon is gone from BOTH arms, so "exactly one" is no longer the
+		// invariant — "zero" is. Kept as a presence guard rather than dropped,
+		// so a bookmark-link regression on either arm still fails loudly.
+		id: "A-9 — any headzone bookmark link at all",
+		why: "STRUCK. The bookmark module is unwired product-wide; no arm renders this link anymore.",
+		detect: (h) => /aria-label="Bookmarks"/.test(h),
+		control: '<a aria-label="Bookmarks"></a>',
 	},
 	{
 		id: "B-1 — entry % / live % under the Staked and Current figures",

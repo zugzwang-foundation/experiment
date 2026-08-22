@@ -105,7 +105,7 @@ export interface ParticipantFixture {
  * which is what makes `/u/<pseudonym>` stable across rebuilds (Q4).
  *
  * ⚠ THE THREE CAPTURED IDENTITIES. Index 0 is the operator's primary account
- * and takes P-owner (the owner arm of Profile, positions and bookmarks). The
+ * and takes P-owner (the owner arm of Profile and positions). The
  * two others take P-visitor-target and P-empty — the roles an operator most
  * wants to be able to SIGN IN AS during inspection: one well-populated profile
  * and one showing every empty state at once. Class-1 decision, Slice B.
@@ -116,7 +116,7 @@ export const PARTICIPANTS: readonly ParticipantFixture[] = [
 		capturedIdentityIndex: 0,
 		syntheticEmailLocal: "p-owner",
 		displayName: "Staging Fixture Owner",
-		serves: "owner arm of Profile / positions / bookmarks; Q4 holds YES on M2",
+		serves: "owner arm of Profile / positions; Q4 holds YES on M2",
 	},
 	{
 		role: "P-visitor-target",
@@ -132,7 +132,7 @@ export const PARTICIPANTS: readonly ParticipantFixture[] = [
 		syntheticEmailLocal: "p-empty",
 		displayName: "Staging Fixture Empty",
 		serves:
-			"zero posts / replies / positions / bookmarks — every empty state at once. NEVER BETS, so its balance stays exactly 1000 (manifest §0 B7)",
+			"zero posts / replies / positions — every empty state at once. NEVER BETS, so its balance stays exactly 1000 (manifest §0 B7)",
 	},
 	{
 		role: "P-flipped",
@@ -1101,37 +1101,10 @@ export const SELLS: readonly SellFixture[] = [
 	},
 ];
 
-// ═══════════════════════════════════════════════════════════════════════════
-// BOOKMARKS — §2.4 B1/B2
-//
-// `addBookmarkAction` rejects a self-bookmark (`self_bookmark_forbidden`), so
-// the acting VIEWER must differ from the target's author. B2 (zero bookmarks)
-// is P-empty, and it is satisfied by absence — nothing below names it.
-// ═══════════════════════════════════════════════════════════════════════════
-
-export interface BookmarkFixture {
-	readonly viewer: ParticipantRole;
-	/** A post key or a reply key — the two arms B1 requires. */
-	readonly target: string;
-	readonly targetKind: "post" | "reply";
-	readonly serves: string;
-}
-
-export const BOOKMARKS: readonly BookmarkFixture[] = [
-	{
-		viewer: "P-owner",
-		target: "M2-P2",
-		targetKind: "post",
-		serves:
-			"B1 — a bookmark on ANOTHER's POST (author P-crowd-1); Staked/Current are the bookmarked author's figures",
-	},
-	{
-		viewer: "P-owner",
-		target: "M2-P2-R2",
-		targetKind: "reply",
-		serves: "B1 — a bookmark on ANOTHER's REPLY (author P-crowd-3)",
-	},
-];
+// UNWIRE-1 — the BOOKMARKS fixture table (§2.4 B1/B2) and the BookmarkFixture
+// type are removed: the bookmark module is unwired product-wide, so the
+// generator no longer drives addBookmarkAction and has nothing left to seed
+// the `bookmarks` table with. The table itself stays untouched (no DDL).
 
 // ═══════════════════════════════════════════════════════════════════════════
 // MODERATION — §2.5 X1/X2/X3, all through the real `moderateComment`

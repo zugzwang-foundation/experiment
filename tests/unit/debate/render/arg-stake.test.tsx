@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ArgProfile } from "@/components/debate/ArgProfile";
 
 /**
@@ -33,14 +32,7 @@ import { ArgProfile } from "@/components/debate/ArgProfile";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
-
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
-
-const COMMENT_ID = "0199a0c0-0000-7000-8000-0000000007c1";
 
 function renderStake(props: {
 	authorStake: string;
@@ -49,11 +41,9 @@ function renderStake(props: {
 }) {
 	return render(
 		<ArgProfile
-			commentId={COMMENT_ID}
 			author={{ pseudonym: "fixture-author", pfpUrl: "" }}
 			side="YES"
 			marker="none"
-			bookmarks={VIEWER}
 			{...props}
 		/>,
 	);

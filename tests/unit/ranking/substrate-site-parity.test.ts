@@ -6,14 +6,18 @@ import { describe, expect, it } from "vitest";
  * RANK-1 R-F — **a SOURCE SCAN, and it is the only control that catches the
  * failure it is written for.**
  *
- * The stake block is duplicated across five separately-maintained query sites.
- * `rank-decay-parity.test.ts` exercises four of them behaviourally, which is the
- * stronger check where it applies — but it cannot reach the fifth, because
- * `scripts/verify-ranking-staging.ts` runs against the LIVE staging database and
- * no test may dial one (ADR-0036 primitive 2; `vitest.config.ts` excludes
- * `tests/staging/**` for exactly this reason).
+ * The stake block is duplicated across four separately-maintained query
+ * sites. (UNWIRE-1-RESOLVE: RANK-1 landed naming five — `src/server/
+ * bookmarks/list.ts` was one of them; the bookmark module is unwired
+ * product-wide, so this file's SITES/AGGREGATE_SITES arrays and this count
+ * both drop to four.) `rank-decay-parity.test.ts` exercises three of them
+ * behaviourally, which is the stronger check where it applies — but it
+ * cannot reach the fourth, because `scripts/verify-ranking-staging.ts` runs
+ * against the LIVE staging database and no test may dial one (ADR-0036
+ * primitive 2; `vitest.config.ts` excludes `tests/staging/**` for exactly
+ * this reason).
  *
- * That fifth site is not a hypothetical gap. **It had already drifted.** It
+ * That fourth site is not a hypothetical gap. **It had already drifted.** It
  * still read the frozen `bets.stake` after LOTS-1 moved the aggregates, so the
  * instrument whose stated job is to confirm the engine's ranking against real
  * rows had been computing a different order from the application — silently,
@@ -34,7 +38,6 @@ const SITES = [
 	"src/server/debate-view/ranking-substrate.ts",
 	"src/server/debate-view/reply-substrate.ts",
 	"src/server/profile/arguments.ts",
-	"src/server/bookmarks/list.ts",
 	"scripts/verify-ranking-staging.ts",
 ] as const;
 
@@ -61,7 +64,8 @@ describe("RANK-1 — every substrate site spells the substitution the same way",
 		});
 	}
 
-	// The four aggregate sites. `reply-substrate.ts` is deliberately absent: it
+	// The three aggregate sites (UNWIRE-1-RESOLVE: four before the bookmark
+	// module's site was removed). `reply-substrate.ts` is deliberately absent: it
 	// loads ONE reply per row and computes no per-side sum, so requiring the
 	// aggregate form there would be requiring a query it does not run.
 	const AGGREGATE_SITES = SITES.filter(

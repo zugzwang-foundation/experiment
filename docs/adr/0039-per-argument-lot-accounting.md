@@ -61,9 +61,17 @@ therefore removes the attack's *other* leg — the claim that a post attracting
 its own author has attracted anything.
 
 **Implementation.** One predicate, `AND rc.user_id <> p.user_id`, added to the
-reply join at the **four** sites that compute the aggregates:
-`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`
-and `scripts/verify-ranking-staging.ts`.
+reply join at every site that computes the aggregates:
+`debate-view/ranking-substrate.ts`, `profile/arguments.ts` and
+`scripts/verify-ranking-staging.ts`.
+
+⚠ **THREE SITES, NOT FOUR, AS OF THIS MERGE.** `src/server/bookmarks/list.ts`
+carried a fourth copy and received the predicate; `unwire-1` then removed the
+bookmark module from `main` while this branch was open, so the file is gone and
+the predicate went with it. If bookmarks ever return they will return with a copy
+of this query — it will need the predicate, and the parity guard will need the
+entry back, or the copy ships unguarded.
+
 
 ⚠ **It lives in the JOIN, never the WHERE.** In a `WHERE` it would drop any post
 whose only replies are self-replies out of the result set entirely; in the `ON`
@@ -504,9 +512,11 @@ answer when nothing did.
 aggregates over the frozen `bets.stake`, at three byte-equivalent sites
 (`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`).
 
-> *(**AMENDED at RANK-2, 2026-08-22.** There are **FOUR** aggregate sites, not
-> three — `scripts/verify-ranking-staging.ts` carries a hand-kept fourth copy,
-> which is how it silently drifted for a release. And the summand now additionally
+> *(**AMENDED at RANK-2, 2026-08-22.** The site list here was already wrong when
+> written: `scripts/verify-ranking-staging.ts` carries a hand-kept copy, which is
+> how it silently drifted for a release. It is **three** sites as of the RANK-2
+> merge — that script plus `ranking-substrate.ts` and `profile/arguments.ts` —
+> because `unwire-1` removed `bookmarks/list.ts` entirely. And the summand now additionally
 > **excludes self-authored replies**: `AND rc.user_id <> p.user_id` on the reply
 > join, in the `ON` clause and never the `WHERE`. Patch record **P2** at the top
 > of this file carries the ruling and the reason.)*

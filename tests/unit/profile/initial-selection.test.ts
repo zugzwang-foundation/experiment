@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { initialBookmarkSelection } from "@/components/bookmarks/selection";
 import {
 	initialMarketIdOf,
 	initialProfileSelection,
@@ -128,20 +127,9 @@ describe("R3 SSR seed — the profile selection", () => {
 	});
 });
 
-describe("R3 SSR seed — the bookmark selection", () => {
-	it("seed::picks-the-first-item", () => {
-		expect(
-			initialBookmarkSelection([
-				{ id: "b1", marketTitle: "Market 1" },
-				{ id: "b2", marketTitle: "Market 2" },
-			]),
-		).toEqual({ commentId: "b1", marketTitle: "Market 1" });
-	});
-
-	it("seed::an-empty-set-selects-nothing", () => {
-		expect(initialBookmarkSelection([])).toBeNull();
-	});
-});
+// UNWIRE-1 — "R3 SSR seed — the bookmark selection" removed whole:
+// initialBookmarkSelection and its module (components/bookmarks/selection.ts)
+// are deleted along with the rest of the bookmark module.
 
 describe("R3 SSR seed — the arenas actually USE the seed", () => {
 	const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
@@ -162,11 +150,9 @@ describe("R3 SSR seed — the arenas actually USE the seed", () => {
 		expect(src).not.toContain("useState<ProfileSelection | null>(null)");
 	});
 
-	it("seed::BookmarksArena-seeds-from-the-shared-derivation", () => {
-		const src = read("src/components/bookmarks/BookmarksArena.tsx");
-		expect(src).toContain("initialBookmarkSelection(");
-		expect(src).not.toContain("useState<BookmarkSelection | null>(null)");
-	});
+	// UNWIRE-1 — "seed::BookmarksArena-seeds-from-the-shared-derivation"
+	// removed whole: BookmarksArena.tsx is deleted along with the /bookmarks
+	// route.
 
 	it("seed::PositionsTable-initialises-its-FILTERS-from-the-same-helpers", () => {
 		// ⛔ THE ANTI-DRIFT CHECK, and the reason the helpers were extracted at all.

@@ -1,9 +1,9 @@
 import "server-only";
 
-import { and, eq, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import type { DbClient } from "@/db";
-import { bookmarks, comments, pools, users } from "@/db/schema";
+import { pools, users } from "@/db/schema";
 import { DAILY_CREDIT_DHARMA } from "@/server/config/limits";
 import { computeSell } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
@@ -46,25 +46,6 @@ export type ViewerMarketContext = {
 	balance: string;
 	/** balance + (unpaid-today ? DAILY_CREDIT_DHARMA : 0) — READ-ONLY preview. */
 	spendableToday: string;
-	/**
-	 * BOOKMARK-ADD-WIRE — comment ids in THIS market the viewer has bookmarked.
-	 * ID-ONLY, never content: it drives the bookmark icon's saved/unsaved state
-	 * and NOTHING else. It is deliberately MARKET-scoped, not scoped to whatever
-	 * `loadDebateView` chose to render, so it may contain ids of comments that
-	 * are `content_removed` or not rendered at all — both inert, because it never
-	 * gates content and is NEVER a masking input (masking stays keyed solely on
-	 * `loadRemovedSet` inside `loadDebateView`, ADR-0034). Do not assume
-	 * congruence with `model.posts`.
-	 */
-	bookmarkedCommentIds: string[];
-	/**
-	 * BOOKMARK-ADD-WIRE — comment ids in THIS market authored BY the viewer, for
-	 * own-argument icon suppression (only someone else's argument is
-	 * bookmarkable). IDS, never pseudonyms: an H2-scrubbed author renders under a
-	 * PLACEHOLDER pseudonym (SPEC.1 §23), so a pseudonym comparison would make
-	 * every scrubbed viewer collide with every scrubbed stranger.
-	 */
-	ownCommentIds: string[];
 };
 
 /**
@@ -99,13 +80,17 @@ export function computeSpendableToday(args: {
  * pool row ONLY when a position is held (a null position needs no pool
  * read beyond the header's).
  *
- * BOOKMARK-ADD-WIRE adds two ID-only SELECTs (Q-A / Q-B below) to the same
- * transaction — 3–4 statements becomes 5–6. This module, NOT `loadDebateView`,
- * is where viewer-scoped debate state lives: ADR-0025 binds the public `.md`
- * export to `loadDebateView`'s `DebateViewModel`, and ADR-0032 D-8 excludes
- * `bookmarks` from the public dataset entirely, so putting per-viewer state on
- * that model would put private state into a public export's input type
- * (ADR-0034). `loadDebateView`'s signature and DTO are untouched.
+ * UNWIRE-1 — the two BOOKMARK-ADD-WIRE SELECTs (Q-A/Q-B, `bookmarkedCommentIds`/
+ * `ownCommentIds`) that used to sit in this same transaction are removed: the
+ * bookmark module is unwired product-wide (founder ruling, SPEC.2 §4.2/ADR-0034's
+ * field-level description of those two fields is now a documented divergence —
+ * see the Gate C packet, not amended here). `held`/`balance` stay: they back
+ * `position`/`balance` independent of bookmarks and always needed this
+ * transaction open. This module, NOT `loadDebateView`, is where viewer-scoped
+ * debate state lives: ADR-0025 binds the public `.md` export to
+ * `loadDebateView`'s `DebateViewModel`, so putting per-viewer state on that
+ * model would put private state into a public export's input type.
+ * `loadDebateView`'s signature and DTO are untouched.
  */
 export async function loadViewerMarketContext(
 	client: DbClient,
@@ -166,43 +151,10 @@ export async function loadViewerMarketContext(
 			};
 		}
 
-		// Q-A (BOOKMARK-ADD-WIRE) — the viewer's bookmarked comment ids in THIS
-		// market. The join to `comments` exists ONLY to apply the market filter;
-		// it selects `bookmarks.comment_id` and reads no content, side or author
-		// column. Drives on `bookmarks.user_id` (bounded by the viewer's bookmark
-		// count, not the market's comment count) and joins by primary key.
-		const bookmarkedRows = await tx
-			.select({ commentId: bookmarks.commentId })
-			.from(bookmarks)
-			.innerJoin(comments, eq(comments.id, bookmarks.commentId))
-			.where(
-				and(
-					eq(bookmarks.userId, args.userId),
-					eq(comments.marketId, args.marketId),
-				),
-			);
-
-		// Q-B (BOOKMARK-ADD-WIRE) — the viewer's OWN comment ids in this market
-		// (D4 own-suppression). Ids only; bounded by one viewer's comments in one
-		// market.
-		const ownRows = await tx
-			.select({ id: comments.id })
-			.from(comments)
-			.where(
-				and(
-					eq(comments.userId, args.userId),
-					eq(comments.marketId, args.marketId),
-				),
-			);
-
 		return {
 			position,
 			balance,
 			spendableToday,
-			// Arrays, never Sets — a Set does not survive the RSC → client
-			// serialization boundary. `DebateView` converts once, client-side.
-			bookmarkedCommentIds: bookmarkedRows.map((r) => r.commentId),
-			ownCommentIds: ownRows.map((r) => r.id),
 		};
 	});
 }

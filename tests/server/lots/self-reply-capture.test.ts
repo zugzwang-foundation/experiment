@@ -1,12 +1,11 @@
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
-import { bookmarks, markets, pools, users } from "@/db/schema";
+import { markets, pools, users } from "@/db/schema";
 import { badgeFor, rankReplies, topOrder } from "@/lib/ranking";
 import { DEFAULT_RANKING_CONFIG } from "@/lib/ranking.config";
 import { place } from "@/server/bets/place";
 import { runBetTransaction } from "@/server/bets/transaction";
-import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 import { loadReplySubstrate } from "@/server/debate-view/reply-substrate";
 import { loadProfileArguments } from "@/server/profile/arguments";
@@ -64,7 +63,6 @@ const CFG = DEFAULT_RANKING_CONFIG;
 const units = (v: string): bigint => BigInt(v.replace(".", ""));
 
 const TABLES = [
-	"bookmarks",
 	"lots",
 	"bets",
 	"comments",
@@ -238,7 +236,7 @@ describe("RANK-2 — a post attracting its own author is not attracting anything
 		expect(badgeFor(captured, posts, CFG)).toBeNull();
 	});
 
-	it("OVER-exclusion control: a CROSS-USER reply still counts, at all three app sites", async () => {
+	it("OVER-exclusion control: a CROSS-USER reply still counts, at both remaining app sites", async () => {
 		// ⛔ THE MUTATION THIS CATCHES, and nothing else in the suite does: an
 		// exclusion written as `rc.user_id <> rc.user_id` (or any predicate that
 		// is simply always false) would satisfy the parity regex, satisfy every
@@ -277,20 +275,11 @@ describe("RANK-2 — a post attracting its own author is not attracting anything
 			units("70.000000000000000000"),
 		);
 
-		// Site 3 — the cross-author bookmark read.
-		const viewer = await seedUser("m-cross-user-counts-viewer");
-		await testDb
-			.insert(bookmarks)
-			.values({ userId: viewer, commentId: f.captured.commentId });
-		const marks = await loadBookmarks(db, { viewerId: viewer });
-		const mark = marks.find((i) => i.id === f.captured.commentId);
-		if (mark === undefined || mark.removed || mark.kind !== "post") {
-			throw new Error("expected the captured post in the bookmark list");
-		}
-		expect(mark.aggregate.supportCount).toBe(1);
-		expect(units(mark.aggregate.supportDharma)).toBe(
-			units("70.000000000000000000"),
-		);
+		// ⚠ SITE 3 (the cross-author bookmark read) WAS HERE AND IS GONE. The
+		// bookmark module was removed from `main` by `unwire-1` while this branch
+		// was open, so there are now THREE aggregate sites, not four. Recorded
+		// rather than silently dropped: if bookmarks ever return, they return with
+		// a copy of this query and will need the predicate and this control.
 	});
 
 	it("the self-replies KEEP their own stake, lane and weight (the ruling's other half)", async () => {

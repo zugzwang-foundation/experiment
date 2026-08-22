@@ -25,9 +25,10 @@ import "./globals.css";
  *
  * It imports NOTHING server-bound and nothing that can throw — no `@/server/**`,
  * no token/format helpers, no providers. This is the boundary of last resort;
- * anything it imports that fails defeats it. The two route-level boundaries
- * (`bookmarks/error.tsx`, `u/[pseudonym]/error.tsx`) are untouched and still
- * catch their own subtrees first.
+ * anything it imports that fails defeats it. The route-level boundaries
+ * (`m/[slug]/error.tsx`, `u/[pseudonym]/error.tsx`) are untouched and still
+ * catch their own subtrees first. (UNWIRE-1: `bookmarks/error.tsx` is deleted
+ * along with the rest of the bookmark module; the other two remain.)
  */
 
 const geistSans = Geist({

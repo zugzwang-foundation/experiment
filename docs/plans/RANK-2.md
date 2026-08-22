@@ -112,8 +112,8 @@ One predicate, `AND rc.user_id <> p.user_id`, on the reply join. Sites
 |---|---|---|
 | 1 | `src/server/debate-view/ranking-substrate.ts` | counts + aggregates |
 | 2 | `src/server/profile/arguments.ts` | counts + aggregates |
-| 3 | `src/server/bookmarks/list.ts` | counts + aggregates |
-| 4 | `scripts/verify-ranking-staging.ts` | the staging instrument's hand-kept copy |
+| 3 | `scripts/verify-ranking-staging.ts` | the staging instrument's hand-kept copy |
+| ~~4~~ | ~~`src/server/bookmarks/list.ts`~~ | **removed from `main` by `unwire-1` mid-branch** — it received the predicate, then the file was deleted upstream and the predicate went with it |
 
 ⚠ **In the JOIN, never the WHERE.** In a `WHERE` it would drop any post whose
 only replies are self-replies out of the result entirely; in the `ON` clause the

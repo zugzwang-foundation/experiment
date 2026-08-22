@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { CommentImage } from "@/components/debate/CommentImage";
 import { PostCard } from "@/components/debate/PostCard";
 import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
@@ -50,13 +49,10 @@ import type {
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
- * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * assert spacing / partitioning / images, never the pop-up, so a
  * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
  * pinned. */
 const noopPopup = () => {};
@@ -135,7 +131,6 @@ describe("POLISH.3 PR 2 — T2, the post image is aspect-respecting in a max box
  * ⚠ O-7 — `innerHTML`, never `textContent`. A mount site is markup structure,
  * and `textContent` cannot see an `<img>` at all.
  */
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
 function focusedPost(imageUrl: string | null): DebatePost {
@@ -190,7 +185,6 @@ function renderFocus(imageUrl: string | null) {
 		<PostFocusHeader
 			post={focusedPost(imageUrl)}
 			market={MARKET}
-			bookmarks={VIEWER}
 			heldSide={null}
 			marketOpen
 			suspended={false}
@@ -267,11 +261,10 @@ describe("HTML-FINISH · MARKET DETAIL — row 11, the image is a left sibling",
  * HTML-FINISH · MARKET DETAIL row 26 (image half) — a REPLY carries its own
  * attachment, and it is the SECOND mount site this row opens.
  *
- * ⛔ THE REMOVED BRANCH IS TYPE-ENFORCED HERE, unlike the bookmark cluster
- * beside it: `DebateReply`'s removed variant has no `imageUrl` field at all, so
- * an image in that branch does not compile. The render assertion below is the
- * belt; the type is the braces. Server-side, the URL is never even minted —
- * pinned by `load-debate-view.integration.test.ts`.
+ * ⛔ THE REMOVED BRANCH IS TYPE-ENFORCED HERE: `DebateReply`'s removed variant
+ * has no `imageUrl` field at all, so an image in that branch does not compile.
+ * The render assertion below is the belt; the type is the braces. Server-side,
+ * the URL is never even minted — pinned by `load-debate-view.integration.test.ts`.
  */
 describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () => {
 	const noopOpen = () => {};
@@ -298,7 +291,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply("https://example.invalid/reply-image")}
-				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
 				onOpenPopup={noopPopup}
 			/>,
@@ -320,7 +312,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply(null)}
-				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
 				onOpenPopup={noopPopup}
 			/>,
@@ -343,7 +334,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 26, the reply's own image", () =>
 					side: "YES",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
-				bookmarks={VIEWER}
 				onOpenImage={noopOpen}
 				onOpenPopup={noopPopup}
 			/>,
@@ -400,7 +390,6 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		const { container } = render(
 			<PostCard
 				post={focusedPost(null)}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -424,7 +413,6 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		const { container } = render(
 			<PostCard
 				post={focusedPost(PH_URL)}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -449,7 +437,6 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 		const { container } = render(
 			<PostCard
 				post={removedPost()}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -476,7 +463,6 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 			<PostFocusHeader
 				post={focusedPost(null)}
 				market={MARKET}
-				bookmarks={VIEWER}
 				heldSide={null}
 				marketOpen
 				suspended={false}
@@ -496,7 +482,6 @@ describe("HTML-FINISH · MARKET DETAIL round 2 — the post-image placeholder", 
 			<PostFocusHeader
 				post={removedPost()}
 				market={MARKET}
-				bookmarks={VIEWER}
 				heldSide={null}
 				marketOpen
 				suspended={false}
