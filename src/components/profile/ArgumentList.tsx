@@ -1,9 +1,6 @@
 import Link from "next/link";
 
-import {
-	type BookmarkAffordance,
-	CardActions,
-} from "@/components/bookmarks/BookmarkToggle";
+import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import {
 	computeSplitBar,
@@ -22,6 +19,7 @@ import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentBody } from "./ArgumentBody";
 import { PROFILE_COPY } from "./copy";
+import { DownloadStub } from "./DownloadStub";
 import type { ProfileSelection } from "./selection";
 
 /**
@@ -524,17 +522,15 @@ function PresentHead({
 					</span>
 				</>
 			)}
-			{/* ⚠⚠ PROFILE REFINEMENT · R4 — THE CLUSTER, no longer data-blocked (see
-			    the block above for the producer the earlier note missed). `ml-auto`
-			    inside `CardActions` pushes it to the row's end, which is the mockup's
-			    `.cardacts{margin-left:auto}` (`:330`).
-			    ⛔ THE SHIPPED CLUSTER, NOT A SECOND ONE — the same `CardActions` the
-			    debate post and reply cards render, so the bookmark's four states
-			    cannot drift between surfaces.
-			    ⚠ `download` IS OPT-IN AND PASSED HERE. It defaults to `false`, so
-			    `/m/[slug]`'s two call sites are untouched and D3's ruling still holds
-			    there; R4 names this surface, so this surface asks for it. */}
-			<CardActions commentId={item.id} bookmarks={bookmarks} download />
+			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
+			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,
+			    extracted to its own component (SUB-1). `ml-auto` on this wrapper is
+			    the same one `CardActions` carried, kept so the lone remaining child
+			    still sits at the row's end — the mockup's `.cardacts{margin-left:
+			    auto}` (`:330`). */}
+			<div className="ml-auto flex shrink-0 items-center gap-0.5">
+				<DownloadStub />
+			</div>
 		</div>
 	);
 }
