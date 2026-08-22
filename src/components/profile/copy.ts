@@ -17,12 +17,29 @@ export const PROFILE_COPY = {
 	// CTA, and this state has none. ⛔ Reusing `positionsOwner` here would
 	// render "No positions yet" to someone whose positions the filter is
 	// hiding — a lying empty state that every test would pass.
+	// ⚠⚠ POSREV-1 RF-14 — THE EMPTY STATES ARE PER-TAB AND AWARE OF EACH OTHER.
+	// The shipped copy told someone who had traded and fully exited that they had
+	// never traded, because there was only ever ONE empty message for a surface
+	// that now has two tabs. `openEmpty` and `closedEmpty` are founder-supplied
+	// verbatim in the POSREV-1 kickoff — carriage, never authoring (CLAUDE.md §3);
+	// `positionsOwner` is REUSED unchanged for "both tabs empty", which is what
+	// the kickoff specifies byte-for-byte.
+	//
+	// ⚠ `positionsFiltered` IS NOW UNREACHABLE AND IS DELIBERATELY KEPT. The
+	// market options are built FROM the rows, so every option has at least one
+	// row, and every row lands in exactly one tab — so at least one tab is always
+	// non-empty and the three cases above cover the space. It is web-authored
+	// ratified copy, and what POSREV-1 removed is a RENDER, not a string: the same
+	// posture `PROFILE_COPY.chip` has carried since PROFILE REFINEMENT R5.
 	empty: {
 		positionsOwner: "No positions yet. Stake a side to open your record.",
 		positionsVisitor: "No positions yet.",
 		argumentsOwner: "No arguments yet — every bet carries one.",
 		argumentsVisitor: "No arguments yet.",
 		positionsFiltered: "No positions match this filter.",
+		openEmpty:
+			"No open arguments. Your closed arguments are in the Closed tab.",
+		closedEmpty: "No closed arguments yet.",
 	},
 	graph: {
 		empty: "Nothing to plot yet.",

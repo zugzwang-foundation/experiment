@@ -11,7 +11,10 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { PositionsTable } from "@/components/profile/PositionsTable";
-import type { ProfilePositionRow } from "@/server/profile/positions";
+import type {
+	ProfilePositionLot,
+	ProfilePositionRow,
+} from "@/server/profile/positions";
 
 /**
  * PROFILE OVERLAP · R4 — ↑/↓ STEP FROM LOAD, WITH NO CLICK.
@@ -49,9 +52,46 @@ function pressOnDocument(key: "ArrowUp" | "ArrowDown"): void {
 // ── positions fixtures ────────────────────────────────────────────────────────
 const M = (n: number) => `0190c0de-0000-7000-8000-00000000000${n}`;
 
+/** The tile key for row `n` — a real lot id, so the tests exercise the real
+ *  per-argument path rather than the whole-holding fallback. */
+const L = (n: number) => `0190c0de-2222-7000-8000-00000000000${n}`;
+
+/**
+ * ⚠⚠ POSREV-1 RF-13 — **"CLOSED" IS NOW A PROPERTY OF THE HOLDING, NOT THE
+ * MARKET.** These helpers used to make a row Closed by setting `marketStatus:
+ * "Resolved"` / `statusLabel: "Closed"`. That no longer moves anything: the tab
+ * filters on whether the ARGUMENT still has surviving shares. A market can be
+ * Resolved and its argument still held (held-to-settlement), and an Open market
+ * can hold nothing but exited arguments. So a closed fixture is one whose lot
+ * has `survivingShares` at canonical zero, and `quantity` follows it — the two
+ * move together by `I-LOT-SUM-001`.
+ */
+/** One argument on row `n` — held (Open tab) or fully exited (Closed tab). */
+function LOT(n: number, held: boolean): ProfilePositionLot {
+	return {
+		lotId: L(n),
+		betId: `bet-${n}`,
+		side: "YES",
+		originalBasis: "25.000000000000000000",
+		survivingBasis: held ? "25.000000000000000000" : "0.000000000000000000",
+		survivingShares: held ? "10.000000000000000000" : "0.000000000000000000",
+		sold: !held,
+		placedAt: "2026-09-10T10:00:00.000Z",
+		argument: {
+			removed: false,
+			commentId: `0190c0de-1111-7000-8000-00000000000${n}`,
+			title: `Opener argument ${n}`,
+			isReply: false,
+			postOrdinal: n,
+			marketSlug: `fixture-${n}`,
+			repliedToTitle: null,
+		},
+	};
+}
+
 function openRow(n: number): ProfilePositionRow {
 	return {
-		lots: [],
+		lots: [LOT(n, true)],
 		marketId: M(n),
 		marketSlug: `fixture-${n}`,
 		marketTitle: `Market fixture-${n}`,
@@ -76,14 +116,14 @@ function openRow(n: number): ProfilePositionRow {
 
 const ROWS = [openRow(1), openRow(2), openRow(3)];
 const PAYLOAD = { owner: false as const, rows: ROWS };
-const posRow = (n: number) => screen.getByTestId(`position-row-${M(n)}`);
+const posRow = (n: number) => screen.getByTestId(`position-tile-${L(n)}`);
 /** The picked rows, among those actually RENDERED — a filter hides the rest, and
  *  a helper that insisted on all three would throw before it could report. */
 const posPicked = () =>
 	[1, 2, 3].filter(
 		(n) =>
 			screen
-				.queryByTestId(`position-row-${M(n)}`)
+				.queryByTestId(`position-tile-${L(n)}`)
 				?.getAttribute("aria-current") === "true",
 	);
 
@@ -219,9 +259,10 @@ describe("R4 — the mount selection is the keyboard's anchor (positions)", () =
 		// Closed rows so there is somewhere to step TO after the switch.
 		const closed = (n: number): ProfilePositionRow => ({
 			...openRow(n),
-			marketStatus: "Resolved",
-			statusLabel: "Closed",
-			settled: true,
+			quantity: "0.000000000000000000",
+			staked: "0.000000000000000000",
+			current: "0.000000000000000000",
+			lots: [LOT(n, false)],
 		});
 		render(
 			<PositionsTable

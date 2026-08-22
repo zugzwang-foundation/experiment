@@ -27,9 +27,17 @@ import { initialProfileSelection, type ProfileSelection } from "./selection";
  *
  * ⚠ WHY A FILTER AND NOT A REPLACEMENT — the one line that matters. SPEC.1
  * §16.3 D8 and §17 name the §23 argument list as where a complete record lives,
- * and `positions.ts:151-158` drops fully-exited markets from the table, so the
- * list holds arguments the table can never reach. A filter hides; a replacement
- * would delete. The full list is one deselect away, and it is the default.
+ * and the list holds arguments the table cannot reach — one made on a market the
+ * participant never took a position in. A filter hides; a replacement would
+ * delete.
+ * ⚠ THE GAP THIS CLAUSE NAMED IS NARROWER THAN IT WAS, and the sentence is
+ * corrected rather than left standing: it read "`positions.ts:151-158` drops
+ * fully-exited markets from the table". POSREV-1 RF-13 widened that domain, so a
+ * fully-exited market now has a row and its arguments are reachable there. The
+ * conclusion holds on what remains; the premise it rested on does not.
+ * ⛔ "The full list is one deselect away" is ALSO gone — PROFILE REFINEMENT R3
+ * retired deselect, as `PositionsTable`'s `pick` records. The full list renders
+ * when there is no selection to pass, which is not the same thing as a way back.
  *
  * ⚠ `setSelection` IS PASSED DIRECTLY as the callback, deliberately. `useState`
  * setters have a stable identity, and `PositionsTable` reports the selection
@@ -39,12 +47,21 @@ import { initialProfileSelection, type ProfileSelection } from "./selection";
  */
 export function ProfileArena({
 	positions,
+	positionsValue,
 	argumentItems,
 	owner,
 	author,
 	initialMarketSlug,
 }: {
 	positions: ProfilePositionsPayload;
+	/**
+	 * POSREV-1 RF-15 level 1 — the §23 Positions-value tile's EXACT figure,
+	 * passed straight through so the group headers are allocated from the very
+	 * string the tile renders. This band holds no opinion about it; it is here
+	 * only because the tile and the table live in different halves of the page
+	 * and one number has to reach both.
+	 */
+	positionsValue: string;
 	argumentItems: ProfileArgumentItem[];
 	owner: boolean;
 	author: ProfileUser;
@@ -72,6 +89,7 @@ export function ProfileArena({
 		<>
 			<PositionsTable
 				payload={positions}
+				positionsValue={positionsValue}
 				initialMarketSlug={initialMarketSlug}
 				onSelect={setSelection}
 			/>

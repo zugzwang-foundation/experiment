@@ -23,8 +23,14 @@ export type ProfilePositionsPayload =
  * A holding is sellable IFF its market is `Open` AND a positive quantity is
  * held (SPEC.1 §23 "sellable iff its market is `Open` and `quantity > 0`";
  * buys and sells require `Open`, §7). Closed/Resolving/Resolved/Voided/Frozen
- * (`statusLabel === "Closed"`) and settled rows are never sellable. The read
- * model's `quantity > 0` row domain makes the quantity check defensive.
+ * (`statusLabel === "Closed"`) and settled rows are never sellable.
+ *
+ * ⚠ **The quantity check is LOAD-BEARING, and it was not always.** This comment
+ * used to end "the read model's `quantity > 0` row domain makes the quantity
+ * check defensive" — true while `loadProfilePositions` dropped exited markets,
+ * and false since POSREV-1 RF-13 widened that domain to admit them. The rows
+ * this now refuses are real and arrive on every load: a fully-exited holding in
+ * a still-Open market passes the status test and is stopped here alone.
  */
 export function isSellEligible(row: ProfilePositionRow): boolean {
 	return (

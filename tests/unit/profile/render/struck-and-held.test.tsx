@@ -4,7 +4,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { IdentityCard } from "@/components/profile/IdentityCard";
@@ -278,10 +284,24 @@ const STRUCK: StruckRow[] = [
 		control: "<span>a positions cell with no parent reference</span>",
 	},
 	{
-		id: "A-8 — dropping the per-row status token on open rows",
-		why: "STRUCK on the sentence as written. SPEC.1 §23: 'status Open / Closed by market state'. Also a PRESENCE guard.",
-		detect: (h) => !/data-testid="position-status-/.test(h),
-		control: "<tr><td>a row with no status badge</td></tr>",
+		id: "A-8 — the per-row market-status token, now RULED OUT (POSREV-1 RF-12)",
+		why:
+			"⚠⚠ THIS ROW IS INVERTED, AND IT IS THE ONLY ONE IN THE TABLE THAT IS. " +
+			"It used to guard the token's PRESENCE, on SPEC.1 §23's 'status Open / " +
+			"Closed by market state'. POSREV-1 RF-12 rules the opposite: 'Market " +
+			"status renders NOWHERE. All eight markets carry the same deadline and " +
+			"none resolves early, so status is constant for the whole live window — " +
+			"a chip repeating Open eleven times conveys nothing.' RF-13 then takes " +
+			"the two WORDS for a different meaning entirely (do you still hold this " +
+			"argument), so a chip reading `Open` beside a tab reading `Open` would " +
+			"name two unrelated facts with one word. " +
+			"⛔ SPEC.1 §23 STILL SAYS WHAT IT SAID — the conflict is REAL, is " +
+			"REPORTED rather than papered over, and is owed a founder amendment. " +
+			"This task is forbidden from editing SPEC.1, so the guard records the " +
+			"divergence instead of hiding it.",
+		detect: (h) => /data-testid="position-status-/.test(h),
+		control:
+			'<tr><td><span data-testid="position-status-m1">Open</span></td></tr>',
 	},
 	{
 		// UNWIRE-1 — supersedes the retired "A-9 — the headzone bookmark icon

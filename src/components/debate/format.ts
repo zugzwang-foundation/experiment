@@ -234,10 +234,16 @@ function netProfitLossDisplayed(
  * ⚠ ZERO CARRIES NO SIGN — `isZero()` covers +0 and −0, so an unmoved position
  * reads `(Đ0)`, never `(+Đ0)`. The MINUS is U+2212 (`e2 88 92`), byte-carried
  * from the mockup's `plShort()`, never the ASCII hyphen `groupInteger` emits.
- * ⚠ AND THE SPACING IS THE MOCKUP'S, WHICH IS NOT THE TILE'S: `plShort` emits
- * `+Đ70` with NO space (`:677`), while the Net P/L tile reads `+Đ 238` with one
- * (`:672`). Two different figures, two different densities, both the mockup's —
- * the caller supplies the glyph, so this returns the parts and states neither.
+ * ⚠ THE CALLER SUPPLIES THE GLYPH AND THEREFORE THE SPACING — this returns the
+ * parts and states neither, which is the one thing about this contract that has
+ * not changed. What DID change is what the caller does with them: this docblock
+ * used to record the mockup's two densities (`plShort` `+Đ70` at `:677` against
+ * the Net P/L tile's `+Đ 238` at `:672`) as a deliberate split to be preserved.
+ * POSREV-1 RF-4 ruled the profile's positions surface onto ONE density — a space
+ * after every Đ — because the delta sits INSIDE the cell whose own figure is
+ * spaced, so the split put the same glyph on two densities two characters apart.
+ * The mockup's own reading is not overturned in general; a caller that wants the
+ * tight form can still write it, because the parts arrive separate.
  *
  * Degrades to an EMPTY magnitude on a malformed operand rather than dressing a
  * bad value in a sign: the caller renders nothing at all in that case, which is
@@ -288,6 +294,111 @@ export function displayNetProfitLossSigned(
 		sign: displayed.isNegative() ? "−" : "+",
 		magnitude: groupInteger(displayed.abs().toFixed(0)),
 	};
+}
+
+/**
+ * POSREV-1 RF-15 — **THE DISPLAYED-SPACE PARTITION: parts that sum to the whole.**
+ *
+ * Round the PARENT from its exact value, then give each child a whole-Đ figure
+ * such that the children sum EXACTLY to that parent. Returns one UNGROUPED
+ * integer string per child, positionally aligned; the caller renders each
+ * through `formatDharma`, which is idempotent on an already-rounded integer and
+ * supplies the grouping.
+ *
+ * **Why it is needed.** Rounding a parent and its children independently loses
+ * the identity between them: the §23 Positions-value tile read `Đ 920` above
+ * rows summing to `Đ 921`. One tile per ARGUMENT rather than per market
+ * multiplies the number of children, so the drift gets worse under the very
+ * change that makes the surface readable — which is why this arrives with it.
+ * Same displayed-space discipline SPEC.1 §10.8 already imposes on the §23 Net
+ * P/L tile and the reply split bar's staked total; `netProfitLossDisplayed` and
+ * `displaySplitTotal` are its two existing one-off instances, and this is the
+ * general form they are special cases of.
+ *
+ * **Largest remainder, and why it terminates.** Floor every child, then hand the
+ * shortfall to the largest fractional remainders (ties by index, so the result
+ * is deterministic and independent of any map ordering). The residual is always
+ * in `[0, n]` for the callers here, where the children ARE the parent's summands:
+ *   - each `floor_i ≤ exact_i`, so `Σfloor ≤ Σexact ≤ parentExact`; `Σfloor` is
+ *     an INTEGER no greater than `parentExact`, hence `Σfloor ≤ ⌊parentExact⌋ ≤
+ *     target` — the residual is never negative, which is why there is no
+ *     "take one back" arm;
+ *   - `Σfloor > Σexact − n` and `target ≤ parentExact + ½`, so it is below
+ *     `n + 1`, i.e. at most `n`.
+ * It is distributed as a quotient plus a remainder rather than by a loop, so the
+ * cost cannot depend on the MAGNITUDE of the residual — defensive, since a
+ * caller passing an unrelated parent is the one way to make it large.
+ *
+ * ⚠ The parent rounds ROUND_HALF_UP, matching `round0Dharma`, so
+ * `allocateDisplayed(v, [v])` returns exactly what `formatDharma(v)` prints and
+ * a one-child group needs no special case at any call site.
+ *
+ * ⚠ **DISPLAY ARITHMETIC ONLY.** It adds no query, reads no store and changes no
+ * value. Its output is TERMINAL in the §10.8 sense: a figure to print, never one
+ * to read back.
+ *
+ * Degrades to independently-rounded children on a malformed or non-finite
+ * operand — a bad value must not crash a render, and children that do not quite
+ * sum are better than a page that does not paint.
+ */
+export function allocateDisplayed(
+	parentExact: string,
+	childExacts: readonly string[],
+): string[] {
+	if (childExacts.length === 0) {
+		return [];
+	}
+	const degrade = (): string[] => childExacts.map((c) => round0Dharma(c));
+	try {
+		const parent = new DisplayDecimal(parentExact);
+		if (!parent.isFinite()) {
+			return degrade();
+		}
+		const target = parent.toDecimalPlaces(0, Decimal.ROUND_HALF_UP);
+
+		const floors: Decimal[] = [];
+		const remainders: Decimal[] = [];
+		for (const child of childExacts) {
+			const value = new DisplayDecimal(child);
+			if (!value.isFinite()) {
+				return degrade();
+			}
+			const floor = value.toDecimalPlaces(0, Decimal.ROUND_DOWN);
+			floors.push(floor);
+			remainders.push(value.minus(floor));
+		}
+
+		const residual = target.minus(
+			floors.reduce((acc, f) => acc.plus(f), new DisplayDecimal(0)),
+		);
+		// Unreachable for the callers described above; a caller that passes an
+		// unrelated parent lands here rather than in a loop that cannot finish.
+		if (residual.isNegative()) {
+			return degrade();
+		}
+
+		const n = childExacts.length;
+		const order = remainders
+			.map((_, i) => i)
+			.sort((a, b) => {
+				const cmp = (remainders[b] as Decimal).cmp(remainders[a] as Decimal);
+				return cmp !== 0 ? cmp : a - b;
+			});
+		const each = residual.dividedToIntegerBy(n);
+		// `0 ≤ extra < n`, so it is small by construction and safe as a JS number —
+		// it indexes an array; it is never money.
+		const extra = residual.minus(each.times(n)).toNumber();
+
+		const out = floors.map((f) => f.plus(each));
+		for (let j = 0; j < extra; j++) {
+			const i = order[j] as number;
+			out[i] = (out[i] as Decimal).plus(1);
+		}
+		// `isZero()` covers +0 and −0 — the same guard that forbids rendering "-0".
+		return out.map((v) => (v.isZero() ? "0" : v.toFixed(0)));
+	} catch {
+		return degrade();
+	}
 }
 
 /**
