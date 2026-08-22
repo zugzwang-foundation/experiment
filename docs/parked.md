@@ -2889,3 +2889,74 @@ deploy gotcha (*"rehearse on staging first"*), which makes the staging push a **
 of a prod promote rather than an alternative to it.
 
 ---
+
+# PERF-1-CLOSE (2026-08-22) — gauge correction, re-measurement, the query-load successor
+
+**Originating task:** PERF-1-CLOSE (2026-08-22) — re-verifying PERF-1's region fix post-LOTS-1/
+CLOSE-1, and settling whether TTFB was ever the right gauge for a Suspense-streamed route. Full
+evidence: `docs/adr/0006-hosting.md`'s third patch record ("Patch record — 2026-08-22"); the
+PERF-1-CLOSE session report.
+
+---
+
+## PERF-2 — Discovery query load under realistic volume
+
+PERF-1 is closed: it was scoped as a region mismatch with a one-line config fix, and that fix is
+verified. It did NOT measure query load. Every measurement to date ran against a database
+holding ~10 comments and ~10 bets IN TOTAL, so Discovery's eight per-market hero computations
+ran over roughly one row each. The constant is fixed and small; the variable is untouched.
+
+**Trigger.** SCALE S-5's measurement rig.
+
+**Owner.** SCALE, not a bespoke seeder — `staging:generate` adds fifteen `sp-*` markets
+alongside the eight and pollutes the set.
+
+---
+
+## COLD-START — ~790ms platform floor measured on `/api/health` after 626s idle; ~1.75s on Discovery after 606s idle
+
+Real for a first visitor on a quiet morning, invisible under sustained traffic. Not PERF-1, and
+not currently in the latency register.
+
+Reproduced independently at PERF-1-CLOSE (2026-08-22, post-LOTS-1): 801.2ms on `/api/health`
+after a fresh ≥600s idle window, 1820.5ms on Discovery after the same. Recorded as a SCALE S-5
+input, not a standalone task.
+
+---
+
+## GAUGE — the RSC streaming gap
+
+`/` (Discovery): the hero (`DiscoveryContent`, including `selectHeroTopPosts` — the eight-market
+top-YES/top-NO computation) sits inside `<Suspense fallback={<LoadingSkeleton />}>`
+(`src/app/(public)/page.tsx:51-53`) — TTFB measures the shell the Suspense boundary commits, not
+the hero; the gauge is `total`. `/u/[pseudonym]` and `/m/[slug]` carry no `Suspense` anywhere in
+their render trees (`grep -rn "Suspense"` across both component trees: zero hits) — the gauge is
+TTFB for both, unchanged.
+
+Any future timing on a route whose expensive work is suspended must read `total`, not TTFB, or
+it measures the shell. Recorded as a SCALE S-5 input, not a standalone task.
+
+---
+
+## Sequencing note (stated here, not acted on)
+
+PERF-1 was carried as the sole GO-LIVE BLOCKER row (line 36, SEQUENCE table intro) and closed
+2026-08-10; the SEQUENCE table's own closing note already names **POOL-2 / `BETTER_AUTH_SECRET`**
+as the head of the queue post-closure, and that is unchanged by this session. Separately, two
+dated (not triggered) gates in this file are worth naming here because they carry the next
+clocks: **RATE-GUARD-PUBLIC** (line 814, DUE 2026-09-05 — anonymous participant RSC surfaces
+carry no request-rate limit) and **LEGAL.1** (line 1471, ⚠ GO-LIVE GATE — the ToS/Privacy bodies
+are still placeholder Lorem ipsum).
+
+**Not added to the SEQUENCE table.** That table's own rule (line 18) is rows "whose stated
+trigger is met today"; RATE-GUARD-PUBLIC and this file's other 2026-09-05-dated rows are
+explicitly marked "hard date, not a trigger." Today (2026-08-22) is not that date, and forcing a
+dated-not-triggered row into a table defined around fired triggers would misstate what the
+file's own convention says about it. Nothing in the SEQUENCE table is edited by this session;
+this paragraph only names what a reader tracking sequence should already know.
+
+**The `.html` tracker dashboards are operator-local and were not touched here.** If the
+operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START
+/ GAUGE, that is a manual move for the operator — not a PR.
+
+---
