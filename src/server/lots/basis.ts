@@ -30,8 +30,9 @@ import { CANONICAL_ZERO, sumLots } from "./compute";
  * the basis anyway — `lots_sold_zeroes_basis` guarantees it — so the predicate
  * is an index choice rather than a correctness one; but it also means a
  * fully-exited holding yields NO entry rather than a zero one, which matches
- * both consumers: `loadProfilePositions` filters its domain to `quantity > 0`,
- * and `computeBookmarkFigures` returns 0/0 when the author does not hold.
+ * its consumer: `loadProfilePositions` filters its domain to `quantity > 0`.
+ * (UNWIRE-1: the other consumer this comment used to name, the bookmark
+ * module's `computeBookmarkFigures`, is deleted along with it.)
  *
  * **At most one side can survive per (user, market)**, so grouping by the pair
  * is sound: `positions_one_held_side_idx` permits only one held side, and a

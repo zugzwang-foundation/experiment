@@ -173,9 +173,11 @@ const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
  * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`),
  * carried as a LITERAL because the mockup states it as one. It is what makes
  * the two side-by-side panel heads one height, and therefore what makes their
- * two scrolling bodies start on the same line. ⛔ ONE string, asserted on all
- * FOUR heads across this file and `bookmarks-height-chain.test.ts`, so the two
- * surfaces can never be sized one after the other (§3).
+ * two scrolling bodies start on the same line. ⛔ ONE string, asserted on both
+ * heads in this file. (UNWIRE-1: this used to be one string asserted on FOUR
+ * heads across this file and the now-deleted `bookmarks-height-chain.test.ts`,
+ * so Profile and `/bookmarks` could never be sized one after the other; only
+ * Profile's own two heads remain to guard.)
  */
 const HEAD_FLOOR = "min-h-[52px]";
 
@@ -473,11 +475,12 @@ describe("profile height chain — every link, asserted by name", () => {
 		// …and the row heights that DO exist are on ROWS, never on the body — asserted
 		// where they now live.
 		// ⚠ PROFILE REFINEMENT · R1 (shared) — THE ROW-THIRD MOVED OUT OF THIS FILE.
-		// It was inline in `PositionsTable`; the bookmarks table needed the identical
-		// rule (measured: positions `[128,128,128]` against bookmarks `[136,92]`), and
-		// two copies of the arithmetic would drift. So it lives in `row-thirds.ts` and
-		// both tables call it. This check follows the code rather than pinning a
-		// location the code has left.
+		// It was inline in `PositionsTable`; the (now-deleted) bookmarks table needed
+		// the identical rule (measured: positions `[128,128,128]` against bookmarks
+		// `[136,92]`), and two copies of the arithmetic would drift. So it lives in
+		// `row-thirds.ts`. (UNWIRE-1: BookmarksTable's own call site is deleted with
+		// the rest of the bookmark module; PositionsTable's remains.) This check
+		// follows the code rather than pinning a location the code has left.
 		const thirds = read(ROW_THIRDS);
 		expect(thirds).toContain("row.style.height");
 		expect(thirds).not.toContain("body.style.height");
