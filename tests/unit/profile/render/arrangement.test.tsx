@@ -4,14 +4,23 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PositionsTable } from "@/components/profile/PositionsTable";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
-import type { ProfilePositionRow } from "@/server/profile/positions";
+import type {
+	ProfilePositionLot,
+	ProfilePositionRow,
+} from "@/server/profile/positions";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
@@ -56,8 +65,54 @@ const M1 = "0190c0de-aaaa-7000-8000-000000000001"; // Open market
 const M2 = "0190c0de-bbbb-7000-8000-000000000002"; // settled market
 const C_OPENER = "0190c0de-ffff-7000-8000-000000000044";
 
+const L1 = "0190c0de-2222-7000-8000-000000000001";
+const L2 = "0190c0de-2222-7000-8000-000000000002";
+const L3 = "0190c0de-2222-7000-8000-000000000003";
+
+const OPENER_CELL = {
+	removed: false as const,
+	commentId: C_OPENER,
+	title: "Opener argument alpha",
+	isReply: false,
+	postOrdinal: 1,
+	marketSlug: "fixture-alpha",
+	repliedToTitle: null,
+};
+
+const OPENER_CELL_2 = {
+	...OPENER_CELL,
+	commentId: "0190c0de-ffff-7000-8000-000000000045",
+	title: "Second argument alpha",
+	postOrdinal: 2,
+};
+
+/**
+ * ⚠⚠ POSREV-1 — THE ROWS CARRY REAL LOTS. The table's unit is the ARGUMENT, so a
+ * row with no lots renders through the whole-holding FALLBACK — the drift path,
+ * not the ordinary one. `ROW_SETTLED`'s lot is fully EXITED, which is what puts
+ * it in the CLOSED tab: under RF-13 a Resolved MARKET no longer does that.
+ */
+function LOT(
+	lotId: string,
+	side: "YES" | "NO",
+	held: boolean,
+	argument: ProfilePositionLot["argument"],
+): ProfilePositionLot {
+	return {
+		lotId,
+		betId: `bet-${lotId}`,
+		side,
+		originalBasis: held ? "25.000000000000000000" : "8.000000000000000000",
+		survivingBasis: held ? "25.000000000000000000" : "0.000000000000000000",
+		survivingShares: held ? "10.000000000000000000" : "0.000000000000000000",
+		sold: !held,
+		placedAt: "2026-09-10T10:00:00.000Z",
+		argument,
+	};
+}
+
 const ROW_OPEN: ProfilePositionRow = {
-	lots: [],
+	lots: [LOT(L1, "YES", true, OPENER_CELL)],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -81,7 +136,7 @@ const ROW_OPEN: ProfilePositionRow = {
 
 /** Settled row whose episode-opening argument is content_removed (N-1a). */
 const ROW_SETTLED: ProfilePositionRow = {
-	lots: [],
+	lots: [LOT(L2, "NO", false, { removed: true, marketSlug: "fixture-beta" })],
 	marketId: M2,
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",
@@ -106,7 +161,7 @@ function indexOf(child: Element): number {
 
 /** The `<td>` list of one rendered position row. */
 function cellsOf(marketId: string): HTMLTableCellElement[] {
-	const row = screen.getByTestId(`position-row-${marketId}`);
+	const row = screen.getByTestId(`position-tile-${marketId}`);
 	return [...row.querySelectorAll("td")];
 }
 
@@ -515,18 +570,29 @@ describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED"
 describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable", () => {
 	const PAYLOAD = { owner: false as const, rows: [ROW_OPEN, ROW_SETTLED] };
 
-	it("item2::the-selected-half-carries-the-ACTIVE-ring-and-the-other-does-not", () => {
+	it("item2::the-selected-half-FILLS-and-the-other-does-not", () => {
+		// ⚠⚠ THE MECHANISM MOVED AT POSREV-1 RF-9 AND THE LAW DID NOT. Item 2's
+		// ring made the selected half unmistakable by EDGE; the founder ruled that
+		// the selected option must fill the BLOCK, not just its text. So the
+		// assertion moves from `--ring-active` to the fill — and the crude
+		// they-must-differ check below, which is the one that would have caught the
+		// original defect, is untouched.
+		// ⛔ THE FILL IS `n7`, NOT `#fafafa`. `--color-no` IS #fafafa: it encodes
+		// the NO SIDE under INV-3, and this toggle sits inches from tiles reading
+		// `Yes`. `n7` is the brightest NEUTRAL rung and carries no side meaning.
 		render(<PositionsTable payload={PAYLOAD} />);
 		const open = screen.getByTestId("positions-status-open");
 		const closed = screen.getByTestId("positions-status-closed");
 		expect(open.getAttribute("aria-pressed")).toBe("true");
-		// `--ring-active` is rung 3 of the shipped emphasis ladder
-		// (`globals.css:178`); the consumption form is `MarketCard.tsx:74`'s.
-		expect(open.className).toContain("[outline:var(--ring-active)]");
-		expect(closed.className).not.toContain("[outline:var(--ring-active)]");
-		// …and the label brightens with the edge, so the difference survives for
-		// anyone who cannot resolve a 0.5px border delta.
-		expect(open.className).toContain("text-ink");
+		expect(open.className).toContain("bg-n7");
+		expect(closed.className).not.toContain("bg-n7");
+		// ⛔ AND NEVER THE NO POLE — asserted by name, because "it looks white" and
+		// "it IS the NO pole" are the same pixel and different bugs.
+		expect(open.className).not.toContain("bg-no");
+		expect(open.className).not.toContain("bg-ink");
+		// …and the label INVERTS with the fill, so the pair reads as one block
+		// rather than as bright text on a bright ground.
+		expect(open.className).toContain("text-ground");
 		expect(closed.className).toContain("text-n5");
 		// ⚠⚠ THE ASSERTION THAT WOULD HAVE CAUGHT THE ORIGINAL DEFECT, and it is
 		// deliberately the crudest one here: the two halves must not RENDER THE
@@ -543,14 +609,39 @@ describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable",
 		).not.toBe(closed.className);
 	});
 
-	it("item2::the-ring-FOLLOWS-the-selection", () => {
+	it("item2::the-FILL-FOLLOWS-the-selection", () => {
 		render(<PositionsTable payload={PAYLOAD} />);
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
 		expect(screen.getByTestId("positions-status-closed").className).toContain(
-			"[outline:var(--ring-active)]",
+			"bg-n7",
 		);
 		expect(screen.getByTestId("positions-status-open").className).not.toContain(
-			"[outline:var(--ring-active)]",
+			"bg-n7",
+		);
+	});
+
+	it("item2::the-toggle-is-a-PLAIN-button-so-the-fill-cannot-be-overruled", () => {
+		// ⛔⛔ THE REASON RF-9 COULD NOT JUST ADD `bg-n7` TO THE `Button` PRIMITIVE.
+		// `buttonVariants` puts `bg-(--btn-fill)` on the element for EVERY variant
+		// — the one-button system — so a `bg-n7` in `className` would be a SECOND
+		// background utility on one element, and two utilities for one property
+		// resolve by STYLESHEET EMISSION ORDER rather than by the order written.
+		// This file's own neighbours record three instances of exactly that trap
+		// (an inert `line-clamp` under a stray `block`; `size="xs"` fighting
+		// explicit padding; two `[outline:…]` on one row). The control below reads
+		// the SHIPPED primitive and proves the conflict is real rather than feared.
+		const src = readFileSync(
+			join(process.cwd(), "src/components/ui/button.tsx"),
+			"utf8",
+		);
+		expect(src).toContain("bg-(--btn-fill)");
+		// ⇒ so the toggle renders a bare `<button>`, carrying exactly ONE
+		// background declaration and the focus token applied by name.
+		render(<PositionsTable payload={PAYLOAD} />);
+		const open = screen.getByTestId("positions-status-open");
+		expect(open.className).not.toContain("bg-(--btn-fill)");
+		expect(open.className).toContain(
+			"focus-visible:shadow-(--state-focus-ring)",
 		);
 	});
 
@@ -633,7 +724,26 @@ describe("HTML-FINISH profile row 15 — the tile value sits ABOVE its label", (
 	});
 });
 
-describe("HTML-FINISH profile rows 6 · 14 · 17 — the positions grid", () => {
+describe("POSREV-1 rows 6 · 14 · 17 — the positions grid, re-cut per ARGUMENT", () => {
+	/**
+	 * ⚠⚠ THIS BLOCK REPLACES THE HTML-FINISH rows 6 · 14 · 17 SUITE, AND EVERY
+	 * ROW IT DROPPED WAS DROPPED BY A FOUNDER RULING RATHER THAN BY CONVENIENCE.
+	 * The four it asserted are recorded here so a later reader can tell a deletion
+	 * from an omission:
+	 *
+	 *   row6::status-and-sell-live-INSIDE-the-position-cell — RF-12 DELETES the
+	 *     status token outright and RF-5 gives Sell its own column, so the cell
+	 *     that held both now holds only the side.
+	 *   row6::the-status-badge-survives-on-EVERY-row (A-8) — INVERTED. It rested
+	 *     on SPEC.1 §23's "status Open / Closed by market state"; RF-12 rules that
+	 *     market status renders NOWHERE. ⛔ THE SPEC STILL SAYS OTHERWISE and the
+	 *     conflict is REPORTED, not papered over — `struck-and-held.test.tsx`
+	 *     carries the inverted guard and the note.
+	 *   row6::there-is-no-trailing-action-column — REVERSED: there is one, and it
+	 *     is `Sell`.
+	 *   row14::the-empty-arrow-track-is-FOURTH-of-five — the track went with the
+	 *     `Staked` column it separated. One value column needs no relation glyph.
+	 */
 	const OWNER_PAYLOAD = {
 		owner: true as const,
 		rows: [
@@ -642,139 +752,91 @@ describe("HTML-FINISH profile rows 6 · 14 · 17 — the positions grid", () => 
 		],
 	};
 
-	it("row6::status-and-sell-live-INSIDE-the-position-cell", () => {
+	it("grid::the-OPEN-tab-is-Position-Argument-Current-Sell", () => {
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		const positionCell = cellsOf(M1)[0];
+		const heads = [
+			...screen.getByTestId("positions-table").querySelectorAll("thead th"),
+		].map((th) => (th.textContent ?? "").trim());
+		expect(heads).toEqual(["Position", "Argument", "Current", "Sell"]);
+	});
+
+	it("grid::the-CLOSED-tab-is-Position-Argument-Staked-Opened", () => {
+		// ⛔ NO `Current` — it would read `Đ 0` on every single row, which is a
+		// column that costs a read and answers nothing. ⛔ NO `Sell` — there is
+		// nothing left to sell.
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-status-closed"));
+		const heads = [
+			...screen.getByTestId("positions-table").querySelectorAll("thead th"),
+		].map((th) => (th.textContent ?? "").trim());
+		expect(heads).toEqual(["Position", "Argument", "Staked", "Opened"]);
+	});
+
+	it("grid::every-tile-has-FOUR-cells-and-no-arrow-track", () => {
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const cells = cellsOf(L1);
+		expect(cells.length).toBe(4);
+		// The `→` survives on the GROUP HEADER, where it still relates two figures.
+		// Asserting its absence from the tile AND its presence on the header is what
+		// distinguishes "moved" from "deleted".
+		expect(cells.map((c) => (c.textContent ?? "").trim())).not.toContain("→");
+		expect(
+			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "",
+		).toContain("→");
+	});
+
+	it("grid::the-position-cell-carries-the-side-and-NOTHING-else", () => {
+		// ⛔ RF-12: no status chip, no Exited/Flipped/Voided/Sold marker, nothing
+		// that adds read cost. The side word and its glyph, and that is all.
+		render(<PositionsTable payload={OWNER_PAYLOAD} />);
+		const positionCell = cellsOf(L1)[0];
 		if (positionCell === undefined) {
-			throw new Error("row6: the row rendered no cells");
+			throw new Error("grid: the tile rendered no cells");
 		}
-		// Containment, not mere presence — the whole row moves both controls from
-		// a trailing fifth column into the FIRST cell, so a `getByTestId` alone
-		// would pass on the pre-change build.
+		expect((positionCell.textContent ?? "").trim()).toBe("Yes");
 		expect(
-			positionCell.contains(screen.getByTestId(`position-side-${M1}`)),
-		).toBe(true);
-		expect(
-			positionCell.contains(screen.getByTestId(`position-status-${M1}`)),
-			`row 6: the status badge is not inside the Position cell. It is still ` +
-				`in the deleted trailing action column.`,
-		).toBe(true);
-		expect(
-			positionCell.contains(screen.getByTestId(`sell-trigger-${M1}`)),
-		).toBe(true);
+			positionCell.querySelector('[data-testid^="position-status-"]'),
+		).toBeNull();
+		// ⚠ THE POSITIVE CONTROL for the negative above: the cell IS being read,
+		// and it does contain the glyph — so "no status node" is a real absence
+		// rather than an empty selector.
+		expect(positionCell.querySelector("svg")).not.toBeNull();
 	});
 
-	it("row6::the-status-badge-survives-on-EVERY-row-A-8", () => {
-		// A-8 STRUCK "drop the per-row status token" on tier 1 (SPEC.1 §23:
-		// "status Open / Closed by market state"). The mockup shows `Closed` only
-		// on closed rows; both statuses must carry a badge here.
-		//
-		// ⚠ TWO RENDERS, NOT ONE, and the reason is the item-11 status filter:
-		// `PositionsTable` derives its initial status from the rows and shows ONE
-		// status at a time, so a single render of a mixed payload can never have
-		// both rows on screen. The first draft of this guard asserted both from
-		// one render and RED-ed — recorded because that red was the guard being
-		// wrong about the surface, not the surface being wrong.
+	it("grid::SELL-sits-in-its-own-trailing-column-on-a-sellable-tile", () => {
+		// ⛔ REVERSED FROM `row6::there-is-no-trailing-action-column`. RF-4 gives
+		// Sell the far-right slot, because RF-5 makes it a per-ARGUMENT control and
+		// the Position cell no longer has room for a button under one word.
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		expect(screen.getByTestId(`position-status-${M1}`).textContent).toBe(
-			"Open",
-		);
-		cleanup();
-		render(
-			<PositionsTable
-				payload={{
-					owner: true,
-					rows: [{ ...ROW_SETTLED, sellEligible: false }],
-				}}
-			/>,
-		);
-		expect(screen.getByTestId(`position-status-${M2}`).textContent).toBe(
-			"Closed",
-		);
+		const cells = cellsOf(L1);
+		const sellCell = cells[3];
+		expect(
+			sellCell?.querySelector(`[data-testid="tile-sell-${L1}"]`),
+		).not.toBeNull();
 	});
 
-	it("row6::there-is-no-trailing-action-column", () => {
+	it("grid::the-headers-and-the-value-cell-centre-over-their-columns", () => {
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		const headers = [
-			...screen.getByTestId("positions-table").querySelectorAll("th"),
-		];
-		expect(headers.length).toBe(5);
-		// The LAST header is `Current`, not an empty action slot. This is the
-		// assertion that catches a re-added action column.
-		expect(headers[4]?.textContent).toBe("Current");
-		const cells = cellsOf(M1);
-		expect(cells.length).toBe(5);
-		expect(cells[4]?.textContent).toContain("31");
+		for (const th of screen
+			.getByTestId("positions-table")
+			.querySelectorAll("thead th")) {
+			expect(th.className).toContain("text-center");
+		}
+		expect(cellsOf(L1)[2]?.className).toContain("text-center");
 	});
 
-	it("row14::the-empty-arrow-track-is-FOURTH-of-five-not-fifth", () => {
+	it("grid::the-CURRENT-cell-stacks-value-over-delta-over-from", () => {
+		// RF-4's three lines, in order. ⚠ ASSERTED AS AN ORDERED LIST OF NODES, not
+		// as a flattened string: `textContent` cannot see a column, and the whole
+		// point of the cell is that the three figures sit one above another.
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		const headers = [
-			...screen.getByTestId("positions-table").querySelectorAll("th"),
-		];
-		expect(headers.map((h) => h.textContent)).toEqual([
-			"Position",
-			"Argument",
-			"Staked",
-			"",
-			"Current",
+		const stack = cellsOf(L1)[2]?.firstElementChild;
+		expect(stack?.className).toContain("flex-col");
+		expect([...(stack?.children ?? [])].map((c) => c.textContent)).toEqual([
+			"Đ 31",
+			"(+Đ 6)",
+			"from Đ 25",
 		]);
-		// And the ROW's arrow cell sits in the same slot, carrying the glyph.
-		const arrow = cellsOf(M1)[3];
-		expect(arrow?.textContent).toBe("→");
-		expect(arrow?.getAttribute("aria-hidden")).toBe("true");
-	});
-
-	it("row14::POSITIVE-CONTROL-the-pre-change-header-order-fails", () => {
-		// ⚠ PROOF BY REVERSAL over the REAL pre-change order. The build's empty
-		// `<th>` was FIFTH; the same equality is false against it.
-		const before = ["Position", "Argument", "Staked", "Current", ""];
-		expect(before).not.toEqual([
-			"Position",
-			"Argument",
-			"Staked",
-			"",
-			"Current",
-		]);
-	});
-
-	it("row17::the-four-named-headers-centre-over-their-cells", () => {
-		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		const headers = [
-			...screen.getByTestId("positions-table").querySelectorAll("th"),
-		];
-		for (const th of headers) {
-			if ((th.textContent ?? "") === "") {
-				continue; // the arrow track carries no label to centre
-			}
-			expect(
-				th.className.split(/\s+/),
-				`row 17: header "${th.textContent}" is not centred over its cell.`,
-			).toContain("text-center");
-		}
-		// The TABLE keeps `text-left` — only headers and the two value cells
-		// centre; the Argument cell's prose must stay left.
-		expect(
-			screen.getByTestId("positions-table").className.split(/\s+/),
-		).toContain("text-left");
-	});
-
-	it("row17::the-two-value-cells-stack-and-centre-their-contents", () => {
-		render(<PositionsTable payload={OWNER_PAYLOAD} />);
-		const cells = cellsOf(M1);
-		for (const index of [2, 4]) {
-			const cell = cells[index];
-			const inner = cell?.firstElementChild;
-			if (inner == null) {
-				throw new Error(`row17: value cell ${index} has no inner element`);
-			}
-			// The mockup's `.pnum` is a CENTRED COLUMN (`:296-297`) — the slot the
-			// B-1 entry %/live % land in if the DTO ever carries them.
-			const classes = inner.className.split(/\s+/);
-			expect(classes).toContain("flex");
-			expect(classes).toContain("flex-col");
-			expect(classes).toContain("items-center");
-		}
 	});
 });
 
@@ -879,10 +941,16 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		expect(trigger.tagName).toBe("BUTTON");
 		expect(trigger.getAttribute("aria-haspopup")).toBe("listbox");
 		expect(trigger.getAttribute("aria-expanded")).toBe("false");
-		// ⛔ The label is canon §6's `Select market ▾`, and the caret is
-		// BYTE-CARRIED — U+25BE, asserted by CODE POINT so a lookalike reddens.
+		// ⚠⚠ THE LABEL IS STATE, NOT A PROMPT — POSREV-1 RF-1. It read
+		// `Select market ▾` permanently, so after choosing a market the control
+		// still asked the reader to choose one and the only way to find out which
+		// was selected was to open it. With none chosen it now reads `All markets`
+		// — which is also the exact string of the option that produces that state,
+		// so the label and the list agree by construction rather than by copy.
+		// ⛔ THE CARET IS UNCHANGED and still BYTE-CARRIED — U+25BE, asserted by
+		// CODE POINT so a lookalike reddens.
 		const label = trigger.textContent ?? "";
-		expect(label).toBe("Select market ▾");
+		expect(label).toBe("All markets ▾");
 		expect(label.codePointAt(label.length - 1)).toBe(0x25be);
 
 		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
@@ -897,6 +965,18 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 				.querySelector('[data-testid="positions-market-option-all"]')
 				?.getAttribute("aria-selected"),
 		).toBe("true");
+	});
+
+	it("row7a::the-label-BECOMES-the-chosen-market (RF-1)", () => {
+		// ⛔ THE HALF THAT MAKES IT STATE RATHER THAN A PROMPT, and it is a separate
+		// row because "it says All markets at rest" passes on a control whose label
+		// never moves at all.
+		render(<PositionsTable payload={PAYLOAD} />);
+		fireEvent.click(screen.getByTestId("positions-market-filter"));
+		fireEvent.click(screen.getByTestId(`positions-market-option-${M1}`));
+		expect(screen.getByTestId("positions-market-filter").textContent).toBe(
+			`${ROW_OPEN.marketTitle} ▾`,
+		);
 	});
 
 	it("row7a::ESC-closes-the-popover-canon-§5", () => {
@@ -924,7 +1004,15 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		// Two, and only two — item 11 (P5-D17a) removed `All` and this row must
 		// not reintroduce it by widening the control.
 		expect(buttons.length).toBe(2);
-		expect(buttons.map((b) => b.textContent)).toEqual(["Open", "Closed"]);
+		// ⚠ `Closed` CARRIES A COUNT (RF-7), so its label is the word plus a
+		// number. The WORDS are unchanged — RF-13 is explicit that they stay
+		// exactly `Open` and `Closed` — so the count is read off its own node and
+		// the word is what is compared here.
+		expect(buttons.map((b) => b.firstChild?.textContent)).toEqual([
+			"Open",
+			"Closed",
+		]);
+		expect(screen.getByTestId("positions-closed-count").textContent).toBe("1");
 		// `aria-pressed` carries the selection — the state a `<select>` supplied
 		// in `.value` and a hand-rolled pair must declare.
 		expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
@@ -936,11 +1024,11 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		// behaviour, because a control that looks right and filters nothing is
 		// precisely the defect a shape-only guard ships.
 		render(<PositionsTable payload={PAYLOAD} />);
-		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
-		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L1}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${L2}`)).toBeNull();
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
-		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${L1}`)).toBeNull();
 	});
 
 	it("row7a::the-popover-still-DRIVES-the-market-filter", () => {
@@ -949,94 +1037,86 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		fireEvent.click(screen.getByTestId(`positions-market-option-${M2}`));
 		// M2 is Closed and the status filter is Open, so choosing it empties the
 		// table — the filter-scoped empty, not the "you hold nothing" one.
-		expect(screen.getByTestId("positions-empty-filtered")).toBeTruthy();
+		expect(screen.getByTestId("positions-empty-tab")).toBeTruthy();
 		// …and choosing closes the popover.
 		expect(screen.queryByTestId("positions-market-popover")).toBeNull();
 	});
 });
 
-describe("HTML-FINISH profile row 10 — the market question sits under the argument title", () => {
+describe("POSREV-1 RF-3 — the market question moved to the GROUP HEADER", () => {
+	/**
+	 * ⚠⚠ THIS BLOCK REPLACES HTML-FINISH row 10 + row 13, AND IT IS AN INVERSION
+	 * RATHER THAN A DELETION. Those rows asserted the market question sits in the
+	 * ARGUMENT cell as a sub-line under the title, and that it links to the market
+	 * as a SIBLING of the title link. Both were right for a table whose unit was
+	 * the market. RF-3 changes the unit to the ARGUMENT and groups tiles under a
+	 * market header — at which point the sub-line prints the same question once
+	 * per argument held in that market, which is the duplication the whole revamp
+	 * exists to remove.
+	 *
+	 * ⇒ Every property those rows protected is preserved ON THE HEADER: the
+	 * question renders, it links to the market (not to a thread), and it survives
+	 * a REMOVED argument — which was row 13's sharpest case, because the market
+	 * has to stay reachable exactly when its argument cannot be read.
+	 */
 	const VISITOR_PAYLOAD = {
 		owner: false as const,
 		rows: [ROW_OPEN, ROW_SETTLED],
 	};
 
-	it("row10::market-question-is-in-the-ARGUMENT-cell-not-the-POSITION-cell", () => {
+	it("rf3::the-question-is-NOT-in-the-argument-cell-any-more", () => {
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const cells = cellsOf(M1);
-		const positionCell = cells[0];
-		const argumentCell = cells[1];
-		const marketLine = screen.getByTestId(`position-market-${M1}`);
-		expect(marketLine.textContent).toBe("Market fixture-alpha");
-		expect(
-			argumentCell?.contains(marketLine),
-			`row 10: the market question is not in the Argument cell.`,
-		).toBe(true);
-		expect(
-			positionCell?.contains(marketLine),
-			`row 10: the market question is STILL in the Position cell — the move ` +
-				`did not happen, or it was duplicated rather than moved.`,
-		).toBe(false);
+		const argCell = cellsOf(L1)[1];
+		expect(argCell?.textContent ?? "").not.toContain(ROW_OPEN.marketTitle);
 	});
 
-	it("row10::it-sits-immediately-AFTER-the-title-link", () => {
+	it("rf3::it-is-on-the-group-header-exactly-ONCE-per-market", () => {
+		// ⚠ THE COUNT IS THE ASSERTION. Two arguments in one market must produce
+		// ONE question on screen — "it renders" would pass on the very duplication
+		// this row removes.
+		const twoArgs = {
+			owner: false as const,
+			rows: [
+				{
+					...ROW_OPEN,
+					lots: [
+						LOT(L1, "YES", true, OPENER_CELL),
+						LOT(L3, "YES", true, OPENER_CELL_2),
+					],
+					quantity: "20.000000000000000000",
+				},
+			],
+		};
+		const { container } = render(<PositionsTable payload={twoArgs} />);
+		expect(screen.getAllByTestId(`position-tile-${L1}`).length).toBe(1);
+		expect(screen.getByTestId(`position-tile-${L3}`)).toBeTruthy();
+		const occurrences =
+			(container.textContent ?? "").split(ROW_OPEN.marketTitle).length - 1;
+		expect(occurrences).toBe(1);
+	});
+
+	it("rf3::the-header-question-links-to-the-MARKET-not-to-a-thread", () => {
+		// Canon §7 item 6: "market title → overview". ⛔ NOT `?post=` — that is a
+		// thread deep link and is the ARGUMENT title's target, which is the
+		// distinction row 13 minted and this preserves.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const marketLine = screen.getByTestId(`position-market-${M1}`);
-		// The mockup's `.pcellt` is `[.ptitle][.pmkt]` — the question is the
-		// title's sub-line, so index 1 among the cell's element children.
-		expect(indexOf(marketLine)).toBe(1);
-		expect(marketLine.previousElementSibling?.tagName).toBe("A");
+		const link = screen.getByTestId(`positions-group-title-${M1}`);
+		expect(link.tagName).toBe("A");
+		expect(link.getAttribute("href")).toBe(`/m/${ROW_OPEN.marketSlug}`);
+		expect(link.getAttribute("href")).not.toContain("?post=");
 	});
 
-	it("row13::the-market-question-links-to-its-MARKET-not-to-a-thread", () => {
+	it("rf3::the-market-stays-reachable-on-a-REMOVED-argument", () => {
+		// ⚠⚠ ROW 13'S SHARPEST CASE, KEPT. `marketTitle` is market METADATA, not
+		// user argument text, so no masking obligation attaches (SC-1 governs
+		// `comments.body` and its derivations). Suppressing it on a removed
+		// argument would drop the market question from exactly the tiles whose
+		// argument the reader cannot see — where the context matters most.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const marketLink = screen.getByTestId(`position-market-${M1}`);
-		expect(marketLink.tagName).toBe("A");
-		// Canon §7 item 6: "market title → overview". The market OVERVIEW, with
-		// no `?post=` — that query is the ARGUMENT title's target, and before
-		// this row every link on the surface carried it.
-		expect(marketLink.getAttribute("href")).toBe("/m/fixture-alpha");
-		expect(marketLink.getAttribute("href")).not.toContain("?post=");
-	});
-
-	it("row13::it-is-a-SIBLING-of-the-title-link-never-nested", () => {
-		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const marketLink = screen.getByTestId(`position-market-${M1}`);
-		const titleLink = screen
-			.getByTestId(`position-arg-${M1}`)
-			.querySelector("a[href*='?post=']");
-		if (titleLink === null) {
-			throw new Error("row13: the argument title link is missing");
-		}
-		// Anchors cannot nest — a nested one is invalid HTML and the inner target
-		// becomes unreachable. Asserted in BOTH directions.
-		expect(titleLink.contains(marketLink)).toBe(false);
-		expect(marketLink.contains(titleLink)).toBe(false);
-	});
-
-	it("row13::the-market-stays-reachable-on-a-REMOVED-opener", () => {
-		// `marketSlug` is present on BOTH arms of `ProfileArgumentCell`, so the
-		// navigation survives masking: the market is reachable when its argument
-		// is not. That is the point of masking CONTENT rather than rows.
-		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
-		const marketLink = screen.getByTestId(`position-market-${M2}`);
-		expect(marketLink.tagName).toBe("A");
-		expect(marketLink.getAttribute("href")).toBe("/m/fixture-beta");
-	});
-
-	it("row10::it-renders-on-the-REMOVED-row-too", () => {
-		// `marketTitle` is `markets.title` — market metadata, not argument text —
-		// so SC-1 attaches no masking obligation, and MOVING a per-row element
-		// means it must still appear on every row. Suppressing it here would drop
-		// the market question from exactly the rows whose argument is hidden.
-		// A CLOSED-ONLY payload: the item-11 status filter derives its initial
-		// value from the rows, so the settled row is only on screen when it is
-		// the only class present.
-		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
-		const removedCell = screen.getByTestId(`position-arg-removed-${M2}`);
-		const marketLine = screen.getByTestId(`position-market-${M2}`);
-		expect(removedCell.contains(marketLine)).toBe(true);
-		expect(marketLine.textContent).toBe("Market fixture-beta");
+		fireEvent.click(screen.getByTestId("positions-status-closed"));
+		expect(screen.getByTestId(`tile-arg-removed-${L2}`)).toBeTruthy();
+		const link = screen.getByTestId(`positions-group-title-${M2}`);
+		expect(link.getAttribute("href")).toBe(`/m/${ROW_SETTLED.marketSlug}`);
 	});
 });
 
@@ -1362,82 +1442,76 @@ describe("HTML-FINISH profile row 19 — the Arguments breakdown is its own elem
 	});
 });
 
-describe("ROUND 5 item D — Đ on the positions table's two value cells", () => {
+describe("POSREV-1 item D — Đ on the positions table's value figures", () => {
+	/**
+	 * ⚠⚠ THIS BLOCK REPLACES ROUND 5 ITEM D, AND THE LAW IT PROTECTS IS INTACT.
+	 * Item D closed a real defect: the two value cells printed bare digits beside
+	 * five tiles and four argument-head figures that all carried Đ, so the one
+	 * place on the surface where two Đ quantities sat side by side was the one
+	 * place that did not say so.
+	 *
+	 * What moved is WHERE those two quantities live. RF-4 deletes the `Staked`
+	 * column — Đa belongs to the MARKET, so it went to the group header — and the
+	 * arrow track went with it, because one value column has no relation to state.
+	 * So item D's "both value CELLS" becomes "both value FIGURES": one on the
+	 * header, one on the tile. ⛔ The all-of-them-or-none discipline is kept in one
+	 * test rather than split, for the reason item D gave: a pair of separate tests
+	 * can go half-green and read as "mostly passing".
+	 */
 	const VISITOR_PAYLOAD = { owner: false as const, rows: [ROW_OPEN] };
 
-	/** The Staked and Current cells, by their fixed positions in the five-column
-	 * grid (Position · Argument · Staked · ␣ · Current — row 14's order). */
-	const valueCells = () => {
-		const cells = cellsOf(M1);
-		return { staked: cells[2], current: cells[4] };
-	};
-
-	it("itemD::BOTH-value-cells-carry-the-glyph", () => {
-		// ⛔ ALL OF THEM OR NONE. A half-applied glyph is the round-3 defect this
-		// item exists to close, so both cells are asserted in ONE test — a pair of
-		// separate tests can go half-green and read as "mostly passing".
+	it("itemD::BOTH-value-figures-carry-the-glyph", () => {
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const { staked, current } = valueCells();
-		for (const [name, cell] of [
-			["Staked", staked],
-			["Current", current],
+		const header = screen.getByTestId(`positions-group-figures-${M1}`);
+		const current = cellsOf(L1)[2];
+		for (const [name, node] of [
+			["group header", header],
+			["tile Current", current],
 		] as const) {
-			const text = (cell?.textContent ?? "").trim();
-			// ⛔ BY CODE POINT, not by pasting the character: U+0110 has lookalikes
-			// (Ð U+00D0 ETH) that are visually identical in many faces.
+			const t = (node?.textContent ?? "").trim();
 			expect(
-				text.codePointAt(0),
-				`item D: the ${name} cell must start with Đ (U+0110). Got "${text}".`,
+				t.codePointAt(0),
+				`item D: the ${name} figure must start with Đ (U+0110). Got "${t}".`,
 			).toBe(0x110);
-			// …and the SHIPPED spacing — `Đ 25`, never `Đ25`.
-			expect(text.slice(0, 2)).toBe("Đ ");
-			expect(text.length).toBeGreaterThan(2);
 		}
 	});
 
-	it("itemD::the-rendered-strings-are-exactly-the-mockup's-shape", () => {
-		// The mockup reads `Đ 240 → Đ 310 (+Đ70)` (`:556`, `:558`). The fixture's
-		// own figures, in that shape.
-		// ⚠⚠ PROFILE-FULL — THE CURRENT CELL NOW CARRIES ITS P/L DELTA, so this
-		// assertion follows the mockup one step further rather than being loosened.
-		// It is still an EXACT full-cell `textContent` pin — the delta is asserted
-		// as part of the string, not excluded from it, so a wrong sign, a wrong
-		// magnitude or a stray space all still red.
-		// ⚠⚠ THE DELTA'S SPACING MOVED AT POSREV-1 RF-4, and the expectation is
-		// updated to the new form WITH its reason rather than restored. This pinned
-		// `Đ 31(+Đ6)` — the mockup's own tight `plShort` density, faithfully
-		// carried. The founder ruled one density for this surface: the delta sits
-		// INSIDE the cell whose own figure is spaced, so the two spellings put the
-		// same glyph two characters apart. ⛔ The pin stays EXACT and full-cell —
-		// a wrong sign, a wrong magnitude or a stray space all still red it.
+	it("itemD::the-rendered-strings-are-exactly-the-expected-shape", () => {
+		// The header states the market's move; the tile states this argument's.
+		// ⚠ NO SPACE BEFORE THE `(` — the gap there is the wrapper's flex `gap`,
+		// not a text node, so `textContent` has never carried one (POSREV-1 S2
+		// established this after encoding it wrongly once).
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const { staked, current } = valueCells();
-		expect((staked?.textContent ?? "").trim()).toBe("Đ 25");
-		// ⚠ NO SPACE BEFORE THE `(`, AND THAT IS THE DOM RATHER THAN AN OVERSIGHT.
-		// The gap between the figure and its delta is the wrapper's `gap-1.5`, a
-		// FLEX gap — there is no text node between them, so `textContent` has never
-		// carried one and RF-4 does not ask for one. RF-4 governs `Đ` followed by a
-		// DIGIT. Writing `Đ 31 (+Đ 6)` here was tried and reddened: it encodes a
-		// space the layout provides and the string does not.
-		expect((current?.textContent ?? "").trim()).toBe("Đ 31(+Đ 6)");
-		// …and the delta is the DISPLAYED-space difference of the two cells beside
-		// it, which is the §10.8 identity this amendment admits: 31 − 25 = 6, true
-		// of the figures actually on screen.
-		expect((current?.textContent ?? "").trim()).toContain("+Đ 6");
+		expect(
+			(
+				screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? ""
+			).trim(),
+		).toBe("Đ 25 → Đ 31");
+		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe(
+			"Đ 31(+Đ 6)from Đ 25",
+		);
 	});
 
-	it("itemD::the-ARROW-track-between-them-takes-no-glyph", () => {
-		// It is a relation, not a quantity — and it is `aria-hidden`.
+	it("itemD::the-ARROW-survives-on-the-HEADER-where-it-still-relates-two-figures", () => {
+		// ⛔ IT IS GONE FROM THE TILE and that is the point: a relation glyph
+		// between one value and nothing states nothing. Asserting its presence on
+		// the header AND its absence from the tile is what distinguishes "moved"
+		// from "deleted", which are different outcomes with the same green.
+		// The glyph is BYTE-CARRIED — U+2192, asserted by code point.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const arrow = cellsOf(M1)[3];
-		expect((arrow?.textContent ?? "").trim()).toBe("→");
+		const header =
+			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "";
+		expect(header).toContain("→");
+		expect(header.codePointAt(header.indexOf("→"))).toBe(0x2192);
+		for (const cell of cellsOf(L1)) {
+			expect(cell.textContent ?? "").not.toContain("→");
+		}
 	});
 
 	it("itemD::formatDharma-still-wraps-the-value-so-DROUND-holds", () => {
 		// The glyph is a sibling TEXT NODE, not a change to the formatter, so
-		// `no-raw-dharma-render` sees the same wrapped call. Proven by the
-		// GROUPING surviving: a bare `{row.staked}` would print the raw
-		// NUMERIC(38,18) string.
+		// `no-raw-dharma-render` sees the same wrapped call. Proven by the GROUPING
+		// surviving: a bare `{row.staked}` would print the raw NUMERIC(38,18).
 		render(
 			<PositionsTable
 				payload={{
@@ -1452,17 +1526,17 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 				}}
 			/>,
 		);
-		const { staked, current } = valueCells();
-		expect((staked?.textContent ?? "").trim()).toBe("Đ 14,260");
-		// ⚠ PROFILE-FULL — the delta rides the Current cell, and it is GROUPED by
-		// the same `groupInteger` the two operands use: 3,226 − 14,260 = −11,034.
-		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried from the
-		// mockup's `plShort()` (`:677`), the same glyph the Net P/L tile emits.
-		// POSREV-1 RF-4 spacing, same supersession as the pin above. ⛔ The GROUPING
-		// is what this test is actually for and is untouched: a bare `{row.staked}`
-		// would print the raw NUMERIC(38,18) string, so the commas are the proof
-		// that `formatDharma` still wraps the value.
-		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226(−Đ 11,034)");
+		expect(
+			(
+				screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? ""
+			).trim(),
+		).toBe("Đ 14,260 → Đ 3,226");
+		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried by the
+		// formatter. The tile's own delta is against its SURVIVING basis (25), not
+		// against the market's Đa, which is the RF-4 distinction.
+		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe(
+			"Đ 3,226(+Đ 3,201)from Đ 25",
+		);
 	});
 
 	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {

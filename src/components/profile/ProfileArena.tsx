@@ -47,12 +47,21 @@ import { initialProfileSelection, type ProfileSelection } from "./selection";
  */
 export function ProfileArena({
 	positions,
+	positionsValue,
 	argumentItems,
 	owner,
 	author,
 	initialMarketSlug,
 }: {
 	positions: ProfilePositionsPayload;
+	/**
+	 * POSREV-1 RF-15 level 1 — the §23 Positions-value tile's EXACT figure,
+	 * passed straight through so the group headers are allocated from the very
+	 * string the tile renders. This band holds no opinion about it; it is here
+	 * only because the tile and the table live in different halves of the page
+	 * and one number has to reach both.
+	 */
+	positionsValue: string;
 	argumentItems: ProfileArgumentItem[];
 	owner: boolean;
 	author: ProfileUser;
@@ -80,6 +89,7 @@ export function ProfileArena({
 		<>
 			<PositionsTable
 				payload={positions}
+				positionsValue={positionsValue}
 				initialMarketSlug={initialMarketSlug}
 				onSelect={setSelection}
 			/>

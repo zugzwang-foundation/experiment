@@ -1,7 +1,13 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { PositionsTable } from "@/components/profile/PositionsTable";
@@ -122,7 +128,7 @@ function post(
 describe("POSREV-1 RF-4 — every Đ on this surface carries its space", () => {
 	it("renders the P/L delta as `+Đ <n>`, not `+Đ<n>`", () => {
 		render(<PositionsTable payload={payload(row())} />);
-		const pl = screen.getByTestId(`position-pl-${M1}`);
+		const pl = screen.getByTestId(`tile-pl-${M1}`);
 		// staked 150 → current 151 ⇒ +1. The parenthesis and the sign are the
 		// cell's, the space is RF-4's.
 		expect(pl.textContent).toBe("(+Đ 1)");
@@ -130,7 +136,7 @@ describe("POSREV-1 RF-4 — every Đ on this surface carries its space", () => {
 
 	it("renders a LOSS the same way, with U+2212 and a space", () => {
 		render(<PositionsTable payload={payload(row({ current: dp18("138") }))} />);
-		const pl = screen.getByTestId(`position-pl-${M1}`);
+		const pl = screen.getByTestId(`tile-pl-${M1}`);
 		// ⚠ U+2212 MINUS, not the ASCII hyphen — byte-carried by the formatter.
 		expect(pl.textContent).toBe("(−Đ 12)");
 	});
@@ -140,7 +146,7 @@ describe("POSREV-1 RF-4 — every Đ on this surface carries its space", () => {
 		// else; a build that "fixed the formatting" by signing everything would
 		// pass both tests above and fail here. `Đ 0`, never `+Đ 0`.
 		render(<PositionsTable payload={payload(row({ current: dp18("150") }))} />);
-		const pl = screen.getByTestId(`position-pl-${M1}`);
+		const pl = screen.getByTestId(`tile-pl-${M1}`);
 		expect(pl.textContent).toBe("(Đ 0)");
 	});
 

@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — the arena mounts `PositionsTable`, which now owns the inline sell
+// and therefore calls `useRouter` for its post-sale `refresh()`. Nothing here
+// submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileArena } from "@/components/profile/ProfileArena";
@@ -402,6 +409,11 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		render(
 			<ProfileArena
 				positions={{ owner: false, rows: ROWS }}
+				// POSREV-1 RF-15 level 1 — the tile's exact figure. This suite does not
+				// exercise the identity; the prop is required so the arena cannot be
+				// mounted without one, which is what keeps the tile and the headers
+				// derived from a single number.
+				positionsValue="0.000000000000000000"
 				argumentItems={ITEMS}
 				owner={false}
 				author={USER}
@@ -425,7 +437,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// the panel. Asserted on the row that is NOT the mount default, so it is a
 		// real transition rather than a no-op.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_REPLY}`));
+		fireEvent.click(screen.getByTestId(`position-tile-${M_REPLY}`));
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
@@ -439,7 +451,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// zero-row filter and every call site that passes no selection still reach
 		// it); it is simply no longer where a second click goes.
 		mount();
-		const row = screen.getByTestId(`position-row-${M_REPLY}`);
+		const row = screen.getByTestId(`position-tile-${M_REPLY}`);
 		fireEvent.click(row);
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		fireEvent.click(row);
@@ -470,7 +482,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// The derived-selection rule reaching the OTHER side of the arena: a panel
 		// filtered to a row that is no longer on screen would be unexplainable.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_POST}`));
+		fireEvent.click(screen.getByTestId(`position-tile-${M_POST}`));
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
 		expect(screen.getByTestId("argument-list")).toBeTruthy();
