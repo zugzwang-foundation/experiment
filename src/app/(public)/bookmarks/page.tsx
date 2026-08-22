@@ -209,26 +209,10 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 				{viewer === null ? (
 					<div data-testid="bookmarks-identity-unresolved" />
 				) : (
-					/* ⚠⚠ PROFILE REFINEMENT · R2 — THIS ROUTE IS THE MOCKUP'S BOOKMARK
-					   MODE, and the toggle is told so. The band's bookmark control renders
-					   FILLED here and points back at the profile, which is the second half
-					   of the two-state switch the profile's own control starts.
-					   ⛔ `profileHref` COMES FROM THE RESOLVED VIEWER, never from a param:
-					   this route has no `[pseudonym]` segment and must not grow one, and
-					   `viewer` is `resolveProfileUser(session.pseudonym)` — the same row
-					   the band is already drawing. So the way back is the viewer's OWN
-					   profile by construction, and it cannot point at anyone else's.
-					   ⚠ THE ONE WART NAMED AT ROUND 3 IS NOW FIXED RATHER THAN REPORTED:
-					   that note said the owner arm's bookmark icon "is a self-link on THIS
-					   route, so it is reported rather than special-cased". It is no longer
-					   a self-link — it is the way out. */
-					<IdentityCard
-						user={viewer}
-						owner={true}
-						tiles={tiles}
-						bookmarksActive
-						profileHref={`/u/${encodeURIComponent(viewer.pseudonym)}`}
-					/>
+					// UNWIRE-1 — `bookmarksActive`/`profileHref` dropped: `IdentityCard`
+					// no longer renders a bookmark-mode-switch control at all (SUB-2).
+					// This whole route dies at E5; kept compiling only until then.
+					<IdentityCard user={viewer} owner={true} tiles={tiles} />
 				)}
 			</div>
 			{/* ⚠⚠ ROUND 3 C3 — THE ARENA BAND, byte-carried from Profile's

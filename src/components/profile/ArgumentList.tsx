@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import {
 	computeSplitBar,
@@ -59,25 +58,10 @@ export function ArgumentList({
 	items,
 	owner,
 	author,
-	bookmarks = null,
 	selection = null,
 }: {
 	items: ProfileArgumentItem[];
 	owner: boolean;
-	/**
-	 * PROFILE REFINEMENT · R4 — the viewer's bookmark affordance for these
-	 * arguments, for the shipped `CardActions` cluster on each card head.
-	 *
-	 * ⚠ DEFAULTS TO `null` (= signed out), which is the honest default rather than a
-	 * convenient one: a call site that passes nothing genuinely knows nothing about
-	 * the viewer, and `null` makes the icon render its shipped DISABLED "sign in to
-	 * use" cell. That is what every render suite gets, and it is true of them.
-	 * ⛔ OPTIONAL, unlike `author` above, and the asymmetry is deliberate: omitting
-	 * `author` would silently drop a whole identity cluster, whereas omitting this
-	 * degrades one control to a state that already exists and is already correct for
-	 * an unknown viewer.
-	 */
-	bookmarks?: BookmarkAffordance;
 	/**
 	 * HTML-FINISH row 4 — the head cluster's avatar + pseudonym. Every argument
 	 * on this surface is authored by the PROFILE USER (that is what the list is),
@@ -166,7 +150,7 @@ export function ArgumentList({
 						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
 					</Card>
 				) : (
-					<ReplicaCard item={picked} author={author} bookmarks={bookmarks} />
+					<ReplicaCard item={picked} author={author} />
 				)}
 			</ArgumentsPanel>
 		);
@@ -191,7 +175,7 @@ export function ArgumentList({
 							data-testid={`argument-${item.id}`}
 							className="gap-2 p-3"
 						>
-							<PresentHead item={item} author={author} bookmarks={bookmarks} />
+							<PresentHead item={item} author={author} />
 							<Link
 								data-testid={`argument-title-${item.id}`}
 								href={`/m/${item.marketSlug}?post=${item.ordinal}`}
@@ -421,27 +405,11 @@ function RemovedHead({
  * (`:624-628`). Shared by the list card and item 7's replica — see `RemovedHead`
  * above for why sharing is a requirement rather than a tidy-up.
  *
- * ⛔⛔ THE CARD-ACTIONS CLUSTER WAS RECORDED HERE AS DATA-BLOCKED. IT IS NOT, AND
- * PROFILE REFINEMENT · R4 DISCHARGES IT. The note read: "`CardActions` requires a
- * `BookmarkAffordance`; `ProfileArgumentItem` carries none, and the only reader
- * that produces one — `loadViewerMarketContext` — is MARKET-scoped while this list
- * is cross-market." Every clause of that is true. The conclusion was still wrong,
- * because the search stopped at one producer: **`loadBookmarks` is the other, and
- * it is viewer-scoped and CROSS-MARKET** — it is the loader `/bookmarks` itself
- * runs, `(client, {viewerId}) => BookmarkItem[]`, with no market argument and an
- * `id` on every variant. That is exactly the missing set.
- *
- * ⇒ AND THE `own` HALF IS EXACT HERE RATHER THAN APPROXIMATED, which is the part
- * that makes this honest instead of merely possible. Every argument in this list is
- * authored by the profile user (the page's own docblock states it), so own-ness is
- * not a lookup at all: it is `viewer === profileUser`. On an OWNER's profile every
- * card is their own argument and every icon is the shipped DISABLED "your own
- * argument" cell — which is CORRECT by D-3 (a bookmark points at someone else's
- * argument) and needs no bookmark read whatsoever. Only a signed-in VISITOR needs
- * `saved`, and only then is the extra read issued. See the page for that split.
- * ⛔ SO NONE OF THE THREE DEFECTIVE SUBSTITUTES IS TAKEN: `null` is passed only
- * when the viewer really is signed out, and `saved` is only ever empty when it
- * really is.
+ * UNWIRE-1 — the bookmark half of the cluster (PROFILE REFINEMENT · R4's
+ * `CardActions`/`loadBookmarks`/own-suppression mechanism, once threaded
+ * through here via `bookmarks: BookmarkAffordance`) is removed: the bookmark
+ * module is unwired product-wide. Only the disabled download stub remains
+ * (SUB-1, `DownloadStub.tsx`).
  *
  * ⚠ NO GAP IS INTRODUCED: `gap-2` is the class this row already carried AND the
  * mockup's `.rchead{gap:8px}` (`:321`) — the same number from both directions.
@@ -449,11 +417,9 @@ function RemovedHead({
 function PresentHead({
 	item,
 	author,
-	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
-	bookmarks: BookmarkAffordance;
 }) {
 	return (
 		<div className="flex flex-wrap items-center gap-2">
@@ -564,9 +530,9 @@ function PresentHead({
  * already: a control whose whole job is to show the rest of the text would reveal
  * nothing, and a control that does nothing visible is worse than an absent one.
  * That is the same test R4 applies to the download affordance, one step removed.
- * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — bookmark + disabled
- * download, threaded through `bookmarks`. Only the `+` is surface-specific, because
- * only the `+` depends on whether the text is clamped.
+ * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — the disabled download
+ * stub (UNWIRE-1: the bookmark half is gone product-wide). Only the `+` is
+ * surface-specific, because only the `+` depends on whether the text is clamped.
  *
  * ⚠ TITLE-THEN-WHOLE-BODY IS THE SHIPPED SHAPE, NOT A DUPLICATION BUG.
  * `deriveTitleTeaser` (`load-debate-view.ts:402-411`) takes the title FROM the
@@ -578,18 +544,9 @@ function PresentHead({
 function ReplicaCard({
 	item,
 	author,
-	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
-	/**
-	 * R4 — threaded through to the head cluster. ⚠ THE REPLICA GETS THE CLUSTER BUT
-	 * NOT THE `+`: it renders the body IN FULL already (see this component's own
-	 * note), so a control whose job is to reveal the rest of the text would reveal
-	 * nothing. A control that does nothing visible is the defect R4's own download
-	 * clause is careful about, one step removed.
-	 */
-	bookmarks: BookmarkAffordance;
 }) {
 	return (
 		<Card
@@ -599,7 +556,7 @@ function ReplicaCard({
 			// below take the leftover instead of the card growing past the panel.
 			className="min-h-0 flex-1 gap-2 p-3"
 		>
-			<PresentHead item={item} author={author} bookmarks={bookmarks} />
+			<PresentHead item={item} author={author} />
 			<Link
 				data-testid={`argument-replica-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}
@@ -657,11 +614,13 @@ function ReplicaCard({
  * `ArgProfile.tsx:59` verbatim, and the two-letter uppercase fallback is
  * `ArgProfile.tsx:54`.
  *
- * ⛔ NOT `ArgProfile` ITSELF, and the reason is a data block, not a preference:
- * `ArgProfile` requires `commentId` AND `bookmarks: BookmarkAffordance`, and no
- * reader on this surface produces the second. Composing the same primitives at
- * the same values is the honest subset; the action cluster is recorded
- * data-blocked at the call site above.
+ * ⛔ NOT `ArgProfile` ITSELF — this surface needs only avatar + pseudonym, not
+ * `ArgProfile`'s full side-chip/marker/stake/replies row, so composing the
+ * same primitives at the same values is the honest subset rather than a
+ * wider component with most of its fields unused. (UNWIRE-1: `ArgProfile` no
+ * longer takes a `commentId`/`bookmarks` pair at all — the historical data
+ * block this note cited is gone with the bookmark module — but the "which
+ * subset of fields does this surface need" reasoning is unchanged.)
  */
 function AuthorHead({ author }: { author: ProfileUser }) {
 	return (

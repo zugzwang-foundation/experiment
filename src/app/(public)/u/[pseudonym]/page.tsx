@@ -1,12 +1,10 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
-import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileArguments } from "@/server/profile/arguments";
 import { buildPositionsPayload } from "@/server/profile/owner-view";
 import { loadProfilePositions } from "@/server/profile/positions";
@@ -72,52 +70,6 @@ export default async function ProfilePage({
 	// F-PROF-3: the Sell affordance exists ONLY on the owner payload arm; the
 	// visitor arm carries no `sellEligible` field (the DTO boundary).
 	const positionsPayload = buildPositionsPayload(positions, owner);
-
-	/* ⚠⚠ PROFILE REFINEMENT · R4 — THE BOOKMARK AFFORDANCE, and the SPLIT is the
-	   whole point of how it is derived.
-
-	   `ArgumentList`'s head cluster needs a `BookmarkAffordance` — `{saved, own}` or
-	   `null` for signed out. Its own docblock recorded the cluster as DATA-BLOCKED
-	   because the only producer it found, `loadViewerMarketContext`, is MARKET-scoped
-	   while this list is cross-market. `loadBookmarks` is the producer it missed: the
-	   loader `/bookmarks` runs, `(client, {viewerId})`, viewer-scoped and with no
-	   market argument at all.
-	   ⛔ CALLING AN EXISTING EXPORTED LOADER IS NOT AN EDIT TO `src/server/**` —
-	   the same standing distinction `bookmarks/page.tsx` records for the four loaders
-	   it calls. Nothing under `src/server/` is modified by this row.
-
-	   ⇒ AND THE OWNER ARM NEEDS NO READ AT ALL, which is why this is a split rather
-	   than one call. Every argument in this list is authored by the profile user, so
-	   own-ness is not a lookup — it is `viewer === profileUser`. On an owner's own
-	   profile EVERY card is their own argument, every icon is the shipped disabled
-	   "your own argument" cell (correct by D-3: a bookmark points at someone else's
-	   argument), and `saved` is never consulted because `BookmarkToggle` checks
-	   own-ness FIRST. So the common case — a participant opening their own profile —
-	   pays nothing.
-	   ⚠ THE COST, NAMED: a signed-in VISITOR on someone else's profile costs one
-	   `loadBookmarks`. That loader builds full `BookmarkItem`s where only the ids are
-	   wanted, which is wasteful — and it is the honest price of §2's ban on touching
-	   `src/server/**`, where a leaner id-only read would belong. Recorded rather than
-	   optimised around.
-	   ⛔ SIGNED OUT STAYS `null`, never an empty set: `null` is what makes the icon
-	   render "sign in to use", and an empty `saved` would instead print an UNSAVED
-	   icon — a lie about a viewer who has no bookmark set to speak of. */
-	const viewerId = session?.user?.id ?? null;
-	let bookmarks: BookmarkAffordance = null;
-	if (viewerId !== null) {
-		bookmarks = owner
-			? {
-					// Own-ness is total on one's own profile — no read needed.
-					own: new Set(argumentItems.map((i) => i.id)),
-					saved: new Set<string>(),
-				}
-			: {
-					own: new Set<string>(),
-					saved: new Set(
-						(await loadBookmarks(db, { viewerId })).map((i) => i.id),
-					),
-				};
-	}
 
 	// OQ-5 B — the W2.10-C click-through preselects the positions market filter
 	// via `?market=<slug>` (a slug, matched against the rows in PositionsTable;
@@ -473,7 +425,6 @@ export default async function ProfilePage({
 					argumentItems={argumentItems}
 					owner={owner}
 					author={profileUser}
-					bookmarks={bookmarks}
 					initialMarketSlug={initialMarketSlug}
 				/>
 			</div>
