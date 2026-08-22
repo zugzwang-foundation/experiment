@@ -509,17 +509,18 @@ answer when nothing did.
 ### D-5 · Ranking (R4) and attracted-value decay (R5)
 
 `support_dharma` / `counter_dharma` are today read-time `SUM(rb.stake) FILTER (…)`
-aggregates over the frozen `bets.stake`, at three byte-equivalent sites
-(`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`).
+aggregates over the frozen `bets.stake`, at two byte-equivalent sites
+(`debate-view/ranking-substrate.ts`, `profile/arguments.ts`) — a third,
+`bookmarks/list.ts`, was unwired product-wide at ADR-0040.
 
-> *(**AMENDED at RANK-2, 2026-08-22.** The site list here was already wrong when
-> written: `scripts/verify-ranking-staging.ts` carries a hand-kept copy, which is
-> how it silently drifted for a release. It is **three** sites as of the RANK-2
-> merge — that script plus `ranking-substrate.ts` and `profile/arguments.ts` —
-> because `unwire-1` removed `bookmarks/list.ts` entirely. And the summand now additionally
-> **excludes self-authored replies**: `AND rc.user_id <> p.user_id` on the reply
-> join, in the `ON` clause and never the `WHERE`. Patch record **P2** at the top
-> of this file carries the ruling and the reason.)*
+> *(**AMENDED at RANK-2, 2026-08-22.** Two further corrections to the sentence
+> above. **(1)** There is a copy it does not count: `scripts/verify-ranking-staging.ts`
+> carries a hand-kept fourth version of this query — which is how it silently
+> drifted for a release — so the number of places that must agree is **three**,
+> not two, even though only two are under `src/`. **(2)** The summand now
+> additionally **excludes self-authored replies**: `AND rc.user_id <> p.user_id`
+> on the reply join, in the `ON` clause and never the `WHERE`. Patch record **P2**
+> at the top of this file carries the ruling and the reason.)*
 Under R4/R5 the summand becomes the replier's **surviving lot basis** for that reply —
 `SUM(COALESCE(l.surviving_basis, rb.stake)) FILTER (…)`, joined `lots ON lots.bet_id =
 rb.id`. A replier who sells their lot down therefore withdraws the weight they lent the
