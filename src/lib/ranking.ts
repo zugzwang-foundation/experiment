@@ -29,13 +29,25 @@ export type PostSubstrate = {
 	id: string;
 	/** The post's own frozen side (`side_at_post_time`) — support/counter basis. */
 	parentSide: Side;
-	/** Reply-bets on the post's own side. */
+	/**
+	 * Reply-bets on the post's own side, **by anyone other than the post's own
+	 * author**. Self-authored replies are excluded here and from the three
+	 * fields below (ADR-0039 patch record P2, RANK-2): a post attracting its own
+	 * author is not attracting anything, and attraction is what these measure.
+	 *
+	 * ⚠ **Counts do NOT decay and are not meant to.** Unlike the stake inputs,
+	 * these are `COUNT(...)` over Bucket-A rows — a count can never move, by any
+	 * mechanism including moderation. Making them decay would assert that an
+	 * argument someone made and later exited never got made, which R9 forbids.
+	 * The single-account capture that exploited that immovability was closed by
+	 * removing its other leg (the self-reply), not by decaying the count.
+	 */
 	supportCount: number;
-	/** Reply-bets on the opposing side. */
+	/** Reply-bets on the opposing side, self-authored excluded (see above). */
 	counterCount: number;
-	/** SUM of support-side reply-bet stakes — decimal string. */
+	/** SUM of support-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	supportDharma: string;
-	/** SUM of counter-side reply-bet stakes — decimal string. */
+	/** SUM of counter-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	counterDharma: string;
 	/** `comments.created_at`. */
 	createdAt: Date;

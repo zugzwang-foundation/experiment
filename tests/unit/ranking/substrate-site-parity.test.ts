@@ -102,6 +102,52 @@ describe("RANK-1 — every substrate site spells the substitution the same way",
 		expect(/shareQuantity:\s*bets\.shareQuantity,/.test(src)).toBe(false);
 	});
 
+	// ── RANK-2: self-authored replies are not attraction ──────────────────────
+	// The FOUR aggregate sites. `reply-substrate.ts` is deliberately absent, and
+	// its absence is the ruling rather than an oversight: a self-reply keeps its
+	// own lane position, so the loader that produces that lane must NOT filter.
+	const AGGREGATE_SITES_R2 = SITES.filter(
+		(site) => !site.endsWith("reply-substrate.ts"),
+	);
+
+	for (const site of AGGREGATE_SITES_R2) {
+		it(`${site} excludes self-authored replies from the aggregates`, () => {
+			const src = source(site);
+			// The predicate itself…
+			expect(/AND\s+rc\.user_id\s*<>\s*p\.user_id/.test(src)).toBe(true);
+			// …and that it sits in the JOIN rather than the WHERE. In a WHERE it
+			// would drop any post whose only replies are self-replies out of the
+			// result entirely, instead of showing it with counts at zero — a much
+			// worse bug than the one being fixed, and an easy one to introduce
+			// while "tidying" the query.
+			expect(
+				/LEFT JOIN [^\n]*rc\s*\n\s*ON rc\.parent_comment_id = p\.id\s*\n\s*AND rc\.user_id <> p\.user_id/.test(
+					src,
+				),
+			).toBe(true);
+		});
+	}
+
+	it("reply-substrate.ts does NOT filter self-replies — the ruling's other half", () => {
+		// ⛔ A POSITIVE ASSERTION OF AN ABSENCE, on purpose. The ruling excludes
+		// self-replies from attraction and from nothing else; a future reader
+		// applying the predicate "consistently" across all five sites would silently
+		// delete a participant's own arguments from the lane they belong in.
+		const src = source("src/server/debate-view/reply-substrate.ts");
+		// ⚠ Anchored on `user_id` appearing in ANY comparison, not on the operand
+		// order this repo happens to use. `/rc\.user_id\s*<>/` would miss the
+		// semantically identical `p.user_id <> rc.user_id` — and missing it is the
+		// UNSAFE direction, since it would mean a self-reply had been silently
+		// deleted from the lane it belongs in.
+		// `NOT IN` and `IS DISTINCT FROM` are the two spellings a regex on the
+		// comparison operators alone would miss — and missing them is the UNSAFE
+		// direction, since either would mean a self-reply had been filtered out of
+		// the lane it belongs in.
+		expect(
+			/user_id\s*(<>|!=|=|NOT\s+IN|IS\s+(NOT\s+)?DISTINCT)/i.test(src),
+		).toBe(false);
+	});
+
 	it("NO site reads a bare frozen stake as a ranking input any more", () => {
 		// ⛔ The exact shapes that shipped the exploit and the drift: a per-bet
 		// `SELECT b.stake` with no lot reach, and a `SUM(rb.stake)` with no

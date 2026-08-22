@@ -135,7 +135,26 @@ export async function loadRankingSubstrate(
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) pb ON true
-		LEFT JOIN comments rc ON rc.parent_comment_id = p.id
+		-- RANK-2 / ADR-0039 (RANK-2 patch record) — SELF-AUTHORED REPLIES ARE NOT
+		-- ATTRACTION. A reply by the parent post's own author is excluded from the
+		-- count lanes (n, lop, n^b) and from the attracted-value aggregates. It is
+		-- excluded from NOTHING ELSE: it keeps its own stake, its own reply-lane
+		-- position and its own weight as an argument (see reply-substrate.ts, which
+		-- is deliberately NOT changed). A post attracting its own author is not
+		-- attracting anything, and attraction is what these inputs measure.
+		--
+		-- ⚠ THE PREDICATE LIVES IN THE JOIN, NOT IN THE WHERE, and that is the whole
+		-- correctness of it. In the WHERE it would drop any post whose only replies
+		-- are self-replies out of the result set entirely; in the ON clause the LEFT
+		-- JOIN still yields the post, with its counts and sums correctly at zero.
+		--
+		-- ⚠ COUNTS COULD NOT SIMPLY BE MADE TO DECAY. That is why this removes the
+		-- attack's other leg instead: a decaying count would assert that an argument
+		-- someone made and later exited never got made, and R9 makes Sold permanent
+		-- precisely because it did.
+		LEFT JOIN comments rc
+			ON rc.parent_comment_id = p.id
+			AND rc.user_id <> p.user_id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
 		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.market_id = ${args.marketId}

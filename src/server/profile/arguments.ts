@@ -218,7 +218,13 @@ export async function loadProfileArguments(
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) pb ON true
-		LEFT JOIN ${comments} rc ON rc.parent_comment_id = p.id
+		-- RANK-2 — self-authored replies are not attraction: excluded from the count
+		-- lanes and the attracted-value aggregates, and from nothing else. In the ON
+		-- clause rather than the WHERE, so a post whose only replies are its own
+		-- still appears with its counts at zero rather than vanishing.
+		LEFT JOIN ${comments} rc
+			ON rc.parent_comment_id = p.id
+			AND rc.user_id <> p.user_id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
 		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.user_id = ${userId} AND p.parent_comment_id IS NULL

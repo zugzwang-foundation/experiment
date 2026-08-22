@@ -14,6 +14,115 @@
 
 ## Patch record
 
+**P2 (2026-08-22, RANK-2) — self-authored replies do not count as attraction.**
+In-place Patch record per CLAUDE.md §5.12. P1 closed the STAKE axis; the RANK-1
+security pass found the COUNT axis open and it is closed here — by a different
+mechanism, for a reason worth stating.
+
+**The ruling (founder-authored, reproduced verbatim):**
+
+> Self-authored replies do not count as attraction. A reply whose author is the
+> parent post's author is excluded from the count lanes (n, lop, n^b) and from
+> the attracted-value aggregates (support_dharma, counter_dharma).
+> It is NOT excluded from anything else: it keeps its own stake, its own lane
+> position, its own ranking weight as an argument, and its place in the author's
+> Arguments count. The argument still happened and R9 still holds.
+> What changes is only this: a post attracting its own author is not attracting
+> anything, and attraction is what those inputs measure.
+> Rationale: counts cannot decay without contradicting R9 (an argument someone
+> made and exited did still get made). This closes the single-account attack by
+> removing its other leg instead. Multi-account capture remains open and costs
+> signup, identity-pool consumption, Turnstile and rate limits — a different
+> threat class, and one every system pays.
+
+**The attack this closes, measured on `4c64e40` before the fix** (one account,
+`DEFAULT_RANKING_CONFIG`): post at `BET_MIN_STAKE_POST` (Đ10), then reply to
+your own post six times at `BET_MIN_STAKE_REPLY` (Đ50) — there is no self-reply
+guard, no per-post reply cap, and no uniqueness on `(user, parent_comment_id)`.
+Measured result:
+
+```
+supportCount = 6      counterCount = 0      supportDharma = Đ300  (all the attacker's own money)
+topOrder     = [ATTACKER, honest]           badge        = "Most Debated"
+```
+
+`n = 6` clears `floorLane.n = 5`, `lop = 1` clears the `floorSplit = 6` gate,
+and being the sole clearer yields `SENTINEL_MAX` — which outranks every finite
+ratio. So a **Đ10** post outranked a **Đ100** one, and then the attacker sells
+everything back through the fee-less CPMM for dust. **The counts never move**:
+`bets` and `comments` are Bucket A, so no mechanism in the system — including
+moderation, which per ADR-0021 removes the body and leaves the row — can reduce
+them. The slot is permanent.
+
+**Why not simply decay the counts.** It is the obvious fix and it is wrong. A
+count that decays asserts that an argument someone made and later exited never
+got made, and **R9 makes Sold permanent precisely because it did**. The ruling
+therefore removes the attack's *other* leg — the claim that a post attracting
+its own author has attracted anything.
+
+**Implementation.** One predicate, `AND rc.user_id <> p.user_id`, added to the
+reply join at the **four** sites that compute the aggregates:
+`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`
+and `scripts/verify-ranking-staging.ts`.
+
+⚠ **It lives in the JOIN, never the WHERE.** In a `WHERE` it would drop any post
+whose only replies are self-replies out of the result set entirely; in the `ON`
+clause the `LEFT JOIN` still yields the post, with its counts and sums correctly
+at zero. Both the predicate and its position are pinned by
+`tests/unit/ranking/substrate-site-parity.test.ts`.
+
+⚠ **`debate-view/reply-substrate.ts` is deliberately NOT changed**, and its
+absence from that list is the ruling rather than an oversight — it is the loader
+that produces a reply's own lane position, which the ruling explicitly preserves.
+A future reader applying the predicate "consistently" across all five sites would
+silently delete a participant's own arguments from the lane they belong in. That
+absence is asserted positively in the parity test.
+
+**⚠ THE RULING'S RESIDUAL-RISK SENTENCE IS MEASURABLY OPTIMISTIC, AND THE
+MEASUREMENT IS RECORDED HERE RATHER THAN LEFT TO BE REDISCOVERED.** The ruling
+text above is founder-authored and is reproduced verbatim — it is not edited.
+What follows is what the RANK-2 security pass measured against the shipped model
+and the shipped auth stack. It does not change the decision; it changes the price
+the decision was taken at, and that is worth ratifying explicitly.
+
+**"Multi-account capture … costs signup, identity-pool consumption, Turnstile and
+rate limits."** Measured:
+
+| Claimed cost | Measured |
+|---|---|
+| "**six accounts**" | **ONE.** `floorLane.n = 5` and `clears()` is `value >= floor`, so **five** replies clear traction — and with no uniqueness on `(user, parent_comment_id)` a **single** sybil supplies all five. |
+| "Turnstile" | The Turnstile gate is matched to `/email-otp/send-verification-otp` **only**. The **Google OAuth signup path has no Turnstile**. |
+| "rate limits" | `OTP_REQUESTS_PER_IP_BURST_PER_MIN = 10` ⇒ **600 signups/hour from one IP**, and `checkRateLimit` **fails open** on an Upstash error (ADR-0015). The attack needs **6** bets against a 30/min cap. |
+| "identity-pool consumption" | **50,000** tuples seeded. Consuming one is not a cost. |
+| implied Dharma cost | **≈ 3 attoDharma.** `INITIAL_USER_DHARMA = 1000` funds 20 reply-bets at the Đ50 floor, so each account is **self-funding**; the fee-less CPMM returns the stake on exit. **The attacker keeps 100% of the money.** |
+
+**So the residual attack is: one extra account, five replies, everything sold
+back, ~0 Đ, permanent** — `topOrder` #1 outright plus *Most Debated* plus the
+Discovery hero, over a Đ1000 post. Neither content removal nor a ban decrements
+`n` (ADR-0021 leaves the row), so no moderator action undoes it.
+
+**Where the fix DOES bind, stated in its favour:** against a post already
+carrying **≥ Đ200 of genuinely-held attracted basis**, the `D` lane clears and
+outranks any finite traction ratio, so the capture fails unless the attacker
+locks up real Dharma and *keeps it locked* — which RANK-1's decay then enforces.
+The residual attack is therefore free and permanent **only in markets where no
+post clears a lane** — quiet markets, and every market's first days, which is
+exactly when the top slot and the hero seed attention.
+
+**Two levers if the founder wants the price raised**, both ranking-semantics
+decisions rather than patches: `COUNT(DISTINCT rc.user_id)` for the traction lane
+(turns one sybil into five), or a per-`(user, parent_comment_id)` reply cap.
+**Neither is taken here** — the ruling conceded multi-account capture, and
+re-pricing an accepted risk is the founder's call, not this task's.
+
+**Still open, and named rather than implied:** multi-account capture. The same
+volume bought from six accounts still clears the floors. That is a different
+threat class — it costs signup, identity-pool consumption, Turnstile and rate
+limits — and one every system pays. It is not closed here and is not claimed to
+be.
+
+---
+
 **P1 (2026-08-22, RANK-1) — R4 now names all THREE rulers.** In-place Patch record
 per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession). **The
 load-bearing decision is unchanged:** ranking keys off surviving lot basis rather
@@ -394,6 +503,13 @@ answer when nothing did.
 `support_dharma` / `counter_dharma` are today read-time `SUM(rb.stake) FILTER (…)`
 aggregates over the frozen `bets.stake`, at three byte-equivalent sites
 (`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`).
+
+> *(**AMENDED at RANK-2, 2026-08-22.** There are **FOUR** aggregate sites, not
+> three — `scripts/verify-ranking-staging.ts` carries a hand-kept fourth copy,
+> which is how it silently drifted for a release. And the summand now additionally
+> **excludes self-authored replies**: `AND rc.user_id <> p.user_id` on the reply
+> join, in the `ON` clause and never the `WHERE`. Patch record **P2** at the top
+> of this file carries the ruling and the reason.)*
 Under R4/R5 the summand becomes the replier's **surviving lot basis** for that reply —
 `SUM(COALESCE(l.surviving_basis, rb.stake)) FILTER (…)`, joined `lots ON lots.bet_id =
 rb.id`. A replier who sells their lot down therefore withdraws the weight they lent the
