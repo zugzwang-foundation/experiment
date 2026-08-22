@@ -113,12 +113,24 @@ describe("DB_POOLER_MODE — the four rows", () => {
 		await import("@/db");
 
 		expect(connectedWith()).toBe(TXN_URL);
-		expect(connectedWith()).toContain(":6543");
+		// ⚠ No port assertion here, deliberately. `TXN_URL` is this file's own
+		// constant, so asserting it contains ":6543" could only fail if the line
+		// above already had — a tautology that reads like a claim about the
+		// module. `src/db/index.ts` knows nothing about ports: it picks a
+		// VARIABLE, and which port that variable's value names is a property of
+		// the secret, set in Doppler. That is exactly why criterion 1 has to be
+		// observed against a deployment and cannot be discharged by a unit test.
 	});
 
-	// ROW 2 also covers previews — the Stage 3 verification runs on a
-	// branch-scoped preview, where ZUGZWANG_ENV is "preview", not "staging".
+	// ROW 2 also covers previews — Stage 3's criterion 1 is observed on a
+	// PREVIEW of this branch, where ZUGZWANG_ENV is "preview", not "staging".
 	// A guard keyed to "staging" alone would have made criterion 1 unreachable.
+	//
+	// (It formerly read "branch-scoped preview", from the ruling that scoped the
+	// flag to one Vercel branch. That was reversed — the flag lives in Doppler
+	// stg unscoped, because it is inert on any deployment whose code cannot read
+	// it. The preview is still where criterion 1 happens; only the flag's home
+	// changed. See docs/plans/S-1.md §2.1.)
 	it("row 2 · transaction mode works on a preview, not only staging", async () => {
 		process.env.DB_POOLER_MODE = "transaction";
 		process.env.ZUGZWANG_ENV = "preview";
@@ -162,7 +174,14 @@ describe("DB_POOLER_MODE — the four rows", () => {
 		process.env.DATABASE_URL = SESSION_URL;
 		process.env.DATABASE_URL_TXN = TXN_URL;
 
+		// BOTH halves are asserted, because the title promises both. The citation
+		// is not decoration: this guard refuses an entire production deploy at
+		// module scope, and the operator who hits it needs the record naming the
+		// decision — otherwise the fastest-looking fix is to delete the guard.
+		// Asserting only the prose would let the citation be dropped while this
+		// test stayed green under a name that had become false.
 		await expect(import("@/db")).rejects.toThrow(/not authorised in prod/);
+		await expect(import("@/db")).rejects.toThrow(/ADR-0024 P3 #8/);
 	});
 
 	it("row 4 · refuses even when the transaction secret IS present", async () => {

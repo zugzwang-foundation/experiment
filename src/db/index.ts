@@ -74,8 +74,15 @@ const client = postgres(connectionString, {
 	// timers. A timer cannot be relied on to hand a slot back; bounding what an
 	// instance can take in the first place does not depend on one running.
 	max: 4,
-	// Defensive on the :5432 session pooler; forward-safe if a :6543
-	// transaction pooler is ever introduced (ADR-0024 §Decision Outcome #8).
+	// ⚠ NOT defensive any more — this is a HARD PRECONDITION of the mode above.
+	// It was written when a :6543 transaction pooler was hypothetical; S-1
+	// introduces one, so the "forward-safe if ever introduced" framing it used to
+	// carry described a future that has arrived (ADR-0024 §Decision Outcome #8).
+	//
+	// Prepared statements are bound to a backend connection. Transaction mode
+	// returns the backend to the pool at COMMIT, so a prepared statement's handle
+	// can be gone before its next use. On :5432 leaving this true costs nothing;
+	// on :6543 removing it breaks the pool. Do not "restore" it.
 	prepare: false,
 	// Return idle connections to the Supavisor pool. postgres.js defaults this
 	// to `null`, which makes the idle timer a literal no-op (`timer()` short-
