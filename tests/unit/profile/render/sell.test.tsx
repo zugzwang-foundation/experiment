@@ -566,6 +566,236 @@ describe("§3.2 — a FAILED sell must not invite a second one", () => {
 		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
 		expect(key(calls[before] as unknown[])).toBe(key(calls[0] as unknown[]));
 	});
+
+	it("sell::a-protective-landing-is-ESCAPABLE-the-next-keystroke-mints", async () => {
+		// ⛔⛔ THIS PINS AN ORDERING, AND NOTHING ELSE IN THE FILE DOES.
+		//
+		// After a `key_reused` 409 BOTH of `arm()`'s guards match at once: `pending`
+		// is `refresh_then_edit` AND the held key is the one that went out unsettled.
+		// Whichever guard is written first wins, and ONLY the first one dispatches
+		// `REFRESHED`. So the order of those two `if`s is load-bearing, and it was
+		// held in place by a comment alone — `@security-auditor` measured the swap and
+		// found `pending` stuck at `refresh_then_edit` forever, where `EDIT` no-ops by
+		// law (`idempotency.ts`). The key can then NEVER rotate: every Confirm 409s,
+		// with no escape short of a page reload. That is the C-2 lockout again, worse,
+		// because C-2 at least let a reload out of it.
+		//
+		// ⚠ THE TEST ABOVE DOES NOT CATCH IT. It asserts a refresh happened and that
+		// the next submit rides the SAME key — both true of the swapped build too. The
+		// distinguishing fact is what happens AFTER the refresh: `REFRESHED` must have
+		// advanced the state to `edit_after_refresh`, so a keystroke mints. That is the
+		// F-2 law's second half — fresh key only on the edit AFTER refresh — and it is
+		// what makes the landing protective rather than terminal.
+		render(<PositionsTable payload={OWNER} />);
+		failWith("error_idempotency_key_reused", 409);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(1),
+		);
+
+		fireEvent.click(screen.getByTestId(`tile-cancel-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		// The keystroke that is only allowed to mint because `REFRESHED` landed.
+		fireEvent.change(screen.getByTestId(`tile-sell-amount-${L1}`), {
+			target: { value: "5" },
+		});
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		// ⛔ THE ASSERTION. There IS a way out of the landing.
+		expect(key(calls[1] as unknown[])).not.toBe(key(calls[0] as unknown[]));
+	});
+});
+
+/**
+ * ⛔⛔ **A KEY THAT WENT OUT AND NEVER SETTLED IS HELD, NOT RE-MINTED.**
+ *
+ * The describe above closes the landing the SERVER names — a `key_reused` 409,
+ * where `pending` becomes `refresh_then_edit` and the component can see it. These
+ * three close the landings the server names NOTHING for.
+ *
+ * `reduceKey` lands `pending: "none"` on a SUCCESS and on a TRANSIENT alike, and
+ * the two states are byte-identical. They mean opposite things: after a success
+ * the key is spent and the next intent needs its own (that is C-2, and G3 below
+ * is what keeps it closed); after a transient the key is held ON PURPOSE, because
+ * the request may have COMMITTED and a retry under the same key replays the
+ * original 200 out of the durable receipt instead of selling twice. `arm()` could
+ * not tell them apart, so it minted over both.
+ *
+ * ⚠ **AND THE GUARD IS DELIBERATELY NOT KEYED ON `failed`.** That was the first
+ * shape considered and it does not survive G1: `cancel()` clears `failed`, and
+ * cancelling is exactly what someone does before pressing Sell again. `edit()`
+ * clears it too, while a transient's key is still held. The marker has to be the
+ * KEY THAT WENT ON THE WIRE, compared against the key currently held — see
+ * `unsettledKeyRef` in `InlineSell.tsx`. Identity survives the UI flag being
+ * reset, and it stops matching by itself the moment the reducer's own law rotates
+ * the key.
+ */
+describe("§3.2 — an unsettled key survives cancel and re-arm", () => {
+	const key = (call: unknown[]): string => {
+		const headers = (call[1] as RequestInit).headers as Record<string, string>;
+		const k = Object.keys(headers).find((h) =>
+			h.toLowerCase().includes("idempotency"),
+		);
+		return k === undefined ? "" : (headers[k] ?? "");
+	};
+
+	/** Make every wire call return the given error envelope. */
+	function failWithCode(code: string, status: number) {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_u: string, init: RequestInit) => {
+				lastBody = JSON.parse(String(init.body));
+				return new Response(JSON.stringify({ ok: false, error: { code } }), {
+					status,
+					headers: { "content-type": "application/json" },
+				});
+			}),
+		);
+	}
+
+	it("sell::G1-a-NETWORK-drop-then-cancel-then-re-arm-retries-under-the-SAME-key", async () => {
+		// ⛔⛔ THE LOST-RESPONSE CASE, WHICH IS THE ONE THAT COSTS MONEY. The sale
+		// may be written and the 200 simply never arrived. The held key is the only
+		// thing that makes the retry a REPLAY — the durable receipt matches it and
+		// returns the original outcome. Mint a new one and the same sale executes a
+		// second time, which is the corruption direction `idempotency.ts` names.
+		// ⚠ THE PATH IS THE REALISTIC ONE, and it is the path a `failed`-keyed guard
+		// fails: the tile stays armed showing `Retry`, so someone who believes
+		// nothing happened CANCELS and presses Sell again. `cancel()` clears
+		// `failed`; it does not clear the fact that a request is outstanding.
+		render(<PositionsTable payload={OWNER} />);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new TypeError("network");
+			}),
+		);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(1),
+		);
+
+		fireEvent.click(screen.getByTestId(`tile-cancel-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		expect(key(calls[0] as unknown[])).not.toBe("");
+		// ⛔ THE ASSERTION. One outstanding request, one key.
+		expect(key(calls[1] as unknown[])).toBe(key(calls[0] as unknown[]));
+	});
+
+	it("sell::G2-a-429-is-not-walked-past-by-re-arming-and-the-next-keystroke-re-keys", async () => {
+		// ⛔⛔ THE SHARPER MOUTH OF THE SAME GAP. `fresh_on_enable` exists to BLOCK
+		// submit until a countdown expires — and this component mounts no countdown,
+		// so `COUNTDOWN_EXPIRED` never arrives. Arming was the one path that left
+		// that state at all, and it left it under a brand-new key: press Sell again
+		// and the rate limit is simply gone.
+		render(<PositionsTable payload={OWNER} />);
+		failWithCode("error_rate_limit_exceeded", 429);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(1),
+		);
+
+		fireEvent.click(screen.getByTestId(`tile-cancel-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		// ⛔⛔ THE ASSERTION, AND IT IS AN ABSENCE WITH A REASON. The submit is
+		// REFUSED by the reducer because `pending` is still `fresh_on_enable` — which
+		// it can only be if arming left the key state alone. Had arming minted, the
+		// fresh state's `pending: "none"` would have accepted the submit and this
+		// count would be 2. So "no second request" is precisely "no mint".
+		await waitFor(() =>
+			expect(screen.getByTestId(`tile-confirm-${L1}`).textContent).toBe(
+				"Retry",
+			),
+		);
+		expect(
+			(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+		).toBe(1);
+
+		// …and the reducer's own exit still works: an EDIT out of `fresh_on_enable`
+		// mints, which is the law this guard must not have broken while closing the
+		// bypass. Without this half, "the 429 holds" would be indistinguishable from
+		// "the control is bricked after a 429".
+		fireEvent.change(screen.getByTestId(`tile-sell-amount-${L1}`), {
+			target: { value: "5" },
+		});
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		expect(key(calls[1] as unknown[])).not.toBe(key(calls[0] as unknown[]));
+	});
+
+	it("sell::G3-POSITIVE-CONTROL-a-SUCCESSFUL-sell-still-re-keys-the-next-tile", async () => {
+		// ⛔⛔ THE CONTROL THAT MAKES THE OTHER TWO MEAN ANYTHING. G1 and G2 both
+		// assert that arming does NOT mint — and DELETING the mint outright would
+		// pass both of them. That is not a hypothetical regression: it is C-2, the
+		// original finding, where one key spans every tile on the page and the
+		// SECOND sell can never succeed, because the same key with a different body
+		// fingerprints differently and comes back 409 forever.
+		// ⇒ So a success must still re-key. `unsettledKeyRef` is released on exactly
+		// one path — the success arm — and this is the assertion that the release is
+		// real rather than a comment.
+		// ⚠ Overlaps `sell::two-tiles-two-keys` above by design. That one guards the
+		// C-2 fix; this one guards the C-2 fix AGAINST ITS OWN GUARD.
+		const twoLots: ProfilePositionsPayload = {
+			owner: true,
+			rows: [
+				{
+					...ROW_OPEN,
+					lots: [lot(L1), lot(L2, { lotId: L2 })],
+					quantity: dp18("20"),
+					sellEligible: true,
+				},
+			],
+		};
+		render(<PositionsTable payload={twoLots} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(1),
+		);
+
+		fireEvent.click(screen.getByTestId(`tile-sell-${L2}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L2}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(2),
+		);
+
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		expect(key(calls[0] as unknown[])).not.toBe("");
+		expect(key(calls[1] as unknown[])).not.toBe("");
+		expect(key(calls[1] as unknown[])).not.toBe(key(calls[0] as unknown[]));
+	});
 });
 
 describe("the control must not look pressable when it is not", () => {

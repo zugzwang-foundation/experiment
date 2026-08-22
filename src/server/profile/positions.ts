@@ -259,6 +259,26 @@ export async function loadProfilePositions(
 	// ⚠ Every other per-market map in the tree filters `quantity > 0` first — see
 	// `dharma/header-portfolio.ts`, `profile/arguments.ts`, `positions/read.ts`.
 	// This one cannot, because RF-13 needs the exited rows; it orders instead.
+	//
+	// ⚠⚠ TWO ZERO ROWS STILL RESOLVE BY SCAN ORDER, AND THAT IS BENIGN ONLY
+	// BECAUSE NOTHING READS THE `side` IT PICKS. A participant who exits YES,
+	// enters NO and exits that too leaves `[(YES, 0), (NO, 0)]`: neither is held,
+	// so the precedence above never fires and the last row scanned wins. The
+	// surviving row's `side` is therefore arbitrary — which is safe TODAY for two
+	// reasons, both of which are properties of the render rather than of this map:
+	//   · the Position column renders `lot.side` (the argument's own immutable
+	//     side), never `row.side` — `PositionsTable.tsx`'s tile builder;
+	//   · the whole-holding fallback, the one tile that WOULD fall back to
+	//     `row.side`, cannot fire here: `usesWholeHoldingFallback` requires
+	//     `isPositiveAmount(row.quantity)` and both rows are zero.
+	// ⛔ SO DO NOT WIRE `row.side` INTO A RENDER WITHOUT FIXING THIS FIRST. It is
+	// not a latent bug; it is a live arbitrary value with no current reader, and
+	// the first reader added is the moment it becomes one. The fix, if that day
+	// comes, is a deterministic tie-break here (most-recent episode, or a stable
+	// `side` ordering) — not a filter, which would drop the row RF-13 exists to
+	// keep. Left as a comment deliberately: inventing a tie-break now would be
+	// unfalsifiable code, since no assertion could tell a right answer from a
+	// wrong one while nothing consumes it.
 	const positionByMarket = new Map<
 		string,
 		{ side: "YES" | "NO"; quantity: string }

@@ -87,6 +87,34 @@ export function useInlineSell() {
 		return next;
 	}, []);
 
+	/**
+	 * ⛔⛔ THE KEY THAT WENT OUT AND NEVER SETTLED — the one bit `pending` cannot
+	 * carry, and the reason `arm()` is allowed to mint at all.
+	 *
+	 * `reduceKey` lands `pending: "none"` on BOTH `success` and `transient`, and
+	 * the two are byte-identical. They mean opposite things: after a success the
+	 * key is spent and a new intent needs a new one (C-2); after a transient the
+	 * key is HELD ON PURPOSE, because the request may have COMMITTED and a manual
+	 * retry under the same key replays the original 200 out of the durable receipt
+	 * (`bet_receipts`, ADR-0031) rather than executing a second sell. A caller that
+	 * reads only `pending` cannot tell those apart, so an unconditional mint at
+	 * arm-time throws the second one away.
+	 *
+	 * ⇒ This ref holds the key STRING last put on the wire whose outcome is not
+	 * known to be a success. `arm()` mints only when the key it currently holds is
+	 * NOT that string. Identity, not a flag — so when the reducer's own law rotates
+	 * the key (an `EDIT` out of `fresh_on_edit` / `fresh_on_enable`), the
+	 * comparison stops matching by construction and no reset is owed.
+	 *
+	 * ⚠ IT IS DELIBERATELY NOT `failed`. `failed` is the label on the button, and
+	 * `cancel()` and `edit()` both clear it while the unsettled key is still held —
+	 * so keying the guard on it would reopen the hole on exactly the path the G1
+	 * guard walks (fail → cancel → re-arm). The three guards and the reasoning are
+	 * in `sell.test.tsx`, describe *"§3.2 — an unsettled key survives cancel and
+	 * re-arm"*.
+	 */
+	const unsettledKeyRef = useRef<string | null>(null);
+
 	const cancel = useCallback(() => {
 		setArmedLotId(null);
 		setDraft(null);
@@ -100,6 +128,25 @@ export function useInlineSell() {
 			setArmedLotId(lotId);
 			setDraft(null);
 			setFailed(false);
+			// ⚠ END ANY LIVE `Sold` DWELL, for the same reason the overwrite path in
+			// `confirm` does. Sell A in full, then arm B inside the 900 ms — A's timer
+			// is still pending, and it fires `router.refresh()` UNDER B's live seed.
+			// A seed that moves between arming and confirming is the one thing this
+			// control cannot afford, since the untouched field submits the exact value
+			// it was seeded with.
+			// ⛔ THE `Sold` STATE IS CLEARED WITH IT, never left behind: dropping the
+			// timeout alone would strand A's tag on screen permanently, since that
+			// timeout is the only thing that clears it.
+			// ⚠ AND NO `router.refresh()` IN ITS PLACE. Cancelling the refresh is the
+			// entire point — A's row stays on its pre-sale figures until the next
+			// genuine refresh (B's own confirm, or a navigation), which is a moment of
+			// staleness on a row the reader has just left, traded for never moving the
+			// seed under the row they are now looking at.
+			if (dwellRef.current !== null) {
+				clearTimeout(dwellRef.current);
+				dwellRef.current = null;
+				setSoldLotId(null);
+			}
 			// ⛔⛔ A FRESH KEY PER SELL INTENT, AND WITHOUT THIS THE SECOND SELL ON A
 			// PAGE CAN NEVER SUCCEED.
 			//
@@ -133,6 +180,25 @@ export function useInlineSell() {
 			// protective landing.
 			if (keyRef.current.pending === "refresh_then_edit") {
 				dispatchKey({ type: "REFRESHED" });
+				router.refresh();
+				return;
+			}
+			// ⛔⛔ AND NEITHER MAY IT LAUNDER A REQUEST THAT SIMPLY NEVER ANSWERED.
+			// `refresh_then_edit` above is only the landing the SERVER named. A 503, a
+			// dropped connection or a 429 leaves no such marker: the reducer parks
+			// `pending: "none"` (transient) or `fresh_on_enable` (rate-limited) and
+			// HOLDS the key, because the request may have committed and the held key is
+			// what makes a retry a replay instead of a second sale. Minting here would
+			// discard that for the same reason, one class quieter.
+			// ⚠ THE 429 MOUTH IS THE SHARPER ONE. `fresh_on_enable` blocks SUBMIT until
+			// a countdown expires — and this component mounts NO countdown (that is
+			// M-2's premise, `confirm` below). So arming was the one path that walked
+			// past the rate-limit landing entirely, under a brand-new key.
+			// ⇒ Hold, and refresh the figures so the decision is made against the truth.
+			// Every state that SHOULD rotate still does: the reducer mints on the next
+			// keystroke out of `fresh_on_edit` / `fresh_on_enable`, which is its law and
+			// not this callback's business.
+			if (unsettledKeyRef.current === keyRef.current.key) {
 				router.refresh();
 				return;
 			}
@@ -303,11 +369,24 @@ export function useInlineSell() {
 				},
 				idempotencyKey: next.key,
 			});
+			// ⛔ RECORDED BEFORE THE WIRE, NOT AFTER THE ANSWER. The whole hazard is a
+			// request whose answer never arrives, so a marker written in a `.then` is
+			// written on exactly the paths that do not need it. From here until a
+			// SUCCESS says otherwise, this key is owed to a request that may have
+			// committed, and `arm()` must not mint over it.
+			unsettledKeyRef.current = next.key;
 			try {
 				const res = await fetch(url, init);
 				const outcome = await parseWireResponse(res);
 				if (outcome.kind === "success") {
 					dispatchKey({ type: "OUTCOME", outcome: "success" });
+					// ⛔ THE ONE PLACE THIS IS RELEASED, AND IT IS WHAT KEEPS C-2 CLOSED.
+					// A settled key is spent: the next sell is a new intent and needs its
+					// own, or it goes out with a different body under the same fingerprint
+					// and comes back 409. Every other exit from this function leaves the
+					// marker standing, which is the point — only a success proves nothing
+					// is owed.
+					unsettledKeyRef.current = null;
 					setBusy(false);
 					setArmedLotId(null);
 					setDraft(null);
