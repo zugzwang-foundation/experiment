@@ -19,17 +19,23 @@ import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
  * count. It also means no quote is fetched and no engine call is made to render
  * a tile.
  *
- * ⚠⚠ **THE SHORT-CIRCUIT IS LOAD-BEARING, NOT AN OPTIMISATION.** When an
- * argument IS the whole holding — the last surviving lot, or the only one — this
- * returns `positionCurrent` **byte-identically** rather than computing
- * `c × q ÷ q`. That matters because the value returned here becomes BOTH the sell
- * field's seed AND the `currentValue` handed to `sellSharesFor`, whose full-exit
- * branch is `dharmaIn.equals(currentValue)` (`sell-convert.ts:54`) and returns
- * the held quantity with zero arithmetic. Multiply-then-divide at 50 significant
- * digits can land a hair off the value it started from; the branch would then
- * miss, the conversion would divide and floor, and "sell everything" would
- * strand dust that can never be sold afterwards — because what is left is
- * smaller than the argument it belongs to.
+ * ⚠⚠ **THE SHORT-CIRCUIT IS LOAD-BEARING — BUT NOT FOR THE REASON THIS DOCBLOCK
+ * FIRST GAVE, AND THE WRONG REASON IS THE DANGEROUS PART.** It claimed that
+ * without the short-circuit `sell-convert.ts:54`'s full-exit branch "would then
+ * miss". **It would not.** That branch tests `dharmaIn.equals(currentValue)`, and
+ * both are the SAME STRING whatever this function returns — the seed and the
+ * conversion basis are one value, so the branch fires either way. A reader acting
+ * on the stated mechanism would have concluded the short-circuit was removable.
+ *
+ * ⇒ **What it actually buys** is that the tile's seed equals the HOLDING's mark
+ * exactly, so the tile and its group header agree on screen and the value that
+ * goes out is the one the server already computed. Measured: without it,
+ * `c × q ÷ q` at 38-digit magnitudes loses a unit in the last place
+ * (`99999999999999999.999999999999999999` → `…998`). Small, and it would put a
+ * figure on the wire that no server ever produced.
+ * (Corrected after `@security-auditor` measured the branch — the guard was right
+ * and its justification was not, which is the lying-docblock class this codebase
+ * polices.)
  *
  * ⚠ **`ComposerDecimal`, deliberately** — the same clone `sellSharesFor` uses,
  * so the seed and the conversion that consumes it run ONE arithmetic rather than

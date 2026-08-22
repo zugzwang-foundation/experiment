@@ -1076,7 +1076,10 @@ function TileRow({
 											type="button"
 											size="xs"
 											variant="outline"
-											disabled={sell.busy}
+											disabled={
+												sell.busy ||
+												!sell.canSubmit(tile.currentExact, tile.shares)
+											}
 											data-testid={`tile-confirm-${tile.key}`}
 											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)]"
 											onClick={() => sell.confirm(tile.key, sellArgs)}
@@ -1088,6 +1091,12 @@ function TileRow({
 											size="icon-xs"
 											variant="ghost"
 											aria-label="Cancel sell"
+											// ⛔ DISABLED IN FLIGHT, like Confirm and the field. Cancelling
+											// mid-request lets another tile arm, which replaces the key state
+											// with a fresh one whose `inFlight` is false — so the live
+											// request's OUTCOME is silently dropped and the NEXT tile shows
+											// this one's failure.
+											disabled={sell.busy}
 											data-testid={`tile-cancel-${tile.key}`}
 											onClick={sell.cancel}
 										>
