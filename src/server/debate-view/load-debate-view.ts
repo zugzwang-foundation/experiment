@@ -71,7 +71,15 @@ export type DebateReply =
 			body: string;
 			marker: Marker;
 			author: AuthorIdentity;
+			/**
+			 * The reply's stake **still held** — the surviving lot basis, and the
+			 * same value its lane sorts on (ADR-0039 R4 as amended at RANK-1).
+			 */
 			stake: string;
+			/** The frozen `bets.stake`, for the struck-through original (R6). */
+			stakeOriginal: string;
+			/** R6/R10 `Sold` — nothing survives on this argument. */
+			sold: boolean;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
 			/**
@@ -116,7 +124,15 @@ export type DebatePost =
 			marker: Marker;
 			badge: Badge | null;
 			author: AuthorIdentity;
+			/**
+			 * `a` — the author's stake **still held** on this post (surviving lot
+			 * basis), the same value the §3.4 tiebreak ranks on.
+			 */
 			authorStake: string;
+			/** The frozen `bets.stake`, for the struck-through original (R6). */
+			authorStakeOriginal: string;
+			/** R6/R10 `Sold` — the author has exited this argument entirely. */
+			authorSold: boolean;
 			/** EXPORT.1 — per-node entry price (`price_at_bet`); non-removed ONLY. */
 			entryPrice: string;
 			aggregate: ReplyAggregate;
@@ -336,6 +352,8 @@ export async function loadDebateView(
 			badge: badgeFor(sub, postSubstrate),
 			author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: sub.authorStake,
+			authorStakeOriginal: sub.authorStakeOriginal,
+			authorSold: sub.authorSold,
 			entryPrice: sub.priceAtBet,
 			aggregate,
 			replies,
@@ -543,6 +561,8 @@ function buildReply(
 		marker: comment.marker,
 		author: authorMap.get(comment.userId) ?? UNKNOWN_AUTHOR,
 		stake: sub.stake,
+		stakeOriginal: sub.stakeOriginal,
+		sold: sub.sold,
 		entryPrice: sub.priceAtBet,
 		imageUrl: imageUrlByComment.get(sub.id) ?? null,
 	};

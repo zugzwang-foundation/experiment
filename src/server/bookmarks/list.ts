@@ -57,6 +57,8 @@ type PostAggRow = {
 	created_at: string | Date;
 	body: string;
 	author_stake: string;
+	author_stake_original: string;
+	author_sold: boolean;
 	price_at_bet: string;
 	support_count: string | number;
 	counter_count: string | number;
@@ -73,6 +75,8 @@ type ReplyRow = {
 	created_at: string | Date;
 	body: string;
 	stake: string;
+	original_stake: string;
+	sold: boolean;
 	price_at_bet: string;
 };
 
@@ -147,7 +151,10 @@ export async function loadBookmarks(
 					p.side_at_post_time AS parent_side,
 					p.created_at,
 					p.body,
+					-- RANK-1 / ADR-0039 R4 (amended) — a is conviction STILL HELD.
 					pb.stake AS author_stake,
+					pb.original_stake AS author_stake_original,
+					pb.sold AS author_sold,
 					pb.price_at_bet AS price_at_bet,
 					COUNT(rb.id) FILTER (
 						WHERE rc.side_at_post_time = p.side_at_post_time
@@ -175,8 +182,13 @@ export async function loadBookmarks(
 					), 0) AS counter_dharma
 				FROM ${comments} p
 				JOIN LATERAL (
-					SELECT b.stake, b.price_at_bet
+					SELECT
+						COALESCE(pl.surviving_basis, b.stake) AS stake,
+						b.stake AS original_stake,
+						COALESCE(pl.surviving_shares = 0, false) AS sold,
+						b.price_at_bet
 					FROM bets b
+					LEFT JOIN lots pl ON pl.bet_id = b.id
 					WHERE b.comment_id = p.id
 					ORDER BY b.created_at ASC, b.id ASC
 					LIMIT 1
@@ -188,7 +200,8 @@ export async function loadBookmarks(
 					postIds.map((id) => sql`${id}::uuid`),
 					sql`, `,
 				)})
-				GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body, pb.stake, pb.price_at_bet
+				GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body,
+					pb.stake, pb.original_stake, pb.sold, pb.price_at_bet
 			`)
 			: [];
 
@@ -204,12 +217,20 @@ export async function loadBookmarks(
 					rc.side_at_post_time AS side,
 					rc.created_at,
 					rc.body,
+					-- RANK-1 — the reply ruler and the figure beside it, one column.
 					rb.stake,
+					rb.original_stake,
+					rb.sold,
 					rb.price_at_bet
 				FROM ${comments} rc
 				JOIN LATERAL (
-					SELECT b.stake, b.price_at_bet
+					SELECT
+						COALESCE(rl.surviving_basis, b.stake) AS stake,
+						b.stake AS original_stake,
+						COALESCE(rl.surviving_shares = 0, false) AS sold,
+						b.price_at_bet
 					FROM bets b
+					LEFT JOIN lots rl ON rl.bet_id = b.id
 					WHERE b.comment_id = rc.id
 					ORDER BY b.created_at ASC, b.id ASC
 					LIMIT 1
@@ -374,6 +395,8 @@ export async function loadBookmarks(
 			counterDharma: toFixed18(new CpmmDecimal(r.counter_dharma)),
 			createdAt: new Date(r.created_at),
 			authorStake: r.author_stake,
+			authorStakeOriginal: r.author_stake_original,
+			authorSold: r.author_sold,
 			priceAtBet: r.price_at_bet,
 		});
 		postMeta.set(r.id, {
@@ -397,6 +420,8 @@ export async function loadBookmarks(
 			id: r.id,
 			side: r.side,
 			stake: toFixed18(new CpmmDecimal(r.stake)),
+			stakeOriginal: toFixed18(new CpmmDecimal(r.original_stake)),
+			sold: r.sold,
 			createdAt: new Date(r.created_at),
 			priceAtBet: r.price_at_bet,
 		});

@@ -12,6 +12,62 @@
 
 ---
 
+## Patch record
+
+**P1 (2026-08-22, RANK-1) — R4 now names all THREE rulers.** In-place Patch record
+per CLAUDE.md §5.12 (consumer-surface scoping, **not** supersession). **The
+load-bearing decision is unchanged:** ranking keys off surviving lot basis rather
+than frozen `bets.stake`. What changes is the enumeration of what "ranking" covers.
+
+**R4 as originally written** read:
+
+> *Ranking keys off SURVIVING LOT BASIS, not frozen bets.stake — both the
+> reply-lane ordering ruler and the post-lane attracted-value aggregates.*
+
+It named two rulers. **There are three.** The third is `tiebreak()`
+(`src/lib/ranking.ts`), which reads a post's author stake from the frozen
+`bets.stake` and decides `topOrder` whenever the lane margins tie — and per
+RANKING.md §3.3 that is not an edge case but the *ordinary* state of a young
+market, where every post sits below every activity floor and the entire order is
+therefore decided by author conviction alone. It also decides `profileOrder`
+outright. It was named in **no** document; it was found adversarially at MERGE-1
+as SURPRISE S-2.
+
+**The reason for the amendment is a confirmed exploit, not a tidiness concern.**
+Place a large reply-bet on a rival's post; the reply-lane ruler sorts on frozen
+`bets.stake`, so it takes the top Support or Counter slot and `twoSlot` surfaces
+it to every visitor as the best argument on that side. Then exit it. **The CPMM
+is fee-less**, so the round trip returns the stake minus ~1e-18 of dust. The lot
+goes Sold, `bets.stake` never moves, and the slot is held permanently. It repeats
+on every post in every market, and the same shape works one lane over on
+`tiebreak()` for the top of the market itself.
+
+Two things this ADR shipped made it worse rather than better, which is why the
+patch belongs here:
+
+- **R3's per-lot sell made the exit surgical.** Before it, recovering one reply's
+  stake shrank every argument that participant held in that market pro-rata, so
+  the attack cost the attacker their other positions.
+- **R5's attracted-value decay made it invisible.** The captured slot now renders
+  `Đ 0` attracted value beside a `#1` ordering — inverting the one signal a
+  reader could have used to detect the manipulation into something that reads
+  like a rounding artifact.
+
+**Also amended, in the same commit:** R4's ruling text above; RANKING.md §2, §3.3,
+§3.4, §3.6, §7 and §8 (which described frozen stake throughout, and whose §2
+aggregate rows had additionally been stale since LOTS-1 shipped R4's aggregate
+half in code without amending the spec); and D-5 below. **R6 is unchanged and now
+applies to two more surfaces** — the reply badge and the post badge render the
+same figure their ruler sorts on, reduced-with-strikethrough when partially sold
+and `Đ 0` + `Sold` at exactly zero.
+
+**No schema change.** `lots.surviving_basis` already exists; this is a read-path
+substitution at four application query sites plus the staging verification script
+(`scripts/verify-ranking-staging.ts`, which had already drifted), and the `lots`
+reach is a 1:1 unique-index lookup (`lots_bet_id_uq`), so no aggregate can fan out.
+
+---
+
 ## Context and Problem Statement
 
 A participant's holding in a market is currently a single aggregate number with no
@@ -127,8 +183,14 @@ founder-authored and is reproduced **verbatim**; it is the normative part of thi
 > **R3**  Sell is per-lot. Position-level "sell all" retained, executed as ONE
 > atomic multi-lot sell in a single DB transaction.
 >
-> **R4**  Ranking keys off SURVIVING LOT BASIS, not frozen bets.stake — both the
-> reply-lane ordering ruler and the post-lane attracted-value aggregates.
+> **R4**  ALL THREE RANKING INPUTS KEY OFF SURVIVING LOT BASIS, no exceptions:
+> the reply-lane ordering ruler, the post-lane `tiebreak()` author-conviction
+> input, and the attracted aggregates. If the money can leave, the rank it
+> bought leaves with it.
+> *(**AMENDED at RANK-1, 2026-08-22.** As originally written R4 named only the
+> reply-lane ruler and the attracted aggregates; `tiebreak()` was a third ruler
+> nobody had listed. Patch record P1 below carries the reason and the original
+> wording — nothing is rewritten out of the record.)*
 >
 > **R5**  support_dharma / counter_dharma decay when a replier's lot sells down.
 >
@@ -333,9 +395,53 @@ answer when nothing did.
 aggregates over the frozen `bets.stake`, at three byte-equivalent sites
 (`debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`).
 Under R4/R5 the summand becomes the replier's **surviving lot basis** for that reply —
-`SUM(l.surviving_basis) FILTER (…)`, joined `lots ON lots.bet_id = rb.id`. A replier who
-sells their lot down therefore withdraws the weight they lent the parent, which is the
-behaviour R5 names. The reply-lane ordering ruler takes the same substitution.
+`SUM(COALESCE(l.surviving_basis, rb.stake)) FILTER (…)`, joined `lots ON lots.bet_id =
+rb.id`. A replier who sells their lot down therefore withdraws the weight they lent the
+parent, which is the behaviour R5 names.
+
+**The COALESCE fallback is part of the ruling, not a defensive habit.** Every bet mints
+its lot inside the same W-1 transaction (R8), so a lot-less bet does not arise. The
+fallback exists for what would happen if one ever did: dropping it would score an
+unknown surviving amount as **zero**, silently deleting a real contribution from the
+model. Reading "unknown" as "all of it survives" is the pre-LOTS-1 behaviour and the
+smaller failure.
+
+⚠ **It IS invisible when it fires, and an earlier draft of this paragraph claimed the
+opposite.** A lot-less row emits nothing: no log line, no Sentry breadcrumb, no counter,
+no DTO field, and no badge difference — `sold` reads `false` and the original equals the
+current, so it renders pixel-identical to an argument nobody has touched. Nothing in the
+tree distinguishes *"this stake is fully intact"* from *"we have no idea and are assuming
+it is"*. The fallback remains the right choice; the reason it is right is that reading
+unknown as zero would silently delete a real argument's weight, **not** that the fallback
+announces itself. That correction matters because it changes what a lot-less row IS after
+RANK-1: with every other row now decaying, it is the one class that holds ranking weight
+regardless of exit — permanently, silently, with no back-fill path (R8) and no detector.
+Not participant-reachable under the shipped write path (the lot mints inside the same W-1
+transaction as its bet), but reachable during an ADR-0024 migrate-before-serve promote or
+a rollback to a pre-`0025` build. **The owed control is a DETECTOR, not a semantics
+change** — the HALT condition `drizzle/migrations/0025_lots.sql` states in prose and
+nothing implements.
+
+**The other two rulers take the same substitution** (R4 as amended at RANK-1 — see the
+Patch record):
+
+- **The reply-lane ordering ruler** — `compareReply` in `src/lib/ranking.ts`, fed by
+  `ReplySubstrate.stake` from **three** sites: `debate-view/reply-substrate.ts`,
+  `profile/arguments.ts` and `bookmarks/list.ts`. ⚠ Note which one is NOT the
+  aggregate trio: `reply-substrate.ts` builds no aggregate and appears on no earlier
+  list, yet it is the loader that feeds the two-slot debate view — the surface the
+  capture runs through — and it had no `lots` join at all. (`ranking-substrate.ts` is
+  in the aggregate trio but builds only `PostSubstrate`, so it feeds ruler (ii),
+  never a reply.)
+- **The post-lane `tiebreak()` author-conviction input** — `PostSubstrate.authorStake`,
+  read through each site's earliest-bet `JOIN LATERAL`. It decides `topOrder` whenever
+  the lane margins tie (the ordinary case below the activity floors) and `profileOrder`
+  outright.
+
+⚠ **Expect the lane order to CHANGE for any market where an argument has been sold down.
+That change is the fix, not a regression.** A shipped test asserting a specific ordering
+that goes red is updated to the new expected order with the reason recorded in the test;
+it is never "fixed" by restoring the old order.
 
 **This makes attracted value mutable where it was frozen.** That is the intended
 semantics: the aggregate now measures *conviction currently held*, not *conviction once

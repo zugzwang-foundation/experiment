@@ -103,6 +103,8 @@ export function PostPopup({
 										marker={post.marker}
 										entryPrice={post.entryPrice}
 										authorStake={post.authorStake}
+										originalStake={post.authorStakeOriginal}
+										sold={post.authorSold}
 										bookmarks={null}
 										showActions={false}
 									/>
@@ -213,6 +215,8 @@ export function ReplyPopup({
 										marker={reply.marker}
 										entryPrice={reply.entryPrice}
 										authorStake={reply.stake}
+										originalStake={reply.stakeOriginal}
+										sold={reply.sold}
 										bookmarks={null}
 										showActions={false}
 									/>

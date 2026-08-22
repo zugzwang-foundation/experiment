@@ -131,6 +131,8 @@ export function PostCard({
 					marker={post.marker}
 					entryPrice={post.entryPrice}
 					authorStake={post.authorStake}
+					originalStake={post.authorStakeOriginal}
+					sold={post.authorSold}
 					replyCount={replyCount}
 					bookmarks={bookmarks}
 				/>

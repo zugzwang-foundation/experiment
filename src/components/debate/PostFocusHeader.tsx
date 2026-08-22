@@ -158,6 +158,8 @@ export function PostFocusHeader({
 											entryPrice={post.entryPrice}
 											chipSize="detail"
 											authorStake={post.authorStake}
+											originalStake={post.authorStakeOriginal}
+											sold={post.authorSold}
 											replyCount={replyCount}
 											bookmarks={bookmarks}
 										/>

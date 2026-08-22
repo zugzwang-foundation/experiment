@@ -88,6 +88,8 @@ export function ReplyCard({
 				marker={reply.marker}
 				entryPrice={reply.entryPrice}
 				authorStake={reply.stake}
+				originalStake={reply.stakeOriginal}
+				sold={reply.sold}
 				bookmarks={bookmarks}
 			/>
 			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.

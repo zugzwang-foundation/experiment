@@ -349,10 +349,22 @@ describe("UI-A6 Slice 3 — loadBookmarks masking + forced-visitor mode (F-BM-3)
 		// Ratified upstream at ADR-0032 D-4 and canon ruling 1; required
 		// downstream by PD-6-01. The no-Sell-key loop below is UNTOUCHED and
 		// still enforcing — it is the invariant; this list is the enumeration.
+		//
+		// ⚠ WIDENED BY TWO AGAIN AT RANK-1 (ADR-0039 R4 as amended / R6), 18 -> 20.
+		// `authorStakeOriginal` is the author's FROZEN `bets.stake` and `authorSold`
+		// is `lots.surviving_shares = 0` on the author's own entry bet. Both are
+		// properties of THE AUTHOR'S argument, exactly as `authorStake` beside them
+		// is — they say what that author committed and whether they still hold it,
+		// and they read the same for every viewer. Neither is Sell-eligibility and
+		// neither is an owner delta: `authorSold` describes the AUTHOR's exit, never
+		// the viewer's ability to make one. The no-Sell-key loop below is again
+		// untouched, and is still the thing actually enforcing the rule.
 		expect(Object.keys(item).sort()).toEqual([
 			"aggregate",
 			"authorPseudonym",
+			"authorSold",
 			"authorStake",
+			"authorStakeOriginal",
 			"body",
 			"createdAt",
 			"current",
