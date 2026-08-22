@@ -21,6 +21,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // it regresses — the only thing standing between a config mistake and prod
 // connecting through a pooler no record authorises (ADR-0024 P3 #8).
 //
+// ⛔ BUT BE PRECISE ABOUT WHAT THESE ROWS ESTABLISH, because the obvious reading
+// claims more. `ZUGZWANG_ENV` is INLINED AT BUILD TIME by `next.config.ts`'s
+// `env` block, so in the deployed artifact the prod half of the guard is a
+// constant — it compiles to `"prod" === "prod"` for a production build, and to
+// DEAD CODE for any other. Under Vitest no inlining happens and these cases
+// mutate `process.env` at runtime. ⇒ they pin the SOURCE rule, NOT the shipped
+// artifact.
+//
+// That is sound today, for a reason recorded outside this file: the promoted
+// artifact is a production build (docs/runbooks/deploy-pipeline.md), and
+// `vercel promote` swaps an alias over a build that already carried
+// ZUGZWANG_ENV=prod — so the guard is live on every artifact that can serve the
+// production domain. The residual is forward-looking: if the promote path ever
+// promoted a staging- or preview-built artifact, the guard would vanish via
+// dead-code elimination and NOTHING HERE WOULD GO RED. A guard whose protection
+// rests on a deploy-pipeline property that no test observes is worth knowing the
+// shape of, even while the property holds.
+//
 // Approach: mock `postgres` so the module-load construction is captured rather
 // than performed (postgres.js is lazy, but a test must not depend on that), and
 // mock the drizzle wrapper so nothing touches a schema. `vi.resetModules()` +

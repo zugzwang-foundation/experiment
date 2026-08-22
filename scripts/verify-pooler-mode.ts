@@ -108,6 +108,62 @@ function firstRowWith<T>(result: unknown, key: keyof T): T | undefined {
 
 type Probe = { v: string; pid: number };
 
+/**
+ * Put back what the probe moved.
+ *
+ * ⚠ THE PROBE MUTATES SHARED STATE, AND UNDER TRANSACTION MODE THAT STATE
+ * OUTLIVES THIS PROCESS. A bare session-level `SET` is the whole mechanism here
+ * — it has to be session-level or it would prove nothing — but in transaction
+ * mode the backend carrying it goes back to the Supavisor pool at check-in, and
+ * neither pgbouncer nor Supavisor guarantees a reset on the way in. The sentinel
+ * would then be inherited by whatever runs on that backend next.
+ *
+ * Application transactions are insulated (`SET LOCAL statement_timeout` overrides
+ * for the transaction), but a `SET LOCAL` reverts to the SESSION value at COMMIT,
+ * so reads issued outside a transaction on that backend would inherit the
+ * sentinel. A timeout is a ceiling rather than a bypass, so nothing is unsafe —
+ * but the named downstream caller is S-5, running this immediately before load
+ * run #1. An instrument that leaves residue in the system it is about to measure
+ * is a defect of the instrument.
+ *
+ * ⛔ CLEANUP IS BEST-EFFORT BY CONSTRUCTION, and that is not a shortcut — it is
+ * the same property the probe measures. In transaction mode we cannot address a
+ * specific backend: each `RESET` lands wherever the pooler sends it. So we issue
+ * them until every polluted pid has been reached, bounded, and REPORT any pid we
+ * could not reach rather than implying the cleanup was total.
+ */
+async function resetSentinel(polluted: Set<number>): Promise<void> {
+	if (polluted.size === 0) return;
+	const remaining = new Set(polluted);
+	// Generous relative to `max: 4`, still bounded — a pooler that never rotates
+	// must not spin here.
+	const maxAttempts = polluted.size * 8;
+
+	for (let i = 0; i < maxAttempts && remaining.size > 0; i++) {
+		const row = firstRowWith<Probe>(
+			await db.execute(
+				sql`RESET statement_timeout; SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+			),
+			"v",
+		);
+		if (row) remaining.delete(row.pid);
+	}
+
+	if (remaining.size === 0) {
+		console.log(`cleanup · sentinel reset on all ${polluted.size} backend(s).`);
+		return;
+	}
+	console.warn(
+		`⚠ cleanup · could NOT reach backend(s) ${[...remaining].join(", ")} — they`,
+	);
+	console.warn(
+		`  may still carry statement_timeout=${SENTINEL_MS}ms. Harmless (a ceiling,`,
+	);
+	console.warn(
+		"  not a bypass) but say so in the evidence rather than assuming it lapsed.",
+	);
+}
+
 async function main(): Promise<void> {
 	console.log(
 		"verify-pooler-mode — is this pooler in transaction or session mode?",
@@ -158,6 +214,8 @@ async function main(): Promise<void> {
 		if (!row) {
 			console.error("");
 			console.error("⛔ CONTROL BROKEN — a follow-up read returned no row.");
+			// The SET already happened, so clean up even on the broken path.
+			await resetSentinel(new Set([applied.pid]));
 			process.exitCode = 2;
 			return;
 		}
@@ -171,6 +229,15 @@ async function main(): Promise<void> {
 	const persisted = observations.every((o) => o.v === `${SENTINEL_MS}ms`);
 	console.log(`backends seen : ${pids.join(", ")}`);
 	console.log(`setting held  : ${persisted ? "every read" : "not every read"}`);
+	console.log("");
+
+	// Put the sentinel back BEFORE printing a verdict, so the cleanup line sits
+	// with the evidence it belongs to rather than after the conclusion.
+	const polluted = new Set<number>([
+		applied.pid,
+		...observations.filter((o) => o.v === `${SENTINEL_MS}ms`).map((o) => o.pid),
+	]);
+	await resetSentinel(polluted);
 	console.log("");
 
 	// EITHER signal alone establishes transaction mode: a rotated backend proves
