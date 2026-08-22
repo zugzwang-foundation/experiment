@@ -59,16 +59,24 @@ export type HeroPost = {
 	 * stores the NO price. The view layer renders it RAW; deriving a complement
 	 * would print the wrong number on every NO chip.
 	 *
-	 * Already loaded on `PostSubstrate` (ranking.ts:50, selected by
-	 * ranking-substrate.ts:74) and discarded until now, so this costs ZERO new
+	 * Already loaded on `PostSubstrate` (its `priceAtBet` field, selected by
+	 * `loadRankingSubstrate`) and discarded until now, so this costs ZERO new
 	 * queries. Passed through verbatim, exactly as `load-debate-view.ts:267` does.
 	 */
 	entryPrice: string;
 	/**
-	 * V16 — every reply-bet on this post, support and counter together. Both
-	 * halves are already on `PostSubstrate` (ranking.ts:31-34) and were discarded
-	 * until now, so this costs ZERO new queries. A plain integer sum: these are
-	 * COUNTS, not money.
+	 * V16 — every reply on this post, support and counter together. Both halves
+	 * are already on `PostSubstrate` (its `*CountTotal` fields — the DISPLAY
+	 * counts, never the ranking ones) and were discarded until now, so this costs
+	 * ZERO new queries. A plain integer sum: these are COUNTS, not money.
+	 *
+	 * ⚠ **The `Total` suffix is the whole of the correctness here.** The ranking
+	 * pair (`supportCount` / `counterCount`) is self-EXCLUSIVE, and this panel
+	 * renders beside a reply lane that is not — so reading the ranking pair here
+	 * printed a number a reader could subtract from the lane to learn that a
+	 * removed reply was the post author's own. That is what RANK-3 closed, and
+	 * this field is where it had leaked onto the most public surface in the
+	 * product. Both names typecheck as `number`; only one is renderable.
 	 */
 	replyCount: number;
 	/**
@@ -380,7 +388,14 @@ export async function selectHeroTopPosts(
 			author: authorMap.get(row.userId) ?? UNKNOWN_AUTHOR,
 			authorStake: p.authorStake,
 			entryPrice: p.priceAtBet,
-			replyCount: p.supportCount + p.counterCount,
+			// ⚠ THE DISPLAY TOTALS, not the ranking counts (ADR-0039 P3, RANK-3).
+			// This renders as "Replies · N" on the PUBLIC hero panel, so it must
+			// be every reply — self-authored and removed included — and must match
+			// what a reader would count on the market page. The ranking counts are
+			// distinct people with self-replies excluded, and rendering them here
+			// would put a second count differential on the most public surface
+			// there is.
+			replyCount: p.supportCountTotal + p.counterCountTotal,
 			replyDharma: toFixed18(
 				new CpmmDecimal(p.supportDharma).plus(p.counterDharma),
 			),

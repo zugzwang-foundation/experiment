@@ -297,7 +297,7 @@
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
 			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT p.id\n\t\t\t\tFROM comments p\n\t\t\t\tJOIN markets m ON m.id = p.market_id\n\t\t\t\tJOIN comments rc ON rc.parent_comment_id = p.id\n\t\t\t\tJOIN bets rb ON rb.comment_id = rc.id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL\n\t\t\t\tGROUP BY p.id\n\t\t\t\tHAVING count(rb.id) >= 5 OR SUM(rb.stake) >= 2000\n\t\t\t) dominant HAVING count(*) >= 2",
-			"look": "three badges, one per lane: M2-P2 Most Debated, M2-P3 Highest Stakes, M2-P4 Contested"
+			"look": "ONE badge since RANK-3: M2-P3 Highest Stakes. M2-P2 and M2-P4 lost theirs when traction became DISTINCT PEOPLE — P2 draws 5 replies from 3 people, P4 draws 4 from 3, and neither clears floor_lane(n)=5 or n^b=3. The fixture data needs re-shaping to restore a three-badge M2; that needs a rebuild."
 		},
 		{
 			"id": "C4",
@@ -307,7 +307,7 @@
 			"url": "https://staging.zugzwangworld.com/m/sp-m2-active",
 			"reason": null,
 			"probe": "SELECT count(*)::int AS n FROM (\n\t\t\t\tSELECT p.id\n\t\t\t\tFROM comments p\n\t\t\t\tJOIN markets m ON m.id = p.market_id\n\t\t\t\tWHERE m.slug = 'sp-m2-active' AND p.parent_comment_id IS NULL\n\t\t\t\t  AND (SELECT count(*) FROM comments r WHERE r.parent_comment_id = p.id) < 5\n\t\t\t) quiet HAVING count(*) > 6",
-			"look": "9 of the 12 posts carry NO badge — that is the criterion, not an omission"
+			"look": "11 of the 12 posts carry NO badge — that is the criterion, not an omission (was 9 before RANK-3 redefined traction as distinct people)"
 		},
 		{
 			"id": "C5",

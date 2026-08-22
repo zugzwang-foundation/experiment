@@ -2530,6 +2530,36 @@ precondition on an operation, not a wait for an event.
 
 ## D-7 — every rate limiter parses `X-Forwarded-For` by hand; the platform, not the code, is what makes that safe
 
+> ### ⛔ READ THIS BEFORE RE-RAISING IT: THE SPOOF IS MEASURED AND DOES NOT WORK.
+>
+> **STATUS — live defect: CLOSED. Latent risk: OPEN.** Measured at CLOSE-1
+> (2026-08-22) against `POST /api/visits` on staging: **six requests, each with a
+> distinct spoofed `X-Forwarded-For` (`203.0.113.1`–`.6`), bought ZERO fresh
+> buckets** — the counter sat at 1452 six times. The arithmetic closes on itself
+> (`2 + 58 = 60`, the documented per-IP-per-minute cap), so the counter stopped at
+> the limiter rather than incidentally. **The Vercel edge overwrites the header
+> before the function sees it.** The full run is below.
+>
+> ⚠ **This has been re-raised as OPEN by four separate security passes while the
+> measurement above was already on disk**, most recently at RANK-2, whose auditor
+> said in as many words: *"I could not verify Vercel's header handling from this
+> repo."* **That sentence is the actual defect in this row.** The measurement is
+> here; it is not reachable from where an auditor looks. **Eight call sites
+> hand-roll the parse and not one of them carries a pointer to this page**, so a
+> reviewer reading `src/` correctly concludes the header is untrusted and
+> correctly flags it — every time.
+>
+> ⇒ **The fix that would end the recurrence is a one-line comment at each of the
+> eight sites**, naming this row. It is deliberately NOT done here: those eight
+> sites are already owned by the `AUDIT-FIX-B7b` HARDEN sweep above, and folding
+> them into an unrelated PR is how two changes become one unreviewable one.
+> **Whoever runs that sweep: add the pointer first — it is cheaper than the sweep
+> and it is what stops the fifth re-raise.**
+>
+> **The residual below stands and is not diminished by any of this:** the control
+> is the PLATFORM, not the code. A topology change makes all eight spoofable at
+> once, with no code change and no failing test.
+
 **Originating task:** MERGE-1 (2026-08-21) adversarial review. **Extends — does not duplicate —
 the `AUDIT-FIX-B7b security-auditor SURPRISE` row above**, which owns the remediation sweep.
 Two things are new here: a corrected site count, and the first actual measurement.
