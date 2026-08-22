@@ -236,29 +236,26 @@ describe("AUDIT-FIX-B3 A3 — sell oversell → cached 400 (not uncached 500)", 
 		expect(await heldSideOrNull(testDb, { userId, marketId })).toBeNull();
 	});
 
-	it("sell-oversell::explicit-null-lotId-is-a-position-level-sell-not-a-400", async () => {
-		// PHASE-0 / LOTS-1. `lotId` is `string | null` behind this route and both
-		// call sites normalise `?? null`, so `null` is what "no particular
-		// argument" MEANS everywhere inside. The schema said `.optional()`, which
-		// admits only ABSENT — so a client round-tripping the shape it was handed
-		// got a 400 for a body that said exactly the right thing.
+	it("sell-oversell::explicit-null-lotId-is-rejected-absent-is-the-only-omission", async () => {
+		// CLOSE-1. The wire schema is `.optional()`, so ABSENT is the only
+		// spelling of "no particular argument" a client may send. `null` is the
+		// INTERNAL spelling — the field is `string | null` behind the route and
+		// both call sites normalise `?? null` — and it deliberately does not
+		// cross the wire.
 		//
-		// And the 400 is the expensive part, not the rejection: `safeParse`
-		// failure throws a bare `InvalidRequestBodyError` with no field detail, so
-		// the message does not name `lotId`; and a 400 is CACHED under the
-		// idempotency key, so the corrected request must be reissued under a FRESH
-		// key to be heard at all. An unhelpful error the client cannot retry its
-		// way out of.
-		//
-		// ⚠ Corrected at MERGE-1: this said the corrected request "replays the
-		// same refusal", and it does not. Correcting the body changes its bytes,
-		// so `computeBodyFingerprint` no longer matches the cached one and the
-		// lookup returns `mismatch` (idempotency/cache.ts:203-206), which the
-		// endpoint answers as 409 `error_idempotency_key_reused`
-		// (bets/endpoint.ts:250-258) — never the stale 400. The conclusion above
-		// is unchanged and the reason for it is worse: a client that reads
-		// key-reused as "pick a new key" has been handed the one instruction that
-		// turns a refused sell into a second executed one.
+		// This is pinned rather than left to the schema because the widening
+		// looks free and is not. The idempotency key's body fingerprint is
+		// `sha256(canonicalize(body))`, and canonicalize emits the KEY SET it is
+		// handed, so `{marketId, shares}` and `{marketId, shares, lotId: null}`
+		// fingerprint differently. If both spellings were legal, a retry that
+		// reached for the fuller form under the same key would miss the cached
+		// fingerprint, land on `mismatch`, and come back 409
+		// `error_idempotency_key_reused` — and a client that reads key-reused as
+		// "pick a new key" turns a completed sell into a second executed one.
+		// Accepting one spelling per meaning is what keeps the fingerprint a
+		// function of the request. No shipped client is affected:
+		// `buildSellRequest` types the field `lotId?: string` and omits the key
+		// when it is undefined, and both callers spread-guard on undefined.
 		const userId = await seedUser("nulllot", "nulllot");
 		const marketId = await seedOpenMarketWithPool("nulllot-market");
 		await seedHeldPosition(userId, marketId, "5.000000000000000000");
@@ -271,27 +268,26 @@ describe("AUDIT-FIX-B3 A3 — sell oversell → cached 400 (not uncached 500)", 
 			),
 		);
 
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(400);
 		const payload = await res.json();
-		expect(payload.ok).toBe(true);
+		expect(payload.error.code).toBe("error_invalid_request_body");
 
-		// It behaved as the POSITION-level sell, which is the whole claim: the
-		// held quantity moved by the full amount. (No lots exist — the position is
-		// seeded directly — so this also rides the no-lots arm.)
+		// And the refusal is a refusal: the held quantity did not move. A 400 that
+		// still sold would be the worse defect of the two.
 		const positionRows = await testDb
 			.select({ quantity: positions.quantity })
 			.from(positions)
 			.where(
 				and(eq(positions.userId, userId), eq(positions.marketId, marketId)),
 			);
-		expect(positionRows[0]?.quantity).toBe("3.000000000000000000");
+		expect(positionRows[0]?.quantity).toBe("5.000000000000000000");
 	});
 
 	it("sell-oversell::a-malformed-lotId-is-still-rejected (the control)", async () => {
-		// The control for the test above. `.nullish()` widens the schema by
-		// exactly one value; it must not have turned the field into "anything
-		// goes", or the previous test would be passing against no validation at
-		// all rather than against a correctly-widened one.
+		// The control for the test above. That one proves the field's TYPE is
+		// narrow (no `null`); this one proves its FORMAT is still checked — the
+		// field must not have degraded into "a string, whatever it says", or a
+		// per-lot sell could name a lot id that could never exist.
 		const userId = await seedUser("badlot", "badlot");
 		const marketId = await seedOpenMarketWithPool("badlot-market");
 		await seedHeldPosition(userId, marketId, "5.000000000000000000");

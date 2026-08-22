@@ -24,16 +24,25 @@ const sellBodySchema = z.object({
 	// the position-level sell this route has always performed, so every existing
 	// client keeps working and keeps meaning the same thing.
 	//
-	// `.nullish()`, NOT `.optional()`. The internal type is `string | null` and
-	// BOTH call sites normalise with `?? null`, so `null` is what a
-	// position-level sell means everywhere behind this line — but `.optional()`
-	// admits only ABSENT, and a client serialising the shape it was handed
-	// (`{marketId, shares, lotId: null}`) was rejected. Rejected badly, at that:
-	// `safeParse` failure throws a bare `InvalidRequestBodyError` with no field
-	// detail, so the participant is told "invalid body" about a body that says
-	// exactly what they meant — AND the 400 is CACHED under the idempotency key,
-	// so the correction has to be reissued under a fresh key to be heard at all.
-	lotId: z.string().uuid().nullish(),
+	// `.optional()`, NOT `.nullish()` — ABSENT is the only spelling of "no
+	// particular argument" that crosses this wire. Behind the line the field is
+	// `string | null` and both call sites normalise with `?? null`, but that is
+	// an INTERNAL convention: `buildSellRequest` types the field `lotId?: string`
+	// and rebuilds the body key-by-key, dropping the key entirely when it is
+	// undefined, and both of its callers spread-guard on undefined too. No
+	// shipped client can send `null`.
+	//
+	// Admitting it anyway would not be a free widening, because the two
+	// spellings are NOT idempotency-equivalent. The key's body fingerprint is
+	// `sha256(canonicalize(body))`, and canonicalize emits the KEY SET it is
+	// given — so `{marketId, shares}` and `{marketId, shares, lotId: null}`
+	// fingerprint differently. A retry that reaches for the fuller form under
+	// the same key misses the cached fingerprint, lands on the `mismatch` arm,
+	// and comes back 409 `error_idempotency_key_reused`. A client that reads
+	// key-reused as "pick a new key" has just been handed the one instruction
+	// that turns a completed sell into a second executed one. One spelling per
+	// meaning is what keeps the fingerprint a function of the request.
+	lotId: z.string().uuid().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
