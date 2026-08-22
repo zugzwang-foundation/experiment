@@ -360,9 +360,10 @@ export function badgeFor(
  * looking at.
  *
  * NOT fixed here, deliberately: `ReplySubstrate.stake` is the substrate contract
- * fed by three byte-equivalent read sites (`debate-view/ranking-substrate.ts`,
- * `profile/arguments.ts`, `bookmarks/list.ts`), and moving the ruler means
- * changing what all three select and re-baselining `RANKING.md` §7. That is the
+ * fed by two byte-equivalent read sites (`debate-view/ranking-substrate.ts`,
+ * `profile/arguments.ts` — `bookmarks/list.ts` was a third before UNWIRE-1
+ * unwired the bookmark module product-wide), and moving the ruler means
+ * changing what both select and re-baselining `RANKING.md` §7. That is the
  * ranking lane's work, with its own before/after ordering baseline; doing it
  * inside a fix pass would be a silent re-ranking of every debate.
  *

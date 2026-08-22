@@ -3,20 +3,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// `UnbookmarkButton` (the bookmark row's action) is a client component calling
-// `useRouter()` and the remove action — mocked at the same boundary the bookmarks
-// selection suite mocks them. This suite tests KEY ROUTING, not the action, and
-// an unmounted app router throws before any assertion runs.
-vi.mock("@/server/bookmarks/remove", () => ({
-	removeBookmarkAction: vi.fn(async () => ({ ok: true })),
-}));
+// `PositionsTable` renders `LotBreakdown`, a client component calling
+// `useRouter()` — mocked here because an unmounted app router throws before
+// any assertion runs. This suite tests KEY ROUTING, not routing itself.
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-import { BookmarksTable } from "@/components/bookmarks/BookmarksTable";
 import { PositionsTable } from "@/components/profile/PositionsTable";
-import type { BookmarkItem } from "@/server/bookmarks/list";
 import type { ProfilePositionRow } from "@/server/profile/positions";
 
 /**
@@ -35,9 +29,10 @@ import type { ProfilePositionRow } from "@/server/profile/positions";
  * the page-scroll condition, since it reports every dimension as zero — so that
  * one case defines the getter it depends on rather than pretending to observe it.
  *
- * ⚠ THE TWO SURFACES SHARE ONE FILE, deliberately: they share the hook, and the
- * whole point of sharing it is that neither can drift. Same reason the row-third
- * and the sticky-header strip are guarded once for both.
+ * UNWIRE-1 — this file used to cover TWO surfaces sharing one hook
+ * (`PositionsTable` and `BookmarksTable`, deliberately kept in one file so
+ * neither could drift). `BookmarksTable` is deleted along with the rest of
+ * the bookmark module; only the positions coverage remains.
  *
  * Fixtures are inline plain objects on the shipped DTOs (type-only imports — no
  * server code executes, no DB). No market content is invented (CLAUDE.md §3).
@@ -92,46 +87,9 @@ const posPicked = () =>
 				?.getAttribute("aria-current") === "true",
 	);
 
-// ── bookmarks fixtures ────────────────────────────────────────────────────────
-const ID = (n: number) => `0190c0de-2222-7000-8000-00000000000${n}`;
-
-function item(n: number): BookmarkItem {
-	return {
-		removed: false,
-		kind: "post",
-		id: ID(n),
-		side: "YES",
-		marketSlug: "fixture-alpha",
-		marketTitle: "Market fixture-alpha",
-		ordinal: n,
-		title: `Saved argument ${n}`,
-		teaser: "Neutral fixture teaser.",
-		body: `Saved argument ${n}\n\nNeutral fixture body.`,
-		marker: "none",
-		authorStake: "12.000000000000000000",
-		priceAtBet: "0.310000000000000000",
-		createdAt: "2026-07-01T00:00:00.000Z",
-		aggregate: {
-			supportCount: 2,
-			counterCount: 1,
-			supportDharma: "300.000000000000000000",
-			counterDharma: "100.000000000000000000",
-		},
-		authorPseudonym: "RedWolf001",
-		staked: "25.000000000000000000",
-		current: "31.000000000000000000",
-	};
-}
-
-const ITEMS = [item(1), item(2), item(3)];
-const bmRow = (n: number) => screen.getByTestId(`bookmark-row-${ID(n)}`);
-const bmPicked = () =>
-	[1, 2, 3].filter(
-		(n) =>
-			screen
-				.queryByTestId(`bookmark-row-${ID(n)}`)
-				?.getAttribute("aria-current") === "true",
-	);
+// UNWIRE-1 — the bookmarks fixtures (ID/item/ITEMS/bmRow/bmPicked) are
+// removed along with the "bookmarks mode" describe block below: the
+// bookmark module is unwired product-wide and BookmarksTable is deleted.
 
 describe("R4 — the mount selection is the keyboard's anchor (positions)", () => {
 	it("anchor::DOWN-from-a-fresh-load-moves-off-row-one", () => {
@@ -270,39 +228,5 @@ describe("R4 — the mount selection is the keyboard's anchor (positions)", () =
 		expect(posPicked()).toEqual([2]);
 		pressOnDocument("ArrowDown");
 		expect(posPicked()).toEqual([3]);
-	});
-});
-
-describe("R4 — the same anchor on the bookmarks mode", () => {
-	it("anchor::DOWN-from-a-fresh-load-moves-off-row-one", () => {
-		// ⛔ R4 says BOTH MODES. Since the bookmark toggle is a route rather than
-		// client state, this component IS the other mode.
-		render(<BookmarksTable items={ITEMS} />);
-		expect(bmPicked()).toEqual([1]);
-		pressOnDocument("ArrowDown");
-		expect(bmPicked()).toEqual([2]);
-	});
-
-	it("anchor::UP-from-a-fresh-load-wraps-to-the-last-row", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		pressOnDocument("ArrowUp");
-		expect(bmPicked()).toEqual([3]);
-	});
-
-	it("anchor::focus-INSIDE-the-table-steps-exactly-once", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		bmRow(1).focus();
-		fireEvent.keyDown(bmRow(1), { key: "ArrowDown" });
-		expect(bmPicked()).toEqual([2]);
-	});
-
-	it("anchor::a-caret-KEEPS-the-key", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		const field = document.createElement("textarea");
-		document.body.appendChild(field);
-		field.focus();
-		fireEvent.keyDown(field, { key: "ArrowDown" });
-		expect(bmPicked()).toEqual([1]);
-		field.remove();
 	});
 });
