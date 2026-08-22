@@ -2,13 +2,11 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { BookmarksArena } from "@/components/bookmarks/BookmarksArena";
-import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
-import { loadProfileGraphSeries } from "@/server/profile/graph-series";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { resolveProfileUser } from "@/server/profile/resolve";
 import { loadProfileTiles } from "@/server/profile/tiles";
@@ -67,11 +65,10 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 	   that previously issued one. They run in ONE `Promise.all` with the
 	   bookmarks read (tiles excepted, which must follow positions), so the
 	   wall-clock cost is one round-trip, not four. */
-	const [items, viewer, positions, graph] = await Promise.all([
+	const [items, viewer, positions] = await Promise.all([
 		loadBookmarks(db, { viewerId }),
 		resolveProfileUser(db, session?.user?.pseudonym ?? ""),
 		loadProfilePositions(db, { userId: viewerId }),
-		loadProfileGraphSeries(db, { userId: viewerId }),
 	]);
 	const tiles = await loadProfileTiles(db, { userId: viewerId, positions });
 
@@ -233,7 +230,6 @@ export default async function BookmarksPage(): Promise<React.JSX.Element> {
 						profileHref={`/u/${encodeURIComponent(viewer.pseudonym)}`}
 					/>
 				)}
-				<ProfileGraph series={graph} />
 			</div>
 			{/* ⚠⚠ ROUND 3 C3 — THE ARENA BAND, byte-carried from Profile's
 			    (`u/[pseudonym]/page.tsx:282-283`). The stacked card list is replaced

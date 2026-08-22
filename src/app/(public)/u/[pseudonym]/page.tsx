@@ -1,7 +1,6 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
-import { ProfileGraph } from "@/components/profile/graph/ProfileGraph";
 import { IdentityCard } from "@/components/profile/IdentityCard";
 import { ProfileArena } from "@/components/profile/ProfileArena";
 import { PageContainer } from "@/components/shell/PageContainer";
@@ -9,7 +8,6 @@ import { db } from "@/db";
 import { auth } from "@/server/auth";
 import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadProfileArguments } from "@/server/profile/arguments";
-import { loadProfileGraphSeries } from "@/server/profile/graph-series";
 import { buildPositionsPayload } from "@/server/profile/owner-view";
 import { loadProfilePositions } from "@/server/profile/positions";
 import { resolveProfileUser } from "@/server/profile/resolve";
@@ -59,10 +57,9 @@ export default async function ProfilePage({
 	// The positions read is the tiles' `positionsValue` source (the FI-2
 	// inheritance law — one holding, one value), so tiles follows it; the
 	// remaining reads run in parallel with positions.
-	const [positions, argumentItems, graph] = await Promise.all([
+	const [positions, argumentItems] = await Promise.all([
 		loadProfilePositions(db, { userId: profileUser.id }),
 		loadProfileArguments(db, { userId: profileUser.id }),
-		loadProfileGraphSeries(db, { userId: profileUser.id }),
 	]);
 	const tiles = await loadProfileTiles(db, {
 		userId: profileUser.id,
@@ -440,7 +437,6 @@ export default async function ProfilePage({
 				    band, so `IdentityCard` renders them and this file no longer
 				    mounts `ProfileTiles` directly. */}
 				<IdentityCard user={profileUser} owner={owner} tiles={tiles} />
-				<ProfileGraph series={graph} />
 			</div>
 			{/* The arena band — `lg:` for the same measured reason as the headzone
 			    above, and the two bands MUST share one breakpoint or the identity
