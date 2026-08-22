@@ -8,6 +8,7 @@ import { computeSell, type Side } from "@/server/cpmm/calculate";
 import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { appendLedgerRow } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
+import { applyLotSale, planLotSale } from "@/server/lots/persist";
 import { upsertPositionDelta } from "@/server/positions/persist";
 import { getHeldPosition } from "@/server/positions/read";
 
@@ -19,6 +20,14 @@ export interface SellParams {
 	userId: string;
 	marketId: string;
 	shares: string;
+	/**
+	 * LOTS-1 / ADR-0039 R3 — the ARGUMENT being exited, or null/omitted for the
+	 * position-level sell. With a lot id exactly that lot is reduced; without
+	 * one every surviving lot is reduced pro-rata (D-3 shape 2). Optional so the
+	 * pre-LOTS-1 callers, which have no notion of a lot, keep compiling and keep
+	 * meaning what they meant.
+	 */
+	lotId?: string | null;
 	/** Generated at handler entry, closed over (retry-purity). */
 	sellEventId: string;
 	/** A fresh UUIDv7 — the synthetic sale id for `bet.sold.payload.betId` (no bets row). */
@@ -38,7 +47,11 @@ export interface SellResult {
 /**
  * The comment-free sell (F-BET-3) — a position unwind, not an argument. Writes
  * NO `comments` and NO `bets` row (`bets.comment_id` NOT NULL forbids a
- * comment-free bet). Write order [R4]: positions → dharma_ledger(bet_id=null,
+ * comment-free bet). Since LOTS-1 it also reduces the holding's LOTS, either the
+ * one named by `lotId` or every surviving lot pro-rata (ADR-0039 D-3) — a sell
+ * that moved `positions` and left `lots` alone would break R2 on the first
+ * trade any participant ever made. Write order [R4]: positions → lots →
+ * dharma_ledger(bet_id=null,
  * `bet_stake` POSITIVE) → events(bet.sold, aggregate "market", synthetic
  * `payload.betId`) → pools. The single `event_id` + the synthetic sale id +
  * `metadata` are caller-generated at handler entry and closed over
@@ -68,6 +81,16 @@ export async function sell(
 		});
 	}
 	const side = held.side;
+	// LOTS-1 / ADR-0039 D-3 — PLAN the lot reduction before ANY write, so a
+	// per-lot oversell is a refusal rather than a rollback that happens to end
+	// in the right place. `planLotSale` reads and validates only.
+	const plannedLots = await planLotSale(tx, {
+		userId,
+		marketId,
+		side,
+		sharesToSell: shares,
+		lotId: params.lotId ?? null,
+	});
 	const cpmmSide: Side = side === "YES" ? "yes" : "no";
 	const sold = computeSell({
 		reserves: { yes: pool.yesReserves, no: pool.noReserves },
@@ -75,13 +98,17 @@ export async function sell(
 		shares,
 	});
 
-	// WRITES: positions → dharma_ledger → events → pools (no comment/bet rows).
+	// WRITES: positions → lots → dharma_ledger → events → pools (no comment/bet
+	// rows). `lots` follows `positions` so the pair moves together inside the one
+	// W-1 tx — R2's equality is held by that shared transaction, not by ordering.
 	await upsertPositionDelta(tx, {
 		userId,
 		marketId,
 		side,
 		shareDelta: new CpmmDecimal(shares).negated().toFixed(18),
 	});
+
+	await applyLotSale(tx, plannedLots);
 
 	await appendLedgerRow(tx, {
 		userId,

@@ -7,6 +7,12 @@ import {
 	StorageObjectMissingError,
 	StorageUnavailableError,
 } from "@/lib/errors";
+// LOTS-1 / ADR-0039 — the two lot-core sentinels, on the identical footing and
+// for the identical reason: `extends Error`, NOT `BetProductError`, so without
+// an explicit map they fall through to 500 `error_internal`. Same one-directional
+// edge (bets → lots); `lots/errors.ts` imports nothing but `server-only`, so no
+// runtime cycle even though `lots/persist.ts` imports back from this file.
+import { LotInputError, LotOversellError } from "@/server/lots/errors";
 import type { MarketStatus } from "@/server/markets/transitions";
 // AUDIT-FIX-B3 A3 — the two positions sentinels the sell path can surface to the
 // user (`extends Error`, NOT `BetProductError`). `toWireError` maps both
@@ -276,6 +282,26 @@ export class ParentCommentNotFoundError extends BetProductError {
 	}
 }
 
+/**
+ * LOTS-1 / ADR-0039 R3 → 404. The named lot does not exist, or does not belong
+ * to this user in this market.
+ *
+ * ⚠ Deliberately NOT the error for a lot that exists and is Sold. That case is
+ * `InsufficientSharesError` (held 0 < requested n), because the two mean
+ * different things to whoever is reading: "that is not your argument" versus
+ * "you have already exited that argument". Collapsing them would also leak
+ * whether a stranger's lot id is real, by answering differently for a lot that
+ * exists-but-is-empty than for one that does not exist.
+ */
+export class LotNotFoundError extends BetProductError {
+	static readonly httpStatus = 404;
+	static readonly code = "lot_not_found";
+	constructor() {
+		super("lot not found");
+		this.name = "LotNotFoundError";
+	}
+}
+
 /** Malformed request body (bad shape / non-positive stake|shares) → 400. */
 export class InvalidRequestBodyError extends BetProductError {
 	static readonly httpStatus = 400;
@@ -399,6 +425,45 @@ export function toWireError(err: unknown): WireError {
 		return buildWire(503, "error_position_conflict", err.message, {
 			retryAfterBody: 1,
 		});
+	}
+	// LOTS-1 / ADR-0039 — the two lot sentinels, mapped for the same reason the
+	// positions pair above them is, and it is not a cosmetic one.
+	//
+	// A 500 is UNCACHED BY DESIGN (`runBetEndpoint` caches only `< 500`, so a
+	// retry re-runs the handler). That is right for a transient fault and exactly
+	// wrong for a deterministic one: a request that fails the same way every time
+	// would be re-executed forever, each attempt paying the full W-1 transaction
+	// to arrive at the same refusal. Falling through to `error_internal` also
+	// tells the participant nothing they can act on.
+	if (err instanceof LotOversellError) {
+		// The lot-level oversell backstop — unreachable except by bug now that the
+		// per-lot pre-check refuses ahead of it and the position arm clamps. Mapped
+		// onto the SAME 400 `insufficient_shares` as the friendly pre-check, the
+		// `PositionOversellError` precedent (:403): a backstop trip should read to
+		// a participant as the thing it is, not as an opaque server fault.
+		return buildWire(
+			InsufficientSharesError.httpStatus,
+			InsufficientSharesError.code,
+			err.message,
+		);
+	}
+	if (err instanceof LotInputError) {
+		// "That is not a quantity" — a malformed or out-of-domain decimal reaching
+		// the pure core. Deterministic in the request, so it takes the existing
+		// 400 `error_invalid_request_body` and is CACHED under the idempotency key:
+		// the retry is answered from the cache instead of re-running the
+		// transaction to fail identically.
+		//
+		// Neither of these mints a NEW wire code. That is deliberate — F-BET-3's
+		// reachable set is a spec surface (SPEC.1 §7), and this slice has already
+		// widened it once with 404 `lot_not_found`. Reusing the two codes that
+		// already mean these things keeps the rider to the one change that is
+		// genuinely new.
+		return buildWire(
+			InvalidRequestBodyError.httpStatus,
+			InvalidRequestBodyError.code,
+			err.message,
+		);
 	}
 	if (err instanceof BetProductError) {
 		const ctor = err.constructor as unknown as {

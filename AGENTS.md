@@ -72,6 +72,7 @@ experiment/
 │   │   ├── (public)/               # the participant surface — layout.tsx + not-found.tsx (shell, SHELL/UI.0)
 │   │   │                           #   page.tsx                     — DISCOVERY, the market list (UI-A4). LIVE.
 │   │   │                           #   m/[slug]/page.tsx            — the debate view
+│   │   │                           #   m/[slug]/error.tsx           — the debate route error boundary
 │   │   │                           #   m/[slug]/export/route.ts     — debate .md export (ADR-0025)
 │   │   │                           #   m/[slug]/quote/route.ts      — CPMM quote read (UI-A2)
 │   │   │                           #   u/[pseudonym]/{page,loading,error}.tsx — PROFILE (UI-A5)
@@ -88,19 +89,28 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   shadcn primitives: avatar, badge, button, card, dialog, input, separator, skeleton, textarea
+│   │   └── ui/                     #   13 files, and they are NOT all shadcn. NINE shadcn
+│   │                               #   primitives: avatar, badge, button, card, dialog,
+│   │                               #   input, separator, skeleton, textarea. FOUR are
+│   │                               #   project-authored and canon-ratified — empty-block
+│   │                               #   (P1), loading-block (P7), error-block (the
+│   │                               #   route-boundary family; canon §10 C-STATES-1 rules
+│   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
+│   │                               #   item 13, pinned by component name and props).
+│   │                               #   Don't reach for a shadcn generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
-│   │   └── schema/                 #   13 files: _enums, audit, auth, bets, bookmarks, comments,
-│   │                               #   dharma, events, identity, image-uploads, index, markets, system
+│   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,
+│   │                               #   dharma, events, identity, image-uploads, index, lots, markets, system
 │   ├── lib/                        # auth-client, errors, utils, ranking{,.config,-decimal}, posthog/
-│   └── server/                     # server-side business logic — 26 dirs
+│   └── server/                     # server-side business logic — 29 dirs (measured at PHASE-0; the line read 26 and was stale by three)
 │       ├── admin/                  # actor (assertAdminActor — the R-14.5 belt; ENGINE.14)
 │       ├── auth/                   # index, email-otp, session-gate, onboarding-ref, tos-*, logout
 │       │   └── admin/              # login, logout, validate (admin path)
-│       ├── bets/ bookmarks/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ health/ idempotency/ identity-pool/
+│       ├── bets/ bookmarks/ comments/ config/ cpmm/ debate-export/ debate-view/ dharma/ events/ github/ health/ idempotency/ identity-pool/ onboarding/
 │       ├── discovery/              # ← list.ts is the Discovery read model. THE PERF-1 SURFACE (docs/parked.md, GO-LIVE BLOCKER)
 │       ├── markets/                # transitions, errors + ENGINE.14: transaction (W-4), create, open, close (incl. the closeDueMarkets sweep)
+│       ├── lots/                   # ← LOTS-1 / ADR-0039. compute (the pure core: mintLot · sellFromLot · allocateProRata · sumLots), persist (the ONLY `lots` write path), errors, basis (Đa = Σ surviving_basis)
 │       ├── middleware/ moderation/ observability/ positions/ profile/ resolution/ storage/ system/ upstash/ visitors/
 ├── tests/                          # dedicated dir (NOT colocated) — see §9
 ├── docs/{adr,specs,logs,plans,…}
@@ -188,7 +198,7 @@ const placeBetSchema = z.object({
 - **Money / Dharma:** `numeric("…", { precision: 38, scale: 18 })`.
 - **Enums:** `pgEnum`. `side` is `["YES","NO"]`, extracted to `src/db/schema/_enums.ts` to break the `bets ↔ comments` runtime-eval cycle. `dharma_entry_type` (column `entry_type`, **not** "reason") has 10 values: `bet_stake, bet_payout, daily_allowance, pool_seed, pool_unwind, correction_reverse, correction_apply, void_refund, uncollectable, initial_grant` (`initial_grant` appended by ENGINE.5 / R-1; `pool_seed`/`pool_unwind` dormant in v1, R-2).
 - **Indexes** inline in the second `pgTable` arg. **FKs** always declared and indexed on the referencing side; circular pairs use the lambda form `(): AnyPgColumn => other.id`.
-- **One file may hold several related tables.** 23 tables live across 11 files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media).
+- **One file may hold several related tables.** 24 tables live across 12 table-bearing files — e.g. `bets.ts` (bets + positions + bet_receipts), `events.ts` (events + resolution_events + payout_events), `markets.ts` (markets + pools + market_media). *(`src/db/schema/` holds 14 files; `_enums.ts` and `index.ts` declare no table, which is why the footer's "24 tables / 14 schema files" and this line's 12 are both right. Re-measured at MERGE-1 — this read "23 tables across 11 files" while six other lines in this file were moved at PHASE-0 and the footer already said 24.)*
 
 ### Reply-as-bet schema reality
 
@@ -199,14 +209,15 @@ const placeBetSchema = z.object({
 
 - **Bucket A — fully append-only** (10 tables: events, dharma_ledger, bets, comments, resolution_events, payout_events, mod_actions, admin_events, user_events, bet_receipts). Protected by `0003_append_only_triggers.sql` (row-level UPDATE/DELETE) + `0021`/`0022` (statement-level TRUNCATE, ADR-0030); `bet_receipts` (AUDIT-FIX-B3 / ADR-0031) ships all three guards in `0022` reusing the shared functions. Reject UPDATE/DELETE/TRUNCATE at the storage layer.
 - **Bucket B — append-only with whitelisted column transition(s)** (3 tables: identity-pool, image-uploads, system-state). Each permits a one-shot `NULL→timestamp` transition on a whitelisted column — e.g. `system_state.frozen_at` flips once then is immutable (`image_uploads` transitions `terminal_state` + `terminal_at` together). All other column changes, every DELETE, and every TRUNCATE are rejected at the storage layer (TRUNCATE statement-level, ADR-0030).
-- **Bucket C — mutable** (e.g. `positions`).
+- **Bucket C — mutable** (e.g. `positions`, `bookmarks`, `lots`).
+  - ⚠ **`lots` is Bucket C and carries a DELETE guard, which no bucket name covers** (ADR-0039 D-1, SPEC.2 §5.2; added at MERGE-1, where this line still read *"e.g. `positions`"* alone). Its shape is narrower than either family: the row may CHANGE — that is what `surviving_shares` is for — in ONE direction, forever, and may never LEAVE. Calling it Bucket A would assert UPDATE is forbidden, the opposite of true. So migration `0026` gives it a row-level `BEFORE DELETE` reject named `lots_no_delete` **deliberately outside the `bucket_%` family**, so it enters neither the §6 append-only contract nor the staging reset's guard catalogue — both of which it would misdescribe. **The protected count is unchanged at thirteen**, and `EXPECTED_GUARD_CATALOG_ROWS` stays 78.
 
 ### Migrations (`drizzle/migrations/`)
 
 - Generated via `just db-generate <name>`; **append-only — never edit a committed migration, write a new one.** Destructive migrations need PR sign-off + a backup snapshot first.
 - The `events` table partitioning is **hand-written** (`PARTITION BY RANGE`) in `0002_events_partitioning.sql` and **excluded from drizzle-kit** via `drizzle.config.ts` → `tablesFilter: ["!events"]`.
 - pg_cron-coupled migrations (`0007_pg_cron_jobs.sql`, `0011_position_drift_pg_cron.sql`) carry `cron.schedule()` (and `0007` the `CREATE EXTENSION pg_cron`); CI strips those statements from every `*pg_cron*.sql` before applying (the CI runner has no pg_cron).
-- Current head: `0024_bookmarks` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31); 0024 = `bookmarks` (UI-A6 / ADR-0032, PR #254)).
+- Current head: `0026_lots_no_delete` (0016 = `mod_actions.reason` for the reactive-moderation foundation, PR #143; 0017 = drop `comments.stake_at_post_time` (DEBATE.8); 0018 = drop `friendly_fire_events` (DEBATE.9); 0019 = `market_media` (MEDIA.1); 0020 = `dharma_ledger.seq` total-order (AUDIT-FIX-B2 / ADR-0029); 0021 = TRUNCATE guards (AUDIT-FIX-B2 / ADR-0030); 0022 = `bet_receipts` durable idempotency receipts + same-file Bucket-A guards (AUDIT-FIX-B3 / ADR-0031); 0023 = `positions_market_id_idx` W-3 settle-read + FK-convention index (AUDIT-FIX-B7b / A31); 0024 = `bookmarks` (UI-A6 / ADR-0032, PR #254); 0025 = `lots` (LOTS-1 / ADR-0039 — Bucket C, no back-fill, seven CHECKs); 0026 = `lots_no_delete` (PHASE-0 / ADR-0039 R9 — a row-level `BEFORE DELETE` reject, deliberately NOT `bucket_%` and deliberately NOT a TRUNCATE guard, so `lots` stays Bucket C, `EXPECTED_GUARD_CATALOG_ROWS` stays 78, and `TRUNCATE bets CASCADE` still empties it)).
 
 ### Transactions, queries, validation
 
@@ -250,7 +261,7 @@ const placeBetSchema = z.object({
 ```
 tests/
 ├── _setup/        env.ts, server-only-shim.ts
-├── db/            _fixtures/, identity-pool/, indexes/ (positions-market-id pg_indexes assert — the catalog-assertion mint, AUDIT-FIX-B7b), triggers/ (13 append-only specs, one per protected table — +bet-receipts-append-only, AUDIT-FIX-B3 — plus truncate-rejected.spec)
+├── db/            _fixtures/, identity-pool/, indexes/ (positions-market-id pg_indexes assert — the catalog-assertion mint, AUDIT-FIX-B7b), triggers/ (13 append-only specs, one per protected table — +bet-receipts-append-only, AUDIT-FIX-B3 — plus truncate-rejected.spec, plus lots-no-delete.spec: NOT an append-only spec — `lots` is Bucket C and the file's third test is a POSITIVE control proving `TRUNCATE bets CASCADE` still empties it)
 ├── integration/   30 *.integration.test.ts (admin-moderation-audit-feed, alarms-drain, composer-image,
 │                  composer-place, composer-reply, composer-sell, debate-export, dharma-chain-drift-drain,
 │                  dharma-ledger, email-otp-send, header-balance, header-portfolio, idempotency-cache — the
@@ -278,12 +289,13 @@ tests/
   - **`pnpm staging:rebuild`** is the composite: reset → seed → generate → gates.
 - **Never mocked in a runner:** anything that writes a row or moves Dharma (ADR-0036 primitive 3). Only the HTTP/cookie shell may be — `next/headers`, `next/navigation`, `next/cache`, `verifyOnboardingRef`, `requireAdminSession`, `auth.api.getSession`. **`tests/unit/staging/generator-no-direct-writes.test.ts` pins an ALLOWLIST of the `@/server/**` entrypoints a runner may import**; adding a name to it is a decision, not an edit, and `@/server/events/insert` + `@/server/dharma/persist` are pinned as *not* ratified as its own positive control.
 - The default config **excludes `tests/staging/**`** exactly as it excludes `tests/scale/**`, so no bare `vitest run` — local, CI, or a subagent's — can reach a live database. Each runner additionally refuses to start unless the FIVE-guard contract passes (intent · target · environment · live connection · post-run verification — the G-5 intent token is the ADR-0035 Addendum's addition to primitive 6's four); the **write-capable** runners require the intent token, the read-only gates deliberately do not. Isolation is asserted by `tests/unit/staging/runner-isolation.test.ts`; the runners' gating shape by `runner-gating.test.ts`; the no-direct-writes rule behaviourally by `_lib/write-guard.ts` and textually by `generator-no-direct-writes.test.ts`; and the fixture table's own consistency — including the C3/C4 lane calibration, computed with the shipped pure `badgeFor` — by `fixture-table.test.ts`.
-- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 10 on disk:
+- **Invariant tests** at `tests/invariants/I-<AREA>-NNN.<slug>.spec.ts` — 11 on disk:
   - `I-APPEND-ONLY-001.resolutions-append-only` (INV-4) — `resolution_events` + `payout_events` reject UPDATE/DELETE post-INSERT at the storage layer.
   - `I-ATOMICITY-001.bet-comment-atomic` (INV-1) — one SERIALIZABLE W-1 tx wraps the full bet spine; if any write throws, every write rolls back (minted ENGINE.7).
   - `I-DAILY-ONCE-001.daily-credit-once-per-utc-day` — at most one `daily_allowance` ledger row per user per UTC day; storage backstop is the unique partial index `dharma_ledger_daily_allowance_day_uq` (minted ENGINE.12).
   - `I-GRANT-ONCE-001.initial-grant-once-per-user` — at most one `initial_grant` ledger row per user, EVER; storage backstop is the unique partial index `dharma_ledger_initial_grant_user_uq` (minted ENGINE.13).
   - `I-IDEM-ONCE-001.one-commit-per-idempotency-key` — at most one committed bet/sell per idempotency key; storage backstop is the unique index `bet_receipts_idempotency_key_uq` (fixture-bypass duplicate key → 23505; the route layer rides it via the durable pre-check + 23505 catch — minted AUDIT-FIX-B3 / ADR-0031).
+  - `I-LOT-SUM-001.lot-shares-sum-to-position` — Σ `lots.surviving_shares` == `positions.quantity` per (user, market, side); the ADR-0039 R2 invariant-class rule. ⚠ It seeds its own rows into the local ephemeral Postgres and truncates after, so it proves the RULE and observes NO live environment — a live-DB Σ check is owed and belongs with the staging gates (minted LOTS-1 S4a).
   - `I-NO-OVERDRAFT-001.dharma-ledger-monotone` (INV-2) — `dharma_ledger` `balance_after >= 0`; no overdraft.
   - `I-NO-OVERSELL-001.positions-quantity-non-negative` — position quantity never negative (invariant-class spec rule, not INV-1..4).
   - `I-RESOLVE-ONCE-001.market-terminates-once` — a market terminates exactly one way, once; storage backstop is the partial unique index `resolution_events_terminal_market_uq` (fixture-bypass second terminal row → 23505; `correct` rows keep the chain open — minted ENGINE.9, OQ-7).
@@ -336,4 +348,4 @@ tests/
 
 ---
 
-*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*
+*Rebuilt at SYNC.8 (Jun 2, 2026) against the live repo at `27216fc` + SPEC.1 v1.9.0-draft + SPEC.2 + ADRs 0003–0031; descriptive drift reconciled at BC.1 (Jul 1, 2026) against `248e02f`; SPEC.1/SPEC.2 version citations reconciled at the SYNC sweep (Jul 7, 2026), then SYNC-LITE (Jul 16). **Reconciled against the live repo at SYNC-1 (Aug 8, 2026), `fecbaf3` — SPEC.1 1.0.29, SPEC.2 1.0.22, cpmm 2.1.0, ADRs 0001–0036 (34 files), migration head `0024_bookmarks`, `EVENT_TYPES` 24, 23 tables / 13 schema files.** **Counts re-measured at PHASE-0 (Aug 21, 2026): ADRs 0001–0039 (37 files), migration head `0026_lots_no_delete`, `EVENT_TYPES` still 24 (a lot rides its bet's events and mints none), 24 tables / 14 schema files, 11 invariant specs.** SYNC-1 corrected: the `(public)/` tree (Discovery / Profile / Bookmarks were all live and undocumented), the `src/server/` directory list (+`bookmarks`, `discovery`, `profile`, `visitors`), the `api/` list (+`visits`), `components/ui/` (+dialog, input, textarea), the integration count (20 → 30) and `*.test.tsx` count (26 → 30), the `just` recipe list (+`test-scale`), and the `Sonner` instruction (removed — not installed). Descriptive: tracks the repo, not the target. Follows the [agents.md](https://agents.md) standard. Maintained per `docs/maintenance.md`.*

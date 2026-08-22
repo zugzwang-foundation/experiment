@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import { SideBadge } from "@/components/debate/badges";
 import { PostPopup } from "@/components/debate/dialogs";
@@ -44,9 +44,6 @@ import type { PresentPost, Side } from "@/components/debate/types";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 const AGGREGATE = {
@@ -72,6 +69,9 @@ function presentPost(side: Side): PresentPost {
 		badge: "Contested",
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: "10.000000000000000000",
+		authorSold: false,
 		entryPrice: "0.500000000000000000",
 		aggregate: AGGREGATE,
 		replies: { support: [], counter: [], twoSlot: [] },
@@ -242,12 +242,6 @@ describe("HTML-FINISH · MARKET DETAIL — rows 33 + 35", () => {
 
 		expect(html).toContain("@");
 		expect(html).toContain("|");
-		// ⛔ NO bookmark cluster in the pop-up: the reader has already chosen, and
-		// the card they opened it from still carries it. `showActions={false}` is
-		// a caller-side layout switch designed for exactly this.
-		expect(
-			dialogContent(baseElement).querySelector('button[aria-label="Bookmark"]'),
-		).toBeNull();
 	});
 
 	it("post-popup::opens-scrolled-to-the-TOP", () => {

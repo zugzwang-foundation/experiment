@@ -1,9 +1,5 @@
 import Link from "next/link";
 
-import {
-	type BookmarkAffordance,
-	CardActions,
-} from "@/components/bookmarks/BookmarkToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { PositionMarker, SideBadge } from "./badges";
@@ -13,38 +9,26 @@ import type { AuthorIdentity, Marker, Side } from "./types";
 /**
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
- * author's own stake `a` · reply count · the bookmark card action.
+ * author's own stake `a` · reply count.
  * The marker chip sits after the side badge, before the stake (D5).
  *
- * BOOKMARK-ADD-WIRE: the bookmark trigger is now LIVE — `CardActions` owns the
- * full icon matrix (signed-out disabled / own-argument absent / active
- * outline-or-filled). ⛔ The download trigger was REMOVED at POLISH.3 PR 2
- * row 7 (`PD-3-15`).
+ * UNWIRE-1 — the `CardActions` cluster (the bookmark trigger + `showActions`,
+ * its caller-side gate) is removed: the bookmark module is unwired
+ * product-wide. This header no longer renders any action cluster at all.
  * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
  * never `YES @ 27%` or `Đ a → Đ now`.
- *
- * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster, so it is
- * deliberately NOT the own-suppression hook. Own-suppression is a condition
- * inside `BookmarkToggle`. ⚠ The original reason for that separation was that
- * `showActions` would also strip the DOWNLOAD trigger from the viewer's own
- * arguments; row 7 removed that trigger, but the separation stands on its own
- * — `showActions` is a caller-side layout switch and own-ness is a viewer
- * fact, and collapsing them would re-couple two unrelated decisions.
  */
 export function ArgProfile({
-	commentId,
 	author,
 	side,
 	marker,
 	entryPrice,
 	authorStake,
+	originalStake,
+	sold = false,
 	replyCount,
-	bookmarks,
 	chipSize,
-	showActions = true,
 }: {
-	/** The comment this header belongs to — the bookmark target (`post.id`). */
-	commentId: string;
 	author: AuthorIdentity;
 	side: Side;
 	marker: Marker;
@@ -58,10 +42,23 @@ export function ArgProfile({
 	 * here because this is the site that supplies the value.
 	 */
 	entryPrice?: string;
+	/**
+	 * The stake **still held** behind this argument — the surviving lot basis,
+	 * and the SAME value its lane is ranked on (ADR-0039 R4 as amended at
+	 * RANK-1; RANKING.md §7.3). One field feeds the ruler and this figure, so
+	 * the ordering and the number beside it cannot disagree.
+	 */
 	authorStake?: string;
+	/**
+	 * The frozen `bets.stake` — what was committed when the argument was made.
+	 * Rendered STRUCK THROUGH beside the current figure, and only when the two
+	 * differ, so an untouched argument shows one number rather than the same
+	 * number twice (the `LotBreakdown` rule, applied here).
+	 */
+	originalStake?: string;
+	/** R6/R10 `Sold` — exactly zero surviving. Renders the tag; never on a partial. */
+	sold?: boolean;
 	replyCount?: number;
-	/** Viewer bookmark state for this market; `null` when signed out. */
-	bookmarks: BookmarkAffordance;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -81,7 +78,6 @@ export function ArgProfile({
 	 * discouraged.
 	 */
 	chipSize?: "detail";
-	showActions?: boolean;
 }) {
 	return (
 		<div className="flex items-center gap-2">
@@ -128,7 +124,39 @@ export function ArgProfile({
 				{authorStake !== undefined ? (
 					<>
 						<Sep />
+						{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
+						    the stake still held, which is exactly what the lane sorted
+						    on; a fully-exited argument reads `Đ 0` here rather than
+						    keeping the number that bought its slot. The original is
+						    shown struck through when the figure has moved, so nothing
+						    is erased — only re-labelled as history.
+						    ⛔ "Lot" appears nowhere here (R1): on screen these are
+						    ARGUMENTS. `tests/unit/debate/render/arg-stake.test.tsx`
+						    pins that with a textContent assertion. */}
 						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
+						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharma` rounds to
+						    whole Đ, so comparing the raw 18-dp strings would strike through on
+						    any movement at all — including one too small to change what is
+						    printed, giving `Đ 1,500  ~~Đ 1,500~~`. The RULER keeps the full
+						    precision; only this affordance keys off what is on screen. */}
+						{!sold &&
+						originalStake !== undefined &&
+						formatDharma(originalStake) !== formatDharma(authorStake) ? (
+							<span
+								data-testid="argstake-original"
+								className="font-mono text-n4 line-through"
+							>
+								Đ {formatDharma(originalStake)}
+							</span>
+						) : null}
+						{sold ? (
+							<span
+								data-testid="argstake-sold"
+								className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+							>
+								Sold
+							</span>
+						) : null}
 					</>
 				) : null}
 				{replyCount !== undefined ? (
@@ -147,9 +175,6 @@ export function ArgProfile({
 					</>
 				) : null}
 			</div>
-			{showActions ? (
-				<CardActions commentId={commentId} bookmarks={bookmarks} />
-			) : null}
 		</div>
 	);
 }

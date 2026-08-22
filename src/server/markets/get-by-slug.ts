@@ -19,7 +19,8 @@ import type { MarketStatus } from "./transitions";
  * opens in a NEW TAB; never an embedded player, never a stored asset).
  * ⚠ COSTS ZERO STATEMENTS: it is one more column on the row this query already
  * reads, not another round-trip. The task's whole read budget is +1 per render
- * and it is spent elsewhere (the `market_media` default-image read), so this
+ * and it is spent elsewhere (the `market_media` read — since MEDIA-SECOND-ROW
+ * Slice 1, the panel's row rather than unconditionally the default), so this
  * field had to be free or not happen.
  */
 export type MarketSummary = {

@@ -64,6 +64,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "CrimsonHawk207", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "560.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "560.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.470000000000000000",
 			aggregate: {
 				supportCount: 2,
@@ -82,6 +85,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 						marker: "none",
 						author: { pseudonym: "TealOwl118", pfpUrl: "/pfp-placeholder.svg" },
 						stake: "180.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "180.000000000000000000",
+						sold: false,
 						entryPrice: "0.490000000000000000",
 						imageUrl: null,
 					},
@@ -97,6 +103,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "75.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "75.000000000000000000",
+						sold: false,
 						entryPrice: "0.520000000000000000",
 						imageUrl: null,
 					},
@@ -114,6 +123,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "210.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "210.000000000000000000",
+						sold: false,
 						entryPrice: "0.490000000000000000",
 						imageUrl: null,
 					},
@@ -135,6 +147,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "GoldenLynx288", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "500.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "500.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.500000000000000000",
 			aggregate: {
 				supportCount: 1,
@@ -156,6 +171,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "140.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "140.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},
@@ -173,6 +191,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "165.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "165.000000000000000000",
+						sold: false,
 						entryPrice: "0.530000000000000000",
 						imageUrl: null,
 					},
@@ -194,6 +215,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "AmberFox042", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "320.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "320.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.450000000000000000",
 			aggregate: {
 				supportCount: 0,
@@ -216,6 +240,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "230.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "230.000000000000000000",
+						sold: false,
 						entryPrice: "0.520000000000000000",
 						imageUrl: null,
 					},
@@ -249,6 +276,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "90.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "90.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},
@@ -266,6 +296,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "110.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "110.000000000000000000",
+						sold: false,
 						entryPrice: "0.540000000000000000",
 						imageUrl: null,
 					},
@@ -287,6 +320,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "TealOwl118", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "150.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "150.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.550000000000000000",
 			aggregate: {
 				supportCount: 0,
@@ -309,6 +345,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "50.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "50.000000000000000000",
+						sold: false,
 						entryPrice: "0.530000000000000000",
 						imageUrl: null,
 					},
@@ -330,6 +369,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "IndigoWolf355", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "95.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "95.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.520000000000000000",
 			aggregate: {
 				supportCount: 1,
@@ -351,6 +393,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "70.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "70.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},

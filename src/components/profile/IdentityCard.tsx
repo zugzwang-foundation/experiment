@@ -1,8 +1,4 @@
-import { Bookmark } from "lucide-react";
-import Link from "next/link";
-
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
@@ -25,27 +21,9 @@ export function IdentityCard({
 	user,
 	owner,
 	tiles,
-	bookmarksActive = false,
-	profileHref,
 }: {
 	user: ProfileUser;
 	owner: boolean;
-	/**
-	 * ⚠⚠ PROFILE REFINEMENT · R2 — WHICH MODE THIS BAND IS IN. The bookmark control
-	 * beside the pseudonym is a TWO-STATE toggle: unmarked on the profile, FILLED on
-	 * bookmarks, and it switches between them. This flag is which state to draw and
-	 * where to point.
-	 *
-	 * ⛔ IT DEFAULTS TO `false`, so every existing call site and every render test is
-	 * unchanged. Only `/bookmarks` passes `true`.
-	 */
-	bookmarksActive?: boolean;
-	/**
-	 * R2 — where the control goes when it is ACTIVE, i.e. the way back to the
-	 * profile. Required only in that state, because only that state has somewhere
-	 * else to go: on the profile the destination is the fixed `/bookmarks` route.
-	 */
-	profileHref?: string;
 	/**
 	 * HTML-FINISH row 8 — the six account tiles now live INSIDE this block
 	 * (mockup `:437`: `.idcol` is `[.unamerow][.tiles]`), so the card owns them
@@ -202,101 +180,12 @@ export function IdentityCard({
 					>
 						{user.pseudonym}
 					</span>
-					{/* PB-1 (item 17) — the headzone bookmark icon, OWNER-ONLY by the
-					    founder ruling of 2026-07-31: it is navigation to the viewer's
-					    OWN saved set, so a visitor never sees it. Before this, the
-					    `/bookmarks` route was live, auth-gated and ORPHANED from the
-					    navigation graph — zero href literals anywhere in `src/`.
-					    Icon + `aria-label`, no visible text — `surface.test.tsx:303`
-					    asserts the whole identity-card subtree contains no "@".
-
-					    ⚠⚠ PROFILE-FULL — IT TAKES THE MOCKUP'S BUTTON BOX. `.idact` is
-					    a 28×28 hit target with a 7px radius and a `hover` fill
-					    (`:199-201`); this shipped as a bare 16px glyph with no box, so
-					    the affordance was 16×16 against the mockup's 28×28. `size-7` is
-					    28px and `rounded-[7px]` is the mockup's literal radius.
-					    ⛔ THE DOWNLOAD SIBLING IS FLAGGED, NOT BUILT — §0's MISSING-FIELD
-					    halt, which does not cascade. The mockup pairs this with a
-					    "Download profile card" button (`:438`), and TWO independent
-					    reasons stop it here: (1) there is NO profile export route and
-					    none can be added without a new server read — `/m/[slug]/export`
-					    is market-scoped (ADR-0025) and there is no `/u/[pseudonym]`
-					    equivalent, so the control would have nothing to fetch; (2) the
-					    mockup's own script marks it inert — "download is visual-only"
-					    (`:730`) — so replicating it literally ships a control that does
-					    nothing on click. A dead affordance on the accountability page is
-					    worse than an absent one. Named here and in the run report; the
-					    cluster wrapper is already in place, so adding it later is one
-					    element and no restructure. */}
-					{/* ⚠⚠ PROFILE REFINEMENT · R2 — THIS IS THE MODE SWITCH, and it is a
-					    TOGGLE rather than a one-way link. Unmarked on the profile → click →
-					    FILLED, and the surface is in bookmarks mode → click again →
-					    unmarked, back to the profile. That is the mockup's own switch: the
-					    `#bmgo` button (`:438`) whose active state is
-					    `body.bookmarks #bmgo{color:var(--ink); background:var(--n1)}`
-					    (`:203`), with the panel retitled and the row action swapped.
-
-					    ⚠⚠ A ROUTE CHANGE, NOT CLIENT STATE — MY CALL, AND THE REASON IS
-					    THAT `/bookmarks` ALREADY *IS* THE MOCKUP'S BOOKMARK MODE. That
-					    route renders the same shell, the same identity band, the same six
-					    tiles and the same right rail, with only the left panel swapped —
-					    which is the mode, built and shipped. Driving the switch by route
-					    therefore needs no second implementation of it, and cannot drift
-					    from one.
-					    ⛔ CLIENT STATE WAS THE OTHER OPTION AND IT COSTS MORE, TWICE OVER.
-					    (1) DATA: the profile is a server component, so a mode it can swap
-					    into instantly is a mode whose data must be loaded on EVERY profile
-					    view — one `loadBookmarks` per owner visit, paid whether or not the
-					    toggle is ever pressed. (2) DUPLICATION: it would mount the
-					    bookmarks table, its filter and its replica panel inside the profile
-					    page, i.e. a second copy of a surface that already exists, which is
-					    how the two drift apart. The mockup switches client-side because a
-					    static prototype has no router; that is a prototype affordance, not
-					    a design requirement.
-					    ⇒ THE OBSERVABLE CONTRACT R2 STATES IS MET EITHER WAY: unmarked →
-					    click → dark + bookmarks mode → click → unmarked + profile mode. It
-					    is two routes rather than two states of one, and `/bookmarks` is
-					    not broken — it is the destination.
-
-					    ⚠ SIZED AND STYLED ONCE, AGAINST BOTH SURFACES — R2's
-					    shared-component clause. This was a hand-rolled 28px box; it now
-					    renders through the SHIPPED `Button` at `variant="ghost"
-					    size="icon-xs"`, which is exactly what `BookmarkToggle` uses on the
-					    debate cards. So the marked/unmarked visual is one treatment in one
-					    place, and `asChild` keeps it a real `<Link>` for navigation.
-					    ⛔ `fill-current` IS THE SHIPPED MARKED GLYPH, byte-identical to
-					    `BookmarkToggle`'s saved state — the filled/outline distinction is
-					    not re-invented here.
-					    ⚠ `aria-pressed` CARRIES THE STATE, so no second label is authored;
-					    the same choice `BookmarkToggle` makes. The name stays `Bookmarks`
-					    in both states because the control's TARGET is the bookmark set
-					    either way. */}
-					{owner && (
-						<span className="flex items-center gap-1">
-							<Button
-								asChild
-								variant="ghost"
-								size="icon-xs"
-								aria-pressed={bookmarksActive}
-								className={
-									bookmarksActive ? "bg-n1 text-ink" : "text-n4 hover:text-ink"
-								}
-							>
-								<Link
-									href={
-										bookmarksActive
-											? (profileHref ?? "/bookmarks")
-											: "/bookmarks"
-									}
-									aria-label="Bookmarks"
-								>
-									<Bookmark
-										className={bookmarksActive ? "fill-current" : undefined}
-									/>
-								</Link>
-							</Button>
-						</span>
-					)}
+					{/* UNWIRE-1 — the headzone bookmark icon (PB-1 item 17, the
+					    PROFILE REFINEMENT · R2 mode-switch to/from `/bookmarks`) is
+					    removed outright: the bookmark module is unwired product-wide
+					    and `/bookmarks` no longer exists, so there is no set left to
+					    switch to. Not repointed, not left as a dead link, not replaced
+					    with a stub. */}
 					{(user.banned || scrubbed) && (
 						<span className="flex flex-wrap items-center gap-2">
 							{user.banned && (

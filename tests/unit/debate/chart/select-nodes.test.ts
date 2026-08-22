@@ -56,6 +56,11 @@ function post(args: {
 		counterDharma: "0",
 		createdAt: new Date(args.at),
 		authorStake: args.stake ?? DEC("10"),
+		// RANK-1 — `authorStake` is SURVIVING basis; nothing is sold in this
+		// fixture, so the frozen original matches it. Only the surviving figure
+		// reaches the §3.4 tiebreak this file exercises.
+		authorStakeOriginal: args.stake ?? DEC("10"),
+		authorSold: false,
 		priceAtBet: DEC("0"),
 	};
 }

@@ -114,7 +114,8 @@ Expected total: 50,000 rows per LD-4. `pseudonym` and `pfp_filename` are derived
 6. **Inserted/skipped counting.** Per chunk: `.returning({ id: identityPool.id })`. `returned.length` is the inserted count; `chunk.length - returned.length` is the skipped (ON CONFLICT) count.
 7. **Progress logging.** `console.log` per chunk: `[seed-identity-pool] chunk N/50: inserted K, skipped (ON CONFLICT) P, cumulative I/50000`. Final summary at end.
 8. **Exit codes:**
-   - `0` — success: `manifestRowCount === 50000` AND post-run `SELECT count(*) FROM identity_pool >= 50000`.
+   - `0` — success: `manifestRowCount === 50000` AND post-run `SELECT count(*) FROM identity_pool` **must equal 50,000**.
+     ⚠ **Corrected at SYNC-4, 2026-08-20: this line read `>= 50000` while `:239` read *must equal* and the shipped verifier implements equality. A plan that states its acceptance two ways cannot fail.** ⚠ **The 50,000 figure itself is NOT corrected here** — the identity-pool namespace is a HARDEN task by founder ruling, and this row's number moves with it.
    - `1` — manifest parse error (file missing, malformed line, type coercion failure).
    - `2` — DB INSERT error (Drizzle / Postgres exception inside `runSeed`).
    - `3` — row-count mismatch (post-run table count ≠ expected; e.g., manifest had 49,998 rows OR another seed source pre-populated unrelated rows).

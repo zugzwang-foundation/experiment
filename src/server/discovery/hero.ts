@@ -3,7 +3,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
-import { bets, comments, imageUploads, positions } from "@/db/schema";
+import { bets, comments, imageUploads, lots, positions } from "@/db/schema";
 import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { computeSell, type Reserves } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
@@ -103,9 +103,10 @@ export type HeroPost = {
 	 * two times, which is what makes the arrow between them mean anything. It is
 	 * NOT the author's whole market holding.
 	 *
-	 * The shares are `min(betShares, heldQuantity)` — `positions` is fungible,
-	 * so after a partial sell there is no exact attribution; see
-	 * `currentValueFor` for why that is the honest degradation.
+	 * The shares are the POST'S OWN surviving lot shares (RANK-1). They used to be
+	 * `min(betShares, heldQuantity)` because `positions` is fungible and there was
+	 * no exact per-post attribution; `lots.surviving_shares` is that attribution,
+	 * so the approximation is retired and both figures now describe the same lot.
 	 *
 	 * `null` whenever a value cannot be honestly computed: no pool row, no bet
 	 * row, no held row, a non-positive quantity, or a holding on the OPPOSITE
@@ -189,12 +190,38 @@ export async function selectHeroTopPosts(
 	// fan the picked-posts result out and pick an arbitrary bet. The shipped
 	// substrate already defends against exactly this with `LIMIT 1`, and this
 	// read must not assume more than the substrate does.
+	//
+	// ⚠ RANK-1 — THE SHARES ARE THE LOT'S SURVIVING ONES, NOT THE BET'S MINTED
+	// ONES, and that is what keeps the arrow honest. OD-1 = Option B rules that
+	// the two figures must be "the same quantity at two times". RANK-1 moved the
+	// LEFT figure (`authorStake`) onto the surviving lot basis; leaving the RIGHT
+	// one on `bets.share_quantity` would have joined a stake that had been exited
+	// to a value computed from shares the author no longer holds — rendering
+	// `Đ 0 → Đ 500` on a post whose author had fully exited it, while a second
+	// post in the same market kept `positions.quantity` high enough for the
+	// `min()` below to find shares. A phantom gain, on a public panel, under a
+	// named pseudonym.
+	//
+	// It also RETIRES the approximation this file used to apologise for. Before
+	// lots there was no per-post attribution, so `min(betShares, heldQuantity)`
+	// was the honest degradation; `lots.surviving_shares` IS that attribution, so
+	// the degradation is no longer needed. The `min()` stays as the belt: it now
+	// only binds if lots and positions ever disagreed, which R2 forbids.
+	//
+	// COALESCE for the same reason every other RANK-1 site has one: a bet with no
+	// lot cannot arise (R8), and if one ever did, reading it as ZERO shares would
+	// silently delete a real holding from the panel.
 	const postBet = client
 		.select({
 			commentId: bets.commentId,
-			shareQuantity: bets.shareQuantity,
+			shareQuantity:
+				sql<string>`COALESCE(${lots.survivingShares}, ${bets.shareQuantity})`.as(
+					"share_quantity",
+				),
 		})
 		.from(bets)
+		// 1:1 by `lots_bet_id_uq` — cannot fan the LIMIT 1 subquery out.
+		.leftJoin(lots, eq(lots.betId, bets.id))
 		.where(eq(bets.commentId, comments.id))
 		.orderBy(asc(bets.createdAt), asc(bets.id))
 		.limit(1)
@@ -284,16 +311,22 @@ export async function selectHeroTopPosts(
 	 * here and the value collapses to ONE pure `computeSell` call — no episode
 	 * walk, no `payout_events`, no `events`.
 	 *
-	 * **`positions` is FUNGIBLE**, so after a partial sell "this post's shares"
-	 * has no exact answer — there is no FIFO/LIFO ground truth in the data.
-	 * `min(betShares, heldQuantity)` is the ruled degradation: exact whenever
-	 * the holding still covers this post's bet, and otherwise capped at what the
-	 * author actually still holds, so the figure can never over-claim against a
-	 * real position. It CAN over-attribute across several posts by one author
-	 * (three posts sold down to one post's worth show that worth on each), but
-	 * Discovery renders at most one panel per side per market, so no summed view
-	 * of it exists. Pro-rata was rejected: it invents an attribution rule the
-	 * data does not support, and costs another aggregate.
+	 * ⚠ **THE PARAGRAPH THAT USED TO SIT HERE IS SUPERSEDED, AND IS REWRITTEN
+	 * RATHER THAN APPENDED TO (O-5).** It argued that `positions` is fungible, so
+	 * "this post's shares" had no exact answer, and that `min(betShares,
+	 * heldQuantity)` was therefore the ruled degradation — one that "CAN
+	 * over-attribute across several posts by one author". **`lots` is that exact
+	 * answer** (ADR-0039 D-1), and since RANK-1 `betShares` carries the post's own
+	 * `lots.surviving_shares`. The over-attribution the old paragraph accepted is
+	 * gone: three posts sold down to one post's worth no longer show that worth on
+	 * each, because each panel now reads only its own lot.
+	 *
+	 * `min(…, heldQuantity)` STAYS, demoted from the attribution rule to a belt.
+	 * It now binds only if `lots` and `positions` ever disagreed — which is
+	 * ADR-0039 R2's invariant (`Σ surviving lot shares == positions.quantity`), so
+	 * a bind means drift, not fungibility. Keeping it costs nothing and keeps the
+	 * figure incapable of over-claiming against a real position, which is the
+	 * property this whole docblock exists to guarantee.
 	 *
 	 * Every guard returns null rather than throwing. `computeSell` calls
 	 * `requirePositive` on shares and reserves, and a throw here would escape

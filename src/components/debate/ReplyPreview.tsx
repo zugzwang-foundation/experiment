@@ -2,13 +2,18 @@
 
 import { useState } from "react";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 
 import { ReplyCard } from "./ReplyCard";
 import type { PresentReply, ReplyGroups } from "./types";
 
 /**
+ * UNWIRE-1 — the `bookmarks` prop and its three pass-throughs to `ReplyCard`
+ * are removed (bookmark module unwired product-wide); the BookmarkToggle-
+ * remount defect this docblock records below is now moot on this component,
+ * since no bookmark affordance renders anywhere in `ReplyCard`/`ArgProfile`
+ * anymore. The rest of the docblock is kept as the historical record it is.
+ *
  * ⛔⛔ NO LONGER MOUNTED BY ANY SURFACE. `PostCard` stopped rendering this at
  * HTML-FINISH · MARKET DETAIL row 25, under the SPEC.1 **1.0.31** amendment: the
  * two-slot default is a SELECTION rule and no longer renders on the market-view
@@ -64,13 +69,10 @@ import type { PresentReply, ReplyGroups } from "./types";
  */
 export function ReplyPreview({
 	replies,
-	bookmarks,
 	onOpenImage,
 	onOpenPopup,
 }: {
 	replies: ReplyGroups;
-	/** BOOKMARK-ADD-WIRE — pass-through to each listed `ReplyCard`. */
-	bookmarks: BookmarkAffordance;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 26 — pass-through to each listed
 	 * `ReplyCard`, whose attached image opens the shared lightbox. REQUIRED, not
@@ -119,7 +121,6 @@ export function ReplyPreview({
 								<li key={reply.id}>
 									<ReplyCard
 										reply={reply}
-										bookmarks={bookmarks}
 										onOpenImage={onOpenImage}
 										onOpenPopup={onOpenPopup}
 									/>
@@ -137,7 +138,6 @@ export function ReplyPreview({
 								<li key={reply.id}>
 									<ReplyCard
 										reply={reply}
-										bookmarks={bookmarks}
 										onOpenImage={onOpenImage}
 										onOpenPopup={onOpenPopup}
 									/>
@@ -160,7 +160,6 @@ export function ReplyPreview({
 					<ReplyCard
 						key={reply.id}
 						reply={reply}
-						bookmarks={bookmarks}
 						onOpenImage={onOpenImage}
 						onOpenPopup={onOpenPopup}
 					/>

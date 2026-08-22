@@ -4,7 +4,13 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { IdentityCard } from "@/components/profile/IdentityCard";
@@ -67,6 +73,7 @@ const TILES: ProfileTilesData = {
 };
 
 const ROW_OPEN: ProfilePositionRow = {
+	lots: [],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -101,6 +108,9 @@ const POST: ProfileArgumentItem = {
 	body: "A profile argument\n\nNeutral fixture body.",
 	marker: "none",
 	authorStake: "50.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	authorStakeOriginal: "50.000000000000000000",
+	authorSold: false,
 	priceAtBet: "0.270000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 	aggregate: {
@@ -274,18 +284,37 @@ const STRUCK: StruckRow[] = [
 		control: "<span>a positions cell with no parent reference</span>",
 	},
 	{
-		id: "A-8 — dropping the per-row status token on open rows",
-		why: "STRUCK on the sentence as written. SPEC.1 §23: 'status Open / Closed by market state'. Also a PRESENCE guard.",
-		detect: (h) => !/data-testid="position-status-/.test(h),
-		control: "<tr><td>a row with no status badge</td></tr>",
+		id: "A-8 — the per-row market-status token, now RULED OUT (POSREV-1 RF-12)",
+		why:
+			"⚠⚠ THIS ROW IS INVERTED, AND IT IS THE ONLY ONE IN THE TABLE THAT IS. " +
+			"It used to guard the token's PRESENCE, on SPEC.1 §23's 'status Open / " +
+			"Closed by market state'. POSREV-1 RF-12 rules the opposite: 'Market " +
+			"status renders NOWHERE. All eight markets carry the same deadline and " +
+			"none resolves early, so status is constant for the whole live window — " +
+			"a chip repeating Open eleven times conveys nothing.' RF-13 then takes " +
+			"the two WORDS for a different meaning entirely (do you still hold this " +
+			"argument), so a chip reading `Open` beside a tab reading `Open` would " +
+			"name two unrelated facts with one word. " +
+			"⛔ SPEC.1 §23 STILL SAYS WHAT IT SAID — the conflict is REAL, is " +
+			"REPORTED rather than papered over, and is owed a founder amendment. " +
+			"This task is forbidden from editing SPEC.1, so the guard records the " +
+			"divergence instead of hiding it.",
+		detect: (h) => /data-testid="position-status-/.test(h),
+		control:
+			'<tr><td><span data-testid="position-status-m1">Open</span></td></tr>',
 	},
 	{
-		id: "A-9 — the headzone bookmark icon shown to every viewer",
-		why: "STRUCK. Founder ruling 2026-07-31: OWNER-ONLY — it is navigation to the viewer's OWN private saved set.",
-		// The surface string carries the OWNER arm then the VISITOR arm, so
-		// exactly ONE bookmark link may appear across the pair.
-		detect: (h) => (h.match(/aria-label="Bookmarks"/g) ?? []).length !== 1,
-		control: '<a aria-label="Bookmarks"></a><a aria-label="Bookmarks"></a>',
+		// UNWIRE-1 — supersedes the retired "A-9 — the headzone bookmark icon
+		// shown to every viewer" row, which asserted exactly ONE bookmark link
+		// across the owner+visitor pair (the OWNER-ONLY founder ruling of
+		// 2026-07-31). The bookmark module is unwired product-wide (SUB-2): the
+		// icon is gone from BOTH arms, so "exactly one" is no longer the
+		// invariant — "zero" is. Kept as a presence guard rather than dropped,
+		// so a bookmark-link regression on either arm still fails loudly.
+		id: "A-9 — any headzone bookmark link at all",
+		why: "STRUCK. The bookmark module is unwired product-wide; no arm renders this link anymore.",
+		detect: (h) => /aria-label="Bookmarks"/.test(h),
+		control: '<a aria-label="Bookmarks"></a>',
 	},
 	{
 		id: "B-1 — entry % / live % under the Staked and Current figures",

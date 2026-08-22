@@ -37,6 +37,10 @@ function makePost(rank: number): PostSubstrate {
 		// createdAt monotonically NEWER as rank grows → R12 is the newest.
 		createdAt: new Date(2026, 8, 1, rank, 0, 0),
 		authorStake: String(1000 - rank),
+		// RANK-1 — nothing is sold in this fixture, so the frozen original equals
+		// the surviving basis. Only the SURVIVING figure is ever sorted on.
+		authorStakeOriginal: String(1000 - rank),
+		authorSold: false,
 		priceAtBet: "0.5",
 		// keep D meaningful
 		...(dharma ? {} : {}),

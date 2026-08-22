@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ArgProfile } from "@/components/debate/ArgProfile";
 import { PostCard } from "@/components/debate/PostCard";
 import { ReplyCard } from "@/components/debate/ReplyCard";
@@ -51,19 +50,16 @@ import type {
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
- * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * assert spacing / partitioning / images, never the pop-up, so a
  * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
  * pinned. */
 const noopPopup = () => {};
 
 /** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
- * These suites assert bookmarks / spacing / card composition, never the
+ * These suites assert spacing / card composition, never the
  * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
  * keeps the viewer state REQUIRED at the component (a trigger without its
  * F-3 gate invites a bet the viewer cannot place) without pretending this
@@ -71,12 +67,11 @@ const noopPopup = () => {};
 const noopReply = () => {};
 
 /** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
- * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * These suites assert spacing / partitioning, never the image, so
  * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
  * (O-1) without pretending this file tests the lightbox. */
 const noopImage = () => {};
 
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 const AGGREGATE = {
 	supportCount: 2,
@@ -96,6 +91,9 @@ function presentReply(): DebateReply {
 		marker: "none",
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5000.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		stakeOriginal: "5000.000000000000000000",
+		sold: false,
 		entryPrice: "0.500000000000000000",
 		imageUrl: null,
 	};
@@ -116,6 +114,9 @@ function presentPost(): DebatePost {
 		badge: null,
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: "10.000000000000000000",
+		authorSold: false,
 		entryPrice: "0.500000000000000000",
 		aggregate: AGGREGATE,
 		replies: EMPTY_REPLIES,
@@ -157,7 +158,6 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply()}
-				bookmarks={VIEWER}
 				onOpenImage={noopImage}
 				onOpenPopup={noopPopup}
 			/>,
@@ -172,13 +172,11 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 		// Site 3 · `ArgProfile.tsx:67 (ArgProfile → authorStake span)` · C10.
 		const { container } = render(
 			<ArgProfile
-				commentId="0199a0c0-0000-7000-8000-0000000007c1"
 				author={{ pseudonym: "fixture-author", pfpUrl: "" }}
 				side="YES"
 				marker="none"
 				authorStake="1500.000000000000000000"
 				replyCount={0}
-				bookmarks={VIEWER}
 			/>,
 		);
 
@@ -194,7 +192,6 @@ describe("POLISH.3 PR 2 — PD-3-07, the spaced Đ across all four PR-2 sites", 
 		const { container } = render(
 			<PostCard
 				post={presentPost()}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
