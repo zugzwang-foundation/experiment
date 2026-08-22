@@ -66,32 +66,63 @@ import "server-only";
 
 import { sql } from "drizzle-orm";
 
-import { db } from "@/db";
+import { connectionVarName, db, poolerMode } from "@/db";
 
 /** A sentinel no default and no other code path would ever produce. */
 const SENTINEL_MS = 7777;
 
-/** Never print a connection string. Report only the pooler PORT. */
+/** How many separate round trips to take. One sample cannot see rotation. */
+const SAMPLES = 5;
+
+/**
+ * Never print a connection string. Report only the pooler PORT.
+ *
+ * The variable NAME comes from `@/db` rather than being re-derived here — the
+ * script must describe the connection the app actually opened, and a local copy
+ * of the selection rule can disagree with the shipped one without anything
+ * failing.
+ */
 function poolerPort(): string {
-	const mode = process.env.DB_POOLER_MODE ?? "session";
-	const raw =
-		mode === "transaction"
-			? process.env.DATABASE_URL_TXN
-			: process.env.DATABASE_URL;
-	const port = raw?.match(/:(\d{4,5})\//)?.[1] ?? "unknown";
-	return `${port} (DB_POOLER_MODE=${mode})`;
+	const raw = process.env[connectionVarName];
+	// Anchor to the host segment: a password containing `:1234/` would otherwise
+	// match first and the script would report a port nobody is connected to.
+	const port = raw?.match(/@[^/@]*:(\d{4,5})(?:[/?]|$)/)?.[1] ?? "unknown";
+	return `${port} (DB_POOLER_MODE=${poolerMode}, via ${connectionVarName})`;
 }
 
+/**
+ * ⚠ A PARAMETERLESS multi-command batch goes over the SIMPLE protocol, and
+ * postgres-js then resolves to an ARRAY OF PER-STATEMENT RESULTS — not to rows.
+ * Destructuring `const [first] = await db.execute(batch)` therefore binds the
+ * `SET`'s empty result, not the `SELECT`'s row, and every field reads
+ * `undefined`.
+ *
+ * This is measured in-repo, not read off a doc: see
+ * `tests/integration/staging-reset-mechanism.integration.test.ts`, which pins
+ * both `simple: args.length === 0` and `length === 2` for a two-command batch.
+ */
+function firstRowWith<T>(result: unknown, key: keyof T): T | undefined {
+	const rows = (result as unknown[]).flat() as T[];
+	return rows.find((r) => r && typeof r === "object" && key in r);
+}
+
+type Probe = { v: string; pid: number };
+
 async function main(): Promise<void> {
-	console.log("S-1 · criterion 6 — positive control");
+	console.log(
+		"verify-pooler-mode — is this pooler in transaction or session mode?",
+	);
 	console.log(`pooler port: ${poolerPort()}`);
 	console.log("");
 
 	// Statement 1 — mutate session state, then read it back IN THE SAME call so
 	// we know the SET was actually accepted. If this read fails, the probe is
 	// broken and neither verdict below means anything.
-	const [applied] = await db.execute<{ v: string; pid: number }>(
-		sql`SET statement_timeout = ${sql.raw(`'${SENTINEL_MS}ms'`)}; SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+	const applied = firstRowWith<Probe>(
+		await db.execute(
+			sql`SET statement_timeout = ${sql.raw(`'${SENTINEL_MS}ms'`)}; SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+		),
+		"v",
 	);
 	console.log(
 		`stmt 1 · set + read back : ${applied?.v} (backend ${applied?.pid})`,
@@ -107,46 +138,75 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	// Statement 2 — a SEPARATE round trip. This is the whole experiment.
-	const [observed] = await db.execute<{ v: string; pid: number }>(
-		sql`SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
-	);
-	console.log(
-		`stmt 2 · subsequent read : ${observed?.v} (backend ${observed?.pid})`,
-	);
+	// SEPARATE round trips. This is the whole experiment.
+	//
+	// ⚠ MORE THAN ONE, and the verdict uses the BACKEND PID, not only the
+	// setting. A transaction-mode pooler returns the backend at COMMIT but is
+	// free to hand the SAME one back next time, and neither pgbouncer nor
+	// Supavisor guarantees a reset on check-in. So `the setting survived` alone
+	// is NOT proof of session mode: against an idle pool with max 4, same-backend
+	// reuse is likely rather than exotic, and a single sample would report a
+	// correctly-flipped runtime as SESSION — halting S-1 on a working pooler.
+	const observations: Probe[] = [];
+	for (let i = 0; i < SAMPLES; i++) {
+		const row = firstRowWith<Probe>(
+			await db.execute(
+				sql`SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+			),
+			"v",
+		);
+		if (!row) {
+			console.error("");
+			console.error("⛔ CONTROL BROKEN — a follow-up read returned no row.");
+			process.exitCode = 2;
+			return;
+		}
+		observations.push(row);
+		console.log(`read ${i + 1} · ${row.v} (backend ${row.pid})`);
+	}
 	console.log("");
 
-	const persisted = observed?.v === `${SENTINEL_MS}ms`;
+	const pids = [...new Set([applied.pid, ...observations.map((o) => o.pid)])];
+	const rotated = pids.length > 1;
+	const persisted = observations.every((o) => o.v === `${SENTINEL_MS}ms`);
+	console.log(`backends seen : ${pids.join(", ")}`);
+	console.log(`setting held  : ${persisted ? "every read" : "not every read"}`);
+	console.log("");
 
-	if (persisted) {
-		console.log("VERDICT: SESSION MODE.");
+	// EITHER signal alone establishes transaction mode: a rotated backend proves
+	// the connection was returned to the pool, and a dropped setting proves it was
+	// reset on check-in. Session mode requires BOTH to be absent.
+	if (rotated || !persisted) {
+		console.log("VERDICT: TRANSACTION MODE.");
 		console.log(
-			`  The bare SET survived into a separate statement, so one backend is`,
+			rotated
+				? `  Statements ran on DIFFERENT backends (${pids.join(" → ")}), so the`
+				: `  The bare SET did not survive a round trip, so the backend was`,
 		);
-		console.log(
-			`  pinned for the whole client session. If this run was meant to be`,
-		);
-		console.log(
-			`  transaction mode, CRITERION 6 FAILS and every other observation in`,
-		);
-		console.log(`  this window is void.`);
-		process.exitCode = 1;
+		console.log("  connection went back to the pool between statements.");
+		console.log("  Criterion 6 fires.");
 		return;
 	}
 
-	console.log("VERDICT: TRANSACTION MODE.");
+	console.log("VERDICT: SESSION MODE.");
 	console.log(
-		`  The bare SET did not survive the round trip — the backend went back to`,
+		`  Across ${SAMPLES} separate statements the bare SET survived and ONE`,
 	);
+	console.log("  backend was seen, so the connection is pinned.");
 	console.log(
-		`  the pool. Criterion 6 fires. Observed '${observed?.v}' instead.`,
+		"  If this run was meant to be transaction mode, CRITERION 6 FAILS",
 	);
-	if (applied?.pid !== observed?.pid) {
-		console.log(
-			`  Corroborating: the two statements ran on DIFFERENT backends`,
-		);
-		console.log(`  (${applied?.pid} → ${observed?.pid}).`);
-	}
+	console.log("  and every other observation against it is void.");
+	console.log("");
+	console.log(
+		`  ⚠ Read this as 'no evidence of pooling in ${SAMPLES} samples', not as`,
+	);
+	console.log("  proof of session mode. A transaction pooler that reused one");
+	console.log(
+		"  backend and never reset it would look identical. Raise SAMPLES",
+	);
+	console.log("  before concluding the flip did not happen.");
+	process.exitCode = 1;
 }
 
 main()
@@ -154,9 +214,18 @@ main()
 		console.error("control errored:", err);
 		process.exitCode = 2;
 	})
-	.finally(() => {
+	.finally(async () => {
 		// The shipped singleton owns no teardown hook; the process ending is the
 		// release. Explicit so nobody adds a db.end() that changes pool behaviour
 		// mid-measurement.
+		//
+		// ⚠ DRAIN FIRST. This script's entire product is its stdout, and when that
+		// is a pipe or a file — which is how an evidence package gets captured —
+		// Node's writes are asynchronous and process.exit() discards whatever is
+		// still buffered. A truncated tail here loses the verdict silently.
+		await new Promise<void>((resolve) => {
+			if (process.stdout.write("")) resolve();
+			else process.stdout.once("drain", () => resolve());
+		});
 		process.exit(process.exitCode ?? 0);
 	});

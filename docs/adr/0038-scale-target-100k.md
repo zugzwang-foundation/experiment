@@ -140,6 +140,30 @@ backend, so the same overload presents as **latency, not error** — a load run 
 "zero errors" against a fully saturated pool. The rig must instrument **queue depth and
 backend utilisation**, not error rate (watch item W-10). This is a finding S-1 owes S-5.
 
+⚠ **AND THE SAME PROPERTY CHANGES THE MONEY PATH'S FAILURE POSTURE, WHICH W-10 DOES NOT
+SAY.** W-10 is framed as a *load-rig instrumentation* problem — how S-5 must measure. The
+consequence for a live bet is separate and is recorded here because nothing else states it:
+
+**After the flip, nothing this codebase owns bounds a bet's wall clock.** Every timeout the
+repo controls is issued **inside** the transaction — `SET LOCAL statement_timeout` and
+`idle_in_transaction_session_timeout` via `applyTxTimeouts`, i.e. **after** a backend has
+already been assigned. Under `:5432` that was sufficient, because exhaustion failed
+immediately and loudly with `EMAXCONNSESSION`. Under `:6543` the request **queues for a
+backend before one exists**, and the queue wait sits *upstream* of every bound named above.
+postgres.js has no per-query timeout (`connect_timeout` covers socket establishment only), and
+no route or `vercel.json` sets a `maxDuration`.
+
+⇒ **Under saturation a bet now hangs for an unknown, Supavisor-side `pool_checkout_timeout`
+that is not configured, recorded, or measured anywhere in this repo.**
+
+⚠ **This is NOT an instruction to tune anything** — decision 2 forbids moving these numbers
+without measurement, and that still holds. It is recorded because the failure it describes
+is the one a reader of W-10 would not expect: W-10 warns that a *load run* will look clean,
+and this warns that a *participant's bet* will look slow rather than broken. **A hang is not
+a failure mode the bet path previously had**, so no existing halt condition, alarm, or
+runbook names it. S-1's plan §6 criterion-4 halt condition is extended to name it; the
+standing operational gap is S-5's to close.
+
 ## Context
 
 ADR-0006 sized this stack against a **≤5k concurrent** target with a **$300/mo default and

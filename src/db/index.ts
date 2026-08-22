@@ -22,7 +22,7 @@ import * as schema from "./schema";
 // and in the direction that hurts most: this module is imported by effectively
 // every server surface, `next build` collects page data by importing them, and
 // the throw below is at module scope — so an unconditional read of a secret
-// `prd` does not have fails the production BUILD. Prod keeps serving the old
+// `prd` does not have would fail the production BUILD. Prod keeps serving the old
 // deployment (fail-closed, which is the one mercy), but every prod deploy is
 // blocked until someone mints the secret. Compare `BETTER_AUTH_URL`, which
 // fails the same way for the same reason.
@@ -45,7 +45,14 @@ if (mode === "transaction" && process.env.ZUGZWANG_ENV === "prod") {
 
 // A missing secret is LOUD and names the variable it wanted, so it can never be
 // read as "session mode was intended here".
-const varName = mode === "transaction" ? "DATABASE_URL_TXN" : "DATABASE_URL";
+// EXPORTED so the criterion-6 control reads the resolved name instead of
+// re-deriving it. A second copy of this rule can silently disagree with this
+// one, and the control would then measure a real pooler and label it wrong —
+// which is worse than not measuring, because it produces confident evidence.
+export const poolerMode = mode;
+export const connectionVarName =
+	mode === "transaction" ? "DATABASE_URL_TXN" : "DATABASE_URL";
+const varName = connectionVarName;
 const connectionString = process.env[varName];
 if (!connectionString) {
 	throw new Error(`${varName} is not set (DB_POOLER_MODE=${mode})`);
