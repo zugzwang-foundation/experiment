@@ -25,8 +25,14 @@ it an S-1 output. The prescribed `ls docs/adr/` check reads **one ref** and stru
 cannot see the other. A patch record needs no number and therefore cannot collide, and
 decision 3 already carries the authorisation a new ADR would have restated. *(The cross-ref
 allocation check S-1 wrote — union `git ls-tree` over `+refs/heads/*` **and**
-`+refs/pull/*/head` — scanned 427 refs and confirms `0040` free. It is a **detector, not a
-reservation**: a number is claimed by a commit to `main`, never by an announcement.)*
+`+refs/pull/*/head` — scanned 427 refs and, **when it ran on 2026-08-21**, found `0040`
+free. **It no longer is: ADR-0040 (UNWIRE-1, #395) landed on `main` 2026-08-22 and the next
+free number is `0041`** — re-measured against `origin/main` at Gate C. S-1 mints no ADR, so
+this corrects no action; it is corrected because a false statement inside an accepted record
+is a trap for whoever reads it next. **And it is the detector's own thesis proving itself:**
+a number is claimed by a **commit to `main`**, never by a scan and never by an announcement
+— so a scan result is true at an instant and decays from it. Which is why the sentence now
+carries the date it was taken.)*
 
 #### P1.1 · The route — the app reads a new secret; the old one is not repointed
 

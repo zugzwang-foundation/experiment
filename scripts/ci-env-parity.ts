@@ -139,6 +139,27 @@ const INTENTIONAL_MANUAL: ReadonlySet<string> = new Set([
 	"SENTRY_PUBLIC_KEY",
 ]);
 
+// S-1 · TRANSITIONAL — Vercel-direct for the duration of Stage 3 ONLY, and
+// deliberately kept OUT of INTENTIONAL_MANUAL above, which is the permanent
+// Sentry-direct inventory and should not acquire a member that is meant to
+// leave.
+//
+// `DB_POOLER_MODE` (src/db/index.ts) selects the Supavisor pooler. During S-1's
+// verification it is set as a BRANCH-SCOPED Vercel Preview var so the flip
+// reaches one preview and nothing else — which means, for that window, a Vercel
+// key with no Doppler source: an orphan, and this audit fails CLOSED on any
+// finding. At the permanent staging advance it moves to Doppler `stg`, previews
+// inherit it by design, and the orphan disappears.
+//
+// ⚠ REMOVE THIS SET when the Doppler `stg` value lands. Leaving it costs a real
+// control: an orphan that is expected forever is indistinguishable from an
+// operator mistake, which is the exact confusion the orphan check exists to
+// surface. It is NOT added to REQUIRED_KEYS — absent means session mode by
+// design, so a must-exist assertion would contradict the thing it is auditing.
+const TRANSITIONAL_VERCEL_ONLY: ReadonlySet<string> = new Set([
+	"DB_POOLER_MODE",
+]);
+
 // ───────────────────────────── thin IO layer ───────────────────────────────
 //
 // The pure logic above is unit-tested; the loaders below map live REST shapes
@@ -313,7 +334,12 @@ async function main(): Promise<void> {
 			vercelKeysByScope,
 			dopplerKeysByConfig,
 			scopeToConfig: SCOPE_TO_CONFIG,
-			intentionalManual: INTENTIONAL_MANUAL,
+			// Union at the CALL SITE, so the two sets stay separately readable
+			// and deleting the transitional one is a single-line removal.
+			intentionalManual: new Set([
+				...INTENTIONAL_MANUAL,
+				...TRANSITIONAL_VERCEL_ONLY,
+			]),
 			requiredKeys: REQUIRED_KEYS,
 		});
 		report(findings);
