@@ -468,6 +468,146 @@ describe("§3.2 — ONE IDEMPOTENCY KEY PER SELL INTENT", () => {
 	});
 });
 
+describe("§3.2 — a FAILED sell must not invite a second one", () => {
+	const key = (call: unknown[]): string => {
+		const headers = (call[1] as RequestInit).headers as Record<string, string>;
+		const k = Object.keys(headers).find((h) =>
+			h.toLowerCase().includes("idempotency"),
+		);
+		return k === undefined ? "" : (headers[k] ?? "");
+	};
+
+	/** Make the next wire call return a terminal 4xx envelope. */
+	function failWith(code: string, status = 400) {
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async (_u: string, init: RequestInit) => {
+				lastBody = JSON.parse(String(init.body));
+				return new Response(JSON.stringify({ ok: false, error: { code } }), {
+					status,
+					headers: { "content-type": "application/json" },
+				});
+			}),
+		);
+	}
+
+	it("sell::a-FAILURE-refreshes-so-Retry-is-never-offered-over-stale-figures", async () => {
+		// ⛔⛔ THIS IS THE SECOND-EXECUTION GUARD, and it is the whole reason the
+		// failure arms refresh at all.
+		//
+		// A request whose response is LOST may still have COMMITTED — the sale is
+		// written, the 200 never arrives. Without a refresh the tile keeps its
+		// pre-sale figures, so the participant reads `Retry` above numbers saying
+		// nothing happened, and the honest interpretation of that screen is "sell it
+		// again". Because arming mints a fresh key, that second attempt has nothing
+		// for the idempotency layer to match and EXECUTES. They sell twice intending
+		// once.
+		// ⚠ Refreshing is harmless when the request genuinely did not land: the
+		// figures come back unchanged.
+		render(<PositionsTable payload={OWNER} />);
+		failWith("error_market_not_open");
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() => expect(refresh).toHaveBeenCalled());
+	});
+
+	it("sell::a-NETWORK-drop-refreshes-too (the lost-response case itself)", async () => {
+		render(<PositionsTable payload={OWNER} />);
+		vi.stubGlobal(
+			"fetch",
+			vi.fn(async () => {
+				throw new TypeError("network");
+			}),
+		);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() => expect(refresh).toHaveBeenCalled());
+	});
+
+	it("sell::a-key-reused-409-is-NOT-laundered-by-re-arming", async () => {
+		// ⛔⛔ THE HAZARD THE PER-ARM KEY CREATES, CLOSED. A `key_reused` 409 lands
+		// the F-2 protective landing — the state that exists precisely because the
+		// earlier request MAY HAVE COMMITTED. Minting a fresh key on the next arm
+		// would be the client answering "key reused" with "pick a new key", which
+		// the sell route's own docblock names as the one instruction that turns a
+		// completed sell into a second EXECUTED one.
+		// ⇒ Re-arming from that state must REFRESH and advance, not mint.
+		render(<PositionsTable payload={OWNER} />);
+		failWith("error_idempotency_key_reused", 409);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() => expect(lastBody).not.toBeNull());
+		refresh.mockClear();
+
+		// ⚠ THE REALISTIC PATH, and it is the auditor's own: the tile stays ARMED
+		// after a failure (showing `Retry`), so re-arming means cancelling first and
+		// pressing Sell again — which is exactly what someone who believes nothing
+		// happened would do.
+		fireEvent.click(screen.getByTestId(`tile-cancel-${L1}`));
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		// It refreshes rather than silently re-keying.
+		await waitFor(() => expect(refresh).toHaveBeenCalled());
+
+		// ⛔⛔ AND THE KEY IS THE ASSERTION, NOT THE REFRESH. A build that laundered
+		// the landing would ALSO have refreshed somewhere and passed on the line
+		// above; what distinguishes the two is whether arming MINTED. Submitting
+		// again without editing must go out under the SAME key — so the idempotency
+		// layer can still recognise the request that may already have committed.
+		// A fresh key here is precisely "pick a new key", the answer that turns a
+		// completed sell into a second executed one.
+		const before = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls
+			.length;
+		fireEvent.click(screen.getByTestId(`tile-confirm-${L1}`));
+		await waitFor(() =>
+			expect(
+				(globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls.length,
+			).toBe(before + 1),
+		);
+		const calls = (globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls;
+		expect(key(calls[before] as unknown[])).toBe(key(calls[0] as unknown[]));
+	});
+});
+
+describe("the control must not look pressable when it is not", () => {
+	it("sell::CONFIRM-is-disabled-when-the-share-falls-below-one-quantum", () => {
+		// ⛔ REACHABLE, not theoretical. CPMM prices live in (0,1), so a
+		// one-quantum lot's share of the mark can round below 1e-18 and seed
+		// canonical zero. `sellSharesFor` then refuses the non-positive amount, and
+		// an ENABLED Confirm would do nothing at all, with no feedback — a money
+		// button that lies. The shipped `SellModule` handled the same state by
+		// disabling; this is that, per tile.
+		const dust: ProfilePositionsPayload = {
+			owner: true,
+			rows: [
+				{
+					...ROW_OPEN,
+					// One quantum of shares against a large holding ⇒ the partition
+					// floors to zero.
+					lots: [lot(L1, { survivingShares: "0.000000000000000001" })],
+					quantity: dp18("1000000"),
+					current: dp18("1"),
+					sellEligible: true,
+				},
+			],
+		};
+		render(<PositionsTable payload={dust} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		expect(
+			(screen.getByTestId(`tile-confirm-${L1}`) as HTMLButtonElement).disabled,
+		).toBe(true);
+	});
+
+	it("sell::CONFIRM-is-ENABLED-on-an-ordinary-tile (the control)", () => {
+		// Without this, "disabled" would pass on a build where Confirm is never
+		// enabled at all.
+		render(<PositionsTable payload={OWNER} />);
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
+		expect(
+			(screen.getByTestId(`tile-confirm-${L1}`) as HTMLButtonElement).disabled,
+		).toBe(false);
+	});
+});
+
 describe("the whole-holding fallback — a held position is never unreachable", () => {
 	/** A holding whose lots are ALL SOLD while the position is still held. */
 	const DRIFTED: ProfilePositionsPayload = {

@@ -64,12 +64,16 @@ export type ProfileSelection = {
 type SelectableLot = {
 	lotId: string;
 	survivingShares: string;
+	/** The ARGUMENT's own pole. Optional so render fixtures can omit it. */
+	side?: "YES" | "NO";
 	argument: { removed: boolean; commentId?: string };
 };
 type SelectableRow = {
 	marketId: string;
 	marketSlug: string;
 	marketTitle: string;
+	/** `positions.side` — the HELD pole. Optional for the same reason. */
+	side?: "YES" | "NO";
 	/**
 	 * `positions.quantity` — needed here ONLY for the whole-holding fallback: a
 	 * held position with no `lots` rows still contributes one Open tile, and a tab
@@ -128,7 +132,8 @@ function isPositiveAmount(value: string): boolean {
  */
 export function usesWholeHoldingFallback(row: {
 	quantity: string;
-	lots: readonly { survivingShares: string }[];
+	side?: "YES" | "NO";
+	lots: readonly { survivingShares: string; side?: "YES" | "NO" }[];
 }): boolean {
 	// ⛔⛔ THE PREDICATE IS "NO SURVIVING LOT", NOT "NO LOTS AT ALL", AND THE
 	// DIFFERENCE IS A WHOLE CLASS OF DRIFT.
@@ -147,7 +152,21 @@ export function usesWholeHoldingFallback(row: {
 	// reader to Closed, where the sold tiles render with no Sell column at all.
 	// The holding was reachable nowhere that could exit it. Same veto as before,
 	// one shape further in.
-	return !row.lots.some(isOpenLot) && isPositiveAmount(row.quantity);
+	// ⚠ AND THE SURVIVING LOT HAS TO BE ON THE HOLDING'S OWN SIDE. A surviving lot
+	// on the OPPOSITE pole is drift too — `planLotSale` scopes by
+	// `eq(lots.side, args.side)`, so such a lot can never pay for this holding's
+	// exit, and counting it as attribution would suppress the fallback and leave
+	// the position renderable only as a wrong-side tile whose sell the server
+	// refuses. `persist.ts` records this drift class as live-undetected and "OWED
+	// WORK, NOT A COVERED CASE", so it is not assumed away here.
+	// ⚠ `side` is OPTIONAL on both so the render tests can pass literals; absent,
+	// the comparison is skipped and the behaviour is exactly what it was.
+	const usable = row.lots.some(
+		(l) =>
+			isOpenLot(l) &&
+			(row.side === undefined || l.side === undefined || l.side === row.side),
+	);
+	return !usable && isPositiveAmount(row.quantity);
 }
 
 /** Does this row contribute at least one tile to `status`? */
@@ -158,7 +177,17 @@ export function rowHasTileIn(
 	if (status === "Closed") {
 		return row.lots.some((l) => !isOpenLot(l));
 	}
-	return row.lots.some(isOpenLot) || usesWholeHoldingFallback(row);
+	// ⚠ THE SAME SIDE-AWARE TEST THE FALLBACK USES, and it has to be the same one
+	// or the TAB derivation and the RENDER would disagree: a holding whose only
+	// surviving lot sits on the opposite pole would be counted as Open here while
+	// the table rendered it through the fallback, or vice versa.
+	return (
+		row.lots.some(
+			(l) =>
+				isOpenLot(l) &&
+				(row.side === undefined || l.side === undefined || l.side === row.side),
+		) || usesWholeHoldingFallback(row)
+	);
 }
 
 /**

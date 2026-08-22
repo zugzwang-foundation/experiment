@@ -93,39 +93,58 @@ export function useInlineSell() {
 		setFailed(false);
 	}, []);
 
-	const arm = useCallback((lotId: string) => {
-		// Opening a second closes the first: the state is a single id, so this is
-		// structural rather than a rule someone has to remember to apply.
-		setArmedLotId(lotId);
-		setDraft(null);
-		setFailed(false);
-		// ⛔⛔ A FRESH KEY PER SELL INTENT, AND WITHOUT THIS THE SECOND SELL ON A
-		// PAGE CAN NEVER SUCCEED.
-		//
-		// `reduceKey` mints a new key ONLY on `EDIT` out of a `fresh_*` pending
-		// state, or on `COUNTDOWN_EXPIRED` — and a successful outcome lands on
-		// `pending: "none"`, where `EDIT` deliberately does NOT rotate ("one key
-		// per intent — pre-submit edits never rotate"). So a hook that lives as
-		// long as the table would carry ONE key across every tile and every
-		// market: sell A under key K, then sell B under the same K with a
-		// different body, and the fingerprint mismatch returns 409
-		// `error_idempotency_key_reused`. That lands `pending:
-		// "refresh_then_edit"`, which without a `REFRESHED` dispatch is terminal —
-		// the button would read `Retry` forever for a request that can never
-		// succeed, which is O-3's misleading-cause defect exactly.
-		//
-		// ⚠ THE SHIPPED `SellModule` NEVER HIT THIS because it is MOUNTED PER
-		// EXPANSION and remounts with a fresh `initialKeyState()` every time it
-		// opens. Its key rotation was component identity, not reducer behaviour.
-		// This hook outlives its controls, so the intent boundary has to be stated
-		// rather than inherited — and ARMING is that boundary.
-		// ⚠ MINTED ONCE and written to BOTH, or the ref and the state would carry
-		// two different keys and which one went on the wire would depend on whether
-		// a render had happened yet.
-		const fresh = initialKeyState();
-		keyRef.current = fresh;
-		setKeyState(fresh);
-	}, []);
+	const arm = useCallback(
+		(lotId: string) => {
+			// Opening a second closes the first: the state is a single id, so this is
+			// structural rather than a rule someone has to remember to apply.
+			setArmedLotId(lotId);
+			setDraft(null);
+			setFailed(false);
+			// ⛔⛔ A FRESH KEY PER SELL INTENT, AND WITHOUT THIS THE SECOND SELL ON A
+			// PAGE CAN NEVER SUCCEED.
+			//
+			// `reduceKey` mints a new key ONLY on `EDIT` out of a `fresh_*` pending
+			// state, or on `COUNTDOWN_EXPIRED` — and a successful outcome lands on
+			// `pending: "none"`, where `EDIT` deliberately does NOT rotate ("one key
+			// per intent — pre-submit edits never rotate"). So a hook that lives as
+			// long as the table would carry ONE key across every tile and every
+			// market: sell A under key K, then sell B under the same K with a
+			// different body, and the fingerprint mismatch returns 409
+			// `error_idempotency_key_reused`. That lands `pending:
+			// "refresh_then_edit"`, which without a `REFRESHED` dispatch is terminal —
+			// the button would read `Retry` forever for a request that can never
+			// succeed, which is O-3's misleading-cause defect exactly.
+			//
+			// ⚠ THE SHIPPED `SellModule` NEVER HIT THIS because it is MOUNTED PER
+			// EXPANSION and remounts with a fresh `initialKeyState()` every time it
+			// opens. Its key rotation was component identity, not reducer behaviour.
+			// This hook outlives its controls, so the intent boundary has to be stated
+			// rather than inherited — and ARMING is that boundary.
+			// ⛔⛔ BUT RE-ARMING MUST NOT LAUNDER THE PROTECTIVE LANDING, AND THAT IS THE
+			// HAZARD THE FRESH KEY ABOVE CREATES. A `key_reused` 409 lands
+			// `pending: "refresh_then_edit"` — the F-2 state that exists because the
+			// earlier request MAY HAVE COMMITTED. Minting unconditionally here would be
+			// the client answering "key reused" with "pick a new key", which is the one
+			// instruction `api/bets/sell/route.ts`'s own docblock names as turning a
+			// completed sell into a second EXECUTED one.
+			// ⇒ In that state, refresh the figures and advance to `edit_after_refresh`
+			// instead. The next keystroke mints — which is exactly what `fresh_on_edit`
+			// / `edit_after_refresh` are for, and what `SellModule` does at its own
+			// protective landing.
+			if (keyRef.current.pending === "refresh_then_edit") {
+				dispatchKey({ type: "REFRESHED" });
+				router.refresh();
+				return;
+			}
+			// ⚠ MINTED ONCE and written to BOTH, or the ref and the state would carry
+			// two different keys and which one went on the wire would depend on whether
+			// a render had happened yet.
+			const fresh = initialKeyState();
+			keyRef.current = fresh;
+			setKeyState(fresh);
+		},
+		[dispatchKey, router],
+	);
 
 	/**
 	 * Every keystroke. ⚠ A value ABOVE the argument's own current value CLAMPS
@@ -137,33 +156,43 @@ export function useInlineSell() {
 	 * ⛔ NO ERROR STATE. The correct answer is available, so it is used; an error
 	 * here would ask the reader to solve a problem the field already solved.
 	 */
-	const edit = useCallback((value: string, seedExact: string) => {
-		// A keystroke means the reader is trying again; a `Retry` left over from a
-		// previous refusal is stale the moment they touch the field.
-		setFailed(false);
-		if (value === "") {
-			setDraft("");
-			return;
-		}
-		let typed: InstanceType<typeof ComposerDecimal>;
-		try {
-			typed = new ComposerDecimal(value);
-		} catch {
-			// Not a number yet — a lone "." mid-typing. Keep it; the submit gate
-			// below refuses anything `sellSharesFor` would reject.
+	const edit = useCallback(
+		(value: string, seedExact: string) => {
+			// A keystroke means the reader is trying again; a `Retry` left over from a
+			// previous refusal is stale the moment they touch the field.
+			setFailed(false);
+			// ⛔ THE §3.2 KEY LAW'S OTHER HALF. After a terminal 4xx the state is
+			// `fresh_on_edit`, and an EDIT is what rotates out of it — without this
+			// dispatch a retry after a refusal reuses the poisoned key and 409s under a
+			// button that has just relabelled itself `Confirm`. The reducer no-ops an
+			// EDIT while in flight and on `pending: "none"`, so this cannot rotate a key
+			// mid-request or mid-intent.
+			dispatchKey({ type: "EDIT" });
+			if (value === "") {
+				setDraft("");
+				return;
+			}
+			let typed: InstanceType<typeof ComposerDecimal>;
+			try {
+				typed = new ComposerDecimal(value);
+			} catch {
+				// Not a number yet — a lone "." mid-typing. Keep it; the submit gate
+				// below refuses anything `sellSharesFor` would reject.
+				setDraft(value);
+				return;
+			}
+			if (!typed.isFinite()) {
+				setDraft(value);
+				return;
+			}
+			if (typed.greaterThan(seedExact)) {
+				setDraft(null);
+				return;
+			}
 			setDraft(value);
-			return;
-		}
-		if (!typed.isFinite()) {
-			setDraft(value);
-			return;
-		}
-		if (typed.greaterThan(seedExact)) {
-			setDraft(null);
-			return;
-		}
-		setDraft(value);
-	}, []);
+		},
+		[dispatchKey],
+	);
 
 	useEffect(() => {
 		return () => {
@@ -244,11 +273,28 @@ export function useInlineSell() {
 				// FAILURE. The field is mid-edit — an empty box, a lone ".". Painting
 				// `Retry` here would report a refusal for a request that was never
 				// sent, which is O-3's misleading-cause defect on a money control.
+				// ⛔ AND THE BUTTON IS DISABLED IN THAT STATE (see `canSubmit`), so
+				// this catch is the belt rather than the affordance — a Confirm that
+				// looks pressable and does nothing is the same defect wearing a
+				// different hat, and it is REACHABLE: a lot whose share of the mark
+				// falls below one 1e-18 quantum seeds canonical zero.
+				return;
+			}
+			const next = dispatchKey({ type: "SUBMIT" });
+			// ⛔ THE REDUCER CAN REFUSE A SUBMIT, AND IGNORING THAT DEADLOCKS THE
+			// CONTROL. `reduceKey` no-ops `SUBMIT` while `pending` is
+			// `fresh_on_enable` (the post-429 state). Fetching anyway replays the
+			// SAME key — whose 429 the idempotency layer has cached for 24h — and
+			// because `inFlight` never became true the `OUTCOME` is then DROPPED, so
+			// the state can never leave `fresh_on_enable`. Every later press repeats
+			// it. This component mounts no countdown, so `COUNTDOWN_EXPIRED` never
+			// arrives to rescue it either.
+			if (!next.inFlight) {
+				setFailed(true);
 				return;
 			}
 			setBusy(true);
 			setFailed(false);
-			const next = dispatchKey({ type: "SUBMIT" });
 			const { url, init } = buildSellRequest({
 				body: {
 					marketId: args.marketId,
@@ -305,17 +351,53 @@ export function useInlineSell() {
 				});
 				setBusy(false);
 				setFailed(true);
+				// ⛔⛔ REFRESH ON FAILURE TOO — this is the half that stops a SECOND
+				// EXECUTION. A request whose response is lost may still have COMMITTED;
+				// leaving the tile on its pre-sale figures shows the participant
+				// `Retry` above numbers that say nothing happened, and the honest
+				// reading of that screen is "sell it again". Refreshing makes the tile
+				// tell the truth before they decide. Harmless when the request really
+				// did not land — the figures simply come back unchanged.
+				router.refresh();
 			} catch {
 				dispatchKey({ type: "OUTCOME", outcome: "transient" });
 				setBusy(false);
 				setFailed(true);
+				router.refresh();
 			}
 		},
 		[busy, draft, dispatchKey, router],
 	);
 
+	/**
+	 * Can this amount actually be sold? ⛔ THE CONTROL MUST NOT LOOK PRESSABLE WHEN
+	 * IT IS NOT. A tile whose share of the holding's mark rounds below one 1e-18
+	 * quantum seeds canonical zero — reachable, because CPMM prices live in (0,1),
+	 * so `shares × price < 1e-18` needs only a one-quantum lot. `sellSharesFor`
+	 * then refuses the non-positive `dharmaIn`, and an enabled Confirm would do
+	 * nothing at all with no feedback. The shipped `SellModule` handled the same
+	 * state by DISABLING (`shares === null`); this is that, per tile.
+	 */
+	const canSubmit = useCallback(
+		(seedExact: string, maxShares: string): boolean => {
+			const amount = draft ?? seedExact;
+			try {
+				sellSharesFor({
+					quantity: maxShares,
+					currentValue: seedExact,
+					dharmaIn: amount,
+				});
+				return true;
+			} catch {
+				return false;
+			}
+		},
+		[draft],
+	);
+
 	return {
 		armedLotId,
+		canSubmit,
 		draft,
 		busy,
 		failed,
