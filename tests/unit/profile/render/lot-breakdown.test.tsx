@@ -29,6 +29,8 @@ function lot(over: Partial<ProfilePositionLot> = {}): ProfilePositionLot {
 	return {
 		lotId: "lot-1",
 		betId: "bet-1",
+		// POSREV-1 S1 — the ARGUMENT's own side (`lots.side`), not the position's.
+		side: "YES",
 		originalBasis: dp18("100"),
 		survivingBasis: dp18("100"),
 		survivingShares: dp18("40"),

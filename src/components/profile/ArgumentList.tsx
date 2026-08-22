@@ -113,9 +113,18 @@ export function ArgumentList({
 	// and every call site that passes no `selection` at all (which is what the
 	// render suites do). It stopped being the DEFAULT; it did not stop existing.
 	// ⇒ WHY A FILTER, one line: SPEC.1 §16.3 D8 and §17 name the §23 argument
-	// list as where a complete record lives, and `positions.ts:151-158` drops
-	// fully-exited markets from the table — so this list holds arguments the
-	// table can never reach. A filter hides; a replacement would delete. It is
+	// list as where a complete record lives, and this list holds arguments the
+	// table cannot reach — an argument on a market the participant never took a
+	// position in at all. A filter hides; a replacement would delete. It is
+	// ⚠ THE REASON GIVEN HERE USED TO BE A DIFFERENT ONE, AND IT IS NOW FALSE.
+	// It read: "`positions.ts:151-158` drops fully-exited markets from the
+	// table". POSREV-1 RF-13 widened that domain — a fully-exited market now
+	// HAS a row, carrying its arguments — so the gap that clause described is
+	// closed. The conclusion survives on the narrower gap above; the premise
+	// does not, and a stale premise propping up a live conclusion is worse than
+	// no comment. ⛔ It also fenced BY LINE, which is O-8's own counter-example:
+	// `loadProfilePositions` has moved since, so the numbers pointed at nothing
+	// even before the claim stopped being true. Symbols, never lines.
 	// the same class of viewer-local narrowing as the market and Open/Closed
 	// filters already on the table, so no spec change is owed.
 	// ⛔ NO PERCENTAGE IN THE HEADER. The mockup's colhead carries a live side

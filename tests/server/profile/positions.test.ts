@@ -634,9 +634,22 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		expect(row?.current).toBe(dp18("250"));
 	});
 
-	it("fully-exited-open-market-yields-no-row", async () => {
-		// OQ-3 A: an exited, still-Open market has nothing to value or settle — NO
-		// row. A separate still-held market is the selectivity control.
+	it("fully-exited-open-market-yields-a-row-carrying-its-arguments", async () => {
+		// ⚠⚠ THIS TEST ASSERTED THE OPPOSITE UNTIL POSREV-1 RF-13, and it is
+		// updated to the new behaviour with its reason rather than "fixed" by
+		// restoring the old one. It read `fully-exited-open-market-yields-no-row`
+		// on OQ-3 A: "an exited participation carries NO positions row — its
+		// record lives in the argument list". RF-13 supersedes that. The old
+		// reasoning was sound about VALUE — there is nothing to mark to market —
+		// and the row is no longer asked to carry one. It carries the ARGUMENTS,
+		// and an exited holding has exactly as many of those as a held one.
+		//
+		// ⛔ IT IS ALSO THE `computeSell` GUARD'S ONLY REGRESSION TEST.
+		// `cpmm/calculate.ts:126` runs `requirePositive(shares)`, which THROWS on
+		// zero — so without the guard in `loadProfilePositions` this call does not
+		// return a wrong row, it rejects, and the profile route 500s for anyone
+		// who ever fully exited a market. `await` alone is the assertion: a throw
+		// here fails the test before any `expect` runs.
 		const userA = await seedUser("exit-user", "exit");
 		const mExit = await seedMarket("m-exit", "Open");
 		await seedPool(mExit);
@@ -698,18 +711,53 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 			quantity: dp18("20"),
 		});
 
+		// A zero-quantity position with NO lot at all — the RF-13 floor. It
+		// attributes nothing and holds nothing, so it is not a record of anything
+		// and must NOT become a row. ⚠ THIS IS THE CONTROL FOR THE WIDENING: without
+		// it, "the exited market appears" would be indistinguishable from "the
+		// predicate was deleted and everything appears".
+		const mEmpty = await seedMarket("m-exit-no-lots", "Open");
+		await seedPool(mEmpty);
+		await seedPosition({
+			userId: userA,
+			marketId: mEmpty,
+			side: "YES",
+			quantity: dp18("0"),
+		});
+
 		const rows = await loadProfilePositions(testDb, { userId: userA });
-		expect(rows.filter((r) => r.marketId === mExit).length).toBe(0);
+
+		const exited = rows.find((r) => r.marketId === mExit);
+		expect(exited).toBeDefined();
+		// Nothing held, nothing surviving, nothing to value — but the argument
+		// survives, which is the whole point of the row existing.
+		expect(exited?.quantity).toBe(dp18("0"));
+		expect(exited?.staked).toBe(dp18("0"));
+		expect(exited?.current).toBe(dp18("0"));
+		expect(exited?.lots.length).toBe(1);
+		expect(exited?.lots[0]?.sold).toBe(true);
+		expect(exited?.lots[0]?.survivingShares).toBe(dp18("0"));
+		// The argument's OWN side rides the lot, not the position row.
+		expect(exited?.lots[0]?.side).toBe("YES");
+		expect(exited?.lots[0]?.originalBasis).toBe(dp18("100"));
+
+		// The still-held control is untouched by the widening.
 		expect(rows.filter((r) => r.marketId === mHeld).length).toBe(1);
+		// And the lot-less zero row is still refused.
+		expect(rows.filter((r) => r.marketId === mEmpty).length).toBe(0);
 	});
 
-	it("fully-exited-then-settled-yields-no-row", async () => {
+	it("fully-exited-then-settled-yields-a-row-valued-at-its-payout", async () => {
 		// @code-reviewer HIGH-1 (Slice 2): a user who FULLY EXITS before the
 		// market settles has a zero-quantity position AND a zero-amount
 		// payout_events row (settle.ts writes one payout per bet, zero legs
-		// included). OQ-3 A: an exited participation carries NO positions row —
-		// its record lives in the argument list + graph, not the table. The
-		// closed-row domain is held-to-settlement, not every payout.
+		// included).
+		//
+		// ⚠⚠ UPDATED AT POSREV-1 RF-13, same supersession as the test above. It
+		// asserted `…-yields-no-row` on OQ-3 A. The row now exists. Its `current`
+		// comes from the SETTLED arm — Σ payout_events — rather than from the
+		// zero-shares guard, so this case proves the two arms are independent:
+		// `settled` is decided by the presence of a payout row, not by quantity.
 		const userA = await seedUser("exited-settled-user", "exited-settled");
 		const marketId = await seedMarket("m-exited-settled", "Resolved", {
 			outcome: "YES",
@@ -763,7 +811,16 @@ describe("UI.A5 Slice 2 — loadProfilePositions (F-PROF-1 positions read model)
 		});
 
 		const rows = await loadProfilePositions(testDb, { userId: userA });
-		expect(rows.filter((r) => r.marketId === marketId).length).toBe(0);
+		const row = rows.find((r) => r.marketId === marketId);
+		expect(row).toBeDefined();
+		// `settled` is decided by the PRESENCE of a payout row, never by quantity
+		// — so this row takes the settled `current` arm (Σ payouts = Đ 0 here),
+		// not the zero-shares guard the still-Open case above takes.
+		expect(row?.settled).toBe(true);
+		expect(row?.quantity).toBe(dp18("0"));
+		expect(row?.current).toBe(dp18("0"));
+		expect(row?.lots.length).toBe(1);
+		expect(row?.lots[0]?.sold).toBe(true);
 	});
 
 	it("held-in-closed-unsettled-market", async () => {

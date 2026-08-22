@@ -13,11 +13,18 @@ import type { ProfileUser } from "@/server/profile/resolve";
 /**
  * ROUND 4 item 7 — THE ARGUMENT PANEL FILTERS TO THE PICKED ROW.
  *
- * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: the
- * full list is the default, one deselect away, and every argument that was in it
- * before is in it after. `positions.ts:151-158` drops fully-exited markets from
- * the table, so the list holds arguments the table can never reach — a
- * replacement would delete them from the surface.
+ * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: every
+ * argument that was in the list before a pick is in it after. The list holds
+ * arguments the table cannot reach — one made on a market the participant never
+ * took a position in — so a replacement would delete them from the surface.
+ *
+ * ⚠ TWO CLAUSES OF THIS PARAGRAPH WERE STALE AND ARE CORRECTED IN PLACE. It said
+ * the full list is "one deselect away" (PROFILE REFINEMENT R3 retired deselect)
+ * and that "`positions.ts:151-158` drops fully-exited markets from the table"
+ * (POSREV-1 RF-13 widened that domain — an exited market now has a row carrying
+ * its arguments). The assertion under test never depended on either; only the
+ * justification did, and a justification that has stopped being true is how a
+ * correct test comes to be deleted by someone who checks it.
  *
  * ⚠ THE MASKING ASSERTIONS READ THE BODY, NOT THE ROW (SC-1). A removed argument
  * is checked by asserting its BODY STRING is absent from the panel's serialised

@@ -71,6 +71,14 @@ export type ProfilePositionLot = {
 	lotId: string;
 	/** The bet this lot IS — R1's 1:1. */
 	betId: string;
+	/**
+	 * The ARGUMENT's OWN side (`lots.side`, immutable at mint) — NOT the row's
+	 * `positions.side`, which is Bucket C and moves when a participant exits one
+	 * pole and re-enters the other. The two agree on every surviving lot by
+	 * construction and diverge only on fully-sold ones; see `lots/basis.ts`'s
+	 * `LotDecompositionRow.side` for why that is the set where it matters.
+	 */
+	side: "YES" | "NO";
 	/** Đ staked on this argument at post time. Frozen forever (`bets.stake`). */
 	originalBasis: string;
 	/** Đ still staked here — the summand of Đa. Falls when this lot sells down. */
@@ -159,11 +167,12 @@ function walkMarket(
 
 /**
  * Load the profile user's cross-market positions — the first batched
- * `positions` read (SPEC.1 §23). The row domain is the markets where the user
- * still HOLDS a position (`quantity > 0`); a settlement never zeroes a held
- * position (INV-4: resolution's write path never touches `positions`), so a
- * held-to-settlement participation persists its row. Each held row is one of
- * two classes:
+ * `positions` read (SPEC.1 §23). The row domain is **every market the user has
+ * a position row in**: still held, or fully exited with at least one argument
+ * attributed to it (POSREV-1 RF-13 — see the widening's own block below for why
+ * it costs no query). A settlement never zeroes a held position (INV-4:
+ * resolution's write path never touches `positions`), so a held-to-settlement
+ * participation persists its row. Each row is one of two classes:
  *
  *   - **Open holding** (settled=false): the market has NO `payout_events`
  *     settlement for this user. `current` = Đb (`computeSell` against the live
@@ -173,16 +182,24 @@ function walkMarket(
  *     net Σ of those payout amounts (`bet_payout` + `void_refund` + correction
  *     pairs netted). `statusLabel` = Closed by market state.
  *
- * A **fully-exited** market — position at zero — yields NO row whether it is
- * still Open OR later settled (settle.ts writes a zero-amount payout row per
- * bet, but there is no surviving held position and nothing to value): OQ-3 A —
- * "an exited market carries no positions row; its record lives in the argument
- * list + graph." (Surfaced for Gate C: the closed-row domain is held-to-
- * settlement, not every payout.) Per holding: `staked` = Đa, which since
- * LOTS-1 is **Σ `lots.surviving_basis`** (`lots/basis.ts`, ADR-0039 D-4) and no
- * longer the episode walk's `stakedBasis`; the `argument` cell is still the
- * current episode's opening comment (N-1a), which is the one thing the walk is
- * kept here for. Read-only; no write, no store (§23).
+ * ⚠⚠ **A fully-exited market NOW YIELDS A ROW, and this paragraph used to say
+ * the opposite.** It read: "a fully-exited market — position at zero — yields NO
+ * row whether it is still Open OR later settled … its record lives in the
+ * argument list + graph" (OQ-3 A). That ruling is SUPERSEDED by POSREV-1 RF-13,
+ * and the reason it stood is worth keeping: there was genuinely nothing to
+ * *value* — no surviving shares, and `settle.ts` writes a zero-amount payout row
+ * per bet. What changed is that the row is no longer asked to carry a value. It
+ * carries the ARGUMENTS, each with what was staked behind it, and an exited
+ * holding has exactly as many of those as a held one. Its `current` is a
+ * canonical zero and is never rendered as a live figure. ⛔ The graph half of
+ * that sentence is doubly stale — UNWIRE-1 deleted the graph (ADR-0040).
+ *
+ * Per holding: `staked` = Đa, which since LOTS-1 is **Σ `lots.surviving_basis`**
+ * (`lots/basis.ts`, ADR-0039 D-4) and no longer the episode walk's
+ * `stakedBasis` — so a fully-exited holding's Đa is canonical zero for free,
+ * because `loadLotBasis` sums only surviving lots. The `argument` cell is still
+ * the current episode's opening comment (N-1a), which is the one thing the walk
+ * is kept here for. Read-only; no write, no store (§23).
  */
 export async function loadProfilePositions(
 	client: ProfileReader,
@@ -190,8 +207,28 @@ export async function loadProfilePositions(
 ): Promise<ProfilePositionRow[]> {
 	const { userId } = args;
 
-	// The row domain: every market where the user still holds a position
-	// (quantity > 0) — exited markets (Open or settled) carry no row (OQ-3 A).
+	// ⚠⚠ POSREV-1 RF-13 — THE ROW DOMAIN IS EVERY POSITION ROW, HELD OR EXITED.
+	//
+	// It used to be `quantity > 0`, and that predicate was a JS `if` over a SELECT
+	// that had already fetched every row — which is why widening it costs nothing.
+	// It cost something else, though: a participant who fully exited a market had
+	// NO row, so an "arguments you no longer hold" view had nothing to render and
+	// would have been permanently empty. Their record lived only in the argument
+	// list, where it is not attached to what they staked on it.
+	//
+	// ⛔ THE WIDENING ADDS NO ROUND TRIP, AND THAT IS THE CONSTRAINT IT WAS
+	// DESIGNED AROUND. Every read below is one batched `inArray(marketIdList)`;
+	// admitting exited markets lengthens the `IN (…)` lists and issues no further
+	// statement. Pinned, not asserted:
+	// `tests/integration/profile-statement-count.integration.test.ts` counts SQL
+	// at the DRIVER at M=1 and M=8 and requires the two to be equal.
+	//
+	// ⚠ A ZERO-QUANTITY ROW WITH NO LOTS IS DROPPED at the assembly loop below —
+	// a position that holds nothing and attributes nothing is not a record of
+	// anything. A HELD row with no lots is KEPT, deliberately: that is the
+	// lots↔positions drift `planLotSale` refuses to let an attribution layer veto
+	// (`lots/persist.ts:204-218`), and hiding a position someone still holds — and
+	// can still sell — would be the profile committing the same error.
 	const positionRows = await client
 		.select({
 			marketId: positions.marketId,
@@ -200,19 +237,17 @@ export async function loadProfilePositions(
 		})
 		.from(positions)
 		.where(eq(positions.userId, userId));
-	const heldByMarket = new Map<
+	const positionByMarket = new Map<
 		string,
 		{ side: "YES" | "NO"; quantity: string }
 	>();
 	for (const p of positionRows) {
-		if (new CpmmDecimal(p.quantity).greaterThan(0)) {
-			heldByMarket.set(p.marketId, { side: p.side, quantity: p.quantity });
-		}
+		positionByMarket.set(p.marketId, { side: p.side, quantity: p.quantity });
 	}
-	if (heldByMarket.size === 0) {
+	if (positionByMarket.size === 0) {
 		return [];
 	}
-	const marketIdList = [...heldByMarket.keys()];
+	const marketIdList = [...positionByMarket.keys()];
 
 	// Net Σ payout per (user, market) — the settled-row `current` (OQ-9 A); its
 	// presence for a held market is the Open-vs-Closed settled discriminant.
@@ -402,22 +437,40 @@ export async function loadProfilePositions(
 	const rows: ProfilePositionRow[] = [];
 	for (const marketId of marketIdList) {
 		const market = marketById.get(marketId);
-		// `held` is defined for every marketId (the domain IS heldByMarket); a
-		// missing market row is structurally impossible (the position FK).
-		const held = heldByMarket.get(marketId);
-		if (market === undefined || held === undefined) {
+		// `position` is defined for every marketId (the domain IS positionByMarket);
+		// a missing market row is structurally impossible (the position FK).
+		const position = positionByMarket.get(marketId);
+		if (market === undefined || position === undefined) {
+			continue;
+		}
+		const marketLots = lotsByMarket.get(marketId) ?? [];
+		const held = new CpmmDecimal(position.quantity).greaterThan(0);
+		// RF-13's floor: nothing held AND nothing attributed is not a record.
+		if (!held && marketLots.length === 0) {
 			continue;
 		}
 		const staked = lotBasisOf(lotBasis, userId, marketId);
 
 		const settled = settledNet.has(marketId);
+		// ⛔⛔ `computeSell` REFUSES A ZERO SHARE COUNT — `cpmm/calculate.ts:126`
+		// runs `requirePositive(shares, "shares")`, which throws `CpmmInputError`
+		// on anything not strictly > 0. Before RF-13 the `quantity > 0` domain
+		// made that unreachable here; widening the domain walks straight onto it,
+		// and the failure is a THROWN PAGE LOAD for anyone with a fully-exited
+		// market — not a wrong number, a 500.
+		// ⇒ The guard is also the honest answer rather than a workaround: a
+		// holding with no shares is worth exactly zero, and there is no curve to
+		// evaluate. `toFixed18(0)` rather than a new literal, so the canonical
+		// 18-dp form comes from the same formatter every other figure here uses.
 		const current = settled
 			? toFixed18(settledNet.get(marketId) ?? new CpmmDecimal(0))
-			: computeSell({
-					reserves: reservesOf(poolByMarket.get(marketId)),
-					side: held.side === "YES" ? "yes" : "no",
-					shares: held.quantity,
-				}).proceeds;
+			: held
+				? computeSell({
+						reserves: reservesOf(poolByMarket.get(marketId)),
+						side: position.side === "YES" ? "yes" : "no",
+						shares: position.quantity,
+					}).proceeds
+				: toFixed18(new CpmmDecimal(0));
 
 		const openerId = openerByMarket.get(marketId) ?? null;
 
@@ -428,8 +481,8 @@ export async function loadProfilePositions(
 			marketStatus: market.status,
 			statusLabel: market.status === "Open" ? "Open" : "Closed",
 			settled,
-			side: held.side,
-			quantity: held.quantity,
+			side: position.side,
+			quantity: position.quantity,
 			staked,
 			current,
 			argument: buildArgumentCell({
@@ -439,9 +492,10 @@ export async function loadProfilePositions(
 				ordinalById,
 				removedSet,
 			}),
-			lots: (lotsByMarket.get(marketId) ?? []).map((lot) => ({
+			lots: marketLots.map((lot) => ({
 				lotId: lot.lotId,
 				betId: lot.betId,
+				side: lot.side,
 				originalBasis: lot.originalBasis,
 				survivingBasis: lot.survivingBasis,
 				survivingShares: lot.survivingShares,

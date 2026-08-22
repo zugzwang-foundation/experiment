@@ -130,6 +130,24 @@ export type LotDecompositionRow = {
 	lotId: string;
 	betId: string;
 	marketId: string;
+	/**
+	 * The ARGUMENT's OWN side, denormalized from its bet at mint and immutable
+	 * after (`db/schema/lots.ts:70`).
+	 *
+	 * ⚠ **NOT `positions.side`, and the difference only shows on the rows that
+	 * matter.** `positions.side` is Bucket C and MUTABLE: a participant who
+	 * exits YES entirely and re-enters NO has a position row reading NO, while
+	 * every argument they made on the way in is still a YES argument. Every
+	 * SURVIVING lot necessarily agrees with the position — `positions_one_held_
+	 * side_idx` permits one held side and a flip requires a full exit first — so
+	 * the two only diverge on FULLY-SOLD lots, which is exactly the set POSREV-1
+	 * RF-13 promotes into the Closed tab. Reading the position's side there would
+	 * relabel a participant's own past arguments as the pole they later moved to.
+	 *
+	 * Carried on the EXISTING select — one more column on a statement already
+	 * issued, not a second read.
+	 */
+	side: "YES" | "NO";
 	originalBasis: string;
 	survivingBasis: string;
 	survivingShares: string;
@@ -161,6 +179,7 @@ export async function loadLotDecomposition(
 			lotId: lots.id,
 			betId: lots.betId,
 			marketId: lots.marketId,
+			side: lots.side,
 			originalBasis: lots.originalBasis,
 			survivingBasis: lots.survivingBasis,
 			survivingShares: lots.survivingShares,
