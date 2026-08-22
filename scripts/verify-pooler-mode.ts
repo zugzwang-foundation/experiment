@@ -1,14 +1,31 @@
 /**
- * S-1 · CRITERION 6 — THE POSITIVE CONTROL.  ⛔ THROWAWAY — DELETE BEFORE MERGE.
+ * VERIFY POOLER MODE — is this connection's pooler in transaction or session mode?
  *
  * A verification that passes when it is not looking is worth nothing (V-2).
- * Criteria 1-5 all assert things about a pooler; this asserts that the pooler
- * under test is the one we think it is. It must fire before any other criterion
- * is recorded as met.
+ * S-1's criteria 1-5 all assert things about a pooler; this asserts that the
+ * pooler under test is the one we think it is. It must fire before any other
+ * criterion is recorded as met.
+ *
+ * ── THIS SHIPS. IT IS NOT AN S-1 ARTIFACT. ───────────────────────────────────
+ *
+ * It was written as a throwaway for S-1 criterion 6 and reclassified when the
+ * control turned out to prove the POOLER rather than the deployment — which is
+ * a standing question, not a one-task one.
+ *
+ * ⚠ NAMED DOWNSTREAM CALLER: **S-5**, the load programme. S-5 must confirm
+ * transaction mode is actually active BEFORE load run #1, and W-10 says
+ * saturation goes QUIET — overload queues rather than erroring, so a run can
+ * report zero errors against a fully saturated pool. "It looked fine" is
+ * therefore not available as evidence, and a committed instrument is how the
+ * check gets re-run rather than re-derived.
+ *
+ * That is also why the filename names the MEASUREMENT and not the criterion:
+ * S-1 closes, and a script called after a closed task's criterion number is a
+ * script nobody can identify in three weeks.
  *
  * ── HOW TO RUN ───────────────────────────────────────────────────────────────
  *
- *   pnpm tsx --conditions=react-server scripts/s1-criterion6-control.ts
+ *   pnpm tsx --conditions=react-server scripts/verify-pooler-mode.ts
  *
  * ⚠ `--conditions=react-server` IS LOAD-BEARING, and this is the one thing about
  * this script worth remembering. `src/db/index.ts` imports `server-only`, whose
