@@ -117,10 +117,83 @@ async function main(): Promise<void> {
 			pb.original_stake AS author_stake_original,
 			pb.sold AS author_sold,
 			pb.price_at_bet AS price_at_bet,
-			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time) AS support_count,
-			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time) AS counter_count,
-			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time), 0) AS support_dharma,
-			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time), 0) AS counter_dharma
+			-- ⚠ TWO DIFFERENT NUMBERS LIVE HERE AND THEY ARE NOT INTERCHANGEABLE
+			-- (ADR-0039 patch record P3, RANK-3).
+			--
+			-- *_count_total  = the DISPLAYED count. Every reply, self-authored and
+			--                  removed INCLUDED. It answers "how many replies are
+			--                  here" and must match what a reader can count on the
+			--                  surface. This is the only one that reaches a DTO.
+			-- *_count        = the RANKING input. DISTINCT PEOPLE, self-authored
+			--                  excluded. Never rendered anywhere, on any surface.
+			--
+			-- R-2: the lanes count PEOPLE, not replies. The thesis is K·n > C and n
+			-- is how many people hold the knowledge — one person posting five times
+			-- is n = 1. COUNT(rb.id) measured the wrong noun; this is a correction
+			-- to a definition, not a mitigation.
+			--
+			-- ⚠ THE SELF-EXCLUSION MOVED FROM THE JOIN INTO THESE FILTERS at RANK-3,
+			-- and it had to: a JOIN predicate removes the row, so the total could
+			-- not be computed from the same query. A FILTER keeps the row and
+			-- declines to count it, which preserves the property the JOIN form was
+			-- chosen for — a post whose only replies are its own still appears, with
+			-- its ranking counts at zero, rather than vanishing from the listing.
+			-- ⚠ THE DISPLAY TOTAL COUNTS REPLY COMMENTS, NOT REPLY-BET ROWS, and the
+			-- distinction is load-bearing rather than pedantic. R-1 only holds if
+			-- this number equals what a reader can COUNT on the surface, and the
+			-- surface is the reply lane, which is one row per reply COMMENT
+			-- (reply-substrate.ts takes its bet through a LIMIT 1 LATERAL). The
+			-- join below is a plain LEFT JOIN on bets.comment_id, which has an
+			-- index but NO unique constraint -- so COUNT(rb.id) would report 2 for
+			-- a comment carrying two bets while the lane still showed one row, and
+			-- the differential this task exists to close would silently re-open at
+			-- exactly the surfaces it was closed at. That a second bet is
+			-- unreachable today is a property of place.ts being the sole write
+			-- path, not of the schema; COUNT(DISTINCT rc.id) does not depend on it.
+			--
+			-- AND rb.id IS NOT NULL makes both forms agree with the lane on the
+			-- other edge too: the lane's LATERAL is an inner join, so a comment
+			-- with no bet at all is absent from it. Without this clause the people
+			-- count would score such a row as a whole person of traction at zero
+			-- stake, since rc.user_id is non-null whether or not a bet exists.
+			COUNT(DISTINCT rc.id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rb.id IS NOT NULL
+			) AS support_count_total,
+			COUNT(DISTINCT rc.id) FILTER (
+				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rb.id IS NOT NULL
+			) AS counter_count_total,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS support_count,
+			COUNT(DISTINCT rc.user_id) FILTER (
+				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rc.user_id <> p.user_id
+					AND rb.id IS NOT NULL
+			) AS counter_count,
+			-- LOTS-1 / ADR-0039 R4+R5 — the attracted-value aggregates key off SURVIVING
+			-- LOT BASIS, not the frozen bets.stake. A replier who sells their lot
+			-- down withdraws the weight they lent the parent, which is what R5 names.
+			-- The historical figure is not lost: bets.stake is Bucket-A immutable and
+			-- still readable; it simply stops being what this aggregate reports.
+			--
+			-- ⚠ COALESCE FALLS BACK TO THE FROZEN STAKE when a reply-bet has no lot.
+			-- Unreachable under R8 (every bet mints a lot), but the alternative on an
+			-- unreachable row is to silently score a real contribution as ZERO — the
+			-- same class of error as letting missing bookkeeping veto a sell (S5). An
+			-- unknown surviving amount is better read as "all of it survives", which
+			-- is exactly the pre-LOTS-1 behaviour.
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
+				WHERE rc.side_at_post_time = p.side_at_post_time
+					AND rc.user_id <> p.user_id
+			), 0) AS support_dharma,
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
+				WHERE rc.side_at_post_time <> p.side_at_post_time
+					AND rc.user_id <> p.user_id
+			), 0) AS counter_dharma
 		FROM comments p
 		JOIN LATERAL (
 			SELECT
@@ -134,13 +207,7 @@ async function main(): Promise<void> {
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) pb ON true
-		-- RANK-2 — self-authored replies are not attraction: excluded from the count
-		-- lanes and the attracted-value aggregates, and from nothing else. In the ON
-		-- clause rather than the WHERE, so a post whose only replies are its own
-		-- still appears with its counts at zero rather than vanishing.
-		LEFT JOIN comments rc
-			ON rc.parent_comment_id = p.id
-			AND rc.user_id <> p.user_id
+		LEFT JOIN comments rc ON rc.parent_comment_id = p.id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
 		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.market_id = ${marketId} AND p.parent_comment_id IS NULL
@@ -153,6 +220,8 @@ async function main(): Promise<void> {
 		parentSide: r.parent_side as "YES" | "NO",
 		supportCount: Number(r.support_count),
 		counterCount: Number(r.counter_count),
+		supportCountTotal: Number(r.support_count_total),
+		counterCountTotal: Number(r.counter_count_total),
 		supportDharma: r.support_dharma as string,
 		counterDharma: r.counter_dharma as string,
 		createdAt: new Date(r.created_at as string),
@@ -180,7 +249,7 @@ async function main(): Promise<void> {
 	for (const s of substrate) {
 		console.log(
 			`  ${s.id.slice(0, 8)} side=${s.parentSide}  ` +
-				`support=${s.supportCount}/Đ${s.supportDharma}  counter=${s.counterCount}/Đ${s.counterDharma}  a=Đ${s.authorStake}`,
+				`support=${s.supportCount}p/${s.supportCountTotal}r/Đ${s.supportDharma}  counter=${s.counterCount}p/${s.counterCountTotal}r/Đ${s.counterDharma}  a=Đ${s.authorStake}`,
 		);
 	}
 

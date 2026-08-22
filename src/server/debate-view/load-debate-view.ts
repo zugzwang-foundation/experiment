@@ -306,9 +306,17 @@ export async function loadDebateView(
 	const posts: DebatePost[] = ordered.map((sub) => {
 		const comment = commentById.get(sub.id);
 		const removed = removedSet.has(sub.id);
+		// ⚠ THE DISPLAY TOTALS, NEVER THE RANKING COUNTS (ADR-0039 P3, RANK-3).
+		// The ranking counts are DISTINCT PEOPLE with self-authored replies
+		// excluded; these are every reply, self-authored and removed included.
+		// Putting the ranking numbers on a DTO is what created the SC-1
+		// differential: subtract the rendered aggregate from the rendered lane
+		// length and the remainder is the self-reply count — which, on a post
+		// carrying a removed reply, attributes that removal to a named pseudonym
+		// from a signed-out page.
 		const aggregate: ReplyAggregate = {
-			supportCount: sub.supportCount,
-			counterCount: sub.counterCount,
+			supportCount: sub.supportCountTotal,
+			counterCount: sub.counterCountTotal,
 			supportDharma: sub.supportDharma,
 			counterDharma: sub.counterDharma,
 		};

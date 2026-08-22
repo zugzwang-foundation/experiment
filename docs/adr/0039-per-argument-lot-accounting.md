@@ -14,6 +14,109 @@
 
 ## Patch record
 
+**P3 (2026-08-22, RANK-3) — the displayed count and the ranking input are two
+numbers, and the ranking one counts people.** In-place Patch record per
+CLAUDE.md §5.12. P2 closed the single-account self-reply capture and, in doing
+so, created a masking differential; P3 closes that and corrects the noun the
+lanes count.
+
+**The ruling (founder-authored, reproduced verbatim):**
+
+> **R-1 · THE DISPLAYED COUNT AND THE RANKING INPUT ARE TWO NUMBERS.**
+> Displayed: totalReplyCount — self-inclusive AND removed-inclusive. It answers
+> "how many replies are here" and MUST match what a reader can count on the
+> surface. Ranking input: the self-exclusive count, never rendered anywhere,
+> on any surface, in any DTO that reaches a client.
+> This does not contradict RANK-1's one-field-two-consumers rule. There the
+> badge and the ruler measured the SAME thing, so splitting them would let one
+> lie. Here they measure different things — a display fact and a ranking
+> judgement. What must never split is a number and its own meaning.
+>
+> **R-2 · TRACTION COUNTS PEOPLE, NOT REPLIES.**
+> Every count-based ranking input — traction n, the dominance split lop, and
+> the contestation input n^b — uses COUNT(DISTINCT rc.user_id), not COUNT(rb.id).
+> The thesis is K·n > C and n is the number of PEOPLE who hold the knowledge.
+> A lane that counts messages measures the wrong noun. One person posting five
+> times is n = 1. This is a correction to a definition, not a mitigation.
+> Consequence, stated: "Most Debated" now means most people arguing rather
+> than most replies typed.
+>
+> **R-3 · RESIDUAL, PRICED HONESTLY.** R-2 raises the floor from one account to five.
+> It does NOT close sybil economics — Google OAuth signup carries no Turnstile
+> and the per-IP OTP cap fails open. That is signup cost and belongs to
+> RATE-GUARD-PUBLIC. Record it; do not fix it here.
+
+**The differential P2 created, measured on `a3cf3f6` before this fix.** P2
+excluded self-authored replies from the aggregates but not from the reply LANE,
+which is unfiltered and includes removed stubs. Both numbers are printed in the
+same **public, signed-out** `.md` export:
+
+```
+replies: 2      ← the lane, removed stub included
+1 support       ← the aggregate, self-reply excluded
+2 − 1 = 1       ← exactly one of these replies is the post author's own
+```
+
+Only one row is unattributed — the removed stub — so the subtraction **assigns a
+removal to a named pseudonym**, from a page requiring no session. A removed
+comment's author is deliberately withheld (the removed DTO variant carries no
+`author` field). That is the SC-1 class, and P2 introduced it.
+
+**Implementation.** The self-exclusion **moved out of the JOIN and into the
+aggregate FILTER clauses**, and had to: a JOIN predicate removes the row, so the
+display total could not be computed from the same query. A FILTER keeps the row
+and declines to count it, which preserves the property the JOIN form was chosen
+for — a post whose only replies are its own still appears, with its ranking
+counts at zero, rather than vanishing from the listing.
+
+Three sites (`debate-view/ranking-substrate.ts`, `profile/arguments.ts`,
+`scripts/verify-ranking-staging.ts`; `bookmarks/list.ts` was removed at
+ADR-0040) now emit **four** numbers per side instead of two: `*_count_total`
+(display) and `*_count` (ranking, `COUNT(DISTINCT rc.user_id)`, self-excluded).
+
+⚠ **A second live instance of the same leak was found by sweeping every reader
+of the count fields, not by the reproduction test:** `discovery/hero.ts` fed the
+ranking count into `HeroPost.replyCount`, rendered as `Replies · N` on the
+**public Discovery hero**. Fixing only the export would have left the most public
+surface in the product still differing.
+
+**Residual, priced — and the measured price is not the one R-3 states.** R-3 says
+five distinct accounts. ⚠ **It is three**, and the ruling's own figure is the one
+thing in P3 that execution could not confirm.
+
+`n` is `supportCount + counterCount` (`ranking.ts::derive`), and those are two
+**separate per-side DISTINCT aggregates** — so one `user_id` appearing on both
+sides of the same post is counted once in *each*. Reaching both sides is a
+shipped, ratified path, not a hole: `place` rejects only a **held** opposite side
+(`getHeldPosition` is `quantity > 0`), so selling a lot to zero re-opens the other
+side, and INV-3 then freezes each reply on the side it was posted from. **One
+account therefore buys two people-units.**
+
+Measured, not reasoned — `tests/server/lots/count-differential.test.ts`, third
+case: three accounts × (reply YES → sell to zero → reply NO) give `n = 6`, clear
+`floorLane.n = 5` as the sole clearer, and take **#1 outright** over a post
+holding ten times the conviction. The YES halves were sold, so `D = Đ150` stays
+**below** `floorLane.D = 200` — the capture is bought entirely on the count axis,
+which is the axis that does not decay, for Dharma the fee-less CPMM returns on
+exit. The *Contested* badge is cheaper still: **two** accounts give `n = 4`,
+`b = 1`, `n^b = 4 ≥ 3`.
+
+⇒ **R-2's direction holds and its magnitude does not.** The floor moved from one
+account to three, not to five, and R-3's conclusion is unaffected: this is still
+signup cost, still **RATE-GUARD-PUBLIC's** lane — Google OAuth signup carries no
+Turnstile and the per-IP OTP cap fails open — and it is still deliberately
+untouched here. What changed is the number an operator would budget against.
+
+**Why the figure is corrected here and the ruling above is not.** R-3 is quoted
+verbatim because it is the founder's text and a decision record is not the place
+to edit one. Closing the doubling is a **ranking-semantics ruling**, not a patch:
+taking `COUNT(DISTINCT rc.user_id)` once across both sides and apportioning it
+would change what `lop`'s denominator means, and that is not execution's call.
+**Open for ruling as `RANK-3-D2`.**
+
+---
+
+
 **P2 (2026-08-22, RANK-2) — self-authored replies do not count as attraction.**
 In-place Patch record per CLAUDE.md §5.12. P1 closed the STAKE axis; the RANK-1
 security pass found the COUNT axis open and it is closed here — by a different
@@ -73,11 +176,17 @@ of this query — it will need the predicate, and the parity guard will need the
 entry back, or the copy ships unguarded.
 
 
-⚠ **It lives in the JOIN, never the WHERE.** In a `WHERE` it would drop any post
-whose only replies are self-replies out of the result set entirely; in the `ON`
-clause the `LEFT JOIN` still yields the post, with its counts and sums correctly
-at zero. Both the predicate and its position are pinned by
-`tests/unit/ranking/substrate-site-parity.test.ts`.
+⚠ **It lived in the JOIN and not the WHERE**, because a `WHERE` would drop any
+post whose only replies are self-replies out of the result set entirely.
+
+> *(**AMENDED at RANK-3.** It now lives in the aggregate **FILTER** clauses, and
+> had to: a JOIN predicate removes the row, so the display totals P3 requires
+> could not be computed from the same query. A FILTER keeps the row and declines
+> to count it, preserving the very property the JOIN placement was chosen for.
+> `substrate-site-parity.test.ts` now pins the FILTER form and asserts the
+> **absence** of the JOIN form — so this paragraph's original closing sentence,
+> which cited that file as pinning the JOIN, would have sent a reader to restore
+> what P3 removed, with a false receipt attached.)*
 
 ⚠ **`debate-view/reply-substrate.ts` is deliberately NOT changed**, and its
 absence from that list is the ruling rather than an oversight — it is the loader
@@ -120,8 +229,11 @@ exactly when the top slot and the hero seed attention.
 **Two levers if the founder wants the price raised**, both ranking-semantics
 decisions rather than patches: `COUNT(DISTINCT rc.user_id)` for the traction lane
 (turns one sybil into five), or a per-`(user, parent_comment_id)` reply cap.
-**Neither is taken here** — the ruling conceded multi-account capture, and
-re-pricing an accepted risk is the founder's call, not this task's.
+**Neither was taken at RANK-2** — the ruling conceded multi-account capture.
+
+> *(**AMENDED at RANK-3.** The first lever WAS subsequently taken: R-2 makes
+> traction `COUNT(DISTINCT rc.user_id)`, raising the floor from one account to
+> five. The per-parent reply cap remains untaken. See patch record P3.)*
 
 **Still open, and named rather than implied:** multi-account capture. The same
 volume bought from six accounts still clears the floors. That is a different
@@ -519,8 +631,9 @@ aggregates over the frozen `bets.stake`, at two byte-equivalent sites
 > drifted for a release — so the number of places that must agree is **three**,
 > not two, even though only two are under `src/`. **(2)** The summand now
 > additionally **excludes self-authored replies**: `AND rc.user_id <> p.user_id`
-> on the reply join, in the `ON` clause and never the `WHERE`. Patch record **P2**
-> at the top of this file carries the ruling and the reason.)*
+> on the reply join at RANK-2 — moved into the aggregate `FILTER` clauses at
+> RANK-3, see patch record **P3**. Patch record **P2**
+> at the top of this file carries the RANK-2 ruling and the reason.)*
 Under R4/R5 the summand becomes the replier's **surviving lot basis** for that reply —
 `SUM(COALESCE(l.surviving_basis, rb.stake)) FILTER (…)`, joined `lots ON lots.bet_id =
 rb.id`. A replier who sells their lot down therefore withdraws the weight they lent the

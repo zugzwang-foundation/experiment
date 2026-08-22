@@ -256,21 +256,38 @@ describe("RANK-2 — a post attracting its own author is not attracting anything
 			parentCommentId: f.captured.commentId,
 		});
 
-		// Site 1 — the debate view.
+		// Site 1 — the debate view SUBSTRATE, which is where the ranking counts
+		// live and the only place they are allowed to live (RANK-3 R-1).
 		const posts = await loadRankingSubstrate(db, { marketId: f.marketId });
 		const captured = posts.find((p) => p.id === f.captured.commentId);
-		expect(captured?.supportCount).toBe(1); // the outsider, not the six selves
+		// The RANKING count: one person — the outsider, not the six selves. Since
+		// RANK-3 this is DISTINCT PEOPLE, so it would read 1 for the outsider even
+		// if they had replied repeatedly.
+		expect(captured?.supportCount).toBe(1);
 		expect(units(captured?.supportDharma ?? "0")).toBe(
 			units("70.000000000000000000"),
 		);
+		// The DISPLAY total, on the same row: every reply, self-authored included.
+		// Six self-replies + one outsider = 7. A reader can count seven, so seven
+		// is what a surface must show.
+		expect(captured?.supportCountTotal).toBe(7);
 
 		// Site 2 — the profile, read as the POST's author.
+		//
+		// ⚠ ASSERTED DIFFERENTLY SINCE RANK-3, and the change is the point: this
+		// line used to read `aggregate.supportCount === 1`, because the DTO then
+		// carried the ranking count. R-1 makes the DTO carry the DISPLAY total —
+		// the ranking count must reach no client — so the same field now correctly
+		// reads 7. The over-exclusion property has not been dropped; it moved to
+		// the DHARMA, which is still self-exclusive and still on the DTO. That is
+		// the stronger probe anyway: an always-false predicate would make it 370
+		// and an always-true one would make it 0.
 		const items = await loadProfileArguments(db, { userId: f.attacker });
 		const item = items.find((i) => i.id === f.captured.commentId);
 		if (item === undefined || item.removed || item.kind !== "post") {
 			throw new Error("expected the captured post on the attacker's profile");
 		}
-		expect(item.aggregate.supportCount).toBe(1);
+		expect(item.aggregate.supportCount).toBe(7);
 		expect(units(item.aggregate.supportDharma)).toBe(
 			units("70.000000000000000000"),
 		);

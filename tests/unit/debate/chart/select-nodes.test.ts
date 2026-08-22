@@ -52,6 +52,12 @@ function post(args: {
 		parentSide: args.side,
 		supportCount: 0,
 		counterCount: 0,
+		// RANK-3 — the DISPLAY totals (self- and removed-inclusive). In these fixtures
+		// every replier is a distinct person and nobody replies to their own post, so
+		// the displayed reply count and the distinct-people ranking count coincide. A
+		// case needing them to differ states both explicitly.
+		supportCountTotal: 0,
+		counterCountTotal: 0,
 		supportDharma: "0",
 		counterDharma: "0",
 		createdAt: new Date(args.at),

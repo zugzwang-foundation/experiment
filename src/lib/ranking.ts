@@ -45,6 +45,25 @@ export type PostSubstrate = {
 	supportCount: number;
 	/** Reply-bets on the opposing side, self-authored excluded (see above). */
 	counterCount: number;
+	/**
+	 * The DISPLAYED reply count on the post's own side — **every** reply,
+	 * self-authored and removed INCLUDED (ADR-0039 patch record P3, RANK-3).
+	 *
+	 * ⚠ **This is the only count that may reach a DTO or a screen.** It answers
+	 * *"how many replies are here"* and must match what a reader can count on the
+	 * surface. The ranking counts above must not be rendered anywhere, because
+	 * the difference between the two IS the self-reply count — and on a post with
+	 * a removed reply that arithmetic attributes the removal to a named
+	 * pseudonym, from a signed-out page.
+	 *
+	 * ⚠ This does NOT contradict RANK-1's one-field-two-consumers rule. There the
+	 * badge and the ruler measured the same thing, so splitting them would let one
+	 * lie. Here they measure different things — a display fact and a ranking
+	 * judgement. What must never split is a number and its own meaning.
+	 */
+	supportCountTotal: number;
+	/** The displayed reply count on the opposing side; see above. */
+	counterCountTotal: number;
 	/** SUM of support-side reply-bet SURVIVING BASIS, self-authored excluded. */
 	supportDharma: string;
 	/** SUM of counter-side reply-bet SURVIVING BASIS, self-authored excluded. */
