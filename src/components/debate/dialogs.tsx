@@ -100,6 +100,8 @@ export function PostPopup({
 										marker={post.marker}
 										entryPrice={post.entryPrice}
 										authorStake={post.authorStake}
+										originalStake={post.authorStakeOriginal}
+										sold={post.authorSold}
 									/>
 									<LaneBadge badge={post.badge} />
 								</div>
@@ -207,6 +209,8 @@ export function ReplyPopup({
 										marker={reply.marker}
 										entryPrice={reply.entryPrice}
 										authorStake={reply.stake}
+										originalStake={reply.stakeOriginal}
+										sold={reply.sold}
 									/>
 								</div>
 							</DialogDescription>

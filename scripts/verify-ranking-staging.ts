@@ -101,28 +101,45 @@ async function main(): Promise<void> {
 	);
 
 	// 3 — the SAME aggregate query as ranking-substrate.ts (join via bets.comment_id).
+	//
+	// ⚠ THIS IS A HAND-KEPT COPY, and at RANK-1 it was found to have DRIFTED. It
+	// still read the frozen `bets.stake` on every stake input, which LOTS-1
+	// changed for the aggregates and RANK-1 changed for the two rulers. An
+	// instrument that computes a different order from the application it is
+	// meant to validate does not merely fail to help — it reports the engine
+	// wrong. Whatever `ranking-substrate.ts` selects, this must select.
 	const rows = await sql`
 		SELECT
 			p.id,
 			p.side_at_post_time AS parent_side,
 			p.created_at,
 			pb.stake AS author_stake,
+			pb.original_stake AS author_stake_original,
+			pb.sold AS author_sold,
 			pb.price_at_bet AS price_at_bet,
 			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time) AS support_count,
 			COUNT(rb.id) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time) AS counter_count,
-			COALESCE(SUM(rb.stake) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time), 0) AS support_dharma,
-			COALESCE(SUM(rb.stake) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time), 0) AS counter_dharma
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (WHERE rc.side_at_post_time = p.side_at_post_time), 0) AS support_dharma,
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (WHERE rc.side_at_post_time <> p.side_at_post_time), 0) AS counter_dharma
 		FROM comments p
 		JOIN LATERAL (
-			SELECT b.stake, b.price_at_bet FROM bets b
+			SELECT
+				COALESCE(pl.surviving_basis, b.stake) AS stake,
+				b.stake AS original_stake,
+				COALESCE(pl.surviving_shares = 0, false) AS sold,
+				b.price_at_bet
+			FROM bets b
+			LEFT JOIN lots pl ON pl.bet_id = b.id
 			WHERE b.comment_id = p.id
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) pb ON true
 		LEFT JOIN comments rc ON rc.parent_comment_id = p.id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
+		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.market_id = ${marketId} AND p.parent_comment_id IS NULL
-		GROUP BY p.id, p.side_at_post_time, p.created_at, pb.stake, pb.price_at_bet
+		GROUP BY p.id, p.side_at_post_time, p.created_at,
+			pb.stake, pb.original_stake, pb.sold, pb.price_at_bet
 		ORDER BY p.created_at ASC, p.id ASC`;
 
 	const substrate: PostSubstrate[] = rows.map((r) => ({
@@ -134,6 +151,8 @@ async function main(): Promise<void> {
 		counterDharma: r.counter_dharma as string,
 		createdAt: new Date(r.created_at as string),
 		authorStake: r.author_stake as string,
+		authorStakeOriginal: r.author_stake_original as string,
+		authorSold: r.author_sold as boolean,
 		priceAtBet: r.price_at_bet as string,
 	}));
 

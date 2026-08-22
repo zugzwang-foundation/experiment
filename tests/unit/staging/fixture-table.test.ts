@@ -65,7 +65,14 @@ function substrateFor(marketKey: string): PostSubstrate[] {
 			// Creation order is the fixture-table order; only the ORDERING matters
 			// to the model (the §3.4 tie chain), never the absolute instant.
 			createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
+			// RANK-1 — the substrate's stake fields are SURVIVING basis. The
+			// staging fixture table (`tests/staging/fixtures.ts`) states no sells
+			// against a post's own entry bet, so surviving == frozen for every row
+			// here and the badge lanes this file pins are unaffected. If a future
+			// fixture DOES sell a post down, this is the line that has to state it.
 			authorStake: post.stake,
+			authorStakeOriginal: post.stake,
+			authorSold: false,
 			priceAtBet: "0.5",
 		};
 	});

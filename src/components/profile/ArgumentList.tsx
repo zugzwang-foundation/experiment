@@ -421,6 +421,13 @@ function PresentHead({
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
 }) {
+	// RANK-1 — the two union variants name the same three quantities differently
+	// (a post's `authorStake*`/`authorSold`, a reply's `stake*`/`sold`), so they
+	// are resolved ONCE here rather than three times inside the JSX.
+	const currentStake = item.kind === "post" ? item.authorStake : item.stake;
+	const originalStake =
+		item.kind === "post" ? item.authorStakeOriginal : item.stakeOriginal;
+	const soldOut = item.kind === "post" ? item.authorSold : item.sold;
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
@@ -452,14 +459,42 @@ function PresentHead({
 
 			    That a figure also feeds ranking is not a reason to hide it from its
 			    author. Both union variants carry a stake — a post's `authorStake`, a
-			    reply's `stake` — so the only real difference was the field name. */}
+			    reply's `stake` — so the only real difference was the field name.
+
+			    ⚠ RANK-1 / ADR-0039 R6 — BOTH fields now carry the stake STILL HELD
+			    (surviving lot basis), which is the same value the §3.6 order ranks
+			    on. The original rides beside it struck through once the figure has
+			    moved, and an argument with nothing left reads `Đ 0` with a `Sold`
+			    tag. ⛔ "Lot" is never the word: on screen these are ARGUMENTS (R1).
+			    Nothing here is erased — the commitment survives in the strikethrough
+			    and in Bucket-A `bets.stake`; it just stops being what ranks. */}
 			<HeadSeparator />
 			<span
 				data-testid={`argument-stake-${item.id}`}
 				className="text-n6 text-xs"
 			>
-				Đ {formatDharma(item.kind === "post" ? item.authorStake : item.stake)}
+				Đ {formatDharma(currentStake)}
 			</span>
+			{soldOut ? (
+				<span
+					data-testid={`argument-sold-${item.id}`}
+					className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+				>
+					Sold
+				</span>
+			) : formatDharma(originalStake) !== formatDharma(currentStake) ? (
+				/* Only when the figure has actually moved ON SCREEN. Compared through
+				   `formatDharma`, not on the raw 18-dp strings: a sub-Đ1 reduction is a
+				   real change to the basis and a non-change to what the reader sees, and
+				   striking a number through beside an identical number is exactly the
+				   "same number twice" this branch exists to prevent. */
+				<span
+					data-testid={`argument-stake-original-${item.id}`}
+					className="text-n4 text-xs line-through"
+				>
+					Đ {formatDharma(originalStake)}
+				</span>
+			) : null}
 			{/* `Replies · N` stays POST-ONLY — replies attract nothing by design
 			    (§9), so a reply has no count to show. That gate was always correct;
 			    it was only ever the STAKE that was wrongly bundled behind it. */}

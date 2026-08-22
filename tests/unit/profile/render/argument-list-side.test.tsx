@@ -76,6 +76,9 @@ const liveItem = (
 	body: BODY,
 	marker,
 	authorStake: "50.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	authorStakeOriginal: "50.000000000000000000",
+	authorSold: false,
 	priceAtBet: "0.270000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 	aggregate: AGGREGATE,
@@ -96,6 +99,9 @@ const replyItem = (side: "YES" | "NO"): ProfileArgumentItem => ({
 	body: BODY,
 	marker: "none",
 	stake: "6.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	stakeOriginal: "6.000000000000000000",
+	sold: false,
 	priceAtBet: "0.270000000000000000",
 	repliedToTitle: "A parent argument",
 	createdAt: "2026-07-01T00:00:00.000Z",

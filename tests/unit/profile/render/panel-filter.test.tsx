@@ -70,6 +70,9 @@ const ARG_POST: ProfileArgumentItem = {
 	body: POST_BODY,
 	marker: "none",
 	authorStake: "12.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	authorStakeOriginal: "12.000000000000000000",
+	authorSold: false,
 	priceAtBet: "0.310000000000000000",
 	createdAt: "2026-07-01T00:00:00.000Z",
 	aggregate: AGGREGATE,
@@ -88,6 +91,9 @@ const ARG_REPLY: ProfileArgumentItem = {
 	body: REPLY_BODY,
 	marker: "none",
 	stake: "6.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	stakeOriginal: "6.000000000000000000",
+	sold: false,
 	priceAtBet: "0.270000000000000000",
 	repliedToTitle: "A parent argument",
 	createdAt: "2026-07-02T00:00:00.000Z",

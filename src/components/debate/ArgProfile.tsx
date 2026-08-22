@@ -24,6 +24,8 @@ export function ArgProfile({
 	marker,
 	entryPrice,
 	authorStake,
+	originalStake,
+	sold = false,
 	replyCount,
 	chipSize,
 }: {
@@ -40,7 +42,22 @@ export function ArgProfile({
 	 * here because this is the site that supplies the value.
 	 */
 	entryPrice?: string;
+	/**
+	 * The stake **still held** behind this argument — the surviving lot basis,
+	 * and the SAME value its lane is ranked on (ADR-0039 R4 as amended at
+	 * RANK-1; RANKING.md §7.3). One field feeds the ruler and this figure, so
+	 * the ordering and the number beside it cannot disagree.
+	 */
 	authorStake?: string;
+	/**
+	 * The frozen `bets.stake` — what was committed when the argument was made.
+	 * Rendered STRUCK THROUGH beside the current figure, and only when the two
+	 * differ, so an untouched argument shows one number rather than the same
+	 * number twice (the `LotBreakdown` rule, applied here).
+	 */
+	originalStake?: string;
+	/** R6/R10 `Sold` — exactly zero surviving. Renders the tag; never on a partial. */
+	sold?: boolean;
 	replyCount?: number;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
@@ -107,7 +124,39 @@ export function ArgProfile({
 				{authorStake !== undefined ? (
 					<>
 						<Sep />
+						{/* RANK-1 / ADR-0039 R6 — the figure FOLLOWS THE RULER. This is
+						    the stake still held, which is exactly what the lane sorted
+						    on; a fully-exited argument reads `Đ 0` here rather than
+						    keeping the number that bought its slot. The original is
+						    shown struck through when the figure has moved, so nothing
+						    is erased — only re-labelled as history.
+						    ⛔ "Lot" appears nowhere here (R1): on screen these are
+						    ARGUMENTS. `tests/unit/debate/render/arg-stake.test.tsx`
+						    pins that with a textContent assertion. */}
 						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
+						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharma` rounds to
+						    whole Đ, so comparing the raw 18-dp strings would strike through on
+						    any movement at all — including one too small to change what is
+						    printed, giving `Đ 1,500  ~~Đ 1,500~~`. The RULER keeps the full
+						    precision; only this affordance keys off what is on screen. */}
+						{!sold &&
+						originalStake !== undefined &&
+						formatDharma(originalStake) !== formatDharma(authorStake) ? (
+							<span
+								data-testid="argstake-original"
+								className="font-mono text-n4 line-through"
+							>
+								Đ {formatDharma(originalStake)}
+							</span>
+						) : null}
+						{sold ? (
+							<span
+								data-testid="argstake-sold"
+								className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+							>
+								Sold
+							</span>
+						) : null}
 					</>
 				) : null}
 				{replyCount !== undefined ? (

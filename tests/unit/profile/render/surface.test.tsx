@@ -217,6 +217,9 @@ const A_POST: ProfileArgumentItem = {
 	body: "Argument post alpha\n\nNeutral fixture body alpha.",
 	marker: "none",
 	authorStake: "25.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	authorStakeOriginal: "25.000000000000000000",
+	authorSold: false,
 	priceAtBet: "0.410000000000000000",
 	createdAt: "2026-09-20T00:00:00.000Z",
 	aggregate: {
@@ -240,6 +243,9 @@ const A_REPLY: ProfileArgumentItem = {
 	body: "Argument reply beta\n\nNeutral fixture body beta.",
 	marker: "Flipped",
 	stake: "6.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	stakeOriginal: "6.000000000000000000",
+	sold: false,
 	priceAtBet: "0.630000000000000000",
 	repliedToTitle: "Parent argument gamma",
 	createdAt: "2026-09-21T00:00:00.000Z",

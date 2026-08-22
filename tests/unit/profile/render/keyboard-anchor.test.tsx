@@ -90,6 +90,11 @@ const posPicked = () =>
 // UNWIRE-1 — the bookmarks fixtures (ID/item/ITEMS/bmRow/bmPicked) are
 // removed along with the "bookmarks mode" describe block below: the
 // bookmark module is unwired product-wide and BookmarksTable is deleted.
+// UNWIRE-1-RESOLVE — RANK-1 (origin/main, PR #391) touched this file only to
+// add `authorStakeOriginal`/`authorSold` to this same now-deleted bookmarks
+// fixture's `item()` function; nothing it changed applies to the surviving
+// positions-only suite below, so the addition is dropped rather than
+// reapplied. Reported per the merge ruling rather than silently discarded.
 
 describe("R4 — the mount selection is the keyboard's anchor (positions)", () => {
 	it("anchor::DOWN-from-a-fresh-load-moves-off-row-one", () => {

@@ -61,6 +61,9 @@ function reply(id: string, side: "YES" | "NO", body: string): DebateReply {
 		marker: "none",
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		stakeOriginal: "5.000000000000000000",
+		sold: false,
 		entryPrice: "0.500000000000000000",
 		imageUrl: null,
 	};

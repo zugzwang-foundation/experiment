@@ -2333,3 +2333,630 @@ that turns this signal into a routing decision rather than a third loose
 observation.
 
 **Conditional trigger.** The read-path / caching workstream — NOT a media task.
+---
+
+# CLOSE-1 docket sweep (2026-08-22) — the LOTS-1 arc's twelve unpaid rows
+
+**Why these twelve are one block.** They were ruled across PHASE-0, LOTS-1 and MERGE-1 and
+lived in reports, reviewer findings and a kickoff — nowhere a repo-side reader could reach
+them. CLAUDE.md §8 already records what that costs: *"a register that lives only in PK cannot
+arbitrate its own numbering,"* and a routing destination named in a committed document gets a
+row here in the SAME commit (the 2026-08-10 standing rule at the top of this file). These are
+written **as ruled**. Where a row was ruled without a priority, none is invented here.
+
+---
+
+## D-1 — the reply-lane ruler and the post-lane tiebreak both key off frozen `bets.stake` ⇒ free, permanent rank capture
+
+**Originating task:** ADR-0039 R4/R5 (PHASE-0), confirmed adversarially at MERGE-1 —
+`@security-auditor` **HIGH-1** and **SURPRISE S-2**.
+
+**Deferred work.** Move the reply-lane ordering ruler, and the `tiebreak()` chain's first key,
+from the frozen `bets.stake` to the replier's **surviving lot basis** (ADR-0039 D-5). R4 and R5
+are one ruling with two halves and **only one half is built**: the aggregate
+(`support_dharma` / `counter_dharma`) moved to surviving basis; `compareReply` in
+`src/lib/ranking.ts` still sorts on `stake`, and `tiebreak()` still reads `authorStake`.
+
+**Why it is a capture, not a cosmetic gap.** The ordering input is immutable and the capital
+behind it is not. Stake large, take the top Support or Counter slot, then sell the lot down to
+zero — the stake is recovered and the slot is kept, permanently, because nothing re-reads it.
+A fully-sold reply contributing **zero** to the attracted total it outranks others on can still
+hold the top slot, and `twoSlot` will surface it as the best argument on that side. The same
+shape reaches the post lane through `tiebreak()`, whose first key is the author's own frozen
+entry stake. The ordering says *conviction once expressed*; the number printed beside it says
+*conviction currently held*; a reader cannot tell which they are looking at.
+
+**Why deferred.** `ReplySubstrate.stake` is a substrate contract fed by **three byte-equivalent
+read sites** — `debate-view/ranking-substrate.ts`, `profile/arguments.ts`, `bookmarks/list.ts`.
+Moving the ruler changes what all three select and re-baselines `RANKING.md` §7. Done inside a
+fix pass it would be a silent re-ranking of every debate; it needs its own before/after ordering
+baseline. The deferral is already recorded at the site, in the `compareReply` docblock — this
+row is its repo-side index entry, not its first mention.
+
+**Conditional trigger.** **MET — ruled as the next lane.**
+
+**Expected next task.** The ranking lane. Evidence: `src/lib/ranking.ts` (the `compareReply`
+docblock and `tiebreak()`); ADR-0039 R4/R5 and D-5; MERGE-1 `@security-auditor` HIGH-1 / S-2.
+
+---
+
+## D-2 — a bare `TRUNCATE lots` is unguarded, and it breaks R2
+
+**Originating task:** MERGE-1 (2026-08-21).
+
+**Deferred work.** `lots` carries **no TRUNCATE guard, deliberately** — SPEC.2 §5.1 records
+that a teardown's `TRUNCATE bets CASCADE` must still reach it, which is why the table is
+Bucket C and why `lots_no_delete` is a row-level `BEFORE DELETE` trigger named outside the
+`bucket_%` family. The consequence that was not ruled on: **`TRUNCATE lots` on its own** — not
+via CASCADE from `bets` — empties the decomposition while every `bets` and `positions` row
+survives, and R2 (Σ surviving lot shares == `positions.quantity`) is false everywhere at once.
+A statement-level guard that permits the CASCADE arrival and rejects the bare form is the
+shape; **it needs a migration.**
+
+**Why deferred.** F3 — CLOSE-1 adds no migration. This is DDL on a Bucket-C table with a
+live-environment interaction (the staging reset's guard catalogue reads trigger names), so it
+belongs to a task that can run the DB gates it implies, not to a docket sweep.
+
+**Conditional trigger.** The next task that opens `drizzle/migrations/` for the `lots` domain —
+or **together with D-4**, which needs a migration on the same table and should not cost two.
+
+**Expected next task.** The R9-enforcement migration (see D-4). Evidence:
+`drizzle/migrations/0026_lots_no_delete.sql`; SPEC.2 §5.1/§5.2 `lots` rows;
+`tests/unit/staging/guard-list-parity.test.ts` (`lots` is Bucket C — TRUNCATE must still reach
+it through CASCADE).
+
+---
+
+## D-3 — `lots_no_delete`'s ENABLED state is unverified off this machine, and the parity test cannot see it
+
+**Originating task:** MERGE-1 (2026-08-21).
+
+**Deferred work.** Verify that `lots_no_delete` is not merely **present** but **enabled**
+(`pg_trigger.tgenabled = 'O'`) in every environment that has migration 0026. The test that
+looks like it covers this — `tests/unit/staging/guard-list-parity.test.ts` — is a **static file
+parser**: it `readFileSync`s the migration SQL and reasons about the text. It never opens a
+database, so `ALTER TABLE lots DISABLE TRIGGER lots_no_delete` would leave it green.
+
+**The test's own history is the argument.** That file already records one silent-green episode:
+its parser read a `-- DROP TABLE IF EXISTS "lots";` COMMENT as SQL, put `lots` in `DROPPED`, and
+filtered every `lots` trigger out of `LIVE_TRIGGERS` — so adding 0026's guard left the file
+green *not because the guard was verified but because it had been parsed away*. A static parser
+can be wrong in ways only a catalog read can catch.
+
+**Why deferred.** The catalog assertion exists as a pattern already
+(`tests/db/indexes/` — the AUDIT-FIX-B7b `pg_indexes` mint), so this is a known small build,
+but it is a new DB test rather than a docket edit.
+
+**Measured at CLOSE-1, so the row starts from evidence rather than suspicion:**
+
+- **local test DB** — `lots_no_delete`, `tgenabled = 'O'` (enabled). ✅
+- **staging** — `lots_no_delete`, `tgenabled = 'O'` (enabled), read from `pg_trigger` **after**
+  migration 0026 applied during CLOSE-1 Step 2. ✅ **This half of the row is now discharged by
+  measurement rather than by the static parser.**
+- **production** — ⛔ **NOT MEASURED AND NOT MEASURABLE HERE.** CLOSE-1's F1 forbids every
+  production action, and 0026 has not reached production at all. This is the half of the row
+  that stays genuinely open — and it will stay open until the promote, since the trigger cannot
+  be enabled anywhere it has not been created.
+
+**What remains, precisely.** Two databases now say `O` by direct catalog read, so the concern is
+no longer *"is it on?"* — it is that **nothing in the repository will notice if it stops being
+on.** The test named above still cannot see a `tgenabled` flag, so a `DISABLE TRIGGER` in any
+environment remains green forever. The build is the assertion, not the reading.
+
+**Conditional trigger.** The next `tests/db/` task, or any task that touches `lots` DDL.
+
+**Expected next task.** A `pg_trigger` catalog assertion beside the existing `pg_indexes` one.
+Evidence: `tests/unit/staging/guard-list-parity.test.ts` (the parser and its comment-parsing
+incident); `drizzle/migrations/0026_lots_no_delete.sql`.
+
+---
+
+## D-4 — the R9 UPDATE-monotonicity trigger
+
+**Originating task:** ADR-0039 ratification — docketed at ratification, not discovered later.
+
+**Deferred work.** R9 says **a lot never grows and Sold is permanent.** Migration 0026 builds
+the *permanence* half as a `BEFORE DELETE` trigger. The *monotonicity* half — that an UPDATE may
+only move `surviving_shares` and `surviving_basis` DOWN — is currently enforced in the
+application layer (`src/server/lots/persist.ts`, comparing against the immutable originals,
+which is strictly stronger than comparing against the previous value that storage cannot see).
+The storage-level trigger was ruled owed at ratification and is not built.
+
+**Why deferred.** Ratification deferred it explicitly; and F3 — CLOSE-1 adds no migration.
+
+**Conditional trigger.** As ruled at ratification. Pairs with **D-2** — same table, same
+migration, and neither is worth a migration alone.
+
+**Expected next task.** The R9-enforcement migration. Evidence: ADR-0039 R9;
+`drizzle/migrations/0025_lots.sql:15` (*"the append-only property this table needs is
+DIRECTIONAL"*); `drizzle/migrations/0026_lots_no_delete.sql:3` (*"0025 backed the first half"*).
+
+---
+
+## D-5 — the pro-rata clamp detects R2 drift, discards the evidence, and on a sell-all erases the drift itself
+
+**Originating task:** MERGE-1 (2026-08-21).
+
+**Deferred work.** In `src/server/lots/persist.ts` the position-level sell clamps the pro-rata
+target to the lot total when the two disagree. The clamp exists for a good reason — without it
+`allocateProRata`'s `target > total` guard throws, turning a participant's ordinary sell into a
+500 over a discrepancy they did not cause. But it is **silent**: the moment it fires it has
+*detected* a real R2 divergence between `positions.quantity` and Σ surviving lot shares, and it
+neither records nor reports it. Worse, on a **sell-all** the clamp drives both sides to zero, so
+the divergence it just observed is **erased** — the only witness destroyed by the act of
+observing it.
+
+**Why deferred.** The fix is not the clamp (removing it hands participants a 500). It is a
+**detection seam** — emit the discrepancy where the nightly position-drift cron already looks —
+and that pairs with the **owed live-environment Σ check** rather than standing alone.
+`I-LOT-SUM-001` asserts the equality against live data, which is where a real divergence should
+surface; today nothing carries the clamp's observation to it.
+
+**Conditional trigger.** With the owed live-environment Σ check, or the next drift-detection
+task.
+
+**Expected next task.** The Σ-check / drift lane. Evidence: `src/server/lots/persist.ts`
+(the clamp and its comment at *"PARTIAL drift — some lots, but…"*); `I-LOT-SUM-001`.
+
+---
+
+## D-6 — there is no restore path for the eight staging markets, and `staging:rebuild` REPLACES them
+
+**Originating task:** MERGE-1 (2026-08-21), measured — not theorised.
+
+**Deferred work.** Build an actual restore path for the eight hand-authored staging markets.
+`docs/data/staging-markets-snapshot.md` + `.json` are a **RECORD, not a seeder** — the file says
+so in its own header, and *"nothing reads it at runtime."* Reading a record back into a database
+is a script nobody has written.
+
+**Why this is the sharpest row in the block.** `pnpm staging:rebuild` does not merely truncate
+the eight markets — **measured at MERGE-1, it REPLACES them with fifteen `sp-*` fixtures and
+reports six GREEN gates while doing it.** A destructive operation that self-certifies as
+successful is worse than one that fails, because nothing in the output tells you what you lost.
+There is no undo. This is why CLOSE-1 ran under a hard fence forbidding `staging:rebuild`,
+`staging:reset`, `staging:generate` and `runGuardedReset` outright.
+
+**Why deferred.** Writing a seeder from the snapshot is real work with its own guard contract
+(ADR-0035's five guards apply to anything that writes staging), and CLOSE-1 is fenced out of
+that surface entirely.
+
+**Conditional trigger.** **Before the next staging rebuild of any kind** — the row is a
+precondition on an operation, not a wait for an event.
+
+**Expected next task.** A staging-restore lane. Evidence:
+`docs/data/staging-markets-snapshot.{md,json}`; ADR-0035; the MERGE-1 session report.
+
+---
+
+## D-7 — every rate limiter parses `X-Forwarded-For` by hand; the platform, not the code, is what makes that safe
+
+**Originating task:** MERGE-1 (2026-08-21) adversarial review. **Extends — does not duplicate —
+the `AUDIT-FIX-B7b security-auditor SURPRISE` row above**, which owns the remediation sweep.
+Two things are new here: a corrected site count, and the first actual measurement.
+
+**Deferred work.** **EIGHT** sites hand-roll `headers.get("x-forwarded-for").split(",")[0]` for
+rate-limit bucketing and, in one case, for the append-only `events.metadata.ip`:
+
+| # | Site | Keys |
+|---|---|---|
+| 1 | `src/app/api/visits/route.ts:36` | visits cap |
+| 2 | `src/app/api/uploads/sign/route.ts:71` | `imagePutUrlPerIp` |
+| 3 | `src/app/(admin)/admin/markets/media/sign/route.ts:91` | `adminMediaPutUrlPerIp` |
+| 4 | `src/server/bets/endpoint.ts:101` | `betPerIp` + `events.metadata.ip` |
+| 5 | `src/server/auth/tos-accept.ts:80` | auth |
+| 6 | `src/server/auth/index.ts:116` | auth `ipFromCtx` |
+| 7 | `src/server/auth/admin/login.ts:58` | **`adminLoginPerIp`** |
+| 8 | `src/server/admin/wire.ts:77` | admin wire |
+
+Exactly one site uses the trusted parser: `src/server/middleware/logging.ts:43`, `ipAddress()`
+from `@vercel/functions`, which prefers `x-vercel-forwarded-for`.
+
+⚠ **The committed count is SEVEN and is now stale by one.** The AUDIT-FIX-B7b row says *"all
+**seven** call sites"* — itself a 4 → 7 correction made at AUDIT-INV-A12.
+`src/app/api/visits/route.ts` landed after that enumeration and is the eighth.
+
+**MEASURED at CLOSE-1, 2026-08-22 — and it had never been measured before.** AUDIT-INV-A12's
+**G3 CONFIRMED** verdict rests, in its own words, on *"Platform evidence — fetched from
+`vercel.com/docs/headers/request-headers`"* plus *"Topology evidence (repo-side)"*.
+Documentation and inference; **no request was ever sent.** Four documents rest on that premise,
+including the ruling that de-queued B4.
+
+The test, against `POST /api/visits` on staging — public, unauthenticated, non-destructive, and
+chosen because a capped caller gets the **current total with no increment** rather than a 429,
+so "did this count?" is readable straight off the number:
+
+- 2 unspoofed requests → total 1393 → **1394**; 66 more → rises to **1452**, then freezes.
+  **2 + 58 = 60 increments — exactly the documented 60/IP/min cap**, so the counter stopped at
+  the limiter and not for some incidental reason.
+- Control, 3 unspoofed → **1452, 1452, 1452.** Window exhausted.
+- **6 requests, each with a DISTINCT spoofed `X-Forwarded-For` (`203.0.113.1`–`.6`) →
+  1452, six times. Not one increment.** Each was served a well-formed 200 from the counter
+  path, so they reached the route and the limiter put them in the bucket they were already in.
+- Control again → still 1452.
+
+**⇒ A client-supplied `X-Forwarded-For` does NOT reach the hand-rolled parse on this platform.**
+The Vercel edge overwrites it before the function sees it. **A12 = G3 survives contact with the
+platform.**
+
+**Consequence for `adminLoginPerIp`, stated without testing it.** `/api/auth/admin/login` was
+deliberately not touched — not one credential attempt. `auth/admin/login.ts::getClientIp` and
+`visits/route.ts::extractIp` are **byte-identical in body** (same header, same `split(",")`,
+same `[0]`, same `trim()`, same `"unknown"` fallback), differing only in taking a header store
+rather than a `Request`. So the 10/hour admin brute-force cap **buckets on an unspoofable key
+and holds**; header rotation does not evade it.
+
+**Why the row stays open anyway — and this is the point of it.** ⚠ **The control is the
+PLATFORM, not the code.** All eight sites are written as though the header were trustworthy,
+and are safe only because something outside this repository is currently sanitising their
+input. Nothing in the code, the tests or CI asserts that. A topology change — a proxy in front
+of Vercel, an Enterprise trusted-proxy enablement, a move off the platform — makes **all eight
+spoofable simultaneously, with no code change, no failing test, and no signal that it
+happened.** That is a latent single point of failure, not a live vulnerability.
+
+**Why deferred.** No live spoof exists to fix; the work is consistency hardening across eight
+sites, and it is already owned by the AUDIT-FIX-B7b row's HARDEN sweep. This row **proposes
+nothing** — CLOSE-1's mandate was to measure and stop.
+
+**Conditional trigger.** As the AUDIT-FIX-B7b row states — the HARDEN pre-launch security pass,
+or first observed abuse hitting a per-IP cap. **Add one:** any change to the deployment
+topology, which is the condition that converts this from hardening into a live defect.
+
+**Expected next task.** The HARDEN trusted-IP sweep. Evidence: the eight sites above;
+`docs/logs/AUDIT-INV-A12.md` (the documentation-based verdict this measurement confirms);
+`src/server/middleware/logging.ts:43` (the one site already using `ipAddress()`).
+
+---
+
+## D-8 — idempotency keys are scoped to neither user nor flow
+
+**Originating task:** MERGE-1 (2026-08-21) adversarial review.
+
+**Deferred work.** The idempotency key is global in both of its stores. Redis:
+`getRedisKey("idem", key)` → `<env>:idem:<key>` — environment, then the raw client-supplied
+key, and nothing else. Postgres: `bets_idempotency_key_idx` and
+`bet_receipts_idempotency_key_uq` are **unqualified** unique indexes on `idempotency_key`.
+Neither store carries the user id or the flow id, so one key names one slot for the whole
+environment across every endpoint and every participant.
+
+**What was refuted, and what was not.** *Cross-user* replay — user B's request colliding with
+user A's cached response — was **refuted**: clients mint UUIDv4 keys, and 122 bits of entropy
+make an accidental collision negligible. ⚠ **But that control is client-side.** The server
+accepts whatever key it is handed; the property holding the two participants apart lives
+entirely in code the server does not run and cannot check.
+
+**Same-user cross-endpoint confusion IS reachable**, and needs no collision to get there: one
+key used for both a place and a sell resolves against one slot, and because the bodies differ
+the second call meets the fingerprint `mismatch` arm and comes back **409
+`error_idempotency_key_reused`** — a refusal whose text points at the key rather than at the
+mixing, which is exactly the wrong thing for a client to act on (see the reasoning committed at
+`src/app/api/bets/sell/route.ts`).
+
+**Why deferred.** Qualifying the key touches the durable receipt's unique index — a migration —
+and the Redis keyspace shape at once, on the money path. Out of a docket sweep's reach twice
+over (F3).
+
+**Conditional trigger.** The next idempotency or receipts task, or any observed key-reuse
+report from a client.
+
+**Expected next task.** An idempotency-scoping task. Evidence:
+`src/server/idempotency/cache.ts`; `src/db/schema/bets.ts`; ADR-0015; ADR-0031.
+
+---
+
+## D-9 — migration prose vs O-5: a superseded R9 sentence sits in two files AGENTS.md §11 forbids editing
+
+**Originating task:** MERGE-1 (2026-08-21). ⚠ **Recommended ruling recorded below; NOT
+ratified.** Recorded as a question, because a rule collision is a founder call.
+
+**The collision.** `drizzle/migrations/0025_lots.sql` and `0026_lots_no_delete.sql` both carry
+prose describing R9 in a form later work superseded. **O-5** says a durable amendment is applied
+at every site that states the superseded position — *"write the correction INTO each operative
+section; an amendments block is a record of the change, never the delivery of it."*
+**AGENTS.md §11 "Never"** says: *edit `drizzle/migrations/*` after commit (append-only)*. Both
+rules are load-bearing and here they point opposite ways.
+
+**Recommended ruling (NOT ratified).** **Append-only wins; O-5 is satisfied elsewhere.** A
+migration file is not documentation that happens to live in SQL — it is a record of what was
+applied to a database, and editing it makes the repo disagree with every environment that ran
+the old text. The `drizzle-kit` journal hashes it. O-5's requirement is that a reader who
+reaches the superseded sentence also reaches the correction; that is dischargeable by putting
+the correction where a reader of `lots` actually goes — the schema file, the ADR, and this
+docket — rather than by rewriting an applied migration. **The founder rules; nothing is edited
+until they do.**
+
+**Why deferred.** It is a ruling, not a task. Nothing is broken while it is open.
+
+**Conditional trigger.** Founder ruling. **Then** whichever task the ruling implies.
+
+**Expected next task.** Whatever the ruling names. Evidence:
+`drizzle/migrations/0025_lots.sql:15`; `drizzle/migrations/0026_lots_no_delete.sql:3,24`;
+CLAUDE.md §8 O-5; AGENTS.md §11.
+
+---
+
+## D-10 — three founder-authored spec debts, all owed
+
+**Originating task:** ADR-0039 §"Spec riders owed (web-owned; named, not authored)" (PHASE-0),
+carried through LOTS-1 and MERGE-1.
+
+**Deferred work.** Three pieces of prose, **all founder-authored, none writable by a CC
+session** — the standing rule is that relay-referenced verbatim text which is absent is a STOP,
+not an invitation to draft:
+
+1. **SPEC.1 §23 — the Đa paragraph.** §23 still defines Đa as episode-scoped and pro-rata
+   reduced; ADR-0039 D-4 redefines it as Σ surviving lot basis, and D-4's own worked example
+   shows the two are **not the same function**. ADR-0039 marks it **STILL OWED**.
+2. **SPEC.1 §7 — F-BET-3's shape.** The slice widens the flow's reachable error set with a
+   fifth code, `404 lot_not_found` — the first 404 on that flow — and adds the optional `lotId`,
+   so one endpoint now has two shapes. A reachable error set is a client contract. ADR-0039
+   marks it **STILL OWED**.
+3. **SPEC.2 version bump + changelog row.** SPEC.2 is at **1.0.24** (PHASE-0's ADR-0039
+   registry riders), measured at CLOSE-1.
+
+**One thing CLOSE-1 measured that shortens this row:** rider 2's text already reads *"it adds an
+**optional** `lotId` to the request body."* That is `.optional()` semantics, and after CLOSE-1
+Step 1 **the code now agrees with the rider that was already written.** The prose was never
+wrong; the code had drifted from it. Nothing here needs re-drafting on that point — only
+landing.
+
+**Why deferred.** Founder-owned text. A CC session that drafts it manufactures spec.
+
+**Conditional trigger.** Founder authorship.
+
+**Expected next task.** The founder's spec pass. Evidence: `docs/adr/0039-per-argument-lot-accounting.md`
+§"Spec riders owed"; `docs/specs/SPEC.2.md` §0 + changelog row 1.0.24.
+
+---
+
+## D-11 — five RECON-1 rows that `lots` did not close: R-03, R-06, R-09, R-14, R-15
+
+**Originating task:** RECON-1 surface audit (2026-08-20), carried unclosed through LOTS-1.
+
+**Deferred work.** Five of RECON-1's R-01…R-16 surface rows were **not** closed by the `lots`
+work: **R-03, R-06, R-09, R-14, R-15.** They remain open and unowned.
+
+⚠ **The row you are reading cannot tell you what they say, and that is the finding.**
+RECON-1 is `~/Downloads/zz_RECON-1_surface-audit_2026-08-20T1905.md` — **verified absent from
+`main`** (`git ls-files` matches nothing; the only repo-side pointer is
+`docs/adr/0039-per-argument-lot-accounting.md:685`, which cites it by `~/Downloads` path). Their
+content is therefore **not reproduced here, deliberately**: authoring five row summaries from an
+off-repo document this session cannot verify against would be inventing the register's content,
+which is the failure this docket exists to prevent.
+
+**This is CLAUDE.md §8's named hazard, one register over.** *"A register that lives only in PK
+cannot arbitrate its own numbering"* — §8 records exactly this for `V-n`, `L-n` and `GC-n`, and
+`R-nn` now joins them: `main` holds citations (`R-07`/`R-11` at ADR-0039:78, `R-12` at
+`docs/logs/LOTS-1.md:74`) and no definitions. A repo-side reader finds every reference and no
+register.
+
+**Why deferred.** Closing them requires reading RECON-1, which is off-repo; and the numbering
+question — whether `R-nn` must become `RECON-1 R-nn` at every citation, per §8's
+`<PR>-GC-n` precedent — is a ruling, not an edit.
+
+**Conditional trigger.** The next task that opens RECON-1, or the §8 register-hygiene sweep.
+
+**Expected next task.** A recon close-out that either commits RECON-1 to `docs/` or task-scopes
+its citations. Evidence: `docs/adr/0039-per-argument-lot-accounting.md:78,685`;
+`docs/logs/LOTS-1.md:74`; CLAUDE.md §8.
+
+---
+
+## D-12 — per-lot settlement attribution (LOTS-1 S10)
+
+**Originating task:** LOTS-1 slice **S10** (ADR-0039 **R7**) — planned, scoped, **NOT BUILT**.
+
+**Deferred work.** Attribute a market's settlement back to the individual lots that composed the
+position, so a resolved market's payout can be read per argument rather than only per position.
+`docs/plans/LOTS-1.md` scopes it as a **read-time derivation over existing rows** — it mints no
+new writes, which is why `docs/plans/LOTS-1.md` §"INV-4" records that it does not disturb the
+append-only resolution chain.
+
+**Why deferred.** Two reasons, and the second is the operative one. It lands in
+`src/server/resolution/` — a CLAUDE.md §1 critical path carrying the full ritual (writer/reviewer,
+invariant gate, same-commit ADR, pre-PR self-audit, subagent cascade). And **there is no
+reachable surface for it until a market actually resolves**, so building it now would ship
+untestable-in-anger code against INV-4's most conservative table.
+
+**Conditional trigger.** The first market resolution — or the resolution lane opening for any
+other reason.
+
+**Expected next task.** The resolution lane. Evidence: `docs/plans/LOTS-1.md` (the S10 row,
+*"yes — NOT BUILT"*, and its §INV-4 note); `docs/logs/LOTS-1.md`; ADR-0039 R7.
+
+---
+
+# CLOSE-1 SURPRISES — ⚠ found during the run, **NOT RATIFIED**
+
+Two conditions CLOSE-1 was not looking for and could not absorb. Rowed rather than left in a
+session report, because a finding that lives only in `~/Downloads` is the exact failure D-11
+above describes. **Neither was ruled by the founder.** Strike either in one deletion if
+unwanted.
+
+## CLOSE-1-S1 — staging reports `migrations: "drift"`, and it will not clear on its own — ⛔ **BLOCKS THE PROD PROMOTE GATE**
+
+**Originating task:** CLOSE-1 Step 2 (2026-08-22), at the primary health gate.
+
+**The condition.** After `staging` was advanced to `b851858` and Staging Migrate went green on
+that exact `headSha`, `GET /api/health` reads:
+
+```json
+{"status":"ok","env":"staging","canary":"b851858…","region":"bom1","db":"ok","migrations":"drift"}
+```
+
+Three of the four gate fields pass. `migrations` does not, stably across seven polls taken
+after the canary flipped.
+
+**Diagnosed to the byte, read-only.** `migrationDriftStatus` compares two multisets of sha256
+content hashes. Counts are **equal (27 and 27)**, and **exactly one hash differs in each
+direction**. The file is **`0025_lots`** (journal idx 25, `when` 1787261127286):
+
+```
+sha256( 0025_lots.sql @ a4d8652 ) = 0b9a1f77…   ← the hash staging's DB holds
+sha256( 0025_lots.sql @ b851858 ) = 8a95bb35…   ← the hash main's code computes
+```
+
+`0025` was applied to staging from the pre-squash tip, and its **text changed before it reached
+`main`**. The `when` timestamp is unchanged, so drizzle's high-water mark treats 0025 as
+already applied and **will never re-apply it**: the drift is permanent under `drizzle-kit
+migrate`.
+
+✅ **The schema is not wrong.** `git diff a4d8652 b851858 -- drizzle/migrations/0025_lots.sql`
+is **comment-only** — a scoping clarification of the R8 halt condition and an *"eight CHECKs"* →
+*"seven CHECKs"* correction. **Zero SQL statements differ.** What diverged is the hash of the
+file, not the schema it produced. The detector did exactly its job (ADR-0024 item 6).
+
+⚠ **The edited text is itself the rule that was broken** — it sits in the paragraph reading
+*"this repo's migrations are forward-only and append-only (AGENTS.md §6: never edit a committed
+migration; write a new one)."* AGENTS.md §11 lists that under **Never**.
+
+⚠ **The local test database holds the identical stale hash**, so this is not a staging accident:
+both databases took the pre-squash 0025. It does not affect the suite, which does not gate on
+drift.
+
+✅ **Production is very likely unaffected — inference, not measurement, because F1 forbids
+measuring it.** Prod has never had 0025 applied; when it migrates it will apply the `b851858`
+text and record `8a95bb35…`, which *is* the code hash.
+
+⛔ **What it blocks.** Runbook §3's promote gate requires `migrations: "ok"` on the staged build.
+**A production promote must not proceed while staging reads `drift`** — not because prod is at
+risk, but because the gate cannot distinguish this benign hash divergence from a real one, and
+that indistinguishability is the property that makes it a gate at all.
+
+**Why deferred.** Repair needs either a new migration or a direct write to
+`drizzle.__drizzle_migrations`. Both are fenced out of CLOSE-1 (F3, F2) and **neither was
+attempted**; the runbook's own instruction at the gate is *halt and report, do not attempt a
+fix*.
+
+⚠ **This is also the empirical answer to `D-9` above.** D-9 asks whether committed migration
+prose may be edited when O-5 says a correction belongs at every site. **This is what happens
+when it is:** a permanent drift verdict that no migration can clear, on the gate that guards
+production. The recommended ruling there — append-only wins, satisfy O-5 elsewhere — now has a
+measurement behind it rather than a principle.
+
+**Conditional trigger.** **MET, and blocking** — before any production promote.
+
+**Expected next task.** A founder ruling on the repair path (new migration vs. a one-row
+correction), taken together with D-9. Evidence: `src/server/health/migration-drift.ts`;
+`drizzle/migrations/0025_lots.sql`; the CLOSE-1 session report.
+
+---
+
+## CLOSE-1-S2 — the deploy runbook's §2.5 (c) routes a staging advance into the PRODUCTION path
+
+**Originating task:** CLOSE-1 Step 2 (2026-08-22), reading the runbook before executing it.
+
+**The condition.** `docs/runbooks/deploy-pipeline.md` §2.5 precondition (c) reads:
+
+> **(c) Migration delta.** **EMPTY → a fast-forward; continue in this section.** **NOT EMPTY →
+> this is a sequenced deploy governed by ADR-0024 and §3, *not* a §2.5 advance — stop here and
+> use §3.**
+
+CLOSE-1's (c) was NOT EMPTY (0025 modified, 0026 new). Followed literally, that sends a
+**staging** advance into **§3 — "Production — migrate-before-serve"**, which is production
+end-to-end (`doppler run --config prd`, `db:migrate:prod`, the `zugzwangworld.com` alias
+promote) and **contains no step that pushes `staging` at all**.
+
+**It contradicts its own section three paragraphs later**, where §2.5 explains how to read the
+migrate log for exactly this case: *"Anything beyond them — `CREATE TABLE`, `ALTER TABLE`, a new
+`__drizzle_migrations` row — means DDL ran, and **(c) should have been NOT EMPTY**."* A
+precondition that says *stop* cannot coexist with three later paragraphs explaining how to
+proceed. §2.5 states (c)'s real job plainly elsewhere: *"the only thing that tells you which
+green to expect… and it only tells you beforehand"* — a **prediction**, not a gate.
+
+**This is `O-5` at the site a reader reaches first.** The correction lives below the sentence
+that misdirects, and a reader following preconditions in order never gets there.
+
+**A second defect in the same section, also measured.** §2.5 (b)'s canonical two-command test
+uses `BASE = merge-base(main, staging)` and requires *"deletions only, ZERO insertions."*
+Measured at CLOSE-1: `git diff --shortstat 78a46b0 origin/staging` = **55 files, 9,959
+insertions** — leg 1 fails, and the runbook then says *stop and reconcile, never force*. It is
+a **false alarm**: `merge-base` is the last *common* commit, far older than the last point
+staging was current with, so an entire squashed feature branch reappears as "insertions" that
+are already on `main`. **The base-free direct test is the one that answers the question** — *does
+content exist only on `staging`?* — via `git diff origin/main origin/staging` plus a per-file
+check that `main` moved on each differing path. It needs no BASE and it gave a clean **zero
+staging-unique files**.
+
+**Why deferred.** Editing the runbook was outside CLOSE-1's ratified scope. Both defects are
+recorded here so the next advance does not re-derive them under time pressure.
+
+**Conditional trigger.** The next staging advance or prod promote — whichever opens the runbook
+first.
+
+**Expected next task.** A runbook correction pass. Evidence:
+`docs/runbooks/deploy-pipeline.md` §2.5 (b) and (c) against §2.1 and §3; CLAUDE.md §5's
+deploy gotcha (*"rehearse on staging first"*), which makes the staging push a **prerequisite**
+of a prod promote rather than an alternative to it.
+
+---
+
+# PERF-1-CLOSE (2026-08-22) — gauge correction, re-measurement, the query-load successor
+
+**Originating task:** PERF-1-CLOSE (2026-08-22) — re-verifying PERF-1's region fix post-LOTS-1/
+CLOSE-1, and settling whether TTFB was ever the right gauge for a Suspense-streamed route. Full
+evidence: `docs/adr/0006-hosting.md`'s third patch record ("Patch record — 2026-08-22"); the
+PERF-1-CLOSE session report.
+
+---
+
+## PERF-2 — Discovery query load under realistic volume
+
+PERF-1 is closed: it was scoped as a region mismatch with a one-line config fix, and that fix is
+verified. It did NOT measure query load. Every measurement to date ran against a database
+holding ~10 comments and ~10 bets IN TOTAL, so Discovery's eight per-market hero computations
+ran over roughly one row each. The constant is fixed and small; the variable is untouched.
+
+**Trigger.** SCALE S-5's measurement rig.
+
+**Owner.** SCALE, not a bespoke seeder — `staging:generate` adds fifteen `sp-*` markets
+alongside the eight and pollutes the set.
+
+---
+
+## COLD-START — ~790ms platform floor measured on `/api/health` after 626s idle; ~1.75s on Discovery after 606s idle
+
+Real for a first visitor on a quiet morning, invisible under sustained traffic. Not PERF-1, and
+not currently in the latency register.
+
+Reproduced independently at PERF-1-CLOSE (2026-08-22, post-LOTS-1): 801.2ms on `/api/health`
+after a fresh ≥600s idle window, 1820.5ms on Discovery after the same. Recorded as a SCALE S-5
+input, not a standalone task.
+
+---
+
+## GAUGE — the RSC streaming gap
+
+`/` (Discovery): the hero (`DiscoveryContent`, including `selectHeroTopPosts` — the eight-market
+top-YES/top-NO computation) sits inside `<Suspense fallback={<LoadingSkeleton />}>`
+(`src/app/(public)/page.tsx:51-53`) — TTFB measures the shell the Suspense boundary commits, not
+the hero; the gauge is `total`. `/u/[pseudonym]` and `/m/[slug]` carry no `Suspense` anywhere in
+their render trees (`grep -rn "Suspense"` across both component trees: zero hits) — the gauge is
+TTFB for both, unchanged.
+
+Any future timing on a route whose expensive work is suspended must read `total`, not TTFB, or
+it measures the shell. Recorded as a SCALE S-5 input, not a standalone task.
+
+---
+
+## Sequencing note (stated here, not acted on)
+
+PERF-1 was carried as the sole GO-LIVE BLOCKER row (line 36, SEQUENCE table intro) and closed
+2026-08-10; the SEQUENCE table's own closing note already names **POOL-2 / `BETTER_AUTH_SECRET`**
+as the head of the queue post-closure, and that is unchanged by this session. Separately, two
+dated (not triggered) gates in this file are worth naming here because they carry the next
+clocks: **RATE-GUARD-PUBLIC** (line 814, DUE 2026-09-05 — anonymous participant RSC surfaces
+carry no request-rate limit) and **LEGAL.1** (line 1471, ⚠ GO-LIVE GATE — the ToS/Privacy bodies
+are still placeholder Lorem ipsum).
+
+**Not added to the SEQUENCE table.** That table's own rule (line 18) is rows "whose stated
+trigger is met today"; RATE-GUARD-PUBLIC and this file's other 2026-09-05-dated rows are
+explicitly marked "hard date, not a trigger." Today (2026-08-22) is not that date, and forcing a
+dated-not-triggered row into a table defined around fired triggers would misstate what the
+file's own convention says about it. Nothing in the SEQUENCE table is edited by this session;
+this paragraph only names what a reader tracking sequence should already know.
+
+**The `.html` tracker dashboards are operator-local and were not touched here.** If the
+operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START
+/ GAUGE, that is a manual move for the operator — not a PR.
+
+---

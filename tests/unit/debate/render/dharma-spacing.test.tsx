@@ -91,6 +91,9 @@ function presentReply(): DebateReply {
 		marker: "none",
 		author: { pseudonym: "fixture-replier", pfpUrl: "" },
 		stake: "5000.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		stakeOriginal: "5000.000000000000000000",
+		sold: false,
 		entryPrice: "0.500000000000000000",
 		imageUrl: null,
 	};
@@ -111,6 +114,9 @@ function presentPost(): DebatePost {
 		badge: null,
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: "10.000000000000000000",
+		authorSold: false,
 		entryPrice: "0.500000000000000000",
 		aggregate: AGGREGATE,
 		replies: EMPTY_REPLIES,

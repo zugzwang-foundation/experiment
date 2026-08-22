@@ -39,8 +39,31 @@ export type PostSubstrate = {
 	counterDharma: string;
 	/** `comments.created_at`. */
 	createdAt: Date;
-	/** The post's own entry-bet stake `a` (author conviction) — decimal string. */
+	/**
+	 * `a` — the author's conviction **still held** on this post: the SURVIVING
+	 * LOT BASIS of the post's own entry bet, `COALESCE(lots.surviving_basis,
+	 * bets.stake)` (decimal string). **NOT the frozen `bets.stake`** —
+	 * ADR-0039 R4 as amended at RANK-1, RANKING.md §3.4/§8.
+	 *
+	 * It feeds TWO consumers and they move together by construction: the
+	 * `tiebreak()` ruler below, and the rendered badge. One field, so an
+	 * ordering justified by one quantity can never sit beside a figure
+	 * reporting another.
+	 */
 	authorStake: string;
+	/**
+	 * The frozen `bets.stake` — what the author committed when the post was
+	 * made. Bucket-A immutable, kept for the badge's struck-through original
+	 * (ADR-0039 R6). **Never a ranking input**; nothing sorts on this.
+	 */
+	authorStakeOriginal: string;
+	/**
+	 * R6/R10 `Sold`, per ARGUMENT: true iff the post's own lot has
+	 * `surviving_shares = 0` — exactly zero, never "nearly". A bet with no lot
+	 * row is NOT sold (see the COALESCE note above): unknown means "all of it
+	 * survives", which is the pre-LOTS-1 reading.
+	 */
+	authorSold: boolean;
 	/**
 	 * The post's own entry-bet `price_at_bet` — the market YES-probability at the
 	 * instant the post's bet executed (decimal string, 0–1). EXPORT.1 gap-fill:
@@ -55,8 +78,17 @@ export type ReplySubstrate = {
 	id: string;
 	/** The reply's own frozen side; Support iff it equals the parent's side. */
 	side: Side;
-	/** The reply-bet's stake (`bets.stake`) — decimal string. */
+	/**
+	 * The reply-bet's SURVIVING LOT BASIS — `COALESCE(lots.surviving_basis,
+	 * bets.stake)`, decimal string. **NOT the frozen `bets.stake`** (ADR-0039 R4
+	 * as amended at RANK-1, RANKING.md §7). This is both what `compareReply`
+	 * sorts the lane on and what the reply badge renders; see `authorStake`.
+	 */
 	stake: string;
+	/** The frozen `bets.stake` — the badge's struck-through original (R6). Never sorted on. */
+	stakeOriginal: string;
+	/** R6/R10 `Sold`: the reply's lot has `surviving_shares = 0`, exactly. */
+	sold: boolean;
 	createdAt: Date;
 	/**
 	 * The reply-bet's `price_at_bet` — the market YES-probability at execution
@@ -230,6 +262,19 @@ function topScore(
  * The §3.4 tie chain, uniform across the whole model: higher author stake `a`
  * first, then earlier-wins (earlier `createdAt`, then lexicographically smaller
  * UUIDv7 id). >0 iff a ranks AFTER b.
+ *
+ * ⚠ **`a` is conviction STILL HELD** — `PostSubstrate.authorStake` carries the
+ * surviving lot basis, not the frozen `bets.stake` (ADR-0039 R4 as amended at
+ * RANK-1). This function is unchanged; what it reads is not.
+ *
+ * ⚠ **"Tiebreak" understates how often this decides the whole order.** Per
+ * RANKING.md §3.3 an all-sub-floor market — every post below every activity
+ * floor, i.e. the ordinary state of a young one — is ordered *entirely* here, by
+ * `a` alone; and `profileOrder` falls through to it for every post pair with
+ * equal attracted value. Under the frozen reading that made the top of a market
+ * purchasable and then refundable for dust. It was the third ruler, named in no
+ * document, found adversarially at MERGE-1 as SURPRISE S-2; its reproduction is
+ * `tests/server/lots/rank-capture.test.ts` ("ruler (ii)").
  */
 function tiebreak(a: PostSubstrate, b: PostSubstrate): number {
 	const byStake = new RankingDecimal(b.authorStake).cmp(a.authorStake);
@@ -341,39 +386,46 @@ export function badgeFor(
 // ── Reply ranking (depth = 1) — stake desc within side (RANKING.md §7) ───────
 
 /**
- * ⚠ **DEFERRED, KNOWN, AND RECORDED HERE BECAUSE A DEFERRAL THAT LIVES ONLY IN A
- * REPORT IS NOT RECORDED — ADR-0039 R4/R5 (PHASE-0).**
+ * The reply lane (RANKING.md §7): **surviving basis descending**, then
+ * earlier-wins. ⚠ It sorts on `ReplySubstrate.stake`, which since RANK-1 carries
+ * `COALESCE(lots.surviving_basis, bets.stake)` and NOT the frozen `bets.stake`
+ * — the substitution lives at the query layer, so this comparator reads one
+ * field and the ruler and the badge cannot drift apart.
  *
- * R4 and R5 are one ruling with two halves, and only one half is built. Under
- * ADR-0039 D-5 the reply-lane summand becomes the replier's **surviving lot
- * basis** rather than the frozen `bets.stake`, at both the aggregate
- * (`support_dharma` / `counter_dharma`) and here at the ordering ruler. The
- * aggregate half has landed; `compareReply` below still sorts on `stake`.
+ * **Why it moved (ADR-0039 R4, amended at RANK-1 — the deferral this docblock
+ * used to record is DISCHARGED).** Sorting on the frozen stake made the top of
+ * every reply lane buyable and then refundable: a large reply-bet took the top
+ * Support or Counter slot, `twoSlot` surfaced it to every visitor as the best
+ * argument on that side, and exiting the lot returned the stake — the CPMM is
+ * fee-less — while `bets.stake`, Bucket-A immutable, held the slot open
+ * forever. Confirmed adversarially at MERGE-1; the reproduction is
+ * `tests/server/lots/rank-capture.test.ts`.
  *
- * The visible consequence: **a replier who sells their lot down loses the weight
- * they lent the parent, but keeps their slot in the reply lane.** A fully-sold
- * reply — one contributing zero to the attracted total it is ranked above others
- * for — can still hold the top Support or Counter position, and the two-slot
- * default (`twoSlot`) will surface it as the best argument on that side. The
- * ordering says *conviction once expressed* while the number beside it says
- * *conviction currently held*, and a reader has no way to tell which they are
- * looking at.
+ * ⛔ **The instruction this docblock previously carried was WRONG and is
+ * corrected here rather than quietly dropped.** It told the next reader to
+ * substitute `SUM(l.surviving_basis)` **bare**. Followed literally, a lot-less
+ * bet would score ZERO — silently deleting a real contribution — where all
+ * shipped sites use `COALESCE(lots.surviving_basis, bets.stake)` and read an
+ * unknown surviving amount as "all of it survives". Every bet mints its lot in
+ * the same transaction (R8), so the fallback should never fire.
  *
- * NOT fixed here, deliberately: `ReplySubstrate.stake` is the substrate contract
- * fed by two byte-equivalent read sites (`debate-view/ranking-substrate.ts`,
- * `profile/arguments.ts` — `bookmarks/list.ts` was a third before UNWIRE-1
- * unwired the bookmark module product-wide), and moving the ruler means
- * changing what both select and re-baselining `RANKING.md` §7. That is the
- * ranking lane's work, with its own before/after ordering baseline; doing it
- * inside a fix pass would be a silent re-ranking of every debate.
+ * ⚠ **BOTH failures are invisible, and the fallback is right anyway.** An earlier
+ * draft justified it by saying the failure it prevents would be the silent one.
+ * Neither announces itself: a row scored zero looks exactly like a genuine full
+ * exit, and a row riding the fallback looks exactly like an untouched argument —
+ * `sold` false, original equal to current, no tag, no strikethrough. The fallback
+ * is right because DELETING a real argument's weight is the worse of two silent
+ * errors, not because it is the louder one. Which is also why a lot-less row is
+ * now the ONE class that holds ranking weight regardless of exit; nothing
+ * detects it, and R8 forbids the back-fill that would repair it.
  *
- * Whoever picks it up: substitute `SUM(l.surviving_basis)` joined
- * `lots ON lots.bet_id = rb.id` at all three sites, carry the same value into
- * `ReplySubstrate`, and expect the lane order to CHANGE for any market where a
- * reply has been partially sold — that change is the fix, not a regression.
+ * ⚠ The lane order CHANGES for any market where a reply has been sold down.
+ * **That change is the fix, not a regression** — a shipped ordering assertion
+ * that goes red is updated to the new order with its reason, never "fixed" by
+ * restoring the old one.
  */
 function compareReply(a: ReplySubstrate, b: ReplySubstrate): number {
-	const byStake = new RankingDecimal(b.stake).cmp(a.stake); // stake descending
+	const byStake = new RankingDecimal(b.stake).cmp(a.stake); // basis descending
 	if (byStake !== 0) return byStake;
 	const byTime = a.createdAt.getTime() - b.createdAt.getTime(); // earlier-wins
 	if (byTime !== 0) return byTime;

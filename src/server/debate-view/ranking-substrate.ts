@@ -18,6 +18,8 @@ type SubstrateRow = {
 	parent_side: "YES" | "NO";
 	created_at: string | Date;
 	author_stake: string;
+	author_stake_original: string;
+	author_sold: boolean;
 	price_at_bet: string;
 	support_count: string;
 	counter_count: string;
@@ -51,12 +53,22 @@ type SubstrateRow = {
  * comment ever carried more than one bet — the 1:1 comment↔bet relationship is the
  * single-write-path (`place.ts`) reality, NOT a unique constraint on
  * `bets.comment_id`. (The reply aggregation counts reply-bets directly — exactly
- * one per reply under INV-1.)
+ * one per reply under INV-1.) That LATERAL now also reaches the bet's **lot**, so
+ * `a` is the author's SURVIVING basis rather than the frozen stake (ADR-0039 R4
+ * as amended at RANK-1, RANKING.md §3.4/§8) — the `lots` join is 1:1
+ * (`lots_bet_id_uq`), so it adds a lookup and cannot add a row.
  *
- * **Frozen-by-construction at resolution (INV-4):** every input is append-only
- * (`bets` / `comments` are Bucket A) and new reply-bets require `market.state =
- * Open`, so a resolved market's substrate — and the order/badges computed from
- * it — is stable forever. No `now` parameter is needed: the v1 outputs (Top +
+ * **Frozen at resolution — but by market state, NOT by append-only-ness.** Every
+ * `bets` / `comments` input is Bucket A, and new reply-bets require
+ * `market.state = Open`; but since LOTS-1 the stake inputs read
+ * `lots.surviving_basis`, and `lots` is **Bucket C, mutable** (ADR-0039 D-1). So
+ * the substrate is stable after resolution because a resolved market accepts no
+ * further bets or sells — there is nothing left to move a lot — and not because
+ * the rows themselves cannot change. **INV-4 is untouched either way**: it
+ * governs `resolution_events` / `payout_events`, which no lot path writes.
+ * ⚠ This paragraph claimed "every input is append-only" until RANK-1; that
+ * stopped being true when the aggregates took the `lots` join, and a stale
+ * invariant claim is worse than none. No `now` parameter is needed: the v1 outputs (Top +
  * interleave + badge + reply + profile) rank on current lane values and
  * `created_at`, not on a time-decayed age (gravity is deferred — RANKING.md §3.5
  * / OD-3).
@@ -70,7 +82,13 @@ export async function loadRankingSubstrate(
 			p.id,
 			p.side_at_post_time AS parent_side,
 			p.created_at,
+			-- RANK-1 / ADR-0039 R4 (amended) — a is the author's conviction STILL
+			-- HELD, so the §3.4 tiebreak (which decides topOrder outright in any
+			-- all-sub-floor market) cannot be bought and then refunded. The frozen
+			-- figure rides alongside for the badge's strikethrough; it is not sorted on.
 			pb.stake AS author_stake,
+			pb.original_stake AS author_stake_original,
+			pb.sold AS author_sold,
 			pb.price_at_bet AS price_at_bet,
 			COUNT(rb.id) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
@@ -98,8 +116,21 @@ export async function loadRankingSubstrate(
 			), 0) AS counter_dharma
 		FROM comments p
 		JOIN LATERAL (
-			SELECT b.stake, b.price_at_bet
+			SELECT
+				-- The COALESCE is the same one the aggregates above use, for the same
+				-- reason: a lot-less bet is unreachable under R8, and if it ever did
+				-- arise, scoring it ZERO would silently delete a real argument's weight.
+				COALESCE(pl.surviving_basis, b.stake) AS stake,
+				b.stake AS original_stake,
+				-- R6/R10 — Sold is EXACTLY zero surviving shares, never "nearly". A bet
+				-- with no lot row is not Sold: = 0 yields NULL there, and the COALESCE
+				-- reads that as false rather than as a fully-exited argument.
+				COALESCE(pl.surviving_shares = 0, false) AS sold,
+				b.price_at_bet
 			FROM bets b
+			-- 1:1 by lots_bet_id_uq, so this is an index lookup that cannot fan the
+			-- LATERAL's single row out.
+			LEFT JOIN lots pl ON pl.bet_id = b.id
 			WHERE b.comment_id = p.id
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
@@ -109,7 +140,8 @@ export async function loadRankingSubstrate(
 		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.market_id = ${args.marketId}
 			AND p.parent_comment_id IS NULL
-		GROUP BY p.id, p.side_at_post_time, p.created_at, pb.stake, pb.price_at_bet
+		GROUP BY p.id, p.side_at_post_time, p.created_at,
+			pb.stake, pb.original_stake, pb.sold, pb.price_at_bet
 		ORDER BY p.created_at ASC, p.id ASC
 	`);
 
@@ -124,6 +156,8 @@ export async function loadRankingSubstrate(
 		// string (timestamptz decode varies by execute path — accrual.ts note).
 		createdAt: new Date(r.created_at),
 		authorStake: r.author_stake,
+		authorStakeOriginal: r.author_stake_original,
+		authorSold: r.author_sold,
 		priceAtBet: r.price_at_bet,
 	}));
 }
