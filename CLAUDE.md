@@ -137,6 +137,10 @@ Critical-path PRs self-audit **before** `gh pr create`, in-session, against the 
 
 PR opens only when the audit is clean. This is the execute surface's own pass — **not** a subagent step (§5.11 is separate). Verification is left-shifted to write-time, where fixes are cheap; there is no post-PR soak. Non-critical PRs skip it (still run `just verify`).
 
+**A waived reviewer cascade is scoped to the task that waived it.** A waiver is a record of a decision taken once, under stated conditions, and never a standing precedent. The next task's cascade is decided on its own blast radius — a prior waiver is not evidence and not an argument. Where a cascade was waived on a critical path and run afterwards, **both** facts are recorded: what was waived, and what the late cascade found.
+
+*The last clause is deliberate. MERGE-1's late cascade found a false storage guarantee replicated across six sites, two of them frozen inside committed migrations and still reading wrong today. **A waiver that records only the waiver reads as costless** — and a cost nobody wrote down is a cost the next waiver will not weigh.*
+
 ### 5.11 Subagent invocation
 Subagents (§6) are invoked **explicitly** from kickoff prompts (auto-match is on via "MUST BE USED", but explicit is the reliable path). **Always pass `@docs/plans/<TASK-ID>.md`** — they start from zero context, and without it they re-explore the codebase from scratch. FAIL in scope → fix before PR; SURPRISE out of scope → `claude-progress.md` + STOP. Don't invoke for tightly-coupled schema + server + UI + tests in one pass (they lose shared intent), non-critical work, or type-only changes.
 
