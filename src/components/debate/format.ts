@@ -234,10 +234,16 @@ function netProfitLossDisplayed(
  * ⚠ ZERO CARRIES NO SIGN — `isZero()` covers +0 and −0, so an unmoved position
  * reads `(Đ0)`, never `(+Đ0)`. The MINUS is U+2212 (`e2 88 92`), byte-carried
  * from the mockup's `plShort()`, never the ASCII hyphen `groupInteger` emits.
- * ⚠ AND THE SPACING IS THE MOCKUP'S, WHICH IS NOT THE TILE'S: `plShort` emits
- * `+Đ70` with NO space (`:677`), while the Net P/L tile reads `+Đ 238` with one
- * (`:672`). Two different figures, two different densities, both the mockup's —
- * the caller supplies the glyph, so this returns the parts and states neither.
+ * ⚠ THE CALLER SUPPLIES THE GLYPH AND THEREFORE THE SPACING — this returns the
+ * parts and states neither, which is the one thing about this contract that has
+ * not changed. What DID change is what the caller does with them: this docblock
+ * used to record the mockup's two densities (`plShort` `+Đ70` at `:677` against
+ * the Net P/L tile's `+Đ 238` at `:672`) as a deliberate split to be preserved.
+ * POSREV-1 RF-4 ruled the profile's positions surface onto ONE density — a space
+ * after every Đ — because the delta sits INSIDE the cell whose own figure is
+ * spaced, so the split put the same glyph on two densities two characters apart.
+ * The mockup's own reading is not overturned in general; a caller that wants the
+ * tight form can still write it, because the parts arrive separate.
  *
  * Degrades to an EMPTY magnitude on a malformed operand rather than dressing a
  * bad value in a sign: the caller renders nothing at all in that case, which is

@@ -1403,14 +1403,27 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 		// It is still an EXACT full-cell `textContent` pin — the delta is asserted
 		// as part of the string, not excluded from it, so a wrong sign, a wrong
 		// magnitude or a stray space all still red.
+		// ⚠⚠ THE DELTA'S SPACING MOVED AT POSREV-1 RF-4, and the expectation is
+		// updated to the new form WITH its reason rather than restored. This pinned
+		// `Đ 31(+Đ6)` — the mockup's own tight `plShort` density, faithfully
+		// carried. The founder ruled one density for this surface: the delta sits
+		// INSIDE the cell whose own figure is spaced, so the two spellings put the
+		// same glyph two characters apart. ⛔ The pin stays EXACT and full-cell —
+		// a wrong sign, a wrong magnitude or a stray space all still red it.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		const { staked, current } = valueCells();
 		expect((staked?.textContent ?? "").trim()).toBe("Đ 25");
-		expect((current?.textContent ?? "").trim()).toBe("Đ 31(+Đ6)");
+		// ⚠ NO SPACE BEFORE THE `(`, AND THAT IS THE DOM RATHER THAN AN OVERSIGHT.
+		// The gap between the figure and its delta is the wrapper's `gap-1.5`, a
+		// FLEX gap — there is no text node between them, so `textContent` has never
+		// carried one and RF-4 does not ask for one. RF-4 governs `Đ` followed by a
+		// DIGIT. Writing `Đ 31 (+Đ 6)` here was tried and reddened: it encodes a
+		// space the layout provides and the string does not.
+		expect((current?.textContent ?? "").trim()).toBe("Đ 31(+Đ 6)");
 		// …and the delta is the DISPLAYED-space difference of the two cells beside
 		// it, which is the §10.8 identity this amendment admits: 31 − 25 = 6, true
 		// of the figures actually on screen.
-		expect((current?.textContent ?? "").trim()).toContain("+Đ6");
+		expect((current?.textContent ?? "").trim()).toContain("+Đ 6");
 	});
 
 	it("itemD::the-ARROW-track-between-them-takes-no-glyph", () => {
@@ -1445,7 +1458,11 @@ describe("ROUND 5 item D — Đ on the positions table's two value cells", () =>
 		// the same `groupInteger` the two operands use: 3,226 − 14,260 = −11,034.
 		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried from the
 		// mockup's `plShort()` (`:677`), the same glyph the Net P/L tile emits.
-		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226(−Đ11,034)");
+		// POSREV-1 RF-4 spacing, same supersession as the pin above. ⛔ The GROUPING
+		// is what this test is actually for and is untouched: a bare `{row.staked}`
+		// would print the raw NUMERIC(38,18) string, so the commas are the proof
+		// that `formatDharma` still wraps the value.
+		expect((current?.textContent ?? "").trim()).toBe("Đ 3,226(−Đ 11,034)");
 	});
 
 	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {

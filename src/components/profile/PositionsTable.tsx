@@ -1083,10 +1083,23 @@ export function PositionsTable({
 										    on `ProfilePositionRow`, so this is a render of data the DTO
 										    carries — unlike the entry/live percentages recorded below,
 										    which it does not.
-										    ⚠ THE SPACING IS THE MOCKUP'S OWN AND IS NOT THE TILE'S:
-										    `plShort` emits `+Đ70` with no space (`:677`) while the Net P/L
-										    tile reads `+Đ 238` with one (`:672`). Both are byte-carried;
-										    the difference is deliberate density on a smaller figure.
+										    ⚠⚠ THE SPACING IS NOW UNIFORM, AND THIS CLAUSE ARGUED THE
+										    OPPOSITE. It read: "`plShort` emits `+Đ70` with no space
+										    (`:677`) while the Net P/L tile reads `+Đ 238` with one
+										    (`:672`) … the difference is deliberate density on a smaller
+										    figure." Both halves were byte-carried faithfully and the
+										    conclusion was still wrong here, which is the interesting part:
+										    two densities are defensible when the two figures sit in
+										    different REGIONS, and this one sits inside the very cell whose
+										    own figure carries the space — `Đ 151 (+Đ1)` puts the same
+										    glyph on two densities two characters apart. Founder-ruled at
+										    POSREV-1 RF-4: always a space after Đ, this surface over.
+										    ⛔ THE SIGN LOGIC IS UNTOUCHED, AND THAT IS DELIBERATE. RF-4's
+										    targets are `+Đ 1` / `−Đ 1` / `Đ 0`, and
+										    `displayPositionProfitLossSigned` already emits exactly those —
+										    zero carries no sign, decided by `isZero()` on the numeric value
+										    rather than by inspecting a printed string (§10.8). Only the
+										    space was ever missing; the formatter needed nothing.
 										    ⚠ AN EMPTY MAGNITUDE RENDERS NOTHING — the formatter's degrade
 										    for a malformed operand. A parenthesis pair with nothing in it
 										    is worse than silence. */}
@@ -1099,7 +1112,7 @@ export function PositionsTable({
 															data-testid={`position-pl-${row.marketId}`}
 															className="text-[10.5px] leading-[1.2] font-bold text-n5"
 														>
-															({pl.sign}Đ{pl.magnitude})
+															({pl.sign}Đ {pl.magnitude})
 														</span>
 													)}
 												</span>

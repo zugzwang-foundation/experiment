@@ -745,7 +745,25 @@ function SplitBar({
 			role="img"
 			aria-label={`Support Đ ${formatDharma(aggregate.supportDharma)}, Counter Đ ${formatDharma(aggregate.counterDharma)}`}
 		>
-			<span className="flex items-center gap-1.5">
+			{/* ⚠⚠ POSREV-1 RF-2(a) — THE LABEL AND ITS FIGURE STACK. They were a
+			    horizontal `[Support][Đ n]` pair on each end, and with the bar between
+			    them the two Đ figures landed at different distances from their own
+			    labels and at different distances from the bar — so the eye had
+			    nothing to line them up against. A column puts each figure directly
+			    under the word it belongs to, and the two columns are then mirror
+			    images of each other across the bar.
+			    ⛔ THE COUNTER SIDE ALSO REVERSES ITS ORDER, and that is required
+			    rather than cosmetic. It rendered `[Đ n][Counter]` — figure first, so
+			    the label sat on the OUTSIDE edge — which was the horizontal layout's
+			    own mirroring. Stacked, "mirrored" means both labels on the TOP line,
+			    so keeping the source order would have put Counter's figure above its
+			    label while Support's sat below.
+			    ⚠ `gap-0.5` is the tightest shipped step; RF-2(a) says "directly
+			    beneath", and anything larger reads as two separate facts again. */}
+			<span
+				data-testid={`argument-split-support-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
 				<span className="text-n6">Support</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
@@ -765,11 +783,14 @@ function SplitBar({
 					staked
 				</span>
 			</span>
-			<span className="flex items-center gap-1.5">
+			<span
+				data-testid={`argument-split-counter-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
+				<span className="text-n6">Counter</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
-				<span className="text-n6">Counter</span>
 			</span>
 		</div>
 	);
