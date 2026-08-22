@@ -1,6 +1,5 @@
 "use client";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -39,7 +38,6 @@ import type {
 export function PostFocusHeader({
 	post,
 	market,
-	bookmarks,
 	heldSide,
 	marketOpen,
 	suspended,
@@ -56,12 +54,6 @@ export function PostFocusHeader({
 	 * market context at all once `MarketHeader` stops rendering beside it (row 1).
 	 */
 	market: DebateMarketHeader;
-	/**
-	 * BOOKMARK-ADD-WIRE — viewer bookmark state for this market; `null` when
-	 * signed out. Reaches only the non-removed branch's `ArgProfile`; the removed
-	 * branch renders side badge + placeholder and no cluster.
-	 */
-	bookmarks: BookmarkAffordance;
 	heldSide: Side | null;
 	marketOpen: boolean;
 	suspended: boolean;
@@ -151,7 +143,6 @@ export function PostFocusHeader({
 								<>
 									<div className="flex items-start justify-between gap-2">
 										<ArgProfile
-											commentId={post.id}
 											author={post.author}
 											side={post.sideAtPostTime}
 											marker={post.marker}
@@ -159,7 +150,6 @@ export function PostFocusHeader({
 											chipSize="detail"
 											authorStake={post.authorStake}
 											replyCount={replyCount}
-											bookmarks={bookmarks}
 										/>
 										<LaneBadge badge={post.badge} />
 									</div>

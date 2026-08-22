@@ -1,9 +1,5 @@
 import Link from "next/link";
 
-import {
-	type BookmarkAffordance,
-	CardActions,
-} from "@/components/bookmarks/BookmarkToggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import { PositionMarker, SideBadge } from "./badges";
@@ -13,38 +9,24 @@ import type { AuthorIdentity, Marker, Side } from "./types";
 /**
  * A post/reply author header (design-language §3.1 "argprofile"): avatar (PFP
  * placeholder, D8) · pseudonym · frozen SideBadge · live PositionMarker · the
- * author's own stake `a` · reply count · the bookmark card action.
+ * author's own stake `a` · reply count.
  * The marker chip sits after the side badge, before the stake (D5).
  *
- * BOOKMARK-ADD-WIRE: the bookmark trigger is now LIVE — `CardActions` owns the
- * full icon matrix (signed-out disabled / own-argument absent / active
- * outline-or-filled). ⛔ The download trigger was REMOVED at POLISH.3 PR 2
- * row 7 (`PD-3-15`).
+ * UNWIRE-1 — the `CardActions` cluster (the bookmark trigger + `showActions`,
+ * its caller-side gate) is removed: the bookmark module is unwired
+ * product-wide. This header no longer renders any action cluster at all.
  * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
  * never `YES @ 27%` or `Đ a → Đ now`.
- *
- * `showActions` semantics are UNCHANGED: it gates the ENTIRE cluster, so it is
- * deliberately NOT the own-suppression hook. Own-suppression is a condition
- * inside `BookmarkToggle`. ⚠ The original reason for that separation was that
- * `showActions` would also strip the DOWNLOAD trigger from the viewer's own
- * arguments; row 7 removed that trigger, but the separation stands on its own
- * — `showActions` is a caller-side layout switch and own-ness is a viewer
- * fact, and collapsing them would re-couple two unrelated decisions.
  */
 export function ArgProfile({
-	commentId,
 	author,
 	side,
 	marker,
 	entryPrice,
 	authorStake,
 	replyCount,
-	bookmarks,
 	chipSize,
-	showActions = true,
 }: {
-	/** The comment this header belongs to — the bookmark target (`post.id`). */
-	commentId: string;
 	author: AuthorIdentity;
 	side: Side;
 	marker: Marker;
@@ -60,8 +42,6 @@ export function ArgProfile({
 	entryPrice?: string;
 	authorStake?: string;
 	replyCount?: number;
-	/** Viewer bookmark state for this market; `null` when signed out. */
-	bookmarks: BookmarkAffordance;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -81,7 +61,6 @@ export function ArgProfile({
 	 * discouraged.
 	 */
 	chipSize?: "detail";
-	showActions?: boolean;
 }) {
 	return (
 		<div className="flex items-center gap-2">
@@ -147,9 +126,6 @@ export function ArgProfile({
 					</>
 				) : null}
 			</div>
-			{showActions ? (
-				<CardActions commentId={commentId} bookmarks={bookmarks} />
-			) : null}
 		</div>
 	);
 }

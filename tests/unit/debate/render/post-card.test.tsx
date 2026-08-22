@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { PostCard } from "@/components/debate/PostCard";
 import type { DebatePost, ReplyGroups } from "@/components/debate/types";
 
@@ -32,20 +31,16 @@ import type { DebatePost, ReplyGroups } from "@/components/debate/types";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
- * These suites assert bookmarks / spacing / card composition, never the
+ * These suites assert spacing / card composition, never the
  * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
  * keeps the viewer state REQUIRED at the component (a trigger without its
  * F-3 gate invites a bet the viewer cannot place) without pretending this
  * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
 const noopReply = () => {};
 
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 const AGGREGATE = {
 	supportCount: 2,
@@ -82,7 +77,6 @@ function renderCard() {
 	return render(
 		<PostCard
 			post={presentPost()}
-			bookmarks={VIEWER}
 			onEnter={noop}
 			onOpenPopup={noop}
 			onOpenImage={noop}
@@ -177,7 +171,6 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		const { container } = render(
 			<PostCard
 				post={presentPost()}
-				bookmarks={VIEWER}
 				onEnter={onEnter}
 				onOpenPopup={onOpenPopup}
 				onOpenImage={noop}
@@ -215,7 +208,6 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 		const { container } = render(
 			<PostCard
 				post={presentPost()}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -266,7 +258,6 @@ describe("POLISH.3 PR 2 — PostCard's disabled write triggers and Read more", (
 					aggregate: AGGREGATE,
 					replies: EMPTY_REPLIES,
 				}}
-				bookmarks={VIEWER}
 				onEnter={onEnter}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -339,7 +330,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 		const present = render(
 			<PostCard
 				post={withReplies}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}
@@ -371,7 +361,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 25, the card sheds teaser + repli
 					aggregate: AGGREGATE,
 					replies: withReplies.replies,
 				}}
-				bookmarks={VIEWER}
 				onEnter={noop}
 				onOpenPopup={noop}
 				onOpenImage={noop}

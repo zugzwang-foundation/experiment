@@ -1,9 +1,8 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ReplyPreview } from "@/components/debate/ReplyPreview";
 import type { DebateReply, ReplyGroups } from "@/components/debate/types";
 
@@ -30,30 +29,26 @@ import type { DebateReply, ReplyGroups } from "@/components/debate/types";
  * removed branch and the present branch), and that is why this guard renders the
  * component DIRECTLY — which is also why the guard survives the removal
  * unamended, still pinning the row-13 partition on the component itself.
- * ⚠ This suite and `bookmark-toggle.test.tsx` are now the component's ONLY
- * consumers; see `ReplyPreview.tsx`'s own docblock for why the file is kept.
+ * ⚠ UNWIRE-1 — this suite is now the component's ONLY consumer
+ * (`bookmark-toggle.test.tsx` is deleted along with the bookmark module); see
+ * `ReplyPreview.tsx`'s own docblock for why the file is kept.
  *
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
- * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * assert spacing / partitioning / images, never the pop-up, so a
  * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
  * pinned. */
 const noopPopup = () => {};
 
 /** HTML-FINISH · MARKET DETAIL row 26 — the reply-image lightbox host.
- * These suites assert bookmarks / spacing / partitioning, never the image, so
+ * These suites assert spacing / partitioning, never the image, so
  * a no-op is the honest stand-in: it keeps the prop REQUIRED at the component
  * (O-1) without pretending this file tests the lightbox. */
 const noopImage = () => {};
-
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 
 /** Neutral fixture prose — no invented market content (CLAUDE.md §3). */
 function reply(id: string, side: "YES" | "NO", body: string): DebateReply {
@@ -104,7 +99,6 @@ function renderPreview() {
 	return render(
 		<ReplyPreview
 			replies={GROUPS}
-			bookmarks={VIEWER}
 			onOpenImage={noopImage}
 			onOpenPopup={noopPopup}
 		/>,
