@@ -2,11 +2,10 @@ import { eq } from "drizzle-orm";
 import { v7 as uuidv7 } from "uuid";
 import { afterEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
-import { bookmarks, lots, markets, pools, users } from "@/db/schema";
+import { lots, markets, pools, users } from "@/db/schema";
 import { place } from "@/server/bets/place";
 import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
-import { loadBookmarks } from "@/server/bookmarks/list";
 import { loadRankingSubstrate } from "@/server/debate-view/ranking-substrate";
 import { loadReplySubstrate } from "@/server/debate-view/reply-substrate";
 import { loadProfileArguments } from "@/server/profile/arguments";
@@ -45,7 +44,6 @@ const dp18 = (v: string): string => {
 };
 
 const TABLES = [
-	"bookmarks",
 	"lots",
 	"bets",
 	"comments",
@@ -314,38 +312,11 @@ describe("RANK-1 R-F — the decay is the same at every read site", () => {
 		expect(replyItem.sold).toBe(true);
 	});
 
-	it("site 3 — loadBookmarks: the same, on the cross-author read", async () => {
-		const f = await seedPartialAndFullExit("m-parity-bookmarks");
-		const viewer = await seedUser("m-parity-bookmarks-viewer");
-		await testDb.insert(bookmarks).values([
-			{ userId: viewer, commentId: f.post.commentId },
-			{ userId: viewer, commentId: f.reply.commentId },
-		]);
-
-		const items = await loadBookmarks(db, { viewerId: viewer });
-
-		const postItem = items.find((i) => i.id === f.post.commentId);
-		if (
-			postItem === undefined ||
-			postItem.removed ||
-			postItem.kind !== "post"
-		) {
-			throw new Error("expected a present post item in the bookmark list");
-		}
-		expect(units(postItem.authorStake)).toBe(units(dp18("100")));
-		expect(units(postItem.authorStakeOriginal)).toBe(units(dp18("200")));
-		expect(postItem.authorSold).toBe(false);
-
-		const replyItem = items.find((i) => i.id === f.reply.commentId);
-		if (
-			replyItem === undefined ||
-			replyItem.removed ||
-			replyItem.kind !== "reply"
-		) {
-			throw new Error("expected a present reply item in the bookmark list");
-		}
-		expect(units(replyItem.stake)).toBe(BigInt(0));
-		expect(units(replyItem.stakeOriginal)).toBe(units(dp18("200")));
-		expect(replyItem.sold).toBe(true);
-	});
+	// UNWIRE-1-RESOLVE — "site 3 — loadBookmarks: the same, on the cross-author
+	// read" removed whole: the bookmark module is unwired product-wide
+	// (UNWIRE-1), and RANK-1's own parity claim ("the decay is the same at
+	// every read site") no longer has this site to be parity with. Sites 1
+	// (loadRankingSubstrate), 2 (loadProfileArguments) and 4
+	// (loadReplySubstrate) are untouched and still exercise the same claim
+	// over the surviving read sites.
 });

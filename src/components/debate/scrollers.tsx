@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
 
 import { PostCard } from "./PostCard";
@@ -207,7 +206,6 @@ type ColumnAuto = {
 export function PostScroller({
 	posts,
 	side,
-	bookmarks,
 	onEnter,
 	onOpenPopup,
 	onOpenImage,
@@ -219,8 +217,6 @@ export function PostScroller({
 }: {
 	posts: DebatePost[];
 	side: Side;
-	/** BOOKMARK-ADD-WIRE — pass-through to the paged `PostCard`. */
-	bookmarks: BookmarkAffordance;
 	onEnter: (id: string) => void;
 	onOpenPopup: (post: PresentPost) => void;
 	onOpenImage: (url: string) => void;
@@ -274,7 +270,6 @@ export function PostScroller({
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<PostCard
 					post={post}
-					bookmarks={bookmarks}
 					onEnter={onEnter}
 					onOpenPopup={onOpenPopup}
 					onOpenImage={onOpenImage}
@@ -322,15 +317,12 @@ export function PostScroller({
 export function ReplyScroller({
 	replies,
 	side,
-	bookmarks,
 	onOpenImage,
 	onOpenPopup,
 	auto,
 }: {
 	replies: DebateReply[];
 	side: Side;
-	/** BOOKMARK-ADD-WIRE — pass-through to the paged `ReplyCard`. */
-	bookmarks: BookmarkAffordance;
 	/** HTML-FINISH · MARKET DETAIL row 26 — pass-through to the reply's image. */
 	onOpenImage: (url: string) => void;
 	/** HTML-FINISH · MARKET DETAIL row 27 — pass-through to the reply's `+`. */
@@ -361,7 +353,6 @@ export function ReplyScroller({
 			<div className="flex min-w-0 flex-1 flex-col gap-2">
 				<ReplyCard
 					reply={reply}
-					bookmarks={bookmarks}
 					onOpenImage={onOpenImage}
 					onOpenPopup={onOpenPopup}
 				/>

@@ -116,7 +116,8 @@ function fixedOverlayClassStrings(): { file: string; classes: string }[] {
  */
 const EXPECTED_OVERLAY_FILES = [
 	"src/components/debate/chart/MarketPriceChartOverlay.tsx",
-	"src/components/profile/graph/ProfileGraphOverlay.tsx",
+	// UNWIRE-1 — `profile/graph/ProfileGraphOverlay.tsx` deleted whole (Profile
+	// Dharma graph unwired); no replacement entry.
 	"src/components/ui/dialog.tsx",
 ];
 

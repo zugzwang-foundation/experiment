@@ -504,63 +504,12 @@ describe("ROUND 4 item 3 — the equal split is restored; the height is REFUSED"
 		}
 	});
 
-	it("item3::the-graph-card-no-longer-derives-its-HEIGHT-from-its-WIDTH", () => {
-		// ⛔ THE OTHER HALF OF ITEM B, AND THE REASON THREE ROUNDS FAILED. While
-		// `aspect-[2/1]` was on the chart box the card's height was
-		// `(colWidth − 32)/2 + 32`, so the GRAPH set the band and any declared
-		// height spilled. `min-h-0` removes the grid item's automatic minimum so
-		// the declared height can bind; `h-full` makes the chart box the card's
-		// content box. Measured after: card 256 = cell 256, spill 0, at 1024 /
-		// 1440 / 1920.
-		const card = readFileSync(
-			join(process.cwd(), "src/components/profile/graph/ProfileGraphCard.tsx"),
-			"utf8",
-		);
-		// ⚠ READ THE CLASSNAMES, NOT THE FILE TEXT. The docblock explaining WHY
-		// this changed necessarily quotes `aspect-[2/1]` several times, so a bare
-		// `.not.toContain("aspect-[2/1]")` over the source reddens on the record
-		// of the fix rather than on the fix — the recorded false-RED hazard for
-		// doc comments that quote the thing they removed.
-		const classNames = [...card.matchAll(/className="([^"]*)"/g)].map(
-			(m) => m[1] ?? "",
-		);
-		expect(classNames.length).toBeGreaterThan(0);
-		for (const cls of classNames) {
-			expect(
-				cls,
-				"item B: a className in ProfileGraphCard still declares an aspect " +
-					"ratio, so the card's height derives from its width again.",
-			).not.toContain("aspect-");
-		}
-		expect(classNames).toContain("h-full w-full");
-		expect(
-			classNames.some((c) => c.includes("block min-h-0 w-full")),
-			"item B: the card lost `min-h-0`, so as a grid item its automatic " +
-				"minimum size is its content again and the declared band height " +
-				"cannot bind.",
-		).toBe(true);
-		// ⛔ POLISH.5 PR C is fenced to symbols in that directory and is UNSTARTED:
-		// the fence was SIZING ONLY, so every symbol and prop must still be there.
-		for (const symbol of [
-			"export function ProfileGraphCard",
-			"series",
-			"onExpand",
-			"ProfileChart",
-			'selection="cumulative"',
-			'mode="placeholder"',
-			"EmptyBlock",
-			"GRAPH_COPY.aria.expand",
-			"PROFILE_COPY.graph.empty",
-			'messageTestId="graph-empty"',
-			'messageAs="p"',
-		]) {
-			expect(
-				card,
-				`item B: \`${symbol}\` left ProfileGraphCard. The fence was SIZING ` +
-					`ONLY — no symbol may be renamed or removed.`,
-			).toContain(symbol);
-		}
-	});
+	// UNWIRE-1 — `item3::the-graph-card-no-longer-derives-its-HEIGHT-from-its-WIDTH`
+	// removed whole. It read `profile/graph/ProfileGraphCard.tsx` directly, which
+	// is deleted along with the rest of the Profile Dharma graph. The four tests
+	// above it assert on the SURVIVING `profile-headzone` div's own className
+	// string (source-scanned from `page.tsx`, untouched by the graph's removal)
+	// and remain meaningful and green.
 });
 
 describe("FOUNDER EYE PASS item 2 — the selected filter half is unmistakable", () => {

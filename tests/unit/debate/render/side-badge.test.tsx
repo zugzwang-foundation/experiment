@@ -121,9 +121,13 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// cluster, which owns one badge for all of them. A floor that outruns the
 		// real inventory is a guard that reddens on correct code, and this file's
 		// own docstring says such a guard "gets suppressed within a week".
+		// ⚠ LOWERED 12 → 10 AT UNWIRE-1: `bookmarks/BookmarkCard.tsx`'s two
+		// sized sites (§ EIGHTH ENTRY-adjacent below) are deleted whole along
+		// with the rest of the bookmark module — a real shrink, the same shape
+		// as row 33's.
 		// ⛔ It is still a NON-VACUITY floor, not a count: the set-equality map
 		// below is what actually fences membership.
-		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(12);
+		expect(sideBadgeSites.length).toBeGreaterThanOrEqual(10);
 	});
 
 	it("exactly-six-sites-pass-no-size-and-ride-CHIP-base", () => {
@@ -218,9 +222,10 @@ describe("SideBadge — the CHIP.base call sites are a measured set", () => {
 		// The positive control beside the assertion above (N3): the classifier
 		// does distinguish the two kinds, so "ten unsized" is not just "the
 		// matcher never sees a size".
+		// UNWIRE-1 — `bookmarks/BookmarkCard.tsx`'s two sized sites are gone
+		// whole with the bookmark module; not replaced.
 		const sized = sideBadgeSites.filter((site) => site.sized);
 		expect(countByFile(sized)).toEqual({
-			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/debate/ArgProfile.tsx": 1,
 			"src/components/discovery/HeroPanels.tsx": 1,
 			"src/components/profile/ArgumentList.tsx": 2,
@@ -562,11 +567,12 @@ describe("SideBadge — the detail and profile seam presets", () => {
 			"src/components/debate/PostFocusHeader.tsx": 1,
 		});
 
+		// UNWIRE-1 — `bookmarks/BookmarkCard.tsx`'s two `size="profile"` sites
+		// are gone whole with the bookmark module; not replaced.
 		const wiredProfile = sideBadgeSites.filter((site) =>
 			/size\s*=\s*["{]?\s*["']?profile/.test(site.markup),
 		);
 		expect(countByFile(wiredProfile)).toEqual({
-			"src/components/bookmarks/BookmarkCard.tsx": 2,
 			"src/components/profile/ArgumentList.tsx": 2,
 		});
 	});

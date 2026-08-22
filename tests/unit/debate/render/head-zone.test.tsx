@@ -5,7 +5,6 @@ import { join } from "node:path";
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { HeadZone } from "@/components/debate/HeadZone";
 import { MarketHeader } from "@/components/debate/MarketHeader";
 import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
@@ -50,16 +49,12 @@ import type {
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 const ROOT = process.cwd();
 const VIEW = "src/components/debate/DebateView.tsx";
 const readSource = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
 /** Neutral fixture prose — no invented market content (CLAUDE.md §3). */
@@ -116,7 +111,6 @@ function renderPostArm() {
 		<PostFocusHeader
 			post={presentPost()}
 			market={market}
-			bookmarks={VIEWER}
 			heldSide={null}
 			marketOpen
 			suspended={false}
@@ -306,7 +300,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 			<PostFocusHeader
 				post={presentPost()}
 				market={market}
-				bookmarks={VIEWER}
 				heldSide={null}
 				marketOpen
 				suspended={false}
@@ -336,7 +329,6 @@ describe("HTML-FINISH · MARKET DETAIL — row 15, the focused post's teaser", (
 			<PostFocusHeader
 				post={post}
 				market={market}
-				bookmarks={VIEWER}
 				heldSide={null}
 				marketOpen
 				suspended={false}

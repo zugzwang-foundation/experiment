@@ -1,5 +1,3 @@
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
-
 import { Button } from "@/components/ui/button";
 
 import { ArgProfile } from "./ArgProfile";
@@ -19,27 +17,16 @@ import type { DebateReply, PresentReply } from "./types";
  * withheld server-side (§6), so they are absent from `reply` at the type level.
  * No vote control anywhere (§4.3).
  *
- * BOOKMARK-ADD-WIRE (C3): the reply card carries the FULL cluster, rendered from
- * the SAME `CardActions` as `ArgProfile` so the two cannot drift. ⚠ Canon §6
- * named bookmark AND download on the reply card; the download half was REMOVED
- * at POLISH.3 PR 2 row 7 (`PD-3-15`, D3).
- *
- * MASKING — the affordance is added to the NON-REMOVED branch ONLY, and the
- * removed branch below gains nothing. Unlike the post path this is NOT enforced
- * by the type system: `DebateReply`'s removed variant still carries an `id`, so
- * a cluster placed in the removed branch WOULD compile. It is a deliberate
- * branch placement, test-locked by `reply-card::removed-reply-renders-no-cluster`
- * (@security-auditor forward obligation 1).
+ * UNWIRE-1 — the bookmark/download `CardActions` cluster this reply card used
+ * to share with `ArgProfile` is gone (bookmark module unwired product-wide);
+ * `ArgProfile` no longer renders any action cluster at all (SUB-3).
  */
 export function ReplyCard({
 	reply,
-	bookmarks,
 	onOpenImage,
 	onOpenPopup,
 }: {
 	reply: DebateReply;
-	/** Viewer bookmark state for this market; `null` when signed out. */
-	bookmarks: BookmarkAffordance;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 26 — opens the reply's attached image in
 	 * the read-only lightbox, the same host `PostFocusHeader` and `PostCard`
@@ -82,7 +69,6 @@ export function ReplyCard({
 			    (`REPLY_DEPTH_MAX = 1`), so the field would render a zero that means
 			    nothing. */}
 			<ArgProfile
-				commentId={reply.id}
 				author={reply.author}
 				side={reply.side}
 				marker={reply.marker}
@@ -90,7 +76,6 @@ export function ReplyCard({
 				authorStake={reply.stake}
 				originalStake={reply.stakeOriginal}
 				sold={reply.sold}
-				bookmarks={bookmarks}
 			/>
 			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.
 			    ⛔ ON THE NON-REMOVED BRANCH ONLY. A removed reply's variant has no

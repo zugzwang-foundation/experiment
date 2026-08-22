@@ -440,34 +440,22 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 	});
 
-	it("owner-only-bookmark-affordance-on-the-identity-card", () => {
-		// POLISH.5 item 17 (PB-1, W2.13 R2 + founder ruling 2026-07-31:
-		// OWNER-ONLY). The headzone bookmark icon is navigation to the viewer's
-		// OWN saved set, so a visitor must not see it. Before this item,
-		// `grep -rn '"/bookmarks"' src/` returned ZERO — the route was live,
-		// auth-gated and ORPHANED from the navigation graph.
-		//
-		// ⚠ TWO ARMS OR IT IS VACUOUS (V-2). An owner-only affordance asserted
-		// only on the owner arm passes identically on a control that is ALWAYS
-		// visible, so the negative arm is what gives the positive one meaning.
+	it("no-bookmark-affordance-on-the-identity-card-either-arm", () => {
+		// UNWIRE-1 — supersedes `owner-only-bookmark-affordance-on-the-identity-
+		// card`. That test asserted the headzone bookmark icon was OWNER-ONLY
+		// (POLISH.5 item 17, founder ruling 2026-07-31); the bookmark module is
+		// now unwired product-wide (SUB-2), so the control isn't gated by
+		// ownership anymore — it's gone from both arms. Kept as a two-arm
+		// negative guard rather than dropped outright, so a bookmark-link
+		// regression on EITHER arm still fails loudly.
 		const asOwner = render(
 			<IdentityCard user={USER} owner={true} tiles={TILES} />,
 		);
-		const card = screen.getByTestId("identity-card");
-		const link = card.querySelector('a[href="/bookmarks"]');
-		expect(link).not.toBeNull();
-		// Icon-only: an accessible name via aria-label, and NO visible "@" —
-		// the `scrubbed-silhouette-and-zero-pii` case asserts the whole
-		// identity-card subtree contains none. (Named by TEST, not by line:
-		// the coordinate this comment used to carry was both wrong and in the
-		// wrong direction — O-8 demotes a line number to evidence.)
-		expect(link?.getAttribute("aria-label")).toBe("Bookmarks");
-		expect(link?.textContent ?? "").toBe("");
-		// ⛔ Bookmark ONLY — W2.13 R2 struck the download icon.
-		expect(card.querySelector('a[href*="download"]')).toBeNull();
+		expect(
+			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
+		).toBeNull();
 		asOwner.unmount();
 
-		// The negative arm: a visitor gets NO link at all.
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(
 			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
