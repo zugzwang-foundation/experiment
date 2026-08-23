@@ -1,8 +1,7 @@
-import { Button } from "@/components/ui/button";
-
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
 import { CommentImage } from "./CommentImage";
+import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebateReply, PresentReply } from "./types";
 
@@ -101,16 +100,22 @@ export function ReplyCard({
 				    placement is deliberate and NOT type-enforced for the cluster; for
 				    the pop-up it IS type-enforced, because `onOpenPopup` takes a
 				    `PresentReply` and `reply` is narrowed here.
-				    ⛔ Label byte-carried from the mockup (`aria-label="Show more"`). */}
-				<Button
-					variant="ghost"
-					size="xs"
+				    ⚠⚠ UI-QUICK change set 2 item 2 — THE GLYPH BECOMES `Know more`,
+				    and the sentence above is the reason this mount could not be left
+				    behind: "one glyph means one thing everywhere" only holds if the
+				    conversion reaches everywhere. Two converted mounts and two
+				    unconverted ones is the state that teaches a reader nothing.
+				    ⛔ AND THE BYTE-CARRIED LABEL HAD TO GO. This read "⛔ Label
+				    byte-carried from the mockup (`aria-label="Show more"`)" — correct
+				    for a glyph, which has no visible text for WCAG 2.5.3 to bind to.
+				    A control reading `Know more` named `Show more` fails Label in Name
+				    outright, so mockup fidelity loses to the success criterion here.
+				    `KnowMore.tsx` owns that rule for all four mounts. */}
+				<KnowMore
+					label="Know more about this reply"
 					onClick={() => onOpenPopup(reply)}
-					aria-label="Show more"
-					className="shrink-0 text-n5 hover:text-ink"
-				>
-					+
-				</Button>
+					className="shrink-0"
+				/>
 			</div>
 		</div>
 	);
