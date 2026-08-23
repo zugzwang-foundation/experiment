@@ -99,6 +99,30 @@ function figure(text: string): number {
 	return Number((m?.[1] ?? "").replace(/,/g, ""));
 }
 
+/**
+ * The Đ figure in a tile's CURRENT cell — the third column.
+ *
+ * ⛔⛔ SCOPED TO THE CELL SINCE POSREV-POLISH-2 R-3, AND IT HAS TO BE. These
+ * tests used to run `figure()` over the WHOLE tile's `textContent`, which was
+ * unambiguous while the tile carried exactly one Đ. R-3 appends `· staked Đ <n>`
+ * to the market-question line — and that line renders BEFORE the Current cell in
+ * DOM order, so a whole-tile read now returns the DENOMINATOR instead of the
+ * value being allocated. The allocation under test never changed; the first Đ in
+ * the string did.
+ */
+function currentFigure(tileKey: string): number {
+	const cells = screen
+		.getByTestId(`position-tile-${tileKey}`)
+		.querySelectorAll("td");
+	// ⚠ THE VALUE NODE, NOT THE CELL. The Current cell stacks the value over the
+	// R-2 movement line and `textContent` concatenates them with no separator, so
+	// a cell-wide read of `Đ 12` above `48%` yields `Đ 1248`. The stack's FIRST
+	// child is the value; the same node `grid::the-CURRENT-cell-stacks-value-over-
+	// delta` asserts the order of.
+	const value = cells[2]?.firstElementChild?.firstElementChild;
+	return figure(value?.textContent ?? "");
+}
+
 describe("RF-15 — Σ displayed tiles == their market's allocated figure", () => {
 	it("rounds parts to sum to their market, not each to itself", () => {
 		// TWO equal arguments in one market worth Đ 10.5 in total.
@@ -132,9 +156,7 @@ describe("RF-15 — Σ displayed tiles == their market's allocated figure", () =
 		expect(screen.queryByTestId(`positions-group-figures-${M1}`)).toBeNull();
 		const marketCurrent = 11; // round0(10.5), HALF_UP — the level-1 parent
 
-		const tiles = [1, 2].map((n) =>
-			figure(screen.getByTestId(`position-tile-${L(n)}`).textContent ?? ""),
-		);
+		const tiles = [1, 2].map((n) => currentFigure(L(n)));
 		expect(tiles.reduce((a, b) => a + b, 0)).toBe(marketCurrent);
 		// ⚠ AND THE NAIVE ANSWER IS ASSERTED WRONG, so a build with no partition
 		// cannot pass by accident: 5 + 5 is what independent rounding produces.
@@ -184,9 +206,7 @@ describe("RF-15 — Σ displayed group headers == the Positions-value tile", () 
 		// unchanged (Σ per-market figures == the §23 tile); it is simply read from
 		// the surviving node. Asserting the headers are absent keeps this honest.
 		expect(screen.queryByTestId(`positions-group-figures-${M1}`)).toBeNull();
-		const perMarket = [1, 2].map((n) =>
-			figure(screen.getByTestId(`position-tile-${L(n)}`).textContent ?? ""),
-		);
+		const perMarket = [1, 2].map((n) => currentFigure(L(n)));
 		expect(perMarket.reduce((a, b) => a + b, 0)).toBe(tileFigure);
 		// ⛔ The naive answer, asserted wrong.
 		expect(perMarket).not.toEqual([11, 11]);
@@ -210,8 +230,7 @@ describe("RF-15 — Σ displayed group headers == the Positions-value tile", () 
 			],
 		};
 		render(<PositionsTable payload={payload} positionsValue={dp18("21")} />);
-		const read = () =>
-			figure(screen.getByTestId(`position-tile-${L(2)}`).textContent ?? "");
+		const read = () => currentFigure(L(2));
 		const unfiltered = read();
 		fireEvent.click(screen.getByTestId("positions-market-filter"));
 		fireEvent.click(screen.getByTestId(`positions-market-option-${M2}`));

@@ -1,5 +1,6 @@
 "use client";
 
+import { TrendingDown, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import {
 	Fragment,
@@ -9,13 +10,9 @@ import {
 	useRef,
 	useState,
 } from "react";
-
 import { fmtUtcDay } from "@/components/debate/chart/geometry";
-import {
-	allocateDisplayed,
-	displayPositionProfitLossSigned,
-	formatDharma,
-} from "@/components/debate/format";
+import { ComposerDecimal } from "@/components/debate/composer/sell-convert";
+import { allocateDisplayed, formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
@@ -60,29 +57,92 @@ import {
 const ROW_WINDOW = 3;
 
 /**
- * POSREV-POLISH P-2 — **EVERY DELTA CARRIES A SIGN, INCLUDING ZERO.**
- *
- * `displayPositionProfitLossSigned` returns an EMPTY sign for zero, and says so
- * deliberately: "ZERO CARRIES NO SIGN … an unmoved position reads `(Đ0)`, never
- * `(+Đ0)`". That contract is unchanged and is not overridden here — the same
- * docblock also states that **the CALLER supplies the glyph**, which is exactly
- * what this does. Other callers keep the unsigned zero.
- *
- * ⛔ **THE ZERO SPELLING IS `±`** (U+00B1), not `+` and not a blank.
- *   · `+Đ 0` asserts a gain that did not happen; `−Đ 0` asserts a loss.
- *     `±` asserts neither, which is the only honest thing to say about a
- *     position that has not moved.
- *   · A blank leaves one row in the column with no glyph where every other row
- *     has one, so the figures no longer line up down the column — and the reason
- *     P-2 wants a sign at all is that the column should read as one thing.
- *
- * ⚠ The MINUS arrives already correct from the formatter: U+2212, byte-carried,
- * never the ASCII hyphen. This function must never manufacture one.
- * ⚠ §10.8 — the returned glyph is TERMINAL. It is printed and never read back
- * into arithmetic, comparison or conditional rendering.
+ * ⚠⚠ **`signGlyphFor` LIVED HERE AND IS GONE AT POSREV-POLISH-2 R-2.** It made
+ * every absolute delta carry a sign, spelling zero `±` — introduced one ruling
+ * ago and superseded by the next: the absolute delta itself is replaced by a
+ * directional percentage below, so there is no `(±Đ 0)` left for it to sign.
+ * ⛔ **`displayPositionProfitLossSigned` IS NO LONGER CALLED FROM THIS FILE**,
+ * and its contract is untouched for the callers that remain. Its docblock still
+ * states that the CALLER supplies the glyph, which is why signing zero could be
+ * done here without editing it — and why removing that choice costs nothing.
  */
-function signGlyphFor(sign: string): string {
-	return sign === "" ? "±" : sign;
+
+/**
+ * POSREV-POLISH-2 R-2 — **HOW FAR THIS ARGUMENT HAS MOVED, AS A DIRECTION AND A
+ * PERCENT.** It replaces the absolute `(±Đ 0)` delta under Current.
+ *
+ * ⛔ **IT LIVES HERE RATHER THAN IN `format.ts`.** `displayPositionProfitLossSigned`
+ * and `formatDharma` are shared with the debate surfaces and the export; a
+ * percentage is a different question with different degenerate cases, and
+ * widening either contract to answer it would change what every other caller
+ * gets. One call site, one helper.
+ *
+ * ⚠ **EXACT SPACE, NOT DISPLAYED SPACE**, which is the one way this differs from
+ * the delta it replaces. That delta rounded both operands FIRST so that
+ * `current − staked` was checkable against the two figures printed beside it
+ * (§10.8's displayed-space identity). A percent has no such pair on screen to
+ * agree with — R-3 prints the denominator, not the difference — so rounding the
+ * operands first would only throw away precision before dividing.
+ *
+ * The four cases, and why the two boring-looking ones are not the same:
+ *   · **no denominator** — `survivingBasis` is zero while shares survive. Real,
+ *     not defensive: `lots_sold_zeroes_basis` is ONE-DIRECTIONAL, so an 18-dp
+ *     quantization can zero a basis while dust shares remain, and `isOpenLot`
+ *     keeps that lot on the Open tab. There is nothing to divide by, so the tile
+ *     shows its value and says nothing else. ⛔ Never a `0%`, never a dash —
+ *     both would be claims about a movement that cannot be computed.
+ *   · **flat** — the delta is exactly zero. An em dash, no glyph.
+ *   · **below one percent** — nonzero, rounds to 0. Renders `<1%` WITH its
+ *     glyph. ⛔ `0%` beside an arrow reads as a bug; "moved a little" and "did
+ *     not move" are different facts and get different marks.
+ *   · **moved** — the ordinary case.
+ *
+ * ⛔ ROUNDED WITH THE DECIMAL, never by casting to a float and rounding — the
+ * `Math.round`-over-a-`Number`-cast idiom is exactly what
+ * `pct-round-render.test.ts` forbids across this tree.
+ * ⚠ AND THAT GUARD IS A TEXT SCAN, SO IT CANNOT TELL A MENTION FROM A USE.
+ * This comment originally spelled the banned pattern out literally and reddened
+ * the guard from a docblock. Naming it in prose is the fix; widening the
+ * predicate to exempt comments is not — the guard's own note is explicit that
+ * the census may widen and the predicate may not.
+ */
+type TileMove =
+	| { kind: "none" }
+	| { kind: "flat" }
+	| { kind: "moved"; up: boolean; label: string; words: string };
+
+function tileMove(basis: string, current: string): TileMove {
+	let base: InstanceType<typeof ComposerDecimal>;
+	let now: InstanceType<typeof ComposerDecimal>;
+	try {
+		base = new ComposerDecimal(basis);
+		now = new ComposerDecimal(current);
+	} catch {
+		return { kind: "none" };
+	}
+	if (!base.isFinite() || !now.isFinite() || !base.greaterThan(0)) {
+		return { kind: "none" };
+	}
+	const delta = now.minus(base);
+	if (delta.isZero()) {
+		return { kind: "flat" };
+	}
+	const rounded = delta
+		.abs()
+		.dividedBy(base)
+		.times(100)
+		.toFixed(0, ComposerDecimal.ROUND_HALF_UP);
+	const belowOne = rounded === "0";
+	const up = delta.greaterThan(0);
+	return {
+		kind: "moved",
+		up,
+		label: belowOne ? "<1%" : `${rounded}%`,
+		// ⛔ THE ARIA TEXT SPELLS THE DIRECTION IN WORDS, and it is not decoration:
+		// the surface is monochrome by ruling, so the GLYPH is the only signal that
+		// a value went up rather than down — and a screen reader cannot see it.
+		words: `${up ? "up" : "down"} ${belowOne ? "less than 1" : rounded} percent`,
+	};
 }
 
 /**
@@ -930,7 +990,7 @@ function TileRow({
 }): React.JSX.Element {
 	const armed = sell.armedLotId === tile.key;
 	const sold = sell.soldLotId === tile.key;
-	const pl = displayPositionProfitLossSigned(tile.basis, tile.currentExact);
+	const move = tileMove(tile.basis, tile.currentExact);
 	const sellArgs = {
 		marketId: tile.row.marketId,
 		// ⚠ `undefined` ON THE FALLBACK TILE — `buildSellRequest` DROPS the key
@@ -1036,6 +1096,7 @@ function TileRow({
 					cell={tile.argument}
 					tileKey={tile.key}
 					marketTitle={tile.row.marketTitle}
+					basis={tile.basis}
 				/>
 			</td>
 			{isOpenTab ? (
@@ -1085,12 +1146,46 @@ function TileRow({
 								<span className="text-[17px] leading-[1.35] font-bold">
 									Đ {formatDharma(tile.valueDisplay)}
 								</span>
-								{pl.magnitude !== "" && (
+								{/* ⚠⚠ R-2 — THE MOVEMENT LINE. Three renderable outcomes and one
+								    silence, and the silence is the interesting one: a lot whose
+								    basis has been quantized to zero while shares survive has no
+								    denominator, so it says nothing rather than inventing a `0%`.
+								    ⛔ THE GLYPH CARRIES THE DIRECTION ALONE. This surface is
+								    monochrome by ruling — green and red were proposed and refused
+								    — so there is no colour behind the arrow and none is coming.
+								    `TrendingUp`/`TrendingDown` rather than `ArrowUp`/`ArrowDown`:
+								    a plain arrow on a table reads as a sort control.
+								    ⚠ `aria-label` ON THE LINE, because a reader who cannot see the
+								    glyph would otherwise get a bare percentage with no sign. */}
+								{move.kind === "flat" && (
 									<span
 										data-testid={`tile-pl-${tile.key}`}
+										role="img"
+										aria-label="unchanged"
 										className="text-[10.5px] leading-[1.2] font-bold text-n5"
 									>
-										({signGlyphFor(pl.sign)}Đ {pl.magnitude})
+										—
+									</span>
+								)}
+								{move.kind === "moved" && (
+									<span
+										data-testid={`tile-pl-${tile.key}`}
+										role="img"
+										aria-label={move.words}
+										className="flex items-center gap-0.5 text-[10.5px] leading-[1.2] font-bold text-n5"
+									>
+										{move.up ? (
+											<TrendingUp
+												aria-hidden="true"
+												className="size-3 shrink-0"
+											/>
+										) : (
+											<TrendingDown
+												aria-hidden="true"
+												className="size-3 shrink-0"
+											/>
+										)}
+										{move.label}
 									</span>
 								)}
 							</span>
@@ -1114,7 +1209,17 @@ function TileRow({
 												!sell.canSubmit(tile.currentExact, tile.shares)
 											}
 											data-testid={`tile-confirm-${tile.key}`}
-											className="font-extrabold tracking-[0.08em] uppercase [border:var(--ring-active)]"
+											// ⚠⚠ R-1 — SIZED DOWN SO THE ✕ FITS. The Sell column is
+											// `w-[104px]` and the cell's own `p-2` leaves 88px of
+											// content; `CONFIRM` at `text-xs` with `px-2` and
+											// `tracking-[0.08em]` measured ~75px, plus a 4px gap and
+											// the 24px `icon-xs` ✕ — 103px into 88, so the ✕ was
+											// clipped at the tile's right edge. At `text-[10px]` /
+											// `px-1.5` / `tracking-[0.04em]` the word is ~58px and the
+											// cluster clears the column with room to spare.
+											// ⛔ THE HEIGHT IS UNCHANGED (`size="xs"` is `h-6`), so the
+											// tap target does not shrink with the label.
+											className="px-1.5 text-[10px] font-extrabold tracking-[0.04em] uppercase [border:var(--ring-active)]"
 											onClick={() => sell.confirm(tile.key, sellArgs)}
 										>
 											{sell.busy ? "…" : sell.failed ? "Retry" : "Confirm"}
@@ -1213,11 +1318,14 @@ function TileArgumentCell({
 	cell,
 	tileKey,
 	marketTitle,
+	basis,
 }: {
 	cell: ProfileArgumentCell;
 	tileKey: string;
 	/** The market question, rendered under the argument title (P-1). */
 	marketTitle: string;
+	/** `survivingBasis` — R-2's denominator, printed on the market line (R-3). */
+	basis: string;
 }): React.JSX.Element {
 	/* ⚠ THE PRE-RF-3 SPELLING, CARRIED RATHER THAN REDESIGNED: 11px / 1.35 /
 	   semibold / `text-n5`, `block`, linking to the market. P-1 says "exactly as
@@ -1225,14 +1333,34 @@ function TileArgumentCell({
 	   happens to look similar. Its testid is keyed by TILE rather than by market,
 	   because the unit of this table is now the argument and two tiles in one
 	   market would otherwise collide on one id. */
+	/* ⚠⚠ POSREV-POLISH-2 R-3 — **THE DENOMINATOR RIDES THIS LINE.** R-2 replaced
+	   the absolute delta with a percentage, and by then this tile had no absolute
+	   reference left at all: POSREV-POLISH removed the group header's Đa and the
+	   `from Đ …` line, and R-2 took the last one. A percentage whose denominator
+	   appears nowhere is a figure nobody can check.
+	   ⛔ IT IS `survivingBasis` — the SAME string R-2 divides by — so the number
+	   shown IS the number being divided by, rather than a second figure that
+	   happens to agree today. Routed through `formatDharma`, space after Đ.
+	   ⚠ APPENDED, NOT STACKED. No new row and no height cost: the line already
+	   existed and this rides it, which is what keeps the three-tile window intact.
+	   ⚠ THE LINK WRAPS THE QUESTION ONLY. The staked figure is a sibling text node
+	   inside the same block, so the market link's text stays the market's name —
+	   a link reading "…5 Nov 2026? · staked Đ 100" would be naming a destination
+	   it does not go to. */
 	const marketLine = (
-		<Link
-			data-testid={`tile-market-${tileKey}`}
-			href={`/m/${cell.marketSlug}`}
-			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
-		>
-			{marketTitle}
-		</Link>
+		<span className="block text-[11px] leading-[1.35] font-semibold text-n5">
+			<Link
+				data-testid={`tile-market-${tileKey}`}
+				href={`/m/${cell.marketSlug}`}
+				className="hover:underline"
+			>
+				{marketTitle}
+			</Link>
+			<span data-testid={`tile-staked-inline-${tileKey}`}>
+				{" · staked Đ "}
+				{formatDharma(basis)}
+			</span>
+		</span>
 	);
 	if (cell.removed) {
 		return (

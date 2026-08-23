@@ -850,9 +850,13 @@ describe("POSREV-1 rows 6 · 14 · 17 — the positions grid, re-cut per ARGUMEN
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
 		const stack = cellsOf(L1)[2]?.firstElementChild;
 		expect(stack?.className).toContain("flex-col");
+		// ⛔ THE SECOND LINE IS A PERCENT SINCE POSREV-POLISH-2 R-2, not `(+Đ 6)`.
+		// staked 25 → current 31 is +6 on 25 = 24%. The absolute delta is gone; the
+		// STRUCTURAL claim this test exists for — two nodes, stacked, in order — is
+		// unchanged, which is why the expectation moved and the test did not.
 		expect([...(stack?.children ?? [])].map((c) => c.textContent)).toEqual([
 			"Đ 31",
-			"(+Đ 6)",
+			"24%",
 		]);
 	});
 });
@@ -1507,6 +1511,14 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 		// all-or-none discipline is the pair that survived. The discipline itself is
 		// unchanged and still lives in ONE test, for the reason item D gave: two
 		// separate tests can go half-green and read as "mostly passing".
+		// ⚠ "BOTH" HAS MOVED AGAIN, AND FOR THE SECOND TIME IT FOLLOWS THE Đ RATHER
+		// THAN THE LAYOUT. It once meant the group header's Đb and the tile's
+		// Current; P-1 removed the header and it became Current + the delta; R-2
+		// removes the delta's Đ entirely (it is a percent now) and R-3 puts a Đ back
+		// on the market line as `staked Đ <n>`. So the two Đ figures on this tile are
+		// the CURRENT value and the STAKED denominator — which is a better pair than
+		// either predecessor, because they are the numerator and denominator of the
+		// percentage sitting between them.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		const current = cellsOf(L1)[2];
 		const value = (current?.textContent ?? "").trim();
@@ -1514,15 +1526,16 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 			value.codePointAt(0),
 			`item D: the tile Current figure must start with Đ (U+0110). Got "${value}".`,
 		).toBe(0x110);
-		const delta = (
-			screen.getByTestId(`tile-pl-${L1}`).textContent ?? ""
+		const staked = (
+			screen.getByTestId(`tile-staked-inline-${L1}`).textContent ?? ""
 		).trim();
-		// The delta is wrapped in parentheses, so its Đ is at index 2 — after the
-		// `(` and the sign glyph, which P-2 makes mandatory on every delta.
+		const at = staked.indexOf("Đ");
 		expect(
-			delta.codePointAt(2),
-			`item D: the tile delta must carry Đ (U+0110). Got "${delta}".`,
+			staked.codePointAt(at),
+			`item D: the staked figure must carry Đ (U+0110). Got "${staked}".`,
 		).toBe(0x110);
+		// ⛔ AND THE SPACE, which is the whole of item D: `Đ 25`, never `Đ25`.
+		expect(staked).not.toMatch(/Đ[0-9]/);
 	});
 
 	it("itemD::the-rendered-strings-are-exactly-the-expected-shape", () => {
@@ -1535,7 +1548,10 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 		// exact two-line shape the founder asked for, pinned whole so a partial
 		// application of either ruling reds rather than passing on a substring.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe("Đ 31(+Đ 6)");
+		// ⛔ R-2: the second line is `24%`, and `textContent` concatenates it onto
+		// the value with no separator — the gap on screen is the flex column's, not
+		// a text node. staked 25 → current 31 is +6 on 25 = 24%.
+		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe("Đ 3124%");
 	});
 
 	it("itemD::the-ARROW-is-now-DELETED-not-moved", () => {
@@ -1582,9 +1598,11 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 		// thousands mark is what shows the shared formatter is still in the path.
 		// ⛔ The tile's delta is against its SURVIVING basis (25), not against the
 		// market's Đa — the RF-4 distinction, unaffected by either polish ruling.
-		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe(
-			"Đ 3,226(+Đ 3,201)",
-		);
+		// ⚠ THE COMMA IS STILL THE PROOF — `Đ 3,226` — and it is now followed by
+		// R-2's percent rather than an absolute delta: 3225.5 − 25 on a base of 25
+		// is 12802%. A large percent is the honest reading of a 25 → 3,226 move and
+		// is not clamped; clamping would be a second claim about the number.
+		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe("Đ 3,22612802%");
 	});
 
 	it("itemD::POSITIVE-CONTROL-the-check-reddens-on-the-pre-change-form", () => {
