@@ -25,6 +25,10 @@ criterion is green on the evidence below, **not** on the script's verdict line.
 as RED and S-1 as BLOCKED pending a vendor-side pooler check. That conclusion was wrong, it is
 preserved below rather than deleted, and **why** it was wrong is the most useful thing here.
 
+**Criterion 2's preview half now has evidence too — Part 2 below.** It is strong, it kills the
+Fluid-artifact hypothesis, and it is **NOT conclusive**: §4 property 3's temporal A/B is absent
+entirely. **Criteria 3a and 3b are discharged from F-2** and need no new observation.
+
 ---
 
 ## What landed
@@ -179,16 +183,113 @@ inference from that fact.
 
 ---
 
+## Part 2 — the preview arrives, and criterion 2's preview half
+
+*Everything below happened after commit `6ece90b` and is the second half of this session.*
+
+### The preview was being SKIPPED, not failing
+
+Deployments of this branch were cancelled by Vercel's **Ignored Build Step**, whose command
+skips every ref that is not `main` / `staging` / `verify`. **This is OQ-1 of
+`docs/logs/O1-DECK-R2.md:68-77` arriving in practice** — that log measured
+`[ "$VERCEL_GIT_COMMIT_REF" != "main" ] && [ … != "staging" ]` and flagged that **O-10's stated
+mechanism does not match this project's configuration**, left as "founder to rule." It is the
+same finding, one clause wider.
+
+⚠ **The setting is DASHBOARD-side, not in the repo.** `vercel.json` carries `regions` + `crons`
+and **no `ignoreCommand`**. It cannot be read or changed from a session — `vercel` CLI absent,
+`gh` absent, and **no `VERCEL_*` key in Doppler `stg` or `prd`** (both checked).
+
+The exit-code convention is inverted and is the whole mechanism: **exit 0 ⇒ SKIP, non-zero ⇒
+BUILD.** An `&&` chain of `!=` tests exits non-zero exactly when the ref *is* one of the named
+branches. A minimal fix appends one clause; verified locally across all five refs. ⚠ **A
+branch-specific allowance outlives its branch — delete it at merge, or it becomes a permanent
+exception nobody can date.**
+
+### The preview, once building
+
+`https://experiment-e75od9xcz-zugzwang-worlds-projects.vercel.app` —
+`env: staging` · `canary: 6ece90b` · `region: bom1` · `db: ok` · `migrations: ok`.
+
+`canary` confirms the flag-reading code, and `env: staging` confirms the Doppler `stg` sync, so
+this **is** a post-F-1b build. ⚠ **`migrations: "ok"`, as the Gate C revision predicted** — the
+earlier `"error"` prediction had already been inverted in the plan.
+
+### Criterion 2, preview half — 15 concurrent requests
+
+Method: 15 concurrent `GET /api/health` (2 SELECTs each, no writes, no auth, no rate-limiter —
+`proxy.ts:42` matches `/admin/:path*` only), while `pg_stat_activity` was sampled every 1.5 s
+for 75 s **through `:5432`**, the runner refusing to start if `DATABASE_URL` contained `:6543`.
+
+**Result: 15/15 HTTP 200, all `db:ok`, starts within a 110 ms window — and only TWO backends.**
+
+| PID | backend_start | distinct `query_start` |
+|---|---|---|
+| `3935767` | 21:38:02 (pre-existing) | 3 |
+| `3936705` | **21:46:48.697 — born mid-burst** | 2 |
+
+Max backends in any single sample: **2**. Distinct `x-vercel-id` request tokens: **14**.
+
+⇒ **Real multiplexing, and the Fluid warm-connection artifact is excluded.** A suspended-instance
+artifact cannot produce a backend that is *created during the burst* and then serves multiple
+statements alongside a second one. **The finding survives the most hostile reading**: even if all
+15 requests hit ONE instance, that pool is `max: 4` (`src/db/index.ts:83`), so session mode
+predicts ~4 backends against 2 observed; if the 14 tokens are distinct instances, session mode
+predicts ≥14 against 2.
+
+⚠ **BUT IT IS NOT CONCLUSIVE FOR CRITERION 2**, and the gap is structural, not a matter of more
+samples. Against §4's four properties (`docs/plans/S-1.md:355-372`): property 1 ✅; property 2
+⚠ satisfied as a loop but sized against *"one bet is 16–19 statements"* while `/api/health` is
+two, the bet path being deliberately excluded; **property 3 ❌ ABSENT ENTIRELY** — the temporal
+A/B (*Sample A staging on `:5432`, Sample B staging on `:6543`, same host, same SHA*) does not
+exist, and this is the preview, not staging. Per `:524` every criterion is observed **twice**;
+this is one half of one.
+
+⚠ **One inference remains unobserved:** nothing here directly proves the preview reaches
+`:6543`. `/api/health` has no pooler field. The chain is `canary` + `env: staging` ⇒
+`DATABASE_URL_TXN`; the 2-backends-for-15-requests reading is *self-consistent* with it and
+inconsistent with `:5432` session mode — **corroboration, not observation.**
+
+### Criteria 3a / 3b — discharged from F-2, no new observation needed
+
+- **3a** (`:533`, client ceiling risen 15 → 200): §8 `:662` states **200 "is the number
+  criterion 3a records"**, and F-2 confirmed it live. ⚠ **The number is discharged; the VERB is
+  not.** *"Has risen"* is a claim about which ceiling a runtime is subject to, which depends on
+  the deployment reaching `:6543` — **3a's verb inherits criterion 2.**
+- **3b** (`:534`, backend Pool Size confirmed unchanged): §8 `:661` maps F-2's **15** straight
+  onto it. **15 is the BACKEND (server-side) pool size, not a client limit, and it does not
+  move** — the two ceilings decouple under transaction mode (`:639-640`). The post-flip re-read
+  is confirmatory, since the application cannot alter a Supabase-side setting; the criterion's
+  real demand is its own note — *positively record the non-change rather than omit it.*
+
+### ⚠ Two measurement traps, both of which produced wrong-looking data first
+
+1. **DB clock ≈ local clock + 3.3 s.** Burst timestamps are the local Windows clock; poller
+   timestamps are the DB clock. Read naively, the burst's activity appeared to be **missing** —
+   backends showed a stale `query_start` through the burst window and only "woke" 2 s after it
+   ended. Translating the burst into DB time lands it exactly on both backends' fresh
+   `query_start` values. **Never correlate `pg_stat_activity` against a local timestamp without
+   establishing the offset first**; the failure mode is a burst that looks like it never hit the
+   database.
+2. **Three defects in the analysis script, authored here, all caught after the fact.**
+   (a) `tee /dev/stderr` interleaved stderr into stdout and mangled the first metric's display.
+   (b) That metric split `x-vercel-id` on `::` and took the whole third segment — which embeds a
+   per-request timestamp and hash, so it counted **requests, not instances** (returning 16 for 15
+   requests, the trailing marker line included). The defensible proxy is the **first token**: 14.
+   (c) `'\s+'` inside a JS template literal collapses to `'s+'`, so `regexp_replace` blanked the
+   `s` characters out of the captured query text. Cosmetic — no analysis column depends on it.
+   **None of the three changes the verdict**, and all three are recorded because a metric that
+   silently counts the wrong thing is exactly what this session already got burned by once.
+
+---
+
 ## Open questions
 
-- **The preview URL is not determinable from this environment.** `gh` not installed, `vercel`
-  CLI not installed, no `VERCEL_*` token in Doppler `stg`. The branch-alias form
-  `experiment-git-fix-pool-transaction-mode-zugzwang-worlds-projects` is **65 chars**, over the
-  63-char DNS label limit, and does not resolve. Needs the URL from the dashboard.
-- **⚠ Any existing preview is the WRONG BUILD.** ADR-0024 `:213` — a Doppler change does not
-  reach a running deployment until a redeploy. The branch was pushed at `b98efe3` **before**
-  F-1b was written, so a standing preview has no `DB_POOLER_MODE` and would run `:5432`.
-  Step (b) needs a preview built **after** the flag write.
+- **⛔ THE IGNORED BUILD STEP NEEDS A RULING, AND IT IS OQ-1.** Preview builds for this branch
+  are skipped by a dashboard-side command. A per-branch allowance unblocks step (b) but leaves a
+  dated exception behind; the alternative is resolving OQ-1 properly (`O1-DECK-R2.md:68-77`),
+  where O-10's stated mechanism was already found not to match this configuration. **Same
+  question, twice, from two directions — worth settling once rather than patching twice.**
 - **⚠ S-5 INHERITS THE FALSE NEGATIVE.** `verify-pooler-mode.ts` names S-5 as its downstream
   caller and is to be run **before load run #1** — i.e. against a quiet system, which is
   exactly the condition that produces the false SESSION verdict. Whether the control should
@@ -209,15 +310,22 @@ inference from that fact.
 
 ## Next session starts at
 
-**Step (b) — the PREVIEW.** Criterion 6 no longer blocks it. Two prerequisites, neither CC's to
-obtain alone:
+**Finish step (b) — criterion 4 is what is left on the preview.** Both earlier prerequisites are
+discharged: the preview exists and is a post-F-1b build.
 
-1. **The preview URL**, from the Vercel dashboard.
-2. **A preview build post-dating the F-1b write** — a standing build carries no flag.
+Preview-half status: **1** ✅ (liveness + inference; no pooler field exists to observe) ·
+**2** ⚠ strong but not conclusive, property 3 absent · **3a** ✅ number, verb inherits 2 ·
+**3b** ✅ · **4** ❌ **not attempted — the bet path, deliberately untouched all session** ·
+**5** inference by composition · **6** ✅.
 
-Then criteria 1, 2, 3a, 3b, 4, 5 on that preview, of which **2, 3a, 3b and 4 are DASH-side**
-and belong to the operator; 5 is inference by composition; 1 is `/api/health` with the caveat
-above. Then step (c): cascade → PR → Gate C → merge.
+⇒ **The exact next action is criterion 4** — *"Bet path works under `SERIALIZABLE`"* (`:535`),
+the money path, DASH-observed. It is the one criterion nothing here has approached, and the
+one whose halt condition is absolute (*"A bet after the flip fails, retries out, or produces no
+receipt — **money path, full stop**"*).
+
+Then step (c): cascade (`@test-writer` → `@code-reviewer` → `@security-auditor`) → PR → Gate C
+→ merge. ⚠ **Criterion 2 cannot be closed on the preview at all** — property 3's Sample A/B is
+staging-only by construction, so it stays open until steps (f) and (h).
 
 ---
 
@@ -259,12 +367,15 @@ above. Then step (c): cascade → PR → Gate C → merge.
   `node_modules` — the scripts were run from there).
 - **No writes of any kind reached staging data.** No bet placed, no staging rows created,
   Doppler unmodified by CC, no deployment triggered, no application code edited, and
-  `scripts/verify-pooler-mode.ts` was run **unmodified** on both runs (`git status` clean).
+  `scripts/verify-pooler-mode.ts` was run **unmodified** on both runs (`git status` clean). The
+  preview burst hit `/api/health` only — two SELECTs per request, no writes, no transaction —
+  and every `pg_stat_activity` sample was a read through `:5432`.
 
 ---
 
 ## Time
 
-Session ran 2026-08-24 IST (≈ 2026-08-23 19:40–20:55 UTC). Ground `a1005b6` / `b98efe3`.
-Run 1 ≈ 20:10-20:20 UTC; run 2 ≈ 20:46-20:54 UTC. Zero application-code commits; this log is
-the only artifact.
+Session ran 2026-08-24 IST (≈ 2026-08-23 19:40–21:50 UTC). Ground `a1005b6` / `b98efe3`.
+Criterion 6 run 1 ≈ 20:10-20:20 UTC; run 2 ≈ 20:46-20:54 UTC; preview burst ≈ 21:46-21:48 UTC
+(local clock; DB clock ≈ +3.3 s). Zero application-code commits; this log is the only artifact,
+committed twice — `6ece90b` (Part 1) and this commit (Part 2).
