@@ -47,6 +47,14 @@ type PricePoint = { at: string; yes: string };
 afterEach(cleanup);
 
 // A three-point YES/NO series across a 5-day window.
+/**
+ * §D — `MarketHeader.criterion` is REQUIRED, so the resolution dialog cannot be
+ * mounted without something watching it. These render tests do not exercise the
+ * freeze (that is `debate-view-freeze.test.tsx`'s subject), so they pass a closed,
+ * inert pair — present enough to compile, never asserted on here.
+ */
+const CRITERION_STUB = { open: false, onOpenChange: () => {} };
+
 const SERIES: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
 	{ at: "2026-09-17T00:00:00.000Z", yes: "0.640000000000000000" },
@@ -346,7 +354,13 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 
 	// ── 4. Error state — priceChart null → header intact, NO chart (web Gate-C).
 	it("header-renders-without-chart-when-priceChart-null", () => {
-		render(<MarketHeader market={MARKET} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={MARKET}
+				priceChart={null}
+			/>,
+		);
 
 		// The header renders unaffected: title, PriceBar, and the totals strip.
 		expect(
@@ -365,6 +379,7 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		cleanup();
 		render(
 			<MarketHeader
+				criterion={CRITERION_STUB}
 				market={MARKET}
 				priceChart={{ series: SERIES, nodes: [] }}
 			/>,

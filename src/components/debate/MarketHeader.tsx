@@ -86,6 +86,7 @@ export function MarketHeader({
 	market,
 	priceChart,
 	pick,
+	criterion,
 }: {
 	market: DebateMarketHeader;
 	priceChart: { series: PricePoint[]; nodes: ChartNode[] } | null;
@@ -103,6 +104,16 @@ export function MarketHeader({
 		suspended: boolean;
 		onPick: (side: Side) => void;
 	};
+	/**
+	 * UI-QUICK change set 3 §D — the resolution dialog, CONTROLLED FROM ABOVE.
+	 * ⛔ It is not optional-with-a-local-fallback, and that is the whole point: an
+	 * uncontrolled fallback is exactly the shape that let the dialog open without
+	 * `DebateView`'s `frozen` predicate seeing it, so the carousel advanced behind
+	 * the modal. Making the prop REQUIRED turns "nobody is watching this dialog"
+	 * into a compile error at every call site rather than a defect found by
+	 * reading. ⚠ This component neither reads nor derives the flag — it threads.
+	 */
+	criterion: { open: boolean; onOpenChange: (open: boolean) => void };
 }) {
 	return (
 		<HeadZone
@@ -364,7 +375,11 @@ export function MarketHeader({
 					    `.overline`'s (`d5:468-469`) and ONLY `.overline`'s. Ported BY TOKEN
 					    (`text-n4`), never the hex — Ruling A / H-HEX. */}
 						{market.description ? (
-							<ResolutionCriterion description={market.description} />
+							<ResolutionCriterion
+								description={market.description}
+								open={criterion.open}
+								onOpenChange={criterion.onOpenChange}
+							/>
 						) : null}
 						{/* HTML-FINISH · MARKET DETAIL row 3 — `.rescards` (`d5:986`), the
 						    last `vm` child of `.hstack`, after the criterion. It renders

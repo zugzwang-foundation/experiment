@@ -40,6 +40,14 @@ import type { DebateMarketHeader } from "@/components/debate/types";
 
 afterEach(cleanup);
 
+/**
+ * §D — `MarketHeader.criterion` is REQUIRED, so the resolution dialog cannot be
+ * mounted without something watching it. These render tests do not exercise the
+ * freeze (that is `debate-view-freeze.test.tsx`'s subject), so they pass a closed,
+ * inert pair — present enough to compile, never asserted on here.
+ */
+const CRITERION_STUB = { open: false, onOpenChange: () => {} };
+
 const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 	id: "0190c0de-2222-7000-8000-000000000002",
 	slug: "attrs-strip-market",
@@ -59,7 +67,13 @@ const market = (postCount: number, replyCount: number): DebateMarketHeader => ({
 
 describe("POLISH.3 — MarketHeader attrs strip", () => {
 	it("market-header::staked-renders-the-SPACED-Đ-form", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 
 		// The space is the whole assertion (§18 C-1).
 		expect(screen.getByText("Đ 150 staked")).toBeTruthy();
@@ -68,7 +82,13 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 	});
 
 	it("market-header::singular-count-takes-singular-noun", () => {
-		render(<MarketHeader market={market(1, 1)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(1, 1)}
+				priceChart={null}
+			/>,
+		);
 
 		expect(screen.getByText("1 post")).toBeTruthy();
 		expect(screen.getByText("1 reply")).toBeTruthy();
@@ -78,7 +98,13 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 	});
 
 	it("market-header::zero-and-plural-counts-take-plural-noun", () => {
-		render(<MarketHeader market={market(0, 0)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(0, 0)}
+				priceChart={null}
+			/>,
+		);
 
 		// Zero is PLURAL — `0 replies`, never `0 reply`. StatLine does the same.
 		expect(screen.getByText("0 posts")).toBeTruthy();
@@ -87,7 +113,13 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 		expect(screen.queryByText("0 reply")).toBeNull();
 
 		cleanup();
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 		expect(screen.getByText("3 posts")).toBeTruthy();
 		expect(screen.getByText("5 replies")).toBeTruthy();
 	});
@@ -121,7 +153,13 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
  */
 describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	it("market-header::overline-labels-the-criterion", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 
 		// The mockup's own source text is "Resolution"; `uppercase` does the
 		// rendering, so the DOM text is title case BY DESIGN (`d5:975`).
@@ -129,7 +167,13 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	});
 
 	it("market-header::overline-carries-the-ruled-d5-recipe", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 
 		const className =
 			screen.getByText("Resolution").getAttribute("class") ?? "";
@@ -150,7 +194,13 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	});
 
 	it("market-header::criterion-container-is-a-hairline-rule-not-a-card", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 
 		const container = screen.getByText("Resolution").parentElement;
 		const className = container?.getAttribute("class") ?? "";
@@ -163,7 +213,13 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 	});
 
 	it("market-header::criterion-clamps-to-ONE-line-and-carries-the-Know-more-affordance", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+		render(
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
+		);
 
 		const container = screen.getByText("Resolution").parentElement;
 
@@ -240,7 +296,11 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () => {
 	it("market-header::question-then-attrs-then-criterion", () => {
 		const { container } = render(
-			<MarketHeader market={market(3, 5)} priceChart={null} />,
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
 		);
 
 		const left = container.querySelector('[data-testid="headzone-left"]');
@@ -291,6 +351,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 	it("market-header::the-chart-renders-in-the-rail-not-the-left-column", () => {
 		const { container } = render(
 			<MarketHeader
+				criterion={CRITERION_STUB}
 				market={market(3, 5)}
 				priceChart={{ series: CHART_SERIES, nodes: [] }}
 			/>,
@@ -311,7 +372,11 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 
 	it("market-header::a-null-series-drops-the-CHART-not-the-rail", () => {
 		const { container } = render(
-			<MarketHeader market={market(3, 5)} priceChart={null} />,
+			<MarketHeader
+				criterion={CRITERION_STUB}
+				market={market(3, 5)}
+				priceChart={null}
+			/>,
 		);
 
 		// ⚠ RE-DERIVED AT C6, NOT RELAXED. At C4 the chart was the rail's only
@@ -353,6 +418,7 @@ describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () =
 	it("market-header::the-price-bar-renders-in-the-rail", () => {
 		const { container } = render(
 			<MarketHeader
+				criterion={CRITERION_STUB}
 				market={market(3, 5)}
 				priceChart={{ series: CHART_SERIES, nodes: [] }}
 			/>,
@@ -404,6 +470,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 	) {
 		return render(
 			<MarketHeader
+				criterion={CRITERION_STUB}
 				market={market(3, 5)}
 				priceChart={{ series: CHART_SERIES, nodes: [] }}
 				pick={{ ...state, onPick }}
@@ -521,6 +588,7 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		// must stay plain `<span>`s and gain no interactive affordance at all.
 		const { container } = render(
 			<MarketHeader
+				criterion={CRITERION_STUB}
 				market={market(3, 5)}
 				priceChart={{ series: CHART_SERIES, nodes: [] }}
 			/>,

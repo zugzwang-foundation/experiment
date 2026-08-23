@@ -1,7 +1,5 @@
 "use client";
 
-import { useState } from "react";
-
 import { ResolutionPopup } from "./dialogs";
 import { KnowMore } from "./KnowMore";
 
@@ -41,9 +39,23 @@ import { KnowMore } from "./KnowMore";
  * VISUAL bound — so find-in-page, a screen reader and the ADR-0025 `.md` export
  * all still see the whole criterion whether or not the control has been pressed.
  */
-export function ResolutionCriterion({ description }: { description: string }) {
-	const [open, setOpen] = useState(false);
-
+export function ResolutionCriterion({
+	description,
+	open,
+	onOpenChange,
+}: {
+	description: string;
+	/**
+	 * ⚠⚠ CONTROLLED FROM `DebateView` — change set 3 §D. This state used to live
+	 * here as a local `useState`, and that was the defect: `DebateView`'s `frozen`
+	 * predicate enumerates every sub-view that stops the carousel, and it could
+	 * not see a flag held in this component. The dialog opened, the columns kept
+	 * advancing behind it. ⛔ There is deliberately no local fallback — an
+	 * uncontrolled mode would silently restore the exact bug.
+	 */
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+}) {
 	return (
 		<div className="pt-2.5 [border-top:var(--hairline)]">
 			<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
@@ -58,13 +70,13 @@ export function ResolutionCriterion({ description }: { description: string }) {
 			    See `KnowMore.tsx`, which states the rule its call sites obey. */}
 			<KnowMore
 				label="Know more about the resolution criterion"
-				onClick={() => setOpen(true)}
+				onClick={() => onOpenChange(true)}
 			/>
 			{/* Focus trap, focus restore and scroll lock all arrive with the
 			    primitive — see `ResolutionPopup`. Nothing is hand-rolled. */}
 			<ResolutionPopup
 				description={open ? description : null}
-				onClose={() => setOpen(false)}
+				onClose={() => onOpenChange(false)}
 			/>
 		</div>
 	);

@@ -95,6 +95,11 @@ export function DebateView({
 	// shared slot would have had to be a union that admits both.
 	const [popupReply, setPopupReply] = useState<PresentReply | null>(null);
 	const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+	// UI-QUICK change set 3 §D — the resolution-criterion dialog. It lives HERE,
+	// not in `ResolutionCriterion`, for one reason: `frozen` below is the list of
+	// every sub-view that stops the carousel, and a sub-view whose state the
+	// predicate cannot see is a sub-view that does not freeze anything.
+	const [criterionOpen, setCriterionOpen] = useState(false);
 	// UI.A3 — the market-view Đ BET composer: at most ONE open (side-slot rule:
 	// betting side S renders the composer in the OPPOSITE slot; opening the
 	// other side closes the first — the d5 slot model, toggle-to-close).
@@ -199,7 +204,16 @@ export function DebateView({
 		openReply !== null ||
 		popupPost !== null ||
 		popupReply !== null ||
-		lightboxUrl !== null;
+		lightboxUrl !== null ||
+		// ⚠⚠ UI-QUICK change set 3 §D — THE SIXTH SUB-VIEW, AND ITS ABSENCE WAS A
+		// defect I shipped. `ResolutionPopup` arrived in change set 2 holding its
+		// own `open` state inside `ResolutionCriterion`, so it was invisible to
+		// this predicate and the carousel kept advancing behind the modal. Radix
+		// locks scroll and marks the page inert, so nothing was CLICKABLE behind
+		// it — but cards still moved, which is precisely the case the block above
+		// admits the lightbox for: "it covers the surface, and a card that moves
+		// underneath it has moved somewhere the reader cannot see."
+		criterionOpen;
 
 	/**
 	 * ⚠⚠ THE FOUNDER'S TWO KEYBOARD REPORTS, AND WHAT THEY ACTUALLY WERE.
@@ -662,6 +676,8 @@ export function DebateView({
 						market={market}
 						priceChart={priceChart}
 						pick={{ heldSide, marketOpen, suspended, onPick: toggleEntry }}
+						// §D — controlled from here so `frozen` can see it.
+						criterion={{ open: criterionOpen, onOpenChange: setCriterionOpen }}
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => (
