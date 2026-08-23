@@ -74,8 +74,38 @@ export function HeadZone({
 			// `shrink-0` is the `0 0` half of `flex:0 0`.
 			// ⚠ `gap-5` = 20px is d5's `.headzone{gap:20px}` (`:447`), the gap
 			// between the text column and the chart rail.
+			// ⚠⚠ `overflow-hidden` — UI-QUICK change set 4 §C. THE BAND NOW CONTAINS
+			// ITS OWN CONTENT, and without it the resolver cards painted over the top
+			// border of both debate columns.
+			// MEASURED on staging, and the cause is arithmetic rather than a stray
+			// margin: `basis-[24.2dvh]` is a VIEWPORT FRACTION while the stack's
+			// content has an INTRINSIC height (~185px from the band's top). Below a
+			// viewport height of ~715px the fraction is smaller than the content, and
+			// with nothing containing it the excess simply painted downward onto the
+			// arena — 3.64px at 1440×700, and 29.14px before §B removed the `Know
+			// more` trigger.
+			// ⛔ THE THREE ALTERNATIVES WERE EACH RULED OUT, not overlooked:
+			//   · restore `overflow-y-auto` on the stack — that is precisely what
+			//     change set 1 removed by ruling (its scrollbar collided with the
+			//     sticky header), so it cannot come back here.
+			//   · drop `min-h-0` / add a `min-h-[…]` floor — `min-h-0` is pinned BY
+			//     NAME by `debate-height-chain.test.ts` as the link that lets the band
+			//     shrink; a floor would contradict it and re-open the one-screen
+			//     ruling.
+			//   · leave it — the exit bar is zero overlap at every tested width.
+			// ⇒ Containment matches what the chain ALREADY does one level up:
+			// `PageContainer` declares one screen and hides its own overflow, on the
+			// stated ground that content spilling out of a declared box "is the same
+			// page scroll under a different name". The band is a declared box too.
+			// ⚠ THE COST, MEASURED AND REPORTED: below ~715px of viewport height the
+			// resolver-card row is now CLIPPED rather than overlapping. That is worse
+			// than fitting and better than painting over the arena, and those were the
+			// only two options left once the scroller was ruled out. Both cards are
+			// empty placeholder chrome docketed for removal before the DP.2 promote
+			// (`docs/parked.md` HTML-FINISH-MD-PLACEHOLDERS), so nothing a
+			// participant can read is being cut.
 			data-testid="headzone"
-			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 lg:flex-row"
+			className="flex min-h-0 shrink-0 basis-[24.2dvh] flex-col gap-5 overflow-hidden lg:flex-row"
 		>
 			<div
 				// `.hleft{flex:1 1 auto;min-width:0;display:flex;gap:16px}` (`d5:448`)
