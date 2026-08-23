@@ -216,6 +216,14 @@ export function DebateView({
 		// underneath it has moved somewhere the reader cannot see."
 		// ⇒ The state is lifted here rather than the predicate reaching down,
 		// because this is the node that already owns every other sub-view flag.
+		//
+		// ⛔⛔ DORMANT BY FOUNDER RULING (change set 4 §B) — THIS TERM CAN NO LONGER
+		// GO TRUE, AND IT STAYS ANYWAY. The `Know more` trigger was removed from the
+		// resolution zone pending its redesign, so nothing sets `criterionOpen`; the
+		// term is a constant `false` until a trigger is re-attached. ⚠ It reads as
+		// dead and it is not — dropping it is how the §D defect comes back, because
+		// the redesign will re-open this dialog and the predicate would once again be
+		// unable to see it. `debate-view-freeze.test.ts` fails if it is removed.
 		criterionOpen;
 
 	/**

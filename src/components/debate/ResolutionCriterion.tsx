@@ -1,7 +1,6 @@
 "use client";
 
 import { ResolutionPopup } from "./dialogs";
-import { KnowMore } from "./KnowMore";
 
 /**
  * UI-QUICK change set 1 item 1 — the RESOLUTION criterion block (`d5:974-977`,
@@ -66,14 +65,31 @@ export function ResolutionCriterion({
 			<p className="mt-[5px] line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground">
 				{description}
 			</p>
-			{/* ⚠ The name EXTENDS `Know more` rather than replacing it — WCAG 2.5.3.
-			    See `KnowMore.tsx`, which states the rule its call sites obey. */}
-			<KnowMore
-				label="Know more about the resolution criterion"
-				onClick={() => onOpenChange(true)}
-			/>
-			{/* Focus trap, focus restore and scroll lock all arrive with the
-			    primitive — see `ResolutionPopup`. Nothing is hand-rolled. */}
+			{/* ⚠⚠ THE `Know more` TRIGGER IS REMOVED — FOUNDER RULING, change set 4 §B.
+			    The full criterion is therefore UNREACHABLE on this surface, and that
+			    is accepted rather than overlooked: the resolution treatment is being
+			    redesigned, and shipping a half-affordance in front of that redesign
+			    is worse than shipping none.
+			    ⛔ `markets.description` IS UNTOUCHED AND INTACT — nothing was written,
+			    nothing truncated. The whole string is still in the DOM behind the
+			    one-line clamp above, so find-in-page, a screen reader and the ADR-0025
+			    `.md` export all still reach it. Only the on-surface control is gone.
+			    ⛔ THE FOUR DEBATE MOUNTS ARE UNTOUCHED — `PostCard`,
+			    `PostFocusHeader`, `ReplyCard` and the post arm all keep their
+			    `Know more`. This ruling is the RESOLUTION ZONE only. */}
+			{/* ⛔⛔ DORMANT, NOT DEAD — DO NOT DELETE THIS AS UNREACHABLE CODE.
+			    `ResolutionPopup` stays mounted and stays wired: `open` can no longer
+			    become true from this component, so it renders `null` forever, and a
+			    reader arriving cold will correctly conclude nothing can open it. That
+			    is the point at which someone deletes it, and deleting it is what the
+			    founder ruled against — the machinery is held intact for the
+			    resolution-treatment redesign that replaces the trigger.
+			    ⇒ The whole chain is preserved on purpose: this mount, the required
+			    `criterion` prop threaded through `MarketHeader` to 19 call sites, the
+			    lifted `criterionOpen` state in `DebateView`, and its term in the
+			    `frozen` predicate. Re-attaching a trigger is a one-line change; any of
+			    those four being deleted first turns it back into a day of work and
+			    re-opens the §D freeze defect. */}
 			<ResolutionPopup
 				description={open ? description : null}
 				onClose={() => onOpenChange(false)}

@@ -232,6 +232,19 @@ export function ReplyPopup({
 }
 
 /**
+ * ⛔⛔ DORMANT BY FOUNDER RULING (change set 4 §B) — NOTHING OPENS THIS TODAY,
+ * AND IT IS DELIBERATELY KEPT. The `Know more` trigger was removed from the
+ * resolution zone because that treatment is being redesigned; this component,
+ * its call site in `ResolutionCriterion`, the required `criterion` prop on
+ * `MarketHeader`, the lifted `criterionOpen` state in `DebateView` and its term
+ * in the `frozen` predicate are ALL held intact for that redesign.
+ * ⚠ It has no reachable caller, so every signal a reader has — no trigger, a
+ * permanently-`null` `description`, coverage that never enters — says "dead
+ * code, delete it". It is not. Re-attaching a trigger is one line; deleting any
+ * link in that chain first turns it back into a day's work AND re-opens the §D
+ * freeze defect, where the dialog opened while the carousel kept advancing
+ * behind it.
+ *
  * UI-QUICK change set 2 item 1 (ruling R3 = c) — the RESOLUTION CRITERION
  * pop-up, opened by `Know more` under the one-line clamp.
  *

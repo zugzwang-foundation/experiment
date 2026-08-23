@@ -212,7 +212,7 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(className).toContain("pt-2.5");
 	});
 
-	it("market-header::criterion-clamps-to-ONE-line-and-carries-the-Know-more-affordance", () => {
+	it("market-header::criterion-clamps-to-ONE-line-and-the-affordance-is-RULED-OUT", () => {
 		render(
 			<MarketHeader
 				criterion={CRITERION_STUB}
@@ -248,30 +248,29 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(container?.innerHTML).toContain("line-clamp-1");
 		expect(container?.innerHTML).not.toContain("line-clamp-2");
 
-		// ⛔ THE AFFORDANCE IS THE WHOLE POINT OF THE TIGHTER CLAMP. One line with
-		// no way to read the rest would truncate the terms of the bet, which is
-		// exactly what the superseded ruling was protecting against; the expander
-		// is that objection being answered.
-		const knowMore = container?.querySelector("button");
-		expect(knowMore).not.toBeNull();
-		expect(knowMore?.textContent).toContain("Know more");
-		// WCAG 2.5.3 (Label in Name) — the accessible name must CONTAIN the
-		// visible string, so a free-form label like the glyph era's "Show more"
-		// is now a failure rather than a requirement.
-		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
-		// ⚠ UI-QUICK change set 2 (ruling R3 = c) — this asserted
-		// `aria-expanded === "false"`, which described the in-place toggle that
-		// lasted one commit. The expansion is a DIALOG now, so the control makes
-		// a different promise: `aria-haspopup="dialog"`. ⛔ `aria-expanded` is
-		// pinned ABSENT rather than merely unasserted — leaving it on a control
-		// that never expands makes a screen reader announce "collapsed" about a
-		// widget with no collapsed state.
-		expect(knowMore?.getAttribute("aria-haspopup")).toBe("dialog");
-		expect(knowMore?.getAttribute("aria-expanded")).toBeNull();
+		// ⚠⚠ AND REVERSED A THIRD TIME AT CHANGE SET 4 §B — THE AFFORDANCE IS GONE
+		// AGAIN, BY FOUNDER RULING. This block required the trigger:
+		//   const knowMore = container?.querySelector("button");
+		//   expect(knowMore).not.toBeNull();
+		//   expect(knowMore?.textContent).toContain("Know more");
+		//   expect(knowMore?.getAttribute("aria-haspopup")).toBe("dialog");
+		// ⇒ The resolution treatment is being redesigned, so the half-affordance
+		// comes out ahead of it. The clamp STAYS — which means the surface once
+		// again truncates the terms of the bet with no in-place way to read the
+		// rest. ⛔ That cost is REAL and is the founder's explicit, recorded
+		// acceptance, not an oversight this guard should paper over.
+		//
+		// ⛔ THE ASSERTION INVERTS RATHER THAN DISAPPEARING. Deleting it would
+		// leave the zone unguarded in BOTH directions; pinning the absence means a
+		// trigger reappearing here — by a stray edit, or by the redesign landing
+		// without its own guard — turns this red on purpose.
+		expect(container?.querySelector("button")).toBeNull();
 
-		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
-		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-
-		// page, and for a screen reader even while the surface truncates them.
+		// ⛔ AND THE TEXT IS STILL WHOLE — the half that proves removing the control
+		// removed an AFFORDANCE, not the content. Nothing was written to the
+		// database and nothing was truncated: the criterion is fully present in the
+		// DOM behind a purely VISUAL clamp, so find-in-page, a screen reader and the
+		// ADR-0025 `.md` export all still reach it.
 		expect(container?.innerHTML).toContain("Resolution criterion text.");
 	});
 });
