@@ -412,24 +412,41 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			expect(table.textContent ?? "").toContain(col);
 		}
 		const rowOpen = within(table).getByTestId(`position-tile-${L1}`);
-		// ⛔ THE MARKET TITLE IS NO LONGER ON THE TILE — RF-3 moved it to the group
-		// header, and removing that repetition is the point of the whole revamp: a
-		// participant holding three arguments in one market read the question three
-		// times. Asserted on the header, and asserted ABSENT from the tile, because
-		// "it moved" and "it is gone" are different outcomes and only one is right.
-		expect(rowOpen.textContent ?? "").not.toContain(ROW_OPEN.marketTitle);
+		// ⛔⛔ INVERTED AT POSREV-POLISH P-1, AND THIS IS A SUPERSESSION, NOT A
+		// REGRESSION. It asserted the opposite: "THE MARKET TITLE IS NO LONGER ON
+		// THE TILE — RF-3 moved it to the group header … asserted ABSENT from the
+		// tile, because 'it moved' and 'it is gone' are different outcomes and only
+		// one is right." That reading was correct for RF-3 and the founder has
+		// overruled RF-3: the group header is removed and the question returns to
+		// each tile, where it sat before. The repetition RF-3 removed is knowingly
+		// paid again — the header cost more vertical rhythm than it saved.
+		// ⚠ THE SAME DISTINCTION IS STILL DRAWN, just the other way round: the title
+		// is asserted PRESENT on the tile and the group header is asserted GONE, so
+		// "it moved back" cannot pass as "it is duplicated in both places".
+		expect(rowOpen.textContent ?? "").toContain(ROW_OPEN.marketTitle);
 		expect(
-			within(table).getByTestId(`positions-group-title-${M1}`).textContent,
-		).toBe(ROW_OPEN.marketTitle);
-		// …and Đa → Đb ride the header, so the market's own figures still render.
+			within(table).queryByTestId(`positions-group-title-${M1}`),
+		).toBeNull();
+		// ⛔ AND Đa → Đb NOW RENDER NOWHERE. They rode the header, which is gone;
+		// the tiles still sum to Đb by construction but the market's own total is
+		// off the surface. Asserted rather than merely dropped, so the absence is a
+		// recorded consequence of the ruling instead of something nobody noticed.
 		expect(
-			within(table).getByTestId(`positions-group-figures-${M1}`).textContent ??
-				"",
-		).toContain("Đ 25");
-		// Staked / Current representations (integer parts — display formatting
-		// is the component's; the 18-dp DTO strings are the source).
-		expect(rowOpen.textContent ?? "").toContain("25");
+			within(table).queryByTestId(`positions-group-figures-${M1}`),
+		).toBeNull();
+		// Current representation (integer part — display formatting is the
+		// component's; the 18-dp DTO strings are the source).
 		expect(rowOpen.textContent ?? "").toContain("31");
+		// ⛔⛔ THE STAKED FIGURE IS NO LONGER ANYWHERE ON AN OPEN TILE, and this
+		// line used to assert it WAS (`toContain("25")`). Two rulings took it, from
+		// opposite ends: RF-4 had already moved Đa to the group header, which P-1
+		// deletes, and the tile's own `from Đ 25` line is deleted by P-2. So an
+		// Open tile now shows what the argument is worth and how far it has moved,
+		// and never what was put in.
+		// ⚠ IT IS STILL REACHABLE — the CLOSED tab has a `Staked` column, asserted
+		// further down this same test. "Gone from the Open tile" and "gone from the
+		// surface" are different claims and only the first one is true.
+		expect(rowOpen.textContent ?? "").not.toContain("25");
 		// The present argument cell carries the opener title (N-1a).
 		expect(text(within(rowOpen).getByTestId(`tile-arg-${L1}`))).toContain(
 			"Opener argument alpha",
@@ -877,19 +894,18 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const yes = screen.getByTestId(`tile-side-${L1}`);
 		const yesGlyph = yes.querySelector("svg");
 		expect(text(yes)).toBe("Yes");
-		// ⛔ INVERTED AT POSREV-1 RF-3. This asserted the market title sits on the
-		// tile — "the glyph is ADDITIVE, it did not replace the question". The
-		// question MOVED to the group header, so the additive claim is now made
-		// against the header instead; asserting it on the tile would re-introduce
-		// the repetition the revamp exists to remove.
+		// ⛔⛔ INVERTED **BACK** AT POSREV-POLISH P-1. The original claim was "the
+		// glyph is ADDITIVE, it did not replace the question", asserted on the tile.
+		// RF-3 moved the question to the group header and this assertion followed it
+		// there. P-1 removes that header by founder ruling, so the question is on
+		// the tile again and the ORIGINAL additive claim is the one that holds —
+		// the assertion has come full circle rather than been loosened.
 		expect(
 			(screen.getByTestId(`position-tile-${L1}`).textContent ?? "").includes(
 				ROW_OPEN.marketTitle,
 			),
-		).toBe(false);
-		expect(screen.getByTestId(`positions-group-title-${M1}`).textContent).toBe(
-			ROW_OPEN.marketTitle,
-		);
+		).toBe(true);
+		expect(screen.queryByTestId(`positions-group-title-${M1}`)).toBeNull();
 
 		// The NO pole, in its own filter state.
 		setStatusFilter("Closed");
@@ -897,16 +913,18 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		const noGlyph = no.querySelector("svg");
 		expect(text(no)).toBe("No");
 
-		// ⚠ 14, NOT 12 — POSREV-1 RF-12: "Larger than current." The side is the
-		// only thing left in this cell now that the status chip is gone, and it was
-		// the smallest thing in it. ⛔ STILL NOT 16: the slot header's 16 is scoped
-		// to it BY NAME in the values-log and does not inherit, so a glyph rendering
-		// at 16 here would mean the default leaked through rather than that RF-12
-		// was applied.
-		expect(yesGlyph?.getAttribute("width")).toBe("14");
-		expect(yesGlyph?.getAttribute("height")).toBe("14");
-		expect(noGlyph?.getAttribute("width")).toBe("14");
-		expect(noGlyph?.getAttribute("height")).toBe("14");
+		// ⚠ 15 SINCE POSREV-POLISH P-3, which raised the tile's type scale to fill
+		// the height `useEqualRowThirds` forces on it; the glyph goes up with the
+		// side word (13px → 15px). It was 14 under RF-12 ("Larger than current"),
+		// and the *reason* attached to that 14 is the part worth keeping:
+		// ⛔ STILL NOT 16 — 16 is `ThumbGlyph`'s own DEFAULT, so `size={16}` would
+		// be byte-identical to omitting the prop and a later reader could not tell a
+		// deliberate re-point from a default leaking through. That argument survives
+		// the ruling unchanged; only the number it protects has moved.
+		expect(yesGlyph?.getAttribute("width")).toBe("15");
+		expect(yesGlyph?.getAttribute("height")).toBe("15");
+		expect(noGlyph?.getAttribute("width")).toBe("15");
+		expect(noGlyph?.getAttribute("height")).toBe("15");
 
 		// Decorative: the WORD carries the meaning, so the glyph stays out of
 		// the accessibility tree.

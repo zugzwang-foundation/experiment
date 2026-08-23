@@ -141,13 +141,29 @@ describe("POSREV-1 RF-4 — every Đ on this surface carries its space", () => {
 		expect(pl.textContent).toBe("(−Đ 12)");
 	});
 
-	it("leaves ZERO unsigned — the sign logic is untouched by RF-4", () => {
-		// ⛔ THE CONTROL FOR THE TWO ABOVE. RF-4 changed the SPACE and nothing
-		// else; a build that "fixed the formatting" by signing everything would
-		// pass both tests above and fail here. `Đ 0`, never `+Đ 0`.
+	it("signs ZERO with ± — every delta carries a sign (P-2)", () => {
+		// ⛔⛔ SUPERSEDED, NOT BROKEN. This asserted `(Đ 0)` and was named "leaves
+		// ZERO unsigned — the sign logic is untouched by RF-4", as the control for
+		// the two tests above: RF-4 changed the SPACE and nothing else, so a build
+		// that "fixed the formatting" by signing everything would pass those and
+		// fail here.
+		// POSREV-POLISH P-2 rules the opposite — the delta ALWAYS carries a sign,
+		// including at zero — so the thing this guarded is now the thing the
+		// founder asked for. It keeps its job as a control by pinning the EXACT
+		// zero spelling instead of the absence of one.
+		// ⚠ `±` (U+00B1), chosen over `+`: a `+` on an unmoved position asserts a
+		// gain that did not happen, and a blank would leave one row in the column
+		// with no glyph where every other row has one. See `signGlyphFor` in
+		// `PositionsTable.tsx` — the shared formatter still returns an EMPTY sign
+		// for zero and is deliberately untouched, because its contract says the
+		// CALLER supplies the glyph and other callers keep the unsigned form.
 		render(<PositionsTable payload={payload(row({ current: dp18("150") }))} />);
 		const pl = screen.getByTestId(`tile-pl-${M1}`);
-		expect(pl.textContent).toBe("(Đ 0)");
+		expect(pl.textContent).toBe("(±Đ 0)");
+		// ⛔ AND STILL NOT THE ASCII HYPHEN OR A BARE `+`: the glyph is exactly one
+		// of the three ruled spellings, so a build that signed zero as `+` reds.
+		expect(pl.textContent).not.toContain("+");
+		expect(pl.textContent).not.toContain("-");
 	});
 
 	it("no Đ anywhere in the positions panel is followed by a digit", () => {

@@ -99,12 +99,24 @@ function figure(text: string): number {
 	return Number((m?.[1] ?? "").replace(/,/g, ""));
 }
 
-describe("RF-15 — Σ displayed tiles == the displayed group header", () => {
-	it("rounds parts to sum to their header, not each to itself", () => {
+describe("RF-15 — Σ displayed tiles == their market's allocated figure", () => {
+	it("rounds parts to sum to their market, not each to itself", () => {
 		// TWO equal arguments in one market worth Đ 10.5 in total.
 		// ⛔ THE WRONG ANSWER, stated: each argument is exactly 5.25, and rounding
-		// each on its own gives 5 + 5 = 10 under a header that reads 11 — the
+		// each on its own gives 5 + 5 = 10 where the market is worth 11 — the
 		// `Đ 920 over Đ 921` defect, one market wide. Largest remainder gives 6 + 5.
+		//
+		// ⚠⚠ THIS TEST USED TO READ THE GROUP HEADER, AND POSREV-POLISH P-1 REMOVED
+		// IT. It asserted `Đa = 40` and `Đb = 11` off `positions-group-figures-…`
+		// and then compared the tiles against that Đb. The header is gone by
+		// founder ruling, so the parent it displayed is no longer on screen — but
+		// the ALLOCATION is untouched and is still the thing under test. P-1's own
+		// instruction: "keep the allocation exactly as it is … do NOT simplify it
+		// to round0 per tile; that is the P-6 defect returning."
+		// ⇒ The parent is read from `positionsValue` instead, which is where it
+		// came from in the first place. With one market, its allocated figure IS
+		// round0(10.5) = 11, so nothing about the arithmetic being checked has
+		// changed — only where the expected value is sourced from.
 		const payload: ProfilePositionsPayload = {
 			owner: false,
 			rows: [
@@ -115,23 +127,15 @@ describe("RF-15 — Σ displayed tiles == the displayed group header", () => {
 			],
 		};
 		render(<PositionsTable payload={payload} positionsValue={dp18("10.5")} />);
-		const header = figure(
-			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "",
-		);
-		// The header is the SECOND Đ on that line (`Đa → Đb`), so read the tiles
-		// and compare against the header's own current figure.
-		const headerText =
-			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "";
-		const headerCurrent = Number(
-			(/→\s*Đ\s*([\d,]+)/.exec(headerText)?.[1] ?? "").replace(/,/g, ""),
-		);
-		expect(header).toBe(40); // Đa, the staked side of the arrow
-		expect(headerCurrent).toBe(11); // round0(10.5) = 11, HALF_UP
+		// ⛔ The header nodes are asserted ABSENT, so this cannot quietly pass again
+		// if one ever comes back without the assertions above being reconsidered.
+		expect(screen.queryByTestId(`positions-group-figures-${M1}`)).toBeNull();
+		const marketCurrent = 11; // round0(10.5), HALF_UP — the level-1 parent
 
 		const tiles = [1, 2].map((n) =>
 			figure(screen.getByTestId(`position-tile-${L(n)}`).textContent ?? ""),
 		);
-		expect(tiles.reduce((a, b) => a + b, 0)).toBe(headerCurrent);
+		expect(tiles.reduce((a, b) => a + b, 0)).toBe(marketCurrent);
 		// ⚠ AND THE NAIVE ANSWER IS ASSERTED WRONG, so a build with no partition
 		// cannot pass by accident: 5 + 5 is what independent rounding produces.
 		expect(tiles).not.toEqual([5, 5]);
@@ -173,24 +177,31 @@ describe("RF-15 — Σ displayed group headers == the Positions-value tile", () 
 		);
 		expect(tileFigure).toBe(21);
 
-		const headers = [M1, M2].map((m) => {
-			const t = screen.getByTestId(`positions-group-figures-${m}`).textContent;
-			return Number(
-				(/→\s*Đ\s*([\d,]+)/.exec(t ?? "")?.[1] ?? "").replace(/,/g, ""),
-			);
-		});
-		expect(headers.reduce((a, b) => a + b, 0)).toBe(tileFigure);
+		// ⚠⚠ READ OFF THE ARGUMENT TILES, NOT THE GROUP HEADERS — P-1 removed those.
+		// Each of these two markets holds exactly ONE argument, so its tile carries
+		// the market's whole allocated figure: the level-2 allocation of a
+		// one-element set is that element. The identity being checked is therefore
+		// unchanged (Σ per-market figures == the §23 tile); it is simply read from
+		// the surviving node. Asserting the headers are absent keeps this honest.
+		expect(screen.queryByTestId(`positions-group-figures-${M1}`)).toBeNull();
+		const perMarket = [1, 2].map((n) =>
+			figure(screen.getByTestId(`position-tile-${L(n)}`).textContent ?? ""),
+		);
+		expect(perMarket.reduce((a, b) => a + b, 0)).toBe(tileFigure);
 		// ⛔ The naive answer, asserted wrong.
-		expect(headers).not.toEqual([11, 11]);
-		expect(headers.sort((a, b) => b - a)).toEqual([11, 10]);
+		expect(perMarket).not.toEqual([11, 11]);
+		expect(perMarket.sort((a, b) => b - a)).toEqual([11, 10]);
 	});
 
-	it("a header figure does NOT move when the market filter narrows", () => {
+	it("a market's figure does NOT move when the market filter narrows", () => {
 		// ⚠⚠ THE STABILITY HALF, AND IT IS WHY THE ALLOCATION IS TAKEN OVER EVERY
 		// ROW THE TILE SUMS RATHER THAN OVER THE VISIBLE ONES. Allocating over the
 		// filtered set would make the SAME holding read `Đ 11` under "All markets"
 		// and `Đ 10` under its own name — a figure that changes because you looked
 		// at it differently, which is worse than the rounding gap being closed.
+		// ⚠ P-1 removed the group header this used to read; the figure is taken off
+		// M2's single argument tile instead, which carries the market's whole
+		// allocated value. The property is identical and so is what would break it.
 		const payload: ProfilePositionsPayload = {
 			owner: false,
 			rows: [
@@ -200,14 +211,7 @@ describe("RF-15 — Σ displayed group headers == the Positions-value tile", () 
 		};
 		render(<PositionsTable payload={payload} positionsValue={dp18("21")} />);
 		const read = () =>
-			Number(
-				(
-					/→\s*Đ\s*([\d,]+)/.exec(
-						screen.getByTestId(`positions-group-figures-${M2}`).textContent ??
-							"",
-					)?.[1] ?? ""
-				).replace(/,/g, ""),
-			);
+			figure(screen.getByTestId(`position-tile-${L(2)}`).textContent ?? "");
 		const unfiltered = read();
 		fireEvent.click(screen.getByTestId("positions-market-filter"));
 		fireEvent.click(screen.getByTestId(`positions-market-option-${M2}`));

@@ -45,16 +45,45 @@ import {
 /**
  * ROUND 4 item 8 — how many tiles fill the panel before the rest scroll.
  * FOUNDER-SUPPLIED ("three rows fill the panel"), reaffirmed at POSREV-1 RF-10
- * with the unit changed: three ARGUMENT TILES, and the market group headers do
- * not consume a slot.
+ * with the unit changed: three ARGUMENT TILES.
+ *
+ * ⚠ POSREV-POLISH P-1/P-3 — the arithmetic got SIMPLER, which is the point.
+ * RF-10 had to subtract the market group headers from the region because sticky
+ * rows take no layout space only while stuck, so in flow each one ate part of a
+ * tile's share. With the headers gone there is no chrome inside the tbody at
+ * all: the region minus `<thead>` divides by three, and the window cap and the
+ * equal-thirds hook can no longer disagree about what counts as a row.
+ * ⛔ `--zz-thead-h` and the group-row selector went with it. They existed ONLY to
+ * position and to discount those headers; keeping either would be machinery
+ * aimed at an element that no longer renders.
  */
 const ROW_WINDOW = 3;
 
-/** The CSS custom property the sticky group headers hang their `top` on. */
-const THEAD_H_VAR = "--zz-thead-h";
-
-/** The group-header rows, for the window's chrome subtraction and the stepper. */
-const GROUP_ROW_SELECTOR = 'tr[data-testid^="positions-group-"]';
+/**
+ * POSREV-POLISH P-2 — **EVERY DELTA CARRIES A SIGN, INCLUDING ZERO.**
+ *
+ * `displayPositionProfitLossSigned` returns an EMPTY sign for zero, and says so
+ * deliberately: "ZERO CARRIES NO SIGN … an unmoved position reads `(Đ0)`, never
+ * `(+Đ0)`". That contract is unchanged and is not overridden here — the same
+ * docblock also states that **the CALLER supplies the glyph**, which is exactly
+ * what this does. Other callers keep the unsigned zero.
+ *
+ * ⛔ **THE ZERO SPELLING IS `±`** (U+00B1), not `+` and not a blank.
+ *   · `+Đ 0` asserts a gain that did not happen; `−Đ 0` asserts a loss.
+ *     `±` asserts neither, which is the only honest thing to say about a
+ *     position that has not moved.
+ *   · A blank leaves one row in the column with no glyph where every other row
+ *     has one, so the figures no longer line up down the column — and the reason
+ *     P-2 wants a sign at all is that the column should read as one thing.
+ *
+ * ⚠ The MINUS arrives already correct from the formatter: U+2212, byte-carried,
+ * never the ASCII hyphen. This function must never manufacture one.
+ * ⚠ §10.8 — the returned glyph is TERMINAL. It is printed and never read back
+ * into arithmetic, comparison or conditional rendering.
+ */
+function signGlyphFor(sign: string): string {
+	return sign === "" ? "±" : sign;
+}
 
 /**
  * ⚠⚠ POSREV-1 — **THE UNIT OF THIS TABLE IS THE ARGUMENT, NOT THE MARKET.**
@@ -67,19 +96,23 @@ const GROUP_ROW_SELECTOR = 'tr[data-testid^="positions-group-"]';
  * one question a holder actually has ("which of my claims is worth keeping?")
  * unanswerable.
  *
- * Now: each market gets a sticky GROUP HEADER carrying that market's `Đa → Đb`,
- * and beneath it one TILE per argument, each exitable on its own.
+ * Now: one TILE per argument, each exitable on its own, grouped by market in
+ * market order.
+ *
+ * ⚠⚠ **POSREV-POLISH P-1 SUPERSEDES RF-3's GROUP HEADER, AND THIS PARAGRAPH USED
+ * TO DESCRIBE IT.** It read: "each market gets a sticky GROUP HEADER carrying
+ * that market's `Đa → Đb`, and beneath it one TILE per argument", followed by an
+ * argument for why those header figures needed no per-tab arithmetic. Founder
+ * ruling: the header ate the vertical rhythm and broke the three-tile window, so
+ * it is gone and the market question returns to the tile, under the argument
+ * title, where it sat before RF-3.
+ * ⛔ **THE CONSEQUENCE, STATED RATHER THAN LOST: `Đa → Đb` renders NOWHERE now.**
+ * The tiles still sum to Đb by construction — Đa is Σ surviving lot bases — but
+ * the market's own total is off the surface. That is the price of the ruling and
+ * it is recorded here so nobody later reads its absence as a bug.
  *
  * ⛔ **"Lot" appears nowhere a participant can read it (ADR-0039 R1).** The word
  * is the schema's. On screen these are ARGUMENTS.
- *
- * **WHY THE HEADER FIGURES NEED NO PER-TAB ARITHMETIC.** `Đa` is Σ SURVIVING lot
- * bases (`lots/basis.ts`), so a sold argument contributes zero to it; invariant
- * `I-LOT-SUM-001` guarantees Σ surviving lot shares == `positions.quantity`, so
- * `Đb` is the mark on exactly the shares the Open tab's tiles represent. The
- * header's `Đa → Đb` therefore ALREADY describes the tiles visible beneath it.
- * Recomputing per tab would be a second answer to a question the position row
- * already answers.
  *
  * **WHY THERE IS NO PER-ARGUMENT `computeSell`.** See `partition.ts`: the curve
  * is concave, so per-argument engine calls would sum to MORE than the holding.
@@ -87,8 +120,9 @@ const GROUP_ROW_SELECTOR = 'tr[data-testid^="positions-group-"]';
  *
  * **The Open/Closed toggle is HOLDING status, not market status (RF-13).** An
  * argument with surviving shares is Open; one with none is Closed. A market with
- * some of each appears in BOTH tabs, its header in each, showing only that tab's
- * tiles — which is correct and intended.
+ * some of each appears in BOTH tabs, showing only that tab's tiles — which is
+ * correct and intended. Both tabs carry a bracketed count of the tiles they
+ * hold (P-4), from the same two derivations the empty states already read.
  *
  * Đ values are `formatDharma`-rounded and grouped, never float math; the
  * displayed figures are partitioned so the parts sum to the whole (RF-15).
@@ -102,13 +136,17 @@ export function PositionsTable({
 	payload: ProfilePositionsPayload;
 	/**
 	 * ⚠⚠ RF-15 LEVEL 1 — the §23 Positions-value tile's EXACT figure, threaded
-	 * down so the group headers can be allocated from the very string the tile
+	 * down so the per-market allocation runs from the very string the tile
 	 * renders. The alternative was re-deriving the sum here from `payload.rows`,
 	 * which is byte-identical arithmetic over the same rows — and therefore two
 	 * implementations that agree right up until one of them is edited. The tile
-	 * and the headers now cannot disagree, because there is one number.
+	 * and the tiles beneath it now cannot disagree, because there is one number.
+	 * ⚠ P-1 REMOVED THE GROUP HEADER THAT USED TO RENDER THIS, and the thread is
+	 * still load-bearing: the per-market figure is now the invisible PARENT of the
+	 * level-2 allocation that apportions the tiles, so the chain "tile → market →
+	 * §23 tile" is intact even though its middle term is no longer on screen.
 	 * ⚠ OPTIONAL, so every render-test call site that does not exercise the
-	 * identity keeps working; absent, each header simply rounds independently.
+	 * identity keeps working; absent, each market simply rounds independently.
 	 */
 	positionsValue?: string;
 	/** OQ-5 B — the W2.10-C `?market=<slug>` preselect; matched against the
@@ -297,7 +335,6 @@ export function PositionsTable({
 						marketId: row.marketId,
 						marketTitle: row.marketTitle,
 						marketSlug: row.marketSlug,
-						headerStaked: row.staked,
 						headerValue: headerCurrent.get(row.marketId) ?? "0",
 						tiles: [
 							{
@@ -348,7 +385,6 @@ export function PositionsTable({
 				marketId: row.marketId,
 				marketTitle: row.marketTitle,
 				marketSlug: row.marketSlug,
-				headerStaked: row.staked,
 				headerValue,
 				tiles: lots.map((lot, i) => ({
 					key: lot.lotId,
@@ -411,17 +447,19 @@ export function PositionsTable({
 	// a DEFINITE region into equal thirds (the one-screen layout at `lg`+); the
 	// `max-height` cap below bounds a GROWABLE page at the third tile's bottom.
 	// Each stands down when the other's condition holds.
-	// ⛔ BOTH MEASURE THE RENDERED TILE. RF-4's stacked Current cell and RF-3's
-	// removed market sub-line both change tile height, so any constant written
-	// here would have been wrong on the day it was typed.
-	// ⚠ GROUP HEADERS ARE CHROME IN BOTH: excluded from the row selector, and
-	// subtracted from the region via `extraHeadSelector`. Sticky takes no layout
-	// space only while STUCK; in flow each header occupies its own band.
+	// ⛔ BOTH MEASURE THE RENDERED TILE, and POSREV-POLISH moved it three ways at
+	// once — P-1 restored the market sub-line, P-2 deleted the `from Đ …` line,
+	// P-3 raised the type scale. Any constant written here would have been wrong
+	// on the day it was typed; it still is.
+	// ⚠ NO `extraHeadSelector` ANY MORE. It existed to discount the sticky market
+	// group headers, which P-1 removed — so the only chrome left inside the
+	// scroll region is `<thead>`, which the hook already subtracts on its own.
+	// Passing a selector that matches nothing would be the same arithmetic wearing
+	// a dead argument.
 	useEqualRowThirds({
 		bodyRef,
 		tableRef,
 		testidPrefix: "position-tile-",
-		extraHeadSelector: GROUP_ROW_SELECTOR,
 		rowWindow: ROW_WINDOW,
 		rowCount: visibleTiles.length,
 	});
@@ -432,20 +470,11 @@ export function PositionsTable({
 			return;
 		}
 		const measure = () => {
-			// ⚠⚠ THE STICKY OFFSET IS MEASURED, NEVER TYPED. The group headers stick
-			// BELOW the column-header row, so their `top` is that row's height — a
-			// figure that moves with the overline's type size and padding. Writing
-			// `top-[19px]` would go stale from the very edit that changed it (O-8's
-			// fence-by-symbol, applied to a number instead of a line).
-			// ⚠ jsdom performs no layout and returns zero rects, so the property is
-			// simply left at its `0px` fallback there — the render suite sees
-			// unstuck headers rather than headers pinned to a wrong offset.
-			const head = table.querySelector("thead");
-			const headH = head ? head.getBoundingClientRect().height : 0;
-			if (headH > 0) {
-				table.style.setProperty(THEAD_H_VAR, `${Math.ceil(headH)}px`);
-			}
-
+			// ⚠ THE STICKY-OFFSET MEASUREMENT WENT WITH THE HEADERS (P-1). It existed
+			// to publish the column-header height as `--zz-thead-h` so each market
+			// group header could stick just below it. Nothing consumes that property
+			// now, and a measurement written to an element no reader reads is worse
+			// than absent — it looks load-bearing to the next person editing this.
 			if (visibleTiles.length < ROW_WINDOW) {
 				// Fewer tiles than the window — nothing to window, and the panel goes
 				// back to its natural height rather than keeping a stale cap.
@@ -640,8 +669,23 @@ export function PositionsTable({
 					    #fafafa: it encodes the NO SIDE under INV-3, and this toggle sits
 					    inches from tiles reading `Yes`. `n7` is the brightest NEUTRAL rung
 					    — visibly filled, and carrying no side meaning at all.
-					    ⚠ THE COUNT RIDES THE CLOSED LABEL (RF-7) in its own node, so the
-					    word stays readable as a word and the number is separable. */}
+					    ⚠⚠ P-4 — **BOTH LABELS CARRY A BRACKETED COUNT NOW.** RF-7 put one
+					    on `Closed` alone, which made the two tabs look like different
+					    kinds of thing: one a place, the other a place with a quantity. It
+					    reads `Open (4)` · `Closed (3)`.
+					    ⛔ BOTH COUNT **TILES**, and both come from the derivations that were
+					    already here rather than from a second one written for the label.
+					    `openCount` and `closedCount` are what the RF-14 empty states read
+					    to decide whether the OTHER tab holds anything — so a label that
+					    disagreed with them would be a surface contradicting its own empty
+					    state. One derivation, two readers.
+					    ⚠ `openCount` COUNTS THE WHOLE-HOLDING FALLBACK AS ONE. A drifted
+					    holding has zero surviving lots and renders exactly one Open tile;
+					    counting lots would print `Open (0)` above a visible tile. That is
+					    handled where the count is derived, not here.
+					    ⚠ The number stays in its own node so the word remains readable as a
+					    word and the count is separable; the brackets are text in that node
+					    rather than a wrapper, so a reader copying the label gets `(4)`. */}
 					<span
 						data-testid="positions-status-filter"
 						className="ml-auto flex items-center gap-1"
@@ -660,14 +704,16 @@ export function PositionsTable({
 								}`}
 							>
 								{s}
-								{s === "Closed" && (
-									<span
-										data-testid="positions-closed-count"
-										className="tabular-nums"
-									>
-										{closedCount}
-									</span>
-								)}
+								<span
+									data-testid={
+										s === "Closed"
+											? "positions-closed-count"
+											: "positions-open-count"
+									}
+									className="tabular-nums"
+								>
+									({s === "Closed" ? closedCount : openCount})
+								</span>
 							</button>
 						))}
 					</span>
@@ -766,67 +812,25 @@ export function PositionsTable({
 					</thead>
 					{groups.map((group) => (
 						<tbody key={group.marketId}>
-							{/* ⚠⚠ RF-3 — THE MARKET GROUP HEADER. Always expanded, never a
-							    dropdown, never collapsible: it is the thing that tells you
-							    which market you are inside, and a header you can hide is a
-							    header you will have hidden when you need it.
-							    ⛔ STICKY ON THE `<tr>`, NOT ON THE CELL. Tailwind's preflight
-							    sets `border-collapse: collapse`, under which sticky TABLE
-							    CELLS do not stick in Chrome — but a sticky row group does,
-							    which is what the column-header row above already relies on.
-							    ⚠ ITS `top` IS THE MEASURED COLUMN-HEADER HEIGHT (see the
-							    effect), never a literal.
-							    ⛔ `Đa → Đb` ON THE OPEN TAB ONLY. On Closed both would read
-							    `Đ 0` — a sold argument contributes zero to Đa by
-							    `lots_sold_zeroes_basis` and holds nothing to mark — so the
-							    Closed header states the one figure that is not zero: what
-							    was staked behind the arguments listed under it. */}
-							<tr
-								data-testid={`positions-group-${group.marketId}`}
-								className="sticky z-[5] bg-n0"
-								style={{ top: `var(${THEAD_H_VAR}, 0px)` }}
-							>
-								<th
-									colSpan={4}
-									scope="colgroup"
-									className="px-2 pt-2 pb-1 text-left font-normal"
-								>
-									<span className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-										<Link
-											href={`/m/${group.marketSlug}`}
-											data-testid={`positions-group-title-${group.marketId}`}
-											className="text-[11px] leading-[1.35] font-extrabold tracking-[0.06em] text-ink uppercase hover:underline"
-										>
-											{group.marketTitle}
-										</Link>
-										<span
-											data-testid={`positions-group-figures-${group.marketId}`}
-											className="shrink-0 text-[11px] leading-[1.35] font-bold whitespace-nowrap tabular-nums text-n5"
-										>
-											{isOpenTab ? (
-												<>
-													Đ {formatDharma(group.headerStaked)}{" "}
-													<span aria-hidden="true" className="text-n4">
-														→
-													</span>{" "}
-													<span className="text-ink">
-														Đ {formatDharma(group.headerValue)}
-													</span>
-												</>
-											) : (
-												<>
-													<span className="tracking-[0.12em] text-n4">
-														STAKED
-													</span>{" "}
-													<span className="text-ink">
-														Đ {formatDharma(group.headerValue)}
-													</span>
-												</>
-											)}
-										</span>
-									</span>
-								</th>
-							</tr>
+							{/* ⛔⛔ POSREV-POLISH P-1 — THE MARKET GROUP HEADER IS GONE, AND THIS
+							    `<tbody>` IS WHAT SURVIVES IT. RF-3 gave each market a sticky header
+							    carrying `Đa → Đb`; the founder has ruled it out because it ate the
+							    vertical rhythm and broke the three-tile window. The market question
+							    moves back INSIDE each tile, under its argument title, exactly where
+							    it sat before RF-3.
+							    ⛔ THE GROUPING ITSELF STAYS. One `<tbody>` per market, in market
+							    order — the header was the only thing removed, not the structure. A
+							    flat list would let two tiles from one market be separated by a third
+							    from another, which is a different surface, not a tidier one.
+							    ⚠ WHAT THIS COSTS, RECORDED RATHER THAN DROPPED: the market's own
+							    `Đa → Đb` now renders NOWHERE. The tiles still sum to it by
+							    construction — Đa is Σ surviving lot bases — but the total itself is
+							    off the surface. That is a consequence of the ruling, not a defect.
+							    ⛔ `group.headerValue` IS STILL COMPUTED AND STILL LOAD-BEARING. It is
+							    the PARENT of RF-15's level-2 allocation, which is what makes the
+							    tiles sum to the §23 Positions-value tile through level 1. Nothing
+							    renders it now, and it must not be "simplified" to a round0 per tile:
+							    that is the P-6 defect (Đ 920 above rows adding to Đ 921) returning. */}
 							{group.tiles.map((tile) => (
 								<Fragment key={tile.key}>
 									<TileRow
@@ -888,9 +892,15 @@ type MarketGroup = {
 	marketId: string;
 	marketTitle: string;
 	marketSlug: string;
-	/** Đa — Σ surviving lot basis, the position's own figure (Open tab). */
-	headerStaked: string;
-	/** Đb on Open; Σ original basis on Closed. Displayed (allocated) figure. */
+	/**
+	 * Đb on Open; Σ original basis on Closed — the DISPLAYED (allocated) figure.
+	 * ⛔ NOT RENDERED since P-1 removed the group header. It is kept because it
+	 * has a SECOND job: it is the PARENT of RF-15's level-2 allocation, so the
+	 * tiles are apportioned from it and therefore sum to the §23 Positions-value
+	 * tile. Its sibling `headerStaked` (Đa) had no such second job and went with
+	 * the header — which is the same fact as "the market's Đa → Đb no longer
+	 * renders anywhere", stated where a reader of this type will meet it.
+	 */
 	headerValue: string;
 	tiles: ArgTile[];
 };
@@ -994,29 +1004,52 @@ function TileRow({
 			    the way in is still a YES argument. They agree on every surviving lot
 			    by construction and part company only on fully-sold ones, which is
 			    exactly the Closed tab.
-			    ⚠ `align-baseline` ON BOTH THIS CELL AND THE ARGUMENT CELL is what
-			    "top-aligned to the argument title's first baseline" MEANS in a table:
-			    the CSS default centres the cell, which floats the side away from the
-			    title the moment the title wraps. Baseline alignment ties the two first
-			    lines together regardless of how many lines follow. */}
-			<td className="p-2 align-baseline">
+			    ⚠⚠ `align-middle`, AND IT USED TO BE `align-baseline` FOR A STATED
+			    REASON. That note read: baseline alignment "ties the two first lines
+			    together regardless of how many lines follow", which is true and was
+			    right while a tile stood at its content height. It stopped being right
+			    when `useEqualRowThirds` began forcing every tile to a third of the
+			    region: the row is then MUCH taller than its content, and top-aligning
+			    inside it leaves the founder's "large void below" with the side marker
+			    pinned to the ceiling. P-3 rules the content centred in the tile.
+			    ⚠ THE SIDE AND THE TITLE NO LONGER SHARE A BASELINE, which is what was
+			    traded away. With both cells centred they share a CENTRE instead, and
+			    that reads as deliberate at every title length rather than only at one. */}
+			<td className="p-2 align-middle">
 				<span
 					data-testid={`tile-side-${tile.key}`}
-					className="flex items-center justify-center gap-[5px] text-[13px] leading-[1.35] font-extrabold text-ink"
+					className="flex items-center justify-center gap-[5px] text-[15px] leading-[1.35] font-extrabold text-ink"
 				>
 					{tile.side === "YES" ? "Yes" : "No"}
-					<ThumbGlyph side={tile.side} size={14} />
+					{/* ⚠ 15, AND DELIBERATELY NOT 16. P-3 raises the side marker with the
+					    rest of the tile's type (13px → 15px), so the glyph goes up with it.
+					    ⛔ 16 IS `ThumbGlyph`'s OWN DEFAULT, so `size={16}` would be
+					    byte-identical to omitting the prop — a later reader could not tell
+					    a deliberate re-point from a default leaking through. That is
+					    `surface.test.tsx`'s own argument for the previous 14 and it
+					    survives the size change; only the number it protects has moved. */}
+					<ThumbGlyph side={tile.side} size={15} />
 				</span>
 			</td>
-			<td className="p-2 align-baseline">
-				<TileArgumentCell cell={tile.argument} tileKey={tile.key} />
+			<td className="p-2 align-middle">
+				<TileArgumentCell
+					cell={tile.argument}
+					tileKey={tile.key}
+					marketTitle={tile.row.marketTitle}
+				/>
 			</td>
 			{isOpenTab ? (
 				<>
-					{/* ⚠⚠ RF-4 — THE CURRENT CELL STACKS THREE LINES, and RF-5 hides two
-					    of them while the amount field is open: a delta and a "from"
-					    beside an editable number are answering a question the reader has
-					    stopped asking.
+					{/* ⚠⚠ P-2 — THE CURRENT CELL STACKS **TWO** LINES NOW, and RF-4's third
+					    is gone. It read `Đ 10 / (Đ 0) / from Đ 10`; the `from` line is
+					    removed by founder ruling.
+					    ⛔ WHAT THAT COSTS, RECORDED RATHER THAN DROPPED: `from Đ …` was the
+					    on-screen REFERENCE that made `current − from = delta` checkable by
+					    eye, which is the whole reason §10.8 admits this delta as a
+					    displayed-space identity in the first place. The delta is still
+					    computed in displayed space and is still true — it simply no longer
+					    has its second operand visible beside it. A reader can no longer
+					    verify it without leaving the row.
 					    ⚠ THE DELTA'S BASE IS `survivingBasis`, NOT `originalBasis`, and
 					    the two are byte-identical until an argument is PARTIALLY sold.
 					    There, `current` is the value of what SURVIVES — so subtracting
@@ -1025,7 +1058,7 @@ function TileRow({
 					    sale carries no tag and that "figures reduce" is the whole signal;
 					    an immutable base cannot reduce, and the reduction would leave no
 					    trace on the surface at all. */}
-					<td className="p-2 text-center align-baseline whitespace-nowrap tabular-nums text-ink">
+					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink">
 						{sold ? (
 							<span
 								data-testid={`tile-sold-${tile.key}`}
@@ -1045,21 +1078,21 @@ function TileRow({
 							/>
 						) : (
 							<span className="flex flex-col items-center leading-[1.35]">
-								<span>Đ {formatDharma(tile.valueDisplay)}</span>
+								{/* ⚠ P-3 — 17px. It was inheriting the table's `text-sm`, so the
+								    figure the column is named after was set at the same size as
+								    the argument title beside it and smaller than nothing on the
+								    row. Leading restated with the size, per AGENTS.md §8. */}
+								<span className="text-[17px] leading-[1.35] font-bold">
+									Đ {formatDharma(tile.valueDisplay)}
+								</span>
 								{pl.magnitude !== "" && (
 									<span
 										data-testid={`tile-pl-${tile.key}`}
 										className="text-[10.5px] leading-[1.2] font-bold text-n5"
 									>
-										({pl.sign}Đ {pl.magnitude})
+										({signGlyphFor(pl.sign)}Đ {pl.magnitude})
 									</span>
 								)}
-								<span
-									data-testid={`tile-from-${tile.key}`}
-									className="text-[9.5px] leading-[1.2] font-semibold text-n4"
-								>
-									from Đ {formatDharma(tile.basis)}
-								</span>
 							</span>
 						)}
 					</td>
@@ -1067,7 +1100,7 @@ function TileRow({
 					    beside a `✕`. ⛔ THE ✕ IS NOT OPTIONAL — a two-step cushion with
 					    no exit is a trap, not a cushion. Escape and a click outside
 					    cancel too (wired in `useInlineSell`). */}
-					<td className="p-2 text-center align-baseline">
+					<td className="p-2 text-center align-middle">
 						{tile.sellable && !sold && (
 							<span className="inline-flex items-center gap-1">
 								{armed ? (
@@ -1127,7 +1160,7 @@ function TileRow({
 					    figure on a closed argument that is not zero. */}
 					<td
 						data-testid={`tile-staked-${tile.key}`}
-						className="p-2 text-center align-baseline whitespace-nowrap tabular-nums text-ink"
+						className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink"
 					>
 						Đ {formatDharma(tile.valueDisplay)}
 					</td>
@@ -1142,7 +1175,7 @@ function TileRow({
 					    resolves per-runtime and would be a hydration mismatch. */}
 					<td
 						data-testid={`tile-opened-${tile.key}`}
-						className="p-2 text-center align-baseline whitespace-nowrap text-n5"
+						className="p-2 text-center align-middle whitespace-nowrap text-n5"
 					>
 						{tile.placedAt === null ? "—" : fmtUtcDay(tile.placedAt)}
 					</td>
@@ -1153,31 +1186,61 @@ function TileRow({
 }
 
 /**
- * The tile's argument cell — the ARGUMENT'S OWN title (the §9 deep link) and its
- * reply context, or the removed stub.
+ * The tile's argument cell — the ARGUMENT'S OWN title (the §9 deep link), the
+ * MARKET QUESTION beneath it, and its reply context; or the removed stub.
  *
- * ⛔ **THE MARKET SUB-LINE IS GONE, AND ITS REMOVAL IS THE POINT OF RF-3.** Every
- * tile used to repeat `Will the Zugzwang repo reach 100,000 stars?` under its
- * own title, so a participant holding three arguments in one market read that
- * question three times. The group header above names the market once.
+ * ⚠⚠ **THE MARKET SUB-LINE IS BACK, AND THIS DOCBLOCK ARGUED THE OTHER WAY.** It
+ * read: "THE MARKET SUB-LINE IS GONE, AND ITS REMOVAL IS THE POINT OF RF-3 …
+ * the group header above names the market once." That reasoning was sound and
+ * the founder has overruled its conclusion at POSREV-POLISH P-1: naming the
+ * market once cost a sticky header, and the header cost more vertical rhythm
+ * than the repetition it saved. So the question returns to each tile, grey and
+ * smaller than the argument, exactly as it rendered before RF-3.
+ * ⚠ The cost RF-3 named is real and is now paid again: a participant holding
+ * three arguments in one market reads the question three times. That is the
+ * trade, made knowingly, not an oversight.
+ *
+ * ⛔ IT RENDERS ON BOTH VARIANTS, including the removed stub — a removed argument
+ * still belongs to a market, and the stub without it would be the one tile on the
+ * surface that could not say where it came from. `marketSlug` is carried by both
+ * variants of `ProfileArgumentCell` precisely so this is possible.
  *
  * ⚠ SC-1 — the removed variant carries NO title field, so a leak here is a
- * compile error rather than a review item.
+ * compile error rather than a review item. The market TITLE is not participant
+ * content and is safe on both arms.
  */
 function TileArgumentCell({
 	cell,
 	tileKey,
+	marketTitle,
 }: {
 	cell: ProfileArgumentCell;
 	tileKey: string;
+	/** The market question, rendered under the argument title (P-1). */
+	marketTitle: string;
 }): React.JSX.Element {
+	/* ⚠ THE PRE-RF-3 SPELLING, CARRIED RATHER THAN REDESIGNED: 11px / 1.35 /
+	   semibold / `text-n5`, `block`, linking to the market. P-1 says "exactly as
+	   it rendered before RF-3", so this is that element, not a new one that
+	   happens to look similar. Its testid is keyed by TILE rather than by market,
+	   because the unit of this table is now the argument and two tiles in one
+	   market would otherwise collide on one id. */
+	const marketLine = (
+		<Link
+			data-testid={`tile-market-${tileKey}`}
+			href={`/m/${cell.marketSlug}`}
+			className="block text-[11px] leading-[1.35] font-semibold text-n5 hover:underline"
+		>
+			{marketTitle}
+		</Link>
+	);
 	if (cell.removed) {
 		return (
-			<span
-				data-testid={`tile-arg-removed-${tileKey}`}
-				className="text-[11px] leading-[1.35] font-semibold text-n5 italic"
-			>
-				{REMOVED_STUB_TEXT}
+			<span data-testid={`tile-arg-removed-${tileKey}`}>
+				<span className="text-[11px] leading-[1.35] font-semibold text-n5 italic">
+					{REMOVED_STUB_TEXT}
+				</span>
+				{marketLine}
 			</span>
 		);
 	}
@@ -1187,13 +1250,18 @@ function TileArgumentCell({
 			    height is a FLOOR and cannot cap content, so this is what stops one long
 			    argument outgrowing its third. ⛔ `line-clamp-*` already makes the
 			    element a `-webkit-box`; adding `block` beside it is two utilities for
-			    one property and the clamp goes INERT — measured once already. */}
+			    one property and the clamp goes INERT — measured once already.
+			    ⚠ P-3 RAISED THIS FROM 14px TO 15px. It is the thing the tile is ABOUT
+			    and it was set at the same size as the reply context two lines down;
+			    the leading is restated with it because an arbitrary `text-[Npx]` keeps
+			    whatever leading was in scope (AGENTS.md §8). */}
 			<Link
 				href={`/m/${cell.marketSlug}?post=${cell.postOrdinal}`}
-				className="line-clamp-4 text-[14px] leading-[1.35] font-bold hover:underline"
+				className="line-clamp-4 text-[15px] leading-[1.35] font-bold hover:underline"
 			>
 				{cell.title}
 			</Link>
+			{marketLine}
 			{cell.isReply && cell.repliedToTitle !== null && (
 				<span className="line-clamp-2 text-[11px] leading-[1.35] font-semibold text-n5">
 					Replied to {cell.repliedToTitle}

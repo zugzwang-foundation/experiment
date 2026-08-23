@@ -148,34 +148,47 @@ describe("RF-8 — the first tile is selected, and NOTHING is focused", () => {
 	});
 });
 
-describe("RF-10 — the window counts TILES; group headers are chrome", () => {
-	it("win::group-headers-carry-a-different-testid-prefix-from-tiles", () => {
-		// ⛔ THIS IS WHAT KEEPS THE HEADERS OUT OF THE COUNT, and it is asserted
-		// rather than assumed because both the window's row selector and the
-		// equal-thirds hook key on the prefix. A header that answered to
-		// `position-tile-` would silently consume one of the three slots.
+describe("RF-10 — the window counts TILES; there is no chrome left in the body", () => {
+	it("win::EVERY-row-in-the-tbody-is-a-tile-now", () => {
+		// ⛔⛔ SUPERSEDED BY POSREV-POLISH P-1, AND THE PROPERTY GOT STRONGER.
+		// This was "win::group-headers-carry-a-different-testid-prefix-from-tiles",
+		// asserting two `<tr data-testid="positions-group-…">` rows existed and did
+		// NOT answer to `position-tile-` — because both the window's row selector
+		// and the equal-thirds hook key on that prefix, so a header answering to it
+		// would silently eat one of the three slots.
+		// P-1 removes those headers entirely. The hazard they posed cannot recur,
+		// so the guard is re-aimed at the fact that now makes it impossible: the
+		// tbody contains tiles and NOTHING else. That is what "group headers do not
+		// consume a slot" reduces to once there are no group headers.
 		render(<PositionsTable payload={PAYLOAD} />);
 		const tiles = document.querySelectorAll('[data-testid^="position-tile-"]');
-		const headers = document.querySelectorAll(
-			'[data-testid^="positions-group-"]',
-		);
 		expect(tiles.length).toBe(4);
-		// Two group rows, each with a title node and a figures node inside it.
-		expect([...headers].filter((el) => el.tagName === "TR").length).toBe(2);
-		for (const h of headers) {
-			expect(h.getAttribute("data-testid")).not.toMatch(/^position-tile-/);
+		expect(
+			document.querySelectorAll('[data-testid^="positions-group-"]').length,
+		).toBe(0);
+		// ⛔ THE STRONGER FORM: every `<tr>` inside every `<tbody>` is a tile. A
+		// future chrome row of ANY testid — not just the one that used to exist —
+		// reds this, which the prefix comparison could never have caught.
+		const bodyRows = document.querySelectorAll("tbody > tr");
+		expect(bodyRows.length).toBe(4);
+		for (const r of bodyRows) {
+			expect(r.getAttribute("data-testid") ?? "").toMatch(/^position-tile-/);
 		}
 	});
 
-	it("win::the-header-row-is-STICKY-and-offset-below-the-column-header", () => {
-		// The column-header row is `sticky top-0`; a group header has to stick
-		// BELOW it or the two overlap on scroll. The offset is a CSS variable the
-		// measuring effect writes, never a literal — a typed `top-[19px]` would go
-		// stale from the very edit that changed the overline's type size.
+	it("win::the-tiles-are-still-GROUPED-by-market", () => {
+		// ⚠ P-1 removed the group HEADER, not the grouping. The tbody-per-market
+		// structure is what keeps two tiles from one market from being split by a
+		// tile from another, and nothing visible says so any more — so it is
+		// asserted here, where the header assertions used to live.
 		render(<PositionsTable payload={PAYLOAD} />);
-		const header = screen.getByTestId(`positions-group-${M1}`);
-		expect(header.className.split(/\s+/)).toContain("sticky");
-		expect(header.getAttribute("style") ?? "").toContain("--zz-thead-h");
+		const bodies = document.querySelectorAll("table tbody");
+		expect(bodies.length).toBe(2);
+		for (const b of bodies) {
+			expect(
+				b.querySelectorAll('tr[data-testid^="position-tile-"]').length,
+			).toBeGreaterThan(0);
+		}
 	});
 
 	it("win::NO-scroll-snap-anywhere-in-the-scroll-container", () => {
