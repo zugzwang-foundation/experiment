@@ -89,6 +89,8 @@ export function ComposerSlot({
 	const held = useRef<ReactNode>(null);
 	/** Whatever had focus when the slot opened — where focus goes back on close. */
 	const opener = useRef<HTMLElement | null>(null);
+	/** Focus has already been moved for THIS open. Reset on close. */
+	const moved = useRef(false);
 
 	if (open && composer !== null) {
 		held.current = composer;
@@ -127,22 +129,54 @@ export function ComposerSlot({
 	 * here would strand a reader inside a panel they can simply Tab out of by
 	 * design. The dialog primitive's trap is NOT borrowed.
 	 */
-	// ⚠ Deps are `[open]` ALONE, deliberately: this must fire on the open EDGE.
-	// Widening them to include the refs would re-run mid-session and steal focus
-	// back to the first control while the reader is typing.
+	/**
+	 * ⛔⛔ `mounted` IS IN THE DEPS AND IT IS LOAD-BEARING — WITHOUT IT THIS EFFECT
+	 * SILENTLY DOES NOTHING. Measured on the verify lane at `8172a1b`: the slide
+	 * ran at a correct `0.26s` and focus stayed on `Buy`.
+	 *
+	 * The cause is an ordering the deps hid. On the render where `open` first goes
+	 * true, `mounted` is still false, so the component has returned the SCROLLER —
+	 * `wrap.current` is null, the effect early-returns, and the wrapper only
+	 * appears on the NEXT render, which `[open]` alone never observes. So the
+	 * focus move was written, shipped, typechecked and never once ran.
+	 * ⚠ Nothing errored. The only way to catch it was to put the composer on a
+	 * screen and read `document.activeElement` — a class-string or type-level
+	 * reading of this file cannot see it.
+	 *
+	 * ⇒ Two passes now: the first CAPTURES the opener while focus is still on the
+	 * control that was clicked, the second (once the wrapper exists) MOVES focus.
+	 * `moved` keeps it to once per open, so a re-render mid-typing cannot yank
+	 * focus back to the first control — the property the narrow deps were
+	 * protecting, kept without the bug they caused.
+	 */
 	useEffect(() => {
 		if (!open) {
+			moved.current = false;
 			return;
 		}
-		const active = document.activeElement;
-		opener.current = active instanceof HTMLElement ? active : null;
-		const node = wrap.current;
+		if (moved.current) {
+			return;
+		}
+		// Captured on the FIRST pass — before focus is moved anywhere, so this is
+		// still the control the reader actually pressed.
+		if (opener.current === null) {
+			const active = document.activeElement;
+			opener.current = active instanceof HTMLElement ? active : null;
+		}
+		// ⚠ `mounted` IS READ HERE, not merely listed. Biome correctly rejected it
+		// as an "unnecessary" dependency when the body only touched the ref —
+		// suppressing that would have left the deps looking wrong to every later
+		// reader. Reading the state the effect actually waits on makes the
+		// dependency real, and the wrapper's presence is exactly what it waits on.
+		const node = mounted ? wrap.current : null;
 		if (!node) {
+			// Not in the DOM yet. `mounted` flips on the next render and re-runs this.
 			return;
 		}
+		moved.current = true;
 		const first = node.querySelector<HTMLElement>(FOCUSABLE);
 		(first ?? node).focus();
-	}, [open]);
+	}, [open, mounted]);
 
 	// Focus RESTORE, split from the move above so it fires on the close edge and
 	// cannot re-run while the slot is open. Guarded on `isConnected`: the opener
