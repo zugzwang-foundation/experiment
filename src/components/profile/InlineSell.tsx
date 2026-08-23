@@ -55,6 +55,26 @@ import { Input } from "@/components/ui/input";
 /** How long the tile holds its `Sold` state before the data refreshes under it. */
 const SOLD_DWELL_MS = 900;
 
+/**
+ * POSREV-POLISH-2 R-1 — the amount field's width, in `ch`, floored at 2.
+ *
+ * ⚠ ATTRIBUTED DUPLICATION of `BetComposer.tsx`'s `stakeFieldWidth` (its own
+ * docblock: the mockup's `sizeAmt()`, *"width JS-managed: tracks content so Đ
+ * travels with the digits"*). That one is module-private to the composer and
+ * exporting it would widen a surface this task has no mandate to widen; the
+ * formula is one line and is copied with its source named, which is the same
+ * posture AGENTS.md §7 records for the duplicated envelope helpers.
+ *
+ * ⛔ `ch` TRACKS THE DIGITS ONLY BECAUSE THE FIELD IS `font-mono` — `ch` is the
+ * width of the `0` glyph, so a proportional face makes `Nch` stop matching N
+ * digits and the Đ drifts off the number. Dropping `font-mono` below is a
+ * silent break of this, not a restyle: jsdom performs no layout, so the width
+ * string is unchanged and nothing reddens.
+ */
+function sellFieldWidth(value: string): string {
+	return `${Math.max(2, value.length)}ch`;
+}
+
 export type InlineSellController = ReturnType<typeof useInlineSell>;
 
 export function useInlineSell() {
@@ -511,15 +531,38 @@ export function InlineSellAmount({
 	onEdit: (value: string, seedExact: string) => void;
 	onSubmit: () => void;
 }): React.JSX.Element {
+	const shown = draft ?? seedDisplay;
 	return (
-		<span className="inline-flex items-baseline gap-1">
-			<span className="text-n5">Đ</span>
+		/* ⚠⚠ POSREV-POLISH-2 R-1 — THIS IS THE BUY COMPOSER'S AMOUNT FIELD, RE-CUT
+		   TO A TABLE CELL. `BetComposer.tsx:555-593` (`.amtval`) is the shipped
+		   anatomy and the founder's instruction is to reuse it, on the ground that
+		   people meet the BUY path first and the two should not behave differently:
+		     · a BORDERED CHIP holds the whole figure, so the field reads as editable
+		       at rest — this cell previously carried `border-none`, `shadow-none`
+		       and `[border:none]`, i.e. it went out of its way to look inert;
+		     · `justify-end` + `gap-1` GLUE the Đ to the digits, so they read as one
+		       figure rather than a glyph stranded at the left of a wide box;
+		     · the input's width TRACKS ITS CONTENT, so the Đ travels right as digits
+		       are added — the composer's own behaviour, same formula.
+		   ⛔ `focus-within`, NOT `focus-visible`, AND THAT IS FORCED BY THE ANATOMY.
+		   The ring token is the shipped `--state-focus-ring`, applied by name and
+		   not authored — but the input inside is deliberately borderless, so a ring
+		   on the input would draw inside the chip's own border. It has to sit on the
+		   element that draws the box. (First use of the `focus-within:` variant in
+		   this tree; the TOKEN is unchanged.)
+		   ⛔ NOTHING ABOUT THE SEED MOVES. `draft ?? seedDisplay` still shows the
+		   ROUNDED figure, the exact value still lives in state, and an untouched
+		   field still submits the EXACT one through `confirm`. R-1 is appearance and
+		   geometry only. */
+		<span className="inline-flex min-w-0 items-baseline justify-end gap-1 rounded-(--r-chip) px-1.5 py-0.5 [border:var(--hairline)] focus-within:shadow-(--state-focus-ring)">
+			<span className="text-[11px] leading-[1.35] text-n5">Đ</span>
 			<Input
-				value={draft ?? seedDisplay}
+				value={shown}
 				inputMode="decimal"
 				disabled={disabled}
 				aria-label="Amount to sell"
 				data-testid={`tile-sell-amount-${tileKey}`}
+				style={{ width: sellFieldWidth(shown) }}
 				onChange={(e) => onEdit(e.target.value, seedExact)}
 				onKeyDown={(e) => {
 					if (e.key === "Enter") {
@@ -527,7 +570,7 @@ export function InlineSellAmount({
 						onSubmit();
 					}
 				}}
-				className="h-auto w-[74px] border-none p-0 text-right font-mono text-sm font-extrabold tabular-nums shadow-none [border:none]"
+				className="h-auto border-none p-0 text-right font-mono text-[15px] font-extrabold tabular-nums shadow-none [border:none]"
 			/>
 		</span>
 	);

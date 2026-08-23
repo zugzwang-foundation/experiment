@@ -126,44 +126,73 @@ function post(
 }
 
 describe("POSREV-1 RF-4 — every Đ on this surface carries its space", () => {
-	it("renders the P/L delta as `+Đ <n>`, not `+Đ<n>`", () => {
+	it("renders a GAIN as a trending glyph and a whole percent", () => {
+		// ⛔⛔ SUPERSEDED BY POSREV-POLISH-2 R-2, AND THE SUBJECT CHANGED WITH IT.
+		// These three tests pinned the ABSOLUTE delta's spelling — `(+Đ 1)`,
+		// `(−Đ 12)` and `(±Đ 0)` — which was RF-4's "every Đ carries its space"
+		// rule applied to the delta line. R-2 replaces that line entirely with a
+		// DIRECTION and a PERCENT, so there is no Đ on it any more and the space
+		// rule has nothing to govern there. The rule itself is untouched and is
+		// still asserted on the Current figure by the sweep below.
+		// ⚠ staked 150 → current 151 ⇒ +1 on 150 = 0.67%, which ROUNDS TO 1%.
 		render(<PositionsTable payload={payload(row())} />);
 		const pl = screen.getByTestId(`tile-pl-${M1}`);
-		// staked 150 → current 151 ⇒ +1. The parenthesis and the sign are the
-		// cell's, the space is RF-4's.
-		expect(pl.textContent).toBe("(+Đ 1)");
+		expect(pl.textContent).toBe("1%");
+		// ⛔ THE GLYPH IS THE ONLY DIRECTION SIGNAL — the surface is monochrome by
+		// ruling, so an `aria-label` in WORDS is the whole accessible story.
+		expect(pl.getAttribute("aria-label")).toBe("up 1 percent");
+		expect(pl.querySelector("svg")).not.toBeNull();
 	});
 
-	it("renders a LOSS the same way, with U+2212 and a space", () => {
+	it("renders a LOSS with the same anatomy, pointing the other way", () => {
+		// staked 150 → current 138 ⇒ −12 on 150 = 8%.
 		render(<PositionsTable payload={payload(row({ current: dp18("138") }))} />);
 		const pl = screen.getByTestId(`tile-pl-${M1}`);
-		// ⚠ U+2212 MINUS, not the ASCII hyphen — byte-carried by the formatter.
-		expect(pl.textContent).toBe("(−Đ 12)");
+		expect(pl.textContent).toBe("8%");
+		expect(pl.getAttribute("aria-label")).toBe("down 8 percent");
+		// ⚠ THE TWO DIRECTIONS MUST NOT RENDER THE SAME GLYPH, and with no colour
+		// behind them that is the only thing distinguishing a gain from a loss.
+		// Compared against the gain above by PATH DATA, because both are `<svg>`
+		// and a node-presence check would pass on one icon used twice.
+		const down = pl.querySelector("svg")?.innerHTML ?? "";
+		cleanup();
+		render(<PositionsTable payload={payload(row())} />);
+		const up =
+			screen.getByTestId(`tile-pl-${M1}`).querySelector("svg")?.innerHTML ?? "";
+		expect(down).not.toBe("");
+		expect(down).not.toBe(up);
 	});
 
-	it("signs ZERO with ± — every delta carries a sign (P-2)", () => {
-		// ⛔⛔ SUPERSEDED, NOT BROKEN. This asserted `(Đ 0)` and was named "leaves
-		// ZERO unsigned — the sign logic is untouched by RF-4", as the control for
-		// the two tests above: RF-4 changed the SPACE and nothing else, so a build
-		// that "fixed the formatting" by signing everything would pass those and
-		// fail here.
-		// POSREV-POLISH P-2 rules the opposite — the delta ALWAYS carries a sign,
-		// including at zero — so the thing this guarded is now the thing the
-		// founder asked for. It keeps its job as a control by pinning the EXACT
-		// zero spelling instead of the absence of one.
-		// ⚠ `±` (U+00B1), chosen over `+`: a `+` on an unmoved position asserts a
-		// gain that did not happen, and a blank would leave one row in the column
-		// with no glyph where every other row has one. See `signGlyphFor` in
-		// `PositionsTable.tsx` — the shared formatter still returns an EMPTY sign
-		// for zero and is deliberately untouched, because its contract says the
-		// CALLER supplies the glyph and other callers keep the unsigned form.
+	it("says NOTHING with a percent when the position is exactly flat", () => {
+		// ⛔⛔ THIS TEST HAS NOW BEEN INVERTED TWICE AND IS WORTH READING WHOLE. It
+		// began as "leaves ZERO unsigned", asserting `(Đ 0)` — RF-4's control that a
+		// build which "fixed the formatting" by signing everything would fail.
+		// POSREV-POLISH P-2 then ruled that every delta carries a sign and it became
+		// `(±Đ 0)`. R-2 now removes the absolute delta altogether: an unmoved
+		// position renders an EM DASH and no glyph, because a percentage of zero
+		// movement is not `0%` — it is "did not move", and the dash says that
+		// without implying a direction.
 		render(<PositionsTable payload={payload(row({ current: dp18("150") }))} />);
 		const pl = screen.getByTestId(`tile-pl-${M1}`);
-		expect(pl.textContent).toBe("(±Đ 0)");
-		// ⛔ AND STILL NOT THE ASCII HYPHEN OR A BARE `+`: the glyph is exactly one
-		// of the three ruled spellings, so a build that signed zero as `+` reds.
-		expect(pl.textContent).not.toContain("+");
-		expect(pl.textContent).not.toContain("-");
+		expect(pl.textContent).toBe("—");
+		expect(pl.getAttribute("aria-label")).toBe("unchanged");
+		// ⛔ NO GLYPH ON THE FLAT CASE. A trending arrow beside a dash would claim a
+		// direction that did not happen.
+		expect(pl.querySelector("svg")).toBeNull();
+	});
+
+	it("renders `<1%` WITH its glyph when a real move rounds below one", () => {
+		// ⛔⛔ "MOVED A LITTLE" AND "DID NOT MOVE" ARE DIFFERENT FACTS AND GET
+		// DIFFERENT MARKS. staked 150 → current 150.3 is +0.2%, which rounds to
+		// zero — and `0%` beside an arrow reads as a bug. The escape is `<1%`,
+		// which keeps the direction honest without overstating the size.
+		render(
+			<PositionsTable payload={payload(row({ current: dp18("150.3") }))} />,
+		);
+		const pl = screen.getByTestId(`tile-pl-${M1}`);
+		expect(pl.textContent).toBe("<1%");
+		expect(pl.getAttribute("aria-label")).toBe("up less than 1 percent");
+		expect(pl.querySelector("svg")).not.toBeNull();
 	});
 
 	it("no Đ anywhere in the positions panel is followed by a digit", () => {

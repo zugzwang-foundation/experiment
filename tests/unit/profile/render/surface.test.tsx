@@ -437,16 +437,22 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// Current representation (integer part — display formatting is the
 		// component's; the 18-dp DTO strings are the source).
 		expect(rowOpen.textContent ?? "").toContain("31");
-		// ⛔⛔ THE STAKED FIGURE IS NO LONGER ANYWHERE ON AN OPEN TILE, and this
-		// line used to assert it WAS (`toContain("25")`). Two rulings took it, from
-		// opposite ends: RF-4 had already moved Đa to the group header, which P-1
-		// deletes, and the tile's own `from Đ 25` line is deleted by P-2. So an
-		// Open tile now shows what the argument is worth and how far it has moved,
-		// and never what was put in.
-		// ⚠ IT IS STILL REACHABLE — the CLOSED tab has a `Staked` column, asserted
-		// further down this same test. "Gone from the Open tile" and "gone from the
-		// surface" are different claims and only the first one is true.
-		expect(rowOpen.textContent ?? "").not.toContain("25");
+		// ⛔⛔ THE STAKED FIGURE IS BACK ON THE OPEN TILE, AND THIS ASSERTION HAS NOW
+		// FLIPPED TWICE IN TWO TASKS. Originally it required `25` on the tile (the
+		// `from Đ 25` line). POSREV-POLISH deleted that line and the group header's
+		// Đa together, so it became `not.toContain("25")` — an Open tile showed what
+		// an argument was worth and never what was put in.
+		// POSREV-POLISH-2 R-3 puts it back, deliberately and for a stated reason:
+		// R-2 turned the delta into a PERCENTAGE, and a percentage whose denominator
+		// appears nowhere is a figure nobody can check. So `survivingBasis` — the
+		// very string R-2 divides by — rides the market-question line.
+		// ⚠ ASSERTED THROUGH ITS OWN NODE, not by a bare substring: `25` could match
+		// almost anything on a money surface, and this is specifically the staked
+		// denominator.
+		expect(rowOpen.textContent ?? "").toContain("25");
+		expect(
+			within(rowOpen).getByTestId(`tile-staked-inline-${L1}`).textContent ?? "",
+		).toContain("staked Đ 25");
 		// The present argument cell carries the opener title (N-1a).
 		expect(text(within(rowOpen).getByTestId(`tile-arg-${L1}`))).toContain(
 			"Opener argument alpha",
