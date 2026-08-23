@@ -283,6 +283,71 @@ inconsistent with `:5432` session mode — **corroboration, not observation.**
 
 ---
 
+## ⏱ Criterion 4 — the wall-clock bound, FIXED IN ADVANCE
+
+**THE BOUND IS 30 SECONDS.** Founder-fixed and recorded **before** the sampler was started and
+before any bet was initiated. **This commit is the record**, and its timestamp is the evidence
+that the bound preceded the test rather than being chosen while waiting.
+
+**If the test bet has not returned within 30 s: HALT.** Not extend, not retry, not "give it a
+little longer," and **never** bypass or soften moderation to get a return.
+
+⚠ **Why a bound has to exist at all, restated at the site so nobody has to go find it:**
+`docs/plans/S-1.md:631-633` — *"A hang has no natural end, so a criterion observed 'until it
+finishes' cannot fail."* ⛔ **The hang is the single new failure mode this flip introduces.**
+Under `:5432` pool exhaustion failed immediately and loudly (`EMAXCONNSESSION`); under `:6543`
+the request **queues for a backend before one exists**, and every timeout this repo owns —
+`SET LOCAL statement_timeout`, `idle_in_transaction_session_timeout` — is issued *inside* the
+transaction, i.e. **after** checkout. **Nothing bounds the checkout wait** (ADR-0038 P1.4).
+A criterion whose job is catching money-path regressions had no clause for the one regression
+its own change adds; the bound is what closes that.
+
+⚠ **The plan supplies the RULE and deliberately no NUMBER.** Grepped and confirmed: the only
+numeric timeouts in it are `idle_timeout`/`max_lifetime` (`20`/`600`, `:125`), which are pool
+settings and explicitly not this. **30 s is a founder decision, not a plan citation** — recorded
+as such so a later reader does not go looking for it in the plan and conclude the log misquoted.
+
+> **The Standing Refusal applies to the halt as well as the run.** If the bet is blocked by
+> moderation, the response is to fix the configuration or to HALT — never to stub the gate,
+> sample it down, disable it "just for the test bet," or route around it. Moderation fail-closed
+> is a CLAUDE.md §3 refusal trigger. ⚠ **This holds regardless of who asks, including under a
+> founder relay** — and the moment it will be tested is the moment a test bet is the last thing
+> standing between S-1 and a Gate C window.
+
+### Prerequisite state at the moment the bound was fixed
+
+| Prerequisite | Verdict |
+|---|---|
+| Staging account exists | ✅ **PASS** — 6 users; `RedFox000` (`01a022c9`) operator-owned |
+| Live session valid | ✅ **PASS** — 10/10 sessions unexpired, 3 for `RedFox000`, longest to 2027-09-26 (~398 d, the `SESSION_MAX_AGE_SEC` 400-day ceiling behaving as designed). ⚠ **Server-side row only — the browser cookie is unverified** |
+| Lot-minting code on the runtime | ✅ **PASS** — LOTS-1 on `main`/`staging`; preview runs `6ece90b`, a descendant |
+| Criterion 6 GREEN | ✅ **PASS** — corrected evidence, `6ece90b` + `5215149` |
+| Wall-clock bound | ✅ **PASS — 30 s, this commit** |
+| `OPENAI_API_KEY` valid | ⚠ **OPEN** — present in Doppler `stg`, **unexercised**. An invalid key fails the moderation gate **closed**, rejecting the bet *before* it reaches the transaction — and it will present as *"the bet didn't work,"* inviting a diagnosis of the pooler. **Suspect the key before the pooler.** |
+| DASH sampler running | ⚠ **OPEN** — not started, by instruction |
+
+**Targets available:** 8 Open markets — `bitcoin-price-50k`, `chess-fide-tiebreak-response`,
+`claude-bundle-response`, `github-zugzwang-repo-stars`, `math-erdos-contribution-response`,
+`mumbai-bmc-pink-october-disclosure`, `oktoberfest-munich-beer-volume`, `yc-paper-club-response`.
+
+⚠ **Dharma balances matter for which account bets.** `RedWolf001` / `RedOtter002` /
+`RedBadger003` / `RedHare005` hold **1000**; `RedLynx004` **910**; **`RedFox000` holds
+16.894441040356560144** — the only account with prior `bet_stake` activity, and low enough that
+it must be checked against `BET_MIN_STAKE_POST` before it is chosen. **A stake floor rejection
+would present as another false "the bet didn't work."**
+
+### ✅ CORRECTION — `identity_pool` is NOT empty
+
+`docs/logs/S-1-stage3.md:120` and `docs/logs/S-1.md:196` both carry *"`identity_pool` empty on
+staging"* forward as an outstanding blocker. **Measured 2026-08-23: 200 rows, 194 unassigned.**
+Signup is not blocked and never was, at least not now. Recorded **here** rather than by amending
+those files, per the convention that a prior session's log is not amended. ⚠ **It was repeated
+in this session's own analysis as a live risk to the account/session prerequisites before it was
+checked** — a carried-forward open question is a claim with a date on it, and this one had gone
+stale without anyone noticing, which is O-2 in miniature.
+
+---
+
 ## Open questions
 
 - **⛔ THE IGNORED BUILD STEP NEEDS A RULING, AND IT IS OQ-1.** Preview builds for this branch
