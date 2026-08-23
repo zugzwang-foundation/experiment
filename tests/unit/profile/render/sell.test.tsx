@@ -193,14 +193,20 @@ describe("RF-5/6 — arming is a two-step with three ways out", () => {
 		expect(screen.getByTestId(`tile-cancel-${L1}`)).toBeTruthy();
 	});
 
-	it("sell::the-delta-and-the-from-line-HIDE-while-the-field-is-open", () => {
-		// ⚠ RF-5. A delta and a "from" beside an editable number answer a question
-		// the reader has stopped asking, and the cell is 124px wide.
+	it("sell::the-delta-HIDES-while-the-field-is-open", () => {
+		// ⚠ RF-5. A delta beside an editable number answers a question the reader
+		// has stopped asking, and the cell is 124px wide.
+		// ⛔ THE `from Đ …` HALF OF THIS GUARD IS GONE, BY RULING NOT BY REGRESSION.
+		// POSREV-POLISH P-2 removes that line from the Current cell entirely, so
+		// there is no longer a `tile-from-*` node to hide — the test now proves the
+		// delta hides and that the `from` line is absent in BOTH states, which is
+		// the honest shape of the assertion after the ruling.
 		render(<PositionsTable payload={OWNER} />);
-		expect(screen.getByTestId(`tile-from-${L1}`)).toBeTruthy();
-		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
 		expect(screen.queryByTestId(`tile-from-${L1}`)).toBeNull();
+		expect(screen.getByTestId(`tile-pl-${L1}`)).toBeTruthy();
+		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
 		expect(screen.queryByTestId(`tile-pl-${L1}`)).toBeNull();
+		expect(screen.queryByTestId(`tile-from-${L1}`)).toBeNull();
 	});
 
 	it("sell::the-✕-cancels-and-restores-the-figure", () => {
@@ -208,7 +214,12 @@ describe("RF-5/6 — arming is a two-step with three ways out", () => {
 		fireEvent.click(screen.getByTestId(`tile-sell-${L1}`));
 		fireEvent.click(screen.getByTestId(`tile-cancel-${L1}`));
 		expect(screen.queryByTestId(`tile-sell-amount-${L1}`)).toBeNull();
-		expect(screen.getByTestId(`tile-from-${L1}`)).toBeTruthy();
+		// ⚠ THE RESTORED FIGURE IS NOW THE DELTA, NOT `from Đ …`. This read
+		// `getByTestId('tile-from-…')`, which POSREV-POLISH P-2 deleted from the
+		// cell. The property under test is unchanged — cancelling puts the resting
+		// figures back — so the guard follows the surviving line rather than being
+		// dropped along with the one that went.
+		expect(screen.getByTestId(`tile-pl-${L1}`)).toBeTruthy();
 	});
 
 	it("sell::ESCAPE-cancels", () => {

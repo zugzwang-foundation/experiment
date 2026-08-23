@@ -785,13 +785,18 @@ describe("POSREV-1 rows 6 · 14 · 17 — the positions grid, re-cut per ARGUMEN
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
 		const cells = cellsOf(L1);
 		expect(cells.length).toBe(4);
-		// The `→` survives on the GROUP HEADER, where it still relates two figures.
-		// Asserting its absence from the tile AND its presence on the header is what
-		// distinguishes "moved" from "deleted".
+		// ⛔ THE `→` IS NOW GONE FROM THE WHOLE SURFACE, and this assertion used to
+		// say the opposite half: "the `→` survives on the GROUP HEADER, where it
+		// still relates two figures … asserting its absence from the tile AND its
+		// presence on the header is what distinguishes 'moved' from 'deleted'."
+		// POSREV-POLISH P-1 removed that header, and the arrow related `Đa → Đb`,
+		// which no longer renders anywhere. So the answer to "moved or deleted" is
+		// now DELETED, and it is asserted over the entire table rather than over the
+		// tile — a narrower check would pass if the arrow reappeared elsewhere.
 		expect(cells.map((c) => (c.textContent ?? "").trim())).not.toContain("→");
 		expect(
-			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "",
-		).toContain("→");
+			screen.getByTestId("positions-table").textContent ?? "",
+		).not.toContain("→");
 	});
 
 	it("grid::the-position-cell-carries-the-side-and-NOTHING-else", () => {
@@ -834,17 +839,20 @@ describe("POSREV-1 rows 6 · 14 · 17 — the positions grid, re-cut per ARGUMEN
 		expect(cellsOf(L1)[2]?.className).toContain("text-center");
 	});
 
-	it("grid::the-CURRENT-cell-stacks-value-over-delta-over-from", () => {
-		// RF-4's three lines, in order. ⚠ ASSERTED AS AN ORDERED LIST OF NODES, not
-		// as a flattened string: `textContent` cannot see a column, and the whole
-		// point of the cell is that the three figures sit one above another.
+	it("grid::the-CURRENT-cell-stacks-value-over-delta", () => {
+		// ⛔ TWO LINES SINCE POSREV-POLISH P-2, NOT RF-4's THREE. The third was
+		// `from Đ 25` and the founder has removed it; the expected list here is the
+		// ruling, so a build that kept the line reds.
+		// ⚠ THE STRUCTURAL DISCIPLINE IS UNCHANGED AND IS THE REASON THIS TEST
+		// EXISTS: asserted as an ORDERED LIST OF NODES, never as a flattened string,
+		// because `textContent` cannot see a column and the whole point of the cell
+		// is that the figures sit one above another (O-7).
 		render(<PositionsTable payload={OWNER_PAYLOAD} />);
 		const stack = cellsOf(L1)[2]?.firstElementChild;
 		expect(stack?.className).toContain("flex-col");
 		expect([...(stack?.children ?? [])].map((c) => c.textContent)).toEqual([
 			"Đ 31",
 			"(+Đ 6)",
-			"from Đ 25",
 		]);
 	});
 });
@@ -1013,15 +1021,22 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 		// Two, and only two — item 11 (P5-D17a) removed `All` and this row must
 		// not reintroduce it by widening the control.
 		expect(buttons.length).toBe(2);
-		// ⚠ `Closed` CARRIES A COUNT (RF-7), so its label is the word plus a
-		// number. The WORDS are unchanged — RF-13 is explicit that they stay
-		// exactly `Open` and `Closed` — so the count is read off its own node and
+		// ⚠ BOTH LABELS CARRY A COUNT SINCE POSREV-POLISH P-4 — RF-7 put one on
+		// `Closed` alone. The WORDS are unchanged — RF-13 is explicit that they stay
+		// exactly `Open` and `Closed` — so each count is read off its own node and
 		// the word is what is compared here.
 		expect(buttons.map((b) => b.firstChild?.textContent)).toEqual([
 			"Open",
 			"Closed",
 		]);
-		expect(screen.getByTestId("positions-closed-count").textContent).toBe("1");
+		// ⛔ BRACKETED, AND BOTH OF THEM. This asserted a bare `"1"` on Closed and
+		// nothing at all on Open; P-4 rules `Open (n)` · `Closed (n)`. The brackets
+		// are asserted as part of the string rather than stripped, because "the
+		// count renders" would pass on the un-bracketed form the founder replaced.
+		expect(screen.getByTestId("positions-open-count").textContent).toBe("(1)");
+		expect(screen.getByTestId("positions-closed-count").textContent).toBe(
+			"(1)",
+		);
 		// `aria-pressed` carries the selection — the state a `<select>` supplied
 		// in `.value` and a hand-rolled pair must declare.
 		expect(buttons[0]?.getAttribute("aria-pressed")).toBe("true");
@@ -1052,37 +1067,53 @@ describe("HTML-FINISH profile rows 2 · 7 — the arena panels and their bars", 
 	});
 });
 
-describe("POSREV-1 RF-3 — the market question moved to the GROUP HEADER", () => {
+describe("POSREV-POLISH P-1 — the market question is back INSIDE the tile", () => {
 	/**
-	 * ⚠⚠ THIS BLOCK REPLACES HTML-FINISH row 10 + row 13, AND IT IS AN INVERSION
-	 * RATHER THAN A DELETION. Those rows asserted the market question sits in the
-	 * ARGUMENT cell as a sub-line under the title, and that it links to the market
-	 * as a SIBLING of the title link. Both were right for a table whose unit was
-	 * the market. RF-3 changes the unit to the ARGUMENT and groups tiles under a
-	 * market header — at which point the sub-line prints the same question once
-	 * per argument held in that market, which is the duplication the whole revamp
-	 * exists to remove.
+	 * ⚠⚠ THIS BLOCK IS INVERTED BACK, AND THAT IS THE WHOLE STORY OF IT. It began
+	 * as HTML-FINISH rows 10 + 13, asserting the market question sits in the
+	 * ARGUMENT cell under the title and links to the market as a sibling of the
+	 * title link. RF-3 moved it to a sticky group header — correctly, for a table
+	 * whose unit had become the argument, because a sub-line prints the same
+	 * question once per argument held in that market.
 	 *
-	 * ⇒ Every property those rows protected is preserved ON THE HEADER: the
-	 * question renders, it links to the market (not to a thread), and it survives
-	 * a REMOVED argument — which was row 13's sharpest case, because the market
-	 * has to stay reachable exactly when its argument cannot be read.
+	 * POSREV-POLISH P-1 overrules that by founder ruling: the header cost more
+	 * vertical rhythm than the repetition it saved, and it broke the three-tile
+	 * window. So the question returns to the tile and rows 10 + 13's original
+	 * assertions are the live ones again.
+	 *
+	 * ⛔ THE DUPLICATION IS NOW THE EXPECTED OUTCOME, NOT A DEFECT — asserted
+	 * explicitly below, so nobody later "fixes" it back. Every property rows 10 and
+	 * 13 protected still holds: the question renders, it links to the MARKET rather
+	 * than to a thread, and it survives a REMOVED argument.
 	 */
 	const VISITOR_PAYLOAD = {
 		owner: false as const,
 		rows: [ROW_OPEN, ROW_SETTLED],
 	};
 
-	it("rf3::the-question-is-NOT-in-the-argument-cell-any-more", () => {
+	it("p1::the-question-IS-in-the-argument-cell-again", () => {
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		const argCell = cellsOf(L1)[1];
-		expect(argCell?.textContent ?? "").not.toContain(ROW_OPEN.marketTitle);
+		expect(argCell?.textContent ?? "").toContain(ROW_OPEN.marketTitle);
 	});
 
-	it("rf3::it-is-on-the-group-header-exactly-ONCE-per-market", () => {
-		// ⚠ THE COUNT IS THE ASSERTION. Two arguments in one market must produce
-		// ONE question on screen — "it renders" would pass on the very duplication
-		// this row removes.
+	it("p1::there-is-NO-group-header-left-to-carry-it", () => {
+		// ⛔ "It moved back" and "it is in both places" are different outcomes and
+		// only one is right — the same distinction RF-3's version drew, pointing
+		// the other way.
+		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
+		expect(
+			document.querySelectorAll('[data-testid^="positions-group-"]').length,
+		).toBe(0);
+	});
+
+	it("p1::it-repeats-ONCE-PER-TILE-which-is-the-accepted-cost", () => {
+		// ⚠⚠ THE COUNT IS STILL THE ASSERTION, INVERTED. RF-3's version required
+		// exactly ONE occurrence for two arguments in one market and called anything
+		// more "the duplication the whole revamp exists to remove". P-1 accepts that
+		// duplication knowingly, so the number is now TWO — and it is pinned rather
+		// than left loose, because "it renders" would pass on a build that printed
+		// it once and would hide a half-applied ruling.
 		const twoArgs = {
 			owner: false as const,
 			rows: [
@@ -1101,30 +1132,30 @@ describe("POSREV-1 RF-3 — the market question moved to the GROUP HEADER", () =
 		expect(screen.getByTestId(`position-tile-${L3}`)).toBeTruthy();
 		const occurrences =
 			(container.textContent ?? "").split(ROW_OPEN.marketTitle).length - 1;
-		expect(occurrences).toBe(1);
+		expect(occurrences).toBe(2);
 	});
 
-	it("rf3::the-header-question-links-to-the-MARKET-not-to-a-thread", () => {
+	it("p1::the-tile-question-links-to-the-MARKET-not-to-a-thread", () => {
 		// Canon §7 item 6: "market title → overview". ⛔ NOT `?post=` — that is a
 		// thread deep link and is the ARGUMENT title's target, which is the
-		// distinction row 13 minted and this preserves.
+		// distinction row 13 minted and this preserves through both inversions.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const link = screen.getByTestId(`positions-group-title-${M1}`);
+		const link = screen.getByTestId(`tile-market-${L1}`);
 		expect(link.tagName).toBe("A");
 		expect(link.getAttribute("href")).toBe(`/m/${ROW_OPEN.marketSlug}`);
 		expect(link.getAttribute("href")).not.toContain("?post=");
 	});
 
-	it("rf3::the-market-stays-reachable-on-a-REMOVED-argument", () => {
-		// ⚠⚠ ROW 13'S SHARPEST CASE, KEPT. `marketTitle` is market METADATA, not
-		// user argument text, so no masking obligation attaches (SC-1 governs
-		// `comments.body` and its derivations). Suppressing it on a removed
-		// argument would drop the market question from exactly the tiles whose
-		// argument the reader cannot see — where the context matters most.
+	it("p1::the-market-stays-reachable-on-a-REMOVED-argument", () => {
+		// ⚠⚠ ROW 13'S SHARPEST CASE, KEPT THROUGH BOTH INVERSIONS. `marketTitle` is
+		// market METADATA, not user argument text, so no masking obligation attaches
+		// (SC-1 governs `comments.body` and its derivations). Suppressing it on a
+		// removed argument would drop the market question from exactly the tiles
+		// whose argument the reader cannot see — where the context matters most.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
 		expect(screen.getByTestId(`tile-arg-removed-${L2}`)).toBeTruthy();
-		const link = screen.getByTestId(`positions-group-title-${M2}`);
+		const link = screen.getByTestId(`tile-market-${L2}`);
 		expect(link.getAttribute("href")).toBe(`/m/${ROW_SETTLED.marketSlug}`);
 	});
 });
@@ -1470,51 +1501,61 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 	const VISITOR_PAYLOAD = { owner: false as const, rows: [ROW_OPEN] };
 
 	it("itemD::BOTH-value-figures-carry-the-glyph", () => {
+		// ⚠ "BOTH" NOW MEANS THE TWO FIGURES IN THE CURRENT CELL — the value and its
+		// delta. It used to mean the group header's Đb and the tile's Current;
+		// POSREV-POLISH P-1 removed that header, so the pair being held to the
+		// all-or-none discipline is the pair that survived. The discipline itself is
+		// unchanged and still lives in ONE test, for the reason item D gave: two
+		// separate tests can go half-green and read as "mostly passing".
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const header = screen.getByTestId(`positions-group-figures-${M1}`);
 		const current = cellsOf(L1)[2];
-		for (const [name, node] of [
-			["group header", header],
-			["tile Current", current],
-		] as const) {
-			const t = (node?.textContent ?? "").trim();
-			expect(
-				t.codePointAt(0),
-				`item D: the ${name} figure must start with Đ (U+0110). Got "${t}".`,
-			).toBe(0x110);
-		}
+		const value = (current?.textContent ?? "").trim();
+		expect(
+			value.codePointAt(0),
+			`item D: the tile Current figure must start with Đ (U+0110). Got "${value}".`,
+		).toBe(0x110);
+		const delta = (
+			screen.getByTestId(`tile-pl-${L1}`).textContent ?? ""
+		).trim();
+		// The delta is wrapped in parentheses, so its Đ is at index 2 — after the
+		// `(` and the sign glyph, which P-2 makes mandatory on every delta.
+		expect(
+			delta.codePointAt(2),
+			`item D: the tile delta must carry Đ (U+0110). Got "${delta}".`,
+		).toBe(0x110);
 	});
 
 	it("itemD::the-rendered-strings-are-exactly-the-expected-shape", () => {
-		// The header states the market's move; the tile states this argument's.
 		// ⚠ NO SPACE BEFORE THE `(` — the gap there is the wrapper's flex `gap`,
 		// not a text node, so `textContent` has never carried one (POSREV-1 S2
 		// established this after encoding it wrongly once).
+		// ⛔ TWO CHANGES SINCE POSREV-1, BOTH BY RULING. The group-header line
+		// (`Đ 25 → Đ 31`) is gone with the header (P-1), and the tile's third line
+		// (`from Đ 25`) is gone from the Current cell (P-2). What is left is the
+		// exact two-line shape the founder asked for, pinned whole so a partial
+		// application of either ruling reds rather than passing on a substring.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		expect(
-			(
-				screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? ""
-			).trim(),
-		).toBe("Đ 25 → Đ 31");
-		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe(
-			"Đ 31(+Đ 6)from Đ 25",
-		);
+		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe("Đ 31(+Đ 6)");
 	});
 
-	it("itemD::the-ARROW-survives-on-the-HEADER-where-it-still-relates-two-figures", () => {
-		// ⛔ IT IS GONE FROM THE TILE and that is the point: a relation glyph
-		// between one value and nothing states nothing. Asserting its presence on
-		// the header AND its absence from the tile is what distinguishes "moved"
-		// from "deleted", which are different outcomes with the same green.
-		// The glyph is BYTE-CARRIED — U+2192, asserted by code point.
+	it("itemD::the-ARROW-is-now-DELETED-not-moved", () => {
+		// ⛔⛔ THE ANSWER TO "MOVED OR DELETED" HAS CHANGED, AND THE QUESTION HAS
+		// NOT. This asserted the arrow's PRESENCE on the group header and its
+		// absence from the tile, because "moved" and "deleted" are different
+		// outcomes with the same green. POSREV-POLISH P-1 removed the header, and
+		// the arrow existed only to relate `Đa → Đb` — neither of which renders now.
+		// So the honest answer is DELETED, asserted over the whole table rather than
+		// over the tile: a tile-scoped check would stay green if the arrow surfaced
+		// anywhere else.
+		// ⚠ THE POSITIVE CONTROL IS KEPT — the code-point assertion below proves the
+		// matcher can see a U+2192 at all, so the absence above is a real absence
+		// rather than a comparison that never fires.
 		render(<PositionsTable payload={VISITOR_PAYLOAD} />);
-		const header =
-			screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? "";
-		expect(header).toContain("→");
-		expect(header.codePointAt(header.indexOf("→"))).toBe(0x2192);
-		for (const cell of cellsOf(L1)) {
-			expect(cell.textContent ?? "").not.toContain("→");
-		}
+		expect(
+			screen.getByTestId("positions-table").textContent ?? "",
+		).not.toContain("→");
+		const control = "Đ 25 → Đ 31";
+		expect(control.codePointAt(control.indexOf("→"))).toBe(0x2192);
 	});
 
 	it("itemD::formatDharma-still-wraps-the-value-so-DROUND-holds", () => {
@@ -1535,16 +1576,14 @@ describe("POSREV-1 item D — Đ on the positions table's value figures", () => 
 				}}
 			/>,
 		);
-		expect(
-			(
-				screen.getByTestId(`positions-group-figures-${M1}`).textContent ?? ""
-			).trim(),
-		).toBe("Đ 14,260 → Đ 3,226");
-		// ⛔ THE MINUS IS U+2212, not an ASCII hyphen — byte-carried by the
-		// formatter. The tile's own delta is against its SURVIVING basis (25), not
-		// against the market's Đa, which is the RF-4 distinction.
+		// ⚠ THE GROUPING IS THE PROOF, and it is now read off the TILE — P-1 removed
+		// the group header this used to assert (`Đ 14,260 → Đ 3,226`). A bare
+		// `{row.current}` would print the raw NUMERIC(38,18), so a comma at the
+		// thousands mark is what shows the shared formatter is still in the path.
+		// ⛔ The tile's delta is against its SURVIVING basis (25), not against the
+		// market's Đa — the RF-4 distinction, unaffected by either polish ruling.
 		expect((cellsOf(L1)[2]?.textContent ?? "").trim()).toBe(
-			"Đ 3,226(+Đ 3,201)from Đ 25",
+			"Đ 3,226(+Đ 3,201)",
 		);
 	});
 
