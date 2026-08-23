@@ -12,6 +12,7 @@ import { PageContainer } from "@/components/shell/PageContainer";
 
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
+import { ComposerSlot } from "./composer/ComposerSlot";
 import { deriveReplySide } from "./composer/gating";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
@@ -206,13 +207,15 @@ export function DebateView({
 		popupReply !== null ||
 		lightboxUrl !== null ||
 		// ⚠⚠ UI-QUICK change set 3 §D — THE SIXTH SUB-VIEW, AND ITS ABSENCE WAS A
-		// defect I shipped. `ResolutionPopup` arrived in change set 2 holding its
+		// DEFECT I SHIPPED. `ResolutionPopup` arrived in change set 2 holding its
 		// own `open` state inside `ResolutionCriterion`, so it was invisible to
 		// this predicate and the carousel kept advancing behind the modal. Radix
 		// locks scroll and marks the page inert, so nothing was CLICKABLE behind
 		// it — but cards still moved, which is precisely the case the block above
 		// admits the lightbox for: "it covers the surface, and a card that moves
 		// underneath it has moved somewhere the reader cannot see."
+		// ⇒ The state is lifted here rather than the predicate reaching down,
+		// because this is the node that already owns every other sub-view flag.
 		criterionOpen;
 
 	/**
@@ -354,23 +357,37 @@ export function DebateView({
 	 * column is the OPPOSITE slot of the open bet side; the post scroller
 	 * otherwise. */
 	const marketColumnBody = (side: Side, scroller: ReactNode) => {
-		if (openSide !== null && side === opposite(openSide)) {
-			return viewer === null ? (
-				<AuthGateSlot side={openSide} onClose={() => setOpenSide(null)} />
-			) : (
-				<BetComposer
-					marketId={market.id}
-					slug={market.slug}
-					side={openSide}
-					kind="post"
-					viewer={viewer}
-					onClose={() => setOpenSide(null)}
-					onSuspended={() => setSuspended(true)}
-					onBusyChange={setComposerBusy}
-				/>
-			);
-		}
-		return scroller;
+		const hosts = openSide !== null && side === opposite(openSide);
+		return (
+			// UI-QUICK change set 3 §C — the slot slides in and out at canon §5's
+			// 260ms and moves focus on both edges. ⚠ IT WRAPS THE SLOT, NOT THE
+			// OCCUPANT: signed-out this animates `AuthGateSlot` and signed-in
+			// `BetComposer`, identically, because the motion belongs to the swap
+			// rather than to whichever component the viewer state selects.
+			<ComposerSlot
+				open={hosts}
+				busy={composerBusy}
+				scroller={scroller}
+				composer={
+					hosts && openSide !== null ? (
+						viewer === null ? (
+							<AuthGateSlot side={openSide} onClose={() => setOpenSide(null)} />
+						) : (
+							<BetComposer
+								marketId={market.id}
+								slug={market.slug}
+								side={openSide}
+								kind="post"
+								viewer={viewer}
+								onClose={() => setOpenSide(null)}
+								onSuspended={() => setSuspended(true)}
+								onBusyChange={setComposerBusy}
+							/>
+						)
+					) : null
+				}
+			/>
+		);
 	};
 
 	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
@@ -602,59 +619,77 @@ export function DebateView({
 										/>
 									}
 								>
-									{hostsComposer && resultingSide !== null && openReply ? (
-										viewer === null ? (
-											<AuthGateSlot
-												key={openReply}
-												side={resultingSide}
-												onClose={() => setOpenReply(null)}
-											/>
-										) : (
-											// key={openReply} (cascade H-2): a relation flip
-											// REMOUNTS the composer — side is immutable per
-											// instance (INV-3); a live instance can never flip.
-											<BetComposer
-												key={openReply}
-												marketId={market.id}
-												slug={market.slug}
-												side={resultingSide}
-												kind="reply"
-												viewer={viewer}
-												parentCommentId={selectedPost.id}
-												replyContext={{
-													relation: openReply,
-													authorPseudonym: selectedPost.removed
-														? null
-														: selectedPost.author.pseudonym,
-													postTitle: selectedPost.removed
-														? null
-														: selectedPost.title,
+									{/* §C — the reply arm takes the SAME slot wrapper as the market
+									    arm. ⛔ `key={openReply}` IS UNTOUCHED on both branches: a
+									    relation flip must still remount, because side is immutable
+									    per instance (INV-3) and a live instance can never flip. The
+									    wrapper animates the slot; the key still governs identity
+									    inside it. */}
+									<ComposerSlot
+										open={
+											hostsComposer &&
+											resultingSide !== null &&
+											openReply !== null
+										}
+										busy={composerBusy}
+										composer={
+											hostsComposer && resultingSide !== null && openReply ? (
+												viewer === null ? (
+													<AuthGateSlot
+														key={openReply}
+														side={resultingSide}
+														onClose={() => setOpenReply(null)}
+													/>
+												) : (
+													// key={openReply} (cascade H-2): a relation flip
+													// REMOUNTS the composer — side is immutable per
+													// instance (INV-3); a live instance can never flip.
+													<BetComposer
+														key={openReply}
+														marketId={market.id}
+														slug={market.slug}
+														side={resultingSide}
+														kind="reply"
+														viewer={viewer}
+														parentCommentId={selectedPost.id}
+														replyContext={{
+															relation: openReply,
+															authorPseudonym: selectedPost.removed
+																? null
+																: selectedPost.author.pseudonym,
+															postTitle: selectedPost.removed
+																? null
+																: selectedPost.title,
+														}}
+														onClose={() => setOpenReply(null)}
+														onSuspended={() => setSuspended(true)}
+														onBusyChange={setComposerBusy}
+													/>
+												)
+											) : null
+										}
+										scroller={
+											<ReplyScroller
+												side={side}
+												replies={repliesForSide(selectedPost, side)}
+												onOpenImage={setLightboxUrl}
+												onOpenPopup={setPopupReply}
+												// R3 — the post arm's own auto-advance. d5 runs a
+												// SECOND, structurally identical timer over the reply
+												// columns (`:1816-1901`); one hook serves both here.
+												// `stagger` on NO only, so the two columns advance
+												// one-after-another rather than flipping together.
+												auto={{
+													picked: pickedSide === side,
+													frozen,
+													onPick: () => pickSide(side),
+													stagger: side === "NO",
+													registerStep:
+														side === "YES" ? registerYes : registerNo,
 												}}
-												onClose={() => setOpenReply(null)}
-												onSuspended={() => setSuspended(true)}
-												onBusyChange={setComposerBusy}
 											/>
-										)
-									) : (
-										<ReplyScroller
-											side={side}
-											replies={repliesForSide(selectedPost, side)}
-											onOpenImage={setLightboxUrl}
-											onOpenPopup={setPopupReply}
-											// R3 — the post arm's own auto-advance. d5 runs a
-											// SECOND, structurally identical timer over the reply
-											// columns (`:1816-1901`); one hook serves both here.
-											// `stagger` on NO only, so the two columns advance
-											// one-after-another rather than flipping together.
-											auto={{
-												picked: pickedSide === side,
-												frozen,
-												onPick: () => pickSide(side),
-												stagger: side === "NO",
-												registerStep: side === "YES" ? registerYes : registerNo,
-											}}
-										/>
-									)}
+										}
+									/>
 								</DebateColumn>
 							);
 						})}
