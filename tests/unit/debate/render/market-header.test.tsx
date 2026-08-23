@@ -203,8 +203,15 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		// visible string, so a free-form label like the glyph era's "Show more"
 		// is now a failure rather than a requirement.
 		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
-		// Collapsed at rest; the control is what changes it.
-		expect(knowMore?.getAttribute("aria-expanded")).toBe("false");
+		// ⚠ UI-QUICK change set 2 (ruling R3 = c) — this asserted
+		// `aria-expanded === "false"`, which described the in-place toggle that
+		// lasted one commit. The expansion is a DIALOG now, so the control makes
+		// a different promise: `aria-haspopup="dialog"`. ⛔ `aria-expanded` is
+		// pinned ABSENT rather than merely unasserted — leaving it on a control
+		// that never expands makes a screen reader announce "collapsed" about a
+		// widget with no collapsed state.
+		expect(knowMore?.getAttribute("aria-haspopup")).toBe("dialog");
+		expect(knowMore?.getAttribute("aria-expanded")).toBeNull();
 
 		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
 		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-

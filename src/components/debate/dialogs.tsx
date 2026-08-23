@@ -232,6 +232,78 @@ export function ReplyPopup({
 }
 
 /**
+ * UI-QUICK change set 2 item 1 (ruling R3 = c) — the RESOLUTION CRITERION
+ * pop-up, opened by `Know more` under the one-line clamp.
+ *
+ * ⛔⛔ A THIRD SIBLING, NOT A REUSED `PostPopup` — and the file already ruled
+ * this shape. `PostPopup` takes `PresentPost | null` and renders a title, an
+ * `ArgProfile` author row, a lane badge, an attachment and an `AggregateFooter`.
+ * A market's resolution criterion has NONE of those: no author, no side, no
+ * stake, no aggregate. Reusing it would mean either widening its union to admit
+ * a non-post — the exact move `ReplyPopup`'s docblock above rejects for replies
+ * (plan H3-e) — or synthesising a fake `PresentPost`, which would render an
+ * author row for a market and put invented attribution on the terms of a bet.
+ * ⇒ The PRIMITIVE is shared (`@/components/ui/dialog`), the geometry is shared
+ * (`max-h-[90vh] max-w-[720px]`, CD-A row 14), and `useScrollTopOnOpen` is
+ * shared because this component lives in the same file rather than exporting it.
+ * Nothing is duplicated but the four lines every `Dialog` call site has.
+ *
+ * ⚠ FOCUS TRAP AND SCROLL LOCK ARE THE PRIMITIVE'S. Radix `Dialog` traps focus,
+ * restores it to the trigger on close, marks the rest of the page inert and locks
+ * body scroll. None of that is hand-rolled here, which is the whole reason the
+ * expander became a dialog rather than staying in place.
+ *
+ * ⚠ `whitespace-pre-wrap`, WHERE THE TWO SIBLINGS ABOVE USE `pre-line`. The
+ * difference is leading whitespace: `pre-line` collapses runs of spaces and
+ * `pre-wrap` keeps them. A resolution criterion is where an operator writes
+ * indented conditions and sub-clauses, so the indentation is part of the terms.
+ *
+ * ⛔ NO COPY IS AUTHORED. The dialog's heading is `Resolution` — the overline
+ * string already rendered under the clamp on this very surface (`d5:975`), not a
+ * new label invented for the pop-up.
+ */
+export function ResolutionPopup({
+	description,
+	onClose,
+}: {
+	/** `null` ⇔ closed. Mirrors the two siblings' controlled-by-content shape. */
+	description: string | null;
+	onClose: () => void;
+}) {
+	const scrollRef = useScrollTopOnOpen(description !== null);
+	return (
+		<Dialog
+			open={description !== null}
+			onOpenChange={(open) => {
+				if (!open) {
+					onClose();
+				}
+			}}
+		>
+			<DialogContent
+				ref={scrollRef}
+				className="max-h-[90vh] max-w-[720px] overflow-y-auto"
+			>
+				{description ? (
+					<>
+						<DialogHeader>
+							<DialogTitle>Resolution</DialogTitle>
+							{/* ⚠ The criterion is the dialog's BODY, not its description, so
+							    the slot that would normally hold a summary is closed out
+							    rather than filled with a duplicate of the text below it. */}
+							<DialogDescription className="sr-only">
+								The full resolution criterion for this market.
+							</DialogDescription>
+						</DialogHeader>
+						<p className="text-sm whitespace-pre-wrap">{description}</p>
+					</>
+				) : null}
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+/**
  * The image lightbox (DEBATE.4 §4) — a read-only enlarged view of a comment
  * image. Controlled by the open URL; focus-trap via shadcn Dialog; the title is
  * screen-reader-only (§8 a11y).

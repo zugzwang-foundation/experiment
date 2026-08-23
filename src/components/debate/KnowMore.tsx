@@ -3,12 +3,19 @@
 import { Button } from "@/components/ui/button";
 
 /**
- * UI-QUICK change set 1 — the `Know more` control. ONE implementation, two
- * mounts: the resolution criterion (`ResolutionCriterion`, where it toggles the
- * clamp in place) and the post card (`PostCard`, where it opens the full-body
- * pop-up). The two mounts differ in what they DO; the affordance the reader
- * learns is the same object in both places, which is the whole point of hoisting
- * it out of either one.
+ * UI-QUICK — the `Know more` control. ONE implementation, now FOUR mounts:
+ * the resolution criterion (`ResolutionCriterion`), the post card (`PostCard`),
+ * the focused post (`PostFocusHeader`) and the reply card (`ReplyCard`). The
+ * affordance the reader learns is the same object in all four, which is the
+ * whole point of hoisting it out of any one of them.
+ *
+ * ⚠⚠ EVERY MOUNT NOW OPENS A DIALOG, so `aria-haspopup="dialog"` is declared
+ * HERE rather than at four call sites. The component briefly carried an
+ * `expanded` prop for the criterion's in-place toggle; ruling R3 = c made that
+ * mount a dialog too, which left `aria-expanded` describing a state no mount
+ * has. It is removed rather than left dangling — an ARIA attribute that does not
+ * match the widget's actual behaviour is worse than none, because a screen
+ * reader announces "collapsed" about something that never expands.
  *
  * ⚠⚠ `label` MUST CONTAIN THE STRING `Know more`, and that is WCAG 2.5.3 (Label
  * in Name), not a style preference. The visible text IS `Know more`, so an
@@ -19,26 +26,27 @@ import { Button } from "@/components/ui/button";
  * moment the control carries visible text the rule switches on. Each call site
  * therefore passes a name that EXTENDS `Know more` rather than replacing it.
  *
- * ⚠ THE VISIBLE LABEL DOES NOT CHANGE WHEN EXPANDED — `aria-expanded` carries
- * the state instead. A control whose text flipped to `Show less` would have to
- * flip its accessible name with it to stay 2.5.3-compliant, and the kickoff
- * ruled the control reads `Know more`. `aria-expanded` is the mechanism the
- * platform already has for exactly this.
- *
  * ⚠ `text-n5 hover:text-ink` is CARRIED FROM THE CONTROL THIS REPLACES — the
  * `+`'s own ported recipe (CD-A `#989898`/`#FAFAFA` BY TOKEN, Ruling A / H-HEX),
  * pinned by `post-card.test.tsx`. No new colour enters.
+ *
+ * ⚠ `className` EXISTS FOR LAYOUT ONLY. The four mounts sit in different frames
+ * — one absolutely positioned in a reserved gutter, two as `shrink-0` flex
+ * siblings — so the call site owns POSITION while this component owns identity.
+ * ⛔ It is not a hook for re-styling the control per mount; a `Know more` that
+ * looked different in the reply column than on the card would defeat the reason
+ * all four share one component.
  */
 export function KnowMore({
 	label,
-	expanded,
 	onClick,
+	className,
 }: {
 	/** Full accessible name. MUST contain `Know more` — see the docblock. */
 	label: string;
-	/** Omitted where the control navigates rather than toggles (the pop-up mount). */
-	expanded?: boolean;
 	onClick: () => void;
+	/** Layout only — positioning at the mount. Never a restyle. */
+	className?: string;
 }) {
 	return (
 		<Button
@@ -47,8 +55,8 @@ export function KnowMore({
 			size="xs"
 			onClick={onClick}
 			aria-label={label}
-			aria-expanded={expanded}
-			className="text-n5 hover:text-ink"
+			aria-haspopup="dialog"
+			className={`text-n5 hover:text-ink${className ? ` ${className}` : ""}`}
 		>
 			Know more
 		</Button>

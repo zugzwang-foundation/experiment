@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { ResolutionPopup } from "./dialogs";
 import { KnowMore } from "./KnowMore";
 
 /**
@@ -26,39 +27,44 @@ import { KnowMore } from "./KnowMore";
  * affordance truncates the terms of the bet with no way to read the rest, and
  * this is that objection being ANSWERED, not overruled.
  *
- * ⚠ `whitespace-pre-wrap` ON THE EXPANDED ARM ONLY. `markets.description` is
- * authored prose with real paragraph breaks; the default `white-space:normal`
- * collapses them, so the expansion would render one undifferentiated wall of
- * text and the reader would have gained length without gaining structure. The
- * clamped arm does not take it — a single line has no breaks to survive, and
- * `line-clamp-1` and `pre-wrap` fight over the same overflow.
+ * ⚠⚠ THE EXPANSION IS A DIALOG, AND THE IN-PLACE VERSION IT REPLACES LASTED ONE
+ * COMMIT. Change set 1 toggled `line-clamp-1` ↔ `whitespace-pre-wrap` on the
+ * paragraph below. That was measured wrong in a way the clamp itself hid: this
+ * stack has no scroller any more (deliberately — the scrollbar collided with the
+ * sticky header), so an expanded criterion had nowhere to go and PAINTED DOWN
+ * OVER THE ARENA. Founder ruling R3 = c: it opens in a dialog instead.
+ * ⇒ The at-rest render is therefore UNCHANGED and ratified — one line, no
+ * overflow, no scroll container. Only what `Know more` does moved.
  *
  * ⛔ ZERO WRITES AND ZERO TRUNCATION. `markets.description` is untouched, the
- * full string is in the DOM in BOTH states, and the clamp is a VISUAL bound —
- * so find-in-page, a screen reader and the ADR-0025 `.md` export all still see
- * the whole criterion whether or not the control has been pressed.
+ * full string is in the DOM at rest as well as in the dialog, and the clamp is a
+ * VISUAL bound — so find-in-page, a screen reader and the ADR-0025 `.md` export
+ * all still see the whole criterion whether or not the control has been pressed.
  */
 export function ResolutionCriterion({ description }: { description: string }) {
-	const [expanded, setExpanded] = useState(false);
+	const [open, setOpen] = useState(false);
 
 	return (
 		<div className="pt-2.5 [border-top:var(--hairline)]">
 			<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
 				Resolution
 			</div>
-			<p
-				className={`mt-[5px] text-[11px] leading-[1.5] text-muted-foreground ${
-					expanded ? "whitespace-pre-wrap" : "line-clamp-1"
-				}`}
-			>
+			{/* ⛔ RATIFIED AT REST — `line-clamp-1`, and nothing else. Do not add an
+			    overflow or a scroller here; that pair is what R3 = c removed. */}
+			<p className="mt-[5px] line-clamp-1 text-[11px] leading-[1.5] text-muted-foreground">
 				{description}
 			</p>
 			{/* ⚠ The name EXTENDS `Know more` rather than replacing it — WCAG 2.5.3.
 			    See `KnowMore.tsx`, which states the rule its call sites obey. */}
 			<KnowMore
 				label="Know more about the resolution criterion"
-				expanded={expanded}
-				onClick={() => setExpanded((v) => !v)}
+				onClick={() => setOpen(true)}
+			/>
+			{/* Focus trap, focus restore and scroll lock all arrive with the
+			    primitive — see `ResolutionPopup`. Nothing is hand-rolled. */}
+			<ResolutionPopup
+				description={open ? description : null}
+				onClose={() => setOpen(false)}
 			/>
 		</div>
 	);
