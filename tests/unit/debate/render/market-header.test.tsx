@@ -162,7 +162,7 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		expect(className).toContain("pt-2.5");
 	});
 
-	it("market-header::criterion-clamps-to-two-lines-and-still-carries-no-affordance", () => {
+	it("market-header::criterion-clamps-to-ONE-line-and-carries-the-Know-more-affordance", () => {
 		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
 
 		const container = screen.getByText("Resolution").parentElement;
@@ -178,12 +178,33 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
 		// design-language / design-canon were each read at HEAD — none of them
 		// mentions clamping or truncating the criterion. No live §-text is
 		// contradicted, which is why the row ships with no spec rider.
-		expect(container?.innerHTML).toContain("line-clamp-2");
+		//
+		// ⚠⚠ REVERSED AGAIN AT UI-QUICK CHANGE SET 1 — 2 LINES → 1, AND THE
+		// NO-AFFORDANCE HALF FINALLY FALLS TOO. This read `toContain("line-clamp-2")`
+		// beside `expect(container?.querySelector("button")).toBeNull()` with the
+		// note "⛔ STILL NO AFFORDANCE, and that half did NOT reverse. 'Criterion
+		// length treatment' remains docketed to HEADER-3ZONE, so an expander here
+		// would decide a question that is explicitly deferred."
+		// ⇒ The kickoff of 2026-08-23 decides it. Both assertions INVERT rather
+		// than relax: the clamp is pinned TIGHTER (1 line, not 2) and the button
+		// is now REQUIRED where it was forbidden. The guard did not get weaker —
+		// it changed which shape it rejects.
+		expect(container?.innerHTML).toContain("line-clamp-1");
+		expect(container?.innerHTML).not.toContain("line-clamp-2");
 
-		// ⛔ STILL NO AFFORDANCE, and that half did NOT reverse. "Criterion length
-		// treatment" remains docketed to HEADER-3ZONE, so an expander here would
-		// decide a question that is explicitly deferred.
-		expect(container?.querySelector("button")).toBeNull();
+		// ⛔ THE AFFORDANCE IS THE WHOLE POINT OF THE TIGHTER CLAMP. One line with
+		// no way to read the rest would truncate the terms of the bet, which is
+		// exactly what the superseded ruling was protecting against; the expander
+		// is that objection being answered.
+		const knowMore = container?.querySelector("button");
+		expect(knowMore).not.toBeNull();
+		expect(knowMore?.textContent).toContain("Know more");
+		// WCAG 2.5.3 (Label in Name) — the accessible name must CONTAIN the
+		// visible string, so a free-form label like the glyph era's "Show more"
+		// is now a failure rather than a requirement.
+		expect(knowMore?.getAttribute("aria-label")).toContain("Know more");
+		// Collapsed at rest; the control is what changes it.
+		expect(knowMore?.getAttribute("aria-expanded")).toBe("false");
 
 		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
 		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-

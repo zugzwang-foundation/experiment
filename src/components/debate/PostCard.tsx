@@ -1,5 +1,7 @@
 "use client";
 
+import { Download } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -7,6 +9,7 @@ import { AggregateFooter } from "./AggregateFooter";
 import { ArgProfile } from "./ArgProfile";
 import { LaneBadge, SideBadge } from "./badges";
 import { CommentImage, PostImagePlaceholder } from "./CommentImage";
+import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebatePost, PresentPost, Side } from "./types";
 
@@ -175,33 +178,65 @@ export function PostCard({
 				    on the `+`, and the column scrolls as the backstop. */}
 				<button
 					type="button"
-					className="block w-full rounded-(--r-chip) pr-5 text-left hover:bg-n1 hover:underline"
+					className="block w-full rounded-(--r-chip) pr-28 text-left hover:bg-n1 hover:underline"
 					onClick={() => onEnter(post.id)}
 				>
 					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
 						{post.title}
 					</h3>
 				</button>
-				{/* Row 24 — `R4` REVERSED by the founder ruling of 2026-08-16, and the
-				    WCAG concern that motivated R4 is ANSWERED rather than dismissed.
-				    R4 removed the Plus glyph for a `Read more` text link and
-				    deliberately dropped the `aria-label`, because "Read the full
-				    argument" does not CONTAIN the visible text "Read more" — a WCAG
-				    2.5.3 (Label in Name) failure. With a glyph there IS no visible
-				    label, so 2.5.3 does not apply and an `aria-label` becomes REQUIRED
-				    rather than forbidden. ⛔ The label is BYTE-CARRIED from the
-				    mockup's own control (`d5:1077`, `aria-label="Show more"`), never
-				    authored. ✅ `text-n5 hover:text-ink` is kept from the R4 render —
-				    CD-A's `#989898`/`#FAFAFA` BY TOKEN (Ruling A / H-HEX). */}
-				<Button
-					variant="ghost"
-					size="xs"
-					onClick={() => onOpenPopup(post)}
-					aria-label="Show more"
-					className="absolute right-0 bottom-0 text-n5 hover:text-ink"
-				>
-					+
-				</Button>
+				{/* ⚠⚠ UI-QUICK change set 1 items 4 + 5 — THE `+` BECOMES `Know more`
+				    AND GAINS A NEIGHBOUR. The two controls are one right-aligned row in
+				    the gutter the title reserves, download on the LEFT.
+				    ⚠ THE BEHAVIOUR IS UNCHANGED — this is a label swap. The `+` opened
+				    the full body in a pop-up (`onOpenPopup`), and `Know more` opens the
+				    same pop-up through the same handler. Nothing about what the control
+				    DOES moved; only what it says it does.
+				    ⚠⚠ AND THE WCAG ARGUMENT INVERTS BACK. The superseded block read:
+				    "With a glyph there IS no visible label, so 2.5.3 does not apply and
+				    an `aria-label` becomes REQUIRED rather than forbidden … the label is
+				    BYTE-CARRIED from the mockup's own control (`d5:1077`,
+				    `aria-label="Show more"`)." That was correct FOR A GLYPH. A control
+				    with visible text `Know more` and an accessible name `Show more`
+				    fails WCAG 2.5.3 (Label in Name) outright — the name must CONTAIN
+				    the visible string. So `Show more` cannot survive the relabel, and
+				    the name becomes one that extends `Know more`. See `KnowMore.tsx`,
+				    which is where that rule now lives for both mounts.
+				    ⛔ THE GUTTER WIDENS FROM `pr-5` TO `pr-28`, and it has to. `pr-5`
+				    is d5's 19px reservation for a ONE-GLYPH control; a text button plus
+				    an icon needs ~100px, and at 19px the title would run underneath
+				    them. ⚠ The title stays a BLOCK with the cluster OVERLAID — making
+				    it a flex sibling would reproduce the measured defect row 24 fixed
+				    (title 628px → 104px, the widest delta in the phase-1 table). The
+				    gutter grows; the mechanism does not change. */}
+				<div className="absolute right-0 bottom-0 flex items-center gap-1">
+					{/* ⛔⛔ NON-FUNCTIONAL PLACEHOLDER — NO HANDLER, NO HREF, NO LOGIC.
+					    It is `disabled` AND `aria-disabled`, so it is unreachable by
+					    pointer and by keyboard and announces itself as unavailable
+					    rather than pretending to work. ⚠ The accessible name is
+					    REQUIRED here for the same reason the old `+` needed one and
+					    `Know more` does not: an icon carries no visible text, so 2.5.3
+					    does not apply and the label is the only name there is.
+					    ⚠ THE RECIPE IS THIS SURFACE'S OWN INLINE-ICON TREATMENT, taken
+					    off `ScrollRail.tsx:136` — `[&_svg]:size-3.5` at `text-n4`, the
+					    rail arrows' exact declaration. Lucide is the ratified set
+					    (`Download` is already imported by `profile/DownloadStub.tsx`);
+					    no icon dependency is added and no colour enters. */}
+					<Button
+						variant="ghost"
+						size="icon-xs"
+						disabled
+						aria-disabled="true"
+						aria-label="Download post image"
+						className="text-n4 [&_svg]:size-3.5"
+					>
+						<Download />
+					</Button>
+					<KnowMore
+						label="Know more about this argument"
+						onClick={() => onOpenPopup(post)}
+					/>
+				</div>
 			</div>
 			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
 			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real

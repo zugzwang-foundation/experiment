@@ -101,7 +101,27 @@ export function DebateColumn({
 			// column refuses to shrink below what it holds, the arena band pushes
 			// past its own `flex-1 min-h-0`, and the band silently reverts to
 			// content height. Nothing errors; the page just gets taller.
-			className={`flex min-h-0 flex-1 flex-col gap-3 ${
+			// ⚠ UI-QUICK change set 1 item 2 — THE COLUMN GETS AN OUTER EDGE. The two
+			// poles had no border at all, so YES and NO read as one undifferentiated
+			// field with cards floating in it; the border is what makes each column a
+			// container rather than a region.
+			// ⛔ TOKENS ONLY, NO VALUES. `var(--hairline)` (`globals.css:166`,
+			// `1px solid var(--color-n2)`) is the build's one ratified border — the
+			// same declaration `Card`, `SlotHeader` and `ResolverCard` already carry,
+			// so the column's edge and the edges inside it are the same line. `--r`
+			// (8px) is the radius every sibling container on this surface uses, and
+			// this component ALREADY used it for its own picked/engaged states.
+			// ⚠ `p-2` IS A JUDGEMENT CALL AND IT IS FLAGGED. Without it the column's
+			// new border sits flush on top of `SlotHeader`'s own hairline — two 1px
+			// lines touching, reading as one thick smudged edge on three sides. 8px
+			// is the smallest step that separates them. It costs the scroller 16px of
+			// height, which `min-h-0` absorbs; no link in the height chain moves.
+			// ⛔ THE POST CARDS INSIDE ARE UNTOUCHED — they keep their own `Card`
+			// border, which is the point: an outer edge around bordered cards.
+			// ⚠ The literal prefix `flex min-h-0 flex-1 flex-col gap-3` is PINNED by
+			// `debate-height-chain.test.ts` (`the-pole-column-may-shrink-below-its-
+			// content`), so the additions land AFTER it and the run stays intact.
+			className={`flex min-h-0 flex-1 flex-col gap-3 rounded-(--r) p-2 [border:var(--hairline)] ${
 				engaged
 					? "rounded-(--r) shadow-[0_0_10px_1px_rgba(255,255,255,0.2)]"
 					: ""

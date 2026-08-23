@@ -7,6 +7,7 @@ import { formatDharma } from "./format";
 import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
 import { PriceBar } from "./PriceBar";
+import { ResolutionCriterion } from "./ResolutionCriterion";
 import { ResolverCards } from "./ResolverCards";
 import type { DebateMarketHeader, Side } from "./types";
 
@@ -192,9 +193,28 @@ export function MarketHeader({
 					    ⇒ Reported rather than smoothed over: this stack is TIGHTER than the
 					    mockup's, and it is tighter because the marker row is a build element
 					    d5 has no equivalent of. Moving that row is not this fence's. */}
+					{/* ⚠⚠ UI-QUICK change set 1 item 1 — `overflow-y-auto` IS REMOVED FROM
+					    THIS STACK, and the accommodation it stood for is retired with it.
+					    The block above records why it was added: the stack overflowed its
+					    own band (`scrollHeight` 197 against `clientHeight` 188), so the
+					    resolver cards spilled past the headzone, and Q-1's extra row
+					    widened the spill. The scroll region that fixed it then COLLIDED
+					    with the sticky debate header — a scrollbar inside a band that is
+					    itself pinned under a sticky element.
+					    ⇒ Founder ruling: kill the scroll by CLAMPING, not by deleting.
+					    `ResolutionCriterion` goes 2 lines → 1, which returns ~16.5px to a
+					    band whose whole gap budget was 20.9px, so the stack fits AT REST
+					    with room it did not have before.
+					    ⛔ THE COST IS REAL AND IT IS THE EXPANDED STATE, reported rather
+					    than smoothed over: with no scroller here and no clip, pressing
+					    `Know more` on a long criterion paints the overflow DOWN OVER THE
+					    ARENA rather than scrolling it. Nothing is lost or unreachable —
+					    it is over-painted, and pressing the control again restores it —
+					    but it is a visible collision on a long description and the
+					    founder should see it before this leaves the review lane. */}
 					<div
 						data-testid="headzone-stack"
-						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
+						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px]"
 					>
 						{/* `.question` (`d5:463`) — `font-size:21px;font-weight:700;
 							    line-height:1.24`, and SINGLE LINE with an ellipsis
@@ -344,17 +364,7 @@ export function MarketHeader({
 					    `.overline`'s (`d5:468-469`) and ONLY `.overline`'s. Ported BY TOKEN
 					    (`text-n4`), never the hex — Ruling A / H-HEX. */}
 						{market.description ? (
-							<div className="pt-2.5 [border-top:var(--hairline)]">
-								<div className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
-									Resolution
-								</div>
-								{/* `.crittext` (`d5:470`) — `font-size:11px;line-height:1.5;
-								    color:var(--n6)`. It shipped at `text-sm` (14px), which is
-								    the same size as the body copy it is meant to sit under. */}
-								<p className="mt-[5px] line-clamp-2 text-[11px] leading-[1.5] text-muted-foreground">
-									{market.description}
-								</p>
-							</div>
+							<ResolutionCriterion description={market.description} />
 						) : null}
 						{/* HTML-FINISH · MARKET DETAIL row 3 — `.rescards` (`d5:986`), the
 						    last `vm` child of `.hstack`, after the criterion. It renders

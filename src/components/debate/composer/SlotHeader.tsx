@@ -150,27 +150,55 @@ export function SlotHeader({
 						    behaviour. The signed-out arm keeps the same shape and stays
 						    non-interactive, so the affordance does not appear and
 						    disappear between session states. */}
+						{/* ⚠⚠ UI-QUICK change set 1 item 3 — `SELL` NOW RENDERS AS `BUY`,
+						    AND THE `↗` IS GONE. The two controls sat in the same band at
+						    different sizes (`sm` vs `xs`) with only one of them carrying a
+						    glyph, so the market's two primary actions did not read as a
+						    pair.
+						    ⛔ THE MOCKUP IS THE AUTHORITY HERE, NOT A PREFERENCE. d5 gives
+						    `.sellbtn` and `.tradebtn` ONE shared rule (`d5:559`) — same
+						    font, size, weight, tracking and transform — so BUY and SELL are
+						    identical in the mockup BY CONSTRUCTION, and `d5:1061` renders
+						    `<button class="sellbtn">Sell</button>` with NO ARROW. The `↗`
+						    was the build's own addition. This is a restoration.
+						    ⛔⛔ IT IS STILL AN ANCHOR, AND THAT RULING IS UNTOUCHED. The
+						    `href` below is the W2.10-C click-through to the viewer's own
+						    profile with this market preselected (OQ-5 B) — the whole point
+						    of the control, and what plan H3-d makes a HALT to drop.
+						    `buttonVariants` supplies the SHAPE; `Link` keeps the
+						    behaviour; the sell path itself is not touched.
+						    ⚠ THE ARROW WAS DOING NAVIGATION-SIGNALLING WORK, and dropping
+						    it is a real cost: BUY opens a composer in place, SELL leaves
+						    for another page, and after this commit nothing on the control
+						    distinguishes those. d5 accepts that trade — its own arrowless
+						    `.sellbtn` navigates too (`:1909` → `nav('profile')`) — but it
+						    is the founder's to reverse, and one glyph restores it.
+						    ⚠ THE GEOMETRY IS BUY'S, BYTE FOR BYTE: `variant="outline"`,
+						    `size="sm"`, and the values-log §1 item 6 ruling
+						    `h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]` — copied off
+						    the entry button 60 lines up, never re-derived, so the two
+						    cannot drift apart again. */}
 						{ownPseudonym !== null ? (
 							<Link
 								data-testid="w210c-sell-link"
 								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
 								className={cn(
-									buttonVariants({ variant: "outline", size: "xs" }),
+									buttonVariants({ variant: "outline", size: "sm" }),
 									// `.sellbtn` (`d5:559`) — uppercase, `.06em`.
-									"tracking-[0.06em] uppercase",
+									"h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase",
 								)}
 							>
-								{COMPOSER_COPY.sell} ↗
+								{COMPOSER_COPY.sell}
 							</Link>
 						) : (
 							<span
 								aria-disabled="true"
 								className={cn(
-									buttonVariants({ variant: "outline", size: "xs" }),
-									"cursor-default tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
+									buttonVariants({ variant: "outline", size: "sm" }),
+									"h-auto min-h-[34px] cursor-default px-3.5 py-[7px] text-[13px] tracking-[0.06em] opacity-(--state-disabled-opacity) uppercase select-none",
 								)}
 							>
-								{COMPOSER_COPY.sell} ↗
+								{COMPOSER_COPY.sell}
 							</span>
 						)}
 					</>
