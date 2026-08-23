@@ -113,9 +113,18 @@ export function ArgumentList({
 	// and every call site that passes no `selection` at all (which is what the
 	// render suites do). It stopped being the DEFAULT; it did not stop existing.
 	// ⇒ WHY A FILTER, one line: SPEC.1 §16.3 D8 and §17 name the §23 argument
-	// list as where a complete record lives, and `positions.ts:151-158` drops
-	// fully-exited markets from the table — so this list holds arguments the
-	// table can never reach. A filter hides; a replacement would delete. It is
+	// list as where a complete record lives, and this list holds arguments the
+	// table cannot reach — an argument on a market the participant never took a
+	// position in at all. A filter hides; a replacement would delete. It is
+	// ⚠ THE REASON GIVEN HERE USED TO BE A DIFFERENT ONE, AND IT IS NOW FALSE.
+	// It read: "`positions.ts:151-158` drops fully-exited markets from the
+	// table". POSREV-1 RF-13 widened that domain — a fully-exited market now
+	// HAS a row, carrying its arguments — so the gap that clause described is
+	// closed. The conclusion survives on the narrower gap above; the premise
+	// does not, and a stale premise propping up a live conclusion is worse than
+	// no comment. ⛔ It also fenced BY LINE, which is O-8's own counter-example:
+	// `loadProfilePositions` has moved since, so the numbers pointed at nothing
+	// even before the claim stopped being true. Symbols, never lines.
 	// the same class of viewer-local narrowing as the market and Open/Closed
 	// filters already on the table, so no spec change is owed.
 	// ⛔ NO PERCENTAGE IN THE HEADER. The mockup's colhead carries a live side
@@ -683,27 +692,29 @@ function AuthorHead({ author }: { author: ProfileUser }) {
  * total enlarged + ink (`.stkn`)". The mockup emits it at `:609-613` as
  * `[Support chip + Đ] [bar + total] [Counter chip + Đ]`.
  *
- * ⚠ THE FILL MAPPING IS RATIFIED, NOT CHOSEN, and the governing clause is the
- * one the recon's own quote truncated. `design-language.md:180` ends: "*(The
- * reply stake bar's exact fill mapping follows the locked v1.0 surface.)*" The
- * locked surface is this mockup, whose `.bar{background:var(--n0)}` +
- * `.fill{background:var(--ink)}` (`:362-364`) is a FIXED bright-track /
- * dark-fill pair, not a side-keyed one. The shipped `ReplySplitBar.tsx:70,73`
- * already renders exactly that relationship in the dark system — `bg-no`
- * (#fafafa, bright) track under a `bg-yes` (#181818, dark) fill — so this reuses
- * the shipped idiom byte-for-byte rather than porting a light-theme colour.
+ * ⚠⚠ **THE FILL MAPPING LEFT THE POLES AT POSREV-1 RF-2(c), AND THE RESIDUAL
+ * THIS DOCBLOCK ROUTED TO THE FOUNDER IS THEREBY DISCHARGED.** What stood here
+ * was: `design-language.md:180`'s "*(The reply stake bar's exact fill mapping
+ * follows the locked v1.0 surface.)*" pointed at a mockup whose
+ * `.bar{background:var(--n0)}` + `.fill{background:var(--ink)}` (`:362-364`) is
+ * a FIXED bright-track / dark-fill pair, and `ReplySplitBar.tsx:70,73` renders
+ * exactly that in the dark system — `bg-no` track under a `bg-yes` fill. Ported
+ * faithfully; wrong anyway, for a reason the port could not see.
  *
- * ⚠⚠ THE RESIDUAL IS RECORDED, NOT HIDDEN. Support inherits the POST's side, so
- * on a NO-side post the Support share paints in the YES pole — the "route 3"
- * exposure `HeroPanels.tsx:325-346` fixed for Discovery by making both segments
- * side-keyed. Correcting it here is NOT free: a side-keyed colour expression in
- * this file makes `side-pole-binding.test.ts` RED on its closed-inventory
- * assertion, and greening it means adding this file to that guard's
- * `PERMITTED_FILES` — which is that guard's own documented extension mechanism
- * ("POLISH.3/.5/.6 will add legitimate pole sites … each such addition must be
- * a DECISION") but sits OUTSIDE this task's write allow-list. So the bar ships
- * on the ratified fixed mapping and the correction is ROUTED to the founder as
- * a widening. ⛔ It is NOT worked around by hiding the binding from the guard.
+ * ⛔ THE RESIDUAL IT RECORDED WAS REAL AND IS NOW CLOSED. Support inherits the
+ * POST's side, so on a NO-side post the Support share painted in the YES pole —
+ * the "route 3" exposure `side-pole-binding.test.ts` names as a KNOWN GAP its
+ * own matcher cannot reach, because no side value appears in the expression at
+ * all. The correction it proposed was to make both segments SIDE-KEYED, which
+ * would have needed this file added to that guard's `PERMITTED_FILES` and was
+ * routed to the founder as a widening.
+ *
+ * ⇒ **THE FOUNDER RULED THE OTHER WAY, AND IT IS THE BETTER ANSWER.** RF-2(c):
+ * Support/Counter is a DIFFERENT RELATION from the bet side and must not borrow
+ * the side encoding at all. So the bar moves onto the neutral ramp — which does
+ * not merely fix the render, it removes the class of error, because a track that
+ * names no pole cannot invert one. No widening is needed and the guard's
+ * inventory is untouched.
  *
  * `displaySplitTotal`, not `computeSplitBar.totalDharma`: SPEC.1 §10.8 names
  * "the reply split bar's staked total" as one of the TWO displayed-space
@@ -717,7 +728,7 @@ function SplitBar({
 	id: string;
 	aggregate: ProfileArgumentAggregate;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -736,18 +747,66 @@ function SplitBar({
 			role="img"
 			aria-label={`Support Đ ${formatDharma(aggregate.supportDharma)}, Counter Đ ${formatDharma(aggregate.counterDharma)}`}
 		>
-			<span className="flex items-center gap-1.5">
+			{/* ⚠⚠ POSREV-1 RF-2(a) — THE LABEL AND ITS FIGURE STACK. They were a
+			    horizontal `[Support][Đ n]` pair on each end, and with the bar between
+			    them the two Đ figures landed at different distances from their own
+			    labels and at different distances from the bar — so the eye had
+			    nothing to line them up against. A column puts each figure directly
+			    under the word it belongs to, and the two columns are then mirror
+			    images of each other across the bar.
+			    ⛔ THE COUNTER SIDE ALSO REVERSES ITS ORDER, and that is required
+			    rather than cosmetic. It rendered `[Đ n][Counter]` — figure first, so
+			    the label sat on the OUTSIDE edge — which was the horizontal layout's
+			    own mirroring. Stacked, "mirrored" means both labels on the TOP line,
+			    so keeping the source order would have put Counter's figure above its
+			    label while Support's sat below.
+			    ⚠ `gap-0.5` is the tightest shipped step; RF-2(a) says "directly
+			    beneath", and anything larger reads as two separate facts again. */}
+			<span
+				data-testid={`argument-split-support-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
 				<span className="text-n6">Support</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
+				{/* ⚠⚠ POSREV-1 RF-2(b) + RF-2(c) — THE TRACK AND FILL LEAVE THE POLES.
+				    This was a `bg-no` (#fafafa) track under a `bg-yes` (#181818) fill,
+				    carried from the shipped `ReplySplitBar` idiom. Two defects, one
+				    cause.
+				    ⛔ (c) THE POLES ENCODE THE BET SIDE UNDER INV-3, AND THIS BAR IS
+				    NOT ABOUT SIDES. Support inherits the POST's side, so on a NO-side
+				    post the Support share painted in the YES pole — the "route 3"
+				    exposure `side-pole-binding.test.ts` documents as a KNOWN GAP its
+				    own matcher cannot see, because no side value appears in the
+				    expression at all. Moving to the neutral ramp does not merely fix
+				    the render; it removes the class of error, since a neutral track
+				    cannot invert a pole it does not name.
+				    ⛔ (b) AND IT MADE THE EMPTY STATE READ AS ITS OPPOSITE. At Đ 0
+				    Support / Đ 0 Counter the fill is zero-width, so the whole bar was
+				    the TRACK — which, being the Counter pole, read as 100% Counter.
+				    "Nothing is not everything." At zero the fill span is not rendered
+				    at all, so an empty track is an empty track.
+				    ⚠ THE ZERO TEST IS `hasStake`, NOT the percentage: `supportPct` is
+				    `"0%"` both for "nothing staked" and for "all Counter", which are
+				    opposite facts, so a renderer keying on it alone MUST paint them the
+				    same. See `computeSplitBar`.
+				    ⚠ `bg-n2` is the hairline's own rung and `bg-n6` the bright end of
+				    the ramp — shipped tokens, no new value, and neither names a side. */}
 				<span
-					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-no"
+					data-testid={`argument-split-track-${id}`}
+					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-n2"
 					aria-hidden="true"
 				>
-					<span className="block h-full bg-yes" style={{ width: supportPct }} />
+					{hasStake && (
+						<span
+							data-testid={`argument-split-fill-${id}`}
+							className="block h-full bg-n6"
+							style={{ width: supportPct }}
+						/>
+					)}
 				</span>
 				{/* `.stkn` — canon §3 item 11's "split-bar staked total enlarged +
 				    ink". `<b className="text-sm text-ink">` is ReplySplitBar.tsx:76. */}
@@ -756,11 +815,14 @@ function SplitBar({
 					staked
 				</span>
 			</span>
-			<span className="flex items-center gap-1.5">
+			<span
+				data-testid={`argument-split-counter-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
+				<span className="text-n6">Counter</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
-				<span className="text-n6">Counter</span>
 			</span>
 		</div>
 	);

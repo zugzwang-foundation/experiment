@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — the arena mounts `PositionsTable`, which now owns the inline sell
+// and therefore calls `useRouter` for its post-sale `refresh()`. Nothing here
+// submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { ProfileArena } from "@/components/profile/ProfileArena";
@@ -13,11 +20,18 @@ import type { ProfileUser } from "@/server/profile/resolve";
 /**
  * ROUND 4 item 7 — THE ARGUMENT PANEL FILTERS TO THE PICKED ROW.
  *
- * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: the
- * full list is the default, one deselect away, and every argument that was in it
- * before is in it after. `positions.ts:151-158` drops fully-exited markets from
- * the table, so the list holds arguments the table can never reach — a
- * replacement would delete them from the surface.
+ * ⚠ THE LOAD-BEARING ASSERTION IS THAT IT FILTERS AND DOES NOT REPLACE: every
+ * argument that was in the list before a pick is in it after. The list holds
+ * arguments the table cannot reach — one made on a market the participant never
+ * took a position in — so a replacement would delete them from the surface.
+ *
+ * ⚠ TWO CLAUSES OF THIS PARAGRAPH WERE STALE AND ARE CORRECTED IN PLACE. It said
+ * the full list is "one deselect away" (PROFILE REFINEMENT R3 retired deselect)
+ * and that "`positions.ts:151-158` drops fully-exited markets from the table"
+ * (POSREV-1 RF-13 widened that domain — an exited market now has a row carrying
+ * its arguments). The assertion under test never depended on either; only the
+ * justification did, and a justification that has stopped being true is how a
+ * correct test comes to be deleted by someone who checks it.
  *
  * ⚠ THE MASKING ASSERTIONS READ THE BODY, NOT THE ROW (SC-1). A removed argument
  * is checked by asserting its BODY STRING is absent from the panel's serialised
@@ -395,6 +409,11 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		render(
 			<ProfileArena
 				positions={{ owner: false, rows: ROWS }}
+				// POSREV-1 RF-15 level 1 — the tile's exact figure. This suite does not
+				// exercise the identity; the prop is required so the arena cannot be
+				// mounted without one, which is what keeps the tile and the headers
+				// derived from a single number.
+				positionsValue="0.000000000000000000"
 				argumentItems={ITEMS}
 				owner={false}
 				author={USER}
@@ -418,7 +437,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// the panel. Asserted on the row that is NOT the mount default, so it is a
 		// real transition rather than a no-op.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_REPLY}`));
+		fireEvent.click(screen.getByTestId(`position-tile-${M_REPLY}`));
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		expect(panelTitle()).toBe("Market question for the reply");
 	});
@@ -432,7 +451,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// zero-row filter and every call site that passes no selection still reach
 		// it); it is simply no longer where a second click goes.
 		mount();
-		const row = screen.getByTestId(`position-row-${M_REPLY}`);
+		const row = screen.getByTestId(`position-tile-${M_REPLY}`);
 		fireEvent.click(row);
 		expect(screen.getByTestId(`argument-replica-${C_REPLY}`)).toBeTruthy();
 		fireEvent.click(row);
@@ -463,7 +482,7 @@ describe("items 5 + 7 end to end — picking a row moves the panel", () => {
 		// The derived-selection rule reaching the OTHER side of the arena: a panel
 		// filtered to a row that is no longer on screen would be unexplainable.
 		mount();
-		fireEvent.click(screen.getByTestId(`position-row-${M_POST}`));
+		fireEvent.click(screen.getByTestId(`position-tile-${M_POST}`));
 		expect(screen.getByTestId(`argument-replica-${C_POST}`)).toBeTruthy();
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
 		expect(screen.getByTestId("argument-list")).toBeTruthy();

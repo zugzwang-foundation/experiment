@@ -76,8 +76,29 @@ async function allEvents(): Promise<EventRow[]> {
 	`;
 }
 
-beforeEach(() => {
+beforeEach(async () => {
 	vi.clearAllMocks();
+	// ⛔⛔ TRUNCATE BEFORE, NOT ONLY AFTER — the `afterEach` below cleans up after
+	// THIS file and does nothing about what arrived before it. `allEvents()` reads
+	// `events` filtered by event_type but scoped to no user, so the FIRST test in
+	// this file counted whatever the PRECEDING file left behind.
+	//
+	// It is not hypothetical and it is not this file's fault:
+	// `tests/integration/onboarded-login-session.integration.test.ts` drives a real
+	// `auth.api.signInEmailOTP`, which fires the `session.create.after` hook and
+	// emits a genuine `user.otp_signed_in` row — and its own `truncateAll()` lists
+	// `users, accounts, sessions, identity_pool, verifications` and NOT `events`.
+	// Measured: run that file alone and two `user.otp_signed_in` rows survive it;
+	// run this one next and `happy-path-emits-one-event` reads 3.
+	//
+	// ⚠ WHY IT WAS INVISIBLE UNTIL NOW. `fileParallelism: false` means files run in
+	// sequencer order, and that order shifts whenever any file's size changes — so
+	// whether those two land adjacent is luck, and the suite had been lucky. A guard
+	// that depends on its neighbour is not a guard.
+	// ⇒ Cleaning before as well as after makes this file self-isolating against
+	// EVERY predecessor rather than against that one. Safe because each test seeds
+	// its own user and session; nothing here is meant to carry over.
+	await truncateTables(testClient, ["events", "users"]);
 });
 
 afterEach(async () => {

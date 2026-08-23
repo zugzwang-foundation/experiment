@@ -420,8 +420,16 @@ export default async function ProfilePage({
 				    from a per-item field: `loadProfileArguments` is untouched and no
 				    new read is issued — by this row or by item 7, which renders only
 				    fields the list already carries. */}
+				{/* ⚠ POSREV-1 RF-15 — `positionsValue` is handed to the arena as well
+				    as to the tiles. The §23 Positions-value tile and the positions
+				    table's market group headers have to agree on screen, and the only
+				    way that survives an edit is for both to be derived from ONE string.
+				    Re-summing `positions` inside the table would be byte-identical
+				    arithmetic over the same rows — i.e. two implementations that agree
+				    until one of them is changed. */}
 				<ProfileArena
 					positions={positionsPayload}
+					positionsValue={tiles.positionsValue}
 					argumentItems={argumentItems}
 					owner={owner}
 					author={profileUser}
