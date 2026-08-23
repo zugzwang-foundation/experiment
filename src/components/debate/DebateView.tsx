@@ -101,6 +101,28 @@ export function DebateView({
 	// every sub-view that stops the carousel, and a sub-view whose state the
 	// predicate cannot see is a sub-view that does not freeze anything.
 	const [criterionOpen, setCriterionOpen] = useState(false);
+	/**
+	 * R6 — which composer slots are OCCUPYING their column, exit included. Keyed
+	 * because BOTH columns render a `ComposerSlot` on every render and only one
+	 * hosts: a single boolean would be written by the hosting slot and immediately
+	 * clobbered by its idle neighbour, and which won would depend on effect order.
+	 */
+	const [occupiedSlots, setOccupiedSlots] = useState<Record<string, boolean>>(
+		{},
+	);
+	// ⚠ STABLE IDENTITY — this is in the slots' effect deps. A fresh function per
+	// render would make them report on every render, which with a `setState` in
+	// the effect is a render loop. The functional update also makes it a no-op
+	// when the value is unchanged, so an idle slot never re-renders the view.
+	const reportSlotOccupied = useCallback(
+		(slotId: string, occupied: boolean) => {
+			setOccupiedSlots((prev) =>
+				prev[slotId] === occupied ? prev : { ...prev, [slotId]: occupied },
+			);
+		},
+		[],
+	);
+	const slotOccupied = Object.values(occupiedSlots).some(Boolean);
 	// UI.A3 — the market-view Đ BET composer: at most ONE open (side-slot rule:
 	// betting side S renders the composer in the OPPOSITE slot; opening the
 	// other side closes the first — the d5 slot model, toggle-to-close).
@@ -224,7 +246,18 @@ export function DebateView({
 		// dead and it is not — dropping it is how the §D defect comes back, because
 		// the redesign will re-open this dialog and the predicate would once again be
 		// unable to see it. `debate-view-freeze.test.ts` fails if it is removed.
-		criterionOpen;
+		criterionOpen ||
+		// ⚠⚠ R6 — THE FREEZE TAIL, founder-ruled. Every term above reads a state
+		// that clears the INSTANT the reader dismisses the sub-view, so the
+		// carousel resumed ~260ms early — cards moved behind a composer that was
+		// still visibly sliding out. This term stays true until the slot has
+		// actually released the column.
+		// ⛔ IT IS NOT A SECOND TIMER. `ComposerSlot` reports its own `mounted`
+		// flag, which is the same state that decides whether the corpse renders at
+		// all — so a stuck freeze would require a stuck composer, visible on
+		// screen rather than silent. See `ComposerSlot.tsx` for why it cannot
+		// persist, and `composer-slot.test.tsx` for the guard that fails if it can.
+		slotOccupied;
 
 	/**
 	 * ⚠⚠ THE FOUNDER'S TWO KEYBOARD REPORTS, AND WHAT THEY ACTUALLY WERE.
@@ -373,6 +406,8 @@ export function DebateView({
 			// `BetComposer`, identically, because the motion belongs to the swap
 			// rather than to whichever component the viewer state selects.
 			<ComposerSlot
+				slotId={side}
+				onOccupiedChange={reportSlotOccupied}
 				open={hosts}
 				busy={composerBusy}
 				scroller={scroller}
@@ -634,6 +669,8 @@ export function DebateView({
 									    wrapper animates the slot; the key still governs identity
 									    inside it. */}
 									<ComposerSlot
+										slotId={side}
+										onOccupiedChange={reportSlotOccupied}
 										open={
 											hostsComposer &&
 											resultingSide !== null &&

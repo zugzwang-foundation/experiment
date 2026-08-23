@@ -70,6 +70,8 @@ export function ComposerSlot({
 	busy,
 	composer,
 	scroller,
+	slotId,
+	onOccupiedChange,
 }: {
 	/** The slot hosts the composer. Derived by the caller from `openSide`/`openReply`. */
 	open: boolean;
@@ -79,6 +81,15 @@ export function ComposerSlot({
 	composer: ReactNode;
 	/** The post/reply scroller this slot replaces. */
 	scroller: ReactNode;
+	/** Identifies this slot to `onOccupiedChange`. Two slots render at once. */
+	slotId: string;
+	/**
+	 * ⚠⚠ R6 — THE FREEZE TAIL. Reports whether this slot is OCCUPYING its column,
+	 * which is true through the exit as well as the open. `DebateView` ORs it into
+	 * `frozen`, so the carousel stays stopped until the corpse is actually gone
+	 * instead of resuming ~260ms early while a panel is still visibly leaving.
+	 */
+	onOccupiedChange?: (slotId: string, occupied: boolean) => void;
 }) {
 	const [mounted, setMounted] = useState(open);
 	const [state, setState] = useState<"open" | "closed">(
@@ -115,6 +126,40 @@ export function ComposerSlot({
 		const t = setTimeout(() => setMounted(false), EXIT_MS);
 		return () => clearTimeout(t);
 	}, [open, busy, mounted]);
+
+	/**
+	 * ⚠⚠ R6 — THE FREEZE TAIL, AND THE WHOLE DESIGN IS THAT THIS REPORTS `mounted`
+	 * AND NOTHING ELSE.
+	 *
+	 * The defect: `frozen` reads `openSide`/`openReply`, which clear the instant
+	 * the reader dismisses the composer — so the carousel resumed ~260ms before the
+	 * corpse finished animating out, and cards moved behind a panel still visibly
+	 * leaving.
+	 *
+	 * ⛔⛔ HOW THE "FREEZES FOREVER" FAILURE MODE IS RULED OUT, since that is the
+	 * real risk in feeding an animation into a global predicate. There is NO second
+	 * timer and NO second flag: the value reported here IS `mounted`, the same
+	 * state that decides whether this component renders the corpse at all (`if
+	 * (!mounted) return <>{scroller}</>` below). So "the freeze is on" and "the
+	 * corpse is on screen" are not two facts that must be kept in agreement — they
+	 * are ONE boolean read twice. A stuck freeze would require a stuck corpse,
+	 * which would be visible on screen rather than silent.
+	 * ⇒ The only writer of `mounted` is the exit effect above: one `setTimeout`,
+	 * cleared on re-open, plus the immediate `busy`/reduced-motion path.
+	 *
+	 * ⚠ AND THE CLEANUP IS THE SECOND HALF. If this component is torn down while
+	 * occupied — an arm swap, a post enter/exit — no effect would ever run again to
+	 * report `false`, and the flag WOULD stick with nothing on screen to explain
+	 * it. Reporting `false` on unmount is what closes that, and it is the one case
+	 * the "same lifecycle" argument above cannot cover by itself.
+	 */
+	useEffect(() => {
+		onOccupiedChange?.(slotId, mounted);
+	}, [slotId, mounted, onOccupiedChange]);
+
+	useEffect(() => {
+		return () => onOccupiedChange?.(slotId, false);
+	}, [slotId, onOccupiedChange]);
 
 	/**
 	 * ⚠⚠ THE FOCUS GAP, AND IT WAS A REAL ONE: opening the composer moved focus
