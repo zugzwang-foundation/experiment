@@ -157,19 +157,48 @@ export function AggregateFooter({
 				    STRUCTURE, so the border returns via the build's own token.
 				    ⛔ NOT `--border-strong`: `emphasis-ladder-tokens.test.ts:216`
 				    pins that token at zero consumers. */}
-				<span
-					data-testid="aggregate-split-track"
-					aria-hidden="true"
-					className={cn(
-						"h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
-						counterPole,
-					)}
-				>
+				{/* ⚠⚠ UI-QUICK change set 6 §1 — THE TRACK NOW OCCUPIES THE PILL'S OWN
+				    BOX, so its centre lands on the Support/Counter centres.
+				    MEASURED before: track centre 696.00 against Support 705.50 and
+				    Counter 706.00 — the bar sat 9.5px HIGH, because `items-start` on
+				    the row (`:106`) top-aligns all three columns and the 6px track is
+				    the first child of its column while a 25px pill is the first child
+				    of each neighbour. Two different first-child heights, one shared
+				    top edge.
+				    ⛔ `items-start` → `items-center` WAS TRIED ON PAPER AND DOES NOT
+				    SOLVE IT. That centres the COLUMNS, not the track: the track stays
+				    the first child of its own column, so it would land ~2px off — the
+				    arithmetic is columns 45/30/45 tall, centring the 30 inside 45
+				    moves the track by 7.5px against a 12.5px target. Better than 9.5,
+				    still outside the 1px bar. So the row's alignment is UNCHANGED.
+				    ⇒ The fix is declarative instead: the track sits in a box the same
+				    height as the control it aligns to (`h-6` = the pill's own
+				    specified box — `text-xs` 16px line + `py-1` 8px) and centres
+				    inside it. A bare offset like `mt-[9.5px]` would hit the same
+				    number today and drift silently the first time the pill's size
+				    variant changes; this expression stays true because it names the
+				    pill's box rather than a difference measured against it.
+				    ⚠ COST, MEASURED AND REPORTED: the centre column grows, so the
+				    strip grows a few px. Reported in the change-set file with the
+				    height-chain check.
+				    ⚠ The `items-center` cited in the comment below belongs to d5's
+				    INNER `.sidewrap` columns (`:585-586`) and is NOT authority for
+				    the outer row — it is not read as such here in either direction. */}
+				<span className="flex h-6 w-full items-center">
 					<span
-						data-testid="aggregate-split-fill"
-						className={cn("block h-full", supportPole)}
-						style={{ width: supportPct }}
-					/>
+						data-testid="aggregate-split-track"
+						aria-hidden="true"
+						className={cn(
+							"h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
+							counterPole,
+						)}
+					>
+						<span
+							data-testid="aggregate-split-fill"
+							className={cn("block h-full", supportPole)}
+							style={{ width: supportPct }}
+						/>
+					</span>
 				</span>
 				<span>
 					<b className="text-sm text-ink">Đ {formatDharma(displayedTotal)}</b>{" "}
