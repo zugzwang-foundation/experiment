@@ -399,23 +399,102 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		render(<DiscoveryCarousel markets={views(3)} />);
 		expect(document.activeElement).toBe(document.body);
 
-		fireEvent.keyDown(document.body, { key: "ArrowRight" });
+		// ⚠ EACH PRESS IS PRECEDED BY A BLUR BACK TO `<body>`, and that is a
+		// CS14 §2 consequence rather than ceremony: an arrow rotation now hands
+		// focus to the hero market link, so only the FIRST press of a run is
+		// genuinely a cold one. Re-parking focus makes every iteration below test
+		// the cold state it claims to, instead of silently testing the
+		// focus-is-inside branch from the second press onward.
+		const cold = (key: string) => {
+			(document.activeElement as HTMLElement | null)?.blur();
+			expect(document.activeElement).toBe(document.body);
+			fireEvent.keyDown(document.body, { key });
+		};
+
+		cold("ArrowRight");
 		expectActive(1);
-		fireEvent.keyDown(document.body, { key: "ArrowLeft" });
+		cold("ArrowLeft");
 		expectActive(0);
 		// …and it wraps backwards from a cold start, exactly as from inside.
-		fireEvent.keyDown(document.body, { key: "ArrowLeft" });
+		cold("ArrowLeft");
 		expectActive(2);
 
 		// ⛔⛔ AND UP/DOWN MUST NOT. These are the PAGE'S SCROLL KEYS. A reader
 		// who lands on Discovery and presses Down to scroll must get a scroll,
 		// not a market rotation nothing on screen explains. Asserted from
 		// body-focus, which is the only state in which this could regress.
-		expect(document.activeElement).toBe(document.body);
 		for (const key of ["ArrowDown", "ArrowUp"]) {
-			fireEvent.keyDown(document.body, { key });
+			cold(key);
 			expectActive(2);
 		}
+	});
+
+	it("render::cs14-an-arrow-rotation-hands-focus-to-the-hero-market-link", () => {
+		// ⛔⛔ CS14 §2 — THE FIX FOR "ENTER OPENS THE NEXT SLIDE". Enter was
+		// advancing because after clicking `›` focus sat on that button and Enter
+		// re-activated it — correct button behaviour, with focus in the wrong
+		// place. Rotation now hands focus to the hero market panel, which is a
+		// real <Link>, so Enter opens THAT market with no Enter handler anywhere.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const heroLink = screen.getByTestId("hero-market-link");
+
+		// From the `›` button — the exact case the founder reported.
+		keyInside("ArrowRight");
+		expectActive(1);
+		expect(document.activeElement).toBe(heroLink);
+		// The link is the SAME node across rotations (React updates its href in
+		// place), and it now points at the market the hero is actually showing —
+		// which is what makes a native Enter open the right one.
+		expect(heroLink.getAttribute("href")).toBe("/m/fixture-market-2");
+
+		// From a cold page — the entry gesture must land focus in the same place,
+		// or the first Enter after it would still go somewhere unpredictable.
+		(document.activeElement as HTMLElement).blur();
+		fireEvent.keyDown(document.body, { key: "ArrowRight" });
+		expectActive(2);
+		expect(document.activeElement).toBe(heroLink);
+		expect(heroLink.getAttribute("href")).toBe("/m/fixture-market-3");
+
+		// ⛔ AND THE `‹ ›` BUTTONS KEEP THEIR OWN ENTER/SPACE. Neither key is
+		// overridden — pinned by asserting the buttons carry no keyboard handler
+		// of their own and that Enter on `›` still ADVANCES rather than
+		// navigating. A build that "fixed" Enter by intercepting it on the
+		// section would fail here, and would also have made the buttons
+		// keyboard-unusable.
+		const next = screen.getByLabelText("Next market");
+		next.focus();
+		fireEvent.keyDown(next, { key: "Enter" });
+		fireEvent.click(next);
+		expectActive(0);
+	});
+
+	it("render::cs14-the-AUTO-ADVANCE-never-steals-focus", () => {
+		// ⛔⛔ CS14 §2 — ONLY ARROW ROTATIONS MOVE FOCUS. The 10s timer must not:
+		// yanking the caret away from a reader on a schedule they did not ask for
+		// is its own defect, and it would also fire while they were tabbing
+		// through the grid below. The timer lives in a separate effect precisely
+		// so it cannot reach the focus move — this is what pins that separation.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const heroLink = screen.getByTestId("hero-market-link");
+
+		// Nothing focused: a full auto-advance must leave it that way.
+		expect(document.activeElement).toBe(document.body);
+		act(() => {
+			vi.advanceTimersByTime(10_000);
+		});
+		expectActive(1);
+		expect(document.activeElement).toBe(document.body);
+
+		// …and with focus parked on a GRID CARD — a reader reading the tiles —
+		// the hero rotating under them must not pull the caret to the hero.
+		const card = screen.getAllByTestId("market-card")[0];
+		card.focus();
+		act(() => {
+			vi.advanceTimersByTime(10_000);
+		});
+		expectActive(2);
+		expect(document.activeElement).toBe(card);
+		expect(document.activeElement).not.toBe(heroLink);
 	});
 
 	it("render::cs14-preventDefault-ONLY-when-the-carousel-consumes-the-key", () => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { RefObject } from "react";
 
 import { SideBadge } from "@/components/debate/badges";
 import { computeSplitBar } from "@/components/debate/composer/split-bar";
@@ -64,10 +65,18 @@ export function HeroPanels({
 	card,
 	series,
 	topPosts,
+	linkRef,
 }: {
 	card: DiscoveryCard;
 	series: PricePoint[];
 	topPosts: HeroTopPosts;
+	/**
+	 * CS14 §2 — the carousel's handle on the market panel's own `<Link>`, so an
+	 * arrow rotation can hand focus to the market it just revealed and Enter
+	 * opens THAT market. Optional: the panel is complete without it, and every
+	 * render test mounts this component directly with no carousel above it.
+	 */
+	linkRef?: RefObject<HTMLAnchorElement | null>;
 }) {
 	return (
 		<div
@@ -109,7 +118,18 @@ export function HeroPanels({
 			    links, the composer's controls and `discovery/ErrorState.tsx` all
 			    carry this exact pair. Matching it is what keeps focus looking the
 			    same everywhere rather than inventing a second appearance. */}
+			{/* ⛔ CS14 §2 — AND STILL NO ENTER HANDLER, WHICH IS THE POINT. This is
+			    a real `<Link>`, so Enter has always opened the market natively.
+			    What was missing was somewhere sensible for focus to BE: after an
+			    arrow rotation focus sat on the `‹ ›` button that caused it, so
+			    Enter re-activated that button and advanced again. The carousel now
+			    hands focus HERE on every arrow rotation (`linkRef`), which fixes
+			    Enter by moving the cursor rather than by intercepting the key —
+			    and leaves the buttons' own Enter/Space behaviour untouched, as it
+			    must be, or they stop being usable from the keyboard at all. */}
 			<Link
+				ref={linkRef}
+				data-testid="hero-market-link"
 				href={`/m/${card.slug}`}
 				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
 			>

@@ -46,6 +46,9 @@ export function DiscoveryCarousel({
 	// grid below it. This ref is the arrow keys' entire scope boundary; see the
 	// key effect for why the region had to become explicit.
 	const controlsRef = useRef<HTMLDivElement>(null);
+	// CS14 §2 — the hero market panel's own `<Link>`, so an arrow rotation can
+	// hand focus to the market it just revealed.
+	const heroLinkRef = useRef<HTMLAnchorElement>(null);
 
 	useEffect(() => {
 		if (n <= 1) {
@@ -139,6 +142,24 @@ export function DiscoveryCarousel({
 			// which is the whole reason the guards come first.
 			e.preventDefault();
 			setActive((i) => (i + (back ? -1 : 1) + n) % n);
+			// ⛔ CS14 §2 — HAND FOCUS TO THE MARKET THE ROTATION JUST REVEALED.
+			// Enter then opens THAT market, natively, because the panel is a real
+			// <Link> — no Enter handler exists anywhere on this section and none
+			// is to be added. Before this, focus stayed on the `‹ ›` button that
+			// caused the rotation, so Enter re-activated the button and advanced
+			// again; the button was behaving correctly and focus simply had
+			// nowhere better to be.
+			//
+			// ⚠ Only ARROW rotations move focus. The 10s auto-advance must not —
+			// stealing focus from a reader on a timer is its own defect, and the
+			// timer lives in a separate effect precisely so it cannot.
+			//
+			// ⚠ `preventScroll` because a focus move that scrolls the page on
+			// every arrow press is also its own defect. The <a> node survives the
+			// re-render (same element, same position — React updates its href in
+			// place), so focusing it here rather than in an effect is safe and
+			// keeps "arrow-driven" distinguishable from "timer-driven".
+			heroLinkRef.current?.focus({ preventScroll: true });
 		};
 		document.addEventListener("keydown", onKey);
 		return () => document.removeEventListener("keydown", onKey);
@@ -195,6 +216,7 @@ export function DiscoveryCarousel({
 					card={view.card}
 					series={view.series}
 					topPosts={view.topPosts}
+					linkRef={heroLinkRef}
 				/>
 
 				{/* HTML-FINISH row 8 — the rail is FIXED height and takes no share of
