@@ -50,9 +50,25 @@ import { cn } from "@/lib/utils";
  * That is the correct shape for a cross-surface presentational primitive, and
  * it is exactly why `debate/badges.tsx` — imported by client modules
  * (`PostCard`, `dialogs`, `SellModule`) and by shared ones (`HeroPanels`,
- * `ArgumentList`, `DebateColumn`) alike — carries none either. Pinning the
- * directive on would fix this leaf to the client graph for no gain today, and
- * would be actively wrong the day any host becomes a true Server Component.
+ * `ArgumentList`, `DebateColumn`) alike — carries none either.
+ *
+ * ⚠ AND THE MECHANISM IS NOT HYPOTHETICAL HERE — it is exercised in this repo
+ * today. `ui/card.tsx` and `ui/badge.tsx` are directive-less `ui/` primitives
+ * that resolve into the SERVER graph and the CLIENT graph at the same time:
+ * server importers `(auth)/onboarding/page.tsx`, `profile/ProfileTiles.tsx`
+ * and `profile/IdentityCard.tsx`, client importers all over `debate/`. ⛔ THIS
+ * CITATION REPLACES A WEAKER ONE. `badges.tsx` has the same graph residency as
+ * this leaf — no directive, and client-only in practice — so it demonstrates
+ * the SHAPE but not the DUAL RESIDENCY, and a reader could take the sentence
+ * above as a description of what happens rather than of what could
+ * (`@code-reviewer` NEW-3). `card` and `badge` prove it operates.
+ *
+ * Pinning the directive on would fix this leaf to the client graph for no gain
+ * today, and would be the wrong choice the day any host becomes a true Server
+ * Component: it would still WORK — `createdAt` is a serializable string and
+ * hydration is already suppressed — it would simply ship JavaScript for a
+ * string that never changes. *(An earlier draft said "actively wrong", which
+ * overstates a bundle cost as a correctness problem — `@code-reviewer` NEW-4.)*
  *
  * ⚠ IF `cacheComponents` IS EVER TURNED ON, this leaf is the thing to revisit,
  * and `"use client"` is NOT the remedy — a client component still runs its body
