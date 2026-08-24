@@ -10,6 +10,7 @@ import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyBlock } from "@/components/ui/empty-block";
+import { RelativeTime } from "@/components/ui/relative-time";
 import type {
 	ProfileArgumentAggregate,
 	ProfileArgumentItem,
@@ -532,6 +533,33 @@ function PresentHead({
 					</span>
 				</>
 			)}
+			{/* TIME-1 — HOW LONG AGO, AFTER EVERY TAG ON THIS ROW: after
+			    `Replies · N` on a post, and after the stake / `Sold` / struck
+			    original on a reply, since a reply has no reply count (§9).
+			    ⛔ NO `HeadSeparator` BEFORE IT. `arrangement.test.tsx:262` pins this
+			    head at EXACTLY THREE seam points against canon §3 item 11 —
+			    `avatar · name | SIDE @ entry% | stake | Replies · N` — and a fourth
+			    pipe is an extension of that composition. The amendment belongs in
+			    canon, not in the guard that exists to catch the drift. The age
+			    separates on the row's own `gap-2` instead.
+			    ⛔ BEFORE THE `ml-auto` WRAPPER, NOT AFTER IT. That wrapper is the
+			    trailing-edge action cluster; an age pushed past it would read as
+			    chrome beside the download mark rather than as the last thing the
+			    head says. This is the same relationship the debate card's row has
+			    between its meta cluster and its own trailing mark.
+			    ⚠ `text-xs` IS PASSED, and it is a SIZE, never a treatment. Every
+			    sibling on this row states its own size (`:483` the stake, `:502` the
+			    struck original, `:524` the `Replies ·` label) because the row itself
+			    states none — so a leaf that inherited would render at the card's
+			    base size and be the one oversized field in the cluster. The colour
+			    stays the leaf's `text-n5`, which is what `:524` already carries.
+			    ⛔ NOT ON `RemovedHead`. A removed argument's head is a deliberately
+			    different, shorter cluster, and market detail renders no identity row
+			    at all for a removed post or reply — so the uniform rule across every
+			    surface is that present cards carry an age and removed stubs do not.
+			    Adding one there would be a new decision about what a withheld
+			    argument discloses, made in a task that was not asked to make it. */}
+			<RelativeTime createdAt={item.createdAt} className="text-xs" />
 			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
 			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,
 			    extracted to its own component (SUB-1). `ml-auto` on this wrapper is

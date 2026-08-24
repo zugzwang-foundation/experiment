@@ -229,14 +229,28 @@ export function ArgProfile({
 				    EDGE; appending there would put the age past a control rather than
 				    after the tags. The ruling is that it follows `Replies · N`, and
 				    `Replies · N` is here.
-				    ⚠ `Sep` IS UNCONDITIONAL BECAUSE THE TIMESTAMP IS. Every other
-				    group on this row carries its divider inside its own conditional,
-				    so the divider and the thing it separates appear and disappear
-				    together; this group always renders, so its divider always does.
+				    ⛔⛔ NO `Sep` BEFORE IT, AND THAT IS A MEASURED DECISION RATHER
+				    THAN AN OMISSION. The first build of this DID carry one. Two
+				    shipped guards count the pipes on the sibling rows against a
+				    governing source and go RED on a fourth —
+				    `tests/unit/profile/render/arrangement.test.tsx:262` pins THREE
+				    against canon §3 item 11's `avatar · name | SIDE @ entry% | stake
+				    | Replies · N`, and
+				    `tests/unit/discovery/render/hero-panels.test.tsx:171` pins TWO
+				    against the hero mockup's own markup. This row is governed the
+				    same way by d5 `:960-968`; it simply has no guard counting it.
+				    ⇒ A pipe here is an extension of a ratified composition, and the
+				    way to make that extension is a canon amendment, not an edit to
+				    the guards that exist to catch it. The age separates on the row's
+				    own `gap-1.5` instead — which the row already does between the
+				    side chip and the position marker, so it is not a new grammar.
+				    ⚠ IF THE FOUNDER RULES THE PIPE IN, it is one `<Sep />` here, one
+				    `<HeadSeparator />` at each sibling row, and three counts — and
+				    canon gains the field either way, because a trailing age is a
+				    composition change with or without a divider.
 				    ⛔ NO SIZE IS PASSED. This row is `text-xs` and the leaf inherits
 				    it — stating a size here would state it without its leading, which
 				    is the trap that put every tile 10px tall at PROFILE-FULL. */}
-				<Sep />
 				<RelativeTime createdAt={createdAt} />
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM
