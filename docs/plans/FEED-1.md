@@ -29,13 +29,20 @@ squash. Flagged; I am walled off from pushing `staging` and will not.
 
 ### Ground verification (each with its positive control)
 
+> ⚠ **FENCED BY SYMBOL, NOT BY LINE (O-8).** This table cited `DebateView.tsx:408` / `:671` and
+> `BetComposer.tsx:338-344` when it was written, and every one of those numbers was stale
+> before the branch was three commits old — the widening moved them, and moving
+> `marketColumnBody` below its inputs moved them again. A fence that names a line goes stale
+> from the very edit it guards. Line numbers below are demoted to evidence; the symbols are the
+> fence.
+
 | Claim | Command | Result | Positive control |
 |---|---|---|---|
 | `ComposerSlot.tsx` exists here | `ls src/components/debate/composer/` | present, 266 lines | 19 sibling files listed |
 | It is a strict 2-state machine | read in full | `open: boolean`, `state: "open"\|"closed"`, one ternary | — |
-| Two call sites, no third | `grep -rn ComposerSlot src --include='*.tsx'` | `DebateView.tsx:408` (market), `:671` (reply) | same grep returns `DebateColumn` hits for a term known present |
-| Success path | `BetComposer.tsx:338-344` | `OUTCOME success` → `router.refresh()` → `onClose()` | — |
-| Poll suspends on composer-open | `DebateView.tsx:586` | `composerOpen={openSide !== null \|\| openReply !== null}` | — |
+| Two call sites, no third | `grep -rn ComposerSlot src --include='*.tsx'` | both inside `DebateView`'s `marketColumnBody` and its post-arm `DebateColumn` map | same grep returns `DebateColumn` hits for a term known present |
+| Success path | `BetComposer`'s `submit()`, the `outcome.kind === "success"` branch | `OUTCOME success` → `router.refresh()` → `onClose()` | — |
+| Poll suspends on composer-open | `DebateView`'s `<DebatePoll>` mount | `composerOpen={openSide !== null \|\| openReply !== null}` | — |
 | …and it reads `openSide`, **not** occupancy | same line | ⚠ **differs from the freeze** — see §2 RF-4 | — |
 
 ---
@@ -44,8 +51,9 @@ squash. Flagged; I am walled off from pushing `staging` and will not.
 
 **Layer:** runtime `router.refresh()` invocations across the **real** `DebateView` tree,
 driven through a **real** submit (jsdom + stubbed wire).
-**Not** a call-site count — a grep finds three `router.refresh` sites and none of them tells
-you that the poll fires a second one from a different file.
+**Not** a call-site count — a grep finds **17** `router.refresh()` call sites in `src/`, **7**
+of them on this surface, and none of them tells you that the poll fires a second one from a
+different file on a path the composer never touches.
 **Conversion:** `/m/[slug]/page.tsx` calls `loadDebateView` exactly once per render ⇒ one
 refresh = one `loadDebateView` + the layout re-execution that rides every refresh (12–14 round
 trips per tick, F-DEBATE-4). Refresh count is the multiplicand.
@@ -127,7 +135,8 @@ a state, never a crash.
 
 The brief infers `useTransition`'s `isPending`. **I did not adopt it**, for a measured reason:
 `router.refresh()` wraps its own dispatch in **its own** `React.startTransition`
-(`node_modules/next/dist/client/components/app-router-instance.js:355-361`, read at HEAD). An
+(`node_modules/next/dist/client/components/app-router-instance.js`, the `refresh:` member of
+the app-router instance, read at HEAD). An
 outer `useTransition`'s pending flag is therefore tracking a *different* transition object than
 the one carrying the RSC fetch, and whether it stays pending depends on React lane-scheduling
 internals I cannot measure without a browser.
@@ -155,9 +164,24 @@ memoized) but not measurable here. → §7.
 Between success and the model landing, the composer stays mounted showing **its own in-flight
 state** — the correct thing to show, and not an approximation of anything.
 
-⛔ The wall says every path out must terminate. It does, **unconditionally**: a `pointerdown`
-or `wheel` outside the slot dismisses, and that dismisser is armed **from the moment of
-success**, not from the moment of confirmation.
+⛔ The wall says every path out must terminate. The dismisser is armed **from the moment of
+success**, not from the moment of confirmation — that is what covers the window before a model
+arrives.
+
+> ⚠⚠ **THIS PARAGRAPH WAS WRONG AS FIRST WRITTEN, AND IT IS CORRECTED HERE RATHER THAN IN AN
+> APPENDIX (O-5).** It read: *"It does, **unconditionally**: a `pointerdown` or `wheel` outside
+> the slot dismisses…"* — and `@code-reviewer` returned it as a **CRITICAL**, correctly.
+> Activating a button from a keyboard dispatches `click` and **no `pointerdown`**; keyboard
+> scrolling fires `scroll`, not `wheel`. So for a keyboard-only or switch-access reader that
+> listener set was unreachable, and in the wait window **every other exit is independently
+> dead** — the composer's `×` is `disabled={inFlight}`, its own ESC handler is guarded on the
+> same flag, all five host navigations no-op on `composerBusy`, the identity retirement needs
+> one of those five to move, and the fallback needs a payload that by hypothesis never came.
+> Place a bet, lose the connection, and a keyboard reader was trapped.
+> ⇒ **`Escape` is the modality-independent exit**, and it is the key that already closes the
+> composer and every dialog on this surface. Guarded by
+> `posted::ESCAPE-releases-the-author-in-the-WAIT-window-with-no-pointer-event`, which dispatches
+> no pointer event at all — so it cannot pass on a pointer listener.
 
 ⚠ Arming it during the wait is safe *specifically because* `posted !== null` proves the request
 already returned 200. `composerBusy` is still `true` in that window, but it is **stale** — the
@@ -214,16 +238,36 @@ dismissal, not on success):
 
 ### RF-5 · Dismissal — every path terminates
 
-| Path | Mechanism |
-|---|---|
-| the `×` | `PostedConfirmation`'s own control, `COMPOSER_COPY.close` — no new string |
-| `pointerdown` outside the slot | new document listener, armed while `posted !== null` |
-| `wheel` / `touchmove` outside the slot | same listener set |
-| clicking the card's title | `enterPost` — changes the composer identity, which retires `posted` |
+⚠ **The table names the EVENT TYPES, because that turned out to be the whole question.** A path
+is only an exit for the input modality that produces its event.
 
-**One rule, both states:** an interaction whose target is *inside* `[data-testid="composer-slot"]`
-belongs to the slot; anything else dismisses. That is what stops a click on the composer's own
-disabled `×` (during the wait) or on the card's `Know more` from dismissing.
+| Path | Event | Reaches |
+|---|---|---|
+| the `×` | `click` on `posted-dismiss` | pointer **and** keyboard (it is a `<button>`) |
+| `Escape` | `keydown` | **every** modality — the only exit that does |
+| a press outside the slot, not on a control | `pointerdown` | pointer / touch |
+| a scroll outside the slot | `wheel` · `touchmove` | pointer / touch |
+| the card's title | `enterPost` → the composer identity moves → `posted` retires | pointer and keyboard |
+| any control that changes the arm | its own handler → identity moves → `posted` retires | pointer and keyboard |
+
+**Three fences, each earning its place:**
+
+1. **Inside `[data-testid="composer-slot"]` belongs to the slot.** Stops a press on the
+   still-mounted composer, or on the card's own `Know more`, from dismissing.
+2. **A press on a `button,a,input,textarea,label` belongs to that control** — d5's own rule and
+   the same exclusion list `onDocClick` already uses. Without it, pressing `Buy` while confirmed
+   dismissed on the `pointerdown` (releasing the arm, so the poll spent a refresh) and then
+   re-opened a composer on the `click`: **one press, one round trip burned**, for a state change
+   the control was going to make anyway through the identity retirement.
+3. **Nothing dismisses while an overlay is open** (`popupPost || popupReply || lightboxUrl` —
+   the same three flags `frozen` already reads). ⛔ This closed a real defect: the card inside
+   the confirmation opens the image lightbox and the pop-ups, which render through a **portal**
+   onto `document.body` and are therefore *outside* the slot. So opening your own just-posted
+   image and closing it again dismissed the confirmation underneath — **the feature's own
+   affordance destroying the state the feature exists to provide.**
+
+*(Fences 2 and 3 were added after `@code-reviewer`; each is guarded, and each guard was verified
+by reverting the fence and reading the red.)*
 
 On dismiss: `posted` and `openSide`/`openReply` clear together ⇒ the slot exits at 260 ms, the
 freeze releases, the poll resumes and fires its immediate refresh. All existing behaviour.
@@ -347,4 +391,18 @@ never that a real server re-render produced a correct post and that `PostCard` d
 7. The reply arm confirms in the composer's column (opposite the parent post) — visually
    correct, since slot ≠ side is the standing rule.
 8. The wait window's duration on a real connection — the one number that decides whether the
-   held composer reads as "submitting" or as "stuck".
+   held composer reads as "submitting" or as "stuck". ⚠ **Related, and OWED rather than built:**
+   `ErrorStrip` renders `null` for `phase: "in_flight"`, so the wait shows a greyed, motionless
+   form with a disabled `×` and a disabled submit — visually indistinguishable from a hang.
+   Before FEED-1 that window was invisible because the slot closed instantly; FEED-1 makes it
+   the primary post-submit view. A progress affordance would need a **new string**, and RF-6
+   says use the given strings and author none. **Flagged for the founder, not built.**
+9. `Escape` dismisses in both the wait window and the confirmed state — the CRITICAL fix. jsdom
+   proves the listener fires; only a browser proves nothing else swallows the key first.
+10. Opening the image lightbox or a pop-up **from the confirmation's own card** and closing it
+    again leaves the confirmation standing (fence 3 above).
+11. Pressing `Buy` while a confirmation is up opens a composer **without** a wasted refresh in
+    between (fence 2 above).
+12. ⚠ While the arm is held, **both** column headers mirror `Buy YES` and there is no `Buy NO`
+    on the surface — pre-existing §5 header-mirror behaviour (`openSide`-keyed) reaching a state
+    it predates. Same class as the SPEC.1 §9 widening flagged in RF-4. **Not changed; flagged.**

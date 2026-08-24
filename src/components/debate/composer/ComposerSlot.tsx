@@ -335,6 +335,14 @@ export function ComposerSlot({
 			// `data-[state=closed]:animate-out` the composer's exit always used.
 			className="flex min-h-0 flex-1 flex-col duration-[260ms] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-[14px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-[14px] motion-reduce:animate-none motion-reduce:duration-0"
 		>
+			{/* ⚠ THE `??` ARM IS THE EXIT'S, AND ONLY THE EXIT'S. While the slot is
+			    occupied `live` is non-null by construction — both call sites derive
+			    the occupant from the same predicate as `slot` — so the fallback is
+			    reachable only when `slot` is `"scroller"` and `mounted` is still
+			    true, which is exactly the corpse. ⛔ If a future caller ever let the
+			    two disagree, this would render a STALE corpse while occupied where
+			    the old `open ? composer : held.current` rendered nothing; keep them
+			    derived together rather than relaxing this line. */}
 			{live ?? held.current}
 		</div>
 	);

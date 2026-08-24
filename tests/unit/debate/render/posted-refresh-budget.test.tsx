@@ -19,11 +19,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * the number of times `router.refresh()` is INVOKED AT RUNTIME by the real
  * `DebateView` tree, driven through a real submit.
  *
- * ⛔ IT IS NOT A CALL-SITE COUNT. A grep for `router.refresh` in the source
- * finds several sites and tells you nothing — most are on paths this scenario
- * never takes, and the one that fires a SECOND time (the poll's resume) is not
- * even in the composer's file. This renders the whole surface, drives a real
- * success through `BetComposer`, and counts what actually fires.
+ * ⛔ IT IS NOT A CALL-SITE COUNT. A grep for `router.refresh()` in `src/` finds
+ * 17 call sites, 7 of them on this surface, and tells you nothing — most are on
+ * paths this scenario never takes, and the one that fires a SECOND time (the
+ * poll's resume) is not even in the composer's file. This renders the whole
+ * surface, drives a real success through `BetComposer`, and counts what
+ * actually fires.
  *
  * ⇒ THE CONVERSION IS FIXED AND STATED ONCE: `/m/[slug]/page.tsx` calls
  * `loadDebateView` exactly once per render, so ONE refresh is ONE

@@ -482,72 +482,6 @@ export function DebateView({
 		return () => document.removeEventListener("click", onDocClick);
 	}, [frozen, pickSide]);
 
-	/** The body of one market-view pole column: composer/auth-gate when this
-	 * column is the OPPOSITE slot of the open bet side; the post scroller
-	 * otherwise. */
-	const marketColumnBody = (side: Side, scroller: ReactNode) => {
-		const hosts = openSide !== null && side === opposite(openSide);
-		// FEED-1 — the confirmed occupant for THIS column, or null. Narrowed to a
-		// value rather than a boolean so the render below cannot ask again and get
-		// a different answer.
-		const confirmedPost = hosts ? postedPost : null;
-		return (
-			// UI-QUICK change set 3 §C — the slot slides in and out at canon §5's
-			// 260ms and moves focus on both edges. ⚠ IT WRAPS THE SLOT, NOT THE
-			// OCCUPANT: signed-out this animates `AuthGateSlot` and signed-in
-			// `BetComposer`, identically, because the motion belongs to the swap
-			// rather than to whichever component the viewer state selects.
-			<ComposerSlot
-				slotId={side}
-				onOccupiedChange={reportSlotOccupied}
-				slot={
-					confirmedPost !== null ? "confirmed" : hosts ? "composer" : "scroller"
-				}
-				busy={composerBusy}
-				scroller={scroller}
-				confirmation={
-					confirmedPost !== null ? (
-						// ⛔ THE SAME `PostCard` THE COLUMN RENDERS, with the same
-						// handlers — not a second presentation of a post. Entering the
-						// post from here is a legitimate way out: it changes the composer
-						// identity, which retires the confirmation on its own.
-						<PostedConfirmation onDismiss={dismissPosted}>
-							<PostCard
-								post={confirmedPost}
-								onEnter={enterPost}
-								onOpenPopup={setPopupPost}
-								onOpenImage={setLightboxUrl}
-								onReplyToPost={replyToPost}
-								heldSide={heldSide}
-								marketOpen={marketOpen}
-								suspended={suspended}
-							/>
-						</PostedConfirmation>
-					) : null
-				}
-				composer={
-					hosts && openSide !== null ? (
-						viewer === null ? (
-							<AuthGateSlot side={openSide} onClose={() => setOpenSide(null)} />
-						) : (
-							<BetComposer
-								marketId={market.id}
-								slug={market.slug}
-								side={openSide}
-								kind="post"
-								viewer={viewer}
-								onClose={() => setOpenSide(null)}
-								onPosted={onPosted}
-								onSuspended={() => setSuspended(true)}
-								onBusyChange={setComposerBusy}
-							/>
-						)
-					) : null
-				}
-			/>
-		);
-	};
-
 	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
 	// `?post=<ordinal>` via history.replaceState on post enter/exit, making
 	// deep links user-MINTABLE (copy the address bar in post view).
@@ -679,12 +613,18 @@ export function DebateView({
 	 * it costs shows the composer's own in-flight state, which is what was already
 	 * on screen.
 	 */
+	// ⚠ A BOOLEAN IN THE DEPS, NOT THE NODE. `findPostedNode` allocates a fresh
+	// object every render, so depending on the node re-subscribes this effect on
+	// every commit while a confirmation is up — a dependency that can never be
+	// stable, which is the shape `reportSlotOccupied`'s own docblock argues
+	// against above. The body only ever asks whether it is null.
+	const postedFound = postedNode !== null;
 	useEffect(() => {
-		if (posted === null || model === posted.fromModel || postedNode !== null) {
+		if (posted === null || model === posted.fromModel || postedFound) {
 			return;
 		}
 		dismissPosted();
-	}, [posted, model, postedNode, dismissPosted]);
+	}, [posted, model, postedFound, dismissPosted]);
 
 	/**
 	 * ⚠⚠ FEED-1 — THE AUTHOR'S FIRST TOUCH ELSEWHERE DISMISSES. The `×` is the
@@ -708,29 +648,153 @@ export function DebateView({
 	 * belongs to the slot and is handled by its own controls — the ×, the card's
 	 * title (which enters the post), `Know more`. Fencing on the confirmation card
 	 * instead would make a click on the still-mounted composer dismiss it.
+	 *
+	 * ⛔⛔ ESCAPE IS HERE BECAUSE THE POINTER EVENTS ARE NOT AN EXIT FOR EVERYONE,
+	 * AND THE FIRST VERSION OF THIS BLOCK CLAIMED THEY WERE. Activating a button
+	 * from the keyboard dispatches `click` and NO `pointerdown`; keyboard scrolling
+	 * fires `scroll`, not `wheel`. So for a keyboard-only or switch-access reader,
+	 * every listener below was unreachable — and in the wait window every OTHER
+	 * exit is independently dead: the composer's × is `disabled={inFlight}`, its
+	 * ESC handler is guarded on the same flag, all five host navigations no-op on
+	 * `composerBusy`, the identity retirement needs one of those five to move, and
+	 * the fallback needs a payload that by hypothesis never came. That is a state
+	 * you can enter and not leave, reachable by placing a bet and losing the
+	 * connection. ⇒ Escape is the modality-independent exit, and it is the same
+	 * key that already closes the composer and every dialog on this surface.
+	 *
+	 * ⛔ IT DOES NOT FIRE WHILE AN OVERLAY IS OPEN, and that is not caution — it is
+	 * a defect this closed. `PostCard`/`ReplyCard` inside the confirmation open the
+	 * image lightbox and the pop-ups, which render through a PORTAL onto
+	 * `document.body` and are therefore OUTSIDE the slot. So opening your own
+	 * just-posted image and closing it again dismissed the confirmation underneath
+	 * — the feature's own affordance destroying the state the feature exists to
+	 * provide. The predicate is the same three flags `frozen` already reads.
+	 *
+	 * ⚠ A POINTER PRESS ON A CONTROL BELONGS TO THE CONTROL — d5's own rule, and
+	 * the same exclusion list `onDocClick` above already uses. Without it, pressing
+	 * `Buy` while confirmed dismissed on the `pointerdown` (releasing the arm, so
+	 * the poll spent a refresh) and then re-opened a composer on the `click`. The
+	 * control's own state change retires the confirmation through the identity
+	 * adjustment; it does not need this listener's help, and taking its help cost
+	 * a round trip.
 	 */
 	useEffect(() => {
 		if (posted === null) {
 			return;
 		}
+		const overlayOpen =
+			popupPost !== null || popupReply !== null || lightboxUrl !== null;
 		const onOutside = (e: Event) => {
+			if (overlayOpen) {
+				return;
+			}
 			const target = e.target instanceof Element ? e.target : null;
 			if (target?.closest('[data-testid="composer-slot"]') != null) {
 				return;
 			}
+			if (target?.closest("button,a,input,textarea,label") != null) {
+				return;
+			}
 			dismissPosted();
+		};
+		const onKey = (e: KeyboardEvent) => {
+			// ⚠ Escape is NOT fenced on the slot: it is the deliberate "I am done"
+			// key, and the reader pressing it may well be focused inside the
+			// confirmation — that is where focus was moved to.
+			if (e.key === "Escape" && !overlayOpen) {
+				dismissPosted();
+			}
 		};
 		// `pointerdown`, not `click`: it fires first and cannot be swallowed by a
 		// control that stops propagation on its way up.
 		document.addEventListener("pointerdown", onOutside);
 		document.addEventListener("wheel", onOutside, { passive: true });
 		document.addEventListener("touchmove", onOutside, { passive: true });
+		document.addEventListener("keydown", onKey);
 		return () => {
 			document.removeEventListener("pointerdown", onOutside);
 			document.removeEventListener("wheel", onOutside);
 			document.removeEventListener("touchmove", onOutside);
+			document.removeEventListener("keydown", onKey);
 		};
-	}, [posted, dismissPosted]);
+	}, [posted, dismissPosted, popupPost, popupReply, lightboxUrl]);
+
+	/**
+	 * ⚠⚠ DECLARED **AFTER** EVERY VALUE IT READS, AND THAT ORDER IS LOAD-BEARING
+	 * NOW IN A WAY IT WAS NOT BEFORE. FEED-1 gave this closure three new
+	 * references — `postedPost`, `enterPost`, `replyToPost` — all declared below
+	 * where it used to sit. A `const` reached through a closure is not a TDZ
+	 * error that `tsc` or biome will show you; it is a runtime `ReferenceError`
+	 * behind a green build, and it stays invisible for exactly as long as the
+	 * single call site happens to run last. Moving the declaration below its
+	 * inputs makes every reference backward, so a second call site added later
+	 * cannot reintroduce it.
+	 */
+	/** The body of one market-view pole column: composer/auth-gate when this
+	 * column is the OPPOSITE slot of the open bet side; the post scroller
+	 * otherwise. */
+	const marketColumnBody = (side: Side, scroller: ReactNode) => {
+		const hosts = openSide !== null && side === opposite(openSide);
+		// FEED-1 — the confirmed occupant for THIS column, or null. Narrowed to a
+		// value rather than a boolean so the render below cannot ask again and get
+		// a different answer.
+		const confirmedPost = hosts ? postedPost : null;
+		return (
+			// UI-QUICK change set 3 §C — the slot slides in and out at canon §5's
+			// 260ms and moves focus on both edges. ⚠ IT WRAPS THE SLOT, NOT THE
+			// OCCUPANT: signed-out this animates `AuthGateSlot` and signed-in
+			// `BetComposer`, identically, because the motion belongs to the swap
+			// rather than to whichever component the viewer state selects.
+			<ComposerSlot
+				slotId={side}
+				onOccupiedChange={reportSlotOccupied}
+				slot={
+					confirmedPost !== null ? "confirmed" : hosts ? "composer" : "scroller"
+				}
+				busy={composerBusy}
+				scroller={scroller}
+				confirmation={
+					confirmedPost !== null ? (
+						// ⛔ THE SAME `PostCard` THE COLUMN RENDERS, with the same
+						// handlers — not a second presentation of a post. Entering the
+						// post from here is a legitimate way out: it changes the composer
+						// identity, which retires the confirmation on its own.
+						<PostedConfirmation onDismiss={dismissPosted}>
+							<PostCard
+								post={confirmedPost}
+								onEnter={enterPost}
+								onOpenPopup={setPopupPost}
+								onOpenImage={setLightboxUrl}
+								onReplyToPost={replyToPost}
+								heldSide={heldSide}
+								marketOpen={marketOpen}
+								suspended={suspended}
+							/>
+						</PostedConfirmation>
+					) : null
+				}
+				composer={
+					hosts && openSide !== null ? (
+						viewer === null ? (
+							<AuthGateSlot side={openSide} onClose={() => setOpenSide(null)} />
+						) : (
+							<BetComposer
+								marketId={market.id}
+								slug={market.slug}
+								side={openSide}
+								kind="post"
+								viewer={viewer}
+								onClose={() => setOpenSide(null)}
+								onPosted={onPosted}
+								onSuspended={() => setSuspended(true)}
+								onBusyChange={setComposerBusy}
+							/>
+						)
+					) : null
+				}
+			/>
+		);
+	};
 
 	const yesPosts = posts.filter((p) => p.sideAtPostTime === "YES");
 	const noPosts = posts.filter((p) => p.sideAtPostTime === "NO");

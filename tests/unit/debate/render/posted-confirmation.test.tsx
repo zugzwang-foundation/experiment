@@ -549,6 +549,160 @@ describe("FEED-1 — every path out terminates", () => {
 		).not.toBeNull();
 	});
 
+	it("posted::ESCAPE-releases-the-author-in-the-WAIT-window-with-no-pointer-event", async () => {
+		// ⛔⛔ THE CRITICAL ONE, AND THE FIRST BUILD OF THIS FEATURE FAILED IT.
+		// The dismisser listened to pointerdown/wheel/touchmove only. Activating a
+		// button from a keyboard dispatches `click` and NO `pointerdown`; keyboard
+		// scrolling fires `scroll`, not `wheel`. So a keyboard-only reader had no
+		// exit at all in the wait window — where the composer's own × is disabled
+		// by its in-flight guard, its ESC handler is guarded on the same flag,
+		// every host navigation no-ops on `composerBusy`, and the fallback is
+		// waiting on a payload that by hypothesis never arrives.
+		// ⇒ Placing a bet and then losing the connection trapped the reader.
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		expect(
+			slot(),
+			"the wait window — nothing has come back yet",
+		).not.toBeNull();
+		expect(confirmation()).toBeNull();
+
+		// ⚠ NO pointer event anywhere in this test. That is the whole point: if the
+		// only exit were a pointer listener, this could not pass.
+		fireEvent.keyDown(document, { key: "Escape" });
+		act(() => {
+			vi.advanceTimersByTime(400);
+		});
+
+		expect(slot(), "Escape is the modality-independent exit").toBeNull();
+	});
+
+	it("posted::ESCAPE-dismisses-the-CONFIRMED-state-too", async () => {
+		// Parity: Escape closes the composer and every dialog on this surface. A
+		// confirmation that ignored it would be the one dismissible thing here that
+		// does not answer the key a reader has already learned.
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		expect(confirmation()).not.toBeNull();
+
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(slot()?.getAttribute("data-state")).toBe("closed");
+		settleExit();
+		expect(confirmation()).toBeNull();
+
+		// THE POSITIVE CONTROL for the key itself: an unrelated key must NOT
+		// dismiss, or the assertion above would hold for any keystroke at all.
+	});
+
+	it("posted::a-key-that-is-NOT-Escape-leaves-the-confirmation-alone", async () => {
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		fireEvent.keyDown(document, { key: "a" });
+		fireEvent.keyDown(document, { key: "Enter" });
+		expect(slot()?.getAttribute("data-state")).toBe("confirmed");
+		// …and Escape still works from the same state, which is what proves the two
+		// assertions above are about the KEY and not about a dead listener.
+		fireEvent.keyDown(document, { key: "Escape" });
+		expect(slot()?.getAttribute("data-state")).toBe("closed");
+	});
+
+	it("posted::opening-the-lightbox-FROM-the-confirmation-does-not-destroy-it", async () => {
+		// ⛔⛔ THE FEATURE'S OWN AFFORDANCE WAS DESTROYING THE FEATURE. The card in
+		// the confirmation opens the image lightbox, which renders through a PORTAL
+		// onto document.body — outside the slot. So closing the lightbox fired a
+		// pointerdown the dismisser read as "the author touched something else",
+		// and the post they had opened the image of was gone underneath it.
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		expect(confirmation()).not.toBeNull();
+
+		// Open a pop-up from the card the confirmation is holding.
+		const knowMore = confirmation()?.querySelector<HTMLElement>(
+			'[aria-label="Know more about this argument"]',
+		);
+		expect(
+			knowMore,
+			"the card must actually offer the affordance",
+		).not.toBeNull();
+		fireEvent.click(knowMore as HTMLElement);
+		expect(
+			document.querySelector('[data-slot="dialog-content"]'),
+			"the pop-up opened — otherwise the assertion below proves nothing",
+		).not.toBeNull();
+
+		// A pointerdown on the portalled overlay: outside the slot, but it is the
+		// author still looking at their own post.
+		fireEvent.pointerDown(
+			document.querySelector('[data-slot="dialog-content"]') as HTMLElement,
+		);
+		expect(
+			slot()?.getAttribute("data-state"),
+			"the confirmation survives its own pop-up",
+		).toBe("confirmed");
+	});
+
+	it("posted::a-press-on-a-CONTROL-does-not-spend-a-refresh-dismissing-first", async () => {
+		// ⚠ d5's own rule, and the same exclusion list `onDocClick` already uses: a
+		// press on a control belongs to the control. Without it, pressing `Buy`
+		// while confirmed dismissed on the pointerdown — releasing the arm, so the
+		// poll spent a refresh — and then re-opened a composer on the click. One
+		// press, one round trip burned, for a state change the control was going to
+		// make anyway through the identity retirement.
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		const before = refreshMock.mock.calls.length;
+
+		// ⚠ getAll, not get: while the arm is held BOTH column headers mirror the
+		// composing side (the §5 header-mirror rule keyed on `openSide`), so two
+		// controls read `Buy YES` for as long as the confirmation is up. That is
+		// pre-existing mirror behaviour reaching a state it predates — recorded
+		// here because the selector is the only place it is visible.
+		fireEvent.pointerDown(
+			screen.getAllByLabelText("Buy YES")[0] as HTMLElement,
+		);
+		expect(refreshMock).toHaveBeenCalledTimes(before);
+		expect(slot()?.getAttribute("data-state")).toBe("confirmed");
+
+		// THE POSITIVE CONTROL: a press on a NON-control in the same breath does
+		// dismiss, so the assertion above is about the exclusion and not about a
+		// listener that was never armed.
+		fireEvent.pointerDown(screen.getByTestId("arena"));
+		expect(slot()?.getAttribute("data-state")).toBe("closed");
+	});
+
 	it("posted::an-outside-touch-releases-the-author-even-BEFORE-the-post-arrives", async () => {
 		// ⛔⛔ THE WALL: never leave the author stuck. Between the 200 and the model
 		// landing, `BetComposer` is still mounted with its × disabled by its own
