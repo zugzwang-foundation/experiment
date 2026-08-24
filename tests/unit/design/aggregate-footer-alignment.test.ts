@@ -111,11 +111,27 @@ describe("the aggregate footer — the track aligns to the pills", () => {
 		const at = source.indexOf('data-testid="aggregate-split-track"');
 		const cls =
 			/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
-				source.slice(at, at + 1600),
+				source.slice(at, at + 4000),
 			)?.[1] ?? "";
 		expect(cls).toContain(`h-[${detail}px]`);
 		// The superseded thickness, pinned as gone.
 		expect(cls).not.toContain("h-1.5");
+
+		// ⚠⚠ change set 11 §2 — THE RADIUS TRAVELS WITH THE THICKNESS. At 6px the
+		// corner treatment was invisible; at 14px a 3px radius read as a RECTANGLE
+		// beside a market bar that is a pill. `design-language` names these ONE
+		// split-bar family — two variants of one construction — so they must not
+		// diverge in shape.
+		// ⛔ READ OFF `PriceBar` TOO, so a change to the market bar takes BOTH or
+		// NEITHER. A literal here would let the two drift apart the moment that
+		// component is restyled, which is the whole failure this pins against.
+		const barRadius = /rounded-\[var\(--r\)\]/.test(bar);
+		expect(barRadius).toBe(true);
+		expect(cls).toContain("rounded-[var(--r)]");
+		expect(cls).not.toContain("rounded-(--r-dot)");
+		// The clip is half the shape: PriceBar's fills carry no radius of their
+		// own and rely on the track clipping them. Mirrored here.
+		expect(cls).toContain("overflow-hidden");
 	});
 
 	it("aggregate-footer::ONE-component-serves-every-mount", () => {

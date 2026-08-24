@@ -197,12 +197,22 @@ export function AggregateFooter({
 							// ⚠ `detail`, not `hero` (22px) or `card` (16px): those render on
 							// the Discovery surfaces, and the comparison a reader actually
 							// makes is against the bar in the same viewport.
+							// ⚠⚠ change set 11 §2 — AND THE RADIUS COMES WITH IT. At 6px the
+							// corner was invisible; at 14px `rounded-(--r-dot)` (3px) read as
+							// a RECTANGLE beside a market bar that is a pill.
+							// ⛔ READ OFF `PriceBar`, not chosen: its track is
+							// `rounded-[var(--r)]` + `overflow-hidden` + the hairline, and
+							// its two fill segments carry NO radius of their own — the
+							// track's `overflow-hidden` clips them. This mirrors all three:
+							// same radius token, same clip, and the fill below stays plain.
+							// ⚠ design-language names these ONE split-bar family, two
+							// variants of one construction; they should not diverge in shape.
 							// ⛔ THIS DOES NOT MOVE THE ALIGNMENT, and that is a property of
 							// the CS6 fix rather than luck: the track is centred inside a
 							// fixed `h-6` box, so its CENTRE is the box's centre at any
 							// thickness. Growing it 6 → 14 changes what fills the box, not
 							// where the middle of it sits.
-							"h-[14px] w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
+							"h-[14px] w-full overflow-hidden rounded-[var(--r)] [border:var(--hairline)]",
 							counterPole,
 						)}
 					>
