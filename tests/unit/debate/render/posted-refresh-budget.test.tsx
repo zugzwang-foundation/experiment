@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `DebateView` tree, driven through a real submit.
  *
  * ⛔ IT IS NOT A CALL-SITE COUNT. A grep for `router.refresh` in the source
- * finds three sites and tells you nothing — two of them are on paths this
- * scenario never takes, and the one that fires twice (the poll's resume) is not
+ * finds several sites and tells you nothing — most are on paths this scenario
+ * never takes, and the one that fires a SECOND time (the poll's resume) is not
  * even in the composer's file. This renders the whole surface, drives a real
  * success through `BetComposer`, and counts what actually fires.
  *
@@ -30,6 +30,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * `loadDebateView`, plus the layout re-execution that rides every refresh
  * (12–14 round trips per tick, measured at F-DEBATE-4). The refresh count is
  * therefore the multiplicand, and holding it constant is the whole budget.
+ *
+ * ⚠⚠ MEASURED BEFORE THE BUILD, AGAINST THE UNCHANGED TREE: **2**. The composer's
+ * own refresh, plus the poll's resume the instant `openSide` cleared. FEED-1
+ * moves WHEN the second one fires — dismissal instead of success — and the whole
+ * claim of this file is that it does not change HOW MANY.
  *
  * ⛔ THE CEILING, STATED: this proves the COUNT, never the CONTENT. jsdom runs
  * no server, so a refresh here returns whatever the harness hands back. That
@@ -60,27 +65,12 @@ vi.mock("next/navigation", () => ({
 
 import { COMPOSER_COPY } from "@/components/debate/composer/copy";
 import { DebateView } from "@/components/debate/DebateView";
+import type { DebateViewModel } from "@/components/debate/types";
 
 import { stubWireFetch, TITLE, VIEWER } from "../../composer/render/_harness";
-import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
+import { baseModel, modelWithPost, newPost, placeOk } from "./_posted-fixtures";
 
-/** The §4.4 success envelope `place()` actually returns (`PlaceResult`). */
-function placeOk(commentId: string) {
-	return {
-		status: 200,
-		body: {
-			ok: true,
-			data: {
-				betId: "bet-0001",
-				commentId,
-				side: "YES",
-				sharesBought: "20.000000000000000000",
-				newPrice: "0.560000000000000000",
-				parentCommentId: null,
-			},
-		},
-	};
-}
+const POSTED_ID = "cmt-just-posted";
 
 beforeEach(() => {
 	vi.useFakeTimers();
@@ -99,6 +89,17 @@ afterEach(() => {
 	Reflect.deleteProperty(document, "hidden");
 });
 
+function view(model: DebateViewModel) {
+	return (
+		<DebateView
+			model={model}
+			viewer={VIEWER}
+			initialPostId={null}
+			ownPseudonym={null}
+		/>
+	);
+}
+
 /** Open the market composer, type a submittable argument, and submit it. */
 async function placeOneBet() {
 	fireEvent.click(screen.getByLabelText("Buy YES"));
@@ -111,28 +112,76 @@ async function placeOneBet() {
 }
 
 describe("FEED-1 A1 — server reads per successful bet", () => {
-	it("posted::one-successful-bet-costs-exactly-two-refreshes", async () => {
-		stubWireFetch([placeOk("cmt-new")]);
-		render(
-			<DebateView
-				model={mumbaiMetroModel}
-				viewer={VIEWER}
-				initialPostId={null}
-				ownPseudonym={null}
-			/>,
-		);
+	it("posted::one-successful-bet-STILL-costs-exactly-two-refreshes", async () => {
+		stubWireFetch([placeOk(POSTED_ID)]);
+		const first = baseModel();
+		const { rerender } = render(view(first));
 
 		// The surface is fresh at first paint — the poll's initial-mount guard.
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
 		await placeOneBet();
 
-		// ⚠⚠ THE BUDGET. TWO, and both are load-bearing:
-		//   1. the success path's own refresh — how the new post reaches the model;
-		//   2. the poll's RESUME refresh, fired the instant the last composer stops
-		//      suspending it (`DebatePoll`, wasSuspended → immediate refresh).
-		// FEED-1 moves WHEN the second one fires (dismissal, not success) and must
-		// not change HOW MANY there are. A third would mean a round trip was added.
+		// ⚠⚠ REFRESH ONE, AND THE FACT THAT THERE IS ONLY ONE IS ITSELF A GUARD.
+		// Before FEED-1 the count here was 2: the composer refreshed AND the poll
+		// resumed, because success cleared `openSide`. It is 1 now precisely
+		// because the arm is HELD — so a build that closed the arm on success
+		// would read 2 here and 3 by the end.
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+
+		// The refresh lands, carrying the new post — a NEW model object, which is
+		// exactly what a fresh RSC payload is.
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		expect(
+			screen.getByTestId("posted-confirmation"),
+			"the confirmation must be up — otherwise the dismissal below proves nothing",
+		).not.toBeNull();
+
+		// ⛔ ARRIVING AT THE CONFIRMATION COSTS NOTHING. No second fetch, no second
+		// refresh: the post came in on the payload the first refresh already asked
+		// for.
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+
+		fireEvent.click(screen.getByTestId("posted-dismiss"));
+
+		// ⚠⚠ REFRESH TWO — the poll's resume, fired the instant the arm releases.
+		// Same refresh that used to fire at success; it now fires when the author
+		// says they are done looking.
 		expect(refreshMock).toHaveBeenCalledTimes(2);
+	});
+
+	it("posted::the-poll-does-NOT-tick-while-the-confirmation-is-up", async () => {
+		// The budget above counts the two deliberate refreshes. This one closes the
+		// other way a round trip could be added: the 15s poll waking up underneath
+		// a confirmation the author is still reading.
+		stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
+		await placeOneBet();
+		rerender(
+			view(
+				modelWithPost(
+					newPost({ id: POSTED_ID, ordinal: 7, sideAtPostTime: "YES" }),
+				),
+			),
+		);
+		expect(screen.queryByTestId("posted-confirmation")).not.toBeNull();
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+
+		// Four full poll intervals with the confirmation on screen.
+		act(() => {
+			vi.advanceTimersByTime(15_000 * 4);
+		});
+
+		expect(refreshMock).toHaveBeenCalledTimes(1);
+		expect(
+			screen.queryByTestId("posted-confirmation"),
+			"and it is still up — a poll that fired would have re-rendered under it",
+		).not.toBeNull();
 	});
 });
