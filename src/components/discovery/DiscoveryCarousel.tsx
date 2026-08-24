@@ -1,6 +1,6 @@
 "use client";
 
-import { type KeyboardEvent, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
@@ -42,6 +42,10 @@ export function DiscoveryCarousel({
 }) {
 	const [active, setActive] = useState(0);
 	const n = markets.length;
+	// ⛔ CS14 §1 — THE CAROUSEL PROPER: hero + rail, and DELIBERATELY NOT the
+	// grid below it. This ref is the arrow keys' entire scope boundary; see the
+	// key effect for why the region had to become explicit.
+	const controlsRef = useRef<HTMLDivElement>(null);
 
 	useEffect(() => {
 		if (n <= 1) {
@@ -65,55 +69,83 @@ export function DiscoveryCarousel({
 	// effect above is keyed on `active`, so re-arming is structural rather than
 	// a second timer call that could drift from it.
 	//
-	// ⛔⛔ CS13 §5 — SCOPED TO THE CAROUSEL, AND NO LONGER BOUND TO THE DOCUMENT.
-	// The original comment justified the document binding with "the carousel has
-	// no single focusable host". That was true, and the fix is to GIVE it one
-	// (see `tabIndex` on the root below) rather than to keep listening globally.
-	// A document listener owns the arrow keys for the WHOLE PAGE: it moved the
-	// hero out from under a viewer who was arrowing through the market grid far
-	// below it, and its `preventDefault` suppressed the page's own scroll on
-	// every arrow press anywhere. Now the handler hangs off the carousel and
-	// fires only while focus is inside it — so `‹ ›` reach it, the grid and the
-	// rest of the page keep their arrows, and the scroll suppression applies
-	// only where a key was actually consumed.
+	// ⛔⛔ CS14 §1 — SCOPE IS WHERE FOCUS IS, AND THE TWO AXES ARE SPLIT.
 	//
-	// ⚠ DIVERGES FROM THE MOCKUP, DELIBERATELY. `:477-479` binds to the
-	// document. Reported to the founder rather than amended — the mockup and
-	// design-canon are read-only to this lane.
+	// CS13 hung a React handler on the section and let the keydown's own bubble
+	// path answer "is focus inside the carousel". That path CANNOT express this
+	// ruling, for one structural reason: `DiscoveryGrid` renders INSIDE the same
+	// section, so a focused grid card was inside the scope and rotated the hero.
+	// Measured on staging before this change — grid card focused, real
+	// ArrowRight: "Claude · Will an official " → "Bitcoin · Will BTC ever go".
+	// The founder ruled a grid card must NOT rotate, so the region became
+	// explicit (`controlsRef` — hero + rail, grid EXCLUDED) and is tested
+	// against `document.activeElement` rather than against the event's path.
 	//
-	// ⚠ THIS IS A REACT HANDLER, NOT A LISTENER, AND THE SCOPING IS THE REASON.
-	// A keydown bubbles from whatever is focused up through the carousel, so
-	// "focus is inside the carousel" is answered by the event's own path rather
-	// than by a `closest()` test that could drift from the DOM it describes
-	// (O-1: structural beats procedural).
-	const onKey = (e: KeyboardEvent<HTMLElement>) => {
+	// ⚠ A REF, NOT A `closest()` STRING. The ref IS the node, so it cannot drift
+	// from the DOM it describes the way a selector can (O-1: structural beats
+	// procedural). This keeps CS13's actual property — the scope is a real
+	// element, not a description of one — while moving the boundary.
+	//
+	// THE TWO AXES ARE NOT SYMMETRIC, AND THE ASYMMETRY IS THE POINT:
+	//
+	//   Left / Right answer when focus is inside the carousel OR when NOTHING
+	//     has claimed focus. This is the ENTRY GESTURE — on a cold page load
+	//     `activeElement` is `<body>`, so the arrows work without the viewer
+	//     first having to find and click a control. It costs nothing: the
+	//     surface has no horizontal overflow, so no scroll is being taken.
+	//
+	//   ⛔⛔ Up / Down answer ONLY when focus is inside the carousel. THESE ARE
+	//     THE PAGE'S SCROLL KEYS. Answering them from body-focus would mean a
+	//     reader who lands on Discovery and presses Down to scroll gets a market
+	//     rotation instead, with nothing on screen explaining why. They are
+	//     never bound at document level.
+	//
+	// Focus on ANY element outside the region — a grid card, a header control, a
+	// text field — answers nothing on either axis.
+	//
+	// ⚠ DIVERGES FROM THE MOCKUP, DELIBERATELY. `:477-479` binds all four keys
+	// to the document unconditionally. Reported to the founder rather than
+	// amended — the mockup and design-canon are read-only to this lane.
+	useEffect(() => {
 		if (n <= 1) {
 			return;
 		}
-		// Up/Left step BACK, Down/Right step FORWARD. Up-and-Left agreeing is
-		// what makes the pair predictable in a horizontal strip that is also a
-		// vertical list of one market at a time.
-		const step =
-			e.key === "ArrowLeft" || e.key === "ArrowUp"
-				? -1
-				: e.key === "ArrowRight" || e.key === "ArrowDown"
-					? 1
-					: 0;
-		if (step === 0) {
-			return;
-		}
-		// Never steal the arrows from a field the viewer is typing in. Kept from
-		// the document-bound original: the scope is narrower now, but a field
-		// could still be placed inside the carousel later, and a caret moving
-		// inside it must not also rotate the hero.
-		const el = e.target as HTMLElement | null;
-		const tag = el?.tagName;
-		if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) {
-			return;
-		}
-		e.preventDefault();
-		setActive((i) => (i + step + n) % n);
-	};
+		const onKey = (e: globalThis.KeyboardEvent) => {
+			// Up/Left step BACK, Down/Right step FORWARD. Up-and-Left agreeing is
+			// what makes the pair predictable in a horizontal strip that is also a
+			// vertical list of one market at a time.
+			const back = e.key === "ArrowLeft" || e.key === "ArrowUp";
+			const forward = e.key === "ArrowRight" || e.key === "ArrowDown";
+			if (!back && !forward) {
+				return;
+			}
+			const el = document.activeElement as HTMLElement | null;
+			// Never steal the arrows from a field the viewer is typing in — a
+			// caret moving inside it must not also rotate the hero.
+			const tag = el?.tagName;
+			if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) {
+				return;
+			}
+			const inside = el !== null && controlsRef.current?.contains(el) === true;
+			// "Nothing has claimed focus" — a cold load parks `activeElement` on
+			// `<body>`; `null` is the same state, defensively.
+			const unclaimed = el === null || el === document.body;
+			const horizontal = e.key === "ArrowLeft" || e.key === "ArrowRight";
+			if (!inside && !(horizontal && unclaimed)) {
+				return;
+			}
+			// preventDefault ONLY on the branch that actually consumes the key.
+			// Every early return above leaves the page's own scrolling alone,
+			// which is the whole reason the guards come first.
+			e.preventDefault();
+			setActive((i) => (i + (back ? -1 : 1) + n) % n);
+		};
+		document.addEventListener("keydown", onKey);
+		return () => document.removeEventListener("keydown", onKey);
+		// `setActive`'s functional form means the countdown-resetting `active`
+		// is NOT a dependency here — the listener is attached once per market
+		// count rather than re-attached on every rotation.
+	}, [n]);
 
 	if (n === 0) {
 		return null;
@@ -127,12 +159,10 @@ export function DiscoveryCarousel({
 		//
 		// HTML-FINISH row 8 — `flex-1` so this column takes the height the page
 		// now hands down and distributes it among hero / rail / grid below.
-		// ⛔ CS13 §5 — THE KEY HANDLER HANGS HERE, AND THAT IS THE WHOLE SCOPE
-		// MECHANISM. Everything the arrows should work from is inside this
-		// element: the hero market panel, both hero post panels and their author
-		// links, the `‹ ›` buttons, and every card in the grid below. A keydown
-		// from any of them bubbles to this handler; a keydown from the header,
-		// the footer or anywhere else on the page never reaches it.
+		// ⛔ CS14 §1 — THE KEY HANDLER NO LONGER HANGS HERE. It is a document
+		// listener scoped by `controlsRef` (see the effect above), because this
+		// element contains the GRID as well as the carousel, and the two now
+		// need different answers to the same keypress.
 		// ⚠ NO `tabIndex` IS ADDED, ON PURPOSE. The ARIA carousel pattern makes
 		// the SLIDES and CONTROLS focusable, not the region — and all of them
 		// already are, because they are real links and buttons. Adding a
@@ -146,62 +176,76 @@ export function DiscoveryCarousel({
 			aria-roledescription="carousel"
 			data-testid="discovery-carousel"
 			className="flex flex-1 flex-col"
-			onKeyDown={onKey}
 		>
-			<HeroPanels
-				card={view.card}
-				series={view.series}
-				topPosts={view.topPosts}
-			/>
+			{/* ⛔ CS14 §1 — THE SCOPE REGION, AND IT GENERATES NO BOX.
+			    `display:contents` (Tailwind's `contents`) keeps this div a real
+			    node in the DOM TREE — which is all `contains()` and event
+			    bubbling need — while generating no layout box of its own, so
+			    its children stay direct flex items of the `<section>` and the
+			    hero's `flex-1` and the rail's `flex-none` resolve exactly as
+			    they did before. The grid stays OUTSIDE it. Drawing that
+			    boundary is the only reason this element exists; it introduces
+			    no size, no spacing and no paint. */}
+			<div
+				ref={controlsRef}
+				data-testid="carousel-controls"
+				className="contents"
+			>
+				<HeroPanels
+					card={view.card}
+					series={view.series}
+					topPosts={view.topPosts}
+				/>
 
-			{/* HTML-FINISH row 8 — the rail is FIXED height and takes no share of
-			    the slack: the mockup's `.sliderwrap` is `flex:0 0 18px` (`:139`).
-			    The 18px was already shipped; `flex-none` is what makes it refuse
-			    to grow now that there is slack to be had. */}
-			<div className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px]">
-				{n > 1 && (
-					<button
-						type="button"
-						aria-label="Previous market"
-						onClick={() => setActive((i) => (i - 1 + n) % n)}
-						className="px-[9px] font-mono text-base text-n4 hover:text-ink"
-					>
-						‹
-					</button>
-				)}
-				{markets.map((m, i) => {
-					const on = i === active;
-					return (
-						<span
-							key={m.card.id}
-							data-testid="carousel-dot"
-							{...(on ? { "data-active": "true" } : {})}
-							// V33 — the two dot states are different SHAPES, not one
-							// shape in two fills: a 6px ring-outlined circle at rest
-							// (`.sdot`), a 22px filled pill when active (`.sdot.on`,
-							// :142-143). Every dot was previously the active pill, so
-							// the rail read as eight identical bars and the active
-							// position was carried by the fill overlay alone.
-							className={
-								on
-									? "relative h-1.5 w-[22px] overflow-hidden rounded-[var(--r-dot)] bg-n2"
-									: "h-1.5 w-1.5 rounded-full [border:var(--hairline)]"
-							}
+				{/* HTML-FINISH row 8 — the rail is FIXED height and takes no share of
+				    the slack: the mockup's `.sliderwrap` is `flex:0 0 18px` (`:139`).
+				    The 18px was already shipped; `flex-none` is what makes it refuse
+				    to grow now that there is slack to be had. */}
+				<div className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px]">
+					{n > 1 && (
+						<button
+							type="button"
+							aria-label="Previous market"
+							onClick={() => setActive((i) => (i - 1 + n) % n)}
+							className="px-[9px] font-mono text-base text-n4 hover:text-ink"
 						>
-							{on && <DotFill key={`fill-${active}`} />}
-						</span>
-					);
-				})}
-				{n > 1 && (
-					<button
-						type="button"
-						aria-label="Next market"
-						onClick={() => setActive((i) => (i + 1) % n)}
-						className="px-[9px] font-mono text-base text-n4 hover:text-ink"
-					>
-						›
-					</button>
-				)}
+							‹
+						</button>
+					)}
+					{markets.map((m, i) => {
+						const on = i === active;
+						return (
+							<span
+								key={m.card.id}
+								data-testid="carousel-dot"
+								{...(on ? { "data-active": "true" } : {})}
+								// V33 — the two dot states are different SHAPES, not one
+								// shape in two fills: a 6px ring-outlined circle at rest
+								// (`.sdot`), a 22px filled pill when active (`.sdot.on`,
+								// :142-143). Every dot was previously the active pill, so
+								// the rail read as eight identical bars and the active
+								// position was carried by the fill overlay alone.
+								className={
+									on
+										? "relative h-1.5 w-[22px] overflow-hidden rounded-[var(--r-dot)] bg-n2"
+										: "h-1.5 w-1.5 rounded-full [border:var(--hairline)]"
+								}
+							>
+								{on && <DotFill key={`fill-${active}`} />}
+							</span>
+						);
+					})}
+					{n > 1 && (
+						<button
+							type="button"
+							aria-label="Next market"
+							onClick={() => setActive((i) => (i + 1) % n)}
+							className="px-[9px] font-mono text-base text-n4 hover:text-ink"
+						>
+							›
+						</button>
+					)}
+				</div>
 			</div>
 
 			<DiscoveryGrid markets={markets} activeIndex={active} />
