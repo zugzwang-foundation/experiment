@@ -530,12 +530,26 @@ export function BetComposer(props: {
 							</div>
 						</div>
 						<div>
+							{/* ⚠⚠ change set 7 §3 — THE DESCRIPTION NO LONGER GROWS AND NO
+							    LONGER DRAGS. `ui/textarea.tsx` ships `field-sizing-content`
+							    (grows with typing) and the browser's default resize handle
+							    (grows with dragging); either one pushes AMOUNT / TO WIN /
+							    PLACE Đ BET below the fold and makes the column scroll.
+							    ⛔ FIXED, NOT CAPPED: `h-24` replaces `min-h-24` and
+							    `field-sizing-fixed` overrides the primitive's own
+							    `field-sizing-content`, so neither content nor a drag can
+							    change this box. `resize-none` removes the handle.
+							    ⛔ THE PRIMITIVE IS NOT EDITED — every other textarea in the
+							    app keeps its behaviour; this is an instance override.
+							    ⚠ Nothing about the FIELD changes: `maxLength` is untouched,
+							    the argument stays required, and the text scrolls INSIDE the
+							    box rather than being truncated. */}
 							<Textarea
 								value={extended}
 								maxLength={extendedMax}
 								disabled={floorAbove || inFlight}
 								aria-label="Argument body"
-								className="min-h-24"
+								className="h-24 resize-none field-sizing-fixed"
 								onChange={(e) => {
 									setExtended(e.target.value);
 									onEdit();
@@ -605,14 +619,33 @@ export function BetComposer(props: {
 										</span>
 									</div>
 								</div>
+								{/* ⚠⚠ change set 7 §4 — LARGER, AND THE LABEL STACKS.
+								    `self-end` → `self-stretch` so it takes the empty height
+								    beside the AMOUNT / TO WIN block instead of hugging the
+								    bottom of it.
+								    ⛔⛔ THE ACCESSIBLE NAME STAYS ONE PHRASE. Two stacked
+								    spans would otherwise concatenate to `PlaceĐ BET` — two
+								    fragments run together, which is what a screen reader
+								    would announce. `aria-label` pins the single readable
+								    phrase, and WCAG 2.5.3 holds because it CONTAINS the
+								    visible words (case-insensitively): visible `Place` +
+								    `Đ BET`, name `PLACE Đ BET`.
+								    ⚠ It is also the SAME string every existing test queries
+								    by role+name, so the label change moves no guard. */}
 								<Button
 									type="button"
 									disabled={submitDisabled}
 									aria-disabled={submitDisabled}
+									aria-label={COMPOSER_COPY.submit}
 									onClick={submit}
-									className="h-auto min-h-[34px] self-end px-4 py-[7px] text-[13px]"
+									className="h-auto min-h-[52px] flex-col gap-0 self-stretch px-4 py-2"
 								>
-									{COMPOSER_COPY.submit}
+									<span className="text-[11px] leading-tight font-medium">
+										Place
+									</span>
+									<span className="text-[15px] leading-tight font-bold">
+										Đ BET
+									</span>
 								</Button>
 							</div>
 
