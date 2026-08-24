@@ -454,7 +454,16 @@ export function BetComposer(props: {
 					onClick={props.onClose}
 					disabled={inFlight}
 					aria-label="Close"
-					className="ml-auto rounded-(--r-chip) px-1.5 text-base text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+					// ⚠ change set 10 §5 — BIGGER GLYPH, AND A HIT TARGET THAT MEETS
+					// THE 44px FLOOR. It was `text-base` (16px) in a shrink-to-fit box
+					// roughly 24px across — under the minimum for a pointer target, and
+					// the one control that dismisses a form someone may have typed into.
+					// `size-11` is 44px square; `text-xl` is the glyph.
+					// ⚠ `aria-label="Close"` is ALREADY on this button and is untouched —
+					// the visible `×` is a glyph, so the label is the only accessible
+					// name it has and WCAG 2.5.3 does not bind (no visible text to
+					// contain).
+					className="ml-auto flex size-11 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 				>
 					{COMPOSER_COPY.close}
 				</button>
