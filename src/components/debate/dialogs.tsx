@@ -102,6 +102,7 @@ export function PostPopup({
 										authorStake={post.authorStake}
 										originalStake={post.authorStakeOriginal}
 										sold={post.authorSold}
+										download
 									/>
 									<LaneBadge badge={post.badge} />
 								</div>

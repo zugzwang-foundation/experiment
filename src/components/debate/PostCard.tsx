@@ -1,7 +1,5 @@
 "use client";
 
-import { Download } from "lucide-react";
-
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -126,6 +124,7 @@ export function PostCard({
 					originalStake={post.authorStakeOriginal}
 					sold={post.authorSold}
 					replyCount={replyCount}
+					download
 				/>
 				<LaneBadge badge={post.badge} />
 			</div>
@@ -178,7 +177,7 @@ export function PostCard({
 				    on the `+`, and the column scrolls as the backstop. */}
 				<button
 					type="button"
-					className="block w-full rounded-(--r-chip) pr-28 text-left hover:bg-n1 hover:underline"
+					className="block w-full rounded-(--r-chip) pr-21 text-left hover:bg-n1 hover:underline"
 					onClick={() => onEnter(post.id)}
 				>
 					<h3 className="line-clamp-2 font-heading text-base leading-snug font-medium">
@@ -209,34 +208,11 @@ export function PostCard({
 				    it a flex sibling would reproduce the measured defect row 24 fixed
 				    (title 628px → 104px, the widest delta in the phase-1 table). The
 				    gutter grows; the mechanism does not change. */}
-				<div className="absolute right-0 bottom-0 flex items-center gap-1">
-					{/* ⛔⛔ NON-FUNCTIONAL PLACEHOLDER — NO HANDLER, NO HREF, NO LOGIC.
-					    It is `disabled` AND `aria-disabled`, so it is unreachable by
-					    pointer and by keyboard and announces itself as unavailable
-					    rather than pretending to work. ⚠ The accessible name is
-					    REQUIRED here for the same reason the old `+` needed one and
-					    `Know more` does not: an icon carries no visible text, so 2.5.3
-					    does not apply and the label is the only name there is.
-					    ⚠ THE RECIPE IS THIS SURFACE'S OWN INLINE-ICON TREATMENT, taken
-					    off `ScrollRail.tsx:136` — `[&_svg]:size-3.5` at `text-n4`, the
-					    rail arrows' exact declaration. Lucide is the ratified set
-					    (`Download` is already imported by `profile/DownloadStub.tsx`);
-					    no icon dependency is added and no colour enters. */}
-					<Button
-						variant="ghost"
-						size="icon-xs"
-						disabled
-						aria-disabled="true"
-						aria-label="Download post image"
-						className="text-n4 [&_svg]:size-3.5"
-					>
-						<Download />
-					</Button>
-					<KnowMore
-						label="Know more about this argument"
-						onClick={() => onOpenPopup(post)}
-					/>
-				</div>
+				<KnowMore
+					label="Know more about this argument"
+					onClick={() => onOpenPopup(post)}
+					className="absolute right-0 bottom-0"
+				/>
 			</div>
 			{/* HTML-FINISH · MARKET DETAIL round 2 · R2 — d5 substitutes its
 			    `POST IMAGE · 640:586` box into `.argimg` on every card with no real

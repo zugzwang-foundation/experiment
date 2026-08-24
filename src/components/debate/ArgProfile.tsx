@@ -1,6 +1,8 @@
+import { Download } from "lucide-react";
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 
 import { PositionMarker, SideBadge } from "./badges";
 import { formatDharma } from "./format";
@@ -28,6 +30,7 @@ export function ArgProfile({
 	sold = false,
 	replyCount,
 	chipSize,
+	download = false,
 }: {
 	author: AuthorIdentity;
 	side: Side;
@@ -59,6 +62,12 @@ export function ArgProfile({
 	/** R6/R10 `Sold` — exactly zero surviving. Renders the tag; never on a partial. */
 	sold?: boolean;
 	replyCount?: number;
+	/**
+	 * ⚠ change set 6 §2 — render the (non-functional) download placeholder at the
+	 * END of this row. OPT-IN: only the post card and the post pop-up pass it, so
+	 * replies and the reply pop-up keep the row they have.
+	 */
+	download?: boolean;
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 13 — the chip's geometry preset, and it is
 	 * wired at EXACTLY ONE site: the post-focus author row (`d5:964`, the only
@@ -175,6 +184,34 @@ export function ArgProfile({
 					</>
 				) : null}
 			</div>
+			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM
+			    THE TITLE ROW, founder ruling. On the title row it shared an absolutely
+			    positioned cluster with `Know more`, and that cluster's reserved gutter
+			    cost every post title 92px of width — enough to push long titles past
+			    the pre-existing two-line clamp into an ellipsis. On this row it costs
+			    the title nothing.
+			    ⛔ OPT-IN, NOT UNCONDITIONAL. `ArgProfile` is shared by the post card,
+			    the focused post, the reply card and both pop-ups; rendering it for all
+			    of them would put a download affordance on replies, which the ruling
+			    does not ask for. Only the two mounts named pass it.
+			    ⚠ ONE SIZE STEP LARGER than it was — `icon-sm` (28px box, 16px glyph)
+			    where the title cluster used `icon-xs` (24px box, 14px glyph).
+			    ⛔ STILL A NON-FUNCTIONAL PLACEHOLDER: no handler, no href, `disabled`
+			    AND `aria-disabled`, so it is unreachable by pointer and keyboard and
+			    announces itself as unavailable rather than promising a download this
+			    build cannot perform. */}
+			{download ? (
+				<Button
+					variant="ghost"
+					size="icon-sm"
+					disabled
+					aria-disabled="true"
+					aria-label="Download post image"
+					className="ml-auto shrink-0 text-n4 [&_svg]:size-4"
+				>
+					<Download />
+				</Button>
+			) : null}
 		</div>
 	);
 }
