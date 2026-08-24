@@ -468,6 +468,46 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(0);
 	});
 
+	it("render::cs14-the-arrow-buttons-ring-on-KEYBOARD-focus-only", () => {
+		// ⛔⛔ CS14 §3 — A CLASS-STRING CLAIM, ASSERTED AS ONE. jsdom performs no
+		// layout and paints nothing, so this cannot and does not assert that a
+		// ring APPEARS; that half was measured in a browser and reported. What is
+		// pinned here is the thing a future edit would actually break: which
+		// VARIANT gates the indicator, and that there is an indicator at all.
+		//
+		// The founder's report was a bright ring on mouse click. Measured on
+		// staging at `0f04272`, a real mouse click leaves `:focus-visible` FALSE
+		// with `outline-style: none` and `box-shadow: none` — nothing paints on a
+		// click. The ring seen was Chrome's UA `outline: auto`, arriving on the
+		// next keystroke when focus-visible modality flips. These buttons simply
+		// had no focus class, so they fell through to that UA default.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		for (const label of ["Previous market", "Next market"]) {
+			const cls = screen.getByLabelText(label).getAttribute("class") ?? "";
+
+			// 1. THE INDICATOR EXISTS. A11Y.0's ratified floor is visible focus,
+			//    and these may be the only keyboard path through the hero — so
+			//    "no ring" is a floor violation, not a tidier button.
+			expect(cls).toContain("focus-visible:shadow-(--state-focus-ring)");
+
+			// 2. IT IS KEYBOARD-GATED. A bare `focus:` variant would paint on
+			//    mouse clicks, which is the appearance being removed. Matched on
+			//    the token boundary so `focus-visible:` cannot satisfy a search
+			//    for `focus:`.
+			expect(cls).not.toMatch(/(^|\s|:)focus:/);
+
+			// 3. THE UA RING IS SUPPRESSED, which is what makes the token the
+			//    thing that paints rather than a second ring beside Chrome's.
+			expect(cls).toContain("outline-none");
+
+			// 4. NO NEW COLOUR AND NO NEW TOKEN — the ring is the ratified one.
+			//    A hard-coded ring/shadow colour here would be a design-token
+			//    escape (canon: `--state-focus-ring` is the ratified slot).
+			expect(cls).not.toMatch(/shadow-\[/);
+			expect(cls).not.toMatch(/ring-\[/);
+		}
+	});
+
 	it("render::cs14-the-AUTO-ADVANCE-never-steals-focus", () => {
 		// ⛔⛔ CS14 §2 — ONLY ARROW ROTATIONS MOVE FOCUS. The 10s timer must not:
 		// yanking the caret away from a reader on a schedule they did not ask for

@@ -224,12 +224,30 @@ export function DiscoveryCarousel({
 				    The 18px was already shipped; `flex-none` is what makes it refuse
 				    to grow now that there is slack to be had. */}
 				<div className="mt-[9px] mb-2 flex h-[18px] flex-none items-center justify-center gap-[7px]">
+					{/* ⛔ CS14 §3 — THESE TWO CARRY THE RATIFIED FOCUS IDIOM NOW, AND
+					    WHAT THEY HAD BEFORE WAS NOT `:focus`. Measured on staging at
+					    `0f04272`, real mouse click on `›`: `:focus` true,
+					    `:focus-visible` FALSE, computed `outline-style: none` and
+					    `box-shadow: none` — nothing painted on a click, then or now.
+					    The bright ring arrives one keystroke LATER: press an arrow
+					    afterwards and Chrome's focus-visible modality flips on the
+					    ALREADY-focused button, painting its UA `outline: auto` ring.
+					    These were the only focusables in the participant tree with no
+					    focus class at all, so they fell through to that UA default
+					    instead of `--state-focus-ring`.
+					    ⛔ THE INDICATOR IS NOT REMOVED — A11Y.0's floor is visible
+					    focus, and these buttons may be the only keyboard path through
+					    the hero. `outline-none` +
+					    `focus-visible:shadow-(--state-focus-ring)` is the exact pair
+					    already on 19 other focusables, `ScrollRail`'s chevrons
+					    included — same role, same `text-n4`/`hover:text-ink`, and
+					    likewise unrounded. No new colour and no new token. */}
 					{n > 1 && (
 						<button
 							type="button"
 							aria-label="Previous market"
 							onClick={() => setActive((i) => (i - 1 + n) % n)}
-							className="px-[9px] font-mono text-base text-n4 hover:text-ink"
+							className="px-[9px] font-mono text-base text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
 						>
 							‹
 						</button>
@@ -262,7 +280,7 @@ export function DiscoveryCarousel({
 							type="button"
 							aria-label="Next market"
 							onClick={() => setActive((i) => (i + 1) % n)}
-							className="px-[9px] font-mono text-base text-n4 hover:text-ink"
+							className="px-[9px] font-mono text-base text-n4 outline-none hover:text-ink focus-visible:shadow-(--state-focus-ring)"
 						>
 							›
 						</button>
