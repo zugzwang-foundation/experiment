@@ -760,57 +760,111 @@ export function DebateView({
 						criterion={{ open: criterionOpen, onOpenChange: setCriterionOpen }}
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
-						{(["YES", "NO"] as const).map((side) => (
-							<DebateColumn
-								key={side}
-								side={side}
-								pricing={market.pricing}
-								engaged={openSide === side}
-								picked={pickedSide === side}
-								header={
-									<SlotHeader
-										side={side}
-										pricing={market.pricing}
-										unitToWin={market.unitToWin}
-										viewer={viewer}
-										marketOpen={marketOpen}
-										suspended={suspended}
-										composerOpen={openSide === side}
-										onToggleEntry={() => toggleEntry(side)}
-										ownPseudonym={ownPseudonym}
-										slug={market.slug}
-									/>
-								}
-							>
-								{marketColumnBody(
-									side,
-									<PostScroller
-										side={side}
-										posts={side === "YES" ? yesPosts : noPosts}
-										onEnter={enterPost}
-										onOpenPopup={setPopupPost}
-										onOpenImage={setLightboxUrl}
-										onReplyToPost={replyToPost}
-										heldSide={heldSide}
-										marketOpen={marketOpen}
-										suspended={suspended}
-										// R3 — auto-advance. `stagger` on NO only: d5 offsets
-										// the second side by half a cadence so the two columns
-										// advance one-after-another (`:1742` — "NO leads by
-										// 10s"). ⚠ The pick is MUTUALLY EXCLUSIVE by
-										// construction — `pickedSide` is one slot, so choosing
-										// one column releases the other with no cross-talk.
-										auto={{
-											picked: pickedSide === side,
-											frozen,
-											onPick: () => pickSide(side),
-											stagger: side === "NO",
-											registerStep: side === "YES" ? registerYes : registerNo,
-										}}
-									/>,
-								)}
-							</DebateColumn>
-						))}
+						{(["YES", "NO"] as const).map((side) => {
+							// §5 — the pole this column's HEADER speaks for. Normally its own;
+							// while a composer is open it is the composing side, for BOTH
+							// columns (the host mirrors, the opener already matches).
+							const headerSide = openSide ?? side;
+							return (
+								<DebateColumn
+									key={side}
+									side={side}
+									pricing={market.pricing}
+									engaged={openSide === side}
+									picked={pickedSide === side}
+									header={
+										/* ⚠⚠ §5 — BOTH HEADERS READ THE COMPOSING SIDE. Founder
+									   ruling: while a composer is open, the column HOSTING it
+									   stops advertising its own pole and mirrors the side being
+									   bet — label, %, odds, position, and the BUY / SELL
+									   controls.
+									   ⛔⛔ THE BINDING RULE, AND IT IS THE WHOLE RISK: every
+									   value below is keyed off `headerSide`, NEVER off `side`.
+									   `SlotHeader` derives its percent, its to-win, its position
+									   readout, its Buy handler and its Sell gate from the ONE
+									   `side` prop it is given, so passing the composing side
+									   binds all six together by construction. A control labelled
+									   one pole that acts on the other is exactly the defect §0c
+									   traced for, reintroduced in the view layer — and with both
+									   headers reading the same pole there is no longer an
+									   on-screen contradiction to expose it. Pinned by
+									   `header-mirror.test.tsx`.
+									   ⚠ 3a — THE MIRRORED BUY IS NOT A FRESH CALL-TO-ACTION.
+									   `composerOpen` drives `aria-expanded`, and the button
+									   variant renders `aria-expanded:bg-(--state-hover-fill)`, so
+									   the real Buy sits in its open fill while its composer is
+									   up. `openSide === headerSide` is true for BOTH headers
+									   while open, so the mirror carries the identical state.
+									   ⚠ 3b — CLICKING IT TOGGLES CLOSED, which is what the real
+									   one does: `toggleEntry` is `cur === side ? null : side`.
+									   Binding the mirror to `headerSide` makes the two controls
+									   the same action rather than two behaviours to keep in step.
+									   ⚠ 3c — SELL stays the same anchor with the same href, and
+									   its gate travels with the side: `viewer.position.side ===
+									   side` now asks whether the viewer holds the COMPOSING side.
+									   ⚠ 3d — TWO CONTROLS NOW SHARE AN ACCESSIBLE NAME. Neither
+									   visible label changes and neither `aria-label` is altered:
+									   each header is wrapped in a labelled GROUP, so a screen
+									   reader announces "YES column, Buy NO, button" and the
+									   context disambiguates them. Renaming one control would have
+									   made the two disagree about an action that is identical. */
+										// ⚠ A `<fieldset>`, NOT a `div role="group"` — biome's
+										// `useSemanticElements` correctly rejects the ARIA role when a native
+										// element already carries it, and this genuinely groups form controls
+										// (the Buy button and the Sell link). ⛔ Not suppressed; the element
+										// changed. `min-w-0` is the standard fieldset fix — its default
+										// `min-width: min-content` would refuse to shrink in the flex chain.
+										<fieldset
+											className="min-w-0"
+											aria-label={`${side} column`}
+											data-testid={`slot-header-${side}`}
+											data-header-side={headerSide}
+										>
+											<SlotHeader
+												side={headerSide}
+												pricing={market.pricing}
+												unitToWin={market.unitToWin}
+												viewer={viewer}
+												marketOpen={marketOpen}
+												suspended={suspended}
+												composerOpen={openSide === headerSide}
+												onToggleEntry={() => toggleEntry(headerSide)}
+												ownPseudonym={ownPseudonym}
+												slug={market.slug}
+											/>
+										</fieldset>
+									}
+								>
+									{marketColumnBody(
+										side,
+										<PostScroller
+											side={side}
+											posts={side === "YES" ? yesPosts : noPosts}
+											onEnter={enterPost}
+											onOpenPopup={setPopupPost}
+											onOpenImage={setLightboxUrl}
+											onReplyToPost={replyToPost}
+											heldSide={heldSide}
+											marketOpen={marketOpen}
+											suspended={suspended}
+											// R3 — auto-advance. `stagger` on NO only: d5 offsets
+											// the second side by half a cadence so the two columns
+											// advance one-after-another (`:1742` — "NO leads by
+											// 10s"). ⚠ The pick is MUTUALLY EXCLUSIVE by
+											// construction — `pickedSide` is one slot, so choosing
+											// one column releases the other with no cross-talk.
+											auto={{
+												picked: pickedSide === side,
+												frozen,
+												onPick: () => pickSide(side),
+												stagger: side === "NO",
+												registerStep: side === "YES" ? registerYes : registerNo,
+											}}
+										/>,
+									)}
+								</DebateColumn>
+							);
+						})}
 					</div>
 				</>
 			)}
