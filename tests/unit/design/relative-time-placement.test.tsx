@@ -112,14 +112,49 @@ const EXPECTED = "5h ago";
  * a false positive a question of luck; a real-looking year, a 01-12 month and
  * a 01-31 day is a date and essentially nothing else.
  */
+/**
+ * Applied to the WHOLE CARD. These three cannot collide with anything a card
+ * legitimately renders — verified against the fixture UUIDs (a UUID's 4-char
+ * hex segments can never satisfy `\d{4}-\d{2}-\d{2}`), Đ figures, `YES @ 27%`,
+ * hrefs and Tailwind class strings including `aspect-[640/586]`.
+ */
 const ABSOLUTE_TIME_IN_MARKUP: [string, RegExp][] = [
 	["a full ISO-8601 instant", /\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/],
 	[
 		"an ISO calendar date",
 		/\b(19|20)\d{2}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/,
 	],
-	["a wall-clock time", /\b([01]?\d|2[0-3]):[0-5]\d\b/],
 	["a slash-formatted date", /\b\d{1,2}\/\d{1,2}\/(19|20)?\d{2}\b/],
+];
+
+/**
+ * Applied to THE LEAF'S OWN OUTPUT ONLY, and the split is the whole point.
+ *
+ * ⚠⚠ THESE TWO FALSE-POSITIVE ON CORRECT MARKUP, DEMONSTRATED IN-REPO RATHER
+ * THAN IMAGINED. Run over a whole card they red on content that has nothing to
+ * do with this feature:
+ *
+ *   · `CommentImage.tsx`'s placeholder label is `POST IMAGE · 640:586`, which
+ *     survives the wall-clock pattern ONLY by digit count — edit it to `16:10`
+ *     and the guard goes red naming a time that is an aspect ratio.
+ *   · A market question reading "Settles at 18:00 UTC" fires the same pattern.
+ *   · The live window is 15 Sep – 5 Nov 2026, so a founder-authored question
+ *     naming September, October or November fires the month pattern — and so
+ *     does the ordinary English word **May**.
+ *
+ * A guard that reddens on a decision it was not written to govern gets
+ * suppressed, and then it governs nothing — this file's own docblock says so,
+ * and running these two over the whole card was that mistake. Scoped to the
+ * leaf they are exact: the leaf's entire output is one of four known strings.
+ *
+ * ⛔ COVERAGE IS NOT LOST, it is relocated. A date rendered NEXT to the age by
+ * a mount is caught by the source scan over all five feature files below —
+ * which is where `@test-writer` H-2's original leak was closed — and by the
+ * three whole-card patterns above, which see a real date in any position.
+ * (`@test-writer` NEW-2.)
+ */
+const ABSOLUTE_TIME_IN_THE_LEAF: [string, RegExp][] = [
+	["a wall-clock time", /\b([01]?\d|2[0-3]):[0-5]\d\b/],
 	[
 		"a calendar month name",
 		/\b(January|February|March|April|May|June|July|August|September|October|November|December|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\b/,
@@ -362,12 +397,18 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// is the last thing the row SAYS: nothing carrying text may follow it.
 			// A strict last-child assertion would have forced the age past a
 			// control on two surfaces to stay green — the guard bending the build.
+			// ⚠ ONE PREDICATE, SHARED BY THE ASSERTION AND BY ITS CONTROL AT (d).
+			// The control used to carry a SECOND, textually separate copy of this
+			// expression — so weakening the one below to `() => false` would have
+			// left the control passing with its own correct copy, certifying a
+			// predicate it no longer shared. A control that does not share code
+			// with what it certifies proves the wrong thing. (`@test-writer`
+			// NEW-3.)
+			const speaks = (el: Element) => (el.textContent ?? "").trim() !== "";
 			const siblings = [...(row?.children ?? [])];
 			const at = siblings.indexOf(leaf);
 			expect(at).toBeGreaterThanOrEqual(0);
-			const speaksAfter = siblings
-				.slice(at + 1)
-				.filter((el) => (el.textContent ?? "").trim() !== "");
+			const speaksAfter = siblings.slice(at + 1).filter(speaks);
 			expect(
 				speaksAfter.map((el) => el.textContent),
 				`${surface.name}: something the row SAYS comes after the age`,
@@ -377,9 +418,7 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			// VACUOUSLY. If the row had no text-bearing tags at all, `speaksAfter`
 			// would be empty wherever the leaf sat — including first. So assert
 			// the tags exist and that they are all BEFORE it.
-			const speaksBefore = siblings
-				.slice(0, at)
-				.filter((el) => (el.textContent ?? "").trim() !== "");
+			const speaksBefore = siblings.slice(0, at).filter(speaks);
 			expect(
 				speaksBefore.length,
 				`${surface.name}: no tags precede the age — the guard cannot tell first from last here`,
@@ -402,9 +441,7 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 			const mutatedSiblings = [...mutated.children];
 			const mutatedAt = mutatedSiblings.indexOf(mutatedLeaf as Element);
 			expect(
-				mutatedSiblings
-					.slice(mutatedAt + 1)
-					.filter((el) => (el.textContent ?? "").trim() !== "").length,
+				mutatedSiblings.slice(mutatedAt + 1).filter(speaks).length,
 				`${surface.name}: the predicate cannot see a tag appended after the age`,
 			).toBeGreaterThan(0);
 
@@ -422,12 +459,26 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 				// The exemption is ASSERTED, never assumed: whatever follows the
 				// age here must be the text-free trailing action cluster and
 				// nothing else.
+				// ⚠ KEYED ON THE CLUSTER'S CONTENT, NEVER ON `ml-auto`. This
+				// assertion used to read the class string — in the file whose own
+				// docblock forbids selecting by presentation, and a purely
+				// cosmetic `ml-auto` → `ms-auto` reddened it while nothing about
+				// the age moved (`@test-writer` NEW-4). The exemption is for a
+				// TEXT-FREE TRAILING ACTION CLUSTER; what makes it that is the
+				// control inside it, not the utility that right-aligns it.
 				const after = siblings.slice(at + 1);
-				expect(after.length, `${surface.name}: exemption shape changed`).toBe(
-					1,
-				);
-				expect(after[0]?.getAttribute("class") ?? "").toContain("ml-auto");
-				expect((after[0]?.textContent ?? "").trim()).toBe("");
+				expect(
+					after.length,
+					`${surface.name}: the trailing cluster is no longer a single element — re-derive the exemption rather than widening it`,
+				).toBe(1);
+				expect(
+					after[0]?.querySelector("button, a, [role='button']"),
+					`${surface.name}: what follows the age is not an action cluster`,
+				).not.toBeNull();
+				expect(
+					speaks(after[0] as Element),
+					`${surface.name}: the element after the age carries text, so it is a tag and not the trailing edge`,
+				).toBe(false);
 			}
 		});
 	}
@@ -528,23 +579,57 @@ describe("TIME-1 :: G5 — no absolute time reaches the DOM", () => {
 		const SAMPLES: [RegExp, string][] = [
 			[ABSOLUTE_TIME_IN_MARKUP[0][1], `<span>${WRITTEN_AT}</span>`],
 			[ABSOLUTE_TIME_IN_MARKUP[1][1], "<span>2026-07-30</span>"],
-			[ABSOLUTE_TIME_IN_MARKUP[2][1], "<span>00:00</span>"],
-			[ABSOLUTE_TIME_IN_MARKUP[3][1], "<span>7/30/2026</span>"],
-			[ABSOLUTE_TIME_IN_MARKUP[4][1], "<span>30 July 2026</span>"],
+			[ABSOLUTE_TIME_IN_MARKUP[2][1], "<span>7/30/2026</span>"],
+			[ABSOLUTE_TIME_IN_THE_LEAF[0][1], "<span>00:00</span>"],
+			[ABSOLUTE_TIME_IN_THE_LEAF[1][1], "<span>30 July 2026</span>"],
 		];
-		expect(SAMPLES).toHaveLength(ABSOLUTE_TIME_IN_MARKUP.length);
+		expect(SAMPLES).toHaveLength(
+			ABSOLUTE_TIME_IN_MARKUP.length + ABSOLUTE_TIME_IN_THE_LEAF.length,
+		);
 		for (const [pattern, sample] of SAMPLES) {
 			expect(sample, `pattern ${pattern} cannot see ${sample}`).toMatch(
 				pattern,
 			);
 		}
-		// …and none of them fires on what this feature actually renders, so a RED
-		// from one of them is a leak rather than the guard eating its own output.
-		for (const [, pattern] of ABSOLUTE_TIME_IN_MARKUP) {
+		// …and none fires on what this feature actually renders, so a RED is a
+		// leak rather than the guard eating its own output.
+		for (const [, pattern] of [
+			...ABSOLUTE_TIME_IN_MARKUP,
+			...ABSOLUTE_TIME_IN_THE_LEAF,
+		]) {
 			for (const ok of ["just now", "5h ago", "51d ago", "59m ago"]) {
 				expect(ok, `pattern ${pattern} false-positives on "${ok}"`).not.toMatch(
 					pattern,
 				);
+			}
+		}
+		// ⚠⚠ AND THE HALF THAT WAS MISSING: the whole-card patterns must not fire
+		// on CARD CONTENT either. The control above only ever proved they do not
+		// eat the timestamp — but the haystack is the whole card, and nothing
+		// tested that half, which is how two patterns that red on the word "May"
+		// shipped green (`@test-writer` NEW-2). Every string below is copy this
+		// product plausibly renders: the live window is 15 Sep – 5 Nov 2026, and
+		// market questions are founder-authored.
+		const REAL_CARD_COPY = [
+			"POST IMAGE · 640:586",
+			"POST IMAGE · 16:10",
+			"Settles at 18:00 UTC.",
+			"Closes 09:30 in Mumbai.",
+			"Before December, or after.",
+			"May be the last word.",
+			"YES @ 27%",
+			"Đ 1,500",
+			"Replies · 24",
+			"/m/fixture-alpha?post=3",
+			"0190b3a0-9999-7000-8000-00000000000a",
+			"aspect-[640/586]",
+		];
+		for (const [what, pattern] of ABSOLUTE_TIME_IN_MARKUP) {
+			for (const copy of REAL_CARD_COPY) {
+				expect(
+					copy,
+					`whole-card pattern for ${what} false-positives on real copy: "${copy}"`,
+				).not.toMatch(pattern);
 			}
 		}
 		const leaked = `<span title="${WRITTEN_AT}"><time datetime="${WRITTEN_AT}">30 July 2026</time></span>`;
@@ -577,22 +662,36 @@ describe("TIME-1 :: G5 — no absolute time reaches the DOM", () => {
 			"<time",
 			// A mount slicing the ISO apart is the cheapest way to print a date
 			// without naming a single date API.
+			// ⚠ THESE FOUR ARE A CONVENIENCE, NOT THE CONTROL. They are literal
+			// strings, so `String(createdAt).slice(0, 10)` walks past them —
+			// measured. What actually catches that is the DOM half: the rendered
+			// output reddens on the ISO-date pattern regardless of how the slice
+			// was spelled (`@test-writer` NEW-7). Recorded so nobody "hardens"
+			// this list under the impression it is load-bearing. It is not.
 			"createdAt.slice",
 			"createdAt.split",
 			"createdAt.substring",
 			"createdAt.substr",
 		];
-		// ⛔ `title=` IS SCANNED ON THE LEAF ONLY, and that is a measured
-		// exception rather than a softening. In a mount file the string is a
-		// REACT PROP, not an HTML tooltip — `ArgumentList.tsx` passes
-		// `<ArgumentsPanel title="Arguments">` at three sites — so banning it
-		// there would redden on a heading, not on a leak. The tooltip itself is
-		// covered where it actually matters: `[title]` is asserted absent from
-		// the rendered DOM of all four surfaces above.
-		const LEAF_ONLY = ["title="];
+		// ⛔ `title=` IS BANNED EVERYWHERE EXCEPT ONE FILE, and the exception is
+		// sized to the measurement rather than to convenience. In a mount file
+		// the string can be a REACT PROP rather than an HTML tooltip, and
+		// `ArgumentList.tsx` passes `<ArgumentsPanel title="Arguments">` at three
+		// sites — so banning it there would redden on a heading. Measured over
+		// stripped source: `ArgumentList` 3, `ArgProfile` 0, `HeroPanels` 0,
+		// leaf 0, formatter 0.
+		// ⚠⚠ THE EXEMPTION USED TO COVER `ArgProfile` AND `HeroPanels` TOO, for
+		// no reason either file supplied — and `ArgProfile` is the file that
+		// renders the identity row on FOUR of the five mounts, i.e. the single
+		// likeliest place a `title={createdAt}` would ever be written
+		// (`@test-writer` NEW-5). An exception three times wider than its
+		// evidence is a hole with a justification attached.
+		const TITLE_PROP_EXEMPT = [ARGLIST];
 		for (const rel of [LEAF, FORMATTER, ARGPROFILE, HERO, ARGLIST]) {
 			const source = code(rel);
-			const list = rel === LEAF ? [...BANNED, ...LEAF_ONLY] : BANNED;
+			const list = TITLE_PROP_EXEMPT.includes(rel)
+				? BANNED
+				: [...BANNED, "title="];
 			for (const banned of list) {
 				expect(
 					source,
@@ -637,7 +736,27 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 		// would most naturally touch (`@test-writer` M-4). If one of them ever
 		// needs a legitimate effect, removing it from this list is a decision
 		// somebody makes on purpose, which is the point.
-		for (const rel of [LEAF, FORMATTER, ARGPROFILE, HERO, ARGLIST]) {
+		// ⚠⚠ `@/lib/utils` IS IN THIS LIST AND IT IS THE POINT. The import
+		// allowlist below is only as tight as the modules ON it, and one of them
+		// is the repo's general-purpose helper bag — exactly where a "small
+		// shared hook" would land. `@test-writer` NEW-1 demonstrated it: a
+		// `useLiveClock()` (a `useState` plus a one-second `setInterval`) added
+		// to `src/lib/utils.ts`, pulled in through the leaf's ALREADY-ALLOWED
+		// `import { cn } from "@/lib/utils"`, shipped one timer per card and
+		// left all 36 assertions green. The module specifier never changed, so
+		// the allowlist saw nothing; the leaf spelled only `useLiveClock`, so
+		// the denylist saw nothing. Scanning the allowlisted module closes the
+		// seam between the two rather than tightening either one.
+		// ⛔ `@/lib/relative-time` needs no entry — its OWN import list is
+		// asserted empty below, so it can reach no timer to re-export.
+		for (const rel of [
+			LEAF,
+			FORMATTER,
+			ARGPROFILE,
+			HERO,
+			ARGLIST,
+			"src/lib/utils.ts",
+		]) {
 			const source = code(rel);
 			for (const ticker of TICKERS) {
 				expect(source, `${rel} introduces ${ticker}`).not.toContain(ticker);
@@ -681,6 +800,20 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 			importsOf(FORMATTER),
 			"the formatter imports anything at all — it is arithmetic on two integers",
 		).toEqual([]);
+
+		// ⚠ THIS IS A STATIC-NAMED-IMPORT ALLOWLIST, not a dependency allowlist:
+		// `importsOf` matches `from "…"`, so a side-effect import or a dynamic
+		// one is invisible to it (`@test-writer` NEW-6). Neither can hand a React
+		// hook to a synchronous component body, so exploitability is low — but
+		// "low" is not "none", and both spellings are two cheap assertions.
+		for (const rel of [LEAF, FORMATTER]) {
+			expect(code(rel), `${rel} carries a dynamic import`).not.toMatch(
+				/\bimport\s*\(/,
+			);
+			expect(code(rel), `${rel} carries a side-effect import`).not.toMatch(
+				/^\s*import\s+"[^"]+";/m,
+			);
+		}
 
 		// POSITIVE CONTROL — the matcher must actually find imports somewhere, or
 		// an empty result would satisfy the formatter assertion vacuously.
