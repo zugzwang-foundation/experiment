@@ -774,12 +774,19 @@ describe("FEED-1 — every path out terminates", () => {
 		await placeMarketBet(fetchStub);
 		expect(slot()?.getAttribute("data-state")).toBe("open");
 
-		// ⚠ The MIRRORED header, not "Buy NO" — while the arm is held BOTH columns
-		// advertise the composing side, so there is no `Buy NO` on the surface at
-		// all (the §5 header-mirror rule reaching a state it predates; flagged in
-		// the plan, not changed here). Index 1 is the other column's copy.
+		// ⚠⚠ INDEX 0, AND THE INDEX IS THE POINT. While the arm is held there is no
+		// `Buy NO` on the surface at all — every header mirrors the composing side
+		// (§5). How MANY `Buy YES` controls exist then depends on a rule outside
+		// this branch: `staging`'s `09b5fa0` drops the HOSTING column's controls
+		// while a composer is open, taking it from two to one. Index 0 is the
+		// non-hosting column's copy under BOTH rules; index 1 existed only under
+		// the older one.
+		// ⇒ Measured, not predicted: with `origin/staging` merged into this branch
+		// in a throwaway worktree, `[1]` is `undefined` and this was the ONLY one
+		// of 702 tests that broke. Selecting the stable element costs nothing and
+		// makes that merge green rather than green-after-a-fix.
 		fireEvent.pointerDown(
-			screen.getAllByLabelText("Buy YES")[1] as HTMLElement,
+			screen.getAllByLabelText("Buy YES")[0] as HTMLElement,
 		);
 		act(() => {
 			vi.advanceTimersByTime(400);
