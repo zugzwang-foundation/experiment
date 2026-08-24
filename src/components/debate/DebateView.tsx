@@ -408,9 +408,10 @@ export function DebateView({
 			<ComposerSlot
 				slotId={side}
 				onOccupiedChange={reportSlotOccupied}
-				open={hosts}
+				slot={hosts ? "composer" : "scroller"}
 				busy={composerBusy}
 				scroller={scroller}
+				confirmation={null}
 				composer={
 					hosts && openSide !== null ? (
 						viewer === null ? (
@@ -671,12 +672,15 @@ export function DebateView({
 									<ComposerSlot
 										slotId={side}
 										onOccupiedChange={reportSlotOccupied}
-										open={
+										slot={
 											hostsComposer &&
 											resultingSide !== null &&
 											openReply !== null
+												? "composer"
+												: "scroller"
 										}
 										busy={composerBusy}
+										confirmation={null}
 										composer={
 											hostsComposer && resultingSide !== null && openReply ? (
 												viewer === null ? (
