@@ -189,7 +189,20 @@ export function AggregateFooter({
 						data-testid="aggregate-split-track"
 						aria-hidden="true"
 						className={cn(
-							"h-1.5 w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
+							// ⚠⚠ change set 10 §6a — THE TRACK MATCHES THE MARKET-LEVEL BAR.
+							// It was `h-1.5` (6px) beside a `PriceBar` whose `detail` size —
+							// the one on this very surface — is `h-[14px]`. Two split bars,
+							// one screen, and one of them read as a hairline next to the
+							// other. MEASURED before changing: 6px vs 14px.
+							// ⚠ `detail`, not `hero` (22px) or `card` (16px): those render on
+							// the Discovery surfaces, and the comparison a reader actually
+							// makes is against the bar in the same viewport.
+							// ⛔ THIS DOES NOT MOVE THE ALIGNMENT, and that is a property of
+							// the CS6 fix rather than luck: the track is centred inside a
+							// fixed `h-6` box, so its CENTRE is the box's centre at any
+							// thickness. Growing it 6 → 14 changes what fills the box, not
+							// where the middle of it sits.
+							"h-[14px] w-full overflow-hidden rounded-(--r-dot) [border:var(--hairline)]",
 							counterPole,
 						)}
 					>

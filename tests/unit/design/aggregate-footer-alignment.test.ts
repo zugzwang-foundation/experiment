@@ -90,6 +90,34 @@ describe("the aggregate footer — the track aligns to the pills", () => {
 		expect(row.split(/\s+/)).toContain("items-start");
 	});
 
+	it("aggregate-footer::the-track-matches-the-market-level-bar-thickness", () => {
+		// ⚠⚠ change set 10 §6a — MEASURED BEFORE CHANGING: the S/C track was
+		// `h-1.5` (6px) while `PriceBar`'s `detail` size — the market-level YES/NO
+		// split bar on this same surface — is `h-[14px]`. One screen, two split
+		// bars, and one of them read as a hairline beside the other.
+		// ⚠ `detail`, not `hero` (22px) or `card` (16px): those render on the
+		// Discovery surfaces, and the comparison a reader actually makes is
+		// against the bar in the same viewport.
+		// ⛔ PINNED AGAINST `PriceBar`'S OWN DECLARATION, not against a copied
+		// literal. If the market bar is re-sized, this reddens and the two are
+		// re-decided together rather than drifting apart in silence.
+		const bar = readFileSync(
+			join(ROOT, "src/components/debate/PriceBar.tsx"),
+			"utf8",
+		);
+		const detail = /detail:\s*\{\s*bar:\s*"h-\[(\d+)px\]"/.exec(bar)?.[1];
+		expect(detail).toBeDefined();
+
+		const at = source.indexOf('data-testid="aggregate-split-track"');
+		const cls =
+			/className=\{cn\(\s*(?:\/\/[^\n]*\n\s*)*"([^"]*)"/.exec(
+				source.slice(at, at + 1600),
+			)?.[1] ?? "";
+		expect(cls).toContain(`h-[${detail}px]`);
+		// The superseded thickness, pinned as gone.
+		expect(cls).not.toContain("h-1.5");
+	});
+
 	it("aggregate-footer::ONE-component-serves-every-mount", () => {
 		// The alignment is fixed in one place because there IS one place. Three
 		// call sites — PostCard's removed branch, PostCard's present branch, and
