@@ -273,6 +273,55 @@ describe("FEED-1 — the third state", () => {
 		).not.toBeNull();
 	});
 
+	it("composer-slot::confirmed-renders-ONLY-the-confirmation-when-BOTH-are-passed", () => {
+		// ⛔⛔ THE PROP SHAPE `DebateView` ACTUALLY PASSES, which is NOT the one
+		// `slotProps` above models. In the host, `composer` is built from
+		// `hosts && openSide !== null` and `openSide` is HELD across the confirmed
+		// state — so while `slot="confirmed"` the host is still handing this
+		// component a LIVE `<BetComposer>` element. `slotProps` passes `null`
+		// there, which makes the sibling test's "the composer is GONE" assertion
+		// true by construction: it is asserting the absence of something the test
+		// never supplied.
+		//
+		// ⇒ Measured: with `live` changed to render `<>{composer}{confirmation}</>`
+		// while confirmed, every one of the nine tests in this file stayed GREEN.
+		// This is the one that goes red — and it is the row that matters, because
+		// what is left mounted is a live money form with its own submit control.
+		const { container, rerender } = render(
+			<ComposerSlot
+				slotId="YES"
+				busy={false}
+				scroller={SCROLLER}
+				slot="composer"
+				composer={COMPOSER}
+				confirmation={null}
+			/>,
+		);
+		rerender(
+			<ComposerSlot
+				slotId="YES"
+				busy={false}
+				scroller={SCROLLER}
+				slot="confirmed"
+				composer={COMPOSER}
+				confirmation={CONFIRMATION}
+			/>,
+		);
+
+		expect(
+			container.querySelector('[data-testid="probe-confirmation"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-testid="probe-composer"]'),
+			"the composer is UNMOUNTED, not merely covered — it is still being passed",
+		).toBeNull();
+		// The submit-bearing control specifically: a form left mounted with a live
+		// control is the second instance the in-flight short-circuit exists to stop.
+		expect(
+			container.querySelector('[data-testid="probe-composer-control"]'),
+		).toBeNull();
+	});
+
 	it("composer-slot::the-exit-corpse-is-the-CONFIRMATION-not-the-composer", () => {
 		// ⛔⛔ THE GUARD FOR THE ONE GENUINELY BINARY LINE IN THE HOLD. `held` used
 		// to latch off `composer` alone. With a third occupant that reads as: the

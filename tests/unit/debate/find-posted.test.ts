@@ -86,6 +86,49 @@ describe("findPostedNode — top-level posts", () => {
 			}),
 		).toBeNull();
 	});
+	it("find-posted::a-removed-node-carrying-a-BODY-still-comes-back-as-null", () => {
+		// ⛔⛔ SC-1's SECOND OBLIGATION, AND IT WAS NOT ASSERTED ANYWHERE. Both
+		// removed cases above are built from fixtures that carry NO body — so they
+		// prove the `null` return and prove nothing at all about whether a body
+		// could travel. The removed variant has no body field at the TYPE level,
+		// which is the whole argument; this is the case that shows the argument is
+		// about the RUNTIME too, because a projection that widened, a stale cache
+		// or a hand-built row can all hand this function an object with a body on
+		// it and a `removed: true` beside it.
+		//
+		// ⚠ The cast is deliberate and is the point: it constructs the row the
+		// type system says cannot exist, which is exactly the row a masking guard
+		// has to survive. The assertion is on the RETURN, not on a row id — a
+		// caller that received the node would be free to render the body.
+		const leaky = {
+			removed: true,
+			id: "cmt-gone",
+			ordinal: 3,
+			sideAtPostTime: "NO",
+			createdAt: "2026-09-18T09:00:00.000Z",
+			title: "WITHHELD-TITLE-SENTINEL",
+			body: "WITHHELD-BODY-SENTINEL",
+			aggregate: {
+				supportCount: 0,
+				counterCount: 0,
+				supportDharma: "0.000000000000000000",
+				counterDharma: "0.000000000000000000",
+			},
+			replies: { support: [], counter: [], twoSlot: [] },
+		} as unknown as DebatePost;
+
+		const found = findPostedNode({
+			posts: [POST_A, leaky],
+			parent: null,
+			commentId: "cmt-gone",
+		});
+		expect(found).toBeNull();
+		// The body's absence, not the row's (SC-1). `null` has no field for it to
+		// travel in, and this is the assertion that says so in the shape a second
+		// consumer would have to break.
+		expect(JSON.stringify(found)).not.toContain("WITHHELD-BODY-SENTINEL");
+		expect(JSON.stringify(found)).not.toContain("WITHHELD-TITLE-SENTINEL");
+	});
 });
 
 describe("findPostedNode — replies under the focused post", () => {

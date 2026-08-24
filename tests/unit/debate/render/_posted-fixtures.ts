@@ -45,8 +45,22 @@ export function placeOk(commentId: string, side: "YES" | "NO" = "YES") {
 }
 
 /** Reused fixture prose (payload.test.ts) — no invented market content. */
-const TITLE = "The base rate argument.";
-const BODY = "The extended argument, first paragraph.";
+const BODY = "The base rate argument.";
+
+/**
+ * ⚠⚠ THE MODEL'S TITLE IS DELIBERATELY **NOT** THE STRING THE COMPOSER TYPES.
+ *
+ * In life they would be the same — the author typed it, the server stored it —
+ * and that is exactly the problem: an assertion that the card shows the typed
+ * string passes just as happily against a card built from the composer's own
+ * local draft, which is the reconstruction this whole feature refuses to do.
+ * Diverging them here is what makes `h3 === MODEL_TITLE` mean "this came from
+ * the MODEL" rather than "this came from somewhere".
+ *
+ * ⛔ Still not invented: both halves are shipped fixture prose from the composer
+ * suite (`payload.test.ts`). Nothing here is market content.
+ */
+export const MODEL_TITLE = "The extended argument, first paragraph.";
 
 /**
  * A present top-level post. ⚠ `ordinal` and `badge` are the two fields a client
@@ -65,7 +79,7 @@ export function newPost(over: {
 		ordinal: over.ordinal,
 		sideAtPostTime: over.sideAtPostTime,
 		createdAt: "2026-09-18T09:00:00.000Z",
-		title: TITLE,
+		title: MODEL_TITLE,
 		teaser: "",
 		body: BODY,
 		imageUrl: null,

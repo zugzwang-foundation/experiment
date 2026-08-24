@@ -183,5 +183,23 @@ describe("FEED-1 A1 — server reads per successful bet", () => {
 			screen.queryByTestId("posted-confirmation"),
 			"and it is still up — a poll that fired would have re-rendered under it",
 		).not.toBeNull();
+
+		// ⛔⛔ THE POSITIVE CONTROL, AND WITHOUT IT THIS TEST IS A COUNT THAT NEVER
+		// MOVES FOR REASONS UNKNOWN. "The poll did not tick" reads identically
+		// against a suspended poll and against a poll that cannot tick in this
+		// harness at all — an unstubbed `document.hidden`, a `marketOpen` that
+		// came through false, a fake-timer wiring that never reaches the interval.
+		// Releasing the arm and advancing the SAME clock is what separates them.
+		fireEvent.click(screen.getByTestId("posted-dismiss"));
+		// The resume refresh, fired the instant the arm clears.
+		expect(refreshMock).toHaveBeenCalledTimes(2);
+
+		act(() => {
+			vi.advanceTimersByTime(15_000 * 4);
+		});
+		expect(
+			refreshMock.mock.calls.length,
+			"the poll DOES tick once released — so its silence above was the suspension",
+		).toBeGreaterThan(2);
 	});
 });
