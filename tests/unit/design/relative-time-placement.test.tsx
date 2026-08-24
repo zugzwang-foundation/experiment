@@ -6,14 +6,17 @@ import { cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PostCard } from "@/components/debate/PostCard";
+import { PostFocusHeader } from "@/components/debate/PostFocusHeader";
 import { ReplyCard } from "@/components/debate/ReplyCard";
 import type {
+	DebateMarketHeader,
 	DebatePost,
 	DebateReply,
 	ReplyGroups,
 } from "@/components/debate/types";
 import { HeroPanels } from "@/components/discovery/HeroPanels";
 import { ArgumentList } from "@/components/profile/ArgumentList";
+import { formatRelativeTime } from "@/lib/relative-time";
 import type { HeroPost } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
@@ -251,6 +254,26 @@ const CARD: DiscoveryCard = {
 		replyCount: 68,
 	},
 	imageUrl: null,
+};
+
+/** The focused post's market context. Neutral fixture prose only — no invented
+ * market content (CLAUDE.md §3); `Market fixture-alpha` is the string every
+ * other suite in this tree uses. */
+const MARKET_HEADER: DebateMarketHeader = {
+	id: "0190b3a0-9999-7000-8000-0000000000c2",
+	slug: "fixture-alpha",
+	title: "Market fixture-alpha",
+	description: null,
+	status: "Open",
+	mediaVideoUrl: null,
+	mediaImageUrl: null,
+	pricing: { yes: "0.500000000000000000", no: "0.500000000000000000" },
+	unitToWin: { yes: "2.000000000000000000", no: "2.000000000000000000" },
+	totals: {
+		dharmaStaked: "14260.000000000000000000",
+		postCount: 28,
+		replyCount: 68,
+	},
 };
 
 function profilePost(): ProfileArgumentItem {
@@ -576,7 +599,43 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 	 * identity row at all for a removed node and inventing one is a new
 	 * decision. Recorded here so a future ruling that reverses it is not
 	 * mistaken for a security regression.
+	 *
+	 * ⚠⚠ ONE PRECONDITION ATTACHES TO REVERSING IT, and it is not optional.
+	 * Reversal is safe ONCE `src/server/debate-view/load-debate-view.ts:334`
+	 * renders the substrate instant instead of `new Date(0)`. Before that, a
+	 * reversed A8 prints roughly `20693d ago` on the `!comment` race path — a
+	 * fabricated fact, and a visible tell that the node is a substrate stub
+	 * rather than a moderated removal, which is a disclosure the UI does not
+	 * have today. ⛔ Reversing first would CREATE the regression this
+	 * relabelling exists to pre-empt. The full trace lives in
+	 * `claude-progress.md`, which is GITIGNORED — which is exactly why the
+	 * precondition is restated here, where a reverser will actually read it.
 	 */
+	const PROFILE_AUTHOR = {
+		id: "0190b3a0-9999-7000-8000-0000000000f1",
+		pseudonym: "fixture-user",
+		banned: false,
+		pfpUrl: "",
+	};
+	/**
+	 * ⚠ `ProfileArgumentItem` has TWO removed variants — `kind: "post"` (this
+	 * one) and `kind: "reply"` (`arguments.ts:49-57`, which carries no
+	 * `aggregate`). `ArgumentList:173-181` renders both through the IDENTICAL
+	 * branch, so the second exercises no distinct code and its absence here is a
+	 * decision rather than an oversight (`@security-auditor`, §3 nuance).
+	 */
+	const REMOVED_PROFILE_ITEM: ProfileArgumentItem = {
+		removed: true,
+		kind: "post",
+		id: "0190b3a0-9999-7000-8000-00000000000d",
+		side: "NO",
+		marketSlug: "fixture-alpha",
+		marketTitle: "Market fixture-alpha",
+		ordinal: 5,
+		createdAt: WRITTEN_AT,
+		aggregate: AGGREGATE,
+	};
+
 	const REMOVED_SURFACES: { name: string; render: () => HTMLElement }[] = [
 		{
 			name: "market detail · removed post card",
@@ -623,25 +682,60 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 			render: () =>
 				render(
 					<ArgumentList
-						items={[
-							{
-								removed: true,
-								kind: "post",
-								id: "0190b3a0-9999-7000-8000-00000000000d",
-								side: "NO",
-								marketSlug: "fixture-alpha",
-								marketTitle: "Market fixture-alpha",
-								ordinal: 5,
-								createdAt: WRITTEN_AT,
-								aggregate: AGGREGATE,
-							},
-						]}
+						items={[REMOVED_PROFILE_ITEM]}
 						owner={false}
-						author={{
-							id: "0190b3a0-9999-7000-8000-0000000000f1",
-							pseudonym: "fixture-user",
-							banned: false,
-							pfpUrl: "",
+						author={PROFILE_AUTHOR}
+					/>,
+				).container,
+		},
+		{
+			// E-1 — THE FOCUSED POST'S REMOVED ARM. `PostFocusHeader` appeared in
+			// this file only inside comments; it was never imported and never
+			// rendered, so a raw instant written into its removed branch was
+			// invisible to every assertion here (`@security-auditor` E-1).
+			name: "market detail · removed focused post",
+			render: () =>
+				render(
+					<PostFocusHeader
+						post={{
+							removed: true,
+							id: "0199a0c0-0000-7000-8000-00000000000f",
+							ordinal: 6,
+							sideAtPostTime: "NO",
+							createdAt: WRITTEN_AT,
+							aggregate: AGGREGATE,
+							replies: EMPTY_REPLIES,
+						}}
+						market={MARKET_HEADER}
+						heldSide={null}
+						marketOpen
+						suspended={false}
+						activeRelation={null}
+						onToggleRelation={noop}
+						onExit={noop}
+						onOpenImage={noop}
+						onOpenPopup={noop}
+					/>,
+				).container,
+		},
+		{
+			// E-2 — THE PROFILE REPLICA'S REMOVED ARM. `ArgumentList` has TWO
+			// removed rendering paths and the fixture above exercises only the
+			// list one; passing a `selection` routes to the filtered branch
+			// instead (`@security-auditor` E-2). Same file, same component, a
+			// different `return` — which is exactly the distinction a
+			// file-keyed inventory cannot make.
+			name: "profile · removed argument, filtered panel",
+			render: () =>
+				render(
+					<ArgumentList
+						items={[REMOVED_PROFILE_ITEM]}
+						owner={false}
+						author={PROFILE_AUTHOR}
+						selection={{
+							marketId: "0190b3a0-9999-7000-8000-0000000000c2",
+							marketTitle: "Market fixture-alpha",
+							commentId: REMOVED_PROFILE_ITEM.id,
 						}}
 					/>,
 				).container,
@@ -678,11 +772,38 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 					`${surface.name}: ${what} reached a removed card`,
 				).not.toMatch(pattern);
 			}
-			// (d) …and none of the four ruled age shapes either.
+			// (d) …AND NO AGE, IN ANY SPELLING.
+			// ⚠⚠ THIS USED TO BE ONE HAND-COPIED REGEX OVER FOUR LITERAL SHAPES,
+			// AND THAT REPRODUCED, ONE LAYER DOWN, THE DEFECT THIS WHOLE SUITE
+			// WAS WRITTEN TO END: the old inventory was bound to a NAME; that
+			// pattern was bound to a SPELLING. `@security-auditor` E-3 walked
+			// past it with three lines of `Intl.RelativeTimeFormat`, which
+			// renders `54 days ago` — no `<digits><m|h|d> ago`, so no match; no
+			// leaf, so the marker count is 0; no date, so the ISO scan is silent;
+			// and `RelativeTimeFormat` does not contain the banned substring
+			// `DateTimeFormat`. Green on every assertion, with a full relative
+			// age on a withheld argument.
+			//
+			// Two nets now, and neither is a copy of the implementation:
+			// (i) every string the SHIPPED formatter can actually produce, swept
+			//     across all four buckets — bound to the function, so it cannot
+			//     drift from what ships;
+			// (ii) a coarse "any relative-age phrasing at all" net, which is what
+			//      catches a spelling the shipped formatter never emits.
+			for (const ageMs of [0, 30_000, 90_000, 5 * 3_600_000, 3 * 86_400_000]) {
+				const shipped = formatRelativeTime(
+					Date.parse(WRITTEN_AT) + ageMs,
+					Date.parse(WRITTEN_AT),
+				);
+				expect(
+					html,
+					`${surface.name}: the shipped age "${shipped}" reached a removed card`,
+				).not.toContain(shipped);
+			}
 			expect(
 				html,
 				`${surface.name}: a relative age reached a removed card`,
-			).not.toMatch(/\b\d+[mhd] ago\b|just now/);
+			).not.toMatch(/\b\d+\s*\w* ago\b|just now|yesterday/i);
 		});
 	}
 
@@ -690,7 +811,7 @@ describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
 		// The present fixtures DO render an age; the removed ones do not. Without
 		// this pair, (b) above could be passing because the render helper is
 		// broken rather than because the branch is right.
-		expect(REMOVED_SURFACES).toHaveLength(3);
+		expect(REMOVED_SURFACES).toHaveLength(5);
 		for (const surface of SURFACES) {
 			const c = surface.render();
 			expect(c.querySelectorAll("[data-relative-time]").length).toBe(1);
