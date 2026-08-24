@@ -544,6 +544,166 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 	});
 });
 
+describe("TIME-1 :: A8 — a REMOVED card renders no age at all", () => {
+	/**
+	 * ⚠⚠ THIS SUITE EXISTS BECAUSE ITS ABSENCE WAS THE ONE REAL GAP THE SECURITY
+	 * AUDIT FOUND. Every other guard here renders a PRESENT fixture, so nothing
+	 * a removed branch produces was ever asserted on — and the mount inventory
+	 * that was standing in for this rule keys on a NAME, not on a BRANCH.
+	 * `@security-auditor` demonstrated two evasions on the real tree, both green:
+	 *
+	 *   · `import { RelativeTime as Age }` inside a file already on the ratified
+	 *     list, mounted in `RemovedHead` — the specifier still matches, and
+	 *     `<Age` is not `<RelativeTime`.
+	 *   · No leaf at all: `<span className="text-xs text-n5">{createdAt}</span>`
+	 *     in `RemovedHead` — a full ISO instant on a removed stub, with no
+	 *     regex anywhere to harden.
+	 *
+	 * ⇒ The fix is a removed FIXTURE, not a tighter pattern. Asserting on what
+	 * the removed branch actually renders converts the rule from "one mount per
+	 * named file" (a naming convention) into "a removed card carries no age"
+	 * (the ruling). The first evasion is caught by the marker count, the second
+	 * by the ISO scan — neither needs to know how the mount was spelled.
+	 *
+	 * ⚠ A8 IS A PRODUCT DECISION, NOT A SECURITY CONTROL, and the audit was
+	 * explicit that it should be labelled that way. `createdAt` is a declared
+	 * structural field that SURVIVES masking (`load-debate-view.ts:52-54`,
+	 * ADR-0020/0021 thread integrity), and the exact instant is already public
+	 * at finer precision through the `.md` export (`debate-export/serialize.ts`
+	 * emits `Time: YYYY-MM-DD HH:MM UTC` on the removed branch, via an
+	 * unauthenticated route). So an age on a removed card would be SAFE; it is
+	 * simply not what this task shipped, because market detail renders no
+	 * identity row at all for a removed node and inventing one is a new
+	 * decision. Recorded here so a future ruling that reverses it is not
+	 * mistaken for a security regression.
+	 */
+	const REMOVED_SURFACES: { name: string; render: () => HTMLElement }[] = [
+		{
+			name: "market detail · removed post card",
+			render: () =>
+				render(
+					<PostCard
+						post={{
+							removed: true,
+							id: "0199a0c0-0000-7000-8000-00000000000d",
+							ordinal: 4,
+							sideAtPostTime: "NO",
+							createdAt: WRITTEN_AT,
+							aggregate: AGGREGATE,
+							replies: EMPTY_REPLIES,
+						}}
+						onEnter={noop}
+						onOpenPopup={noop}
+						onOpenImage={noop}
+						onReplyToPost={noop}
+						heldSide={null}
+						marketOpen
+						suspended={false}
+					/>,
+				).container,
+		},
+		{
+			name: "market detail · removed reply card",
+			render: () =>
+				render(
+					<ReplyCard
+						reply={{
+							removed: true,
+							id: "0199a0c0-0000-7000-8000-00000000000e",
+							side: "NO",
+							createdAt: WRITTEN_AT,
+						}}
+						onOpenImage={noop}
+						onOpenPopup={noop}
+					/>,
+				).container,
+		},
+		{
+			name: "profile · removed argument",
+			render: () =>
+				render(
+					<ArgumentList
+						items={[
+							{
+								removed: true,
+								kind: "post",
+								id: "0190b3a0-9999-7000-8000-00000000000d",
+								side: "NO",
+								marketSlug: "fixture-alpha",
+								marketTitle: "Market fixture-alpha",
+								ordinal: 5,
+								createdAt: WRITTEN_AT,
+								aggregate: AGGREGATE,
+							},
+						]}
+						owner={false}
+						author={{
+							id: "0190b3a0-9999-7000-8000-0000000000f1",
+							pseudonym: "fixture-user",
+							banned: false,
+							pfpUrl: "",
+						}}
+					/>,
+				).container,
+		},
+	];
+
+	for (const surface of REMOVED_SURFACES) {
+		it(`relative-time::A8-no-age-on-a-removed-card — ${surface.name}`, () => {
+			const container = surface.render();
+
+			// (a) The stub really did render — otherwise every assertion below
+			// passes against an empty container, which is the vacuous-green shape
+			// this whole file keeps guarding against.
+			expect(
+				container.textContent ?? "",
+				`${surface.name}: the removed stub did not render`,
+			).toContain("Removed by moderator");
+
+			// (b) NO LEAF. Catches an aliased-import mount, because the alias
+			// changes the tag and not the marker it renders.
+			expect(
+				container.querySelectorAll("[data-relative-time]").length,
+				`${surface.name}: a removed card rendered an age`,
+			).toBe(0);
+
+			// (c) AND NO INSTANT BY ANY OTHER SPELLING. Catches a raw
+			// `{createdAt}` written straight into the stub, which has no leaf and
+			// no marker for (b) to find.
+			const html = container.innerHTML;
+			expect(html).not.toContain(WRITTEN_AT);
+			for (const [what, pattern] of ABSOLUTE_TIME_IN_MARKUP) {
+				expect(
+					html,
+					`${surface.name}: ${what} reached a removed card`,
+				).not.toMatch(pattern);
+			}
+			// (d) …and none of the four ruled age shapes either.
+			expect(
+				html,
+				`${surface.name}: a relative age reached a removed card`,
+			).not.toMatch(/\b\d+[mhd] ago\b|just now/);
+		});
+	}
+
+	it("relative-time::A8-the-removed-fixtures-are-alive", () => {
+		// The present fixtures DO render an age; the removed ones do not. Without
+		// this pair, (b) above could be passing because the render helper is
+		// broken rather than because the branch is right.
+		expect(REMOVED_SURFACES).toHaveLength(3);
+		for (const surface of SURFACES) {
+			const c = surface.render();
+			expect(c.querySelectorAll("[data-relative-time]").length).toBe(1);
+			cleanup();
+		}
+		for (const surface of REMOVED_SURFACES) {
+			const c = surface.render();
+			expect(c.querySelectorAll("[data-relative-time]").length).toBe(0);
+			cleanup();
+		}
+	});
+});
+
 describe("TIME-1 :: G5 — no absolute time reaches the DOM", () => {
 	for (const surface of SURFACES) {
 		it(`relative-time::G5-the-leaf-carries-only-its-marker-and-its-class — ${surface.name}`, () => {
@@ -942,7 +1102,9 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 		// over three names — this is what catches a second mount added to a
 		// removed-variant branch in a file the list above happens to cover.
 		const mountSites = tree.flatMap((rel) => {
-			const mounts = code(rel).match(/<RelativeTime\b[\s\S]*?\/>/g) ?? [];
+			const mounts =
+				code(rel).match(/<RelativeTime\b[\s\S]*?(?:\/>|<\/RelativeTime>)/g) ??
+				[];
 			return mounts.map((m) => ({ rel, m }));
 		});
 		expect(mountSites.map((s) => s.rel).sort()).toEqual(
