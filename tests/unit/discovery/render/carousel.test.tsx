@@ -218,11 +218,25 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(0);
 	});
 
+	/** A key pressed INSIDE the carousel — dispatched on a real descendant, so
+	 *  the event has to BUBBLE to reach the handler, exactly as a keypress from
+	 *  a focused card or link does. Dispatching on the carousel root itself
+	 *  would pass even if the scoping were wired to the wrong element. */
+	function keyInside(key: string) {
+		fireEvent.keyDown(screen.getByLabelText("Next market"), { key });
+	}
+
 	it("render::arrow-keys-advance-and-reset", () => {
 		// POLISH.2 V37 — design-canon §5 Discovery: "`‹ ›` / Left-Right advance
 		// immediately and RESET the timer". The build had no keyboard handler at
 		// all. This is canon, not an a11y-deferred item, so it does not wait on
 		// R16. The mockup binds the same two keys at :477-479.
+		//
+		// ⛔⛔ RE-POINTED AT UI-QUICK CS13 §5 — the keys are now SCOPED TO THE
+		// CAROUSEL rather than bound to the document, so every press below is
+		// dispatched from inside it. The BEHAVIOUR asserted — advance, reset,
+		// wrap — is unchanged and every original assertion is still here; only
+		// the origin of the event moved, which is precisely what §5 changed.
 		render(<DiscoveryCarousel markets={views(3)} />);
 		expectActive(0);
 
@@ -230,7 +244,7 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		act(() => {
 			vi.advanceTimersByTime(7_000);
 		});
-		fireEvent.keyDown(document, { key: "ArrowRight" });
+		keyInside("ArrowRight");
 		expectActive(1);
 
 		// …and RESETS, exactly as the arrows do: the discarded countdown would
@@ -245,34 +259,110 @@ describe("UI.A4 §5 — DiscoveryCarousel (canon §5 motion)", () => {
 		expectActive(2);
 
 		// ArrowLeft steps back and wraps 0 → 2.
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(1);
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(0);
-		fireEvent.keyDown(document, { key: "ArrowLeft" });
+		keyInside("ArrowLeft");
 		expectActive(2);
+	});
+
+	it("render::cs13-ArrowUp-and-ArrowDown-join-Left-and-Right", () => {
+		// ⛔ CS13 §5 — Up/Left step BACK, Down/Right step FORWARD. All four are
+		// asserted against the SAME carousel so a handler that answered one pair
+		// and dropped the other cannot pass.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		expectActive(0);
+
+		keyInside("ArrowDown");
+		expectActive(1);
+		keyInside("ArrowDown");
+		expectActive(2);
+		// …and Down wraps forward, exactly as Right does.
+		keyInside("ArrowDown");
+		expectActive(0);
+
+		// Up steps back and wraps 0 → 2, exactly as Left does.
+		keyInside("ArrowUp");
+		expectActive(2);
+		keyInside("ArrowUp");
+		expectActive(1);
+
+		// ⛔ AND THE PAIRS AGREE. Up must land where Left lands, Down where Right
+		// lands — asserted rather than assumed, because a transposed sign here
+		// would be invisible in any single-key test above.
+		keyInside("ArrowUp");
+		expectActive(0);
+		keyInside("ArrowLeft");
+		expectActive(2);
+		keyInside("ArrowDown");
+		expectActive(0);
+		keyInside("ArrowRight");
+		expectActive(1);
+	});
+
+	it("render::cs13-NO-arrow-key-is-answered-from-OUTSIDE-the-carousel", () => {
+		// ⛔⛔ CS13 §5, AND THIS IS THE ASSERTION THE SCOPING EXISTS FOR. Before
+		// this change the handler was on the DOCUMENT, so it answered arrow keys
+		// pressed anywhere on the page: it rotated the hero out from under a
+		// viewer arrowing through the market grid, and its `preventDefault`
+		// suppressed the page's own scroll on every arrow press on the surface.
+		//
+		// ⚠ ALL FOUR KEYS ARE CHECKED, not just the original two. A scope that
+		// leaked would most likely leak uniformly, but the two NEW keys are the
+		// ones with no prior coverage at all, and an outside-leak is exactly the
+		// defect a fresh binding introduces.
+		render(<DiscoveryCarousel markets={views(3)} />);
+		const outside = document.createElement("button");
+		document.body.appendChild(outside);
+
+		for (const key of ["ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp"]) {
+			fireEvent.keyDown(outside, { key });
+			expectActive(0);
+		}
+		// The document itself is outside too — this is the literal binding that
+		// was removed, so it is pinned as removed.
+		for (const key of ["ArrowRight", "ArrowDown"]) {
+			fireEvent.keyDown(document, { key });
+			expectActive(0);
+		}
+		outside.remove();
+
+		// ⛔ AND THE POSITIVE CONTROL, in the same test. Without it, a carousel
+		// that answered NOTHING — the failure mode a broken scope actually
+		// produces — would pass every assertion above.
+		keyInside("ArrowRight");
+		expectActive(1);
 	});
 
 	it("render::arrow-keys-ignored-while-typing-and-when-static", () => {
 		// Two boundaries, both of which would be silent defects.
 		//
 		// 1. A viewer typing in a field must keep their caret. Nothing on `/`
-		//    has an input today, which is exactly why this is pinned now — the
-		//    handler is on the DOCUMENT and the first input added to this
-		//    surface would otherwise inherit a stolen ArrowLeft.
+		//    has an input today, and CS13 §5 narrowed the binding to the
+		//    carousel — but the guard is KEPT rather than dropped, because a
+		//    field placed INSIDE the carousel later would reach the handler and
+		//    a caret moving in it must not also rotate the hero. The input is
+		//    therefore mounted inside the carousel, which is now the only place
+		//    it could do harm.
 		const { unmount } = render(<DiscoveryCarousel markets={views(3)} />);
 		const input = document.createElement("input");
-		document.body.appendChild(input);
-		fireEvent.keyDown(input, { key: "ArrowRight" });
-		expectActive(0);
+		screen.getByTestId("discovery-carousel").appendChild(input);
+		for (const key of ["ArrowRight", "ArrowDown"]) {
+			fireEvent.keyDown(input, { key });
+			expectActive(0);
+		}
 		input.remove();
 		unmount();
 
 		// 2. One market ⇒ static (§22 F-DISC-2). No timer, no arrows, and no
 		//    key handler either — a keypress must not move a single-position
-		//    carousel.
+		//    carousel. ⚠ With n = 1 the `‹ ›` buttons do not render, so the press
+		//    goes to the carousel root; there is no descendant control to use.
 		render(<DiscoveryCarousel markets={views(1)} />);
-		fireEvent.keyDown(document, { key: "ArrowRight" });
+		fireEvent.keyDown(screen.getByTestId("discovery-carousel"), {
+			key: "ArrowRight",
+		});
 		expectActive(0);
 	});
 

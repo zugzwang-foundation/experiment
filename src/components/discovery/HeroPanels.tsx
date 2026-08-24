@@ -96,9 +96,22 @@ export function HeroPanels({
 			    ⚠ Canon §3 item 6 ("Pick / carousel-select is view-only — never
 			    mutates a position") governs POSITION MUTATION. Navigating to
 			    `/m/[slug]` mutates nothing; ruled as not barring this. */}
+			{/* ⛔ CS13 §4 — THE KEYBOARD PATH WAS ALREADY WHOLE; WHAT WAS MISSING
+			    WAS THE EVIDENCE OF IT. This panel is a real `<Link>`, so it has
+			    always been Tab-reachable and Enter has always opened the market —
+			    no handler is added here and none is needed. The defect was that a
+			    keyboard viewer could not SEE where they were: the panel had no
+			    focus treatment at all, so Tab moved an invisible cursor and Enter
+			    navigated somewhere the viewer had no way to predict.
+			    ⚠ NO NEW COLOUR AND NO NEW TOKEN. `focus-visible:shadow-(--state-focus-ring)`
+			    with `outline-none` is the idiom already shipped on every focusable
+			    in the participant tree — the header controls, both route-boundary
+			    links, the composer's controls and `discovery/ErrorState.tsx` all
+			    carry this exact pair. Matching it is what keeps focus looking the
+			    same everywhere rather than inventing a second appearance. */}
 			<Link
 				href={`/m/${card.slug}`}
-				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 [border:var(--border-hero)]"
+				className="flex flex-col rounded-[var(--r)] bg-n0 px-4 pt-[14px] pb-3 outline-none [border:var(--border-hero)] focus-visible:shadow-(--state-focus-ring)"
 			>
 				<div className="flex items-center gap-3">
 					{/* The shared `MarketThumb` (PRIMITIVES-2 D2) — one owner of null ·
@@ -252,32 +265,63 @@ function HeroPostPanel({
 				<h3 className="line-clamp-2 text-sm leading-snug font-medium">
 					{post.title}
 				</h3>
-				{/* HTML-FINISH row 7 — THE ARGUMENT TEXT IS QUOTED; the headline
-				    above it is NOT (the mockup's `.argtext` at `:192` carries the
-				    quotes and its own header declares the missing headline a MOCKUP
-				    gap at `:11-13`, so row 3 — "drop the headline" — is STRUCK).
-				    ⛔ Glyphs BYTE-CARRIED from `:192`: hexdump gives `3e 22 52 …`
-				    opening and `… 2e 22 3c` closing — `0x22` both ends, U+0022
-				    QUOTATION MARK, straight ASCII, NOT curly. Corroborated by the
-				    mockup's own JS: `q('.argtext').textContent='"'+d[4]+'"'`
-				    (`:455`). Curly-vs-straight is a byte question, and this is the
-				    byte. */}
-				{post.teaser !== "" && (
-					<p className="line-clamp-3 text-xs leading-snug text-muted-foreground">
-						"{post.teaser}"
-					</p>
-				)}
+				{/* UI-QUICK CS13 §2 — THE HERO POST IS TITLE-ONLY. The quoted
+				    `.argtext` teaser that stood here is removed; the panel now
+				    carries the argument's headline and its picture, and the
+				    argument itself is read one click away on the debate surface.
+				    The space it freed is NOT left as a gap — the image box below
+				    absorbs it (§3 lands with this for that reason).
+				    ⚠ THIS DIVERGES FROM THE RATIFIED MOCKUP, DELIBERATELY AND ON
+				    A FOUNDER RULING. `surface_discovery_v1_0.html:192` renders
+				    `.argtext`, and HTML-FINISH row 7 ruled on the QUOTE GLYPHS it
+				    carried (byte-carried `0x22`, straight not curly) — a finding
+				    that is now moot here because there is no quoted text left on
+				    this surface to carry them. Reported to the founder rather than
+				    amended: design-canon and the mockup are read-only to this lane.
+				    ⛔ `post.teaser` IS STILL COMPUTED AND STILL ON THE WIRE.
+				    `deriveTitleTeaser` still splits it in `hero.ts` and the DTO
+				    still carries the field — this change is PRESENTATION ONLY, and
+				    the read model was deliberately not touched. Anything that
+				    wants the teaser back needs only to render it. */}
 			</Link>
 			{/* V15 — `.argimg` (mockup :91-93, markup :193). `flex-1` so it absorbs
 			    the panel's spare height and pushes the reply head + bar to the
-			    bottom, exactly as the mockup's `flex:1 1 auto` does. */}
+			    bottom, exactly as the mockup's `flex:1 1 auto` does — and, since
+			    CS13 §2, the teaser's freed space along with it.
+
+			    ⛔⛔ CS13 §3 — THE PANEL'S HEIGHT IS A PROPERTY OF THE LAYOUT, NEVER
+			    OF THE PICTURE. That is what the bound below is, and it is DERIVED
+			    rather than invented — no new number appears here:
+			      · `flex-1` is `flex: 1 1 0%`, so the box's flex BASIS is ZERO.
+			        The image's intrinsic height contributes nothing to the panel's
+			        content height; the box takes the panel's leftover space and no
+			        more.
+			      · `min-h-[40px]` (already shipped) is what neutralises the flex
+			        AUTOMATIC MINIMUM SIZE. A flex item defaults to
+			        `min-height: auto`, which for a replaced element resolves to its
+			        INTRINSIC height — that is the one path by which a tall picture
+			        could have driven the panel, and an explicit `min-height`
+			        closes it. It is load-bearing, not decoration.
+			      · The FALLBACK below carries the SAME `mt-2 min-h-[40px] flex-1`,
+			        so the no-image case and the image case are the same box. That
+			        is why "panel height with no image == with a landscape ==
+			        with a portrait" holds by CONSTRUCTION rather than by matching
+			        two numbers that could drift apart.
+
+			    ⛔ `object-contain`, NEVER `object-cover` (founder wall: no crop).
+			    `cover` filled the box by cropping the picture — on the portrait
+			    attachments that meant most of the image was simply not shown.
+			    `contain` fits the whole picture inside the box and letterboxes the
+			    remainder against the `bg-n1` the box already carried. The BOX is
+			    unchanged in both cases; only what happens to the picture inside it
+			    differs, which is precisely why this does not move any height. */}
 			<MarketThumb
 				data-testid={`hero-post-image-${side}`}
 				src={post.imageUrl}
 				// The argument text carries the meaning and the post title is
 				// adjacent, so the attachment is decorative here (WCAG 1.1.1).
 				alt=""
-				className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]"
+				className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]"
 				fallback={
 					<div
 						data-testid={`hero-post-image-empty-${side}`}

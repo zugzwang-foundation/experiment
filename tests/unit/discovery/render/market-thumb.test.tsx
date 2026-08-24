@@ -292,13 +292,23 @@ const HERO_THUMB_NULL =
 	'<div aria-hidden="true" class="flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[8.5px] tracking-[0.16em] text-n4">IMG</div>';
 
 /**
- * The hero POST image, per pole. 192/191 bytes loaded, 239/238 null — the
- * one-byte spread is `YES` vs `NO` in the `data-testid`. Both poles are pinned
- * because a YES-only proof passes against an inverted NO panel, which is how
- * the last inversion survived a full PR with tests (plan §3 D14 Q2).
+ * The hero POST image, per pole. Both poles are pinned because a YES-only proof
+ * passes against an inverted NO panel, which is how the last inversion survived
+ * a full PR with tests (plan §3 D14 Q2).
+ *
+ * ⚠ RE-POINTED AT UI-QUICK CS13 §3 — `object-cover` → `object-contain` (no
+ * crop; the founder's wall). NOTHING ELSE IN THE LITERAL MOVED, and that is the
+ * useful part of a byte-exact pin: the diff on this line is exactly two
+ * characters wide, so the pin itself testifies that the box — `mt-2`,
+ * `min-h-[40px]`, `flex-1`, the radius, the fill and the hairline — is
+ * untouched, which is the §3 height claim.
+ *
+ * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
+ * are small fixed-size squares where filling the frame is right and there is no
+ * height to protect; only the post attachment — the box that grows — changed.
  */
 const POST_IMAGE_LOADED = (side: "YES" | "NO") =>
-	`<img data-testid="hero-post-image-${side}" alt="" class="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-cover [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
+	`<img data-testid="hero-post-image-${side}" alt="" class="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
 const POST_IMAGE_NULL = (side: "YES" | "NO") =>
 	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
 

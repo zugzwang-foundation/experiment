@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { type KeyboardEvent, useEffect, useState } from "react";
 
 import type { HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
@@ -56,38 +56,64 @@ export function DiscoveryCarousel({
 		return () => clearTimeout(timer);
 	}, [n, active]);
 
-	// V37 — ArrowLeft / ArrowRight step the carousel (canon §5: "`‹ ›` /
-	// Left-Right advance immediately and reset the timer"; the mockup binds the
-	// same two keys at :477-479). This is CANON, not an a11y-deferred nicety,
-	// which is why it lands here rather than waiting on R16.
+	// V37 — the arrow keys step the carousel (canon §5: "`‹ ›` / Left-Right
+	// advance immediately and reset the timer"; the mockup binds the same keys
+	// at :477-479). This is CANON, not an a11y-deferred nicety, which is why it
+	// landed here rather than waiting on R16.
 	//
 	// The reset half is free: `setActive` changes `active`, and the countdown
 	// effect above is keyed on `active`, so re-arming is structural rather than
 	// a second timer call that could drift from it.
 	//
-	// Bound to the DOCUMENT, matching the mockup, because the carousel has no
-	// single focusable host — the dots are spans and the arrows disappear at
-	// n <= 1. `preventDefault` stops the page scrolling under the key.
-	useEffect(() => {
+	// ⛔⛔ CS13 §5 — SCOPED TO THE CAROUSEL, AND NO LONGER BOUND TO THE DOCUMENT.
+	// The original comment justified the document binding with "the carousel has
+	// no single focusable host". That was true, and the fix is to GIVE it one
+	// (see `tabIndex` on the root below) rather than to keep listening globally.
+	// A document listener owns the arrow keys for the WHOLE PAGE: it moved the
+	// hero out from under a viewer who was arrowing through the market grid far
+	// below it, and its `preventDefault` suppressed the page's own scroll on
+	// every arrow press anywhere. Now the handler hangs off the carousel and
+	// fires only while focus is inside it — so `‹ ›` reach it, the grid and the
+	// rest of the page keep their arrows, and the scroll suppression applies
+	// only where a key was actually consumed.
+	//
+	// ⚠ DIVERGES FROM THE MOCKUP, DELIBERATELY. `:477-479` binds to the
+	// document. Reported to the founder rather than amended — the mockup and
+	// design-canon are read-only to this lane.
+	//
+	// ⚠ THIS IS A REACT HANDLER, NOT A LISTENER, AND THE SCOPING IS THE REASON.
+	// A keydown bubbles from whatever is focused up through the carousel, so
+	// "focus is inside the carousel" is answered by the event's own path rather
+	// than by a `closest()` test that could drift from the DOM it describes
+	// (O-1: structural beats procedural).
+	const onKey = (e: KeyboardEvent<HTMLElement>) => {
 		if (n <= 1) {
 			return;
 		}
-		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") {
-				return;
-			}
-			// Never steal the arrows from a field the viewer is typing in.
-			const el = e.target as HTMLElement | null;
-			const tag = el?.tagName;
-			if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) {
-				return;
-			}
-			e.preventDefault();
-			setActive((i) => (i + (e.key === "ArrowLeft" ? -1 : 1) + n) % n);
-		};
-		document.addEventListener("keydown", onKey);
-		return () => document.removeEventListener("keydown", onKey);
-	}, [n]);
+		// Up/Left step BACK, Down/Right step FORWARD. Up-and-Left agreeing is
+		// what makes the pair predictable in a horizontal strip that is also a
+		// vertical list of one market at a time.
+		const step =
+			e.key === "ArrowLeft" || e.key === "ArrowUp"
+				? -1
+				: e.key === "ArrowRight" || e.key === "ArrowDown"
+					? 1
+					: 0;
+		if (step === 0) {
+			return;
+		}
+		// Never steal the arrows from a field the viewer is typing in. Kept from
+		// the document-bound original: the scope is narrower now, but a field
+		// could still be placed inside the carousel later, and a caret moving
+		// inside it must not also rotate the hero.
+		const el = e.target as HTMLElement | null;
+		const tag = el?.tagName;
+		if (tag === "INPUT" || tag === "TEXTAREA" || el?.isContentEditable) {
+			return;
+		}
+		e.preventDefault();
+		setActive((i) => (i + step + n) % n);
+	};
 
 	if (n === 0) {
 		return null;
@@ -101,7 +127,27 @@ export function DiscoveryCarousel({
 		//
 		// HTML-FINISH row 8 — `flex-1` so this column takes the height the page
 		// now hands down and distributes it among hero / rail / grid below.
-		<div data-testid="discovery-carousel" className="flex flex-1 flex-col">
+		// ⛔ CS13 §5 — THE KEY HANDLER HANGS HERE, AND THAT IS THE WHOLE SCOPE
+		// MECHANISM. Everything the arrows should work from is inside this
+		// element: the hero market panel, both hero post panels and their author
+		// links, the `‹ ›` buttons, and every card in the grid below. A keydown
+		// from any of them bubbles to this handler; a keydown from the header,
+		// the footer or anywhere else on the page never reaches it.
+		// ⚠ NO `tabIndex` IS ADDED, ON PURPOSE. The ARIA carousel pattern makes
+		// the SLIDES and CONTROLS focusable, not the region — and all of them
+		// already are, because they are real links and buttons. Adding a
+		// tabIndex here would insert a second, contentless tab stop in front of
+		// them and buy nothing the real controls do not already provide.
+		// ⚠ `<section>` + an accessible name, not a `<div>`: this is a labelled
+		// region, and the native element carries that without a `role`
+		// (biome's `useSemanticElements` — the same correction CS12 took).
+		<section
+			aria-label="Markets"
+			aria-roledescription="carousel"
+			data-testid="discovery-carousel"
+			className="flex flex-1 flex-col"
+			onKeyDown={onKey}
+		>
 			<HeroPanels
 				card={view.card}
 				series={view.series}
@@ -159,7 +205,7 @@ export function DiscoveryCarousel({
 			</div>
 
 			<DiscoveryGrid markets={markets} activeIndex={active} />
-		</div>
+		</section>
 	);
 }
 
