@@ -148,7 +148,22 @@ export function ArgProfile({
 						    ⛔ "Lot" appears nowhere here (R1): on screen these are
 						    ARGUMENTS. `tests/unit/debate/render/arg-stake.test.tsx`
 						    pins that with a textContent assertion. */}
-						<span className="font-mono">Đ {formatDharma(authorStake)}</span>
+						{/* ⚠⚠ change set 8 §1 — THE WHOLE UNIT GOES `text-ink`, GLYPH AND
+						    NUMBER TOGETHER, AND IT STAYS ONE TEXT NODE.
+						    ⛔ THE NUMBER IS NOT PROMOTED SEPARATELY, and that is a founder
+						    ruling rather than a shortcut. `dharma-spacing.test.tsx` asserts
+						    this element's `innerHTML` CONTAINS the contiguous string
+						    `Đ 1,500` (site 3, PD-3-07). Styling the glyph and the figure
+						    differently requires wrapping one of them, which breaks that
+						    contiguity — there is no arrangement that does both. That guard is
+						    what §18's closure of PD-3-07 rests on, so the size asymmetry is
+						    routed to a task that can amend it properly.
+						    ⇒ Colour only here: `text-ink` lifts the figure out of the row's
+						    inherited `text-muted-foreground` to the same weight as
+						    `Replies · n`, with the node shape untouched. */}
+						<span className="font-mono text-ink">
+							Đ {formatDharma(authorStake)}
+						</span>
 						{/* ⚠ COMPARED AS RENDERED, not as stored. `formatDharma` rounds to
 						    whole Đ, so comparing the raw 18-dp strings would strike through on
 						    any movement at all — including one too small to change what is
