@@ -323,6 +323,17 @@ describe("FEED-1 — the confirmed state renders the REAL post", () => {
 			screen.queryByRole("button", { name: COMPOSER_COPY.submit }),
 			"the composer is still mounted — it IS the wait state",
 		).not.toBeNull();
+		// ⚠⚠ AND `aria-busy` IS THE ONLY THING SAYING SO. The comment here used to
+		// read "it shows the composer's own in-flight state, which is the truth" —
+		// asserting a rendering that does not exist: `ErrorStrip` returns null for
+		// `phase: "in_flight"`, so the form is greyed and motionless and nothing on
+		// screen distinguishes waiting from broken. The aria state is what makes
+		// the window detectable at all; the visible affordance is OWED.
+		expect(
+			document
+				.querySelector('[data-testid="composer-slot"] section')
+				?.getAttribute("aria-busy"),
+		).toBe("true");
 
 		// ⛔ AND THE HOLD IS NOT A TIMER, which is the design decision this half
 		// pins. The plan rejected a `setTimeout` bound on the wait outright ("a
@@ -733,11 +744,76 @@ describe("FEED-1 — every path out terminates", () => {
 		expect(refreshMock).toHaveBeenCalledTimes(before);
 		expect(slot()?.getAttribute("data-state")).toBe("confirmed");
 
-		// THE POSITIVE CONTROL: a press on a NON-control in the same breath does
-		// dismiss, so the assertion above is about the exclusion and not about a
-		// listener that was never armed.
-		fireEvent.pointerDown(screen.getByTestId("arena"));
-		expect(slot()?.getAttribute("data-state")).toBe("closed");
+		// ⚠ AND THE FOLLOW-UP CLICK IS WHAT COMPLETES THE CLAIM. The exemption is
+		// only defensible because the control retires the confirmation ITSELF — so
+		// the press must end with the slot released anyway, by the control's own
+		// state change rather than by the dismisser. Firing only `pointerDown`
+		// asserted the exclusion and left that half in prose.
+		fireEvent.click(screen.getAllByLabelText("Buy YES")[0] as HTMLElement);
+		expect(
+			slot()?.getAttribute("data-state"),
+			"the control released it — through the identity retirement, not the dismisser",
+		).not.toBe("confirmed");
+		// ⚠⚠ ONE refresh for the whole press, not two — and this is the number the
+		// exemption exists for. The `click` legitimately costs the poll's resume
+		// (the arm released, so the surface is live again: that IS the bet's second
+		// and last round trip). Without the exemption the `pointerDown` spent one
+		// too, and the author paid twice for a single gesture.
+		expect(refreshMock).toHaveBeenCalledTimes(before + 1);
+	});
+
+	it("posted::in-the-WAIT-window-a-press-on-a-control-DOES-release-the-author", async () => {
+		// ⛔⛔ THE EXEMPTION IS GATED ON THE CONFIRMED STATE, AND THIS IS WHY. In the
+		// wait window `composerBusy` is still true, so every host navigation no-ops
+		// and no identity moves — the control cannot retire anything. Applying the
+		// exemption there made a pointer press FULLY INERT: a mouse-only author in
+		// a stalled wait pressed `Buy`, or a post title, and got nothing at all
+		// from a surface already showing them a greyed motionless form.
+		const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+		render(view(baseModel()));
+		await placeMarketBet(fetchStub);
+		expect(slot()?.getAttribute("data-state")).toBe("open");
+
+		// ⚠ The MIRRORED header, not "Buy NO" — while the arm is held BOTH columns
+		// advertise the composing side, so there is no `Buy NO` on the surface at
+		// all (the §5 header-mirror rule reaching a state it predates; flagged in
+		// the plan, not changed here). Index 1 is the other column's copy.
+		fireEvent.pointerDown(
+			screen.getAllByLabelText("Buy YES")[1] as HTMLElement,
+		);
+		act(() => {
+			vi.advanceTimersByTime(400);
+		});
+		expect(
+			slot(),
+			"a control is an exit while there is nothing to read",
+		).toBeNull();
+	});
+
+	it("posted::the-resolution-dialog-counts-as-an-overlay-too", async () => {
+		// ⚠⚠ `criterionOpen` IS DORMANT — its trigger was detached by founder ruling
+		// — so this cannot be driven through the UI, and it is asserted at the
+		// predicate instead. Omitting it would have been this file's own documented
+		// defect committed a second time: `frozen`'s docblock records that
+		// `ResolutionPopup` held its own `open` state and was invisible to that
+		// predicate, and the carousel advanced behind the modal. On the day the
+		// redesign re-attaches the trigger, Escape pressed to close that dialog
+		// would fire Radix's dismissal AND this one in a single keystroke.
+		const src = await import("node:fs").then((fs) =>
+			fs.readFileSync("src/components/debate/DebateView.tsx", "utf8"),
+		);
+		const block = src.slice(
+			src.indexOf("const overlayOpen ="),
+			src.indexOf("const onOutside ="),
+		);
+		for (const flag of [
+			"popupPost",
+			"popupReply",
+			"lightboxUrl",
+			"criterionOpen",
+		]) {
+			expect(block, `overlayOpen must read ${flag}`).toContain(flag);
+		}
 	});
 
 	it("posted::an-outside-touch-releases-the-author-even-BEFORE-the-post-arrives", async () => {

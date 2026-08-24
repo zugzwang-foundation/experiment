@@ -632,9 +632,17 @@ export function DebateView({
 	 * distrust the surface, which costs more than showing them nothing.
 	 *
 	 * ⚠ An effect rather than a render-time close, because closing is a state
-	 * write for the WHOLE view (both arms, the freeze, the poll) — the one render
-	 * it costs shows the composer's own in-flight state, which is what was already
-	 * on screen.
+	 * write for the WHOLE view (both arms, the freeze, the poll) — and the one
+	 * render it costs shows exactly what was already on screen: the composer,
+	 * still mounted, still disabled.
+	 * ⚠⚠ THAT SENTENCE USED TO SAY "the composer's own IN-FLIGHT STATE", AND IT WAS
+	 * ASSERTING SOMETHING THAT DOES NOT RENDER. `ErrorStrip` returns `null` for
+	 * `phase: "in_flight"`, so there is no in-flight affordance to show — the form
+	 * simply sits greyed and motionless. `BetComposer`'s `<section>` now carries
+	 * `aria-busy` so the state is at least announceable; a VISIBLE progress
+	 * affordance would need copy this task has no mandate to author and is logged
+	 * as owed. Corrected here rather than in the log, because the next reader hits
+	 * the comment first.
 	 */
 	/**
 	 * ⛔⛔ SCOPED TO THE ARM THAT IS ACTUALLY SHOWING, NOT TO "a node was found",
@@ -646,6 +654,13 @@ export function DebateView({
 	 * and never close it. The author sat in the wait state permanently, released
 	 * only by Escape. Asking whether THIS ARM has something to show is the same
 	 * question the render asks, so the two cannot disagree.
+	 * ⚠ "Cannot disagree" RESTS ON THE HELD-ARM INVARIANT, and is worth naming
+	 * because the whole point of this change was to stop a predicate drifting from
+	 * the render: `selectedPost !== null` picks the arm, and the COLUMN inside it
+	 * is picked by `hosts`/`hostsComposer`, which derive from
+	 * `openSide`/`openReply`. Anything that cleared those without moving
+	 * `composerIdentity` — or decoupled the two — would separate this predicate
+	 * from what is actually on screen.
 	 *
 	 * ⚠ A BOOLEAN IN THE DEPS, NOT THE NODE. `findPostedNode` allocates a fresh
 	 * object every render, so depending on the node re-subscribes this effect on
@@ -704,22 +719,50 @@ export function DebateView({
 	 * `document.body` and are therefore OUTSIDE the slot. So opening your own
 	 * just-posted image and closing it again dismissed the confirmation underneath
 	 * — the feature's own affordance destroying the state the feature exists to
-	 * provide. The predicate is the same three flags `frozen` already reads.
+	 * provide.
 	 *
-	 * ⚠ A POINTER PRESS ON A CONTROL BELONGS TO THE CONTROL — d5's own rule, and
-	 * the same exclusion list `onDocClick` above already uses. Without it, pressing
-	 * `Buy` while confirmed dismissed on the `pointerdown` (releasing the arm, so
-	 * the poll spent a refresh) and then re-opened a composer on the `click`. The
-	 * control's own state change retires the confirmation through the identity
-	 * adjustment; it does not need this listener's help, and taking its help cost
-	 * a round trip.
+	 * ⚠⚠ AND `criterionOpen` IS IN IT, THOUGH IT CANNOT GO TRUE TODAY — because
+	 * omitting it would be this file's own documented defect committed a second
+	 * time, one predicate to the left. `frozen` above records that
+	 * `ResolutionPopup` "arrived in change set 2 holding its own `open` state
+	 * inside `ResolutionCriterion`, so it was invisible to this predicate and the
+	 * carousel kept advancing behind the modal". Its trigger is currently detached
+	 * by founder ruling, so this term is inert — but the redesign re-attaches it,
+	 * and on that day Escape pressed to close that dialog would fire Radix's
+	 * dismissal AND `dismissPosted()` in one keystroke, destroying the
+	 * confirmation underneath. Inert now, correct later, two tokens either way.
+	 * ⇒ The predicate is every sub-view flag `frozen` reads except the slot's own
+	 * occupancy, which is what the fence above already covers.
+	 *
+	 * ⚠⚠ A POINTER PRESS ON A CONTROL BELONGS TO THE CONTROL — d5's own rule, and
+	 * the same exclusion list `onDocClick` above already uses — **BUT ONLY ONCE
+	 * THERE IS SOMETHING CONFIRMED**, and that qualifier is the whole of it.
+	 *
+	 * The exemption rests on the control retiring the confirmation ITSELF, through
+	 * the identity adjustment. That is true in the confirmed state, where
+	 * `composerBusy` has cleared and `toggleEntry`/`enterPost`/the rest are live
+	 * again — so dismissing here as well would only spend a round trip on a state
+	 * change the control was going to make anyway.
+	 * ⛔ IT IS FALSE IN THE WAIT WINDOW, and applying it there made a pointer press
+	 * FULLY INERT: `composerBusy` is still true, so all five host navigations
+	 * no-op, no identity moves, no retirement runs — and the exemption had removed
+	 * the dismisser too. A mouse-only author in a stalled wait pressed `Buy`, or a
+	 * post title, and got nothing at all, from a surface already showing them a
+	 * greyed motionless form. ⇒ Gated on the confirmed state, so every control
+	 * releases the author while they are waiting and belongs to itself once they
+	 * are reading.
+	 * ⚠ Gated on `postedShown`, NOT on `!composerBusy`: the two agree today, and
+	 * only the first is the question actually being asked.
 	 */
 	useEffect(() => {
 		if (posted === null) {
 			return;
 		}
 		const overlayOpen =
-			popupPost !== null || popupReply !== null || lightboxUrl !== null;
+			popupPost !== null ||
+			popupReply !== null ||
+			lightboxUrl !== null ||
+			criterionOpen;
 		const onOutside = (e: Event) => {
 			if (overlayOpen) {
 				return;
@@ -728,7 +771,10 @@ export function DebateView({
 			if (target?.closest('[data-testid="composer-slot"]') != null) {
 				return;
 			}
-			if (target?.closest("button,a,input,textarea,label") != null) {
+			if (
+				postedShown &&
+				target?.closest("button,a,input,textarea,label") != null
+			) {
 				return;
 			}
 			dismissPosted();
@@ -753,7 +799,15 @@ export function DebateView({
 			document.removeEventListener("touchmove", onOutside);
 			document.removeEventListener("keydown", onKey);
 		};
-	}, [posted, dismissPosted, popupPost, popupReply, lightboxUrl]);
+	}, [
+		posted,
+		postedShown,
+		dismissPosted,
+		popupPost,
+		popupReply,
+		lightboxUrl,
+		criterionOpen,
+	]);
 
 	/**
 	 * ⚠⚠ DECLARED **AFTER** EVERY VALUE IT READS, AND THAT ORDER IS LOAD-BEARING
