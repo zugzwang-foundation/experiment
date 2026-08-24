@@ -52,74 +52,109 @@ export function MarketPriceChartHost({
 }
 
 /**
- * ⛔⛔ DEMO PLACEHOLDER — FOUNDER RULING 2026-08-23. DELETE THIS, DO NOT MAINTAIN IT.
+ * ⛔⛔ DEMO REPLICA — FOUNDER RULING 2026-08-23/24. DELETE THIS, DO NOT MAINTAIN IT.
  *
- * WHAT IT IS. A hardcoded sample price line, drawn only when the real series is
- * EMPTY and only outside production. It exists so the 340px rail reads as a chart
- * slot awaiting data instead of a blank bordered box during demo prep.
+ * WHAT IT IS. A hardcoded stand-in for `MarketPriceChart`, drawn only when the
+ * real series is EMPTY and only outside production.
  *
- * ⛔⛔ THE UNDERLYING FAULT IS THE EMPTY SERIES, NOT THIS COMPONENT. Measured on
- * staging 2026-08-23: `market-price-chart` is absent from the DOM on EVERY market,
- * seeded and unseeded alike — `github-zugzwang-repo-stars` (Đ300, 6 posts) renders
- * no chart for the same reason `bitcoin-price-50k` (Đ0) does. The price series is
- * derived from event-sourced data and staging's fixtures are raw-INSERT, so it
- * reads empty everywhere. ⚠ Nothing was deleted: the five chart files are intact
- * on `main` and no chart commit has landed in 30 days. UNWIRE-1 (`ff1c0f9`) removed
- * the PROFILE Dharma graph and touched no market chart file.
+ * ⛔⛔ IT STANDS IN FOR A CHART THAT CANNOT DRAW YET, AND THE REASON IS DATA.
+ * `replayReserveSeries` seeds its CPMM walk from the `market.opened` event, and
+ * there are ZERO of those in the entire staging database (measured 2026-08-24)
+ * while all 8 markets sit Open with pools — every one was opened by raw INSERT
+ * rather than through `openMarket()`. So the walk returns `[]` before reading a
+ * single bet event, and it does that even on a market carrying 10 `bet.placed`
+ * and 3 `bet.sold`. ⚠ The price BAR moves on those markets because it reads the
+ * live `pools` row; the chart does not because it reads the event log. Two
+ * sources, one of them unusable.
+ * ⇒ DELETED WHEN STAGING IS RE-SEEDED THROUGH `openMarket()`. That re-seed is
+ * deferred by founder ruling (R8), which is the only reason this exists.
  *
- * ⇒ REMOVED WHEN THE REAL PRICE SERIES POPULATES. This is not a fallback to keep,
- * an empty state to design against, or a component to extend. The day a market on
- * a non-prod environment has price history, this branch stops rendering and the
- * whole function below should be deleted with it.
+ * ⛔ THE LABEL IS GONE, founder ruling — no `Sample`, no replacement text, no
+ * tooltip, no aria substitute. ⚠ THAT RAISES THE STAKES ON THE ENV GATE: with
+ * nothing on screen saying "fabricated", the gate in `MarketPriceChartHost` is
+ * the ONLY thing keeping invented data off production. It is exercised and
+ * pinned in `tests/unit/debate/render/chart-placeholder-gate.test.tsx`.
  *
- * ⛔ IT NEVER TOUCHES REAL DATA. It is reachable only from `series.length === 0`;
- * it does not override, merge with, or fall back over a real series.
+ * ⛔ IT NEVER TOUCHES REAL DATA. Reachable only from `series.length === 0`; it
+ * does not override, merge with, or fall back over a real series.
  *
  * ⚠ DETERMINISTIC BY CONSTRUCTION. Every coordinate is a literal. No
- * `Math.random()`, no `Date.now()`, no client-only value — so it renders
- * identically on every load and cannot hydration-mismatch.
+ * `Math.random()`, no `Date.now()`, no client-only value — identical on every
+ * load, and it cannot hydration-mismatch.
  *
- * ⛔ MONOCHROME, AND DELIBERATELY NOT THE SIDE POLES. The real chart strokes
- * `var(--graph-yes)` / `var(--graph-no)`, which encode bet SIDE (INV-3). A sample
- * line is not a side, so it takes a neutral ramp step (`--color-n5`) with an
- * `--color-n2` fill. ⚠ That is also why this file does not join
- * `side-pole-binding.test.ts`'s permitted inventory — it uses no pole token.
+ * ⛔⛔ THE TOKENS ARE THE REAL CHART'S, INCLUDING THE SIDE POLES — and that
+ * REVERSES the previous placeholder, which used neutral ramp steps on the
+ * ground that "a sample line is not a side". Founder ruling: mirror the real
+ * component exactly, do not invent a treatment. So `line-no` strokes
+ * `var(--graph-no)` and `line-yes` strokes `var(--graph-yes)`, both at 1.75,
+ * NO into the buffer first so YES paints over it — the real component's own
+ * order. ⚠ These are the GRAPH family, not `--color-yes`/`--color-no`:
+ * `--color-yes` IS the page ground (#181818), so a value-copy would be
+ * invisible AND invert the poles. `MarketPriceChart` states this in terms.
+ * ⚠ `side-pole-binding.test.ts` does not gain an entry, because its offender
+ * predicate keys on a SIDE COMPARISON (`x === "YES"`) reaching a pole token,
+ * and there is no comparison here at all — the two lines are unconditional.
+ *
+ * ⚠ THE TIME AXIS IS DELIBERATELY HALF-CARRIED. The dashed thirds gridlines are
+ * taken (pure geometry, `--color-n2`, `5 4` dash — the real `CollapsedAxis`'s
+ * own recipe); the THREE DATE LABELS are NOT. A fabricated price shape says
+ * "a chart belongs here"; fabricated dates would assert a specific market
+ * lifetime that does not exist. Shape is replicated, claims are not.
  */
 function PlaceholderPriceChart(): React.JSX.Element {
 	return (
 		<div
 			data-testid="market-price-chart-placeholder"
-			// ⚠ BOX MATCHED TO `MarketPriceChartCard` so the swap is invisible as
-			// layout: same `flex min-h-0 w-full flex-1 flex-col`, same
-			// `rounded-[var(--r)]`, same `bg-n0`, same `p-3`. The real card is a
-			// <button>; this is a <div> because it is non-interactive.
+			// Box matched to `MarketPriceChartCard` so the swap is invisible as
+			// layout: same flex column, same `rounded-[var(--r)]`, same `bg-n0`,
+			// same `p-3`. That card is a <button>; this is a <div>, non-interactive.
 			className="flex min-h-0 w-full flex-1 flex-col rounded-[var(--r)] bg-n0 p-3"
 		>
-			{/* The `.overline` recipe, byte-carried from `MarketHeader`'s RESOLUTION
-			    label — same role (a quiet label above a block), so the same recipe
-			    rather than a fourth variant. This text carries the meaning; the SVG
-			    below is `aria-hidden`. */}
-			<span className="text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase">
-				Sample · no price history yet
-			</span>
-			{/* `min-h-0 w-full flex-1` — the card's own inner wrapper, so the SVG gets
-			    the same definite height to fill. */}
-			<div className="mt-1.5 min-h-0 w-full flex-1">
+			<div className="min-h-0 w-full flex-1">
 				<svg
 					viewBox="0 0 640 320"
 					preserveAspectRatio="none"
 					aria-hidden="true"
 					className="h-full w-full"
 				>
-					<polygon
-						points="0,160 53,154 107,163 160,150 213,157 267,144 320,154 373,166 427,160 480,150 533,157 587,163 640,160 640,320 0,320"
-						fill="var(--color-n2)"
-						fillOpacity="0.5"
+					{/* Drawn FIRST so the lines paint over it — the real component's
+					    layer order (gridlines behind data). */}
+					<line
+						x1="213"
+						x2="213"
+						y1="0"
+						y2="320"
+						stroke="var(--color-n2)"
+						strokeWidth="1"
+						strokeDasharray="5 4"
+						vectorEffect="non-scaling-stroke"
+					/>
+					<line
+						x1="427"
+						x2="427"
+						y1="0"
+						y2="320"
+						stroke="var(--color-n2)"
+						strokeWidth="1"
+						strokeDasharray="5 4"
+						vectorEffect="non-scaling-stroke"
+					/>
+					{/* Two complementary lines mirrored about 50% — y_yes + y_no = 320 at
+					    every x, exactly as the real chart's `yYesPx`/`yNoPx` guarantee.
+					    A market drifting 50% → ~64% YES, gently, no spikes. */}
+					<polyline
+						points="0,160 71,163 142,170 213,166 284,179 356,187 427,184 498,195 569,206 640,203"
+						fill="none"
+						stroke="var(--graph-no)"
+						strokeWidth="1.75"
+						strokeLinejoin="round"
+						strokeLinecap="round"
+						vectorEffect="non-scaling-stroke"
 					/>
 					<polyline
-						points="0,160 53,154 107,163 160,150 213,157 267,144 320,154 373,166 427,160 480,150 533,157 587,163 640,160"
+						points="0,160 71,157 142,150 213,154 284,141 356,133 427,136 498,125 569,114 640,117"
 						fill="none"
-						stroke="var(--color-n5)"
+						stroke="var(--graph-yes)"
 						strokeWidth="1.75"
 						strokeLinejoin="round"
 						strokeLinecap="round"
