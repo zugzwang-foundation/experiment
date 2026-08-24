@@ -89,7 +89,13 @@ export function ArgProfile({
 	chipSize?: "detail";
 }) {
 	return (
-		<div className="flex items-center gap-2">
+		// ⚠ `w-full` — change set 7 §1. `ml-auto` on the download mark only reaches
+		// the TRAILING EDGE if this row actually spans its container; as a
+		// shrink-to-fit box it had no slack, so the mark sat immediately beside
+		// `Replies · n` instead of at the edge. The row is a flex ITEM of the card's
+		// header (`PostCard`'s `justify-between` row), so without this it measured
+		// exactly its content.
+		<div className="flex w-full items-center gap-2">
 			<Avatar size="sm">
 				<AvatarImage src={author.pfpUrl} alt="" />
 				<AvatarFallback>
@@ -203,11 +209,18 @@ export function ArgProfile({
 			{download ? (
 				<Button
 					variant="ghost"
-					size="icon-sm"
+					size="icon"
 					disabled
 					aria-disabled="true"
 					aria-label="Download post image"
-					className="ml-auto shrink-0 text-n4 [&_svg]:size-4"
+					// ⚠ change set 7 §1 — `text-ink`, the SAME token `Replies · n` uses
+					// two elements to the left, not the muted ramp. The mark and the one
+					// promoted field on this row now sit at the same emphasis.
+					// ⚠ One step larger again: `icon-sm` (28px box / 16px glyph) →
+					// `icon` (32px / 20px). ⛔ `disabled` keeps it inert at every size;
+					// a bigger placeholder reads MORE like a working control, so the
+					// disabled state matters more here than it did at 24px.
+					className="ml-auto shrink-0 text-ink [&_svg]:size-5"
 				>
 					<Download />
 				</Button>
