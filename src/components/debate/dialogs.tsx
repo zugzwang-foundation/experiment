@@ -102,6 +102,7 @@ export function PostPopup({
 										authorStake={post.authorStake}
 										originalStake={post.authorStakeOriginal}
 										sold={post.authorSold}
+										createdAt={post.createdAt}
 										download
 									/>
 									<LaneBadge badge={post.badge} />
@@ -212,6 +213,7 @@ export function ReplyPopup({
 										authorStake={reply.stake}
 										originalStake={reply.stakeOriginal}
 										sold={reply.sold}
+										createdAt={reply.createdAt}
 									/>
 								</div>
 							</DialogDescription>

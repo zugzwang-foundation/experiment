@@ -124,6 +124,7 @@ export function PostCard({
 					originalStake={post.authorStakeOriginal}
 					sold={post.authorSold}
 					replyCount={replyCount}
+					createdAt={post.createdAt}
 					download
 				/>
 				<LaneBadge badge={post.badge} />
