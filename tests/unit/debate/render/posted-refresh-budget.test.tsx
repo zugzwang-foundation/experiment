@@ -32,10 +32,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
  * (12–14 round trips per tick, measured at F-DEBATE-4). The refresh count is
  * therefore the multiplicand, and holding it constant is the whole budget.
  *
- * ⚠⚠ MEASURED BEFORE THE BUILD, AGAINST THE UNCHANGED TREE: **2**. The composer's
- * own refresh, plus the poll's resume the instant `openSide` cleared. FEED-1
- * moves WHEN the second one fires — dismissal instead of success — and the whole
- * claim of this file is that it does not change HOW MANY.
+ * ⚠⚠ THE NUMBER HAS NEVER MOVED, THROUGH TWO DIFFERENT DESIGNS: **2**.
+ *   · pre-FEED-1 — the composer's refresh, then the poll's resume on close.
+ *   · FEED-1     — the host's refresh, then the poll's resume on DISMISSAL,
+ *                  because the arm was held open until the author dismissed.
+ *   · FEED-2     — the host's refresh, and the poll's resume on close again,
+ *                  both at the success, because nothing is held any more.
+ * ⇒ FEED-2 moves the second one BACK to where it was. What this file pins is
+ * that neither redesign changed HOW MANY.
  *
  * ⛔ THE CEILING, STATED: this proves the COUNT, never the CONTENT. jsdom runs
  * no server, so a refresh here returns whatever the harness hands back. That
@@ -67,6 +71,7 @@ vi.mock("next/navigation", () => ({
 import { COMPOSER_COPY } from "@/components/debate/composer/copy";
 import { DebateView } from "@/components/debate/DebateView";
 import type { DebateViewModel } from "@/components/debate/types";
+import { POLL_INTERVAL_MS_DEBATE_VIEW } from "@/server/config/limits";
 
 import { stubWireFetch, TITLE, VIEWER } from "../../composer/render/_harness";
 import { baseModel, modelWithPost, newPost, placeOk } from "./_posted-fixtures";
@@ -102,7 +107,7 @@ function view(model: DebateViewModel) {
 }
 
 /** Open the market composer, type a submittable argument, and submit it. */
-async function placeOneBet() {
+async function placeOneBet(wire: ReturnType<typeof stubWireFetch>) {
 	fireEvent.click(screen.getByLabelText("Buy YES"));
 	fireEvent.change(screen.getByLabelText<HTMLInputElement>("Argument title"), {
 		target: { value: TITLE },
@@ -110,28 +115,37 @@ async function placeOneBet() {
 	await act(async () => {
 		fireEvent.click(screen.getByRole("button", { name: COMPOSER_COPY.submit }));
 	});
+	// ⚠ A refresh COUNT is exactly the shape that passes when nothing happened —
+	// zero bets and zero refreshes agree. The receipt is what makes the number
+	// mean something.
+	expect(
+		wire.mock.calls.filter(([u]) => String(u).includes("/api/bets/place")),
+		"the bet must actually have gone to the wire",
+	).toHaveLength(1);
 }
 
-describe("FEED-1 A1 — server reads per successful bet", () => {
+describe("FEED-2 — server reads per successful bet", () => {
 	it("posted::one-successful-bet-STILL-costs-exactly-two-refreshes", async () => {
-		stubWireFetch([placeOk(POSTED_ID)]);
-		const first = baseModel();
-		const { rerender } = render(view(first));
+		const wire = stubWireFetch([placeOk(POSTED_ID)]);
+		const { rerender } = render(view(baseModel()));
 
 		// The surface is fresh at first paint — the poll's initial-mount guard.
 		expect(refreshMock).toHaveBeenCalledTimes(0);
 
-		await placeOneBet();
+		await placeOneBet(wire);
 
-		// ⚠⚠ REFRESH ONE, AND THE FACT THAT THERE IS ONLY ONE IS ITSELF A GUARD.
-		// Before FEED-1 the count here was 2: the composer refreshed AND the poll
-		// resumed, because success cleared `openSide`. It is 1 now precisely
-		// because the arm is HELD — so a build that closed the arm on success
-		// would read 2 here and 3 by the end.
-		expect(refreshMock).toHaveBeenCalledTimes(1);
+		// ⚠⚠ BOTH, AT THE SUCCESS, and the fact that they are both here is itself
+		// the guard. FEED-1 read **1** at this point, because the arm was held and
+		// the poll stayed suspended until the author dismissed a panel. With
+		// nothing held, the composer closes, the poll un-suspends, and its resume
+		// refresh fires immediately — exactly as it did before FEED-1 existed.
+		//   1. the host's refresh, from `onPosted` — how the new post is fetched;
+		//   2. the poll's resume, fired the instant `openSide` clears.
+		expect(refreshMock).toHaveBeenCalledTimes(2);
 
-		// The refresh lands, carrying the new post — a NEW model object, which is
-		// exactly what a fresh RSC payload is.
+		// ⛔ ARRIVING AT THE CARD COSTS NOTHING. The payload the first refresh
+		// already asked for carries the post; the jump is a cursor move, not a
+		// read. A third call here would mean a round trip was added.
 		rerender(
 			view(
 				modelWithPost(
@@ -139,31 +153,17 @@ describe("FEED-1 A1 — server reads per successful bet", () => {
 				),
 			),
 		);
-		expect(
-			screen.getByTestId("posted-confirmation"),
-			"the confirmation must be up — otherwise the dismissal below proves nothing",
-		).not.toBeNull();
-
-		// ⛔ ARRIVING AT THE CONFIRMATION COSTS NOTHING. No second fetch, no second
-		// refresh: the post came in on the payload the first refresh already asked
-		// for.
-		expect(refreshMock).toHaveBeenCalledTimes(1);
-
-		fireEvent.click(screen.getByTestId("posted-dismiss"));
-
-		// ⚠⚠ REFRESH TWO — the poll's resume, fired the instant the arm releases.
-		// Same refresh that used to fire at success; it now fires when the author
-		// says they are done looking.
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 	});
 
-	it("posted::the-poll-does-NOT-tick-while-the-confirmation-is-up", async () => {
-		// The budget above counts the two deliberate refreshes. This one closes the
-		// other way a round trip could be added: the 15s poll waking up underneath
-		// a confirmation the author is still reading.
-		stubWireFetch([placeOk(POSTED_ID)]);
+	it("posted::the-poll-resumes-its-ORDINARY-cadence-after-the-bet", async () => {
+		// ⛔ The counterpart to FEED-1's "the poll does NOT tick while the
+		// confirmation is up". That property is gone because the state it
+		// described is gone — and its absence is the thing now worth pinning:
+		// after a bet the surface is live again, on its ordinary clock.
+		const wire = stubWireFetch([placeOk(POSTED_ID)]);
 		const { rerender } = render(view(baseModel()));
-		await placeOneBet();
+		await placeOneBet(wire);
 		rerender(
 			view(
 				modelWithPost(
@@ -171,36 +171,14 @@ describe("FEED-1 A1 — server reads per successful bet", () => {
 				),
 			),
 		);
-		expect(screen.queryByTestId("posted-confirmation")).not.toBeNull();
-		expect(refreshMock).toHaveBeenCalledTimes(1);
-
-		// Four full poll intervals with the confirmation on screen.
-		act(() => {
-			vi.advanceTimersByTime(15_000 * 4);
-		});
-
-		expect(refreshMock).toHaveBeenCalledTimes(1);
-		expect(
-			screen.queryByTestId("posted-confirmation"),
-			"and it is still up — a poll that fired would have re-rendered under it",
-		).not.toBeNull();
-
-		// ⛔⛔ THE POSITIVE CONTROL, AND WITHOUT IT THIS TEST IS A COUNT THAT NEVER
-		// MOVES FOR REASONS UNKNOWN. "The poll did not tick" reads identically
-		// against a suspended poll and against a poll that cannot tick in this
-		// harness at all — an unstubbed `document.hidden`, a `marketOpen` that
-		// came through false, a fake-timer wiring that never reaches the interval.
-		// Releasing the arm and advancing the SAME clock is what separates them.
-		fireEvent.click(screen.getByTestId("posted-dismiss"));
-		// The resume refresh, fired the instant the arm clears.
 		expect(refreshMock).toHaveBeenCalledTimes(2);
 
 		act(() => {
-			vi.advanceTimersByTime(15_000 * 4);
+			vi.advanceTimersByTime(POLL_INTERVAL_MS_DEBATE_VIEW);
 		});
-		expect(
-			refreshMock.mock.calls.length,
-			"the poll DOES tick once released — so its silence above was the suspension",
-		).toBeGreaterThan(2);
+
+		// ⚠ The third is NOT charged to the bet — it is the 15 s poll doing its
+		// ordinary job on a surface with nothing held.
+		expect(refreshMock).toHaveBeenCalledTimes(3);
 	});
 });

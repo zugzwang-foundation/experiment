@@ -231,6 +231,22 @@ export function modelWithReply(
 	};
 }
 
+/**
+ * A NEW model object carrying `posts` appended IN ORDER — so a caller can put a
+ * card AHEAD of another and move the second one's index.
+ *
+ * ⚠⚠ THIS EXISTS TO MAKE ONE GUARD FALSIFIABLE. "A second payload must not
+ * re-jump" cannot tell an id-keyed guard from an index-keyed one unless the
+ * card's index actually MOVES between payloads — and in life it moves whenever
+ * a new bet lands above it, which is the common case, not the exotic one.
+ */
+export function modelWithPosts(...added: DebatePost[]): DebateViewModel {
+	return {
+		...mumbaiMetroModel,
+		posts: [...mumbaiMetroModel.posts, ...added],
+	};
+}
+
 /** A NEW model object that is otherwise identical — a refresh that brought nothing. */
 export function modelUnchanged(): DebateViewModel {
 	return { ...mumbaiMetroModel, posts: [...mumbaiMetroModel.posts] };

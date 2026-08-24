@@ -58,28 +58,6 @@ const EXIT_MS = 260;
 const FOCUSABLE =
 	'a[href],button:not([disabled]),textarea:not([disabled]),input:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
-/**
- * FEED-1 — WHAT IS OCCUPYING THE COLUMN. The gate widened from a boolean because
- * a third thing can now hold this slot: after a successful bet it keeps the
- * author's own post on screen instead of closing and dropping them back into a
- * ranked column with nothing to show for what they just wrote.
- *
- * ⛔ IT IS NOT A SECOND BOOLEAN BESIDE `open`, and that is the whole reason it is
- * one value. Two flags admit a fourth arrangement — "composer AND confirmed" —
- * that has no meaning on screen, and every reader of the pair would have to
- * decide which one wins. Three names, three arrangements, nothing to reconcile.
- */
-export type SlotState = "scroller" | "composer" | "confirmed";
-
-/**
- * The `data-state` an OCCUPIED slot carries. `"closed"` is the exit's alone and
- * is set by the exit effect, never derived here — a slot that is leaving is not
- * described by what it was showing.
- */
-function occupiedStateFor(slot: SlotState): "open" | "confirmed" {
-	return slot === "confirmed" ? "confirmed" : "open";
-}
-
 function prefersReducedMotion() {
 	return (
 		typeof window !== "undefined" &&
@@ -88,22 +66,19 @@ function prefersReducedMotion() {
 }
 
 export function ComposerSlot({
-	slot,
+	open,
 	busy,
 	composer,
-	confirmation,
 	scroller,
 	slotId,
 	onOccupiedChange,
 }: {
-	/** What holds the column. Derived by the caller from `openSide`/`openReply`. */
-	slot: SlotState;
+	/** The slot hosts the composer. Derived by the caller from `openSide`/`openReply`. */
+	open: boolean;
 	/** `BetComposer`'s in-flight guard. True ⇒ skip the exit and unmount now. */
 	busy: boolean;
-	/** Rendered while `slot` is `"composer"`. `null` otherwise — see `held`. */
+	/** Rendered while open. `null` when closed — the last one is held for the exit. */
 	composer: ReactNode;
-	/** Rendered while `slot` is `"confirmed"` — the author's just-posted argument. */
-	confirmation: ReactNode;
 	/** The post/reply scroller this slot replaces. */
 	scroller: ReactNode;
 	/** Identifies this slot to `onOccupiedChange`. Two slots render at once. */
@@ -116,53 +91,26 @@ export function ComposerSlot({
 	 */
 	onOccupiedChange?: (slotId: string, occupied: boolean) => void;
 }) {
-	/**
-	 * ⚠⚠ OCCUPANCY IS DERIVED ONCE, AND THAT IS WHY A THIRD STATE COST SO LITTLE.
-	 * Every rule below that only asks WHETHER the column is taken — the exit, the
-	 * R6 freeze tail, the focus RESTORE — reads this and is untouched by the new
-	 * value. Only the two rules that ask WHICH content is up read `slot` itself:
-	 * the animation state, and the focus MOVE.
-	 */
-	const occupied = slot !== "scroller";
-	const [mounted, setMounted] = useState(occupied);
-	const [state, setState] = useState<"open" | "confirmed" | "closed">(
-		occupied ? occupiedStateFor(slot) : "closed",
+	const [mounted, setMounted] = useState(open);
+	const [state, setState] = useState<"open" | "closed">(
+		open ? "open" : "closed",
 	);
 	const wrap = useRef<HTMLDivElement>(null);
-	/** The last non-null occupant, so the exit has something to render. */
+	/** The last non-null composer element, so the exit has something to render. */
 	const held = useRef<ReactNode>(null);
 	/** Whatever had focus when the slot opened — where focus goes back on close. */
 	const opener = useRef<HTMLElement | null>(null);
-	/**
-	 * The slot value focus has already been moved for. Reset when the slot empties.
-	 *
-	 * ⚠ A SLOT VALUE, NOT A BOOLEAN, and the change is load-bearing. As a boolean
-	 * it meant "focus has been moved for THIS OPEN", so the composer→confirmation
-	 * swap — which is not a new open — would not have re-run the move, and focus
-	 * would have been left on a control that just unmounted, i.e. on `<body>`.
-	 * Keyed on the value, the move runs once per CONTENT, which is what the rule
-	 * always meant.
-	 */
-	const moved = useRef<SlotState | null>(null);
+	/** Focus has already been moved for THIS open. Reset on close. */
+	const moved = useRef(false);
 
-	/**
-	 * ⚠⚠ WHICHEVER NODE IS LIVE — AND THIS IS THE ONE PART OF THE HOLD THAT WAS
-	 * GENUINELY BINARY. The hold ITSELF is content-agnostic; it is a bare
-	 * `ReactNode` and never cared what it was given. What was binary is where it
-	 * READ FROM: latched off `composer` alone, dismissing a confirmation would
-	 * have animated the COMPOSER out for 260ms — the author closes their own post
-	 * and the form they already submitted slides away in its place.
-	 */
-	const live =
-		slot === "composer" ? composer : slot === "confirmed" ? confirmation : null;
-	if (occupied && live !== null) {
-		held.current = live;
+	if (open && composer !== null) {
+		held.current = composer;
 	}
 
 	useEffect(() => {
-		if (occupied) {
+		if (open) {
 			setMounted(true);
-			setState(occupiedStateFor(slot));
+			setState("open");
 			return;
 		}
 		if (!mounted) {
@@ -177,7 +125,7 @@ export function ComposerSlot({
 		setState("closed");
 		const t = setTimeout(() => setMounted(false), EXIT_MS);
 		return () => clearTimeout(t);
-	}, [occupied, slot, busy, mounted]);
+	}, [open, busy, mounted]);
 
 	/**
 	 * ⚠⚠ R6 — THE FREEZE TAIL, AND THE WHOLE DESIGN IS THAT THIS REPORTS `mounted`
@@ -198,11 +146,6 @@ export function ComposerSlot({
 	 * which would be visible on screen rather than silent.
 	 * ⇒ The only writer of `mounted` is the exit effect above: one `setTimeout`,
 	 * cleared on re-open, plus the immediate `busy`/reduced-motion path.
-	 *
-	 * ⚠ FEED-1 CHANGES NOTHING HERE, DELIBERATELY. The confirmation is modelled as
-	 * the slot STILL BEING OCCUPIED rather than as a new independent flag, so this
-	 * reports `true` across it for the reason it already reported `true` across the
-	 * exit — one boolean, still read twice.
 	 *
 	 * ⚠ AND THE CLEANUP IS THE SECOND HALF. If this component is torn down while
 	 * occupied — an arm swap, a post enter/exit — no effect would ever run again to
@@ -247,22 +190,20 @@ export function ComposerSlot({
 	 *
 	 * ⇒ Two passes now: the first CAPTURES the opener while focus is still on the
 	 * control that was clicked, the second (once the wrapper exists) MOVES focus.
-	 * `moved` keeps it to once per slot value, so a re-render mid-typing cannot
-	 * yank focus back to the first control — the property the narrow deps were
+	 * `moved` keeps it to once per open, so a re-render mid-typing cannot yank
+	 * focus back to the first control — the property the narrow deps were
 	 * protecting, kept without the bug they caused.
 	 */
 	useEffect(() => {
-		if (!occupied) {
-			moved.current = null;
+		if (!open) {
+			moved.current = false;
 			return;
 		}
-		if (moved.current === slot) {
+		if (moved.current) {
 			return;
 		}
 		// Captured on the FIRST pass — before focus is moved anywhere, so this is
-		// still the control the reader actually pressed. ⚠ Only when null: the
-		// composer→confirmation swap must NOT re-capture, or dismissal would
-		// restore focus to the submit button instead of to the BUY that opened it.
+		// still the control the reader actually pressed.
 		if (opener.current === null) {
 			const active = document.activeElement;
 			opener.current = active instanceof HTMLElement ? active : null;
@@ -277,26 +218,26 @@ export function ComposerSlot({
 			// Not in the DOM yet. `mounted` flips on the next render and re-runs this.
 			return;
 		}
-		moved.current = slot;
+		moved.current = true;
 		const first = node.querySelector<HTMLElement>(FOCUSABLE);
 		(first ?? node).focus();
-	}, [occupied, slot, mounted]);
+	}, [open, mounted]);
 
 	// Focus RESTORE, split from the move above so it fires on the close edge and
-	// cannot re-run while the slot is occupied. Guarded on `isConnected`: the
-	// opener may itself have been unmounted (a relation flip re-renders the split
-	// bar), and focusing a detached node silently sends focus to <body>.
-	const wasOccupied = useRef(occupied);
+	// cannot re-run while the slot is open. Guarded on `isConnected`: the opener
+	// may itself have been unmounted (a relation flip re-renders the split bar),
+	// and focusing a detached node silently sends focus to <body>.
+	const wasOpen = useRef(open);
 	useEffect(() => {
-		if (wasOccupied.current && !occupied) {
+		if (wasOpen.current && !open) {
 			const back = opener.current;
 			if (back?.isConnected) {
 				back.focus();
 			}
 			opener.current = null;
 		}
-		wasOccupied.current = occupied;
-	}, [occupied]);
+		wasOpen.current = open;
+	}, [open]);
 
 	if (!mounted) {
 		return <>{scroller}</>;
@@ -317,33 +258,9 @@ export function ComposerSlot({
 			// arbitrary values because the scale steps do not carry them:
 			// `slide-in-from-bottom-14` is 14 × 0.25rem = 56px, four times the
 			// ratified distance.
-			//
-			// ⛔⛔ FEED-1 — `data-state="confirmed"` DELIBERATELY MATCHES NO VARIANT
-			// HERE, AND THAT IS THE OPPOSITE OF AN OMISSION. Measured in the shipped
-			// stylesheet (`tw-animate-css/dist/tw-animate.css`): EVERY `animate-in`
-			// variant compiles to the same `animation-name: enter`. Adding
-			// `data-[state=confirmed]:animate-in` would therefore change the label on
-			// an element that is not being re-created while leaving `animation-name`
-			// exactly as it was — and CSS restarts an animation only when the name
-			// changes or the element is replaced. It would have read correct,
-			// typechecked, and never once played, which is precisely the defect this
-			// file's own focus-move docblock was minted over.
-			// ⇒ The confirmation's entrance rides the CONFIRMATION NODE, which is
-			// genuinely newly mounted and so cannot fail to fire. Canon §5:100's
-			// .26 s still governs it; see `PostedConfirmation.tsx`.
-			// ⚠ The EXIT is untouched: `confirmed → closed` matches the same
-			// `data-[state=closed]:animate-out` the composer's exit always used.
 			className="flex min-h-0 flex-1 flex-col duration-[260ms] data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-bottom-[14px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-bottom-[14px] motion-reduce:animate-none motion-reduce:duration-0"
 		>
-			{/* ⚠ THE `??` ARM IS THE EXIT'S, AND ONLY THE EXIT'S. While the slot is
-			    occupied `live` is non-null by construction — both call sites derive
-			    the occupant from the same predicate as `slot` — so the fallback is
-			    reachable only when `slot` is `"scroller"` and `mounted` is still
-			    true, which is exactly the corpse. ⛔ If a future caller ever let the
-			    two disagree, this would render a STALE corpse while occupied where
-			    the old `open ? composer : held.current` rendered nothing; keep them
-			    derived together rather than relaxing this line. */}
-			{live ?? held.current}
+			{open ? composer : held.current}
 		</div>
 	);
 }

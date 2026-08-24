@@ -41,31 +41,6 @@ export const COMPOSER_COPY = {
 	close: "×",
 } as const;
 
-/**
- * FEED-1 — the post-submit confirmation's header.
- *
- * ⛔ IT IS DELIBERATELY NOT INSIDE `COMPOSER_COPY`, AND THE REASON IS THE CLAIM
- * THAT BLOCK MAKES ABOUT ITSELF. Its docblock reads "Canon §6 — the composer +
- * slot-header register (verbatim)", and design-canon §6:122 enumerates that
- * register — `Place your Đ BET` · `Your argument — required` · the counters ·
- * `Image` · `Amount Đ 50` · `To win Đ 126.6` · `PLACE Đ BET` · `Confirm bet ·
- * Đ 500` · `Cancel` · `×` — with no confirmation string among them. Dropping
- * this one in there would have falsified a claim in place rather than
- * registered a new string, which is the O-5 residue in miniature.
- *
- * ⚠ PROVENANCE, WHICH IS BETTER THAN THE FOUR ABOVE: supplied VERBATIM by the
- * FEED-1 kickoff. Founder copy, not authored at execute — CC invented nothing.
- * Registered here for the web lane's canon amendment exactly as the four
- * authored-at-execute strings named at the top of this file are. **Canon is not
- * edited from here.**
- *
- * ⚠ The dismiss control reuses `COMPOSER_COPY.close`. One string is minted, not
- * two — the `×` a reader already knows dismisses a composer dismisses this too.
- */
-export const POSTED_COPY = {
-	header: "Posted",
-} as const;
-
 /** W2.10-D — the over-cap strip (ruling 2: "Max Đ N per bet"). */
 export function overCapStrip(): string {
 	return `Max Đ ${formatDharma(BET_MAX_STAKE)} per bet`;
