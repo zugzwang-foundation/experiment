@@ -25,35 +25,52 @@ import { cn } from "@/lib/utils";
  * re-renders this string for free; everywhere else the string is right at load
  * and stays as it was, which is accepted.
  *
- * ⚠⚠ **THERE IS DELIBERATELY NO `"use client"` HERE, AND THE RULING IT SERVES
- * IS THE REASON.** The rule this leaf exists for is that a card must not become
- * a client component: marking `discovery/HeroPanels.tsx` or
- * `profile/ArgumentList.tsx` — both server components, measured — would convert
- * a whole server-rendered card tree per surface for one text node. Putting the
- * directive HERE instead of on the card satisfies that. Putting it NOWHERE
- * satisfies it too, and costs less:
+ * ⚠⚠ **THERE IS DELIBERATELY NO `"use client"` HERE — BECAUSE THIS IS A SHARED
+ * PRIMITIVE, NOT BECAUSE IT SAVES A BUNDLE.**
  *
- * · On Discovery and Profile this renders as a **Server Component**. The routes
- *   are dynamic (`force-dynamic` on `(public)/page.tsx`; the profile page reads
- *   `headers()` and records itself "UNCACHED / dynamic v1"), so the server
- *   clock IS the reader's load time to within transit, and **no client
- *   JavaScript ships at all** for a string that never changes after load.
- * · On market detail it compiles into the client graph anyway, because
- *   `DebateView` is `"use client"` and everything under it is client-by-import
- *   — exactly as `debate/badges.tsx` already is, which the same three surfaces
- *   share the same way.
+ * ⛔ AN EARLIER VERSION OF THIS PARAGRAPH SAID THE OPPOSITE AND SAID IT AS A
+ * MEASUREMENT. It claimed `discovery/HeroPanels.tsx` and
+ * `profile/ArgumentList.tsx` were "both server components, measured", and that
+ * omitting the directive meant "no client JavaScript ships at all" on those two
+ * surfaces. **Both claims are false**, caught by `@code-reviewer` and confirmed
+ * three ways: `HeroPanels` is imported only by `discovery/DiscoveryCarousel.tsx`
+ * and `ArgumentList` only by `profile/ProfileArena.tsx`, and BOTH of those
+ * carry `"use client"` on line 1 — so both cards are client-by-import and
+ * always were, before this branch existed. The build agrees: `just now` and
+ * `data-relative-time` appear in THREE client chunks, and one of them
+ * (`0rzwuduj9u0-0.js`) carries `hero-reply-head` alongside them.
  *
- * ⇒ The directive would buy nothing on the two surfaces where it would cost
- * something. If a future `cacheComponents` retrofit ever caches these routes,
- * this leaf becomes the thing to revisit — and the revisit is `"use client"`
- * plus a mount-time re-read, not a timer.
+ * What went wrong is worth keeping: the original "measurement" read each file's
+ * OWN first line and never asked who imports it. A directive is a property of a
+ * module's position in the graph, not of its text — O-2, and O-3, since the
+ * conclusion was right for a stated reason that was not the real one.
  *
- * ⚠ `suppressHydrationWarning` IS LOAD-BEARING, AND ONLY ON MARKET DETAIL.
- * There the leaf renders twice — once during SSR on the server clock, once
- * during hydration on the reader's — and two clocks a second apart can land on
+ * ⇒ **THE REAL REASON THE DIRECTIVE IS ABSENT.** A component in `ui/` with no
+ * directive is a SHARED component: it compiles into whichever graph imports it.
+ * That is the correct shape for a cross-surface presentational primitive, and
+ * it is exactly why `debate/badges.tsx` — imported by client modules
+ * (`PostCard`, `dialogs`, `SellModule`) and by shared ones (`HeroPanels`,
+ * `ArgumentList`, `DebateColumn`) alike — carries none either. Pinning the
+ * directive on would fix this leaf to the client graph for no gain today, and
+ * would be actively wrong the day any host becomes a true Server Component.
+ *
+ * ⚠ IF `cacheComponents` IS EVER TURNED ON, this leaf is the thing to revisit,
+ * and `"use client"` is NOT the remedy — a client component still runs its body
+ * during the prerender pass, so the directive exempts nothing. The remedy is to
+ * defer the clock read past prerender (a mount-time read) and/or put the
+ * subtree behind Suspense. ⛔ Still never a timer. *(An earlier version of this
+ * sentence named the directive as half the fix; it is not — `@code-reviewer`
+ * M-2. Re-verify against the Next version in play before acting on it.)*
+ *
+ * ⚠ `suppressHydrationWarning` IS LOAD-BEARING ON EVERY SURFACE. The leaf
+ * renders twice everywhere — once during SSR on the server clock, once during
+ * hydration on the reader's — and two clocks a second apart can land on
  * opposite sides of a bucket edge (59 s vs 61 s). That is a text mismatch React
- * would otherwise report, on correct output. It suppresses the warning only;
- * it renders no attribute and changes nothing about what the reader sees.
+ * would otherwise report, on correct output. ⛔ THIS TOO ONCE READ "AND ONLY ON
+ * MARKET DETAIL", which followed from the false premise above and would have
+ * told the next reader that Discovery and Profile could safely drop it. They
+ * cannot. It suppresses the warning only; it renders no attribute and changes
+ * nothing about what the reader sees.
  */
 export function RelativeTime({
 	createdAt,

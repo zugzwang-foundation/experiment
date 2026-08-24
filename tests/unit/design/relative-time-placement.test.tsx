@@ -516,6 +516,22 @@ describe("TIME-1 :: G6 — the age is the LAST element of the identity row", () 
 		// silently produced an empty container, each individual assertion would
 		// have failed — but a future edit that drops an entry from SURFACES would
 		// shrink the guard in silence. This pins the count.
+		//
+		// ⚠ FOUR OF SEVEN MOUNTS ARE RENDERED HERE, DELIBERATELY
+		// (`@code-reviewer` M-1). The focused post (`PostFocusHeader.tsx:145`)
+		// and the two pop-ups (`dialogs.tsx:97`, `:208`) are covered
+		// TRANSITIVELY: all three pass props to `ArgProfile`, which owns the row
+		// JSX these assertions read, so none of them can produce a different
+		// arrangement. Rendering them would buy a third and fourth copy of an
+		// assertion about one component — and `Dialog` portals to
+		// `document.body`, so the fixtures would need their own container
+		// plumbing to say the same thing.
+		// ⛔ THE ONE THING TRANSITIVITY DOES NOT CARRY is which entity's
+		// `createdAt` each passes. Today that is not expressible: `PostPopup`
+		// and `PostFocusHeader` hold only a post, `ReplyPopup` only a reply. If
+		// a refactor ever brings both into one scope, `tsc` cannot tell
+		// `post.createdAt` from `reply.createdAt` — both are `string` — and this
+		// guard would not either. Add the surface then.
 		expect(SURFACES).toHaveLength(4);
 		for (const surface of SURFACES) {
 			const container = surface.render();
@@ -842,9 +858,24 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 		expect(pkg).toContain('"decimal.js"');
 	});
 
-	it("relative-time::the-cards-did-not-become-client-components", () => {
-		// THE WALL'S ACTUAL OUTCOME. Marking either card `"use client"` would
-		// convert a whole server-rendered card tree per surface for one text node.
+	it("relative-time::no-feature-file-pins-itself-to-the-client-graph", () => {
+		// ⛔⛔ RENAMED, AND THE OLD NAME WAS A CLAIM THAT IS NOT TRUE. This was
+		// `the-cards-did-not-become-client-components`, justified as "marking
+		// either card `use client` would convert a whole server-rendered card
+		// tree". **Both cards are ALREADY client components** and were before
+		// this branch existed — `HeroPanels` is imported only by
+		// `discovery/DiscoveryCarousel.tsx` and `ArgumentList` only by
+		// `profile/ProfileArena.tsx`, and both of those are `"use client"` on
+		// line 1 (`@code-reviewer` C-1/H-2). A guard whose NAME asserts something
+		// false teaches the wrong model to everyone who reads it, which is worse
+		// than a guard that is merely redundant.
+		//
+		// ⚠ THE ASSERTION IS KEPT, because what it actually pins is still worth
+		// pinning: these three files carry NO directive, so each compiles into
+		// whichever graph imports it. That is what makes a `ui/` primitive
+		// shareable — the shape `debate/badges.tsx` already has — and it is
+		// cheap insurance for the day a host stops being a client entry point.
+		// It pins a PROPERTY OF THESE FILES; it does not pin a bundle outcome.
 		//
 		// ⚠⚠ ASSERTED OVER THE WHOLE FILE, NOT LINE 1, AND THE FIRST VERSION READ
 		// LINE 1. A directive preceded by a comment is still a valid directive,
@@ -859,9 +890,10 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 		// Comments are stripped first, so a docblock DISCUSSING the directive —
 		// as the leaf's does at length — is not mistaken for one.
 		for (const rel of [HERO, ARGLIST, LEAF]) {
-			expect(code(rel), `${rel} became a client component`).not.toContain(
-				"use client",
-			);
+			expect(
+				code(rel),
+				`${rel} pinned itself to the client graph — it is a shared module and should carry no directive`,
+			).not.toContain("use client");
 		}
 		// POSITIVE CONTROLS: the same read against a file that IS one, and the
 		// raw/stripped pair proving the stripping is not what makes it pass.
@@ -928,10 +960,15 @@ describe("TIME-1 :: the three walls, as structure rather than as review notes", 
 	it("relative-time::the-hydration-suppression-is-not-silently-droppable", () => {
 		// `suppressHydrationWarning` renders NO attribute, so nothing in the DOM
 		// can see it and removing it is invisible to every other assertion here
-		// (`@test-writer` L-2). It is load-bearing on market detail, where the
-		// leaf renders once on the server clock and once on the reader's and the
-		// two can land either side of a bucket edge. Pinned in source so that
-		// dropping it is a decision rather than an accident.
+		// (`@test-writer` L-2). Pinned in source so that dropping it is a
+		// decision rather than an accident.
+		//
+		// ⛔ IT IS LOAD-BEARING ON EVERY SURFACE, not just market detail. All
+		// three cards are client-by-import, so the leaf SSRs and then hydrates
+		// on all three, and two clocks a second apart can land either side of a
+		// bucket edge anywhere. This comment previously said "market detail" —
+		// which would have told a later reader that Discovery and Profile could
+		// safely drop it (`@code-reviewer` H-1).
 		expect(code(LEAF)).toContain("suppressHydrationWarning");
 	});
 });
