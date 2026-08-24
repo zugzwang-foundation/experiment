@@ -799,6 +799,11 @@ describe("FEED-1 — every path out terminates", () => {
 		// predicate, and the carousel advanced behind the modal. On the day the
 		// redesign re-attaches the trigger, Escape pressed to close that dialog
 		// would fire Radix's dismissal AND this one in a single keystroke.
+		// ⚠ IT IS A SOURCE SCAN, and that is the honest option rather than a
+		// disguised behavioural one: a dormant flag cannot be driven, and the repo
+		// has precedent (the four design height-chain scans). What it CANNOT catch
+		// is the term being present but inert — `&& false && criterionOpen` would
+		// pass. It pins presence, which is the thing that was missing.
 		const src = await import("node:fs").then((fs) =>
 			fs.readFileSync("src/components/debate/DebateView.tsx", "utf8"),
 		);

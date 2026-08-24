@@ -126,9 +126,20 @@ export function newRemovedPost(over: {
  * ⛔⛔ THE ROW THE TYPE SAYS CANNOT EXIST, CARRYING A BODY — SC-1's positive
  * specimen. `newRemovedPost` above carries no body at all, so an assertion that
  * its body is absent is an assertion about nothing. This one is built through a
- * cast precisely so the guard has withheld content to fail to find: if the
- * masking narrowing ever loosened, THIS is the string that would appear on
- * screen.
+ * cast precisely so the guard has withheld content to fail to find.
+ *
+ * ⚠⚠ AND HERE IS EXACTLY WHAT IT PROVES, BECAUSE THIS COMMENT SAID SOMETHING
+ * STRONGER AND IT WAS MEASURED FALSE. It read: "if the masking narrowing ever
+ * loosened, THIS is the string that would appear on screen." It would not.
+ * Loosening `find-posted`'s narrowing alone gets the row as far as `PostCard`,
+ * whose OWN `if (post.removed)` check then draws `Removed by moderator` — the
+ * sentinel still never reaches the document. ⇒ The three assertions in the
+ * render guard pin DIFFERENT layers: the sentinel line pins `PostCard`'s union
+ * check, and the two null assertions pin the narrowing. The claim that the
+ * narrowing ALONE keeps a body off screen belongs to `find-posted.test.ts`,
+ * which asserts on the RETURN VALUE, where `PostCard` does not exist.
+ * ⛔ A guard that describes itself wrongly costs the same keystroke to fix as
+ * one that fails wrongly (O-3), and it misleads for longer.
  *
  * ⚠ It models a real failure, not a fantasy: the server emitting a removed
  * variant that still carries its columns is exactly what a regression in

@@ -2960,3 +2960,19 @@ operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PER
 / GAUGE, that is a manual move for the operator — not a PR.
 
 ---
+
+## FEED-1 security-auditor SURPRISE — the pop-up and lightbox slots cache a resolved node, so they never re-mask
+
+**Originating task:** FEED-1 directed security audit (branch `feat/feed-1`, 2026-08-24) — out-of-scope SURPRISE per §5.11: **pre-existing on `main` and `staging`, not touched by the FEED-1 diff**; recorded, not absorbed. Also written to that run's `claude-progress.md`, which is **gitignored** — the auditor pushed back that a live masking gap whose only record dies with a worktree is the §8 founding case one register over, and it is right. This row is the durable half.
+
+**Deferred work.** `DebateView` holds three slots that capture a **resolved value** rather than an id: `popupPost` / `popupReply` (the whole `PresentPost` / `PresentReply`; `PostPopup` renders `post.body` off the captured object) and `lightboxUrl` (a presigned R2 GET URL). None is re-derived or cleared when a new model lands, and **`DebatePoll` is not suspended for pop-ups** — `composerOpen` reads only the composer flags. So a pop-up opened before a moderator removes its comment keeps rendering the withheld body for as long as it is left open, on a page that has the masked payload in hand. ⚠ **The image half outlives the DOM:** measured at this audit, after a masking payload closed the surrounding surface the presigned URL was still in the document, and `READ_URL_TTL_SECONDS = 3600` (`src/server/debate-view/load-debate-view.ts:36`) — removal does not revoke an already-minted URL, so the object stays fetchable and shareable for up to an hour. That half is the one most likely to be under-rated later, because it is invisible once the dialog closes.
+
+**This is the SC-1 class** (§5.14): a read path over `comments.body` that never re-intersects the removed set. SC-1 fires on *"any PR that adds or edits a read over `comments`"*; this is a standing one that predates the check.
+
+**Fix direction, and FEED-1 is the worked example.** Store the **id**, re-derive the node from `model` at render. `posted` does exactly that — it holds a `commentId`, never a node, so `postedNode` is recomputed every render and a masking payload takes the card off screen in the SAME commit (measured, both reviewers, `M0 → M1(present) → M2(removed)`: no intermediate frame). `popupPost` / `popupReply` / `lightboxUrl` want the same treatment. Sizing: two state slots plus a lightbox key, all inside `DebateView`; the removed variants are already unpassable at the type level, so the compiler does most of it. **The presigned-URL half is separate and harder** — R2 presign revocation is not a client concern and may be a TTL-shortening decision rather than a code fix.
+
+**Why deferred.** Pre-existing, reachable on three surfaces FEED-1 does not touch (market column, reply column, `PostFocusHeader`), and absorbing it would be the "while we're here" §5.4 forbids on a branch whose reviewer cascade has already run.
+
+**Conditional trigger.** The next task touching `DebateView`'s pop-up/lightbox slots or `dialogs.tsx`, OR any HARDEN.* moderation pass, OR the first moderator report that a removed argument stayed visible.
+
+**Expected next task.** A small `fix/` lane in `src/components/debate/` — id-not-node for the two pop-up slots (behavioural, guardable in jsdom exactly as FEED-1's confirmation is), with the R2 TTL question raised separately.
