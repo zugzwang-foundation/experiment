@@ -69,6 +69,32 @@ describe("relative-time :: G1 — bucket boundaries, asserted at the edges", () 
 		expect(at(4000 * DAY)).toBe("4000d ago");
 	});
 
+	it("relative-time::G1-every-bucket-truncates-INSIDE-itself-not-only-at-its-edges", () => {
+		// ⚠⚠ THIS TEST EXISTS BECAUSE ITS ABSENCE WAS A REAL HOLE, found by
+		// `@test-writer` on this branch. Every other day-bucket assertion sits on
+		// an EXACT MULTIPLE of a day — where `Math.floor` and `Math.round` agree —
+		// so swapping one for the other passed all 32 guards, and an argument
+		// written 36 hours ago would have shipped reading `2d ago`.
+		//
+		// R1 rules two separate things and the edge pairs above only prove one.
+		// They prove WHERE a bucket starts; this proves the bucket TRUNCATES
+		// toward zero all the way across, which is the other half of the
+		// sentence. Every value below is deliberately NOT a whole multiple.
+		expect(at(36 * HOUR)).toBe("1d ago"); // `Math.round` → "2d ago"
+		expect(at(DAY + 23 * HOUR)).toBe("1d ago"); // `Math.round` → "2d ago"
+		expect(at(2 * DAY + 12 * HOUR)).toBe("2d ago"); // `Math.round` → "3d ago"
+		expect(at(50 * DAY + 23 * HOUR + 59 * MINUTE)).toBe("50d ago");
+
+		// The same hole, one bucket down in each direction. `3599 s` and
+		// `86 399 s` above are interior values, but each is at the very TOP of
+		// its bucket; these sit in the middle, where a half-rounding defect that
+		// happens to be correct at the top would still be wrong.
+		expect(at(90 * SECOND)).toBe("1m ago"); // `Math.round` → "2m ago"
+		expect(at(30 * MINUTE + 30 * SECOND)).toBe("30m ago");
+		expect(at(90 * MINUTE)).toBe("1h ago"); // `Math.round` → "2h ago"
+		expect(at(12 * HOUR + 31 * MINUTE)).toBe("12h ago");
+	});
+
 	it("relative-time::G1-every-minute-and-hour-step-reads-back-its-own-number", () => {
 		// The three edges above pin the transitions; this pins that nothing in
 		// between is silently off by one either. Both full ranges, exhaustively.

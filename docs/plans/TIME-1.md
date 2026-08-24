@@ -45,7 +45,7 @@ changes, no DTO gains a field, no migration, no event type.
 | 7 | `src/components/debate/dialogs.tsx` | edit | S2. Two mounts — post pop-up and reply pop-up. |
 | 8 | `src/components/discovery/HeroPanels.tsx` | edit | S3. Hero post identity row, after the Đ figure, with a `HeadSeparator`. |
 | 9 | `src/components/profile/ArgumentList.tsx` | edit | S3. `PresentHead` — after `Replies · N` (post) / after the stake block (reply), before the `ml-auto` download wrapper. Serves BOTH mounts (`:187` list card, `:603` replica card). |
-| 10 | `tests/unit/lib/relative-time.test.ts` | **new** | S1 guards G1–G4. |
+| 10 | `tests/unit/relative-time.test.ts` | **new** | S1 guards G1–G4. *(Flat, not `tests/unit/lib/` as this row first said — `tests/unit/` already holds three flat single-subject unit files: `body-fingerprint`, `rate-limit-prefix`, `idempotency-release`. Corrected at the cascade, `@test-writer` L-1.)* |
 | 11 | `tests/unit/design/relative-time-placement.test.tsx` | **new** | S4 guards G5–G6. |
 | 12 | `AGENTS.md` | edit | §3's `components/ui/` line moves FOUR → FIVE project-authored primitives. Descriptive maintenance of a descriptive file; the canon entry is OWED, not authored (report §11). |
 
