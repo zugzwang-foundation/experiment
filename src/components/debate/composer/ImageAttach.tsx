@@ -392,11 +392,16 @@ export function ImageAttach({
 		// DOWN to fit, stays centred, and keeps its ratio — letterboxed, never
 		// stretched or squashed. ⛔ Not one coordinate, text node or viewBox value
 		// is touched; only the box the artwork is asked to fit into.
-		// ⚠ 224 is derived, not chosen: the right column measures 262.0, and the
-		// panel is 2 (border) + 24 (`p-3`) + the art. 224 puts the panel at 250 —
-		// under the right column at EVERY width, with 12px of headroom so the
-		// column keeps setting the row rather than the two trading places.
-		"aspect-[4/5] max-h-[224px] min-h-0 w-full rounded-(--imgr) bg-n1";
+		// ⚠ THE CAP IS DERIVED FROM THE RIGHT COLUMN, AND IT MOVED AT CS11.
+		// panel = 2 (border) + 24 (`p-3`) + art. The right column grew when the
+		// title went to three lines (+40) and the description to 128px (+32),
+		// from 262 to 334 — so a 224 cap would have left the panel 72px short and
+		// letterboxing inside a stretched box. 308 puts the panel at 334, level
+		// with the column: neither drives the row alone.
+		// ⛔ STILL A FIXED px CAP, NOT A RATIO OF WIDTH and NOT `max-h-full`.
+		// Width-invariance is what CS10 bought and it is not being traded back —
+		// measured identical at 1440, 1728 and 1920.
+		"aspect-[4/5] max-h-[308px] min-h-0 w-full rounded-(--imgr) bg-n1";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//

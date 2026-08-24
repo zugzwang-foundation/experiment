@@ -428,7 +428,11 @@ export function BetComposer(props: {
 			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
 			    (v0.10): verb line + the full post title; masked parent → canon
 			    fallback header. */}
-			<div className="flex items-start gap-2">
+			{/* ⚠ change set 11 §4 — `items-center` so the × shares a centre line
+			    with the header text. It was `items-start`, which top-aligned a 20px
+			    label against a 44px control: measured centres 407.3 vs 419.3, i.e.
+			    the × hanging 12px below the words it belongs to. */}
+			<div className="flex items-center gap-2">
 				<SideBadge side={props.side} />
 				{props.replyContext && props.replyContext.authorPseudonym !== null ? (
 					<span className="flex min-w-0 flex-col">
@@ -463,7 +467,15 @@ export function BetComposer(props: {
 					// the visible `×` is a glyph, so the label is the only accessible
 					// name it has and WCAG 2.5.3 does not bind (no visible text to
 					// contain).
-					className="ml-auto flex size-11 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
+					// ⚠⚠ `-my-3` — THE HIT TARGET NO LONGER DICTATES THE ROW HEIGHT.
+					// The control stays a real 44 × 44 (CS10 §5, WCAG target size), but
+					// −12px top and bottom means it contributes 44 − 24 = 20px to the
+					// row — exactly the header text's height. The extra 24px of target
+					// overhangs into the composer's own padding above and its `gap-3`
+					// below, both of which are empty.
+					// ⇒ The header block drops 44 → 20px and that 24px goes to the
+					// title, per §1's spending order. The hit area is unchanged.
+					className="-my-3 ml-auto flex size-11 items-center justify-center rounded-(--r-chip) text-xl text-n4 transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 				>
 					{COMPOSER_COPY.close}
 				</button>
@@ -522,14 +534,48 @@ export function BetComposer(props: {
 					{/* `.compright` (d5) */}
 					<div className="flex min-w-0 flex-col gap-2">
 						<div>
-							<Input
+							{/* ⚠⚠ change set 11 §3 — A TEXTAREA, SO ALL 125 CHARACTERS ARE
+							    VISIBLE AT ONCE. As an `<input>` only the tail showed at
+							    125/125.
+							    ⚠ THREE LINES, MEASURED NOT ASSUMED: at the field's 352.4px
+							    content width in 14px/20px Geist, **52 characters** fit per
+							    line, so 125 characters render 60px tall = 3 lines.
+							    `h-[72px]` is that plus the field's existing 12px of padding
+							    and border.
+							    ⛔ FIXED, exactly as CS7 §3 fixed the description:
+							    `field-sizing-fixed` overrides the primitive's
+							    `field-sizing-content`, and `resize-none` removes the drag
+							    handle. Neither content nor a drag can change this box.
+							    ⛔⛔ THE NEWLINE DEFENCE IS NOT WEAKENED — IT IS REBUILT. The
+							    `<input>` was a STRUCTURAL layer (an input cannot hold a
+							    newline); a textarea can, so that layer is gone. It is
+							    replaced by `onKeyDown` blocking Enter at source, and the
+							    existing onChange strip is KEPT for paste, drop and IME.
+							    ⚠ THIS MATTERS BECAUSE OF WHAT THE SERVER DOES WITH IT.
+							    There is no title column: `payload.ts` joins title + "\n\n" +
+							    body into one `comments.body`, and `deriveTitleTeaser` splits
+							    it back with `body.split("\n", 1)[0]` — the FIRST newline. A
+							    newline in the title would truncate the derived title on the
+							    debate card, the pop-up, the Discovery hero, both profile
+							    surfaces and the ADR-0025 `.md` export.
+							    ⚠ Blocking Enter costs nothing: there is no `<form>` and no
+							    key handler, so Enter submits nothing today. */}
+							<Textarea
 								value={title}
 								maxLength={TITLE_MAX_CHARS}
 								disabled={floorAbove || inFlight}
 								aria-label="Argument title"
+								className="h-[72px] resize-none field-sizing-fixed"
+								onKeyDown={(e) => {
+									// Layer 1, replacing the `<input>`: a newline never gets
+									// typed in the first place.
+									if (e.key === "Enter") {
+										e.preventDefault();
+									}
+								}}
 								onChange={(e) => {
-									// F-5: the title is newline-free (paste belt; the input
-									// itself cannot hold newlines).
+									// Layer 2, KEPT VERBATIM: the paste/drop/IME belt. F-5 —
+									// the title is newline-free.
 									setTitle(e.target.value.replace(/[\n\r]/g, " "));
 									onEdit();
 								}}
@@ -558,7 +604,12 @@ export function BetComposer(props: {
 								maxLength={extendedMax}
 								disabled={floorAbove || inFlight}
 								aria-label="Argument body"
-								className="h-24 resize-none field-sizing-fixed"
+								// ⚠ change set 11 §1 — 96 → 128px. The last step of the
+								// spending order: the title takes what it needs for 3 lines
+								// (+40) and the header reclaim (+24), and what is left of the
+								// restoration goes here. Still FIXED — a bigger box, not an
+								// elastic one.
+								className="h-32 resize-none field-sizing-fixed"
 								onChange={(e) => {
 									setExtended(e.target.value);
 									onEdit();

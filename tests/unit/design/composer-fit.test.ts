@@ -51,10 +51,15 @@ describe("the composer fits without scrolling", () => {
 	it("composer-fit::the-description-cannot-grow-by-content-or-by-drag", () => {
 		const classes = bodyFieldClasses();
 
-		// ⛔ FIXED, not a floor. `min-h-24` let content push the box taller; `h-24`
-		// does not. This is the single most load-bearing token in the file.
-		expect(classes).toContain("h-24");
-		expect(classes).not.toContain("min-h-24");
+		// ⛔ FIXED, NOT A FLOOR — and asserted as the PROPERTY rather than as one
+		// value. It read `toContain("h-24")`, which reddened at CS11 §1 when the
+		// description grew to `h-32` to take the restored height. The number was
+		// never the point: `min-h-*` lets content push the box taller and `h-*`
+		// does not, so what this guard exists to catch is a return to a FLOOR.
+		// Pinning the property survives a deliberate resize and still fails the
+		// regression.
+		expect(classes.some((c) => /^h-\d+$/.test(c))).toBe(true);
+		expect(classes.some((c) => c.startsWith("min-h-"))).toBe(false);
 		// The drag handle — the founder's actual report was dragging it.
 		expect(classes).toContain("resize-none");
 		// ⛔ The PRIMITIVE ships `field-sizing-content`, so the instance must
