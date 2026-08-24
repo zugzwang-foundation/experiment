@@ -96,7 +96,7 @@ async function submitWith(data: unknown) {
 }
 
 describe("FEED-1 — the composer hands the receipt up", () => {
-	it("composer-handoff::a-200-hands-the-host-the-commentId-and-does-NOT-close", async () => {
+	it("composer-handoff::a-200-hands-the-host-the-commentId-AND-closes", async () => {
 		// THE POSITIVE CONTROL for every rejection below. Without it, four tests
 		// asserting "onPosted was NOT called" would pass identically against a
 		// build in which `onPosted` is never called at all.
@@ -105,7 +105,11 @@ describe("FEED-1 — the composer hands the receipt up", () => {
 		expect(onPosted).toHaveBeenCalledTimes(1);
 		expect(onPosted).toHaveBeenCalledWith({ commentId: "cmt-just-posted" });
 		// ⛔ The composer does NOT close itself any more — the host holds the slot.
-		expect(onClose).not.toHaveBeenCalled();
+		// ⚠ FEED-2 — IT CLOSES NOW. Under FEED-1 this asserted the opposite: the
+		// composer stayed mounted until the refreshed model arrived, because it WAS
+		// the post-submit view. Nothing is held any more — the host is handed the
+		// id and the slot closes in the same breath, exactly as it did before.
+		expect(onClose).toHaveBeenCalledTimes(1);
 		// ⛔ AND IT DOES NOT REFRESH. The refresh moved to the host, which is the
 		// component that has to recognise the new model; a second one fired here
 		// would be a second server read for one bet and the §1 budget would be 3.

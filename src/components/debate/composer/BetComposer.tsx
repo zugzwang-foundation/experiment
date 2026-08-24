@@ -398,7 +398,14 @@ export function BetComposer(props: {
 				props.onClose();
 				return;
 			}
+			// ⚠⚠ FEED-2 — THE COMPOSER CLOSES NOW, exactly as it did before FEED-1.
+			// The host is told which comment was made and closes the slot in the same
+			// breath; when the refreshed payload lands it points the column on the
+			// BET'S OWN SIDE at that card. Nothing is held open in between — FEED-1
+			// held this composer mounted until the model arrived, and the panel that
+			// replaced it was the shape the founder ruled wrong.
 			props.onPosted({ commentId });
+			props.onClose();
 			return;
 		}
 		if (outcome.kind === "malformed") {
@@ -482,21 +489,6 @@ export function BetComposer(props: {
 	return (
 		<section
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
-			/**
-			 * ⚠⚠ FEED-1 — THE WAIT IS NOW ANNOUNCEABLE, AND IT NEEDED TO BE. After a
-			 * success the host HOLDS this composer mounted until the refreshed model
-			 * arrives, so its in-flight state stopped being a flicker and became the
-			 * primary post-submit view. `ErrorStrip` renders NOTHING for
-			 * `phase: "in_flight"`, so visually that window is a greyed motionless
-			 * form — and to an assistive technology it was previously indistinguishable
-			 * from an idle one.
-			 * ⛔ AN ARIA STATE, NOT A STRING. A progress LINE would need copy this
-			 * task has no mandate to author (canon §6 enumerates the composer's
-			 * strings and carries none for this); `aria-busy` is a state, adds no
-			 * text, and changes no logic — it reads the same `inFlight` the controls
-			 * already read. The visible affordance stays OWED.
-			 */
-			aria-busy={inFlight}
 			className="flex flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
 		>
 			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
