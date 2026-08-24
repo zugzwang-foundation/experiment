@@ -290,48 +290,65 @@ function HeroPostPanel({
 			    CS13 §2, the teaser's freed space along with it.
 
 			    ⛔⛔ CS13 §3 — THE PANEL'S HEIGHT IS A PROPERTY OF THE LAYOUT, NEVER
-			    OF THE PICTURE. That is what the bound below is, and it is DERIVED
-			    rather than invented — no new number appears here:
-			      · `flex-1` is `flex: 1 1 0%`, so the box's flex BASIS is ZERO.
-			        The image's intrinsic height contributes nothing to the panel's
-			        content height; the box takes the panel's leftover space and no
-			        more.
-			      · `min-h-[40px]` (already shipped) is what neutralises the flex
-			        AUTOMATIC MINIMUM SIZE. A flex item defaults to
-			        `min-height: auto`, which for a replaced element resolves to its
-			        INTRINSIC height — that is the one path by which a tall picture
-			        could have driven the panel, and an explicit `min-height`
-			        closes it. It is load-bearing, not decoration.
-			      · The FALLBACK below carries the SAME `mt-2 min-h-[40px] flex-1`,
-			        so the no-image case and the image case are the same box. That
-			        is why "panel height with no image == with a landscape ==
-			        with a portrait" holds by CONSTRUCTION rather than by matching
-			        two numbers that could drift apart.
+			    OF THE PICTURE. The picture is taken OUT OF FLOW to achieve that:
+			    the wrapper below is the box, and the image is absolutely
+			    positioned to fill it. An out-of-flow child contributes nothing to
+			    its parent's content height — no intrinsic size, no aspect ratio,
+			    nothing — so the wrapper's height is decided by the panel and the
+			    image simply occupies whatever it is given.
+
+			    ⚠⚠ AND THE OBVIOUS SIMPLER VERSION DOES NOT WORK — MEASURED, NOT
+			    ASSUMED. Leaving the `<img>` in flow as `flex-1 min-h-[40px]` LOOKS
+			    sufficient: `flex-1` is `flex: 1 1 0%`, so the basis reads as zero,
+			    and the explicit `min-height` appears to close the flex
+			    AUTOMATIC-MINIMUM-SIZE path that would otherwise resolve to a
+			    replaced element's intrinsic height. Both halves of that reasoning
+			    are wrong here, for one reason: a PERCENTAGE flex-basis resolved
+			    against an INDEFINITE container height falls back to `auto`, and
+			    `auto` on an `<img>` is its intrinsic height. This panel's height
+			    comes from the grid row, so the height IS indefinite and the
+			    fallback fires.
+
+			    The measurement that caught it, on staging at 1440, same panel,
+			    same market, same viewport — only the picture swapped:
+			      portrait  482x638  → hero row 574.6px
+			      landscape 1200x400 → hero row 375.8px
+			    198.8px of panel height carried by nothing but the attachment's
+			    aspect ratio. 375.8 is the row's true height; the portrait was
+			    inflating it. Out of flow, both cases sit at 375.8.
+
+			    ⛔ NO NEW NUMBER IS INTRODUCED. `mt-2`, `min-h-[40px]` and `flex-1`
+			    are the shipped values, moved from the image to the wrapper that
+			    now owns the box; `inset-0` is not a size.
 
 			    ⛔ `object-contain`, NEVER `object-cover` (founder wall: no crop).
-			    `cover` filled the box by cropping the picture — on the portrait
-			    attachments that meant most of the image was simply not shown.
-			    `contain` fits the whole picture inside the box and letterboxes the
-			    remainder against the `bg-n1` the box already carried. The BOX is
-			    unchanged in both cases; only what happens to the picture inside it
-			    differs, which is precisely why this does not move any height. */}
-			<MarketThumb
-				data-testid={`hero-post-image-${side}`}
-				src={post.imageUrl}
-				// The argument text carries the meaning and the post title is
-				// adjacent, so the attachment is decorative here (WCAG 1.1.1).
-				alt=""
-				className="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]"
-				fallback={
-					<div
-						data-testid={`hero-post-image-empty-${side}`}
-						aria-hidden="true"
-						className="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
-					>
-						IMG
-					</div>
-				}
-			/>
+			    `cover` filled the box by cropping — on a portrait attachment most
+			    of the picture was simply not shown. `contain` fits the whole
+			    picture inside the box and letterboxes the remainder against the
+			    `bg-n1` the box already carried.
+
+			    ⚠ The FALLBACK takes the same `absolute inset-0`, so the no-image
+			    case and the image case are the SAME box by construction rather
+			    than by two class strings that could drift apart. */}
+			<div className="relative mt-2 min-h-[40px] flex-1">
+				<MarketThumb
+					data-testid={`hero-post-image-${side}`}
+					src={post.imageUrl}
+					// The argument text carries the meaning and the post title is
+					// adjacent, so the attachment is decorative here (WCAG 1.1.1).
+					alt=""
+					className="absolute inset-0 h-full w-full rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]"
+					fallback={
+						<div
+							data-testid={`hero-post-image-empty-${side}`}
+							aria-hidden="true"
+							className="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]"
+						>
+							IMG
+						</div>
+					}
+				/>
+			</div>
 			{/* V16 — `.replyhead` (mockup :97-98, markup :194). Display-only, and a
 			    SIBLING of the stretched link above, so a click anywhere on it still
 			    opens the post (the mockup's whole-`.argbody` handler). */}

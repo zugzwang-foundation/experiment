@@ -296,21 +296,31 @@ const HERO_THUMB_NULL =
  * passes against an inverted NO panel, which is how the last inversion survived
  * a full PR with tests (plan §3 D14 Q2).
  *
- * ⚠ RE-POINTED AT UI-QUICK CS13 §3 — `object-cover` → `object-contain` (no
- * crop; the founder's wall). NOTHING ELSE IN THE LITERAL MOVED, and that is the
- * useful part of a byte-exact pin: the diff on this line is exactly two
- * characters wide, so the pin itself testifies that the box — `mt-2`,
- * `min-h-[40px]`, `flex-1`, the radius, the fill and the hairline — is
- * untouched, which is the §3 height claim.
+ * ⚠⚠ RE-POINTED AT UI-QUICK CS13 §3. Two changes, and they are one idea:
+ *   · `object-cover` → `object-contain` — no crop (the founder's wall). `cover`
+ *     filled the box by cropping, so a portrait attachment was mostly unseen.
+ *   · the layout classes leave the image entirely and move to a WRAPPER, and
+ *     the image becomes `absolute inset-0 h-full w-full`. Out of flow, it
+ *     contributes NOTHING to the panel's height — which is the §3 invariant.
+ *     In flow it did: staging measured a 198.8px swing on one panel from the
+ *     attachment's aspect ratio alone (portrait 482x638 → 574.6px row,
+ *     landscape 1200x400 → 375.8px, same panel and viewport).
+ *
+ * ⛔ THE BYTE-EXACT PIN IS DOING REAL WORK HERE, which is why it was re-pointed
+ * rather than loosened to a `toContain`. Both literals must move TOGETHER: the
+ * loaded image and the null placeholder occupy the same wrapper, and a change
+ * that positioned only one of them would leave the two cases different boxes —
+ * exactly the drift §3 exists to prevent — while a substring assertion on each
+ * would still pass.
  *
  * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
  * are small fixed-size squares where filling the frame is right and there is no
  * height to protect; only the post attachment — the box that grows — changed.
  */
 const POST_IMAGE_LOADED = (side: "YES" | "NO") =>
-	`<img data-testid="hero-post-image-${side}" alt="" class="mt-2 min-h-[40px] flex-1 rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
+	`<img data-testid="hero-post-image-${side}" alt="" class="absolute inset-0 h-full w-full rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
 const POST_IMAGE_NULL = (side: "YES" | "NO") =>
-	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="mt-2 flex min-h-[40px] flex-1 items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
+	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
 
 /** The thumb slot of a card/hero market panel — the row's first child. */
 function thumbSlot(container: HTMLElement, row: string): string {

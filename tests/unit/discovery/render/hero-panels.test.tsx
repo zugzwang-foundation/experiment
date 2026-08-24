@@ -490,15 +490,26 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 		expect(cls).toContain("object-contain");
 		expect(cls).not.toContain("object-cover");
 		expect(cls).toContain("rounded-[var(--imgr)]");
-		// ⛔ CS13 §3 — `min-h-[40px]` + `flex-1` ARE THE HEIGHT BOUND, and they
-		// are pinned together because either alone is insufficient. `flex-1` is
-		// `flex: 1 1 0%`, so the box's basis is ZERO and the picture's intrinsic
-		// height contributes nothing; `min-h-[40px]` overrides the flex AUTOMATIC
-		// MINIMUM SIZE, which for a replaced element resolves to that same
-		// intrinsic height and is the one path by which a tall picture could have
-		// driven the panel. Drop either and the panel starts tracking its image.
-		expect(cls).toContain("min-h-[40px]");
-		expect(cls).toContain("flex-1");
+		// ⛔⛔ CS13 §3 — THE PICTURE IS OUT OF FLOW, AND THAT IS THE WHOLE HEIGHT
+		// INVARIANT. An absolutely-positioned child contributes nothing to its
+		// parent's content height, so the panel cannot track its attachment.
+		//
+		// ⚠⚠ THIS ASSERTION REPLACED A WRONG ONE, AND THE REPLACEMENT IS THE
+		// POINT. It first pinned `flex-1` + `min-h-[40px]` ON THE IMAGE, on the
+		// reasoning that a zero flex-basis plus an explicit min-height leaves no
+		// path for an intrinsic height to reach the layout. That reasoning is
+		// false when the container's height is INDEFINITE — as it is here, the
+		// panel being sized by its grid row — because a PERCENTAGE flex-basis
+		// then falls back to `auto`, and `auto` on an `<img>` is its intrinsic
+		// height. Staging measured 198.8px of panel height moving with nothing
+		// but the attachment's aspect ratio (portrait 482x638 → 574.6px row;
+		// landscape 1200x400 → 375.8px row, same panel, same viewport).
+		// ⛔ So the negatives below are not tidiness — they are the specific
+		// wrong fix, pinned as wrong so it cannot come back.
+		expect(cls).toContain("absolute");
+		expect(cls).toContain("inset-0");
+		expect(cls).not.toContain("flex-1");
+		expect(cls).not.toContain("min-h-");
 		// No placeholder alongside it.
 		expect(screen.queryByTestId("hero-post-image-empty-YES")).toBeNull();
 	});
@@ -524,21 +535,41 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			imageUrl: "https://signed.test/uploads/u/x/arg.webp",
 		};
 		renderHero({ yes: withImage, no: null });
-		const imgCls = screen.getByTestId("hero-post-image-YES").className;
+		const withImg = screen.getByTestId("hero-post-image-YES");
+		const imgWrap = withImg.parentElement;
+		const imgCls = withImg.className;
 		cleanup();
 		renderHero({ yes: heroPost("YES"), no: null });
-		const emptyCls = screen.getByTestId("hero-post-image-empty-YES").className;
+		const empty = screen.getByTestId("hero-post-image-empty-YES");
+		const emptyWrap = empty.parentElement;
+		const emptyCls = empty.className;
 
-		for (const token of ["mt-2", "min-h-[40px]", "flex-1"]) {
-			expect(imgCls).toContain(token);
-			expect(emptyCls).toContain(token);
-		}
-		// ⛔ And neither box may acquire a FIXED height or a cap, which would
-		// re-introduce a number the panel's height depends on.
+		// ⛔ BOTH are out of flow, so NEITHER can push the panel — the no-image
+		// case and the image case are the same box because neither is a box at
+		// all as far as the panel's height is concerned.
 		for (const cls of [imgCls, emptyCls]) {
+			expect(cls).toContain("absolute");
+			expect(cls).toContain("inset-0");
+		}
+
+		// ⛔⛔ AND THE WRAPPER — the element that IS the box — is identical for
+		// both, carrying the shipped `mt-2 min-h-[40px] flex-1` and the
+		// `relative` that the `inset-0` above is measured against. Without
+		// `relative` the images would position against some ancestor further up
+		// and the panel would lose its picture entirely, so it is pinned here
+		// rather than left implicit.
+		for (const wrap of [imgWrap, emptyWrap]) {
+			const cls = wrap?.className ?? "";
+			expect(cls).toContain("relative");
+			for (const token of ["mt-2", "min-h-[40px]", "flex-1"]) {
+				expect(cls).toContain(token);
+			}
+			// ⛔ No FIXED height and no cap — either would re-introduce a number
+			// the panel's height depends on, which is what §3 removed.
 			expect(/(^|\s)h-\[/.test(cls)).toBe(false);
 			expect(/(^|\s)max-h-/.test(cls)).toBe(false);
 		}
+		expect(imgWrap?.className).toBe(emptyWrap?.className);
 	});
 
 	it("render::cs13-the-hero-market-panel-is-keyboard-operable-AND-visibly-focused", () => {
