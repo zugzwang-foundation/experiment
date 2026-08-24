@@ -122,6 +122,42 @@ export function newRemovedPost(over: {
 	};
 }
 
+/**
+ * ⛔⛔ THE ROW THE TYPE SAYS CANNOT EXIST, CARRYING A BODY — SC-1's positive
+ * specimen. `newRemovedPost` above carries no body at all, so an assertion that
+ * its body is absent is an assertion about nothing. This one is built through a
+ * cast precisely so the guard has withheld content to fail to find: if the
+ * masking narrowing ever loosened, THIS is the string that would appear on
+ * screen.
+ *
+ * ⚠ It models a real failure, not a fantasy: the server emitting a removed
+ * variant that still carries its columns is exactly what a regression in
+ * `loadDebateView`'s union construction would produce.
+ */
+export const WITHHELD_SENTINEL = "WITHHELD-BODY-SENTINEL";
+
+export function newRemovedPostCarryingBody(over: {
+	id: string;
+	ordinal: number;
+	sideAtPostTime: "YES" | "NO";
+}): DebatePost {
+	// ⚠⚠ A FULLY RENDERABLE PRESENT ROW, FLAGGED REMOVED — and it has to be fully
+	// renderable or the guard reds for the WRONG REASON. Built from the removed
+	// variant alone it has no `author`, so a loosened narrowing crashes inside
+	// `ArgProfile` on `pfpUrl` instead of putting the withheld text on screen:
+	// a red that says "something broke" where the guard needs to say "the body
+	// reached the document" (O-3 — a true refusal with a misleading cause is a
+	// defect). Built this way, removing the narrowing renders the card and the
+	// sentinel assertion fires on its own terms.
+	return {
+		...newPost(over),
+		removed: true,
+		title: WITHHELD_SENTINEL,
+		body: WITHHELD_SENTINEL,
+		teaser: WITHHELD_SENTINEL,
+	} as unknown as DebatePost;
+}
+
 /** A present depth-1 reply. */
 export function newReply(over: {
 	id: string;

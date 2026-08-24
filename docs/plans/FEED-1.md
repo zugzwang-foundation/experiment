@@ -272,11 +272,26 @@ by reverting the fence and reading the red.)*
 On dismiss: `posted` and `openSide`/`openReply` clear together ⇒ the slot exits at 260 ms, the
 freeze releases, the poll resumes and fires its immediate refresh. All existing behaviour.
 
-⚠ **The stale-column option, logged and NOT built** (the brief asks for exactly this): while
-confirmed, the poll is suspended, so the column is stale for that reader. Correct for a short
-look, wrong for a long one. A bound without a timer exists — release the poll (but not the
-freeze) once the confirmation has been on screen for one poll interval — but it costs a round
-trip and would break the §1 budget. **Not built. Logged.**
+⚠⚠ **The stale-column option, logged and NOT built — and `@security-auditor` gave it a second,
+better reason.** While confirmed, the poll is suspended, so the column is stale for that reader.
+Correct for a short look, wrong for a long one. A bound without a timer exists — release the
+poll (but not the freeze) once the confirmation has been on screen for one poll interval — but
+it costs a round trip and would break the §1 budget. **Not built. Logged.**
+
+> ⛔ **THE MODERATION ARGUMENT, WHICH IS THE ONE THAT MIGHT ACTUALLY DECIDE IT.** The auditor
+> verified there is **no other reachable `router.refresh()` on `/m/[slug]`** while the arm is
+> held — no interval, no visibility-resume, nothing. So a confirmation freezes that
+> participant's view of **every** comment on the surface, not only their own, at the
+> `loadDebateView` snapshot taken when the bet was placed. A `content_removed` action taken
+> after that read never reaches that screen until they dismiss.
+> ⚠ **It is NOT a masking bypass** — nothing renders that was not masked at read time, and the
+> confirmation self-corrects the instant any payload does arrive, because `posted` stores a
+> `commentId` and not a node. And an indefinite freeze was already reachable by leaving a
+> composer open. **What changed is that it is now the DEFAULT post-bet state rather than an
+> opt-in**, and it ends only on an explicit user action. Pre-FEED-1 a removal was masked within
+> one poll interval (15 s) of a successful bet.
+> ⇒ **Founder call, not a code fix.** Recorded here rather than in an appendix so whoever
+> reconsiders the poll-release option reads both reasons at once (O-5).
 
 ### RF-6 · Copy
 

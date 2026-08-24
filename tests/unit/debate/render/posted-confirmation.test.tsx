@@ -66,8 +66,10 @@ import {
 	modelWithReply,
 	newPost,
 	newRemovedPost,
+	newRemovedPostCarryingBody,
 	newReply,
 	placeOk,
+	WITHHELD_SENTINEL,
 } from "./_posted-fixtures";
 
 const POSTED_ID = "cmt-just-posted";
@@ -394,6 +396,41 @@ describe("FEED-1 — the confirmed state renders the REAL post", () => {
 		// text somewhere else on the surface.
 		expect(document.body.innerHTML).not.toContain(TITLE);
 	});
+});
+
+it("posted::a-removed-row-that-STILL-CARRIES-a-body-never-puts-it-on-screen", async () => {
+	// ⛔⛔ SC-1's SECOND OBLIGATION, AT THE RENDER LAYER. The sibling case above
+	// uses a removed row with no body, so it can only assert the ROW's absence
+	// — and a row-level assertion does not catch a second read path that draws
+	// the text somewhere else. This one hands the view a row that is removed
+	// AND carries withheld text, and asserts the TEXT never reaches the
+	// document. `find-posted.test.ts` pins the same specimen one layer down at
+	// the return value; both layers now hold.
+	const fetchStub = stubWireFetch([placeOk(POSTED_ID)]);
+	const { rerender } = render(view(baseModel()));
+	await placeMarketBet(fetchStub);
+
+	rerender(
+		view(
+			modelWithPost(
+				newRemovedPostCarryingBody({
+					id: POSTED_ID,
+					ordinal: 7,
+					sideAtPostTime: "YES",
+				}),
+			),
+		),
+	);
+	act(() => {
+		vi.advanceTimersByTime(400);
+	});
+
+	expect(
+		document.body.innerHTML,
+		"a withheld body must not reach the document by ANY path",
+	).not.toContain(WITHHELD_SENTINEL);
+	expect(confirmation()).toBeNull();
+	expect(slot()).toBeNull();
 });
 
 describe("FEED-1 — every path out terminates", () => {
@@ -776,6 +813,31 @@ describe("FEED-1 — the surface holds still while the author reads", () => {
 			"the column advances once released — so its stillness above was the freeze",
 		).not.toBe(released);
 	});
+});
+
+it("posted::a-receipt-naming-the-WRONG-KIND-closes-the-slot-instead-of-hanging", async () => {
+	// ⛔⛔ THE ARM-BLIND HANG. The reply arm can only render a REPLY. A receipt
+	// whose `commentId` named a top-level post produced a found node this arm
+	// could not show — so the slot stayed on the composer, and a fallback that
+	// asked "was a node found?" rather than "does THIS ARM have something to
+	// show?" early-returned and never closed it. The author sat in the wait
+	// state permanently.
+	// ⚠ It takes a wrong server receipt to reach, which is why it is not a
+	// scenario so much as a promise: no receipt, however wrong, may strand
+	// someone on this surface.
+	const fetchStub = stubWireFetch([placeOk(PARENT_ID)]);
+	const { rerender } = render(view(baseModel(), PARENT_ID));
+	await placeReplyBet(fetchStub);
+
+	// A payload lands. `cmt-p1` IS in it — as a top-level post, which the reply
+	// arm has no way to render.
+	rerender(view(modelUnchanged(), PARENT_ID));
+	act(() => {
+		vi.advanceTimersByTime(400);
+	});
+
+	expect(confirmation()).toBeNull();
+	expect(slot(), "closed, not hung").toBeNull();
 });
 
 describe("FEED-1 — both arms, one implementation", () => {

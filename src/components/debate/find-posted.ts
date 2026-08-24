@@ -53,7 +53,13 @@ export function findPostedNode(args: {
 }): PostedNode | null {
 	const post = args.posts.find((p) => p.id === args.commentId);
 	if (post !== undefined) {
-		return post.removed ? null : { kind: "post", post };
+		// ⚠ `=== false`, NOT a truthiness test. At the type level `removed` is
+		// `true | false` and either form narrows; at RUNTIME a row arriving with
+		// `undefined` would pass a truthiness check and be returned as PRESENT.
+		// This file exists to be the one auditable place the narrowing happens, so
+		// it takes the fail-closed form — the same posture the moderation gate
+		// itself has (ADR-0014: fail closed on a terminal error).
+		return post.removed === false ? { kind: "post", post } : null;
 	}
 	if (args.parent === null) {
 		return null;
@@ -68,5 +74,6 @@ export function findPostedNode(args: {
 	if (reply === undefined) {
 		return null;
 	}
-	return reply.removed ? null : { kind: "reply", reply };
+	// Fail-closed, for the reason given above.
+	return reply.removed === false ? { kind: "reply", reply } : null;
 }

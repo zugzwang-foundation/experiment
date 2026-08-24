@@ -576,20 +576,43 @@ export function DebateView({
 		: null;
 
 	/**
+	 * ⚠⚠ THE REFRESH-LANDED SIGNAL, ASSERTED WHERE THE RENDER READS IT. `model` is
+	 * deserialized from the RSC payload, so it takes a new object identity exactly
+	 * when a new payload is applied and at no other time.
+	 *
+	 * ⛔ IT GATES THE RENDER, NOT ONLY THE FALLBACK, AND THAT IS A CORRECTION.
+	 * `@security-auditor` measured that the confirmation would render off ANY
+	 * model in hand: hand the view a model that already carries the id the receipt
+	 * will name, and the confirmed state appears with zero refreshes landed. It is
+	 * untriggerable today for two reasons that are nowhere written down — a
+	 * genuinely new comment cannot be in the pre-bet model, and the suspended poll
+	 * means no other payload can arrive — and the SECOND of those dies the moment
+	 * anyone releases the poll during the confirmed state (the option RF-5 logs as
+	 * considered). ⇒ Stated once, here, so the render depends on the same fact its
+	 * docblock claims it does.
+	 */
+	const refreshLanded = posted !== null && model !== posted.fromModel;
+
+	/**
 	 * FEED-1 — the author's just-posted comment, FOUND in the refreshed model.
 	 * `null` until the new payload arrives, and `null` forever if it arrives
 	 * without the comment (removed between post and refresh, masked, or simply
 	 * absent) — `findPostedNode` returns the PRESENT variant or nothing, so the
 	 * confirmed render cannot be reached with withheld content.
+	 *
+	 * ⚠ RE-DERIVED FROM THE CURRENT `model` ON EVERY RENDER, never cached into
+	 * state, and that is what makes the masking self-correcting: `posted` holds a
+	 * `commentId` and NOT a node, so a later payload that masks the comment takes
+	 * it off screen in the same commit. Caching the resolved node here — which is
+	 * exactly what the pop-up slots do with `popupPost` — would destroy that.
 	 */
-	const postedNode =
-		posted !== null
-			? findPostedNode({
-					posts,
-					parent: selectedPost,
-					commentId: posted.commentId,
-				})
-			: null;
+	const postedNode = refreshLanded
+		? findPostedNode({
+				posts,
+				parent: selectedPost,
+				commentId: posted.commentId,
+			})
+		: null;
 	const postedPost =
 		postedNode !== null && postedNode.kind === "post" ? postedNode.post : null;
 	const postedReply =
@@ -613,18 +636,31 @@ export function DebateView({
 	 * it costs shows the composer's own in-flight state, which is what was already
 	 * on screen.
 	 */
-	// ⚠ A BOOLEAN IN THE DEPS, NOT THE NODE. `findPostedNode` allocates a fresh
-	// object every render, so depending on the node re-subscribes this effect on
-	// every commit while a confirmation is up — a dependency that can never be
-	// stable, which is the shape `reportSlotOccupied`'s own docblock argues
-	// against above. The body only ever asks whether it is null.
-	const postedFound = postedNode !== null;
+	/**
+	 * ⛔⛔ SCOPED TO THE ARM THAT IS ACTUALLY SHOWING, NOT TO "a node was found",
+	 * AND THAT DISTINCTION IS A HANG. The reply arm consumes only `postedReply`
+	 * and the market arm only `postedPost`. A receipt whose `commentId` named a
+	 * TOP-LEVEL POST while the reply arm was engaged therefore produced a found
+	 * node the engaged arm could not render: the slot stayed on the composer, and
+	 * a kind-agnostic `postedNode !== null` made the fallback below early-return
+	 * and never close it. The author sat in the wait state permanently, released
+	 * only by Escape. Asking whether THIS ARM has something to show is the same
+	 * question the render asks, so the two cannot disagree.
+	 *
+	 * ⚠ A BOOLEAN IN THE DEPS, NOT THE NODE. `findPostedNode` allocates a fresh
+	 * object every render, so depending on the node re-subscribes this effect on
+	 * every commit while a confirmation is up — a dependency that can never be
+	 * stable, which is the shape `reportSlotOccupied`'s own docblock argues
+	 * against above.
+	 */
+	const postedShown =
+		selectedPost !== null ? postedReply !== null : postedPost !== null;
 	useEffect(() => {
-		if (posted === null || model === posted.fromModel || postedFound) {
+		if (posted === null || !refreshLanded || postedShown) {
 			return;
 		}
 		dismissPosted();
-	}, [posted, model, postedFound, dismissPosted]);
+	}, [posted, refreshLanded, postedShown, dismissPosted]);
 
 	/**
 	 * ⚠⚠ FEED-1 — THE AUTHOR'S FIRST TOUCH ELSEWHERE DISMISSES. The `×` is the

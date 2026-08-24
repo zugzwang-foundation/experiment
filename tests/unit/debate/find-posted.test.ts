@@ -129,6 +129,19 @@ describe("findPostedNode — top-level posts", () => {
 		expect(JSON.stringify(found)).not.toContain("WITHHELD-BODY-SENTINEL");
 		expect(JSON.stringify(found)).not.toContain("WITHHELD-TITLE-SENTINEL");
 	});
+	it("find-posted::a-row-whose-removed-flag-is-MISSING-is-treated-as-removed", () => {
+		// ⛔ FAIL-CLOSED, and this is the case that distinguishes `removed === false`
+		// from a truthiness test. At the type level `removed` is `true | false` and
+		// either form narrows identically; at RUNTIME a row arriving without the
+		// field — a regression in the union construction, a hand-built payload —
+		// passes a truthiness check and is returned as PRESENT. Masking is the one
+		// place in this file where "probably fine" is not a posture.
+		const noFlag = { ...POST_A, removed: undefined } as unknown as DebatePost;
+		expect(
+			findPostedNode({ posts: [noFlag], parent: null, commentId: "cmt-a" }),
+			"an unstated removal is a removal",
+		).toBeNull();
+	});
 });
 
 describe("findPostedNode — replies under the focused post", () => {
