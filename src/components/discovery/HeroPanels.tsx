@@ -344,8 +344,30 @@ function HeroPostPanel({
 			    ⛔ `object-contain`, NEVER `object-cover` (founder wall: no crop).
 			    `cover` filled the box by cropping — on a portrait attachment most
 			    of the picture was simply not shown. `contain` fits the whole
-			    picture inside the box and letterboxes the remainder against the
-			    `bg-n1` the box already carried.
+			    picture inside the box and letterboxes the remainder.
+
+			    ⛔⛔ CS14 §4 — AND THE LETTERBOX IS NOW INVISIBLE, BECAUSE THE
+			    LOADED IMAGE CARRIES NO FILL. `object-contain` leaves bars
+			    wherever the picture's aspect ratio differs from the box's, and
+			    the `<img>` used to paint `bg-n1` behind them — so a portrait
+			    attachment read as a small picture mounted on a grey card rather
+			    than as the picture itself. Measured on staging at `0f04272`, the
+			    482×638 portrait in the NO panel at a 1440×900 frame: image box
+			    321.7 wide, picture 205.7 wide, i.e. 58.0px of `#2a2a2a` — 29.0px
+			    down each side. Dropping the fill lets the panel's own `bg-n0`
+			    show through and the bars stop reading as an object.
+
+			    ⛔ THE PLACEHOLDER KEEPS ITS WELL, and the two arms are separate
+			    class strings, so this is a one-word difference rather than a
+			    conditional: with NO image there must still be a visible box, or
+			    the empty state becomes nothing at all. `bg-n1` stays on the
+			    fallback below and is gone from the image above — that IS the
+			    distinction, and a test asserts both halves so neither can drift
+			    into the other.
+
+			    ⚠ THE HAIRLINE IS DELIBERATELY LEFT ON BOTH. It outlines the box,
+			    not the picture, and removing it is a second visual change nobody
+			    ruled on. Reported rather than taken.
 
 			    ⚠ The FALLBACK takes the same `absolute inset-0`, so the no-image
 			    case and the image case are the SAME box by construction rather
@@ -357,7 +379,7 @@ function HeroPostPanel({
 					// The argument text carries the meaning and the post title is
 					// adjacent, so the attachment is decorative here (WCAG 1.1.1).
 					alt=""
-					className="absolute inset-0 h-full w-full rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]"
+					className="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]"
 					fallback={
 						<div
 							data-testid={`hero-post-image-empty-${side}`}

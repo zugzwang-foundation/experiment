@@ -316,9 +316,26 @@ const HERO_THUMB_NULL =
  * ⛔ The 52px/54px MARKET thumbs above KEEP `object-cover`, deliberately. They
  * are small fixed-size squares where filling the frame is right and there is no
  * height to protect; only the post attachment — the box that grows — changed.
+ *
+ * ⚠⚠ RE-POINTED AGAIN AT UI-QUICK CS14 §4, and ONLY the LOADED literal moved:
+ * `bg-n1` is gone from the image and STAYS on the placeholder. That asymmetry
+ * is the change, not a drift in it — see `paint-distinction` below, which
+ * asserts the difference directly so this pair cannot quietly re-converge.
+ * `object-contain` letterboxes whenever the picture's ratio differs from the
+ * box's, and the fill turned those bars into a grey card the picture appeared
+ * to sit on. Measured on staging at `0f04272`, the 482×638 portrait at a
+ * 1440×900 frame: box 321.7 wide, picture 205.7 wide → 58.0px of `#2a2a2a`,
+ * 29.0px a side. With no fill the panel's own `bg-n0` shows through instead.
+ *
+ * ⚠ The two literals no longer move TOGETHER — the note above says they must,
+ * and that was true while the only changes were POSITIONING ones, where a
+ * one-sided edit would have left the two cases different BOXES. This edit is
+ * a PAINT one and is deliberately one-sided: the box geometry (`absolute
+ * inset-0`, radius, hairline) is still byte-identical across both arms, which
+ * is the property that note was protecting.
  */
 const POST_IMAGE_LOADED = (side: "YES" | "NO") =>
-	`<img data-testid="hero-post-image-${side}" alt="" class="absolute inset-0 h-full w-full rounded-[var(--imgr)] bg-n1 object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
+	`<img data-testid="hero-post-image-${side}" alt="" class="absolute inset-0 h-full w-full rounded-[var(--imgr)] object-contain [border:var(--hairline)]" src="https://signed.test/uploads/u/x/arg.webp">`;
 const POST_IMAGE_NULL = (side: "YES" | "NO") =>
 	`<div data-testid="hero-post-image-empty-${side}" aria-hidden="true" class="absolute inset-0 flex items-center justify-center rounded-[var(--imgr)] bg-n1 font-mono text-[9px] tracking-[0.18em] text-n4 [border:var(--hairline)]">IMG</div>`;
 
@@ -440,6 +457,50 @@ describe("§8.1 zero-delta — the hero POST image, at BOTH poles", () => {
 			expect(postSlot(container, side)).toBe(POST_IMAGE_NULL(side));
 		});
 	}
+
+	it("cs14-paint-distinction::the-WELL-is-the-placeholder's-alone", () => {
+		// ⛔⛔ CS14 §4 — THE ONE ASSERTION THAT STATES THE RULE RATHER THAN A
+		// SNAPSHOT OF IT. The byte pins above would both still pass if a later
+		// edit put `bg-n1` back on the image AND updated the literal to match;
+		// they record what the DOM is, not what must remain true of it. This
+		// says the thing directly, in both directions, so neither arm can drift
+		// into the other:
+		//
+		//   · a LOADED image carries NO fill, so `object-contain`'s letterbox
+		//     bars fall away against the panel and the picture stops reading as
+		//     mounted on a grey card;
+		//   · a PLACEHOLDER keeps its well, because with no image there must
+		//     still be a visible box — otherwise the empty state is nothing at
+		//     all, which is the failure this half exists to prevent.
+		//
+		// ⚠ Asserted on BOTH poles: the panels are independent instances and a
+		// one-sided regression is exactly what a shared literal would hide.
+		for (const side of ["YES", "NO"] as const) {
+			const loaded = renderPosts(POST_IMAGE_URL);
+			const loadedCls =
+				loaded.container
+					.querySelector(`[data-testid="hero-post-image-${side}"]`)
+					?.getAttribute("class") ?? "";
+			expect(loadedCls).not.toMatch(/(^|\s)bg-/);
+			loaded.unmount();
+
+			const empty = renderPosts(null);
+			const emptyCls =
+				empty.container
+					.querySelector(`[data-testid="hero-post-image-empty-${side}"]`)
+					?.getAttribute("class") ?? "";
+			expect(emptyCls).toContain("bg-n1");
+			empty.unmount();
+
+			// …and the BOX itself is unchanged across the two arms — the geometry
+			// the CS13 out-of-flow fix depends on. Only the PAINT differs, which
+			// is what makes this a one-word change rather than a second box.
+			for (const geometry of ["absolute", "inset-0", "rounded-[var(--imgr)]"]) {
+				expect(loadedCls).toContain(geometry);
+				expect(emptyCls).toContain(geometry);
+			}
+		}
+	});
 
 	it("one-pole-failing-does-not-blank-the-other", () => {
 		// The panels hold INDEPENDENT MarketThumb instances. A shared or hoisted
