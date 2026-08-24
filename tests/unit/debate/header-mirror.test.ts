@@ -62,8 +62,17 @@ describe("§5 the header mirrors the composing side", () => {
 		const tag = slotHeaderTag();
 
 		// ⛔⛔ THE BINDING RULE, ASSERTED PROP BY PROP.
+		// ⚠⚠ RE-POINTED AT CS12 §3, AND THE RULE IS UNCHANGED — ITS SURFACE
+		// SHRANK. The mirrored header no longer renders a Buy or a Sell, so the
+		// "mirrored CONTROL binds to openSide" claim has no control left to bind.
+		// What it protected is still here and still worth pinning: the label, the
+		// percent, the odds and the position readout are ALL derived from the ONE
+		// `side` prop, so this single assertion still binds every side-keyed thing
+		// the mirrored header renders.
 		expect(tag).toContain("side={headerSide}");
-		// The Buy handler — the control that opens/closes a bet on a side.
+		// ⛔ THE HANDLER IS STILL PINNED, and it is NOT vestigial: the header that
+		// is NOT hosting keeps its Buy, and this is the prop that makes clicking it
+		// act on the composing side. Suppression is per-column; the binding is not.
 		expect(tag).toContain("onToggleEntry={() => toggleEntry(headerSide)}");
 		// 3a — the open state. Both headers must show the SAME open fill, so this
 		// compares against the mirrored side, not the column.
@@ -76,6 +85,56 @@ describe("§5 the header mirrors the composing side", () => {
 		expect(tag).not.toContain("side={side}");
 		expect(tag).not.toContain("toggleEntry(side)");
 		expect(tag).not.toContain("openSide === side");
+	});
+
+	it("header-mirror::the-HOSTING-column-renders-no-buy-and-no-sell", () => {
+		// ⛔⛔ CS12 §1, founder ruling. The mirrored header — the one sitting
+		// directly above the composer — keeps the composing side's label, percent,
+		// odds and position, and loses both controls.
+		// ⚠ THE CONDITION IS DERIVED PER RENDER, NEVER STORED. `openSide !== null
+		// && side === opposite(openSide)` is recomputed every time, so closing the
+		// composer restores the controls with no reset step that could be missed.
+		// A stored flag is how a suppression becomes permanent by accident.
+		// ⚠ Matched as a REGEX: the declaration wraps across lines and biome may
+		// re-indent it, so a literal string would pin formatting rather than the
+		// rule. The whitespace class is what makes this survive a reformat.
+		expect(source).toMatch(
+			/const hostingComposer =\s*openSide !== null && side === opposite\(openSide\);/,
+		);
+		expect(slotHeaderTag()).toContain("showControls={!hostingComposer}");
+
+		// ⛔ THE REAL HEADER KEEPS ITS CONTROLS, and that is the half that matters
+		// most: its Buy is the toggle-closed affordance. Suppressing on
+		// `openSide !== null` alone — rather than on hosting — would strip BOTH
+		// headers and leave the × as the only exit. The `side === opposite(...)`
+		// clause above is what prevents that, so it is asserted rather than
+		// assumed.
+		expect(source).toContain("side === opposite(openSide)");
+	});
+
+	it("header-mirror::the-REPLY-arm-suppresses-on-the-same-condition", () => {
+		// One rule, both arms. The reply arm's map already had this column under
+		// the name `hostsComposer`; the strip takes the same prop rather than a
+		// second mechanism that could drift.
+		const strip = /<PositionStrip[\s\S]*?\/>/.exec(source)?.[0] ?? "";
+		expect(strip).toContain("showControls={!hostsComposer}");
+		expect(source).toMatch(
+			/const hostsComposer =\s*openReply !== null && side === composerColumn;/,
+		);
+	});
+
+	it("header-mirror::the-suppression-is-OPT-OUT-so-nothing-else-loses-controls", () => {
+		// `showControls` defaults TRUE in both components, so every other consumer
+		// — and both headers whenever no composer is open — is unaffected by
+		// construction rather than by each call site remembering to pass it.
+		for (const f of [
+			"src/components/debate/composer/SlotHeader.tsx",
+			"src/components/debate/composer/PositionStrip.tsx",
+		]) {
+			expect(readFileSync(join(ROOT, f), "utf8")).toContain(
+				"showControls = true,",
+			);
+		}
 	});
 
 	it("header-mirror::SlotHeader-derives-everything-from-its-ONE-side-prop", () => {

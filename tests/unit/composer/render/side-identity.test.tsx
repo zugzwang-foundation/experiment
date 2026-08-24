@@ -131,14 +131,31 @@ describe("§0d the value survives the opposite-column mount", () => {
 	});
 
 	it("side-identity::opposite-is-used-ONLY-to-choose-the-host-column", () => {
-		// Two call sites, both positional: the market arm's `hosts` predicate and
-		// the reply arm's `composerColumn`. If a third appears, this reddens and
-		// the new one must be read before it is accepted.
+		// Call sites, ALL positional — each one chooses a COLUMN, none transforms
+		// a bet's side. If a new one appears, this reddens and it must be read
+		// before it is accepted.
+		//
+		// ⚠⚠ THAT IS EXACTLY WHAT HAPPENED AT CS12, and it is why the count is
+		// pinned rather than the predicate alone. The count went 2 → 3 when the
+		// mirrored header learned to suppress its own controls:
+		//   `const hostingComposer = openSide !== null && side === opposite(openSide)`
+		// It was READ before being accepted, and it is the same class as the other
+		// two — it answers "is THIS COLUMN the host?", never "which side is being
+		// bet?". Accepted and enumerated below.
+		//
+		// ⛔ THE NEGATIVE IS THE PART THAT ACTUALLY GUARDS INV-3, and it is
+		// untouched: `side={opposite(` must never appear, so no `opposite()` may
+		// reach a value handed down as a side. Raising the count admits a new
+		// POSITIONAL use; it admits nothing about the value.
 		const uses = VIEW.match(/opposite\(/g) ?? [];
-		expect(uses).toHaveLength(2);
+		expect(uses).toHaveLength(3);
 		expect(VIEW).toContain("side === opposite(openSide)");
 		expect(VIEW).toContain(
 			"const composerColumn = opposite(selectedPost.sideAtPostTime)",
 		);
+		expect(VIEW).toMatch(
+			/const hostingComposer =\s*openSide !== null && side === opposite\(openSide\);/,
+		);
+		expect(VIEW).not.toContain("side={opposite(");
 	});
 });

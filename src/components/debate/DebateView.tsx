@@ -659,6 +659,10 @@ export function DebateView({
 											viewer={viewer}
 											ownPseudonym={ownPseudonym}
 											slug={market.slug}
+											// §1, the reply arm — `hostsComposer` is this map's own
+											// name for the same condition the market arm calls
+											// `hostingComposer`: the column the composer opens in.
+											showControls={!hostsComposer}
 										/>
 									}
 								>
@@ -765,6 +769,12 @@ export function DebateView({
 							// while a composer is open it is the composing side, for BOTH
 							// columns (the host mirrors, the opener already matches).
 							const headerSide = openSide ?? side;
+							// §1 — this column is HOSTING the composer, so its header is the
+							// mirrored one and drops its Buy and Sell. ⛔ The column whose OWN
+							// side is the composing side is not hosting and keeps both — its
+							// Buy is the toggle-closed affordance.
+							const hostingComposer =
+								openSide !== null && side === opposite(openSide);
 							return (
 								<DebateColumn
 									key={side}
@@ -828,6 +838,7 @@ export function DebateView({
 												marketOpen={marketOpen}
 												suspended={suspended}
 												composerOpen={openSide === headerSide}
+												showControls={!hostingComposer}
 												onToggleEntry={() => toggleEntry(headerSide)}
 												ownPseudonym={ownPseudonym}
 												slug={market.slug}

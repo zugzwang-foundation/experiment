@@ -55,6 +55,7 @@ export function SlotHeader({
 	onToggleEntry,
 	ownPseudonym,
 	slug,
+	showControls = true,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
@@ -69,6 +70,18 @@ export function SlotHeader({
 	ownPseudonym: string | null;
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
+	/**
+	 * ⚠⚠ change set 12 §1 — FALSE ON THE COLUMN THAT IS HOSTING A COMPOSER.
+	 * Founder ruling: the mirrored header keeps the composing side's label,
+	 * percent, odds and position readout, and loses its Buy and its Sell.
+	 * ⛔ SCOPED TO THE HOSTING STATE, NEVER PERSISTENT. It is derived per render
+	 * from `openSide`/`openReply`, so closing the composer restores the controls
+	 * with no reset step to forget.
+	 * ⛔ THE REAL HEADER IS UNTOUCHED — the column whose own side IS the
+	 * composing side keeps both. Its Buy is the toggle-closed affordance, and
+	 * removing it would leave the × as the only way out.
+	 */
+	showControls?: boolean;
 }) {
 	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
@@ -83,24 +96,26 @@ export function SlotHeader({
 	return (
 		<div className="flex items-center justify-between gap-2 rounded-(--r) px-3.5 py-2 shadow-(--elev-1) [border:var(--hairline)]">
 			<div className="flex items-center gap-3">
-				<Button
-					variant="outline"
-					size="sm"
-					disabled={entryDisabled}
-					aria-disabled={entryDisabled}
-					aria-expanded={composerOpen}
-					aria-label={c3 ?? `Buy ${side}`}
-					title={c3 ?? undefined}
-					onClick={onToggleEntry}
-					// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
-					// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
-					// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
-					// button's 13px / `7px 14px` / 34px geometry is the values-log §1
-					// item 6 ruling and is deliberately NOT replaced by d5's 10px.
-					className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
-				>
-					Buy
-				</Button>
+				{showControls ? (
+					<Button
+						variant="outline"
+						size="sm"
+						disabled={entryDisabled}
+						aria-disabled={entryDisabled}
+						aria-expanded={composerOpen}
+						aria-label={c3 ?? `Buy ${side}`}
+						title={c3 ?? undefined}
+						onClick={onToggleEntry}
+						// ⚠ `uppercase tracking-[0.06em]` — d5's `.tradebtn`/`.sellbtn`
+						// (`d5:559`) are `text-transform:uppercase;letter-spacing:.06em`, and
+						// the mockup renders `BUY` / `SELL`. CASE AND TRACKING ONLY: the
+						// button's 13px / `7px 14px` / 34px geometry is the values-log §1
+						// item 6 ruling and is deliberately NOT replaced by d5's 10px.
+						className="h-auto min-h-[34px] px-3.5 py-[7px] text-[13px] tracking-[0.06em] uppercase"
+					>
+						Buy
+					</Button>
+				) : null}
 				{unit !== null && (
 					/* ⚠ `.poslab` (`d5:556`) — `font-weight:800;letter-spacing:.12em;
 					   text-transform:uppercase`. The market arm read `To win` in
@@ -178,7 +193,12 @@ export function SlotHeader({
 						    `h-auto min-h-[34px] px-3.5 py-[7px] text-[13px]` — copied off
 						    the entry button 60 lines up, never re-derived, so the two
 						    cannot drift apart again. */}
-						{ownPseudonym !== null ? (
+						{/* ⛔ change set 12 §1 — ONLY THE SELL IS GATED HERE. The
+						    `YOUR POSITION` readout above stays: the ruling removes the
+						    two CONTROLS from a hosting header, not its readouts, and a
+						    mirrored header that dropped the position would be hiding
+						    information the composer above it is about to act on. */}
+						{!showControls ? null : ownPseudonym !== null ? (
 							<Link
 								data-testid="w210c-sell-link"
 								href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}

@@ -26,6 +26,7 @@ export function PositionStrip({
 	viewer,
 	ownPseudonym,
 	slug,
+	showControls = true,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
@@ -35,6 +36,18 @@ export function PositionStrip({
 	ownPseudonym: string | null;
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
+	/**
+	 * ⚠⚠ change set 12 §1 — FALSE ON THE COLUMN THAT IS HOSTING A COMPOSER.
+	 * Founder ruling: the mirrored header keeps the composing side's label,
+	 * percent, odds and position readout, and loses its Buy and its Sell.
+	 * ⛔ SCOPED TO THE HOSTING STATE, NEVER PERSISTENT. It is derived per render
+	 * from `openSide`/`openReply`, so closing the composer restores the controls
+	 * with no reset step to forget.
+	 * ⛔ THE REAL HEADER IS UNTOUCHED — the column whose own side IS the
+	 * composing side keeps both. Its Buy is the toggle-closed affordance, and
+	 * removing it would leave the × as the only way out.
+	 */
+	showControls?: boolean;
 }) {
 	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
@@ -60,7 +73,13 @@ export function PositionStrip({
 			    preselected (OQ-5 B). Signed-out → non-interactive. */}
 			<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				{held && viewer?.position ? (
-					ownPseudonym !== null ? (
+					/* ⛔ change set 12 §1 — WHILE HOSTING, THE READOUT STAYS AND THE
+					   NAVIGATION GOES. Here the Sell affordance IS the readout's link
+					   rather than a separate control, so suppressing it falls through
+					   to the plain-text variant already below — same words, same
+					   figure, no click-through. There is no Buy on this strip, so
+					   that is the whole of the reply arm's suppression. */
+					showControls && ownPseudonym !== null ? (
 						<Link
 							data-testid="w210c-sell-link"
 							href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}
