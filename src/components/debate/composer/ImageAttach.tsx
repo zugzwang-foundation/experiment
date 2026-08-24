@@ -376,7 +376,27 @@ export function ImageAttach({
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the
 	// preview from driving the composer's height off the grid row.
 	const preview =
-		"aspect-[4/5] max-h-full min-h-0 w-full rounded-(--imgr) bg-n1";
+		// ⚠⚠ change set 10 §1 — THE ART'S HEIGHT IS CAPPED AND NO LONGER TRACKS
+		// THE PANEL'S WIDTH. `aspect-[4/5] w-full` made height a FUNCTION of
+		// width, so the composer grew taller on wider screens: measured 239.5px
+		// at 1280 and 279.5px at 1440, which is why the panel out-grew the right
+		// column and set the grid row.
+		// ⇒ `max-h-[224px]` CAPS it. ⛔ `aspect-[4/5]` STAYS — it is a ratified
+		// PROPORTION (this file's own docblock files it under "arrangement, not
+		// values") and it is pinned by `attach-preview.test.tsx`. Removing it was
+		// my first attempt and it reddened four guards, correctly: the fix is to
+		// bound the box, not to stop declaring its shape. Width still drives the
+		// height until the cap, and the cap replaces the looser `max-h-full`.
+		// The `<svg>` keeps its own `viewBox` and its
+		// DEFAULT `preserveAspectRatio="xMidYMid meet"`, so the drawing scales
+		// DOWN to fit, stays centred, and keeps its ratio — letterboxed, never
+		// stretched or squashed. ⛔ Not one coordinate, text node or viewBox value
+		// is touched; only the box the artwork is asked to fit into.
+		// ⚠ 224 is derived, not chosen: the right column measures 262.0, and the
+		// panel is 2 (border) + 24 (`p-3`) + the art. 224 puts the panel at 250 —
+		// under the right column at EVERY width, with 12px of headroom so the
+		// column keeps setting the row rather than the two trading places.
+		"aspect-[4/5] max-h-[224px] min-h-0 w-full rounded-(--imgr) bg-n1";
 	// The slot's CONTENT — the same node at both render sites below, so the
 	// preview is present while `attaching` too and never waits on the PUT.
 	//
@@ -517,10 +537,25 @@ export function ImageAttach({
 						onClick={() => inputRef.current?.click()}
 						className="flex min-h-0 w-full flex-1 flex-col items-center justify-center gap-2 rounded-(--imgr) transition-all hover:text-ink focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)"
 					>
+						{/* ⚠⚠ change set 10 §4 — THE STANDALONE `Image` LABEL IS REMOVED,
+						    founder ruling. The word already appears INSIDE the artwork as
+						    `Add Image`, so the panel said it twice.
+						    ⛔⛔ IT WAS NOT THE ACCESSIBLE NAME AND NOTHING IS LOST. This
+						    control's name comes from `aria-label={PICK_LABEL}` on the button
+						    itself, and the `<fieldset>` around it carries `ATTACH_LABEL` —
+						    both untouched. A screen reader is unaffected by this removal;
+						    only the duplicated visible word goes.
+						    ⚠ THE ATTACHING STATE KEEPS ITS READOUT. While a file is
+						    uploading the label carried the filename, and dropping that would
+						    have removed the only feedback that anything is happening. It now
+						    renders ONLY in that phase.
+						    ⚠ DIVERGES FROM `design-canon.md` §6, which names `Image` as this
+						    field's label — reported for routing, NOT amended (that document
+						    is web-authored). */}
 						{previewBox}
-						<span className="text-n5">
-							{state.phase === "attaching" ? `${state.name}…` : "Image"}
-						</span>
+						{state.phase === "attaching" ? (
+							<span className="text-n5">{`${state.name}…`}</span>
+						) : null}
 					</button>
 				)}
 				{state.phase === "error" && (
