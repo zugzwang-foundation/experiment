@@ -24,9 +24,18 @@ export const VIEWER: ViewerMarketContext = {
 	spendableToday: "100",
 };
 
-/** The minimal BetComposer prop set (post variant, YES slot). */
+/**
+ * The minimal BetComposer prop set (post variant, YES slot).
+ *
+ * ⚠ FEED-1 — `onPosted` is REQUIRED on the component and so it is required here.
+ * That is the point of it being required: making it optional would have let a
+ * host silently swallow every successful bet on a path only a real submit
+ * reaches. Nineteen call sites went red when it landed, which is the compile
+ * error doing the job a convention could not.
+ */
 export function composerProps(handlers?: {
 	onClose?: () => void;
+	onPosted?: (result: { commentId: string }) => void;
 	onSuspended?: () => void;
 }) {
 	return {
@@ -36,6 +45,7 @@ export function composerProps(handlers?: {
 		kind: "post" as const,
 		viewer: VIEWER,
 		onClose: handlers?.onClose ?? vi.fn(),
+		onPosted: handlers?.onPosted ?? vi.fn(),
 		onSuspended: handlers?.onSuspended ?? vi.fn(),
 	};
 }

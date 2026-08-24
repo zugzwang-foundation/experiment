@@ -74,6 +74,29 @@ function stakeFieldWidth(value: string): string {
 	return `${Math.max(2, value.length)}ch`;
 }
 
+/**
+ * The `commentId` off the §4.4 success envelope's `data`, which
+ * `parseWireResponse` deliberately leaves as `unknown`: the parser validates the
+ * ENVELOPE, and the payload inside it is still the wire — a trust boundary.
+ *
+ * ⚠ Narrowed in `envelope.ts`'s own `Record<string, unknown>` idiom rather than
+ * with a zod schema, because there is exactly ONE field to read and pulling a
+ * validator onto the composer's success path for one string would cost more
+ * than it guards. The `as` is a trust-boundary cast with this comment as its
+ * pair (AGENTS.md §4).
+ *
+ * ⛔ EMPTY STRING IS NOT A COMMENT ID. `typeof id === "string"` alone would let
+ * `""` through and send the host looking for a post that cannot exist, which
+ * would land on the fallback anyway — but by accident rather than by rule.
+ */
+function readCommentId(data: unknown): string | null {
+	if (typeof data !== "object" || data === null) {
+		return null;
+	}
+	const id = (data as Record<string, unknown>).commentId;
+	return typeof id === "string" && id.length > 0 ? id : null;
+}
+
 export function BetComposer(props: {
 	marketId: string;
 	slug: string;
@@ -94,6 +117,24 @@ export function BetComposer(props: {
 		postTitle: string | null;
 	};
 	onClose: () => void;
+	/**
+	 * FEED-1 — THE BET COMMITTED. Fired instead of `onClose` on a 200, handing the
+	 * host the one thing it needs to find the real post in the refreshed model.
+	 *
+	 * ⛔ REQUIRED, NOT OPTIONAL, DELIBERATELY. `onBusyChange` above is optional
+	 * because a host that ignores it merely loses a guard; a host that ignored
+	 * this one would swallow every successful bet's confirmation silently, on a
+	 * path that only runs after a real submit and that no type would complain
+	 * about. A missing required argument is a compile error (O-1: structural
+	 * beats procedural).
+	 *
+	 * ⚠ IT CARRIES THE `commentId` AND NOTHING ELSE. `PlaceResult` is stored
+	 * VERBATIM in `bet_receipts.result` for idempotent replay (ADR-0031), so its
+	 * shape is load-bearing far beyond this call site — widening it to carry
+	 * display fields is not a free edit, and is not needed: the host reads the
+	 * post from the model, not from the receipt.
+	 */
+	onPosted: (result: { commentId: string }) => void;
 	/** P2 terminal reached (Track A / banned): the view disables all entry controls. */
 	onSuspended: () => void;
 	/**
@@ -337,9 +378,27 @@ export function BetComposer(props: {
 		}
 		if (outcome.kind === "success") {
 			dispatchKey({ type: "OUTCOME", outcome: "success" });
-			// Success: close + refresh — the new post renders from the RSC model.
-			router.refresh();
-			props.onClose();
+			// ⛔ THE KEY LIFECYCLE IS SETTLED FIRST AND IS UNTOUCHED. Everything
+			// below this line is presentation; everything above it is the money
+			// path, and the order between them is not negotiable.
+			//
+			// ⚠⚠ FEED-1 — the host HOLDS the slot instead of closing it, so the
+			// author sees the post they just made rather than watching it vanish
+			// into a ranked column. The refresh moves to the host too: it is the
+			// host that has to know when the new model landed, and firing one here
+			// as well would be a second round trip for one bet.
+			const commentId = readCommentId(outcome.data);
+			if (commentId === null) {
+				// ⚠ THE ENVELOPE WAS OK BUT ITS PAYLOAD WAS NOT READABLE. The bet is
+				// COMMITTED — the 200 already said so — so this must never surface as
+				// an error. It degrades to the exact pre-FEED-1 behaviour: refresh,
+				// close, and the post lands in the column as it always did. SG-5
+				// posture: unknown input renders a state, never a crash.
+				router.refresh();
+				props.onClose();
+				return;
+			}
+			props.onPosted({ commentId });
 			return;
 		}
 		if (outcome.kind === "malformed") {
@@ -423,6 +482,21 @@ export function BetComposer(props: {
 	return (
 		<section
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
+			/**
+			 * ⚠⚠ FEED-1 — THE WAIT IS NOW ANNOUNCEABLE, AND IT NEEDED TO BE. After a
+			 * success the host HOLDS this composer mounted until the refreshed model
+			 * arrives, so its in-flight state stopped being a flicker and became the
+			 * primary post-submit view. `ErrorStrip` renders NOTHING for
+			 * `phase: "in_flight"`, so visually that window is a greyed motionless
+			 * form — and to an assistive technology it was previously indistinguishable
+			 * from an idle one.
+			 * ⛔ AN ARIA STATE, NOT A STRING. A progress LINE would need copy this
+			 * task has no mandate to author (canon §6 enumerates the composer's
+			 * strings and carries none for this); `aria-busy` is a state, adds no
+			 * text, and changes no logic — it reads the same `inFlight` the controls
+			 * already read. The visible affordance stays OWED.
+			 */
+			aria-busy={inFlight}
 			className="flex flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
 		>
 			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
