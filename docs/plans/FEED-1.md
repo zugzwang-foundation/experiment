@@ -1,5 +1,32 @@
 # FEED-1 — the author sees the post they just made
 
+> ⛔⛔ **SUPERSEDED — DO NOT BUILD FROM THIS PLAN.**
+>
+> The design specified below was built, shipped as **PR #400**, used by the founder, and then
+> **ruled the wrong shape**: a panel that had to be dismissed is friction, and it appeared on the
+> **wrong column** — a composer opens *opposite* the side being bet, so treating the composer's
+> column as the author's column put a YES argument on the NO side.
+>
+> **What replaced it (FEED-2, PR #401, merged):** when a bet succeeds the composer closes as it
+> always did, and when the refreshed payload lands the column **on the bet's own side** is pointed
+> at the author's card, in its true ranked position — no panel, no chrome, nothing to dismiss.
+>
+> **Still true and still load-bearing** — these survived FEED-2 unchanged and the reasoning below
+> is the reasoning for them:
+> `onPosted` / `readCommentId` · the `model !== posted.fromModel` refresh-landed signal · and
+> `findPostedNode` with its fail-closed `removed === false` masking narrowing, which matters **more**
+> under FEED-2, not less: a comment masked between submit and refresh must not be jumped to.
+>
+> **Dead below this line:** the confirmation panel, `PostedConfirmation.tsx`, `ComposerSlot`'s third
+> state, `POSTED_COPY`, `aria-busy`, and every dismissal mechanism (RF-1, RF-5, RF-6 and the
+> §5 guard rows that describe them). `PostedConfirmation.tsx` is not in the tree.
+>
+> ⚠ Two notes this plan raised are **discharged by deletion, not by amendment**: SPEC.1 §9's
+> "any bet composer is open" is literally true again, and design-canon §6's composer register is
+> back to canon because `POSTED_COPY` is gone.
+
+---
+
 **Branch** `feat/feed-1` · **Base** `06d417823de78ac6470525178219c82f6d8d6d12` (`origin/staging`)
 **Mode** autonomous overnight; no operator gate at any point.
 **PR target** `staging`, left unmerged.
