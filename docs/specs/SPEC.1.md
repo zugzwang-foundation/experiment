@@ -12,7 +12,7 @@
 
 *Thesis relevance: (b) operationally enabling.*
 
-- **Version:** 1.0.40 (semver; bump major on invariant changes)
+- **Version:** 1.0.41 (semver; bump major on invariant changes)
 - **Last updated:** 2026-08-25
 - **Authors:** The Zugzwang Authors
 - **Status:** Approved — locked at v1.0.0 by PRECURSOR.4 (fresh-session writer/reviewer review, NOT the SYNC.7 author, per CLAUDE.md; completed 2026-06-03); subsequent revisions bump patch/minor. Folds ADR-0017 (ranking model, supersedes ADR-0009), ADR-0018 (Dharma issuance + two-floor minimum bet), and ADR-0019 (RLS out of scope) on top of the v1.8.0 anchor.
@@ -804,6 +804,13 @@ The pseudonym and PFP are permanent. On `H2` scrub:
   - `users.tos_accepted_at` — timestamp of acceptance.
   - `users.tos_version_hash` — content hash of the ToS document the user was shown.
   - `users.privacy_version_hash` — content hash of the Privacy Policy the user was shown.
+
+    > ⚠ **2026-08-25 — not yet implemented.** The hashes are string literals
+    > in `src/server/auth/tos-versions.ts`. Deriving them from the document
+    > bodies is a LEGAL.1 obligation. Until it is discharged, swapping the
+    > document bodies would leave the recorded acceptance evidence describing
+    > the wrong text.
+
   - `users.tos_acceptance_ip` — IP address at acceptance time.
   - `users.tos_acceptance_user_agent` — User-Agent header at acceptance time.
 
@@ -811,7 +818,21 @@ The pseudonym and PFP are permanent. On `H2` scrub:
 
   This is the dispute-resolution record: which versions were accepted, by which client, when. Document version hashes are computed at deployment time and frozen; rendered alongside the documents on the acceptance screen for transparency (small footer text: "ToS v1.0 · `<hash>`"). ⚠ **Amended 2026-08-25**: the hashes are still computed at deployment time, still frozen, still written, and the footer line still renders on the acceptance screen — the documents it sits alongside are now one link away rather than inline.
 
-- **Mid-experiment ToS / Privacy Policy updates.** If the lawyer issues a revised ToS or Privacy Policy mid-experiment, the new version's hash differs from the user's stored hash. **No automatic re-prompt in v1** — the user remains on the version they accepted at signup. ADR-TOS-UPDATE governs the policy for any mid-experiment revision: whether existing users must re-accept, whether continued use constitutes acceptance, and how the change is communicated. In v1 we ship one ToS version and assume no mid-experiment revisions are needed (Q5 finalisation pre-launch); the ADR mechanism exists for exception cases.
+  > ⚠ **2026-08-25 — not yet implemented.** The hashes are string literals
+  > in `src/server/auth/tos-versions.ts`. Deriving them from the document
+  > bodies is a LEGAL.1 obligation. Until it is discharged, swapping the
+  > document bodies would leave the recorded acceptance evidence describing
+  > the wrong text.
+
+- **Mid-experiment ToS / Privacy Policy updates.** If the lawyer issues a revised ToS or Privacy Policy mid-experiment, the new version's hash differs from the user's stored hash.
+
+  > ⚠ **2026-08-25 — not yet implemented.** The hashes are string literals
+  > in `src/server/auth/tos-versions.ts`. Deriving them from the document
+  > bodies is a LEGAL.1 obligation. Until it is discharged, swapping the
+  > document bodies would leave the recorded acceptance evidence describing
+  > the wrong text.
+
+  **No automatic re-prompt in v1** — the user remains on the version they accepted at signup. ADR-TOS-UPDATE governs the policy for any mid-experiment revision: whether existing users must re-accept, whether continued use constitutes acceptance, and how the change is communicated. In v1 we ship one ToS version and assume no mid-experiment revisions are needed (Q5 finalisation pre-launch); the ADR mechanism exists for exception cases.
 
 - **Edge cases.**
   - *User closes the tab mid-flow.* The F-AUTH-3 `users` row remains with `tos_accepted_at IS NULL` and the `(colour, animal, number)` tuple stays assigned to that row. On the user's next sign-in attempt with the same Google account or email, F-AUTH-1 / F-AUTH-2 finds the existing `users` row, but the auth middleware sees `tos_accepted_at IS NULL` and routes the user back to F-AUTH-4 — same identity, same screen, fresh acceptance attempt. No second pool consumption.
@@ -822,6 +843,12 @@ The pseudonym and PFP are permanent. On `H2` scrub:
 - **Response.** Session cookie issued. User redirected to the post-signup landing page (market list / debate view).
 
 - **Errors.** 400 `error_tos_acceptance_required` (Continue pressed without checkbox ticked — should be UI-prevented but server-side check exists). 410 `error_tos_version_changed` (ToS document hash changed between page load and Continue press — re-renders the screen with the new version, defensive against deploy-during-signup races).
+
+  > ⚠ **2026-08-25 — not yet implemented.** The hashes are string literals
+  > in `src/server/auth/tos-versions.ts`. Deriving them from the document
+  > bodies is a LEGAL.1 obligation. Until it is discharged, swapping the
+  > document bodies would leave the recorded acceptance evidence describing
+  > the wrong text.
 
 - **Acceptance.** ⚠ **Two of these cases are superseded by the 2026-08-25 amendment below** — `warning-rendered-emphasised` and `tos-and-privacy-rendered-inline` describe a screen that no longer renders either. The surviving acceptance evidence for the amended screen is `tests/server/auth/onboarding-page-wiring.test.ts::onboarding-skin::preserves-the-tos-gate-bindings` (checkbox, form action, version-hash footer, the `/legal` link on the checkbox label) plus the unchanged evidence-write cases below. `tests/server/auth/tos.test.ts::warning-rendered-emphasised`, `tests/server/auth/tos.test.ts::pseudonym-and-pfp-shown-as-permanent`, `tests/server/auth/tos.test.ts::tos-and-privacy-rendered-inline`, `tests/server/auth/tos.test.ts::checkbox-required-before-continue`, `tests/server/auth/tos.test.ts::acceptance-evidence-recorded`, `tests/server/auth/tos.test.ts::cancel-leaves-tos-null`, `tests/server/auth/tos.test.ts::reentry-routes-back-to-tos-without-pool-reconsumption`, `tests/server/auth/tos.test.ts::tab-race-idempotent-acceptance`, `tests/server/auth/tos.test.ts::stale-unaccepted-users-swept-after-30d`.
 
@@ -840,10 +867,14 @@ The pseudonym and PFP are permanent. On `H2` scrub:
 > unticked by default, the continue control is unavailable until it is
 > ticked, and the acceptance transaction writes `tos_accepted_at`,
 > `tos_version_hash`, `privacy_version_hash`, IP and user-agent together
-> with the initial grant. ⚠ **The version hashes continue to be computed
-> from the document bodies at deploy time and frozen. The bodies no longer
-> rendering on the acceptance screen does NOT remove the obligation to
-> read and hash them.**
+> with the initial grant.
+> ⚠ **This amendment does not change how the version hashes are produced.
+> Recorded as of 2026-08-25: they are string literals in
+> `src/server/auth/tos-versions.ts` and are not derived from the document
+> bodies by any code path. The deploy-time derivation this section
+> describes is an obligation LEGAL.1 must discharge, not a description of
+> what ships today. Removing the bodies from the acceptance screen does
+> not affect this either way — there was no hashing surface to move.**
 >
 > Ground: legibility of the acceptance screen. Two full documents inline
 > on a mobile-led signup flow is scroll a participant traverses before
@@ -1572,6 +1603,18 @@ Claude does not try to resolve these; it implements the default and flags the qu
 | 2026-08-21 | 1.0.38 | §0; §9; §15 F-ADMIN-1 | **Market-Detail header narrowed from a carousel to a single image (MEDIA-SECOND-ROW Slice 1) — a display narrowing, not a storage or pool change.** §9 *Market media — participant display* now specifies the header renders the market's lowest-`display_order` **non-default** `market_media` row, falling back to the sole `is_default` row when that is the market's only row (every market today) — one query, `ORDER BY is_default ASC, display_order ASC`, riding the same zero-extra-round-trip read ADR-0026 #8 already specified. **The carousel is deferred, not dropped** — a new §9 amendment paragraph states this explicitly, and the admin media pool and the exactly-one-`is_default` invariant are **unaffected**: an admin market can still carry more than one row, only which single row the *header* renders narrows. (§8 F-COMMENT-3's composer pick-from-pool affordance is a separate, still-unbuilt design — `comments.market_media_id` is not yet in schema per SPEC.2 §5.1 row 4 — and is likewise untouched by this amendment, not shipped by it.) §15 F-ADMIN-1's parenthetical restated the old carousel description and is corrected to match. Paired same-commit with `docs/adr/0026-market-media.md` Patch record P1 (drivers #5 and #7 corrected in place). No DDL, no migration, no new event type, no §17 row (no new Acceptance case is minted by a spec-text narrowing of an already-shipped-with-one-row display; the four new `market-media-selection.integration.test.ts` cases + the updated `load-debate-view.integration.test.ts` case are the Acceptance evidence, cited in the PR rather than a §17 row, consistent with the 1.0.30 precedent's "doc/display-only, no field/query/cache change" posture where the change IS a query change here but adds no round-trip). **§0** → 1.0.38, last-updated → 2026-08-21. | MEDIA-SECOND-ROW Slice 1 execute — `docs/plans/MEDIA-SECOND-ROW.md`, operator rulings R1-R4. The spec described a carousel no code has ever built (ADR-0026 was accepted 2026-06-30; the display build task that would have shipped the carousel never landed before this slice), and this slice makes the header render a real row instead of the single always-was-default row it silently rendered before — narrowing the spec to match what ships is the O-9 discipline this repo already applies (cf. 1.0.30, 1.0.31, 1.0.32, 1.0.36 — each a founder/operator-ruled reconciliation of spec text to shipped behaviour). | ADR-0026 (Patch record P1) |
 | 2026-08-22 | 1.0.39 | §2; §10.8 (unchanged, cross-checked); §23 | **AMEND-1 — records ADR-0040 (unwire the bookmark module and the Profile Dharma graph).** §23 drops the Dharma-graph paragraph ("Net worth + the Dharma graph"), the "Forward (A6)" bookmark clause, and every now-stale in-section restatement that the page renders a graph (the opening "What Profile is" surface enumeration, F-PROF-1's System/Acceptance bullets including the `tests/server/profile/graph.test.ts` citation — that file is deleted, the read-model "graph's value lines" clause, and the Net P/L tile's "coherent with the graph's net-worth line" parenthetical). The **six tiles** clause is unchanged. §2 glossary ("Net worth", "SideEpisode"), §9 (the market price chart's X-domain contrast against "the fixed experiment window pinned for the §23 Dharma graph"), §10.8 (net worth's canonical-surfaces list), and Appendix B's `PROFILE_GRAPH_Y_MAX` constant still name the deleted graph — **deliberately left unamended**, outside this task's named scope (SPEC.1 §23 only); recorded here so a future reader does not mistake the omission for an oversight. | ADR-0040 unwires the bookmark module and the Profile Dharma graph product-wide (cost inventory against the ADR-0038 100k-scale target: the graph was the only unbounded statement cost in the product). This row and its companion SPEC.2 row are the same-commit spec amendment ADR-0040 §Supersedes-and-amends promises. | ADR-0040 |
 | 2026-08-25 | 1.0.40 | §0; §13 F-AUTH-4 | **ONBOARD-CARD — the acceptance screen stops rendering the two document bodies; `/legal` renders them instead.** A dated **AMENDMENT — 2026-08-25** block is inserted after F-AUTH-4's requirement text, superseding two of the flow's five spec-locked structural commitments: the ToS and Privacy bodies rendering in their entirety on the acceptance screen, and the re-identification warning rendering there as its own emphasised block. The screen keeps the identity block, the single unticked checkbox, the continue control gated on it, Cancel, and the version-hash footer; the documents become a conspicuous link to **`/legal`** on the checkbox label, and the re-id warning moves into the ToS body at **LEGAL.1** (the text itself is unchanged and still binding wherever it renders). ⚠ **The acceptance-evidence write is untouched** — `tos_accepted_at`, `tos_version_hash`, `privacy_version_hash`, IP and user-agent, with the initial grant, in one transaction; the amendment states in terms that the bodies no longer rendering does NOT remove the obligation to read and hash them. Per **O-5** the supersession is written INTO each operative locus rather than left to the block alone: System items 1 (marks (ii)/(iii)/(iv)), 2 and 3, the acceptance-evidence hash paragraph, the Acceptance case list (two named cases retired, the surviving evidence named), and the 2026-08-04 lapse note (whose "stands as written" conclusion is now superseded in part). No schema change, no migration, no new event type, no §17 row. **§0** → 1.0.40, last-updated → 2026-08-25. | Operator ruling — Hrishikesh, 2026-08-25 (ONBOARD-CARD kickoff, amendment text supplied verbatim). Ground stated in the block: legibility of a mobile-led signup flow, with the enforceable pattern (conspicuous link + unticked checkbox + disabled control + durable per-user version record) preserved in full. | — |
+| 2026-08-25 | 1.0.41 | §0; §13 F-AUTH-4 | **ONBOARD-CARD-FIX — §13's deploy-time hash derivation is recorded as UNBUILT, at every locus that asserts it.** F-AUTH-4 has described `tos_version_hash` / `privacy_version_hash` as content hashes computed from the document bodies at deployment time since the section was written. **No code path derives them from anything** — they are two string literals in `src/server/auth/tos-versions.ts` (`placeholder-tos-v0` / `placeholder-privacy-v0`), measured against the live tree on 2026-08-25. The 1.0.40 amendment above **restated** that unbuilt mechanism as a live one it was preserving ("the version hashes continue to be computed from the document bodies at deploy time"); that sentence is **replaced** with a recorded-as-of statement naming the literals and assigning the derivation to LEGAL.1 as an obligation rather than a description. ⚠ **The 1.0.40 row above therefore misdescribes the amendment as it now stands** — its clause "the amendment states in terms that the bodies no longer rendering does NOT remove the obligation to read and hash them" describes the sentence this row replaces; the row is left as the record of what 1.0.40 said and is corrected here rather than rewritten. A dated **not-yet-implemented** rider is inserted at each of the four remaining §13 loci making the same claim, **three of them pre-existing text this task's author did not write**: the two `content hash of the …` acceptance-evidence columns, the deploy-time-and-frozen sentence (together with 1.0.40's own O-5 pointer on it), the mid-experiment re-acceptance clause ("the new version's hash differs from the user's stored hash"), and the 410 `error_tos_version_changed` error ("ToS document hash changed between page load and Continue press"). Each rider names the consequence that makes this load-bearing: **until LEGAL.1 discharges it, swapping the document bodies leaves the recorded acceptance evidence describing the wrong text.** Doc-only — no schema, no migration, no `src/` or `tests/` change, no §17 row. **§0** → 1.0.41. | O-13 — an endpoint that cannot answer has not answered, and its sibling case: a spec sentence describing a mechanism nobody built reads as a description of what ships. Found while verifying the ONBOARD-CARD fence, where the kickoff's own premise ("the bodies are still READ and HASHED at deploy time") was measured against the tree and did not hold. Operator ruling — Hrishikesh, 2026-08-25; replacement and rider text supplied verbatim. | — |
+
+> ⚠ **2026-08-25 — not yet implemented.** The hashes are string literals
+> in `src/server/auth/tos-versions.ts`. Deriving them from the document
+> bodies is a LEGAL.1 obligation. Until it is discharged, swapping the
+> document bodies would leave the recorded acceptance evidence describing
+> the wrong text.
+
+*(The rider above belongs to the `1.0.40` row's "obligation to read and hash them"
+clause. It sits under the table rather than inside that cell because a blockquote
+inside a table row does not render — the nearest position that does is here, directly
+beneath the row it corrects and beside the `1.0.41` row that supersedes it.)*
 
 ---
 
