@@ -18,8 +18,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 //     chain (§4) is untouched by a presentation swap, so the three redirects
 //     still fire. This is part of the "gate provably intact" proof.
 //   STRUCTURE (seam contract §3.3) — GREEN both ways: the tree still carries
-//     the ToS-gate bindings (form action, accepted checkbox, the version-hash
-//     footer, the Cancel link to /).
+//     the ToS-gate bindings (form action, accepted checkbox). ⚠ The version-hash
+//     footer and the Cancel link were part of this contract until
+//     ONBOARD-CARD-2; both rows are INVERTED below, not dropped.
 //   DRIVER (RED pre-skin) — the tree contains a node whose `type === Card`.
 //     Today's scaffold uses <section>s → RED; the skin swaps to <Card> → GREEN.
 //
@@ -196,16 +197,67 @@ describe("UI-A7 onboarding skin — seam contract (§3.3 STRUCTURE, green both w
 		expect(accepted?.props.value).toBe("true");
 		expect(accepted?.props.required).toBe(true);
 
-		// The source-hash footer carries both version constants verbatim.
-		const footer = elements.find((e) => e.type === "footer");
-		expect(footer).toBeDefined();
-		const footerText = textOf(footer);
-		expect(footerText).toContain(TOS_VERSION_HASH);
-		expect(footerText).toContain(PRIVACY_VERSION_HASH);
+		// ⚠ INVERTED AT ONBOARD-CARD-2 (SPEC.1 §13 AMENDMENT 2026-08-25 (second)).
+		// Two rows here used to assert PRESENCE — the source-hash footer, and the
+		// Cancel link to `/`. Both are superseded, so both are turned over rather
+		// than deleted: absence is now the contract, and an assertion is the only
+		// thing that will notice either coming back.
+		//
+		// ⛔ THE VERSION LABEL IS NOT GONE FROM THE PRODUCT, it moved to `/legal`.
+		// That is asserted at its destination in the row below, not merely implied
+		// by its absence here — an absence test alone would stay green if the line
+		// had been deleted outright, which is the one outcome the amendment
+		// forbids.
+		expect(elements.some((e) => e.type === "footer")).toBe(false);
+		const rendered = textOf(el);
+		expect(rendered).not.toContain(TOS_VERSION_HASH);
+		expect(rendered).not.toContain(PRIVACY_VERSION_HASH);
 
-		// Cancel link → home.
-		const cancel = elements.find((e) => e.type === "a" && e.props.href === "/");
-		expect(cancel).toBeDefined();
+		// No Cancel: no control on this card navigates to `/`. The only anchor
+		// left is the `/legal` link inside the checkbox label.
+		expect(elements.some((e) => e.type === "a" && e.props.href === "/")).toBe(
+			false,
+		);
+	});
+});
+
+describe("ONBOARD-CARD-2 — one control, no version line (SPEC.1 §13, 2026-08-25 second)", () => {
+	it("onboarding-skin::carries-exactly-one-control-labelled-enter-zugzwang", async () => {
+		const el = await OnboardingPage();
+		const elements = collectElements(el);
+
+		// EXACTLY one <button>, and it is the form's submit. "Exactly" is the
+		// assertion the amendment actually makes — a second control appearing
+		// beside this one is the regression, and a `find`-and-assert row would
+		// not see it.
+		const buttons = elements.filter((e) => e.type === "button");
+		expect(buttons).toHaveLength(1);
+		expect(buttons[0]?.props.type).toBe("submit");
+		expect(textOf(buttons[0])).toBe("Enter Zugzwang");
+
+		// The submit still rides the same server-action form, and the checkbox
+		// still gates it — the label changed, the binding did not.
+		const form = elements.find((e) => e.type === "form");
+		expect(typeof form?.props.action).toBe("function");
+		expect(
+			collectElements(form).some(
+				(e) =>
+					e.type === "input" &&
+					e.props.name === "accepted" &&
+					e.props.required === true,
+			),
+		).toBe(true);
+	});
+
+	it("legal-page::still-renders-the-version-colophon", async () => {
+		// The destination half of the move. `/legal` is a server component that
+		// reads two files and imports no request-scoped boundary, so it renders
+		// here with no mocks at all — which makes this the cheapest possible
+		// proof that the version label survived the removal above.
+		const { default: LegalPage } = await import("@/app/(public)/legal/page");
+		const legalText = textOf(await LegalPage());
+		expect(legalText).toContain(TOS_VERSION_HASH);
+		expect(legalText).toContain(PRIVACY_VERSION_HASH);
 	});
 });
 
