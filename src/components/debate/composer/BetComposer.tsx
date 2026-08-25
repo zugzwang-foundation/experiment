@@ -481,6 +481,45 @@ export function BetComposer(props: {
 
 	const extendedMax = extendedMaxChars(title.trim().length);
 	const dimmed = floorAbove ? "opacity-(--state-disabled-opacity)" : undefined;
+	/**
+	 * ⚠⚠ RPLY-1 · R3 — THE ONE NOTICE, and its precedence is a ruling rather
+	 * than an accident of ordering.
+	 *
+	 * ⛔ C2 FIRST. It is the only one of the three that SPEC.1 §16.2 requires —
+	 * the message must name both the current balance and the required stake, and
+	 * `c2Sentence` is how that is satisfied — and it is the only one describing a
+	 * TOTAL block: in this state every input is disabled and the whole argument
+	 * form is dimmed. A transient banner must not displace a spec-mandated
+	 * explanation of why the form is dead; the reader would be left with a
+	 * countdown and no account of the greyed-out fields beneath it.
+	 *
+	 * ⚠ AND THE OTHER ORDER WAS CONSIDERED AND REJECTED ON A MEASUREMENT, not on
+	 * taste: a 429 cannot originate from a composer in the C2 state, because
+	 * `submitDisabled` carries `floorAbove` and no request can leave. The pair
+	 * can only coexist if a refresh lowers `spendableToday` after a 429 has
+	 * already landed — a window in which "you cannot afford the floor" is still
+	 * the more useful sentence.
+	 *
+	 * ⛔ C2 AND OVER-CAP ARE PROVABLY EXCLUSIVE, so their relative order can
+	 * never be observed: `assessAmount` clamps to `spendableToday` BEFORE reading
+	 * the cap, so in the C2 state the clamped amount is ≤ spendable < floor
+	 * (50) ≪ `BET_MAX_STAKE` (10,000) and `overCap` cannot be true. Stated
+	 * because it is the reason this chain needs no tie-break between them.
+	 *
+	 * ⛔ THE C2 SENTENCE SHIPS VERBATIM from `c2Sentence` — not shortened, not
+	 * reworded, not replaced by a shorter string that would have fitted one line.
+	 * The slot was sized to the copy; the copy was not cut to the slot.
+	 */
+	const notice: string | null = floorAbove
+		? c2Sentence({
+				floor: floorFor(props.kind),
+				spendable: props.viewer.spendableToday,
+			})
+		: countdown !== null
+			? rateLimitedBanner(countdown)
+			: assess.overCap
+				? overCapStrip()
+				: null;
 	const toWin =
 		quote !== null && quote.kind === "quote"
 			? formatDharma(String(quote.data.shares ?? "—"))
@@ -547,26 +586,16 @@ export function BetComposer(props: {
 				</button>
 			</div>
 
-			{/* P4 429 banner — countdown auto-clears; expiry re-keys (F-1). */}
-			{countdown !== null && (
-				<div
-					role="status"
-					aria-live="polite"
-					className="rounded-(--r-chip) bg-n1 px-3 py-2 text-xs text-ink"
-				>
-					<b>{rateLimitedBanner(countdown)}</b>
-				</div>
-			)}
-
-			{/* Floor-above-balance (C2, verbatim): disabled composer, label-only dim. */}
-			{floorAbove && (
-				<div className="rounded-(--r-chip) px-3 py-2 text-xs text-n5 [border:var(--hairline)]">
-					{c2Sentence({
-						floor: floorFor(props.kind),
-						spendable: props.viewer.spendableToday,
-					})}
-				</div>
-			)}
+			{/* ⚠⚠ RPLY-1 · R3 — THE THREE BLOCKED-STATE STRIPS USED TO LIVE HERE AND
+			    IN THE FOOTBLOCK, AND THEY ARE NOW ONE SLOT INSIDE THE AMOUNT BLOCK.
+			    See `noticeSlot` below for the whole argument. Two of them were
+			    direct children of this `gap-3` column, so each cost its own box PLUS
+			    a 12px gap; MEASURED at 1280×800 the section ran 428.81px clean,
+			    472.81 with the 429 banner (+44.00) and 474.81 with the C2 strip
+			    (+46.00), against a 416px column — 13px of overflow became 57 and 59.
+			    ⛔ The submit was ALREADY disabled in every one of those states and
+			    still is; not one gating predicate is touched. Only the HEIGHT was
+			    ever the defect. */}
 
 			<div className={dimmed}>
 				<div className="mb-1 text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
@@ -733,16 +762,58 @@ export function BetComposer(props: {
 										</span>
 									</div>
 									<div className="my-1.5 border-t border-n2" />
-									<div className="flex items-center justify-between">
-										<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
-											{COMPOSER_COPY.toWinLabel}
-										</span>
-										<span
-											aria-live="polite"
-											className="font-mono text-sm text-ink"
-										>
-											{toWin !== null ? `Đ ${toWin}` : "—"}
-										</span>
+									{/* ⚠⚠ RPLY-1 · R3 — THE NOTICE SLOT. TO WIN is meaningless in
+									    all three blocked states — the bet cannot be submitted in
+									    any of them — so the row is free, and a notice written into
+									    it costs no box and no gap. That is the whole mechanism:
+									    the composer's height stops depending on which blocked
+									    state it is in.
+									    ⛔⛔ `h-8` IS RESERVED, NOT FITTED, AND THE NUMBER IS
+									    MEASURED. At this block's real 210px inner width (1280×800,
+									    real compiled CSS) the C2 sentence wraps to TWO lines = 32px
+									    while the 429 and over-cap strings are one = 16px, and the
+									    TO WIN row is 20px. Reserving the tallest makes the height
+									    identical in all four states, which is the actual goal — a
+									    slot that merely collapsed would still JUMP by 12px on
+									    entering C2, and a form moving under someone is the
+									    complaint this row exists to answer.
+									    ⚠ THE C2 FIGURE DOES NOT CHANGE THE WRAP: measured with
+									    `Đ 9,999,999` as well as `Đ 0`, both 32px. The reservation
+									    is stable against the balance, not tuned to one fixture.
+									    ⛔⛔ `text-ink`, NOT `text-n5`, AND THE REASON IS CONTRAST —
+									    MEASURED IN A BROWSER, NOT ESTIMATED. This slot sits INSIDE
+									    the `dimmed` wrapper, and `--state-disabled-opacity` is 0.5.
+									    Composited against the real backdrop (rgb(24,24,24)):
+									    `--color-ink` #fafafa gives **5.08:1**, `--color-n5` #989898
+									    gives **2.50:1** — the latter is under the 4.5:1 body floor,
+									    on the one sentence that explains why the form is dead.
+									    ⚠ The C2 strip used to ESCAPE the dimming by sitting outside
+									    the wrapper, so it never needed this decision; moving it
+									    inside is exactly what makes the token load-bearing. Reaching
+									    for the muted default here would have quietly halved the
+									    legibility of the only message on a disabled form.
+									    ⚠ ONE `aria-live` REGION, ON THE SLOT. It was on the TO WIN
+									    value and `role="status"` was on the 429 banner; with the two
+									    sharing a box, one polite region announces whichever
+									    currently occupies it. Two nested live regions would be a
+									    second announcement of the same change. */}
+									<div
+										aria-live="polite"
+										data-testid="composer-notice-slot"
+										className="flex h-8 items-center"
+									>
+										{notice !== null ? (
+											<p className="text-xs text-ink">{notice}</p>
+										) : (
+											<div className="flex w-full items-center justify-between">
+												<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+													{COMPOSER_COPY.toWinLabel}
+												</span>
+												<span className="font-mono text-sm text-ink">
+													{toWin !== null ? `Đ ${toWin}` : "—"}
+												</span>
+											</div>
+										)}
 									</div>
 								</div>
 								{/* ⚠⚠ change set 7 §4 — LARGER, AND THE LABEL STACKS.
@@ -775,10 +846,16 @@ export function BetComposer(props: {
 								</Button>
 							</div>
 
-							{/* W2.10-D: over-cap = typing allowed, submit disabled, strip. */}
-							{assess.overCap && (
-								<div className="mt-1.5 text-xs text-n5">{overCapStrip()}</div>
-							)}
+							{/* ⚠ RPLY-1 · R3 — the over-cap strip moved into the notice slot
+							    above. W2.10-D is UNCHANGED in substance: typing is still
+							    allowed, submit is still disabled, and the strip still says
+							    the same words — it simply no longer adds 22px here.
+							    ⚠ THE BRIEF FOR THIS TASK CALLED IT A THIRD SIBLING OF THE
+							    OTHER TWO AND IT WAS NOT: it lived inside this footblock, so
+							    it cost `mt-1.5` (6px) rather than the column's 12px gap.
+							    MEASURED: the section grew 428.81 → 450.81 (+22.00) in this
+							    state while its direct flex-child count stayed at 2, which is
+							    how the difference showed up at all. */}
 						</div>
 					</div>
 				</div>
