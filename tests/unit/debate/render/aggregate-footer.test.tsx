@@ -329,12 +329,17 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 		);
 		expect(support?.disabled).toBe(false);
 		expect(counter?.disabled).toBe(true);
-		// The C3 batch string carries the refusal in BOTH channels, identical to
+		// The C3 batch string carries the refusal in TWO channels, identical to
 		// the focused-post bar — one refusal, one wording, wherever it is met.
-		expect(counter?.getAttribute("title")).toBeTruthy();
-		expect(counter?.getAttribute("aria-label")).toBe(
-			counter?.getAttribute("title"),
-		);
+		// INFO-1: the second channel moved from a native `title` to `InfoTip`
+		// (`aria-describedby` + a Popover/Tooltip carrying the same string,
+		// INFO-1 §3.4 C3 precedence) — `aria-label` is unchanged and still
+		// carries the refusal on its own channel.
+		expect(
+			counter?.getAttribute("aria-describedby"),
+			"the disabled trigger still carries an InfoTip description",
+		).toBeTruthy();
+		expect(counter?.getAttribute("aria-label")).toBeTruthy();
 	});
 
 	it("aggregate-footer::a-closed-market-disables-both", () => {

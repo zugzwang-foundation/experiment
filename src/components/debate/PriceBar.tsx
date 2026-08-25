@@ -1,3 +1,5 @@
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import { c3OppositeSide } from "./composer/copy";
@@ -175,20 +177,39 @@ function PriceLabel({
 		oppositeHeld && pick.heldSide !== null
 			? c3OppositeSide({ held: pick.heldSide, resulting: side })
 			: null;
+	// C3 precedence (INFO-1 §3.4) — c3 wins outright; the glossary gloss (which
+	// names the action AND the meaning) fills the null branch only. Still
+	// `aria-describedby`, never `aria-label` — this component's whole `title`
+	// choice above was WCAG 2.5.3 (Label in Name): the visible text `YES 38%`
+	// must stay contained in the accessible name, so the affordance is
+	// carried by a DESCRIPTION, never a name override.
+	//
+	// ⚠ INFO-1: `title` is KEPT here, byte-identical, rather than removed —
+	// the one deliberate exception to "remove the native title at every
+	// site". `tests/unit/debate/render/market-header.test.tsx` (walled,
+	// never edited by this task) pins this exact attribute at `:429` (`"Buy
+	// YES"`) and `:485-487` (the live C3 string) as "the ONLY tooltip string
+	// in the entire repo under test." Removing it would red the one
+	// regression guard this surface has; layering `InfoTip` beside it costs
+	// a redundant hover tooltip on desktop (where `title` already worked)
+	// in exchange for the tap-reachable gloss phones never had.
+	const gloss = c3 ?? (side === "YES" ? GLOSSARY.priceYes : GLOSSARY.priceNo);
 	return (
-		<button
-			type="button"
-			data-testid={`price-label-${side}`}
-			disabled={disabled}
-			aria-disabled={disabled}
-			title={c3 ?? `Buy ${side}`}
-			onClick={() => pick.onPick(side)}
-			className={cn(
-				className,
-				"rounded-(--r-chip) outline-none hover:underline focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:no-underline disabled:opacity-(--state-disabled-opacity)",
-			)}
-		>
-			{text}
-		</button>
+		<InfoTip content={gloss} asChild>
+			<button
+				type="button"
+				data-testid={`price-label-${side}`}
+				disabled={disabled}
+				aria-disabled={disabled}
+				title={c3 ?? `Buy ${side}`}
+				onClick={() => pick.onPick(side)}
+				className={cn(
+					className,
+					"rounded-(--r-chip) outline-none hover:underline focus-visible:shadow-(--state-focus-ring) disabled:pointer-events-none disabled:no-underline disabled:opacity-(--state-disabled-opacity)",
+				)}
+			>
+				{text}
+			</button>
+		</InfoTip>
 	);
 }
