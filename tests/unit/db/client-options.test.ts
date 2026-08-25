@@ -90,21 +90,34 @@ describe("db client — postgres.js pool options", () => {
 	});
 
 	it("db-client::pins-pool-max-at-4 (the load-bearing control)", () => {
-		// `max` is PER INSTANCE and a Vercel instance is per DEPLOYMENT, against
-		// a 15-slot Supavisor tenant pool. This — not the timeouts — is what
-		// actually bounds occupancy, because a suspended Fluid instance runs no
-		// timers (measured: 620 s idle against a 20 s idle_timeout).
-		expect(options.max).toBe(4);
-	});
-
-	it("db-client::pool-max-leaves-room-for-three-instances", () => {
-		// The arithmetic, asserted rather than only described: at least three
-		// concurrent instances must fit inside the tenant pool. At the previous
-		// `max: 10`, two already wanted 20 against 15. If someone raises `max`
-		// past 5 this goes RED and forces the pool ceiling back into the room.
-		const SUPAVISOR_TENANT_POOL_SIZE = 15;
-		const max = options.max ?? Number.POSITIVE_INFINITY;
-		expect(max * 3).toBeLessThanOrEqual(SUPAVISOR_TENANT_POOL_SIZE);
+		// Pins the VALUE, deliberately — not a derivation of it.
+		//
+		// This assertion used to be a pair: `max === 4`, plus `max * 3 <= 15`
+		// re-deriving that 4 from the Supavisor tenant pool. The second one is
+		// removed rather than updated, because under the `:6543` transaction
+		// pooler the two ceilings decouple — client connections rise to 200
+		// while backend connections stay at 15 — so "three instances fit inside
+		// 15" no longer describes what 4 is protecting against. A derivation
+		// that has stopped describing its subject does not merely go quiet; it
+		// fails for the wrong reason and teaches the next reader the wrong
+		// ceiling. S-5 raising `max` must go RED here as a decision that needs
+		// an ADR touch, never as arithmetic against a phantom 15-slot bound.
+		expect(
+			options.max,
+			"`max` is pinned at 4 by ADR-0038 P1.2, for two reasons, and neither " +
+				"is the tenant-pool arithmetic this test used to assert. (1) It " +
+				"bounds what a SUSPENDED Vercel Fluid instance can STRAND: measured " +
+				"on staging, a connection sat idle 620 s with BOTH a 20 s " +
+				"idle_timeout and a 600 s max_lifetime configured and verified " +
+				"live, because a suspended instance runs no timers — so a timer " +
+				"cannot be relied on to hand a slot back, and bounding what an " +
+				"instance can take in the first place does not depend on one " +
+				"running. (2) ADR-0038 decision 2 forbids acting without " +
+				"measurement: transaction mode makes a higher `max` PERMISSIBLE, " +
+				"it does not say which value is CORRECT. S-5 measures; then it " +
+				"moves, with the ADR. Changing this number is an ADR edit, not a " +
+				"test edit.",
+		).toBe(4);
 	});
 
 	it("db-client::pins-prepare-false", () => {
