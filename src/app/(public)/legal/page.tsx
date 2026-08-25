@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { Metadata } from "next";
+import {
+	LegalFigure,
+	type LegalFigureName,
+} from "@/components/legal/LegalFigure";
 import { PageContainer } from "@/components/shell/PageContainer";
+import { splitLegalSections } from "@/lib/legal-sections";
 import {
 	PRIVACY_VERSION_HASH,
 	TOS_VERSION_HASH,
@@ -49,11 +54,54 @@ async function readLegalDoc(name: "tos" | "privacy"): Promise<string> {
 	return readFile(path, "utf-8");
 }
 
+/**
+ * The figure for each numbered section, in document order — Terms 1–12, then
+ * Privacy 1–5. Names index `LegalFigure`'s registry; `envelope-open` appears in
+ * both lists because both documents end on Contact, and drawing it once is the
+ * point of having a registry.
+ *
+ * ⚠ A LIST, NOT A MAP KEYED BY SECTION NUMBER. The section order is the
+ * document's own, and the render walks the two in step — so a document that
+ * gains a section gets `undefined` here and renders with no figure, rather than
+ * silently handing section 13 the envelope that belonged to section 12.
+ */
+const TOS_FIGURES: readonly LegalFigureName[] = [
+	"hourglass-dates",
+	"threshold-crossed",
+	"tile-circle",
+	"coin-struck",
+	"paths-converging",
+	"boundary-gap",
+	"sieve-caught",
+	"page-arrows-out",
+	"tag-thread",
+	"umbrella",
+	"branching-graph",
+	"envelope-open",
+];
+
+const PRIVACY_FIGURES: readonly LegalFigureName[] = [
+	"four-boxes",
+	"hub-spokes",
+	"token-alone",
+	"hourglass-run-out",
+	"envelope-open",
+];
+
 export default async function LegalPage(): Promise<React.ReactElement> {
 	const [tosBody, privacyBody] = await Promise.all([
 		readLegalDoc("tos"),
 		readLegalDoc("privacy"),
 	]);
+
+	const documents = [
+		{ title: "Terms of Service", body: tosBody, figures: TOS_FIGURES },
+		{ title: "Privacy Policy", body: privacyBody, figures: PRIVACY_FIGURES },
+	];
+
+	// Sides alternate down the PAGE, not within a document — Privacy §1 picks up
+	// where Terms §12 left off, so the rhythm does not stutter at the seam.
+	let placed = 0;
 
 	return (
 		<PageContainer preset="reading">
@@ -96,20 +144,55 @@ export default async function LegalPage(): Promise<React.ReactElement> {
 
 				{/* Both bodies render whole — no scroller, no clamp, no "read more".
 				    A page whose whole purpose is that the text is reachable must not
-				    be the second place the text is hidden. */}
-				<section className="flex flex-col gap-3">
-					<h2 className="text-base font-medium text-ink">Terms of Service</h2>
-					<pre className="font-sans text-sm whitespace-pre-wrap text-n6">
-						{tosBody}
-					</pre>
-				</section>
+				    be the second place the text is hidden.
 
-				<section className="flex flex-col gap-3">
-					<h2 className="text-base font-medium text-ink">Privacy Policy</h2>
-					<pre className="font-sans text-sm whitespace-pre-wrap text-n6">
-						{privacyBody}
-					</pre>
-				</section>
+				    ⛔ ONE `<pre>` PER SECTION, NOT ONE PER DOCUMENT, and the split is
+				    LOSSLESS — `splitLegalSections` guarantees the chunks re-join to
+				    the file byte for byte, asserted against the real files on disk.
+				    The only reason to split at all is that a margin figure needs an
+				    anchor: each chunk gets a `relative` wrapper, and its figure hangs
+				    off that wrapper's edge.
+
+				    ⚠ NO GAP BETWEEN THE CHUNKS. The documents supply their own blank
+				    lines between sections, and `whitespace-pre-wrap` renders them; a
+				    flex `gap` here would add a second helping of space to every seam
+				    and the page would read as though it had been double-spaced. The
+				    heading keeps its `gap-3` from the body — that one is the page's,
+				    not the document's. */}
+				{documents.map((doc) => (
+					<section key={doc.title} className="flex flex-col gap-3">
+						<h2 className="text-base font-medium text-ink">{doc.title}</h2>
+						<div>
+							{splitLegalSections(doc.body).map((chunk, index) => {
+								// Chunk 0 is the preamble — title, version line, the
+								// sentence pointing at the sibling document. It is not a
+								// numbered section and takes no figure.
+								const figure = index === 0 ? null : doc.figures[index - 1];
+								// The counter advances ONLY where a figure is actually
+								// placed. Advancing it on the figure-less preamble would
+								// spend a side on nothing and invert the alternation for
+								// every section after it.
+								const side: "left" | "right" = figure
+									? placed++ % 2 === 0
+										? "left"
+										: "right"
+									: "left";
+								return (
+									<div
+										// biome-ignore lint/suspicious/noArrayIndexKey: the chunk list is derived from a static file read at render; position IS the identity here, and two sections could legitimately carry identical text.
+										key={`${doc.title}-${index}`}
+										className="relative"
+									>
+										{figure ? <LegalFigure name={figure} side={side} /> : null}
+										<pre className="font-sans text-sm whitespace-pre-wrap text-n6">
+											{chunk}
+										</pre>
+									</div>
+								);
+							})}
+						</div>
+					</section>
+				))}
 
 				{/* The colophon, and deliberately NOT a `<footer>` element. SPEC.1
 				    1.0.26 withdrew the page-level footer product-wide, and
