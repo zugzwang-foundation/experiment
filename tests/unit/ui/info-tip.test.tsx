@@ -49,6 +49,13 @@ function mockMatchMedia(matches: boolean): void {
 	})) as typeof window.matchMedia;
 }
 
+/** Radix's `DismissableLayer` arms its outside-pointer listener inside a
+ * `setTimeout(…, 0)` — a pointer event dispatched synchronously right after
+ * open reaches no listener at all (AGENTS.md §9). */
+function armDismissableLayer(): Promise<void> {
+	return new Promise((r) => setTimeout(r, 0));
+}
+
 const GLOSS = "Test gloss — the content under test";
 
 describe("INFO-1 — InfoTip", () => {
@@ -150,6 +157,39 @@ describe("INFO-1 — InfoTip", () => {
 		});
 
 		fireEvent.keyDown(document, { key: "Escape" });
+		await waitFor(() => {
+			expect(document.body.textContent).not.toContain(GLOSS);
+		});
+	});
+
+	it("touch path: a second click on the trigger (mouse pointerType) CLOSES it, not reopens it", async () => {
+		// Regression guard for the `context.triggerRef` fix: `InfoTip` no
+		// longer uses `Popover.Trigger` (it stamped invalid button semantics
+		// onto non-button hosts — see the primitive's own docblock), and
+		// Popover's own outside-interaction check reads `context.triggerRef`
+		// to tell "the trigger was clicked again" apart from "somewhere else
+		// was clicked". Left unpopulated, a second click reads as OUTSIDE: the
+		// content dismisses on `pointerdown`, then this component's own
+		// click-toggle re-opens it a moment later — closed-then-reopened
+		// rather than closed, for any non-touch `pointerType` (mouse, pen —
+		// touch itself is unaffected, since its own dismissal listener runs
+		// after React's).
+		mockMatchMedia(false);
+		render(
+			<InfoTip content={GLOSS} asChild>
+				<button type="button">Trigger</button>
+			</InfoTip>,
+		);
+		const trigger = document.querySelector("button") as HTMLButtonElement;
+
+		fireEvent.click(trigger);
+		await waitFor(() => {
+			expect(document.body.textContent).toContain(GLOSS);
+		});
+		await armDismissableLayer();
+
+		fireEvent.pointerDown(trigger, { pointerType: "mouse" });
+		fireEvent.click(trigger);
 		await waitFor(() => {
 			expect(document.body.textContent).not.toContain(GLOSS);
 		});

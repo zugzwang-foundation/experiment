@@ -124,6 +124,12 @@ export function InfoTip({
 	const pointerFine = usePointerFine();
 	const contentId = React.useMemo(() => contentHashId(content), [content]);
 	const [open, setOpen] = React.useState(false);
+	// Popover-branch only, but declared unconditionally (hooks must run in
+	// the same order every render) — see its use below. Typed `HTMLDivElement`
+	// to match `Popover.Anchor`'s own ref type; the real host varies by call
+	// site (`<span>`, `<th>`, `<a>`, `<button>`), but `.contains()` works on
+	// any `Node` regardless of that type parameter.
+	const anchorRef = React.useRef<HTMLDivElement>(null);
 
 	if (pointerFine) {
 		// No `id`/`aria-describedby` override here: `TooltipTrigger` already
@@ -150,13 +156,15 @@ export function InfoTip({
 		);
 	}
 
-	// `onClick` here is ONLY the toggle. `Slot.Root` composes it with the
-	// child's own `onClick` itself (calls this one, then the child's —
-	// Radix's own `mergeProps` behaviour, the same one `Popover.Trigger`
-	// relied on internally). Composing it a second time by hand would have
-	// called the child's original handler twice per click — measured via
-	// `market-header.test.tsx`'s own click-count assertion, which is walled
-	// (never edited) and is what caught it.
+	// `onClick` here is ONLY the toggle. `Slot`'s own `mergeProps` composes it
+	// with the child's own `onClick` (child's handler first, then this one —
+	// `@radix-ui/react-slot`'s own order; the reverse of what `Trigger` used
+	// to look like from the outside, but the same net effect since neither
+	// handler here depends on the other's side effects). Composing it a
+	// second time by hand would have called the child's original handler
+	// twice per click — measured via `market-header.test.tsx`'s own
+	// click-count assertion, which is walled (never edited) and is what
+	// caught it.
 	const triggerProps = {
 		"aria-describedby": contentId,
 		onClick: () => setOpen((o) => !o),
@@ -173,7 +181,21 @@ export function InfoTip({
 
 	return (
 		<PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
-			<PopoverPrimitive.Anchor asChild>{trigger}</PopoverPrimitive.Anchor>
+			{/* `ref` here is the one thing dropping `Popover.Trigger` cost that
+			    isn't cosmetic: `PopoverContentImpl`'s own outside-interaction
+			    check reads `context.triggerRef` to tell "the trigger was
+			    clicked again" apart from "somewhere else was clicked" — and
+			    only `Trigger` used to populate that ref. Left unset, a second
+			    click on the trigger reads as an OUTSIDE click: the content
+			    dismisses on `pointerdown`, then this component's own `onClick`
+			    toggle re-opens it a moment later — closed-then-reopened, not
+			    closed, on every second click from a mouse or a stylus (touch
+			    is unaffected — its dismissal listener runs after React's).
+			    Populating the same ref `Trigger` used to is the fix; verified
+			    against the shipped Radix source, not inferred. */}
+			<PopoverPrimitive.Anchor asChild ref={anchorRef}>
+				{trigger}
+			</PopoverPrimitive.Anchor>
 			<PopoverPrimitive.Portal>
 				<PopoverPrimitive.Content
 					id={contentId}
@@ -191,6 +213,16 @@ export function InfoTip({
 					// the trigger, so the click's PRIMARY action stays keyboard-safe;
 					// the popover still opens and is still dismissible by Escape.
 					onOpenAutoFocus={(event) => event.preventDefault()}
+					// The other half of the `triggerRef` fix above: without this,
+					// `context.triggerRef` (now populated) still isn't consulted by
+					// every dismissal path the same way `Trigger` had it wired.
+					// Checking containment against OUR OWN ref, directly, is what
+					// `Trigger` did internally and is what actually closes the loop.
+					onInteractOutside={(event) => {
+						if (anchorRef.current?.contains(event.target as Node)) {
+							event.preventDefault();
+						}
+					}}
 				>
 					{content}
 				</PopoverPrimitive.Content>

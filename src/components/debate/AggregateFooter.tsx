@@ -218,7 +218,12 @@ export function AggregateFooter({
  * `aria-label` and the `InfoTip` gloss (INFO-1 §3.4 C3 precedence — the
  * refusal wins over the relation's definition) — identical to the
  * focused-post bar, so the same refusal reads the same way wherever the
- * viewer meets it.
+ * viewer meets it. ⚠ The `aria-label` channel is the one that reliably
+ * reaches a screen reader here: this trigger also carries
+ * `disabled:pointer-events-none` (below), which — same reasoning as
+ * `RadioSlot`'s (O-3) — suppresses hover/click at the browser's hit-testing
+ * layer, so the `InfoTip` channel may never actually open on a disabled
+ * pill in a real browser. Not measured; not worked around here.
  */
 function TriggerPill({
 	relation,

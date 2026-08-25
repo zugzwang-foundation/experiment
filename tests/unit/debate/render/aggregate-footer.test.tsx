@@ -352,6 +352,14 @@ describe("HTML-FINISH · MARKET DETAIL — row 22, the card trigger pills", () =
 			"the disabled trigger states the C3 refusal",
 		).toBeTruthy();
 		expect(ariaLabel).not.toBe(GLOSSARY.counter);
+		// Positive control on the hash comparison itself: a degenerate or
+		// colliding `contentHashId` would make the assertion below pass
+		// vacuously no matter which string won. Prove the two candidate
+		// strings hash to two different ids before trusting that the
+		// describedby id singles one of them out.
+		expect(contentHashId(GLOSSARY.counter)).not.toBe(
+			contentHashId(ariaLabel as string),
+		);
 		expect(counter?.getAttribute("aria-describedby")).toBe(
 			contentHashId(ariaLabel as string),
 		);

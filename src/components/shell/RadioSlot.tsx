@@ -12,11 +12,12 @@ import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
  * mockup's verbatim string described the ON depiction this inert skin never
  * shows, so it promised liveness the build cannot deliver.
  *
- * ⚠ INFO-1: `disabled` native buttons suppress pointer/mouse events in
- * Chrome/Safari at the browser's hit-testing layer, independent of CSS — this
- * button carries no `pointer-events-none` class, and the suppression still
- * applies. So the hover path may never reach this trigger's `InfoTip` in a
- * real browser. ⛔ Whether the native `title` this replaces had the SAME
+ * ⚠ INFO-1: `disabled` native buttons suppress pointer/mouse events — hover
+ * AND click both — in Chrome/Safari at the browser's hit-testing layer,
+ * independent of CSS; this button carries no `pointer-events-none` class,
+ * and the suppression still applies regardless. So neither the hover
+ * (pointer) nor the tap (touch) path may ever reach this trigger's `InfoTip`
+ * in a real browser. ⛔ Whether the native `title` this replaces had the SAME
  * limitation is NOT measured and is NOT asserted here (O-3: a stated cause
  * that turns out wrong is itself a defect) — `title` is a browser-native
  * hover affordance, not a JS event listener, and may not be gated by
