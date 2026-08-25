@@ -1,6 +1,6 @@
 import { ArgProfile } from "./ArgProfile";
 import { SideBadge } from "./badges";
-import { CommentImage } from "./CommentImage";
+import { CommentImage, PostImagePlaceholder } from "./CommentImage";
 import { KnowMore } from "./KnowMore";
 import { RemovedPlaceholder } from "./placeholders";
 import type { DebateReply, PresentReply } from "./types";
@@ -82,10 +82,45 @@ export function ReplyCard({
 			    `imageUrl` field at all, so this cannot compile in the branch above —
 			    unlike the bookmark cluster beside it, whose placement this file
 			    already records as deliberate-but-not-type-enforced. Here the type
-			    system does carry it (SC-1). */}
-			{reply.imageUrl ? (
-				<CommentImage url={reply.imageUrl} onOpen={onOpenImage} />
-			) : null}
+			    system does carry it (SC-1).
+
+			    ⚠⚠ RPLY-1 · R6 — THE IMAGE IS NOW A CELL, AND THE CELL IS WHY THE
+			    CARD STOPPED HAVING DEAD SPACE UNDER ITS TEXT. This card's root is
+			    `min-h-0 flex-1` deliberately — d5's `.rpanel{flex:1 1 auto}`, so the
+			    post arm's arena is a FILLED two-column band rather than two short
+			    boxes floating at the top. But all three of its children were
+			    content-sized, and in a stretched `flex-col` every pixel of leftover
+			    height lands AFTER the last child. The gap was not a spacing bug; it
+			    was the absence of anything able to absorb.
+			    ⇒ `PostCard` does not have this problem because it has two absorbers
+			    this card lacks: an explicit image CELL and an `AggregateFooter`
+			    pinned at the bottom. R6 gives this card the FIRST one only.
+			    ⛔ AND DELIBERATELY NOT THE FOOTER. A reply has no replies
+			    (`REPLY_DEPTH_MAX = 1`) so there is no count to show, and there is no
+			    split bar on the reply path at all — both are ALREADY absent, which
+			    is exactly what the founder asked for ("like the post view, just
+			    without the replies counter and the S/C bar"). The image cell is
+			    therefore the whole change, and closing the gap is its side effect
+			    rather than a second edit.
+			    ⛔ `flex min-h-0 flex-1 items-center justify-center` — byte-carried
+			    from `PostCard`'s `.argimg` cell, because THE CELL IS WHERE THE
+			    HEIGHT LIVES, not the image: `max-h-full` on an `<img>` is a
+			    percentage and resolves to `none` without a definite height above it.
+			    Break the chain and the image silently reverts to intrinsic size. */}
+			<div className="flex min-h-0 flex-1 items-center justify-center">
+				{reply.imageUrl ? (
+					<CommentImage url={reply.imageUrl} onOpen={onOpenImage} fill />
+				) : (
+					/* ⚠ REUSED VERBATIM, `POST IMAGE · 640:586` CHROME AND ALL. Minting
+					   a "REPLY IMAGE" variant would be authoring product copy, which
+					   needs a founder ruling; the label is one string to change in the
+					   morning if he wants it different. ⚠⚠ It remains REVIEW-SURFACE
+					   ONLY — docketed at `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`)
+					   to be stripped or gated before the DP.2 production promote, and
+					   this is now a FOURTH mount that docket covers. */
+					<PostImagePlaceholder fill />
+				)}
+			</div>
 			{/* `.rtitle` (`:1550`) — the argument itself. A reply has no separate
 			    title column, so its BODY is its title; `deriveTitleTeaser` is a
 			    post-only derivation and is deliberately not applied here.
