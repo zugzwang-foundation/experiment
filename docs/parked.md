@@ -2976,3 +2976,28 @@ operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PER
 **Conditional trigger.** The next task touching `DebateView`'s pop-up/lightbox slots or `dialogs.tsx`, OR any HARDEN.* moderation pass, OR the first moderator report that a removed argument stayed visible.
 
 **Expected next task.** A small `fix/` lane in `src/components/debate/` — id-not-node for the two pop-up slots (behavioural, guardable in jsdom exactly as FEED-1's confirmation is), with the R2 TTL question raised separately.
+
+---
+
+## TIME-1 Form B — `Replies · N` runs at two sizes on two rows canon §3 item 11 calls siblings
+
+**Originating task:** TIME-1 · Form B (branch `feat/time-1-form-b`, PR #406, 2026-08-25) — noticed while measuring the identity rows at 1440 for the argument-age alignment item. **Out of scope and deliberately not fixed:** that run's brief was a divider, a CSS measurement, two guard counts and two doc edits, and this is neither the age nor the divider.
+
+**Deferred work.** Canon §3 item 11 governs one composition — *"head = avatar · name | SIDE @ entry% | stake … `Replies · N` inline with enlarged count (`.repn`)"* — and the TIME-1 Form B amendment now treats the debate and profile identity rows as siblings, giving both the same trailing age under one rule. **They render `Replies · N` at different sizes.** Measured on staging at 1440, computed values:
+
+| surface | `Replies ·` label | the count | the age beside it |
+|---|---|---|---|
+| Market detail (`debate/ArgProfile.tsx`) | **9.5px** bold, `0.12em` tracking, uppercase, `text-ink` | **13px** | 12px |
+| Profile (`profile/ArgumentList.tsx`) | **12px** (`text-xs`), `text-n5` | **14px** (`text-sm`) | 12px |
+
+⚠ **Market detail is the one that matches the ratified source; Profile is the drift.** Both mockups declare the same two values — `surface_d5_v1_0.html:579-580` and `surface_profile_v1_0.html:327/336` give `.repmeta{font-size:9.5px}` and `.repn{font-size:13px}` byte-identically, and the profile mockup's own comment at `:616` names its count *"D5 `.repn`"*, i.e. it explicitly borrows d5's. So this is not two defensible readings of one rule; it is one ratified pair of values that Profile does not use.
+
+**Root cause, and it is already recorded in the code that caused it.** HTML-FINISH row 12 **moved** `Replies · N` on Profile from the card footer's running text into the head cluster, and `ArgumentList.tsx` states that *"both spans keep their class strings byte-for-byte from the footer they left."* Keeping the footer's classes is what carried the footer's **body-text** sizes (12/14) into a head whose mockup rule is 9.5/13. The move was right; the class strings came with it.
+
+**The visible cost, which is why it is worth a row rather than a shrug.** On market detail the run `REPLIES · 3   4d ago` now contains **three type sizes in five words** — 9.5px label, 13px count, 12px age. The founder has ruled that the **age** stays at its row's size and is not the field to change (measured: the age matches its row's declared size and its stake's baseline on all three surfaces — the alignment finding in that run's report). ⇒ **The label is the outlier**, and the question this row parks is whether Profile's head takes `.repmeta`/`.repn` — which would also collapse market detail's run from three sizes to two by making the label and the age the only pair left to reconcile.
+
+**Why deferred.** Changing either surface's `Replies · N` sizes moves a shipped composition that `tests/unit/design/debate-height-chain.test.ts` and `tests/unit/design/profile-height-chain.test.ts` both scan, and re-pointing Profile at the mockup's 9.5/13 is a visual ruling about the head cluster, not a typo fix. Taking it inside a task not asked to make it is the §5.4 "while we're here" this file exists to prevent.
+
+**Conditional trigger.** The next task touching either identity row's `Replies · N` cluster — `debate/ArgProfile.tsx` or `profile/ArgumentList.tsx` — OR any founder pass over head-cluster typography, OR the first Gate C that reads the two rows side by side and asks why they differ.
+
+**Expected next task.** A small `fix/` lane in `src/components/profile/`, taking `.repmeta`/`.repn`'s ratified 9.5px/13px onto the profile head, with the two height chains re-measured at 1440 before and after. ⛔ No mockup edit — both mockups already say 9.5/13; this is the build catching up to them, not a canon question.

@@ -273,9 +273,9 @@ function HeroPostPanel({
 						</>
 					)}
 				</span>
-				{/* TIME-1 — HOW LONG AGO, LAST ON THE ROW. `HeroPost.createdAt` has
-				    been on the read model since the hero shipped
-				    (`server/discovery/hero.ts:117`); nothing new is queried,
+				{/* TIME-1 · Form B — HOW LONG AGO, LAST ON THE ROW.
+				    `HeroPost.createdAt` has been on the read model since the hero
+				    shipped (`server/discovery/hero.ts:117`); nothing new is queried,
 				    presigned or serialized for it.
 				    ⚠ `Replies · N` IS NOT ON THIS ROW — it lives in the panel's own
 				    reply head below (`hero-reply-head-${side}`), so this row ends at
@@ -283,18 +283,31 @@ function HeroPostPanel({
 				    RULE as the debate card ("after every existing tag on the identity
 				    row"), applied to the tags this row actually has, rather than the
 				    same POSITION copied across from a row with different contents.
-				    ⛔ NO `HeadSeparator` BEFORE IT.
-				    `tests/unit/discovery/render/hero-panels.test.tsx:171` pins this
-				    row at EXACTLY TWO separators against the mockup's own markup
-				    (`:187`, `:189`), and its sibling assertions pin their positions.
-				    A third pipe is an extension of a ratified composition; the way to
-				    make one is a canon amendment, not an edit to the guard that
-				    exists to catch it. The age separates on the row's own `gap-1.5`.
+				    ⚠⚠ THE `HeadSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
+				    OPPOSITE UNTIL THE COMMIT BEFORE THIS ONE. It read "⛔ NO
+				    `HeadSeparator` BEFORE IT", because the hero guard pins this row's
+				    separator count against the MOCKUP's own markup and a third pipe
+				    would have reddened it.
+				    ⛔ THAT GUARD'S TWO SOURCES ARE NOW DIFFERENT DOCUMENTS, and the
+				    guard says so. Separators one and two remain governed by
+				    `surface_discovery_v1_0.html`; the third is governed by the canon
+				    §3 item 11 amendment, which supersedes the mockup ON THIS ELEMENT
+				    AND ONLY ON THIS ELEMENT. TIME-1 had already put this row ahead of
+				    the mockup — the mockup's head has no age field at all — so the
+				    pipe does not open a new divergence, it makes the existing one
+				    visible. ⛔ The mockup is NOT edited: a locked mockup is amended
+				    deliberately, never as a side effect of a UI pass.
 				    ⛔ NO SIZE AND NO `shrink-0`. The row is `text-[9.5px]
 				    flex-nowrap overflow-hidden whitespace-nowrap` and the leaf
 				    inherits all of it; every other element here is governed by that
 				    same clip, and exempting this one would make the newest field the
-				    only one that survives a narrow panel. */}
+				    only one that survives a narrow panel.
+				    ⚠ PD-2-36 — this row is the binding constraint on Discovery's
+				    horizontal overflow, and each pipe costs it. Measured at 1440 on
+				    staging before this landed: pipe min-content 2.52px + one 6px gap,
+				    against 33.87px of slack on the wider (NO) panel. Overflow was 0
+				    before and is 0 after; the after-figure is in the run report. */}
+				<HeadSeparator />
 				<RelativeTime createdAt={post.createdAt} />
 			</div>
 			{/* V18 — the WHOLE panel is the post's click target, matching the

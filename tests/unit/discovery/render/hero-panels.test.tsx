@@ -162,15 +162,25 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 				throw new Error(`expected the ${side} hero post panel`);
 			}
 
-			// Row 6 — TWO separators per panel (mockup markup `:187`, `:189`),
-			// between the author name and the side chip, and between the chip and
-			// the stake figure. The head row is the panel's first child.
+			// Row 6 — THREE separators per panel, and they DO NOT SHARE ONE
+			// GOVERNING SOURCE. ⛔ Read this before moving the count again.
+			//  · Separators ONE and TWO are the mockup's own markup
+			//    (`surface_discovery_v1_0.html:187`, `:189`) — between the author
+			//    name and the side chip, and between the chip and the stake.
+			//  · Separator THREE is canon §3 item 11's TIME-1 · Form B amendment,
+			//    which supersedes the discovery mockup ON THIS ELEMENT AND ONLY ON
+			//    THIS ELEMENT. The mockup's head carries no age field at all, so
+			//    TIME-1 had already put the shipped row ahead of it; this pipe
+			//    makes that divergence visible rather than opening a new one.
+			// ⛔ The mockup is deliberately NOT edited — a locked mockup is amended
+			// deliberately, never as a side effect of a UI pass.
+			// The head row is the panel's first child.
 			const head = panel.children[0];
 			const kids = Array.from(head.children);
 			const seps = kids.filter((el) => el.textContent === "|");
-			expect(seps).toHaveLength(2);
+			expect(seps).toHaveLength(3);
 			// Sibling ORDER is the point, so assert positions rather than a count
-			// alone: avatar · author · SEP · chip · SEP · stake.
+			// alone: avatar · author · SEP · chip · SEP · stake · SEP · age.
 			const authorLink = head.querySelector(
 				`[data-testid="hero-author-link-${side}"]`,
 			);
@@ -179,6 +189,16 @@ describe("UI.A4 §4 — HeroPanels (top-YES | market | top-NO)", () => {
 			}
 			expect(kids.indexOf(seps[0])).toBe(kids.indexOf(authorLink) + 1);
 			expect(kids.indexOf(seps[1])).toBe(kids.indexOf(seps[0]) + 2);
+			expect(kids.indexOf(seps[2])).toBe(kids.indexOf(seps[1]) + 2);
+			// …and what the third separator PRECEDES is the age, which is what
+			// makes it a seam rather than a trailing glyph. Asserted here because
+			// a count alone passes on a pipe appended past the age.
+			const age = head.querySelector("[data-relative-time]");
+			if (!age) {
+				throw new Error(`expected the ${side} argument age`);
+			}
+			expect(kids.indexOf(age)).toBe(kids.indexOf(seps[2]) + 1);
+			expect(kids.indexOf(age)).toBe(kids.length - 1);
 			// The glyph is the BYTE the mockup carries — U+007C, not U+2502 and
 			// not any box-drawing look-alike.
 			for (const sep of seps) {
