@@ -91,22 +91,17 @@ experiment/
 │   │                               #   rail — and, since R3, the auto-advance countdown)
 │   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
-│   │                               #   input, separator, skeleton, textarea. FOUR are
+│   │                               #   input, separator, skeleton, textarea. FIVE are
 │   │                               #   project-authored and canon-ratified — empty-block
 │   │                               #   (P1), loading-block (P7), error-block (the
 │   │                               #   route-boundary family; canon §10 C-STATES-1 rules
 │   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
-│   │                               #   item 13, pinned by component name and props).
+│   │                               #   item 13, pinned by component name and props), and
+│   │                               #   relative-time (canon §3 item 14 + the §6 copy
+│   │                               #   register's `Argument age` entry, pinned the same
+│   │                               #   way — TIME-1's age at the end of every card's
+│   │                               #   identity row, on all four card surfaces).
 │   │                               #   Don't reach for a shadcn generator to change one
-│   │                               #   ⚠ THE FOURTEENTH FILE IS A FIFTH PROJECT-AUTHORED
-│   │                               #   PRIMITIVE AND IS NOT CANON-RATIFIED: relative-time
-│   │                               #   (TIME-1 — the age at the end of every card's
-│   │                               #   identity row, on all four card surfaces). It is
-│   │                               #   listed here because this file is DESCRIPTIVE and
-│   │                               #   the primitive is on disk; the canon §6 copy-register
-│   │                               #   and §3.11/§3.12 card-anatomy entries are OWED and
-│   │                               #   are the web lane's to author. Do not read its
-│   │                               #   presence here as ratification.
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,

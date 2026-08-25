@@ -74,9 +74,14 @@
 8. **No invented market content** — extra posts reuse on-topic prose; only counts synthesized.
 9. **Bookmark = the profile blob in a mode**, not a fork, not a 4th source blob.
 10. **`:has()` is banned** (silently dropped CSS blocks in the operator's browser) — JS-toggled body classes instead.
-11. **Card anatomy** (all card renders): rounded corners `--r:8px` / `--imgr:6px`; ink argument text; head = avatar · name | SIDE @ entry% | stake → current + right-edge bookmark/download cluster; `Replies · N` inline with enlarged count (`.repn`); split-bar staked total enlarged + ink (`.stkn`); titles are the click targets.
+11. **Card anatomy** (all card renders): rounded corners `--r:8px` / `--imgr:6px`; ink argument text; head = avatar · name | SIDE @ entry% | stake → current + right-edge bookmark/download cluster; `Replies · N` inline with enlarged count (`.repn`); split-bar staked total enlarged + ink (`.stkn`); titles are the click targets. **Amendment (TIME-1).** Every identity row that names an author ends with the argument's age. It is the row's last field, following every existing tag, and **it is preceded by the row's own divider** — so wherever this field is present, the row's separator count is one higher than item 11 previously recorded. The age sits at the meta rung: `--text-meta`, which resolves to the same token the row's other muted fields already carry. **One treatment across every surface.** Size is the row's, never the field's — the three identity rows run at three different sizes and the age inherits whichever it lands in. **The age sits on the same optical line as the fields beside it.** It is a peer of the row's meta fields, not a trailing annotation set apart from them. Where a row ends in a trailing-edge action cluster — a download mark, a menu glyph — **the age precedes that cluster.** The cluster is the row's edge, not one of its tags, and an age pushed past a control reads as chrome rather than as the last thing the row says.
 12. **Side chip** = curved rectangle (4px), card-scoped *(reply cards + popover still show pill chips — CD fine-tune log, §10)*.
 13. **Thumb glyph = the `ThumbGlyph` primitive** (`src/components/ui/thumb-glyph.tsx`), pinned **by component name and props — never by emoji**: `side` (required) and `size` (optional, **default 16**). Thumb-up renders **stroked `currentColor`**; thumb-down renders **FILLED `--color-no` (`fill-no`), `stroke="none"`, rotated 180°** *(values-log §1 item 3, which supersedes the W2.6 mockup's stroked `THDN` — "match the mockup" regresses it)*. ⚠ **Size does not inherit**: values-log `:186` scopes **16** to the slot header BY NAME, and the profile positions table passes **12** (`surface_profile_v1_0.html:509-510`), so each caller states its own. ⛔ The mockup's and the step-0 close-out's 👍/👎 shorthands are **superseded** — `D1(b)` ruled tier 2 over tier 4, with word-only (**never** an emoji) as the fallback had no reusable primitive existed.
+14. **Argument age = the `RelativeTime` primitive** — `ui/relative-time.tsx`, `RelativeTime({ createdAt, className? })`, pinned by component name and props in the manner of `thumb-glyph` (item 13). *(TIME-1: the `ui/` directory's project-authored primitives go from four to five.)*
+    - `createdAt` is the ISO instant the argument was written, already carried by every read model that reaches a card. Required, never optional — an optional prop would make "an age on some cards and not others" expressible by omission, which is the inconsistency the field exists to remove.
+    - `className` carries **size only**. The treatment is `--text-meta` and belongs to the component, not the caller. One treatment across every surface is the ruling; a colour passed by a caller would defeat it silently.
+    - Marks itself `data-relative-time` — its own marker, never an override of `data-slot`.
+    - Carries **no** `"use client"` directive. It is a shared presentational primitive and compiles into whichever graph imports it, in the manner of `ui/card.tsx` and `ui/badge.tsx`. This is a property of the module's position in the graph, not a bundle claim.
 
 ---
 
@@ -124,6 +129,27 @@ All content is **illustrative dummy** — not final product copy (final copy, mi
 **Profile:** tiles `Wallet value · Positions value · Net profit / loss · Arguments · Total Support received · Total Counter received` · view chip `Viewing as owner · V toggles` / visitor variant · list `Positions` (→ `Bookmarks`) · filters `Select market ▾`, `Open`/`Closed` · columns `Position · Argument · Staked · Current` · actions `Sell` / `Closed` tag · argument-card reply footer `Replied to <author>'s argument — "<parent quote>"` (2-line clamp) · sell hint `No argument needed — selling is the only comment-free action. Default = full position; edit for a partial sell.`
 **Bookmark:** list `Bookmarks` · chip `Your bookmarks` · visitor mode, never Sell.
 **Wave-2 strings:** live in the W2 close-outs' copy blocks (auth set, onboarding deck, header cluster, state kit, share card) — carried as-authored; final wording lands at branding/build per the Depth-1 rule.
+
+### Argument age
+
+Every post and every reply card states how long ago it was written, as the last field of its identity row. Four shapes and no others:
+
+| elapsed | renders |
+|---|---|
+| under a minute | `just now` |
+| 1–59 minutes | `1m ago` … `59m ago` |
+| 1–23 hours | `1h ago` … `23h ago` |
+| 24 hours and over | `1d ago`, `2d ago`, … unbounded |
+
+Lower case throughout. **Never compounded** — `1h 5m ago` is not a shape. **Never a zero unit**; the floor bucket is `just now`, which is also what an argument dated in the reader's future renders, because a device clock running ahead of the server's is ordinary and a card must not promise a future.
+
+**No weeks, months or years bucket.** The live window is ~51 days, so an unbounded day count is the honest end of the ladder and `51d ago` is the practical ceiling. A `w` or `mo` bucket would be code for a state this build cannot reach.
+
+**The exact instant is never shown** — no tooltip, no `title`, no `<time>` element, no calendar date anywhere on the page. The age is what the reader is given. The instant is not withheld reluctantly; it is simply not the affordance.
+
+**It does not tick.** Market detail re-reads its server model every `POLL_INTERVAL_MS_DEBATE_VIEW` and the string refreshes with it; elsewhere it is correct at load and stays as it was. A per-card timer is one timer per card.
+
+**Removed stubs carry no age.** A withheld argument renders its stub without an identity row, so there is no row for the field to end. This is a product ruling, not a security control — the instant survives masking by design and is already public at finer precision through the `.md` export. Reversing it is a visual decision, not a regression, **and it has one precondition recorded in `docs/plans/TIME-1.md` (A8) and in the guard's own docblock. Read that first.**
 
 ---
 
