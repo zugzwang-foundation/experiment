@@ -47,7 +47,7 @@ Recorded because a later reader will otherwise find rows that were recommended f
 
 | ID | What | Class | Verdict | Ground |
 |---|---|---|---|---|
-| **P7a-D01** | Card title → "Continue to Zugzwang" | V | **BUILD** | §4.2 B2. Tier 4 `auth-modal:313`; higher tiers silent |
+| **P7a-D01** | Card title → "Continue to Zugzwang" | V | **SUPERSEDED** → PR #408 | §4.2 B2. Tier 4 `auth-modal:313`; higher tiers silent |
 | **P7a-D02** | Google `.gmark` circular mark absent | V | **HOLD** → `AUTH-GOOGLE-MARK` | §2.1 (1) |
 | **P7a-D03** | Email entry stacked; mockup is a flex row | V | **BUILD** | §4.2 B1. Tier 4 `:154`, `:318`. Non-token layout, §6 fair game |
 | **P7a-D04** | Submit copy "Send code" → "Continue" | V | **HOLD** → `AUTH-TURNSTILE-WIRE` | §4.2 **S2**. The mockup's "Continue" advanced to a Turnstile pane that does not exist; the built control sends immediately. Porting the label would make it lie. New ground stated |
