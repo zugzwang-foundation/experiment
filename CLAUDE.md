@@ -153,24 +153,31 @@ One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md`, in the **same c
 ### 5.13 Commit & git hygiene
 Branches `feat/` · `fix/` · `chore/` · `refactor/`.
 
-⛔ **NOTHING IN THIS SECTION IS ENFORCED. There is no branch protection on this repository — not on `main`, not on `staging`.** Measured at S-1, 2026-08-25, four independent reads:
+⚠ **`Squash-merge only` is DISCIPLINE, not enforcement — corrected 2026-08-14 against the live API.** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**; nothing forbids a rebase merge. *(Re-measured 2026-08-25 at S-1: still all three `true`.)*
+
+**⚠ NOTHING IN THIS SECTION IS MECHANICALLY ENFORCED.** Measured against the live API, 2026-08-25:
 
 ```
-GET /repos/…/branches/main          → "protected": false
-GET /repos/…/branches/staging       → "protected": false
-GET /repos/…/branches/{main,staging}/protection
-                                    → 403 "Upgrade to GitHub Pro or make this repository public"
-GET /repos/…/rulesets               → 403 (same gate)
-GET /repos/…/rules/branch/{main,staging}
-                                    → 404
-GET /orgs/zugzwang-foundation       → plan: "free";   repo visibility: "private"
+branches/main            → "protected": false
+branches/staging         → "protected": false
+branches/*/protection    → 403 "Upgrade to GitHub Pro or make this
+                           repository public to enable this feature."
+rulesets                 → 403 (same plan gate)
+rules/branch/*           → 404
+org plan "free" · repo visibility "private"
 ```
 
-A private repo on a Free org plan can hold neither classic branch protection nor rulesets. **State this as a measurement, not a history: it is NOT ESTABLISHED whether protection ever existed and was lost, or was never configured** — that needs `admin:org` for the audit log, a scope the operational token does not carry (`admin:public_key, gist, read:org, repo`).
+A private repository on a Free organisation plan cannot hold branch protection or rulesets. **PR-required, the `ci` status check, `required_signatures`, `enforce_admins`, linear history and no-force-push are DISCIPLINES WITH NO BACKSTOP.** A red PR can be merged. A force-push to `main` or `staging` would succeed.
 
-**So every line below is a DISCIPLINE with no backstop.** PRs · signed commits (SSH, ED25519) · linear history · squash-only · no force-push · no direct commit to `main`: all convention, all held by whoever is typing. ⚠ **`ci` is NOT a required status check, because no check can be required without protection** — a PR whose CI is red can be merged, and nothing objects. **Green is a thing to CHECK, immediately before each merge; it is not a gate.** ⚠ **Nothing rejects a force-push** to any branch, so O-4's prohibition on force-pushing `staging` (§8) is the only thing standing between the repo and a rewritten ref.
+Corroborating, independently: the 32 directly-pushed `staging` commits verify **G**; the three PR-squash commits verify **N**. Under `required_signatures` the squash commits would be GitHub-signed.
 
-⚠ **What IS still true, re-measured the same day:** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**. That flag reading came from the repository endpoint, which works; the enforcement claims that used to sit beside it came from an endpoint that returns 403. **The 2026-08-14 pass measured the readable half and carried the unreadable half through as if a 403 were a confirmation** — which is why this correction is the same defect as the one it replaces, one endpoint over, and why the paragraph now leads with the reads rather than with the conclusion.
+⚠ **NOT ESTABLISHED** — whether protection ever existed and was lost, or was never configured. The audit log needs `admin:org`, which the working token does not carry. **Write the measurement and its date. Do not write a history.**
+
+**Consequence at every merge:** CI green is a thing to CHECK, not a gate to lean on. Verify the check's conclusion in the same action as the merge, not once at the start of a session.
+
+**This section previously asserted the opposite.** The 2026-08-14 pass that corrected "squash-merge only" measured the merge-method flags from the repo endpoint — which works — and left the protection claims beside them unchecked, because that endpoint returns 403.
+
+**The one mechanism that exists is client-side and is not a control:** `lefthook.yml`'s `pre-push` `no-force-push-protected` job refuses a non-fast-forward push to `main` or `staging` (item 7, S-1). It runs in every clone because Lefthook already does, and `--no-verify` skips it. **A discipline with a mechanism beats one in a document; neither is enforcement.**
 
 Multi-line commit messages: write `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt` — never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB; split multi-command pastes into single commands). Commit identity: `Zugzwang/world <zugzwangworld@proton.me>` (git username `Chrollo`).
 
@@ -322,6 +329,8 @@ Operating lessons, ruled durable and numbered. **O-space is the *operating* regi
 - **O-11 · Every CC → web reply is a file. The file is uploaded, never pasted.** CC writes its report to `~/Downloads/zz_<TASK.ID>_<phase>_<YYYY-MM-DD>T<HHMM>.md` **before** printing anything inline, and writes **incrementally as it works** — a session that dies mid-run still leaves the artifact on disk. The minute stamp makes collision structurally impossible; on a genuine collision append `-r2`, and **never let the filesystem mint a `(1)` suffix** — an OS-appended `(1)` is indistinguishable from a stale duplicate. Never rename, move, overwrite or delete a report the operator staged. **The inline turn is a headline, never the report**, capped at ten lines: `FILE` / `LINES` / `MD5` / `STATUS` / `HALTED-AT` (omit when COMPLETE) / `HEADLINE` (≤4 lines) / `UPLOAD`. **The headline names; it does not conclude** — it states what was measured and what stopped, never a verdict, and *"all clear"* is not headline content. `LINES` and `MD5` are **measured** as the last action, never asserted. **The operator uploads the file; never select-and-paste from a terminal** — a terminal selection is a partial artifact that looks whole, arriving with a beginning, an end and no signal that a middle is missing. Web Claude checks the received line count against `LINES` **before reading**; a mismatch is a failed transfer, not a short report, and is re-requested rather than reasoned from. **No exception for size** — a one-line answer still writes the file, and `UPLOAD: OPTIONAL` is what makes that cheap. Writing is free; judging when to write is what fails, because the reply that turns out to matter is not reliably the one that looked long when it was written.
 
 - **O-12 · A routed item inherits its LOCATION, not its DEFECT CLASS.** Moving a finding to the surface that owns the file it lives in says where the work happens; it says nothing about what kind of defect it is. Re-deriving the class from the destination is how a visual row becomes a functional one on arrival, and how a spec gap acquires a baseline it never had. **Carry the class with the row.** ⚠ This rule was cited six times as `O-10` before it was minted, while `O-10` was issued to a different rule — the citations are corrected in the same commit that mints this number.
+
+- **O-13 · An endpoint that cannot answer has not answered.** A 403, a 404, or a permission error is **NOT ESTABLISHED** — never confirmation of the document you were checking against it. Record what you could not read, and what would read it. *(Minted at S-1. Founding case: CLAUDE.md §5.13 and AGENTS.md §10/§11 asserted six enforced branch-protection controls for eleven days after a pass that "verified live" the merge-method flags — from the repository endpoint, which works — while the protection endpoint beside them returned 403, and the 403 was carried through as if it were the confirmation. Not one of the six existed. The shape reaches past one API: a `command not found`, a skipped test, an empty grep against a file you never opened, and a subagent that returned nothing are all silence, and silence is the one answer that never corroborates.)*
 
 **Retired, not numbered:** *"the staging runner has never been executed and cannot be locally."* **DISCHARGED** — STAGING-PARITY Slice B.3 executed it against the live staging database. Recorded here so it is not re-derived as a live constraint.
 
