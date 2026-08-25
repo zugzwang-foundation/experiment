@@ -15,7 +15,7 @@
 The **Zugzwang Experiment** — a CPMM prediction market with mandatory commentary and soulbound reputation (Dharma). Web2 only. Live 15 Sep – 5 Nov 2026; concludes 6 Nov at Devcon 8, Mumbai.
 
 - **Scope:** pure web2. **No chain, no contracts, no tokens.** Dharma is a Postgres `NUMERIC(38,18)` column. Testnet/Mainnet get their own repos.
-- **Source of truth:** `SPEC.1` (product — **version lives in the file's own header; read it there**) + `SPEC.2` (technical, 1.0.24) + `docs/adr/` **0001–0039** (37 files; 0002 and 0012 unused — never count files to find the ceiling, read the highest number; next free **0040**; always verify with `ls docs/adr/` on the live repo) are canonical. The project tracker (operator-maintained, external; version lives on the tracker) is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block. *(Corrected at SYNC-1: this sentence taught "read the highest number, never count" and was itself three numbers stale — 0034/33/0035. The discipline was never applied to the sentence stating it. That is O-2, §8. **Two numbers stale again at PHASE-0** — 0037 against a live 0039 — which is the tell that a ceiling written into prose decays no matter how loudly the same prose says not to trust it. The instruction is the durable part; the number never is.)*
+- **Source of truth:** `SPEC.1` (product — **version lives in the file's own header; read it there**) + `SPEC.2` (technical, 1.0.24) + `docs/adr/` **0001–0040** (38 files; 0002 and 0012 unused — never count files to find the ceiling, read the highest number; next free **0041**; always verify with `ls docs/adr/` on the live repo) are canonical. The project tracker (operator-maintained, external; version lives on the tracker) is planning/sequencing only. On conflict, spec/ADR wins — note the drift once, don't block. *(Corrected at SYNC-1: this sentence taught "read the highest number, never count" and was itself three numbers stale — 0034/33/0035. The discipline was never applied to the sentence stating it. That is O-2, §8. **Two numbers stale again at PHASE-0** — 0037 against a live 0039 — which is the tell that a ceiling written into prose decays no matter how loudly the same prose says not to trust it. The instruction is the durable part; the number never is. **One number stale again at S-1** — 0039 against a live 0040, ADR-0040 having landed the day after PHASE-0 corrected this. That is the third consecutive correction this sentence records, and the interval is shortening: SYNC-1 (2026-08-08) → PHASE-0 (2026-08-21) was 13 days; PHASE-0 → S-1 (2026-08-25) was 4. Read `ls docs/adr/`; the number above is a snapshot of 2026-08-25 and nothing more.)*
 - **License:** AGPL-3.0-or-later (§13 forecloses closed-source forks).
 - **Deliberate schema choices:** the DEBATE.8/9 schema catch-up is complete — `comments.stake_at_post_time` and `friendly_fire_events` are dropped. One apparent spec↔schema gap remains and is **intentional**: `comments.bet_id` is **deliberately nullable** (INV-1 via `bets.comment_id` NOT NULL + the W-1 atomic transaction; not a pending NOT-NULL migration — detail in AGENTS.md §6). **Don't "correct" it to the spec.**
 
@@ -151,7 +151,28 @@ Subagents (§6) are invoked **explicitly** from kickoff prompts (auto-match is o
 One ADR per architectural change at `docs/adr/<NNNN>-<slug>.md`, in the **same commit** as the code (template `docs/adr/_template.md`). Decision unchanged but consumer surface needs scoping → in-place *Patch record*, not a formal supersession.
 
 ### 5.13 Commit & git hygiene
-Branches `feat/` · `fix/` · `chore/` · `refactor/`. **PRs required; signed commits (SSH, ED25519)** — enforced by GitHub branch protection (server-side), *not* a local hook. ⚠ **`Squash-merge only` is DISCIPLINE, not enforcement — corrected 2026-08-14 against the live API.** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**; nothing forbids a rebase merge. **What IS enforced:** PR required · `ci` as a required check (`strict: true`) · `required_signatures` · `enforce_admins` · linear history · no force-push · required approvals **0**. Merge-commit is blocked *in practice* by linear history, so the reachable set is **squash OR rebase** — and only convention picks squash. Multi-line commit messages: write `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt` — never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB; split multi-command pastes into single commands). Commit identity: `Zugzwang/world <zugzwangworld@proton.me>` (git username `Chrollo`).
+Branches `feat/` · `fix/` · `chore/` · `refactor/`.
+
+⛔ **NOTHING IN THIS SECTION IS ENFORCED. There is no branch protection on this repository — not on `main`, not on `staging`.** Measured at S-1, 2026-08-25, four independent reads:
+
+```
+GET /repos/…/branches/main          → "protected": false
+GET /repos/…/branches/staging       → "protected": false
+GET /repos/…/branches/{main,staging}/protection
+                                    → 403 "Upgrade to GitHub Pro or make this repository public"
+GET /repos/…/rulesets               → 403 (same gate)
+GET /repos/…/rules/branch/{main,staging}
+                                    → 404
+GET /orgs/zugzwang-foundation       → plan: "free";   repo visibility: "private"
+```
+
+A private repo on a Free org plan can hold neither classic branch protection nor rulesets. **State this as a measurement, not a history: it is NOT ESTABLISHED whether protection ever existed and was lost, or was never configured** — that needs `admin:org` for the audit log, a scope the operational token does not carry (`admin:public_key, gist, read:org, repo`).
+
+**So every line below is a DISCIPLINE with no backstop.** PRs · signed commits (SSH, ED25519) · linear history · squash-only · no force-push · no direct commit to `main`: all convention, all held by whoever is typing. ⚠ **`ci` is NOT a required status check, because no check can be required without protection** — a PR whose CI is red can be merged, and nothing objects. **Green is a thing to CHECK, immediately before each merge; it is not a gate.** ⚠ **Nothing rejects a force-push** to any branch, so O-4's prohibition on force-pushing `staging` (§8) is the only thing standing between the repo and a rewritten ref.
+
+⚠ **What IS still true, re-measured the same day:** `allow_squash_merge`, `allow_merge_commit` **and** `allow_rebase_merge` are **all three `true`**. That flag reading came from the repository endpoint, which works; the enforcement claims that used to sit beside it came from an endpoint that returns 403. **The 2026-08-14 pass measured the readable half and carried the unreadable half through as if a 403 were a confirmation** — which is why this correction is the same defect as the one it replaces, one endpoint over, and why the paragraph now leads with the reads rather than with the conclusion.
+
+Multi-line commit messages: write `/tmp/commit-msg.txt`, then `git commit -F /tmp/commit-msg.txt` — never multi-line `-m` or heredocs (macOS zsh truncates pastes ~1KB; split multi-command pastes into single commands). Commit identity: `Zugzwang/world <zugzwangworld@proton.me>` (git username `Chrollo`).
 
 #### 5.13.1 The `Instructions for AI` block
 
@@ -187,7 +208,9 @@ That is why the block reads *Where there is a note* and not *the note*: the sent
 
 Fourteen squash subjects on `main` between 2026-08-09 and 2026-08-18 carry `⛔ DO NOT MERGE`, `⚠ DO NOT MERGE`, or a Gate-C-pending variant. **They are not mistakes and they are not evidence that unreviewed work landed.**
 
-The marker means *do not merge before Gate C*, written into the PR title so that a merge button clicked out of sequence would look wrong. When Gate C passes, the merge itself is the discharge — GitHub carries the PR title into the squash subject, so the warning outlives the condition it described. **Read a `DO NOT MERGE` subject on `main` as: this PR was gated, and the gate passed.** The evidence is that it is on `main` at all, in a repository whose branch protection requires a PR and a green `ci` check.
+The marker means *do not merge before Gate C*, written into the PR title so that a merge button clicked out of sequence would look wrong. When Gate C passes, the merge itself is the discharge — GitHub carries the PR title into the squash subject, so the warning outlives the condition it described. **Read a `DO NOT MERGE` subject on `main` as: this PR was gated, and the gate passed.**
+
+⚠ **The evidence this paragraph used to offer for that reading is void, and the reading survives on weaker ground.** It said: *the evidence is that it is on `main` at all, in a repository whose branch protection requires a PR and a green `ci` check.* **There is no branch protection (§5.13), so being on `main` proves neither a PR nor a green check.** What remains is that all fourteen do have merged PRs with green `ci` runs — which is a fact about those fourteen, checkable one at a time with `gh pr view`, and not a property the repository guarantees. **The conclusion is unchanged; the reason for believing it is now per-commit rather than structural.** Corrected at S-1 rather than left standing, because an argument that names a mechanism which does not exist is worse than one that names none.
 
 ⚠ **`6272d5b` is different and is the one exception.** It says `⛔ DRAFT, DO NOT MERGE` — `DRAFT` is a GitHub PR *state*, not a Gate-C marker, and a draft PR cannot be merged until it is marked ready. Its presence on `main` means the PR was taken out of draft before merging; the subject records the state at the time the title was written, not at the time it landed.
 
