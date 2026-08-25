@@ -123,3 +123,37 @@ export function deriveReplySide(args: {
 	}
 	return args.parentSide === "YES" ? "NO" : "YES";
 }
+
+/**
+ * RPLY-1 · R1 — the pole column a REPLY composer hosts in: the one OPPOSITE the
+ * side being bet.
+ *
+ * ⛔⛔ IT TAKES THE RELATION, AND THAT IS THE WHOLE POINT OF ITS SIGNATURE. The
+ * shipped expression was `opposite(post.sideAtPostTime)` — a function of the
+ * PARENT's side alone — so Support and Counter could not produce different
+ * columns. Support coincided with the correct answer by arithmetic accident (a
+ * Support bet inherits its parent's side, so opposite-the-parent IS
+ * opposite-the-bet); Counter did not, and opened the composer on top of the very
+ * side it was betting.
+ *
+ * ⚠ THE RULE WAS FAILING ITS OWN STATED REASON. design-canon §3.3 gives it as
+ * "the bet's side stays visible" — and the bet's side was exactly what the
+ * composer covered on every Counter.
+ *
+ * ⇒ EXPORTED RATHER THAN INLINED, deliberately: taking `relation` as a required
+ * argument makes the dependency TYPE-VISIBLE, so a revert to keying off the
+ * parent alone is a compile error at the call site rather than a silent
+ * re-inversion. O-1 — structural beats procedural. It also makes the four-row
+ * matrix assertable as BEHAVIOUR over shipped code rather than as a string
+ * match against a component that cannot be mounted without the whole bet stack.
+ *
+ * ⚠ The side derivation is REUSED, never re-implemented — this composes
+ * `deriveReplySide` so the column and the badge cannot disagree about a
+ * relation. Both are pure, so deriving the side twice cannot drift.
+ */
+export function replyComposerColumn(args: {
+	parentSide: Side;
+	relation: "support" | "counter";
+}): Side {
+	return deriveReplySide(args) === "YES" ? "NO" : "YES";
+}

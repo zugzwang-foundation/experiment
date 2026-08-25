@@ -14,7 +14,7 @@ import { PageContainer } from "@/components/shell/PageContainer";
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { ComposerSlot } from "./composer/ComposerSlot";
-import { deriveReplySide } from "./composer/gating";
+import { deriveReplySide, replyComposerColumn } from "./composer/gating";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
@@ -749,15 +749,48 @@ export function DebateView({
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {
-							// v0.10: the reply composer — Support OR Counter — opens in
-							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
-							// side (slot ≠ side, permanently — INV-3 narrative; the
-							// side derives via the unit-pinned deriveReplySide, never
-							// from the hosting column).
-							const composerColumn = opposite(selectedPost.sideAtPostTime);
+							// ⚠⚠ RPLY-1 · R1 — THE COLUMN IS OPPOSITE THE **BET**, NEVER
+							// OPPOSITE THE PARENT. This read "opens in the slot OPPOSITE THE
+							// POST" and the code did exactly that, which is the defect: the
+							// RELATION was not an input to the expression at all, so Support
+							// and Counter could not produce different columns. Support
+							// coincided with the right answer by arithmetic accident (a
+							// Support bet inherits the parent's side, so opposite-the-parent
+							// IS opposite-the-bet); Counter did not — a Counter on a YES
+							// parent bets NO and opened inside the NO column.
+							//
+							// ⛔ THE RULE FAILED ITS OWN STATED PURPOSE. design-canon §3.3
+							// gives the reason as "the bet's side stays visible", and the
+							// composer was covering precisely the side being bet. So this is
+							// the post arm catching up to the market arm, which has always
+							// keyed its slot off the side being bet rather than off a parent.
+							//
+							// ⚠⚠ THE COLUMN IS A CALL, NOT AN EXPRESSION, AND THAT DESIGNED
+							// OUT A HAZARD RATHER THAN ACCEPTING ONE. The obvious fix inlines
+							// the local flip of the RESULTING side — but `composerColumn` was
+							// declared ABOVE `resultingSide`, so that form only works if the
+							// two are also reordered, and getting that wrong is a TDZ
+							// ReferenceError at runtime that a source-scanning test would
+							// never reach. `replyComposerColumn` takes the same two inputs
+							// the derivation does, so neither declaration depends on the
+							// other and the ordering stops being load-bearing at all.
+							// ⇒ It also makes the relation a REQUIRED ARGUMENT, so a revert
+							// to keying off the parent alone is a compile error here rather
+							// than a silent re-inversion (O-1).
+							//
+							// ⚠ The chip still carries the TRUE bet side (slot ≠ side,
+							// permanently — INV-3 narrative), and the side still derives via
+							// the unit-pinned `deriveReplySide`, never from the hosting column.
 							const resultingSide =
 								openReply !== null
 									? deriveReplySide({
+											parentSide: selectedPost.sideAtPostTime,
+											relation: openReply,
+										})
+									: null;
+							const composerColumn =
+								openReply !== null
+									? replyComposerColumn({
 											parentSide: selectedPost.sideAtPostTime,
 											relation: openReply,
 										})
@@ -769,6 +802,17 @@ export function DebateView({
 									key={side}
 									side={side}
 									pricing={market.pricing}
+									// ⚠ RPLY-1 · R1 — UNCHANGED EXPRESSION, AND IT ONLY NOW
+									// FIRES ON THE COUNTER PATH. Measured against the shipped
+									// `deriveReplySide`: with the column keyed off the PARENT,
+									// a Counter put `resultingSide` and `composerColumn` on the
+									// same pole, so `side !== composerColumn` was false wherever
+									// `resultingSide === side` was true and the engaged-slot
+									// backlight (values-log §1 item 4) was dead on that path.
+									// Keying the column off the BET repairs it as a consequence
+									// rather than as a second edit — the backlight belongs on
+									// the bet's own column, which is exactly the column the
+									// composer no longer covers.
 									engaged={resultingSide === side && side !== composerColumn}
 									picked={pickedSide === side}
 									header={
