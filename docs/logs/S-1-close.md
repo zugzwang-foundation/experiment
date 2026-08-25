@@ -31,7 +31,7 @@ one key is the complete rollback, by design.
 | # | Criterion | Preview (Dev B, 2026-08-22/25) | Staging (this run) | Artifact |
 |---|---|---|---|---|
 | **1** | Runtime connects via `:6543` | **verified** | **verified** (composition — see criterion 2) | `/api/health` canary `e76966f` |
-| **2** | Transaction mode actually active | **verified** | ⛔ **verified — MEASURED** | 8 app backends vs a `max: 4` pool, traffic driven at the domain, observed through `:5432` |
+| **2** | Transaction mode actually active | **verified** | **verified** | **criterion 6's discrimination** — `SESSION MODE` before the flip, `TRANSACTION MODE` after, same instrument/code/database 20 min apart |
 | **3a** | Client ceiling risen 15 → 200 | **verified** (DASH) | **not exercised** | Supavisor dashboard — not readable from a session |
 | **3b** | Backend Pool Size unchanged at 15 | **verified** (DASH) | **not exercised** | same |
 | **4** | Bet path works under `SERIALIZABLE` | **verified** — HTTP 200 in 3.55 s vs a 30 s bound, W-1 spine 8/8 | ⛔ **not exercised** | needs an authenticated staging session; not held by the executor |
@@ -41,24 +41,46 @@ one key is the complete rollback, by design.
 
 ### Labels that stay labels
 
-- **Criterion 2 · MEASURED at staging, and here is why it could not have been.**
+- **Criterion 2 · established by CRITERION 6, and here is what could NOT establish it.**
   A direct `pg_stat_activity` identity query returns `application_name = "Supavisor"` from one
   address for **every** pooled connection, regardless of which port it arrived on. **The
   database cannot tell you which pooler serves a backend.** That is an architectural fact, and
   **S-5 needs it**: no query against the database will ever attribute load to a pooler.
-  What closed it instead was an *effect*: the shipped pool is `max: 4`, session mode pins one
-  backend per client session, so >4 backends carrying app statements is only reachable by
-  returning them at COMMIT. **Eight were observed.** The four-fact composition it replaces
-  (Doppler value · explicit redeploy · code resolution · Sample B's shift) is now corroboration.
+  Nor can the stored flag be read — Vercel marks it `type: sensitive` and returns `""` for all
+  56 project variables, including `ZUGZWANG_ENV`, which is provably `staging`.
+  **What establishes it is criterion 6's discrimination:** the sentinel survived *every* read
+  before the flip and only *some* after — same instrument, same code, same database, twenty
+  minutes apart. **Connection reuse is the only thing that produces that**, and it is not
+  affected by how many app instances are running.
+  The four-fact composition (Doppler value · explicit redeploy · code resolution · Sample B's
+  shift) remains as corroboration.
 - **Criterion 5 · inference by composition.** Not measured. Not promoted.
 - **Criterion 7 deep · DOCUMENTED, NOT RUN.** `git revert` + redeploy was never executed. V-3's
   split: *"rollback documented"* and *"rollback tested"* are different claims; only the first
   is made.
 - **Criteria 3a / 3b staging-side · dashboard, not the executor's to claim.**
 - **Sample A/B · directionally consistent, 16 requests, NOT conclusive on its own.**
-  9 → 12 backends and 1 → 2 in-transaction is within ordinary variance. **The discrimination is
-  criterion 6 and the 8-backend measurement — not the A/B table.** The A/B's value is that it
-  established a SHA-clean baseline (`canary e76966f` on both sides).
+  9 → 12 backends and 1 → 2 in-transaction is within ordinary variance. The A/B's value is that
+  it established a SHA-clean baseline (`canary e76966f` on both sides).
+- ⛔ **The 48-request / 8-backend count · DIRECTIONALLY CONSISTENT, CONFOUNDED, not conclusive.**
+  48 requests (6 × 8 parallel) at the domain put **8 distinct backends** on app transactions
+  against a shipped `max: 4`. **Its distinct and real value is that it was driven at the
+  DEPLOYED RUNTIME**, where criterion 6 runs locally against the same secrets — so it is the
+  only observation in this task that touches the deployment's own sockets.
+  **But `max: 4` is PER INSTANCE.** Six waves of eight parallel requests can raise a second
+  Vercel instance, and **two instances in session mode also produce 8 pinned backends.** The
+  count therefore does not discriminate between the modes, and it was written up as if it did.
+  **The control that would close it was not run: the identical 48-request pattern in session
+  mode.** Sample A is not that control — 16 requests, lower parallelism, one instance's worth
+  of traffic.
+  ⇒ **If a later stratum needs the deployed-runtime claim standing alone, it is one line:**
+  delete `DB_POOLER_MODE`, redeploy, replay the same 6 × 8 pattern under the sampler, and
+  compare distinct app backends. A session-mode reading at or below 8 leaves the count
+  confounded; well below 4 closes it.
+  *(Corrected at close-out review. The finding is a LABEL, not a defect — nothing about the
+  final state changes, and criterion 2 stands on criterion 6. It is recorded because the row
+  that was hardest to earn is the one easiest to overstate, and §5's own discipline for Sample
+  A/B applies one row up.)*
 
 ---
 
