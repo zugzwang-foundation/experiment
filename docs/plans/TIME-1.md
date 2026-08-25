@@ -94,7 +94,7 @@ comments.created_at
 | Slice | Ships | Exit condition |
 |---|---|---|
 | **S1** | `src/lib/relative-time.ts` + `tests/unit/relative-time.test.ts` | G1–G4 green; each verified RED by reverting its fix; full suite green |
-| **S2** | The leaf + `ArgProfile` + the four debate mount files | `tests/unit/design/` green (13 files / 71 tests); `tests/unit/debate/` green; full suite green |
+| **S2** | The leaf + `ArgProfile` + the four debate mount files | `tests/unit/design/` green (13 files / 71 tests); `tests/unit/debate/` green; full suite green. ⚠ **`13 / 71` IS THE COUNT AT S2 AND IS CORRECT AS SUCH** — a moment, not a present-tense claim. S4 adds the placement suite and takes the folder to **14 files / 99 tests**, so S2 could not have exited at 99: 28 of those tests did not exist yet. The figure stays; only its tense was misleading. |
 | **S3** | `HeroPanels.tsx` + `ArgumentList.tsx` | `tests/unit/design/` green; `tests/unit/profile/` green; full suite green |
 | **S4** | `tests/unit/design/relative-time-placement.test.tsx` (G5, G6) | Both verified RED by reverting; full suite green |
 | **S5** | Reviewer cascade → fixes → re-review of each fix → PR | Cascade dispositions logged; PR open against `staging`, unmerged |
@@ -174,6 +174,9 @@ in this order, all at effort max:
 2. `@code-reviewer` — scope the RSC→client boundary and the shared card
    components. Failure mode: `"use client"` on a card rather than a leaf; a
    smuggled timer/interval; the formatter re-implemented per surface.
+   ⚠ **QUOTED AS ISSUED, NOT AS A DESCRIPTION OF THE BUILD** — the shipped leaf
+   carries no directive at all (**A7**); this phrasing is preserved unaltered
+   because presupposing one is part of how C-1 was found.
 3. `@security-auditor` — scope how a CONTENT-REMOVED post or reply renders.
    Failure mode: the mount reaching into a path where a removed node's masked
    fields become reachable.
