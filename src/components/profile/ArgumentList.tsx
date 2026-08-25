@@ -533,15 +533,28 @@ function PresentHead({
 					</span>
 				</>
 			)}
-			{/* TIME-1 — HOW LONG AGO, AFTER EVERY TAG ON THIS ROW: after
+			{/* TIME-1 · Form B — HOW LONG AGO, AFTER EVERY TAG ON THIS ROW: after
 			    `Replies · N` on a post, and after the stake / `Sold` / struck
 			    original on a reply, since a reply has no reply count (§9).
-			    ⛔ NO `HeadSeparator` BEFORE IT. `arrangement.test.tsx:262` pins this
-			    head at EXACTLY THREE seam points against canon §3 item 11 —
-			    `avatar · name | SIDE @ entry% | stake | Replies · N` — and a fourth
-			    pipe is an extension of that composition. The amendment belongs in
-			    canon, not in the guard that exists to catch the drift. The age
-			    separates on the row's own `gap-2` instead.
+			    ⚠⚠ THE `HeadSeparator` IS RULED IN, AND THIS BLOCK ARGUED THE
+			    OPPOSITE UNTIL THE COMMIT BEFORE THIS ONE. It read "⛔ NO
+			    `HeadSeparator` BEFORE IT", because the arrangement guard pins this
+			    head's seam count against canon §3 item 11 and a fourth pipe would
+			    have reddened it. Canon §3 item 11 now carries the field and its
+			    divider, so the seam count is FOUR by ruling; the guard follows the
+			    ruling rather than the other way round.
+			    ⚠ MEASURED at 1440 on staging: this row carries TWO baselines,
+			    because it mixes type sizes under `items-center` — a 14px group (the
+			    pseudonym, all three pipes, and `Replies · N`, whose box baseline is
+			    set by its 14px inner count) at 373, and a 12px group (the stake and
+			    the age) at 372. The new pipe joins the 14px group, so it sits 1px
+			    below the age — which is EXACTLY the pairing this row already ships
+			    between the third pipe and `Đ 10`. It is a property of the row's
+			    mixed sizes, not of this field, and the mockup's own `.rchead`
+			    (`:321-336`) mixes four sizes under centre alignment the same way.
+			    Matching the age's line box to its neighbour's does NOT move the
+			    baseline (measured); only `items-baseline` does, and that costs the
+			    row 24 → 26px and moves the avatar and the chip.
 			    ⛔ BEFORE THE `ml-auto` WRAPPER, NOT AFTER IT. That wrapper is the
 			    trailing-edge action cluster; an age pushed past it would read as
 			    chrome beside the download mark rather than as the last thing the
@@ -559,6 +572,7 @@ function PresentHead({
 			    surface is that present cards carry an age and removed stubs do not.
 			    Adding one there would be a new decision about what a withheld
 			    argument discloses, made in a task that was not asked to make it. */}
+			<HeadSeparator />
 			<RelativeTime createdAt={item.createdAt} className="text-xs" />
 			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
 			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,

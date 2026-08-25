@@ -223,34 +223,36 @@ export function ArgProfile({
 						</span>
 					</>
 				) : null}
-				{/* TIME-1 — HOW LONG AGO, AND IT IS THE LAST THING ON THE ROW.
+				{/* TIME-1 · Form B — HOW LONG AGO, AND IT IS THE LAST THING ON THE ROW.
 				    ⛔ INSIDE THIS DIV, NOT THE ROW ABOVE IT. The outer row's last
 				    child is the `ml-auto` download mark, which sits at the trailing
 				    EDGE; appending there would put the age past a control rather than
-				    after the tags. The ruling is that it follows `Replies · N`, and
-				    `Replies · N` is here.
-				    ⛔⛔ NO `Sep` BEFORE IT, AND THAT IS A MEASURED DECISION RATHER
-				    THAN AN OMISSION. The first build of this DID carry one. Two
-				    shipped guards count the pipes on the sibling rows against a
-				    governing source and go RED on a fourth —
-				    `tests/unit/profile/render/arrangement.test.tsx:262` pins THREE
-				    against canon §3 item 11's `avatar · name | SIDE @ entry% | stake
-				    | Replies · N`, and
-				    `tests/unit/discovery/render/hero-panels.test.tsx:171` pins TWO
-				    against the hero mockup's own markup. This row is governed the
-				    same way by d5 `:960-968`; it simply has no guard counting it.
-				    ⇒ A pipe here is an extension of a ratified composition, and the
-				    way to make that extension is a canon amendment, not an edit to
-				    the guards that exist to catch it. The age separates on the row's
-				    own `gap-1.5` instead — which the row already does between the
-				    side chip and the position marker, so it is not a new grammar.
-				    ⚠ IF THE FOUNDER RULES THE PIPE IN, it is one `<Sep />` here, one
-				    `<HeadSeparator />` at each sibling row, and three counts — and
-				    canon gains the field either way, because a trailing age is a
-				    composition change with or without a divider.
+				    after the tags. Canon §3 item 11 now rules exactly that — "the age
+				    precedes that cluster" — so the position is ratified rather than
+				    merely reasoned from d5.
+				    ⚠⚠ THE `Sep` IS RULED IN, AND THIS BLOCK ARGUED THE OPPOSITE UNTIL
+				    THE COMMIT BEFORE THIS ONE. It read "⛔⛔ NO `Sep` BEFORE IT, AND
+				    THAT IS A MEASURED DECISION RATHER THAN AN OMISSION", on the
+				    reasoning that two shipped guards count the pipes on the SIBLING
+				    rows against a governing source and would redden on a fourth. That
+				    was right about the guards and wrong about the remedy. The founder
+				    ruled Form B; canon §3 item 11 gained the field AND its divider
+				    first; the counts move because the ruling moved. The ordering is
+				    the whole point — a guard edited ahead of the ruling it cites is a
+				    guard edited to match the code.
+				    ⛔ THIS ROW STILL HAS NO GUARD COUNTING ITS OWN PIPES, and that is
+				    a recorded gap rather than a licence: a composition change here is
+				    invisible to CI, while both sibling rows redden. Adding one would
+				    pin a third composition against canon and is a deliberate decision,
+				    not a side effect of this pass.
 				    ⛔ NO SIZE IS PASSED. This row is `text-xs` and the leaf inherits
 				    it — stating a size here would state it without its leading, which
-				    is the trap that put every tile 10px tall at PROFILE-FULL. */}
+				    is the trap that put every tile 10px tall at PROFILE-FULL.
+				    ⚠ MEASURED at 1440 on staging before the pipe landed: this row's
+				    three existing pipes and the stake all sit at baseline 439.50, and
+				    so does the age. The new pipe is the same `Sep` at the same size,
+				    so it joins that line rather than introducing a second one. */}
+				<Sep />
 				<RelativeTime createdAt={createdAt} />
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM

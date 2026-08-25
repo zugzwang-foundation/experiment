@@ -257,9 +257,16 @@ describe("HTML-FINISH profile rows 4 · 5 · 12 — the argument card", () => {
 		);
 		const head = headOf(container);
 		const seps = [...head.children].filter((c) => c.textContent === "|");
-		// Canon §3 item 11 writes THREE seam points on a post head:
-		// `avatar · name | SIDE @ entry% | stake | Replies · N`.
-		expect(seps.length).toBe(3);
+		// Canon §3 item 11 writes FOUR seam points on a post head:
+		// `avatar · name | SIDE @ entry% | stake | Replies · N | <age>`.
+		// ⚠ THREE until the TIME-1 · Form B amendment, which added the argument
+		// age as the row's last field AND ruled that it is preceded by the row's
+		// own divider — "wherever this field is present, the row's separator
+		// count is one higher than item 11 previously recorded".
+		// ⛔ THE COUNT MOVED BECAUSE CANON MOVED, in the commit BEFORE the one
+		// that added the element. A guard edited ahead of the ruling it cites is
+		// a guard edited to match the code, which inverts what this guard is for.
+		expect(seps.length).toBe(4);
 		// ⛔ The glyph is U+007C, plain ASCII — not U+2502 or any box-drawing
 		// lookalike. Asserted by CODE POINT so a visually identical substitute
 		// reddens.
