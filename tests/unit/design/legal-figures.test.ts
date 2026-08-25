@@ -9,6 +9,16 @@ import { splitLegalSections } from "@/lib/legal-sections";
 /**
  * LEGAL-REAL — the `/legal` margin figures and the lossless section split.
  *
+ * ⚠ AMENDED AT LEGAL-FIGURES-2. The figures were redrawn into the house
+ * infographic language (`src/components/onboarding/figures.tsx`): filled mass,
+ * near-ink contrast, type set inside the drawing, sized to the measured gutter.
+ * Two rows below carried the *previous* task's mistaken constraints — one
+ * asserted `exactly one fill=`, the other a wrapper-level `text-n2` — and both
+ * are REWRITTEN in place rather than deleted, each with a note saying what it
+ * used to hold and why that was wrong. A guard that encodes a wrong decision is
+ * harder to dislodge than a comment, and deleting it quietly would leave the
+ * next author with no record that the constraint was ever considered.
+ *
  * ⛔ EVERY ASSERTION ABOUT DOCUMENT SHAPE READS `public/legal/*.txt` OFF DISK.
  * Not a fixture, not a snippet, not a count typed into this file. The real
  * documents landed here replacing placeholders, and they will be replaced again
@@ -177,10 +187,25 @@ describe("legal figures — one per section, in the margin, decorative", () => {
 		expect(cls).toContain("hidden");
 		expect(cls).toContain("md:block");
 
-		// Low contrast, through the token layer. `text-n2` is #404040 against the
-		// page's #181818 ground — two steps up from the ground, four below the
-		// body's `text-n6`.
-		expect(cls).toContain("text-n2");
+		// ⚠ THE `text-n2` ASSERTION THAT SAT HERE IS GONE, at LEGAL-FIGURES-2. It
+		// pinned a wrapper-level `currentColor` at low contrast; the house
+		// language sets colour PER ELEMENT and near ink, so there is no single
+		// class left to assert and the token guard moved to the row below, which
+		// checks every fill and stroke value in the file.
+		//
+		// What replaces it here is the SIZE step, which is the wrapper's own
+		// business: the figures are sized to the measured gutter (143/271/399px
+		// at md/lg/xl) and step with it.
+		const svgCls = String(
+			((el as WalkedElement).props.children as WalkedElement)?.props
+				?.className ?? "",
+		);
+		expect(svgCls).toContain("w-[110px]");
+		expect(svgCls).toContain("lg:w-[200px]");
+		expect(svgCls).toContain("xl:w-[290px]");
+		// `font-sans` on the svg, not on each `<text>` — the house convention,
+		// because `font-family` inherits through SVG.
+		expect(svgCls).toContain("font-sans");
 
 		// The opposite side is the mirror, so one class list cannot drift.
 		const right = LegalFigure({ name: "envelope-open", side: "right" });
@@ -189,27 +214,64 @@ describe("legal figures — one per section, in the margin, decorative", () => {
 		);
 	});
 
-	it("legal-figures::line-art-only-no-fills-no-literal-colour", () => {
-		// Read as SOURCE, because a fill could arrive on any one of seventeen
-		// registry entries and the element walk above only reaches the wrapper.
+	it("legal-figures::every-colour-is-a-neutral-ramp-token", () => {
+		// ⚠ REWRITTEN AT LEGAL-FIGURES-2, and the reason is worth keeping. This
+		// row used to assert `exactly one fill=`, pinning the figures as
+		// fill-less line art. That was never a requirement of this product — the
+		// house infographic language in `src/components/onboarding/figures.tsx`
+		// is built on FILLED mass, and the assertion had quietly promoted one
+		// task's mistake into a guard that would have blocked the correction.
+		// A test can hold a wrong decision in place more effectively than a
+		// comment ever could, which is why it is rewritten here rather than
+		// deleted: what it should have been guarding all along is that colour
+		// arrives through the token layer, and that is what it guards now.
 		const source = readFileSync(
 			join(ROOT, "src/components/legal/LegalFigure.tsx"),
 			"utf-8",
 		);
-		// `fill="none"` on the svg is the only fill declaration permitted.
-		expect(source.match(/fill=/g) ?? []).toHaveLength(1);
-		expect(source).toContain('fill="none"');
-		// Colour arrives as `currentColor`, never as a literal. (The repo-wide
-		// hex scan covers this file too — this row states the intent locally.)
-		expect(source).toContain('stroke="currentColor"');
+
 		// ⚠ COMMENTS STRIPPED FIRST, exactly as `no-raw-hex-view-layer.test.ts`
 		// does it. That file's docblock explains why: prose citing a contract
-		// value ("`text-n2` is #404040 against #181818") is documentation, not a
-		// smuggled colour, and a scan that cannot tell them apart pushes authors
-		// toward comments that omit the number they are explaining.
+		// value is documentation, not a smuggled colour, and a scan that cannot
+		// tell them apart pushes authors toward comments that omit the number
+		// they are explaining.
 		const code = source
 			.replace(/\/\*[\s\S]*?\*\//g, "")
 			.replace(/^\s*\/\/.*$/gm, "");
+
+		// No literal colour, in any notation.
 		expect(code).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+		expect(code).not.toMatch(/\brgba?\(/);
+		expect(code).not.toMatch(/\bhsla?\(/);
+		expect(code).not.toMatch(/\boklch\(/);
+
+		// Every `fill=` / `stroke=` value is a design token or the literal
+		// `none`. Fills are now REQUIRED rather than forbidden, so this counts
+		// what they resolve to instead of how many there are.
+		const values = [...code.matchAll(/(?:fill|stroke)="([^"]*)"/g)].map(
+			(m) => m[1],
+		);
+		expect(values.length).toBeGreaterThan(20);
+		for (const v of values) {
+			expect(v, `non-token colour "${v}"`).toMatch(
+				/^(none|var\(--color-(?:ink|ground|n[0-7])\))$/,
+			);
+		}
+		// Filled mass is the house language — assert it is actually used, so
+		// this file cannot drift back to outlines while still passing.
+		expect(
+			values.filter((v) => v === "var(--color-ink)").length,
+		).toBeGreaterThan(8);
+
+		// ⛔ THE POLE TOKENS ARE ABSENT, DELIBERATELY. `--color-yes` / `--color-no`
+		// encode BET SIDE (INV-3) and mean nothing in a legal figure. The one
+		// figure that could have used them — `paths-converging`, a market
+		// resolving — does not, because `--color-yes` is #181818, exactly
+		// `--color-ground`, so a YES panel filled with it would be invisible on
+		// this page; the deck's own `SideFigure` hits that wall and renders YES
+		// as filled ink. Moving this assertion is a decision, not an edit.
+		expect(code).not.toContain("--color-yes");
+		expect(code).not.toContain("--color-no");
+		expect(code).not.toContain("--color-brand");
 	});
 });
