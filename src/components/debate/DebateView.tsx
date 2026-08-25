@@ -23,6 +23,7 @@ import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
 import { findPostedNode } from "./find-posted";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
+import { readPostParam, resolvePostParamClient } from "./post-param";
 import { PostScroller, ReplyScroller } from "./scrollers";
 import type {
 	DebatePost,
@@ -480,17 +481,52 @@ export function DebateView({
 	};
 
 	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
-	// `?post=<ordinal>` via history.replaceState on post enter/exit, making
-	// deep links user-MINTABLE (copy the address bar in post view).
-	// replaceState, never pushState — focus toggling must not pollute history.
-	const syncPostParam = (ordinal: number | null) => {
+	// `?post=<ordinal>`, making deep links user-MINTABLE (copy the address bar
+	// in post view).
+	//
+	// ⚠⚠ RPLY-1 · R2 — ENTERING A POST NOW PUSHES, AND THE SUPERSEDED RULE IS
+	// RECORDED RATHER THAN DELETED (O-4). This read: "replaceState, never
+	// pushState — focus toggling must not pollute history." The intent was right
+	// and the mechanism produced the opposite of it: with nothing ever pushed,
+	// `history.length` did not grow on entering post-focus, and `HeaderNav`'s
+	// `canGoBack` reads `usePathname()`, which excludes the query string. So
+	// Back — the header's and the browser's — left `/m/[slug]` ALTOGETHER, and
+	// `FocusMarketCard` was left as the only in-app way out of post focus.
+	//
+	// ⛔ THE ANSWER TO "DO NOT POLLUTE HISTORY" IS THE EXIT, NOT THE ENTRY.
+	// Entering pushes ONE rung; leaving calls `history.back()` and UNWINDS it
+	// rather than pushing a third. A reader who enters and leaves five posts
+	// ends with a stack the same depth they started with, which is what that
+	// sentence was actually asking for.
+	//
+	// ⚠ EXACTLY TWO RUNGS — post-focus, then the route. Opening the composer
+	// gets NO entry of its own: it already has an × and an ESC path, and a
+	// third rung would make Back mean two different things one after the other.
+	//
+	// ⛔ `{...history.state}` IS LOAD-BEARING, NOT DEFENSIVE PADDING. Next's App
+	// Router keeps its own bookkeeping on `history.state`, and it reads that
+	// bookkeeping back on `popstate`. Pushing a bare object would strip it and
+	// leave the router meeting an entry it does not recognise — which it
+	// resolves with a hard navigation, i.e. a full reload in the middle of a
+	// back button. Spreading preserves the router's fields and adds ours beside
+	// them. `zzPost` is what `exitPost` reads to know the top of the stack is
+	// an entry THIS component pushed.
+	const syncPostParam = (
+		ordinal: number | null,
+		mode: "push" | "replace" = "replace",
+	) => {
 		const url = new URL(window.location.href);
 		if (ordinal === null) {
 			url.searchParams.delete("post");
 		} else {
 			url.searchParams.set("post", String(ordinal));
 		}
-		history.replaceState(null, "", url);
+		const state = { ...history.state, zzPost: ordinal };
+		if (mode === "push") {
+			history.pushState(state, "", url);
+		} else {
+			history.replaceState(state, "", url);
+		}
 	};
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 36 — ENTERING A POST RESETS THE PAGE
@@ -524,7 +560,8 @@ export function DebateView({
 		// chose.
 		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
-		syncPostParam(target ? target.ordinal : null);
+		// R2 — a rung, so Back returns to the market view instead of leaving it.
+		syncPostParam(target ? target.ordinal : null, "push");
 		resetPageScroll();
 	};
 	/**
@@ -552,13 +589,39 @@ export function DebateView({
 		// R3 — same arm swap, same release.
 		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
-		syncPostParam(target ? target.ordinal : null);
+		// R2 — the same rung: a card pill ENTERS the post, so it is the same arm
+		// swap and gets the same history entry.
+		syncPostParam(target ? target.ordinal : null, "push");
 		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
 		// arm swap and the same reason.
 		resetPageScroll();
 	};
 	const exitPost = () => {
 		if (composerBusy) {
+			return;
+		}
+		/**
+		 * ⚠⚠ RPLY-1 · R2 — LEAVING UNWINDS THE STACK, IT DOES NOT GROW IT. Calling
+		 * `history.back()` pops the rung `enterPost` pushed, so entering and
+		 * leaving is depth-neutral and the browser's own Back keeps agreeing with
+		 * the surface's. The `popstate` listener below then clears the focus state
+		 * off the URL, which is why nothing is set here on that branch — one
+		 * mechanism owns the transition, in both directions.
+		 *
+		 * ⛔⛔ AND IT IS CONDITIONAL, BECAUSE THE UNCONDITIONAL VERSION REINTRODUCES
+		 * THE BUG IN MIRROR IMAGE. A reader arriving on a DEEP LINK (`?post=3`
+		 * pasted, or opened from elsewhere) has no rung of ours beneath them —
+		 * their previous entry is another site, or nothing. A bare `history.back()`
+		 * would take them OFF `/m/[slug]` entirely, which is precisely the defect
+		 * R2 exists to remove. `history.state.zzPost` is the marker `syncPostParam`
+		 * writes on the entries this component pushed, so it answers exactly the
+		 * question that matters: is the top of the stack mine to pop?
+		 * ⇒ When it is not, fall back to the old `replaceState` — the URL loses its
+		 * param, the surface returns to the market arm, and the reader stays on the
+		 * page they deep-linked into.
+		 */
+		if (history.state?.zzPost != null) {
+			history.back();
 			return;
 		}
 		setSelectedPostId(null);
@@ -571,6 +634,60 @@ export function DebateView({
 	const selectedPost = selectedPostId
 		? (posts.find((p) => p.id === selectedPostId) ?? null)
 		: null;
+
+	/**
+	 * ⚠⚠ RPLY-1 · R2 — THE INBOUND HALF. Pushing a rung is only half a history
+	 * ladder: a popped entry changes the URL and nothing else, so without this
+	 * the address bar would say `?post=3` while the surface sat on the market
+	 * arm. This is what makes Back actually re-render.
+	 *
+	 * ⛔⛔ THE PARAM IS RESOLVED, NEVER INDEXED, AND THAT IS THE SECURITY
+	 * PROPERTY. `resolvePostParamClient` applies the same three refusals the
+	 * cold server arrival applies — shape gate, no-such-ordinal, REMOVED target
+	 * — and falls back silently to the market arm on each. A listener that did
+	 * the obvious thing and used the param to index a comment list would reach a
+	 * removed post that `page.tsx` correctly declines to focus: a masking bypass
+	 * through the back button. See `post-param.ts` for why resolving against the
+	 * already-masked model is exact rather than an approximation of the server's
+	 * answer — same ranking domain, same order, removed rows included in both.
+	 *
+	 * ⛔ THE COMPOSER IS CLOSED ON EVERY POP, in both directions. Composer-open
+	 * has no history entry of its own (two rungs only), so a popped entry can
+	 * carry no opinion about it; leaving one open across a pop would strand a
+	 * composer belonging to a post the reader has just navigated away from.
+	 *
+	 * ⛔⛔ IT NO-OPS WHILE A SUBMIT IS IN FLIGHT, exactly as `enterPost`,
+	 * `replyToPost` and `exitPost` already do, and for the same reason those
+	 * three do: unmounting a composer mid-request lets a re-open mint a FRESH
+	 * idempotency key over a possibly-committing bet, which is a second bet
+	 * rather than a replay — the one seam `bet_receipts` cannot close, because a
+	 * new key collides with nothing. ⚠ The cost is a transient disagreement
+	 * between the URL and the surface for the length of one request, and that is
+	 * the right trade: a stale query string is cosmetic and a double bet is not.
+	 */
+	const postsRef = useRef(posts);
+	postsRef.current = posts;
+	const composerBusyRef = useRef(composerBusy);
+	composerBusyRef.current = composerBusy;
+	useEffect(() => {
+		const onPop = () => {
+			if (composerBusyRef.current) {
+				return;
+			}
+			const resolved = resolvePostParamClient(
+				postsRef.current,
+				readPostParam(window.location.search),
+			);
+			setSelectedPostId(resolved);
+			setOpenReply(null);
+			setOpenSide(null);
+			// The arm may have swapped, and a pick names a COLUMN — the same reason
+			// `enterPost` and `exitPost` release it.
+			setPickedSide(null);
+		};
+		window.addEventListener("popstate", onPop);
+		return () => window.removeEventListener("popstate", onPop);
+	}, []);
 
 	/**
 	 * ⚠⚠ FEED-2 — THE JUMP. When the refreshed payload arrives carrying the
