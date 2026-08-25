@@ -7,18 +7,14 @@ import { db } from "@/db";
 import { users } from "@/db/schema/auth";
 import { verifyOnboardingRef } from "@/server/auth/onboarding-ref";
 import { acceptTosAction } from "@/server/auth/tos-accept";
-import {
-	PRIVACY_VERSION_HASH,
-	TOS_VERSION_HASH,
-} from "@/server/auth/tos-versions";
 
-// F-AUTH-4 onboarding page per SPEC.1 §13 F-AUTH-4, as amended 2026-08-25
-// (ONBOARD-CARD). One short card:
+// F-AUTH-4 onboarding page per SPEC.1 §13 F-AUTH-4, as amended 2026-08-25 —
+// both amendments (ONBOARD-CARD, and the second one at ONBOARD-CARD-2). One
+// short card:
 //
 //   1. Pseudonym + PFP
 //   2. Single combined acceptance checkbox, its label linking to /legal
-//   3. Continue (formAction={acceptTosAction}) + Cancel (Link to /)
-//   4. Footer: "ToS placeholder-tos-v0 · Privacy placeholder-privacy-v0"
+//   3. ONE control — "Enter Zugzwang" (formAction={acceptTosAction})
 //
 // ⛔ WHAT LEFT, AND WHY THE READ LEFT WITH IT. The amendment supersedes two of
 // F-AUTH-4's structural commitments: the two document bodies rendering inline,
@@ -31,8 +27,21 @@ import {
 // bodies whole from the same files the hashes name. The warning text stays
 // exported from `tos-versions.ts` and lands in the ToS body at LEGAL.1.
 //
+// ⛔ WHAT LEFT AT ONBOARD-CARD-2, AND WHY NEITHER TOOK BEHAVIOUR WITH IT.
+// Cancel was a bare `<a href="/">` — no handler, no action, no cookie work, no
+// session teardown. SPEC.1's own Cancel semantics are "routes back to the
+// landing page without committing acceptance", and every one of those words
+// describes the absence of a write rather than a write: the users row keeps
+// `tos_accepted_at IS NULL`, the pool tuple stays consumed, the signed ref
+// expires on its own 10-minute clock. So deleting the anchor deletes a link and
+// nothing else, and the way out it offered still exists — `GlobalHeader`'s
+// brand cluster is an `<a href="/">` on this very page. The version line left
+// for a different reason: it is not gone from the product, it renders on
+// `/legal` beneath the documents it identifies, which is where a version label
+// is legible instead of decorative.
+//
 // ⚠ THE GATE IS UNCHANGED. Everything F-AUTH-4 still binds is still here: the
-// checkbox is unticked by default and `required`, Continue submits to
+// checkbox is unticked by default and `required`, the sole control submits to
 // `acceptTosAction`, and the acceptance transaction writes tos_accepted_at,
 // both version hashes, IP and user-agent with the initial grant. Nothing in
 // this file touches that path — it renders the form the action already owns.
@@ -92,7 +101,7 @@ export default async function OnboardingPage(): Promise<React.ReactElement> {
 				<p className="text-xl font-semibold text-ink">{user.pseudonym}</p>
 			</CardHeader>
 			<CardContent className="flex flex-col gap-4">
-				{/* (ii) + (iii) Single checkbox + Continue / Cancel.
+				{/* (ii) + (iii) Single checkbox + the sole control.
 				    Inline Server Action wrapper discards the `{ ok: false,
 				    code: 'tos_acceptance_required' }` return so the form's
 				    action prop type is satisfied (Next.js form actions are
@@ -129,32 +138,24 @@ export default async function OnboardingPage(): Promise<React.ReactElement> {
 							.
 						</span>
 					</label>
-					<div className="flex gap-3">
-						<button
-							type="submit"
-							className="inline-flex h-8 flex-1 items-center justify-center rounded-(--r) bg-(--btn-fill) px-2.5 text-sm font-medium text-ink transition-all outline-none [border:var(--hairline)] hover:bg-(--state-hover-fill) focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
-						>
-							Continue
-						</button>
-						<a
-							href="/"
-							className="inline-flex h-8 items-center justify-center rounded-(--r) border border-transparent px-2.5 text-sm font-medium text-n5 transition-all outline-none hover:bg-(--state-hover-fill) hover:text-ink focus-visible:shadow-(--state-focus-ring)"
-						>
-							Cancel
-						</a>
-					</div>
+					{/* THE SOLE CONTROL. `w-full` is the whole of "size it
+					    accordingly": it no longer shares a row, so it takes the
+					    row. The HEIGHT deliberately does not move — `h-8` is
+					    `ui/button`'s `default` size, which is what every primary
+					    control in the product stands at, including the two on the
+					    sign-in card a participant sees moments earlier. A taller
+					    hero button would be a type scale this design language has
+					    not minted, and inventing one here to signal importance
+					    would put an unratified size on the most consequential
+					    click in the flow. */}
+					<button
+						type="submit"
+						className="inline-flex h-8 w-full items-center justify-center rounded-(--r) bg-(--btn-fill) px-2.5 text-sm font-medium text-ink transition-all outline-none [border:var(--hairline)] hover:bg-(--state-hover-fill) focus-visible:shadow-(--state-focus-ring) active:bg-(--state-pressed-fill)"
+					>
+						Enter Zugzwang
+					</button>
 				</form>
 			</CardContent>
-
-			{/* (iv) Footer with version hashes — the amendment keeps this line on
-			    this screen: it names the exact version this acceptance will be
-			    recorded against, which is the transparency half of the
-			    acceptance-evidence record. */}
-			<footer className="px-(--card-spacing) pb-1 text-center">
-				<small className="text-xs text-n5">
-					ToS {TOS_VERSION_HASH} · Privacy {PRIVACY_VERSION_HASH}
-				</small>
-			</footer>
 		</Card>
 	);
 }
