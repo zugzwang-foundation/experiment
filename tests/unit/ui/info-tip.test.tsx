@@ -79,6 +79,31 @@ describe("INFO-1 — InfoTip", () => {
 		expect(content?.id).toBe(trigger.getAttribute("aria-describedby"));
 	});
 
+	it("touch path: opening the Popover does NOT move focus off the trigger", async () => {
+		// Several wired call sites are ALREADY-interactive controls (a tab
+		// button, a Support/Counter trigger) whose click both performs their
+		// own action and opens this Popover. Radix's default auto-focus would
+		// move focus onto the (unfocusable, plain-text) content on every such
+		// tap — which is exactly what broke PositionsTable's keyboard row
+		// stepping: focus left the table and neither its own key handler nor
+		// the document-level fallback still owned the key.
+		mockMatchMedia(false);
+		render(
+			<InfoTip content={GLOSS} asChild>
+				<button type="button">Trigger</button>
+			</InfoTip>,
+		);
+		const trigger = document.querySelector("button") as HTMLButtonElement;
+		trigger.focus();
+		expect(document.activeElement).toBe(trigger);
+
+		fireEvent.click(trigger);
+		await waitFor(() => {
+			expect(document.body.textContent).toContain(GLOSS);
+		});
+		expect(document.activeElement).toBe(trigger);
+	});
+
 	it("pointer path (pointer-fine: true): opens the Tooltip content on hover", async () => {
 		mockMatchMedia(true);
 		render(

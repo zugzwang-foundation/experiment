@@ -78,6 +78,17 @@ export const GLOSSARY = {
 } as const;
 
 /**
+ * INFO-1 §3.5 — "Sold" is not a state (no `pgEnum`, no `Marker` union member),
+ * yet it was typed by hand at four render sites, each gated on its own
+ * boolean (`authorSold` / `sold`). Import this alongside `GLOSSARY.sold` at
+ * all four so the word and its gloss cannot drift apart.
+ *
+ * ⚠ The register's one invented string: every other GLOSSARY entry traces to
+ * SPEC.1 / RANKING.md / the reader-voice doc. This one doesn't — founder-owned.
+ */
+export const SOLD_LABEL = "Sold";
+
+/**
  * Strings already shipped inline in the global header, moved here unchanged so
  * they are in one place and under test. VERBATIM — do not re-word.
  */

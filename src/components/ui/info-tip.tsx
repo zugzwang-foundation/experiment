@@ -135,6 +135,18 @@ export function InfoTip({
 					id={contentId}
 					sideOffset={6}
 					className={CONTENT_CLASS}
+					// The content is plain text with nothing to focus, and several
+					// wired sites are ALREADY-interactive controls (a tab button, a
+					// Support/Counter trigger) whose own click both performs their
+					// action and opens this Popover. Radix's default auto-focus would
+					// then move focus OFF the trigger and onto the content on every
+					// such tap, which is what broke keyboard row-stepping on
+					// PositionsTable's status tabs — focus left the table, so neither
+					// the table's own key handler nor the document-level fallback
+					// still owned the key. Declining the auto-focus keeps focus on
+					// the trigger, so the click's PRIMARY action stays keyboard-safe;
+					// the popover still opens and is still dismissible by Escape.
+					onOpenAutoFocus={(event) => event.preventDefault()}
 				>
 					{content}
 				</PopoverPrimitive.Content>

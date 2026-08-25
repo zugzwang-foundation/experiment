@@ -1,6 +1,8 @@
 import { Download } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * UNWIRE-1 — extracted from `bookmarks/BookmarkToggle.tsx`'s `CardActions`
@@ -19,14 +21,16 @@ import { Button } from "@/components/ui/button";
  */
 export function DownloadStub() {
 	return (
-		<Button
-			variant="ghost"
-			size="icon-xs"
-			disabled
-			aria-disabled="true"
-			aria-label="Download — no per-argument export exists yet"
-		>
-			<Download />
-		</Button>
+		<InfoTip content={GLOSSARY.downloadStub} asChild>
+			<Button
+				variant="ghost"
+				size="icon-xs"
+				disabled
+				aria-disabled="true"
+				aria-label="Download — no per-argument export exists yet"
+			>
+				<Download />
+			</Button>
+		</InfoTip>
 	);
 }
