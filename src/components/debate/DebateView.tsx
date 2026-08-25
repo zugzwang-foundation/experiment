@@ -940,10 +940,14 @@ export function DebateView({
 											viewer={viewer}
 											ownPseudonym={ownPseudonym}
 											slug={market.slug}
-											// §1, the reply arm — `hostsComposer` is this map's own
-											// name for the same condition the market arm calls
-											// `hostingComposer`: the column the composer opens in.
-											showControls={!hostsComposer}
+											// ⚠ RPLY-1 · R4b — NO `showControls` HERE ANY MORE. The
+											// post arm's header carries no Buy and no Sell, so the
+											// market arm's suppression had nothing of its kind to
+											// suppress and was only removing the position readout's
+											// click-through. Founder: "when composer opens, both
+											// headers should be same … there are no buy/sell buttons
+											// anyway." The prop is gone from `PositionStrip`
+											// entirely — see its own block for the measurement.
 										/>
 									}
 								>
@@ -984,12 +988,13 @@ export function DebateView({
 														parentCommentId={selectedPost.id}
 														replyContext={{
 															relation: openReply,
+															// ⚠ The masked arm is the composer's THIRD header
+															// state, not an omission: a removed parent has no
+															// author at the type level, and `null` is what makes
+															// the header fall back to the canon line.
 															authorPseudonym: selectedPost.removed
 																? null
 																: selectedPost.author.pseudonym,
-															postTitle: selectedPost.removed
-																? null
-																: selectedPost.title,
 														}}
 														onClose={() => setOpenReply(null)}
 														onPosted={onPosted}

@@ -26,7 +26,6 @@ export function PositionStrip({
 	viewer,
 	ownPseudonym,
 	slug,
-	showControls = true,
 }: {
 	side: Side;
 	pricing: { yes: string; no: string } | null;
@@ -37,17 +36,37 @@ export function PositionStrip({
 	/** The market slug — the `/u/<own>?market=<slug>` preselect (OQ-5 B). */
 	slug: string;
 	/**
-	 * ⚠⚠ change set 12 §1 — FALSE ON THE COLUMN THAT IS HOSTING A COMPOSER.
-	 * Founder ruling: the mirrored header keeps the composing side's label,
-	 * percent, odds and position readout, and loses its Buy and its Sell.
-	 * ⛔ SCOPED TO THE HOSTING STATE, NEVER PERSISTENT. It is derived per render
-	 * from `openSide`/`openReply`, so closing the composer restores the controls
-	 * with no reset step to forget.
-	 * ⛔ THE REAL HEADER IS UNTOUCHED — the column whose own side IS the
-	 * composing side keeps both. Its Buy is the toggle-closed affordance, and
-	 * removing it would leave the × as the only way out.
+	 * ⚠⚠ RPLY-1 · R4b — `showControls` IS GONE FROM THIS COMPONENT, AND THE
+	 * SUPERSEDED RULING IS RECORDED RATHER THAN DELETED (O-4). It read: "FALSE ON
+	 * THE COLUMN THAT IS HOSTING A COMPOSER. Founder ruling: the mirrored header
+	 * keeps the composing side's label, percent, odds and position readout, and
+	 * loses its Buy and its Sell."
+	 *
+	 * ⛔ THAT RULING IS `SlotHeader`'S, AND IT STILL HOLDS THERE. It was carried
+	 * across to this strip by name, but the two components are not the same
+	 * shape: this one's own docblock says it in terms — "the market grammar MINUS
+	 * action buttons … NO Đ BET / Sell buttons on the debate surface." There was
+	 * no Buy and no Sell here to suppress. The founder's R4b wording is exactly
+	 * that observation: "both headers should be same … there are no buy/sell
+	 * buttons anyway."
+	 *
+	 * ⇒ MEASURED BEFORE REMOVING (OVN-O4). Across signed-out · signed-in with no
+	 * position · holding YES · holding NO, each with and without a pseudonym, and
+	 * in all three composer states, the flag changed exactly ONE thing: whether
+	 * the held column's position readout was a `<Link>` or plain text. A
+	 * click-through to the viewer's own profile is not a Buy and not a Sell, so
+	 * suppressing it was the ruling being applied past its subject — and opening
+	 * a composer silently took an affordance away from a header that was not
+	 * hosting anything the reader was interacting with.
+	 *
+	 * ⛔ REMOVED RATHER THAN LEFT DEFAULTING TRUE. After R1 the hosting column is
+	 * the pole OPPOSITE the bet, and F-3 only permits opening a relation whose
+	 * resulting side IS the held side — so the held column can no longer BE the
+	 * hosting column and the flag had become unreachable. Leaving it would have
+	 * meant the founder's ruling holding by an arithmetic coincidence with a
+	 * different slice, which is precisely the kind of guarantee that evaporates
+	 * the next time someone changes the column rule.
 	 */
-	showControls?: boolean;
 }) {
 	const pct = pricing ? formatPricePercent(pricing, side) : "—";
 	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
@@ -73,13 +92,12 @@ export function PositionStrip({
 			    preselected (OQ-5 B). Signed-out → non-interactive. */}
 			<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
 				{held && viewer?.position ? (
-					/* ⛔ change set 12 §1 — WHILE HOSTING, THE READOUT STAYS AND THE
-					   NAVIGATION GOES. Here the Sell affordance IS the readout's link
-					   rather than a separate control, so suppressing it falls through
-					   to the plain-text variant already below — same words, same
-					   figure, no click-through. There is no Buy on this strip, so
-					   that is the whole of the reply arm's suppression. */
-					showControls && ownPseudonym !== null ? (
+					/* ⚠ RPLY-1 · R4b — the ONLY remaining condition is whether we know
+					   who the viewer is. Signed out there is nobody to link to, so the
+					   plain-text variant below carries the same words and the same
+					   figure without a click-through. Opening a composer no longer
+					   enters this decision at all — see the prop block above. */
+					ownPseudonym !== null ? (
 						<Link
 							data-testid="w210c-sell-link"
 							href={`/u/${encodeURIComponent(ownPseudonym)}?market=${encodeURIComponent(slug)}`}

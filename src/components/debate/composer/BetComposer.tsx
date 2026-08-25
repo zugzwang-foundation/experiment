@@ -105,16 +105,22 @@ export function BetComposer(props: {
 	viewer: ViewerMarketContext;
 	parentCommentId?: string;
 	/**
-	 * Reply variant (v0.10): header verb `Support/Counter <author>'s argument`
-	 * + the FULL post title beneath (wraps, no ellipsis). A REMOVED parent has
-	 * no author/title at the type level (SG-3 masking) — pass nulls and the
-	 * header falls back to the canon `Place your Đ BET` line (no copy invented,
-	 * nothing leaked).
+	 * Reply variant: the header verb `Support/Counter <author>'s argument`,
+	 * rendered in the SAME span, at the same size and weight, as the fresh-post
+	 * header (RPLY-1 · R4a). A REMOVED parent has no author at the type level
+	 * (SG-3 masking) — pass `null` and the header falls back to the canon
+	 * `Place your Đ BET` line (no copy invented, nothing leaked).
+	 *
+	 * ⚠ `postTitle` IS GONE, and it was removed rather than left unread. R4a
+	 * dropped the subtitle that consumed it, so keeping the field would have
+	 * meant a masked-or-not decision at the call site feeding a prop nothing
+	 * renders — dead weight that still looks load-bearing. Less data crossing
+	 * this boundary is also strictly safer: the parent's title no longer reaches
+	 * the composer at all.
 	 */
 	replyContext?: {
 		relation: "support" | "counter";
 		authorPseudonym: string | null;
-		postTitle: string | null;
 	};
 	onClose: () => void;
 	/**
@@ -539,25 +545,32 @@ export function BetComposer(props: {
 			    the × hanging 12px below the words it belongs to. */}
 			<div className="flex items-center gap-2">
 				<SideBadge side={props.side} />
-				{props.replyContext && props.replyContext.authorPseudonym !== null ? (
-					<span className="flex min-w-0 flex-col">
-						<span className="text-[13.5px] leading-snug font-bold text-ink">
-							{props.replyContext.relation === "support"
-								? "Support"
-								: "Counter"}{" "}
-							{props.replyContext.authorPseudonym}'s argument
-						</span>
-						{props.replyContext.postTitle !== null && (
-							<span className="text-xs text-n5">
-								{props.replyContext.postTitle}
-							</span>
-						)}
-					</span>
-				) : (
-					<span className="text-sm font-semibold text-ink">
-						{COMPOSER_COPY.header}
-					</span>
-				)}
+				{/* ⚠⚠ RPLY-1 · R4a — ONE SPAN, ONE SIZE, ONE WEIGHT. The reply variant
+				    used to be a two-child flex COLUMN at `text-[13.5px] font-bold`
+				    carrying the parent's full title beneath the verb line, while the
+				    fresh-post variant was a single leaf span at `text-sm
+				    font-semibold`. Two headers, two type treatments and one extra line
+				    of copy, on a panel whose height is the thing R3 just spent a whole
+				    slice defending.
+				    ⇒ THE SUBTITLE IS GONE and the two are now literally the SAME
+				    ELEMENT with a different string in it — which is stronger than
+				    giving them matching classes, because matching classes can drift
+				    apart and one element cannot.
+				    ⚠ THE WORDING IS UNTOUCHED. `Support|Counter <author>'s argument` is
+				    ratified at design-canon §6 and it is the only place the relation is
+				    named once the composer is open — the side chip beside it names the
+				    SIDE, which is a different fact.
+				    ⛔⛔ AND THE THIRD STATE SURVIVES, which is the part a subtitle
+				    removal could easily have taken with it: a REMOVED parent has
+				    `authorPseudonym === null` (masked server-side, SG-3), and that arm
+				    still falls back to the canon `Place your Đ BET` header on a composer
+				    that is still `kind="reply"`. No copy is invented and nothing is
+				    leaked. Pinned by `composer-header.test.tsx`. */}
+				<span className="text-sm font-semibold text-ink">
+					{props.replyContext && props.replyContext.authorPseudonym !== null
+						? `${props.replyContext.relation === "support" ? "Support" : "Counter"} ${props.replyContext.authorPseudonym}'s argument`
+						: COMPOSER_COPY.header}
+				</span>
 				<button
 					type="button"
 					onClick={props.onClose}
