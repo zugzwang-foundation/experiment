@@ -35,10 +35,44 @@ const CONTENT_CLASS = cn(
 	"duration-[260ms]",
 );
 
+/**
+ * A deterministic id derived from `content`, not `React.useId()`.
+ *
+ * `useId()` prefixes by REACT ROOT, so two independently-mounted `render()`
+ * calls of an otherwise-identical tree get DIFFERENT ids — and this repo's
+ * established "does a 404 degrade to byte-identical markup" test idiom
+ * (`tests/unit/discovery/render/market-thumb.test.tsx` and its siblings)
+ * renders two separate roots and asserts their `innerHTML` are equal. A
+ * per-root id would fail that comparison for every surface this task wires,
+ * for a reason that has nothing to do with the behaviour under test.
+ *
+ * A hash of `content` is stable across roots and across hydration, at one
+ * real cost: two SIMULTANEOUSLY OPEN `InfoTip`s sharing the same gloss text
+ * share one DOM id. Accepted because their description text is, by
+ * construction, identical either way — the vocabulary is the fixed,
+ * closed GLOSSARY register, not per-instance data.
+ */
+function contentHashId(content: string): string {
+	let hash = 5381;
+	for (let i = 0; i < content.length; i++) {
+		hash = (hash * 33) ^ content.charCodeAt(i);
+	}
+	return `info-tip-${(hash >>> 0).toString(36)}`;
+}
+
 function usePointerFine(): boolean {
 	const [pointerFine, setPointerFine] = React.useState(false);
 
 	React.useEffect(() => {
+		// jsdom (this repo's render-test environment) does not implement
+		// `matchMedia` at all — not "always false", genuinely `undefined`. Falling
+		// through to the touch default here is the same unknown-defaults-to-touch
+		// rule stated above, applied to a second kind of unknown: a device that
+		// can't answer the query gets the same answer as one that hasn't answered
+		// yet.
+		if (typeof window.matchMedia !== "function") {
+			return;
+		}
 		const mql = window.matchMedia("(hover: hover) and (pointer: fine)");
 		setPointerFine(mql.matches);
 		const onChange = (event: MediaQueryListEvent) =>
@@ -65,7 +99,7 @@ export function InfoTip({
 	asChild?: boolean;
 }) {
 	const pointerFine = usePointerFine();
-	const contentId = React.useId();
+	const contentId = React.useMemo(() => contentHashId(content), [content]);
 
 	if (pointerFine) {
 		return (

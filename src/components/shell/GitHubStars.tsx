@@ -1,5 +1,7 @@
 import { Star } from "lucide-react";
 
+import { InfoTip } from "@/components/ui/info-tip";
+import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
 import { GITHUB_REPO_URL } from "@/server/github/star-count";
 
 /**
@@ -128,26 +130,27 @@ export function GitHubStarsView({ stars }: { stars: number | null }) {
 				} (opens in a new tab)`;
 
 	return (
-		<a
-			href={GITHUB_REPO_URL}
-			target="_blank"
-			rel="noopener noreferrer"
-			data-testid="github-stars"
-			data-state={stars === null ? "unavailable" : "value"}
-			aria-label={label}
-			title="Star the repo on GitHub"
-			className={GITHUB_TAB}
-		>
-			<Star aria-hidden="true" />
-			<span>GitHub</span>
-			{stars === null ? null : (
-				<span
-					data-testid="github-stars-count"
-					className="tracking-normal normal-case tabular-nums"
-				>
-					{formatStarCount(stars)}
-				</span>
-			)}
-		</a>
+		<InfoTip content={HEADER_GLOSSARY.github} asChild>
+			<a
+				href={GITHUB_REPO_URL}
+				target="_blank"
+				rel="noopener noreferrer"
+				data-testid="github-stars"
+				data-state={stars === null ? "unavailable" : "value"}
+				aria-label={label}
+				className={GITHUB_TAB}
+			>
+				<Star aria-hidden="true" />
+				<span>GitHub</span>
+				{stars === null ? null : (
+					<span
+						data-testid="github-stars-count"
+						className="tracking-normal normal-case tabular-nums"
+					>
+						{formatStarCount(stars)}
+					</span>
+				)}
+			</a>
+		</InfoTip>
 	);
 }

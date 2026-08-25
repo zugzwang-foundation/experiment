@@ -3,6 +3,8 @@
 import { useState } from "react";
 
 import { OnboardingDeck } from "@/components/onboarding/OnboardingDeck";
+import { InfoTip } from "@/components/ui/info-tip";
+import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * The header's `RULES` control, and the re-show deck it opens (SPEC.1 §21.9).
@@ -54,14 +56,15 @@ export function RulesControl() {
 
 	return (
 		<>
-			<button
-				type="button"
-				onClick={() => setOpen(true)}
-				title="Rules — how it works"
-				className={RULES_TAB}
-			>
-				Rules
-			</button>
+			<InfoTip content={HEADER_GLOSSARY.rules} asChild>
+				<button
+					type="button"
+					onClick={() => setOpen(true)}
+					className={RULES_TAB}
+				>
+					Rules
+				</button>
+			</InfoTip>
 			<OnboardingDeck context="reshow" open={open} onOpenChange={setOpen} />
 		</>
 	);
