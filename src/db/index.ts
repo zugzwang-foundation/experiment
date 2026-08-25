@@ -5,15 +5,87 @@ import postgres from "postgres";
 
 import * as schema from "./schema";
 
-const connectionString = process.env.DATABASE_URL;
+// Which Supavisor pooler this runtime connects through. The mode is DECLARED,
+// never inferred from which secrets happen to exist — that distinction is the
+// whole point of this block, and it is worth stating why.
+//
+// The obvious shape is `DATABASE_URL_TXN ?? DATABASE_URL`. It is wrong: a
+// MISSING secret then becomes indistinguishable from deliberate session-mode
+// config, so staging would silently run session mode while every observation
+// taken against it — "transaction mode is active", "the client ceiling rose",
+// "SET LOCAL timeouts still apply" — was measuring the wrong pooler, with
+// `/api/health` reporting `db: "ok"` throughout. A verification that passes
+// when it is not looking is worth nothing, and presence-inference is exactly
+// that failure one layer below the control meant to catch it.
+//
+// The other obvious shape is to swap the variable name outright. Also wrong,
+// and in the direction that hurts most: this module is imported by effectively
+// every server surface, `next build` collects page data by importing them, and
+// the throw below is at module scope — so an unconditional read of a secret
+// `prd` does not have would fail the production BUILD. Prod keeps serving the old
+// deployment (fail-closed, which is the one mercy), but every prod deploy is
+// blocked until someone mints the secret. Compare `BETTER_AUTH_URL`, which
+// fails the same way for the same reason.
+//
+// So: default `session`, which makes `prd` byte-identical to what it has always
+// done and requires nothing to be minted there.
+//
+// ⚠ `||`, NOT `??`, and the difference is operational rather than stylistic.
+// `??` catches only null/undefined, so `DB_POOLER_MODE=""` would resolve to `""`
+// — still session-mode for routing, since nothing but the exact string
+// "transaction" reaches the other secret, but `poolerMode` would then EXPORT an
+// empty string into the criterion-6 control's evidence and the missing-secret
+// error would read `(DB_POOLER_MODE=)`. That is not a hypothetical spelling:
+// step (d) of this task is "unset the flag", and the natural way to unset a
+// value in a dashboard is to CLEAR THE FIELD, which is what both Doppler and
+// Vercel store as empty rather than absent. `||` collapses the two spellings so
+// the deleted key and the cleared field are indistinguishable to this module.
+// The plan still says to delete the key — this makes it safe when someone does
+// the other thing, which is the point of a default.
+const mode = process.env.DB_POOLER_MODE || "session";
+
+// ADR-0024 Patch P3 decision outcome #8: every environment stays on `:5432`
+// EXCEPT staging. Production is not authorised for transaction mode by any
+// record, and the flag reaching `prd` would mean a config mistake rather than a
+// decision — so this refuses at boot instead of connecting somewhere nobody
+// ratified. A guard that never fires in practice is exactly the guard that goes
+// unnoticed when it regresses, which is why it is pinned by a test.
+if (mode === "transaction" && process.env.ZUGZWANG_ENV === "prod") {
+	throw new Error(
+		`DB_POOLER_MODE=transaction is not authorised in prod (ADR-0024 P3 #8)`,
+	);
+}
+
+// A missing secret is LOUD and names the variable it wanted, so it can never be
+// read as "session mode was intended here".
+// EXPORTED so the criterion-6 control reads the resolved name instead of
+// re-deriving it. A second copy of this rule can silently disagree with this
+// one, and the control would then measure a real pooler and label it wrong —
+// which is worse than not measuring, because it produces confident evidence.
+export const poolerMode = mode;
+export const connectionVarName =
+	mode === "transaction" ? "DATABASE_URL_TXN" : "DATABASE_URL";
+const varName = connectionVarName;
+const connectionString = process.env[varName];
 if (!connectionString) {
-	throw new Error("DATABASE_URL is not set");
+	throw new Error(`${varName} is not set (DB_POOLER_MODE=${mode})`);
 }
 
 const client = postgres(connectionString, {
 	// Pool ceiling PER INSTANCE — and a Vercel instance is per DEPLOYMENT, not
-	// per environment. Against the 15-slot Supavisor tenant pool, 15 ÷ 4 means
-	// three concurrent instances fit; at the previous 10, TWO already wanted 20.
+	// per environment.
+	//
+	// ⚠ This value is NOT derived from the tenant pool any more. Under the
+	// `:6543` transaction pooler the two ceilings decouple — client connections
+	// rise to 200 while backend connections stay at 15 — so the old "15 ÷ 4 means
+	// three instances fit" arithmetic no longer describes what `4` is protecting
+	// against, and a stale derivation is how the next person re-derives the wrong
+	// number (ADR-0038 P1.2).
+	//
+	// What `4` actually bounds is what a SUSPENDED instance can STRAND. The
+	// relaxation says a higher `max` is now permissible; it does not say which
+	// value is correct, and ADR-0038 decision 2 forbids acting on that without
+	// measurement. S-5 measures; then it moves.
 	//
 	// THIS is the load-bearing control, not the timeouts below. Measured on
 	// staging: a connection sat idle 620 s with BOTH a 20 s idle_timeout and a
@@ -22,8 +94,15 @@ const client = postgres(connectionString, {
 	// timers. A timer cannot be relied on to hand a slot back; bounding what an
 	// instance can take in the first place does not depend on one running.
 	max: 4,
-	// Defensive on the :5432 session pooler; forward-safe if a :6543
-	// transaction pooler is ever introduced (ADR-0024 §Decision Outcome #8).
+	// ⚠ NOT defensive any more — this is a HARD PRECONDITION of the mode above.
+	// It was written when a :6543 transaction pooler was hypothetical; S-1
+	// introduces one, so the "forward-safe if ever introduced" framing it used to
+	// carry described a future that has arrived (ADR-0024 §Decision Outcome #8).
+	//
+	// Prepared statements are bound to a backend connection. Transaction mode
+	// returns the backend to the pool at COMMIT, so a prepared statement's handle
+	// can be gone before its next use. On :5432 leaving this true costs nothing;
+	// on :6543 removing it breaks the pool. Do not "restore" it.
 	prepare: false,
 	// Return idle connections to the Supavisor pool. postgres.js defaults this
 	// to `null`, which makes the idle timer a literal no-op (`timer()` short-
