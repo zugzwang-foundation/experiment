@@ -2,13 +2,13 @@
 
 | | |
 |---|---|
-| **Status** | accepted |
+| **Status** | superseded |
 | **Date** | 2026-07-20 |
 | **Deciders** | Hrishikesh (founder) |
 | **Tracker task** | UI-lane Session A · A6 (Bookmarks) — spec-lane precursor (the A6 gate) |
 | **Frame document** | SPEC.1 §23 Profile — *Forward (A6)* delegation sentence ("specified by A6's own ADR, not here"); design-canon §4 ruling 1 + §2 *Bookmark* (semantics); `docs/plans/UI-LANE.md` §2 row A6 (the slot). SPEC.2 §22 (ADR Index — row added at A6 execute, not here). |
 | **Supersedes** | — |
-| **Superseded-by** | — |
+| **Superseded-by** | ADR-0040 |
 
 ---
 

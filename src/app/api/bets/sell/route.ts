@@ -20,6 +20,29 @@ import { IDEMPOTENCY_ERROR_CODES } from "@/server/idempotency/types";
 const sellBodySchema = z.object({
 	marketId: z.string().uuid(),
 	shares: numericString,
+	// LOTS-1 / ADR-0039 R3 — the argument being exited. OPTIONAL: omitting it is
+	// the position-level sell this route has always performed, so every existing
+	// client keeps working and keeps meaning the same thing.
+	//
+	// `.optional()`, NOT `.nullish()` — ABSENT is the only spelling of "no
+	// particular argument" that crosses this wire. Behind the line the field is
+	// `string | null` and both call sites normalise with `?? null`, but that is
+	// an INTERNAL convention: `buildSellRequest` types the field `lotId?: string`
+	// and rebuilds the body key-by-key, dropping the key entirely when it is
+	// undefined, and both of its callers spread-guard on undefined too. No
+	// shipped client can send `null`.
+	//
+	// Admitting it anyway would not be a free widening, because the two
+	// spellings are NOT idempotency-equivalent. The key's body fingerprint is
+	// `sha256(canonicalize(body))`, and canonicalize emits the KEY SET it is
+	// given — so `{marketId, shares}` and `{marketId, shares, lotId: null}`
+	// fingerprint differently. A retry that reaches for the fuller form under
+	// the same key misses the cached fingerprint, lands on the `mismatch` arm,
+	// and comes back 409 `error_idempotency_key_reused`. A client that reads
+	// key-reused as "pick a new key" has just been handed the one instruction
+	// that turns a completed sell into a second executed one. One spelling per
+	// meaning is what keeps the fingerprint a function of the request.
+	lotId: z.string().uuid().optional(),
 });
 
 export async function POST(request: Request): Promise<Response> {
@@ -29,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 		if (!parsed.success) {
 			throw new InvalidRequestBodyError();
 		}
-		const { marketId, shares } = parsed.data;
+		const { marketId, shares, lotId } = parsed.data;
 		if (!new CpmmDecimal(shares).greaterThan(0)) {
 			throw new InvalidRequestBodyError("shares must be > 0");
 		}
@@ -61,6 +84,7 @@ export async function POST(request: Request): Promise<Response> {
 						userId: ctx.userId,
 						marketId,
 						shares,
+						lotId: lotId ?? null,
 						sellEventId,
 						syntheticBetId,
 						idempotencyKey: ctx.idempotencyKey,

@@ -105,6 +105,7 @@ export function useEqualRowThirds({
 	bodyRef,
 	tableRef,
 	testidPrefix,
+	extraHeadSelector,
 	rowWindow,
 	rowCount,
 }: {
@@ -114,6 +115,13 @@ export function useEqualRowThirds({
 	tableRef: RefObject<HTMLTableElement | null>;
 	/** `data-testid` prefix identifying a data row (never a sell-host row). */
 	testidPrefix: string;
+	/**
+	 * POSREV-1 RF-10 — a selector for rows that are CHROME rather than data: the
+	 * sticky market group headers. Their height is subtracted from the region
+	 * alongside `<thead>`'s, so the three tiles divide what is actually left.
+	 * Omitted ⇒ nothing extra, which is what every pre-POSREV-1 caller meant.
+	 */
+	extraHeadSelector?: string;
 	/** How many rows fill the region — the founder's three. */
 	rowWindow: number;
 	/**
@@ -172,12 +180,29 @@ export function useEqualRowThirds({
 			}
 			const cs = getComputedStyle(body);
 			const head = table.querySelector("thead");
+			// ⚠⚠ POSREV-1 RF-10 — THE GROUP HEADERS COUNT AS CHROME, NOT AS ROWS.
+			// The founder's rule is "three ARGUMENT tiles; group headers are sticky
+			// and do NOT consume a slot". Sticky positioning takes no layout space
+			// only while an element is STUCK — in normal flow each group header
+			// occupies its own band, so leaving it out of the chrome would hand its
+			// height to the three tiles and make each one taller than a third of what
+			// is actually left. The row selector above already excludes them (they
+			// carry a different testid prefix); this is the other half of the same
+			// exclusion, and without it the two halves disagree.
+			const extraHead =
+				extraHeadSelector === undefined
+					? 0
+					: [...table.querySelectorAll(extraHeadSelector)].reduce(
+							(acc, el) => acc + el.getBoundingClientRect().height,
+							0,
+						);
 			const third = rowThird({
 				regionHeight: body.clientHeight,
 				padY:
 					(Number.parseFloat(cs.paddingTop) || 0) +
 					(Number.parseFloat(cs.paddingBottom) || 0),
-				headHeight: head ? head.getBoundingClientRect().height : 0,
+				headHeight:
+					(head ? head.getBoundingClientRect().height : 0) + extraHead,
 				rowWindow,
 				naturalHeight,
 			});
@@ -197,5 +222,5 @@ export function useEqualRowThirds({
 		const observer = new ResizeObserver(measure);
 		observer.observe(table);
 		return () => observer.disconnect();
-	}, [bodyRef, tableRef, testidPrefix, rowWindow, rowCount]);
+	}, [bodyRef, tableRef, testidPrefix, extraHeadSelector, rowWindow, rowCount]);
 }

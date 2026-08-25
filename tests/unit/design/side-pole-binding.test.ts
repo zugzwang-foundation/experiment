@@ -358,7 +358,8 @@ const PERMITTED_FILES = [
 	// inventory. The predicate was NOT relaxed to avoid the churn — relaxing it
 	// is the one thing this file must never do to stay green.
 	"src/components/discovery/HeroPanels.tsx",
-	"src/components/profile/graph/ProfileChart.tsx",
+	// UNWIRE-1 — `profile/graph/ProfileChart.tsx` deleted whole (Profile Dharma
+	// graph unwired); this entry drops with it rather than being replaced.
 	// EIGHTH ENTRY, and it REPLACES `composer/SlotHeader.tsx` rather than
 	// joining it — POLISH.5 item 1 lifted `ThumbGlyph` here, so the spread this
 	// guard collects left that file and arrived in this one. See the SURVEY

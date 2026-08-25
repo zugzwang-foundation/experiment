@@ -10,7 +10,6 @@ import {
 	REPLY_DEPTH_MAX,
 } from "@/server/config/limits";
 import {
-	BOOKMARKS,
 	MODERATION,
 	PARTICIPANTS,
 	type ParticipantRole,
@@ -66,7 +65,14 @@ function substrateFor(marketKey: string): PostSubstrate[] {
 			// Creation order is the fixture-table order; only the ORDERING matters
 			// to the model (the §3.4 tie chain), never the absolute instant.
 			createdAt: new Date(Date.UTC(2026, 0, 1, 0, i)),
+			// RANK-1 — the substrate's stake fields are SURVIVING basis. The
+			// staging fixture table (`tests/staging/fixtures.ts`) states no sells
+			// against a post's own entry bet, so surviving == frozen for every row
+			// here and the badge lanes this file pins are unaffected. If a future
+			// fixture DOES sell a post down, this is the line that has to state it.
 			authorStake: post.stake,
+			authorStakeOriginal: post.stake,
+			authorSold: false,
 			priceAtBet: "0.5",
 		};
 	});
@@ -94,17 +100,15 @@ describe("the fixture table is internally consistent", () => {
 		expect(REPLY_DEPTH_MAX).toBe(1);
 	});
 
-	it("points every bookmark and moderation row at a target that exists", () => {
+	it("points every moderation row at a target that exists", () => {
+		// UNWIRE-1 — this test covered bookmark rows too before the bookmark
+		// module was unwired product-wide; "never lets a viewer bookmark their
+		// own argument (B1)" (a dedicated BOOKMARKS-only test) is removed
+		// whole for the same reason.
 		const postKeys = new Set(POSTS.map((p) => p.key));
 		const replyKeys = new Set(REPLIES.map((r) => r.key));
 		const resolves = (target: string, kind: "post" | "reply") =>
 			kind === "post" ? postKeys.has(target) : replyKeys.has(target);
-		for (const b of BOOKMARKS) {
-			expect({ t: b.target, ok: resolves(b.target, b.targetKind) }).toEqual({
-				t: b.target,
-				ok: true,
-			});
-		}
 		for (const m of MODERATION) {
 			expect({ t: m.target, ok: resolves(m.target, m.targetKind) }).toEqual({
 				t: m.target,
@@ -112,24 +116,8 @@ describe("the fixture table is internally consistent", () => {
 			});
 		}
 		// Non-empty controls: a loop over an empty list asserts nothing.
-		expect(BOOKMARKS.length).toBeGreaterThan(0);
 		expect(MODERATION.length).toBeGreaterThan(0);
 		expect(REPLIES.length).toBeGreaterThan(0);
-	});
-
-	it("never lets a viewer bookmark their own argument (B1)", () => {
-		// `addBookmarkAction` returns `self_bookmark_forbidden`, so a self-bookmark
-		// here is not a bad fixture — it is a step that silently does nothing.
-		const authorOf = new Map<string, ParticipantRole>([
-			...POSTS.map((p) => [p.key, p.author] as const),
-			...REPLIES.map((r) => [r.key, r.author] as const),
-		]);
-		for (const b of BOOKMARKS) {
-			expect({
-				t: b.target,
-				self: authorOf.get(b.target) === b.viewer,
-			}).toEqual({ t: b.target, self: false });
-		}
 	});
 
 	it("respects both stake floors, read from the shipped constants", () => {
@@ -231,7 +219,6 @@ describe("the fixture table is internally consistent", () => {
 		]);
 		expect(authors.has("P-empty")).toBe(false);
 		expect(SELLS.some((s) => s.seller === "P-empty")).toBe(false);
-		expect(BOOKMARKS.some((b) => b.viewer === "P-empty")).toBe(false);
 		// Every author is a declared participant role — no stray string.
 		const roles = new Set(PARTICIPANTS.map((p) => p.role));
 		expect(

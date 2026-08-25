@@ -6,6 +6,8 @@ import type { DbClient } from "@/db";
 // `src/server/auth/index.ts` to atomically allocate a (colour, animal,
 // number, pfp_filename) tuple to the new user row.
 //
+// Ordering: `created_at, id` — the `id` tiebreaker is load-bearing, not decoration. Seed order IS assignment order (PFP-1), so the anti-clustering rotation only holds if this ORDER BY is a total order. Both seeders insert row by row today, giving each row its own transaction timestamp; batching either into one multi-row INSERT would stamp every row with the same `now()` and silently collapse the rotation with no test going red. ⚠ The tiebreaker makes the order TOTAL and DETERMINISTIC; it does NOT recover insertion order. This repo's `uuidv7()` (migration 0000) is a millisecond-precision timestamp prefix over `gen_random_uuid()`, so ids sharing a millisecond sort randomly. That is fine — a random order does not cluster either — but the guarantee is determinism, not insertion order, and the batched-INSERT case above stays a thing to avoid rather than something `id ASC` repairs.
+//
 // Concurrency: `SELECT … FOR UPDATE SKIP LOCKED` lets parallel signups pick
 // distinct tuples without serializing through the same row. The immediate
 // `UPDATE assigned_at = now()` in the same transaction commits the
@@ -29,7 +31,7 @@ export async function consumeIdentityPoolTuple(
 				SELECT id, colour, animal, number, pfp_filename AS "pfpFilename"
 				FROM identity_pool
 				WHERE assigned_at IS NULL
-				ORDER BY created_at ASC
+				ORDER BY created_at ASC, id ASC
 				LIMIT 1
 				FOR UPDATE SKIP LOCKED
 			`,

@@ -3,21 +3,18 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-// `UnbookmarkButton` (the bookmark row's action) is a client component calling
-// `useRouter()` and the remove action — mocked at the same boundary the bookmarks
-// selection suite mocks them. This suite tests KEY ROUTING, not the action, and
-// an unmounted app router throws before any assertion runs.
-vi.mock("@/server/bookmarks/remove", () => ({
-	removeBookmarkAction: vi.fn(async () => ({ ok: true })),
-}));
+// `PositionsTable` renders `LotBreakdown`, a client component calling
+// `useRouter()` — mocked here because an unmounted app router throws before
+// any assertion runs. This suite tests KEY ROUTING, not routing itself.
 vi.mock("next/navigation", () => ({
 	useRouter: () => ({ refresh: vi.fn() }),
 }));
 
-import { BookmarksTable } from "@/components/bookmarks/BookmarksTable";
 import { PositionsTable } from "@/components/profile/PositionsTable";
-import type { BookmarkItem } from "@/server/bookmarks/list";
-import type { ProfilePositionRow } from "@/server/profile/positions";
+import type {
+	ProfilePositionLot,
+	ProfilePositionRow,
+} from "@/server/profile/positions";
 
 /**
  * PROFILE OVERLAP · R4 — ↑/↓ STEP FROM LOAD, WITH NO CLICK.
@@ -35,9 +32,10 @@ import type { ProfilePositionRow } from "@/server/profile/positions";
  * the page-scroll condition, since it reports every dimension as zero — so that
  * one case defines the getter it depends on rather than pretending to observe it.
  *
- * ⚠ THE TWO SURFACES SHARE ONE FILE, deliberately: they share the hook, and the
- * whole point of sharing it is that neither can drift. Same reason the row-third
- * and the sticky-header strip are guarded once for both.
+ * UNWIRE-1 — this file used to cover TWO surfaces sharing one hook
+ * (`PositionsTable` and `BookmarksTable`, deliberately kept in one file so
+ * neither could drift). `BookmarksTable` is deleted along with the rest of
+ * the bookmark module; only the positions coverage remains.
  *
  * Fixtures are inline plain objects on the shipped DTOs (type-only imports — no
  * server code executes, no DB). No market content is invented (CLAUDE.md §3).
@@ -54,8 +52,46 @@ function pressOnDocument(key: "ArrowUp" | "ArrowDown"): void {
 // ── positions fixtures ────────────────────────────────────────────────────────
 const M = (n: number) => `0190c0de-0000-7000-8000-00000000000${n}`;
 
+/** The tile key for row `n` — a real lot id, so the tests exercise the real
+ *  per-argument path rather than the whole-holding fallback. */
+const L = (n: number) => `0190c0de-2222-7000-8000-00000000000${n}`;
+
+/**
+ * ⚠⚠ POSREV-1 RF-13 — **"CLOSED" IS NOW A PROPERTY OF THE HOLDING, NOT THE
+ * MARKET.** These helpers used to make a row Closed by setting `marketStatus:
+ * "Resolved"` / `statusLabel: "Closed"`. That no longer moves anything: the tab
+ * filters on whether the ARGUMENT still has surviving shares. A market can be
+ * Resolved and its argument still held (held-to-settlement), and an Open market
+ * can hold nothing but exited arguments. So a closed fixture is one whose lot
+ * has `survivingShares` at canonical zero, and `quantity` follows it — the two
+ * move together by `I-LOT-SUM-001`.
+ */
+/** One argument on row `n` — held (Open tab) or fully exited (Closed tab). */
+function LOT(n: number, held: boolean): ProfilePositionLot {
+	return {
+		lotId: L(n),
+		betId: `bet-${n}`,
+		side: "YES",
+		originalBasis: "25.000000000000000000",
+		survivingBasis: held ? "25.000000000000000000" : "0.000000000000000000",
+		survivingShares: held ? "10.000000000000000000" : "0.000000000000000000",
+		sold: !held,
+		placedAt: "2026-09-10T10:00:00.000Z",
+		argument: {
+			removed: false,
+			commentId: `0190c0de-1111-7000-8000-00000000000${n}`,
+			title: `Opener argument ${n}`,
+			isReply: false,
+			postOrdinal: n,
+			marketSlug: `fixture-${n}`,
+			repliedToTitle: null,
+		},
+	};
+}
+
 function openRow(n: number): ProfilePositionRow {
 	return {
+		lots: [LOT(n, true)],
 		marketId: M(n),
 		marketSlug: `fixture-${n}`,
 		marketTitle: `Market fixture-${n}`,
@@ -80,57 +116,25 @@ function openRow(n: number): ProfilePositionRow {
 
 const ROWS = [openRow(1), openRow(2), openRow(3)];
 const PAYLOAD = { owner: false as const, rows: ROWS };
-const posRow = (n: number) => screen.getByTestId(`position-row-${M(n)}`);
+const posRow = (n: number) => screen.getByTestId(`position-tile-${L(n)}`);
 /** The picked rows, among those actually RENDERED — a filter hides the rest, and
  *  a helper that insisted on all three would throw before it could report. */
 const posPicked = () =>
 	[1, 2, 3].filter(
 		(n) =>
 			screen
-				.queryByTestId(`position-row-${M(n)}`)
+				.queryByTestId(`position-tile-${L(n)}`)
 				?.getAttribute("aria-current") === "true",
 	);
 
-// ── bookmarks fixtures ────────────────────────────────────────────────────────
-const ID = (n: number) => `0190c0de-2222-7000-8000-00000000000${n}`;
-
-function item(n: number): BookmarkItem {
-	return {
-		removed: false,
-		kind: "post",
-		id: ID(n),
-		side: "YES",
-		marketSlug: "fixture-alpha",
-		marketTitle: "Market fixture-alpha",
-		ordinal: n,
-		title: `Saved argument ${n}`,
-		teaser: "Neutral fixture teaser.",
-		body: `Saved argument ${n}\n\nNeutral fixture body.`,
-		marker: "none",
-		authorStake: "12.000000000000000000",
-		priceAtBet: "0.310000000000000000",
-		createdAt: "2026-07-01T00:00:00.000Z",
-		aggregate: {
-			supportCount: 2,
-			counterCount: 1,
-			supportDharma: "300.000000000000000000",
-			counterDharma: "100.000000000000000000",
-		},
-		authorPseudonym: "RedWolf001",
-		staked: "25.000000000000000000",
-		current: "31.000000000000000000",
-	};
-}
-
-const ITEMS = [item(1), item(2), item(3)];
-const bmRow = (n: number) => screen.getByTestId(`bookmark-row-${ID(n)}`);
-const bmPicked = () =>
-	[1, 2, 3].filter(
-		(n) =>
-			screen
-				.queryByTestId(`bookmark-row-${ID(n)}`)
-				?.getAttribute("aria-current") === "true",
-	);
+// UNWIRE-1 — the bookmarks fixtures (ID/item/ITEMS/bmRow/bmPicked) are
+// removed along with the "bookmarks mode" describe block below: the
+// bookmark module is unwired product-wide and BookmarksTable is deleted.
+// UNWIRE-1-RESOLVE — RANK-1 (origin/main, PR #391) touched this file only to
+// add `authorStakeOriginal`/`authorSold` to this same now-deleted bookmarks
+// fixture's `item()` function; nothing it changed applies to the surviving
+// positions-only suite below, so the addition is dropped rather than
+// reapplied. Reported per the merge ruling rather than silently discarded.
 
 describe("R4 — the mount selection is the keyboard's anchor (positions)", () => {
 	it("anchor::DOWN-from-a-fresh-load-moves-off-row-one", () => {
@@ -255,9 +259,10 @@ describe("R4 — the mount selection is the keyboard's anchor (positions)", () =
 		// Closed rows so there is somewhere to step TO after the switch.
 		const closed = (n: number): ProfilePositionRow => ({
 			...openRow(n),
-			marketStatus: "Resolved",
-			statusLabel: "Closed",
-			settled: true,
+			quantity: "0.000000000000000000",
+			staked: "0.000000000000000000",
+			current: "0.000000000000000000",
+			lots: [LOT(n, false)],
 		});
 		render(
 			<PositionsTable
@@ -269,39 +274,5 @@ describe("R4 — the mount selection is the keyboard's anchor (positions)", () =
 		expect(posPicked()).toEqual([2]);
 		pressOnDocument("ArrowDown");
 		expect(posPicked()).toEqual([3]);
-	});
-});
-
-describe("R4 — the same anchor on the bookmarks mode", () => {
-	it("anchor::DOWN-from-a-fresh-load-moves-off-row-one", () => {
-		// ⛔ R4 says BOTH MODES. Since the bookmark toggle is a route rather than
-		// client state, this component IS the other mode.
-		render(<BookmarksTable items={ITEMS} />);
-		expect(bmPicked()).toEqual([1]);
-		pressOnDocument("ArrowDown");
-		expect(bmPicked()).toEqual([2]);
-	});
-
-	it("anchor::UP-from-a-fresh-load-wraps-to-the-last-row", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		pressOnDocument("ArrowUp");
-		expect(bmPicked()).toEqual([3]);
-	});
-
-	it("anchor::focus-INSIDE-the-table-steps-exactly-once", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		bmRow(1).focus();
-		fireEvent.keyDown(bmRow(1), { key: "ArrowDown" });
-		expect(bmPicked()).toEqual([2]);
-	});
-
-	it("anchor::a-caret-KEEPS-the-key", () => {
-		render(<BookmarksTable items={ITEMS} />);
-		const field = document.createElement("textarea");
-		document.body.appendChild(field);
-		field.focus();
-		fireEvent.keyDown(field, { key: "ArrowDown" });
-		expect(bmPicked()).toEqual([1]);
-		field.remove();
 	});
 });

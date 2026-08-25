@@ -23,10 +23,10 @@ import { describe, expect, it } from "vitest";
  * silently uncovers 4px of strip again. Both sides are written as multiples of
  * `var(--spacing)`, and this asserts they are the same multiple.
  *
- * ⚠ AND IT COVERS BOTH SURFACES IN ONE FILE, deliberately. Positions and
- * bookmarks are one shell with the left panel swapped — same padding, same
- * sticky header — so a fix on one is drift waiting to be filed as a second bug.
- * That is the same reason the row-third lives in a shared module.
+ * UNWIRE-1 — this file used to cover TWO surfaces sharing one shell
+ * (Positions and the bookmark module's BookmarksTable, "one shell with the
+ * left panel swapped"). BookmarksTable is deleted along with the rest of the
+ * bookmark module; only the positions coverage remains.
  *
  * ⚠ A SOURCE SCAN, and the limit is stated: jsdom performs no layout and paints
  * nothing, so no render test can see a strip or a stacking order. What is
@@ -42,11 +42,6 @@ const SURFACES = [
 		name: "positions",
 		file: "src/components/profile/PositionsTable.tsx",
 		bodyTestId: "positions-panel-body",
-	},
-	{
-		name: "bookmarks",
-		file: "src/components/bookmarks/BookmarksTable.tsx",
-		bodyTestId: "bookmarks-panel-body",
 	},
 ] as const;
 

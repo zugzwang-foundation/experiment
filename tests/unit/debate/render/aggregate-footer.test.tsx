@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { AggregateFooter } from "@/components/debate/AggregateFooter";
 import { PostCard } from "@/components/debate/PostCard";
 import type { DebatePost, ReplyGroups, Side } from "@/components/debate/types";
@@ -47,20 +46,16 @@ import type { DebatePost, ReplyGroups, Side } from "@/components/debate/types";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 22 — the card's Support/Counter pills.
- * These suites assert bookmarks / spacing / card composition, never the
+ * These suites assert spacing / card composition, never the
  * trigger gate, so a no-op with `heldSide: null` is the honest stand-in: it
  * keeps the viewer state REQUIRED at the component (a trigger without its
  * F-3 gate invites a bet the viewer cannot place) without pretending this
  * file tests it. `aggregate-footer.test.tsx` is where the gate is pinned. */
 const noopReply = () => {};
 
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const EMPTY_REPLIES: ReplyGroups = { support: [], counter: [], twoSlot: [] };
 
 /** Asymmetric on purpose — a 50/50 split hides a swapped fill. */
@@ -87,6 +82,9 @@ function presentPost(side: Side): DebatePost {
 		badge: null,
 		author: { pseudonym: "fixture-author", pfpUrl: "" },
 		authorStake: "10.000000000000000000",
+		// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+		authorStakeOriginal: "10.000000000000000000",
+		authorSold: false,
 		entryPrice: "0.500000000000000000",
 		aggregate: AGGREGATE,
 		replies: EMPTY_REPLIES,
@@ -99,7 +97,6 @@ function renderFooter(side: Side) {
 	const { container } = render(
 		<PostCard
 			post={presentPost(side)}
-			bookmarks={VIEWER}
 			onEnter={noop}
 			onOpenPopup={noop}
 			onOpenImage={noop}

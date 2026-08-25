@@ -19,7 +19,7 @@ import { profileOrder } from "@/lib/ranking";
 function post(
 	over: Partial<PostSubstrate> & Pick<PostSubstrate, "id">,
 ): PostSubstrate {
-	return {
+	const built: PostSubstrate = {
 		parentSide: "YES",
 		supportCount: 1,
 		counterCount: 1,
@@ -27,21 +27,39 @@ function post(
 		counterDharma: "0",
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		authorStake: "100",
+		authorStakeOriginal: "100",
+		authorSold: false,
 		priceAtBet: "0.5",
 		...over,
 	};
+	// RANK-1 — `authorStake` is now SURVIVING basis and `authorStakeOriginal` the
+	// frozen one. Unless a case explicitly states an original (an argument sold
+	// down), the two are equal: a fixture where the original is SMALLER than what
+	// survives is unrepresentable in the database (`lots_surviving_basis_monotone`),
+	// and a fixture the storage layer would reject teaches nothing.
+	return over.authorStakeOriginal === undefined
+		? { ...built, authorStakeOriginal: built.authorStake }
+		: built;
 }
 
 function reply(
 	over: Partial<ReplySubstrate> & Pick<ReplySubstrate, "id">,
 ): ReplySubstrate {
-	return {
+	const built: ReplySubstrate = {
 		side: "YES",
 		stake: "50",
+		stakeOriginal: "50",
+		sold: false,
 		createdAt: new Date("2026-09-01T00:00:00.000Z"),
 		priceAtBet: "0.5",
 		...over,
 	};
+	// RANK-1 — `stake` is now SURVIVING basis, `stakeOriginal` the frozen one.
+	// They are equal unless a case explicitly states otherwise; see the post
+	// factory note on why an original below the survivor is not a legal fixture.
+	return over.stakeOriginal === undefined
+		? { ...built, stakeOriginal: built.stake }
+		: built;
 }
 
 describe("ranking::profile-ordering-posts-above-replies (§3.6)", () => {

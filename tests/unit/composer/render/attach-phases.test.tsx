@@ -126,11 +126,16 @@ describe("ImageAttach — the error is announced, not swallowed by a button", ()
 
 describe("ImageAttach — the group and the control are named separately", () => {
 	// The a11y fix moved the affordance's label onto the <fieldset>. That left
-	// the pick control deriving its name from its own contents — "Image Shown
-	// whole · any orientation" idle, and the FILENAME while attaching, so the
-	// control's accessible name changed under the user mid-interaction. A group
-	// names a region; a button names an action; they are different objects and
-	// a button may carry its own.
+	// the pick control deriving its name from its own contents — the label plus
+	// the caption that used to sit under the box when idle, and the FILENAME
+	// while attaching — so the control's accessible name changed under the user
+	// mid-interaction. A group names a region; a button names an action; they
+	// are different objects and a button may carry its own.
+	//
+	// ⚠ The caption is gone (POLISH-4-EMPTYSLOT) but the hazard is NOT: the box
+	// now holds a figure carrying its own text, which is why that <svg> is
+	// `aria-hidden`. These assertions hold the explicit name in place either
+	// way — that is the point of pinning the name rather than the contents.
 	const namedPhases: Array<[string, ImageAttachState]> = [
 		["none", { phase: "none" }],
 		["attaching", { phase: "attaching", name: "chart.png" }],

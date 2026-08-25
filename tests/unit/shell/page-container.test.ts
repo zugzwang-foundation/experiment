@@ -79,47 +79,12 @@ const SITES: Site[] = [
 		file: "src/app/(public)/not-found.tsx",
 		before: "mx-auto w-full max-w-3xl px-4 py-24 text-center",
 	},
-	{
-		site: 2,
-		file: "src/app/(public)/bookmarks/page.tsx",
-		before: "mx-auto flex w-full max-w-3xl flex-col gap-4 px-4 py-6",
-		// ⚠⚠ HTML-FINISH · BOOKMARKS round 3 — `/bookmarks` takes the PROFILE
-		// ARRANGEMENT as it ships on `main` (founder-ruled). That is a two-column
-		// arena, and `reading`'s `max-w-3xl` = 768 caps the container BELOW the
-		// `lg` breakpoint at which the arena may become two columns at all — so
-		// the surface would render its two-column layout at its own minimum on
-		// every screen and never widen. That is the exact measured defect
-		// HTML-FINISH row 20 minted `wide` to fix on Profile (site 5).
-		// ⇒ This site moves to `wide` and takes Profile's own content-layout
-		// classes byte-for-byte, INCLUDING the `lg:` one-screen pair: the route
-		// occupies exactly the viewport below the header at `lg`+, bounded against
-		// the same figure `<main>`'s own floor uses.
-		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
-		// read-only this round, so `BOX_AXES` moves by preset selection alone.
-		// ⚠⚠ MOVED AGAIN AT PROFILE-DIMS R2 · D-4 — onto `screen`, byte-carried
-		// from Profile's call site in the SAME commit. `/bookmarks` takes the
-		// Profile arrangement, so it takes Profile's frame; moving only one of the
-		// pair would re-open exactly the drift §3 forbids. `gap-3` is the mockup's
-		// `.arena{margin-top:12px}` and `100dvh` replaces `100vh` for the reason
-		// `/m/[slug]`'s guard pins by name.
-		// ⛔ STILL CONSUMED, NEVER RE-MINTED — `screen` already existed (#341), so
-		// `BOX_AXES` moves by preset SELECTION alone and no preset was authored.
-		now: "mx-auto w-full max-w-none px-7 py-4 flex min-h-0 flex-1 flex-col gap-3 lg:h-[calc(100dvh-60px-2px)] lg:flex-none",
-		movedBy:
-			"HTML-FINISH · BOOKMARKS round 3 — full replication of Profile " +
-			"(founder-ruled 2026-08-15); PROFILE-DIMS R2 · D-4 — takes the `screen` " +
-			"preset with Profile (founder-ruled 2026-08-17)",
-	},
-	{
-		site: 3,
-		file: "src/app/(public)/bookmarks/loading.tsx",
-		before: "mx-auto w-full max-w-3xl px-4 py-6",
-	},
-	{
-		site: 4,
-		file: "src/app/(public)/bookmarks/error.tsx",
-		before: "mx-auto w-full max-w-3xl px-4 py-6",
-	},
+	// UNWIRE-1 — sites 2, 3, 4 (bookmarks/{page,loading,error}.tsx) are
+	// retired whole: the bookmark module is unwired product-wide and the
+	// route is deleted. The numbers are NOT reused and the array is NOT
+	// renumbered — site 5 onward are cited by number from other files'
+	// comments (e.g. `u/[pseudonym]/page.tsx`'s own docblock), and
+	// renumbering would silently break those cross-references.
 	{
 		site: 5,
 		file: "src/app/(public)/u/[pseudonym]/page.tsx",
@@ -198,15 +163,15 @@ const SITES: Site[] = [
 		// suppresses `align-self: stretch` and the class becomes the difference
 		// between fill-to-max-w and shrink-to-fit.
 		adds: "w-full",
-		// ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R1 — `/m/[slug]` JOINS SITES 2
-		// AND 5 ON `wide`, and it is the SAME ruling reaching a third route. The
+		// ⚠⚠ HTML-FINISH · MARKET DETAIL round 2 · R1 — `/m/[slug]` JOINS SITE 5
+		// ON `wide` (UNWIRE-1: site 2, `/bookmarks`, also joined them at round 3
+		// but is now retired with the route). The
 		// debate surface is a two-column HEADER above a two-column ARENA, and
 		// `debate`'s own `max-w-5xl` = 1024 is the width at which the header rail
 		// stops being a rail. MEASURED on staging at a 1440 viewport before the
 		// move: container 1024 (capped), headzone-left 716, headzone-right 244 —
 		// so the rail rendered at 244px on a 1440 screen and could not widen. That
-		// is the identical defect row 20 minted `wide` to fix on Profile, and the
-		// identical reason `/bookmarks` took it at round 3.
+		// is the identical defect row 20 minted `wide` to fix on Profile.
 		// ⛔ THE PRESET IS CONSUMED, NEVER RE-MINTED — `PageContainer.tsx` is
 		// read-only this round too, so `BOX_AXES` moves by preset selection alone.
 		// ⚠ `adds` above is KEPT rather than folded into `now`: it is the historical
@@ -250,7 +215,8 @@ const SITES: Site[] = [
  * there would invert the B2 no-change proof INSIDE the suite whose entire
  * purpose is that proof — the same inversion V-1 fences on `DETAIL_BASELINE`.
  * A greenfield site is therefore DECLARED here and left out of the class-set
- * rows above, rather than faked into `SITES`. `SITES` stays at nine.
+ * rows above, rather than faked into `SITES`. `SITES` stays at six
+ * (UNWIRE-1 — nine, less the three retired bookmarks sites).
  */
 const GREENFIELD: { file: string; reason: string }[] = [
 	{
@@ -363,17 +329,15 @@ describe("B2 — the container primitive moves nothing", () => {
 			expect(s.now).not.toBe(s.before);
 		}
 		// EXACT, so a second silent move cannot join the first.
-		// ⚠ SITE 2 JOINS SITE 5 AT HTML-FINISH · BOOKMARKS round 3, and the two
-		// moves are the SAME ruling reaching two routes: `/bookmarks` takes the
-		// Profile arrangement, which is a two-column arena, and `reading`'s
-		// `max-w-3xl` = 768 caps the container BELOW the `lg` breakpoint at which
-		// that arena may become two columns at all. ⛔ THE LIST STAYS EXACT — this
-		// is an enumeration of ruled moves, not a permission to drift.
-		// ⚠ SITE 9 JOINS THEM AT HTML-FINISH · MARKET DETAIL round 2 (R1 /
-		// HTML-FINISH-MD-1) — the third route to hit the same wall, measured at
-		// 1024 on a 1440 viewport. THREE ruled moves, all onto `wide`, all
+		// ⚠ SITE 9 JOINS SITE 5 AT HTML-FINISH · MARKET DETAIL round 2 (R1 /
+		// HTML-FINISH-MD-1) — the second route to hit the same wall, measured at
+		// 1024 on a 1440 viewport. TWO ruled moves, both onto `wide`, both
 		// founder-ruled, each carrying its own `movedBy`.
-		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([2, 5, 9]);
+		// UNWIRE-1 — site 2 (`/bookmarks`, which had joined site 5 at
+		// HTML-FINISH · BOOKMARKS round 3) is retired along with the route
+		// itself; the list below is EXACT, not a permission to drift, so its
+		// retirement is a real shrink of this enumeration, not an omission.
+		expect(SITES.filter((s) => s.now).map((s) => s.site)).toEqual([5, 9]);
 	});
 
 	it.each(SITES)("site $site ($file) leaves every box axis to the preset", ({
@@ -392,10 +356,12 @@ describe("B2 — the container primitive moves nothing", () => {
 		}
 	});
 
-	it("covers all nine declaration sites, each exactly once", () => {
-		expect(SITES).toHaveLength(9);
-		expect(new Set(SITES.map((s) => s.site)).size).toBe(9);
-		expect(new Set(SITES.map((s) => s.file)).size).toBe(9);
+	it("covers all six declaration sites, each exactly once", () => {
+		// UNWIRE-1 — nine dropped to six: sites 2, 3, 4 (bookmarks) retired
+		// whole, not renumbered.
+		expect(SITES).toHaveLength(6);
+		expect(new Set(SITES.map((s) => s.site)).size).toBe(6);
+		expect(new Set(SITES.map((s) => s.file)).size).toBe(6);
 	});
 
 	it("exactly one site adds a class beyond its c5892bc baseline", () => {
@@ -605,11 +571,13 @@ describe("B2 — the container primitive moves nothing", () => {
 		// same hazard. The second direction below would also catch an empty walk,
 		// but only as a side effect — this makes it explicit and independent.
 		//
-		// TEN is the POST-`error.tsx` measurement: the nine `SITES` files plus
-		// the one `GREENFIELD` file, counted on the tree at `9468c30` and every
-		// commit since. It is a FLOOR, not an equality — a tenth-plus site is
-		// caught by the membership loop below, not by this line.
-		expect(treeCallSites().length).toBeGreaterThanOrEqual(10);
+		// UNWIRE-1 — TEN dropped to SEVEN: sites 2/3/4 (bookmarks/{page,loading,
+		// error}.tsx) are deleted from the tree along with the route, not just
+		// retired from `SITES`, so the physical `<PageContainer>` count on disk
+		// shrank by three. SEVEN is the six `SITES` files plus the one
+		// `GREENFIELD` file. It is a FLOOR, not an equality — an eighth-plus
+		// site is caught by the membership loop below, not by this line.
+		expect(treeCallSites().length).toBeGreaterThanOrEqual(7);
 		for (const file of treeCallSites()) {
 			expect(
 				declared.has(file),

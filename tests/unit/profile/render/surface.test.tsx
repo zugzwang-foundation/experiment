@@ -9,6 +9,12 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
+
 import { ArgumentList } from "@/components/profile/ArgumentList";
 import { PROFILE_COPY } from "@/components/profile/copy";
 import { IdentityCard } from "@/components/profile/IdentityCard";
@@ -16,7 +22,10 @@ import { PositionsTable } from "@/components/profile/PositionsTable";
 import { ProfileTiles } from "@/components/profile/ProfileTiles";
 import { ProfileError, ProfileLoading } from "@/components/profile/states";
 import type { ProfileArgumentItem } from "@/server/profile/arguments";
-import type { ProfilePositionRow } from "@/server/profile/positions";
+import type {
+	ProfilePositionLot,
+	ProfilePositionRow,
+} from "@/server/profile/positions";
 import type { ProfileUser } from "@/server/profile/resolve";
 import type { ProfileTiles as ProfileTilesData } from "@/server/profile/tiles";
 
@@ -163,7 +172,50 @@ const TILES: ProfileTilesData = {
 	counterReceived: "12.000000000000000000",
 };
 
+const L1 = "0190c0de-2222-7000-8000-000000000001";
+const L2 = "0190c0de-2222-7000-8000-000000000002";
+
+/**
+ * ⚠⚠ POSREV-1 — THESE ROWS CARRY REAL LOTS NOW, AND THAT IS NOT COSMETIC.
+ * The table's unit is the ARGUMENT: a row with no lots renders through the
+ * whole-holding FALLBACK tile, which is the drift path, not the ordinary one.
+ * Fixtures without lots would have tested the exception on every assertion.
+ * ⚠ `ROW_SETTLED`'s lot is fully EXITED, so it lands in the CLOSED tab — which
+ * is what lets the both-poles assertions below reach a NO tile at all. Under
+ * RF-13 the tab is holding status, so a Resolved MARKET is no longer what puts
+ * a row on the Closed side.
+ */
+function LOT(
+	lotId: string,
+	side: "YES" | "NO",
+	held: boolean,
+	argument: ProfilePositionLot["argument"],
+): ProfilePositionLot {
+	return {
+		lotId,
+		betId: `bet-${lotId}`,
+		side,
+		originalBasis: held ? "25.000000000000000000" : "8.000000000000000000",
+		survivingBasis: held ? "25.000000000000000000" : "0.000000000000000000",
+		survivingShares: held ? "10.000000000000000000" : "0.000000000000000000",
+		sold: !held,
+		placedAt: "2026-09-10T10:00:00.000Z",
+		argument,
+	};
+}
+
+const OPENER_CELL = {
+	removed: false as const,
+	commentId: C_OPENER,
+	title: "Opener argument alpha",
+	isReply: false,
+	postOrdinal: 1,
+	marketSlug: "fixture-alpha",
+	repliedToTitle: null,
+};
+
 const ROW_OPEN: ProfilePositionRow = {
+	lots: [LOT(L1, "YES", true, OPENER_CELL)],
 	marketId: M1,
 	marketSlug: "fixture-alpha",
 	marketTitle: "Market fixture-alpha",
@@ -187,6 +239,7 @@ const ROW_OPEN: ProfilePositionRow = {
 
 /** Settled row whose episode-opening argument is content_removed (N-1a). */
 const ROW_SETTLED: ProfilePositionRow = {
+	lots: [LOT(L2, "NO", false, { removed: true, marketSlug: "fixture-beta" })],
 	marketId: M2,
 	marketSlug: "fixture-beta",
 	marketTitle: "Market fixture-beta",
@@ -194,7 +247,16 @@ const ROW_SETTLED: ProfilePositionRow = {
 	statusLabel: "Closed",
 	settled: true,
 	side: "NO",
-	quantity: "4.000000000000000000",
+	// ⚠⚠ ZERO, AND THE FIXTURE WAS INCONSISTENT UNTIL POSREV-1'S REVIEW. This row's
+	// only argument is fully EXITED, and `I-LOT-SUM-001` says Σ surviving lot
+	// shares == `positions.quantity` — so a sold-out holding cannot also hold 4.
+	// The old render never noticed, because nothing read the two together. The
+	// whole-holding fallback does: "no surviving lot AND a positive quantity" is
+	// exactly the lots↔positions DRIFT shape, so an invariant-violating fixture
+	// now (correctly) renders an extra Open tile and reddens these tests. Making
+	// the fixture obey the invariant is the fix; loosening the predicate would be
+	// deleting a real guard to accommodate an impossible row.
+	quantity: "0.000000000000000000",
 	staked: "8.000000000000000000",
 	current: "12.000000000000000000",
 	argument: { removed: true, marketSlug: "fixture-beta" },
@@ -215,6 +277,9 @@ const A_POST: ProfileArgumentItem = {
 	body: "Argument post alpha\n\nNeutral fixture body alpha.",
 	marker: "none",
 	authorStake: "25.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	authorStakeOriginal: "25.000000000000000000",
+	authorSold: false,
 	priceAtBet: "0.410000000000000000",
 	createdAt: "2026-09-20T00:00:00.000Z",
 	aggregate: {
@@ -238,6 +303,9 @@ const A_REPLY: ProfileArgumentItem = {
 	body: "Argument reply beta\n\nNeutral fixture body beta.",
 	marker: "Flipped",
 	stake: "6.000000000000000000",
+	// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+	stakeOriginal: "6.000000000000000000",
+	sold: false,
 	priceAtBet: "0.630000000000000000",
 	repliedToTitle: "Parent argument gamma",
 	createdAt: "2026-09-21T00:00:00.000Z",
@@ -334,36 +402,77 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			expect(tile.textContent ?? "").toContain(label);
 		}
 
-		// Positions table: canon §6 column headers + both rows.
+		// ⚠⚠ POSREV-1 RF-4 — THE OPEN TAB'S FOUR COLUMNS. `Staked` is DELETED from
+		// the tile row: Đa now lives on the market GROUP HEADER, where it belongs to
+		// the market rather than to one argument, and `Sell` takes the far-right
+		// slot. The `→` arrow track goes with `Staked` — it existed only to carry a
+		// relation between two value columns, and there is one.
 		const table = screen.getByTestId("positions-table");
-		for (const col of ["Position", "Argument", "Staked", "Current"]) {
+		for (const col of ["Position", "Argument", "Current", "Sell"]) {
 			expect(table.textContent ?? "").toContain(col);
 		}
-		const rowOpen = within(table).getByTestId(`position-row-${M1}`);
+		const rowOpen = within(table).getByTestId(`position-tile-${L1}`);
+		// ⛔⛔ INVERTED AT POSREV-POLISH P-1, AND THIS IS A SUPERSESSION, NOT A
+		// REGRESSION. It asserted the opposite: "THE MARKET TITLE IS NO LONGER ON
+		// THE TILE — RF-3 moved it to the group header … asserted ABSENT from the
+		// tile, because 'it moved' and 'it is gone' are different outcomes and only
+		// one is right." That reading was correct for RF-3 and the founder has
+		// overruled RF-3: the group header is removed and the question returns to
+		// each tile, where it sat before. The repetition RF-3 removed is knowingly
+		// paid again — the header cost more vertical rhythm than it saved.
+		// ⚠ THE SAME DISTINCTION IS STILL DRAWN, just the other way round: the title
+		// is asserted PRESENT on the tile and the group header is asserted GONE, so
+		// "it moved back" cannot pass as "it is duplicated in both places".
 		expect(rowOpen.textContent ?? "").toContain(ROW_OPEN.marketTitle);
-		// Staked / Current representations (integer parts — display formatting
-		// is the component's; the 18-dp DTO strings are the source).
-		expect(rowOpen.textContent ?? "").toContain("25");
+		expect(
+			within(table).queryByTestId(`positions-group-title-${M1}`),
+		).toBeNull();
+		// ⛔ AND Đa → Đb NOW RENDER NOWHERE. They rode the header, which is gone;
+		// the tiles still sum to Đb by construction but the market's own total is
+		// off the surface. Asserted rather than merely dropped, so the absence is a
+		// recorded consequence of the ruling instead of something nobody noticed.
+		expect(
+			within(table).queryByTestId(`positions-group-figures-${M1}`),
+		).toBeNull();
+		// Current representation (integer part — display formatting is the
+		// component's; the 18-dp DTO strings are the source).
 		expect(rowOpen.textContent ?? "").toContain("31");
+		// ⛔⛔ THE STAKED FIGURE IS BACK ON THE OPEN TILE, AND THIS ASSERTION HAS NOW
+		// FLIPPED TWICE IN TWO TASKS. Originally it required `25` on the tile (the
+		// `from Đ 25` line). POSREV-POLISH deleted that line and the group header's
+		// Đa together, so it became `not.toContain("25")` — an Open tile showed what
+		// an argument was worth and never what was put in.
+		// POSREV-POLISH-2 R-3 puts it back, deliberately and for a stated reason:
+		// R-2 turned the delta into a PERCENTAGE, and a percentage whose denominator
+		// appears nowhere is a figure nobody can check. So `survivingBasis` — the
+		// very string R-2 divides by — rides the market-question line.
+		// ⚠ ASSERTED THROUGH ITS OWN NODE, not by a bare substring: `25` could match
+		// almost anything on a money surface, and this is specifically the staked
+		// denominator.
+		expect(rowOpen.textContent ?? "").toContain("25");
+		expect(
+			within(rowOpen).getByTestId(`tile-staked-inline-${L1}`).textContent ?? "",
+		).toContain("staked Đ 25");
 		// The present argument cell carries the opener title (N-1a).
-		expect(text(within(rowOpen).getByTestId(`position-arg-${M1}`))).toContain(
+		expect(text(within(rowOpen).getByTestId(`tile-arg-${L1}`))).toContain(
 			"Opener argument alpha",
 		);
-		// Status cells show the statusLabel. ⚠ Item 11 removed the status
-		// filter's `All` option, so the two rows are never on screen together
-		// — each label is read in its own filter state. ⚠ Gate C S-1 then made
-		// the default DERIVED rather than fixed, and `ROWS` contains an Open
-		// row, so the derivation yields `Open` here and this switch is STILL
-		// REQUIRED. ⛔ Not the twin B10 removed: that one's fixture was
-		// all-Closed under a market preselect, which is what made its switch a
-		// no-op. The assertion is unchanged; only the attribution moved.
-		expect(text(within(table).getByTestId(`position-status-${M1}`))).toContain(
-			"Open",
-		);
+		// ⛔⛔ THE PER-TILE STATUS CELL IS DELETED (POSREV-1 RF-12), AND THE
+		// ASSERTION IS REPLACED RATHER THAN DROPPED. It read the `statusLabel` off
+		// each row in its own filter state. Market status now renders NOWHERE:
+		// every market carries the same deadline and none resolves early, so the
+		// chip repeated one constant word on every tile — and RF-13 then took the
+		// two WORDS for a different meaning entirely, so a chip reading `Open`
+		// beside a tab reading `Open` would name two unrelated facts with one word.
+		// ⇒ What replaces it is the ABSENCE, asserted with the tab switch kept:
+		// each tile is read in its own tab, and neither carries a status node.
+		expect(table.querySelector('[data-testid^="position-status-"]')).toBeNull();
 		setStatusFilter("Closed");
-		expect(text(within(table).getByTestId(`position-status-${M2}`))).toContain(
-			"Closed",
-		);
+		// The settled row's argument is fully exited, so it is the CLOSED tab's
+		// tile — which is RF-13's whole redefinition, exercised here rather than
+		// merely described.
+		expect(within(table).getByTestId(`position-tile-${L2}`)).toBeTruthy();
+		expect(table.querySelector('[data-testid^="position-status-"]')).toBeNull();
 		setStatusFilter("Open");
 
 		// Argument list: present post + present reply + removed stub.
@@ -432,34 +541,22 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 	});
 
-	it("owner-only-bookmark-affordance-on-the-identity-card", () => {
-		// POLISH.5 item 17 (PB-1, W2.13 R2 + founder ruling 2026-07-31:
-		// OWNER-ONLY). The headzone bookmark icon is navigation to the viewer's
-		// OWN saved set, so a visitor must not see it. Before this item,
-		// `grep -rn '"/bookmarks"' src/` returned ZERO — the route was live,
-		// auth-gated and ORPHANED from the navigation graph.
-		//
-		// ⚠ TWO ARMS OR IT IS VACUOUS (V-2). An owner-only affordance asserted
-		// only on the owner arm passes identically on a control that is ALWAYS
-		// visible, so the negative arm is what gives the positive one meaning.
+	it("no-bookmark-affordance-on-the-identity-card-either-arm", () => {
+		// UNWIRE-1 — supersedes `owner-only-bookmark-affordance-on-the-identity-
+		// card`. That test asserted the headzone bookmark icon was OWNER-ONLY
+		// (POLISH.5 item 17, founder ruling 2026-07-31); the bookmark module is
+		// now unwired product-wide (SUB-2), so the control isn't gated by
+		// ownership anymore — it's gone from both arms. Kept as a two-arm
+		// negative guard rather than dropped outright, so a bookmark-link
+		// regression on EITHER arm still fails loudly.
 		const asOwner = render(
 			<IdentityCard user={USER} owner={true} tiles={TILES} />,
 		);
-		const card = screen.getByTestId("identity-card");
-		const link = card.querySelector('a[href="/bookmarks"]');
-		expect(link).not.toBeNull();
-		// Icon-only: an accessible name via aria-label, and NO visible "@" —
-		// the `scrubbed-silhouette-and-zero-pii` case asserts the whole
-		// identity-card subtree contains none. (Named by TEST, not by line:
-		// the coordinate this comment used to carry was both wrong and in the
-		// wrong direction — O-8 demotes a line number to evidence.)
-		expect(link?.getAttribute("aria-label")).toBe("Bookmarks");
-		expect(link?.textContent ?? "").toBe("");
-		// ⛔ Bookmark ONLY — W2.13 R2 struck the download icon.
-		expect(card.querySelector('a[href*="download"]')).toBeNull();
+		expect(
+			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
+		).toBeNull();
 		asOwner.unmount();
 
-		// The negative arm: a visitor gets NO link at all.
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		expect(
 			screen.getByTestId("identity-card").querySelector('a[href="/bookmarks"]'),
@@ -511,11 +608,11 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// lying-docblock class, and it would have hidden a real regression in the
 		// derivation behind a manual override.
 		render(<PositionsTable payload={{ owner: false, rows: [ROW_SETTLED] }} />);
-		const cell = screen.getByTestId(`position-arg-removed-${M2}`);
+		const cell = screen.getByTestId(`tile-arg-removed-${L2}`);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_TITLE);
 		expect(cell.textContent ?? "").not.toContain(REMOVED_WOULD_BE_BODY);
 		// The present-variant cell testid must not exist for a removed cell.
-		expect(screen.queryByTestId(`position-arg-${M2}`)).toBeNull();
+		expect(screen.queryByTestId(`tile-arg-${L2}`)).toBeNull();
 	});
 
 	it("owner-vs-visitor-body-identical", () => {
@@ -548,7 +645,7 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 			);
 		const snapshot = (root: ParentNode) => ({
 			tilesHtml: root.querySelector('[data-testid="profile-tiles"]')?.innerHTML,
-			rowIds: testids(root, "position-row-"),
+			rowIds: testids(root, "position-tile-"),
 			argIds: testids(root, "argument-"),
 		});
 
@@ -800,28 +897,40 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// property is PRESERVED by reading each in its own filter state — it is
 		// the reach that changed, not the law.
 		// The YES pole, and the market title that proves the glyph is ADDITIVE.
-		const yes = screen.getByTestId(`position-side-${M1}`);
+		const yes = screen.getByTestId(`tile-side-${L1}`);
 		const yesGlyph = yes.querySelector("svg");
 		expect(text(yes)).toBe("Yes");
+		// ⛔⛔ INVERTED **BACK** AT POSREV-POLISH P-1. The original claim was "the
+		// glyph is ADDITIVE, it did not replace the question", asserted on the tile.
+		// RF-3 moved the question to the group header and this assertion followed it
+		// there. P-1 removes that header by founder ruling, so the question is on
+		// the tile again and the ORIGINAL additive claim is the one that holds —
+		// the assertion has come full circle rather than been loosened.
 		expect(
-			(screen.getByTestId(`position-row-${M1}`).textContent ?? "").includes(
+			(screen.getByTestId(`position-tile-${L1}`).textContent ?? "").includes(
 				ROW_OPEN.marketTitle,
 			),
 		).toBe(true);
+		expect(screen.queryByTestId(`positions-group-title-${M1}`)).toBeNull();
 
 		// The NO pole, in its own filter state.
 		setStatusFilter("Closed");
-		const no = screen.getByTestId(`position-side-${M2}`);
+		const no = screen.getByTestId(`tile-side-${L2}`);
 		const noGlyph = no.querySelector("svg");
 		expect(text(no)).toBe("No");
 
-		// THIS surface's size is 12. The slot header's 16 is scoped to it BY
-		// NAME in the values-log and does not inherit — so a glyph rendering at
-		// 16 here means the default leaked through.
-		expect(yesGlyph?.getAttribute("width")).toBe("12");
-		expect(yesGlyph?.getAttribute("height")).toBe("12");
-		expect(noGlyph?.getAttribute("width")).toBe("12");
-		expect(noGlyph?.getAttribute("height")).toBe("12");
+		// ⚠ 15 SINCE POSREV-POLISH P-3, which raised the tile's type scale to fill
+		// the height `useEqualRowThirds` forces on it; the glyph goes up with the
+		// side word (13px → 15px). It was 14 under RF-12 ("Larger than current"),
+		// and the *reason* attached to that 14 is the part worth keeping:
+		// ⛔ STILL NOT 16 — 16 is `ThumbGlyph`'s own DEFAULT, so `size={16}` would
+		// be byte-identical to omitting the prop and a later reader could not tell a
+		// deliberate re-point from a default leaking through. That argument survives
+		// the ruling unchanged; only the number it protects has moved.
+		expect(yesGlyph?.getAttribute("width")).toBe("15");
+		expect(yesGlyph?.getAttribute("height")).toBe("15");
+		expect(noGlyph?.getAttribute("width")).toBe("15");
+		expect(noGlyph?.getAttribute("height")).toBe("15");
 
 		// Decorative: the WORD carries the meaning, so the glyph stays out of
 		// the accessibility tree.
@@ -868,20 +977,20 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// ⇒ Only the Open row is visible at mount. This is the CAPABILITY
 		// REMOVAL, asserted rather than implied: there is no longer any state of
 		// this surface in which an open and a closed position appear together.
-		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
-		expect(screen.queryByTestId(`position-row-${M2}`)).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L1}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${L2}`)).toBeNull();
 
 		// Status → Closed hides the Open row, keeps the Closed row.
 		setStatusFilter("Closed");
-		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.queryByTestId(`position-tile-${L1}`)).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L2}`)).toBeTruthy();
 		first.unmount();
 
 		// Fresh mount: the market filter isolates one market's rows, and it does
 		// so independently of the status filter.
 		render(<PositionsTable payload={{ owner: false, rows: ROWS }} />);
 		setMarketFilter(M1);
-		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
+		expect(screen.getByTestId(`position-tile-${L1}`)).toBeTruthy();
 
 		// ⚠ The negative arm now selects the OTHER market rather than asserting
 		// M2's absence under `market=M1`: item 11's `Open` default already
@@ -890,15 +999,26 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// selecting M2 is the market filter's own doing — the status filter has
 		// not moved.
 		setMarketFilter(M2);
-		expect(screen.queryByTestId(`position-row-${M1}`)).toBeNull();
+		expect(screen.queryByTestId(`position-tile-${L1}`)).toBeNull();
 	});
 
-	it("positions-filtered-empty-is-not-stranded", () => {
+	it("positions-empty-TAB-is-not-stranded", () => {
 		// POLISH.5 Gate C S-1. Item 11 made `rows > 0 ∧ visible === 0` reachable
 		// at mount; the component rendered four column headers over an empty
 		// `<tbody>` and NO message. This is that state, entered deliberately.
 		// The OWNER arm, because that is the motivating case: an owner opening
 		// their own profile. Its rows carry `sellEligible` (`SellablePositionRow`).
+		//
+		// ⚠⚠ THE COPY MOVED AT POSREV-1 RF-14 AND THE LAW DID NOT. This asserted
+		// `positionsFiltered` — "No positions match this filter." — which was the
+		// only empty message a one-message surface could offer. RF-14 makes the
+		// empty states per-tab AND aware of each other, because the old single
+		// message told someone who had traded and fully exited that they had never
+		// traded. An Open-populated / Closed-empty state now says exactly that.
+		// ⛔ `positionsFiltered` IS NOW UNREACHABLE: the market options are built
+		// FROM the rows, so every option has a row and every row lands in exactly
+		// one tab — at least one tab is always non-empty. The string stays in
+		// `copy.ts` unrendered, on the `PROFILE_COPY.chip` precedent.
 		render(
 			<PositionsTable
 				payload={{ owner: true, rows: [{ ...ROW_OPEN, sellEligible: false }] }}
@@ -908,8 +1028,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 		// The filter-scoped message, which is a DIFFERENT state from "no
 		// positions at all" and carries different copy.
-		expect(text(screen.getByTestId("positions-empty-filtered"))).toBe(
-			PROFILE_COPY.empty.positionsFiltered,
+		expect(text(screen.getByTestId("positions-empty-tab"))).toBe(
+			PROFILE_COPY.empty.closedEmpty,
 		);
 
 		// ⛔ THE TWO EMPTY STATES NEVER COLLIDE. Reusing `positions-empty` here
@@ -928,8 +1048,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 
 		// The way out WORKS: switching back restores the row.
 		setStatusFilter("Open");
-		expect(screen.getByTestId(`position-row-${M1}`)).toBeTruthy();
-		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L1}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-tab")).toBeNull();
 	});
 
 	it("status-default-is-derived", () => {
@@ -952,8 +1072,8 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		// ⚠ POSITIVE CONTROL. A default that only moves the `<select>`'s value
 		// while the table stays empty satisfies a value-only assertion — which
 		// is the exact bug this finding is about.
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
-		expect(screen.queryByTestId("positions-empty-filtered")).toBeNull();
+		expect(screen.getByTestId(`position-tile-${L2}`)).toBeTruthy();
+		expect(screen.queryByTestId("positions-empty-tab")).toBeNull();
 		allClosed.unmount();
 
 		// (c) ⚠ THE DEEP-LINK ARM — the one that pins the SCOPING. `fixture-beta`
@@ -969,6 +1089,6 @@ describe("UI.A5 Slice 6 — profile page-assembly components", () => {
 		);
 		expect(selectedMarket()).toBe(M2);
 		expect(selectedStatus()).toBe("Closed");
-		expect(screen.getByTestId(`position-row-${M2}`)).toBeTruthy();
+		expect(screen.getByTestId(`position-tile-${L2}`)).toBeTruthy();
 	});
 });

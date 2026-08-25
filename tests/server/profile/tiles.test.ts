@@ -129,6 +129,7 @@ function makeRow(o: {
 	current: string;
 }): ProfilePositionRow {
 	return {
+		lots: [],
 		marketId: o.marketId,
 		marketSlug: `slug-${o.marketId}`,
 		marketTitle: "Title",

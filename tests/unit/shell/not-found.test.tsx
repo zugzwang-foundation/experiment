@@ -133,9 +133,10 @@ describe("T1 — not-found boundaries", () => {
 			)
 			.map((e) => join(e.parentPath, e.name));
 
-		// Alive check: 17 today (3 layouts + 14 pages). A glob that silently
-		// matched nothing would pass vacuously — the POLISH.1 z-index failure.
-		expect(files.length).toBeGreaterThanOrEqual(17);
+		// Alive check: 16 today (3 layouts + 13 pages — UNWIRE-1 dropped
+		// bookmarks/page.tsx, 14 → 13). A glob that silently matched nothing
+		// would pass vacuously — the POLISH.1 z-index failure.
+		expect(files.length).toBeGreaterThanOrEqual(16);
 
 		// A footer inside any of these is CONTENT chrome, not page chrome.
 		const CONTAINERS = ["Card", "article", "section", "aside", "dialog", "li"];

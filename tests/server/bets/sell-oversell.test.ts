@@ -235,4 +235,73 @@ describe("AUDIT-FIX-B3 A3 — sell oversell → cached 400 (not uncached 500)", 
 		const { heldSideOrNull } = await import("@/server/positions/read");
 		expect(await heldSideOrNull(testDb, { userId, marketId })).toBeNull();
 	});
+
+	it("sell-oversell::explicit-null-lotId-is-rejected-absent-is-the-only-omission", async () => {
+		// CLOSE-1. The wire schema is `.optional()`, so ABSENT is the only
+		// spelling of "no particular argument" a client may send. `null` is the
+		// INTERNAL spelling — the field is `string | null` behind the route and
+		// both call sites normalise `?? null` — and it deliberately does not
+		// cross the wire.
+		//
+		// This is pinned rather than left to the schema because the widening
+		// looks free and is not. The idempotency key's body fingerprint is
+		// `sha256(canonicalize(body))`, and canonicalize emits the KEY SET it is
+		// handed, so `{marketId, shares}` and `{marketId, shares, lotId: null}`
+		// fingerprint differently. If both spellings were legal, a retry that
+		// reached for the fuller form under the same key would miss the cached
+		// fingerprint, land on `mismatch`, and come back 409
+		// `error_idempotency_key_reused` — and a client that reads key-reused as
+		// "pick a new key" turns a completed sell into a second executed one.
+		// Accepting one spelling per meaning is what keeps the fingerprint a
+		// function of the request. No shipped client is affected:
+		// `buildSellRequest` types the field `lotId?: string` and omits the key
+		// when it is undefined, and both callers spread-guard on undefined.
+		const userId = await seedUser("nulllot", "nulllot");
+		const marketId = await seedOpenMarketWithPool("nulllot-market");
+		await seedHeldPosition(userId, marketId, "5.000000000000000000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await sellPOST(
+			req(
+				{ marketId, shares: "2.000000000000000000", lotId: null },
+				"nulllot-key",
+			),
+		);
+
+		expect(res.status).toBe(400);
+		const payload = await res.json();
+		expect(payload.error.code).toBe("error_invalid_request_body");
+
+		// And the refusal is a refusal: the held quantity did not move. A 400 that
+		// still sold would be the worse defect of the two.
+		const positionRows = await testDb
+			.select({ quantity: positions.quantity })
+			.from(positions)
+			.where(
+				and(eq(positions.userId, userId), eq(positions.marketId, marketId)),
+			);
+		expect(positionRows[0]?.quantity).toBe("5.000000000000000000");
+	});
+
+	it("sell-oversell::a-malformed-lotId-is-still-rejected (the control)", async () => {
+		// The control for the test above. That one proves the field's TYPE is
+		// narrow (no `null`); this one proves its FORMAT is still checked — the
+		// field must not have degraded into "a string, whatever it says", or a
+		// per-lot sell could name a lot id that could never exist.
+		const userId = await seedUser("badlot", "badlot");
+		const marketId = await seedOpenMarketWithPool("badlot-market");
+		await seedHeldPosition(userId, marketId, "5.000000000000000000");
+		mockGetSession.mockResolvedValue({ user: { id: userId } });
+
+		const res = await sellPOST(
+			req(
+				{ marketId, shares: "2.000000000000000000", lotId: "not-a-uuid" },
+				"badlot-key",
+			),
+		);
+
+		expect(res.status).toBe(400);
+		const payload = await res.json();
+		expect(payload.error.code).toBe("error_invalid_request_body");
+	});
 });

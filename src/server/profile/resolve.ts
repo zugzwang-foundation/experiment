@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 
 import type { DbClient, DbTransaction } from "@/db";
 import { users } from "@/db/schema";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type ProfileReader = DbClient | DbTransaction;
@@ -29,16 +30,10 @@ export type ProfileUser = {
 	/** `users.banned_at IS NOT NULL` — the D8 `Banned` label (visible to all). */
 	banned: boolean;
 	/**
-	 * The identity PFP. The R2 URL builder is not wired yet (SCAFFOLD.15
-	 * seam), so every identity renders the shared placeholder — the same
-	 * `resolve-authors.ts` posture; a scrubbed `pfp_filename` NULL renders the
-	 * identical silhouette path.
+	 * The identity PFP as a public R2 URL (SPEC.2 §12.7), or the shared placeholder when `pfp_filename` is NULL — the scrubbed-row case — or when the bucket base URL is unconfigured.
 	 */
 	pfpUrl: string;
 };
-
-/** Mirrors `resolve-authors.ts` (not exported there) — the shared placeholder. */
-const PFP_PLACEHOLDER = "/pfp-placeholder.svg";
 
 /**
  * Resolve a profile by the CURRENT value of `users.pseudonym` (UNIQUE, extends
@@ -46,6 +41,8 @@ const PFP_PLACEHOLDER = "/pfp-placeholder.svg";
  * only. Returns `null` when no row carries the name (unknown → the route 404s;
  * a retired pre-scrub pseudonym 404s the same way — the identity is
  * permanently retired, ADR-0011). Reads only the four non-PII columns.
+ *
+ * `pfp_filename` is one of them: it names a pre-baked asset, not the person, and PFP-1 turns it into the public R2 URL via `pfpUrl`. A scrubbed row carries NULL there and resolves to the placeholder, which is the same silhouette every identity rendered before PFP-1.
  */
 export async function resolveProfileUser(
 	client: ProfileReader,
@@ -56,6 +53,7 @@ export async function resolveProfileUser(
 			id: users.id,
 			pseudonym: users.pseudonym,
 			bannedAt: users.bannedAt,
+			pfpFilename: users.pfpFilename,
 		})
 		.from(users)
 		.where(eq(users.pseudonym, pseudonym))
@@ -69,6 +67,6 @@ export async function resolveProfileUser(
 		id: row.id,
 		pseudonym: row.pseudonym,
 		banned: row.bannedAt !== null,
-		pfpUrl: PFP_PLACEHOLDER,
+		pfpUrl: pfpUrl(row.pfpFilename),
 	};
 }

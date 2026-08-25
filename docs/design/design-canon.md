@@ -60,8 +60,6 @@
 >
 > ⛔ **NOTHING ELSE IN CANON WAS TOUCHED.** Four Profile sections state this position — §2, §5, §6, §7 item 5 — and all four now agree. This note is kept, rather than deleted, because O-5's lesson is about the residue being *findable*: a reader arriving at §2 should be able to see that the inconsistency existed and when it closed.
 
-**Bookmark** *(new at v1.0 — a genuine separate page reusing the Profile surface)*. Loads the same profile blob in bookmark mode: forced **visitor** view, list retitled **"Bookmarks,"** headzone bookmark icon active. **Semantics per ruling 1 (§4):** only *someone else's* posts/replies can be bookmarked; the Staked/Current figures shown are **that bookmarked author's** figures on their argument — not the viewer's.
-
 ---
 
 ## §3 — Locked design decisions (the invariant spine)
@@ -84,7 +82,8 @@
 
 ## §4 — The DC rulings (operator-ratified 2026-07-02 · folded, closed)
 
-1. **Bookmark semantics (closes W2.7 + phase-record §7 + spec-changes §7's open question).** You can only bookmark **someone else's** posts/replies. The Staked/Current figures on a bookmarked row are **the bookmarked author's** figures on that argument — never the viewer's. The bookmark page needs no new still; the v1.0 page + this semantics rule are the build spec.
+Ruling 1 (Bookmark semantics) is retired at ADR-0040 — the bookmark module it governed is unwired product-wide. Rulings 2–5 keep their original numbers; nothing is renumbered.
+
 2. **Slippage display (closes W2.10; Option A ratified 2026-06-27).** Deep-liquidity seeding + the per-bet cap `BET_MAX_STAKE` make per-bet impact sub-threshold ⇒ **no slippage warning, no tolerance control, buy or sell**. The d5 "Price impact warning" modal is **RETIRED** (named-retired in design-language v0.5 §3.1 so it is never resurrected). W2.10 collapsed to: the **Sell module** (default = full position, editable partial) + a clean **price / shares / cost-or-proceeds** display. Cap clamp on buy/add only (over-cap = disabled submit + inline "Max Đ N per bet" strip, the W2.11 P3 primitive); **sell is never clamped**.
 3. **Partial-sell (closes spec-changes §5's "unspecified").** A partial unwind is **native CPMM behaviour** — sell N shares, the curve reprices, proceeds are credited. **No new mechanism, no extra parameter.** Confirm parameter-free at the build boundary; nothing to spec.
 4. **Discovery nav-identity (closes spec-changes §6 / phase-record §7's open item).** Already handled: Discovery's header shows **Sign in / Sign up** logged-out and the **nav-identity widget** (avatar + pseudonym → Profile) logged-in — per the W2.1 Discovery-widget fold-in + the W2.4/5/14 global header. Not a missing widget.

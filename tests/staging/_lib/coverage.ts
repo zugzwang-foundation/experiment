@@ -20,13 +20,7 @@
 // below is what makes "matches §3 exactly" checkable rather than asserted.
 // ═══════════════════════════════════════════════════════════════════════════
 
-import {
-	BOOKMARKS,
-	MARKETS,
-	MODERATION,
-	PARTICIPANTS,
-	POSTS,
-} from "../fixtures";
+import { MARKETS, MODERATION, PARTICIPANTS, POSTS } from "../fixtures";
 
 /** Where an inspector actually goes. Staging's participant origin. */
 export const STAGING_ORIGIN = "https://staging.zugzwangworld.com";
@@ -294,7 +288,7 @@ export function buildCoverage(
 		});
 	}
 
-	// ── §2.4 · POSITIONS AND BOOKMARKS ───────────────────────────────────────
+	// ── §2.4 · POSITIONS (UNWIRE-1: the BOOKMARKS half retired with the module) ──
 	const ownerPseudonym = pseudonymOf("Staging Fixture Owner");
 	const emptyPseudonym = pseudonymOf("Staging Fixture Empty");
 	const visitorPseudonym = pseudonymOf("Staging Fixture Visitor Target");
@@ -358,31 +352,10 @@ export function buildCoverage(
 			   AND NOT EXISTS (SELECT 1 FROM positions p WHERE p.user_id = u.id)`,
 			"empty PositionsTable — owner and visitor copy",
 		],
-		[
-			"B1",
-			"bookmarks on OTHERS' posts and replies",
-			`${STAGING_ORIGIN}/bookmarks`,
-			// Scoped to the VIEWER, and it checks BOTH arms the row claims — one
-			// bookmark on a top-level post and one on a reply. `count(*) = 1` on
-			// the outer HAVING means both sub-counts were non-zero.
-			`SELECT count(*)::int AS n FROM (
-				SELECT 1 FROM bookmarks b
-				JOIN comments c ON c.id = b.comment_id
-				WHERE b.user_id = ${userOf(ownerPseudonym)} AND c.user_id <> b.user_id
-				HAVING count(*) FILTER (WHERE c.parent_comment_id IS NULL) > 0
-				   AND count(*) FILTER (WHERE c.parent_comment_id IS NOT NULL) > 0
-			) arms`,
-			`signed in AS ${ownerPseudonym} — Staked/Current are the BOOKMARKED author's figures`,
-		],
-		[
-			"B2",
-			"zero bookmarks",
-			`${STAGING_ORIGIN}/bookmarks`,
-			`SELECT count(*)::int AS n FROM users u
-			 WHERE u.pseudonym = '${emptyPseudonym}'
-			   AND NOT EXISTS (SELECT 1 FROM bookmarks b WHERE b.user_id = u.id)`,
-			`signed in AS ${emptyPseudonym} — the empty Bookmarks page`,
-		],
+		// UNWIRE-1 — "B1"/"B2" (bookmarks on others' posts/replies; zero
+		// bookmarks) removed whole: the bookmark module is unwired
+		// product-wide and `/bookmarks` no longer exists to point a gate URL
+		// at.
 	];
 	for (const [id, shape, url, probe, look] of q) {
 		entries.push({
@@ -503,8 +476,6 @@ export function expectedCoverageIds(): string[] {
 		"Q3",
 		"Q4",
 		"Q5",
-		"B1",
-		"B2",
 		"X1",
 		"X2",
 		"X3",
@@ -516,14 +487,12 @@ export function expectedCoverageIds(): string[] {
 export function coverageSourceCounts(): {
 	markets: number;
 	participants: number;
-	bookmarks: number;
 	moderation: number;
 	posts: number;
 } {
 	return {
 		markets: MARKETS.length,
 		participants: PARTICIPANTS.length,
-		bookmarks: BOOKMARKS.length,
 		moderation: MODERATION.length,
 		posts: POSTS.length,
 	};

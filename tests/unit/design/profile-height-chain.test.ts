@@ -173,9 +173,11 @@ const CLIPPING_OVERFLOW = /^(overflow|overflow-y)-(hidden|clip)$/;
  * The mockup's `.colhead{min-height:52px}` (`surface_profile_v1_0.html:228`),
  * carried as a LITERAL because the mockup states it as one. It is what makes
  * the two side-by-side panel heads one height, and therefore what makes their
- * two scrolling bodies start on the same line. ⛔ ONE string, asserted on all
- * FOUR heads across this file and `bookmarks-height-chain.test.ts`, so the two
- * surfaces can never be sized one after the other (§3).
+ * two scrolling bodies start on the same line. ⛔ ONE string, asserted on both
+ * heads in this file. (UNWIRE-1: this used to be one string asserted on FOUR
+ * heads across this file and the now-deleted `bookmarks-height-chain.test.ts`,
+ * so Profile and `/bookmarks` could never be sized one after the other; only
+ * Profile's own two heads remain to guard.)
  */
 const HEAD_FLOOR = "min-h-[52px]";
 
@@ -473,11 +475,12 @@ describe("profile height chain — every link, asserted by name", () => {
 		// …and the row heights that DO exist are on ROWS, never on the body — asserted
 		// where they now live.
 		// ⚠ PROFILE REFINEMENT · R1 (shared) — THE ROW-THIRD MOVED OUT OF THIS FILE.
-		// It was inline in `PositionsTable`; the bookmarks table needed the identical
-		// rule (measured: positions `[128,128,128]` against bookmarks `[136,92]`), and
-		// two copies of the arithmetic would drift. So it lives in `row-thirds.ts` and
-		// both tables call it. This check follows the code rather than pinning a
-		// location the code has left.
+		// It was inline in `PositionsTable`; the (now-deleted) bookmarks table needed
+		// the identical rule (measured: positions `[128,128,128]` against bookmarks
+		// `[136,92]`), and two copies of the arithmetic would drift. So it lives in
+		// `row-thirds.ts`. (UNWIRE-1: BookmarksTable's own call site is deleted with
+		// the rest of the bookmark module; PositionsTable's remains.) This check
+		// follows the code rather than pinning a location the code has left.
 		const thirds = read(ROW_THIRDS);
 		expect(thirds).toContain("row.style.height");
 		expect(thirds).not.toContain("body.style.height");
@@ -626,5 +629,72 @@ describe("profile height chain — every link, asserted by name", () => {
 		expect(() => containerExtras("export default function P() {}")).toThrow();
 		expect(() => bandClasses(page, "profile-nonexistent-band")).toThrow();
 		expect(() => panelClasses(pos, POSITIONS, "no-such-node")).toThrow();
+	});
+});
+
+/**
+ * POSREV-1 RF-11 — **THE HEADZONE'S SECOND CELL, AND THE BAND BELOW `lg`.**
+ *
+ * RF-11 rules two things: the second grid cell — where the profile graph used to
+ * live before UNWIRE-1 deleted it — stays EMPTY at `lg`+ (founder-ratified,
+ * deliberate, not a defect); and below `lg` the band must not carry a dead 188px
+ * of nothing.
+ *
+ * ⚠⚠ **THE SECOND HALF NEEDED NO CODE, AND THAT WAS MEASURED RATHER THAN
+ * ASSUMED.** Read off the COMPILED stylesheet on a live deployment: the only two
+ * declarations carrying `188px` — `height: 188px` and `grid-template-rows: 188px`
+ * — sit inside `@media (min-width: 64rem)`, and there is no third. Below `lg` the
+ * band is `grid gap-4` with a single child, so its height IS the identity card's
+ * and there is no band to collapse. The ruled OUTCOME already held; the mechanism
+ * the ruling described ("collapse it") was a fix for a state that does not exist.
+ *
+ * ⛔ SO THIS GUARD PINS THE PROPERTY, NOT A CHANGE. It is here because the next
+ * person to add a height to this band is one unprefixed token away from creating
+ * the dead 188px RF-11 was written to prevent — and nothing else would catch it.
+ * ⚠ ASSERTED ON SOURCE, deliberately: jsdom performs no layout, and a CSSOM read
+ * needs a running deployment. The class list is where the property actually lives.
+ */
+describe("POSREV-1 RF-11 — the headzone band is lg-scoped, top to bottom", () => {
+	const headzone = (): string[] => bandClasses(read(PAGE), "profile-headzone");
+
+	it("rf11::EVERY-height-token-on-the-band-is-lg-prefixed", () => {
+		const heightish = headzone().filter((t) =>
+			/(^|:)(h-|min-h-|max-h-|grid-rows-)/.test(t),
+		);
+		// Non-vacuity: the band really does declare heights, so an empty filter
+		// would mean the selector broke rather than that the rule holds.
+		expect(heightish.length).toBeGreaterThan(0);
+		for (const t of heightish) {
+			expect(
+				t.startsWith("lg:"),
+				`RF-11: \`${t}\` applies at EVERY width. Below \`lg\` the headzone holds ` +
+					`one child and must be exactly as tall as it — an unprefixed height ` +
+					`is the dead 188px band RF-11 exists to prevent.`,
+			).toBe(true);
+		}
+	});
+
+	it("rf11::the-188px-figure-appears-ONLY-behind-lg", () => {
+		const withFigure = headzone().filter((t) => t.includes("188px"));
+		expect(withFigure.length).toBeGreaterThan(0);
+		for (const t of withFigure) {
+			expect(t.startsWith("lg:")).toBe(true);
+		}
+	});
+
+	it("rf11::the-band-is-TWO-columns-at-lg-and-the-second-cell-stays-EMPTY", () => {
+		// ⛔ FOUNDER-RATIFIED, NOT A DEFECT. The graph's slot is deliberately left
+		// empty; RF-11 says do not fill it. The band keeps `lg:grid-cols-2` with a
+		// SINGLE child, and this asserts both halves — a second child would mean
+		// someone filled the slot, and a dropped `grid-cols-2` would mean someone
+		// "tidied" the empty cell away.
+		expect(headzone()).toContain("lg:grid-cols-2");
+		const src = read(PAGE);
+		const at = src.indexOf('data-testid="profile-headzone"');
+		const inner = src.slice(
+			src.indexOf(">", at) + 1,
+			src.indexOf("</div>", at),
+		);
+		expect((inner.match(/<[A-Z]/g) ?? []).length).toBe(1);
 	});
 });

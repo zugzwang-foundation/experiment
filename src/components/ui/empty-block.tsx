@@ -16,15 +16,18 @@
  * demoting a heading to a `div` would lose document semantics for no visual
  * gain. Only the type tiers moved when P1 landed; the elements did not.
  *
- * ⛔ NO ACTION PROP, for the current consumer set. `ProfileGraphCard` is itself
- * a `<button>` and its `graph-empty` state renders INSIDE that button, so an
- * interactive element here is not a styling preference but a structural
- * impossibility on one of the three sites — a `<button>` cannot nest in a
- * `<button>`. ⚠ Scoped to the current consumers, NOT "never": canon R9
- * contemplates P1's optional single CTA and Discovery's error panel ships one.
+ * ⛔ NO ACTION PROP, for the current consumer set (`PositionsTable.tsx`,
+ * `ArgumentList.tsx` — UNWIRE-1 dropped the module's other two consumers,
+ * `ProfileGraphCard.tsx` with the Profile graph and `BookmarksTable.tsx` with
+ * the bookmark module). ⚠ Scoped to the current consumers, NOT "never": canon
+ * R9 contemplates P1's optional single CTA and Discovery's error panel ships
+ * one.
  *
- * ⛔ `sub` IS OPTIONAL AND UNPASSED ON THE PROFILE. It is declared because
- * `/bookmarks` carries a sub string and this surface's three sites do not — a
+ * ⛔ `sub` IS OPTIONAL AND CURRENTLY UNPASSED BY ANY CONSUMER. It was declared
+ * because `/bookmarks`'s `BookmarksTable.tsx` carried a sub string and no
+ * other site did; UNWIRE-1 removed that consumer along with the rest of the
+ * bookmark module, so the prop is kept (a generic empty-state primitive isn't
+ * this task's fence to redesign) but nothing currently exercises it — a
  * tier is REQUIRED when every consumer carries content for it, OPTIONAL when
  * only some do. ⛔ THE TESTID RIDES THE MESSAGE NODE, NEVER THE PANEL: a
  * testid on the panel would return message + sub through a `textContent` read

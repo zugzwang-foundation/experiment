@@ -123,6 +123,44 @@ export function rateLimitedBanner(secondsLeft: number): string {
 	return `Too many requests. Try again in ${secondsLeft}s.`;
 }
 
+/**
+ * The EMPTY image slot's contents — the thesis figure that now fills the 4:5
+ * box, replacing a box that held nothing.
+ *
+ * ⛔ PROVENANCE PER STRING, because these do not share one. Two are carried,
+ * one is new, and lumping them under a single claim is the `V-3` shape this
+ * file's own docblock exists to prevent:
+ *   · `eyebrow` + `headline` — **O1 deck register VERBATIM**, Card 3
+ *     (`docs/design/ZUGZWANG-O1-DECK_copy-register_v1_0.md:131,137`), already
+ *     shipped at `src/components/onboarding/cards.ts:93-94`. A participant has
+ *     read both during onboarding; the composer repeats the thesis rather than
+ *     restating it in new words.
+ *   · `action` — **AUTHORED AT EXECUTE. Not in canon.** Registered here for the
+ *     Gate C web read, alongside the four already named at the top of this file.
+ *
+ * ⚠ `action` IS AN INSTRUCTION, NOT A CAPTION, and the distinction is why it is
+ * separated from the two above rather than treated as a third line of the same
+ * block. The canon §6 caption `Shown whole · any orientation` is deleted, so
+ * this is the ONLY text telling a participant the box is clickable. It carries
+ * the affordance alone — which is also why it is Title Case while the two lines
+ * above it are a sentence: it reads as a control's label, not as more prose.
+ */
+export const EMPTY_SLOT_COPY = {
+	eyebrow: "THE GOAL",
+	headline: "Knowledge, at scale, beats capital.",
+	/**
+	 * The SAME sentence, broken for the 4:5 column. SVG does not wrap text, so
+	 * the break has to be authored — but a break is TYPOGRAPHY, not copy, and
+	 * writing the halves as their own strings is how a canon sentence quietly
+	 * becomes two non-canon ones. `headline` above stays the single source of
+	 * truth and `empty-slot-figure.test.tsx` pins `headlineLines.join(" ")`
+	 * against it, so any edit to one that is not made to the other reddens.
+	 * The break falls at the sentence's own clause boundary, not mid-phrase.
+	 */
+	headlineLines: ["Knowledge, at scale,", "beats capital."],
+	action: "Add Image",
+} as const;
+
 /** W2.11 P2 modal contents (verbatim). */
 export const SUSPENDED_COPY = {
 	trackA: {

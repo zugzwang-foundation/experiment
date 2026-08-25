@@ -9,6 +9,7 @@ import { CpmmDecimal } from "@/server/cpmm/decimal";
 import { accrueDailyCredit } from "@/server/dharma/accrual";
 import { appendLedgerRow, readBalance } from "@/server/dharma/persist";
 import { insertEvent } from "@/server/events/insert";
+import { mintLotForBet } from "@/server/lots/persist";
 import { upsertPositionDelta } from "@/server/positions/persist";
 import { getHeldPosition } from "@/server/positions/read";
 
@@ -76,7 +77,8 @@ export interface PlaceResult {
  * floor); ENGINE.8 always passes `parentCommentId: null` (the post branch).
  *
  * Write order [R1 + ENGINE.12 R4]: reads → accrual unit (cursor → credit →
- * dharma.credited) → positions → comments → bets → dharma_ledger(bet_id=bet.id)
+ * dharma.credited) → positions → comments → bets → lots (LOTS-1 / ADR-0039 D-2,
+ * minted from the bet's RETURNING id) → dharma_ledger(bet_id=bet.id)
  * → events(bet.placed + comment.placed) → pools. comments + bets move AHEAD of
  * dharma_ledger so the `bet_stake` debit can link `bet_id` (the FK is
  * satisfiable). The three `event_id`s + `metadata` are caller-generated at
@@ -127,7 +129,7 @@ export async function place(
 		stake,
 	});
 
-	// WRITES: positions → comments → bets → dharma_ledger → events → pools.
+	// WRITES: positions → comments → bets → lots → dharma_ledger → events → pools.
 	await upsertPositionDelta(tx, {
 		userId,
 		marketId,
@@ -167,6 +169,23 @@ export async function place(
 	if (bet === undefined) {
 		throw new Error("place: bets INSERT … RETURNING produced no row");
 	}
+
+	// LOTS-1 / ADR-0039 D-2 — the lot, minted from the bet that just landed and
+	// inside this same W-1 tx. It follows `bets` because it carries the bet's
+	// RETURNING id, and precedes `dharma_ledger` so the money writes stay where
+	// they were. R1's one-to-one is closed by `lots_bet_id_uq` + the FK; because
+	// `bets.comment_id` is already NOT NULL (INV-1), that also means a lot cannot
+	// exist without an argument. Inside the tx and not beside it: a mint that
+	// escaped the rollback would leave a lot attributing basis to a bet that
+	// never committed.
+	await mintLotForBet(tx, {
+		betId: bet.id,
+		userId,
+		marketId,
+		side,
+		shares: buy.shares,
+		stake,
+	});
 
 	await appendLedgerRow(tx, {
 		userId,

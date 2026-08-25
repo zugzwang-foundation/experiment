@@ -137,7 +137,6 @@ vi.mock("@/db/index", async () => {
 
 import {
 	bets,
-	bookmarks,
 	comments,
 	dharmaLedger,
 	identityPool,
@@ -155,7 +154,6 @@ import { assertStakeFloor } from "@/server/bets/floors";
 import { place } from "@/server/bets/place";
 import { sell } from "@/server/bets/sell";
 import { runBetTransaction } from "@/server/bets/transaction";
-import { addBookmarkAction } from "@/server/bookmarks/add";
 import { PUT_URL_TTL_SECONDS } from "@/server/config/limits";
 import { closeMarket } from "@/server/markets/close";
 import { createMarket } from "@/server/markets/create";
@@ -180,7 +178,6 @@ import {
 } from "./_lib/client";
 import { resolveRunnerTarget } from "./_lib/target";
 import {
-	BOOKMARKS,
 	FIXTURE_IMAGE_BASE64,
 	FIXTURE_IMAGE_CONTENT_TYPE,
 	type FixturePhase,
@@ -223,18 +220,6 @@ if (!runnerTarget.ok) {
 			"Run it as: pnpm staging:generate",
 	);
 }
-
-/**
- * `addBookmarkAction` resolves its viewer through `auth.api.getSession` — the
- * one shell layer between it and the write. It is on ADR-0036 primitive 3's
- * MAY-be-mocked list.
- *
- * A SPY rather than a module factory: the generator needs `auth.$context` REAL
- * (it is the Better Auth create-path every participant is minted through), and
- * `@/server/bookmarks/add` imports the same `auth` singleton, so replacing one
- * method reaches it without touching the rest of the object.
- */
-const getSessionSpy = vi.spyOn(auth.api, "getSession");
 
 /** Resolved participant ids, keyed by role. Populated by the generation step. */
 const participantIds = new Map<ParticipantRole, string>();
@@ -362,9 +347,9 @@ async function createParticipant(args: {
 }
 
 /**
- * Fixture key -> the engine-minted `comments.id`. Replies, bookmarks and
- * moderation all name their target by KEY, because UUIDv7 ids differ every run
- * (Q4) and a literal key is the only cross-reference that survives a rebuild.
+ * Fixture key -> the engine-minted `comments.id`. Replies and moderation both
+ * name their target by KEY, because UUIDv7 ids differ every run (Q4) and a
+ * literal key is the only cross-reference that survives a rebuild.
  */
 const commentIds = new Map<string, string>();
 
@@ -709,23 +694,10 @@ describe("staging fixture generation", () => {
 			// The gates assert it; this is what produces it.
 			await runCommentPhase("after-flip");
 
-			// ── 10 · BOOKMARKS ──────────────────────────────────────────────
-			// `addBookmarkAction` reads the viewer from `auth.api.getSession`, so
-			// the session is stubbed per call to the acting viewer. Everything
-			// after the auth gate — the self-bookmark refusal included — is the
-			// shipped code.
-			for (const b of BOOKMARKS) {
-				const viewerId = requireParticipant(b.viewer);
-				getSessionSpy.mockResolvedValue({
-					user: { id: viewerId },
-				} as never);
-				const result = await addBookmarkAction(requireComment(b.target));
-				if (!result.ok) {
-					throw new Error(
-						`bookmark ${b.viewer} -> ${b.target} refused: ${result.code}`,
-					);
-				}
-			}
+			// UNWIRE-1 — step "10 · BOOKMARKS" removed whole: the bookmark module
+			// is unwired product-wide, addBookmarkAction no longer exists, and
+			// the `bookmarks` DB table (untouched, no DDL) is simply never
+			// written by this generator anymore.
 
 			// ── 11 · MODERATION ─────────────────────────────────────────────
 			// AFTER all content exists. ADR-0021: a ban removes voice, not past
@@ -1083,29 +1055,11 @@ describe("staging fixture generation", () => {
 		expect(rows.every((r) => Number(r.quantity) === 0)).toBe(true);
 	});
 
-	it("B1/B2 · bookmarked others' work, never its own; P-empty has none", async () => {
-		const rows = await readOnly
-			.select({ userId: bookmarks.userId, commentId: bookmarks.commentId })
-			.from(bookmarks);
-		expect(rows.length).toBe(BOOKMARKS.length);
-		for (const row of rows) {
-			const [target] = await readOnly
-				.select({ author: comments.userId })
-				.from(comments)
-				.where(eq(comments.id, row.commentId));
-			// `addBookmarkAction` refuses a self-bookmark, so this also proves the
-			// fixture did not quietly no-op.
-			expect(target?.author).not.toBe(row.userId);
-		}
-		// B1 needs BOTH arms — a post and a reply.
-		const replyKeys = new Set(REPLIES.map((r) => requireComment(r.key)));
-		expect(rows.some((r) => replyKeys.has(r.commentId))).toBe(true);
-		expect(rows.some((r) => !replyKeys.has(r.commentId))).toBe(true);
-		// B2 — P-empty holds none.
-		expect(
-			rows.filter((r) => r.userId === requireParticipant("P-empty")),
-		).toEqual([]);
-	});
+	// UNWIRE-1 — "B1/B2 · bookmarked others' work, never its own; P-empty has
+	// none" removed whole: the bookmark module is unwired product-wide, the
+	// generator no longer writes the `bookmarks` table (§2.4 B1/B2's fixture
+	// data is gone from `fixtures.ts` with it), and the table itself stays
+	// untouched but permanently empty from this generator's own writes.
 
 	it("X1-X3 · removals landed and the ban left past content standing", async () => {
 		const rows = await readOnly

@@ -62,8 +62,11 @@ export const mumbaiMetroModel: DebateViewModel = {
 			imageUrl: null,
 			marker: "none",
 			badge: null,
-			author: { pseudonym: "CrimsonHawk207", pfpUrl: "/pfp-placeholder.svg" },
+			author: { pseudonym: "MagentaWolf207", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "560.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "560.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.470000000000000000",
 			aggregate: {
 				supportCount: 2,
@@ -82,6 +85,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 						marker: "none",
 						author: { pseudonym: "TealOwl118", pfpUrl: "/pfp-placeholder.svg" },
 						stake: "180.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "180.000000000000000000",
+						sold: false,
 						entryPrice: "0.490000000000000000",
 						imageUrl: null,
 					},
@@ -93,10 +99,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "Corporate shuttle replacement is already happening at a couple of BKC firms I know of. That is hundreds of daily trips moving onto the line per employer.",
 						marker: "none",
 						author: {
-							pseudonym: "SlateHeron061",
+							pseudonym: "GreenCamel061",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "75.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "75.000000000000000000",
+						sold: false,
 						entryPrice: "0.520000000000000000",
 						imageUrl: null,
 					},
@@ -114,6 +123,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "210.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "210.000000000000000000",
+						sold: false,
 						entryPrice: "0.490000000000000000",
 						imageUrl: null,
 					},
@@ -133,8 +145,11 @@ export const mumbaiMetroModel: DebateViewModel = {
 			imageUrl: null,
 			marker: "none",
 			badge: null,
-			author: { pseudonym: "GoldenLynx288", pfpUrl: "/pfp-placeholder.svg" },
+			author: { pseudonym: "SilverLynx288", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "500.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "500.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.500000000000000000",
 			aggregate: {
 				supportCount: 1,
@@ -152,10 +167,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "The last-mile gap is the killer. Half these stations drop you 1.5 km from where you are actually going with no integrated bus feeder. Until that is fixed, people with a direct bus stick to the bus.",
 						marker: "none",
 						author: {
-							pseudonym: "RustStag149",
+							pseudonym: "GoldSwan149",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "140.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "140.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},
@@ -169,10 +187,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "Doubling current throughput sounds dramatic, but that is literally the normal ramp curve for a line that just completed its full length. The base you are quoting is from before the Colaba extension opened. Forward the trend, do not freeze it at today.",
 						marker: "Flipped",
 						author: {
-							pseudonym: "VioletCrane092",
+							pseudonym: "VioletHorse092",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "165.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "165.000000000000000000",
+						sold: false,
 						entryPrice: "0.530000000000000000",
 						imageUrl: null,
 					},
@@ -192,8 +213,11 @@ export const mumbaiMetroModel: DebateViewModel = {
 			imageUrl: null,
 			marker: "Flipped",
 			badge: null,
-			author: { pseudonym: "AmberFox042", pfpUrl: "/pfp-placeholder.svg" },
+			author: { pseudonym: "OliveFox042", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "320.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "320.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.450000000000000000",
 			aggregate: {
 				supportCount: 0,
@@ -212,10 +236,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "Monsoon lifts ridership for days at a time, not a sustained 7-day average over a million. And the surge cuts both ways: severe flooding also shuts stations and snaps the feeder network people use to reach them. It is a spike, not a new baseline.",
 						marker: "none",
 						author: {
-							pseudonym: "GoldenLynx288",
+							pseudonym: "SilverLynx288",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "230.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "230.000000000000000000",
+						sold: false,
 						entryPrice: "0.520000000000000000",
 						imageUrl: null,
 					},
@@ -245,10 +272,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "Even setting tone aside, the throughput math in the parent is roughly right: the gap to 1M is large and the clock is short.",
 						marker: "none",
 						author: {
-							pseudonym: "AzureBison330",
+							pseudonym: "OliveBison330",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "90.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "90.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},
@@ -262,10 +292,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "The gap looks large only if you ignore that two major interchange stations open next month. Interchanges are where ridership compounds.",
 						marker: "none",
 						author: {
-							pseudonym: "MossViper175",
+							pseudonym: "JadeSnake175",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "110.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "110.000000000000000000",
+						sold: false,
 						entryPrice: "0.540000000000000000",
 						imageUrl: null,
 					},
@@ -287,6 +320,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "TealOwl118", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "150.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "150.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.550000000000000000",
 			aggregate: {
 				supportCount: 0,
@@ -305,10 +341,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: 'Fare beats a cab, sure, but most of the "bulk volume" you need is people currently on the suburban locals, which are cheaper than the metro, not pricier. Cost actually cuts against the switch for them.',
 						marker: "none",
 						author: {
-							pseudonym: "RustStag149",
+							pseudonym: "GoldSwan149",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "50.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "50.000000000000000000",
+						sold: false,
 						entryPrice: "0.530000000000000000",
 						imageUrl: null,
 					},
@@ -330,6 +369,9 @@ export const mumbaiMetroModel: DebateViewModel = {
 			badge: null,
 			author: { pseudonym: "IndigoWolf355", pfpUrl: "/pfp-placeholder.svg" },
 			authorStake: "95.000000000000000000",
+			// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+			authorStakeOriginal: "95.000000000000000000",
+			authorSold: false,
 			entryPrice: "0.520000000000000000",
 			aggregate: {
 				supportCount: 1,
@@ -347,10 +389,13 @@ export const mumbaiMetroModel: DebateViewModel = {
 						body: "This matches what I am seeing on the ground: packed core stations, empty feeder roads. The line is not the bottleneck, getting to it is.",
 						marker: "none",
 						author: {
-							pseudonym: "SlateHeron061",
+							pseudonym: "GreenCamel061",
 							pfpUrl: "/pfp-placeholder.svg",
 						},
 						stake: "70.000000000000000000",
+						// RANK-1 — the substrate stake is SURVIVING basis; nothing is sold in this fixture.
+						stakeOriginal: "70.000000000000000000",
+						sold: false,
 						entryPrice: "0.510000000000000000",
 						imageUrl: null,
 					},

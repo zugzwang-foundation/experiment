@@ -14,6 +14,7 @@ import {
 	REID_WARNING_TEXT,
 	TOS_VERSION_HASH,
 } from "@/server/auth/tos-versions";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 
 // F-AUTH-4 onboarding page per plan §4 + SPEC.1 §13 lines 682–688. Single
 // inline-scrollable screen:
@@ -31,7 +32,8 @@ import {
 // /sign-in (the acceptance flow can't proceed without a verified pre-
 // session userId).
 //
-// PFP rendering: /public/pfp-placeholder.svg (Q2) until SCAFFOLD.15
+// PFP rendering: the assigned identity's own PFP via `pfpUrl` (PFP-1); an
+// unassigned or unconfigured one falls back to /public/pfp-placeholder.svg
 // wires the R2 URL builder.
 
 async function readLegalDoc(name: "tos" | "privacy"): Promise<string> {
@@ -74,10 +76,12 @@ export default async function OnboardingPage(): Promise<React.ReactElement> {
 			{/* (i) Pseudonym + PFP labelled permanent */}
 			<CardHeader className="justify-items-center text-center">
 				<Image
-					src="/pfp-placeholder.svg"
+					src={pfpUrl(user.pfpFilename)}
 					alt={user.pseudonym}
 					width={128}
 					height={128}
+					// `unoptimized` because the src is an absolute R2 URL whose host differs between staging and prod (`pub-<hash>.r2.dev`), and `next/image` refuses any host absent from `images.remotePatterns` — which would 500 this page, the mandatory first screen after signup. Optimization buys nothing here: SPEC.2 §12.7 has PFP reads hitting R2 directly with a one-year immutable cache, already at 256x256 and ~5KB.
+					unoptimized
 					className="rounded-(--imgr) [border:var(--avatar-ring)]"
 				/>
 				<CardTitle className="mt-3 text-lg">Your Zugzwang identity</CardTitle>

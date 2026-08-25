@@ -83,28 +83,25 @@ export function PostPopup({
 							    `pm-reps` — the same author row the card and the focused post
 							    render, so it is `ArgProfile` here too rather than a fourth
 							    hand-rolled copy.
-							    ⚠ `showActions={false}`: the bookmark cluster belongs on the
-							    CARD, where the reader is choosing between arguments. Inside a
-							    pop-up they have already chosen, and the card they opened it
-							    from still carries it. `showActions` is a caller-side layout
-							    switch and was designed for exactly this.
 							    ⚠ SUPERSEDES the PD-3-14 / PD-3-13 / PD-3-12 rows' hand-built
 							    strip (bare side badge · marker · pseudonym · `·` · stake ·
 							    lane badge). Every element they added survives — they arrive
 							    through the shared row now, plus the avatar and the entry price
 							    the strip never had. The lane badge is NOT part of that row, so
-							    it stays beside it. */}
+							    it stays beside it.
+							    UNWIRE-1 — `bookmarks`/`showActions` dropped: `ArgProfile` no
+							    longer renders any action cluster (SUB-3), so this call site's
+							    own former no-cluster instruction has nothing left to say. */}
 							<DialogDescription asChild>
 								<div className="flex flex-wrap items-center gap-1.5">
 									<ArgProfile
-										commentId={post.id}
 										author={post.author}
 										side={post.sideAtPostTime}
 										marker={post.marker}
 										entryPrice={post.entryPrice}
 										authorStake={post.authorStake}
-										bookmarks={null}
-										showActions={false}
+										originalStake={post.authorStakeOriginal}
+										sold={post.authorSold}
 									/>
 									<LaneBadge badge={post.badge} />
 								</div>
@@ -207,14 +204,13 @@ export function ReplyPopup({
 							<DialogDescription asChild>
 								<div>
 									<ArgProfile
-										commentId={reply.id}
 										author={reply.author}
 										side={reply.side}
 										marker={reply.marker}
 										entryPrice={reply.entryPrice}
 										authorStake={reply.stake}
-										bookmarks={null}
-										showActions={false}
+										originalStake={reply.stakeOriginal}
+										sold={reply.sold}
 									/>
 								</div>
 							</DialogDescription>

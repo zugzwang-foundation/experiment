@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { getHeaderBalance } from "@/server/dharma/header-balance";
 import { getHeaderPortfolio } from "@/server/dharma/header-portfolio";
 import { readStarCount } from "@/server/github/star-count";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 import { completeOnboardingDeckAction } from "@/server/onboarding/complete";
 import {
 	INTRO_SEEN_COOKIE,
@@ -86,7 +87,10 @@ export default async function PublicLayout({
 	// collapses them to one per request. See `_lib/session.ts`.
 	const session = await getRequestSession();
 	const viewer = session
-		? { pseudonym: session.user?.pseudonym ?? null }
+		? {
+				pseudonym: session.user?.pseudonym ?? null,
+				pfpUrl: pfpUrl(session.user?.pfpFilename ?? null),
+			}
 		: null;
 	const [spendable, portfolio] = session?.user?.id
 		? await Promise.all([

@@ -176,6 +176,20 @@
       "when": 1784579785405,
       "tag": "0024_bookmarks",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1787261127286,
+      "tag": "0025_lots",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787332046984,
+      "tag": "0026_lots_no_delete",
+      "breakpoints": true
     }
   ]
 }

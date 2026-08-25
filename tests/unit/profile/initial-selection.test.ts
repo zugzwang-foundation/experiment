@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { initialBookmarkSelection } from "@/components/bookmarks/selection";
 import {
 	initialMarketIdOf,
 	initialProfileSelection,
@@ -32,40 +31,69 @@ import {
  * permanently empty after the freeze). Those are the cases below.
  */
 
+/**
+ * ⚠⚠ POSREV-1 RF-13 — **THE FIXTURE'S SHAPE CHANGED BECAUSE THE QUESTION DID.**
+ * These rows used to carry a `statusLabel`, because the Open/Closed toggle
+ * filtered MARKET STATE. It now filters HOLDING state: an argument with
+ * surviving shares is Open, one with none is Closed. So a row is no longer
+ * open or closed — its individual ARGUMENTS are, and a market with some of each
+ * appears in BOTH tabs. The fixture carries lots for exactly that reason.
+ */
+type Lot = {
+	lotId: string;
+	survivingShares: string;
+	argument: { removed: boolean; commentId?: string };
+};
 type Row = {
 	marketId: string;
 	marketSlug: string;
 	marketTitle: string;
-	statusLabel: "Open" | "Closed";
+	/** The whole-holding fallback's two inputs — see `usesWholeHoldingFallback`. */
+	quantity: string;
 	argument: { removed: boolean; commentId?: string };
+	lots: Lot[];
 };
+
+const dp18 = (v: string): string => {
+	const [int, frac = ""] = v.split(".");
+	return `${int}.${frac.padEnd(18, "0")}`;
+};
+
+/** An argument with shares still in it (Open tab) or none left (Closed tab). */
+const lot = (n: number, held: boolean, removed = false): Lot => ({
+	lotId: `l${n}`,
+	survivingShares: held ? dp18("40") : dp18("0"),
+	argument: removed
+		? { removed: true }
+		: { removed: false, commentId: `c${n}` },
+});
 
 const row = (n: number, over: Partial<Row> = {}): Row => ({
 	marketId: `m${n}`,
 	marketSlug: `slug-${n}`,
 	marketTitle: `Market ${n}`,
-	statusLabel: "Open",
-	argument: { removed: false, commentId: `c${n}` },
+	quantity: dp18("40"),
+	argument: { removed: false, commentId: `c${n}-opener` },
+	lots: [lot(n, true)],
 	...over,
 });
 
+/** The same row with its single argument fully exited. */
+const closedRow = (n: number): Row =>
+	row(n, { quantity: dp18("0"), lots: [lot(n, false)] });
+
 describe("R3 SSR seed — the initial status filter is DERIVED", () => {
 	it("seed::open-when-any-scoped-row-is-open", () => {
-		expect(
-			initialStatusFilter([row(1), row(2, { statusLabel: "Closed" })], "all"),
-		).toBe("Open");
+		expect(initialStatusFilter([row(1), closedRow(2)], "all")).toBe("Open");
 	});
 
 	it("seed::closed-when-NO-scoped-row-is-open", () => {
 		// ⚠ THE CASE GATE C S-1 MINTED: after the freeze every holding is non-Open,
 		// and a fixed `Open` default would show four column headers and nothing else,
 		// forever.
-		expect(
-			initialStatusFilter(
-				[row(1, { statusLabel: "Closed" }), row(2, { statusLabel: "Closed" })],
-				"all",
-			),
-		).toBe("Closed");
+		expect(initialStatusFilter([closedRow(1), closedRow(2)], "all")).toBe(
+			"Closed",
+		);
 	});
 
 	it("seed::the-status-default-is-SCOPED-to-the-preselected-market", () => {
@@ -73,7 +101,7 @@ describe("R3 SSR seed — the initial status filter is DERIVED", () => {
 		// whose only holding is Closed must land on `Closed`, even though ANOTHER
 		// market in the set is Open. Scoping to all rows would land on `Open` and
 		// show a blank table — the defect S-1 records.
-		const rows = [row(1), row(2, { statusLabel: "Closed" })];
+		const rows = [row(1), closedRow(2)];
 		expect(initialStatusFilter(rows, "m2")).toBe("Closed");
 		expect(initialStatusFilter(rows, "all")).toBe("Open");
 	});
@@ -96,7 +124,7 @@ describe("R3 SSR seed — the profile selection", () => {
 	it("seed::picks-the-first-VISIBLE-row-not-the-first-row", () => {
 		// Row 1 is Closed and row 2 is Open, so the derived status is `Open` and the
 		// first VISIBLE row is row 2 — not row 1.
-		const rows = [row(1, { statusLabel: "Closed" }), row(2)];
+		const rows = [closedRow(1), row(2)];
 		expect(initialProfileSelection(rows, undefined)).toEqual({
 			marketId: "m2",
 			marketTitle: "Market 2",
@@ -113,7 +141,7 @@ describe("R3 SSR seed — the profile selection", () => {
 		// The removed cell variant carries `{removed: true, marketSlug}` and no id.
 		// The panel renders its removed stub for that case; inventing an id would
 		// point it at someone else's argument.
-		const rows = [row(1, { argument: { removed: true } })];
+		const rows = [row(1, { lots: [lot(1, true, true)] })];
 		expect(initialProfileSelection(rows, undefined)).toEqual({
 			marketId: "m1",
 			marketTitle: "Market 1",
@@ -128,20 +156,89 @@ describe("R3 SSR seed — the profile selection", () => {
 	});
 });
 
-describe("R3 SSR seed — the bookmark selection", () => {
-	it("seed::picks-the-first-item", () => {
-		expect(
-			initialBookmarkSelection([
-				{ id: "b1", marketTitle: "Market 1" },
-				{ id: "b2", marketTitle: "Market 2" },
-			]),
-		).toEqual({ commentId: "b1", marketTitle: "Market 1" });
+describe("POSREV-1 RF-13 — Open/Closed is HOLDING status, per argument", () => {
+	it("rf13::a-SPLIT-market-is-open-AND-closed-at-once", () => {
+		// ⚠⚠ THE CASE THE OLD MODEL COULD NOT EXPRESS. Under market-status filtering
+		// a row was in exactly one tab; under holding status a market with one
+		// argument still held and one fully exited belongs in BOTH — its header in
+		// each, showing only that tab's arguments. So the derived tab is `Open` (an
+		// argument survives) and the seeded selection is the OPEN one, not merely
+		// the first lot in the array.
+		const split: Row = {
+			marketId: "m9",
+			marketSlug: "slug-9",
+			marketTitle: "Market 9",
+			quantity: dp18("40"),
+			argument: { removed: false, commentId: "c9-opener" },
+			// ⛔ THE EXITED ONE IS FIRST, deliberately. If the derivation returned
+			// `lots[0]` it would pass a test whose fixture happened to list the held
+			// argument first, and this ordering is what distinguishes "picked the
+			// first VISIBLE argument" from "picked the first argument".
+			lots: [lot(91, false), lot(92, true)],
+		};
+		expect(initialStatusFilter([split], "all")).toBe("Open");
+		expect(initialProfileSelection([split], undefined)).toEqual({
+			marketId: "m9",
+			marketTitle: "Market 9",
+			commentId: "c92",
+		});
 	});
 
-	it("seed::an-empty-set-selects-nothing", () => {
-		expect(initialBookmarkSelection([])).toBeNull();
+	it("rf13::a-DUST-argument-is-still-OPEN-zero-basis-is-not-zero-shares", () => {
+		// ⛔⛔ THE PREDICATE IS `surviving_shares = 0`, EXACTLY — NEVER ZERO BASIS.
+		// `lots_sold_zeroes_basis` (db/schema/lots.ts) is deliberately
+		// ONE-DIRECTIONAL: shares imply basis, the converse is NOT enforced, because
+		// an 18-dp quantization of a pro-rata reduction can in principle round a
+		// basis to zero while dust shares remain. Retiring such an argument to the
+		// Closed tab would take a still-sellable holding away from the only tab that
+		// has a Sell control in it.
+		// ⚠ THIS IS THE POSITIVE CONTROL for the row below: same zero basis, and the
+		// two land in DIFFERENT tabs, so the predicate is provably reading shares.
+		const dust: Row = {
+			marketId: "m10",
+			marketSlug: "slug-10",
+			marketTitle: "Market 10",
+			quantity: "0.000000000000000001",
+			argument: { removed: false, commentId: "c10-opener" },
+			lots: [
+				{
+					lotId: "l-dust",
+					survivingShares: "0.000000000000000001",
+					argument: { removed: false, commentId: "c-dust" },
+				},
+			],
+		};
+		expect(initialStatusFilter([dust], "all")).toBe("Open");
+		expect(initialProfileSelection([dust], undefined)?.commentId).toBe(
+			"c-dust",
+		);
+	});
+
+	it("rf13::the-CONTROL-a-truly-sold-argument-IS-closed", () => {
+		// The other arm. Exactly zero shares — the only spelling `sellFromLot` ever
+		// writes on a full sale, since it sets the canonical zero rather than
+		// dividing down to it.
+		const soldOut: Row = {
+			marketId: "m11",
+			marketSlug: "slug-11",
+			marketTitle: "Market 11",
+			quantity: dp18("0"),
+			argument: { removed: false, commentId: "c11-opener" },
+			lots: [
+				{
+					lotId: "l-sold",
+					survivingShares: "0.000000000000000000",
+					argument: { removed: false, commentId: "c-sold" },
+				},
+			],
+		};
+		expect(initialStatusFilter([soldOut], "all")).toBe("Closed");
 	});
 });
+
+// UNWIRE-1 — "R3 SSR seed — the bookmark selection" removed whole:
+// initialBookmarkSelection and its module (components/bookmarks/selection.ts)
+// are deleted along with the rest of the bookmark module.
 
 describe("R3 SSR seed — the arenas actually USE the seed", () => {
 	const read = (rel: string) => readFileSync(join(process.cwd(), rel), "utf8");
@@ -162,11 +259,9 @@ describe("R3 SSR seed — the arenas actually USE the seed", () => {
 		expect(src).not.toContain("useState<ProfileSelection | null>(null)");
 	});
 
-	it("seed::BookmarksArena-seeds-from-the-shared-derivation", () => {
-		const src = read("src/components/bookmarks/BookmarksArena.tsx");
-		expect(src).toContain("initialBookmarkSelection(");
-		expect(src).not.toContain("useState<BookmarkSelection | null>(null)");
-	});
+	// UNWIRE-1 — "seed::BookmarksArena-seeds-from-the-shared-derivation"
+	// removed whole: BookmarksArena.tsx is deleted along with the /bookmarks
+	// route.
 
 	it("seed::PositionsTable-initialises-its-FILTERS-from-the-same-helpers", () => {
 		// ⛔ THE ANTI-DRIFT CHECK, and the reason the helpers were extracted at all.

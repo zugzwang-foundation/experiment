@@ -1,10 +1,19 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// POSREV-1 — `PositionsTable` now owns the inline sell, which calls `useRouter`
+// for its post-sale `refresh()`. Nothing here submits; the stub only has to exist.
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
 
 import { PositionsTable } from "@/components/profile/PositionsTable";
-import type { ProfilePositionRow } from "@/server/profile/positions";
+import type {
+	ProfilePositionLot,
+	ProfilePositionRow,
+} from "@/server/profile/positions";
 
 /**
  * ROUND 4 items 5 + 6 — ROW SELECTION AND THE BORDERED ROW CARD.
@@ -34,8 +43,40 @@ afterEach(cleanup);
 
 const M = (n: number) => `0190c0de-0000-7000-8000-00000000000${n}`;
 
+const L = (n: number) => `0190c0de-2222-7000-8000-00000000000${n}`;
+
+/**
+ * ⚠⚠ POSREV-1 RF-13 — "CLOSED" IS A PROPERTY OF THE HOLDING, NOT THE MARKET.
+ * `CLOSED` below used to be built by setting `marketStatus: "Resolved"`; that no
+ * longer moves anything, because the tab filters on whether the ARGUMENT still
+ * has surviving shares. A Resolved market can hold a live argument
+ * (held-to-settlement) and an Open one can hold nothing but exited arguments.
+ */
+function LOT(n: number, held: boolean): ProfilePositionLot {
+	return {
+		lotId: L(n),
+		betId: `bet-${n}`,
+		side: "YES",
+		originalBasis: "25.000000000000000000",
+		survivingBasis: held ? "25.000000000000000000" : "0.000000000000000000",
+		survivingShares: held ? "10.000000000000000000" : "0.000000000000000000",
+		sold: !held,
+		placedAt: "2026-09-10T10:00:00.000Z",
+		argument: {
+			removed: false,
+			commentId: `0190c0de-1111-7000-8000-00000000000${n}`,
+			title: `Opener argument ${n}`,
+			isReply: false,
+			postOrdinal: n,
+			marketSlug: `fixture-${n}`,
+			repliedToTitle: null,
+		},
+	};
+}
+
 function openRow(n: number): ProfilePositionRow {
 	return {
+		lots: [LOT(n, true)],
 		marketId: M(n),
 		marketSlug: `fixture-${n}`,
 		marketTitle: `Market fixture-${n}`,
@@ -64,12 +105,13 @@ const PAYLOAD = { owner: false as const, rows: ROWS };
 /** A closed row, so the Open/Closed filter has something to hide a selection with. */
 const CLOSED: ProfilePositionRow = {
 	...openRow(4),
-	marketStatus: "Resolved",
-	statusLabel: "Closed",
-	settled: true,
+	quantity: "0.000000000000000000",
+	staked: "0.000000000000000000",
+	current: "0.000000000000000000",
+	lots: [LOT(4, false)],
 };
 
-const rowEl = (n: number) => screen.getByTestId(`position-row-${M(n)}`);
+const rowEl = (n: number) => screen.getByTestId(`position-tile-${L(n)}`);
 const classesOf = (n: number) =>
 	rowEl(n).className.split(/\s+/).filter(Boolean);
 const isPicked = (n: number) =>
@@ -254,7 +296,7 @@ describe("item 5 — the selection is derived against the VISIBLE set", () => {
 		fireEvent.click(rowEl(1));
 		expect(isPicked(1)).toBe(true);
 		fireEvent.click(screen.getByTestId("positions-status-closed"));
-		expect(screen.queryByTestId(`position-row-${M(1)}`)).toBeNull();
+		expect(screen.queryByTestId(`position-tile-${M(1)}`)).toBeNull();
 		// The Closed set's FIRST row is picked — the rail is never left empty.
 		expect(isPicked(4)).toBe(true);
 		// …and coming back restores the remembered pick rather than keeping row 4.
@@ -271,7 +313,7 @@ describe("item 5 — the selection is derived against the VISIBLE set", () => {
 		fireEvent.keyDown(table, { key: "ArrowDown" });
 		// Wraps to row 1, NOT into the filtered-out closed row 4.
 		expect(isPicked(1)).toBe(true);
-		expect(screen.queryByTestId(`position-row-${M(4)}`)).toBeNull();
+		expect(screen.queryByTestId(`position-tile-${L(4)}`)).toBeNull();
 	});
 });
 
@@ -376,17 +418,18 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 		expect(borderCount(1)).toBe(1);
 	});
 
-	it("item6::a-sellable-row-carries-NO-empty-sell-band", () => {
-		// ⚠ RE-POINTED at PROFILE OVERLAP R1, and the claim changed shape with the
-		// law. Item 6 asked "does the reserved band draw an empty card under every
-		// sellable row?" — and the answer is now that THERE IS NO BAND to draw one:
-		// the 50px reservation is reversed, so the host arrives with its module.
-		// ⇒ The unbordered-host predicate MOVED to `sell.test.tsx`
-		// (`sell-host-is-canon-s-50px-box-and-is-ABSENT-until-opened`), which is
-		// the suite that stubs the heavy `SellModule`; opening the real one here
-		// would need this file to mock a router it has no other reason to know
-		// about. What stays here is the part this suite owns: on a row that IS
-		// sellable, nothing is reserved.
+	it("item6::a-sellable-tile-carries-NO-expansion-row-of-any-kind", () => {
+		// ⚠ THE CLAIM HAS NOW SURVIVED TWO RESHAPINGS AND IS STRONGER EACH TIME.
+		// Item 6 originally asked "does the reserved 50px band draw an empty card
+		// under every sellable row?"; PROFILE OVERLAP R1 reversed the reservation,
+		// so the host arrived only with its module. POSREV-1 RF-5 removes the host
+		// ENTIRELY: the control is INSIDE the tile's own last column, so there is no
+		// second `<tr>` under a tile at any time — armed or resting.
+		// ⇒ That makes this the strongest form of the assertion it has ever had: not
+		// "the band is empty" nor "the band is absent until opened", but "no row is
+		// ever inserted", which is also what keeps the three-tile window's
+		// arithmetic true (a band is invisible to the divisor while spending what it
+		// divides — the 150px overflow R1 measured).
 		render(
 			<PositionsTable
 				payload={{
@@ -396,10 +439,19 @@ describe("item 6 — the row is a bordered card, and the two states differ", () 
 			/>,
 		);
 		// ⛔ THE POSITIVE CONTROL IS LOAD-BEARING: without it, "no sell row" would
-		// pass on a row that renders no sell affordance at all.
-		expect(screen.getByTestId(`sell-trigger-${M(1)}`)).toBeTruthy();
+		// pass on a tile that renders no sell affordance at all.
+		expect(screen.getByTestId(`tile-sell-${L(1)}`)).toBeTruthy();
 		expect(screen.queryByTestId(`sell-row-${M(1)}`)).toBeNull();
 		expect(screen.queryByTestId(`sell-host-${M(1)}`)).toBeNull();
+		// …and ARMING it still inserts nothing: the tile row count is unchanged.
+		const before = document.querySelectorAll(
+			'[data-testid^="position-tile-"]',
+		).length;
+		fireEvent.click(screen.getByTestId(`tile-sell-${L(1)}`));
+		expect(
+			document.querySelectorAll('[data-testid^="position-tile-"]').length,
+		).toBe(before);
+		expect(screen.getByTestId(`tile-sell-amount-${L(1)}`)).toBeTruthy();
 	});
 
 	it("item6::the-row-is-keyboard-operable-and-shows-a-focus-ring", () => {

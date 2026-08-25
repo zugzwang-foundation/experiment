@@ -140,8 +140,6 @@ describe("HTML-FINISH · MARKET DETAIL — rows 20 + 21, the slot header", () =>
 		},
 		balance: "100.000000000000000000",
 		spendableToday: "100.000000000000000000",
-		bookmarkedCommentIds: [],
-		ownCommentIds: [],
 	};
 
 	it("row-20::the-entry-reads-Buy-and-its-aria-label-agrees", () => {

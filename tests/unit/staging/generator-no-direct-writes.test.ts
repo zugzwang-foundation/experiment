@@ -268,7 +268,9 @@ const RATIFIED_SERVER_IMPORTS = new Set([
 	"@/server/resolution/settle", // settleMarket
 	"@/server/resolution/void", // voidMarket
 	"@/server/admin/moderation/act", // moderateComment
-	"@/server/bookmarks/add", // addBookmarkAction
+	// UNWIRE-1 — "@/server/bookmarks/add" (addBookmarkAction) removed: the
+	// module is deleted along with the rest of the bookmark module, and the
+	// generator no longer drives it.
 	// ── C7, THE PARTICIPANT IMAGE CHAIN — added at Slice C ──────────────────
 	// Ratification Record §7 enumerates the engine functions as they stood when
 	// C7 was still flagged "most expensive shape, see OQ-1". Slice B's STEP 8b

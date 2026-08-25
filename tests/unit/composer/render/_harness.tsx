@@ -22,10 +22,6 @@ export const VIEWER: ViewerMarketContext = {
 	position: null,
 	balance: "100",
 	spendableToday: "100",
-	// BOOKMARK-ADD-WIRE — the two ID-only arrays; empty is the composer's case
-	// (the composer consumes neither, but the DTO is the contract).
-	bookmarkedCommentIds: [],
-	ownCommentIds: [],
 };
 
 /** The minimal BetComposer prop set (post variant, YES slot). */

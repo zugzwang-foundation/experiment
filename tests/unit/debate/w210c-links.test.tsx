@@ -40,10 +40,6 @@ const HELD_VIEWER: ViewerMarketContext = {
 	},
 	balance: "100",
 	spendableToday: "100",
-	// BOOKMARK-ADD-WIRE — the two ID-only arrays (unconsumed by SlotHeader /
-	// PositionStrip; present because the DTO is the contract).
-	bookmarkedCommentIds: [],
-	ownCommentIds: [],
 };
 
 /** The full SlotHeader prop set (minimal values; entry live, un-suspended). */

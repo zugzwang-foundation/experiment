@@ -1,9 +1,5 @@
 import Link from "next/link";
 
-import {
-	type BookmarkAffordance,
-	CardActions,
-} from "@/components/bookmarks/BookmarkToggle";
 import { PositionMarker, SideBadge } from "@/components/debate/badges";
 import {
 	computeSplitBar,
@@ -22,6 +18,7 @@ import type { ProfileUser } from "@/server/profile/resolve";
 
 import { ArgumentBody } from "./ArgumentBody";
 import { PROFILE_COPY } from "./copy";
+import { DownloadStub } from "./DownloadStub";
 import type { ProfileSelection } from "./selection";
 
 /**
@@ -61,25 +58,10 @@ export function ArgumentList({
 	items,
 	owner,
 	author,
-	bookmarks = null,
 	selection = null,
 }: {
 	items: ProfileArgumentItem[];
 	owner: boolean;
-	/**
-	 * PROFILE REFINEMENT · R4 — the viewer's bookmark affordance for these
-	 * arguments, for the shipped `CardActions` cluster on each card head.
-	 *
-	 * ⚠ DEFAULTS TO `null` (= signed out), which is the honest default rather than a
-	 * convenient one: a call site that passes nothing genuinely knows nothing about
-	 * the viewer, and `null` makes the icon render its shipped DISABLED "sign in to
-	 * use" cell. That is what every render suite gets, and it is true of them.
-	 * ⛔ OPTIONAL, unlike `author` above, and the asymmetry is deliberate: omitting
-	 * `author` would silently drop a whole identity cluster, whereas omitting this
-	 * degrades one control to a state that already exists and is already correct for
-	 * an unknown viewer.
-	 */
-	bookmarks?: BookmarkAffordance;
 	/**
 	 * HTML-FINISH row 4 — the head cluster's avatar + pseudonym. Every argument
 	 * on this surface is authored by the PROFILE USER (that is what the list is),
@@ -131,9 +113,18 @@ export function ArgumentList({
 	// and every call site that passes no `selection` at all (which is what the
 	// render suites do). It stopped being the DEFAULT; it did not stop existing.
 	// ⇒ WHY A FILTER, one line: SPEC.1 §16.3 D8 and §17 name the §23 argument
-	// list as where a complete record lives, and `positions.ts:151-158` drops
-	// fully-exited markets from the table — so this list holds arguments the
-	// table can never reach. A filter hides; a replacement would delete. It is
+	// list as where a complete record lives, and this list holds arguments the
+	// table cannot reach — an argument on a market the participant never took a
+	// position in at all. A filter hides; a replacement would delete. It is
+	// ⚠ THE REASON GIVEN HERE USED TO BE A DIFFERENT ONE, AND IT IS NOW FALSE.
+	// It read: "`positions.ts:151-158` drops fully-exited markets from the
+	// table". POSREV-1 RF-13 widened that domain — a fully-exited market now
+	// HAS a row, carrying its arguments — so the gap that clause described is
+	// closed. The conclusion survives on the narrower gap above; the premise
+	// does not, and a stale premise propping up a live conclusion is worse than
+	// no comment. ⛔ It also fenced BY LINE, which is O-8's own counter-example:
+	// `loadProfilePositions` has moved since, so the numbers pointed at nothing
+	// even before the claim stopped being true. Symbols, never lines.
 	// the same class of viewer-local narrowing as the market and Open/Closed
 	// filters already on the table, so no spec change is owed.
 	// ⛔ NO PERCENTAGE IN THE HEADER. The mockup's colhead carries a live side
@@ -168,7 +159,7 @@ export function ArgumentList({
 						<p className="text-xs text-n5 italic">{REMOVED_STUB_TEXT}</p>
 					</Card>
 				) : (
-					<ReplicaCard item={picked} author={author} bookmarks={bookmarks} />
+					<ReplicaCard item={picked} author={author} />
 				)}
 			</ArgumentsPanel>
 		);
@@ -193,7 +184,7 @@ export function ArgumentList({
 							data-testid={`argument-${item.id}`}
 							className="gap-2 p-3"
 						>
-							<PresentHead item={item} author={author} bookmarks={bookmarks} />
+							<PresentHead item={item} author={author} />
 							<Link
 								data-testid={`argument-title-${item.id}`}
 								href={`/m/${item.marketSlug}?post=${item.ordinal}`}
@@ -423,27 +414,11 @@ function RemovedHead({
  * (`:624-628`). Shared by the list card and item 7's replica — see `RemovedHead`
  * above for why sharing is a requirement rather than a tidy-up.
  *
- * ⛔⛔ THE CARD-ACTIONS CLUSTER WAS RECORDED HERE AS DATA-BLOCKED. IT IS NOT, AND
- * PROFILE REFINEMENT · R4 DISCHARGES IT. The note read: "`CardActions` requires a
- * `BookmarkAffordance`; `ProfileArgumentItem` carries none, and the only reader
- * that produces one — `loadViewerMarketContext` — is MARKET-scoped while this list
- * is cross-market." Every clause of that is true. The conclusion was still wrong,
- * because the search stopped at one producer: **`loadBookmarks` is the other, and
- * it is viewer-scoped and CROSS-MARKET** — it is the loader `/bookmarks` itself
- * runs, `(client, {viewerId}) => BookmarkItem[]`, with no market argument and an
- * `id` on every variant. That is exactly the missing set.
- *
- * ⇒ AND THE `own` HALF IS EXACT HERE RATHER THAN APPROXIMATED, which is the part
- * that makes this honest instead of merely possible. Every argument in this list is
- * authored by the profile user (the page's own docblock states it), so own-ness is
- * not a lookup at all: it is `viewer === profileUser`. On an OWNER's profile every
- * card is their own argument and every icon is the shipped DISABLED "your own
- * argument" cell — which is CORRECT by D-3 (a bookmark points at someone else's
- * argument) and needs no bookmark read whatsoever. Only a signed-in VISITOR needs
- * `saved`, and only then is the extra read issued. See the page for that split.
- * ⛔ SO NONE OF THE THREE DEFECTIVE SUBSTITUTES IS TAKEN: `null` is passed only
- * when the viewer really is signed out, and `saved` is only ever empty when it
- * really is.
+ * UNWIRE-1 — the bookmark half of the cluster (PROFILE REFINEMENT · R4's
+ * `CardActions`/`loadBookmarks`/own-suppression mechanism, once threaded
+ * through here via `bookmarks: BookmarkAffordance`) is removed: the bookmark
+ * module is unwired product-wide. Only the disabled download stub remains
+ * (SUB-1, `DownloadStub.tsx`).
  *
  * ⚠ NO GAP IS INTRODUCED: `gap-2` is the class this row already carried AND the
  * mockup's `.rchead{gap:8px}` (`:321`) — the same number from both directions.
@@ -451,12 +426,17 @@ function RemovedHead({
 function PresentHead({
 	item,
 	author,
-	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
-	bookmarks: BookmarkAffordance;
 }) {
+	// RANK-1 — the two union variants name the same three quantities differently
+	// (a post's `authorStake*`/`authorSold`, a reply's `stake*`/`sold`), so they
+	// are resolved ONCE here rather than three times inside the JSX.
+	const currentStake = item.kind === "post" ? item.authorStake : item.stake;
+	const originalStake =
+		item.kind === "post" ? item.authorStakeOriginal : item.stakeOriginal;
+	const soldOut = item.kind === "post" ? item.authorSold : item.sold;
 	return (
 		<div className="flex flex-wrap items-center gap-2">
 			<AuthorHead author={author} />
@@ -474,21 +454,61 @@ function PresentHead({
 			    `aria-label="Author Flipped"` the hand-roll lacked (PD-0-10's root
 			    cause: primitive duplication). */}
 			<PositionMarker marker={item.marker} />
-			{/* Item 4 (P5-D06a) — the author's own opening stake, canon §3 item 11's
-			    head. POST VARIANT ONLY: a reply's `stake` is the §3.6 ranking ruler, a
-			    different figure (§0.5). D21 struck the `→ current` half, so the stake
-			    ships alone. Routed through `formatDharma` — `authorStake` is a
-			    MONEY_ID and a bare `{item.authorStake}` reddens
-			    no-raw-dharma-render. */}
+			{/* Item 4 (P5-D06a) — the author's own stake on THIS argument, canon §3
+			    item 11's head. Routed through `formatDharma` — the stake is a MONEY_ID
+			    and a bare `{item.authorStake}` reddens no-raw-dharma-render.
+
+			    ⚠ LOTS-1 (RECON-1 R-01) — THIS NOW RENDERS FOR REPLIES TOO. It was
+			    gated to posts on the reasoning that "a reply's `stake` is the §3.6
+			    ranking ruler, a different figure". Measured consequence of that gate:
+			    a participant whose basis is entirely reply-bets saw NO component of
+			    it anywhere on their own profile — 12 of 39 held positions on staging
+			    were majority-reply, and two were 100%. The number was already on the
+			    DTO and already in the RSC payload; only the render was withheld.
+
+			    That a figure also feeds ranking is not a reason to hide it from its
+			    author. Both union variants carry a stake — a post's `authorStake`, a
+			    reply's `stake` — so the only real difference was the field name.
+
+			    ⚠ RANK-1 / ADR-0039 R6 — BOTH fields now carry the stake STILL HELD
+			    (surviving lot basis), which is the same value the §3.6 order ranks
+			    on. The original rides beside it struck through once the figure has
+			    moved, and an argument with nothing left reads `Đ 0` with a `Sold`
+			    tag. ⛔ "Lot" is never the word: on screen these are ARGUMENTS (R1).
+			    Nothing here is erased — the commitment survives in the strikethrough
+			    and in Bucket-A `bets.stake`; it just stops being what ranks. */}
+			<HeadSeparator />
+			<span
+				data-testid={`argument-stake-${item.id}`}
+				className="text-n6 text-xs"
+			>
+				Đ {formatDharma(currentStake)}
+			</span>
+			{soldOut ? (
+				<span
+					data-testid={`argument-sold-${item.id}`}
+					className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+				>
+					Sold
+				</span>
+			) : formatDharma(originalStake) !== formatDharma(currentStake) ? (
+				/* Only when the figure has actually moved ON SCREEN. Compared through
+				   `formatDharma`, not on the raw 18-dp strings: a sub-Đ1 reduction is a
+				   real change to the basis and a non-change to what the reader sees, and
+				   striking a number through beside an identical number is exactly the
+				   "same number twice" this branch exists to prevent. */
+				<span
+					data-testid={`argument-stake-original-${item.id}`}
+					className="text-n4 text-xs line-through"
+				>
+					Đ {formatDharma(originalStake)}
+				</span>
+			) : null}
+			{/* `Replies · N` stays POST-ONLY — replies attract nothing by design
+			    (§9), so a reply has no count to show. That gate was always correct;
+			    it was only ever the STAKE that was wrongly bundled behind it. */}
 			{item.kind === "post" && (
 				<>
-					<HeadSeparator />
-					<span
-						data-testid={`argument-stake-${item.id}`}
-						className="text-n6 text-xs"
-					>
-						Đ {formatDharma(item.authorStake)}
-					</span>
 					<HeadSeparator />
 					{/* HTML-FINISH row 12 — `Replies · N` MOVES INTO THE HEAD, beside the
 					    stake. Canon §3 item 11 places it "inline with enlarged count
@@ -512,17 +532,15 @@ function PresentHead({
 					</span>
 				</>
 			)}
-			{/* ⚠⚠ PROFILE REFINEMENT · R4 — THE CLUSTER, no longer data-blocked (see
-			    the block above for the producer the earlier note missed). `ml-auto`
-			    inside `CardActions` pushes it to the row's end, which is the mockup's
-			    `.cardacts{margin-left:auto}` (`:330`).
-			    ⛔ THE SHIPPED CLUSTER, NOT A SECOND ONE — the same `CardActions` the
-			    debate post and reply cards render, so the bookmark's four states
-			    cannot drift between surfaces.
-			    ⚠ `download` IS OPT-IN AND PASSED HERE. It defaults to `false`, so
-			    `/m/[slug]`'s two call sites are untouched and D3's ruling still holds
-			    there; R4 names this surface, so this surface asks for it. */}
-			<CardActions commentId={item.id} bookmarks={bookmarks} download />
+			{/* UNWIRE-1 — the bookmark half of this cluster is gone (bookmark module
+			    unwired product-wide, SUB-2/H-NEW-2); the download stub survives,
+			    extracted to its own component (SUB-1). `ml-auto` on this wrapper is
+			    the same one `CardActions` carried, kept so the lone remaining child
+			    still sits at the row's end — the mockup's `.cardacts{margin-left:
+			    auto}` (`:330`). */}
+			<div className="ml-auto flex shrink-0 items-center gap-0.5">
+				<DownloadStub />
+			</div>
 		</div>
 	);
 }
@@ -556,9 +574,9 @@ function PresentHead({
  * already: a control whose whole job is to show the rest of the text would reveal
  * nothing, and a control that does nothing visible is worse than an absent one.
  * That is the same test R4 applies to the download affordance, one step removed.
- * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — bookmark + disabled
- * download, threaded through `bookmarks`. Only the `+` is surface-specific, because
- * only the `+` depends on whether the text is clamped.
+ * ⚠ THE HEAD CLUSTER IS DIFFERENT AND DOES LAND HERE — the disabled download
+ * stub (UNWIRE-1: the bookmark half is gone product-wide). Only the `+` is
+ * surface-specific, because only the `+` depends on whether the text is clamped.
  *
  * ⚠ TITLE-THEN-WHOLE-BODY IS THE SHIPPED SHAPE, NOT A DUPLICATION BUG.
  * `deriveTitleTeaser` (`load-debate-view.ts:402-411`) takes the title FROM the
@@ -570,18 +588,9 @@ function PresentHead({
 function ReplicaCard({
 	item,
 	author,
-	bookmarks,
 }: {
 	item: Extract<ProfileArgumentItem, { removed: false }>;
 	author: ProfileUser;
-	/**
-	 * R4 — threaded through to the head cluster. ⚠ THE REPLICA GETS THE CLUSTER BUT
-	 * NOT THE `+`: it renders the body IN FULL already (see this component's own
-	 * note), so a control whose job is to reveal the rest of the text would reveal
-	 * nothing. A control that does nothing visible is the defect R4's own download
-	 * clause is careful about, one step removed.
-	 */
-	bookmarks: BookmarkAffordance;
 }) {
 	return (
 		<Card
@@ -591,7 +600,7 @@ function ReplicaCard({
 			// below take the leftover instead of the card growing past the panel.
 			className="min-h-0 flex-1 gap-2 p-3"
 		>
-			<PresentHead item={item} author={author} bookmarks={bookmarks} />
+			<PresentHead item={item} author={author} />
 			<Link
 				data-testid={`argument-replica-title-${item.id}`}
 				href={`/m/${item.marketSlug}?post=${item.ordinal}`}
@@ -649,11 +658,13 @@ function ReplicaCard({
  * `ArgProfile.tsx:59` verbatim, and the two-letter uppercase fallback is
  * `ArgProfile.tsx:54`.
  *
- * ⛔ NOT `ArgProfile` ITSELF, and the reason is a data block, not a preference:
- * `ArgProfile` requires `commentId` AND `bookmarks: BookmarkAffordance`, and no
- * reader on this surface produces the second. Composing the same primitives at
- * the same values is the honest subset; the action cluster is recorded
- * data-blocked at the call site above.
+ * ⛔ NOT `ArgProfile` ITSELF — this surface needs only avatar + pseudonym, not
+ * `ArgProfile`'s full side-chip/marker/stake/replies row, so composing the
+ * same primitives at the same values is the honest subset rather than a
+ * wider component with most of its fields unused. (UNWIRE-1: `ArgProfile` no
+ * longer takes a `commentId`/`bookmarks` pair at all — the historical data
+ * block this note cited is gone with the bookmark module — but the "which
+ * subset of fields does this surface need" reasoning is unchanged.)
  */
 function AuthorHead({ author }: { author: ProfileUser }) {
 	return (
@@ -681,27 +692,29 @@ function AuthorHead({ author }: { author: ProfileUser }) {
  * total enlarged + ink (`.stkn`)". The mockup emits it at `:609-613` as
  * `[Support chip + Đ] [bar + total] [Counter chip + Đ]`.
  *
- * ⚠ THE FILL MAPPING IS RATIFIED, NOT CHOSEN, and the governing clause is the
- * one the recon's own quote truncated. `design-language.md:180` ends: "*(The
- * reply stake bar's exact fill mapping follows the locked v1.0 surface.)*" The
- * locked surface is this mockup, whose `.bar{background:var(--n0)}` +
- * `.fill{background:var(--ink)}` (`:362-364`) is a FIXED bright-track /
- * dark-fill pair, not a side-keyed one. The shipped `ReplySplitBar.tsx:70,73`
- * already renders exactly that relationship in the dark system — `bg-no`
- * (#fafafa, bright) track under a `bg-yes` (#181818, dark) fill — so this reuses
- * the shipped idiom byte-for-byte rather than porting a light-theme colour.
+ * ⚠⚠ **THE FILL MAPPING LEFT THE POLES AT POSREV-1 RF-2(c), AND THE RESIDUAL
+ * THIS DOCBLOCK ROUTED TO THE FOUNDER IS THEREBY DISCHARGED.** What stood here
+ * was: `design-language.md:180`'s "*(The reply stake bar's exact fill mapping
+ * follows the locked v1.0 surface.)*" pointed at a mockup whose
+ * `.bar{background:var(--n0)}` + `.fill{background:var(--ink)}` (`:362-364`) is
+ * a FIXED bright-track / dark-fill pair, and `ReplySplitBar.tsx:70,73` renders
+ * exactly that in the dark system — `bg-no` track under a `bg-yes` fill. Ported
+ * faithfully; wrong anyway, for a reason the port could not see.
  *
- * ⚠⚠ THE RESIDUAL IS RECORDED, NOT HIDDEN. Support inherits the POST's side, so
- * on a NO-side post the Support share paints in the YES pole — the "route 3"
- * exposure `HeroPanels.tsx:325-346` fixed for Discovery by making both segments
- * side-keyed. Correcting it here is NOT free: a side-keyed colour expression in
- * this file makes `side-pole-binding.test.ts` RED on its closed-inventory
- * assertion, and greening it means adding this file to that guard's
- * `PERMITTED_FILES` — which is that guard's own documented extension mechanism
- * ("POLISH.3/.5/.6 will add legitimate pole sites … each such addition must be
- * a DECISION") but sits OUTSIDE this task's write allow-list. So the bar ships
- * on the ratified fixed mapping and the correction is ROUTED to the founder as
- * a widening. ⛔ It is NOT worked around by hiding the binding from the guard.
+ * ⛔ THE RESIDUAL IT RECORDED WAS REAL AND IS NOW CLOSED. Support inherits the
+ * POST's side, so on a NO-side post the Support share painted in the YES pole —
+ * the "route 3" exposure `side-pole-binding.test.ts` names as a KNOWN GAP its
+ * own matcher cannot reach, because no side value appears in the expression at
+ * all. The correction it proposed was to make both segments SIDE-KEYED, which
+ * would have needed this file added to that guard's `PERMITTED_FILES` and was
+ * routed to the founder as a widening.
+ *
+ * ⇒ **THE FOUNDER RULED THE OTHER WAY, AND IT IS THE BETTER ANSWER.** RF-2(c):
+ * Support/Counter is a DIFFERENT RELATION from the bet side and must not borrow
+ * the side encoding at all. So the bar moves onto the neutral ramp — which does
+ * not merely fix the render, it removes the class of error, because a track that
+ * names no pole cannot invert one. No widening is needed and the guard's
+ * inventory is untouched.
  *
  * `displaySplitTotal`, not `computeSplitBar.totalDharma`: SPEC.1 §10.8 names
  * "the reply split bar's staked total" as one of the TWO displayed-space
@@ -715,7 +728,7 @@ function SplitBar({
 	id: string;
 	aggregate: ProfileArgumentAggregate;
 }) {
-	const { supportPct } = computeSplitBar({
+	const { supportPct, hasStake } = computeSplitBar({
 		supportDharma: aggregate.supportDharma,
 		counterDharma: aggregate.counterDharma,
 	});
@@ -734,18 +747,66 @@ function SplitBar({
 			role="img"
 			aria-label={`Support Đ ${formatDharma(aggregate.supportDharma)}, Counter Đ ${formatDharma(aggregate.counterDharma)}`}
 		>
-			<span className="flex items-center gap-1.5">
+			{/* ⚠⚠ POSREV-1 RF-2(a) — THE LABEL AND ITS FIGURE STACK. They were a
+			    horizontal `[Support][Đ n]` pair on each end, and with the bar between
+			    them the two Đ figures landed at different distances from their own
+			    labels and at different distances from the bar — so the eye had
+			    nothing to line them up against. A column puts each figure directly
+			    under the word it belongs to, and the two columns are then mirror
+			    images of each other across the bar.
+			    ⛔ THE COUNTER SIDE ALSO REVERSES ITS ORDER, and that is required
+			    rather than cosmetic. It rendered `[Đ n][Counter]` — figure first, so
+			    the label sat on the OUTSIDE edge — which was the horizontal layout's
+			    own mirroring. Stacked, "mirrored" means both labels on the TOP line,
+			    so keeping the source order would have put Counter's figure above its
+			    label while Support's sat below.
+			    ⚠ `gap-0.5` is the tightest shipped step; RF-2(a) says "directly
+			    beneath", and anything larger reads as two separate facts again. */}
+			<span
+				data-testid={`argument-split-support-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
 				<span className="text-n6">Support</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.supportDharma)}
 				</span>
 			</span>
 			<span className="flex min-w-0 flex-1 flex-col items-center gap-1">
+				{/* ⚠⚠ POSREV-1 RF-2(b) + RF-2(c) — THE TRACK AND FILL LEAVE THE POLES.
+				    This was a `bg-no` (#fafafa) track under a `bg-yes` (#181818) fill,
+				    carried from the shipped `ReplySplitBar` idiom. Two defects, one
+				    cause.
+				    ⛔ (c) THE POLES ENCODE THE BET SIDE UNDER INV-3, AND THIS BAR IS
+				    NOT ABOUT SIDES. Support inherits the POST's side, so on a NO-side
+				    post the Support share painted in the YES pole — the "route 3"
+				    exposure `side-pole-binding.test.ts` documents as a KNOWN GAP its
+				    own matcher cannot see, because no side value appears in the
+				    expression at all. Moving to the neutral ramp does not merely fix
+				    the render; it removes the class of error, since a neutral track
+				    cannot invert a pole it does not name.
+				    ⛔ (b) AND IT MADE THE EMPTY STATE READ AS ITS OPPOSITE. At Đ 0
+				    Support / Đ 0 Counter the fill is zero-width, so the whole bar was
+				    the TRACK — which, being the Counter pole, read as 100% Counter.
+				    "Nothing is not everything." At zero the fill span is not rendered
+				    at all, so an empty track is an empty track.
+				    ⚠ THE ZERO TEST IS `hasStake`, NOT the percentage: `supportPct` is
+				    `"0%"` both for "nothing staked" and for "all Counter", which are
+				    opposite facts, so a renderer keying on it alone MUST paint them the
+				    same. See `computeSplitBar`.
+				    ⚠ `bg-n2` is the hairline's own rung and `bg-n6` the bright end of
+				    the ramp — shipped tokens, no new value, and neither names a side. */}
 				<span
-					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-no"
+					data-testid={`argument-split-track-${id}`}
+					className="h-1.5 w-full overflow-hidden rounded-(--r-dot) bg-n2"
 					aria-hidden="true"
 				>
-					<span className="block h-full bg-yes" style={{ width: supportPct }} />
+					{hasStake && (
+						<span
+							data-testid={`argument-split-fill-${id}`}
+							className="block h-full bg-n6"
+							style={{ width: supportPct }}
+						/>
+					)}
 				</span>
 				{/* `.stkn` — canon §3 item 11's "split-bar staked total enlarged +
 				    ink". `<b className="text-sm text-ink">` is ReplySplitBar.tsx:76. */}
@@ -754,11 +815,14 @@ function SplitBar({
 					staked
 				</span>
 			</span>
-			<span className="flex items-center gap-1.5">
+			<span
+				data-testid={`argument-split-counter-${id}`}
+				className="flex flex-col items-center gap-0.5"
+			>
+				<span className="text-n6">Counter</span>
 				<span className="text-n5">
 					Đ {formatDharma(aggregate.counterDharma)}
 				</span>
-				<span className="text-n6">Counter</span>
 			</span>
 		</div>
 	);

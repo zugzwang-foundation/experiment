@@ -71,10 +71,16 @@ export type ProfileArgumentItem =
 			body: string;
 			/** `computeMarker` on the PROFILE USER's held side in this market. */
 			marker: Marker;
-			/** The author's OWN opening stake on this post (canon §3 item 11's
-			 * head). Distinct from a reply's `stake` below — see §0.5's name
-			 * collision — and distinct from `.6`'s `staked` (the episode basis). */
+			/** The author's own stake **still held** on this post (canon §3 item
+			 * 11's head) — the surviving lot basis, which is also what the §3.6
+			 * post order tie-breaks on (ADR-0039 R4 as amended at RANK-1).
+			 * Distinct from a reply's `stake` below — see §0.5's name collision —
+			 * and distinct from `.6`'s `staked` (the episode basis). */
 			authorStake: string;
+			/** The frozen `bets.stake`, for the struck-through original (R6). */
+			authorStakeOriginal: string;
+			/** R6/R10 `Sold` — the author has exited this argument entirely. */
+			authorSold: boolean;
 			/** `price_at_bet` — the effective price of THE SIDE THE AUTHOR BOUGHT,
 			 * already side-scoped by the engine. ⚠ NOT the YES probability:
 			 * deriving `100 − x` would misprint a NO entry. Forwarded RAW. */
@@ -95,8 +101,13 @@ export type ProfileArgumentItem =
 			teaser: string;
 			body: string;
 			marker: Marker;
-			/** The reply-bet's own stake — the §3.6 reply ruler. */
+			/** The reply-bet's own stake **still held** — the §3.6 reply ruler, and
+			 * the same value rendered beside it (surviving lot basis, RANK-1). */
 			stake: string;
+			/** The frozen `bets.stake`, for the struck-through original (R6). */
+			stakeOriginal: string;
+			/** R6/R10 `Sold` — nothing survives on this argument. */
+			sold: boolean;
 			/** `price_at_bet` — the bought side's price, as on the post variant. */
 			priceAtBet: string;
 			/** The parent post's title; null when the parent is removed (no leak). */
@@ -112,6 +123,8 @@ type PostAggRow = {
 	created_at: string | Date;
 	body: string;
 	author_stake: string;
+	author_stake_original: string;
+	author_sold: boolean;
 	price_at_bet: string;
 	support_count: string | number;
 	counter_count: string | number;
@@ -127,6 +140,8 @@ type ReplyRow = {
 	created_at: string | Date;
 	body: string;
 	stake: string;
+	original_stake: string;
+	sold: boolean;
 	price_at_bet: string;
 };
 
@@ -159,7 +174,12 @@ export async function loadProfileArguments(
 			p.side_at_post_time AS parent_side,
 			p.created_at,
 			p.body,
+			-- RANK-1 / ADR-0039 R4 (amended) — a is conviction STILL HELD. On this
+			-- surface it feeds the §3.6 post tiebreak AND the rendered stake, which
+			-- is why they can never disagree: one column, two consumers.
 			pb.stake AS author_stake,
+			pb.original_stake AS author_stake_original,
+			pb.sold AS author_sold,
 			pb.price_at_bet AS price_at_bet,
 			COUNT(rb.id) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
@@ -167,24 +187,43 @@ export async function loadProfileArguments(
 			COUNT(rb.id) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 			) AS counter_count,
-			COALESCE(SUM(rb.stake) FILTER (
+			-- LOTS-1 / ADR-0039 R4+R5 — the attracted-value aggregates key off SURVIVING
+			-- LOT BASIS, not the frozen bets.stake. A replier who sells their lot
+			-- down withdraws the weight they lent the parent, which is what R5 names.
+			-- The historical figure is not lost: bets.stake is Bucket-A immutable and
+			-- still readable; it simply stops being what this aggregate reports.
+			--
+			-- ⚠ COALESCE FALLS BACK TO THE FROZEN STAKE when a reply-bet has no lot.
+			-- Unreachable under R8 (every bet mints a lot), but the alternative on an
+			-- unreachable row is to silently score a real contribution as ZERO — the
+			-- same class of error as letting missing bookkeeping veto a sell (S5). An
+			-- unknown surviving amount is better read as "all of it survives", which
+			-- is exactly the pre-LOTS-1 behaviour.
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time = p.side_at_post_time
 			), 0) AS support_dharma,
-			COALESCE(SUM(rb.stake) FILTER (
+			COALESCE(SUM(COALESCE(rl.surviving_basis, rb.stake)) FILTER (
 				WHERE rc.side_at_post_time <> p.side_at_post_time
 			), 0) AS counter_dharma
 		FROM ${comments} p
 		JOIN LATERAL (
-			SELECT b.stake, b.price_at_bet
+			SELECT
+				COALESCE(pl.surviving_basis, b.stake) AS stake,
+				b.stake AS original_stake,
+				COALESCE(pl.surviving_shares = 0, false) AS sold,
+				b.price_at_bet
 			FROM bets b
+			LEFT JOIN lots pl ON pl.bet_id = b.id
 			WHERE b.comment_id = p.id
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
 		) pb ON true
 		LEFT JOIN ${comments} rc ON rc.parent_comment_id = p.id
 		LEFT JOIN bets rb ON rb.comment_id = rc.id
+		LEFT JOIN lots rl ON rl.bet_id = rb.id
 		WHERE p.user_id = ${userId} AND p.parent_comment_id IS NULL
-		GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body, pb.stake, pb.price_at_bet
+		GROUP BY p.id, p.market_id, p.side_at_post_time, p.created_at, p.body,
+			pb.stake, pb.original_stake, pb.sold, pb.price_at_bet
 	`);
 
 	// The user's replies + each reply-bet's own stake (INV-1: one bet per reply).
@@ -196,12 +235,20 @@ export async function loadProfileArguments(
 			rc.side_at_post_time AS side,
 			rc.created_at,
 			rc.body,
+			-- RANK-1 — the §3.6 reply ruler, and the figure beside it.
 			rb.stake,
+			rb.original_stake,
+			rb.sold,
 			rb.price_at_bet
 		FROM ${comments} rc
 		JOIN LATERAL (
-			SELECT b.stake, b.price_at_bet
+			SELECT
+				COALESCE(rl.surviving_basis, b.stake) AS stake,
+				b.stake AS original_stake,
+				COALESCE(rl.surviving_shares = 0, false) AS sold,
+				b.price_at_bet
 			FROM bets b
+			LEFT JOIN lots rl ON rl.bet_id = b.id
 			WHERE b.comment_id = rc.id
 			ORDER BY b.created_at ASC, b.id ASC
 			LIMIT 1
@@ -224,12 +271,16 @@ export async function loadProfileArguments(
 		counterDharma: toFixed18(new CpmmDecimal(r.counter_dharma)),
 		createdAt: new Date(r.created_at),
 		authorStake: r.author_stake,
+		authorStakeOriginal: r.author_stake_original,
+		authorSold: r.author_sold,
 		priceAtBet: r.price_at_bet,
 	}));
 	const replies: ReplySubstrate[] = replyRows.map((r) => ({
 		id: r.id,
 		side: r.side,
 		stake: toFixed18(new CpmmDecimal(r.stake)),
+		stakeOriginal: toFixed18(new CpmmDecimal(r.original_stake)),
+		sold: r.sold,
 		createdAt: new Date(r.created_at),
 		priceAtBet: r.price_at_bet,
 	}));
@@ -414,11 +465,19 @@ export function buildPostItem(args: {
 		}),
 		// Read-and-forward: both are already fetched by the unchanged post query
 		// and already carried on `PostSubstrate`. This re-derives neither.
-		// ⚠ They are 18-dp by COLUMN TYPE (`bets.stake` / `bets.price_at_bet` are
-		// numeric(38,18)), not by a `toFixed18` call — unlike the aggregate sums
-		// beside them in the substrate assembly, which are canonicalised there
-		// because COALESCE(...,0) yields a bare "0".
+		// ⚠ They are 18-dp by COLUMN TYPE, not by a `toFixed18` call — unlike the
+		// aggregate sums beside them in the substrate assembly, which are
+		// canonicalised there because COALESCE(...,0) yields a bare "0".
+		// ⚠ RANK-1 — `authorStake` is no longer `bets.stake`: it is
+		// `COALESCE(lots.surviving_basis, bets.stake)`. The 18-dp conclusion still
+		// holds — BOTH branches are numeric(38,18) and a two-arm COALESCE over one
+		// typmod passes the datum through unchanged — and that matters beyond
+		// tidiness, because the badge decides whether to strike the original
+		// through by comparing these two strings. `authorStakeOriginal` beside it
+		// is the frozen `bets.stake`.
 		authorStake: post.authorStake,
+		authorStakeOriginal: post.authorStakeOriginal,
+		authorSold: post.authorSold,
 		priceAtBet: post.priceAtBet,
 		createdAt,
 		aggregate,
@@ -492,6 +551,8 @@ export function buildReplyItem(args: {
 			heldSide: heldByMarket.get(meta?.marketId ?? "") ?? null,
 		}),
 		stake: reply.stake,
+		stakeOriginal: reply.stakeOriginal,
+		sold: reply.sold,
 		// Read-and-forward, as on the post variant — already carried on
 		// `ReplySubstrate` from the unchanged reply query, 18-dp by column type.
 		priceAtBet: reply.priceAtBet,

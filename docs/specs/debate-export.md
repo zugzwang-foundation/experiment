@@ -259,7 +259,7 @@ chronological_index_posts: [post-3, post-1, post-2, post-4, post-5, post-6]
 
 - **Rank:** 1 of 6
 - **Side:** YES
-- **Author:** CrimsonHawk207
+- **Author:** MagentaWolf207
 - **Stake:** 560 Đ
 - **Entry price:** 0.47
 - **Support / Counter:** 2 support (255 Đ) · 1 counter (210 Đ)
@@ -305,7 +305,7 @@ Design intent and realized ridership are different things — Line 1 ran far bel
 
 *[This argument was removed by a moderator. Its text, author, and stake are not shown. The replies below remain part of the debate.]*
 
-#### Reply 4.1 — Support (NO) — AzureBison330
+#### Reply 4.1 — Support (NO) — OliveBison330
 
 - **Replies to:** Post 4 (removed)
 - **Side:** NO

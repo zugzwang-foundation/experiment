@@ -3,7 +3,6 @@
 import { cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { BookmarkAffordance } from "@/components/bookmarks/BookmarkToggle";
 import { ReplyCard } from "@/components/debate/ReplyCard";
 import type { DebateReply } from "@/components/debate/types";
 
@@ -21,18 +20,14 @@ import type { DebateReply } from "@/components/debate/types";
  * No jest-dom in this repo (AGENTS.md §9) — plain DOM assertions only.
  */
 
-vi.mock("@/server/bookmarks/add", () => ({ addBookmarkAction: vi.fn() }));
-vi.mock("@/server/bookmarks/remove", () => ({ removeBookmarkAction: vi.fn() }));
-
 afterEach(cleanup);
 
 /** HTML-FINISH · MARKET DETAIL row 27 — the reply pop-up host. These suites
- * assert bookmarks / spacing / partitioning / images, never the pop-up, so a
+ * assert spacing / partitioning / images, never the pop-up, so a
  * no-op is the honest stand-in. `reply-card.test.tsx` is where the `+` is
  * pinned. */
 const noopPopup = () => {};
 
-const VIEWER: BookmarkAffordance = { saved: new Set(), own: new Set() };
 const noop = () => {};
 
 function presentReply(overrides?: Partial<DebateReply>): DebateReply {
@@ -56,7 +51,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply()}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -69,10 +63,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 		expect(html).toContain("Đ 1,000");
 		// The pipe separator the shared row renders.
 		expect(html).toContain("|");
-		// The bookmark cluster rides the same head.
-		expect(
-			container.querySelector('button[aria-label="Bookmark"]'),
-		).not.toBeNull();
 	});
 
 	it("reply-card::the-pseudonym-renders-ONCE", () => {
@@ -81,7 +71,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply()}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -105,7 +94,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply()}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -123,7 +111,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 					side: "NO",
 					entryPrice: "0.550000000000000000",
 				})}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -144,7 +131,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -152,7 +138,6 @@ describe("ReplyCard — row 26, the mockup's anatomy", () => {
 
 		expect(container.innerHTML).not.toContain("fixture-replier");
 		expect(container.innerHTML).not.toContain("Fixture reply argument.");
-		expect(container.querySelector('button[aria-label="Bookmark"]')).toBeNull();
 		// The frozen side badge is still there — the slot survives.
 		expect(container.innerHTML).toContain("NO");
 	});
@@ -174,12 +159,7 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 		const onOpenPopup = vi.fn();
 		const reply = presentReply();
 		const { container } = render(
-			<ReplyCard
-				reply={reply}
-				bookmarks={VIEWER}
-				onOpenImage={noop}
-				onOpenPopup={onOpenPopup}
-			/>,
+			<ReplyCard reply={reply} onOpenImage={noop} onOpenPopup={onOpenPopup} />,
 		);
 
 		const plus = Array.from(container.querySelectorAll("button")).find(
@@ -202,7 +182,6 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noop}
 			/>,
@@ -219,7 +198,6 @@ describe("ReplyCard — rows 27 + 34, the pop-up and the lightbox", () => {
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply({ imageUrl: "https://example.invalid/r.png" })}
-				bookmarks={VIEWER}
 				onOpenImage={onOpenImage}
 				onOpenPopup={noop}
 			/>,
@@ -255,7 +233,6 @@ describe("ReplyCard — row 42, the pseudonym links to the profile", () => {
 		const { container } = render(
 			<ReplyCard
 				reply={presentReply()}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
@@ -283,7 +260,6 @@ describe("ReplyCard — row 42, the pseudonym links to the profile", () => {
 					side: "NO",
 					createdAt: "2026-07-30T00:00:00.000Z",
 				}}
-				bookmarks={VIEWER}
 				onOpenImage={noop}
 				onOpenPopup={noopPopup}
 			/>,
