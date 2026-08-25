@@ -231,6 +231,30 @@ describe("DB_POOLER_MODE — the default", () => {
 		expect(connectedWith()).toBe(SESSION_URL);
 	});
 
+	// ⛔ THE EMPTY STRING IS NOT AN EDGE CASE — it sits on step (d)'s path.
+	// Step (d) is "unset DB_POOLER_MODE", and the natural way to unset a value in
+	// a dashboard is to CLEAR THE FIELD, which Doppler and Vercel both store as
+	// empty rather than absent. Under `??` that resolved to `""`: routing was
+	// still correct, but `poolerMode` exported an empty string into criterion 6's
+	// evidence and a read-back showed `DB_POOLER_MODE=` — which a human reads as
+	// unset without it being unset. `||` collapses both spellings; this row is
+	// what keeps them collapsed, and it goes RED if anyone "restores" the `??`.
+	it("an EMPTY flag is indistinguishable from an unset one", async () => {
+		process.env.DB_POOLER_MODE = "";
+		process.env.ZUGZWANG_ENV = "staging";
+		process.env.DATABASE_URL = SESSION_URL;
+		process.env.DATABASE_URL_TXN = TXN_URL;
+
+		const mod = await import("@/db");
+
+		// Behaviour: session routing, exactly as an absent key gives.
+		expect(connectedWith()).toBe(SESSION_URL);
+		// And the EVIDENCE the control reads says the word, not nothing. Asserting
+		// only the URL above would pass under `??` and miss the whole defect.
+		expect(mod.poolerMode).toBe("session");
+		expect(mod.connectionVarName).toBe("DATABASE_URL");
+	});
+
 	it("an unrecognised flag value falls to session mode rather than guessing", async () => {
 		process.env.DB_POOLER_MODE = "Transaction"; // wrong case, deliberately
 		process.env.ZUGZWANG_ENV = "staging";

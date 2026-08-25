@@ -29,7 +29,20 @@ import * as schema from "./schema";
 //
 // So: default `session`, which makes `prd` byte-identical to what it has always
 // done and requires nothing to be minted there.
-const mode = process.env.DB_POOLER_MODE ?? "session";
+//
+// ⚠ `||`, NOT `??`, and the difference is operational rather than stylistic.
+// `??` catches only null/undefined, so `DB_POOLER_MODE=""` would resolve to `""`
+// — still session-mode for routing, since nothing but the exact string
+// "transaction" reaches the other secret, but `poolerMode` would then EXPORT an
+// empty string into the criterion-6 control's evidence and the missing-secret
+// error would read `(DB_POOLER_MODE=)`. That is not a hypothetical spelling:
+// step (d) of this task is "unset the flag", and the natural way to unset a
+// value in a dashboard is to CLEAR THE FIELD, which is what both Doppler and
+// Vercel store as empty rather than absent. `||` collapses the two spellings so
+// the deleted key and the cleared field are indistinguishable to this module.
+// The plan still says to delete the key — this makes it safe when someone does
+// the other thing, which is the point of a default.
+const mode = process.env.DB_POOLER_MODE || "session";
 
 // ADR-0024 Patch P3 decision outcome #8: every environment stays on `:5432`
 // EXCEPT staging. Production is not authorised for transaction mode by any
