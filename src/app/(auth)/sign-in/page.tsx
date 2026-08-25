@@ -94,8 +94,11 @@ export default function SignInPage(): ReactElement {
 				    grid. `dialogs.tsx:201` is the same `sr-only` title move.
 
 				    ⛔ REUSED, NOT REDRAWN. The mark is `BrandCluster`'s own
-				    `/brand/zugzwang-mark.svg` static asset at the `size-12` it ships
-				    at there, and the letters are that cluster's own `Wordmark` — the
+				    `/brand/zugzwang-mark.svg` static asset — at the 140px it renders
+				    at on the re-show deck the header's RULES control opens
+				    (`figures.tsx:402`), not the header's own 48px, because this card
+				    is a destination and not chrome. The letters are that cluster's
+				    own `Wordmark` — the
 				    component extracted at O1-DECK-R2 §4 precisely so a second site
 				    could not drift from the header. No SVG is inlined here and there
 				    is no second implementation of either half. `gap-2.5` is the
@@ -113,13 +116,13 @@ export default function SignInPage(): ReactElement {
 				    has no business on a sign-in card. */}
 				<CardTitle className="sr-only">Zugzwang</CardTitle>
 				<div className="flex flex-col items-center gap-2.5">
-					{/* biome-ignore lint/performance/noImgElement: static 48px brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
+					{/* biome-ignore lint/performance/noImgElement: static 140px brand svg — next/image's optimizer refuses svg by default and buys nothing here. */}
 					<img
 						src="/brand/zugzwang-mark.svg"
 						alt=""
-						width={48}
-						height={48}
-						className="size-12"
+						width={140}
+						height={140}
+						className="size-[140px]"
 					/>
 					<Wordmark scale="card" />
 				</div>
