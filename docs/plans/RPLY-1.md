@@ -216,7 +216,8 @@ counter and the split bar are ALREADY absent, so the cell is the whole change).
 
 | G | Asserts | Rejects |
 |---|---|---|
-| G1 | the four-row column matrix | any column that is a function of the parent's side alone |
+| G1 | the four-row column matrix over `replyComposerColumn` | a helper that ignores the relation |
+| G1-WIRED | which arena column HOSTS the open composer, through a real click on a mounted `DebateView` | ⚠ **ADDED AFTER `@test-writer`'s CRITICAL.** G1 alone guards the HELPER THE FIX CREATED, not the wiring the defect lived in — feeding the helper a constant `relation` reproduces the original defect with all eight guards green. Verified red against both that escape and the bare revert. |
 | G2 | badge/column independence | **EXISTS** — `side-identity.test.tsx`'s `not.toContain("side={opposite(")`. Cited, not duplicated. |
 | G3 | enter grows `history.length`; exit does not | `replaceState` on enter |
 | G4 | unresolvable / removed `?post=` falls back on popstate | a listener indexing a comment list from the raw param |

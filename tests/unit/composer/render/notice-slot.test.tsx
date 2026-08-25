@@ -242,6 +242,24 @@ describe("R3 — the copy is unchanged and still verbatim", () => {
 		// still pass. SPEC.1 §16.2 requires the message to name both the balance
 		// and the required stake, which is what that sentence does.
 		expect(noticeText(container)).toBe(expected);
+
+		// ⛔⛔ AND THE SENTENCE ITSELF IS PINNED LITERALLY, WHICH THE REST OF THIS
+		// FILE DOES NOT DO AND CANNOT. Everything above derives both sides from
+		// `c2Sentence`, so rewording the FUNCTION — `Đ 0 left. Need Đ 10.` — keeps
+		// every assertion green: measured. Deriving is still right for the render
+		// comparison (a retyped copy there could drift from the module), but it
+		// means the VERBATIM obligation was pinned nowhere in the repo at all;
+		// `c2Sentence`'s only two consumers both derive. @test-writer found the
+		// hole and it is closed here rather than left as "the brief said this
+		// rejects a reworded C2" when it did not.
+		// ⚠ SPEC.1 §16.2 is why this is a copy contract and not a preference: the
+		// message must name BOTH the current balance and the required stake, and
+		// this is the operator-ratified C2 batch string that satisfies it. It is
+		// not CC's to reword.
+		expect(c2Sentence({ floor: "10", spendable: "0" })).toBe(
+			"Đ 0 spendable today — below the Đ 10 minimum.",
+		);
+
 		// Non-vacuity: SPEC.1 §16.2 requires the message to name BOTH the current
 		// balance and the required stake, so both are asserted present.
 		// ⚠ The floor is DERIVED, never a literal. `composerProps()` is the POST

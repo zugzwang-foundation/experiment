@@ -242,6 +242,29 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 });
 
 describe("R2 · G4 — the popstate target is RESOLVED, never indexed", () => {
+	it("history-ladder::THE-FIXTURE-ITSELF-must-keep-ordinals-OUT-of-index-order", () => {
+		// ⛔⛔ THE ASSERTION THIS WHOLE DESCRIBE BLOCK DEPENDS ON, AND IT WAS
+		// MISSING. Every test below distinguishes "resolved by ordinal" from
+		// "indexed by the raw param" ONLY because the fixture's ordinals do not
+		// match its array positions. Renumber the fixture so they do — a
+		// completely reasonable-looking tidy, which the fixture's own comment
+		// even invites by explaining the ordinals as date-derived — and the
+		// discrimination vanishes SILENTLY: measured by @test-writer, the
+		// renumber reds four tests, all four have obvious one-line repairs, and
+		// after those repairs a naive indexer passes all nineteen.
+		// ⇒ So the property is pinned here, where the red says what it means.
+		const offBy = baseModel().posts.filter(
+			(p, i) => p.ordinal !== i + 1,
+		).length;
+		expect(
+			offBy,
+			"G4 is VACUOUS if every post's ordinal equals its array index + 1: a " +
+				"resolver and an indexer then return the same row for every input. " +
+				"Do not 'fix' this by renumbering the fixture — restore an ordinal " +
+				"that differs from its position.",
+		).toBeGreaterThan(0);
+	});
+
 	it("history-ladder::POSITIVE-CONTROL-a-valid-ordinal-focuses-THE-ORDINAL-not-the-index", () => {
 		// ⛔⛔ THE CONTROL WITHOUT WHICH EVERY REFUSAL BELOW IS VACUOUS. A listener
 		// that did nothing at all would pass all four refusal cases. This is the one

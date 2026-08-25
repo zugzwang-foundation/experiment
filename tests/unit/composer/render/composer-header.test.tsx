@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -107,9 +109,30 @@ describe("R4a — the reply header matches the fresh-post header", () => {
 		// rather than about a component that failed to render.
 		const { container } = renderReply(PSEUDONYM);
 		expect(container.innerHTML).toContain(`Support ${PSEUDONYM}'s argument`);
-		// ⛔ And the parent's title is nowhere in the composer — the prop that
-		// carried it was removed, so this cannot come back by a styling change.
-		expect(container.innerHTML).not.toContain(PARENT_TITLE);
+
+		// ⚠⚠ ASSERTED ON THE PROP TYPE, NOT ON THE RENDER, AND THE RENDER VERSION
+		// IS RECORDED AS THE MISTAKE IT WAS. This read
+		// `expect(container.innerHTML).not.toContain(PARENT_TITLE)` — which
+		// @test-writer correctly called **structurally vacuous**: `replyContext`
+		// has no title field and this harness passes none, so `PARENT_TITLE` has
+		// NO PATH into the render under any mutation the test controls. It could
+		// not fire, and measured against a full R4a revert it PASSED while two
+		// other assertions in this file caught the revert. A negative whose
+		// subject cannot reach the subject under test is a comment with an
+		// `expect()` around it (OVN-V3).
+		// ⇒ What actually forecloses the subtitle is that the field is GONE from
+		// the props, so a revert must re-add it — and that is what this pins.
+		const source = readFileSync(
+			join(process.cwd(), "src/components/debate/composer/BetComposer.tsx"),
+			"utf8",
+		);
+		const propBlock = /replyContext\?: \{[\s\S]*?\};/.exec(source)?.[0];
+		// Positive control: the block was found, so the negative is about the field
+		// and not about a regex that matched nothing.
+		expect(propBlock).toBeDefined();
+		expect(propBlock).toContain("relation:");
+		expect(propBlock).toContain("authorPseudonym:");
+		expect(propBlock).not.toContain("postTitle");
 	});
 
 	it("composer-header::the-relation-is-still-NAMED", () => {

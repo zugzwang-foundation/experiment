@@ -104,13 +104,34 @@ describe("R6 — the reply card can absorb its own leftover height", () => {
 	it("reply-card-absorber::WITHOUT-an-image-a-descendant-absorbs", () => {
 		// ⛔ THE ASSERTION THIS FILE EXISTS FOR, on the common path. Before R6 this
 		// count was 0: the root stretched and nothing inside it could.
-		const found = absorbers(card(presentReply(null)).container);
+		const { container } = card(presentReply(null));
+		const found = absorbers(container);
 		expect(found.length).toBeGreaterThan(0);
 		// …and the absorber is the image cell, centring what it holds.
 		const cell = found[0]?.getAttribute("class")?.split(/\s+/) ?? [];
 		expect(cell).toContain("min-h-0");
 		expect(cell).toContain("items-center");
 		expect(cell).toContain("justify-center");
+
+		// ⛔⛔ AND IT IS A DIRECT CHILD OF THE FLEX ROOT, WHICH IS THE HALF THAT WAS
+		// MISSING. `flex-1` on an element does NOTHING unless its PARENT is the
+		// flex container distributing the space. @test-writer measured the hole:
+		// wrapping this cell in a plain `<div className="block">` leaves the class
+		// present, the guard 6/6 green, and the dead space fully restored. A class
+		// is not a mechanism, and jsdom cannot see the difference — so the
+		// structural relationship is asserted instead of inferred from the class.
+		expect(found[0]?.parentElement).toBe(root(container));
+		// …and the root really is a flex COLUMN, or "direct child" would still not
+		// mean the space is distributed down this axis.
+		const rootCls = root(container).getAttribute("class")?.split(/\s+/) ?? [];
+		expect(rootCls).toContain("flex");
+		expect(rootCls).toContain("flex-col");
+
+		// The absorber is the IMAGE cell specifically, not merely some element that
+		// happens to carry `flex-1` — `found[0]` is DOM-order dependent on its own.
+		expect(
+			found[0]?.querySelector('[data-testid="post-image-placeholder"]'),
+		).not.toBeNull();
 	});
 
 	it("reply-card-absorber::WITH-an-image-a-descendant-absorbs-too", () => {

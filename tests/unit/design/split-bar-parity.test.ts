@@ -85,12 +85,22 @@ describe("R5 — the focused post's bar carries the card's geometry", () => {
 		// COLUMNS while the track stays its column's first child. MEASURED here on
 		// the real compiled CSS: `items-center` would leave −2.0px and
 		// `items-start` leaves −0.6px, against −11.99px before the port.
-		const row = /<div className="(flex items-[a-z]+ gap-\d[^"]*)">/.exec(
+		// ⚠ ANCHORED ON THE ROW'S OWN `data-testid`, and the unanchored version is
+		// recorded as the defect it was. This read
+		// `/<div className="(flex items-[a-z]+ gap-\d[^"]*)">/` — the FIRST match of
+		// an extremely common shape. `expect(row).toBeDefined()` proves *a* match,
+		// never the *right* one, so any future edit introducing an earlier
+		// `flex items-… gap-…` div would silently re-point this assertion and free
+		// the real row to drift back to `items-center` — the ~2px misalignment the
+		// port exists to remove. The card half already anchors on
+		// `data-testid="aggregate-footer"`; this now matches it (OVN-V5).
+		const row = /data-testid="reply-split-bar"\s+className="([^"]*)"/.exec(
 			reply,
 		)?.[1];
 		expect(row).toBeDefined();
 		expect(row?.split(/\s+/)).toContain("items-start");
 		expect(row?.split(/\s+/)).not.toContain("items-center");
+		expect(row?.split(/\s+/)).toContain("gap-2");
 	});
 
 	it("split-bar-parity::both-flanks-STACK-the-figure-under-its-pill", () => {

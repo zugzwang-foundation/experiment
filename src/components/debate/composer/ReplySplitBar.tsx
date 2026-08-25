@@ -68,7 +68,15 @@ export function ReplySplitBar({
 		   ⚠ `gap-2` matches the card too. The pole logic below is UNTOUCHED — RR-3
 		   corrected which SIDE each span paints, and this row moves only where the
 		   spans sit. */
-		<div className="flex items-start gap-2 text-xs">
+		/* ⚠ `data-testid` so the parity guard can ANCHOR on this row rather than
+		   matching the first `flex items-* gap-*` div in the file — the card half
+		   already anchors on `aggregate-footer`, and an unanchored generic pattern
+		   silently re-points the moment any earlier div takes that extremely common
+		   shape (OVN-V5: never select the thing under test by a styling class). */
+		<div
+			data-testid="reply-split-bar"
+			className="flex items-start gap-2 text-xs"
+		>
 			{/* `.sidewrap` (`d5:585-586`) — the Đ figure is CENTRED UNDER its own
 			    pill rather than inline beside it, on both flanks. */}
 			<span className="flex shrink-0 flex-col items-center gap-1">
