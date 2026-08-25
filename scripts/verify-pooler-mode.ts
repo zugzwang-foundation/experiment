@@ -25,7 +25,18 @@
  *
  * ── HOW TO RUN ───────────────────────────────────────────────────────────────
  *
- *   pnpm tsx --conditions=react-server scripts/verify-pooler-mode.ts
+ *   doppler run --project zugzwang-experiment --config stg -- \
+ *     pnpm tsx --conditions=react-server scripts/verify-pooler-mode.ts
+ *
+ *   # assert the OTHER direction (the both-directions self-test, below):
+ *   … scripts/verify-pooler-mode.ts --expect=session
+ *
+ * ⚠ THE `doppler run --config stg --` WRAPPER IS PART OF THE INVOCATION, not
+ * decoration. Without it the target is whatever the ambient shell happens to
+ * hold, and this script issues a bare session-level `SET` on up to `max`
+ * backends of whatever it reaches. `stg` and `prd` are one word apart. The
+ * guards in `assertTarget()` below are what make a wrong word refuse instead of
+ * connect, and the wrapper is what makes the right word the easy one to type.
  *
  * ⚠ `--conditions=react-server` IS LOAD-BEARING, and this is the one thing about
  * this script worth remembering. `src/db/index.ts` imports `server-only`, whose
@@ -60,6 +71,52 @@
  * only the one we hope for: run it against :5432 and it must report SESSION. A
  * probe that cannot detect the mode it is not looking for is not a control, it
  * is a formality that happens to agree with us.
+ *
+ * ⚠ BOTH DIRECTIONS IS AN EXIT-CODE PROPERTY, NOT ONLY A PRINTED ONE. `--expect`
+ * names which verdict this run asserts; the exit code reports agreement, never
+ * the verdict itself. A `SESSION` verdict against `:5432` is a PASS and exits 0.
+ * The first version hardcoded `exitCode = 1` on SESSION, so the correct half of
+ * the self-test exited non-zero and no caller could tell "detected session mode,
+ * as asked" from "the check failed" from "the instrument is broken".
+ *
+ * ── ⛔ WHY THE READS ARE CONCURRENT, AND WHY THE SEQUENTIAL VERSION LIED ──────
+ *
+ * The first version awaited each read in turn. postgres.js hands a sequential
+ * caller the same pooled socket every time (`open.shift()`, one connection
+ * returned before the next asks), so ALL `SAMPLES` reads traversed ONE client
+ * socket no matter how large `SAMPLES` was. Against a quiet pool Supavisor then
+ * hands that socket the same warm backend at every checkout and does not reset
+ * GUCs on check-in — so a correctly-flipped transaction pooler produced one pid
+ * and a surviving sentinel, i.e. `VERDICT: SESSION MODE`. **Measured: it did
+ * exactly that against a pooler independently proven to be multiplexing.**
+ *
+ * The version that printed that verdict also advised *"Raise SAMPLES before
+ * concluding the flip did not happen."* Raising it changes nothing — every extra
+ * sample rides the same socket. The instrument prescribed a remedy it had made
+ * useless, which is the failure O-3 names: a true refusal reported with a
+ * misleading cause.
+ *
+ * ⚠ CONCURRENCY ALONE WOULD HAVE TRADED A FALSE NEGATIVE FOR A FALSE POSITIVE,
+ * and this is the part worth reading. Under SESSION mode each client socket owns
+ * its own pinned backend, so simply firing the reads concurrently yields several
+ * distinct pids — and the old `rotated` test (`pids.length > 1`) would have
+ * called that TRANSACTION. The old `persisted` test breaks the same way: the
+ * sentinel was set on ONE socket, so reads arriving on the other sockets miss it
+ * and "the setting dropped" would also read as TRANSACTION. Both signals invert.
+ *
+ * So the sentinel is PRIMED ON EVERY SOCKET first (phase 1), which is what makes
+ * both signals survive concurrency:
+ *
+ *   SESSION      · C sockets ⇒ C pinned backends, every one of them primed ⇒ the
+ *                  sentinel is seen on every read, forever, and the pid set can
+ *                  never exceed C.
+ *   TRANSACTION  · C simultaneous statements force C distinct checkouts per
+ *                  round, so the pool cannot serve the run from one warm
+ *                  backend. Reads reach backends that were never primed (the
+ *                  sentinel drops) and the pid set grows past C.
+ *
+ * Either signal alone still establishes transaction mode, exactly as before —
+ * what changed is that the experiment can now produce them.
  */
 
 import "server-only";
@@ -71,8 +128,83 @@ import { connectionVarName, db, poolerMode } from "@/db";
 /** A sentinel no default and no other code path would ever produce. */
 const SENTINEL_MS = 7777;
 
-/** How many separate round trips to take. One sample cannot see rotation. */
+/** How many ROUNDS of concurrent reads to take. One round cannot see rotation. */
 const SAMPLES = 5;
+
+/**
+ * How many statements to hold in flight at once.
+ *
+ * Pinned to the shipped pool's `max` (`src/db/index.ts`). Fewer would leave
+ * sockets unprimed, and a read arriving on an unprimed socket looks like a
+ * dropped sentinel under BOTH modes — the false positive the docblock describes.
+ * More cannot help: postgres.js will not open past `max`, so the extra work
+ * queues behind the same sockets and adds latency, not discrimination.
+ *
+ * ⚠ IF `max` MOVES, THIS MOVES WITH IT. S-5 is authorised to raise `max` once it
+ * has measured (ADR-0038 P1.2, decision 2), and this constant is a silent
+ * dependency on that number.
+ */
+const CONCURRENCY = 4;
+
+/**
+ * Which verdict this run asserts. `transaction` is the default because the named
+ * downstream caller (S-5, before load run #1) is asking "is the flip live?".
+ * `--expect=session` is how the other direction gets asserted — against `:5432`,
+ * where SESSION is the correct answer and must therefore exit 0.
+ */
+type Mode = "transaction" | "session";
+const EXPECT: Mode = process.argv.includes("--expect=session")
+	? "session"
+	: "transaction";
+
+/**
+ * Refuse a target nobody ratified, BEFORE issuing a single statement.
+ *
+ * ⚠ THIS SCRIPT WRITES. The bare session-level `SET` is the entire mechanism, so
+ * "read-only" is not available as a mitigation — it mutates shared session state
+ * on up to `CONCURRENCY` backends of whatever it connects to. Every sibling that
+ * reaches a live database fails closed on a project-ref fragment first
+ * (`smoke-staging.ts`, `seed-staging.ts`, `migrate-staging.ts`, `migrate-prod.ts`,
+ * and the ADR-0035/0036 five-guard contract). This is the only one that did not,
+ * and it shipped in the PR that cites those ADRs.
+ *
+ * ⛔ `src/db/index.ts`'s prod refusal DOES NOT COVER THIS, and the asymmetry is
+ * the reason this guard has to exist separately. That one fires only on
+ * `mode === "transaction" && ZUGZWANG_ENV === "prod"`. Under
+ * `doppler run --config prd` with `DB_POOLER_MODE` unset — the STEADY STATE in
+ * `prd` — `mode` resolves to `session`, the refusal never fires, and this script
+ * would connect to production and set a GUC there. It protects prod from the
+ * transaction POOLER; it does not protect prod from this SCRIPT.
+ */
+function assertTarget(): void {
+	const fragment = process.env.STAGING_PROJECT_REF_FRAGMENT;
+	if (!fragment) {
+		throw new Error(
+			"STAGING_PROJECT_REF_FRAGMENT is not set; cannot verify the target is staging. " +
+				"Run via: doppler run --project zugzwang-experiment --config stg -- …",
+		);
+	}
+	const target = process.env[connectionVarName];
+	if (!target) {
+		// Unreachable in practice — `@/db` throws at import if this is unset — but
+		// stated rather than assumed, because this guard must not depend on the
+		// import order that makes it unreachable.
+		throw new Error(`${connectionVarName} is not set`);
+	}
+	if (!target.includes(fragment)) {
+		throw new Error(
+			`${connectionVarName} does not contain STAGING_PROJECT_REF_FRAGMENT; refusing to run. ` +
+				"This is the wrong-target case — check the Doppler config (stg, never prd).",
+		);
+	}
+	const env = process.env.ZUGZWANG_ENV;
+	if (env !== "staging" && env !== "preview") {
+		throw new Error(
+			`ZUGZWANG_ENV is ${env === undefined ? "unset" : `"${env}"`}; this script runs against staging or preview only. ` +
+				"Refusing rather than guessing.",
+		);
+	}
+}
 
 /**
  * Never print a connection string. Report only the pooler PORT.
@@ -164,115 +296,189 @@ async function resetSentinel(polluted: Set<number>): Promise<void> {
 	);
 }
 
+/** One concurrent read. Returns undefined if the row could not be read. */
+async function probeRead(): Promise<Probe | undefined> {
+	return firstRowWith<Probe>(
+		await db.execute(
+			sql`SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+		),
+		"v",
+	);
+}
+
 async function main(): Promise<void> {
 	console.log(
 		"verify-pooler-mode — is this pooler in transaction or session mode?",
 	);
+
+	// ⛔ BEFORE THE FIRST STATEMENT. A wrong target must refuse, not connect.
+	assertTarget();
+
 	console.log(`pooler port: ${poolerPort()}`);
+	console.log(`asserting  : ${EXPECT.toUpperCase()} MODE (--expect)`);
 	console.log("");
 
-	// Statement 1 — mutate session state, then read it back IN THE SAME call so
-	// we know the SET was actually accepted. If this read fails, the probe is
-	// broken and neither verdict below means anything.
-	const applied = firstRowWith<Probe>(
-		await db.execute(
-			sql`SET statement_timeout = ${sql.raw(`'${SENTINEL_MS}ms'`)}; SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+	// ── PHASE 1 · PRIME ────────────────────────────────────────────────────────
+	// Set the sentinel on EVERY socket the pool will open, concurrently, and read
+	// it back in the same call so we know each SET was accepted. Priming all of
+	// them is what keeps both signals meaningful under concurrency — see the
+	// docblock. If any of these fails, the probe is broken and neither verdict
+	// below means anything.
+	const primed = await Promise.all(
+		Array.from({ length: CONCURRENCY }, async () =>
+			firstRowWith<Probe>(
+				await db.execute(
+					sql`SET statement_timeout = ${sql.raw(`'${SENTINEL_MS}ms'`)}; SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
+				),
+				"v",
+			),
 		),
-		"v",
 	);
-	console.log(
-		`stmt 1 · set + read back : ${applied?.v} (backend ${applied?.pid})`,
-	);
+	for (const [i, row] of primed.entries()) {
+		console.log(
+			`prime ${i + 1} · set + read back : ${row?.v} (backend ${row?.pid})`,
+		);
+	}
 
-	if (applied?.v !== `${SENTINEL_MS}ms`) {
+	const primedOk = primed.filter(
+		(r): r is Probe => r?.v === `${SENTINEL_MS}ms`,
+	);
+	if (primedOk.length !== CONCURRENCY) {
 		console.error("");
-		console.error("⛔ CONTROL BROKEN — the SET did not take effect at all.");
+		console.error(
+			`⛔ CONTROL BROKEN — the SET took on ${primedOk.length}/${CONCURRENCY} sockets.`,
+		);
 		console.error(
 			"   Neither verdict is available. Do not record any criterion.",
 		);
+		// Some SETs may already have landed, so clean up even on the broken path.
+		await resetSentinel(new Set(primedOk.map((r) => r.pid)));
 		process.exitCode = 2;
 		return;
 	}
+	const primedPids = new Set(primedOk.map((r) => r.pid));
+	console.log("");
 
-	// SEPARATE round trips. This is the whole experiment.
-	//
-	// ⚠ MORE THAN ONE, and the verdict uses the BACKEND PID, not only the
-	// setting. A transaction-mode pooler returns the backend at COMMIT but is
-	// free to hand the SAME one back next time, and neither pgbouncer nor
-	// Supavisor guarantees a reset on check-in. So `the setting survived` alone
-	// is NOT proof of session mode: against an idle pool with max 4, same-backend
-	// reuse is likely rather than exotic, and a single sample would report a
-	// correctly-flipped runtime as SESSION — halting S-1 on a working pooler.
+	// ── PHASE 2 · SAMPLE ───────────────────────────────────────────────────────
+	// `SAMPLES` rounds of `CONCURRENCY` SIMULTANEOUS reads. The simultaneity is
+	// the experiment: it forces the pooler to hold that many checkouts at once,
+	// so it cannot serve the whole run from one warm backend the way the old
+	// sequential loop allowed.
 	const observations: Probe[] = [];
-	for (let i = 0; i < SAMPLES; i++) {
-		const row = firstRowWith<Probe>(
-			await db.execute(
-				sql`SELECT current_setting('statement_timeout') AS v, pg_backend_pid() AS pid`,
-			),
-			"v",
+	for (let round = 0; round < SAMPLES; round++) {
+		const rows = await Promise.all(
+			Array.from({ length: CONCURRENCY }, () => probeRead()),
 		);
-		if (!row) {
+		if (rows.some((r) => r === undefined)) {
 			console.error("");
 			console.error("⛔ CONTROL BROKEN — a follow-up read returned no row.");
-			// The SET already happened, so clean up even on the broken path.
-			await resetSentinel(new Set([applied.pid]));
+			await resetSentinel(
+				new Set([
+					...primedPids,
+					...observations
+						.filter((o) => o.v === `${SENTINEL_MS}ms`)
+						.map((o) => o.pid),
+				]),
+			);
 			process.exitCode = 2;
 			return;
 		}
-		observations.push(row);
-		console.log(`read ${i + 1} · ${row.v} (backend ${row.pid})`);
+		const round_ = rows as Probe[];
+		observations.push(...round_);
+		console.log(
+			`round ${round + 1} · ${round_.map((r) => `${r.v}@${r.pid}`).join("  ")}`,
+		);
 	}
 	console.log("");
 
-	const pids = [...new Set([applied.pid, ...observations.map((o) => o.pid)])];
-	const rotated = pids.length > 1;
-	const persisted = observations.every((o) => o.v === `${SENTINEL_MS}ms`);
-	console.log(`backends seen : ${pids.join(", ")}`);
-	console.log(`setting held  : ${persisted ? "every read" : "not every read"}`);
+	const pids = [...new Set([...primedPids, ...observations.map((o) => o.pid)])];
+
+	// ⚠ THE TWO SIGNALS, RESTATED FOR THE CONCURRENT PROBE.
+	//
+	// `sentinelDropped` — a read reached a backend that was never primed. Under
+	// session mode every socket is primed and pinned, so this cannot happen.
+	//
+	// `exceededSockets` — more distinct backends than we hold sockets. Under
+	// session mode the pid set is bounded BY the socket count, permanently; only
+	// a pooler that returns backends between statements can exceed it.
+	//
+	// The old `rotated` test (`pids.length > 1`) is GONE, and deliberately: under
+	// concurrency it is true in both modes, so keeping it would have made every
+	// session-mode run report TRANSACTION.
+	const sentinelDropped = observations.some((o) => o.v !== `${SENTINEL_MS}ms`);
+	const exceededSockets = pids.length > CONCURRENCY;
+
+	console.log(`backends seen  : ${pids.length} (${pids.join(", ")})`);
+	console.log(`sockets primed : ${CONCURRENCY}`);
+	console.log(
+		`sentinel held  : ${sentinelDropped ? "NOT on every read" : "every read"}`,
+	);
 	console.log("");
 
 	// Put the sentinel back BEFORE printing a verdict, so the cleanup line sits
 	// with the evidence it belongs to rather than after the conclusion.
 	const polluted = new Set<number>([
-		applied.pid,
+		...primedPids,
 		...observations.filter((o) => o.v === `${SENTINEL_MS}ms`).map((o) => o.pid),
 	]);
 	await resetSentinel(polluted);
 	console.log("");
 
-	// EITHER signal alone establishes transaction mode: a rotated backend proves
-	// the connection was returned to the pool, and a dropped setting proves it was
-	// reset on check-in. Session mode requires BOTH to be absent.
-	if (rotated || !persisted) {
+	// EITHER signal alone establishes transaction mode. Session mode requires
+	// BOTH to be absent.
+	const verdict: Mode =
+		sentinelDropped || exceededSockets ? "transaction" : "session";
+
+	if (verdict === "transaction") {
 		console.log("VERDICT: TRANSACTION MODE.");
+		if (sentinelDropped) {
+			console.log(
+				"  A read reached a backend that was never primed, so backends are",
+			);
+			console.log("  being returned to the pool between statements.");
+		}
+		if (exceededSockets) {
+			console.log(
+				`  ${pids.length} distinct backends served ${CONCURRENCY} sockets, so a socket`,
+			);
+			console.log("  does not own its backend.");
+		}
+	} else {
+		console.log("VERDICT: SESSION MODE.");
 		console.log(
-			rotated
-				? `  Statements ran on DIFFERENT backends (${pids.join(" → ")}), so the`
-				: `  The bare SET did not survive a round trip, so the backend was`,
+			`  Across ${SAMPLES} rounds of ${CONCURRENCY} simultaneous reads the sentinel`,
 		);
-		console.log("  connection went back to the pool between statements.");
-		console.log("  Criterion 6 fires.");
+		console.log(
+			`  survived on every one and no more than ${CONCURRENCY} backends appeared,`,
+		);
+		console.log("  so each socket is pinned to its own backend.");
+	}
+	console.log("");
+
+	// ── THE EXIT CODE REPORTS AGREEMENT, NEVER THE VERDICT ─────────────────────
+	// 0 = the pooler is what --expect asked for · 1 = it is the other one ·
+	// 2 = the instrument could not answer (set above, never here).
+	if (verdict === EXPECT) {
+		console.log(`✅ PASS — expected ${EXPECT}, observed ${verdict}.`);
+		if (EXPECT === "transaction") console.log("  Criterion 6 fires.");
 		return;
 	}
 
-	console.log("VERDICT: SESSION MODE.");
-	console.log(
-		`  Across ${SAMPLES} separate statements the bare SET survived and ONE`,
-	);
-	console.log("  backend was seen, so the connection is pinned.");
-	console.log(
-		"  If this run was meant to be transaction mode, CRITERION 6 FAILS",
-	);
-	console.log("  and every other observation against it is void.");
-	console.log("");
-	console.log(
-		`  ⚠ Read this as 'no evidence of pooling in ${SAMPLES} samples', not as`,
-	);
-	console.log("  proof of session mode. A transaction pooler that reused one");
-	console.log(
-		"  backend and never reset it would look identical. Raise SAMPLES",
-	);
-	console.log("  before concluding the flip did not happen.");
+	console.log(`⛔ FAIL — expected ${EXPECT}, observed ${verdict}.`);
+	if (EXPECT === "transaction") {
+		console.log(
+			"  CRITERION 6 FAILS and every other observation against this pooler",
+		);
+		console.log("  is void. Do not record any criterion.");
+	} else {
+		console.log(
+			"  The both-directions self-test did not hold: this connection was",
+		);
+		console.log(
+			"  expected to be a session pooler. Check which URL was resolved",
+		);
+		console.log("  before concluding anything about transaction mode.");
+	}
 	process.exitCode = 1;
 }
 
