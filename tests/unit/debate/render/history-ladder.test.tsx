@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { act, cleanup, fireEvent, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -141,7 +143,33 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		expect(new URL(window.location.href).searchParams.get("post")).toBe("2");
 	});
 
-	it("history-ladder::the-pushed-rung-is-MARKED-so-exit-knows-it-is-ours", () => {
+	it("history-ladder::the-push-passes-a-NULL-state-and-writes-NO-custom-field", () => {
+		// ⚠⚠ THIS ASSERTION IS INVERTED FROM WHAT IT WAS, AND THE OLD ONE CODIFIED
+		// A REGRESSION. It read:
+		//
+		//   history.replaceState({ __NA: "next-router-bookkeeping" }, "", ROUTE);
+		//   … expect(history.state?.__NA).toBe("next-router-bookkeeping");
+		//   … expect(history.state?.zzPost).toBe(2);
+		//
+		// under the heading "Next router history state SURVIVES the push",
+		// defending a `{...history.state, zzPost}` spread. Measured in the shipped
+		// `next@16.2.4` (`client/components/app-router.js:252-263`), Next patches
+		// `pushState` and SKIPS its own work when `data?.__NA` is truthy — and
+		// `HistoryUpdater` stamps `__NA: true` on first paint. So the spread
+		// guaranteed the skip, `applyUrlFromHistoryPushReplace` never ran, and the
+		// router's `canonicalUrl` never learned about `?post=N`. The next
+		// `router.refresh()` (every 15s, from `DebatePoll`) then `replaceState`d
+		// the STALE url and the address bar silently dropped the param.
+		// ⛔ The old assertion asserted precisely the condition that triggers the
+		// skip. It was green, and it was pinning the bug.
+		//
+		// ⇒ Next copies its OWN bookkeeping for us
+		// (`copyNextJsInternalHistoryState`, `:84-96`); the correct state argument
+		// is `null`, which is what `origin/staging` always passed.
+		// ⚠ `next/navigation` is mocked here, so Next's patch is NOT installed and
+		// the raw state is observable — which is exactly what makes this
+		// assertable at this layer.
+		history.replaceState({ __NA: true }, "", ROUTE);
 		render(view());
 		const title = Array.from(document.querySelectorAll("h3")).find(
 			(h) => h.textContent === P1_TITLE,
@@ -149,27 +177,34 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		act(() => {
 			fireEvent.click(title?.closest("button") as HTMLButtonElement);
 		});
-		// `zzPost` is what tells `exitPost` the top of the stack is poppable. A
-		// deep-link arrival has no such marker — see the deep-link case below.
-		expect(history.state?.zzPost).toBe(2);
+		// No spread: the previous entry's `__NA` must NOT have been carried over.
+		expect(history.state).toBeNull();
 	});
 
-	it("history-ladder::Next-router-history-state-SURVIVES-the-push", () => {
-		// ⛔⛔ NOT COSMETIC. Next's App Router keeps bookkeeping on `history.state`
-		// and reads it back on `popstate`; a bare `pushState({zzPost})` would strip
-		// it, and the router meeting an entry it does not recognise resolves that
-		// with a HARD NAVIGATION — a full reload in the middle of a back button.
-		// The spread is what prevents it, so it is asserted rather than trusted.
-		history.replaceState({ __NA: "next-router-bookkeeping" }, "", ROUTE);
-		render(view());
-		const title = Array.from(document.querySelectorAll("h3")).find(
-			(h) => h.textContent === P1_TITLE,
+	it("history-ladder::the-rung-counter-is-NOT-kept-on-history-state", () => {
+		// ⛔⛔ THE SECOND HALF OF THE SAME LESSON. A `zzPost` marker on the entry
+		// cannot survive: `HistoryUpdater` rebuilds the state as
+		// `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}` and
+		// every soft navigation sets that flag false
+		// (`segment-cache/navigation.js:271,382`), so `router.refresh()` deletes
+		// it ~15s after it is written. `exitPost` would then take the fallback
+		// branch and ORPHAN the rung it pushed — `history.length` growing by one
+		// per enter/exit cycle, and a dead Back step left behind.
+		// ⇒ The counter lives in a component ref, which a refresh cannot touch.
+		// This asserts the source does not reach for `history.state` again.
+		const view = readFileSync(
+			join(process.cwd(), "src/components/debate/DebateView.tsx"),
+			"utf8",
 		);
-		act(() => {
-			fireEvent.click(title?.closest("button") as HTMLButtonElement);
-		});
-		expect(history.state?.__NA).toBe("next-router-bookkeeping");
-		expect(history.state?.zzPost).toBe(2);
+		// ⚠ ASSERTED AS THE POSITIVE CODE FORMS, NOT AS
+		// `not.toContain("history.state")`. That bare negative went red against
+		// this file's own comments, which necessarily QUOTE `history.state` to
+		// explain why it is not used — the fourth time in this task that a
+		// textual negative caught its own explanation. The forms below say the
+		// same thing and cannot be tripped by prose.
+		expect(view).toContain("history.pushState(null,");
+		expect(view).toContain("pushedRungsRef.current > 0");
+		expect(view).toContain("pushedRungsRef.current += 1");
 	});
 
 	it("history-ladder::leaving-UNWINDS-the-rung-instead-of-pushing-a-third", () => {
@@ -196,6 +231,68 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		// closes five posts ends where they started.
 		expect(back).toHaveBeenCalledTimes(1);
 		expect(history.length).toBe(afterEnter);
+	});
+
+	it("history-ladder::enter-exit-cycles-are-DEPTH-NEUTRAL-over-repetition", () => {
+		// ⛔⛔ THE PROPERTY THE ORPHANED-RUNG DEFECT BROKE, asserted over MORE THAN
+		// ONE CYCLE because one cycle cannot see it. When the rung marker lived on
+		// `history.state`, a `router.refresh()` deleted it and the exit silently
+		// took the fallback branch — leaving the pushed rung on the stack. Each
+		// subsequent enter/exit then added one more, and browser Back from the
+		// market arm landed on a dead duplicate that appeared to do nothing.
+		// The plan's S2 contract is the sentence this pins: "a reader who enters
+		// and leaves five posts ends with a stack the same depth they started
+		// with."
+		render(view());
+		const back = vi.spyOn(history, "back").mockImplementation(() => undefined);
+		const enter = () => {
+			const t = Array.from(document.querySelectorAll("h3")).find(
+				(h) => h.textContent === P1_TITLE,
+			);
+			act(() => {
+				fireEvent.click(t?.closest("button") as HTMLButtonElement);
+			});
+		};
+		const leave = () => {
+			act(() => {
+				fireEvent.click(
+					document.querySelector(
+						'[data-testid="focus-market-card"]',
+					) as HTMLElement,
+				);
+			});
+		};
+
+		for (let i = 0; i < 3; i++) {
+			enter();
+			expect(onPostArm()).toBe(true);
+
+			// ⛔⛔ THE SIMULATED POLL TICK, AND IT IS THE WHOLE POINT OF THIS TEST.
+			// This is byte-for-byte what Next's `HistoryUpdater` writes on a soft
+			// navigation — `{...(preserveCustomHistoryState ? state : {}), __NA,
+			// TREE}` with the flag FALSE — i.e. exactly what `router.refresh()`
+			// does to the current entry every 15s. Any rung marker kept on
+			// `history.state` is DELETED right here. Without this line the test
+			// passes against the defect, which is why the defect survived the
+			// first version of this file.
+			history.replaceState(
+				{ __NA: true, __PRIVATE_NEXTJS_INTERNALS_TREE: {} },
+				"",
+				window.location.href,
+			);
+
+			// jsdom's `history.back()` is asynchronous, so the DECISION is what is
+			// asserted (was `back()` chosen over the fallback?) rather than a raw
+			// `history.length`, which would be measuring jsdom's task queue.
+			leave();
+			// ⛔ Every cycle must still choose to UNWIND. Under the superseded
+			// `history.state.zzPost` marker this was true on cycle 1 and false
+			// from cycle 2 on, orphaning a rung each time.
+			expect(back).toHaveBeenCalledTimes(i + 1);
+
+			popTo("");
+			expect(onMarketArm()).toBe(true);
+		}
 	});
 
 	it("history-ladder::a-DEEP-LINK-arrival-exits-WITHOUT-calling-back", () => {

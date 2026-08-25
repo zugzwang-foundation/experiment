@@ -503,14 +503,41 @@ export function DebateView({
 	// gets NO entry of its own: it already has an × and an ESC path, and a
 	// third rung would make Back mean two different things one after the other.
 	//
-	// ⛔ `{...history.state}` IS LOAD-BEARING, NOT DEFENSIVE PADDING. Next's App
-	// Router keeps its own bookkeeping on `history.state`, and it reads that
-	// bookkeeping back on `popstate`. Pushing a bare object would strip it and
-	// leave the router meeting an entry it does not recognise — which it
-	// resolves with a hard navigation, i.e. a full reload in the middle of a
-	// back button. Spreading preserves the router's fields and adds ours beside
-	// them. `zzPost` is what `exitPost` reads to know the top of the stack is
-	// an entry THIS component pushed.
+	// ⛔⛔ THE STATE ARGUMENT IS `null`, AND AN EARLIER DRAFT OF THIS CODE SPREAD
+	// `history.state` INTO IT ON A REASON THAT IS THE EXACT OPPOSITE OF THE
+	// TRUTH. That draft's comment read: "Next's App Router keeps its own
+	// bookkeeping on `history.state` … pushing a bare object would strip it and
+	// leave the router meeting an entry it does not recognise." Measured in the
+	// shipped `next@16.2.4` (`client/components/app-router.js:252-263`), Next
+	// PATCHES `history.pushState` and the patch opens with:
+	//
+	//     if (data?.__NA || data?._N) { return originalPushState(...); }   ← SKIP
+	//     data = copyNextJsInternalHistoryState(data);   ← copies __NA + TREE
+	//     if (url) { applyUrlFromHistoryPushReplace(url); }  ← updates canonicalUrl
+	//
+	// `HistoryUpdater` stamps `__NA: true` onto `history.state` on first paint,
+	// so spreading it GUARANTEES the short-circuit — and the router's
+	// `canonicalUrl` never learns about `?post=N`. Next copies its own
+	// bookkeeping for us (`copyNextJsInternalHistoryState`, `:84-96`); the
+	// spread was not merely unnecessary, it was the thing that broke the sync.
+	//
+	// ⚠ AND IT WAS A REGRESSION, NOT A MISSING FEATURE. The superseded code
+	// passed `null`, which is falsy, so the patch ran. What the spread cost:
+	// `DebatePoll` calls `router.refresh()` every 15s while the market is Open,
+	// and each refresh has `HistoryUpdater` `replaceState` the STALE
+	// `canonicalUrl` — so the address bar silently dropped `?post=N` a few
+	// seconds after entering a post, killing the UI.A2 §3.4 mintable-deep-link
+	// property that works on `staging` today.
+	//
+	// ⛔ NO CUSTOM FIELD IS WRITTEN HERE EITHER, and that is the second half of
+	// the same lesson. A `zzPost` marker was tried and cannot survive: the same
+	// `HistoryUpdater` builds its state as
+	// `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}` and
+	// every soft navigation — `router.refresh()` included — sets that flag
+	// FALSE (`segment-cache/navigation.js:271,382`). So a custom field is
+	// deleted on the first poll tick, ~15s after it is written. Whatever
+	// remembers our rungs has to live somewhere Next does not own; see
+	// `pushedRungsRef`.
 	const syncPostParam = (
 		ordinal: number | null,
 		mode: "push" | "replace" = "replace",
@@ -521,11 +548,12 @@ export function DebateView({
 		} else {
 			url.searchParams.set("post", String(ordinal));
 		}
-		const state = { ...history.state, zzPost: ordinal };
 		if (mode === "push") {
-			history.pushState(state, "", url);
+			history.pushState(null, "", url);
+			// One more rung of ours is on the stack. See `exitPost`.
+			pushedRungsRef.current += 1;
 		} else {
-			history.replaceState(state, "", url);
+			history.replaceState(null, "", url);
 		}
 	};
 	/**
@@ -546,6 +574,17 @@ export function DebateView({
 	const resetPageScroll = () => {
 		window.scrollTo({ top: 0, behavior: "instant" });
 	};
+	/**
+	 * RPLY-1 · R2 — HOW MANY HISTORY RUNGS THIS COMPONENT HAS PUSHED AND NOT YET
+	 * SEEN POPPED. `exitPost` reads it to decide whether it has something of its
+	 * own to unwind; the `popstate` listener decrements it.
+	 *
+	 * ⛔ A REF, NOT STATE: it must not re-render, and it must survive a
+	 * `router.refresh()`. ⛔ NOT `history.state`, which is where this started —
+	 * Next's `HistoryUpdater` drops custom fields on every soft navigation, so a
+	 * marker written there is gone by the first poll tick. See `exitPost`.
+	 */
+	const pushedRungsRef = useRef(0);
 	const enterPost = (id: string) => {
 		if (composerBusy) {
 			return;
@@ -613,14 +652,30 @@ export function DebateView({
 		 * pasted, or opened from elsewhere) has no rung of ours beneath them —
 		 * their previous entry is another site, or nothing. A bare `history.back()`
 		 * would take them OFF `/m/[slug]` entirely, which is precisely the defect
-		 * R2 exists to remove. `history.state.zzPost` is the marker `syncPostParam`
-		 * writes on the entries this component pushed, so it answers exactly the
-		 * question that matters: is the top of the stack mine to pop?
-		 * ⇒ When it is not, fall back to the old `replaceState` — the URL loses its
-		 * param, the surface returns to the market arm, and the reader stays on the
-		 * page they deep-linked into.
+		 * R2 exists to remove.
+		 *
+		 * ⚠⚠ THE COUNTER LIVES IN A REF BECAUSE `history.state` CANNOT HOLD IT.
+		 * A `zzPost` marker on the history entry was the obvious mechanism and it
+		 * is measurably wrong: `HistoryUpdater` rebuilds the entry's state as
+		 * `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}`,
+		 * and every soft navigation sets that flag FALSE — so `router.refresh()`,
+		 * which `DebatePoll` fires every 15s, DELETES the marker. The exit would
+		 * then take the fallback branch and ORPHAN the rung it pushed, growing
+		 * `history.length` by one per enter/exit cycle and leaving a dead Back
+		 * step behind — the exact history pollution the superseded comment above
+		 * was written to prevent, arriving on a timer. A ref survives a refresh
+		 * because a refresh re-renders this component rather than remounting it.
+		 *
+		 * ⛔ IT DECREMENTS ON `popstate`, NEVER HERE, so one rung is not counted
+		 * twice: our own `history.back()` raises a `popstate` like any other.
+		 * ⇒ AND IT FAILS SAFE BY CONSTRUCTION. A `popstate` cannot tell us whether
+		 * the reader went back or forward, so the listener always decrements. The
+		 * worst that costs is a conservative `false` here — the fallback runs, the
+		 * surface still returns to the market arm, and one spare entry stays on the
+		 * stack. The opposite error would walk the reader off the page, so the
+		 * asymmetry is deliberate.
 		 */
-		if (history.state?.zzPost != null) {
+		if (pushedRungsRef.current > 0) {
 			history.back();
 			return;
 		}
@@ -671,6 +726,12 @@ export function DebateView({
 	composerBusyRef.current = composerBusy;
 	useEffect(() => {
 		const onPop = () => {
+			// ⚠ DECREMENTED BEFORE THE BUSY GUARD, and deliberately so: the browser
+			// has ALREADY moved the stack whether or not this handler updates the
+			// surface, so a rung is gone either way. Skipping it under `busy` would
+			// leave the counter claiming a rung that is no longer there — and the
+			// next exit would `back()` off the page.
+			pushedRungsRef.current = Math.max(0, pushedRungsRef.current - 1);
 			if (composerBusyRef.current) {
 				return;
 			}

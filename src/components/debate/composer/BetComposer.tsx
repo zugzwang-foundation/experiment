@@ -805,24 +805,36 @@ export function BetComposer(props: {
 									    inside is exactly what makes the token load-bearing. Reaching
 									    for the muted default here would have quietly halved the
 									    legibility of the only message on a disabled form.
-									    ⚠ ONE `aria-live` REGION, ON THE SLOT. It was on the TO WIN
-									    value and `role="status"` was on the 429 banner; with the two
-									    sharing a box, one polite region announces whichever
-									    currently occupies it. Two nested live regions would be a
-									    second announcement of the same change. */}
+									    ⚠⚠ THE ANNOUNCED REGIONS STAY EXACTLY WHERE THEY WERE, and an
+									    earlier draft of this slot moved them. That draft put ONE
+									    `aria-live="polite"` on this container, reasoning that "one
+									    region announces whichever currently occupies it". It cost two
+									    things, both silent: the 429 banner lost its `role="status"`
+									    (which carries an implicit `aria-atomic`, so the countdown was
+									    announced as a whole), and the TO WIN **label** came inside
+									    the region — so every debounced quote update re-announced
+									    "To win Đ …" instead of just the figure that changed.
+									    ⇒ Each arm carries its own region, as each did before: the
+									    notice is a `role="status"`, and the live region on the TO WIN
+									    arm stays on the VALUE span alone. Only one arm is ever
+									    mounted, so there is no double announcement to avoid. */}
 									<div
-										aria-live="polite"
 										data-testid="composer-notice-slot"
 										className="flex h-8 items-center"
 									>
 										{notice !== null ? (
-											<p className="text-xs text-ink">{notice}</p>
+											<p role="status" className="text-xs text-ink">
+												{notice}
+											</p>
 										) : (
 											<div className="flex w-full items-center justify-between">
 												<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
 													{COMPOSER_COPY.toWinLabel}
 												</span>
-												<span className="font-mono text-sm text-ink">
+												<span
+													aria-live="polite"
+													className="font-mono text-sm text-ink"
+												>
 													{toWin !== null ? `Đ ${toWin}` : "—"}
 												</span>
 											</div>
