@@ -12,12 +12,18 @@ import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
  * mockup's verbatim string described the ON depiction this inert skin never
  * shows, so it promised liveness the build cannot deliver.
  *
- * ⚠ INFO-1: `disabled` native buttons suppress pointer events in Chrome/
- * Safari, so the hover path may never reach this trigger in a real browser —
- * carried forward unchanged from the native `title` this replaces, which had
- * the identical limitation. Not a regression introduced here; flagged as
- * OWED in the run report rather than worked around, since fixing it would
- * mean restructuring a disabled control beyond what this task's wiring asks.
+ * ⚠ INFO-1: `disabled` native buttons suppress pointer/mouse events in
+ * Chrome/Safari at the browser's hit-testing layer, independent of CSS — this
+ * button carries no `pointer-events-none` class, and the suppression still
+ * applies. So the hover path may never reach this trigger's `InfoTip` in a
+ * real browser. ⛔ Whether the native `title` this replaces had the SAME
+ * limitation is NOT measured and is NOT asserted here (O-3: a stated cause
+ * that turns out wrong is itself a defect) — `title` is a browser-native
+ * hover affordance, not a JS event listener, and may not be gated by
+ * `disabled` the same way. Flagged as OWED in the run report for a real-
+ * browser check rather than guessed at; not worked around here, since fixing
+ * it would mean restructuring a disabled control beyond what this task's
+ * wiring asks.
  */
 const BAR = "w-[3px] rounded-[1px] bg-ink";
 

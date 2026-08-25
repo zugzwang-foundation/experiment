@@ -2,6 +2,7 @@
 
 import {
 	Popover as PopoverPrimitive,
+	Slot,
 	Tooltip as TooltipPrimitive,
 } from "radix-ui";
 import * as React from "react";
@@ -24,6 +25,20 @@ import { cn } from "@/lib/utils";
  * a desktop stuck on the Popover for one paint still opens correctly on
  * click. The two failure modes are not symmetric, so the default isn't
  * either.
+ *
+ * ⚠⚠ THE TOUCH BRANCH DOES NOT USE `Popover.Trigger`, and that is a
+ * measured correction, not a style choice. `Popover.Trigger` is a
+ * `Primitive.button` wrapper — even through `asChild` it stamps
+ * `type="button"`, `aria-haspopup="dialog"` and `aria-controls` onto
+ * whatever it clones onto (`@radix-ui/react-popover` dist `:89-92`,
+ * confirmed by reading the shipped source, not assumed). Roughly two thirds
+ * of this task's ~29 wired sites are NOT buttons — a `<span>` glyph, a
+ * `<th>` column header, an `<a>` — and `type` on an anchor means the MIME
+ * type of the linked resource, not this. `Popover.Anchor` carries none of
+ * that; it is pure position tracking. Open state is driven by hand and
+ * merged onto the child via `Slot` — the same prop-merge `Trigger` uses
+ * internally — without the button semantics that were never true of most
+ * of these hosts.
  */
 
 const CONTENT_CLASS = cn(
@@ -51,8 +66,16 @@ const CONTENT_CLASS = cn(
  * share one DOM id. Accepted because their description text is, by
  * construction, identical either way — the vocabulary is the fixed,
  * closed GLOSSARY register, not per-instance data.
+ *
+ * ⚠ Radix's OWN Popover/Tooltip internals ALSO call `useId()` for their own
+ * `context.contentId` (used for `aria-controls` on Popover's — no longer
+ * used — Trigger, and for Tooltip's always-present `VisuallyHidden`
+ * description). That id is separate from this one and is not fought here on
+ * the Tooltip branch (§ below); on the Popover branch this hash is the only
+ * id in play, because `Popover.Anchor` replaces `Popover.Trigger` and never
+ * establishes a competing `contentId` consumer.
  */
-function contentHashId(content: string): string {
+export function contentHashId(content: string): string {
 	let hash = 5381;
 	for (let i = 0; i < content.length; i++) {
 		hash = (hash * 33) ^ content.charCodeAt(i);
@@ -92,31 +115,33 @@ export function InfoTip({
 	/** The gloss — a `GLOSSARY.*` string. A description, never a name. */
 	content: string;
 	children: React.ReactNode;
-	/** Merge onto `children` instead of wrapping it (Radix `Slot`). Every
-	 * call site in this task uses it, so wiring an info affordance onto an
-	 * existing element never introduces a new DOM node and never touches
-	 * `GlobalHeader`'s fixed, non-reflowing width (AGENTS.md §5.4). */
+	/** Merge onto `children` instead of wrapping it. Every call site in this
+	 * task uses it, so wiring an info affordance onto an existing element
+	 * never introduces a new DOM node and never touches `GlobalHeader`'s
+	 * fixed, non-reflowing width (AGENTS.md §5.4). */
 	asChild?: boolean;
 }) {
 	const pointerFine = usePointerFine();
 	const contentId = React.useMemo(() => contentHashId(content), [content]);
+	const [open, setOpen] = React.useState(false);
 
 	if (pointerFine) {
+		// No `id`/`aria-describedby` override here: `TooltipTrigger` already
+		// sets `aria-describedby` to its own `context.contentId` whenever open
+		// (`@radix-ui/react-tooltip` dist `:180`), pointing at an always-in-sync
+		// `VisuallyHidden` copy of `content` Radix renders for exactly this
+		// purpose (dist `:349-350`). Setting our own hash `id` on the VISIBLE
+		// content here would have left that hidden copy correctly described
+		// while adding a second, redundant description on the visible node —
+		// a screen reader meeting both once open.
 		return (
 			<TooltipPrimitive.Provider delayDuration={200}>
 				<TooltipPrimitive.Root>
-					<TooltipPrimitive.Trigger
-						asChild={asChild}
-						aria-describedby={contentId}
-					>
+					<TooltipPrimitive.Trigger asChild={asChild}>
 						{children}
 					</TooltipPrimitive.Trigger>
 					<TooltipPrimitive.Portal>
-						<TooltipPrimitive.Content
-							id={contentId}
-							sideOffset={6}
-							className={CONTENT_CLASS}
-						>
+						<TooltipPrimitive.Content sideOffset={6} className={CONTENT_CLASS}>
 							{content}
 						</TooltipPrimitive.Content>
 					</TooltipPrimitive.Portal>
@@ -125,11 +150,30 @@ export function InfoTip({
 		);
 	}
 
-	return (
-		<PopoverPrimitive.Root>
-			<PopoverPrimitive.Trigger asChild={asChild} aria-describedby={contentId}>
+	// `onClick` here is ONLY the toggle. `Slot.Root` composes it with the
+	// child's own `onClick` itself (calls this one, then the child's —
+	// Radix's own `mergeProps` behaviour, the same one `Popover.Trigger`
+	// relied on internally). Composing it a second time by hand would have
+	// called the child's original handler twice per click — measured via
+	// `market-header.test.tsx`'s own click-count assertion, which is walled
+	// (never edited) and is what caught it.
+	const triggerProps = {
+		"aria-describedby": contentId,
+		onClick: () => setOpen((o) => !o),
+	};
+
+	const trigger =
+		asChild && React.isValidElement(children) ? (
+			<Slot.Root {...triggerProps}>{children}</Slot.Root>
+		) : (
+			<button type="button" {...triggerProps}>
 				{children}
-			</PopoverPrimitive.Trigger>
+			</button>
+		);
+
+	return (
+		<PopoverPrimitive.Root open={open} onOpenChange={setOpen}>
+			<PopoverPrimitive.Anchor asChild>{trigger}</PopoverPrimitive.Anchor>
 			<PopoverPrimitive.Portal>
 				<PopoverPrimitive.Content
 					id={contentId}

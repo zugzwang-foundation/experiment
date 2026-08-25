@@ -25,7 +25,16 @@ import { InfoTip } from "@/components/ui/info-tip";
  * ⛔ No jest-dom (AGENTS.md §9) — plain DOM assertions only.
  */
 
-afterEach(cleanup);
+const ORIGINAL_MATCH_MEDIA = window.matchMedia;
+
+afterEach(() => {
+	cleanup();
+	// jsdom has no native `matchMedia` (it's `undefined` here, not a stub) —
+	// restore that exact absence, not just "some function", so a later test
+	// in this file that relies on the real jsdom default isn't handed a
+	// leftover mock from an earlier one.
+	window.matchMedia = ORIGINAL_MATCH_MEDIA;
+});
 
 function mockMatchMedia(matches: boolean): void {
 	window.matchMedia = ((query: string) => ({
@@ -169,6 +178,23 @@ describe("INFO-1 — InfoTip", () => {
 		fireEvent.keyDown(document, { key: "Escape" });
 		await waitFor(() => {
 			expect(document.body.textContent).not.toContain(GLOSS);
+		});
+	});
+
+	it("no matchMedia at all (this repo's real jsdom default): renders on the touch branch without throwing", async () => {
+		// The branch every OTHER render test in this repo actually exercises —
+		// jsdom genuinely has no `matchMedia`, not a stub returning `false`.
+		// @ts-expect-error — deleting a required global to restore jsdom's own default
+		window.matchMedia = undefined;
+		render(
+			<InfoTip content={GLOSS} asChild>
+				<button type="button">Trigger</button>
+			</InfoTip>,
+		);
+		const trigger = document.querySelector("button") as HTMLButtonElement;
+		fireEvent.click(trigger);
+		await waitFor(() => {
+			expect(document.body.textContent).toContain(GLOSS);
 		});
 	});
 

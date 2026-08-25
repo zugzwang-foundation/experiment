@@ -14,7 +14,11 @@ import { GLOSSARY, HEADER_GLOSSARY } from "@/lib/copy/glossary";
  * fails here instead of shipping silently.
  */
 
-const MAX_LEN = 90;
+// glossary.ts's own docblock budgets "≤ ~75 characters so it survives an
+// unstyled render" — 80 tracks that with a few characters of "~" slack
+// rather than the 90 this guard shipped with, which was loose enough to
+// admit a violation of the stated rule (longest current string is 72).
+const MAX_LEN = 80;
 
 /** A spaced ASCII hyphen (` - `) is the defect this guards against — the house
  * separator is U+2014 (—), never a hyphen standing in for one. Compound-word

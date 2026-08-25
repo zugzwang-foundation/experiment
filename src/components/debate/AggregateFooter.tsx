@@ -215,8 +215,10 @@ export function AggregateFooter({
  *
  * ⚠ F-3 GATING IS NOT OPTIONAL. A trigger whose RESULTING side is not the
  * viewer's held side renders disabled, carrying the C3 batch string in both
- * `title` and `aria-label` — identical to the focused-post bar, so the same
- * refusal reads the same way wherever the viewer meets it.
+ * `aria-label` and the `InfoTip` gloss (INFO-1 §3.4 C3 precedence — the
+ * refusal wins over the relation's definition) — identical to the
+ * focused-post bar, so the same refusal reads the same way wherever the
+ * viewer meets it.
  */
 function TriggerPill({
 	relation,
