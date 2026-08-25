@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { identityPool } from "@/db/schema";
+import { ANIMALS, COLOURS } from "@/server/identity-pool/vocabulary";
 import { runSeed } from "../../../scripts/seed-identity-pool";
 import { testClient, testDb } from "../_fixtures/db";
 import { truncateTables } from "../_fixtures/truncate";
@@ -60,7 +61,7 @@ describe("seed-identity-pool — runSeed against real Postgres", () => {
 		}
 
 		// Range check: numbers 0–99 by manifest construction (colourIdx*10 +
-		// animalIdx). RedFox000 → IvoryPine099 covers the full namespace.
+		// animalIdx) — the first ten colours against the first ten animals.
 		const numbers = new Set(rows.map((r) => r.number));
 		expect(numbers.size).toBe(100);
 		expect(Math.min(...numbers)).toBe(0);
@@ -94,26 +95,13 @@ describe("seed-identity-pool — runSeed against real Postgres", () => {
 
 	it("inserts only missing rows when half the manifest is pre-seeded", async () => {
 		// Pre-seed 50 rows that overlap the manifest's first 50. Use the
-		// manifest's own deterministic shape (RedFox000…IvoryFox050 range —
-		// the first 50 rows of the manifest by colourIdx*10 + animalIdx).
+		// manifest's own deterministic shape — the first 50 rows of the manifest
+		// by colourIdx*10 + animalIdx.
 		const preseed = Array.from({ length: 50 }, (_, i) => {
 			const colourIdx = Math.floor(i / 10);
 			const animalIdx = i % 10;
-			const colours = ["Red", "Blue", "Amber", "Green", "Crimson"] as const;
-			const animals = [
-				"Fox",
-				"Wolf",
-				"Otter",
-				"Badger",
-				"Lynx",
-				"Hare",
-				"Owl",
-				"Hawk",
-				"Stoat",
-				"Pine",
-			] as const;
-			const colour = colours[colourIdx] ?? "Red";
-			const animal = animals[animalIdx] ?? "Fox";
+			const colour = COLOURS[colourIdx] ?? "Red";
+			const animal = ANIMALS[animalIdx] ?? "Alpaca";
 			const number = colourIdx * 10 + animalIdx;
 			const nnn = String(number).padStart(3, "0");
 			return {
@@ -121,7 +109,7 @@ describe("seed-identity-pool — runSeed against real Postgres", () => {
 				animal,
 				number,
 				pseudonym: `${colour}${animal}${nnn}`,
-				pfpFilename: `${colour.toLowerCase()}-${animal.toLowerCase()}-${nnn}.webp`,
+				pfpFilename: `${colour.toLowerCase()}-${animal.toLowerCase()}.webp`,
 			};
 		});
 

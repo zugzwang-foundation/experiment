@@ -16,6 +16,7 @@ import {
 	type AuthorIdentity,
 	resolveAuthors,
 } from "@/server/debate-view/resolve-authors";
+import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
 import { signRead } from "@/server/storage/sign-read";
 
 /** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). */
@@ -32,7 +33,7 @@ type DiscoveryReader = DbClient | DbTransaction;
  */
 const UNKNOWN_AUTHOR: AuthorIdentity = {
 	pseudonym: "—",
-	pfpUrl: "/pfp-placeholder.svg",
+	pfpUrl: PFP_PLACEHOLDER,
 };
 
 /**

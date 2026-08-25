@@ -289,6 +289,46 @@ The five existing pseudonym tests (`auth::pseudonym-auto-assigned-permanent`, `p
 | ADR-0008 | Drizzle per-domain schema split convention | Consumes: convention. Specific domain-file boundary deferred to SCAFFOLD.2. |
 | Tracker | SCAFFOLD.17 (Identity-pool generation pipeline), SCAFFOLD.15 (R2 storage + signed-URL endpoint) | All depend on this ADR being `accepted` before pipeline build proceeds. |
 
+## Patch record — PFP-1 (2026-08-25)
+
+**Scoping, not supersession.** The decision above stands: pre-baked assets, FIFO pool consumption, R2 `v1/` prefix, immutable cache headers, no runtime generation. What this record does is state what the built system actually is, because until PFP-1 this ADR described a pipeline that had never been run to the shape it specifies, and a reader had no way to tell which parts existed.
+
+### 1 · Namespace: 871 pairs, not 5,000
+
+The ADR sizes the namespace at 50 colours × 100 animals = 5,000 pairs × 10 numbers = 50,000. The Flux run that exists on `spark-3100` covers **13 colours × 67 animals = 871 pairs** — 17% of the planned animal list and 26% of the colours.
+
+The thirteen colours are Red plus the twelve `~/pfp_recolor/recolor_batch.py` recolours it into: Orange, Gold, Olive, Green, Jade, Teal, Cerulean, Indigo, Violet, Magenta, Rose, Silver. Red is the source render every other arm is derived from, which is why it has no folder of its own in the render tree — the red originals sit at the animal directory root.
+
+`src/server/identity-pool/vocabulary.ts` is the single source for both lists. The word-list files this ADR names (`asset-pipeline/colours.txt`, `animals.txt`) were never created; the TS module supersedes them, because it is what both the seed scripts and their tests import, and a second copy in `.txt` could only drift from it.
+
+### 2 · Number compositing is DEFERRED, and `pfp_filename` is pair-keyed until it lands
+
+The ADR requires the number painted onto each image by `asset-pipeline/composite_numbers.py`, giving one image per pseudonym. **That script was never written and the renders carry no digits.** Deferred by operator decision at PFP-1.
+
+Consequence for the filename, which is the part a reader needs: `pfp_filename` is `<colour>-<animal>.webp`, so every `GoldZebra###` shares one image. The ADR's `<colour>-<animal>-<number>` slug is what it becomes once compositing lands.
+
+Where a pair has more than one render — Cat and Dog were generated from nine source poses each, so nine per colour arm — the extra images are addressed as `<colour>-<animal>-v<N>.webp`. The `v` prefix keeps that axis unambiguous against the future `-<number>` segment, so adding compositing later does not have to rename anything.
+
+### 3 · Seed order is the assignment order
+
+Not a change to the decision, but a property the ADR does not state and which turns out to be load-bearing. `consumeIdentityPoolTuple` allocates FIFO by `created_at`, so the order tuples are seeded in IS the order users receive them. Seeding the grid in nested-loop order would hand the first thirteen signups the same animal in thirteen colours.
+
+`generatePoolTuples` in `src/server/identity-pool/rotation.ts` walks `colour = i mod 13` and `animal = i mod 67`. 13 and 67 are coprime, so by the Chinese remainder theorem this visits all 871 pairs exactly once before repeating, and consecutive steps always advance both indices — no two adjacent tuples can share either axis. One number is spent per full pass, which caps the namespace at 871,000 and preserves the ADR's cheap-doubling-via-numbers property.
+
+### 4 · What ships at PFP-1
+
+| Artifact | Path |
+|---|---|
+| Colour + animal vocabulary | `src/server/identity-pool/vocabulary.ts` |
+| Seed-order generator | `src/server/identity-pool/rotation.ts` |
+| Public URL builder | `src/server/identity-pool/pfp-url.ts` |
+| Converter + uploader | `~/asset-pipeline/convert_and_upload_pfp.py` — on spark-3100, not in this repo |
+
+The converter centre-crops each 1280×720 render to square, resizes to 256×256 (the size this ADR names as the distinguishability target), encodes webp, and uploads under `v1/` with the `Content-Type` and `Cache-Control` this ADR requires. 1,079 objects, 4.9 MiB.
+
+**Still owed:** `composite_numbers.py`, the word-list extension from 871 pairs toward the planned namespace, and the 50,000-row production manifest for `scripts/seed-identity-pool.ts`. None of the three is started.
+
+
 ## More Information
 
 - SPEC.1 §13 F-AUTH-3 (full body, asset pipeline subsection, namespace sizing, pool exhaustion, permanence + scrub interaction).

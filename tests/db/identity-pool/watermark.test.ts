@@ -20,33 +20,9 @@ import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { identityPool } from "@/db/schema";
+import { ANIMALS, COLOURS } from "@/server/identity-pool/vocabulary";
 import { testClient, testDb } from "../_fixtures/db";
 import { truncateTables } from "../_fixtures/truncate";
-
-const COLOURS = [
-	"Red",
-	"Blue",
-	"Amber",
-	"Green",
-	"Crimson",
-	"Azure",
-	"Emerald",
-	"Violet",
-	"Saffron",
-	"Ivory",
-] as const;
-const ANIMALS = [
-	"Fox",
-	"Wolf",
-	"Otter",
-	"Badger",
-	"Lynx",
-	"Hare",
-	"Owl",
-	"Hawk",
-	"Stoat",
-	"Pine",
-] as const;
 
 // Build 100 deterministic identity_pool rows matching the manifest-100
 // fixture shape (10 colours × 10 animals; PascalCase pseudonym; kebab
@@ -72,7 +48,7 @@ function build100Rows() {
 				animal,
 				number,
 				pseudonym: `${colour}${animal}${nnn}`,
-				pfpFilename: `${colour.toLowerCase()}-${animal.toLowerCase()}-${nnn}.webp`,
+				pfpFilename: `${colour.toLowerCase()}-${animal.toLowerCase()}.webp`,
 			});
 		}
 	}

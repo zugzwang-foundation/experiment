@@ -14,17 +14,18 @@ import type { OnboardingFigure } from "./cards";
  *   · Cards 3–7 — the five `FIG` illustrations, ported from the locked W2.2
  *     mockup's inline SVG.
  *
- * ⛔ CARD 2 IS NOT A LIVE PFP, AND THE REGISTER'S FIGURE NOTE IS WRONG ABOUT
- * THAT. There is no live PFP anywhere in this product: every surface renders
- * the one static `/pfp-placeholder.svg`, and `users.pfp_filename` is populated
- * at signup and then deliberately never read by any renderer
- * (`server/debate-view/resolve-authors.ts` says so in its own words). When the
- * real PFP lands it lands in the `resolve*.ts` resolvers that already own the
- * placeholder constant, and this card inherits it the same way every other
- * surface will. A deck-local avatar fetch would create a second PFP path for
- * that migration to unpick, which is why there is no fetch here at all — the
- * pseudonym the card already needs for its title is the only viewer data it
- * touches.
+ * ⛔ CARD 2 IS STILL NOT A LIVE PFP, AND THAT IS NOW A CHOICE RATHER THAN A
+ * LIMITATION. Live PFPs landed at PFP-1: `pfp_filename` is read by the
+ * `resolve*.ts` resolvers and composed into a public R2 URL by
+ * `server/identity-pool/pfp-url.ts`, so the profile, debate, discovery and
+ * header surfaces all render the real image. This card does not, because it
+ * takes no viewer data beyond the pseudonym its title already needs — and
+ * adding a deck-local avatar fetch would create a second PFP path beside the
+ * one resolver-owned builder. The card keeps the placeholder deliberately.
+ *
+ * (Until PFP-1 this note said there was no live PFP anywhere in the product and
+ * cited `resolve-authors.ts` as saying so in its own words. That file no longer
+ * says so.)
  *
  * ⚠ COLOURS ARRIVE THROUGH THE TOKEN LAYER, never as literals. The mockup's
  * SVGs reference its own `var(--ink)` / `var(--nN)` names; the built tokens are
