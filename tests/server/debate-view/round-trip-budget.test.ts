@@ -231,15 +231,15 @@ describe("/m/[slug] read budget — the polled surface (S-4 Phase E)", () => {
 		expect(executed).toBe(12);
 	});
 
-	it("the VIEWER CONTEXT costs 5 statements with no held position", async () => {
+	it("the VIEWER CONTEXT costs 3 statements with no held position", async () => {
 		// Viewer-scoped and therefore never cached, on any mechanism — this is
 		// what a SIGNED-IN viewer adds on top of the warm remainder, on every
 		// render and every poll tick.
 		//
-		// 5 with no holding: held-position, balance, cursor+now, bookmarked ids,
-		// own comment ids. A held position adds a 6th (the pool read for Đb),
-		// which is why this fixture deliberately holds none — the floor is the
-		// number worth pinning, and the +1 is documented on the module.
+		// 3 with no holding: held-position, balance, cursor+now. A held position
+		// adds a 4th (the pool read for Đb), which is why this fixture
+		// deliberately holds none — the floor is the number worth pinning, and
+		// the +1 is documented on the module.
 		const { marketId, userId } = await seedMarket();
 
 		executed = 0;
@@ -248,7 +248,7 @@ describe("/m/[slug] read budget — the polled surface (S-4 Phase E)", () => {
 		// ⚠ The transaction's own BEGIN/COMMIT are not logged as queries by the
 		// postgres-js driver, so this counts statements, not round trips to the
 		// wire. Named because the two differ here and nowhere else in this file.
-		expect(executed).toBe(5);
+		expect(executed).toBe(3);
 	});
 
 	it("POSITIVE CONTROL — the counter observes real statements", async () => {

@@ -216,15 +216,14 @@ describe("Phase D — session dedupe", () => {
 		expect(src).toContain('import "server-only"');
 	});
 
-	it("all four (public) RSC call sites go through the helper", () => {
-		// The layout plus the three surfaces that previously read the session a
+	it("all three (public) RSC call sites go through the helper", () => {
+		// The layout plus the two surfaces that previously read the session a
 		// SECOND time (layouts cannot pass data to pages). One read per render
 		// now, which on /m/[slug] also divides the 15s poll's cost.
 		for (const rel of [
 			"src/app/(public)/layout.tsx",
 			"src/app/(public)/m/[slug]/page.tsx",
 			"src/app/(public)/u/[pseudonym]/page.tsx",
-			"src/app/(public)/bookmarks/page.tsx",
 		]) {
 			const src = read(rel);
 			expect(src).toContain("getRequestSession");
