@@ -84,6 +84,12 @@ Named so a later reader sees they were considered, not missed: every modal-chrom
 ### D01 · Card title
 `src/app/(auth)/sign-in/page.tsx:88` → `"Continue to Zugzwang"`, matching tier-4 `auth-modal:313`. Check `tests/unit/auth/sign-in-render.test.tsx` for any assertion pinning the current string; the recon reports its DRIVER cases assert presence, not treatment — **re-verify at PR head rather than trusting that.**
 
+> **SUPERSEDED 2026-08-25 — PR #408.** The `.mhead` text heading on
+> `/sign-in` is replaced by the brand lockup (`/brand/zugzwang-mark.svg`
+> + `<Wordmark scale="card" />`). The accessible name "Zugzwang" is
+> retained as an `sr-only` `CardTitle` in the same slot. This row's copy
+> ratification no longer describes the shipped surface.
+
 ### D03 · Email entry as a flex row
 `src/app/(auth)/sign-in/page.tsx:113–129`. Baseline tier-4 `:154` — `.emailrow{display:flex;gap:9px}`.
 - Input takes the remaining width; the submit button is intrinsic and does not shrink.
