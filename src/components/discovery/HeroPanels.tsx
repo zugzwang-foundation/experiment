@@ -6,6 +6,7 @@ import { computeSplitBar } from "@/components/debate/composer/split-bar";
 import { formatDharma } from "@/components/debate/format";
 import { PriceBar } from "@/components/debate/PriceBar";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { RelativeTime } from "@/components/ui/relative-time";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -272,6 +273,29 @@ function HeroPostPanel({
 						</>
 					)}
 				</span>
+				{/* TIME-1 — HOW LONG AGO, LAST ON THE ROW. `HeroPost.createdAt` has
+				    been on the read model since the hero shipped
+				    (`server/discovery/hero.ts:117`); nothing new is queried,
+				    presigned or serialized for it.
+				    ⚠ `Replies · N` IS NOT ON THIS ROW — it lives in the panel's own
+				    reply head below (`hero-reply-head-${side}`), so this row ends at
+				    the Đ figure and the age follows the figure. That is the same
+				    RULE as the debate card ("after every existing tag on the identity
+				    row"), applied to the tags this row actually has, rather than the
+				    same POSITION copied across from a row with different contents.
+				    ⛔ NO `HeadSeparator` BEFORE IT.
+				    `tests/unit/discovery/render/hero-panels.test.tsx:171` pins this
+				    row at EXACTLY TWO separators against the mockup's own markup
+				    (`:187`, `:189`), and its sibling assertions pin their positions.
+				    A third pipe is an extension of a ratified composition; the way to
+				    make one is a canon amendment, not an edit to the guard that
+				    exists to catch it. The age separates on the row's own `gap-1.5`.
+				    ⛔ NO SIZE AND NO `shrink-0`. The row is `text-[9.5px]
+				    flex-nowrap overflow-hidden whitespace-nowrap` and the leaf
+				    inherits all of it; every other element here is governed by that
+				    same clip, and exempting this one would make the newest field the
+				    only one that survives a narrow panel. */}
+				<RelativeTime createdAt={post.createdAt} />
 			</div>
 			{/* V18 — the WHOLE panel is the post's click target, matching the
 			    mockup's `.argbody[data-post]` handler. Implemented as a stretched

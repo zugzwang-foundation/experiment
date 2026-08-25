@@ -152,6 +152,7 @@ export function PostFocusHeader({
 											originalStake={post.authorStakeOriginal}
 											sold={post.authorSold}
 											replyCount={replyCount}
+											createdAt={post.createdAt}
 										/>
 										<LaneBadge badge={post.badge} />
 									</div>

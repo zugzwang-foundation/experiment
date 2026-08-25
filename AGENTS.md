@@ -89,7 +89,7 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   13 files, and they are NOT all shadcn. NINE shadcn
+│   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
 │   │                               #   input, separator, skeleton, textarea. FOUR are
 │   │                               #   project-authored and canon-ratified — empty-block
@@ -98,6 +98,15 @@ experiment/
 │   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
 │   │                               #   item 13, pinned by component name and props).
 │   │                               #   Don't reach for a shadcn generator to change one
+│   │                               #   ⚠ THE FOURTEENTH FILE IS A FIFTH PROJECT-AUTHORED
+│   │                               #   PRIMITIVE AND IS NOT CANON-RATIFIED: relative-time
+│   │                               #   (TIME-1 — the age at the end of every card's
+│   │                               #   identity row, on all four card surfaces). It is
+│   │                               #   listed here because this file is DESCRIPTIVE and
+│   │                               #   the primitive is on disk; the canon §6 copy-register
+│   │                               #   and §3.11/§3.12 card-anatomy entries are OWED and
+│   │                               #   are the web lane's to author. Do not read its
+│   │                               #   presence here as ratification.
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,

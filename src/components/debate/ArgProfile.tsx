@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { RelativeTime } from "@/components/ui/relative-time";
 
 import { PositionMarker, SideBadge } from "./badges";
 import { formatDharma } from "./format";
@@ -19,6 +20,11 @@ import type { AuthorIdentity, Marker, Side } from "./types";
  * product-wide. This header no longer renders any action cluster at all.
  * The `@entry%`/`→now` enrichments are deferred (D7) — just the side and `Đ a`,
  * never `YES @ 27%` or `Đ a → Đ now`.
+ *
+ * TIME-1 — the row now ENDS with how long ago the argument was written. One
+ * edit here reaches the post card, the focused post, the reply card and both
+ * pop-ups, which is the dividend of rows 12/26/33 having collapsed four author
+ * rows into this one: none of the five can drift away from the others.
  */
 export function ArgProfile({
 	author,
@@ -29,6 +35,7 @@ export function ArgProfile({
 	originalStake,
 	sold = false,
 	replyCount,
+	createdAt,
 	chipSize,
 	download = false,
 }: {
@@ -62,6 +69,18 @@ export function ArgProfile({
 	/** R6/R10 `Sold` — exactly zero surviving. Renders the tag; never on a partial. */
 	sold?: boolean;
 	replyCount?: number;
+	/**
+	 * TIME-1 — the ISO instant this argument was written (`comments.created_at`,
+	 * already on `DebatePost`/`DebateReply` at every variant since DEBATE.4).
+	 *
+	 * ⛔ REQUIRED, NOT OPTIONAL, AND THAT IS O-1. Every one of this component's
+	 * five mounts holds the whole union member and can supply it, so a mount
+	 * that forgets is a COMPILE error rather than a card that silently shows no
+	 * age while its four siblings do. An optional prop here would make
+	 * "timestamp on some cards and not others" — the exact inconsistency this
+	 * task exists to remove — expressible by omission.
+	 */
+	createdAt: string;
 	/**
 	 * ⚠ change set 6 §2 — render the (non-functional) download placeholder at the
 	 * END of this row. OPT-IN: only the post card and the post pop-up pass it, so
@@ -204,6 +223,35 @@ export function ArgProfile({
 						</span>
 					</>
 				) : null}
+				{/* TIME-1 — HOW LONG AGO, AND IT IS THE LAST THING ON THE ROW.
+				    ⛔ INSIDE THIS DIV, NOT THE ROW ABOVE IT. The outer row's last
+				    child is the `ml-auto` download mark, which sits at the trailing
+				    EDGE; appending there would put the age past a control rather than
+				    after the tags. The ruling is that it follows `Replies · N`, and
+				    `Replies · N` is here.
+				    ⛔⛔ NO `Sep` BEFORE IT, AND THAT IS A MEASURED DECISION RATHER
+				    THAN AN OMISSION. The first build of this DID carry one. Two
+				    shipped guards count the pipes on the sibling rows against a
+				    governing source and go RED on a fourth —
+				    `tests/unit/profile/render/arrangement.test.tsx:262` pins THREE
+				    against canon §3 item 11's `avatar · name | SIDE @ entry% | stake
+				    | Replies · N`, and
+				    `tests/unit/discovery/render/hero-panels.test.tsx:171` pins TWO
+				    against the hero mockup's own markup. This row is governed the
+				    same way by d5 `:960-968`; it simply has no guard counting it.
+				    ⇒ A pipe here is an extension of a ratified composition, and the
+				    way to make that extension is a canon amendment, not an edit to
+				    the guards that exist to catch it. The age separates on the row's
+				    own `gap-1.5` instead — which the row already does between the
+				    side chip and the position marker, so it is not a new grammar.
+				    ⚠ IF THE FOUNDER RULES THE PIPE IN, it is one `<Sep />` here, one
+				    `<HeadSeparator />` at each sibling row, and three counts — and
+				    canon gains the field either way, because a trailing age is a
+				    composition change with or without a divider.
+				    ⛔ NO SIZE IS PASSED. This row is `text-xs` and the leaf inherits
+				    it — stating a size here would state it without its leading, which
+				    is the trap that put every tile 10px tall at PROFILE-FULL. */}
+				<RelativeTime createdAt={createdAt} />
 			</div>
 			{/* ⚠⚠ UI-QUICK change set 6 §2 — THE DOWNLOAD PLACEHOLDER MOVED HERE FROM
 			    THE TITLE ROW, founder ruling. On the title row it shared an absolutely

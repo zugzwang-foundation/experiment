@@ -44,6 +44,12 @@ function renderStake(props: {
 			author={{ pseudonym: "fixture-author", pfpUrl: "" }}
 			side="YES"
 			marker="none"
+			// TIME-1 — `createdAt` became REQUIRED on `ArgProfile` so that a mount
+			// which forgets the age is a compile error rather than a card silently
+			// missing it. This fixture therefore supplies one. ⛔ NOT AN ASSERTION
+			// CHANGE: every `expect` below is untouched, and none of them reads the
+			// timestamp. The value is arbitrary — nothing here measures age.
+			createdAt="2026-07-30T00:00:00.000Z"
 			{...props}
 		/>,
 	);
