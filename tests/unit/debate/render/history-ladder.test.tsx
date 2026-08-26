@@ -196,15 +196,22 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 			join(process.cwd(), "src/components/debate/DebateView.tsx"),
 			"utf8",
 		);
-		// ⚠ ASSERTED AS THE POSITIVE CODE FORMS, NOT AS
-		// `not.toContain("history.state")`. That bare negative went red against
-		// this file's own comments, which necessarily QUOTE `history.state` to
-		// explain why it is not used — the fourth time in this task that a
-		// textual negative caught its own explanation. The forms below say the
-		// same thing and cannot be tripped by prose.
+		// ⚠⚠ ONE TEXTUAL PIN, DELIBERATELY, AND TWO WERE DROPPED. This began as
+		// `not.toContain("history.state")`, which went red against this file's own
+		// comments — they necessarily QUOTE `history.state` to explain why it is
+		// not used. It became three positive `toContain` scans, and @code-reviewer
+		// then pointed out the mirror problem: a comment quoting
+		// `pushedRungsRef.current += 1` keeps such a scan green through a refactor
+		// that moved the real increment. That is the same failure with the sign
+		// flipped, and it is the fifth instance of this genus in this task.
+		// ⇒ The COUNTER's behaviour is already asserted by the two tests above
+		// (every exit chooses to unwind; a double activation traverses once), so
+		// those pins were carrying nothing the suite did not already hold. What
+		// stays is the ONE claim no behavioural test in jsdom can make: that the
+		// state argument handed to the browser is `null` rather than an object —
+		// because Next's patch, which is what makes that matter, is not installed
+		// here.
 		expect(view).toContain("history.pushState(null,");
-		expect(view).toContain("pushedRungsRef.current > 0");
-		expect(view).toContain("pushedRungsRef.current += 1");
 	});
 
 	it("history-ladder::leaving-UNWINDS-the-rung-instead-of-pushing-a-third", () => {
@@ -233,7 +240,14 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		expect(history.length).toBe(afterEnter);
 	});
 
-	it("history-ladder::enter-exit-cycles-are-DEPTH-NEUTRAL-over-repetition", () => {
+	it("history-ladder::every-exit-CHOOSES-to-unwind-even-after-a-poll-tick", () => {
+		// ⚠ RENAMED FROM `…DEPTH-NEUTRAL…`, which over-claimed: `history.back()` is
+		// mocked here, so no depth is actually observed. What IS observed is the
+		// DECISION — did the exit choose to unwind, or silently fall back and
+		// orphan its rung? Real depth for one cycle is covered by
+		// `leaving-UNWINDS-the-rung-instead-of-pushing-a-third` above. A test name
+		// that promises more than its assertions deliver is how a suite reads as
+		// covering something it does not.
 		// ⛔⛔ THE PROPERTY THE ORPHANED-RUNG DEFECT BROKE, asserted over MORE THAN
 		// ONE CYCLE because one cycle cannot see it. When the rung marker lived on
 		// `history.state`, a `router.refresh()` deleted it and the exit silently
@@ -285,9 +299,12 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 			// asserted (was `back()` chosen over the fallback?) rather than a raw
 			// `history.length`, which would be measuring jsdom's task queue.
 			leave();
-			// ⛔ Every cycle must still choose to UNWIND. Under the superseded
-			// `history.state.zzPost` marker this was true on cycle 1 and false
-			// from cycle 2 on, orphaning a rung each time.
+			// ⛔ Every cycle must still choose to UNWIND. ⚠ An earlier version of
+			// this comment said the superseded `history.state.zzPost` marker made
+			// it "true on cycle 1 and false from cycle 2 on". Traced: the simulated
+			// poll rewrite above runs inside cycle 0 too, so the marker is deleted
+			// before the FIRST `leave()` and the defect reds at i = 0. The guard was
+			// sound; the story about it described neither configuration.
 			expect(back).toHaveBeenCalledTimes(i + 1);
 
 			popTo("");

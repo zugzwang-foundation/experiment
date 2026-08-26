@@ -37,6 +37,14 @@ import type {
 
 const opposite = (side: Side): Side => (side === "YES" ? "NO" : "YES");
 
+/**
+ * RPLY-1 · R2 — how long the exit waits for its own `popstate` before deciding
+ * the traversal never happened. Comfortably longer than a same-document
+ * traversal (a queued task) and far shorter than a reader's second deliberate
+ * click. See `exitPost` for why a dead-man's release is needed at all.
+ */
+const TRAVERSAL_RELEASE_MS = 400;
+
 /** A focused post's replies for one pole column — placed by their OWN side (D3). */
 function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
 	return [...post.replies.support, ...post.replies.counter].filter(
@@ -719,6 +727,26 @@ export function DebateView({
 			}
 			traversalPendingRef.current = true;
 			history.back();
+			// ⛔⛔ A TIMED RELEASE, BECAUSE THE LATCH HAS EXACTLY ONE OTHER WAY OUT
+			// AND IT DEPENDS ON AN INVARIANT NOTHING HERE ASSERTS. `onPop` clears
+			// it — which is only guaranteed to run if there IS an entry below to
+			// traverse to. That holds today because `enterPost`/`replyToPost` are
+			// reachable only from the MARKET arm, capping the counter at 1; it is
+			// not true by construction. A `history.go(-n)` (the back button's
+			// long-press menu) fires ONE `popstate` while moving n entries, so the
+			// counter can outlive the entries it counts — and then `history.back()`
+			// is an out-of-range no-op that dispatches NOTHING, leaving this latch
+			// set and the exit control dead for the rest of the page instance, with
+			// no in-app recovery.
+			// ⇒ If the pop has not arrived, the traversal did not happen. Releasing
+			// early risks at worst the double-traverse this latch prevents, in a
+			// race measured in milliseconds; never releasing risks a permanently
+			// wedged button. The asymmetry decides it.
+			// ⚠ NOT A DEBOUNCE and not tuned to a repeat rate: it is a dead-man's
+			// release for a traversal that produced no event at all.
+			window.setTimeout(() => {
+				traversalPendingRef.current = false;
+			}, TRAVERSAL_RELEASE_MS);
 			return;
 		}
 		setSelectedPostId(null);
@@ -768,15 +796,24 @@ export function DebateView({
 	 * `postsRef.current = posts` written DURING RENDER. `router.refresh()` renders
 	 * inside a React transition, and a transition render that is DISCARDED still
 	 * runs those assignments — so the listener could read a `composerBusy` from a
-	 * render that never committed. The damaging direction is a stale `false`: a
-	 * Back inside that window unmounts an in-flight composer, and a re-open mints
-	 * a FRESH idempotency key over a possibly-committing bet. That is a second
-	 * bet, not a replay, and it is the one seam `bet_receipts` cannot close.
+	 * render that never committed.
 	 * ⇒ Real deps instead. The listener re-registers when `posts` identity changes
-	 * (once per poll payload) or when `composerBusy` flips, which is a
-	 * `removeEventListener`/`addEventListener` pair on the order of once per 15s —
-	 * a price worth paying to make the money-path read exact rather than
-	 * probably-fine.
+	 * (once per poll payload) or when `composerBusy` flips — a
+	 * `removeEventListener`/`addEventListener` pair on the order of once per 15s.
+	 *
+	 * ⚠⚠ AND AN EARLIER VERSION OF THIS BLOCK CLAIMED MORE THAN THE CODE
+	 * DELIVERS, WHICH IS ITS OWN DEFECT (O-3). It said the change made "the
+	 * money-path read exact rather than probably-fine." IT DOES NOT. `composerBusy`
+	 * is reported up from `BetComposer`'s own PASSIVE EFFECT, so the true order is:
+	 * child sets in-flight → child commits → child effect calls `onBusyChange` →
+	 * parent state → parent commits → parent effect re-registers. The listener
+	 * holds `false` for that whole window either way, and the deps form re-arms one
+	 * commit LATER than a render-phase ref write did. ⇒ The guard is LATE BY
+	 * CONSTRUCTION, and neither refs nor deps change that. What the deps form
+	 * actually buys is the removal of a render-phase write that a discarded
+	 * transition could leave inconsistent — real, and smaller than the sentence it
+	 * replaced. The genuine backstop on that seam is the durable
+	 * `bet_receipts` UNIQUE (ADR-0031), not this listener.
 	 */
 	useEffect(() => {
 		const onPop = () => {
