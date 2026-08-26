@@ -75,15 +75,42 @@ export default async function OnboardingPage(): Promise<React.ReactElement> {
 		<Card className="w-full">
 			{/* (i) Pseudonym + PFP labelled permanent */}
 			<CardHeader className="justify-items-center text-center">
-				<Image
-					src={pfpUrl(user.pfpFilename)}
-					alt={user.pseudonym}
-					width={128}
-					height={128}
-					// `unoptimized` because the src is an absolute R2 URL whose host differs between staging and prod (`pub-<hash>.r2.dev`), and `next/image` refuses any host absent from `images.remotePatterns` — which would 500 this page, the mandatory first screen after signup. Optimization buys nothing here: SPEC.2 §12.7 has PFP reads hitting R2 directly with a one-year immutable cache, already at 256x256 and ~5KB.
-					unoptimized
-					className="rounded-(--imgr) [border:var(--avatar-ring)]"
-				/>
+				{/* ⚠⚠ PFP-UI-1 — THE RING IS AN OVERLAY HERE BECAUSE A BORDER WAS
+				    SHRINKING THE IMAGE. `[border:var(--avatar-ring)]` sat directly on
+				    the `<Image>`, and under Tailwind preflight's `box-sizing:
+				    border-box` that eats 1px per side: a 128px box was rendering a
+				    126px picture. One token, `--avatar-ring`, had two mechanisms
+				    across the product — a zero-cost pseudo-element on the six
+				    primitive mounts and a real layout border here — so this mount was
+				    the odd one out twice over.
+				    The wrapper carries the identical `after:` declaration
+				    `ui/avatar.tsx:34` uses, which is why the image is now 128px and
+				    not 126px.
+				    ⛔ THE PRIMITIVE IS NOT AN OPTION HERE, so this is not a choice
+				    between two mechanisms. `AvatarImage` is `AvatarPrimitive.Image`
+				    and renders its own `<img>`; it cannot wrap or adopt a
+				    `next/image`. The choice was between a hand-rolled overlay and the
+				    border that was already wrong.
+				    ⚠ `block size-32` RESTATES the image's own 128px box on the
+				    wrapper rather than changing it — `inset-0` must land on the
+				    image's edge for the ring to sit where the border did. `block` is
+				    declared rather than inherited: a `<span>` is a non-replaced inline
+				    box, where width and height simply do not apply, and this one is
+				    only blockified today because `CardHeader` happens to be a grid.
+				    Depending on a parent's display mode for a box to exist is the
+				    same class of implicit chain that made the profile hero blow out to
+				    256×256. */}
+				<span className="relative block size-32 after:absolute after:inset-0 after:rounded-full after:[border:var(--avatar-ring)]">
+					<Image
+						src={pfpUrl(user.pfpFilename)}
+						alt={user.pseudonym}
+						width={128}
+						height={128}
+						// `unoptimized` because the src is an absolute R2 URL whose host differs between staging and prod (`pub-<hash>.r2.dev`), and `next/image` refuses any host absent from `images.remotePatterns` — which would 500 this page, the mandatory first screen after signup. Optimization buys nothing here: SPEC.2 §12.7 has PFP reads hitting R2 directly with a one-year immutable cache, already at 256x256 and ~5KB.
+						unoptimized
+						className="rounded-full"
+					/>
+				</span>
 				<CardTitle className="mt-3 text-lg">Your Zugzwang identity</CardTitle>
 				<p className="text-xl font-semibold text-ink">{user.pseudonym}</p>
 				<p className="text-sm text-n5">

@@ -1217,7 +1217,29 @@ describe("HTML-FINISH profile row 16 — the band-height square, BUILT at `xl`+"
 		if (pfp === null) {
 			throw new Error("row16: the identity card renders no <img>");
 		}
-		const classes = pfp.className.split(/\s+/);
+		// ⚠ PFP-UI-1 RE-EXPRESSED THIS ONE ELEMENT OUT. THE PROPERTY IS THE SAME
+		// PROPERTY — *the square is declared, and it is `xl`-scoped* — and every
+		// assertion below is untouched; only the element carrying the utilities
+		// moved. The circle pass gave this mount a ring, and the ring needs a
+		// wrapper (the primitive that supplies one to the other six cannot be
+		// adopted here without deleting the coverage that proves this hero renders
+		// the right image). A wrapper between the grid item and the `<img>` breaks
+		// the percentage-height chain these utilities depend on, so the sizing had
+		// to move ONTO the wrapper — measured, otherwise the box resolves to the
+		// intrinsic 256×256 and overflows the band by 68px.
+		// ⛔ READING THE `<img>` HERE WOULD NOW PASS VACUOUSLY IN THE BROKEN STATE
+		// TOO, which is why the paired half — that the `<img>` carries NONE of
+		// these — lives in `tests/unit/design/avatar-ring-token.test.ts`. A
+		// one-sided check is green both when the sizing moved correctly and when
+		// it was merely duplicated onto both elements.
+		const wrapper = pfp.parentElement;
+		if (wrapper === null) {
+			throw new Error(
+				"row16: the identity card's <img> has no wrapper — the ring wrapper " +
+					"is what carries the band-height square since PFP-UI-1.",
+			);
+		}
+		const classes = wrapper.className.split(/\s+/);
 		// The square itself, at `xl`+ — the three utilities that together make
 		// `.pfp`'s `height:100%; aspect-ratio:1/1; flex:0 0 auto` (`:191-193`).
 		for (const c of ["xl:h-full", "xl:w-auto", "xl:aspect-square"]) {
@@ -1424,11 +1446,30 @@ describe("HTML-FINISH profile rows 1 · 8 — the two-band frame", () => {
 		// The PFP stays the identity BAND's first child; the column beside it
 		// holds the name block and the tiles. If the tiles landed beside the PFP
 		// the band would be three columns, not two.
+		//
+		// ⚠ PFP-UI-1 RE-EXPRESSED THIS AGAINST THE CLAIM IT ACTUALLY MAKES. It
+		// asserted `img.parentElement === card`, which was only ever a PROXY for
+		// the sentence above: while the `<img>` was the band's direct child,
+		// counting its parent counted the column. The circle pass wraps the image
+		// so the ring has something to sit on, so the `<img>` is now a grandchild
+		// and the proxy broke — but the property it stood for did not.
+		// ⛔ SO IT IS TESTED DIRECTLY NOW, WHICH IS STRICTLY STRONGER. The old
+		// form could not have caught a THIRD column appearing beside the two; the
+		// child count can, and that is the failure the sentence above names.
 		render(<IdentityCard user={USER} owner={false} tiles={TILES} />);
 		const card = screen.getByTestId("identity-card");
 		const img = card.querySelector("img");
 		const tiles = screen.getByTestId("profile-tiles");
-		expect(img?.parentElement).toBe(card);
+		const pfpColumn = img?.parentElement;
+		expect(
+			pfpColumn?.parentElement,
+			"row 8: the PFP's column is not a direct child of the identity band.",
+		).toBe(card);
+		expect(
+			card.children.length,
+			"row 8: the identity band must be exactly TWO columns — the PFP and the " +
+				"identity column. A third child is the arrangement this row forbids.",
+		).toBe(2);
 		expect(tiles.parentElement).not.toBe(card);
 	});
 });
