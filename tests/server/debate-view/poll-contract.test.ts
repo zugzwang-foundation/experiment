@@ -87,6 +87,62 @@ function sourcesUnder(relativeDir: string): string[] {
 		.sort();
 }
 
+/** The top-level parameter NAMES of a matched function signature, in order —
+ * `["client", "args"]`. Splits only at depth 0, so an object type's own fields
+ * never leak in as parameters. */
+function paramNames(signature: string): string[] {
+	const inner = signature.slice(
+		signature.indexOf("(") + 1,
+		signature.lastIndexOf(")"),
+	);
+	const out: string[] = [];
+	let depth = 0;
+	let current = "";
+	for (const ch of inner) {
+		if ("{[(<".includes(ch)) depth++;
+		else if ("}])>".includes(ch)) depth--;
+		if (ch === "," && depth === 0) {
+			out.push(current);
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	out.push(current);
+	return out
+		.map((p) => p.trim().split(":")[0]?.trim() ?? "")
+		.filter((p) => p.length > 0);
+}
+
+/** The field names declared on the `args: { … }` object of a matched signature,
+ * in order — `["market", "walk"]`. Depth-aware for the same reason as above, so
+ * a nested type's fields are not mistaken for `args`' own. */
+function argsFields(signature: string): string[] {
+	const start = signature.indexOf("args: {");
+	if (start === -1) return [];
+	const body = signature.slice(start + "args: {".length);
+	const out: string[] = [];
+	let depth = 0;
+	let current = "";
+	for (const ch of body) {
+		if ("{[(<".includes(ch)) depth++;
+		else if ("}])>".includes(ch)) {
+			if (depth === 0) break;
+			depth--;
+		}
+		if (ch === ";" && depth === 0) {
+			out.push(current);
+			current = "";
+			continue;
+		}
+		current += ch;
+	}
+	out.push(current);
+	return out
+		.map((f) => f.trim().split(/[?:]/)[0]?.trim() ?? "")
+		.filter((f) => f.length > 0 && /^[A-Za-z_$][\w$]*$/.test(f));
+}
+
 const POLL = "src/components/debate/DebatePoll.tsx";
 const HOST = "src/components/debate/DebateView.tsx";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
@@ -208,17 +264,50 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 
 	it("keeps loadDebateView's viewer-independent signature (ADR-0034 D-1)", () => {
 		const source = code(LOADER);
-		expect(source).toMatch(
-			/export async function loadDebateView\(\s*client: DebateViewReader,\s*args: \{ market: MarketSummary \},\s*\): Promise<DebateViewModel>/,
-		);
-		// No session / viewer / userId parameter may be threaded into the masking
-		// loader — the property that makes masking structurally viewer-independent
-		// rather than merely tested to be.
 		const signature =
 			source.match(
 				/export async function loadDebateView\([\s\S]*?\): Promise<DebateViewModel>/,
 			)?.[0] ?? "";
+		expect(signature).not.toBe("");
+
+		// ⚠ THE SIGNATURE GAINED ONE PARAMETER AT CHART-1, and this assertion is
+		// edited here in the same commit rather than deleted — the same posture
+		// the two-callers guard above records for its own edit. `args` now carries
+		// an OPTIONAL `walk`: an already-derived CPMM reserve walk for the price
+		// chart, so the market-detail read can skip a three-statement replay it
+		// has already paid for behind `getCachedReserveWalk`.
+		//
+		// ⛔ IT IS NOT VIEWER STATE, AND THE ASSERTION BELOW IS WHAT PROVES THAT
+		// RATHER THAN THIS COMMENT. A walk is pool reserves and event timestamps
+		// for one market — public, market-scoped, identical for every reader. What
+		// ADR-0034 D-1 forbids is threading a session/user identity into the
+		// masking loader, and that remains forbidden and mechanically checked.
+		const params = paramNames(signature);
+		expect(params).toEqual(["client", "args"]);
+		expect(argsFields(signature)).toEqual(["market", "walk"]);
+
+		// No session / viewer / userId parameter may be threaded into the masking
+		// loader — the property that makes masking structurally viewer-independent
+		// rather than merely tested to be.
+		//
+		// ⚠ THE SCAN IS ALREADY COMMENT-FREE, and that is load-bearing rather than
+		// incidental: `code()` strips comments before this file sees a byte, for
+		// exactly the reason its own helper docblock gives — the prose explaining
+		// why a parameter is NOT viewer-scoped necessarily contains the word
+		// "viewer", and a guard that reddens on its own explanation is a guard
+		// that gets suppressed. So the ban below applies to declarations, and the
+		// new `walk` parameter can be documented at length without touching it.
 		expect(signature).not.toMatch(/session|viewer|userId|user_id/i);
+
+		// POSITIVE CONTROL — the ban above must be able to FIRE. A negative
+		// assertion over a stripped string proves nothing unless the stripping
+		// left something a violation could still be found in. Inject the exact
+		// shape of the violation into the same text and require a match; if the
+		// comment-stripping upstream ever over-reached and left the signature
+		// empty, this line reddens instead of the guard passing vacuously.
+		expect(signature.replace("args: {", "args: { userId: string;")).toMatch(
+			/session|viewer|userId|user_id/i,
+		);
 	});
 
 	it("keeps masking single-sourced on loadRemovedSet (ADR-0034 D-4)", () => {

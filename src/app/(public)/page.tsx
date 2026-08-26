@@ -10,6 +10,7 @@ import {
 	getCachedDiscoveryMarketIds,
 	getCachedMarketDiscoveryData,
 } from "@/server/discovery/list";
+import { withLiveTail } from "@/server/discovery/price-series";
 
 /**
  * OQ-1 A (ratified §16): Discovery's R-2 cache retrofit landed at S-4 Phase C
@@ -117,7 +118,27 @@ export async function DiscoveryContent() {
 					totals: data.totals,
 					imageUrl: data.imageUrl,
 				},
-				series: data.series,
+				// CHART-1 — the hero chart's live right edge (SPEC.1 1.0.40 §9).
+				// `data.series` is floored history from `getCachedReserveWalk`; the
+				// terminal point is composed HERE from `priced`, the same live pool
+				// read two lines above that already fills `card.pricing` and renders
+				// in the price bar. Zero additional queries — that is the only reason
+				// the history is allowed to be a minute old.
+				//
+				// ⚠ `nowIso` is read at RENDER, never inside the cache: a clock read
+				// behind a cached boundary freezes for the whole window, which would
+				// put an `Open` market's "now" edge up to a minute in the past — the
+				// exact defect this composition exists to prevent.
+				//
+				// Every market on this surface is `Open` by construction
+				// (`getCachedDiscoveryMarketIds` filters `status = 'Open'`), so the
+				// flag is a literal rather than a read. INV-4 is not reachable from
+				// here; the non-`Open` branch is exercised on `/m/[slug]`.
+				series: withLiveTail(data.series, {
+					spotYes: priced?.pricing.yes ?? null,
+					nowIso: new Date().toISOString(),
+					isOpen: true,
+				}),
 				topPosts: data.topPosts,
 			});
 		}

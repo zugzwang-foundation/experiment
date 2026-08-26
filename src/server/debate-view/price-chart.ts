@@ -5,9 +5,11 @@ import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { MARKET_SERIES_MAX_POINTS } from "@/server/config/limits";
 import { getPrices, type Reserves } from "@/server/cpmm/calculate";
 import {
+	mapWalkToSeries,
 	type PricePoint,
-	type ReservePoint,
 	replayReserveSeries,
+	toWireWalk,
+	type WireReservePoint,
 } from "@/server/discovery/price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
@@ -46,7 +48,7 @@ export async function loadMarketPriceSeries(
 	marketId: string,
 	spotYes: string | null,
 ): Promise<PricePoint[]> {
-	const walk = await replayReserveSeries(client, marketId);
+	const walk = toWireWalk(await replayReserveSeries(client, marketId));
 	if (walk.length === 0) {
 		return [];
 	}
@@ -67,9 +69,27 @@ export async function deriveMarketPriceChart(
 		postSubstrate: PostSubstrate[];
 		removedSet: Set<string>;
 		spotYes: string | null;
+		/**
+		 * An ALREADY-DERIVED reserve walk, supplied by the caller (CHART-1). When
+		 * present the replay is skipped entirely — this is how the market-detail
+		 * page pays for the walk once per `MARKET_SERIES_MIN_WINDOW_MS` instead of
+		 * once per cache miss (`getCachedReserveWalk`).
+		 *
+		 * ⛔ IT IS A PARAMETER, NEVER FETCHED HERE, AND THAT IS DELIBERATE — the
+		 * same shape `getCachedMarketDiscoveryData` uses for `reserves`. Reaching
+		 * for the cached walk inside this function would put a cache boundary
+		 * underneath `loadDebateView`, which the `.md` export route also calls and
+		 * which ADR-0025 forbids caching. Leaving the choice with the caller keeps
+		 * the export uncached by construction rather than by anyone remembering.
+		 *
+		 * Omitted ⇒ the live replay, byte-for-byte the prior behaviour. The export
+		 * route omits it.
+		 */
+		walk?: WireReservePoint[];
 	},
 ): Promise<{ series: PricePoint[]; nodes: ChartNode[] }> {
-	const walk = await replayReserveSeries(client, args.marketId);
+	const walk =
+		args.walk ?? toWireWalk(await replayReserveSeries(client, args.marketId));
 	if (walk.length === 0) {
 		return { series: [], nodes: [] };
 	}
@@ -96,7 +116,7 @@ export async function deriveMarketPriceChart(
 export function selectChartNodes(
 	substrate: PostSubstrate[],
 	removedSet: Set<string>,
-	walk: ReservePoint[],
+	walk: WireReservePoint[],
 ): ChartNode[] {
 	if (walk.length === 0) {
 		return [];
@@ -132,11 +152,11 @@ export function selectChartNodes(
  * so this is the state after the most recent event at or before `at`; `walk[0]`
  * (the `market.opened` seed) is the floor for the unreachable before-all case.
  */
-function reservesAt(walk: ReservePoint[], at: Date): Reserves {
+function reservesAt(walk: WireReservePoint[], at: Date): Reserves {
 	const t = at.getTime();
 	let chosen = walk[0].reserves;
 	for (const step of walk) {
-		if (step.at.getTime() <= t) {
+		if (Date.parse(step.at) <= t) {
 			chosen = step.reserves;
 		}
 	}
@@ -150,15 +170,10 @@ function reservesAt(walk: ReservePoint[], at: Date): Reserves {
  * construction.
  */
 function buildSeries(
-	walk: ReservePoint[],
+	walk: WireReservePoint[],
 	spotYes: string | null,
 ): PricePoint[] {
-	const full: PricePoint[] = walk.map((step) => ({
-		at: step.at.toISOString(),
-		yes: getPrices(step.reserves).yes,
-	}));
-
-	const series = downsample(full, MARKET_SERIES_MAX_POINTS);
+	const series = mapWalkToSeries(walk, MARKET_SERIES_MAX_POINTS);
 
 	// Stamp the terminal with the shared PriceBar spot (decision #6) — the point
 	// beneath the bar agrees with it by construction, not by monitoring.
@@ -170,20 +185,4 @@ function buildSeries(
 	}
 
 	return series;
-}
-
-/** Uniform-stride thinning to ≤ `max` points — a strict SUBSET (never
- * interpolated), first + last always kept, order preserved (the
- * `discovery/price-series.ts` downsample, re-implemented file-local per the A5
- * precedent — the index helper is never exported). */
-function downsample(series: PricePoint[], max: number): PricePoint[] {
-	if (series.length <= max) {
-		return series;
-	}
-	const n = series.length;
-	const out: PricePoint[] = [];
-	for (let i = 0; i < max; i++) {
-		out.push(series[Math.round((i * (n - 1)) / (max - 1))]);
-	}
-	return out;
 }

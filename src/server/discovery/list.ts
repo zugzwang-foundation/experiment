@@ -5,14 +5,22 @@ import { cacheLife, cacheTag } from "next/cache";
 import type { DbClient, DbTransaction } from "@/db";
 import { db } from "@/db";
 import { markets } from "@/db/schema";
-import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
+import {
+	DISCOVERY_GRID_SIZE,
+	DISCOVERY_SERIES_MAX_POINTS,
+} from "@/server/config/limits";
 import type { Reserves } from "@/server/cpmm/calculate";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 
+import { getCachedReserveWalk } from "./cached-series";
 import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
 import { getDefaultMarketMediaUrl } from "./media";
-import { loadPriceSeries, type PricePoint } from "./price-series";
+import {
+	loadPriceSeries,
+	mapWalkToSeries,
+	type PricePoint,
+} from "./price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -188,7 +196,28 @@ export async function getCachedMarketDiscoveryData(
 
 	const totals = await getMarketTotals(db, marketId);
 	const imageUrl = await getDefaultMarketMediaUrl(db, marketId);
-	const series = await loadPriceSeries(db, marketId);
+
+	// CHART-1 — the hero's series now rides `getCachedReserveWalk`, keyed on the
+	// market id ALONE, instead of `loadPriceSeries`, which replayed inside this
+	// reserves-keyed block. This block misses on every bet; that one does not, so
+	// the walk is derived once per `MARKET_SERIES_MIN_WINDOW_MS` however busy the
+	// market gets (SPEC.1 1.0.40 §9 *Refresh*). The hero's own cap is unchanged.
+	//
+	// ⚠ THE F-1 DRIFT WARN IS DELIBERATELY GONE FROM THIS PATH, AND IT IS A
+	// SUPERSESSION RATHER THAN AN OVERSIGHT. `loadPriceSeries` spends a fourth
+	// statement reading the live `pools` row and WARNs `discovery_price_series_drift`
+	// when the replay's final reserves disagree with it. Under a floored history
+	// that comparison is no longer diagnostic: a walk up to a minute old
+	// LEGITIMATELY differs from a pool that has moved since, so the check would
+	// fire by design and train its own reader to ignore it. What it was
+	// protecting — the chart's right edge agreeing with the price bar — is now
+	// guaranteed by construction instead of by monitoring, because
+	// `withLiveTail` composes that edge from the live read at the page. The
+	// instrument survives on `loadPriceSeries` for any uncached caller.
+	const series = mapWalkToSeries(
+		await getCachedReserveWalk(marketId),
+		DISCOVERY_SERIES_MAX_POINTS,
+	);
 	const topPosts = await selectHeroTopPosts(db, marketId, reserves);
 
 	return { totals, imageUrl, series, topPosts };

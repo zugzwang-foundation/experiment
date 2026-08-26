@@ -31,6 +31,111 @@ export type PricePoint = { at: string; yes: string };
  * share ONE replay authority (no second reserve walk to drift). */
 export type ReservePoint = { at: Date; reserves: Reserves };
 
+/**
+ * The same step, with its instant as an ISO string instead of a `Date` — the
+ * form the walk takes once it crosses a cache boundary (CHART-1, SPEC.1 1.0.40
+ * §9 *Refresh*).
+ *
+ * ⛔ THE `Date` IS CONVERTED DELIBERATELY, NOT INCIDENTALLY. `getCachedReserveWalk`
+ * is a `'use cache'` function, so its return value is serialized and revived by
+ * the framework rather than handed back by reference. Whether a `Date` survives
+ * that round trip intact is a property of the serializer, not of this code — and
+ * the directive is INERT under a bare `vitest run` (see
+ * `tests/server/debate-view/round-trip-budget.test.ts`, which pins the uncached
+ * cost for exactly this reason). So a `Date` that failed to revive would pass
+ * every test in this repository and fail only in production, where nobody is
+ * watching a chart's x-axis closely enough to notice it silently became
+ * `[object Object]`. An ISO string has no such failure mode. The conversion
+ * costs one `map` and removes the question.
+ */
+export type WireReservePoint = { at: string; reserves: Reserves };
+
+/** `ReservePoint[]` → `WireReservePoint[]`. Pure; the only place the `Date` →
+ * ISO conversion happens, so the two shapes cannot drift apart. */
+export function toWireWalk(walk: ReservePoint[]): WireReservePoint[] {
+	return walk.map((step) => ({
+		at: step.at.toISOString(),
+		reserves: step.reserves,
+	}));
+}
+
+/**
+ * A reserve walk mapped to the downsampled YES-price series — the ONE mapping
+ * both surfaces use, at their own caps (§22's `DISCOVERY_SERIES_MAX_POINTS`,
+ * §9's `MARKET_SERIES_MAX_POINTS`). Pure: index math and `getPrices`, never
+ * money arithmetic of its own.
+ *
+ * ⚠ THIS REPLACED TWO IDENTICAL PRIVATE `downsample` HELPERS, and the docblock
+ * on the second one used to justify the duplication by "the A5 precedent — the
+ * index helper is never exported". That precedent held while there were two
+ * consumers in two files. CHART-1 added a third (the cached walk), and a rule
+ * whose effect is "write the stride arithmetic a third time" is no longer
+ * protecting anything — three copies of a subsetting rule that must agree
+ * exactly is a drift surface, not an encapsulation win. Exported here, once.
+ */
+export function mapWalkToSeries(
+	walk: WireReservePoint[],
+	max: number,
+): PricePoint[] {
+	const series: PricePoint[] = walk.map((step) => ({
+		at: step.at,
+		yes: getPrices(step.reserves).yes,
+	}));
+	return downsample(series, max);
+}
+
+/**
+ * The chart's LIVE RIGHT EDGE, composed onto a floored history (SPEC.1 1.0.40
+ * §9 — *X domain* and *Refresh*, founder-ruled at CHART-1). PURE: it reads a
+ * price and a clock that its CALLER supplies, and does no IO of its own.
+ *
+ * This is the half of the mechanism that makes the other half affordable. The
+ * history behind it may be up to `MARKET_SERIES_MIN_WINDOW_MS` old; this point
+ * never is. Both callers already hold `spotYes` — it is the same
+ * `pricing.yes` they render in `PriceBar` — so pinning the edge costs **zero
+ * additional queries**, which is the only reason §9's superseded objection ("a
+ * chart that lagged the price bar sitting directly beneath it would be worse
+ * than no chart") is *answered* here rather than waived.
+ *
+ * Two shapes, chosen by market state:
+ *
+ * - **`Open`** — the domain runs to **now**, and the series gains a terminal
+ *   point at the present instant carrying the live price. A market nobody has
+ *   bet on in a week therefore renders a flat tail running to today, which is
+ *   TRUE and is information: *nothing has happened lately* is a fact about the
+ *   market, and the old behaviour — ending the axis at some arbitrary past
+ *   instant — hid it. It also removes the jitter the window would otherwise
+ *   introduce, where the right edge slid between "last event" and "whenever the
+ *   entry was derived" depending on cache age.
+ * - **Every other state** — the terminal is RESTAMPED in place and the domain
+ *   does **not** advance (**INV-4**). A resolved market's chart is frozen at its
+ *   last event, forever. The restamp is a no-op in practice, since a closed
+ *   market's pool cannot move; it is kept so that the "can never disagree with
+ *   `PriceBar`" property holds by construction in every state rather than in
+ *   most of them.
+ *
+ * ⚠ The append can push the series one point past its cap. That is deliberate
+ * and is not a cap violation to "fix": the cap bounds how much HISTORY crosses
+ * the wire, and this point is not history — dropping a real interior point to
+ * make room for it would trade a fact for an accounting convenience.
+ *
+ * ⚠ `spotYes === null` (no pool row — unreachable for an opened market) leaves
+ * the replay's own terminal untouched rather than inventing one. Defensive.
+ */
+export function withLiveTail(
+	series: PricePoint[],
+	args: { spotYes: string | null; nowIso: string; isOpen: boolean },
+): PricePoint[] {
+	const last = series[series.length - 1];
+	if (last === undefined || args.spotYes === null) {
+		return series;
+	}
+	if (args.isOpen && Date.parse(args.nowIso) > Date.parse(last.at)) {
+		return [...series, { at: args.nowIso, yes: args.spotYes }];
+	}
+	return [...series.slice(0, -1), { at: last.at, yes: args.spotYes }];
+}
+
 /** 18-dp canonical form for the F-1 reserve comparison — collapses any
  * formatting difference between the replayed strings and the NUMERIC(38,18)
  * wire text of the live pool row. */
@@ -167,10 +272,7 @@ export async function loadPriceSeries(
 		return [];
 	}
 
-	const series: PricePoint[] = walk.map((step) => ({
-		at: step.at.toISOString(),
-		yes: getPrices(step.reserves).yes,
-	}));
+	const series = mapWalkToSeries(toWireWalk(walk), DISCOVERY_SERIES_MAX_POINTS);
 
 	// F-1 soft check — WARN + always serve, never throw (OQ-2 ruling). The walk's
 	// LAST step is the replayed final reserves.
@@ -199,7 +301,7 @@ export async function loadPriceSeries(
 		});
 	}
 
-	return downsample(series, DISCOVERY_SERIES_MAX_POINTS);
+	return series;
 }
 
 /** Uniform-stride thinning to ≤ `max` points — a strict SUBSET of the input
