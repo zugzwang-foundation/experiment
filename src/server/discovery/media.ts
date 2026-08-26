@@ -5,6 +5,7 @@ import { and, asc, eq } from "drizzle-orm";
 import type { DbClient, DbTransaction } from "@/db";
 import { marketMedia } from "@/db/schema";
 import { mintReadUrl } from "@/server/storage/r2";
+import { memoizedReadUrl } from "@/server/storage/read-url-memo";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -22,12 +23,27 @@ const READ_URL_TTL_SECONDS = 7200;
  * §1e); the arm exists in `r2.ts`, this wrapper only hides the bucket-id
  * literal at the call site. No validation, no DB hit — pure forward; R2
  * unavailability throws raw from `mintReadUrl`, caller decides posture.
+ *
+ * R2-MEMO — held for a fraction of its TTL (`read-url-memo.ts`), same rule as
+ * `signRead`. The market image is the most re-served object on the site: it
+ * renders on Discovery for every visitor AND on `/m/[slug]`, which re-renders
+ * every 15 s. Re-minting per render meant a new URL, and so a full re-download
+ * of an unchanged image, on every one of those.
+ *
+ * ⚠ THE BUCKET IS PART OF THE MEMO KEY. This arm and `signRead`'s `"uploads"`
+ * arm are DIFFERENT buckets, and the §1e separation above is a rule about
+ * which objects an admin path may serve — not a naming convention. A memo
+ * keyed on the object alone would let one bucket's URL answer for the other's
+ * identically-named key, quietly defeating it. Prefixing keeps the two
+ * namespaces disjoint by construction.
  */
 export async function signReadMarketMedia(
 	key: string,
 	ttlSeconds: number,
 ): Promise<string> {
-	return mintReadUrl("market-media", key, ttlSeconds);
+	return memoizedReadUrl(`market-media:${key}:${ttlSeconds}`, ttlSeconds, () =>
+		mintReadUrl("market-media", key, ttlSeconds),
+	);
 }
 
 /**
