@@ -25,6 +25,15 @@ import { describe, expect, it } from "vitest";
  *   arena band      flex-1 min-h-0                    ← takes ALL the leftover
  *   pole columns    min-h-0 flex-col                  ← may be shorter than content
  *   column scroll   flex-1 min-h-0 overflow-y-auto    ← THE ONLY SCROLLER
+ *                                                       IN *THIS* CHAIN
+ *
+ * ⚠⚠ RPLY-2 · R1 — NOT the only scroller on the surface any more, one level
+ * BELOW this chain: `BetComposer`'s own argument region is now a second,
+ * deliberate `overflow-y-auto` region, nested INSIDE whatever `column scroll`
+ * renders (a card, a composer — the chain above does not know or care which).
+ * `DebateColumn.tsx`'s own docblock is corrected in place for that; this
+ * diagram is left naming only the chain it actually asserts node-by-node
+ * below, which stops at `column scroll` and never reaches into its children.
  *
  * ⚠ `min-h-0` IS THE LINK EVERYONE DROPS, and dropping it is invisible. A flex
  * item's automatic minimum size is its CONTENT, so without `min-h-0` a node
@@ -308,7 +317,11 @@ describe("debate height chain — the arena band takes the leftover", () => {
 		expect([...arenas[0]].sort()).toEqual([...arenas[1]].sort());
 	});
 
-	it("debate-height::the-column-is-the-ONLY-scroller-and-it-is-wired", () => {
+	it("debate-height::the-column-is-the-ONLY-scroller-IN-THIS-CHAIN-and-it-is-wired", () => {
+		// ⚠ RPLY-2 · R1 gave `BetComposer` its own nested `overflow-y-auto`
+		// region — see the docblock amendment above. This test's own three
+		// assertions were never about "nothing else on the page scrolls"; they
+		// pin `column-scroll`'s className, which R1 does not touch.
 		const source = read(COLUMN);
 		const [classes, ...extra] = bandClasses(source, COLUMN, "column-scroll");
 

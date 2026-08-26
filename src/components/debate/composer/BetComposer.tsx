@@ -534,7 +534,16 @@ export function BetComposer(props: {
 	return (
 		<section
 			aria-label={`${COMPOSER_COPY.header} — ${props.side}`}
-			className="flex flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
+			// ⚠⚠ RPLY-2 · R1 — `min-h-0`, so THIS section can shrink below its own
+			// content height. Without it, a flex item's automatic minimum size is
+			// its content (the same rule `DebateColumn`'s docblock already states
+			// for `column-scroll`), and the whole point of the argument region
+			// below being shrinkable (its own `min-h-0`, no `flex-1` — see its
+			// comment) is defeated if the section wrapping it refuses to shrink in
+			// the first place — measured: without this, the footblock still
+			// needed `column-scroll` to scroll to reach it, same defect, just
+			// with an unused scrollable region hidden inside it.
+			className="flex min-h-0 flex-col gap-3 rounded-(--r) p-3.5 shadow-(--elev-1) [border:var(--hairline)]"
 		>
 			{/* modhead — side chip (the TRUE bet side) · header · ×. Reply variant
 			    (v0.10): verb line + the full post title; masked parent → canon
@@ -543,7 +552,13 @@ export function BetComposer(props: {
 			    with the header text. It was `items-start`, which top-aligned a 20px
 			    label against a 44px control: measured centres 407.3 vs 419.3, i.e.
 			    the × hanging 12px below the words it belongs to. */}
-			<div className="flex items-center gap-2">
+			{/* RPLY-2 · R1 — `shrink-0`. This header row, the argument region and
+			    the footblock below are the three permanent direct children of this
+			    section (`<ErrorStrip>` and the suspended `<Dialog>` are two more,
+			    present only while their own state is active — neither carries a
+			    box when idle, so neither competes for the shrink); only the
+			    argument region ever gives way when the column is short. */}
+			<div className="flex shrink-0 items-center gap-2">
 				<SideBadge side={props.side} />
 				{/* ⚠⚠ RPLY-1 · R4a — ONE SPAN, ONE SIZE, ONE WEIGHT. The reply variant
 				    used to be a two-child flex COLUMN at `text-[13.5px] font-bold`
@@ -610,15 +625,47 @@ export function BetComposer(props: {
 			    still is; not one gating predicate is touched. Only the HEIGHT was
 			    ever the defect. */}
 
-			<div className={dimmed}>
-				<div className="mb-1 text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+			{/* RPLY-2 · R1 — THE ARGUMENT REGION, AND THE ONLY THING IN THIS SECTION
+			    THAT GIVES WAY. `min-h-0` is what lets it shrink below its own
+			    content height when the column is short — the header and footblock
+			    are `shrink-0`, so this is the ONLY sibling flex-shrink can act on,
+			    and it absorbs the whole deficit by default (flex-shrink:1 needs no
+			    class of its own). `overflow-y-auto` catches what shrinking alone
+			    can't: once the textareas below hit their own floors, this region
+			    scrolls internally rather than pushing the footblock off screen.
+			    ⛔ DELIBERATELY NOT `flex-1`. A `flex-1` (flex-grow) here computes
+			    this region's OWN intrinsic contribution to the section's auto
+			    height differently from "sum of my children's natural sizes" —
+			    measured: it inflated the tall-viewport height by ~28px for no
+			    functional gain, since nothing above ever has spare room to hand
+			    down. Shrinking needs no grow.
+			    ⚠ `p-0.5 -m-0.5`, MEASURED, NOT DECORATIVE. Setting ONE overflow
+			    axis makes BOTH compute to `auto` (CSS Overflow 3), and the title
+			    textarea's right edge sits flush with this region's own edge (0px
+			    gap, measured) — its `focus-visible:shadow-(--state-focus-ring)`
+			    (a 2px outset) would clip against this region's own scroll clip
+			    rect, which was never a risk before this region could scroll at
+			    all. The padding gives the ring room; the equal negative margin
+			    cancels it back out so the content's position (and the `gap-3`
+			    to the header/footblock siblings) is unchanged.
+			    `DebateColumn`'s docblock is corrected in place for this second
+			    scrolling region (below, at `column-scroll`). */}
+			<div
+				className={`flex min-h-0 -m-0.5 flex-col overflow-y-auto p-0.5${dimmed ? ` ${dimmed}` : ""}`}
+			>
+				<div className="mb-1 shrink-0 text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
 					{COMPOSER_COPY.argumentLabel}
 				</div>
 				{/* `.compgrid` (d5) — TWO COLUMNS: the image attach panel at full
-				    height on the left, title → body → the money footblock on the
-				    right. The mockup's own CSS section header states it in terms:
-				    "composer: PORTRAIT attach FULL MODULE HEIGHT · title/body/money
-				    right". Fenced by SYMBOL (`O-8`).
+				    height on the left, title → body on the right. The mockup's own
+				    CSS section header states it in terms: "composer: PORTRAIT attach
+				    FULL MODULE HEIGHT · title/body/money right" — quoted verbatim
+				    though the build now diverges from its last clause: RPLY-2 · R1
+				    hoists the money footblock OUT of this grid entirely (it was
+				    `.compright`'s third child, per d5's own `:1132`), to a
+				    `shrink-0` section-level sibling below, so it is never subject to
+				    this grid's own shrink-and-scroll at a short viewport. Fenced by
+				    SYMBOL (`O-8`).
 
 				    ⛔ THE TRACK FLOOR IS REFUSED, NOT PORTED. d5 declares
 				    `minmax(210px,40%) 1fr`; `210px` is a VALUE out of a light-mode
@@ -631,17 +678,26 @@ export function BetComposer(props: {
 				    layout, so the render suites pin the ARRANGEMENT (two tracks,
 				    which child is which) and say nothing about how the columns
 				    actually resolve. That is a browser read against the compiled
-				    CSS and it is the founder's staging pass. */}
-				<div className="grid grid-cols-[2fr_3fr] items-stretch gap-3">
+				    CSS and it is the founder's staging pass.
+
+				    RPLY-2 · R1 — `min-h-0` ADDED, not `flex-1` (see the argument
+				    region's own comment above for why grow is refused here too).
+				    `min-h-0` is what lets this grid's row shrink below its content
+				    when the region above it shrinks, and `items-stretch` carries
+				    that same shrunken height to `ImageAttach` via its `h-full`. */}
+				<div className="grid min-h-0 grid-cols-[2fr_3fr] items-stretch gap-3">
 					<ImageAttach
 						state={image}
 						disabled={floorAbove || inFlight}
 						onPick={onPickImage}
 						onRemove={onRemoveImage}
 					/>
-					{/* `.compright` (d5) */}
-					<div className="flex min-w-0 flex-col gap-2">
-						<div>
+					{/* `.compright` (d5). RPLY-2 · R1 — `min-h-0`, so its two children
+					    (title/body) can shrink below their own content height instead
+					    of forcing this whole column — and the grid row it sits in — to
+					    stay at full size regardless of the space actually available. */}
+					<div className="flex min-h-0 min-w-0 flex-col gap-2">
+						<div className="flex min-h-0 flex-col">
 							{/* ⚠⚠ change set 11 §3 — A TEXTAREA, SO ALL 125 CHARACTERS ARE
 							    VISIBLE AT ONCE. As an `<input>` only the tail showed at
 							    125/125.
@@ -673,7 +729,24 @@ export function BetComposer(props: {
 								maxLength={TITLE_MAX_CHARS}
 								disabled={floorAbove || inFlight}
 								aria-label="Argument title"
-								className="h-[72px] resize-none field-sizing-fixed"
+								// RPLY-2 · R1 — `min-h-8` ADDED; `h-[72px]` stays a definite
+								// height, not a cap, so it is what this field renders at
+								// when there is room (unchanged at a tall viewport, three
+								// lines exactly as CS11 §3 measured) — a flex item's
+								// default `flex-shrink: 1` is what lets a definite height
+								// still give way under pressure. `min-h-8` (32px, one
+								// line + the field's own 12px of chrome) is the floor a
+								// short viewport shrinks toward before the argument region's
+								// own `overflow-y-auto` takes over. A textarea scrolls its
+								// own overflowing text internally regardless of its own
+								// height, so a floor below three lines never hides typed
+								// content — it is one scroll away inside the field itself.
+								// ⛔ NOT `flex-1`: title and body would then split whatever
+								// height the row is given in equal halves regardless of
+								// needing different amounts — measured leaving 42px of
+								// dead space under a title stuck at its own ceiling while
+								// body still ran short of its own (see `.compright`).
+								className="h-[72px] min-h-8 resize-none field-sizing-fixed"
 								onKeyDown={(e) => {
 									// Layer 1, replacing the `<input>`: a newline never gets
 									// typed in the first place.
@@ -688,11 +761,11 @@ export function BetComposer(props: {
 									onEdit();
 								}}
 							/>
-							<div className="mt-0.5 text-right text-[10px] text-n4">
+							<div className="mt-0.5 shrink-0 text-right text-[10px] text-n4">
 								{groupCount(title.length)} / {groupCount(TITLE_MAX_CHARS)}
 							</div>
 						</div>
-						<div>
+						<div className="flex min-h-0 flex-col">
 							{/* ⚠⚠ change set 7 §3 — THE DESCRIPTION NO LONGER GROWS AND NO
 							    LONGER DRAGS. `ui/textarea.tsx` ships `field-sizing-content`
 							    (grows with typing) and the browser's default resize handle
@@ -717,174 +790,188 @@ export function BetComposer(props: {
 								// (+40) and the header reclaim (+24), and what is left of the
 								// restoration goes here. Still FIXED — a bigger box, not an
 								// elastic one.
-								className="h-32 resize-none field-sizing-fixed"
+								// RPLY-2 · R1 — `min-h-14` ADDED; `h-32` stays a definite
+								// height (128px), never a cap — same rationale as the
+								// title field above, floor here is ~2 lines + chrome, and
+								// `flex-1` is refused for the same equal-split reason.
+								className="h-32 min-h-14 resize-none field-sizing-fixed"
 								onChange={(e) => {
 									setExtended(e.target.value);
 									onEdit();
 								}}
 							/>
-							<div className="mt-0.5 text-right text-[10px] text-n4">
+							<div className="mt-0.5 shrink-0 text-right text-[10px] text-n4">
 								{groupCount(extended.length)} / {groupCount(extendedMax)}
 								{COMPOSER_COPY.optionalSuffix}
 							</div>
 						</div>
-
-						{/* `.footblock` (d5) — the money row is the right column's
-						    FOOTER, so it sits at the column's foot rather than
-						    floating under the body. */}
-						<div className="mt-auto">
-							<div className="flex items-stretch gap-3">
-								<div className="flex flex-1 flex-col rounded-(--r-chip) px-3 py-2 [border:var(--hairline)]">
-									<div className="flex items-center justify-between">
-										<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
-											{COMPOSER_COPY.amountLabel}
-										</span>
-										{/* `.amtval` — flex-END, so the glued `Đ` sits against
-										    the digits and MOVES with them as the field's width
-										    tracks its content (`stakeFieldWidth`).
-										    ⚠ `ch` TRACKS THE DIGITS EXACTLY ONLY BECAUSE THIS
-										    FIELD IS `font-mono`. The `ch` unit is the width of
-										    the `0` glyph, so a proportional face makes `Nch`
-										    stop matching N digits and the `Đ` drifts off the
-										    number — and nothing goes red, because jsdom performs
-										    no layout and the width string is unchanged. Dropping
-										    `font-mono` below is therefore a silent break of R2,
-										    not a restyle. */}
-										<span className="flex min-w-0 items-baseline justify-end gap-1">
-											<span className="text-sm text-n5">Đ</span>
-											<Input
-												value={amount}
-												inputMode="decimal"
-												disabled={floorAbove || inFlight}
-												aria-label="Stake amount"
-												style={{ width: stakeFieldWidth(amount) }}
-												onChange={(e) => {
-													setAmount(e.target.value);
-													onEdit();
-												}}
-												onBlur={() => {
-													// T3: normalize the display to the clamped value.
-													if (isPositiveAmount(amount)) {
-														setAmount(assess.clampedAmount);
-													}
-												}}
-												className={`h-auto border-none p-0 text-right font-mono text-[22px] font-extrabold tabular-nums shadow-none [border:none] ${
-													assess.overCap ? "text-n4" : ""
-												}`}
-											/>
-										</span>
-									</div>
-									<div className="my-1.5 border-t border-n2" />
-									{/* ⚠⚠ RPLY-1 · R3 — THE NOTICE SLOT. TO WIN is meaningless in
-									    all three blocked states — the bet cannot be submitted in
-									    any of them — so the row is free, and a notice written into
-									    it costs no box and no gap. That is the whole mechanism:
-									    the composer's height stops depending on which blocked
-									    state it is in.
-									    ⛔⛔ `h-8` IS RESERVED, NOT FITTED, AND THE NUMBER IS
-									    MEASURED. At this block's real 210px inner width (1280×800,
-									    real compiled CSS) the C2 sentence wraps to TWO lines = 32px
-									    while the 429 and over-cap strings are one = 16px, and the
-									    TO WIN row is 20px. Reserving the tallest makes the height
-									    identical in all four states, which is the actual goal — a
-									    slot that merely collapsed would still JUMP by 12px on
-									    entering C2, and a form moving under someone is the
-									    complaint this row exists to answer.
-									    ⚠ THE C2 FIGURE DOES NOT CHANGE THE WRAP: measured with
-									    `Đ 9,999,999` as well as `Đ 0`, both 32px. The reservation
-									    is stable against the balance, not tuned to one fixture.
-									    ⛔⛔ `text-ink`, NOT `text-n5`, AND THE REASON IS CONTRAST —
-									    MEASURED IN A BROWSER, NOT ESTIMATED. This slot sits INSIDE
-									    the `dimmed` wrapper, and `--state-disabled-opacity` is 0.5.
-									    Composited against the real backdrop (rgb(24,24,24)):
-									    `--color-ink` #fafafa gives **5.08:1**, `--color-n5` #989898
-									    gives **2.50:1** — the latter is under the 4.5:1 body floor,
-									    on the one sentence that explains why the form is dead.
-									    ⚠ The C2 strip used to ESCAPE the dimming by sitting outside
-									    the wrapper, so it never needed this decision; moving it
-									    inside is exactly what makes the token load-bearing. Reaching
-									    for the muted default here would have quietly halved the
-									    legibility of the only message on a disabled form.
-									    ⚠⚠ THE ANNOUNCED REGIONS STAY EXACTLY WHERE THEY WERE, and an
-									    earlier draft of this slot moved them. That draft put ONE
-									    `aria-live="polite"` on this container, reasoning that "one
-									    region announces whichever currently occupies it". It cost two
-									    things, both silent: the 429 banner lost its `role="status"`
-									    (which carries an implicit `aria-atomic`, so the countdown was
-									    announced as a whole), and the TO WIN **label** came inside
-									    the region — so every debounced quote update re-announced
-									    "To win Đ …" instead of just the figure that changed.
-									    ⇒ Each arm carries its own region, as each did before: the
-									    notice is a `role="status"`, and the live region on the TO WIN
-									    arm stays on the VALUE span alone. Only one arm is ever
-									    mounted, so there is no double announcement to avoid. */}
-									<div
-										data-testid="composer-notice-slot"
-										className="flex h-8 items-center"
-									>
-										{notice !== null ? (
-											<p role="status" className="text-xs text-ink">
-												{notice}
-											</p>
-										) : (
-											<div className="flex w-full items-center justify-between">
-												<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
-													{COMPOSER_COPY.toWinLabel}
-												</span>
-												<span
-													aria-live="polite"
-													className="font-mono text-sm text-ink"
-												>
-													{toWin !== null ? `Đ ${toWin}` : "—"}
-												</span>
-											</div>
-										)}
-									</div>
-								</div>
-								{/* ⚠⚠ change set 7 §4 — LARGER, AND THE LABEL STACKS.
-								    `self-end` → `self-stretch` so it takes the empty height
-								    beside the AMOUNT / TO WIN block instead of hugging the
-								    bottom of it.
-								    ⛔⛔ THE ACCESSIBLE NAME STAYS ONE PHRASE. Two stacked
-								    spans would otherwise concatenate to `PlaceĐ BET` — two
-								    fragments run together, which is what a screen reader
-								    would announce. `aria-label` pins the single readable
-								    phrase, and WCAG 2.5.3 holds because it CONTAINS the
-								    visible words (case-insensitively): visible `Place` +
-								    `Đ BET`, name `PLACE Đ BET`.
-								    ⚠ It is also the SAME string every existing test queries
-								    by role+name, so the label change moves no guard. */}
-								<Button
-									type="button"
-									disabled={submitDisabled}
-									aria-disabled={submitDisabled}
-									aria-label={COMPOSER_COPY.submit}
-									onClick={submit}
-									className="h-auto min-h-[52px] flex-col gap-0 self-stretch px-4 py-2"
-								>
-									<span className="text-[11px] leading-tight font-medium">
-										Place
-									</span>
-									<span className="text-[15px] leading-tight font-bold">
-										Đ BET
-									</span>
-								</Button>
-							</div>
-
-							{/* ⚠ RPLY-1 · R3 — the over-cap strip moved into the notice slot
-							    above. W2.10-D is UNCHANGED in substance: typing is still
-							    allowed, submit is still disabled, and the strip still says
-							    the same words — it simply no longer adds 22px here.
-							    ⚠ THE BRIEF FOR THIS TASK CALLED IT A THIRD SIBLING OF THE
-							    OTHER TWO AND IT WAS NOT: it lived inside this footblock, so
-							    it cost `mt-1.5` (6px) rather than the column's 12px gap.
-							    MEASURED: the section grew 428.81 → 450.81 (+22.00) in this
-							    state while its direct flex-child count stayed at 2, which is
-							    how the difference showed up at all. */}
-						</div>
 					</div>
 				</div>
 			</div>
+
+			{/* `.footblock` (d5) — the money row. RPLY-2 · R1 — HOISTED to be a
+			    direct, `shrink-0` child of the section's own flex column (it was
+			    three levels deep inside the argument grid, pinned to the bottom of
+			    a taller non-scrolling column via `mt-auto`), so it and the submit
+			    button below it are ALWAYS visible regardless of how much the
+			    argument region above has had to shrink or scroll to fit. `mt-auto`
+			    is gone with it — that trick pinned the footblock to the bottom of a
+			    flex column that no longer exists in that shape.
+			    ⛔ THE DIMMING IS UNCHANGED, ONLY ITS MECHANISM: this row carries
+			    the SAME `dimmed` class the argument region above carries, directly
+			    rather than by ancestry, so the whole form still dims together in
+			    the floor-above-balance (C2) state — the WALLS forbid moving the
+			    notice slot's `text-ink` token, its reserved height or the
+			    `c2Sentence` string, and this keeps the contrast decision beneath
+			    it (see the notice-slot comment below) true exactly as measured. */}
+			<div
+				className={`flex shrink-0 items-stretch gap-3${dimmed ? ` ${dimmed}` : ""}`}
+			>
+				<div className="flex flex-1 flex-col rounded-(--r-chip) px-3 py-2 [border:var(--hairline)]">
+					<div className="flex items-center justify-between">
+						<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+							{COMPOSER_COPY.amountLabel}
+						</span>
+						{/* `.amtval` — flex-END, so the glued `Đ` sits against
+						    the digits and MOVES with them as the field's width
+						    tracks its content (`stakeFieldWidth`).
+						    ⚠ `ch` TRACKS THE DIGITS EXACTLY ONLY BECAUSE THIS
+						    FIELD IS `font-mono`. The `ch` unit is the width of
+						    the `0` glyph, so a proportional face makes `Nch`
+						    stop matching N digits and the `Đ` drifts off the
+						    number — and nothing goes red, because jsdom performs
+						    no layout and the width string is unchanged. Dropping
+						    `font-mono` below is therefore a silent break of R2,
+						    not a restyle. */}
+						<span className="flex min-w-0 items-baseline justify-end gap-1">
+							<span className="text-sm text-n5">Đ</span>
+							<Input
+								value={amount}
+								inputMode="decimal"
+								disabled={floorAbove || inFlight}
+								aria-label="Stake amount"
+								style={{ width: stakeFieldWidth(amount) }}
+								onChange={(e) => {
+									setAmount(e.target.value);
+									onEdit();
+								}}
+								onBlur={() => {
+									// T3: normalize the display to the clamped value.
+									if (isPositiveAmount(amount)) {
+										setAmount(assess.clampedAmount);
+									}
+								}}
+								className={`h-auto border-none p-0 text-right font-mono text-[22px] font-extrabold tabular-nums shadow-none [border:none] ${
+									assess.overCap ? "text-n4" : ""
+								}`}
+							/>
+						</span>
+					</div>
+					<div className="my-1.5 border-t border-n2" />
+					{/* ⚠⚠ RPLY-1 · R3 — THE NOTICE SLOT. TO WIN is meaningless in
+					    all three blocked states — the bet cannot be submitted in
+					    any of them — so the row is free, and a notice written into
+					    it costs no box and no gap. That is the whole mechanism:
+					    the composer's height stops depending on which blocked
+					    state it is in.
+					    ⛔⛔ `h-8` IS RESERVED, NOT FITTED, AND THE NUMBER IS
+					    MEASURED. At this block's real 210px inner width (1280×800,
+					    real compiled CSS) the C2 sentence wraps to TWO lines = 32px
+					    while the 429 and over-cap strings are one = 16px, and the
+					    TO WIN row is 20px. Reserving the tallest makes the height
+					    identical in all four states, which is the actual goal — a
+					    slot that merely collapsed would still JUMP by 12px on
+					    entering C2, and a form moving under someone is the
+					    complaint this row exists to answer.
+					    ⚠ THE C2 FIGURE DOES NOT CHANGE THE WRAP: measured with
+					    `Đ 9,999,999` as well as `Đ 0`, both 32px. The reservation
+					    is stable against the balance, not tuned to one fixture.
+					    ⛔⛔ `text-ink`, NOT `text-n5`, AND THE REASON IS CONTRAST —
+					    MEASURED IN A BROWSER, NOT ESTIMATED. This slot's row carries
+					    the `dimmed` class (RPLY-2 · R1 — a sibling row now, not an
+					    ancestor, but the same class and the same 0.5 opacity), and
+					    `--state-disabled-opacity` is 0.5. Composited against the
+					    real backdrop (rgb(24,24,24)): `--color-ink` #fafafa gives
+					    **5.08:1**, `--color-n5` #989898 gives **2.50:1** — the
+					    latter is under the 4.5:1 body floor, on the one sentence
+					    that explains why the form is dead.
+					    ⚠ The C2 strip used to ESCAPE the dimming by sitting outside
+					    the wrapper, so it never needed this decision; moving it
+					    inside is exactly what makes the token load-bearing. Reaching
+					    for the muted default here would have quietly halved the
+					    legibility of the only message on a disabled form.
+					    ⚠⚠ THE ANNOUNCED REGIONS STAY EXACTLY WHERE THEY WERE, and an
+					    earlier draft of this slot moved them. That draft put ONE
+					    `aria-live="polite"` on this container, reasoning that "one
+					    region announces whichever currently occupies it". It cost two
+					    things, both silent: the 429 banner lost its `role="status"`
+					    (which carries an implicit `aria-atomic`, so the countdown was
+					    announced as a whole), and the TO WIN **label** came inside
+					    the region — so every debounced quote update re-announced
+					    "To win Đ …" instead of just the figure that changed.
+					    ⇒ Each arm carries its own region, as each did before: the
+					    notice is a `role="status"`, and the live region on the TO WIN
+					    arm stays on the VALUE span alone. Only one arm is ever
+					    mounted, so there is no double announcement to avoid. */}
+					<div
+						data-testid="composer-notice-slot"
+						className="flex h-8 items-center"
+					>
+						{notice !== null ? (
+							<p role="status" className="text-xs text-ink">
+								{notice}
+							</p>
+						) : (
+							<div className="flex w-full items-center justify-between">
+								<span className="text-[9.5px] font-bold tracking-[0.12em] text-n5 uppercase">
+									{COMPOSER_COPY.toWinLabel}
+								</span>
+								<span aria-live="polite" className="font-mono text-sm text-ink">
+									{toWin !== null ? `Đ ${toWin}` : "—"}
+								</span>
+							</div>
+						)}
+					</div>
+				</div>
+				{/* ⚠⚠ change set 7 §4 — LARGER, AND THE LABEL STACKS.
+				    `self-end` → `self-stretch` so it takes the empty height
+				    beside the AMOUNT / TO WIN block instead of hugging the
+				    bottom of it.
+				    ⛔⛔ THE ACCESSIBLE NAME STAYS ONE PHRASE. Two stacked
+				    spans would otherwise concatenate to `PlaceĐ BET` — two
+				    fragments run together, which is what a screen reader
+				    would announce. `aria-label` pins the single readable
+				    phrase, and WCAG 2.5.3 holds because it CONTAINS the
+				    visible words (case-insensitively): visible `Place` +
+				    `Đ BET`, name `PLACE Đ BET`.
+				    ⚠ It is also the SAME string every existing test queries
+				    by role+name, so the label change moves no guard. */}
+				<Button
+					type="button"
+					disabled={submitDisabled}
+					aria-disabled={submitDisabled}
+					aria-label={COMPOSER_COPY.submit}
+					onClick={submit}
+					className="h-auto min-h-[52px] flex-col gap-0 self-stretch px-4 py-2"
+				>
+					<span className="text-[11px] leading-tight font-medium">Place</span>
+					<span className="text-[15px] leading-tight font-bold">Đ BET</span>
+				</Button>
+			</div>
+
+			{/* ⚠ RPLY-1 · R3 — the over-cap strip moved into the notice slot
+			    above. W2.10-D is UNCHANGED in substance: typing is still
+			    allowed, submit is still disabled, and the strip still says
+			    the same words — it simply no longer adds 22px here.
+			    ⚠ THE BRIEF FOR THIS TASK CALLED IT A THIRD SIBLING OF THE
+			    OTHER TWO AND IT WAS NOT: it lived inside this footblock, so
+			    it cost `mt-1.5` (6px) rather than the column's 12px gap.
+			    MEASURED: the section grew 428.81 → 450.81 (+22.00) in this
+			    state while its direct flex-child count stayed at 2 (RPLY-1's
+			    OWN count, at RPLY-1's OWN structure — RPLY-2 · R1 changes it to
+			    3, see the header-row comment above; this record is left as the
+			    measurement it was), which is
+			    how the difference showed up at all. */}
 
 			<ErrorStrip status={status} />
 

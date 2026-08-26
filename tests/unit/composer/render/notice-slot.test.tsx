@@ -165,8 +165,17 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 		// The control the three below are measured against. If this number changes
 		// for an unrelated reason, the three comparisons are still valid — they are
 		// written against THIS value, not against a literal.
+		//
+		// ⚠⚠ RPLY-2 · R1 — 2 → 3, MEASURED, NOT A REGRESSION. The footblock
+		// (AMOUNT/notice/TO WIN + `Đ BET`) used to live inside the argument
+		// region's wrapper (a child of a child); it is now hoisted to be its OWN
+		// `shrink-0` direct child of `<section>`, alongside the header row and
+		// the (also new) scrollable argument region — three direct children
+		// where there were two. The three comparisons below are unaffected
+		// exactly as the comment above says: they read `before` fresh from this
+		// same baseline function, never the literal.
 		const { container } = renderNone();
-		expect(sectionChildCount(container)).toBe(2);
+		expect(sectionChildCount(container)).toBe(3);
 		// …and the clean state shows TO WIN, which is what the notice displaces.
 		expect(noticeText(container)).toContain(COMPOSER_COPY.toWinLabel);
 	});

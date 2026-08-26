@@ -1089,6 +1089,10 @@ export function DebateView({
 									header={
 										<PositionStrip
 											side={side}
+											// RPLY-2 · R2 — mirrors the label/percent/TO-WIN to the
+											// BET's side on the column hosting its composer; `null`
+											// (every other render) leaves this identical to before.
+											composingSide={hostsComposer ? resultingSide : null}
 											pricing={market.pricing}
 											unitToWin={market.unitToWin}
 											viewer={viewer}
