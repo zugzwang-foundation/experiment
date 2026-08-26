@@ -19,8 +19,11 @@ import {
 import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
 import { signRead } from "@/server/storage/sign-read";
 
-/** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). */
-const READ_URL_TTL_SECONDS = 3600;
+/** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). Gate C
+ * fix — 7200 s (2× `cacheLife("minutes").expire`), not 3600: see
+ * `load-debate-view.ts`'s constant for why equal-to-expire silently expires
+ * URLs still being served. */
+const READ_URL_TTL_SECONDS = 7200;
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;

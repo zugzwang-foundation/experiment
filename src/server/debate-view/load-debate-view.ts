@@ -32,8 +32,19 @@ import { type AuthorIdentity, resolveAuthors } from "./resolve-authors";
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DebateViewReader = DbClient | DbTransaction;
 
-/** D9 — the DEBATE.4 render-path presigned-GET TTL (sign-read.ts seam tag). */
-const READ_URL_TTL_SECONDS = 3600;
+/**
+ * D9 — the DEBATE.4 render-path presigned-GET TTL (sign-read.ts seam tag).
+ *
+ * Gate C fix — MUST exceed `cacheLife("minutes").expire` (3600 s), not equal
+ * it. `getCachedDebateView` can serve an entry generated up to `expire`
+ * seconds ago (stale-while-revalidate), and a URL minted AT generation time
+ * is embedded in that entry — so a TTL equal to `expire` lets a served URL
+ * already be at or past its own expiry, a silent broken image with no error
+ * and no failing test. 7200 s (2×) covers the full worst-case serve age plus
+ * render/fetch latency, while staying short enough to hold D9's original
+ * intent (a presigned URL, not a long-lived link).
+ */
+const READ_URL_TTL_SECONDS = 7200;
 
 /**
  * Defensive author fallback. Every `comments.user_id` is a real `users` row

@@ -78,10 +78,13 @@ export default function DiscoveryPage() {
  *     cached in any form. `pricing` goes straight onto `card` from here.
  *   - `getCachedMarketDiscoveryData(id, reserves)` — cached, KEYED on the
  *     `reserves` value just read live, so a hit is only possible when
- *     reserves are provably unchanged (see that function's docstring for why
- *     this makes `topPosts[].currentValue` safe to cache without ever being
- *     stale). `reserves` itself stays a server-local binding — never pushed
- *     onto `card`, which crosses into the `"use client"` carousel (C8/V13).
+ *     reserves are provably equal to a previously observed value (see that
+ *     function's docstring for why this makes `topPosts[].currentValue` safe
+ *     to cache without ever being stale — purity, not pool stillness; and
+ *     for ADR-0041 OQ-1, the open fee-less-CPMM ABA gap that makes those two
+ *     different claims). `reserves` itself stays a server-local binding —
+ *     never pushed onto `card`, which crosses into the `"use client"`
+ *     carousel (C8/V13).
  * Still sequential per market (the bounded ≤8-market cost the plan accepts;
  * batching is the OQ-1 C follow-up).
  *

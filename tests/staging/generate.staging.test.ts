@@ -103,6 +103,7 @@ vi.mock("next/navigation", () => ({
 vi.mock("next/cache", () => ({
 	revalidatePath: vi.fn(),
 	revalidateTag: vi.fn(),
+	updateTag: vi.fn(),
 }));
 
 // `requireAdminSession` is ADR-0036 primitive 3's MAY-be-mocked list, and the

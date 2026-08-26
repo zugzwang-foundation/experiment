@@ -10,8 +10,10 @@ import { mintReadUrl } from "@/server/storage/r2";
 type DiscoveryReader = DbClient | DbTransaction;
 
 /** Discovery render-path presigned-GET TTL — mirrors the DEBATE.4 D9 seam
- * (`load-debate-view.ts` READ_URL_TTL_SECONDS). */
-const READ_URL_TTL_SECONDS = 3600;
+ * (`load-debate-view.ts` READ_URL_TTL_SECONDS). Gate C fix — 7200 s (2×
+ * `cacheLife("minutes").expire`), not 3600: see that file's constant for why
+ * equal-to-expire silently expires URLs still being served. */
+const READ_URL_TTL_SECONDS = 7200;
 
 /**
  * Sign a READ URL against the `market-media` bucket arm (ADR-0026 / SPEC.2
