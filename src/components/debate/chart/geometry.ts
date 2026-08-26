@@ -122,7 +122,18 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 	const yNo = yNoPx(yes);
 	const gap = Math.abs(yYes - yNo);
 	if (gap >= TERMINAL_LABEL_MIN_GAP) {
-		return { yes: yYes, no: yNo };
+		// ⚠ CLAMPED HERE TOO — and this line is a FIX, not symmetry for its own
+		// sake. The early return originally handed back the raw positions on the
+		// reasoning that a non-colliding pair needs no adjustment. Collision and
+		// CLIPPING are different failures: at YES ≳ 98.44 % the two labels are 300
+		// units apart and perfectly legible, while the upper one's 10px box sits
+		// at y ≈ −1.8 and is cut off by the `<svg>` edge. A binary market a week
+		// from resolution lives exactly there.
+		// ⛔ Caught by `@test-writer` at the CHART-1 audit, which also found that
+		// the case NAMED for the clamp could never have caught it: it asserted the
+		// label's CENTRE was inside `0…VIEWBOX_H` rather than its BOX, so deleting
+		// `clampLabelY` outright left it green. The assertion now measures the box.
+		return { yes: clampLabelY(yYes), no: clampLabelY(yNo) };
 	}
 	const push = (TERMINAL_LABEL_MIN_GAP - gap) / 2 + 2;
 	const yesGoesUp = yYes <= yNo;

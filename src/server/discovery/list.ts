@@ -16,11 +16,7 @@ import { getMarketTotals } from "@/server/debate-view/market-totals";
 import { getCachedReserveWalk } from "./cached-series";
 import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
 import { getDefaultMarketMediaUrl } from "./media";
-import {
-	loadPriceSeries,
-	mapWalkToSeries,
-	type PricePoint,
-} from "./price-series";
+import { mapWalkToSeries, type PricePoint } from "./price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -32,7 +28,10 @@ type DiscoveryReader = DbClient | DbTransaction;
  * `getPrices` authority (null defensive — no pool row); `totals` the
  * `Đ staked · posts · replies` stat line; `imageUrl` the presigned GET for
  * the market's `is_default` `market_media` row (null defensive). The price
- * sparkline series rides `loadPriceSeries` (Slice 2), composed at the page.
+ * series rides `getCachedReserveWalk` → `mapWalkToSeries` (CHART-1), composed at
+ * the page, where `withLiveTail` also pins its live right edge. ⚠ It rode
+ * `loadPriceSeries` until CHART-1 and it is not a "sparkline" any more — the
+ * hero renders the same time-scaled component `/m/[slug]` does.
  */
 export type DiscoveryCard = {
 	id: string;
@@ -213,7 +212,15 @@ export async function getCachedMarketDiscoveryData(
 	// protecting — the chart's right edge agreeing with the price bar — is now
 	// guaranteed by construction instead of by monitoring, because
 	// `withLiveTail` composes that edge from the live read at the page. The
-	// instrument survives on `loadPriceSeries` for any uncached caller.
+	// ⛔ AND THE INSTRUMENT DOES NOT SURVIVE IN PRODUCTION — this sentence used
+	// to claim it did, "on `loadPriceSeries` for any uncached caller", which
+	// was false the moment it was written: this was `loadPriceSeries`'s LAST
+	// production call site, and it now has none. Caught by `@test-writer` at
+	// the CHART-1 audit. The function and its suite are retained rather than
+	// deleted — the drift comparison it carries is the only place in the repo
+	// that checks the event replay against the live pool, and that check is
+	// exactly what would surface an events↔pools divergence. Whether to re-site
+	// it or drop it is a Gate C question, flagged rather than decided here.
 	const series = mapWalkToSeries(
 		await getCachedReserveWalk(marketId),
 		DISCOVERY_SERIES_MAX_POINTS,
