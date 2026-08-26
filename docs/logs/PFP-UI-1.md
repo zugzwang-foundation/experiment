@@ -1,6 +1,6 @@
 # PFP-UI-1 — the avatar becomes a circle — execute log
 
-**PR # TBD at `gh pr create`** (next action) · branch `feat/pfp-ui-1` · base `origin/main` @ `5463f61aa34cd059ef8c441019cb83251be352b9` · run from worktree `~/code/zugzwang/pfp-ui-1` (detached at `origin/main`, cut before this session) · squash SHA TBD at merge.
+**PR #421** (OPEN, not draft — founder merges, and NOT on CI-green alone; see the gate below) · branch `feat/pfp-ui-1` · base `origin/main` @ `5463f61aa34cd059ef8c441019cb83251be352b9` · run from worktree `~/code/zugzwang/pfp-ui-1` (detached at `origin/main`, cut before this session) · squash SHA TBD at merge.
 
 Plan: `docs/plans/PFP-UI-1.md` (870 lines, md5 `24652058c6a9c77145228b20fb913540`), committed as `1bbaf9b` **before any code moved**. Full execute report: `~/Downloads/zz_PFP-UI-1_EXEC_2026-08-26T1907.md` — the primary artifact; this log is the repo-side companion §5.9 requires, not a duplicate.
 
