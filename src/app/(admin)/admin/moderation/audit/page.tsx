@@ -31,7 +31,11 @@ import {
 // before ANY data read (an outer `(admin)` layout would loop the in-group
 // login). READ-ONLY: no action/handler; the search form is a GET form. Blocked
 // images are withheld (hasBlockedImage boolean) — never rendered, no r2 key.
-export const dynamic = "force-dynamic";
+//
+// S-4 Phase B — `instant = false` (below): `requireAdminPage` (`cookies()`)
+// plus this page's own `searchParams` search form are read unwrapped; either
+// errors the `cacheComponents` prerender build otherwise. Deferred, not
+// restructured — admin is outside S-4's scope (CLAUDE.md §1).
 
 const ROW_LIMIT: NonNullable<LoadModerationAuditFeedOptions["limit"]> = 200;
 
@@ -390,6 +394,8 @@ function SearchResultRow({
 		</article>
 	);
 }
+
+export const instant = false;
 
 export default async function ModerationAuditPage(props: {
 	searchParams: Promise<SearchParams>;

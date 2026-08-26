@@ -14,8 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // lands the route and the suite runs for real.
 //
 // PINNED ROUTE CONTRACT (the implementer matches EXACTLY):
-//   export const dynamic = "force-dynamic";
 //   GET(request, ctx: { params: Promise<{ slug: string }> })
+//   (no `dynamic` export since S-4 Phase B — redundant/build-breaking under
+//   `cacheComponents`; this handler stays dynamic by default, unconditional
+//   runtime read, no `'use cache'` anywhere in its path)
 //   1. Session gate FIRST — auth.api.getSession({ headers: request.headers });
 //      no session → 401 { ok: false, error: { code: "error_session_required",
 //      message: "session required" } } — the bets-endpoint code string reused

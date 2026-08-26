@@ -408,33 +408,48 @@ function BrandHero() {
 }
 
 /**
- * `.idhero` — the rounded-square avatar hero (W2.2 mockup `:79-81`).
+ * `.idhero` — the avatar hero (W2.2 mockup `:79-81`).
  *
- * The RADIUS LIVES ON THE FRAME, and the avatar is squared off inside it. The
- * primitive is round by default and carries its own ring, so overriding both on
- * the primitive would leave two radius utilities racing in the compiled sheet;
- * letting the frame clip via `overflow-hidden` is one declaration with no
- * ambiguity. The placeholder asset is a full-bleed square, so it fills the
- * frame edge to edge.
+ * ⚠ PFP-UI-1 (2026-08-26): THE SHAPE IS A CIRCLE, AND THE FRAME NO LONGER
+ * OWNS IT. Everything this block used to describe — the radius on the frame,
+ * the `overflow-hidden` clip, and the three `rounded-none` overrides that
+ * squared the primitive off inside it — existed for one reason: to defeat a
+ * round primitive. That reason is gone, so the mechanism went with it and the
+ * primitive is simply itself at `size-[140px]`.
+ *
+ * The rounded square was never wrong; it was ratified against an avatar nobody
+ * had seen. `--imgr` was assigned to avatars while the asset was an abstract
+ * empty square (values-log v0_3 `:44`, O6 — *"Empty square in CD is the correct
+ * current state"*). The art that arrived on 2026-08-25 is a disc with padding
+ * around it, so framing it as a square renders a median 24.83% of the tile as
+ * cream margin. Matching the mount to the shape the asset already has is worth
+ * 4.1× on visible padding, and it is not a compensation — see the plan's §0.3.
+ *
+ * ⚠ DELETING `after:hidden` IS WHAT GIVES THIS MOUNT ITS RING. The suppression
+ * was collateral: the pseudo-element ring is round, so it had to go when the
+ * frame was square. Removing it restores `var(--avatar-ring)` from
+ * `ui/avatar.tsx:34`, which is what puts this mount in parity with the other
+ * seven under the one ring rule.
  *
  * ⛔ ITS GREY FILL AND ITS BORDER WENT WITH THE BAND (O1-DECK-R2 refinement 4 +
  * homogeneity). The founder's ruling is *"no container, no band background"*
  * across all seven cards, so this one cannot keep a `bg-n1` and a 1.5px ink
- * frame while the other six sit bare on the card. What survives is the
- * rounded-square CLIP, which is the avatar's ratified shape (register Card 2,
- * *"rounded-square at `--imgr`… matches `.navav`"*) rather than decoration
- * around it. Sized to 140px to match the figure row on every other card.
+ * frame while the other six sit bare on the card. Sized to 140px to match the
+ * figure row on every other card.
+ *
+ * ⚠ The src is still the PLACEHOLDER, deliberately, while the register at
+ * `ZUGZWANG-O1-DECK_copy-register_v1_0.md:80` calls this slot the viewer's live
+ * avatar. Reshaping the frame makes that gap more visible, not less — it is
+ * parked as `PD-PFP-10` rather than carried silently, because wiring it means
+ * giving `CardFigure` viewer data and creating a second PFP path beside the
+ * resolver-owned builder (see `:17-28`).
  */
 function IdentityHero({ pseudonym }: { pseudonym: string | null }) {
 	return (
-		<div className="mb-[18px] flex size-[140px] items-center justify-center overflow-hidden rounded-(--imgr)">
-			<Avatar className="size-full rounded-none after:hidden">
-				<AvatarImage
-					src="/pfp-placeholder.svg"
-					alt=""
-					className="rounded-none"
-				/>
-				<AvatarFallback className="rounded-none text-[28px] font-extrabold">
+		<div className="mb-[18px] flex size-[140px] items-center justify-center">
+			<Avatar className="size-full">
+				<AvatarImage src="/pfp-placeholder.svg" alt="" />
+				<AvatarFallback className="text-[28px] font-extrabold">
 					{pseudonym?.charAt(0) ?? ""}
 				</AvatarFallback>
 			</Avatar>

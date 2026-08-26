@@ -7,6 +7,13 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+	revalidatePath: vi.fn(),
+	revalidateTag: vi.fn(),
+	cacheTag: vi.fn(),
+	cacheLife: vi.fn(),
+}));
+
 import { events, markets } from "@/db/schema";
 import { closeDueMarkets, closeMarket } from "@/server/markets/close";
 import {

@@ -177,7 +177,16 @@
 	--border-hero: 1px solid var(--color-n3); /* rung 2 — FOUNDER-RULED, PD-2-07 */
 	--ring-active: 1.5px solid var(--color-n4); /* rung 3 — ruling OPEN, PD-2-08 */
 	--imgmax: 160px; /* tunable — comment-image max (consumed by DEBATE.4) */
-	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, avatars, media, graph panels) */
+	/* ⚠ "avatars" WAS STRUCK FROM THIS SCOPE at PFP-UI-1 (2026-08-26). The avatar
+	 * is a circle at all eight mounts and its edge is `--avatar-ring`, not a
+	 * radius — the token was scoped to avatars while the avatar was an abstract
+	 * empty square, and the art delivered on 2026-08-25 is a disc with padding.
+	 * ⛔ THE VALUE IS UNCHANGED AND MUST STAY SO: 19 of this token's 21 consumers
+	 * are not avatars (market thumbs, comment images, media panels, composer
+	 * wells), so editing it would re-radius every image in the product. This line
+	 * reads like a token definition, which is exactly why the claim buried in its
+	 * comment was the one most likely to be missed. */
+	--imgr: 6px; /* image corner radius — ratified (values-log §3 item 2: images, media, graph panels) */
 	/* Applied surfaces */
 	--surface-page: var(--color-ground);
 	--surface-inset: var(--color-n1);

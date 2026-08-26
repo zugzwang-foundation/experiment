@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -125,5 +125,16 @@ export async function moderateComment(
 	});
 
 	revalidatePath("/admin/moderation");
+	// S-4 Phase C — a "remove" changes `content_removed`, which
+	// `getCachedMarketDiscoveryData`'s hero read masks against (`loadRemovedSet`
+	// inside `selectHeroTopPosts`); the Discovery cache for this market must not
+	// keep serving a removed post. A "ban" does NOT: ban removes voice, not
+	// content — a banned user's prior posts stay visible (ADR-0021), so nothing
+	// Discovery renders changes. `cacheTag(\`market:${id}\`)` is set on that
+	// cached function specifically so this invalidates only the affected
+	// market's entry, not the whole Discovery listing.
+	if (action === "remove") {
+		revalidateTag(`market:${comment.marketId}`, "max");
+	}
 	return { ok: true, data: { modActionId, action } };
 }

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { and, asc, eq, lte } from "drizzle-orm";
+import { revalidateTag } from "next/cache";
 import { v7 as uuidv7 } from "uuid";
 
 import { db } from "@/db";
@@ -40,7 +41,7 @@ export async function closeMarket(args: {
 	// Minted internally ONCE at entry (gate ruling), closed over (ADR-0016 D1).
 	const closedEventId = uuidv7();
 
-	return runLifecycleTransaction(
+	const result = await runLifecycleTransaction(
 		{ marketId: args.marketId, flow: "W-4-CLOSE", expectedStatus: ["Open"] },
 		async ({ tx, market }) => {
 			if (market === null) {
@@ -91,6 +92,14 @@ export async function closeMarket(args: {
 			};
 		},
 	);
+
+	// S-4 Phase C, post-commit (mirrors `openMarket`'s posture — ADR-0014, never
+	// inside the transaction). A Closed market drops out of Discovery's
+	// `status = 'Open'` listing, so this busts the LISTING tag; `closeDueMarkets`
+	// below inherits this for free since it calls `closeMarket` per candidate.
+	revalidateTag("discovery", "max");
+
+	return result;
 }
 
 /**

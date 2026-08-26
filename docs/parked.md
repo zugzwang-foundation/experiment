@@ -2938,6 +2938,39 @@ it measures the shell. Recorded as a SCALE S-5 input, not a standalone task.
 
 ---
 
+## PD-PFP-10 — the onboarding deck's Card 2 is reshaped to a circle while still hard-coding the placeholder
+
+**Originating task:** PFP-UI-1 (2026-08-26), §7.2. Rowed in the SAME commit as the code, per the
+standing rule at the head of this file — the plan named a routing destination, so it gets a row
+rather than a promise.
+
+`components/onboarding/figures.tsx`'s `IdentityHero` renders `/pfp-placeholder.svg` as a literal.
+The O1-DECK copy register calls that slot *"the viewer's live PFP avatar as a centred hero"*, and
+`DESIGN_W2_2_CLOSE-OUT.md` says the same. PFP-1 (`c49138d`) made live PFPs real everywhere else:
+this is now the **one surface** still on the placeholder by construction rather than by fallback.
+
+**Why this pass makes it worse rather than better, which is the whole reason for the row.** The
+circle pass reshapes the frame around that placeholder. It does not touch the src, so the deck
+now presents a mount that looks exactly like the seven live ones and is not one. **A divergence
+that was legible as "nothing is wired yet" becomes invisible the moment the frame stops
+advertising it.**
+
+**Why it is parked and not fixed here.** Wiring a live avatar into the deck means giving
+`CardFigure` viewer data it does not currently take — a new prop threaded through the whole figure
+chain, which is a different change with a different blast radius. More importantly the deck's own
+docblock argues on the record that a deck-local avatar fetch would create a **second PFP path**
+beside the one resolver-owned builder, which is exactly what founder ruling **D-5** (2026-08-18)
+forecloses. That argument is sound and this pass does not overturn it. Shape was in scope; data
+flow was not.
+
+**Trigger.** Whenever the deck next takes viewer data for any reason. At that point the second
+path stops being a new cost and becomes a marginal one, and D-5's objection no longer bites.
+
+**Owner.** Whoever rules `OD-2` — the all-circle vs all-rounded-square decision this pass is
+built on. If `OD-2` were ever reversed the row survives unchanged: the src is wrong either way.
+
+---
+
 ## Sequencing note (stated here, not acted on)
 
 PERF-1 was carried as the sole GO-LIVE BLOCKER row (line 36, SEQUENCE table intro) and closed
