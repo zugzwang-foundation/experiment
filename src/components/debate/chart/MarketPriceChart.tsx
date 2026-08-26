@@ -12,7 +12,24 @@ import {
 	yYesPx,
 } from "./geometry";
 
-export type MarketPriceChartMode = "collapsed" | "expanded";
+/**
+ * The three surfaces this one component renders (CHART-1, SPEC.1 1.0.40 §9/§22).
+ *
+ * `hero` is the Discovery hero, which until CHART-1 rendered a DIFFERENT
+ * component — `PriceSparkline`, index-spaced and `aria-hidden`. Index spacing
+ * draws twenty bets in an hour identically to twenty bets across three weeks,
+ * which was defensible while the hero was a decorative thumbnail beside a card
+ * sparkline. It stopped being one when HTML-FINISH · DISCOVERY deleted the card
+ * sparkline and left the hero as Discovery's ONLY price graph. It is time-scaled
+ * here for the same reason §9 gave for market detail: on a surface a reader uses
+ * to judge whether a market has already moved, chronology *is* the information.
+ *
+ * `hero` renders lines and terminals and NO axis — it is a third of the height
+ * of the collapsed card, where three date labels would be noise rather than
+ * orientation. That is a presentational choice inside canon's jurisdiction, not
+ * a spec pin; §22 and C-CHART-2 both stop at "same component, same derivation".
+ */
+export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
 
 /** The market-detail price-chart SVG (SPEC.1 1.0.32 §9 / F-DEBATE-5) — two
  * complementary YES/NO probability lines mirrored about 50 % (design-language
@@ -52,6 +69,12 @@ export function MarketPriceChart({
 	return (
 		<svg
 			data-testid="market-price-chart"
+			// CHART-1 — which of the three surfaces this render is. The hero's
+			// retired `PriceSparkline` carried `data-size`, and two hero tests
+			// selected on it; keeping a mode attribute means a guard can still
+			// name the surface it is asserting about without reaching for a
+			// styling class to identify the thing under test (OVN-V5).
+			data-mode={mode}
 			viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
 			preserveAspectRatio="none"
 			aria-hidden="true"

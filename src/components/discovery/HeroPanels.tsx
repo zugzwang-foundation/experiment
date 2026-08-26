@@ -8,9 +8,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
-
+import { MarketPriceChart } from "../debate/chart/MarketPriceChart";
 import { MarketThumb } from "./MarketThumb";
-import { PriceSparkline } from "./PriceSparkline";
 import { StatLine } from "./StatLine";
 
 /**
@@ -91,7 +90,7 @@ export function HeroPanels({
 			    panels' stretched-link workaround: that workaround exists ONLY
 			    because those panels contain a second, independent author anchor
 			    and anchors cannot nest. This panel contains none — thumb, `<h2>`,
-			    `StatLine`, `PriceSparkline` and `PriceBar` are all anchor-free —
+			    `StatLine`, the price chart and `PriceBar` are all anchor-free —
 			    so the simple form is available and is used.
 			    ⚠ Canon §3 item 6 ("Pick / carousel-select is view-only — never
 			    mutates a position") governs POSITION MUTATION. Navigating to
@@ -135,8 +134,21 @@ export function HeroPanels({
 				    FLOOR rather than a fixed height — and `flex-1` lets it grow
 				    above that. A growing box with the shipped number as its
 				    minimum invents nothing. */}
+				{/* CHART-1 — THE SAME COMPONENT `/m/[slug]` RENDERS, in `hero` mode
+				    (SPEC.1 1.0.40 §22 + §9). This slot held `PriceSparkline`, a
+				    second, index-spaced two-line graph that drew twenty bets in an
+				    hour identically to twenty bets across three weeks.
+				    ⚠ THAT WAS DEFENSIBLE AND STOPPED BEING SO. §9 called the hero
+				    sparkline "decorative" while the CARD carried one too; HTML-FINISH ·
+				    DISCOVERY deleted the card's, leaving this the only price graph on
+				    the surface a reader uses to pick a market. A decorative rendering
+				    is the wrong thing to be the only one.
+				    ⚠ NO GEOMETRY CHANGED HERE. Both components fill this box the same
+				    way — `preserveAspectRatio="none"` on `h-full w-full` — so the box,
+				    its border, its `min-h-24` floor and its `flex-1` growth are
+				    untouched. What changed is what the X axis MEANS. */}
 				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
-					<PriceSparkline series={series} size="hero" />
+					<MarketPriceChart series={series} mode="hero" />
 				</div>
 				<div className="mt-[9px]">
 					<PriceBar pricing={card.pricing} size="hero" />
