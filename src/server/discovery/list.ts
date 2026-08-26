@@ -221,6 +221,18 @@ export async function getCachedMarketDiscoveryData(
 	// that checks the event replay against the live pool, and that check is
 	// exactly what would surface an events↔pools divergence. Whether to re-site
 	// it or drop it is a Gate C question, flagged rather than decided here.
+	// ⛔ AND THE HUMAN TELL WENT WITH IT, WHICH IS THE HALF THIS COMMENT MISSED.
+	// `@security-auditor` observed that `withLiveTail` now composes the terminal
+	// from the live pool price on BOTH surfaces — so an events↔`pools`
+	// divergence no longer shows up as the chart disagreeing with the bar
+	// either. The automated detector and the visual one were removed by the same
+	// commit, on the money surface, and that coincidence is the finding rather
+	// than either removal alone. A pool that moved without a matching event is
+	// exactly the shape a CPMM accounting bug takes. ⇒ RE-SITING THIS CHECK IS
+	// OWED, and it belongs somewhere that runs against production — beside the
+	// `position_drift` cron, or as a staging gate — never back on the render
+	// path, where a floored history guarantees it fires by design and trains its
+	// reader to ignore it.
 	const series = mapWalkToSeries(
 		await getCachedReserveWalk(marketId),
 		DISCOVERY_SERIES_MAX_POINTS,

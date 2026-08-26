@@ -77,6 +77,27 @@ const EXPIRE_SEC = WINDOW_SEC * 60;
  * still be correct, and the entire cost argument would be gone with no test
  * going red. Read that as a constraint on the bet path, not a fragility here.
  *
+ * ⛔ `marketId` MUST BE A DATABASE-RESOLVED ID, NEVER A REQUEST PARAMETER, and
+ * nothing but this sentence says so. Both call sites resolve it first —
+ * `getMarketBySlug` (which `notFound()`s an unknown slug) and
+ * `getCachedDiscoveryMarketIds` (which reads the `markets` table) — so the key
+ * space is bounded by the market count today. It is bounded by CONVENTION, not
+ * by the signature: the parameter is a `string`, and a future Route Handler that
+ * took an id off the request and passed it straight in — `m/[slug]/quote/route.ts`
+ * is already that shape — would hand an unauthenticated caller the ability to
+ * write arbitrarily many entries into the shared cache handler and evict the real
+ * ones. Raised by `@security-auditor` at the CHART-1 cascade.
+ *
+ * ⚠ TAGGED `market:${id}` BUT NOT `discovery`, unlike both of its callers. That
+ * is correct today and was traced rather than assumed: every lifecycle
+ * transition that fires `revalidateTag("discovery")` — open, close, void —
+ * leaves this walk's inputs untouched, because `openMarket` is the only writer
+ * of `market.opened` and no bet can land on a non-`Open` market (the W-1
+ * transaction rejects buys and sells alike). It stops being correct the day a
+ * lifecycle transition moves the pool, which is not hypothetical: `pool_unwind`
+ * exists in `dharma_entry_type` and is documented dormant in v1. If it ever
+ * wakes, this function needs the `discovery` tag too.
+ *
  * Returns `[]` for a market with no `market.opened` event. Read-only.
  */
 export async function getCachedReserveWalk(
