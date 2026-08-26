@@ -183,10 +183,15 @@ describe("RPLY-3 · R2 — the reply card is a post card minus the split bar", (
 	 */
 	function anatomy(container: HTMLElement): string[] {
 		return Array.from(root(container).children).map((el) => {
-			if (
-				el.querySelector('[data-testid="post-image-placeholder"]') !== null ||
-				el.querySelector("img") !== null
-			) {
+			// ⚠ THE IMAGE CELL IS IDENTIFIED BY ITS OWN CLASS FIRST, and `img` is
+			// only a fallback INSIDE that. The first draft asked `querySelector("img")`
+			// before anything else, which would classify the PROFILE ROW as the image
+			// cell the moment `ArgProfile`'s avatar mounted an `<img>`. It happens not
+			// to today — Radix's `AvatarImage` never resolves a load in jsdom — so the
+			// guard was correct by accident of the harness rather than by rule, and the
+			// accident would end silently. Caught by `@code-reviewer` (LOW).
+			const cls = (el.getAttribute("class") ?? "").split(/\s+/);
+			if (cls.includes("flex-1") && cls.includes("justify-center")) {
 				return "IMAGE-CELL";
 			}
 			if (el.querySelector("p") !== null) {

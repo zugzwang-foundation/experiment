@@ -9,12 +9,18 @@ import type { DebateReply, PresentReply } from "./types";
  * A depth-1 reply row (design-language §3.1 "Reply"). ✅ HTML-FINISH · MARKET
  * DETAIL row 26 rebuilt its anatomy to d5's `.rcardhead` (`:1545-1548`): an
  * `ArgProfile` head (avatar · pseudonym | side chip with entry price | staked ·
- * card actions) · the reply's image · the argument text. ⇒ The head is REUSED
+ * card actions) · the argument text · the reply's image. ⇒ The head is REUSED
  * from `ArgProfile` rather than hand-rolled, so the post and reply author rows
  * cannot drift apart again — they had already. A removed reply renders only its frozen side + the
  * "removed by moderator" placeholder — its body/author/marker/stake were
  * withheld server-side (§6), so they are absent from `reply` at the type level.
  * No vote control anywhere (§4.3).
+ *
+ * ⚠ RPLY-3 · R2 REVERSED THE LAST TWO, and the sentence above is corrected in
+ * place rather than left for the amendment further down to contradict (`O-5`) —
+ * an operative statement a reader reaches first is where the correction has to
+ * land. The card now reads head → argument → image, which is `PostCard`'s own
+ * order; the reasoning is at the image cell.
  *
  * UNWIRE-1 — the bookmark/download `CardActions` cluster this reply card used
  * to share with `ArgProfile` is gone (bookmark module unwired product-wide);
@@ -97,8 +103,18 @@ export function ReplyCard({
 			    file's own line above states the rule: a reply has no separate title,
 			    so its BODY *is* its title. `PostCard`'s title slot is therefore this
 			    row, and putting it above the image is what makes the two cards the
-			    same composition minus the split bar — which is the only difference
-			    the founder asked to keep. */}
+			    same COMPOSITION minus the split bar.
+			    ⚠ COMPOSITION, NOT EVERY DETAIL — the founder's "only the S/C bar is
+			    removed" is a claim about the arrangement, and overstating it as
+			    full parity would be the sort of sentence a later reader audits and
+			    finds false. Two known differences survive on purpose and neither is
+			    R2's to close: `PostCard` carries a `LaneBadge` beside its head, and
+			    its `KnowMore` is OVERLAID on the title in a reserved gutter
+			    (`absolute right-0 bottom-0`, `pr-28`) where this card's is a flex
+			    sibling. That mount's own comment records why the overlay exists —
+			    a flex sibling measured the title down from 628px to 104px — so
+			    porting it is a real change with a real measurement behind it, not
+			    a tidy-up. Docketed, not done. */}
 			<div className="flex items-start justify-between gap-2">
 				<p className="text-sm whitespace-pre-line">{reply.body}</p>
 				{/* HTML-FINISH · MARKET DETAIL row 27 — d5's `.rtitle.plust` `+`

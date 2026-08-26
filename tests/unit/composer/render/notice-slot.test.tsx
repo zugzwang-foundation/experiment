@@ -242,24 +242,69 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 		// `mt-2`, a `py-3` that only appears when disabled — which would move the
 		// height just as surely while the count held.
 		//
-		// ⇒ This compares the section's direct children by CLASS STRING across
-		// all four states. Anything height-bearing lives in those strings.
+		// ⇒ This compares EVERY ELEMENT IN THE SECTION by class string across all
+		// four states. Anything height-bearing lives in those strings.
 		//
-		// ⚠ THE ONE THING THAT LEGITIMATELY DIFFERS IS THE DIMMING, and it is
-		// normalised rather than ignored: the C2 state adds
-		// `opacity-(--state-disabled-opacity)` to the argument region, which is
-		// the state's whole visual point and costs no height. Normalising it
-		// keeps this guard about GEOMETRY. ⛔ Its own correctness — that the
-		// footblock INHERITS that opacity now rather than re-applying it, since a
-		// second copy would composite to 0.25 and halve the notice's measured
-		// contrast — is asserted in `composer-fit.test.ts`, not here.
-		const shape = (container: HTMLElement) =>
-			Array.from(section(container).children).map((el) =>
-				(el.getAttribute("class") ?? "")
-					.split(/\s+/)
-					.filter((c) => c !== "opacity-(--state-disabled-opacity)")
-					.join(" "),
-			);
+		// ⛔⛔ EVERY ELEMENT, NOT THE DIRECT CHILDREN — AND THE FIRST DRAFT SAID
+		// "direct children" WHILE ITS OWN COMMENT NAMED THE CASE THAT ESCAPES.
+		// `@code-reviewer` proved it: a conditional `py-3` on the FOOTBLOCK — the
+		// comment's literal example — left all twelve tests green, because R1 had
+		// just moved the footblock three levels down, out of the direct-child set.
+		// Under RPLY-2 the same guard would have caught it, since the footblock
+		// WAS a direct child then. A guard written in the same commit as a move
+		// inherits the shape from before the move unless it is asked to walk.
+		//
+		// ⚠⚠ EXACTLY TWO THINGS LEGITIMATELY DIFFER, and both are normalised
+		// rather than ignored — naming them is what keeps this guard about
+		// GEOMETRY rather than about sameness.
+		//
+		// (1) THE DIMMING. The C2 state adds `opacity-(--state-disabled-opacity)`
+		// to the argument region: the state's whole visual point, and it costs no
+		// height. ⛔ Its own correctness — that the footblock INHERITS that
+		// opacity now rather than re-applying it, since a second copy would
+		// composite to 0.25 and halve the notice's measured contrast — is
+		// asserted in `composer-fit.test.ts`, not here.
+		//
+		// (2) THE NOTICE SLOT'S CONTENTS, which is the whole R3 mechanism: the
+		// clean state renders a TO WIN row (a flex `div` and two `span`s), a
+		// blocked state renders one `p`, and both sit inside a slot whose `h-8`
+		// is RESERVED rather than fitted. Different elements, identical box —
+		// which is precisely the thing R3 bought. So the slot ELEMENT stays in
+		// the comparison, because its `h-8` is the reservation and losing it is
+		// the regression; its DESCENDANTS are excluded.
+		// ⛔ Excluding the slot itself would delete the assertion that matters;
+		// including its children reds the guard on the design.
+		//
+		// (3) THE OVER-CAP STATE RE-COLOURS THE STAKE FIELD — `text-ink` becomes
+		// `text-n4` (`assess.overCap ? "text-n4" : ""`), shipped long before this
+		// task. A colour is not a geometry, so the ramp tokens are stripped.
+		// ⚠⚠ STRIPPED BY THE COLOUR PATTERN ONLY, NEVER BY THE `text-` PREFIX.
+		// Tailwind overloads `text-*`: `text-n4` is a colour and `text-[9.5px]` /
+		// `text-sm` are TYPE SIZES, which are load-bearing here — the notice slot
+		// exists because a wrapped sentence is 32px and a single line is 16px.
+		// Dropping the prefix wholesale would blind this guard to exactly the
+		// class of change it was written to catch.
+		const isRampColour = (c: string) => /^text-(?:ink|n[0-7])$/.test(c);
+		const shape = (container: HTMLElement) => {
+			const root = section(container);
+			const slot = root.querySelector('[data-testid="composer-notice-slot"]');
+			if (slot === null) {
+				throw new Error("no notice slot");
+			}
+			return Array.from(root.querySelectorAll("*"))
+				.filter((el) => el === slot || !slot.contains(el))
+				.map(
+					(el) =>
+						`${el.tagName}|${(el.getAttribute("class") ?? "")
+							.split(/\s+/)
+							.filter(
+								(c) =>
+									c !== "opacity-(--state-disabled-opacity)" &&
+									!isRampColour(c),
+							)
+							.join(" ")}`,
+				);
+		};
 
 		const clean = shape(renderNone().container);
 		cleanup();

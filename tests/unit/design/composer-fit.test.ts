@@ -221,11 +221,40 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 			`expected a className= before \`${marker}\``,
 		).toBeGreaterThan(-1);
 		// To the end of the attribute: a quoted string, or a `{`…`}` expression.
-		const open = source[attrAt + "className=".length];
-		const end =
-			open === '"'
-				? source.indexOf('"', attrAt + "className=".length + 1) + 1
-				: source.indexOf("}\n", attrAt) + 1;
+		const valueAt = attrAt + "className=".length;
+		let end: number;
+		if (source[valueAt] === '"') {
+			end = source.indexOf('"', valueAt + 1) + 1;
+		} else {
+			// ⚠⚠ BRACE-MATCHED, NOT LINE-MATCHED — AND THE FIRST DRAFT WAS THE
+			// SECOND, INSIDE THE VERY HELPER MINTED TO END FENCING BY DISTANCE.
+			// It ended the `{`-expression arm at the first `}\n`, which the
+			// argument region's attribute does not contain: that one ends `}>` on
+			// its own line, so the search ran on and returned 195 characters where
+			// the attribute is 65 — swallowing the NEXT element's whole opening tag
+			// and its text child. Every `not.toContain` over the result was then an
+			// assertion about two elements, passing on whatever the following bytes
+			// happened to hold, and a `flex-1` added to the ARGUMENT LABEL would
+			// have reddened a guard that names the argument region. Counting braces
+			// is the only thing that ends where the attribute actually ends.
+			// Caught by `@code-reviewer` (MEDIUM), measured rather than argued.
+			let depth = 0;
+			end = valueAt;
+			for (let i = valueAt; i < source.length; i++) {
+				if (source[i] === "{") {
+					depth++;
+				} else if (source[i] === "}") {
+					depth--;
+					if (depth === 0) {
+						end = i + 1;
+						break;
+					}
+				}
+			}
+			expect(end, `unbalanced className={…} for \`${marker}\``).toBeGreaterThan(
+				valueAt,
+			);
+		}
 		return { text: source.slice(attrAt, end), at: attrAt };
 	}
 
@@ -249,18 +278,39 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		// ⚠ THE `shrink-0` HALF IS UNCHANGED AND IS THE HALF THAT MATTERS. What
 		// R1 rules is WHERE it sits, never whether it may be squeezed: it is
 		// `shrink-0` within the right column now instead of within the section.
-		const footRowAt = source.indexOf(
-			'<div className="mt-auto flex shrink-0 items-stretch gap-3">',
-		);
-		expect(
-			footRowAt,
-			"expected the footblock row's `mt-auto` + `shrink-0` declaration",
-		).toBeGreaterThan(-1);
+		// ⚠ Anchored via `classAttrContaining` so a mutation that CHANGES this
+		// row reds the assertion below rather than an element lookup (`O-3`).
+		const foot = classAttrContaining("mt-auto flex shrink-0");
+		expect(foot.text).toContain("shrink-0");
+		expect(foot.text).toContain("mt-auto");
+		const footRowAt = foot.at;
 
-		// ⛔ INSIDE the right column, asserted as an ORDERING against that
-		// column's own opening tag and against the grid's close. A className
-		// check alone cannot see nesting, and nesting is the entire ruling.
+		// ⛔⛔ NESTING IS THE ENTIRE RULING, AND A BYTE ORDERING CANNOT SEE IT.
+		// This block previously claimed "an ORDERING against that column's own
+		// opening tag AND against the grid's close" and only performed the first
+		// half — which a SECTION-LEVEL footblock satisfies just as well, because
+		// the hoisted position is also later in the file than `.compright`'s
+		// opening tag. `@code-reviewer` proved it: moving the row back out to a
+		// direct child of `<section>` left all thirteen tests in this file green.
+		// ⇒ The bound is now two-sided. The footblock must sit between the right
+		// column's opening tag and the `.fieldscroll` box's own end, which is
+		// inside that column — a section-level row is after BOTH and fails.
 		expect(footRowAt).toBeGreaterThan(rightColumnAt());
+		const gridAt = source.indexOf('<div className="grid min-h-0 grid-cols-');
+		expect(gridAt, "expected the `.compgrid` declaration").toBeGreaterThan(-1);
+		expect(rightColumnAt()).toBeGreaterThan(gridAt);
+		// ⛔⛔ AND THE REAL CHECK IS A DOM ONE, IN ANOTHER FILE, BY DESIGN. A
+		// source scan reads a file top to bottom and cannot tell nesting from
+		// sequence at all. `composer-grid.test.tsx` asserts on the rendered tree
+		// that the money row's PARENT is the right column — it is what actually
+		// caught the reviewer's mutation, and it is named here so a later reader
+		// does not mistake the ordering above for the guarantee.
+		expect(
+			readFileSync(
+				join(ROOT, "tests/unit/composer/render/composer-grid.test.tsx"),
+				"utf8",
+			),
+		).toContain("expect(stakeRow.parentElement).toBe(right)");
 
 		// ⛔⛔ AND THE HOISTED SHAPE MUST BE GONE, not merely un-referenced. This
 		// is the assertion that reds against the build RPLY-3 replaces: RPLY-2's
@@ -270,7 +320,20 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 
 		// And it must still hold the actual submit button and the notice slot —
 		// a passing className check on an EMPTY row would prove nothing.
-		const footRowToSubmit = source.slice(footRowAt, footRowAt + 7000);
+		//
+		// ⚠⚠ BOUNDED BY THE NEXT SYMBOL, NOT BY A CHARACTER COUNT — third time in
+		// this one file, and the third is the one that makes it a rule rather
+		// than bad luck. This read `footRowAt + 7000` and went red the moment a
+		// comment was added between the row and its submit, reporting that the
+		// money row does not contain `Đ BET` when what had actually happened was
+		// that prose moved. `<ErrorStrip` is the first element after the argument
+		// region closes, so it is the real end of this row's subtree.
+		const errorStripAt = source.indexOf("<ErrorStrip", footRowAt);
+		expect(
+			errorStripAt,
+			"expected <ErrorStrip> after the footblock",
+		).toBeGreaterThan(footRowAt);
+		const footRowToSubmit = source.slice(footRowAt, errorStripAt);
 		expect(footRowToSubmit).toContain('data-testid="composer-notice-slot"');
 		expect(footRowToSubmit).toContain("aria-label={COMPOSER_COPY.submit}");
 	});
@@ -282,9 +345,14 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		// submit inside a scroll box again — exactly the defect RPLY-2 fixed by
 		// hoisting. So the overflow moved DOWN onto the title/body pair's own
 		// wrapper, whose sibling the footblock is.
-		const fieldScrollAt = source.indexOf(
-			'<div className="flex min-h-0 -m-0.5 flex-col gap-2 overflow-y-auto p-0.5">',
-		);
+		// ⚠ Anchored on `overflow-y-auto p-0.5` via `classAttrContaining`, so
+		// deleting the ring-room padding or adding a class reds the assertions
+		// below rather than an element lookup (`O-3`).
+		const fieldScroll = classAttrContaining("overflow-y-auto p-0.5");
+		expect(fieldScroll.text).toContain("min-h-0");
+		expect(fieldScroll.text).toContain("-m-0.5");
+		expect(fieldScroll.text).toContain("p-0.5");
+		const fieldScrollAt = fieldScroll.at;
 		expect(
 			fieldScrollAt,
 			"expected the `.fieldscroll` wrapper around the title/body pair",
@@ -292,9 +360,7 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		// It is inside the right column, and it comes BEFORE the footblock —
 		// i.e. the footblock is its sibling, not its content.
 		expect(fieldScrollAt).toBeGreaterThan(rightColumnAt());
-		const footRowAt = source.indexOf(
-			'<div className="mt-auto flex shrink-0 items-stretch gap-3">',
-		);
+		const footRowAt = classAttrContaining("mt-auto flex shrink-0").at;
 		expect(fieldScrollAt).toBeLessThan(footRowAt);
 		// ⛔ Both fields are inside it; the submit is not.
 		const fieldScrollBody = source.slice(fieldScrollAt, footRowAt);
@@ -302,9 +368,7 @@ describe("RPLY-3 · R1 — the argument fields give way; the money row never doe
 		expect(fieldScrollBody).toContain('aria-label="Argument body"');
 		expect(fieldScrollBody).not.toContain("aria-label={COMPOSER_COPY.submit}");
 		// ⛔ NOT `flex-1` — same refusal as every other node in this chain.
-		expect(source.slice(fieldScrollAt, fieldScrollAt + 100)).not.toContain(
-			"flex-1",
-		);
+		expect(fieldScroll.text).not.toContain("flex-1");
 	});
 
 	it("composer-fit::G1-the-argument-region-shrinks-but-no-longer-scrolls", () => {

@@ -383,12 +383,27 @@ export function ImageAttach({
 	//     token zero.
 	//   · Below the floor the panel would otherwise keep collapsing and take the
 	//     artwork with it, because the `<svg>` scales to whatever box it is given.
-	//     Measured at the floor: `Add Image` renders 9.38px and the headline
-	//     11.25px — both still legible; at an unfloored 650px they were 5.63 and
-	//     6.25px, which is the state the founder reported as the panel being cut
-	//     off. 192px does NOT bind at any tested height (650px lands the panel
+	//     At the floor, at 1280 wide, the figure's uniform scale is 0.667 —
+	//     `Add Image` renders at an effective 7.3px (a 9.4px glyph box) and the
+	//     headline at 8.7px (11.3px box). Unfloored at 650px they were 4.1 and
+	//     4.8px (5.6 and 6.3px boxes) — the state the founder reported as the
+	//     panel being cut off. 192px does NOT bind at any tested height (650px lands the panel
 	//     near 224px), so it costs nothing in the range that matters and only
 	//     catches the fall below it.
+	//     ⚠ THE TWO FIGURES ARE FONT SIZES AND THE PARENTHESES ARE GLYPH BOXES,
+	//     stated apart because the first draft of this comment quoted only the
+	//     box heights and called them what the text "renders" — reading as a
+	//     font size roughly 28% larger than the type actually is.
+	//     `@code-reviewer` reconstructed the real scale from the declarations and
+	//     was right; re-measured with `svg.getScreenCTM().a` rather than with a
+	//     bounding rect.
+	//     ⚠⚠ AND THE FLOOR BOUNDS HEIGHT WHILE `meet` SCALES BY
+	//     `min(w/200, h/250)` — so at a narrow enough column the artwork is
+	//     WIDTH-limited and this floor buys no legibility at all, it only makes
+	//     the panel taller than its contents. Measured at 900px viewport width:
+	//     the figure is width-limited at every height, scale 0.585, `Add Image`
+	//     6.4px. The founder's matrix is 1280 wide; narrower widths are a
+	//     separate, unruled question and are recorded rather than fixed here.
 	//
 	// ⛔ THE FLOOR IS ON THE PANEL, NOT ON THE ARTWORK, AND THAT IS THE WHOLE
 	// DIFFERENCE BETWEEN SCALING AND CLIPPING. Floor the `<svg>` instead and the

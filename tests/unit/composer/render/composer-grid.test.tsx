@@ -140,7 +140,47 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		// is in this column" and "the control that spends it is in this column"
 		// are different claims, and the founder's ruling names the second. A
 		// hoist that moved only `Đ BET` out would satisfy every line above.
-		expect(right.contains(screen.getByLabelText("PLACE Đ BET"))).toBe(true);
+		const submit = screen.getByLabelText("PLACE Đ BET");
+		expect(right.contains(submit)).toBe(true);
+
+		// ⛔⛔ AND IT IS A **DIRECT CHILD** OF THAT COLUMN, WHICH IS THE HALF
+		// `.contains()` CANNOT SEE AND THE HALF R1 ACTUALLY RULES. `@code-reviewer`
+		// measured the hole: wrapping the money row in a plain
+		// `<div className="block">` INSIDE `.compright` left all 28 tests across
+		// this file, `composer-fit` and `notice-slot` green — while killing the
+		// mechanism outright, because `margin-top:auto` is inert in block layout
+		// (no bottom pin) and a shrinkable box now sits between the row and the
+		// flex container that was supposed to leave it alone.
+		// ⚠ THIS IS THE SAME HOLE `@test-writer` FOUND AND CLOSED FOR THE REPLY
+		// CARD — `reply-card-absorber.test.tsx` asserts `parentElement` for exactly
+		// this reason, with its own note that "a class is not a mechanism". The
+		// closure had not been applied to the footblock, which is the element this
+		// task is actually about.
+		const stakeRow = Array.from(right.children).find((c) => c.contains(stake));
+		if (stakeRow === undefined) {
+			// ⛔ A THROW, NOT `expect(...).toBeDefined()` — the assertions below need
+			// the narrowing, and a guard whose own subject is missing should say so
+			// once rather than report several downstream failures about a property
+			// of `undefined` (`O-3`: a true refusal reported with a misleading cause
+			// is a defect).
+			throw new Error(
+				"the money row is not a DIRECT child of the right column",
+			);
+		}
+		expect(stakeRow.contains(submit)).toBe(true);
+		// The relationship itself, stated the way the reviewer's mutation breaks it.
+		expect(stakeRow.parentElement).toBe(right);
+		// …and the column really is the flex COLUMN that distributes down this
+		// axis, or "direct child" would not mean the row is left alone.
+		const rightCls = (right.getAttribute("class") ?? "").split(/\s+/);
+		expect(rightCls).toContain("flex");
+		expect(rightCls).toContain("flex-col");
+		// ⛔ `mt-auto` + `shrink-0` on the ROW ITSELF — the bottom pin and the
+		// refusal to be squeezed, both inert if either the class or the parent
+		// relationship above is wrong.
+		const rowCls = (stakeRow.getAttribute("class") ?? "").split(/\s+/);
+		expect(rowCls).toContain("mt-auto");
+		expect(rowCls).toContain("shrink-0");
 		// The two are SIBLINGS, never nested: the attach is not in the right column.
 		expect(right.contains(attach)).toBe(false);
 	});
