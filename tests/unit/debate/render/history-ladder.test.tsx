@@ -295,6 +295,75 @@ describe("R2 · G3 — entering post-focus is a rung on the stack", () => {
 		}
 	});
 
+	it("history-ladder::a-DOUBLE-activation-of-the-exit-traverses-ONCE", () => {
+		// ⛔⛔ THE ASYNC WINDOW, and it walks the reader off the page. `history.back()`
+		// is a QUEUED traversal and this branch sets no React state, so between the
+		// call and its `popstate` the exit control stays mounted and enabled. A
+		// second activation inside that window re-read the rung counter as still
+		// positive and called `back()` again — the browser traverses −2, past the
+		// market entry, off `/m/[slug]`, destroying any argument being typed. That
+		// is the defect R2 exists to remove, arriving through R2's own fix.
+		// ⚠ REACHABLE AT HUMAN SPEED: a held Enter on a focused `<button>` repeats
+		// a click roughly every 30ms, and the poll's 15s `router.refresh()` is
+		// exactly the main-thread work that widens the gap. A double-click does it.
+		// ⇒ "Pop requested, not yet observed" is a third state the counter cannot
+		// express, so it has its own latch, cleared by the same `popstate` that
+		// decrements.
+		render(view());
+		const title = Array.from(document.querySelectorAll("h3")).find(
+			(h) => h.textContent === P1_TITLE,
+		);
+		act(() => {
+			fireEvent.click(title?.closest("button") as HTMLButtonElement);
+		});
+		expect(onPostArm()).toBe(true);
+
+		// Mocked so the traversal never completes — which is precisely the window
+		// under test. The real `back()` is async too; this just holds it open.
+		const back = vi.spyOn(history, "back").mockImplementation(() => undefined);
+		const exit = document.querySelector(
+			'[data-testid="focus-market-card"]',
+		) as HTMLElement;
+		act(() => {
+			fireEvent.click(exit);
+		});
+		act(() => {
+			fireEvent.click(exit);
+		});
+		act(() => {
+			fireEvent.click(exit);
+		});
+
+		// ⛔ THREE ACTIVATIONS, ONE TRAVERSAL. Before the latch this was 3.
+		expect(back).toHaveBeenCalledTimes(1);
+
+		// …and the latch RELEASES when the pop finally lands, or the exit would be
+		// wedged shut for the rest of the session. This half matters as much as the
+		// half above: a latch with no release is a different bug, not a fix.
+		popTo("");
+		expect(onMarketArm()).toBe(true);
+		// ⚠ RE-QUERIED, not reused. Returning to the market arm re-rendered the
+		// column, so the `title` node captured above is detached and clicking it
+		// does nothing — which failed this assertion for a reason that had nothing
+		// to do with the latch. A stale handle is the quiet way a render test ends
+		// up asserting about a node the user could not have clicked.
+		const titleAgain = Array.from(document.querySelectorAll("h3")).find(
+			(h) => h.textContent === P1_TITLE,
+		);
+		act(() => {
+			fireEvent.click(titleAgain?.closest("button") as HTMLButtonElement);
+		});
+		expect(onPostArm()).toBe(true);
+		act(() => {
+			fireEvent.click(
+				document.querySelector(
+					'[data-testid="focus-market-card"]',
+				) as HTMLElement,
+			);
+		});
+		expect(back).toHaveBeenCalledTimes(2);
+	});
+
 	it("history-ladder::a-DEEP-LINK-arrival-exits-WITHOUT-calling-back", () => {
 		// ⛔⛔ THE MIRROR-IMAGE BUG, AND THE REASON THE EXIT IS CONDITIONAL. A reader
 		// who pasted `?post=2` has NO rung of ours beneath them — the entry below is

@@ -38,7 +38,11 @@ const CLIENT = "src/components/debate/post-param.ts";
 /** The `POST_PARAM_SHAPE = /…/;` literal out of a file, as written. */
 function shapeLiteral(rel: string): string | undefined {
 	const src = readFileSync(join(ROOT, rel), "utf8");
-	return /const POST_PARAM_SHAPE = (\/.*\/);/.exec(src)?.[1];
+	// ⚠ ANCHORED AT LINE START (`m` flag + `^`), so a commented-out declaration
+	// placed ABOVE the real one cannot become the compared literal — an
+	// unanchored `.exec` takes the FIRST match, and this guard is the only thing
+	// standing between the two copies.
+	return /^const POST_PARAM_SHAPE = (\/.*\/);$/m.exec(src)?.[1];
 }
 
 describe("R2 — the client and server `?post=` gates cannot drift apart", () => {

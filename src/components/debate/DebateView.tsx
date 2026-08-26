@@ -585,6 +585,13 @@ export function DebateView({
 	 * marker written there is gone by the first poll tick. See `exitPost`.
 	 */
 	const pushedRungsRef = useRef(0);
+	/**
+	 * RPLY-1 · R2 — a `history.back()` has been REQUESTED and its `popstate` has
+	 * not arrived yet. `history.back()` is asynchronous and `exitPost` sets no
+	 * React state on that branch, so without this the exit control stays live and
+	 * a second activation traverses a second entry. See `exitPost`.
+	 */
+	const traversalPendingRef = useRef(false);
 	const enterPost = (id: string) => {
 		if (composerBusy) {
 			return;
@@ -600,7 +607,13 @@ export function DebateView({
 		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
 		// R2 — a rung, so Back returns to the market view instead of leaving it.
-		syncPostParam(target ? target.ordinal : null, "push");
+		// ⚠ `> 0`, NOT MERELY "a target exists". `load-debate-view` falls back to
+		// `ordinal: 0` on a defensive branch, and 0 is REFUSED by both shape gates
+		// (`^[1-9]…`) — so writing `?post=0` mints a URL that silently lands on
+		// the market arm on reload and on Back. Harmless while the param was only
+		// ever replaced; R2 makes it a durable history entry, so it is filtered
+		// here rather than left to be discovered as a dead deep link.
+		syncPostParam(target && target.ordinal > 0 ? target.ordinal : null, "push");
 		resetPageScroll();
 	};
 	/**
@@ -630,7 +643,13 @@ export function DebateView({
 		const target = posts.find((p) => p.id === id);
 		// R2 — the same rung: a card pill ENTERS the post, so it is the same arm
 		// swap and gets the same history entry.
-		syncPostParam(target ? target.ordinal : null, "push");
+		// ⚠ `> 0`, NOT MERELY "a target exists". `load-debate-view` falls back to
+		// `ordinal: 0` on a defensive branch, and 0 is REFUSED by both shape gates
+		// (`^[1-9]…`) — so writing `?post=0` mints a URL that silently lands on
+		// the market arm on reload and on Back. Harmless while the param was only
+		// ever replaced; R2 makes it a durable history entry, so it is filtered
+		// here rather than left to be discovered as a dead deep link.
+		syncPostParam(target && target.ordinal > 0 ? target.ordinal : null, "push");
 		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
 		// arm swap and the same reason.
 		resetPageScroll();
@@ -674,8 +693,31 @@ export function DebateView({
 		 * surface still returns to the market arm, and one spare entry stays on the
 		 * stack. The opposite error would walk the reader off the page, so the
 		 * asymmetry is deliberate.
+		 *
+		 * ⛔⛔ AND THE TRAVERSAL IS LATCHED, BECAUSE `history.back()` IS
+		 * ASYNCHRONOUS AND THIS BRANCH SETS NO REACT STATE. The traversal is a
+		 * queued task and `popstate` — where the counter is decremented — fires in
+		 * a LATER one. In between, nothing about the surface changes: the exit
+		 * control stays mounted and enabled, so a second activation inside that
+		 * window re-reads the counter as still positive and calls `back()` AGAIN.
+		 * The browser then traverses −2 and the reader lands off `/m/[slug]`
+		 * entirely, losing any argument they had typed — which is precisely the
+		 * defect R2 exists to remove, arriving through R2's own fix.
+		 * ⚠ NOT HYPOTHETICAL AT HUMAN SPEED: a held Enter on a focused `<button>`
+		 * auto-repeats a click roughly every 30ms, and the poll's 15s
+		 * `router.refresh()` is exactly the kind of main-thread work that widens
+		 * the gap. A double-click does it too.
+		 * ⇒ "Pop requested, not yet observed" is a THIRD state the counter cannot
+		 * express, so it gets its own flag rather than being folded into the
+		 * count. The same `popstate` handler clears it and decrements — one
+		 * observation, one place. ⛔ The counter is NOT decremented here as well:
+		 * that would double-count the single rung this pop consumes.
 		 */
 		if (pushedRungsRef.current > 0) {
+			if (traversalPendingRef.current) {
+				return;
+			}
+			traversalPendingRef.current = true;
 			history.back();
 			return;
 		}
@@ -720,23 +762,37 @@ export function DebateView({
 	 * between the URL and the surface for the length of one request, and that is
 	 * the right trade: a stale query string is cosmetic and a double bet is not.
 	 */
-	const postsRef = useRef(posts);
-	postsRef.current = posts;
-	const composerBusyRef = useRef(composerBusy);
-	composerBusyRef.current = composerBusy;
+	/**
+	 * ⚠⚠ `posts` AND `composerBusy` ARE READ FROM THE CLOSURE, NOT FROM REFS, AND
+	 * THE REF VERSION IS RECORDED AS THE MISTAKE IT WAS. This effect used
+	 * `postsRef.current = posts` written DURING RENDER. `router.refresh()` renders
+	 * inside a React transition, and a transition render that is DISCARDED still
+	 * runs those assignments — so the listener could read a `composerBusy` from a
+	 * render that never committed. The damaging direction is a stale `false`: a
+	 * Back inside that window unmounts an in-flight composer, and a re-open mints
+	 * a FRESH idempotency key over a possibly-committing bet. That is a second
+	 * bet, not a replay, and it is the one seam `bet_receipts` cannot close.
+	 * ⇒ Real deps instead. The listener re-registers when `posts` identity changes
+	 * (once per poll payload) or when `composerBusy` flips, which is a
+	 * `removeEventListener`/`addEventListener` pair on the order of once per 15s —
+	 * a price worth paying to make the money-path read exact rather than
+	 * probably-fine.
+	 */
 	useEffect(() => {
 		const onPop = () => {
-			// ⚠ DECREMENTED BEFORE THE BUSY GUARD, and deliberately so: the browser
-			// has ALREADY moved the stack whether or not this handler updates the
-			// surface, so a rung is gone either way. Skipping it under `busy` would
-			// leave the counter claiming a rung that is no longer there — and the
-			// next exit would `back()` off the page.
+			// ⚠ THE LATCH AND THE COUNTER ARE BOTH SETTLED HERE, BEFORE THE BUSY
+			// GUARD, and deliberately so: the browser has ALREADY moved the stack
+			// whether or not this handler updates the surface. Skipping either would
+			// leave `exitPost` believing a rung is still there — and the next exit
+			// would `back()` off the page — or leave the traversal latched forever,
+			// which would wedge the exit control shut.
+			traversalPendingRef.current = false;
 			pushedRungsRef.current = Math.max(0, pushedRungsRef.current - 1);
-			if (composerBusyRef.current) {
+			if (composerBusy) {
 				return;
 			}
 			const resolved = resolvePostParamClient(
-				postsRef.current,
+				posts,
 				readPostParam(window.location.search),
 			);
 			setSelectedPostId(resolved);
@@ -748,7 +804,7 @@ export function DebateView({
 		};
 		window.addEventListener("popstate", onPop);
 		return () => window.removeEventListener("popstate", onPop);
-	}, []);
+	}, [posts, composerBusy]);
 
 	/**
 	 * ⚠⚠ FEED-2 — THE JUMP. When the refreshed payload arrives carrying the
