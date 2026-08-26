@@ -1,3 +1,5 @@
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 
 import { c3OppositeSide } from "./composer/copy";
@@ -265,8 +267,15 @@ export function AggregateFooter({
  *
  * ⚠ F-3 GATING IS NOT OPTIONAL. A trigger whose RESULTING side is not the
  * viewer's held side renders disabled, carrying the C3 batch string in both
- * `title` and `aria-label` — identical to the focused-post bar, so the same
- * refusal reads the same way wherever the viewer meets it.
+ * `aria-label` and the `InfoTip` gloss (INFO-1 §3.4 C3 precedence — the
+ * refusal wins over the relation's definition) — identical to the
+ * focused-post bar, so the same refusal reads the same way wherever the
+ * viewer meets it. ⚠ The `aria-label` channel is the one that reliably
+ * reaches a screen reader here: this trigger also carries
+ * `disabled:pointer-events-none` (below), which — same reasoning as
+ * `RadioSlot`'s (O-3) — suppresses hover/click at the browser's hit-testing
+ * layer, so the `InfoTip` channel may never actually open on a disabled
+ * pill in a real browser. Not measured; not worked around here.
  */
 function TriggerPill({
 	relation,
@@ -297,24 +306,30 @@ function TriggerPill({
 		resultingSide === "YES"
 			? "bg-yes text-no border-[0.5px] border-n2"
 			: "bg-no text-yes [border:var(--hairline)]";
+	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
+	// told why they are blocked, not given the relation's definition. The
+	// glossary gloss fills the null branch only — c3 still wins outright.
+	const gloss =
+		c3 ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
-		<button
-			type="button"
-			data-testid={`card-trigger-${relation}`}
-			disabled={disabled}
-			aria-disabled={disabled}
-			aria-label={
-				c3 ??
-				`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
-			}
-			title={c3 ?? undefined}
-			onClick={() => onReply(relation)}
-			className={cn(
-				"rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
-				pole,
-			)}
-		>
-			{relation === "support" ? "Support" : "Counter"}
-		</button>
+		<InfoTip content={gloss} asChild>
+			<button
+				type="button"
+				data-testid={`card-trigger-${relation}`}
+				disabled={disabled}
+				aria-disabled={disabled}
+				aria-label={
+					c3 ??
+					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
+				}
+				onClick={() => onReply(relation)}
+				className={cn(
+					"rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity)",
+					pole,
+				)}
+			>
+				{relation === "support" ? "Support" : "Counter"}
+			</button>
+		</InfoTip>
 	);
 }

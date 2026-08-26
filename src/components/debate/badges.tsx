@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import type { Badge as BadgeKind } from "@/lib/ranking";
 import { cn } from "@/lib/utils";
 
@@ -151,20 +153,22 @@ export function SideBadge({
 	// value is ALREADY the bought side's price; see the `price` prop above.
 	const pct = price === undefined ? null : formatPercentUnpaired(price);
 	return (
-		<Badge
-			aria-label={
-				pct === null ? `${side} side` : `${side} side, entry price ${pct}`
-			}
-			className={cn(
-				// Pole edges are carried by the standard #404040 border on BOTH
-				// poles (values-log v0_3 §3) — without it the black YES fill is
-				// invisible on the n0 card. Carried inside each preset above.
-				CHIP[size ?? "base"],
-				side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
-			)}
-		>
-			{pct === null ? side : `${side} @ ${pct}`}
-		</Badge>
+		<InfoTip content={GLOSSARY.side} asChild>
+			<Badge
+				aria-label={
+					pct === null ? `${side} side` : `${side} side, entry price ${pct}`
+				}
+				className={cn(
+					// Pole edges are carried by the standard #404040 border on BOTH
+					// poles (values-log v0_3 §3) — without it the black YES fill is
+					// invisible on the n0 card. Carried inside each preset above.
+					CHIP[size ?? "base"],
+					side === "YES" ? "bg-yes text-no" : "bg-no text-yes",
+				)}
+			>
+				{pct === null ? side : `${side} @ ${pct}`}
+			</Badge>
+		</InfoTip>
 	);
 }
 
@@ -178,14 +182,17 @@ export function PositionMarker({ marker }: { marker: Marker }) {
 	if (marker === "none") {
 		return null;
 	}
+	const gloss = marker === "Flipped" ? GLOSSARY.flipped : GLOSSARY.exited;
 	return (
-		<Badge
-			variant="secondary"
-			className="rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground"
-			aria-label={`Author ${marker}`}
-		>
-			{marker}
-		</Badge>
+		<InfoTip content={gloss} asChild>
+			<Badge
+				variant="secondary"
+				className="rounded-sm px-1.5 text-[10px] font-normal text-muted-foreground"
+				aria-label={`Author ${marker}`}
+			>
+				{marker}
+			</Badge>
+		</InfoTip>
 	);
 }
 
@@ -195,13 +202,21 @@ export function PositionMarker({ marker }: { marker: Marker }) {
  * read-time label on a post that dominates a lane. `null` → no badge (the
  * majority).
  */
+const LANE_GLOSS: Record<BadgeKind, string> = {
+	"Most Debated": GLOSSARY.laneMostDebated,
+	"Highest Stakes": GLOSSARY.laneHighestStakes,
+	Contested: GLOSSARY.laneContested,
+};
+
 export function LaneBadge({ badge }: { badge: BadgeKind | null }) {
 	if (!badge) {
 		return null;
 	}
 	return (
-		<Badge variant="outline" className="rounded-sm text-[10px] font-normal">
-			{badge}
-		</Badge>
+		<InfoTip content={LANE_GLOSS[badge]} asChild>
+			<Badge variant="outline" className="rounded-sm text-[10px] font-normal">
+				{badge}
+			</Badge>
+		</InfoTip>
 	);
 }

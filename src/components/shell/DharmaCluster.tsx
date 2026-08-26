@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 import { formatDharma } from "@/components/debate/format";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * The signed-in Đ cluster — the locked W2.4/.5/.14 anatomy (mockup v0_2
@@ -76,28 +78,33 @@ export function DharmaCluster({
 	return (
 		<span
 			data-testid="dharma-cluster"
-			title="Your Dharma — Portfolio (open positions) + Balance (spendable)"
 			className="mr-3.5 flex h-11 shrink-0 items-center gap-[13px] rounded-(--r) bg-(--btn-fill) pr-3.5 pl-3 select-none [border:var(--hairline)]"
 		>
-			<span className="text-[17px] font-bold text-ink">Đ</span>
+			<InfoTip content={GLOSSARY.dharma} asChild>
+				<span className="text-[17px] font-bold text-ink">Đ</span>
+			</InfoTip>
 			{/* The mockup's `.sep` hairline — decorative, so no testid. It is NOT the
 			    §21.1 register boundary: that is the `w-px` divider in `GlobalHeader`'s
 			    right zone, a separate named untouchable. Do not conflate them. */}
 			<span aria-hidden="true" className="h-[26px] w-px bg-n2" />
 			{portfolio !== null ? (
 				<span className="flex flex-col gap-1 leading-none">
-					<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
-						Portfolio
-					</span>
+					<InfoTip content={GLOSSARY.portfolio} asChild>
+						<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
+							Portfolio
+						</span>
+					</InfoTip>
 					<span className="text-[13px] font-bold text-ink tabular-nums">
 						Đ {formatDharma(portfolio)}
 					</span>
 				</span>
 			) : null}
 			<span className="flex flex-col gap-1 leading-none">
-				<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
-					Balance
-				</span>
+				<InfoTip content={GLOSSARY.balance} asChild>
+					<span className="text-[8.5px] font-bold tracking-[0.13em] text-muted-foreground uppercase">
+						Balance
+					</span>
+				</InfoTip>
 				<span className="text-[13px] font-bold text-ink tabular-nums">
 					Đ {formatDharma(spendable)}
 				</span>

@@ -3,7 +3,9 @@
 import Link from "next/link";
 
 import { Button, buttonVariants } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import { cn } from "@/lib/utils";
 import { formatDharma, formatPricePercent } from "../format";
 import type { Side, ViewerMarketContext } from "../types";
@@ -124,7 +126,9 @@ export function SlotHeader({
 					   mockup rule. The recipe is byte-carried from that shipped component
 					   rather than re-derived, so the two arms cannot drift again. */
 					<span className="hidden items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase lg:flex">
-						<span>{COMPOSER_COPY.toWinLabel}</span>
+						<InfoTip content={GLOSSARY.toWin} asChild>
+							<span>{COMPOSER_COPY.toWinLabel}</span>
+						</InfoTip>
 						<span className="font-mono text-xs tracking-normal text-ink normal-case">
 							Đ 1 <span aria-hidden="true">→</span> Đ {formatMultiplier(unit)}
 						</span>
@@ -143,7 +147,9 @@ export function SlotHeader({
 					<>
 						{/* `.poslab` again — same rule, same recipe as `TO WIN` above. */}
 						<span className="flex items-center gap-1 text-[10px] font-bold tracking-[0.1em] text-n5 uppercase">
-							<span>{COMPOSER_COPY.yourPositionLabel}</span>
+							<InfoTip content={GLOSSARY.position} asChild>
+								<span>{COMPOSER_COPY.yourPositionLabel}</span>
+							</InfoTip>
 							{/* Đb-ONLY until the Đa staked-basis SPEC.1 line lands (OQ-1 HELD). */}
 							<span className="font-mono text-xs tracking-normal text-ink normal-case">
 								Đ {formatDharma(viewer.position.currentValue)}

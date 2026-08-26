@@ -1,4 +1,6 @@
 import { Badge } from "@/components/ui/badge";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
@@ -41,13 +43,32 @@ function AttrSep() {
 }
 
 /**
+ * INFO-1 — one gloss per real lifecycle state. `Draft` has no entry: it is
+ * excluded upstream (`getMarketBySlug` never returns a Draft market to this
+ * surface), and adding an invented "not yet open" gloss for a state this
+ * component can never actually receive would be a definition nobody
+ * ratified.
+ */
+const LIFECYCLE_GLOSS: Record<
+	Exclude<DebateMarketHeader["status"], "Draft">,
+	string
+> = {
+	Open: GLOSSARY.lifecycleOpen,
+	Closed: GLOSSARY.lifecycleClosed,
+	Resolving: GLOSSARY.lifecycleResolving,
+	Resolved: GLOSSARY.lifecycleResolved,
+	Voided: GLOSSARY.lifecycleVoided,
+	Frozen: GLOSSARY.lifecycleFrozen,
+};
+
+/**
  * The market lifecycle / resolution marker (INV-4 / design-language §3.1). A
  * terminal market (Closed/Resolving/Resolved/Voided/Frozen) reads as locked —
  * "read-only" — paired with the literal status (never colour alone, §8).
  */
 function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 	const terminal = TERMINAL.has(status);
-	return (
+	const badge = (
 		<Badge
 			variant={terminal ? "secondary" : "outline"}
 			aria-label={`Market ${status}${terminal ? ", read-only" : ""}`}
@@ -55,6 +76,17 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
 			{status}
 			{terminal ? " · read-only" : ""}
 		</Badge>
+	);
+	// Structurally unreachable (see LIFECYCLE_GLOSS above) — kept as a guard
+	// rather than an unsafe cast, so an admitted-but-impossible type stays
+	// admitted rather than asserted away.
+	if (status === "Draft") {
+		return badge;
+	}
+	return (
+		<InfoTip content={LIFECYCLE_GLOSS[status]} asChild>
+			{badge}
+		</InfoTip>
 	);
 }
 
@@ -295,7 +327,9 @@ export function MarketHeader({
 						    three fields, same order. Only weight, colour and the
 						    separators change. */}
 						<div className="flex flex-wrap items-center gap-y-1 text-xs font-bold text-ink">
-							<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+							<InfoTip content={GLOSSARY.stakedMarket} asChild>
+								<span>Đ {formatDharma(market.totals.dharmaStaked)} staked</span>
+							</InfoTip>
 							<AttrSep />
 							<span>
 								{market.totals.postCount}{" "}
@@ -326,14 +360,16 @@ export function MarketHeader({
 							<LifecycleBadge status={market.status} />
 							{/* EXPORT.1 — native download of the debate `.md` (server-mediated
 							    GET); plain anchor, no client boundary, works signed-out. */}
-							<a
-								download
-								href={`/m/${market.slug}/export`}
-								aria-label="Download this debate as Markdown"
-								className="text-muted-foreground text-xs underline-offset-2 hover:underline"
-							>
-								Download .md
-							</a>
+							<InfoTip content={GLOSSARY.downloadMd} asChild>
+								<a
+									download
+									href={`/m/${market.slug}/export`}
+									aria-label="Download this debate as Markdown"
+									className="text-muted-foreground text-xs underline-offset-2 hover:underline"
+								>
+									Download .md
+								</a>
+							</InfoTip>
 						</div>
 						{/* T1 — the RESOLUTION criterion block (`d5:974-977`, `.criterion` +
 					    `.overline`). The container is a TOP HAIRLINE RULE + padding

@@ -3,7 +3,9 @@ import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { InfoTip } from "@/components/ui/info-tip";
 import { RelativeTime } from "@/components/ui/relative-time";
+import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 
 import { PositionMarker, SideBadge } from "./badges";
 import { formatDharma } from "./format";
@@ -199,12 +201,14 @@ export function ArgProfile({
 							</span>
 						) : null}
 						{sold ? (
-							<span
-								data-testid="argstake-sold"
-								className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
-							>
-								Sold
-							</span>
+							<InfoTip content={GLOSSARY.sold} asChild>
+								<span
+									data-testid="argstake-sold"
+									className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+								>
+									{SOLD_LABEL}
+								</span>
+							</InfoTip>
 						) : null}
 					</>
 				) : null}

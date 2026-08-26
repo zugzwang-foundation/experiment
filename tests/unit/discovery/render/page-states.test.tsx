@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { normalizeRadixIds } from "../../_support/dom-html";
+
 // UI.A4 Slice 6 tests-first (plan §2 row 6 / §4 wiring / §5 state table) —
 // the RED driver for the Discovery page `src/app/(public)/page.tsx`, the /
 // route inside the ADR-0023 shell (the root `src/app/page.tsx` coming-soon
@@ -345,7 +347,12 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// Non-vacuous: the body actually rendered content…
 		expect(anon.container.innerHTML.length).toBeGreaterThan(0);
 		// …and two composals are byte-identical — deterministic,
-		// viewer-independent markup.
-		expect(loggedIn.container.innerHTML).toBe(anon.container.innerHTML);
+		// viewer-independent markup. Normalized for Radix's own per-root
+		// `radix-_r_<n>_` trigger/content pairing id (INFO-1's `InfoTip`, inside
+		// `StatLine`) — a property of which React root rendered it, not of
+		// either composal, and not what this assertion exists to catch.
+		expect(normalizeRadixIds(loggedIn.container.innerHTML)).toBe(
+			normalizeRadixIds(anon.container.innerHTML),
+		);
 	});
 });

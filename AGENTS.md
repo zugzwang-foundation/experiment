@@ -89,19 +89,23 @@ experiment/
 │   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
 │   │                               #   gate before the DP.2 promote), ScrollRail (the
 │   │                               #   rail — and, since R3, the auto-advance countdown)
-│   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
+│   │   └── ui/                     #   15 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
-│   │                               #   input, separator, skeleton, textarea. FIVE are
-│   │                               #   project-authored and canon-ratified — empty-block
-│   │                               #   (P1), loading-block (P7), error-block (the
-│   │                               #   route-boundary family; canon §10 C-STATES-1 rules
-│   │                               #   it NEITHER P1 NOR P7), thumb-glyph (canon §3
-│   │                               #   item 13, pinned by component name and props), and
-│   │                               #   relative-time (canon §3 item 14 + the §6 copy
-│   │                               #   register's `Argument age` entry, pinned the same
-│   │                               #   way — TIME-1's age at the end of every card's
-│   │                               #   identity row, on all four card surfaces).
-│   │                               #   Don't reach for a shadcn generator to change one
+│   │                               #   input, separator, skeleton, textarea. SIX are
+│   │                               #   project-authored — empty-block (P1), loading-block
+│   │                               #   (P7), error-block (the route-boundary family; canon
+│   │                               #   §10 C-STATES-1 rules it NEITHER P1 NOR P7),
+│   │                               #   thumb-glyph (canon §3 item 13, pinned by component
+│   │                               #   name and props), relative-time (canon §3 item 14 + the
+│   │                               #   §6 copy register's `Argument age` entry, pinned the same
+│   │                               #   way — TIME-1's age at the end of every card's identity
+│   │                               #   row, on all four card surfaces), and info-tip (INFO-1 —
+│   │                               #   the one affordance that opens on both pointer hover and
+│   │                               #   touch tap; composes radix-ui's Tooltip and Popover,
+│   │                               #   picked per-render on `(hover: hover) and (pointer:
+│   │                               #   fine)`; not yet canon-ratified — the others are, this
+│   │                               #   one landed the same night). Don't reach for a shadcn
+│   │                               #   generator to change one
 │   ├── db/                         # ← Drizzle client + schema live HERE (not src/server/db)
 │   │   ├── index.ts                #   the drizzle client
 │   │   └── schema/                 #   14 files: _enums, audit, auth, bets, bookmarks, comments,

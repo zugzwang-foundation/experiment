@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
 
 /**
  * Right-zone identity affordance. Signed-out → the JOIN entry (mockup v0_2,
@@ -67,9 +69,11 @@ export function IdentityCluster({ viewer }: { viewer: HeaderViewer | null }) {
 				<AvatarImage src={viewer.pfpUrl} alt="" />
 				<AvatarFallback>{viewer.pseudonym.charAt(0)}</AvatarFallback>
 			</Avatar>
-			<span className="max-w-40 truncate text-xs font-semibold text-ink">
-				{viewer.pseudonym}
-			</span>
+			<InfoTip content={GLOSSARY.pseudonym} asChild>
+				<span className="max-w-40 truncate text-xs font-semibold text-ink">
+					{viewer.pseudonym}
+				</span>
+			</InfoTip>
 		</Link>
 	);
 }

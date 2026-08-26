@@ -9,6 +9,7 @@ import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
 
+import { normalizeRadixIds } from "../../_support/dom-html";
 import {
 	EXTENDED,
 	MARKET_ID,
@@ -238,8 +239,13 @@ describe("PRIMITIVES-2 D2/D3 — the three Discovery image sites degrade a 404",
 
 			// D3 — the error state IS the null state. Full-string equality, never
 			// `.toContain`: a placeholder emitting the right classes in the wrong
-			// order is a real delta and must fail here.
-			expect(loaded.container.innerHTML).toBe(nullHtml);
+			// order is a real delta and must fail here. Normalized for Radix's own
+			// internal `radix-_r_<n>_` trigger/content pairing id (INFO-1's
+			// `InfoTip`, inside `StatLine`) — a per-ROOT id, not a property of
+			// either render, and not what this assertion exists to catch.
+			expect(normalizeRadixIds(loaded.container.innerHTML)).toBe(
+				normalizeRadixIds(nullHtml),
+			);
 		});
 	}
 });
@@ -651,7 +657,11 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 				// NO `fireEvent.error` anywhere in this block. That is the whole
 				// point: the event already fired, before anything was listening.
 				expect(findImgs(loaded.container, site.selector)).toHaveLength(0);
-				expect(loaded.container.innerHTML).toBe(nullHtml);
+				// Normalized for Radix's per-root `radix-_r_<n>_` id — see the
+				// sibling assertion above for why.
+				expect(normalizeRadixIds(loaded.container.innerHTML)).toBe(
+					normalizeRadixIds(nullHtml),
+				);
 			});
 		});
 
@@ -716,7 +726,11 @@ describe("D2-P1 — a 404 that resolved BEFORE hydration still degrades", () => 
 		nullRender.unmount();
 
 		const view = renderThenSwap({ complete: true, naturalWidth: 0 });
-		expect(view.container.innerHTML).toBe(nullHtml);
+		// Normalized for Radix's per-root `radix-_r_<n>_` id — see the control
+		// tests above for why.
+		expect(normalizeRadixIds(view.container.innerHTML)).toBe(
+			normalizeRadixIds(nullHtml),
+		);
 	});
 
 	it("control::a src CHANGE to a GOOD image does not blank it", () => {
