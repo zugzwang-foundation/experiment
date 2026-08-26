@@ -31,6 +31,22 @@ import { composerProps, stubWireFetch } from "./_harness";
  * a short viewport. So the right column now holds title + body ONLY, and the
  * Amount/`Đ BET` money block sits at the SECTION level, not inside the grid.
  *
+ * ⚠⚠ RPLY-3 · R1 AMENDS IT BACK, and the two amendments are left stacked on
+ * purpose — this column's contents have now moved twice, and a reader who sees
+ * only the current state cannot tell a settled design from a repeated argument.
+ * ⛔ THE SECOND MOVE IS A SPECIFICATION CORRECTION, NOT A BUILD FIX. RPLY-2's
+ * own brief demanded the footblock be "`shrink-0` and a direct child of the
+ * composer's flex root"; that wording forced the hoist, and the founder had
+ * asked for the composer to FIT rather than for its layout to change. So the
+ * money row is `.compright`'s third child again, exactly as d5 draws it
+ * (`:1132`) and as POLISH.4 PR B originally built it — and the assertions below
+ * that read `right.contains(stake)` are back to `true`.
+ * ⚠ THE FIT IS NOT TRADED BACK TO GET THERE. What makes the money row safe
+ * inside a shrinking column this time is that the `overflow-y-auto` moved off
+ * the argument region onto the title/body pair alone, so the footblock is the
+ * scroll box's SIBLING rather than its content. `composer-fit.test.ts` owns
+ * that mechanism; this file owns the arrangement.
+ *
  * ⛔ ARRANGEMENT ONLY. Nothing here asserts a px, colour, radius, type size,
  * duration or easing (POLISH-4 §10 `H-VALUE` / `H-SYSTEM`): the grid's TRACK
  * SIZES are the shipped design system's, never this test's. What is pinned is
@@ -112,14 +128,19 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		expect(columns).toHaveLength(2);
 		// FIRST column — the image attach, a DIRECT child of the grid.
 		expect(columns[0]).toBe(attach);
-		// SECOND column — title input + body textarea. RPLY-2 · R1 — NOT the
-		// Amount row any more (see the file docblock's amendment): `stake` is
-		// section-level now, a sibling of the grid, not inside either column.
+		// SECOND column — title, body AND the money footblock. RPLY-3 · R1 put
+		// the Amount row back here (see the file docblock's second amendment);
+		// RPLY-2 had briefly made it a section-level sibling of the grid.
 		const right = columns[1];
 		expect(right.contains(title)).toBe(true);
 		expect(right.contains(body)).toBe(true);
-		expect(right.contains(stake)).toBe(false);
-		expect(grid.contains(stake)).toBe(false);
+		expect(right.contains(stake)).toBe(true);
+		expect(grid.contains(stake)).toBe(true);
+		// ⛔ AND SO IS THE SUBMIT — asserted separately, because "the stake input
+		// is in this column" and "the control that spends it is in this column"
+		// are different claims, and the founder's ruling names the second. A
+		// hoist that moved only `Đ BET` out would satisfy every line above.
+		expect(right.contains(screen.getByLabelText("PLACE Đ BET"))).toBe(true);
 		// The two are SIBLINGS, never nested: the attach is not in the right column.
 		expect(right.contains(attach)).toBe(false);
 	});

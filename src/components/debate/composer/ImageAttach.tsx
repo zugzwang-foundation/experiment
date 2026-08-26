@@ -369,8 +369,38 @@ export function ImageAttach({
 	// not resize as the state moves through pick → busy → attached → error.
 	// `min-w-0` is LOAD-BEARING: a fieldset's UA `min-inline-size:min-content`
 	// would otherwise refuse to shrink inside the grid track.
+	//
+	// ⚠⚠ RPLY-3 · R1 — `min-h-48` IS THIS PANEL'S FLOOR, AND IT IS ALSO THE ONLY
+	// THING THAT LETS THE PANEL SHRINK AT ALL. Both halves from ONE declaration,
+	// which is why it reads as a floor and behaves as a release:
+	//   · A grid item's automatic minimum size is its CONTENT. With `min-height`
+	//     left at `auto` this panel refused to give an inch — MEASURED at 650px
+	//     on the post arm against the real compiled CSS, the grid box around it
+	//     had already shrunk to 117.41px while the panel still measured its full
+	//     266.45px and simply overflowed. Any explicit `min-height` replaces that
+	//     automatic minimum; `0` and `192px` were measured to release it
+	//     identically, so the number is free to be a real floor rather than a
+	//     token zero.
+	//   · Below the floor the panel would otherwise keep collapsing and take the
+	//     artwork with it, because the `<svg>` scales to whatever box it is given.
+	//     Measured at the floor: `Add Image` renders 9.38px and the headline
+	//     11.25px — both still legible; at an unfloored 650px they were 5.63 and
+	//     6.25px, which is the state the founder reported as the panel being cut
+	//     off. 192px does NOT bind at any tested height (650px lands the panel
+	//     near 224px), so it costs nothing in the range that matters and only
+	//     catches the fall below it.
+	//
+	// ⛔ THE FLOOR IS ON THE PANEL, NOT ON THE ARTWORK, AND THAT IS THE WHOLE
+	// DIFFERENCE BETWEEN SCALING AND CLIPPING. Floor the `<svg>` instead and the
+	// panel — released by its own `min-h-0` — keeps shrinking underneath it, so
+	// the drawing spills past this fieldset's own border; add `overflow-hidden`
+	// to stop the spill and you have cropped the sentence instead, which is the
+	// defect being fixed. Floor the BOX and the artwork simply scales to it:
+	// the `<svg>` keeps its `viewBox` and its default
+	// `preserveAspectRatio="xMidYMid meet"`, so it fits, stays centred, keeps
+	// its ratio, and never clips or scrolls at any height.
 	const panel =
-		"flex h-full min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
+		"flex h-full min-h-48 min-w-0 flex-col items-center justify-center gap-2 rounded-(--imgr) p-3 text-center text-xs [border:var(--hairline)]";
 	// `.imgprev` — d5's `width:100%; aspect-ratio:4/5; max-height:calc(100% - 22px)`
 	// ported as PROPORTIONS ONLY: the `- 22px` is a value and is refused, so the
 	// clamp lands as `max-h-full`. Keeping d5's height clamp is what stops the

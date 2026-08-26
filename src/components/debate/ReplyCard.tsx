@@ -77,56 +77,28 @@ export function ReplyCard({
 				sold={reply.sold}
 				createdAt={reply.createdAt}
 			/>
-			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.
-			    ⛔ ON THE NON-REMOVED BRANCH ONLY. A removed reply's variant has no
-			    `imageUrl` field at all, so this cannot compile in the branch above —
-			    unlike the bookmark cluster beside it, whose placement this file
-			    already records as deliberate-but-not-type-enforced. Here the type
-			    system does carry it (SC-1).
-
-			    ⚠⚠ RPLY-1 · R6 — THE IMAGE IS NOW A CELL, AND THE CELL IS WHY THE
-			    CARD STOPPED HAVING DEAD SPACE UNDER ITS TEXT. This card's root is
-			    `min-h-0 flex-1` deliberately — d5's `.rpanel{flex:1 1 auto}`, so the
-			    post arm's arena is a FILLED two-column band rather than two short
-			    boxes floating at the top. But all three of its children were
-			    content-sized, and in a stretched `flex-col` every pixel of leftover
-			    height lands AFTER the last child. The gap was not a spacing bug; it
-			    was the absence of anything able to absorb.
-			    ⇒ `PostCard` does not have this problem because it has two absorbers
-			    this card lacks: an explicit image CELL and an `AggregateFooter`
-			    pinned at the bottom. R6 gives this card the FIRST one only.
-			    ⛔ AND DELIBERATELY NOT THE FOOTER. A reply has no replies
-			    (`REPLY_DEPTH_MAX = 1`) so there is no count to show, and there is no
-			    split bar on the reply path at all — both are ALREADY absent, which
-			    is exactly what the founder asked for ("like the post view, just
-			    without the replies counter and the S/C bar"). The image cell is
-			    therefore the whole change, and closing the gap is its side effect
-			    rather than a second edit.
-			    ⛔ `flex min-h-0 flex-1 items-center justify-center` — byte-carried
-			    from `PostCard`'s `.argimg` cell, because THE CELL IS WHERE THE
-			    HEIGHT LIVES, not the image: `max-h-full` on an `<img>` is a
-			    percentage and resolves to `none` without a definite height above it.
-			    Break the chain and the image silently reverts to intrinsic size. */}
-			<div className="flex min-h-0 flex-1 items-center justify-center">
-				{reply.imageUrl ? (
-					<CommentImage url={reply.imageUrl} onOpen={onOpenImage} fill />
-				) : (
-					/* ⚠ REUSED VERBATIM, `POST IMAGE · 640:586` CHROME AND ALL. Minting
-					   a "REPLY IMAGE" variant would be authoring product copy, which
-					   needs a founder ruling; the label is one string to change in the
-					   morning if he wants it different. ⚠⚠ It remains REVIEW-SURFACE
-					   ONLY — docketed at `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`)
-					   to be stripped or gated before the DP.2 production promote, and
-					   this is now a FOURTH mount that docket covers. */
-					<PostImagePlaceholder fill />
-				)}
-			</div>
 			{/* `.rtitle` (`:1550`) — the argument itself. A reply has no separate
 			    title column, so its BODY is its title; `deriveTitleTeaser` is a
 			    post-only derivation and is deliberately not applied here.
 			    ⚠ The trailing pseudonym line is GONE: it is in the `ArgProfile`
 			    head above now, and rendering it twice was the drift this row
-			    removes. */}
+			    removes.
+
+			    ⚠⚠ RPLY-3 · R2 — THIS ROW NOW COMES BEFORE THE IMAGE, WHICH IS THE
+			    ORDER `PostCard` HAS ALWAYS HAD. Founder: "it should be exactly like
+			    posts — only the S/C bar is removed and hence the image is
+			    enlarged." MEASURED against the post card rather than assumed:
+			    `PostCard` renders profile row → TITLE → image cell → aggregate
+			    footer, while this card rendered profile row → image → body. RPLY-1's
+			    R6 gave this card the image CELL but left it where the old hand-rolled
+			    anatomy had put it, so the two surfaces still read in different
+			    orders.
+			    ⛔ THE MAPPING IS TITLE→BODY, AND IT IS NOT A LOOSE ANALOGY. This
+			    file's own line above states the rule: a reply has no separate title,
+			    so its BODY *is* its title. `PostCard`'s title slot is therefore this
+			    row, and putting it above the image is what makes the two cards the
+			    same composition minus the split bar — which is the only difference
+			    the founder asked to keep. */}
 			<div className="flex items-start justify-between gap-2">
 				<p className="text-sm whitespace-pre-line">{reply.body}</p>
 				{/* HTML-FINISH · MARKET DETAIL row 27 — d5's `.rtitle.plust` `+`
@@ -152,6 +124,65 @@ export function ReplyCard({
 					onClick={() => onOpenPopup(reply)}
 					className="shrink-0"
 				/>
+			</div>
+			{/* HTML-FINISH · MARKET DETAIL row 26 — the reply's own attachment.
+			    ⛔ ON THE NON-REMOVED BRANCH ONLY. A removed reply's variant has no
+			    `imageUrl` field at all, so this cannot compile in the branch above —
+			    unlike the bookmark cluster beside it, whose placement this file
+			    already records as deliberate-but-not-type-enforced. Here the type
+			    system does carry it (SC-1).
+
+			    ⚠⚠ RPLY-1 · R6 — THE IMAGE IS A CELL, AND THE CELL IS WHY THE CARD
+			    STOPPED HAVING DEAD SPACE UNDER ITS TEXT. This card's root is
+			    `min-h-0 flex-1` deliberately — d5's `.rpanel{flex:1 1 auto}`, so the
+			    post arm's arena is a FILLED two-column band rather than two short
+			    boxes floating at the top. But all three of its children were
+			    content-sized, and in a stretched `flex-col` every pixel of leftover
+			    height lands AFTER the last child. The gap was not a spacing bug; it
+			    was the absence of anything able to absorb.
+			    ⇒ `PostCard` does not have this problem because it has two absorbers
+			    this card lacks: an explicit image CELL and an `AggregateFooter`
+			    pinned at the bottom. R6 gives this card the FIRST one only.
+			    ⛔ AND DELIBERATELY NOT THE FOOTER. A reply has no replies
+			    (`REPLY_DEPTH_MAX = 1`) so there is no count to show, and there is no
+			    split bar on the reply path at all — both are ALREADY absent, which
+			    is exactly what the founder asked for ("like the post view, just
+			    without the replies counter and the S/C bar").
+
+			    ⚠⚠ RPLY-3 · R2 — AND THE CELL IS NOW LAST, WHERE `PostCard` PUTS IT.
+			    The founder's "hence the image is enlarged" is DISCHARGED HERE AND IT
+			    IS WORTH SAYING HOW, because the mechanism is not the reorder. This
+			    cell is the card's ONLY `flex-1`, so it already took every pixel the
+			    stretched root had left over — including the pixels `PostCard` spends
+			    on its `AggregateFooter`. That is what "inherits the vertical space
+			    the split bar would have occupied" means on this card, and it was
+			    already true before the reorder: MEASURED before and after, the cell
+			    is the same height in the same column. What the reorder buys is that
+			    the leftover now falls at the FOOT of the card rather than in its
+			    middle, so a reply reads title-then-picture exactly as a post does.
+			    ⛔ `flex min-h-0 flex-1 items-center justify-center` — byte-carried
+			    from `PostCard`'s `.argimg` cell, because THE CELL IS WHERE THE
+			    HEIGHT LIVES, not the image: `max-h-full` on an `<img>` is a
+			    percentage and resolves to `none` without a definite height above it.
+			    Break the chain and the image silently reverts to intrinsic size. */}
+			<div className="flex min-h-0 flex-1 items-center justify-center">
+				{reply.imageUrl ? (
+					<CommentImage url={reply.imageUrl} onOpen={onOpenImage} fill />
+				) : (
+					/* ⚠ REUSED VERBATIM, `POST IMAGE · 640:586` CHROME AND ALL. Minting
+					   a "REPLY IMAGE" variant would be authoring product copy, which
+					   needs a founder ruling; the label is one string to change in the
+					   morning if he wants it different. ⚠⚠ It remains REVIEW-SURFACE
+					   ONLY — docketed at `docs/parked.md` (`HTML-FINISH-MD-PLACEHOLDERS`)
+					   to be stripped or gated before the DP.2 production promote, and
+					   this is now a FOURTH mount that docket covers.
+					   ⚠ THE CHROME IS ALREADY `PostCard`'S, VERIFIED RATHER THAN
+					   ASSUMED (RPLY-3 · R2): both cards render the SAME two components
+					   with the SAME `fill` prop inside the SAME cell class string, so
+					   "the image renders in the same chrome as PostCard's" needed no
+					   edit — only the check that said so. */
+					<PostImagePlaceholder fill />
+				)}
 			</div>
 		</div>
 	);

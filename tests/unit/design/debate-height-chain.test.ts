@@ -28,12 +28,24 @@ import { describe, expect, it } from "vitest";
  *                                                       IN *THIS* CHAIN
  *
  * ⚠⚠ RPLY-2 · R1 — NOT the only scroller on the surface any more, one level
- * BELOW this chain: `BetComposer`'s own argument region is now a second,
- * deliberate `overflow-y-auto` region, nested INSIDE whatever `column scroll`
- * renders (a card, a composer — the chain above does not know or care which).
+ * BELOW this chain: `BetComposer` gained a second, deliberate `overflow-y-auto`
+ * region, nested INSIDE whatever `column scroll` renders (a card, a composer —
+ * the chain above does not know or care which).
  * `DebateColumn.tsx`'s own docblock is corrected in place for that; this
  * diagram is left naming only the chain it actually asserts node-by-node
  * below, which stops at `column scroll` and never reaches into its children.
+ *
+ * ⚠⚠ RPLY-3 · R1 — THE EXCEPTION STANDS AND THE ELEMENT MOVED, which is worth
+ * a line because "is the claim true again?" was asked explicitly and the answer
+ * is no. RPLY-2 put that `overflow-y-auto` on the composer's whole ARGUMENT
+ * REGION. R1 rules the money footblock back into the right column — i.e. back
+ * INSIDE that region — so a scroller there would once again be able to hide
+ * `Đ BET`, the exact defect RPLY-2 hoisted the footblock to avoid. The overflow
+ * therefore moved DOWN onto the title/body pair's own wrapper (`.fieldscroll`),
+ * whose sibling the footblock is.
+ * ⇒ `column scroll` is STILL not the only scroller on the surface; there is
+ * still exactly one deliberate exception, and it is now a smaller box in a
+ * different place. The retired claim is NOT restored.
  *
  * ⚠ `min-h-0` IS THE LINK EVERYONE DROPS, and dropping it is invisible. A flex
  * item's automatic minimum size is its CONTENT, so without `min-h-0` a node

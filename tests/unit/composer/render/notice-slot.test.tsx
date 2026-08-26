@@ -174,8 +174,21 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 		// where there were two. The three comparisons below are unaffected
 		// exactly as the comment above says: they read `before` fresh from this
 		// same baseline function, never the literal.
+		//
+		// ⚠⚠ RPLY-3 · R1 — 3 → 2, AND IT IS THE SAME MOVE RUN BACKWARDS. The
+		// hoist RPLY-2 recorded above was demanded by RPLY-2's own brief and that
+		// demand was a SPECIFICATION error: the founder had asked for the
+		// composer to FIT, not for its layout to change. R1 returns the footblock
+		// to `.compright`, where d5 puts it (`:1132`), so the section is back to
+		// two direct children — the header row and the argument region. Recorded
+		// on top of RPLY-2's own record rather than replacing it (O-4/O-5): the
+		// point of this comment is that the number has moved twice and why, not
+		// what it happens to be today.
+		// ⛔ THE THREE COMPARISONS BELOW REMAIN INDIFFERENT TO ALL OF THIS, which
+		// is the property that made this file survive both moves untouched: they
+		// read `before` fresh from this same baseline function, never a literal.
 		const { container } = renderNone();
-		expect(sectionChildCount(container)).toBe(3);
+		expect(sectionChildCount(container)).toBe(2);
 		// …and the clean state shows TO WIN, which is what the notice displaces.
 		expect(noticeText(container)).toContain(COMPOSER_COPY.toWinLabel);
 	});
@@ -219,6 +232,49 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 			).toBe(1);
 			cleanup();
 		}
+	});
+
+	it("notice-slot::G3-RPLY-3-the-four-states-render-a-STRUCTURALLY-IDENTICAL-section", async () => {
+		// ⛔⛔ RPLY-3 · G3 — R3's CONSTANT-HEIGHT PROPERTY IS A REGRESSION TARGET
+		// FOR EVERY LATER LAYOUT TASK, AND R1 MOVED EVERY BOX IN THIS SECTION.
+		// The count assertions above catch a state that adds a CHILD; they cannot
+		// catch a state that changes an existing child's classes — a conditional
+		// `mt-2`, a `py-3` that only appears when disabled — which would move the
+		// height just as surely while the count held.
+		//
+		// ⇒ This compares the section's direct children by CLASS STRING across
+		// all four states. Anything height-bearing lives in those strings.
+		//
+		// ⚠ THE ONE THING THAT LEGITIMATELY DIFFERS IS THE DIMMING, and it is
+		// normalised rather than ignored: the C2 state adds
+		// `opacity-(--state-disabled-opacity)` to the argument region, which is
+		// the state's whole visual point and costs no height. Normalising it
+		// keeps this guard about GEOMETRY. ⛔ Its own correctness — that the
+		// footblock INHERITS that opacity now rather than re-applying it, since a
+		// second copy would composite to 0.25 and halve the notice's measured
+		// contrast — is asserted in `composer-fit.test.ts`, not here.
+		const shape = (container: HTMLElement) =>
+			Array.from(section(container).children).map((el) =>
+				(el.getAttribute("class") ?? "")
+					.split(/\s+/)
+					.filter((c) => c !== "opacity-(--state-disabled-opacity)")
+					.join(" "),
+			);
+
+		const clean = shape(renderNone().container);
+		cleanup();
+		const c2 = shape(renderFloorAbove().container);
+		cleanup();
+		const overCap = shape(renderOverCap().container);
+		cleanup();
+		const limited = shape((await renderRateLimited()).container);
+
+		expect(c2).toEqual(clean);
+		expect(overCap).toEqual(clean);
+		expect(limited).toEqual(clean);
+		// Non-vacuity: a section that rendered no children would satisfy every
+		// comparison above and prove nothing.
+		expect(clean.length).toBeGreaterThan(0);
 	});
 
 	it("notice-slot::the-slot-RESERVES-a-constant-height-rather-than-fitting-its-content", () => {

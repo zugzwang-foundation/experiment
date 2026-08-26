@@ -158,15 +158,22 @@ export function DebateColumn({
 			</div>
 			{/* ⚠⚠ `.colwrap` (`d5:568`) — `flex:1 1 auto;min-height:0;overflow-y:auto`.
 			    ⛔ NO LONGER THE ONLY SCROLLING REGION ON THE SURFACE — RPLY-2 · R1
-			    gave `BetComposer`'s own argument band a second, nested one, on
-			    purpose. This box is still the one that keeps the one-screen page
-			    correct rather than merely short; the composer's is a DELIBERATE
-			    EXCEPTION, not a lapse, because a scrollable composer would rather
-			    lose a few pixels of its argument view than ever cover its own
-			    Đ BET / submit — see `BetComposer.tsx`'s argument-region comment for
-			    that ruling. Nothing else on this surface earns the same exception:
-			    a card, a title, a reply — none of them carry a control the reader
-			    is mid-transaction with.
+			    gave `BetComposer` a second, nested one, on purpose. This box is
+			    still the one that keeps the one-screen page correct rather than
+			    merely short; the composer's is a DELIBERATE EXCEPTION, not a lapse,
+			    because a scrollable composer would rather lose a few pixels of its
+			    argument view than ever cover its own Đ BET / submit. Nothing else
+			    on this surface earns the same exception: a card, a title, a reply —
+			    none of them carry a control the reader is mid-transaction with.
+			    ⚠ RPLY-3 · R1 — THE EXCEPTION IS UNCHANGED; THE BOX IT SITS ON IS
+			    NOT. It was the composer's whole ARGUMENT REGION; with the money
+			    footblock ruled back into the right column, a scroller there could
+			    hide `Đ BET` again — the very thing the exception exists to prevent —
+			    so it moved down onto the title/body pair alone (`.fieldscroll`),
+			    with the footblock as that box's `shrink-0` sibling. Read
+			    `BetComposer.tsx`'s `.fieldscroll` comment for the ruling; the
+			    sentence above is corrected in place rather than left pointing at an
+			    element that no longer scrolls (`O-5`).
 
 			    ⛔ A FIXED-HEIGHT PAGE DOES NOT MAKE CONTENT FIT — IT CLIPS IT. The
 			    founder's 2026-08-17 ruling takes the page's own scrollbar away, so
