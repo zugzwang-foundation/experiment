@@ -5,6 +5,7 @@ import { GlobalHeader } from "@/components/shell/GlobalHeader";
 import { PageContainer } from "@/components/shell/PageContainer";
 import { auth } from "@/server/auth";
 import { readStarCount } from "@/server/github/star-count";
+import { pfpUrl } from "@/server/identity-pool/pfp-url";
 
 /**
  * (auth) route-group shell — the ratified-additive OQ-1 mount (UI.A1;
@@ -30,7 +31,10 @@ export default async function AuthLayout({
 }) {
 	const session = await auth.api.getSession({ headers: await headers() });
 	const viewer = session
-		? { pseudonym: session.user?.pseudonym ?? null }
+		? {
+				pseudonym: session.user?.pseudonym ?? null,
+				pfpUrl: pfpUrl(session.user?.pfpFilename ?? null),
+			}
 		: null;
 
 	// GH-STAR — read here even though this layout deliberately skips the two Đ

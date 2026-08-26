@@ -16,11 +16,11 @@ import {
 } from "@/lib/ranking";
 import { getSecondaryMarketMediaUrl } from "@/server/discovery/media";
 import type { PricePoint } from "@/server/discovery/price-series";
+import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 import { safeCaptureMessage } from "@/server/observability/safe-capture";
 import type { Marker } from "@/server/positions/compute";
 import { signRead } from "@/server/storage/sign-read";
-
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
 import { getMarketTotals } from "./market-totals";
@@ -43,7 +43,7 @@ const READ_URL_TTL_SECONDS = 3600;
  */
 const UNKNOWN_AUTHOR: AuthorIdentity = {
 	pseudonym: "—",
-	pfpUrl: "/pfp-placeholder.svg",
+	pfpUrl: PFP_PLACEHOLDER,
 };
 
 // ── The masked view-model (the type-level safety boundary) ───────────────────

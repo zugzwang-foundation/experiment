@@ -1,5 +1,5 @@
 /**
- * Seed the staging Supabase identity_pool — 200 deterministic
+ * Seed the staging Supabase identity_pool — 871 deterministic
  * (colour, animal, number) tuples via DATABASE_URL_STAGING (the
  * Session pooler URL synced from Doppler stg). Per SCAFFOLD.8 plan
  * §4.3 + J2 fix.
@@ -17,20 +17,25 @@
  * unconditionally under tsx (no Next.js bundler / Vitest alias to
  * replace it). Bypassed here by constructing our own `postgres()`
  * client directly — mirroring the pattern in scripts/smoke-staging.ts
- * (lines 8 + 110). The COLOURS/ANIMALS constants below are
- * intentionally duplicated from scripts/seed-identity-pool-dev.ts:25-63
- * pending the root-cause fix tracked for C12 close-out.
+ * (lines 8 + 110). The tuples themselves come from
+ * `@/server/identity-pool/rotation`, which is pure and so imports
+ * cleanly here; the C12 duplication this file used to carry is gone.
  *
  * Idempotent via `ON CONFLICT (colour, animal, number) DO NOTHING`
  * against the identity_pool_tuple_idx unique constraint (see
- * src/db/schema/identity.ts:36-40). Re-runs report "0 new rows, 200
- * already present"; total row count stays at 200. Existing rows are
+ * src/db/schema/identity.ts:36-40). Re-runs report "0 new rows, 871
+ * already present"; total row count stays at 871. Existing rows are
  * preserved — including any with `assigned_at` set via the Bucket B
  * transition (per src/db/schema/identity.ts:30,41-43) — so the
  * idempotency strategy is non-destructive vs. truncate-then-insert.
+ *
+ * Re-runs report "0 new rows, 871 already present".
  */
 
 import postgres from "postgres";
+
+import { generatePoolTuples } from "@/server/identity-pool/rotation";
+import { ANIMALS, COLOURS } from "@/server/identity-pool/vocabulary";
 
 const dbUrl = process.env.DATABASE_URL_STAGING;
 const fragment = process.env.STAGING_PROJECT_REF_FRAGMENT;
@@ -63,57 +68,10 @@ if (!dbUrl.includes(fragment)) {
 	process.exit(1);
 }
 
-// Deterministic tuple constants — duplicated verbatim from
-// scripts/seed-identity-pool-dev.ts:25-63 pending the root-cause fix
-// for the dev-seed tsx-import-crash (tracked for C12).
-const COLOURS = [
-	"Red",
-	"Blue",
-	"Amber",
-	"Green",
-	"Crimson",
-	"Azure",
-	"Emerald",
-	"Violet",
-	"Saffron",
-	"Ivory",
-	"Coral",
-	"Cyan",
-	"Magenta",
-	"Plum",
-	"Olive",
-	"Teal",
-	"Maroon",
-	"Beige",
-	"Indigo",
-	"Gold",
-] as const;
-
-const ANIMALS = [
-	"Fox",
-	"Wolf",
-	"Otter",
-	"Badger",
-	"Lynx",
-	"Hare",
-	"Owl",
-	"Hawk",
-	"Stoat",
-	"Pine",
-] as const;
-
-function pad3(n: number): string {
-	return String(n).padStart(3, "0");
-}
-
-const rows = COLOURS.flatMap((colour, colourIdx) =>
-	ANIMALS.map((animal, animalIdx) => {
-		const number = colourIdx * 10 + animalIdx;
-		const pseudonym = `${colour}${animal}${pad3(number)}`;
-		const pfpFilename = `${colour.toLowerCase()}-${animal.toLowerCase()}-${pad3(number)}.webp`;
-		return { colour, animal, number, pseudonym, pfpFilename };
-	}),
-);
+// One full pass over the identity grid — every (colour, animal) pair exactly once, in the order `consumeIdentityPoolTuple` will hand them out.
+//
+// The COLOURS/ANIMALS duplication this block used to carry (tracked for C12) is gone: `@/server/identity-pool/rotation` is pure, so it imports cleanly under tsx without dragging in the `@/db` -> `server-only` chain that made the duplication necessary.
+const rows = generatePoolTuples(COLOURS.length * ANIMALS.length);
 
 console.log(`[seed-staging] Target: ${safeHost(dbUrl)}`);
 console.log(

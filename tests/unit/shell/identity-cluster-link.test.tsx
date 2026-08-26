@@ -25,7 +25,9 @@ const PSEUDONYM = "RedFox001";
 describe("UI.A5 §2 row 8 — identity chip → own /u/[pseudonym] (A4 follow-up #2)", () => {
 	it("chip-links-to-own-profile", () => {
 		const { container } = render(
-			<IdentityCluster viewer={{ pseudonym: PSEUDONYM }} />,
+			<IdentityCluster
+				viewer={{ pseudonym: PSEUDONYM, pfpUrl: "/pfp-placeholder.svg" }}
+			/>,
 		);
 		const link = screen.getByTestId("identity-chip-link");
 		// The activation: a real anchor onto the viewer's own profile.
@@ -50,7 +52,9 @@ describe("UI.A5 §2 row 8 — identity chip → own /u/[pseudonym] (A4 follow-up
 		// failed. jsdom cannot compute `::after`, so the class binding IS the
 		// assertion (AGENTS.md §9 — no jest-dom, plain DOM only).
 		const { container } = render(
-			<IdentityCluster viewer={{ pseudonym: PSEUDONYM }} />,
+			<IdentityCluster
+				viewer={{ pseudonym: PSEUDONYM, pfpUrl: "/pfp-placeholder.svg" }}
+			/>,
 		);
 		const avatar = container.querySelector('[data-slot="avatar"]');
 		expect(avatar).not.toBeNull();
@@ -74,7 +78,9 @@ describe("UI.A5 §2 row 8 — identity chip → own /u/[pseudonym] (A4 follow-up
 		// NOT NULL, but a leaked null must not build a profile URL — the
 		// non-linked chip stays, and the render must not crash.
 		const { container } = render(
-			<IdentityCluster viewer={{ pseudonym: null }} />,
+			<IdentityCluster
+				viewer={{ pseudonym: null, pfpUrl: "/pfp-placeholder.svg" }}
+			/>,
 		);
 		expect(screen.queryByTestId("identity-chip-link")).toBeNull();
 		expect(container.querySelector('a[href^="/u/"]')).toBeNull();

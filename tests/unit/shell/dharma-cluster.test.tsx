@@ -53,7 +53,7 @@ beforeEach(() => {
 	);
 });
 
-const VIEWER = { pseudonym: "RedFox001" };
+const VIEWER = { pseudonym: "RedFox001", pfpUrl: "/pfp-placeholder.svg" };
 
 // LABEL TEXT IS THE COPY REGISTER; UPPERCASE IS ITS RENDERING. Plan §6.2 says
 // exactly that — "the copy register's `Portfolio` · `Balance` is the label

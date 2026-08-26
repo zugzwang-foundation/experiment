@@ -1,77 +1,24 @@
 /**
- * Dev seed for `identity_pool` per SCAFFOLD.3 plan §2 + Q2. Inserts ~200
- * deterministic (colour, animal, number, pfp_filename) tuples for local
- * development. Idempotent — `ON CONFLICT (colour, animal, number) DO
- * NOTHING` makes re-runs no-ops.
+ * Dev seed for `identity_pool` per SCAFFOLD.3 plan §2 + Q2. Inserts one full pass over the identity grid for local development. Idempotent — `ON CONFLICT (colour, animal, number) DO NOTHING` makes re-runs no-ops.
  *
- * 20 PascalCase colours × 10 PascalCase animals × 1 number per pair = 200
- * tuples. Numbers are `(colourIdx * 10 + animalIdx)` so each (colour,
- * animal) pair gets a deterministic unique number, but pseudonyms across
- * pairs use the full 0–199 namespace for variety.
+ * The vocabulary and the seed order both come from `@/server/identity-pool/rotation`, which is shared with `scripts/seed-staging.ts` and with the tests. Before PFP-1 this file hardcoded 20 colours x 10 animals invented before any render existed; 13 of those colours and 5 of those animals had no image, and one entry was not an animal.
  *
- * The production 50K-row asset pipeline (per SPEC.1 §13 lines 643–651) is
- * pre-launch Hrishikesh DGX-Spark work — out of repo scope.
- *
- * PFP filename slug: `${colour.toLowerCase()}-${animal.toLowerCase()}-NNN
- * .webp`. The actual webp file lives on R2 (SCAFFOLD.15); until then the
- * UI renders /public/pfp-placeholder.svg.
+ * One pass over the grid is 13 x 67 = 871 tuples, every one of them backed by a render in the R2 `v1/` prefix.
  *
  * Run via: `pnpm seed:identity-pool:dev` (see package.json scripts).
  */
 
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { generatePoolTuples } from "@/server/identity-pool/rotation";
+import { ANIMALS, COLOURS } from "@/server/identity-pool/vocabulary";
 
-const COLOURS = [
-	"Red",
-	"Blue",
-	"Amber",
-	"Green",
-	"Crimson",
-	"Azure",
-	"Emerald",
-	"Violet",
-	"Saffron",
-	"Ivory",
-	"Coral",
-	"Cyan",
-	"Magenta",
-	"Plum",
-	"Olive",
-	"Teal",
-	"Maroon",
-	"Beige",
-	"Indigo",
-	"Gold",
-] as const;
+// One full pass over the grid — every (colour, animal) pair exactly once.
+const GRID_PASS = COLOURS.length * ANIMALS.length;
 
-const ANIMALS = [
-	"Fox",
-	"Wolf",
-	"Otter",
-	"Badger",
-	"Lynx",
-	"Hare",
-	"Owl",
-	"Hawk",
-	"Stoat",
-	"Pine",
-] as const;
-
-function pad3(n: number): string {
-	return String(n).padStart(3, "0");
-}
+const rows = generatePoolTuples(GRID_PASS);
 
 async function main(): Promise<void> {
-	const rows = COLOURS.flatMap((colour, colourIdx) =>
-		ANIMALS.map((animal, animalIdx) => {
-			const number = colourIdx * 10 + animalIdx;
-			const pseudonym = `${colour}${animal}${pad3(number)}`;
-			const pfpFilename = `${colour.toLowerCase()}-${animal.toLowerCase()}-${pad3(number)}.webp`;
-			return { colour, animal, number, pseudonym, pfpFilename };
-		}),
-	);
-
 	console.log(
 		`[seed-identity-pool-dev] inserting ${rows.length} tuples (idempotent via ON CONFLICT)...`,
 	);

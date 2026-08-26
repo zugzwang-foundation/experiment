@@ -10,12 +10,16 @@ import { ProfileTiles } from "./ProfileTiles";
  * scrubbed user (H2 — the pseudonym is a bracketed placeholder like
  * `[scrubbed_user_4729]`) renders the scrubbed marker + the shared placeholder
  * avatar; NO PII (the DTO carries only the pseudonym, banned flag, and the
- * placeholder PFP — no email/name/googleId ever reaches this surface).
+ * resolved PFP URL — no email/name/googleId ever reaches this surface). The URL
+ * is a public R2 link built from `pfp_filename` by
+ * `server/identity-pool/pfp-url.ts` (PFP-1); `pfp_filename` is a coarsening of
+ * the already-public pseudonym — `<colour>-<animal>.webp`, with the number
+ * dropped — so it discloses nothing the DTO did not already carry.
  *
  * The dedicated scrubbed-user silhouette asset is UNDEFINED (a brand ruling is
- * owed — values-log §278); v1 reuses the shared `pfp-placeholder.svg` (the same
- * avatar every identity shows until the R2 PFP builder is wired). Surfaced for
- * Gate C.
+ * owed — values-log §278); a scrubbed row carries `pfp_filename` NULL and so
+ * reuses the shared `pfp-placeholder.svg`, which is now the fallback rather
+ * than the universal case it was before PFP-1. Surfaced for Gate C.
  */
 export function IdentityCard({
 	user,
