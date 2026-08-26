@@ -651,3 +651,70 @@ describe("discovery::hero-chart-time-scaled", () => {
 		).not.toBeNull();
 	});
 });
+
+// ── CHART-1 — the hero carries the SPEC.1 §9 accessible readout ─────────────
+//
+// SPEC.1 §17 row proved here:
+//   discovery::hero-chart-carries-accessible-summary
+describe("discovery::hero-chart-carries-accessible-summary", () => {
+	it("names the opening price, the current price and both endpoints", () => {
+		const { container } = render(
+			<HeroPanels
+				card={CARD}
+				series={[
+					{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+					{ at: "2026-09-20T00:00:00.000Z", yes: "0.800000000000000000" },
+				]}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+
+		const summary = container.querySelector(
+			'[data-testid="hero-price-chart-summary"]',
+		);
+		expect(summary).not.toBeNull();
+
+		const text = summary?.textContent ?? "";
+		// All four quantities SPEC.1 §9 · Accessibility names, and no fewer.
+		expect(text).toContain("opening 50%");
+		expect(text).toContain("current 80%");
+		expect(text).toContain("Sep 15");
+		expect(text).toContain("Sep 20");
+	});
+
+	it("keys distinctly from the other two summaries", () => {
+		// Three summaries can share a document — a market page's card and overlay,
+		// and this. A shared testid would let a query assert about the wrong
+		// surface and pass.
+		const { container } = render(
+			<HeroPanels
+				card={CARD}
+				series={SERIES}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		expect(
+			container.querySelectorAll('[data-testid="hero-price-chart-summary"]'),
+		).toHaveLength(1);
+		expect(
+			container.querySelector('[data-testid="market-price-chart-summary"]'),
+		).toBeNull();
+	});
+
+	it("is screen-reader-only — it must not become visible chrome", () => {
+		// The readout is an accessibility channel, not a caption. If it ever
+		// renders visibly it changes the hero's layout, which four height-chain
+		// guards read as source and none of them would attribute to this.
+		const { container } = render(
+			<HeroPanels
+				card={CARD}
+				series={SERIES}
+				topPosts={{ yes: null, no: null }}
+			/>,
+		);
+		const summary = container.querySelector(
+			'[data-testid="hero-price-chart-summary"]',
+		);
+		expect(summary?.getAttribute("class")).toContain("sr-only");
+	});
+});

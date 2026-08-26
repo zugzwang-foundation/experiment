@@ -8,6 +8,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { HeroPost, HeroTopPosts } from "@/server/discovery/hero";
 import type { DiscoveryCard } from "@/server/discovery/list";
 import type { PricePoint } from "@/server/discovery/price-series";
+import { ChartSummary } from "../debate/chart/ChartSummary";
 import { MarketPriceChart } from "../debate/chart/MarketPriceChart";
 import { MarketThumb } from "./MarketThumb";
 import { StatLine } from "./StatLine";
@@ -150,6 +151,23 @@ export function HeroPanels({
 				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
 					<MarketPriceChart series={series} mode="hero" />
 				</div>
+				{/* SPEC.1 1.0.40 §9 · Accessibility — the hero's readout, the third and
+				    last mode to get one, discharging `PD-3-04`.
+				    ⛔ THIS SLOT WAS LEGITIMATELY EMPTY UNTIL NOW AND IS NOT ANY MORE.
+				    The §22 hero graph was specified DECORATIVE — `aria-hidden`, no
+				    axis, index-spaced — and a decorative graphic correctly announces
+				    nothing. It stopped being decorative when HTML-FINISH · DISCOVERY
+				    deleted the card sparkline and left this the surface's only price
+				    graph, and CHART-1 made it time-scaled. A graphic carrying real
+				    chronology that a screen reader cannot reach is a conformance gap,
+				    not a design choice.
+				    ⚠ It lands INSIDE the panel `<Link>`, so it lengthens that link's
+				    accessible name rather than announcing separately. That is the
+				    shipped pattern on the other two modes and the honest trade here:
+				    the alternative is a graphic with no accessible content at all.
+				    Whether this link's whole name is too long is a cross-surface
+				    question and A11Y.0's, not this task's. */}
+				<ChartSummary series={series} testId="hero-price-chart-summary" />
 				<div className="mt-[9px]">
 					<PriceBar pricing={card.pricing} size="hero" />
 				</div>

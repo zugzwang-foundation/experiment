@@ -5,8 +5,7 @@ import { useEffect } from "react";
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
-import { formatPercentUnpaired } from "../format";
-import { fmtUtcDay } from "./geometry";
+import { ChartSummary } from "./ChartSummary";
 import { MarketPriceChart } from "./MarketPriceChart";
 
 /** The expanded price chart — a STATE TOGGLE (not a route; the §23 overlay
@@ -23,17 +22,6 @@ export function MarketPriceChartOverlay({
 	nodes: ChartNode[];
 	onClose: () => void;
 }): React.JSX.Element {
-	const opening = series[0];
-	const current = series[series.length - 1];
-	// pctround-allow: genuinely single-side — the OPENING YES price, one point in
-	// TIME, not one half of a live pair (SPEC.1 §10.8 escape hatch). Same grounds
-	// as the collapsed card's two, which this readout must agree with.
-	const openingPct = formatPercentUnpaired(opening.yes);
-	// pctround-allow: genuinely single-side — the CURRENT YES price, the other
-	// point in TIME. Shares the card's formatter core, so the collapsed and
-	// expanded readouts can never disagree on the same market.
-	const currentPct = formatPercentUnpaired(current.yes);
-
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
 			if (e.key === "Escape") {
@@ -108,13 +96,10 @@ export function MarketPriceChartOverlay({
 				    query can never match the wrong one.
 				    ⛔ `PD-3-04` ONLY — D6 does not widen to chart GEOMETRY, which defers
 				    with the media panel (HEADER-3ZONE). No geometry changes here. */}
-				<span
-					data-testid="market-price-chart-overlay-summary"
-					className="sr-only"
-				>
-					Price history: opening {openingPct}, current {currentPct},{" "}
-					{fmtUtcDay(opening.at)} to {fmtUtcDay(current.at)}.
-				</span>
+				<ChartSummary
+					series={series}
+					testId="market-price-chart-overlay-summary"
+				/>
 			</div>
 		</div>
 	);
