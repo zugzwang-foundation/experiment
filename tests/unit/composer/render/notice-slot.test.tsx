@@ -174,8 +174,21 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 		// where there were two. The three comparisons below are unaffected
 		// exactly as the comment above says: they read `before` fresh from this
 		// same baseline function, never the literal.
+		//
+		// ⚠⚠ RPLY-3 · R1 — 3 → 2, AND IT IS THE SAME MOVE RUN BACKWARDS. The
+		// hoist RPLY-2 recorded above was demanded by RPLY-2's own brief and that
+		// demand was a SPECIFICATION error: the founder had asked for the
+		// composer to FIT, not for its layout to change. R1 returns the footblock
+		// to `.compright`, where d5 puts it (`:1132`), so the section is back to
+		// two direct children — the header row and the argument region. Recorded
+		// on top of RPLY-2's own record rather than replacing it (O-4/O-5): the
+		// point of this comment is that the number has moved twice and why, not
+		// what it happens to be today.
+		// ⛔ THE THREE COMPARISONS BELOW REMAIN INDIFFERENT TO ALL OF THIS, which
+		// is the property that made this file survive both moves untouched: they
+		// read `before` fresh from this same baseline function, never a literal.
 		const { container } = renderNone();
-		expect(sectionChildCount(container)).toBe(3);
+		expect(sectionChildCount(container)).toBe(2);
 		// …and the clean state shows TO WIN, which is what the notice displaces.
 		expect(noticeText(container)).toContain(COMPOSER_COPY.toWinLabel);
 	});
@@ -219,6 +232,94 @@ describe("R3 — one notice slot, and no state adds a box", () => {
 			).toBe(1);
 			cleanup();
 		}
+	});
+
+	it("notice-slot::G3-RPLY-3-the-four-states-render-a-STRUCTURALLY-IDENTICAL-section", async () => {
+		// ⛔⛔ RPLY-3 · G3 — R3's CONSTANT-HEIGHT PROPERTY IS A REGRESSION TARGET
+		// FOR EVERY LATER LAYOUT TASK, AND R1 MOVED EVERY BOX IN THIS SECTION.
+		// The count assertions above catch a state that adds a CHILD; they cannot
+		// catch a state that changes an existing child's classes — a conditional
+		// `mt-2`, a `py-3` that only appears when disabled — which would move the
+		// height just as surely while the count held.
+		//
+		// ⇒ This compares EVERY ELEMENT IN THE SECTION by class string across all
+		// four states. Anything height-bearing lives in those strings.
+		//
+		// ⛔⛔ EVERY ELEMENT, NOT THE DIRECT CHILDREN — AND THE FIRST DRAFT SAID
+		// "direct children" WHILE ITS OWN COMMENT NAMED THE CASE THAT ESCAPES.
+		// `@code-reviewer` proved it: a conditional `py-3` on the FOOTBLOCK — the
+		// comment's literal example — left all twelve tests green, because R1 had
+		// just moved the footblock three levels down, out of the direct-child set.
+		// Under RPLY-2 the same guard would have caught it, since the footblock
+		// WAS a direct child then. A guard written in the same commit as a move
+		// inherits the shape from before the move unless it is asked to walk.
+		//
+		// ⚠⚠ EXACTLY TWO THINGS LEGITIMATELY DIFFER, and both are normalised
+		// rather than ignored — naming them is what keeps this guard about
+		// GEOMETRY rather than about sameness.
+		//
+		// (1) THE DIMMING. The C2 state adds `opacity-(--state-disabled-opacity)`
+		// to the argument region: the state's whole visual point, and it costs no
+		// height. ⛔ Its own correctness — that the footblock INHERITS that
+		// opacity now rather than re-applying it, since a second copy would
+		// composite to 0.25 and halve the notice's measured contrast — is
+		// asserted in `composer-fit.test.ts`, not here.
+		//
+		// (2) THE NOTICE SLOT'S CONTENTS, which is the whole R3 mechanism: the
+		// clean state renders a TO WIN row (a flex `div` and two `span`s), a
+		// blocked state renders one `p`, and both sit inside a slot whose `h-8`
+		// is RESERVED rather than fitted. Different elements, identical box —
+		// which is precisely the thing R3 bought. So the slot ELEMENT stays in
+		// the comparison, because its `h-8` is the reservation and losing it is
+		// the regression; its DESCENDANTS are excluded.
+		// ⛔ Excluding the slot itself would delete the assertion that matters;
+		// including its children reds the guard on the design.
+		//
+		// (3) THE OVER-CAP STATE RE-COLOURS THE STAKE FIELD — `text-ink` becomes
+		// `text-n4` (`assess.overCap ? "text-n4" : ""`), shipped long before this
+		// task. A colour is not a geometry, so the ramp tokens are stripped.
+		// ⚠⚠ STRIPPED BY THE COLOUR PATTERN ONLY, NEVER BY THE `text-` PREFIX.
+		// Tailwind overloads `text-*`: `text-n4` is a colour and `text-[9.5px]` /
+		// `text-sm` are TYPE SIZES, which are load-bearing here — the notice slot
+		// exists because a wrapped sentence is 32px and a single line is 16px.
+		// Dropping the prefix wholesale would blind this guard to exactly the
+		// class of change it was written to catch.
+		const isRampColour = (c: string) => /^text-(?:ink|n[0-7])$/.test(c);
+		const shape = (container: HTMLElement) => {
+			const root = section(container);
+			const slot = root.querySelector('[data-testid="composer-notice-slot"]');
+			if (slot === null) {
+				throw new Error("no notice slot");
+			}
+			return Array.from(root.querySelectorAll("*"))
+				.filter((el) => el === slot || !slot.contains(el))
+				.map(
+					(el) =>
+						`${el.tagName}|${(el.getAttribute("class") ?? "")
+							.split(/\s+/)
+							.filter(
+								(c) =>
+									c !== "opacity-(--state-disabled-opacity)" &&
+									!isRampColour(c),
+							)
+							.join(" ")}`,
+				);
+		};
+
+		const clean = shape(renderNone().container);
+		cleanup();
+		const c2 = shape(renderFloorAbove().container);
+		cleanup();
+		const overCap = shape(renderOverCap().container);
+		cleanup();
+		const limited = shape((await renderRateLimited()).container);
+
+		expect(c2).toEqual(clean);
+		expect(overCap).toEqual(clean);
+		expect(limited).toEqual(clean);
+		// Non-vacuity: a section that rendered no children would satisfy every
+		// comparison above and prove nothing.
+		expect(clean.length).toBeGreaterThan(0);
 	});
 
 	it("notice-slot::the-slot-RESERVES-a-constant-height-rather-than-fitting-its-content", () => {

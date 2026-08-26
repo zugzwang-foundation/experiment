@@ -175,6 +175,113 @@ describe("R6 — the reply card can absorb its own leftover height", () => {
 	});
 });
 
+describe("RPLY-3 · R2 — the reply card is a post card minus the split bar", () => {
+	/**
+	 * The card's direct children, named by what they carry. The names are the
+	 * ANATOMY, so the ordering assertion below reads as the founder's sentence
+	 * rather than as index arithmetic.
+	 */
+	function anatomy(container: HTMLElement): string[] {
+		return Array.from(root(container).children).map((el) => {
+			// ⚠ THE IMAGE CELL IS IDENTIFIED BY ITS OWN CLASS FIRST, and `img` is
+			// only a fallback INSIDE that. The first draft asked `querySelector("img")`
+			// before anything else, which would classify the PROFILE ROW as the image
+			// cell the moment `ArgProfile`'s avatar mounted an `<img>`. It happens not
+			// to today — Radix's `AvatarImage` never resolves a load in jsdom — so the
+			// guard was correct by accident of the harness rather than by rule, and the
+			// accident would end silently. Caught by `@code-reviewer` (LOW).
+			const cls = (el.getAttribute("class") ?? "").split(/\s+/);
+			if (cls.includes("flex-1") && cls.includes("justify-center")) {
+				return "IMAGE-CELL";
+			}
+			if (el.querySelector("p") !== null) {
+				return "BODY";
+			}
+			return "PROFILE-ROW";
+		});
+	}
+
+	it("reply-card-absorber::G5-the-body-comes-BEFORE-the-image-just-as-the-post-title-does", () => {
+		// ⛔⛔ THE MEASURED MISMATCH THIS FIXES, which RPLY-1 · R6 did not address
+		// because R6 was about the CELL and not about where it sat:
+		//     PostCard   profile row → title → image cell → split bar
+		//     ReplyCard  profile row → image → body                (no split bar)
+		// Founder: "it should be exactly like posts — only the S/C bar is removed
+		// and hence the image is enlarged." Two cards in two different reading
+		// orders is not "exactly like".
+		//
+		// ⚠ THE MAPPING IS TITLE→BODY, AND THE FILE ITSELF LICENSES IT: a reply
+		// has no separate title, so its BODY *is* its title (`deriveTitleTeaser`
+		// is a post-only derivation). `PostCard`'s title slot is therefore this
+		// card's body row.
+		//
+		// ⛔ ASSERTED ON THE RENDERED DOM, NOT ON THE SOURCE. A source scan would
+		// compare the order of two JSX blocks in a file and could not tell which
+		// BRANCH they landed in — and the removed branch must have neither.
+		expect(anatomy(card(presentReply(null)).container)).toEqual([
+			"PROFILE-ROW",
+			"BODY",
+			"IMAGE-CELL",
+		]);
+	});
+
+	it("reply-card-absorber::G5-the-order-holds-on-the-WITH-image-path-too", () => {
+		// The empty path is the common one and the one above; this is the path
+		// where a real attachment could plausibly have been special-cased.
+		expect(
+			anatomy(card(presentReply("https://example.invalid/r.png")).container),
+		).toEqual(["PROFILE-ROW", "BODY", "IMAGE-CELL"]);
+	});
+
+	it("reply-card-absorber::G5-the-image-cell-is-the-LAST-child-so-the-slack-falls-at-the-foot", () => {
+		// ⚠⚠ WHAT "hence the image is enlarged" ACTUALLY MEANS HERE, stated
+		// because the honest answer is not the flattering one. This cell is the
+		// card's ONLY `flex-1`, so it ALREADY took every leftover pixel — including
+		// the ones `PostCard` spends on its `AggregateFooter`. MEASURED before and
+		// after the reorder in a real browser: the cell is 360.01px in both, and
+		// the card is 493.24px in both. The reorder does not enlarge it; the
+		// absence of a split bar already had. What the reorder changes is WHERE
+		// the leftover sits — at the card's foot, as on a post, instead of in its
+		// middle.
+		// ⇒ So the assertion is placement, not size, because size is what was
+		// already true and placement is what moved.
+		const { container } = card(presentReply(null));
+		const kids = Array.from(root(container).children);
+		const last = kids[kids.length - 1];
+		expect(
+			last?.querySelector('[data-testid="post-image-placeholder"]'),
+		).not.toBeNull();
+		expect(last?.getAttribute("class")?.split(/\s+/)).toContain("flex-1");
+	});
+
+	it("reply-card-absorber::G5-the-image-cell-and-its-contents-are-PostCard-s-chrome-verbatim", () => {
+		// ⛔ "the image renders in the same chrome as PostCard's" — verified
+		// rather than rebuilt. Both files declare the SAME cell class string and
+		// mount the SAME two components with the SAME `fill` prop, so this is a
+		// check that reported "already true" rather than an edit. Read out of
+		// `PostCard.tsx` itself, so a change there reddens here instead of the two
+		// drifting silently apart — which is exactly what happened to the card
+		// heads before row 26 made them one component.
+		const post = readFileSync(
+			join(process.cwd(), "src/components/debate/PostCard.tsx"),
+			"utf8",
+		);
+		const CELL =
+			'<div className="flex min-h-0 flex-1 items-center justify-center">';
+		expect(post).toContain(CELL);
+		expect(
+			readFileSync(
+				join(process.cwd(), "src/components/debate/ReplyCard.tsx"),
+				"utf8",
+			),
+		).toContain(CELL);
+		// ⚠ MATCHED AS PROP SYNTAX, never the bare word `fill` — which appears in
+		// prose all over both files.
+		expect(post).toContain("<PostImagePlaceholder fill />");
+		expect(post).toMatch(/<CommentImage[^>]*\sfill\s*\/>/);
+	});
+});
+
 describe("R6 — the founder's two exclusions were already true", () => {
 	const source = readFileSync(
 		join(process.cwd(), "src/components/debate/ReplyCard.tsx"),
@@ -205,5 +312,25 @@ describe("R6 — the founder's two exclusions were already true", () => {
 		// pieces and not about a card that renders no head at all.
 		expect(source).toContain("<ArgProfile");
 		expect(container.innerHTML).toContain("fixture-replier");
+	});
+
+	it("reply-card-absorber::G6-RPLY-3-and-the-post-card-DOES-have-both-so-the-absence-means-something", () => {
+		// ⛔⛔ THE CONTROL THAT MAKES G6 NON-VACUOUS, and RPLY-3 · R2 is exactly
+		// the task that needs it. "Only the S/C bar is removed" is a claim about
+		// a DIFFERENCE between two cards; a guard that only reads one of them
+		// would stay green if `PostCard` quietly lost its footer too, at which
+		// point the two would still match and the sentence would still be false.
+		// ⚠ MATCHED AS ELEMENT AND PROP SYNTAX, never bare words: both files
+		// discuss `AggregateFooter` and `replyCount` at length in prose, and a
+		// bare-substring assertion here would be reading the commentary.
+		const post = readFileSync(
+			join(process.cwd(), "src/components/debate/PostCard.tsx"),
+			"utf8",
+		);
+		expect(post).toContain("<AggregateFooter");
+		expect(post).toContain("replyCount={replyCount}");
+		// …and the reply card has neither. (`source` is `ReplyCard.tsx`.)
+		expect(source).not.toContain("<AggregateFooter");
+		expect(source).not.toContain("replyCount=");
 	});
 });
