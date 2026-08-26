@@ -1,7 +1,7 @@
 # Zugzwang — Design Canon (consolidated · v1.0-era + Wave-2 + DC rulings)
 
 > **Doc:** `docs/design/design-canon.md`
-> **Status:** v1.2-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3** · BRIDGE amendments 2026-07-14 · TIME-1 Form B amendment 2026-08-25
+> **Status:** v1.2-draft · authored at **DC.1** (2026-07-02) · committed at **DC.3** · BRIDGE amendments 2026-07-14 · TIME-1 Form B amendment 2026-08-25 · RPLY-CLOSE composer-open exception 2026-08-26
 > **Authorship:** web Claude (orchestrator) · ratified by operator · committed by Claude Code
 >
 > **What this is.** The single consolidated record of the DESIGN phase: the locked surfaces, the locked decisions, motion/timing, copy, spec deltas, the five DC rulings, the per-surface mockup index (the handoff unit), and the CD fine-tune log. It **absorbs** `DESIGN-phase-record.md` + the three by-type consolidations (motion / spec-changes / copy-register), reconciled against the 2026-07-02 rulings. Those four source docs are **superseded by this canon** (delete-after-verify from PK once DC.3 lands).
@@ -46,6 +46,10 @@
 
 **Reply** *(the d5 "postview" — per-post thread)*. **Columns are FIXED poles: left = YES, right = NO, for every post.** Column header = the side **price pill only** (`Yes 👍 38%` / `No 👎 62%`). **Support/Counter is a property of the POST, never the column** — it lives on the post's **split bar** (`Đ support ─ total ─ Đ counter`, with the Support/Counter buttons that open the composer) and in the composer ("Support/Counter <author>'s argument"). Replies route into columns by their **own** YES/NO side. Composer opens in the opposite slot.
 
+**Composer-open exception.** While a composer is open, the HOSTING column's header renders the label, percent and TO-WIN unit of the **side being bet**, not of its own pole. The non-hosting column's header does not move.
+
+**The position readout is excluded from the mirroring.** `NO ACTIVE POSITION` / `YOUR POSITION Đ N` is a fact about the viewer's holding on that specific pole; mirroring it prints a falsehood. `PositionStrip` decouples the two via a `composingSide` prop that drives display only. `SlotHeader` does not decouple them and is therefore wrong — see `docs/parked.md`.
+
 **Profile** *(frozen v0.18 + lock-cycle extensions)*. Two bands. Top: identity card (PFP + pseudonym + bookmark/download combo) + six account tiles (Wallet value · Positions value · Net P/L · Arguments · Total Support received · Total Counter received) + the graph slot (W2.6 design locked). Bottom "arena": **Positions** table (Position · Argument · Staked · Current; market + Open/Closed filters) + the **argument list** (D5-synced card anatomy; a reply card keeps its "Replied to …" context). The **Sell flow** is hosted on the positions row, not in the right panel. Owner sees Sell; **closed positions are unsellable** (frozen-at-resolution). Up/Down step the *visible filtered* rows; titles are the click targets (↗ arrows removed).
 
 > **⚠ CORRECTED at HTML-FINISH · PROFILE (2026-08-15), founder ruling, and corrected HERE rather than in an appendix (O-5 — an amendments block is a record of the change, never the delivery of it).** Two clauses of this entry were superseded and are rewritten above:
@@ -65,7 +69,7 @@
 ## §3 — Locked design decisions (the invariant spine)
 
 1. **Side binding (app-wide, permanent):** YES = **black** · NO = **white**; thumb-up = YES, thumb-down = NO. The poles encode **side only** — *Support/Counter is a separate, post-relative relation* (the v1.0 axis correction; design-language v0.5 §1.3/§6 now match).
-2. **Columns are fixed YES/NO poles** in the Reply view; Support/Counter lives on the split bar + composer only, never as a column label or colour.
+2. **Columns are fixed YES/NO poles** in the Reply view; Support/Counter lives on the split bar + composer only, never as a column label or colour. *(⚠ The fixed-poles half now carries the **composer-open exception** — see §2's Reply entry. The Support/Counter half is unqualified and unchanged: the exception moves which SIDE a hosting header names, never whether a column may be labelled by relation. Pointer added at RPLY-CLOSE per `O-5` — a ruling that states the superseded position has to carry the correction too, not rely on a reader reaching §2 first.)*
 3. **Composer slide rule:** the composer opens in the **opposite** slot; the bet's side stays visible.
 4. **Reply-as-bet** throughout: a reply IS a Support/Counter bet; the split-bar buttons open the composer; every buy carries the mandatory argument; **selling is the only comment-free action**.
 5. **"Đ BET" wordmark** end-to-end (entry button `Đ BET` → header `Place your Đ BET` → submit `PLACE Đ BET`; reads as DEBATE).
