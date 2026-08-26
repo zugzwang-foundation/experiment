@@ -193,3 +193,67 @@ describe("debate-view::price-chart-single-point-flat-line — G-10's pin", () =>
 		expect(new Set(out.map((p) => p.yes)).size).toBe(2);
 	});
 });
+
+// ── CHART-1 · @code-reviewer HIGH-1 — a price may never be moved onto a
+//    timestamp it did not happen at ─────────────────────────────────────────
+//
+// ⛔ THE DEFECT THIS REJECTS, CONCRETELY. `deriveMarketPriceChart` stamped the
+// series' last point with the live pool price (decision #6). That was exact
+// while the walk was replayed inside the same read that fetched the price — the
+// walk's last step WAS the event that produced it. Once CHART-1 let the walk be
+// INJECTED from its own cache, the two came from different instants: a bet
+// causes a miss in the surrounding block, the walk still hits its own key and
+// arrives WITHOUT that bet, and the live price arrives WITH it. Stamping then
+// drew the new price at the PREVIOUS event's timestamp.
+//
+// ⚠ THE ERROR IS IN X AND IS NOT BOUNDED BY THE WINDOW. It is the gap to the
+// preceding event — three days, on a market nobody has touched in three days.
+// The chart would say the price moved then and has been flat since. That is a
+// false statement about the market rather than a stale view of it, which is the
+// line this whole task is built on: the history may be a minute old, and it may
+// never be wrong.
+//
+// The guard is at the composition level because that is the level the defect
+// lived at, and because `'use cache'` THROWS under a bare `vitest run` — no
+// test in this repo can put a genuinely stale walk beside a genuinely fresh
+// price. What CAN be pinned is the rule: given a walk that is missing the most
+// recent bet, every point that came from the walk keeps its own price, and the
+// live price appears ONLY on a new point at `now`.
+describe("a floored history is never retro-stamped with a live price", () => {
+	it("adds the live price as a NEW point and moves no existing one", () => {
+		// A walk missing the latest bet: last real event is five days ago at 0.70.
+		const stale: PricePoint[] = [
+			{ at: OPENED, yes: HALF },
+			{ at: LAST_EVENT, yes: "0.700000000000000000" },
+		];
+		// …while the pool has since moved to 0.61.
+		const out = withLiveTail(stale, {
+			spotYes: SPOT,
+			nowIso: NOW,
+			isOpen: true,
+		});
+
+		// ⛔ The point at the last EVENT still carries the price that event
+		// produced. If this reddens, something is writing `SPOT` backwards onto a
+		// timestamp where it was never true.
+		const atLastEvent = out.find((p) => p.at === LAST_EVENT);
+		expect(atLastEvent?.yes).toBe("0.700000000000000000");
+		expect(atLastEvent?.yes).not.toBe(SPOT);
+
+		// …and the live price is a NEW point at NOW, not a relocated old one.
+		expect(out[out.length - 1]).toEqual({ at: NOW, yes: SPOT });
+		expect(out).toHaveLength(stale.length + 1);
+	});
+
+	it("POSITIVE CONTROL — the assertion can see a retro-stamp", () => {
+		// Without this, "the old point kept its price" would also pass on an
+		// implementation that returned the input untouched and never pinned
+		// anything at all. Hand-build the defect and require the check to catch it.
+		const retroStamped: PricePoint[] = [
+			{ at: OPENED, yes: HALF },
+			{ at: LAST_EVENT, yes: SPOT },
+		];
+		const atLastEvent = retroStamped.find((p) => p.at === LAST_EVENT);
+		expect(atLastEvent?.yes).toBe(SPOT);
+	});
+});

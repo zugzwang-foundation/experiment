@@ -93,7 +93,36 @@ export async function deriveMarketPriceChart(
 	if (walk.length === 0) {
 		return { series: [], nodes: [] };
 	}
-	const series = buildSeries(walk, args.spotYes);
+	// ⛔ THE TERMINAL STAMP IS ONLY LEGITIMATE ON A FRESHLY REPLAYED WALK, AND
+	// THIS ARGUMENT IS WHY. Decision #6 stamps the series' last point with the
+	// live pool price so the chart cannot disagree with `PriceBar`. That was
+	// exact while the walk was always replayed inside the same read that fetched
+	// `spotYes`: the walk's last step WAS the event that produced that price, so
+	// the stamp changed nothing and only guaranteed agreement.
+	//
+	// With an INJECTED walk (CHART-1) the two come from different instants. On a
+	// cache miss caused by a bet, the walk can still HIT its own key and arrive
+	// without that bet, while `spotYes` is read live and carries it. Stamping
+	// then writes the NEW price onto the PREVIOUS event's timestamp — drawing the
+	// market as having moved three days ago and sat flat since, if that is when
+	// the previous bet was. ⚠ The error is in X, and it is NOT bounded by the
+	// window: it is the gap to the preceding event, which is unbounded on a quiet
+	// market. A price at the wrong time is a false statement about the market,
+	// not a stale one.
+	//
+	// So the injected path leaves the replay's own terminal alone and lets
+	// `withLiveTail` compose the edge at the page — which appends `(now, spot)`
+	// as a NEW point rather than moving an old one, and is the mechanism that
+	// exists for exactly this. The uninjected path (the `.md` export) keeps
+	// decision #6 byte-for-byte.
+	//
+	// Found by `@code-reviewer` at the CHART-1 cascade. Invisible to the whole
+	// suite: `'use cache'` THROWS under a bare `vitest run`, so no test can put a
+	// stale walk beside a fresh spot.
+	const series = buildSeries(
+		walk,
+		args.walk === undefined ? args.spotYes : null,
+	);
 	const nodes = selectChartNodes(args.postSubstrate, args.removedSet, walk);
 	return { series, nodes };
 }
@@ -112,6 +141,17 @@ export async function deriveMarketPriceChart(
  * step at or before the post's `createdAt`, NEVER interpolating (price is a step
  * function). Per decision (a) a post's `created_at` is ≥ its own `bet.placed`
  * event, so that step is the post's own bet. Nodes are sorted `(at asc, id asc)`.
+ *
+ * ⚠ THAT LAST GUARANTEE WEAKENS WHEN THE WALK IS INJECTED, and saying so is the
+ * point of this paragraph. `postSubstrate` is read fresh on every miss; an
+ * injected `walk` is floored to `MARKET_SERIES_MIN_WINDOW_MS`. A post created
+ * inside that window is therefore in the substrate and NOT in the walk, so
+ * `reservesAt` returns the last step BEFORE its bet and the node is drawn at the
+ * price that preceded it. Expanded mode only, bounded by the window, and it
+ * self-corrects on the next revalidation — but it is a real divergence from the
+ * sentence above rather than a hypothetical. Not clamped here on purpose:
+ * dropping such a post from node eligibility would hide a real argument to
+ * protect a pixel. Raised by `@code-reviewer` at the CHART-1 cascade.
  */
 export function selectChartNodes(
 	substrate: PostSubstrate[],

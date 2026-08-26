@@ -49,8 +49,16 @@ export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
  * STILL RENDERS NO NODES — only the axis half moved. EXPANDED is UNTOUCHED: the
  * two X endpoint labels (`market.opened` · last event), and interior ticks there
  * remain canon-owned and unbuilt.
- * Post nodes arrive in Slice 2. The SVG is `aria-hidden` (decorative) — the
- * accessible readout lives in the card's `sr-only` summary. Strokes bind by the
+ * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
+ * and the accessible readout lives in the shared `ChartSummary` beside it —
+ * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
+ * used to say "the card's `sr-only` summary", naming one surface of three and a
+ * home the sentence no longer has. ⚠ SPEC.1 1.0.40 §9 says this chart is "not
+ * `aria-hidden` on any surface"; that is a claim about the CHART, not this
+ * ELEMENT — a screen reader cannot read a polyline, so announcing the graphic
+ * means announcing the summary next to it. The attribute below and that sentence
+ * are about different things; this note exists because the next reader will grep
+ * the attribute and find them in apparent conflict. Strokes bind by the
  * `--graph-yes` / `--graph-no` token NAME (INV-3 side binding, never the slot
  * value; `--color-yes` = the ground, so a value-copy would be invisible AND
  * invert the poles). No raw hex. Slice 2: EXPANDED also marks the per-`(UTC day,
@@ -119,6 +127,18 @@ export function MarketPriceChart({
 			    lands at ~5.6px and is ~15% narrower than tall. The profile's was
 			    **2.09** anisotropic, an order of magnitude worse, which is why that one
 			    was reported and this one has not been.
+			    ⚠⚠ THOSE NUMBERS WERE MEASURED AGAINST A 640-WIDE VIEWBOX, AND CHART-1
+			    WIDENED IT TO 678 for the `C-CHART-2` label gutter — so the measurement
+			    above is stale by the very change it now sits inside. At the same CSS box
+			    `scaleX` falls to ~0.466 and the anisotropy INVERTS to ~0.92: labels are
+			    now slightly narrower than tall rather than wider.
+			    ⛔ AND THE SUBSTANTIVE HALF, which is not about type at all: because
+			    `preserveAspectRatio="none"` maps the WHOLE widened viewBox onto the
+			    unchanged CSS box, the PLOT now renders ~5.6 % narrower in the same
+			    space. `geometry.ts` says "no existing coordinate moved" — true in USER
+			    UNITS, false ON SCREEN. Recorded as drift on a finished surface rather
+			    than left implied by a claim about user space. Raised by
+			    `@code-reviewer` at the CHART-1 cascade.
 			    ⛔ NOT FIXED HERE ON PURPOSE. `/m/[slug]` is a finished surface and the
 			    pass that found this was fenced to re-measure it at ZERO DRIFT; changing
 			    a label's rendered size is drift. Raised for the founder rather than
@@ -208,8 +228,22 @@ export function MarketPriceChart({
 			    ⚠ The DOTS sit at the lines' true y. Only the LABELS may be displaced,
 			    and only when they would collide — that whole rule lives in
 			    `terminalLabelYs`, not here. */}
+			{/* ⚠ THE DEGENERATE CASE READS THE SAME POINT THE LINE DOES. `buildLine`
+			    draws a flat line at `series[0].yes` when the domain collapses
+			    (`length < 2`, or every point sharing one instant), while the terminal
+			    normally reads the LAST point. Those differ only if two or more events
+			    share a timestamp to the microsecond — remote, but the consequence is
+			    that the dots would sit off their own line, which is the one thing a
+			    terminal marker must never do. Raised by `@code-reviewer` at the
+			    CHART-1 cascade. */}
 			{series.length > 0 && (
-				<TerminalMarkers yes={series[series.length - 1].yes} />
+				<TerminalMarkers
+					yes={
+						series.length < 2 || endMs === startMs
+							? series[0].yes
+							: series[series.length - 1].yes
+					}
+				/>
 			)}
 		</svg>
 	);
@@ -397,7 +431,9 @@ function nearestPoint(
 /** An SVG `points` string for one line. With fewer than two points OR a
  * degenerate domain (`startMs === endMs`, the unbet market), draws a FULL-WIDTH
  * FLAT LINE — the value duplicated at x = 0 and x = VIEWBOX_W (the
- * `PriceSparkline` "duplicate at both ends" trick; SPEC.1 §9 "flat line at the
+ * "duplicate at both ends" trick the retired `PriceSparkline` also used — that
+ * component was DELETED at CHART-1 when the hero moved onto this one, so read
+ * the name as history, not as a live reference; SPEC.1 §9 "flat line at the
  * opening price"). */
 function buildLine(
 	series: PricePoint[],

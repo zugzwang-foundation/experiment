@@ -1,7 +1,8 @@
 /**
  * UI.19 §9 market-detail price-chart display geometry — the d3-free linear
- * scale layer (the `PriceSparkline` / profile-graph precedent: the repo carries
- * no d3, and linear scales + polyline strings suffice). DUPLICATED from
+ * scale layer (the profile-graph precedent: the repo carries no d3, and linear
+ * scales + polyline strings suffice — the retired `PriceSparkline` was the other
+ * example and was DELETED at CHART-1 when the hero moved onto this component). DUPLICATED from
  * `profile/graph/geometry.ts` per web Gate-C ruling #2 — deliberately NOT a
  * shared module: coupling §23↔§9 through one file would let a profile change
  * silently alter the market chart, and the Y semantics differ (fixed 0–100 %
@@ -19,8 +20,7 @@
  *
  * PURE DISPLAY GEOMETRY only: a canonical price string is read as a number
  * SOLELY to place an SVG point / label a percent — no money arithmetic happens
- * here; the canonical values stay server-computed strings (CLAUDE.md §2 /
- * `PriceSparkline` doctrine).
+ * here; the canonical values stay server-computed strings (CLAUDE.md §2).
  */
 
 export const VIEWBOX_W = 640;
@@ -49,9 +49,17 @@ const TERMINAL_LABEL_GAP = 5;
  * because the measuring engine resolved the stack to `ui-sans-serif`: Geist
  * ships through `next/font/google` and cannot be fetched offline, so the exact
  * shipped advance is a font-metric difference away from the number above. The
- * headroom absorbs that, and `terminalLabelYs` clamps besides, so a wider face
- * shifts the label rather than clipping it. ⚠ If Geist's advance is ever
- * measured directly, correct this number — do not add a second constant.
+ * headroom absorbs a face up to about 28 % wider than the measurement — the
+ * label has `SVG_W - TERMINAL_LABEL_X` = 30 units of room and needs 23.41.
+ * ⚠ AND THE Y CLAMP DOES NOT HELP HERE, contrary to what this paragraph used to
+ * claim ("`terminalLabelYs` clamps besides"). That function clamps the VERTICAL
+ * axis only; the font hazard is HORIZONTAL, and nothing in this module bounds a
+ * label's advance against the viewBox edge — an `<svg>` clips there by default.
+ * So `C-CHART-2` clause 3's "never clip" is mechanically guarded on one axis and
+ * held by the 28 % margin on the other. Corrected at the CHART-1 reviewer
+ * cascade rather than left claiming a protection it does not provide.
+ * ⚠ If Geist's advance is ever measured directly, correct this number — do not
+ * add a second constant.
  */
 const TERMINAL_LABEL_ADVANCE = 26;
 
