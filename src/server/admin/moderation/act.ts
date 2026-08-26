@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 
 import { db } from "@/db";
@@ -133,8 +133,16 @@ export async function moderateComment(
 	// Discovery renders changes. `cacheTag(\`market:${id}\`)` is set on that
 	// cached function specifically so this invalidates only the affected
 	// market's entry, not the whole Discovery listing.
+	//
+	// Gate C CRITICAL fix — `updateTag`, not `revalidateTag(tag, "max")`. The
+	// "max" profile marks the tag STALE with a 365-day expiry; Next's cache
+	// handler keeps serving the pre-removal entry (verified against the
+	// shipped next@16.3.2 handler — a "max" call returns the old body). This
+	// is a Server Action (`moderateComment` IS the action, "use server" above),
+	// so `updateTag` is legal and gives immediate expiration — the removed
+	// body actually stops being served, which is the whole point of this call.
 	if (action === "remove") {
-		revalidateTag(`market:${comment.marketId}`, "max");
+		updateTag(`market:${comment.marketId}`);
 	}
 	return { ok: true, data: { modActionId, action } };
 }

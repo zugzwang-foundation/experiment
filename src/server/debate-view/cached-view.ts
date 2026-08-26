@@ -26,9 +26,16 @@ import { type DebateViewModel, loadDebateView } from "./load-debate-view";
  *
  *   - `reserves` is fetched LIVE by the caller (`m/[slug]/page.tsx`, via
  *     `getMarketPricingAndReserves`) and passed in. Every bet — post, reply or
- *     sell — moves the CPMM pool, which changes this key and forces a miss. So
- *     the debate view cannot serve a post that a just-placed bet should have
- *     changed, and the price bar's own figures cannot go stale.
+ *     sell — moves the CPMM pool, so a hit proves the live reserves are
+ *     PROVABLY EQUAL TO A PREVIOUSLY OBSERVED VALUE: the one that generated
+ *     the entry. The price bar's own figures therefore cannot go stale.
+ *     ⚠ That is STRICTLY WEAKER than "no bet has intervened", and the
+ *     difference is real here: the CPMM is fee-less, so a buy-then-sell-back
+ *     of the same shares restores the exact prior 18-dp pair and the key
+ *     matches an entry that predates both bets — which mint comments (INV-1)
+ *     this entry does not carry. Priced fields stay correct (pure functions
+ *     of the matched `reserves`); comments/ranking/totals can lag by one
+ *     cache lifetime. Tracked as ADR-0041 OQ-1, open, not fixed here.
  *   - `market` carries `status`, so a lifecycle transition (Open → Closed →
  *     Resolved) changes the key and auto-misses. No explicit invalidation is
  *     needed for state changes.
@@ -42,10 +49,17 @@ import { type DebateViewModel, loadDebateView } from "./load-debate-view";
  * `pricing = getPrices(reserves)` and `unitToWin = deriveUnitToWin(reserves)`
  * are both PURE functions of `reserves`, and `reserves` is the cache key. The
  * cached values are therefore provably identical to what a live read would
- * return at hit time. (Disclosed at Phase C as a departure from R3's literal
- * "price is never cached" wording — never STALE, which is the property R3
- * protects, but not literally uncached. Awaiting the Gate C ruling; if that
- * ruling goes the other way, this file is where the fix lands.)
+ * return at hit time — a claim about PRICED fields only, and one that holds
+ * under OQ-1 above precisely because it rests on purity, not on the pool
+ * having stayed put. Ratified as R3 v2 in ADR-0041 D-2 — the priced figures
+ * are never STALE, which is the property R3 protects, proven from the
+ * compiled build and Next's own runtime source rather than asserted here.
+ * This is compliance with R3 v2, not an exception to it. (`/m/[slug]/page.tsx` additionally overrides the
+ * rendered `pricing`/`unitToWin` with its own live read of the same
+ * `reserves` this cache is keyed on — ADR-0041 D-2/D-6 — so the page's own
+ * guarantee does not rest on this file's internal computation at all; it is
+ * kept here because the price chart's terminal stamp and other consumers of
+ * `loadDebateView`'s return shape still need it.)
  *
  * ⛔ NOTHING VIEWER-SCOPED MAY ENTER THIS FUNCTION. No session, no `headers()`,
  * no `cookies()`, no `loadViewerMarketContext`. Its output is shared verbatim

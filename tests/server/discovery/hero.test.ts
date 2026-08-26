@@ -1103,9 +1103,11 @@ describe("UI.A4 §22 — discovery hero top-posts + Track-B masking (F-DISC-2)",
 			(await selectHeroTopPosts(testDb, marketId, RESERVES)).yes,
 		);
 		expect(yes.id).toBe(post);
-		// `signRead` hardcodes the "uploads" bucket; TTL is the 3600s D9 render
-		// seam. The mocked `mintReadUrl` echoes both back.
-		expect(yes.imageUrl).toBe(`https://signed.test/uploads/${key}?ttl=3600`);
+		// `signRead` hardcodes the "uploads" bucket; TTL is the 7200s D9 render
+		// seam (Gate C fix — was 3600, equal to cacheLife("minutes").expire,
+		// which let a served entry carry an already-expired image URL). The
+		// mocked `mintReadUrl` echoes both back.
+		expect(yes.imageUrl).toBe(`https://signed.test/uploads/${key}?ttl=7200`);
 	});
 
 	it("next-eligible-when-top-removed", async () => {

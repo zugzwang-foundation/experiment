@@ -30,6 +30,7 @@ vi.mock("next/headers", () => ({
 
 vi.mock("next/cache", () => ({
 	revalidatePath: vi.fn(),
+	revalidateTag: vi.fn(),
 }));
 
 import { events, markets, pools, resolutionEvents } from "@/db/schema";

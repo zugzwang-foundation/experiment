@@ -79,7 +79,7 @@ const DEADLINE = new Date("2027-01-01T00:00:00.000Z");
  * own TTL fails here rather than silently serving a shorter-lived URL to one of
  * the two render sites.
  */
-const READ_URL_TTL_SECONDS = 3600;
+const READ_URL_TTL_SECONDS = 7200;
 
 /** Mirrors the mock above — the exact URL a correctly-signed key produces. */
 function signed(key: string): string {

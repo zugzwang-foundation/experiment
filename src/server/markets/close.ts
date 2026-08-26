@@ -97,7 +97,14 @@ export async function closeMarket(args: {
 	// inside the transaction). A Closed market drops out of Discovery's
 	// `status = 'Open'` listing, so this busts the LISTING tag; `closeDueMarkets`
 	// below inherits this for free since it calls `closeMarket` per candidate.
-	revalidateTag("discovery", "max");
+	//
+	// Gate C CRITICAL fix — `{ expire: 0 }`, not `"max"` (which does not evict;
+	// see act.ts's same fix for the measured proof). `updateTag` is NOT an
+	// option here: `closeMarket`/`closeDueMarkets` is `server-only`, not itself
+	// a Server Action, and `api/cron/close-due-markets/route.ts` calls
+	// `closeDueMarkets` directly from a Route Handler — `updateTag` throws
+	// outside a Server Action, so the call site must work from any caller.
+	revalidateTag("discovery", { expire: 0 });
 
 	return result;
 }

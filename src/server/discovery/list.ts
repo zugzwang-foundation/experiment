@@ -147,12 +147,22 @@ export type CachedMarketDiscoveryData = {
  * The caller (`DiscoveryContent`, `(public)/page.tsx`) fetches `reserves` LIVE
  * via `getMarketPricingAndReserves` every render, then passes it in here. Since
  * the cache key IS that exact value, a hit can only occur when reserves are
- * PROVABLY unchanged since the last write — a bet moving the pool changes the
- * key and forces a miss. This is why `selectHeroTopPosts`'s `currentValue`
- * (the Đb execution-value figure, `computeSell(reserves, ...)`) is safe to let
- * ride this cache even though R3 (CLAUDE.md-adjacent S-4 pack decision) says
- * price/reserves are "never cached": it is never STALE, by construction, which
- * is the property R3 actually protects — not literal cache-boundary avoidance.
+ * PROVABLY EQUAL TO A PREVIOUSLY OBSERVED VALUE — the one that generated the
+ * entry — because a bet moving the pool changes the key and forces a miss.
+ * This is why `selectHeroTopPosts`'s `currentValue` (the Đb execution-value
+ * figure, `computeSell(reserves, ...)`) is safe to let ride this cache even
+ * though R3 (CLAUDE.md-adjacent S-4 pack decision) says price/reserves are
+ * "never cached": `currentValue` is a pure function of the reserves that
+ * matched, so it is never STALE, which is the property R3 actually protects —
+ * not literal cache-boundary avoidance.
+ *
+ * ⚠ Key equality is STRICTLY WEAKER than "unchanged since the last write",
+ * and on a fee-less CPMM the gap is reachable: a buy-then-sell-back of the
+ * same shares restores the exact prior 18-dp reserve pair, so the key matches
+ * an entry generated before either bet. `currentValue` and price stay correct
+ * (purity, above); `totals` and `topPosts`'s membership/order can lag by one
+ * cache lifetime, since every bet rides a comment (INV-1). ADR-0041 OQ-1 —
+ * OPEN, two candidate fixes named there, not fixed here.
  * Flagged explicitly for a Gate C ruling on whether this satisfies R3's intent
  * (see the Phase C plan / session log).
  *
