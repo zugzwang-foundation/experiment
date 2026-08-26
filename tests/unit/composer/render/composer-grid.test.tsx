@@ -23,11 +23,20 @@ import { composerProps, stubWireFetch } from "./_harness";
  * `<ImageAttach>` → amount, with the money block a separate sibling of the
  * fields column — so every assertion in this file is RED at `8db535d`.
  *
+ * ⚠⚠ RPLY-2 · R1 amends the SECOND column's contents, recorded rather than
+ * silently overwritten (O-4/O-5). POLISH.4 PR B put the Amount row INSIDE
+ * `.compright` alongside title/body; R1 moves it back OUT — a `shrink-0`
+ * sibling of the whole grid (the "footblock"), so the AMOUNT/notice block and
+ * `Đ BET` are never subject to the argument region's own shrink-and-scroll at
+ * a short viewport. So the right column now holds title + body ONLY, and the
+ * Amount/`Đ BET` money block sits at the SECTION level, not inside the grid.
+ *
  * ⛔ ARRANGEMENT ONLY. Nothing here asserts a px, colour, radius, type size,
  * duration or easing (POLISH-4 §10 `H-VALUE` / `H-SYSTEM`): the grid's TRACK
  * SIZES are the shipped design system's, never this test's. What is pinned is
  * that a two-column grid exists, that the attach affordance is its FIRST
- * column and that the title + body + Amount row are its SECOND.
+ * column and that the title + body fields are its SECOND (RPLY-2 · R1 — the
+ * Amount row is no longer part of either column, see above).
  *
  * `O-7` — every assertion reads the `class` attribute or `innerHTML`, never
  * `textContent`: an arrangement lives in the markup, and `textContent` cannot
@@ -88,7 +97,7 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		expect(columnsOf(grid)).toHaveLength(2);
 	});
 
-	it("render::attach-is-the-left-column-and-the-fields-are-the-right", () => {
+	it("render::attach-is-the-left-column-and-the-title-body-fields-are-the-right", () => {
 		const { section, attach, grid } = renderComposer();
 		const title = screen.getByLabelText("Argument title");
 		const body = screen.getByLabelText("Argument body");
@@ -103,11 +112,14 @@ describe("BetComposer argument region — two-column grid (R1)", () => {
 		expect(columns).toHaveLength(2);
 		// FIRST column — the image attach, a DIRECT child of the grid.
 		expect(columns[0]).toBe(attach);
-		// SECOND column — title input + body textarea + the Amount row.
+		// SECOND column — title input + body textarea. RPLY-2 · R1 — NOT the
+		// Amount row any more (see the file docblock's amendment): `stake` is
+		// section-level now, a sibling of the grid, not inside either column.
 		const right = columns[1];
 		expect(right.contains(title)).toBe(true);
 		expect(right.contains(body)).toBe(true);
-		expect(right.contains(stake)).toBe(true);
+		expect(right.contains(stake)).toBe(false);
+		expect(grid.contains(stake)).toBe(false);
 		// The two are SIBLINGS, never nested: the attach is not in the right column.
 		expect(right.contains(attach)).toBe(false);
 	});

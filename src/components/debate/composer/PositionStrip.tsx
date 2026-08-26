@@ -21,6 +21,7 @@ import { COMPOSER_COPY, formatMultiplier } from "./copy";
  */
 export function PositionStrip({
 	side,
+	composingSide = null,
 	pricing,
 	unitToWin,
 	viewer,
@@ -28,6 +29,34 @@ export function PositionStrip({
 	slug,
 }: {
 	side: Side;
+	/**
+	 * RPLY-2 · R2 — the other half of CS12 that was never built on this strip
+	 * (see the block below). Set by the caller ONLY on the column hosting an
+	 * open composer, to the bet's own resulting side; `null` (the default)
+	 * everywhere else, which collapses `displaySide` below to `side` and
+	 * leaves this component's rendering identical to before this prop existed.
+	 *
+	 * ⛔ MEASURED, NOT PORTED FROM `SlotHeader`. `SlotHeader` derives its
+	 * label, percent, TO WIN *and* its position readout from ONE `side` prop
+	 * (the caller passes it `headerSide = openSide ?? side`), so its position
+	 * readout mirrors too — `viewer.position.side === side` compares the
+	 * viewer's REAL holding against the MIRRORED pole while a composer is
+	 * open, which prints a falsehood on the market arm (a real finding,
+	 * reported rather than fixed here — `SlotHeader` is this task's read-only
+	 * reference, not its subject). This component deliberately does NOT
+	 * repeat that: `composingSide` drives ONLY the label/percent/TO-WIN
+	 * below; `side` — the column's own true pole — is what the position
+	 * readout (`held`) keeps comparing against, unconditionally.
+	 *
+	 * ⚠ DIVERGES FROM `design-canon.md` §2 (the Reply surface entry), which
+	 * fixes this component's whole reason for being to "**Columns are FIXED
+	 * poles** … Column header = the side **price pill only**" — reported for
+	 * routing, NOT amended (that document is web-authored). The founder's
+	 * later ruling for THIS task overrides it for the hosting column only:
+	 * "when a composer opens, the headers must be the same as the side bet
+	 * being taken."
+	 */
+	composingSide?: Side | null;
 	pricing: { yes: string; no: string } | null;
 	unitToWin: { yes: string; no: string } | null;
 	viewer: ViewerMarketContext | null;
@@ -66,10 +95,27 @@ export function PositionStrip({
 	 * meant the founder's ruling holding by an arithmetic coincidence with a
 	 * different slice, which is precisely the kind of guarantee that evaporates
 	 * the next time someone changes the column rule.
+	 *
+	 * ⚠⚠ RPLY-2 · R2 — CS12'S OTHER CLAUSE ARRIVES HERE NOW, AND THIS RULING IS
+	 * UNCHANGED BY IT. R4b's finding was about the SECOND clause only ("loses
+	 * its Buy and its Sell") — correctly retired above, since this strip never
+	 * had either. The FIRST clause ("keeps the composing side's label, percent,
+	 * odds") was never implemented on this strip at all until `composingSide`
+	 * above. Both are true at once: nothing here had a control to lose, and
+	 * nothing here ever mirrored a label either — until the founder's separate
+	 * observation that a YES composer hosted in the NO column left that
+	 * column's strip reading "No" beside what the reader had just bet YES on.
 	 */
 }) {
-	const pct = pricing ? formatPricePercent(pricing, side) : "—";
-	const unit = unitToWin ? unitToWin[side === "YES" ? "yes" : "no"] : null;
+	const displaySide = composingSide ?? side;
+	const pct = pricing ? formatPricePercent(pricing, displaySide) : "—";
+	const unit = unitToWin
+		? unitToWin[displaySide === "YES" ? "yes" : "no"]
+		: null;
+	// ⛔ NOT `displaySide`. The position readout is a fact about the VIEWER'S
+	// OWN holding on THIS column's true pole — mirroring it would print a
+	// falsehood the moment the viewer holds a position on the pole this
+	// column is temporarily labelled with instead of the one it actually is.
 	const held = viewer?.position && viewer.position.side === side;
 	return (
 		<div className="flex min-h-12 items-center justify-between gap-2 rounded-(--r) px-3.5 py-3 shadow-(--elev-1) [border:var(--hairline)]">
@@ -82,8 +128,8 @@ export function PositionStrip({
 			</span>
 
 			<span className="flex items-center gap-[5px] text-[19px] font-semibold text-ink">
-				{side === "YES" ? "Yes" : "No"}
-				<PriceThumb side={side} />
+				{displaySide === "YES" ? "Yes" : "No"}
+				<PriceThumb side={displaySide} />
 				<b className="font-extrabold">{pct}</b>
 			</span>
 

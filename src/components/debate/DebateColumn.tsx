@@ -157,8 +157,16 @@ export function DebateColumn({
 				)}
 			</div>
 			{/* ⚠⚠ `.colwrap` (`d5:568`) — `flex:1 1 auto;min-height:0;overflow-y:auto`.
-			    THIS IS THE ONLY SCROLLING REGION ON THE SURFACE, and it is what makes
-			    the one-screen page correct rather than merely short.
+			    ⛔ NO LONGER THE ONLY SCROLLING REGION ON THE SURFACE — RPLY-2 · R1
+			    gave `BetComposer`'s own argument band a second, nested one, on
+			    purpose. This box is still the one that keeps the one-screen page
+			    correct rather than merely short; the composer's is a DELIBERATE
+			    EXCEPTION, not a lapse, because a scrollable composer would rather
+			    lose a few pixels of its argument view than ever cover its own
+			    Đ BET / submit — see `BetComposer.tsx`'s argument-region comment for
+			    that ruling. Nothing else on this surface earns the same exception:
+			    a card, a title, a reply — none of them carry a control the reader
+			    is mid-transaction with.
 
 			    ⛔ A FIXED-HEIGHT PAGE DOES NOT MAKE CONTENT FIT — IT CLIPS IT. The
 			    founder's 2026-08-17 ruling takes the page's own scrollbar away, so
