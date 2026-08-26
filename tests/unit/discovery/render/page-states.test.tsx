@@ -24,10 +24,14 @@ import { normalizeRadixIds } from "../../_support/dom-html";
 //   module export `dynamic === "force-dynamic"` (OQ-1 A — uncached/dynamic
 //   v1, no 'use cache', no static prerender).
 // - `DiscoveryContent` (async RSC body, exported for tests): ONE
-//   whole-surface try/catch around ALL read-model composition —
-//   `listOpenMarkets(db)` then per-market (sequential) `loadPriceSeries` +
-//   `selectHeroTopPosts` → DiscoveryMarketView[]. ANY throw anywhere
-//   (including the masking read inside selectHeroTopPosts) → `<ErrorState />`
+//   whole-surface try/catch around ALL read-model composition — since S-4
+//   Phase C: `getCachedDiscoveryMarketIds()` then, per market (sequential), a
+//   LIVE `getMarketPricingAndReserves` and the cached
+//   `getCachedMarketDiscoveryData(id, reserves)` → DiscoveryMarketView[].
+//   (`loadPriceSeries` / `selectHeroTopPosts` still run — inside the cached
+//   function — but are no longer this page's call surface.) ANY throw anywhere
+//   (including the masking read that now sits inside the cached block)
+//   → `<ErrorState />`
 //   — the WHOLE surface fails closed; NEVER a partial render, NEVER a
 //   per-market/per-call catch (the Slice-3 @security-auditor's
 //   catch-granularity law: a per-call catch defaulting the removed-set would
@@ -45,12 +49,24 @@ import { normalizeRadixIds } from "../../_support/dom-html";
 // `fixture-market-N`; hero prose = the composer-harness strings — no
 // invented market content, CLAUDE.md §3).
 
+// ⚠ REWIRED AT S-4 PHASE C. `DiscoveryContent` no longer calls
+// `listOpenMarkets` / `loadPriceSeries` / `selectHeroTopPosts` directly: the
+// shared reads moved behind `getCachedMarketDiscoveryData` (`'use cache'`),
+// and pricing is now a SEPARATE live read the page performs per market. Those
+// three still run — inside the cached function — but they are no longer this
+// page's call surface, so mocking them here would mock nothing the page
+// touches and the real ones would run against a jsdom environment with no DB.
+// (That is exactly what happened: this suite went red at Phase D with the
+// whole-surface ErrorState, because Phase C changed the composition and left
+// these mocks pointing at the old names.)
 vi.mock("@/db", () => ({ db: {} }));
-vi.mock("@/server/discovery/list", () => ({ listOpenMarkets: vi.fn() }));
-vi.mock("@/server/discovery/price-series", () => ({
-	loadPriceSeries: vi.fn(),
+vi.mock("@/server/discovery/list", () => ({
+	getCachedDiscoveryMarketIds: vi.fn(),
+	getCachedMarketDiscoveryData: vi.fn(),
 }));
-vi.mock("@/server/discovery/hero", () => ({ selectHeroTopPosts: vi.fn() }));
+vi.mock("@/server/debate-view/market-pricing", () => ({
+	getMarketPricingAndReserves: vi.fn(),
+}));
 
 import { Suspense } from "react";
 
@@ -59,12 +75,14 @@ import * as page from "@/app/(public)/page";
 import { EMPTY_COPY } from "@/components/discovery/EmptyState";
 import { ERROR_COPY } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
-import { type HeroTopPosts, selectHeroTopPosts } from "@/server/discovery/hero";
-import { type DiscoveryCard, listOpenMarkets } from "@/server/discovery/list";
+import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import type { HeroTopPosts } from "@/server/discovery/hero";
 import {
-	loadPriceSeries,
-	type PricePoint,
-} from "@/server/discovery/price-series";
+	type DiscoveryCard,
+	getCachedDiscoveryMarketIds,
+	getCachedMarketDiscoveryData,
+} from "@/server/discovery/list";
+import type { PricePoint } from "@/server/discovery/price-series";
 
 import { EXTENDED, TITLE } from "../../composer/render/_harness";
 
@@ -133,22 +151,43 @@ function cards(n: number): DiscoveryCard[] {
 	});
 }
 
-/** Prime all three loaders on the happy path: the list resolves n cards;
- * every market gets the 1-point seed series; market 1 alone carries hero
- * posts (topPosts null/null elsewhere — the Slice-5 fixture shape).
+/** Prime the happy path across S-4 Phase C's THREE-call composition: the
+ * cached id list resolves n markets; each gets a LIVE pricing read; each gets
+ * its cached block (1-point seed series, market 1 alone carrying hero posts —
+ * the Slice-5 fixture shape).
  *
- * DISCOVERY-COMPLETE C8: `listOpenMarkets` now returns `DiscoveryListing[]` —
- * the card PLUS its pool reserves as a SIBLING field, so reserves never ride
- * `DiscoveryCard` into the `"use client"` carousel. `reserves: null` here
- * because these page-state tests are about Empty/Error/Loading, not V13. */
+ * `reserves: null` throughout: these are page-state tests (Empty/Error/
+ * Loading), not V13 valuation tests. `null` reserves are a legal input — it is
+ * what the page passes when a market has no pool row — and they still exercise
+ * the full call sequence. */
 function primeHappyLoaders(n: number): DiscoveryCard[] {
 	const list = cards(n);
-	vi.mocked(listOpenMarkets).mockResolvedValue(
-		list.map((card) => ({ card, reserves: null })),
+	vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
+		list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 	);
-	vi.mocked(loadPriceSeries).mockResolvedValue(SEED_SERIES);
-	vi.mocked(selectHeroTopPosts).mockImplementation(async (_client, marketId) =>
-		marketId === list[0].id ? HERO_TOP_POSTS : { yes: null, no: null },
+	vi.mocked(getMarketPricingAndReserves).mockImplementation(
+		async (_client, marketId) => {
+			const card = list.find((c) => c.id === marketId);
+			return card?.pricing
+				? { pricing: card.pricing, reserves: { yes: "1", no: "1" } }
+				: null;
+		},
+	);
+	vi.mocked(getCachedMarketDiscoveryData).mockImplementation(
+		async (marketId) => {
+			const card = list.find((c) => c.id === marketId);
+			return {
+				totals: card?.totals ?? {
+					dharmaStaked: "0.000000000000000000",
+					postCount: 0,
+					replyCount: 0,
+				},
+				imageUrl: null,
+				series: SEED_SERIES,
+				topPosts:
+					marketId === list[0].id ? HERO_TOP_POSTS : { yes: null, no: null },
+			};
+		},
 	);
 	return list;
 }
@@ -173,35 +212,27 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		expect(screen.getAllByTestId("market-card")).toHaveLength(2);
 
 		// The §22 all-up-front composition (the carousel re-fetches NOTHING):
-		// series + hero read exactly ONCE PER listed market, keyed by that
+		// each listed market gets its cached block exactly ONCE, keyed by that
 		// market's id, in list order (the plan-§3 sequential per-market walk).
-		expect(vi.mocked(loadPriceSeries)).toHaveBeenCalledTimes(2);
-		expect(vi.mocked(loadPriceSeries)).toHaveBeenNthCalledWith(
+		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenCalledTimes(2);
+		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenNthCalledWith(
 			1,
-			expect.anything(),
 			list[0].id,
+			// S-4 Phase C: the SECOND argument is the market's live pool reserves,
+			// and it is the cache KEY — which is what makes a hit impossible once a
+			// bet has moved the pool. The fixture's pricing mock supplies these.
+			{ yes: "1", no: "1" },
 		);
-		expect(vi.mocked(loadPriceSeries)).toHaveBeenNthCalledWith(
+		expect(vi.mocked(getCachedMarketDiscoveryData)).toHaveBeenNthCalledWith(
 			2,
-			expect.anything(),
 			list[1].id,
+			{ yes: "1", no: "1" },
 		);
-		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenCalledTimes(2);
-		// DISCOVERY-COMPLETE C8: the third argument is the market's pool reserves,
-		// threaded from the read `listOpenMarkets` already performs. `null` here
-		// because `primeHappyLoaders` supplies no pool.
-		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenNthCalledWith(
-			1,
-			expect.anything(),
-			list[0].id,
-			null,
-		);
-		expect(vi.mocked(selectHeroTopPosts)).toHaveBeenNthCalledWith(
-			2,
-			expect.anything(),
-			list[1].id,
-			null,
-		);
+
+		// R3 — pricing is read LIVE, once per market, OUTSIDE the cached block.
+		// If this ever stopped being called per market, price would be coming
+		// from cache, which is the one thing the boundary exists to prevent.
+		expect(vi.mocked(getMarketPricingAndReserves)).toHaveBeenCalledTimes(2);
 
 		// Neither sibling state leaks into the happy path.
 		expect(screen.queryByTestId("discovery-empty")).toBeNull();
@@ -209,7 +240,7 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 	});
 
 	it("render::zero-markets-empty-state-page", async () => {
-		vi.mocked(listOpenMarkets).mockResolvedValue([]);
+		vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue([]);
 
 		render(await DiscoveryContent());
 
@@ -220,13 +251,14 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// No hero, no grid (plan §5 zero-markets row)…
 		expect(screen.queryByTestId("discovery-carousel")).toBeNull();
 		expect(screen.queryAllByTestId("market-card")).toHaveLength(0);
-		// …and the per-market loaders NEVER run on an empty list.
-		expect(vi.mocked(loadPriceSeries)).not.toHaveBeenCalled();
-		expect(vi.mocked(selectHeroTopPosts)).not.toHaveBeenCalled();
+		// …and NEITHER per-market read runs on an empty list — the live pricing
+		// read included, which is new at Phase C and must not fire either.
+		expect(vi.mocked(getMarketPricingAndReserves)).not.toHaveBeenCalled();
+		expect(vi.mocked(getCachedMarketDiscoveryData)).not.toHaveBeenCalled();
 	});
 
 	it("render::read-model-throw-whole-surface-error", async () => {
-		vi.mocked(listOpenMarkets).mockRejectedValue(
+		vi.mocked(getCachedDiscoveryMarketIds).mockRejectedValue(
 			new Error("simulated list read failure"),
 		);
 
@@ -243,18 +275,34 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 	});
 
 	it("render::masking-read-throw-whole-surface-error", async () => {
-		// THE auditor's pin (the Slice-3 catch-granularity law): the list and
-		// every series read succeed; the MASKING read (selectHeroTopPosts)
-		// throws on the SECOND market only. A per-market/per-call catch would
-		// render market 1 and default market 2's hero — masking fail-OPEN. The
-		// law: the WHOLE surface fails closed instead.
+		// THE auditor's pin (the Slice-3 catch-granularity law): the id list and
+		// market 1 both succeed; the read carrying MASKING throws on the SECOND
+		// market only. A per-market/per-call catch would render market 1 and
+		// default market 2's hero — masking fail-OPEN. The law: the WHOLE
+		// surface fails closed instead.
+		//
+		// ⚠ S-4 Phase C moved the masking read INSIDE `getCachedMarketDiscoveryData`
+		// (`selectHeroTopPosts` → `loadRemovedSet` is called there now), so the
+		// throw is staged on that boundary rather than on `selectHeroTopPosts`
+		// directly. The property under test is unchanged: a masking failure on
+		// ANY market takes the whole surface down. What this now ALSO covers is
+		// that wrapping the read in a cache did not introduce a per-market catch
+		// that would swallow it.
 		const list = cards(2);
-		vi.mocked(listOpenMarkets).mockResolvedValue(
-			list.map((card) => ({ card, reserves: null })),
+		vi.mocked(getCachedDiscoveryMarketIds).mockResolvedValue(
+			list.map((c) => ({ id: c.id, slug: c.slug, title: c.title })),
 		);
-		vi.mocked(loadPriceSeries).mockResolvedValue(SEED_SERIES);
-		vi.mocked(selectHeroTopPosts)
-			.mockResolvedValueOnce(HERO_TOP_POSTS)
+		vi.mocked(getMarketPricingAndReserves).mockResolvedValue({
+			pricing: { yes: "0.5", no: "0.5" },
+			reserves: { yes: "1", no: "1" },
+		});
+		vi.mocked(getCachedMarketDiscoveryData)
+			.mockResolvedValueOnce({
+				totals: list[0].totals,
+				imageUrl: null,
+				series: SEED_SERIES,
+				topPosts: HERO_TOP_POSTS,
+			})
 			.mockRejectedValueOnce(new Error("simulated masking read failure"));
 
 		render(await DiscoveryContent());
@@ -328,9 +376,11 @@ describe("UI.A4 §6 — Discovery page states (wiring)", () => {
 		// The suspended child is the exported async body itself.
 		expect(boundary.props.children.type).toBe(DiscoveryContent);
 
-		// OQ-1 A pin: Discovery ships UNCACHED/dynamic v1 — the route segment
-		// opts out of static prerender via the `dynamic` export; no 'use cache'.
-		expect(page.dynamic).toBe("force-dynamic");
+		// OQ-1 A pin: Discovery ships UNCACHED/dynamic v1 — no 'use cache' yet.
+		// S-4 Phase B: `dynamic` is gone (redundant/build-breaking under
+		// `cacheComponents`); `instant = false` is the equivalent opt-out until
+		// the S-4 Phase C/D cache retrofit lands.
+		expect(page.instant).toBe(false);
 	});
 
 	it("render::anon-and-logged-in-body-identical", async () => {

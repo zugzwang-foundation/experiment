@@ -16,8 +16,6 @@ import { incrementAndRead, read } from "@/server/visitors/counter";
 // bot filter / rate-limit bucket and persisted NOWHERE, and never logged
 // (ADR-0007 redaction discipline).
 
-export const dynamic = "force-dynamic";
-
 // Module-LOCAL per-IP sliding-window cap (SPEC.1 §21.1 scoped carve-out): this
 // constant is deliberately NOT a §16.1 constant and NOT a SPEC.2 §11 row — §11
 // governs thesis-bearing flows and this surface touches none. Its own Ratelimit

@@ -5,17 +5,27 @@ import { EmptyState } from "@/components/discovery/EmptyState";
 import { ErrorState } from "@/components/discovery/ErrorState";
 import { LoadingSkeleton } from "@/components/discovery/LoadingSkeleton";
 import { db } from "@/db";
-import { selectHeroTopPosts } from "@/server/discovery/hero";
-import { listOpenMarkets } from "@/server/discovery/list";
-import { loadPriceSeries } from "@/server/discovery/price-series";
+import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
+import {
+	getCachedDiscoveryMarketIds,
+	getCachedMarketDiscoveryData,
+} from "@/server/discovery/list";
 
 /**
- * OQ-1 A (ratified §16): Discovery ships UNCACHED/dynamic v1 — no
- * `'use cache'`, no `cacheComponents` flip (the named foundational follow-up
- * owns the R-2 cache retrofit). The page reads no dynamic API, so without
- * this it would static-prerender at build — the opposite of the ruling.
+ * OQ-1 A (ratified §16): Discovery's R-2 cache retrofit landed at S-4 Phase C
+ * — `getCachedDiscoveryMarketIds` / `getCachedMarketDiscoveryData`
+ * (`server/discovery/list.ts`) carry `'use cache'`; this page itself stays
+ * uncached, composing them plus a live per-market pricing read (see
+ * `DiscoveryContent` below). S-4 Phase B enabled `cacheComponents`, under
+ * which `force-dynamic` is redundant (Next.js: "all pages are dynamic by
+ * default") and errors the build if left in place. `instant = false`
+ * replaces it here as the equivalent opt-out — this route still isn't
+ * restructured for the framework's instant-navigation validation (that's the
+ * `cookies()`/`headers()` Suspense hoist, S-4 Phase D territory, not this
+ * page's concern since it reads neither), so it defers that check rather
+ * than forcing static prerendering it was never meant to have.
  */
-export const dynamic = "force-dynamic";
+export const instant = false;
 
 /**
  * Discovery — the public front page at `/` (SPEC.1 §22; UI.A4 Slice 6).
@@ -59,32 +69,54 @@ export default function DiscoveryPage() {
  * The async read-model composition (exported for the page-states/wiring
  * suites): all ≤ `DISCOVERY_GRID_SIZE` markets' card + series + hero data
  * up-front — the carousel is client-side motion over already-loaded props
- * and re-fetches NOTHING (§22). Sequential per-market reads (the bounded
- * ≤8 × ~5-read cost the plan accepts uncached — §3; batching is the OQ-1 C
- * follow-up's optimization).
+ * and re-fetches NOTHING (§22).
+ *
+ * S-4 Phase C — split into a CACHED half and a LIVE half, never a single
+ * uncached loop the way this used to read:
+ *   - `getCachedDiscoveryMarketIds()` — cached, the Open-markets set.
+ *   - per market, `getMarketPricingAndReserves` — LIVE, every render, never
+ *     cached in any form. `pricing` goes straight onto `card` from here.
+ *   - `getCachedMarketDiscoveryData(id, reserves)` — cached, KEYED on the
+ *     `reserves` value just read live, so a hit is only possible when
+ *     reserves are provably unchanged (see that function's docstring for why
+ *     this makes `topPosts[].currentValue` safe to cache without ever being
+ *     stale). `reserves` itself stays a server-local binding — never pushed
+ *     onto `card`, which crosses into the `"use client"` carousel (C8/V13).
+ * Still sequential per market (the bounded ≤8-market cost the plan accepts;
+ * batching is the OQ-1 C follow-up).
  *
  * ONE whole-surface try/catch: ANY read-model throw — including the masking
- * read inside `selectHeroTopPosts` — renders `ErrorState` for the WHOLE
- * surface. Never a partial render, never a per-market/per-call catch: a
- * narrower catch that defaulted the removed-set would flip Track-B masking
- * fail-open (the Slice-3 @security-auditor catch-granularity law). Zero
- * markets → the §22 empty state (no hero, no grid). Viewer-independent —
- * no session read anywhere in the body.
+ * read inside `selectHeroTopPosts` (now reached via `getCachedMarketDiscoveryData`)
+ * — renders `ErrorState` for the WHOLE surface. Never a partial render, never
+ * a per-market/per-call catch: a narrower catch that defaulted the
+ * removed-set would flip Track-B masking fail-open (the Slice-3
+ * @security-auditor catch-granularity law). Zero markets → the §22 empty
+ * state (no hero, no grid). Viewer-independent — no session read anywhere in
+ * the body.
  */
 export async function DiscoveryContent() {
 	let views: DiscoveryMarketView[];
 	try {
-		const listings = await listOpenMarkets(db);
+		const marketIds = await getCachedDiscoveryMarketIds();
 		views = [];
-		for (const { card, reserves } of listings) {
-			const series = await loadPriceSeries(db, card.id);
-			// C8/V13: `reserves` stays a SERVER-LOCAL binding. It is threaded into
-			// the hero read and then dropped — it is deliberately NOT pushed onto
-			// `card`, because `DiscoveryMarketView` crosses into `DiscoveryCarousel`
-			// (`"use client"`) and would serialize an internal pool row to the
-			// browser.
-			const topPosts = await selectHeroTopPosts(db, card.id, reserves);
-			views.push({ card, series, topPosts });
+		for (const m of marketIds) {
+			const priced = await getMarketPricingAndReserves(db, m.id);
+			const data = await getCachedMarketDiscoveryData(
+				m.id,
+				priced?.reserves ?? null,
+			);
+			views.push({
+				card: {
+					id: m.id,
+					slug: m.slug,
+					title: m.title,
+					pricing: priced?.pricing ?? null,
+					totals: data.totals,
+					imageUrl: data.imageUrl,
+				},
+				series: data.series,
+				topPosts: data.topPosts,
+			});
 		}
 	} catch {
 		// Whole-surface fail-closed. The OQ-6 reload button is LIVE —

@@ -6,6 +6,14 @@ import { adminLoginAction } from "@/server/auth/admin/login";
 // F-AUTH-ADMIN login page per plan §4 + SPEC.1 §13 + SPEC.2 §8.4.
 // Single password field, no Turnstile (Q1 — SPEC.1 line 609). URL not
 // linked from any public surface; robots.txt Disallow + noindex below.
+//
+// S-4 Phase B — `instant = false` (below): this page never carried a
+// `dynamic` export (Phase A's T7 grep-based inventory couldn't see it — it
+// was dynamic only implicitly, via the unwrapped `searchParams` read below,
+// same shape as `/u/[pseudonym]` and `/bookmarks`). Under `cacheComponents`
+// that unwrapped read errors the prerender build. Deferred, not restructured
+// — admin is outside S-4's scope (CLAUDE.md §1).
+export const instant = false;
 
 export const metadata: Metadata = {
 	robots: {

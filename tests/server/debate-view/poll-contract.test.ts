@@ -92,6 +92,8 @@ const HOST = "src/components/debate/DebateView.tsx";
 const LOADER = "src/server/debate-view/load-debate-view.ts";
 const PAGE = "src/app/(public)/m/[slug]/page.tsx";
 const EXPORT_ROUTE = "src/app/(public)/m/[slug]/export/route.ts";
+/** S-4 Phase D — the page's `'use cache'` wrapper around the loader. */
+const CACHED_VIEW = "src/server/debate-view/cached-view.ts";
 
 /**
  * Any client-side transport a forked poll could reach for. SSE and WebSocket are
@@ -172,12 +174,36 @@ describe("debate-view::poll-preserves-removal-masking", () => {
 		// SPEC.2 §4.3's catalogue is closed at eleven and F-DEBATE-4 adds no
 		// twelfth. A dedicated poll endpoint would necessarily surface here as a
 		// third `loadDebateView(` call site.
+		//
+		// ⚠ THE SECOND ENTRY MOVED AT S-4 PHASE D, and the count did not. The
+		// page no longer calls `loadDebateView` itself: it calls
+		// `getCachedDebateView` (`debate-view/cached-view.ts`), which is the one
+		// carrying `'use cache'`. So the two callers are now the export route
+		// (DIRECT and uncached — ADR-0025 forbids caching the `.md` export) and
+		// the cached wrapper (the page's path).
+		//
+		// ⛔ WHAT THIS GUARD PROTECTS IS UNCHANGED: still exactly two readers,
+		// still ONE masking implementation, still no third path that could fork
+		// `loadRemovedSet`. The entry is edited here, in the same commit as the
+		// change, rather than the assertion being loosened — a `toEqual` on an
+		// explicit list is what makes a genuine third reader impossible to add
+		// silently, and relaxing it to a length check would give that up.
 		const callers = sourcesUnder("src")
 			// The loader's own `export async function loadDebateView(` is the
 			// definition, not a call site.
 			.filter((file) => file !== LOADER)
 			.filter((file) => /loadDebateView\s*\(/.test(code(file)));
-		expect(callers).toEqual([EXPORT_ROUTE, PAGE]);
+		expect(callers).toEqual([EXPORT_ROUTE, CACHED_VIEW]);
+	});
+
+	it("the cached wrapper is the page's ONLY route to the debate model", () => {
+		// The other half of the move above: the page must reach the model through
+		// the cached wrapper and never around it. A page that called both would
+		// issue the shared reads twice — once cached, once not — and the uncached
+		// copy would quietly become the one rendered.
+		const page = code(PAGE);
+		expect(page).toContain("getCachedDebateView(");
+		expect(page).not.toMatch(/loadDebateView\s*\(/);
 	});
 
 	it("keeps loadDebateView's viewer-independent signature (ADR-0034 D-1)", () => {
@@ -276,10 +302,16 @@ describe("debate-view::poll-stops-when-market-leaves-open", () => {
 		);
 	});
 
-	it("the polled route is explicitly dynamic, not dynamic by accident (RULING F)", () => {
-		// The route was previously dynamic only as a side effect of calling
-		// `headers()` for the session; a poll against an accidentally-static route
-		// would serve a frozen payload indefinitely.
-		expect(code(PAGE)).toMatch(/export const dynamic = "force-dynamic";/);
+	it("the polled route is not cached, not dynamic by accident (RULING F)", () => {
+		// Originally pinned via `export const dynamic = "force-dynamic";`. S-4
+		// Phase B enabled `cacheComponents`, under which that export is
+		// redundant and build-breaking — every route is dynamic by default
+		// unless it opts INTO caching with `'use cache'`. RULING F's guarantee
+		// now inverts to the same effect: this file must carry no `'use cache'`
+		// directive, so nothing can make the poll start serving a frozen
+		// payload. (The S-4 Phase C/D retrofit caches an EXTRACTED child
+		// component, never this page file itself — see the cache-boundary note
+		// in `docs/scale/S4-WORK-PACK.md` §2.4 / the Phase A audit's T5.)
+		expect(code(PAGE)).not.toMatch(/["']use cache["']/);
 	});
 });
