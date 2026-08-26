@@ -5,6 +5,10 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
 	fmtUtcDay,
+	SVG_W,
+	TERMINAL_DOT_R,
+	TERMINAL_LABEL_X,
+	terminalLabelYs,
 	VIEWBOX_H,
 	VIEWBOX_W,
 	xPx,
@@ -75,7 +79,11 @@ export function MarketPriceChart({
 			// name the surface it is asserting about without reaching for a
 			// styling class to identify the thing under test (OVN-V5).
 			data-mode={mode}
-			viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+			// C-CHART-2 clause 3 — the viewBox is the 2:1 PLOT plus the right
+			// gutter the end labels live in. Widening the box rather than narrowing
+			// the plot is what keeps every plotted coordinate — and every guard that
+			// asserts one — exactly where it already was.
+			viewBox={`0 0 ${SVG_W} ${VIEWBOX_H}`}
 			preserveAspectRatio="none"
 			aria-hidden="true"
 			className="h-full w-full"
@@ -186,7 +194,76 @@ export function MarketPriceChart({
 						vectorEffect="non-scaling-stroke"
 					/>
 				))}
+
+			{/* C-CHART-2 clauses 1, 2 and 4 — EVERY MODE, INCLUDING THE HERO. Each
+			    line ends in a rimless r=3 dot on its own series token, and immediately
+			    right of it, in the gutter, that line's own name in THE SAME TOKEN.
+			    ⛔ THE FILL IS THE POINT, NOT DECORATION. A neutral `n5` label would
+			    need a key to say which line it names — which is exactly the legend
+			    this supersedes (`C-CHART-1` clause 3, REMOVED at CHART-1, not
+			    restyled). And it binds by TOKEN NAME (`--graph-yes` / `--graph-no`,
+			    INV-3), never the `--color-*` slot: the repo aliases `--color-yes` to
+			    the page ground, so a value-copy would render the YES label invisible
+			    AND invert the poles.
+			    ⚠ The DOTS sit at the lines' true y. Only the LABELS may be displaced,
+			    and only when they would collide — that whole rule lives in
+			    `terminalLabelYs`, not here. */}
+			{series.length > 0 && (
+				<TerminalMarkers yes={series[series.length - 1].yes} />
+			)}
 		</svg>
+	);
+}
+
+/**
+ * The two line ends: a dot at each line's true terminal y, and that line's name
+ * beside it (`C-CHART-2` clauses 1, 2, 4).
+ *
+ * Takes the terminal YES price ALONE, because NO is its complement by
+ * construction (design-language §3.2) — the same reason the whole chart is fed
+ * one series. Passing both would mint a second place for the poles to disagree.
+ */
+function TerminalMarkers({ yes }: { yes: string }): React.JSX.Element {
+	const labelY = terminalLabelYs(yes);
+	return (
+		<>
+			<circle
+				data-testid="terminal-dot-no"
+				cx={VIEWBOX_W}
+				cy={yNoPx(yes)}
+				r={TERMINAL_DOT_R}
+				fill="var(--graph-no)"
+			/>
+			<circle
+				data-testid="terminal-dot-yes"
+				cx={VIEWBOX_W}
+				cy={yYesPx(yes)}
+				r={TERMINAL_DOT_R}
+				fill="var(--graph-yes)"
+			/>
+			<text
+				data-testid="terminal-label-no"
+				x={TERMINAL_LABEL_X}
+				y={labelY.no}
+				dominantBaseline="middle"
+				textAnchor="start"
+				className="text-[10px] font-bold tracking-[0.1em]"
+				fill="var(--graph-no)"
+			>
+				NO
+			</text>
+			<text
+				data-testid="terminal-label-yes"
+				x={TERMINAL_LABEL_X}
+				y={labelY.yes}
+				dominantBaseline="middle"
+				textAnchor="start"
+				className="text-[10px] font-bold tracking-[0.1em]"
+				fill="var(--graph-yes)"
+			>
+				YES
+			</text>
+		</>
 	);
 }
 
