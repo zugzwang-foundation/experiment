@@ -1211,7 +1211,7 @@ the runbook section.
 
 **Carried forward from this closure:**
 - **CHART-NODE-RING** — the W2.6 node primitive that never shipped. Its own row below.
-- **`PD-3-04`** — the overlay's missing accessible summary, a tier-1 conformance gap that only exists *because* tier 1 exists.
+- ~~**`PD-3-04`**~~ — the overlay's missing accessible summary, a tier-1 conformance gap that only exists *because* tier 1 exists. ✅ **DISCHARGED at CHART-1, 2026-08-27**, and struck here rather than left reading as live carried work: the summary now binds on all three modes — collapsed, expanded overlay, and the Discovery hero, which dropped `aria-hidden` when CHART-1 unified it onto the same time-scaled component. `POLISH-register.md`'s row carries the status.
 - Overlay focus management, cross-surface on both overlays → **A11Y.0**, row minted in this same commit.
 
 ⚠ **The lesson worth keeping is not the existence rider — that worked exactly as designed and found the phantom.** It is that the phantom's absence was allowed to stand in for a survey of the sources that were present. **A missing citation is a finding about the citation. It is not yet a finding about the component.**

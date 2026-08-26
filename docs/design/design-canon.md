@@ -42,7 +42,7 @@
 
 **Discovery** *(locked at integration v0.12)*. Market-discovery grid: hero featured market + 8 grid cards on **one shared carousel index** (hero market + both hero top posts + grid outline ring + active dot move in sync). Cards: image + title + stats + YES/NO bar. Rounded corners (`--r:8px`), ink argument text. Hero posts → the Reply page; author pseuds → Profile. Header identity: **Sign in / Sign up** logged-out, the **nav-identity widget** logged-in (ruling 4, §4).
 
-**Market Detail** *(frozen at integration v0.19 — the d5 "market" view)*. Media, resolution, resolver; two top posts side-by-side (**YES left / NO right**); market YES/NO bar. Post carousel: 4 posts/side. **Side-slot rule:** a bet's composer opens in the **opposite** slot so the side being bet on stays visible. Buy/Sell + position in the slot header; per-side colhead entry button reads **`Đ BET`** (W2.8). Pick is **view-only**. **Price-history chart slot** (SPEC.1 §9 · F-DEBATE-5): a collapsed card above the YES/NO bar — two-line YES/NO probability lines, no axis, no nodes, the whole card being the expand affordance — opening a fullscreen overlay (React state toggle, **not** a route) carrying the same lines with two X endpoint labels and the per-(UTC day, side) top-post nodes. Behaviour, X domain and node selection are SPEC.1's; the presentational rules are **C-CHART-1** (§10).
+**Market Detail** *(frozen at integration v0.19 — the d5 "market" view)*. Media, resolution, resolver; two top posts side-by-side (**YES left / NO right**); market YES/NO bar. Post carousel: 4 posts/side. **Side-slot rule:** a bet's composer opens in the **opposite** slot so the side being bet on stays visible. Buy/Sell + position in the slot header; per-side colhead entry button reads **`Đ BET`** (W2.8). Pick is **view-only**. **Price-history chart slot** (SPEC.1 §9 · F-DEBATE-5): a collapsed card above the YES/NO bar — two-line YES/NO probability lines, **a presentational x-axis of two interior ticks and three date labels** (SPEC.1 1.0.32), no nodes, each line terminating in a dot and its own token-bound `YES` / `NO` label (**C-CHART-2**), the whole card being the expand affordance — opening a fullscreen overlay (React state toggle, **not** a route) carrying the same lines with two X endpoint labels and the per-(UTC day, side) top-post nodes. **The same component renders the Discovery hero** (SPEC.1 §22, CHART-1). Behaviour, X domain and node selection are SPEC.1's; the presentational rules are **C-CHART-1** and **C-CHART-2** (§10).
 
 **Reply** *(the d5 "postview" — per-post thread)*. **Columns are FIXED poles: left = YES, right = NO, for every post.** Column header = the side **price pill only** (`Yes 👍 38%` / `No 👎 62%`). **Support/Counter is a property of the POST, never the column** — it lives on the post's **split bar** (`Đ support ─ total ─ Đ counter`, with the Support/Counter buttons that open the composer) and in the composer ("Support/Counter <author>'s argument"). Replies route into columns by their **own** YES/NO side. Composer opens in the opposite slot.
 
@@ -263,10 +263,57 @@ CTA present on Error (`Reload`) and absent on Empty.
 
 **Explicitly NOT ruled here, and not absorbed:**
 
-- **The overlay's missing accessible summary.** SPEC.1 §9 · Accessibility requires a text summary naming opening price, current price and the domain endpoints. It exists on the collapsed card only; the overlay's SVG is `aria-hidden` and its only text is the dialog label plus two identical close names. That is a **tier-1 conformance gap with a live baseline**, not a presentational question — POLISH.3 files it as `PD-3-04`. `UI.19.md` scoped the summary to the card; tier 3 never supersedes tier 1.
+- ~~**The overlay's missing accessible summary.**~~ ✅ **CLOSED — the gap this bullet described no longer exists, and the sentence is corrected here rather than left contradicting the component** (doctrine §6.2: edit the docblock, never append a note saying it is false). SPEC.1 §9 · Accessibility requires a text summary naming opening price, current price and the domain endpoints; it was on the collapsed card only when this clause was written. `MarketPriceChartOverlay.tsx` now renders `data-testid="market-price-chart-overlay-summary"` as an `sr-only` span carrying all three, keyed distinctly from the card's so a query can never match the wrong one. POLISH.3 filed it as `PD-3-04`; **CHART-1 (2026-08-27) landed the third and last mode — the Discovery hero — and flipped the register row.** The reasoning the bullet recorded still stands and is why the gap existed at all: `UI.19.md` scoped the summary to the card by name, and tier 3 never supersedes tier 1.
 - **Overlay focus management.** No focus move on open, no trap, no restore on close; two controls sharing one accessible name; the backdrop button in the tab order. **Identical on `MarketPriceChartOverlay` and `ProfileGraphOverlay`** — one cross-surface item, routed to **A11Y.0**, not to either surface.
 
 **`DESIGN-W2_6-graph-prototype-record.md` is not a baseline for this component and must not be cited as one.** It is on-subject — probability lines, collapsed card → fullscreen overlay, one top post per (day, side) — and it is unusable: its X domain is the fixed Sep 15 → Nov 5 window SPEC.1 §9 rules out by name, every figure it derives from that window ("~46 nodes per side", "9 weekly labels") dies with it, its node primitive never shipped, and its own §10 item 1 instructs that a production spec be written **from** it. **Read it as history.**
+
+---
+
+### C-CHART-2 · Market price chart — line termination, and the retirement of the legend
+
+**Ruled 2026-08-27 IST, founder ruling at CHART-1.** Governs every render of the two-line price
+chart on every surface — the collapsed card and expanded overlay of `/m/[slug]`, and the
+Discovery hero, which CHART-1 unified onto the same component. **`C-CHART-1` clauses 1, 2, 4 and
+5 stand unchanged. Clause 3 — the two-item legend — is SUPERSEDED by clause 2 below.**
+
+1. **Terminal dot.** Each line ends in a filled circle of `r=3` on that line's own series token
+   (`--graph-yes` / `--graph-no`, **INV-3** — never the `--color-*` slot, whose values the repo
+   aliases such that a value-copy inverts the poles), with **no rim**. This is deliberately
+   distinct from `C-CHART-1` clause 2's post node, which keeps `r=4` and its 1.5px non-scaling
+   `--color-ground` rim. The dot marks where the series ends; it encodes no quantity.
+
+2. **End label, and the legend retired.** Immediately right of each terminal dot sits that line's
+   name — `YES` or `NO` — uppercase, 10px, letter-spaced to the axis microlabel treatment, filled
+   with **the line's own series token, not `n5`.** Binding the name to the line is the whole point:
+   a neutral label would need a key to disambiguate, and the key is what this replaces.
+   ⚠ **`C-CHART-1` clause 3's two-item legend above the plot is REMOVED, not restyled.** That
+   clause recorded, at its own ratification, that the legend *"appears in no document at any
+   tier"* and had shipped unbaselined; it is now superseded by an element that carries the same
+   information at the point of use.
+
+3. **Right gutter.** The plot area insets from the right by a gutter sized to the widest label
+   plus the dot plus the gap. The **plot's 2:1 aspect (`C-CHART-1` clause 4) is preserved**; the
+   gutter is taken from the viewBox, not from the aspect. Labels are clamped inside the box and
+   never clip.
+
+4. **Collision - the default case, not an edge case.** YES and NO mirror across 50%, so the
+   vertical gap between the two labels is proportional to |2 x YES - 100| and they overlap on any
+   market sitting near even — which is where every market sits at open. When the two label boxes
+   would overlap, the labels are pushed apart symmetrically, each by half the deficit plus 2px,
+   clamped inside the plot box. **The dots do not move.**
+
+5. **Coincident lines are drawn coincident.** On a market with no bets both lines sit at the
+   opening price and are identical; one is painted over the other and **no offset is applied.**
+   A half-pixel separation invented to make two identical values look different is a false
+   statement about the data, on the surface where stake is committed. The displaced label pair
+   (clause 4) carries the information, and the lines separate the instant anyone bets. ⚠ Ruled
+   deliberately, against the visually tidier alternative, and recorded so a future reader does not
+   mistake it for an oversight.
+
+6. **No charting runtime.** The chart is server-rendered SVG. No charting library, no client-side
+   plotting dependency, on any surface. A chart that ships a runtime is a load barrier, and this
+   ruling's parent task exists to prevent one.
 
 ---
 
