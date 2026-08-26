@@ -14,7 +14,7 @@ import { PageContainer } from "@/components/shell/PageContainer";
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { ComposerSlot } from "./composer/ComposerSlot";
-import { deriveReplySide } from "./composer/gating";
+import { deriveReplySide, replyComposerColumn } from "./composer/gating";
 import { PositionStrip } from "./composer/PositionStrip";
 import { SlotHeader } from "./composer/SlotHeader";
 import { DebateColumn } from "./DebateColumn";
@@ -23,6 +23,7 @@ import { ImageLightbox, PostPopup, ReplyPopup } from "./dialogs";
 import { findPostedNode } from "./find-posted";
 import { MarketHeader } from "./MarketHeader";
 import { PostFocusHeader } from "./PostFocusHeader";
+import { readPostParam, resolvePostParamClient } from "./post-param";
 import { PostScroller, ReplyScroller } from "./scrollers";
 import type {
 	DebatePost,
@@ -35,6 +36,14 @@ import type {
 } from "./types";
 
 const opposite = (side: Side): Side => (side === "YES" ? "NO" : "YES");
+
+/**
+ * RPLY-1 · R2 — how long the exit waits for its own `popstate` before deciding
+ * the traversal never happened. Comfortably longer than a same-document
+ * traversal (a queued task) and far shorter than a reader's second deliberate
+ * click. See `exitPost` for why a dead-man's release is needed at all.
+ */
+const TRAVERSAL_RELEASE_MS = 400;
 
 /** A focused post's replies for one pole column — placed by their OWN side (D3). */
 function repliesForSide(post: DebatePost, side: Side): DebateReply[] {
@@ -480,17 +489,80 @@ export function DebateView({
 	};
 
 	// UI.A2 §3.4 (ratified OQ-5c) — outbound URL sync: mirror focus into
-	// `?post=<ordinal>` via history.replaceState on post enter/exit, making
-	// deep links user-MINTABLE (copy the address bar in post view).
-	// replaceState, never pushState — focus toggling must not pollute history.
-	const syncPostParam = (ordinal: number | null) => {
+	// `?post=<ordinal>`, making deep links user-MINTABLE (copy the address bar
+	// in post view).
+	//
+	// ⚠⚠ RPLY-1 · R2 — ENTERING A POST NOW PUSHES, AND THE SUPERSEDED RULE IS
+	// RECORDED RATHER THAN DELETED (O-4). This read: "replaceState, never
+	// pushState — focus toggling must not pollute history." The intent was right
+	// and the mechanism produced the opposite of it: with nothing ever pushed,
+	// `history.length` did not grow on entering post-focus, and `HeaderNav`'s
+	// `canGoBack` reads `usePathname()`, which excludes the query string. So
+	// Back — the header's and the browser's — left `/m/[slug]` ALTOGETHER, and
+	// `FocusMarketCard` was left as the only in-app way out of post focus.
+	//
+	// ⛔ THE ANSWER TO "DO NOT POLLUTE HISTORY" IS THE EXIT, NOT THE ENTRY.
+	// Entering pushes ONE rung; leaving calls `history.back()` and UNWINDS it
+	// rather than pushing a third. A reader who enters and leaves five posts
+	// ends with a stack the same depth they started with, which is what that
+	// sentence was actually asking for.
+	//
+	// ⚠ EXACTLY TWO RUNGS — post-focus, then the route. Opening the composer
+	// gets NO entry of its own: it already has an × and an ESC path, and a
+	// third rung would make Back mean two different things one after the other.
+	//
+	// ⛔⛔ THE STATE ARGUMENT IS `null`, AND AN EARLIER DRAFT OF THIS CODE SPREAD
+	// `history.state` INTO IT ON A REASON THAT IS THE EXACT OPPOSITE OF THE
+	// TRUTH. That draft's comment read: "Next's App Router keeps its own
+	// bookkeeping on `history.state` … pushing a bare object would strip it and
+	// leave the router meeting an entry it does not recognise." Measured in the
+	// shipped `next@16.2.4` (`client/components/app-router.js:252-263`), Next
+	// PATCHES `history.pushState` and the patch opens with:
+	//
+	//     if (data?.__NA || data?._N) { return originalPushState(...); }   ← SKIP
+	//     data = copyNextJsInternalHistoryState(data);   ← copies __NA + TREE
+	//     if (url) { applyUrlFromHistoryPushReplace(url); }  ← updates canonicalUrl
+	//
+	// `HistoryUpdater` stamps `__NA: true` onto `history.state` on first paint,
+	// so spreading it GUARANTEES the short-circuit — and the router's
+	// `canonicalUrl` never learns about `?post=N`. Next copies its own
+	// bookkeeping for us (`copyNextJsInternalHistoryState`, `:84-96`); the
+	// spread was not merely unnecessary, it was the thing that broke the sync.
+	//
+	// ⚠ AND IT WAS A REGRESSION, NOT A MISSING FEATURE. The superseded code
+	// passed `null`, which is falsy, so the patch ran. What the spread cost:
+	// `DebatePoll` calls `router.refresh()` every 15s while the market is Open,
+	// and each refresh has `HistoryUpdater` `replaceState` the STALE
+	// `canonicalUrl` — so the address bar silently dropped `?post=N` a few
+	// seconds after entering a post, killing the UI.A2 §3.4 mintable-deep-link
+	// property that works on `staging` today.
+	//
+	// ⛔ NO CUSTOM FIELD IS WRITTEN HERE EITHER, and that is the second half of
+	// the same lesson. A `zzPost` marker was tried and cannot survive: the same
+	// `HistoryUpdater` builds its state as
+	// `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}` and
+	// every soft navigation — `router.refresh()` included — sets that flag
+	// FALSE (`segment-cache/navigation.js:271,382`). So a custom field is
+	// deleted on the first poll tick, ~15s after it is written. Whatever
+	// remembers our rungs has to live somewhere Next does not own; see
+	// `pushedRungsRef`.
+	const syncPostParam = (
+		ordinal: number | null,
+		mode: "push" | "replace" = "replace",
+	) => {
 		const url = new URL(window.location.href);
 		if (ordinal === null) {
 			url.searchParams.delete("post");
 		} else {
 			url.searchParams.set("post", String(ordinal));
 		}
-		history.replaceState(null, "", url);
+		if (mode === "push") {
+			history.pushState(null, "", url);
+			// One more rung of ours is on the stack. See `exitPost`.
+			pushedRungsRef.current += 1;
+		} else {
+			history.replaceState(null, "", url);
+		}
 	};
 	/**
 	 * HTML-FINISH · MARKET DETAIL row 36 — ENTERING A POST RESETS THE PAGE
@@ -510,6 +582,24 @@ export function DebateView({
 	const resetPageScroll = () => {
 		window.scrollTo({ top: 0, behavior: "instant" });
 	};
+	/**
+	 * RPLY-1 · R2 — HOW MANY HISTORY RUNGS THIS COMPONENT HAS PUSHED AND NOT YET
+	 * SEEN POPPED. `exitPost` reads it to decide whether it has something of its
+	 * own to unwind; the `popstate` listener decrements it.
+	 *
+	 * ⛔ A REF, NOT STATE: it must not re-render, and it must survive a
+	 * `router.refresh()`. ⛔ NOT `history.state`, which is where this started —
+	 * Next's `HistoryUpdater` drops custom fields on every soft navigation, so a
+	 * marker written there is gone by the first poll tick. See `exitPost`.
+	 */
+	const pushedRungsRef = useRef(0);
+	/**
+	 * RPLY-1 · R2 — a `history.back()` has been REQUESTED and its `popstate` has
+	 * not arrived yet. `history.back()` is asynchronous and `exitPost` sets no
+	 * React state on that branch, so without this the exit control stays live and
+	 * a second activation traverses a second entry. See `exitPost`.
+	 */
+	const traversalPendingRef = useRef(false);
 	const enterPost = (id: string) => {
 		if (composerBusy) {
 			return;
@@ -524,7 +614,14 @@ export function DebateView({
 		// chose.
 		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
-		syncPostParam(target ? target.ordinal : null);
+		// R2 — a rung, so Back returns to the market view instead of leaving it.
+		// ⚠ `> 0`, NOT MERELY "a target exists". `load-debate-view` falls back to
+		// `ordinal: 0` on a defensive branch, and 0 is REFUSED by both shape gates
+		// (`^[1-9]…`) — so writing `?post=0` mints a URL that silently lands on
+		// the market arm on reload and on Back. Harmless while the param was only
+		// ever replaced; R2 makes it a durable history entry, so it is filtered
+		// here rather than left to be discovered as a dead deep link.
+		syncPostParam(target && target.ordinal > 0 ? target.ordinal : null, "push");
 		resetPageScroll();
 	};
 	/**
@@ -552,13 +649,104 @@ export function DebateView({
 		// R3 — same arm swap, same release.
 		setPickedSide(null);
 		const target = posts.find((p) => p.id === id);
-		syncPostParam(target ? target.ordinal : null);
+		// R2 — the same rung: a card pill ENTERS the post, so it is the same arm
+		// swap and gets the same history entry.
+		// ⚠ `> 0`, NOT MERELY "a target exists". `load-debate-view` falls back to
+		// `ordinal: 0` on a defensive branch, and 0 is REFUSED by both shape gates
+		// (`^[1-9]…`) — so writing `?post=0` mints a URL that silently lands on
+		// the market arm on reload and on Back. Harmless while the param was only
+		// ever replaced; R2 makes it a durable history entry, so it is filtered
+		// here rather than left to be discovered as a dead deep link.
+		syncPostParam(target && target.ordinal > 0 ? target.ordinal : null, "push");
 		// Row 36 applies here too: a card pill ENTERS the post, so it is the same
 		// arm swap and the same reason.
 		resetPageScroll();
 	};
 	const exitPost = () => {
 		if (composerBusy) {
+			return;
+		}
+		/**
+		 * ⚠⚠ RPLY-1 · R2 — LEAVING UNWINDS THE STACK, IT DOES NOT GROW IT. Calling
+		 * `history.back()` pops the rung `enterPost` pushed, so entering and
+		 * leaving is depth-neutral and the browser's own Back keeps agreeing with
+		 * the surface's. The `popstate` listener below then clears the focus state
+		 * off the URL, which is why nothing is set here on that branch — one
+		 * mechanism owns the transition, in both directions.
+		 *
+		 * ⛔⛔ AND IT IS CONDITIONAL, BECAUSE THE UNCONDITIONAL VERSION REINTRODUCES
+		 * THE BUG IN MIRROR IMAGE. A reader arriving on a DEEP LINK (`?post=3`
+		 * pasted, or opened from elsewhere) has no rung of ours beneath them —
+		 * their previous entry is another site, or nothing. A bare `history.back()`
+		 * would take them OFF `/m/[slug]` entirely, which is precisely the defect
+		 * R2 exists to remove.
+		 *
+		 * ⚠⚠ THE COUNTER LIVES IN A REF BECAUSE `history.state` CANNOT HOLD IT.
+		 * A `zzPost` marker on the history entry was the obvious mechanism and it
+		 * is measurably wrong: `HistoryUpdater` rebuilds the entry's state as
+		 * `{...(preserveCustomHistoryState ? history.state : {}), __NA, TREE}`,
+		 * and every soft navigation sets that flag FALSE — so `router.refresh()`,
+		 * which `DebatePoll` fires every 15s, DELETES the marker. The exit would
+		 * then take the fallback branch and ORPHAN the rung it pushed, growing
+		 * `history.length` by one per enter/exit cycle and leaving a dead Back
+		 * step behind — the exact history pollution the superseded comment above
+		 * was written to prevent, arriving on a timer. A ref survives a refresh
+		 * because a refresh re-renders this component rather than remounting it.
+		 *
+		 * ⛔ IT DECREMENTS ON `popstate`, NEVER HERE, so one rung is not counted
+		 * twice: our own `history.back()` raises a `popstate` like any other.
+		 * ⇒ AND IT FAILS SAFE BY CONSTRUCTION. A `popstate` cannot tell us whether
+		 * the reader went back or forward, so the listener always decrements. The
+		 * worst that costs is a conservative `false` here — the fallback runs, the
+		 * surface still returns to the market arm, and one spare entry stays on the
+		 * stack. The opposite error would walk the reader off the page, so the
+		 * asymmetry is deliberate.
+		 *
+		 * ⛔⛔ AND THE TRAVERSAL IS LATCHED, BECAUSE `history.back()` IS
+		 * ASYNCHRONOUS AND THIS BRANCH SETS NO REACT STATE. The traversal is a
+		 * queued task and `popstate` — where the counter is decremented — fires in
+		 * a LATER one. In between, nothing about the surface changes: the exit
+		 * control stays mounted and enabled, so a second activation inside that
+		 * window re-reads the counter as still positive and calls `back()` AGAIN.
+		 * The browser then traverses −2 and the reader lands off `/m/[slug]`
+		 * entirely, losing any argument they had typed — which is precisely the
+		 * defect R2 exists to remove, arriving through R2's own fix.
+		 * ⚠ NOT HYPOTHETICAL AT HUMAN SPEED: a held Enter on a focused `<button>`
+		 * auto-repeats a click roughly every 30ms, and the poll's 15s
+		 * `router.refresh()` is exactly the kind of main-thread work that widens
+		 * the gap. A double-click does it too.
+		 * ⇒ "Pop requested, not yet observed" is a THIRD state the counter cannot
+		 * express, so it gets its own flag rather than being folded into the
+		 * count. The same `popstate` handler clears it and decrements — one
+		 * observation, one place. ⛔ The counter is NOT decremented here as well:
+		 * that would double-count the single rung this pop consumes.
+		 */
+		if (pushedRungsRef.current > 0) {
+			if (traversalPendingRef.current) {
+				return;
+			}
+			traversalPendingRef.current = true;
+			history.back();
+			// ⛔⛔ A TIMED RELEASE, BECAUSE THE LATCH HAS EXACTLY ONE OTHER WAY OUT
+			// AND IT DEPENDS ON AN INVARIANT NOTHING HERE ASSERTS. `onPop` clears
+			// it — which is only guaranteed to run if there IS an entry below to
+			// traverse to. That holds today because `enterPost`/`replyToPost` are
+			// reachable only from the MARKET arm, capping the counter at 1; it is
+			// not true by construction. A `history.go(-n)` (the back button's
+			// long-press menu) fires ONE `popstate` while moving n entries, so the
+			// counter can outlive the entries it counts — and then `history.back()`
+			// is an out-of-range no-op that dispatches NOTHING, leaving this latch
+			// set and the exit control dead for the rest of the page instance, with
+			// no in-app recovery.
+			// ⇒ If the pop has not arrived, the traversal did not happen. Releasing
+			// early risks at worst the double-traverse this latch prevents, in a
+			// race measured in milliseconds; never releasing risks a permanently
+			// wedged button. The asymmetry decides it.
+			// ⚠ NOT A DEBOUNCE and not tuned to a repeat rate: it is a dead-man's
+			// release for a traversal that produced no event at all.
+			window.setTimeout(() => {
+				traversalPendingRef.current = false;
+			}, TRAVERSAL_RELEASE_MS);
 			return;
 		}
 		setSelectedPostId(null);
@@ -571,6 +759,89 @@ export function DebateView({
 	const selectedPost = selectedPostId
 		? (posts.find((p) => p.id === selectedPostId) ?? null)
 		: null;
+
+	/**
+	 * ⚠⚠ RPLY-1 · R2 — THE INBOUND HALF. Pushing a rung is only half a history
+	 * ladder: a popped entry changes the URL and nothing else, so without this
+	 * the address bar would say `?post=3` while the surface sat on the market
+	 * arm. This is what makes Back actually re-render.
+	 *
+	 * ⛔⛔ THE PARAM IS RESOLVED, NEVER INDEXED, AND THAT IS THE SECURITY
+	 * PROPERTY. `resolvePostParamClient` applies the same three refusals the
+	 * cold server arrival applies — shape gate, no-such-ordinal, REMOVED target
+	 * — and falls back silently to the market arm on each. A listener that did
+	 * the obvious thing and used the param to index a comment list would reach a
+	 * removed post that `page.tsx` correctly declines to focus: a masking bypass
+	 * through the back button. See `post-param.ts` for why resolving against the
+	 * already-masked model is exact rather than an approximation of the server's
+	 * answer — same ranking domain, same order, removed rows included in both.
+	 *
+	 * ⛔ THE COMPOSER IS CLOSED ON EVERY POP, in both directions. Composer-open
+	 * has no history entry of its own (two rungs only), so a popped entry can
+	 * carry no opinion about it; leaving one open across a pop would strand a
+	 * composer belonging to a post the reader has just navigated away from.
+	 *
+	 * ⛔⛔ IT NO-OPS WHILE A SUBMIT IS IN FLIGHT, exactly as `enterPost`,
+	 * `replyToPost` and `exitPost` already do, and for the same reason those
+	 * three do: unmounting a composer mid-request lets a re-open mint a FRESH
+	 * idempotency key over a possibly-committing bet, which is a second bet
+	 * rather than a replay — the one seam `bet_receipts` cannot close, because a
+	 * new key collides with nothing. ⚠ The cost is a transient disagreement
+	 * between the URL and the surface for the length of one request, and that is
+	 * the right trade: a stale query string is cosmetic and a double bet is not.
+	 */
+	/**
+	 * ⚠⚠ `posts` AND `composerBusy` ARE READ FROM THE CLOSURE, NOT FROM REFS, AND
+	 * THE REF VERSION IS RECORDED AS THE MISTAKE IT WAS. This effect used
+	 * `postsRef.current = posts` written DURING RENDER. `router.refresh()` renders
+	 * inside a React transition, and a transition render that is DISCARDED still
+	 * runs those assignments — so the listener could read a `composerBusy` from a
+	 * render that never committed.
+	 * ⇒ Real deps instead. The listener re-registers when `posts` identity changes
+	 * (once per poll payload) or when `composerBusy` flips — a
+	 * `removeEventListener`/`addEventListener` pair on the order of once per 15s.
+	 *
+	 * ⚠⚠ AND AN EARLIER VERSION OF THIS BLOCK CLAIMED MORE THAN THE CODE
+	 * DELIVERS, WHICH IS ITS OWN DEFECT (O-3). It said the change made "the
+	 * money-path read exact rather than probably-fine." IT DOES NOT. `composerBusy`
+	 * is reported up from `BetComposer`'s own PASSIVE EFFECT, so the true order is:
+	 * child sets in-flight → child commits → child effect calls `onBusyChange` →
+	 * parent state → parent commits → parent effect re-registers. The listener
+	 * holds `false` for that whole window either way, and the deps form re-arms one
+	 * commit LATER than a render-phase ref write did. ⇒ The guard is LATE BY
+	 * CONSTRUCTION, and neither refs nor deps change that. What the deps form
+	 * actually buys is the removal of a render-phase write that a discarded
+	 * transition could leave inconsistent — real, and smaller than the sentence it
+	 * replaced. The genuine backstop on that seam is the durable
+	 * `bet_receipts` UNIQUE (ADR-0031), not this listener.
+	 */
+	useEffect(() => {
+		const onPop = () => {
+			// ⚠ THE LATCH AND THE COUNTER ARE BOTH SETTLED HERE, BEFORE THE BUSY
+			// GUARD, and deliberately so: the browser has ALREADY moved the stack
+			// whether or not this handler updates the surface. Skipping either would
+			// leave `exitPost` believing a rung is still there — and the next exit
+			// would `back()` off the page — or leave the traversal latched forever,
+			// which would wedge the exit control shut.
+			traversalPendingRef.current = false;
+			pushedRungsRef.current = Math.max(0, pushedRungsRef.current - 1);
+			if (composerBusy) {
+				return;
+			}
+			const resolved = resolvePostParamClient(
+				posts,
+				readPostParam(window.location.search),
+			);
+			setSelectedPostId(resolved);
+			setOpenReply(null);
+			setOpenSide(null);
+			// The arm may have swapped, and a pick names a COLUMN — the same reason
+			// `enterPost` and `exitPost` release it.
+			setPickedSide(null);
+		};
+		window.addEventListener("popstate", onPop);
+		return () => window.removeEventListener("popstate", onPop);
+	}, [posts, composerBusy]);
 
 	/**
 	 * ⚠⚠ FEED-2 — THE JUMP. When the refreshed payload arrives carrying the
@@ -749,15 +1020,48 @@ export function DebateView({
 					/>
 					<div data-testid="arena" className="flex min-h-0 flex-1 gap-4">
 						{(["YES", "NO"] as const).map((side) => {
-							// v0.10: the reply composer — Support OR Counter — opens in
-							// the slot OPPOSITE THE POST; the chip carries the TRUE bet
-							// side (slot ≠ side, permanently — INV-3 narrative; the
-							// side derives via the unit-pinned deriveReplySide, never
-							// from the hosting column).
-							const composerColumn = opposite(selectedPost.sideAtPostTime);
+							// ⚠⚠ RPLY-1 · R1 — THE COLUMN IS OPPOSITE THE **BET**, NEVER
+							// OPPOSITE THE PARENT. This read "opens in the slot OPPOSITE THE
+							// POST" and the code did exactly that, which is the defect: the
+							// RELATION was not an input to the expression at all, so Support
+							// and Counter could not produce different columns. Support
+							// coincided with the right answer by arithmetic accident (a
+							// Support bet inherits the parent's side, so opposite-the-parent
+							// IS opposite-the-bet); Counter did not — a Counter on a YES
+							// parent bets NO and opened inside the NO column.
+							//
+							// ⛔ THE RULE FAILED ITS OWN STATED PURPOSE. design-canon §3.3
+							// gives the reason as "the bet's side stays visible", and the
+							// composer was covering precisely the side being bet. So this is
+							// the post arm catching up to the market arm, which has always
+							// keyed its slot off the side being bet rather than off a parent.
+							//
+							// ⚠⚠ THE COLUMN IS A CALL, NOT AN EXPRESSION, AND THAT DESIGNED
+							// OUT A HAZARD RATHER THAN ACCEPTING ONE. The obvious fix inlines
+							// the local flip of the RESULTING side — but `composerColumn` was
+							// declared ABOVE `resultingSide`, so that form only works if the
+							// two are also reordered, and getting that wrong is a TDZ
+							// ReferenceError at runtime that a source-scanning test would
+							// never reach. `replyComposerColumn` takes the same two inputs
+							// the derivation does, so neither declaration depends on the
+							// other and the ordering stops being load-bearing at all.
+							// ⇒ It also makes the relation a REQUIRED ARGUMENT, so a revert
+							// to keying off the parent alone is a compile error here rather
+							// than a silent re-inversion (O-1).
+							//
+							// ⚠ The chip still carries the TRUE bet side (slot ≠ side,
+							// permanently — INV-3 narrative), and the side still derives via
+							// the unit-pinned `deriveReplySide`, never from the hosting column.
 							const resultingSide =
 								openReply !== null
 									? deriveReplySide({
+											parentSide: selectedPost.sideAtPostTime,
+											relation: openReply,
+										})
+									: null;
+							const composerColumn =
+								openReply !== null
+									? replyComposerColumn({
 											parentSide: selectedPost.sideAtPostTime,
 											relation: openReply,
 										})
@@ -769,6 +1073,17 @@ export function DebateView({
 									key={side}
 									side={side}
 									pricing={market.pricing}
+									// ⚠ RPLY-1 · R1 — UNCHANGED EXPRESSION, AND IT ONLY NOW
+									// FIRES ON THE COUNTER PATH. Measured against the shipped
+									// `deriveReplySide`: with the column keyed off the PARENT,
+									// a Counter put `resultingSide` and `composerColumn` on the
+									// same pole, so `side !== composerColumn` was false wherever
+									// `resultingSide === side` was true and the engaged-slot
+									// backlight (values-log §1 item 4) was dead on that path.
+									// Keying the column off the BET repairs it as a consequence
+									// rather than as a second edit — the backlight belongs on
+									// the bet's own column, which is exactly the column the
+									// composer no longer covers.
 									engaged={resultingSide === side && side !== composerColumn}
 									picked={pickedSide === side}
 									header={
@@ -779,10 +1094,14 @@ export function DebateView({
 											viewer={viewer}
 											ownPseudonym={ownPseudonym}
 											slug={market.slug}
-											// §1, the reply arm — `hostsComposer` is this map's own
-											// name for the same condition the market arm calls
-											// `hostingComposer`: the column the composer opens in.
-											showControls={!hostsComposer}
+											// ⚠ RPLY-1 · R4b — NO `showControls` HERE ANY MORE. The
+											// post arm's header carries no Buy and no Sell, so the
+											// market arm's suppression had nothing of its kind to
+											// suppress and was only removing the position readout's
+											// click-through. Founder: "when composer opens, both
+											// headers should be same … there are no buy/sell buttons
+											// anyway." The prop is gone from `PositionStrip`
+											// entirely — see its own block for the measurement.
 										/>
 									}
 								>
@@ -823,12 +1142,13 @@ export function DebateView({
 														parentCommentId={selectedPost.id}
 														replyContext={{
 															relation: openReply,
+															// ⚠ The masked arm is the composer's THIRD header
+															// state, not an omission: a removed parent has no
+															// author at the type level, and `null` is what makes
+															// the header fall back to the canon line.
 															authorPseudonym: selectedPost.removed
 																? null
 																: selectedPost.author.pseudonym,
-															postTitle: selectedPost.removed
-																? null
-																: selectedPost.title,
 														}}
 														onClose={() => setOpenReply(null)}
 														onPosted={onPosted}

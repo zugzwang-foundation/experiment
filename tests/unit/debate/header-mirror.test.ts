@@ -112,29 +112,64 @@ describe("§5 the header mirrors the composing side", () => {
 		expect(source).toContain("side === opposite(openSide)");
 	});
 
-	it("header-mirror::the-REPLY-arm-suppresses-on-the-same-condition", () => {
-		// One rule, both arms. The reply arm's map already had this column under
-		// the name `hostsComposer`; the strip takes the same prop rather than a
-		// second mechanism that could drift.
+	it("header-mirror::the-REPLY-arm-does-NOT-suppress-and-that-is-the-ruling", () => {
+		// ⚠⚠ RPLY-1 · R4b — THIS ASSERTION IS INVERTED, AND THE SUPERSEDED ONE IS
+		// RECORDED RATHER THAN DELETED (O-4). It read:
+		//   expect(strip).toContain("showControls={!hostsComposer}");
+		// under the heading "One rule, both arms."
+		//
+		// ⛔ IT WAS NOT ONE RULE, BECAUSE IT WAS NOT ONE HEADER. `SlotHeader`
+		// carries a Buy and a Sell and the CS12 ruling suppresses them on the
+		// hosting column. `PositionStrip` — this arm's header — has neither; its
+		// own docblock says "the market grammar MINUS action buttons … NO Đ BET /
+		// Sell buttons on the debate surface." So the prop travelled here by name
+		// and, measured across every viewer state and all three composer states,
+		// changed exactly one thing: whether the HELD column's position readout
+		// was a link or plain text. Founder: "when composer opens, both headers
+		// should be same … there are no buy/sell buttons anyway."
+		//
+		// ⇒ The prop is gone from `PositionStrip` entirely, so this now asserts
+		// its ABSENCE — and the market arm's suppression, which is the real
+		// ruling, is asserted untouched by the tests above.
 		const strip = /<PositionStrip[\s\S]*?\/>/.exec(source)?.[0] ?? "";
-		expect(strip).toContain("showControls={!hostsComposer}");
+		// Positive control: the tag was actually found, so the negative below is
+		// about the prop rather than about a regex that matched nothing.
+		expect(strip).toContain("side={side}");
+		// ⚠ MATCHED AS `showControls=`, THE PROP SYNTAX — never the bare word. The
+		// tag carries a JSX comment explaining why the prop is absent, and that
+		// comment necessarily NAMES it; a bare-substring negative went red against
+		// its own explanation on the first run. A guard that forbids discussing
+		// the thing it guards will be "fixed" by deleting the explanation.
+		expect(strip).not.toContain("showControls=");
+
+		// ⛔ `hostsComposer` ITSELF IS UNTOUCHED and still pinned: it is what
+		// decides which column HOSTS the composer, which is its real job. Only its
+		// use as a header suppressor was ever the mistake.
 		expect(source).toMatch(
 			/const hostsComposer =\s*openReply !== null && side === composerColumn;/,
 		);
 	});
 
 	it("header-mirror::the-suppression-is-OPT-OUT-so-nothing-else-loses-controls", () => {
-		// `showControls` defaults TRUE in both components, so every other consumer
-		// — and both headers whenever no composer is open — is unaffected by
-		// construction rather than by each call site remembering to pass it.
-		for (const f of [
-			"src/components/debate/composer/SlotHeader.tsx",
-			"src/components/debate/composer/PositionStrip.tsx",
-		]) {
-			expect(readFileSync(join(ROOT, f), "utf8")).toContain(
-				"showControls = true,",
-			);
-		}
+		// `showControls` defaults TRUE, so every other consumer — and both headers
+		// whenever no composer is open — is unaffected by construction rather than
+		// by each call site remembering to pass it.
+		// ⚠ RPLY-1 · R4b — `PositionStrip` LEFT THIS LIST because it no longer has
+		// the prop at all. Asserting a safe DEFAULT on a component that no longer
+		// takes the flag would be asserting the safety of a mechanism that is gone
+		// — true, and about nothing. Its absence is asserted directly above.
+		expect(
+			readFileSync(
+				join(ROOT, "src/components/debate/composer/SlotHeader.tsx"),
+				"utf8",
+			),
+		).toContain("showControls = true,");
+		expect(
+			readFileSync(
+				join(ROOT, "src/components/debate/composer/PositionStrip.tsx"),
+				"utf8",
+			),
+		).not.toContain("showControls = true,");
 	});
 
 	it("header-mirror::SlotHeader-derives-everything-from-its-ONE-side-prop", () => {
