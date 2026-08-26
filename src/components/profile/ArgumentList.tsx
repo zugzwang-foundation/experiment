@@ -10,6 +10,8 @@ import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { EmptyBlock } from "@/components/ui/empty-block";
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type {
 	ProfileArgumentAggregate,
 	ProfileArgumentItem,
@@ -485,12 +487,14 @@ function PresentHead({
 				Đ {formatDharma(currentStake)}
 			</span>
 			{soldOut ? (
-				<span
-					data-testid={`argument-sold-${item.id}`}
-					className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
-				>
-					Sold
-				</span>
+				<InfoTip content={GLOSSARY.sold} asChild>
+					<span
+						data-testid={`argument-sold-${item.id}`}
+						className="rounded-[var(--r-chip)] bg-n1 px-1.5 py-0.5 font-bold text-[10px] text-n5 uppercase tracking-[0.08em]"
+					>
+						{SOLD_LABEL}
+					</span>
+				</InfoTip>
 			) : formatDharma(originalStake) !== formatDharma(currentStake) ? (
 				/* Only when the figure has actually moved ON SCREEN. Compared through
 				   `formatDharma`, not on the raw 18-dp strings: a sub-Đ1 reduction is a

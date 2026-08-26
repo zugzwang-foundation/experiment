@@ -4,6 +4,9 @@ import { Eye } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 
+import { InfoTip } from "@/components/ui/info-tip";
+import { HEADER_GLOSSARY } from "@/lib/copy/glossary";
+
 /**
  * The global-header visitor counter (SPEC.1 §21.1, DESIGN.W2.5). A vanity /
  * traction count of TOTAL page views — repeats counted — labelled plainly
@@ -67,17 +70,18 @@ export function VisitorCounter() {
 			: NUMBER_FORMAT.format(state.total);
 
 	return (
-		<span
-			data-testid="visitor-counter"
-			data-state={dataState}
-			aria-busy={state === "loading"}
-			title="Total page views — not participants"
-			className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
-		>
-			<Eye aria-hidden="true" className="size-3.5 shrink-0" />
-			<span>
-				<span className="tabular-nums">{numberText}</span> views
+		<InfoTip content={HEADER_GLOSSARY.visitorCounter} asChild>
+			<span
+				data-testid="visitor-counter"
+				data-state={dataState}
+				aria-busy={state === "loading"}
+				className="flex items-center gap-1.5 text-xs text-muted-foreground select-none"
+			>
+				<Eye aria-hidden="true" className="size-3.5 shrink-0" />
+				<span>
+					<span className="tabular-nums">{numberText}</span> views
+				</span>
 			</span>
-		</span>
+		</InfoTip>
 	);
 }

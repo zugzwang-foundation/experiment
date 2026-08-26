@@ -1,5 +1,8 @@
 "use client";
 
+import { InfoTip } from "@/components/ui/info-tip";
+import { GLOSSARY } from "@/lib/copy/glossary";
+
 import { formatDharma } from "../format";
 import type { ReplyAggregate, Side } from "../types";
 import { c3OppositeSide } from "./copy";
@@ -189,21 +192,27 @@ function TriggerPill({
 			? // Black-pill exception: 0.5px n2 edge (values-log §1 item 8).
 				"bg-yes text-no border-[0.5px] border-n2"
 			: "bg-no text-yes [border:var(--hairline)]";
+	// C3 precedence (INFO-1 §3.4): a viewer blocked by the single-side rule is
+	// told why they are blocked, not given the relation's definition. The
+	// glossary gloss fills the null branch only — c3 still wins outright.
+	const gloss =
+		c3 ?? (relation === "support" ? GLOSSARY.support : GLOSSARY.counter);
 	return (
-		<button
-			type="button"
-			disabled={disabled}
-			aria-disabled={disabled}
-			aria-expanded={active}
-			aria-label={
-				c3 ??
-				`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
-			}
-			title={c3 ?? undefined}
-			onClick={() => onToggle(relation)}
-			className={`rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${pole}`}
-		>
-			{relation === "support" ? "Support" : "Counter"}
-		</button>
+		<InfoTip content={gloss} asChild>
+			<button
+				type="button"
+				disabled={disabled}
+				aria-disabled={disabled}
+				aria-expanded={active}
+				aria-label={
+					c3 ??
+					`${relation === "support" ? "Support" : "Counter"} — bet ${resultingSide}`
+				}
+				onClick={() => onToggle(relation)}
+				className={`rounded-(--r-chip) px-3 py-1 text-xs font-bold transition-all hover:shadow-(--state-hover-glow-pole) focus-visible:shadow-(--state-focus-ring) active:shadow-(--state-pressed-glow-pole) disabled:pointer-events-none disabled:opacity-(--state-disabled-opacity) ${pole}`}
+			>
+				{relation === "support" ? "Support" : "Counter"}
+			</button>
+		</InfoTip>
 	);
 }

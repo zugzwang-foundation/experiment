@@ -16,7 +16,9 @@ import { allocateDisplayed, formatDharma } from "@/components/debate/format";
 import { REMOVED_STUB_TEXT } from "@/components/debate/placeholders";
 import { Button } from "@/components/ui/button";
 import { EmptyBlock } from "@/components/ui/empty-block";
+import { InfoTip } from "@/components/ui/info-tip";
 import { ThumbGlyph } from "@/components/ui/thumb-glyph";
+import { GLOSSARY, SOLD_LABEL } from "@/lib/copy/glossary";
 import type {
 	ProfilePositionsPayload,
 	SellablePositionRow,
@@ -751,30 +753,35 @@ export function PositionsTable({
 						className="ml-auto flex items-center gap-1"
 					>
 						{(["Open", "Closed"] as const).map((s) => (
-							<button
+							<InfoTip
 								key={s}
-								type="button"
-								data-testid={`positions-status-${s.toLowerCase()}`}
-								aria-pressed={status === s}
-								onClick={() => setStatus(s)}
-								className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-(--r) px-2 text-xs font-medium transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring) ${
-									status === s
-										? "bg-n7 text-ground"
-										: "text-n5 [border:var(--hairline)] hover:bg-(--state-hover-fill)"
-								}`}
+								content={s === "Open" ? GLOSSARY.tabOpen : GLOSSARY.tabClosed}
+								asChild
 							>
-								{s}
-								<span
-									data-testid={
-										s === "Closed"
-											? "positions-closed-count"
-											: "positions-open-count"
-									}
-									className="tabular-nums"
+								<button
+									type="button"
+									data-testid={`positions-status-${s.toLowerCase()}`}
+									aria-pressed={status === s}
+									onClick={() => setStatus(s)}
+									className={`inline-flex h-6 shrink-0 items-center gap-1 rounded-(--r) px-2 text-xs font-medium transition-all outline-none select-none focus-visible:shadow-(--state-focus-ring) ${
+										status === s
+											? "bg-n7 text-ground"
+											: "text-n5 [border:var(--hairline)] hover:bg-(--state-hover-fill)"
+									}`}
 								>
-									({s === "Closed" ? closedCount : openCount})
-								</span>
-							</button>
+									{s}
+									<span
+										data-testid={
+											s === "Closed"
+												? "positions-closed-count"
+												: "positions-open-count"
+										}
+										className="tabular-nums"
+									>
+										({s === "Closed" ? closedCount : openCount})
+									</span>
+								</button>
+							</InfoTip>
 						))}
 					</span>
 				</>
@@ -853,16 +860,20 @@ export function PositionsTable({
 							<th className="px-2 pt-0 pb-2 text-center">Argument</th>
 							{isOpenTab ? (
 								<>
-									<th className="w-[124px] px-2 pt-0 pb-2 text-center">
-										Current
-									</th>
+									<InfoTip content={GLOSSARY.currentValue} asChild>
+										<th className="w-[124px] px-2 pt-0 pb-2 text-center">
+											Current
+										</th>
+									</InfoTip>
 									<th className="w-[104px] px-2 pt-0 pb-2 text-center">Sell</th>
 								</>
 							) : (
 								<>
-									<th className="w-[92px] px-2 pt-0 pb-2 text-center">
-										Staked
-									</th>
+									<InfoTip content={GLOSSARY.stakedOwn} asChild>
+										<th className="w-[92px] px-2 pt-0 pb-2 text-center">
+											Staked
+										</th>
+									</InfoTip>
 									<th className="w-[92px] px-2 pt-0 pb-2 text-center">
 										Opened
 									</th>
@@ -1121,12 +1132,14 @@ function TileRow({
 					    trace on the surface at all. */}
 					<td className="p-2 text-center align-middle whitespace-nowrap tabular-nums text-ink">
 						{sold ? (
-							<span
-								data-testid={`tile-sold-${tile.key}`}
-								className="text-[11px] leading-[1.2] font-extrabold tracking-[0.1em] text-n5 uppercase"
-							>
-								Sold
-							</span>
+							<InfoTip content={GLOSSARY.sold} asChild>
+								<span
+									data-testid={`tile-sold-${tile.key}`}
+									className="text-[11px] leading-[1.2] font-extrabold tracking-[0.1em] text-n5 uppercase"
+								>
+									{SOLD_LABEL}
+								</span>
+							</InfoTip>
 						) : armed ? (
 							<InlineSellAmount
 								tileKey={tile.key}
