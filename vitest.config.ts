@@ -58,6 +58,11 @@ export default defineConfig({
 		// that keeps a bare `vitest run` — local, CI, or a subagent's — from
 		// ever reaching a live database; it is asserted by
 		// tests/unit/staging/runner-isolation.test.ts. Do not remove it.
-		exclude: [...configDefaults.exclude, "tests/scale/**", "tests/staging/**"],
+		exclude: [
+			...configDefaults.exclude,
+			"tests/scale/**",
+			"tests/staging/**",
+			"tests/e2e/**",
+		],
 	},
 });

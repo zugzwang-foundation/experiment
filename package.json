@@ -28,7 +28,8 @@
 		"staging:rebuild": "pnpm run staging:reset && pnpm run staging:generate && pnpm run staging:gates",
 		"test:invariants": "vitest run tests/invariants/",
 		"test:integration": "vitest run tests/integration/",
-		"test:scale": "vitest run --config vitest.scale.config.ts"
+		"test:scale": "vitest run --config vitest.scale.config.ts",
+		"test:e2e": "playwright test"
 	},
 	"dependencies": {
 		"@aws-sdk/client-s3": "3.1045.0",
@@ -64,6 +65,7 @@
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.4.13",
+		"@playwright/test": "^1.62.1",
 		"@tailwindcss/postcss": "^4",
 		"@testing-library/react": "16.3.2",
 		"@types/node": "^20",
@@ -74,6 +76,7 @@
 		"fast-check": "4.8.0",
 		"jsdom": "29.1.1",
 		"lefthook": "2.1.6",
+		"redis": "^6.2.1",
 		"tailwindcss": "^4",
 		"tsx": "4.22.0",
 		"typescript": "^5",

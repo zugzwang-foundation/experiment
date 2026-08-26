@@ -19,8 +19,16 @@
  * Run via: `pnpm seed:identity-pool:dev` (see package.json scripts).
  */
 
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
+import postgres from "postgres";
+
+// Inlines its own postgres() client rather than importing @/db — scripts run
+// under tsx must not delegate into the @/db → server-only chain (AGENTS.md §7).
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+	console.error("[seed-identity-pool-dev] DATABASE_URL is not set");
+	process.exit(1);
+}
+const sql = postgres(databaseUrl, { max: 1 });
 
 const COLOURS = [
 	"Red",
@@ -78,22 +86,24 @@ async function main(): Promise<void> {
 
 	let inserted = 0;
 	for (const row of rows) {
-		const result = await db.execute(sql`
+		const result = await sql`
 			INSERT INTO identity_pool (colour, animal, number, pseudonym, pfp_filename)
 			VALUES (${row.colour}, ${row.animal}, ${row.number}, ${row.pseudonym}, ${row.pfpFilename})
 			ON CONFLICT (colour, animal, number) DO NOTHING
 			RETURNING id
-		`);
-		if ((result as unknown as Array<unknown>).length > 0) inserted += 1;
+		`;
+		if (result.length > 0) inserted += 1;
 	}
 
 	console.log(
 		`[seed-identity-pool-dev] done — ${inserted} new rows, ${rows.length - inserted} already present`,
 	);
+	await sql.end();
 	process.exit(0);
 }
 
-main().catch((err) => {
+main().catch(async (err) => {
 	console.error("[seed-identity-pool-dev] failed:", err);
+	await sql.end();
 	process.exit(1);
 });
