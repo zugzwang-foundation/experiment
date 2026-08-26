@@ -50,6 +50,13 @@ vi.mock("@/server/storage/r2", () => ({
 	),
 }));
 
+vi.mock("next/cache", () => ({
+	revalidatePath: vi.fn(),
+	revalidateTag: vi.fn(),
+	cacheTag: vi.fn(),
+	cacheLife: vi.fn(),
+}));
+
 // RED import: the greenfield Slice-6 page under test (fails collection).
 import { DiscoveryContent } from "@/app/(public)/page";
 import {

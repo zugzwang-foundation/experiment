@@ -8,6 +8,13 @@ vi.mock("@sentry/nextjs", () => ({
 	captureException: vi.fn(),
 }));
 
+vi.mock("next/cache", () => ({
+	revalidatePath: vi.fn(),
+	revalidateTag: vi.fn(),
+	cacheTag: vi.fn(),
+	cacheLife: vi.fn(),
+}));
+
 import { bets, comments, events, markets, pools, users } from "@/db/schema";
 import {
 	BetSerializationExhaustedError,
