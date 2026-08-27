@@ -4,6 +4,7 @@ import { cacheLife, cacheTag } from "next/cache";
 
 import { db } from "@/db";
 import type { Reserves } from "@/server/cpmm/calculate";
+import { getCachedReserveWalk } from "@/server/discovery/cached-series";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 
 import { type DebateViewModel, loadDebateView } from "./load-debate-view";
@@ -83,8 +84,37 @@ export async function getCachedDebateView(
 	cacheTag(`market:${market.id}`);
 
 	// `reserves` is a KEY INPUT ONLY — deliberately not forwarded. Forwarding it
-	// would change `loadDebateView`'s signature, which this task does not touch.
+	// would change `loadDebateView`'s pricing semantics, which CHART-1 does not
+	// touch (the `walk` argument below is a separate, non-priced addition).
 	void reserves;
 
-	return loadDebateView(db, { market });
+	// CHART-1 — the price chart's HISTORY, on its OWN key.
+	//
+	// ⛔ THIS IS A NESTED CACHE, AND THE NESTING IS THE POINT. This block is
+	// keyed on `(market, reserves)`, so every bet moves the pool, changes the
+	// key, and forces a full miss. Before CHART-1 the three-statement reserve
+	// replay was inside that miss, which meant the chart's history was re-derived
+	// once per bet per reader — the "invalidation coupled to activity performs
+	// worst when load is highest" failure SPEC.1 §9 *Refresh* names by hand.
+	//
+	// `getCachedReserveWalk` is keyed on the market id ALONE, which no bet
+	// touches. So on a miss HERE, the walk can still HIT there, and fifty bets in
+	// thirty seconds cost one derivation instead of fifty. That is the founder's
+	// ruling made mechanical: the graph shows how the market MOVED, and a picture
+	// of the past does not need re-drawing four times a minute.
+	//
+	// ⚠ On an `Open` market the chart's RIGHT EDGE is not floored with it:
+	// `m/[slug]/page.tsx` recomposes the terminal point from its own live pool
+	// read (`withLiveTail`), so the chart cannot disagree with the `PriceBar`
+	// beneath it — the objection §9 raised against exactly this trade, answered
+	// rather than waived.
+	//
+	// ⛔ On every OTHER state the right edge IS floored with the walk, because
+	// `withLiveTail` returns a non-`Open` series untouched (CHART-1.A). That is
+	// deliberate: a frozen market's chart is its event history, and restamping it
+	// with a live price would put that price on a past event's timestamp
+	// (**INV-4**).
+	const walk = await getCachedReserveWalk(market.id);
+
+	return loadDebateView(db, { market, walk });
 }

@@ -74,7 +74,28 @@ const FORMATTER_MODULE = "src/components/debate/format.ts";
 // ⛔ THE PLAN WIDENS THE CENSUS, NEVER THE PREDICATE. `UNPAIRED_CALL`,
 // `ALLOW_MARKER`, `FLOAT_PERCENT`, `SCAN_DIRS`, the liveness floor and
 // `expect(offenders).toEqual([])` are all UNTOUCHED.
-const EXPECTED_ALLOW_MARKERS = 5;
+// ── CHART-1 (2026-08-27) — THE CENSUS NARROWS, 5 → 3 ────────────────────────
+//
+// ⛔ AND NARROWING IS THE SAFE DIRECTION, WHICH IS WHY THIS EDIT IS SMALLER THAN
+// THE ONE ABOVE IT. Nothing gained the single-side hatch. The collapsed card and
+// the expanded overlay each carried the SAME two `pctround-allow` readouts —
+// opening YES and current YES, byte-identical prose, four markers for one
+// sentence written twice. CHART-1 owed a third copy to the Discovery hero, so
+// the sentence was extracted to `chart/ChartSummary.tsx` and the three surfaces
+// now render one component. Four markers became two; `badges.tsx`'s historical
+// single-bet price is untouched. 1 + 2 = 3.
+//
+// R-3's three conditions, each checked rather than asserted:
+//   (1) the OFFENDER PREDICATE passes — verified before this count moved: the
+//       run failed ONLY at `expect(markers).toHaveLength(…)`, while
+//       `expect(offenders).toEqual([])` on the line above stayed green. No call
+//       site lost its marker; two call sites stopped existing.
+//   (2) the addition is NAMED — R-3 names this file explicitly.
+//   (3) it lands in the SAME COMMIT as the code that makes it necessary.
+// ⛔ THE PLAN NARROWS THE CENSUS, NEVER THE PREDICATE. `UNPAIRED_CALL`,
+// `ALLOW_MARKER`, `FLOAT_PERCENT`, `SCAN_DIRS`, the liveness floor and
+// `expect(offenders).toEqual([])` are all UNTOUCHED.
+const EXPECTED_ALLOW_MARKERS = 3;
 
 const UNPAIRED_CALL = /formatPercentUnpaired\s*\(/;
 const ALLOW_MARKER = /pctround-allow:/;

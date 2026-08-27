@@ -419,146 +419,37 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 });
 
 /**
- * RESO-1 · R-6 — the YES / NO tags at the two lines' terminal points, and R-5's
- * "no change was needed" pin.
+ * RESO-1 · R-6 — DISCHARGED BY CHART-1, NOT DROPPED. The guards that stood here
+ * are removed, and this note is what replaces them.
  *
- * ⛔⛔ THE WALL THIS ROW IS FENCED BY, ASSERTED RATHER THAN TRUSTED. INV-3's side
- * poles are `--color-yes` (#181818) and `--color-no` (#fafafa). `--color-yes` IS
- * the page ground, so a YES-poled mark on this chart is INVISIBLE — and the
- * poles encode a bet's SIDE, which is semantic and not a palette. The tags
- * therefore bind to the deliberately-separate GRAPH family, the same tokens the
- * lines they label already carry. Both halves are asserted: the graph token is
- * present AND the pole token is absent, because asserting only the first passes
- * on a tag carrying both.
+ * ⚠⚠ R-6 ASKED FOR "YES and NO tagged inline on the chart lines … text tags
+ * adjacent to each line's terminal point … neutral ramp only … not styled as
+ * YES/NO chips." RESO-1 built that as `LineTags` — two `<text>` nodes at
+ * `x = VIEWBOX_W`, filled `var(--graph-yes)` / `var(--graph-no)`, with a
+ * separation rule for the 50/50 case — and this block guarded it.
+ *
+ * ⇒ CHART-1 (#425) LANDED ON `main` WHILE RESO-1 WAS IN FLIGHT AND SHIPS THE
+ * SAME ROW, BETTER. `TerminalMarkers` in `MarketPriceChart.tsx` draws a DOT at
+ * each line's true terminal y plus that line's name beside it, on the same
+ * `--graph-*` family, with the collision-displacement rule factored into
+ * `terminalLabelYs` in `geometry.ts` — and it cites ratified canon
+ * (`C-CHART-2` clauses 1, 2, 4) where RESO-1's version was one session's reading
+ * of a register line. It is guarded by `tests/unit/debate/render/terminal-markers.test.tsx`.
+ *
+ * ⛔ KEEPING BOTH WOULD HAVE RENDERED "YES" TWICE ON THE SAME LINE END. The
+ * merge conflict in `MarketPriceChart.tsx` was therefore resolved by taking
+ * `main`'s file WHOLESALE — RESO-1 contributes nothing to that component now —
+ * and these guards go with the code they guarded. Removing a guard whose subject
+ * no longer exists is not weakening the suite; leaving it would have been a
+ * tripwire naming testids nothing emits.
+ *
+ * ⚠ THE ONE THING RESO-1's VERSION HAD THAT IS WORTH NAMING, so it is not lost:
+ * it asserted the tags carry the GRAPH family and NOT the INV-3 poles, in both
+ * spellings (`var(--color-yes)` and the `fill-yes`/`text-yes` utilities). If
+ * `terminal-markers.test.tsx` does not pin that negative, it is worth adding
+ * there — the reason is `--color-yes` IS the page ground, so a pole-bound label
+ * is invisible as well as semantically wrong.
  */
-describe("RESO-1 — R-6, the lines are tagged YES and NO", () => {
-	it("line-tags-render-at-each-lines-terminal-point", () => {
-		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="collapsed" />,
-		);
-		const yes = container.querySelector('[data-testid="line-tag-yes"]');
-		const no = container.querySelector('[data-testid="line-tag-no"]');
-		expect(yes).not.toBeNull();
-		expect(no).not.toBeNull();
-		expect(yes?.textContent).toBe("YES");
-		expect(no?.textContent).toBe("NO");
-
-		// Anchored at the domain's right edge, where both lines terminate.
-		expect(Number(yes?.getAttribute("x"))).toBe(VIEWBOX_W);
-		expect(Number(no?.getAttribute("x"))).toBe(VIEWBOX_W);
-
-		// ⛔ AND AT THEIR OWN LINE'S y. SERIES ends at yes = 0.8, so the YES line
-		// terminates at (1 − 0.8)·320 = 64 and the NO line at 0.8·320 = 256. A tag
-		// pinned to a fixed y would pass a "renders" check and label the wrong line.
-		expect(Number(yes?.getAttribute("y"))).toBe(64);
-		expect(Number(no?.getAttribute("y"))).toBe(256);
-	});
-
-	it("line-tags-bind-to-the-GRAPH-family-and-NEVER-to-the-INV-3-poles", () => {
-		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="collapsed" />,
-		);
-		const yes = container.querySelector('[data-testid="line-tag-yes"]');
-		const no = container.querySelector('[data-testid="line-tag-no"]');
-
-		expect(yes?.getAttribute("fill")).toBe("var(--graph-yes)");
-		expect(no?.getAttribute("fill")).toBe("var(--graph-no)");
-
-		// ⛔ THE POLE SLOT IS ABSENT. `--color-yes` is the ground; a tag carrying it
-		// would be invisible AND would assert a side encoding this chart does not
-		// use. Checked on the whole tag markup, attributes and classes alike.
-		for (const el of [yes, no]) {
-			expect(el?.outerHTML).not.toContain("--color-yes");
-			expect(el?.outerHTML).not.toContain("--color-no");
-			// …and not as a Tailwind pole utility either, which is the OTHER
-			// spelling `side-pole-binding` exists for.
-			expect(el?.outerHTML).not.toContain("fill-yes");
-			expect(el?.outerHTML).not.toContain("fill-no");
-			expect(el?.outerHTML).not.toContain("text-yes");
-			expect(el?.outerHTML).not.toContain("text-no");
-		}
-	});
-
-	it("line-tags-are-NOT-chips", () => {
-		// The brief's wall: the tags must not read as YES/NO chips, because a chip
-		// is the `SideBadge` family and implies the pole encoding is in play. A
-		// `<text>` node with no background, border or radius is the shape that
-		// cannot be mistaken for one.
-		const { container } = render(
-			<MarketPriceChart series={SERIES} mode="collapsed" />,
-		);
-		for (const id of ["line-tag-yes", "line-tag-no"]) {
-			const el = container.querySelector(`[data-testid="${id}"]`);
-			expect(el?.tagName.toLowerCase()).toBe("text");
-			const cls = el?.getAttribute("class") ?? "";
-			expect(cls).not.toContain("rounded");
-			expect(cls).not.toContain("bg-");
-			expect(cls).not.toContain("border");
-		}
-	});
-
-	it("line-tags-SEPARATE-when-the-two-lines-converge-at-50-percent", () => {
-		// ⛔ THE CASE A NAIVE IMPLEMENTATION GETS WRONG, and it is not an edge case:
-		// a freshly opened market sits at exactly 50/50, where the two mirrored
-		// lines MEET. Tags placed at their raw terminal y would print on top of
-		// each other on the most common market state there is.
-		const FLAT: PricePoint[] = [
-			{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-			{ at: "2026-09-20T00:00:00.000Z", yes: "0.500000000000000000" },
-		];
-		const { container } = render(
-			<MarketPriceChart series={FLAT} mode="collapsed" />,
-		);
-		const yes = Number(
-			container
-				.querySelector('[data-testid="line-tag-yes"]')
-				?.getAttribute("y"),
-		);
-		const no = Number(
-			container.querySelector('[data-testid="line-tag-no"]')?.getAttribute("y"),
-		);
-		// Raw terminal y for both would be 160. They must not be equal…
-		expect(yes).not.toBe(no);
-		// …and must be far enough apart to actually read as two labels.
-		expect(Math.abs(yes - no)).toBeGreaterThanOrEqual(20);
-		// YES stays on top at the tie, which is where the mirror puts it.
-		expect(yes).toBeLessThan(no);
-	});
-
-	it("line-tags-stay-clear-of-the-date-label-band-at-an-extreme-price", () => {
-		// A line at 0% terminates at y = 320, which is BELOW the date labels at
-		// y = 312. Unclamped, the tag would print on top of one.
-		const EXTREME: PricePoint[] = [
-			{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
-			{ at: "2026-09-20T00:00:00.000Z", yes: "1.000000000000000000" },
-		];
-		const { container } = render(
-			<MarketPriceChart series={EXTREME} mode="collapsed" />,
-		);
-		for (const id of ["line-tag-yes", "line-tag-no"]) {
-			const y = Number(
-				container.querySelector(`[data-testid="${id}"]`)?.getAttribute("y"),
-			);
-			expect(y).toBeGreaterThanOrEqual(0);
-			// Clear of the `VIEWBOX_H − 8` date-label row.
-			expect(y).toBeLessThan(320 - 8);
-		}
-	});
-
-	it("line-tags-render-in-BOTH-modes", () => {
-		// "Which line is which" is the same fact in both modes; the larger view
-		// dropping the identification the small one carries would be backwards.
-		const { container } = render(
-			<MarketPriceChart series={SERIES} nodes={[]} mode="expanded" />,
-		);
-		expect(
-			container.querySelector('[data-testid="line-tag-yes"]'),
-		).not.toBeNull();
-		expect(
-			container.querySelector('[data-testid="line-tag-no"]'),
-		).not.toBeNull();
-	});
-});
 
 /**
  * RESO-1 · R-5 — THE CHART GROWS INTO THE VACATED SPACE, AND NO CHART CODE

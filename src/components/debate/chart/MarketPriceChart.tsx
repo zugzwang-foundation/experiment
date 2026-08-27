@@ -5,6 +5,10 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
 	fmtUtcDay,
+	SVG_W,
+	TERMINAL_DOT_R,
+	TERMINAL_LABEL_X,
+	terminalLabelYs,
 	VIEWBOX_H,
 	VIEWBOX_W,
 	xPx,
@@ -12,7 +16,24 @@ import {
 	yYesPx,
 } from "./geometry";
 
-export type MarketPriceChartMode = "collapsed" | "expanded";
+/**
+ * The three surfaces this one component renders (CHART-1, SPEC.1 1.0.40 §9/§22).
+ *
+ * `hero` is the Discovery hero, which until CHART-1 rendered a DIFFERENT
+ * component — `PriceSparkline`, index-spaced and `aria-hidden`. Index spacing
+ * draws twenty bets in an hour identically to twenty bets across three weeks,
+ * which was defensible while the hero was a decorative thumbnail beside a card
+ * sparkline. It stopped being one when HTML-FINISH · DISCOVERY deleted the card
+ * sparkline and left the hero as Discovery's ONLY price graph. It is time-scaled
+ * here for the same reason §9 gave for market detail: on a surface a reader uses
+ * to judge whether a market has already moved, chronology *is* the information.
+ *
+ * `hero` renders lines and terminals and NO axis — it is a third of the height
+ * of the collapsed card, where three date labels would be noise rather than
+ * orientation. That is a presentational choice inside canon's jurisdiction, not
+ * a spec pin; §22 and C-CHART-2 both stop at "same component, same derivation".
+ */
+export type MarketPriceChartMode = "collapsed" | "expanded" | "hero";
 
 /** The market-detail price-chart SVG (SPEC.1 1.0.32 §9 / F-DEBATE-5) — two
  * complementary YES/NO probability lines mirrored about 50 % (design-language
@@ -28,8 +49,16 @@ export type MarketPriceChartMode = "collapsed" | "expanded";
  * STILL RENDERS NO NODES — only the axis half moved. EXPANDED is UNTOUCHED: the
  * two X endpoint labels (`market.opened` · last event), and interior ticks there
  * remain canon-owned and unbuilt.
- * Post nodes arrive in Slice 2. The SVG is `aria-hidden` (decorative) — the
- * accessible readout lives in the card's `sr-only` summary. Strokes bind by the
+ * Post nodes arrive in Slice 2. The SVG is `aria-hidden` on ALL THREE surfaces
+ * and the accessible readout lives in the shared `ChartSummary` beside it —
+ * collapsed card, expanded overlay and, since CHART-1, the Discovery hero. ⚠ It
+ * used to say "the card's `sr-only` summary", naming one surface of three and a
+ * home the sentence no longer has. ⚠ SPEC.1 1.0.40 §9 says this chart is "not
+ * `aria-hidden` on any surface"; that is a claim about the CHART, not this
+ * ELEMENT — a screen reader cannot read a polyline, so announcing the graphic
+ * means announcing the summary next to it. The attribute below and that sentence
+ * are about different things; this note exists because the next reader will grep
+ * the attribute and find them in apparent conflict. Strokes bind by the
  * `--graph-yes` / `--graph-no` token NAME (INV-3 side binding, never the slot
  * value; `--color-yes` = the ground, so a value-copy would be invisible AND
  * invert the poles). No raw hex. Slice 2: EXPANDED also marks the per-`(UTC day,
@@ -52,7 +81,17 @@ export function MarketPriceChart({
 	return (
 		<svg
 			data-testid="market-price-chart"
-			viewBox={`0 0 ${VIEWBOX_W} ${VIEWBOX_H}`}
+			// CHART-1 — which of the three surfaces this render is. The hero's
+			// retired `PriceSparkline` carried `data-size`, and two hero tests
+			// selected on it; keeping a mode attribute means a guard can still
+			// name the surface it is asserting about without reaching for a
+			// styling class to identify the thing under test (OVN-V5).
+			data-mode={mode}
+			// C-CHART-2 clause 3 — the viewBox is the 2:1 PLOT plus the right
+			// gutter the end labels live in. Widening the box rather than narrowing
+			// the plot is what keeps every plotted coordinate — and every guard that
+			// asserts one — exactly where it already was.
+			viewBox={`0 0 ${SVG_W} ${VIEWBOX_H}`}
 			preserveAspectRatio="none"
 			aria-hidden="true"
 			className="h-full w-full"
@@ -88,6 +127,18 @@ export function MarketPriceChart({
 			    lands at ~5.6px and is ~15% narrower than tall. The profile's was
 			    **2.09** anisotropic, an order of magnitude worse, which is why that one
 			    was reported and this one has not been.
+			    ⚠⚠ THOSE NUMBERS WERE MEASURED AGAINST A 640-WIDE VIEWBOX, AND CHART-1
+			    WIDENED IT TO 678 for the `C-CHART-2` label gutter — so the measurement
+			    above is stale by the very change it now sits inside. At the same CSS box
+			    `scaleX` falls to ~0.466 and the anisotropy INVERTS to ~0.92: labels are
+			    now slightly narrower than tall rather than wider.
+			    ⛔ AND THE SUBSTANTIVE HALF, which is not about type at all: because
+			    `preserveAspectRatio="none"` maps the WHOLE widened viewBox onto the
+			    unchanged CSS box, the PLOT now renders ~5.6 % narrower in the same
+			    space. `geometry.ts` says "no existing coordinate moved" — true in USER
+			    UNITS, false ON SCREEN. Recorded as drift on a finished surface rather
+			    than left implied by a claim about user space. Raised by
+			    `@code-reviewer` at the CHART-1 cascade.
 			    ⛔ NOT FIXED HERE ON PURPOSE. `/m/[slug]` is a finished surface and the
 			    pass that found this was fenced to re-measure it at ZERO DRIFT; changing
 			    a label's rendered size is drift. Raised for the founder rather than
@@ -143,42 +194,6 @@ export function MarketPriceChart({
 				vectorEffect="non-scaling-stroke"
 			/>
 
-			{/* ✅ RESO-1 · R-6 — WHICH LINE IS WHICH, SAID IN WORDS AT THE POINT THE
-			    READER'S EYE ALREADY IS. Two text tags at the lines' terminal points.
-			    Drawn AFTER the polylines so a tag is never painted under its own
-			    line, and after the axis for the same reason.
-
-			    ⛔⛔ THE POLE ENCODING IS DELIBERATELY *NOT* APPLIED HERE, AND THAT IS
-			    THE WHOLE POINT OF THE ROW. INV-3's side poles are `--color-yes`
-			    (#181818) and `--color-no` (#fafafa); `--color-yes` IS the page
-			    ground, so a YES-poled mark on this chart would be invisible — and
-			    the poles encode a bet's SIDE, which is semantic, not a decorative
-			    palette to reach for. Each tag therefore takes ITS OWN LINE's
-			    `--graph-*` token, the deliberately-separate graph family the lines
-			    themselves already use, so a tag and its line are the same colour and
-			    nothing new enters the build.
-			    ⛔ AND AS LITERALS, NEVER A SIDE-KEYED TERNARY. There is no `side ===
-			    "YES" ? … : …` anywhere below, so this file's entry in
-			    `side-pole-binding.test.ts`'s CLOSED INVENTORY is unchanged by the
-			    row — the guard's set equality is deliberately brittle and a new
-			    side-keyed colour expression here would move it.
-			    ⛔ NOT CHIPS. No background, no border, no radius — a chip would read
-			    as the `SideBadge` family and imply exactly the pole encoding the
-			    paragraph above refuses.
-
-			    ⚠ THE TAGS INHERIT THIS CARD'S DOCUMENTED ANISOTROPY, and it is
-			    carried rather than fixed. `preserveAspectRatio="none"` scales user
-			    space non-uniformly, so a declared 10px lands at ~5.6px and ~15%
-			    narrower than tall (measured, see the axis block above). The three
-			    date labels already ship on exactly these terms and the founder
-			    decided to carry that cost; introducing an HTML overlay for these two
-			    would be a new positioning mechanism on a finished surface, and would
-			    leave the two label families rendering by different rules.
-			    ⚠ `aria-hidden` rides the parent `<svg>` — the accessible readout is
-			    the card's `sr-only` summary, which already names both series. These
-			    tags add no data, so they announce nothing new. */}
-			<LineTags series={series} />
-
 			{/* EXPANDED only — the per-(UTC day, side) top-post nodes (Slice 2). Each
 			    a dot at (post timestamp, its YES price on the 0–100 % scale), filled
 			    by the post's SIDE token (`--graph-yes`/`--graph-no`, INV-3 — never
@@ -199,89 +214,88 @@ export function MarketPriceChart({
 						vectorEffect="non-scaling-stroke"
 					/>
 				))}
+
+			{/* C-CHART-2 clauses 1, 2 and 4 — EVERY MODE, INCLUDING THE HERO. Each
+			    line ends in a rimless r=3 dot on its own series token, and immediately
+			    right of it, in the gutter, that line's own name in THE SAME TOKEN.
+			    ⛔ THE FILL IS THE POINT, NOT DECORATION. A neutral `n5` label would
+			    need a key to say which line it names — which is exactly the legend
+			    this supersedes (`C-CHART-1` clause 3, REMOVED at CHART-1, not
+			    restyled). And it binds by TOKEN NAME (`--graph-yes` / `--graph-no`,
+			    INV-3), never the `--color-*` slot: the repo aliases `--color-yes` to
+			    the page ground, so a value-copy would render the YES label invisible
+			    AND invert the poles.
+			    ⚠ The DOTS sit at the lines' true y. Only the LABELS may be displaced,
+			    and only when they would collide — that whole rule lives in
+			    `terminalLabelYs`, not here. */}
+			{/* ⚠ THE DEGENERATE CASE READS THE SAME POINT THE LINE DOES. `buildLine`
+			    draws a flat line at `series[0].yes` when the domain collapses
+			    (`length < 2`, or every point sharing one instant), while the terminal
+			    normally reads the LAST point. Those differ only if two or more events
+			    share a timestamp to the microsecond — remote, but the consequence is
+			    that the dots would sit off their own line, which is the one thing a
+			    terminal marker must never do. Raised by `@code-reviewer` at the
+			    CHART-1 cascade. */}
+			{series.length > 0 && (
+				<TerminalMarkers
+					yes={
+						series.length < 2 || endMs === startMs
+							? series[0].yes
+							: series[series.length - 1].yes
+					}
+				/>
+			)}
 		</svg>
 	);
 }
 
 /**
- * RESO-1 · R-6 — the YES / NO tags at the two lines' terminal points.
+ * The two line ends: a dot at each line's true terminal y, and that line's name
+ * beside it (`C-CHART-2` clauses 1, 2, 4).
  *
- * ⚠ RENDERED IN BOTH MODES, deliberately. `mode` gates the axis (collapsed) and
- * the nodes (expanded) because those carry DIFFERENT DATA per mode; "which line
- * is which" is the same fact in both, and having the LARGER view drop the
- * identification the small one carries would be backwards.
- *
- * ⛔ THE TWO LINES CONVERGE, SO THE TAGS MUST BE ALLOWED TO SEPARATE. The lines
- * are exact mirrors about the 50 % midline (`yYesPx` + `yNoPx` always sum to
- * `VIEWBOX_H`), so at a 50/50 market they meet and two tags placed naively would
- * print on top of each other — the one market state that is both the DEFAULT for
- * a freshly opened market and the likeliest thing a reviewer opens. When the two
- * terminal points are closer than `MIN_SEPARATION`, the tags are pushed apart
- * symmetrically about the midline: YES up, NO down, preserving the one thing the
- * position means (YES above the midline = YES winning).
- *
- * ⛔ AND THEY ARE CLAMPED OFF THE BOTTOM EDGE. The date labels sit at
- * `VIEWBOX_H − 8`; an unclamped tag on a line at 0 % would land on top of one.
- * `MAX_Y` keeps a tag clear of that band, so the two label families cannot
- * collide no matter what the price does.
- *
- * ⚠ NO MONEY MATH. `yYesPx`/`yNoPx` are the same pure display helpers the
- * polylines use, reading the canonical price string exactly as they do — this
- * places a label, it does not compute a price (CLAUDE.md §2).
+ * Takes the terminal YES price ALONE, because NO is its complement by
+ * construction (design-language §3.2) — the same reason the whole chart is fed
+ * one series. Passing both would mint a second place for the poles to disagree.
  */
-function LineTags({
-	series,
-}: {
-	series: PricePoint[];
-}): React.JSX.Element | null {
-	const last = series[series.length - 1];
-	if (!last) {
-		return null;
-	}
-	/** The vertical room two stacked tags need before they touch. ⚠ This said
-	 * "Half" until @code-reviewer caught the off-by-a-factor: the trigger below
-	 * is `< MIN_SEPARATION` and the push yields exactly it, so this is the WHOLE
-	 * gap. The geometry was always right; only the sentence was not. */
-	const MIN_SEPARATION = 26;
-	/** Clear of the `VIEWBOX_H − 8` date-label band, and of the top edge. */
-	const MIN_Y = 12;
-	const MAX_Y = VIEWBOX_H - 26;
-	const mid = VIEWBOX_H / 2;
-
-	let yYes = yYesPx(last.yes);
-	let yNo = yNoPx(last.yes);
-	if (Math.abs(yYes - yNo) < MIN_SEPARATION) {
-		// Push apart about the midline, keeping YES on the side its price puts it.
-		const half = MIN_SEPARATION / 2;
-		const yesAbove = yYes <= yNo;
-		yYes = yesAbove ? mid - half : mid + half;
-		yNo = yesAbove ? mid + half : mid - half;
-	}
-	const clamp = (y: number) => Math.min(MAX_Y, Math.max(MIN_Y, y));
-
+function TerminalMarkers({ yes }: { yes: string }): React.JSX.Element {
+	const labelY = terminalLabelYs(yes);
 	return (
 		<>
-			<text
-				data-testid="line-tag-yes"
-				x={VIEWBOX_W}
-				y={clamp(yYes)}
-				fill="var(--graph-yes)"
-				className="text-[10px]"
-				textAnchor="end"
-				dominantBaseline="middle"
-			>
-				YES
-			</text>
-			<text
-				data-testid="line-tag-no"
-				x={VIEWBOX_W}
-				y={clamp(yNo)}
+			<circle
+				data-testid="terminal-dot-no"
+				cx={VIEWBOX_W}
+				cy={yNoPx(yes)}
+				r={TERMINAL_DOT_R}
 				fill="var(--graph-no)"
-				className="text-[10px]"
-				textAnchor="end"
+			/>
+			<circle
+				data-testid="terminal-dot-yes"
+				cx={VIEWBOX_W}
+				cy={yYesPx(yes)}
+				r={TERMINAL_DOT_R}
+				fill="var(--graph-yes)"
+			/>
+			<text
+				data-testid="terminal-label-no"
+				x={TERMINAL_LABEL_X}
+				y={labelY.no}
 				dominantBaseline="middle"
+				textAnchor="start"
+				className="text-[10px] font-bold tracking-[0.1em]"
+				fill="var(--graph-no)"
 			>
 				NO
+			</text>
+			<text
+				data-testid="terminal-label-yes"
+				x={TERMINAL_LABEL_X}
+				y={labelY.yes}
+				dominantBaseline="middle"
+				textAnchor="start"
+				className="text-[10px] font-bold tracking-[0.1em]"
+				fill="var(--graph-yes)"
+			>
+				YES
 			</text>
 		</>
 	);
@@ -417,7 +431,9 @@ function nearestPoint(
 /** An SVG `points` string for one line. With fewer than two points OR a
  * degenerate domain (`startMs === endMs`, the unbet market), draws a FULL-WIDTH
  * FLAT LINE — the value duplicated at x = 0 and x = VIEWBOX_W (the
- * `PriceSparkline` "duplicate at both ends" trick; SPEC.1 §9 "flat line at the
+ * "duplicate at both ends" trick the retired `PriceSparkline` also used — that
+ * component was DELETED at CHART-1 when the hero moved onto this one, so read
+ * the name as history, not as a live reference; SPEC.1 §9 "flat line at the
  * opening price"). */
 function buildLine(
 	series: PricePoint[],

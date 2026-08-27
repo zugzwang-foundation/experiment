@@ -5,14 +5,18 @@ import { cacheLife, cacheTag } from "next/cache";
 import type { DbClient, DbTransaction } from "@/db";
 import { db } from "@/db";
 import { markets } from "@/db/schema";
-import { DISCOVERY_GRID_SIZE } from "@/server/config/limits";
+import {
+	DISCOVERY_GRID_SIZE,
+	DISCOVERY_SERIES_MAX_POINTS,
+} from "@/server/config/limits";
 import type { Reserves } from "@/server/cpmm/calculate";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 
+import { getCachedReserveWalk } from "./cached-series";
 import { type HeroTopPosts, selectHeroTopPosts } from "./hero";
 import { getDefaultMarketMediaUrl } from "./media";
-import { loadPriceSeries, type PricePoint } from "./price-series";
+import { mapWalkToSeries, type PricePoint } from "./price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -24,7 +28,10 @@ type DiscoveryReader = DbClient | DbTransaction;
  * `getPrices` authority (null defensive — no pool row); `totals` the
  * `Đ staked · posts · replies` stat line; `imageUrl` the presigned GET for
  * the market's `is_default` `market_media` row (null defensive). The price
- * sparkline series rides `loadPriceSeries` (Slice 2), composed at the page.
+ * series rides `getCachedReserveWalk` → `mapWalkToSeries` (CHART-1), composed at
+ * the page, where `withLiveTail` also pins its live right edge. ⚠ It rode
+ * `loadPriceSeries` until CHART-1 and it is not a "sparkline" any more — the
+ * hero renders the same time-scaled component `/m/[slug]` does.
  */
 export type DiscoveryCard = {
 	id: string;
@@ -188,7 +195,48 @@ export async function getCachedMarketDiscoveryData(
 
 	const totals = await getMarketTotals(db, marketId);
 	const imageUrl = await getDefaultMarketMediaUrl(db, marketId);
-	const series = await loadPriceSeries(db, marketId);
+
+	// CHART-1 — the hero's series now rides `getCachedReserveWalk`, keyed on the
+	// market id ALONE, instead of `loadPriceSeries`, which replayed inside this
+	// reserves-keyed block. This block misses on every bet; that one does not, so
+	// the walk is derived once per `MARKET_SERIES_MIN_WINDOW_MS` however busy the
+	// market gets (SPEC.1 1.0.40 §9 *Refresh*). The hero's own cap is unchanged.
+	//
+	// ⚠ THE F-1 DRIFT WARN IS DELIBERATELY GONE FROM THIS PATH, AND IT IS A
+	// SUPERSESSION RATHER THAN AN OVERSIGHT. `loadPriceSeries` spends a fourth
+	// statement reading the live `pools` row and WARNs `discovery_price_series_drift`
+	// when the replay's final reserves disagree with it. Under a floored history
+	// that comparison is no longer diagnostic: a walk up to a minute old
+	// LEGITIMATELY differs from a pool that has moved since, so the check would
+	// fire by design and train its own reader to ignore it. What it was
+	// protecting — the chart's right edge agreeing with the price bar — is now
+	// guaranteed by construction instead of by monitoring, because
+	// `withLiveTail` composes that edge from the live read at the page. The
+	// ⛔ AND THE INSTRUMENT DOES NOT SURVIVE IN PRODUCTION — this sentence used
+	// to claim it did, "on `loadPriceSeries` for any uncached caller", which
+	// was false the moment it was written: this was `loadPriceSeries`'s LAST
+	// production call site, and it now has none. Caught by `@test-writer` at
+	// the CHART-1 audit. The function and its suite are retained rather than
+	// deleted — the drift comparison it carries is the only place in the repo
+	// that checks the event replay against the live pool, and that check is
+	// exactly what would surface an events↔pools divergence. Whether to re-site
+	// it or drop it is a Gate C question, flagged rather than decided here.
+	// ⛔ AND THE HUMAN TELL WENT WITH IT, WHICH IS THE HALF THIS COMMENT MISSED.
+	// `@security-auditor` observed that `withLiveTail` now composes the terminal
+	// from the live pool price on BOTH surfaces — so an events↔`pools`
+	// divergence no longer shows up as the chart disagreeing with the bar
+	// either. The automated detector and the visual one were removed by the same
+	// commit, on the money surface, and that coincidence is the finding rather
+	// than either removal alone. A pool that moved without a matching event is
+	// exactly the shape a CPMM accounting bug takes. ⇒ RE-SITING THIS CHECK IS
+	// OWED, and it belongs somewhere that runs against production — beside the
+	// `position_drift` cron, or as a staging gate — never back on the render
+	// path, where a floored history guarantees it fires by design and trains its
+	// reader to ignore it.
+	const series = mapWalkToSeries(
+		await getCachedReserveWalk(marketId),
+		DISCOVERY_SERIES_MAX_POINTS,
+	);
 	const topPosts = await selectHeroTopPosts(db, marketId, reserves);
 
 	return { totals, imageUrl, series, topPosts };
