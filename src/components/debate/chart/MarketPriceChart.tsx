@@ -5,9 +5,9 @@ import type { PricePoint } from "@/server/discovery/price-series";
 
 import {
 	fmtUtcDay,
+	labelTopPct,
 	SVG_W,
 	TERMINAL_DOT_R,
-	TERMINAL_LABEL_X,
 	terminalLabelYs,
 	VIEWBOX_H,
 	VIEWBOX_W,
@@ -69,34 +69,112 @@ export function MarketPriceChart({
 	series,
 	nodes,
 	mode,
+	isOpen,
 }: {
 	series: PricePoint[];
 	nodes?: ChartNode[];
 	mode: MarketPriceChartMode;
+	/**
+	 * `C-CHART-2` clause 1 (CHART-2) — whether the terminal dots pulse.
+	 *
+	 * ⛔ REQUIRED, NEVER DEFAULTED, and for the reason `ChartSummary.testId` is:
+	 * a default would let a caller get this wrong by omission, and the wrong
+	 * value here is a **frozen market advertising itself as live** (INV-4). It
+	 * is READ from `market.status` on `/m/[slug]` and is the licensed `true`
+	 * literal on Discovery, which lists only `Open` markets — the same
+	 * asymmetry, from the same two call sites, that `withLiveTail` already
+	 * carries. **Never inferred from the series' shape**: a quiet `Open` market
+	 * and a `Closed` one look identical from the data.
+	 */
+	isOpen: boolean;
 }): React.JSX.Element {
 	const startMs = series.length > 0 ? Date.parse(series[0].at) : 0;
 	const endMs =
 		series.length > 0 ? Date.parse(series[series.length - 1].at) : 0;
 
+	// The terminal YES price — the ONE value both the dots and the HTML labels
+	// read, so the two can never disagree about where the series ends. The
+	// degenerate branch is `buildLine`'s: see `TerminalMarkers` for why it reads
+	// the FIRST point rather than the last when the domain collapses.
+	const terminalYes =
+		series.length === 0
+			? null
+			: series.length < 2 || endMs === startMs
+				? series[0].yes
+				: series[series.length - 1].yes;
+
 	return (
-		<svg
-			data-testid="market-price-chart"
-			// CHART-1 — which of the three surfaces this render is. The hero's
-			// retired `PriceSparkline` carried `data-size`, and two hero tests
-			// selected on it; keeping a mode attribute means a guard can still
-			// name the surface it is asserting about without reaching for a
-			// styling class to identify the thing under test (OVN-V5).
+		/* ⛔ THE FRAME IS A FLEX ROW, AND THAT IS THE WHOLE LABEL FIX
+		   (`C-CHART-2` clause 2, CHART-2). Left cell: the plot, which the viewBox
+		   stretches into. Right cell: an HTML gutter the viewBox cannot reach. A
+		   `<text>` inside the `<svg>` is scaled by `preserveAspectRatio="none"`
+		   along with everything else, and the scale is DIFFERENT on each of the
+		   three surfaces and varies with viewport and carousel position besides —
+		   so the same declared 10px rendered 4.28px on the collapsed card. Nothing
+		   applied inside that space can be right at more than one size. Out here,
+		   10px is 10px.
+		   ⚠ The gutter is RETURNED FROM THIS COMPONENT rather than left for each
+		   caller to place — the `ProfileChart` precedent (PROFILE OVERLAP R2),
+		   which moved its endpoint labels out of its `<svg>` the same way. A
+		   component-scoped query still finds them, which is the property that
+		   makes them guardable; a sibling of the component would not be. */
+		<div
+			data-testid="market-price-chart-frame"
 			data-mode={mode}
-			// C-CHART-2 clause 3 — the viewBox is the 2:1 PLOT plus the right
-			// gutter the end labels live in. Widening the box rather than narrowing
-			// the plot is what keeps every plotted coordinate — and every guard that
-			// asserts one — exactly where it already was.
-			viewBox={`0 0 ${SVG_W} ${VIEWBOX_H}`}
-			preserveAspectRatio="none"
-			aria-hidden="true"
-			className="h-full w-full"
+			className={
+				mode === "expanded"
+					? "flex w-full items-stretch"
+					: "flex h-full w-full items-stretch"
+			}
 		>
-			{/* ✅ COLLAPSED — THE TIME AXIS (SPEC.1 1.0.32, HTML-FINISH · MARKET
+			<div
+				data-testid="market-price-chart-plot"
+				className="min-w-0 flex-1"
+				/* ⛔ THE CONTAINER/VIEWBOX LOCK — `C-CHART-1` clause 4 as amended at
+				   CHART-2, and the reason this task exists. The expanded overlay is
+				   the ONE mode whose box is declared rather than inherited, so it is
+				   the one mode that can be locked. It used to declare `aspect-[2/1]`
+				   against a 640×320 viewBox — exactly uniform — and CHART-1 widened
+				   the viewBox to 678×320 without touching it, dropping anisotropy to
+				   0.94395 where no guard was looking, because every guard asserts in
+				   user units and the defect exists only in CSS pixels.
+				   ⛔ IT IS DERIVED, NOT RESTATED. `aspect-[644/320]` would be the
+				   same defect with a newer number; this reads the two constants the
+				   viewBox itself is built from, so the ratio cannot fall out of step
+				   with the box it is meant to match. `tests/unit/debate/chart/
+				   container-viewbox-lock.test.tsx` asserts the two are equal.
+				   ⚠ COLLAPSED AND HERO GET NO LOCK, DELIBERATELY. Their boxes are
+				   `flex-1`/`min-h-24` inside a rail and a carousel panel — functions
+				   of viewport and content, not declared shapes. Pinning an aspect to
+				   either would be inventing a constraint the layout does not have.
+				   What makes THEM correct is the label move above, not a lock. */
+				style={
+					mode === "expanded"
+						? { aspectRatio: `${SVG_W} / ${VIEWBOX_H}` }
+						: undefined
+				}
+			>
+				<svg
+					data-testid="market-price-chart"
+					// CHART-1 — which of the three surfaces this render is. The hero's
+					// retired `PriceSparkline` carried `data-size`, and two hero tests
+					// selected on it; keeping a mode attribute means a guard can still
+					// name the surface it is asserting about without reaching for a
+					// styling class to identify the thing under test (OVN-V5).
+					data-mode={mode}
+					// C-CHART-2 clause 3 (CHART-2) — the viewBox is the PLOT plus a DOT
+					// ALLOWANCE, and nothing else. The end labels used to live in a 38-unit
+					// gutter here; they are HTML beside the plot now, so all that remains is
+					// the 4 units the terminal circle needs not to half-clip at `cx =
+					// VIEWBOX_W`. Still ADDED to the viewBox rather than taken out of the
+					// plot, so every plotted coordinate — and every guard asserting one — is
+					// exactly where it has always been; only the addition shrank, 38 → 4.
+					viewBox={`0 0 ${SVG_W} ${VIEWBOX_H}`}
+					preserveAspectRatio="none"
+					aria-hidden="true"
+					className="h-full w-full"
+				>
+					{/* ✅ COLLAPSED — THE TIME AXIS (SPEC.1 1.0.32, HTML-FINISH · MARKET
 			    DETAIL round 2 · R8). Two interior ticks and three date labels.
 			    ⚠ IT IS DRAWN FIRST, so the two price lines paint OVER it — gridlines
 			    behind data. That is also the shipped `expanded` order below and
@@ -118,117 +196,129 @@ export function MarketPriceChart({
 			    component-scoped query still finds them, which is the property this
 			    block was protecting.
 
-			    ⚠⚠ AND THIS AXIS CARRIES A MILDER VERSION OF THE SAME DISTORTION —
-			    SURFACED, NOT FIXED. Measured on staging at a pinned 1440×777, canary
-			    `53ae009`: this card's `<svg>` renders **316×137** against the 640×320
-			    viewBox, so `scaleX 0.4938` / `scaleY 0.4282` — an anisotropy of
-			    **1.153**. All three date labels render at **0.494 of their natural
-			    width and 0.556 of their natural height**, i.e. a declared 10px type
-			    lands at ~5.6px and is ~15% narrower than tall. The profile's was
-			    **2.09** anisotropic, an order of magnitude worse, which is why that one
-			    was reported and this one has not been.
-			    ⚠⚠ THOSE NUMBERS WERE MEASURED AGAINST A 640-WIDE VIEWBOX, AND CHART-1
-			    WIDENED IT TO 678 for the `C-CHART-2` label gutter — so the measurement
-			    above is stale by the very change it now sits inside. At the same CSS box
-			    `scaleX` falls to ~0.466 and the anisotropy INVERTS to ~0.92: labels are
-			    now slightly narrower than tall rather than wider.
-			    ⛔ AND THE SUBSTANTIVE HALF, which is not about type at all: because
-			    `preserveAspectRatio="none"` maps the WHOLE widened viewBox onto the
-			    unchanged CSS box, the PLOT now renders ~5.6 % narrower in the same
-			    space. `geometry.ts` says "no existing coordinate moved" — true in USER
-			    UNITS, false ON SCREEN. Recorded as drift on a finished surface rather
-			    than left implied by a claim about user space. Raised by
-			    `@code-reviewer` at the CHART-1 cascade.
-			    ⛔ NOT FIXED HERE ON PURPOSE. `/m/[slug]` is a finished surface and the
-			    pass that found this was fenced to re-measure it at ZERO DRIFT; changing
-			    a label's rendered size is drift. Raised for the founder rather than
-			    absorbed — the disposition canon already uses for a cost it has decided
-			    to carry. The fix, if it is wanted, is the one `ProfileChart` now
-			    carries. */}
-			{mode === "collapsed" && (
-				<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
-			)}
+			    ⚠⚠ THESE DATE LABELS ARE STILL DISTORTED, AND THEY ARE NOW THE ONLY
+			    TEXT IN THIS `<svg>` THAT IS. The `YES`/`NO` end labels left for an
+			    HTML gutter at CHART-2 (`C-CHART-2` clause 2); the axis did not,
+			    because it is positioned against the PLOT's x-domain — a date sits
+			    under the series point it names — and moving it out would mean
+			    re-deriving every tick's x in CSS space. That is a real task and it is
+			    not this one. Measured at a pinned 1440×777, `main` at `9d2a920`:
+			    collapsed renders **316 × 137.03** against the CHART-2 viewBox of
+			    644×320, so `scaleX 0.49068` / `scaleY 0.42822` — an anisotropy of
+			    **1.1459**, and a declared 10px date label lands at **4.28px tall**.
+			    ⚠⚠ THE PARAGRAPH THAT STOOD HERE WAS ARITHMETICALLY WRONG AND IS
+			    CORRECTED RATHER THAN ANNOTATED. It said that CHART-1's widening made
+			    "the anisotropy INVERT to ~0.92: labels are now slightly narrower than
+			    tall rather than wider". Measured against that 678-wide viewBox the
+			    anisotropy was **1.0884** — `scaleX` (0.46608) was still GREATER than
+			    `scaleY` (0.42822), so the labels stayed ~8.8 % **wider** than tall.
+			    The direction never inverted; the magnitude shrank, 1.153 → 1.088. The
+			    `0.92` is `scaleY/scaleX` (1 / 1.0884 = 0.9188) quoted as though it
+			    were the same quantity as the `1.153` two sentences earlier, which is
+			    `scaleX/scaleY`. **One ratio, written both ways up, inside one
+			    paragraph** — and nothing could catch it, because no guard in this
+			    repo measures a CSS pixel.
+			    ✅ ITS SUBSTANTIVE HALF WAS CORRECT AND IS NOW DISCHARGED. Because
+			    `preserveAspectRatio="none"` maps the WHOLE viewBox onto the CSS box,
+			    the 678-wide box rendered the PLOT ≈5.6 % narrower in the same space —
+			    true on screen, invisible in user units, and docketed at CHART-1's
+			    Gate C as a cost to carry. CHART-2 dissolves it instead: the viewBox is
+			    644 wide, the plot takes 640/644 = **99.4 %** of the box against
+			    640/678 = 94.4 % before, **recovering ≈5.3 of the 5.6 points.** The
+			    residual 0.62 % is the dot allowance. */}
+					{mode === "collapsed" && (
+						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
+					)}
 
-			{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9). */}
-			{mode === "expanded" && series.length > 0 && (
-				<>
-					<text
-						data-testid="axis-x-start"
-						x={0}
-						y={VIEWBOX_H - 8}
-						className="fill-n5 text-[10px]"
-						textAnchor="start"
-					>
-						{fmtUtcDay(series[0].at)}
-					</text>
-					<text
-						data-testid="axis-x-end"
-						x={VIEWBOX_W}
-						y={VIEWBOX_H - 8}
-						className="fill-n5 text-[10px]"
-						textAnchor="end"
-					>
-						{fmtUtcDay(series[series.length - 1].at)}
-					</text>
-				</>
-			)}
+					{/* EXPANDED only — the two X endpoint labels (no interior ticks, §9). */}
+					{mode === "expanded" && series.length > 0 && (
+						<>
+							<text
+								data-testid="axis-x-start"
+								x={0}
+								y={VIEWBOX_H - 8}
+								className="fill-n5 text-[10px]"
+								textAnchor="start"
+							>
+								{fmtUtcDay(series[0].at)}
+							</text>
+							<text
+								data-testid="axis-x-end"
+								x={VIEWBOX_W}
+								y={VIEWBOX_H - 8}
+								className="fill-n5 text-[10px]"
+								textAnchor="end"
+							>
+								{fmtUtcDay(series[series.length - 1].at)}
+							</text>
+						</>
+					)}
 
-			<polyline
-				data-testid="line-no"
-				points={buildLine(series, startMs, endMs, yNoPx)}
-				fill="none"
-				stroke="var(--graph-no)"
-				strokeWidth="1.75"
-				strokeLinejoin="round"
-				strokeLinecap="round"
-				vectorEffect="non-scaling-stroke"
-			/>
-			<polyline
-				data-testid="line-yes"
-				points={buildLine(series, startMs, endMs, yYesPx)}
-				fill="none"
-				stroke="var(--graph-yes)"
-				strokeWidth="1.75"
-				strokeLinejoin="round"
-				strokeLinecap="round"
-				vectorEffect="non-scaling-stroke"
-			/>
+					<polyline
+						data-testid="line-no"
+						points={buildLine(series, startMs, endMs, yNoPx)}
+						fill="none"
+						stroke="var(--graph-no)"
+						strokeWidth="1.75"
+						strokeLinejoin="round"
+						strokeLinecap="round"
+						vectorEffect="non-scaling-stroke"
+					/>
+					<polyline
+						data-testid="line-yes"
+						points={buildLine(series, startMs, endMs, yYesPx)}
+						fill="none"
+						stroke="var(--graph-yes)"
+						strokeWidth="1.75"
+						strokeLinejoin="round"
+						strokeLinecap="round"
+						vectorEffect="non-scaling-stroke"
+					/>
 
-			{/* EXPANDED only — the per-(UTC day, side) top-post nodes (Slice 2). Each
+					{/* EXPANDED only — the per-(UTC day, side) top-post nodes (Slice 2). Each
 			    a dot at (post timestamp, its YES price on the 0–100 % scale), filled
 			    by the post's SIDE token (`--graph-yes`/`--graph-no`, INV-3 — never
 			    the `--color-*` slot; decision #7). A ground-toned rim separates a
 			    node from its same-token line. */}
-			{mode === "expanded" &&
-				(nodes ?? []).map((node) => (
-					<circle
-						key={node.id}
-						data-testid={`graph-node-${node.id}`}
-						data-side={node.side}
-						cx={xPx(node.at, startMs, endMs)}
-						cy={yYesPx(node.yYes)}
-						r="4"
-						fill={node.side === "YES" ? "var(--graph-yes)" : "var(--graph-no)"}
-						stroke="var(--color-ground)"
-						strokeWidth="1.5"
-						vectorEffect="non-scaling-stroke"
-					/>
-				))}
+					{mode === "expanded" &&
+						(nodes ?? []).map((node) => (
+							<circle
+								key={node.id}
+								data-testid={`graph-node-${node.id}`}
+								data-side={node.side}
+								cx={xPx(node.at, startMs, endMs)}
+								cy={yYesPx(node.yYes)}
+								r="4"
+								fill={
+									node.side === "YES" ? "var(--graph-yes)" : "var(--graph-no)"
+								}
+								stroke="var(--color-ground)"
+								strokeWidth="1.5"
+								vectorEffect="non-scaling-stroke"
+							/>
+						))}
 
-			{/* C-CHART-2 clauses 1, 2 and 4 — EVERY MODE, INCLUDING THE HERO. Each
-			    line ends in a rimless r=3 dot on its own series token, and immediately
-			    right of it, in the gutter, that line's own name in THE SAME TOKEN.
-			    ⛔ THE FILL IS THE POINT, NOT DECORATION. A neutral `n5` label would
-			    need a key to say which line it names — which is exactly the legend
-			    this supersedes (`C-CHART-1` clause 3, REMOVED at CHART-1, not
-			    restyled). And it binds by TOKEN NAME (`--graph-yes` / `--graph-no`,
-			    INV-3), never the `--color-*` slot: the repo aliases `--color-yes` to
-			    the page ground, so a value-copy would render the YES label invisible
-			    AND invert the poles.
+					{/* C-CHART-2 clauses 1 and 7 — EVERY MODE, INCLUDING THE HERO. Each line
+			    ends in a rimless r=3 dot on its own series token, and on an `Open`
+			    market a ring of the same token pulses out of it.
+			    ⚠ THE NAMES USED TO BE HERE AND ARE NOT ANY MORE (clause 2, CHART-2).
+			    They render as HTML in `TerminalLabels`, outside this `<svg>`, because
+			    `preserveAspectRatio="none"` stretched them by a factor that differs
+			    per surface and per viewport. What stayed is what must: a dot marks a
+			    PRICE, so it has to sit exactly where that price is, in the same
+			    stretched space as the line it terminates.
+			    ⛔ THE TOKEN IS THE POINT, NOT DECORATION — and it is why the ruling's
+			    word "grey" is not taken literally. A neutral mark on the NO line is a
+			    pole rendered off its own token (INV-3). It binds by TOKEN NAME
+			    (`--graph-yes` / `--graph-no`), never the `--color-*` slot: the repo
+			    aliases `--color-yes` to the page ground, so a value-copy would render
+			    the YES mark invisible AND invert the poles. It reads grey anyway —
+			    `--graph-yes` IS grey (#737373), and a `--graph-no` (#fafafa) ring at
+			    low alpha over `--color-ground` (#181818) reads grey.
 			    ⚠ The DOTS sit at the lines' true y. Only the LABELS may be displaced,
 			    and only when they would collide — that whole rule lives in
 			    `terminalLabelYs`, not here. */}
-			{/* ⚠ THE DEGENERATE CASE READS THE SAME POINT THE LINE DOES. `buildLine`
+					{/* ⚠ THE DEGENERATE CASE READS THE SAME POINT THE LINE DOES. `buildLine`
 			    draws a flat line at `series[0].yes` when the domain collapses
 			    (`length < 2`, or every point sharing one instant), while the terminal
 			    normally reads the LAST point. Those differ only if two or more events
@@ -236,68 +326,145 @@ export function MarketPriceChart({
 			    that the dots would sit off their own line, which is the one thing a
 			    terminal marker must never do. Raised by `@code-reviewer` at the
 			    CHART-1 cascade. */}
-			{series.length > 0 && (
-				<TerminalMarkers
-					yes={
-						series.length < 2 || endMs === startMs
-							? series[0].yes
-							: series[series.length - 1].yes
-					}
-				/>
-			)}
-		</svg>
+					{terminalYes !== null && (
+						<TerminalMarkers yes={terminalYes} isOpen={isOpen} />
+					)}
+				</svg>
+			</div>
+			{terminalYes !== null && <TerminalLabels yes={terminalYes} />}
+		</div>
 	);
 }
 
 /**
- * The two line ends: a dot at each line's true terminal y, and that line's name
- * beside it (`C-CHART-2` clauses 1, 2, 4).
+ * The two line ends, INSIDE the plot: a dot at each line's true terminal y, and
+ * — on an `Open` market only — a ring pulsing out of it (`C-CHART-2` clauses 1
+ * and 7). The NAMES are not here; they are HTML, in `TerminalLabels` below.
  *
  * Takes the terminal YES price ALONE, because NO is its complement by
  * construction (design-language §3.2) — the same reason the whole chart is fed
  * one series. Passing both would mint a second place for the poles to disagree.
+ *
+ * ⛔ THE RING IS DRAWN BEFORE THE DOT so the solid dot paints over it and stays
+ * crisp at its own radius. It shares the dot's `cx`/`cy`/`r` exactly, so it
+ * expands FROM the dot rather than from somewhere near it.
+ *
+ * ⚠ `fillOpacity` IS THE "LOW OPACITY" OF THE RULING; the animation's own
+ * `opacity` 1 → 0.2 is canon clause 7's ratified live-indicator value. They are
+ * two different properties doing two different jobs — the first sets how present
+ * the ring ever is, the second is the breath — and multiplying rather than
+ * conflating them is what lets the motion values stay byte-identical to the
+ * radio's while the mark stays a faint ring rather than a second dot.
  */
-function TerminalMarkers({ yes }: { yes: string }): React.JSX.Element {
-	const labelY = terminalLabelYs(yes);
+function TerminalMarkers({
+	yes,
+	isOpen,
+}: {
+	yes: string;
+	isOpen: boolean;
+}): React.JSX.Element {
+	const yNo = yNoPx(yes);
+	const yYes = yYesPx(yes);
 	return (
 		<>
+			{isOpen && (
+				<>
+					<circle
+						data-testid="terminal-pulse-no"
+						cx={VIEWBOX_W}
+						cy={yNo}
+						r={TERMINAL_DOT_R}
+						fill="var(--graph-no)"
+						fillOpacity={0.35}
+						className="chart-terminal-pulse"
+					/>
+					<circle
+						data-testid="terminal-pulse-yes"
+						cx={VIEWBOX_W}
+						cy={yYes}
+						r={TERMINAL_DOT_R}
+						fill="var(--graph-yes)"
+						fillOpacity={0.35}
+						className="chart-terminal-pulse"
+					/>
+				</>
+			)}
 			<circle
 				data-testid="terminal-dot-no"
 				cx={VIEWBOX_W}
-				cy={yNoPx(yes)}
+				cy={yNo}
 				r={TERMINAL_DOT_R}
 				fill="var(--graph-no)"
 			/>
 			<circle
 				data-testid="terminal-dot-yes"
 				cx={VIEWBOX_W}
-				cy={yYesPx(yes)}
+				cy={yYes}
 				r={TERMINAL_DOT_R}
 				fill="var(--graph-yes)"
 			/>
-			<text
+		</>
+	);
+}
+
+/**
+ * The two end labels, OUTSIDE the plot — `C-CHART-2` clause 2 as amended at
+ * CHART-2. HTML text in a gutter beside the `<svg>`, so `10px` is 10px on every
+ * surface at every width.
+ *
+ * ⛔ THE VERTICAL POSITION IS A PERCENTAGE, AND THAT IS THE ALIGNMENT CONTRACT.
+ * `preserveAspectRatio="none"` maps `VIEWBOX_H` onto the plot box's full height
+ * whatever that height turns out to be, so a fraction of the viewBox is the
+ * same fraction of the rendered box — always. The dot's rendered `cy` is
+ * `(cy / VIEWBOX_H) · boxHeight`; the label's centre is `labelTopPct(y)` of the
+ * gutter, which `items-stretch` makes exactly as tall as the plot. **The two
+ * agree by construction rather than by a number that happens to match at one
+ * size**, which is the property a pixel offset could not have given.
+ *
+ * ⚠ `terminalLabelYs` IS NOT RE-DERIVED HERE, only converted. The 12-unit
+ * minimum gap, the symmetric push, the clamp and the YES-takes-upper tie-break
+ * all still happen in plot space exactly as they did when these were `<text>`
+ * (`C-CHART-2` clause 4, unchanged). This function spends that answer; it does
+ * not second-guess it. So in the ordinary non-colliding case the label centre
+ * IS the dot's `cy`, and in the colliding case it is deliberately not — which
+ * is the whole point of clause 4 and why the alignment guard uses a
+ * non-colliding market.
+ *
+ * ⚠ `leading-none` IS STATED BECAUSE `text-[10px]` DOES NOT RESET IT. An
+ * arbitrary Tailwind size inherits whatever step's line-height is in scope, so
+ * the box would be 16px tall around 10px type and `-translate-y-1/2` would
+ * centre the wrong box. At `leading-none` the box IS the type.
+ */
+function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
+	const labelY = terminalLabelYs(yes);
+	return (
+		<div
+			data-testid="terminal-label-gutter"
+			className="relative shrink-0 pl-[5px] text-[10px] leading-none font-bold tracking-[0.1em]"
+		>
+			{/* ⛔ THE SIZER, AND IT REPLACES A HAND-MEASURED CONSTANT. CHART-1 had to
+			    pin `YES` at 26 user units because it could not measure Geist offline.
+			    This invisible copy is laid out by the browser in the real shipped
+			    face, so the gutter is exactly as wide as the widest label actually
+			    is — on every device, with no number to go stale. */}
+			<span aria-hidden="true" className="invisible block">
+				YES
+			</span>
+			<span
 				data-testid="terminal-label-no"
-				x={TERMINAL_LABEL_X}
-				y={labelY.no}
-				dominantBaseline="middle"
-				textAnchor="start"
-				className="text-[10px] font-bold tracking-[0.1em]"
-				fill="var(--graph-no)"
+				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-no)]"
+				style={{ top: `${labelTopPct(labelY.no)}%` }}
 			>
 				NO
-			</text>
-			<text
+			</span>
+			<span
 				data-testid="terminal-label-yes"
-				x={TERMINAL_LABEL_X}
-				y={labelY.yes}
-				dominantBaseline="middle"
-				textAnchor="start"
-				className="text-[10px] font-bold tracking-[0.1em]"
-				fill="var(--graph-yes)"
+				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-yes)]"
+				style={{ top: `${labelTopPct(labelY.yes)}%` }}
 			>
 				YES
-			</text>
-		</>
+			</span>
+		</div>
 	);
 }
 

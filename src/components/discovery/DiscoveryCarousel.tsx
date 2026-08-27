@@ -22,6 +22,15 @@ export type DiscoveryMarketView = {
 	card: DiscoveryCard;
 	series: PricePoint[];
 	topPosts: HeroTopPosts;
+	/**
+	 * `C-CHART-2` clause 1 (CHART-2) — whether the hero chart's terminal dots
+	 * pulse. Always `true` on this surface, and carried as a FIELD rather than
+	 * assumed inside `HeroPanels` so the licence stays where it can be read: the
+	 * `status = 'Open'` filter that makes it true lives in
+	 * `getCachedDiscoveryMarketIds`, and `page.tsx` is where the two are written
+	 * next to each other and pinned together.
+	 */
+	isOpen: boolean;
 };
 
 /**
@@ -106,6 +115,7 @@ export function DiscoveryCarousel({
 				card={view.card}
 				series={view.series}
 				topPosts={view.topPosts}
+				isOpen={view.isOpen}
 			/>
 
 			{/* HTML-FINISH row 8 — the rail is FIXED height and takes no share of

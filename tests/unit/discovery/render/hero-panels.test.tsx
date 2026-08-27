@@ -86,7 +86,14 @@ function heroPost(side: HeroPost["side"]): HeroPost {
 }
 
 function renderHero(topPosts: HeroTopPosts) {
-	return render(<HeroPanels card={CARD} series={SERIES} topPosts={topPosts} />);
+	return render(
+		<HeroPanels
+			card={CARD}
+			series={SERIES}
+			topPosts={topPosts}
+			isOpen={true}
+		/>,
+	);
 }
 
 /** DOM-order assertion: `a` precedes `b` in the rendered tree. */
@@ -591,6 +598,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 	it("places the middle point by elapsed time, not by its index", () => {
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -619,6 +627,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 		// disagree about when something happened.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -633,6 +642,7 @@ describe("discovery::hero-chart-time-scaled", () => {
 		// identical" tidy-up has something to fail against.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={UNEVEN}
 				topPosts={{ yes: null, no: null }}
@@ -660,6 +670,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 	it("names the opening price, the current price and both endpoints", () => {
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={[
 					{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
@@ -688,6 +699,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 		// surface and pass.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={SERIES}
 				topPosts={{ yes: null, no: null }}
@@ -707,6 +719,7 @@ describe("discovery::hero-chart-carries-accessible-summary", () => {
 		// guards read as source and none of them would attribute to this.
 		const { container } = render(
 			<HeroPanels
+				isOpen={true}
 				card={CARD}
 				series={SERIES}
 				topPosts={{ yes: null, no: null }}

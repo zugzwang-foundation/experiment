@@ -10,13 +10,16 @@
  * market chart's X spans the whole width and Y the whole height (no axis
  * gutter), unlike the profile module's margined inset.
  *
- * ⚠ "FULL-BLEED" NOW DESCRIBES THE PLOT, NOT THE `<svg>` — corrected here at
- * CHART-1 rather than left reading as an absolute a later reader would trust.
- * `C-CHART-2` clause 3 adds a RIGHT GUTTER for the end labels, and it is added
- * to the viewBox rather than taken out of the plot. So the plot is still
- * full-bleed across `VIEWBOX_W × VIEWBOX_H`, `xPx` still maps a domain onto
- * 0…640, and no existing coordinate moved; the `<svg>` is `SVG_W` wide. Y is
- * untouched and full-bleed outright.
+ * ⚠ "FULL-BLEED" DESCRIBES THE PLOT, NOT THE `<svg>`, and at CHART-2 the two
+ * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
+ * gutter in the viewBox — the labels are HTML beside the plot now — so all the
+ * viewBox still reserves is a **dot allowance**, `TERMINAL_DOT_ALLOWANCE`,
+ * enough that the terminal circle at `cx = VIEWBOX_W` cannot half-clip on the
+ * right edge. The plot is full-bleed across `VIEWBOX_W × VIEWBOX_H`, `xPx`
+ * still maps a domain onto 0…640, no plotted coordinate has ever moved, and
+ * the `<svg>` is `SVG_W` wide — but `SVG_W` is now 644 rather than 678, which
+ * is what gives the plot back the width CHART-1 spent on text. Y is untouched
+ * and full-bleed outright.
  *
  * PURE DISPLAY GEOMETRY only: a canonical price string is read as a number
  * SOLELY to place an SVG point / label a percent — no money arithmetic happens
@@ -32,69 +35,50 @@ export const VIEWBOX_H = 320;
  * apart by the label beside this one, not by a one-pixel radius difference. */
 export const TERMINAL_DOT_R = 3;
 
-/** Gap between the terminal dot's edge and the start of its label. */
-const TERMINAL_LABEL_GAP = 5;
+/**
+ * The ONLY thing the viewBox reserves to the right of the plot — `C-CHART-2`
+ * clause 3, as amended at CHART-2. The terminal dot is centred at
+ * `cx = VIEWBOX_W`, so without an allowance its right half would sit outside
+ * the viewBox and an `<svg>` clips there by default. Radius plus one unit of
+ * air.
+ *
+ * ⛔ THIS REPLACES A 38-UNIT LABEL GUTTER, AND THE DELETION IS THE POINT.
+ * CHART-1 sized that gutter by hand-measuring the string `YES` at 23.41 user
+ * units and pinning **26** — a ~11 % headroom bought because the measuring
+ * engine resolved the font stack to `ui-sans-serif`, Geist being unfetchable
+ * offline through `next/font/google`. That pin was a guess about a font nobody
+ * could measure, guarding a horizontal clip nothing asserted. **The labels are
+ * HTML now and the browser measures them in the real face**, so the pin is
+ * deleted rather than left stale, and no constant in this module encodes a
+ * string's width any more.
+ */
+export const TERMINAL_DOT_ALLOWANCE = TERMINAL_DOT_R + 1;
 
 /**
- * Horizontal room reserved for one end label, in viewBox user units.
+ * The `<svg viewBox>` width — the plot plus the dot allowance. **644.**
  *
- * ⛔ MEASURED, NOT ESTIMATED — `C-CHART-2` clause 3 requires the gutter be sized
- * to the rendered text advance. Measured with `getComputedTextLength()` on an
- * SVG `<text>` carrying this component's exact type — `font-size: 10px`,
- * `font-weight: 700`, `letter-spacing: 0.1em` — in Chrome:
+ * ⛔ IT IS STILL ADDED TO THE VIEWBOX RATHER THAN SUBTRACTED FROM THE PLOT, so
+ * `VIEWBOX_W` remains the PLOT width, `xPx` still maps the domain onto 0…640,
+ * and no plotted coordinate has moved at CHART-1 or here. What changed is the
+ * SIZE of the addition: 38 → 4.
  *
- *     "YES" → 23.41 user units      "NO" → 17.78 user units
- *
- * `YES` is the binding case. The pin is **26**, ~11 % above the measurement,
- * because the measuring engine resolved the stack to `ui-sans-serif`: Geist
- * ships through `next/font/google` and cannot be fetched offline, so the exact
- * shipped advance is a font-metric difference away from the number above. The
- * headroom absorbs a face up to about 28 % wider than the measurement — the
- * label has `SVG_W - TERMINAL_LABEL_X` = 30 units of room and needs 23.41.
- * ⚠ AND THE Y CLAMP DOES NOT HELP HERE, contrary to what this paragraph used to
- * claim ("`terminalLabelYs` clamps besides"). That function clamps the VERTICAL
- * axis only; the font hazard is HORIZONTAL, and nothing in this module bounds a
- * label's advance against the viewBox edge — an `<svg>` clips there by default.
- * So `C-CHART-2` clause 3's "never clip" is mechanically guarded on one axis and
- * held by the 28 % margin on the other. Corrected at the CHART-1 reviewer
- * cascade rather than left claiming a protection it does not provide.
- * ⚠ If Geist's advance is ever measured directly, correct this number — do not
- * add a second constant.
+ * ⚠ AND THAT IS A USER-SPACE FACT WITH A CSS-PIXEL CONSEQUENCE, which is the
+ * distinction CHART-1 got wrong. Because `preserveAspectRatio="none"` maps the
+ * whole viewBox onto the CSS box, a wider viewBox renders the PLOT narrower in
+ * the same box: at 678 the plot took 640/678 = 94.4 % of the width, so every
+ * `/m/[slug]` chart drew ≈5.6 % narrower than it had. At 644 it takes
+ * 640/644 = 99.4 %. **That recovers ≈5.3 of the 5.6 points**; the residual
+ * 0.62 % is the dot allowance and is the price of the dot not clipping.
  */
-const TERMINAL_LABEL_ADVANCE = 26;
-
-/** Trailing breathing room between the label and the viewBox edge. */
-const TERMINAL_LABEL_PAD = 4;
-
-/**
- * The right gutter — `C-CHART-2` clause 3. Dot + gap + label + pad = **38**.
- *
- * ⛔ IT IS ADDED TO THE VIEWBOX, NOT SUBTRACTED FROM THE PLOT, and that is the
- * clause's own instruction: *"the plot's 2:1 aspect is preserved; the gutter is
- * taken from the viewBox, not from the aspect."* So `VIEWBOX_W` stays the PLOT
- * width, `xPx` still maps the domain onto 0…640, and every coordinate any
- * existing guard asserts is unchanged. Subtracting the gutter from the plot
- * instead would have silently moved every point on every chart in the product
- * to buy the same 38 units.
- */
-export const TERMINAL_GUTTER =
-	TERMINAL_DOT_R +
-	TERMINAL_LABEL_GAP +
-	TERMINAL_LABEL_ADVANCE +
-	TERMINAL_LABEL_PAD;
-
-/** The `<svg viewBox>` width — the 2:1 plot plus the label gutter. */
-export const SVG_W = VIEWBOX_W + TERMINAL_GUTTER;
-
-/** x where a terminal label begins (`textAnchor="start"`), just past its dot. */
-export const TERMINAL_LABEL_X = VIEWBOX_W + TERMINAL_DOT_R + TERMINAL_LABEL_GAP;
+export const SVG_W = VIEWBOX_W + TERMINAL_DOT_ALLOWANCE;
 
 /** Minimum vertical centre-to-centre distance between the two end labels before
  * they read as one smudge: the 10px type plus 2px of air. */
 export const TERMINAL_LABEL_MIN_GAP = 12;
 
-/** Keep a label's centre far enough inside the plot that its 10px box cannot
- * clip on either edge (`C-CHART-2` clause 3, "clamped inside the box"). */
+/** Keep a label's centre far enough inside the plot that its 10px box stays
+ * within the plot's vertical extent (`C-CHART-2` clause 3, "clamped inside the
+ * plot's vertical extent"). 6 is half that box. */
 function clampLabelY(y: number): number {
 	return Math.min(Math.max(y, 6), VIEWBOX_H - 6);
 }
@@ -135,8 +119,15 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 		// reasoning that a non-colliding pair needs no adjustment. Collision and
 		// CLIPPING are different failures: at YES ≳ 98.44 % the two labels are 300
 		// units apart and perfectly legible, while the upper one's 10px box sits
-		// at y ≈ −1.8 and is cut off by the `<svg>` edge. A binary market a week
+		// at y ≈ −1.8, outside the plot's vertical extent. A binary market a week
 		// from resolution lives exactly there.
+		// ⚠ THE CLIP SURFACE CHANGED AT CHART-2 AND THE CLAMP STILL EARNS ITS
+		// KEEP. It used to be the `<svg>` edge, which clips by default; the labels
+		// are HTML in a gutter now, and a gutter does NOT clip — an unclamped
+		// label would instead escape upward past the top of the chart and collide
+		// with whatever the surface puts above it. Different failure, same fix,
+		// and worth saying so rather than leaving a reader to assume the clamp
+		// went vestigial when its enclosure did.
 		// ⛔ Caught by `@test-writer` at the CHART-1 audit, which also found that
 		// the case NAMED for the clamp could never have caught it: it asserted the
 		// label's CENTRE was inside `0…VIEWBOX_H` rather than its BOX, so deleting
@@ -149,6 +140,39 @@ export function terminalLabelYs(yes: string): { yes: number; no: number } {
 		yes: clampLabelY(round(yYes + (yesGoesUp ? -push : push))),
 		no: clampLabelY(round(yNo + (yesGoesUp ? push : -push))),
 	};
+}
+
+/**
+ * A plot-space y (0…`VIEWBOX_H`) as a PERCENTAGE of the plot's rendered height
+ * — the one bridge between the SVG's user space and the HTML gutter's CSS
+ * space (`C-CHART-2` clause 2, CHART-2).
+ *
+ * ⛔ THIS IS A CONVERSION, NOT A SECOND DERIVATION, and that distinction is the
+ * whole reason the collision rule could stay untouched. `terminalLabelYs` still
+ * computes everything — the 12-unit minimum gap, the symmetric push, the clamp,
+ * the YES-takes-upper tie-break — in plot space, exactly as it did when the
+ * labels were `<text>`. All that changed is where its answer is spent.
+ *
+ * ⚠ WHY A PERCENTAGE AND NOT A PIXEL OFFSET. `preserveAspectRatio="none"` maps
+ * `VIEWBOX_H` onto the plot box's full height whatever that height is, so a
+ * fraction of the viewBox IS the same fraction of the rendered box — at every
+ * mode, every viewport, and every carousel position. A pixel offset would have
+ * to know the box's height, which is exactly the thing that varies and exactly
+ * the reason the labels are leaving the SVG in the first place. This is what
+ * makes the label's centre land on its dot's rendered `cy` **by construction**
+ * rather than by a number that happens to agree at one size.
+ */
+export function labelTopPct(y: number): number {
+	// ⚠ FOUR DECIMAL PLACES, NOT THE MODULE'S USUAL TWO, AND THE REASON IS A UNIT
+	// CHANGE RATHER THAN A TASTE FOR PRECISION. Everywhere else in this module
+	// `round` trims a PLOT-UNIT coordinate, where 0.01 is already far below a
+	// rendered pixel. Here the quantity becomes a PERCENTAGE OF 320, so two
+	// decimal places would quantise the position to 0.032 plot units and a label
+	// could no longer land exactly on the y `terminalLabelYs` computed. Harmless
+	// on screen; corrosive in a guard, because the alignment assertion would have
+	// to be loosened to absorb an error this function invented. Four places puts
+	// the round-trip error at ~1e-4 units, which is nothing on either side.
+	return Math.round((y / VIEWBOX_H) * 100 * 10000) / 10000;
 }
 
 const MONTHS = [

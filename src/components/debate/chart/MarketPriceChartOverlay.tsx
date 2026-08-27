@@ -16,10 +16,15 @@ import { MarketPriceChart } from "./MarketPriceChart";
 export function MarketPriceChartOverlay({
 	series,
 	nodes,
+	isOpen,
 	onClose,
 }: {
 	series: PricePoint[];
 	nodes: ChartNode[];
+	/** `C-CHART-2` clause 1 — whether the market is `Open`, i.e. whether the
+	 * terminal dots pulse. Threaded straight through; this component neither
+	 * derives nor gates it, for the reason `MarketHeader` gives about `pick`. */
+	isOpen: boolean;
 	onClose: () => void;
 }): React.JSX.Element {
 	useEffect(() => {
@@ -79,8 +84,31 @@ export function MarketPriceChartOverlay({
 						✕
 					</button>
 				</div>
-				<div className="aspect-[2/1] w-full">
-					<MarketPriceChart series={series} nodes={nodes} mode="expanded" />
+				{/* ⛔ THIS DIV NO LONGER DECLARES AN ASPECT, AND THAT IS THE CHART-2
+				    REGRESSION FIX. It was `aspect-[2/1] w-full` — a literal tuned to
+				    a `0 0 640 320` viewBox, giving exactly uniform scaling. CHART-1
+				    widened the viewBox to 678×320 for the label gutter and left this
+				    class alone, so the expanded overlay — the one mode that had been
+				    undistorted — fell to an anisotropy of 0.94395, and no guard in
+				    the repo could see it because every guard asserts in user units.
+				    ⛔ THE LOCK MOVED INTO `MarketPriceChart`, WHERE IT BELONGS: the
+				    box that must match the viewBox is the box the viewBox is mapped
+				    into, which is the plot — and the plot is no longer this div,
+				    because the labels now sit in a CSS gutter beside it. Sizing this
+				    div by an aspect would size plot + gutter together and mis-shape
+				    the plot by the gutter's width. `w-full` and nothing else; the
+				    plot derives its own height from `SVG_W / VIEWBOX_H`.
+				    ⚠ Replacing the literal with `aspect-[644/320]` was considered and
+				    rejected by ruling: it is the same defect with a newer number.
+				    `C-CHART-1` clause 4 now states a relationship, and
+				    `container-viewbox-lock.test.tsx` asserts it. */}
+				<div className="w-full">
+					<MarketPriceChart
+						series={series}
+						nodes={nodes}
+						mode="expanded"
+						isOpen={isOpen}
+					/>
 				</div>
 				{/* Row 8 · PD-3-04 · class F, TIER 1. SPEC.1 §9 · Accessibility requires
 				    "an accessible text summary naming the opening price, the current

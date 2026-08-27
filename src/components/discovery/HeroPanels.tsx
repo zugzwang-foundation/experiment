@@ -64,10 +64,16 @@ export function HeroPanels({
 	card,
 	series,
 	topPosts,
+	isOpen,
 }: {
 	card: DiscoveryCard;
 	series: PricePoint[];
 	topPosts: HeroTopPosts;
+	/** `C-CHART-2` clause 1 — whether the hero chart's terminal dots pulse.
+	 * Threaded from `page.tsx`, where the `status = 'Open'` licence is written
+	 * and guarded; deliberately NOT a literal here, which would put a second
+	 * copy of that licence somewhere nothing pins it. */
+	isOpen: boolean;
 }) {
 	return (
 		<div
@@ -149,7 +155,7 @@ export function HeroPanels({
 				    its border, its `min-h-24` floor and its `flex-1` growth are
 				    untouched. What changed is what the X axis MEANS. */}
 				<div className="mt-[11px] min-h-24 flex-1 rounded-[var(--r)] [border:var(--hairline)]">
-					<MarketPriceChart series={series} mode="hero" />
+					<MarketPriceChart series={series} mode="hero" isOpen={isOpen} />
 				</div>
 				{/* SPEC.1 1.0.40 §9 · Accessibility — the hero's readout, the third and
 				    last mode to get one, discharging `PD-3-04`.

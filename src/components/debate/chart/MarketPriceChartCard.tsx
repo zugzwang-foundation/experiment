@@ -22,9 +22,13 @@ import { MarketPriceChart } from "./MarketPriceChart";
  * new read"), so there is nothing new for the summary to announce. */
 export function MarketPriceChartCard({
 	series,
+	isOpen,
 	onExpand,
 }: {
 	series: PricePoint[];
+	/** `C-CHART-2` clause 1 — whether the market is `Open`, i.e. whether the
+	 * terminal dots pulse. Passed through untouched. */
+	isOpen: boolean;
 	onExpand: () => void;
 }): React.JSX.Element {
 	return (
@@ -47,7 +51,7 @@ export function MarketPriceChartCard({
 			    attempt still rendered 182px inside a 188px rail. `flex-1` takes what
 			    the price bar and the gap leave: 161px against d5's 160. */}
 			<div className="min-h-0 w-full flex-1">
-				<MarketPriceChart series={series} mode="collapsed" />
+				<MarketPriceChart series={series} mode="collapsed" isOpen={isOpen} />
 			</div>
 			{/* The ONE non-decorative element (SPEC.1 §9 Accessibility): the SVG is
 			    aria-hidden, so this sr-only summary carries the readout — opening %,

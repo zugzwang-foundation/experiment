@@ -157,6 +157,19 @@ export async function DiscoveryContent() {
 					isOpen: true,
 				}),
 				topPosts: data.topPosts,
+				// CHART-2 — `C-CHART-2` clause 1's terminal pulse, carried to the
+				// hero chart. ⛔ THE SECOND SPENDING OF THE SAME LICENCE, and it is
+				// deliberately written adjacent to the first so the two are read
+				// together: both are `true` for exactly one reason — every market on
+				// this surface is `Open` by construction, because
+				// `getCachedDiscoveryMarketIds` filters `status = 'Open'`. Neither is
+				// an assumption about a market; both are restatements of that filter.
+				// ⚠ THEY ARE PINNED TOGETHER, NOT SEPARATELY.
+				// `tests/server/discovery/live-tail-wiring.test.ts` asserts this file
+				// carries exactly two `isOpen: true` and no `isOpen: false`, beside
+				// the `where` that licenses them — so a widened filter reds the suite
+				// once for both rather than leaving one of them quietly wrong.
+				isOpen: true,
 			});
 		}
 	} catch {
