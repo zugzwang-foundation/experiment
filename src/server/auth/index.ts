@@ -25,7 +25,12 @@ import {
 // Better Auth instance + plugins + databaseHooks + cookie config + UUIDv7
 // generateId override per SPEC.2 §8.10 single source of truth. Wires:
 //
-//   - drizzleAdapter with usePlural:true (Q11) + transaction:true (Q6)
+//   - drizzleAdapter with usePlural:true (Q11) + transaction:FALSE (ADR-0042 —
+//     `true` deadlocked OAuth signup: it wrapped createOAuthUser in one
+//     adapter transaction holding one pooled connection, inside which the
+//     create.before hook checked out a SECOND connection from the same
+//     pool — which holds `max` connections (`src/db/index.ts`), so the wedge
+//     fires at exactly `max` concurrent signups. S-3)
 //   - socialProviders.google with email_verified enforcement (SPEC.2 §8.2)
 //   - emailOTP plugin with Resend-backed sendVerificationOTP
 //   - zugzwang-otp-gate plugin: Turnstile siteverify + rate-limit MATCHED
@@ -332,7 +337,14 @@ export const auth = betterAuth({
 		provider: "pg",
 		schema,
 		usePlural: true,
-		transaction: true,
+		// ADR-0042. `true` is a CAPABILITY, not a state: it populates
+		// adapter.transaction, and every path that never invokes it is
+		// unaffected — which is why reading the flag and inferring behaviour
+		// put this defect on the wrong door for five days. The one path that
+		// DOES invoke it is createOAuthUser, and it deadlocked: one pooled
+		// connection held for its transaction, a second demanded from the same
+		// pool by consumeIdentityPoolTuple inside the create.before hook.
+		transaction: false,
 	}),
 	secret: process.env.BETTER_AUTH_SECRET,
 	baseURL: process.env.BETTER_AUTH_URL,
@@ -447,6 +459,14 @@ export const auth = betterAuth({
 				// aliases) — Drizzle adapter resolves by table-key.
 				// Q6 verified: pool consumption commits in its own
 				// db.transaction; stranded-tuple recovery via stale-30d sweep.
+				// ⚠ That own transaction is a SECOND connection checkout from
+				// the same pool as the caller. It is safe only because the
+				// adapter no longer opens one of its own (transaction:false,
+				// ADR-0042) — under transaction:true this nesting wedged the
+				// pool at exactly `max` concurrent signups. Do not reintroduce
+				// an outer transaction around this hook without reading S-3.
+				// The independent commit is also why a tuple can strand: that
+				// PRE-DATES ADR-0042 and is unchanged by it.
 				before: async (user: Record<string, unknown>) => {
 					const tuple = await consumeIdentityPoolTuple(db);
 					if (!tuple) {

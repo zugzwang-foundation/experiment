@@ -14,7 +14,8 @@ import { truncateTables } from "../db/_fixtures/truncate";
 // ⛔ THIS FILE IS EXPECTED **RED** BEFORE THE FIX AND **GREEN** AFTER IT, AND
 //    IT RUNS UNCHANGED IN BOTH PHASES.
 //
-//   PRE-FIX  (src/server/auth/index.ts:335 `transaction: true` still present):
+//   PRE-FIX  (the `transaction` key of the `drizzleAdapter(db, {...})` call in
+//            `src/server/auth/index.ts` still reads `true`):
 //            the N `createOAuthUser` calls NEVER RESOLVE, and the intersection
 //            of `idle in transaction` pids across the window is N — the same N
 //            backends, never moving. ASSERT 1 and ASSERT 2 are SOFT, so BOTH
@@ -30,11 +31,11 @@ import { truncateTables } from "../db/_fixtures/truncate";
 // and step 6 re-runs this file unchanged at the same N.
 //
 // ── THE DEFECT ─────────────────────────────────────────────────────────────
-// `src/server/auth/index.ts:335` sets `transaction: true` on the drizzle
-// adapter, so `createOAuthUser` holds ONE pooled connection open for the whole
+// The `transaction` key of the `drizzleAdapter(db, {...})` call in
+// `src/server/auth/index.ts` is set to `true`, so `createOAuthUser` holds ONE pooled connection open for the whole
 // of its transaction. Inside that transaction the `user.create.before` hook
 // calls `consumeIdentityPoolTuple(db)` on the MODULE-LEVEL `db` — which opens a
-// SECOND `db.transaction` (`src/server/identity-pool/consume.ts:26`), and
+// SECOND `db.transaction` (`src/server/identity-pool/consume.ts:28`), and
 // therefore checks out a SECOND connection from the SAME pool.
 // `src/db/index.ts:96` sets `max: 4`. Four concurrent signups each hold one
 // slot and each wait for a second slot that no one will ever release. Nothing
@@ -57,7 +58,7 @@ import { truncateTables } from "../db/_fixtures/truncate";
 //     none survives the window. Hence: intersection across samples, not count.
 //
 // ⚠ `consume.ts`'s own comment (the "Stranded-tuple semantic" block,
-//   consume.ts:18-24) is WRONG, and it is the first thing the next reader will
+//   consume.ts:18-23) is WRONG, and it is the first thing the next reader will
 //   find when they ask why a transaction is still there. It tells them Better
 //   Auth's OAuth flow does NOT wrap the user create in a transaction — which is
 //   exactly the premise under which nesting a second checkout inside it looks
