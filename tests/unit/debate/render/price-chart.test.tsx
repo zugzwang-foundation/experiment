@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -412,5 +415,92 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		const noEl = screen.getByTestId(`graph-node-${noNode.id}`);
 		expect(noEl.getAttribute("data-side")).toBe("NO");
 		expect(noEl.getAttribute("fill")).toBe("var(--graph-no)");
+	});
+});
+
+/**
+ * RESO-1 · R-6 — DISCHARGED BY CHART-1, NOT DROPPED. The guards that stood here
+ * are removed, and this note is what replaces them.
+ *
+ * ⚠⚠ R-6 ASKED FOR "YES and NO tagged inline on the chart lines … text tags
+ * adjacent to each line's terminal point … neutral ramp only … not styled as
+ * YES/NO chips." RESO-1 built that as `LineTags` — two `<text>` nodes at
+ * `x = VIEWBOX_W`, filled `var(--graph-yes)` / `var(--graph-no)`, with a
+ * separation rule for the 50/50 case — and this block guarded it.
+ *
+ * ⇒ CHART-1 (#425) LANDED ON `main` WHILE RESO-1 WAS IN FLIGHT AND SHIPS THE
+ * SAME ROW, BETTER. `TerminalMarkers` in `MarketPriceChart.tsx` draws a DOT at
+ * each line's true terminal y plus that line's name beside it, on the same
+ * `--graph-*` family, with the collision-displacement rule factored into
+ * `terminalLabelYs` in `geometry.ts` — and it cites ratified canon
+ * (`C-CHART-2` clauses 1, 2, 4) where RESO-1's version was one session's reading
+ * of a register line. It is guarded by `tests/unit/debate/render/terminal-markers.test.tsx`.
+ *
+ * ⛔ KEEPING BOTH WOULD HAVE RENDERED "YES" TWICE ON THE SAME LINE END. The
+ * merge conflict in `MarketPriceChart.tsx` was therefore resolved by taking
+ * `main`'s file WHOLESALE — RESO-1 contributes nothing to that component now —
+ * and these guards go with the code they guarded. Removing a guard whose subject
+ * no longer exists is not weakening the suite; leaving it would have been a
+ * tripwire naming testids nothing emits.
+ *
+ * ⚠ THE ONE THING RESO-1's VERSION HAD THAT IS WORTH NAMING, so it is not lost:
+ * it asserted the tags carry the GRAPH family and NOT the INV-3 poles, in both
+ * spellings (`var(--color-yes)` and the `fill-yes`/`text-yes` utilities). If
+ * `terminal-markers.test.tsx` does not pin that negative, it is worth adding
+ * there — the reason is `--color-yes` IS the page ground, so a pole-bound label
+ * is invisible as well as semantically wrong.
+ */
+
+/**
+ * RESO-1 · R-5 — THE CHART GROWS INTO THE VACATED SPACE, AND NO CHART CODE
+ * CHANGED. Pinned rather than edited, per the brief: "if the ruled outcome
+ * already holds, pin it with a guard and report that no change was needed."
+ *
+ * ⚠ WHY A SOURCE SCAN. jsdom performs no layout — it resolves no flex, no
+ * percentage height, no Tailwind utility — so a render test structurally cannot
+ * observe a component growing. What IS checkable here is the DECLARATION that
+ * makes it grow, which is the thing a future edit would break.
+ */
+describe("RESO-1 — R-5, the chart fills whatever the rail leaves it", () => {
+	it("the-collapsed-card-declares-flex-1-min-h-0-so-it-ABSORBS-the-freed-space", () => {
+		const source = readFileSync(
+			join(
+				process.cwd(),
+				"src/components/debate/chart/MarketPriceChartCard.tsx",
+			),
+			"utf8",
+		);
+
+		// ⛔⛔ THE NEGATIVES BELOW SCAN `className` VALUES, NEVER THE RAW FILE, AND
+		// THAT IS A CORRECTION MADE IN PLACE. The first version of this test asserted
+		// `expect(source).not.toContain("aspect-[2/1]")` and went RED — not because
+		// the class was on an element, but because the component's own docblock
+		// RECORDS that it used to be ("It was `aspect-[2/1] w-full`, which is
+		// WIDTH-driven"). The guard caught the comment explaining the absence, which
+		// is a failure mode this repo has now hit six times. A source-scan negative
+		// must match SYNTAX — here, a class token inside a class attribute — never a
+		// bare word that prose can contain.
+		const classAttrs = [...source.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
+		const tokens = new Set(
+			classAttrs.flatMap((c) => c.split(/\s+/)).filter(Boolean),
+		);
+
+		// `flex-1` is what takes the leftover; `min-h-0` is what lets it shrink
+		// below its content instead of pushing the band taller. Drop either and
+		// the growth silently stops being growth.
+		expect(source).toContain("flex min-h-0 w-full flex-1 flex-col");
+		expect(tokens.has("flex-1")).toBe(true);
+		expect(tokens.has("min-h-0")).toBe(true);
+
+		// ⛔ A FIXED OR WIDTH-DRIVEN HEIGHT WOULD DEFEAT IT ENTIRELY, and this card
+		// shipped one once: `aspect-[2/1] w-full` ignores the rail it sits in and
+		// measured 182px inside a 146px column, pushing the price bar clean out of
+		// the band.
+		expect(tokens.has("aspect-[2/1]")).toBe(false);
+		expect(tokens.has("h-full")).toBe(false);
+		expect([...tokens].filter((t) => /^h-\[/.test(t))).toEqual([]);
 	});
 });

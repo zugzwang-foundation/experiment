@@ -94,101 +94,101 @@ describe("POLISH.3 — MarketHeader attrs strip", () => {
 });
 
 /**
- * POLISH.3 PR 2 · C3 — row T1, Tier B-1: the RESOLUTION overline + its hairline
- * container (`d5:467-471`, `.criterion` / `.overline` / `.crittext`).
+ * RESO-1 · G-1 — THE CRITERION EXCERPT IS ABSENT FROM THE RENDERED DOM.
  *
- * ⚠ THE PLAN NAMES C3's RISK AS **FABRICATION** (§9), because this commit writes
- * the artifact and then its proof. The mitigation is that every value asserted
- * below is READ OFF THE MOCKUP — `d5:468-469`'s `.overline` rule — and not off
- * the component. A test that mirrored whatever the component happened to emit
- * would pass on the earlier, WRONG `8px / .12em` recipe, which came from reading
- * `.poslab` (`d5:556`) and `.colstk .lab` (`d5:614`) and generalising across
- * ROLES. The family shares weight (800), transform (uppercase) and colour (n4)
- * and NOTHING else — `.reslabel` (`d5:483`) is a third pair again, 8px/.14em.
+ * ⚠⚠ THIS BLOCK REPLACES FOUR ASSERTIONS THAT PINNED THE OPPOSITE, and they are
+ * recorded here rather than deleted (O-4). It was `POLISH.3 PR 2 · C3 — T1, the
+ * RESOLUTION overline`, and it required: the overline to render
+ * (`getByText("Resolution")`), to carry d5's `9.5px / 800 / .14em / uppercase /
+ * n4` recipe, to sit in a `pt-2.5 [border-top:var(--hairline)]` container rather
+ * than a boxed card, and — reversing its OWN earlier ruling — to carry
+ * `line-clamp-2` while still exposing no expander button. That whole row is what
+ * RESO-1 · R-1 and R-2 remove, so every one of those four is now a pin on a row
+ * that does not exist.
  *
- * ⚠ EVERY QUERY IS TARGETED (PF-3), for the reason this file's header already
- * gives: a `container.innerHTML` pin or a snapshot here would sweep in unrelated
- * neighbours and turn a copy guard into a tripwire.
+ * ⛔⛔ WHY THIS GUARD MUST NOT QUERY THE WORD `Resolution`, WHICH IS THE TRAP THE
+ * OBVIOUS VERSION OF IT FALLS INTO. R-7 ships a block LABELLED `Resolution` in
+ * the four-block row a few lines further down the same stack. So
+ * `queryByText("Resolution")` is NON-NULL on the correct build — a guard written
+ * that way would fail on the very change it is meant to certify, and, worse, the
+ * inverse spelling (`expect(...).toBeNull()`) would go GREEN the day someone
+ * restored the excerpt *without* its overline. The subject here is the
+ * criterion's BODY TEXT, which is the thing that actually left.
  *
- * ⚠ THE NEGATIVE CLAMP ASSERTION WAS A RULING AND IT WAS REVERSED. It read:
- * "`.crittext` carries `-webkit-line-clamp:2` in the mockup and it is filed
- * BUCKET D (§17 H-T1(c)) … pinned so a later reader cannot restore fidelity by
- * adopting it." The founder ruling of 2026-08-16 adopts the clamp (row 10) and
- * overturns `R4` in the same breath, which removes the ground that sentence
- * stood on. Superseded in place (O-4), not deleted — the record of what was
- * ruled, and why it changed, is the point. The NO-AFFORDANCE half survives
- * unreversed.
+ * ⛔ AND IT CARRIES A POSITIVE CONTROL (OVN-V1). A `not.toContain` that returns
+ * nothing is equally consistent with "the text is gone" and "my query never
+ * looked at the right subtree". The control asserts the SAME query shape, over
+ * the SAME container, against a string this fixture is known to render — so a
+ * green here means the query works AND the excerpt is absent, rather than only
+ * the second.
  */
-describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
-	it("market-header::overline-labels-the-criterion", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
+describe("RESO-1 — R-2, the criterion excerpt is gone", () => {
+	it("market-header::G-1-the-criterion-BODY-is-absent-from-the-DOM", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const html = left?.innerHTML ?? "";
 
-		// The mockup's own source text is "Resolution"; `uppercase` does the
-		// rendering, so the DOM text is title case BY DESIGN (`d5:975`).
-		expect(screen.getByText("Resolution")).toBeTruthy();
+		// ── POSITIVE CONTROL, FIRST. Same container, same `toContain` shape, on a
+		// string the fixture DOES render. If this fails, the negative below proves
+		// nothing and the failure says so at the right place.
+		expect(html).toContain("Attrs Strip Market Question");
+		expect(html).toContain("Đ 150 staked");
+
+		// ── THE SUBJECT. `description` on this fixture is "Resolution criterion
+		// text." — asserted by BODY, never by the `Resolution` label, for the
+		// reason the docblock gives.
+		expect(html).not.toContain("Resolution criterion text.");
+		// The clamp was a class on that element, so it leaves with it. A surviving
+		// `line-clamp-2` here would mean the row was hidden rather than removed.
+		expect(html).not.toContain("line-clamp-2");
 	});
 
-	it("market-header::overline-carries-the-ruled-d5-recipe", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
-
-		const className =
-			screen.getByText("Resolution").getAttribute("class") ?? "";
-
-		// `.overline{font-size:9.5px;font-weight:800;letter-spacing:.14em;
-		//            text-transform:uppercase;color:var(--n4);}`  — d5:468-469
-		expect(className).toContain("text-[9.5px]");
-		expect(className).toContain("font-extrabold");
-		expect(className).toContain("tracking-[.14em]");
-		expect(className).toContain("uppercase");
-		// Ported BY TOKEN — a raw hex here also reddens no-raw-hex-view-layer.
-		expect(className).toContain("text-n4");
-
-		// The superseded recipe, pinned as gone. It was WRONG, and it was wrong
-		// by generalising across roles rather than by a typo.
-		expect(className).not.toContain("text-[8px]");
-		expect(className).not.toContain("tracking-[.12em]");
+	it("market-header::G-1-the-excerpt-is-gone-for-ANY-description-not-just-the-fixture-string", () => {
+		// ⛔ NON-VACUITY, and it is not decoration: the assertion above names one
+		// literal, so it would also pass on a component that rendered a DIFFERENT
+		// description. This renders a description that shares NO substring with the
+		// default fixture and asserts it too is absent — which distinguishes "the
+		// excerpt is gone" from "that one string is gone".
+		const distinctive = "ZZQQXX-criterion-marker-9471";
+		const { container } = render(
+			<MarketHeader
+				market={{ ...market(3, 5), description: distinctive }}
+				priceChart={null}
+			/>,
+		);
+		expect(container.innerHTML).toContain("Attrs Strip Market Question"); // control
+		expect(container.innerHTML).not.toContain(distinctive);
 	});
 
-	it("market-header::criterion-container-is-a-hairline-rule-not-a-card", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
-
-		const container = screen.getByText("Resolution").parentElement;
-		const className = container?.getAttribute("class") ?? "";
-
-		// `.criterion{margin-top:12px;border-top:var(--hairline);padding-top:10px}`
-		// — a TOP RULE, never a boxed card. The 12px margin is carried by the
-		// section's own `gap-3`.
-		expect(className).toContain("[border-top:var(--hairline)]");
-		expect(className).toContain("pt-2.5");
-	});
-
-	it("market-header::criterion-clamps-to-two-lines-and-still-carries-no-affordance", () => {
-		render(<MarketHeader market={market(3, 5)} priceChart={null} />);
-
-		const container = screen.getByText("Resolution").parentElement;
-
-		// ⚠ REVERSED AT HTML-FINISH · MARKET DETAIL row 10, and the superseded
-		// assertion is recorded rather than silently swapped. This used to pin the
-		// ABSENCE of a clamp as a RULING (§17 H-T1(c), bucket D), on the ground
-		// that a bare clamp with no affordance was the defect class PD-0-01/R4 was
-		// removing in that same PR. The founder ruling of 2026-08-16 reverses
-		// BOTH: R4 is itself overturned (row 24 returns the `+` glyph), so the
-		// coherence argument that grounded the no-clamp is gone.
-		// ⚠ O-9: `§17 H-T1(c)` lives in a PLANNING document, and SPEC.1 /
-		// design-language / design-canon were each read at HEAD — none of them
-		// mentions clamping or truncating the criterion. No live §-text is
-		// contradicted, which is why the row ships with no spec rider.
-		expect(container?.innerHTML).toContain("line-clamp-2");
-
-		// ⛔ STILL NO AFFORDANCE, and that half did NOT reverse. "Criterion length
-		// treatment" remains docketed to HEADER-3ZONE, so an expander here would
-		// decide a question that is explicitly deferred.
-		expect(container?.querySelector("button")).toBeNull();
-
-		// ⚠ The criterion text is still fully present in the DOM — the clamp is a
-		// VISUAL bound, so the terms survive for the ADR-0025 export, for find-in-
-		// page, and for a screen reader even while the surface truncates them.
-		expect(container?.innerHTML).toContain("Resolution criterion text.");
+	it("market-header::G-1-every-Resolution-label-belongs-to-a-BLOCK-not-a-section", () => {
+		// R-1 — the SECTION label is gone, asserted structurally rather than by a
+		// class spelling.
+		// ⚠ THIS WAS `not.toContain("[border-top:var(--hairline)]")`, on the stated
+		// premise that "the removed container was the ONLY hairline node in this
+		// header". @test-writer flagged that the premise is unasserted and the
+		// subtree is no longer solely this row's — `ResolverCards` lives there now
+		// and a hairline is exactly what a four-block row acquires next. It was also
+		// a SPELLING pin: `border-t border-n2` or an inline style evade it. Green
+		// today, false-RED on the next styling pass, false-green the day the
+		// spelling changes.
+		// ⇒ THE REAL PROPERTY: the word `Resolution` still appears on this surface
+		// (R-7 ships a block labelled it), and EVERY occurrence must belong to a
+		// block. A surviving section label is an occurrence that does not.
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		expect(left).not.toBeNull();
+		const leaves = Array.from(left?.querySelectorAll("*") ?? []).filter(
+			(e) => e.children.length === 0 && e.textContent?.trim() === "Resolution",
+		);
+		// CONTROL — the word IS rendered, so the loop below is not vacuous.
+		expect(leaves.length).toBeGreaterThan(0);
+		for (const el of leaves) {
+			expect(el.closest('[data-testid^="resolution-block-"]')).not.toBeNull();
+		}
 	});
 });
 
@@ -209,8 +209,127 @@ describe("POLISH.3 PR 2 — T1, the RESOLUTION overline", () => {
  *
  * ⚠ O-7 — `innerHTML`, never `textContent`. Order is a property of the markup.
  */
+/**
+ * RESO-1 · R-3 — the meta line and the actions share ONE row, actions right.
+ *
+ * ⚠ THE FAILURE THIS EXISTS FOR IS "both still render", which is the assertion a
+ * lazy version of this guard would make and which was ALREADY TRUE before R-3.
+ * The subject is that they are SIBLINGS IN ONE CONTAINER, so the guard walks up
+ * from each element to a common parent and asserts the relationship — never that
+ * the two strings both appear somewhere.
+ *
+ * ⚠ O-7 — structure, never `textContent`. A row and a column flatten to the same
+ * text, so a text assertion structurally cannot see this change.
+ */
+describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
+	/** The nearest ancestor of `el` that is a flex ROW container. */
+	const rowOf = (el: Element | null | undefined): Element | null => {
+		let n = el?.parentElement ?? null;
+		while (n) {
+			// ⛔ TOKEN MATCH, NOT SUBSTRING. This read
+			// `c.includes("flex") && !c.includes("flex-col")`, and `flex-1` CONTAINS
+			// `flex` — so any `flex-1` ancestor with `display:block` was returned as
+			// "the row" (@test-writer). `ResolverCards`' own row carries `flex-1`.
+			const t = (n.getAttribute("class") ?? "").split(/\s+/);
+			if (t.includes("flex") && !t.includes("flex-col")) return n;
+			n = n.parentElement;
+		}
+		return null;
+	};
+
+	it("market-header::G-R3-meta-and-actions-share-one-row-container", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+
+		const meta = screen.getByText("Đ 150 staked");
+		const exportLink = container.querySelector(
+			'a[aria-label="Download this debate as Markdown"]',
+		);
+		const badge = screen.getByText("Open");
+		expect(exportLink).not.toBeNull();
+
+		// Walk up from each to its enclosing row, then to the row that holds BOTH.
+		const metaRow = rowOf(meta);
+		expect(metaRow).not.toBeNull();
+		const shared = metaRow?.parentElement ?? null;
+		expect(shared).not.toBeNull();
+		// ⛔ THE LOAD-BEARING PAIR: one container contains both, and it is a ROW.
+		expect(shared?.contains(meta)).toBe(true);
+		expect(shared?.contains(exportLink as Node)).toBe(true);
+		expect(shared?.contains(badge)).toBe(true);
+		const sharedTokens = (shared?.getAttribute("class") ?? "").split(/\s+/);
+		expect(sharedTokens).toContain("flex");
+		expect(sharedTokens).not.toContain("flex-col");
+		// ⛔ AND IT MAY NOT WRAP OR REVERSE. `flex-wrap` puts the actions on a
+		// SECOND LINE while every source-order and container assertion above stays
+		// green — one row in the markup, two on screen. `flex-col-reverse` and
+		// `flex-row-reverse` invert it without touching source order either.
+		expect(sharedTokens).not.toContain("flex-wrap");
+		expect(sharedTokens).not.toContain("flex-col-reverse");
+		expect(sharedTokens).not.toContain("flex-row-reverse");
+		// R-3 says vertically centred against the meta line. The two children are
+		// different heights (16px strip vs 20px badge row), so this is the
+		// declaration that does the centring, and it is pinned by name.
+		expect(sharedTokens).toContain("items-center");
+	});
+
+	it("market-header::G-R3-the-actions-are-pushed-RIGHT-and-the-meta-stays-left", () => {
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const exportLink = container.querySelector(
+			'a[aria-label="Download this debate as Markdown"]',
+		);
+		const actions = rowOf(exportLink);
+		expect(actions).not.toBeNull();
+		// ⛔ `ml-auto`, not `justify-between` — the two are identical while both
+		// children exist and diverge when one does not (see the component's own
+		// note). Pinning the mechanism, not the appearance.
+		expect(actions?.getAttribute("class") ?? "").toContain("ml-auto");
+
+		// …and the meta line does NOT carry it, which is what keeps it left. This
+		// is the half that fails if someone "centres the row" instead.
+		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
+		expect(metaRow?.getAttribute("class") ?? "").not.toContain("ml-auto");
+	});
+
+	it("market-header::G-R3-they-are-NOT-two-stacked-rows-any-more", () => {
+		// ⛔ THE REGRESSION SHAPE, stated positively. Before R-3 the actions sat in
+		// their own sibling `<div>` under the attrs strip, so the two had NO shared
+		// row — only the stack. If a later change splits them again, the actions'
+		// row and the meta's row become siblings of the STACK rather than of each
+		// other, and this reddens.
+		const { container } = render(
+			<MarketHeader market={market(3, 5)} priceChart={null} />,
+		);
+		const stack = container.querySelector('[data-testid="headzone-stack"]');
+		expect(stack).not.toBeNull();
+		const exportLink = container.querySelector(
+			'a[aria-label="Download this debate as Markdown"]',
+		);
+		const metaRow = rowOf(screen.getByText("Đ 150 staked"));
+		const actionsRow = rowOf(exportLink);
+		// Neither is a DIRECT child of the stack — they are both nested one level
+		// deeper, inside the shared row R-3 introduced.
+		expect(metaRow?.parentElement).not.toBe(stack);
+		expect(actionsRow?.parentElement).not.toBe(stack);
+		expect(metaRow?.parentElement).toBe(actionsRow?.parentElement);
+	});
+});
+
 describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () => {
-	it("market-header::question-then-attrs-then-criterion", () => {
+	it("market-header::question-then-attrs-then-blocks", () => {
+		// ⚠ THE THIRD MARKER CHANGED AND THE ROW DID NOT. This read
+		// `question-then-attrs-then-criterion` and indexed
+		// `"Resolution criterion text."` as its last marker; RESO-1 · R-2 removes
+		// that element, so the marker would index to -1 and — this is the point —
+		// `-1 < anything` would have satisfied the ordering VACUOUSLY rather than
+		// failing. The `toBeGreaterThan(-1)` floors below are what caught it, and
+		// they are why every marker still gets one.
+		// ⇒ The subject is unchanged: READING ORDER down the left column. The
+		// column now ends with the price bar (R-4) and the block row (R-7), so
+		// those are the markers.
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
@@ -221,16 +340,16 @@ describe("HTML-FINISH · MARKET DETAIL — row 6, the left column's order", () =
 
 		const question = html.indexOf("Attrs Strip Market Question");
 		const attrs = html.indexOf("Đ 150 staked");
-		const criterion = html.indexOf("Resolution criterion text.");
+		const blocks = html.indexOf('data-testid="resolver-cards"');
 
 		// All three present — an absent marker indexes to -1 and would otherwise
 		// satisfy the ordering below by accident.
 		expect(question).toBeGreaterThan(-1);
 		expect(attrs).toBeGreaterThan(-1);
-		expect(criterion).toBeGreaterThan(-1);
+		expect(blocks).toBeGreaterThan(-1);
 
 		expect(question).toBeLessThan(attrs);
-		expect(attrs).toBeLessThan(criterion);
+		expect(attrs).toBeLessThan(blocks);
 	});
 });
 
@@ -281,48 +400,152 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		);
 	});
 
-	it("market-header::a-null-series-drops-the-CHART-not-the-rail", () => {
+	it("market-header::a-null-series-drops-the-RAIL-not-just-the-chart", () => {
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 
-		// ⚠ RE-DERIVED AT C6, NOT RELAXED. At C4 the chart was the rail's only
-		// occupant, so a null series meant no rail node at all. C6 moved the
-		// price bar in beside it, and `PriceBar` renders its "Pricing
-		// unavailable" stub rather than null — so on the market arm the rail is
-		// now ALWAYS occupied and a null series means "no CHART", never "no
-		// rail". The PD-3-09 property that mattered (never an EMPTY rail) is
-		// unchanged and is still pinned, one assertion down.
+		// ⚠⚠ THIS ASSERTION IS INVERTED FROM WHAT IT SAID, AND THE HISTORY IS THE
+		// POINT. It was `a-null-series-drops-the-CHART-not-the-rail`, and read:
+		// "C6 moved the price bar in beside it, and `PriceBar` renders its
+		// 'Pricing unavailable' stub rather than null — so on the market arm the
+		// rail is now ALWAYS occupied and a null series means 'no CHART', never
+		// 'no rail'."
+		// ⇒ RESO-1 · R-4 takes the bar OUT of the rail, which removes the only
+		// reason the rail was always occupied. The invariant underneath never
+		// changed — PD-3-09 / OD-6: NEVER AN EMPTY RAIL — and satisfying it now
+		// requires the opposite assertion, because the only thing that could
+		// occupy the rail is the chart. This is the same property, re-derived
+		// against a moved neighbour, not a relaxation.
+		// ⛔ IT IS NOT COSMETIC. Measured at RESO-1 recon on the base build:
+		// `market-price-chart-card` renders on ZERO of the eight staging markets,
+		// so without this the empty rail would be the state on EVERY market.
 		const right = container.querySelector('[data-testid="headzone-right"]');
-		expect(right).not.toBeNull();
-		expect(right?.innerHTML).not.toContain(
-			'data-testid="market-price-chart-card"',
-		);
-		// The rail is occupied, not empty — the price bar is in it.
-		expect(right?.innerHTML).toContain("YES 50%");
+		expect(right).toBeNull();
+
 		// …and the left column still stands, the pre-existing non-fatal contract.
 		expect(
 			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
 		).toContain("Attrs Strip Market Question");
 	});
+
+	it("market-header::an-EMPTY-series-drops-the-rail-too", () => {
+		// ⛔⛔ THE SHAPE PRODUCTION ACTUALLY PRODUCES, AND THE ONE THE FIRST VERSION
+		// OF THIS GUARD MISSED. `priceChart` is NOT null on a market with no price
+		// history — the read model returns `{ series: [], nodes: [] }`, which is
+		// TRUTHY — and `MarketPriceChartHost` returns null for an empty series one
+		// level down. So a rail gated on `priceChart != null` renders an EMPTY
+		// 340×188 column, which is `PD-3-09` verbatim.
+		// ⇒ THIS IS NOT HYPOTHETICAL AND IT IS NOT A NEAR MISS. It SHIPPED to the
+		// RESO-1 preview and was caught by measuring the deployed build:
+		// `headzone-right` present, `innerHTML === ""`, 340×188. The null-shaped
+		// test above was green the whole time. A control that does not exercise the
+		// failing condition IN ITS FAILING SHAPE is not a control (OVN-V3).
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: [], nodes: [] }}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="headzone-right"]'),
+		).toBeNull();
+		// Control: the header still rendered, so the null above is a real absence
+		// rather than a failed render.
+		expect(
+			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+		).toContain("Attrs Strip Market Question");
+	});
+
+	it("market-header::G-2-the-rail-renders-IF-AND-ONLY-IF-the-chart-does", () => {
+		// ⛔⛔ THE PROPERTY ITSELF, RATHER THAN A LIST OF SHAPES THAT SATISFY IT.
+		// The three tests around this one pin the gate against three ENUMERATED
+		// inputs (`null`, empty, present), which proves two predicates agree
+		// POINTWISE — `MarketHeader`'s rail gate and `MarketPriceChartHost`'s own
+		// null return — never that they agree. @test-writer's point: a fourth input
+		// shape reopens the defect and no enumeration can be finished.
+		// ⇒ `PD-3-09` / `OD-6` is an EQUIVALENCE — a rail exists exactly when there
+		// is something in it — so state it as one and it holds for any input.
+		// ⚠ The one-point series is in the list deliberately: it is truthy AND
+		// non-empty, so it passes a `length > 0` gate, and it is not exotic (a
+		// market on its first day). Measured: it DOES render the card today, so the
+		// arms agree — but the assertion no longer depends on my having checked.
+		const shapes: Array<{
+			series: PricePointFixture[];
+			nodes: never[];
+		} | null> = [
+			null,
+			{ series: [], nodes: [] },
+			{ series: [CHART_SERIES[0]], nodes: [] },
+			{ series: CHART_SERIES, nodes: [] },
+		];
+		for (const priceChart of shapes) {
+			cleanup();
+			const { container } = render(
+				<MarketHeader market={market(3, 5)} priceChart={priceChart} />,
+			);
+			const right = container.querySelector('[data-testid="headzone-right"]');
+			const card = container.querySelector(
+				'[data-testid="market-price-chart-card"]',
+			);
+			// THE EQUIVALENCE: rail ⟺ chart.
+			expect(right === null).toBe(card === null);
+			// …and PD-3-09 stated verbatim — a rendered rail is never empty.
+			if (right !== null) {
+				expect(right.innerHTML).not.toBe("");
+			}
+			// CONTROL — the header rendered at all, so the nulls above are real
+			// absences rather than a failed render.
+			expect(
+				container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+			).toContain("Attrs Strip Market Question");
+		}
+	});
+
+	it("market-header::a-PRESENT-series-still-renders-the-rail", () => {
+		// ⛔ THE POSITIVE CONTROL FOR THE ASSERTION ABOVE (OVN-V1). `toBeNull()`
+		// passes just as happily on a component that renders no rail EVER — including
+		// one that dropped `HeadZone`'s `right` prop altogether. This is the arm
+		// that proves the rail still exists when it has something to hold, so the
+		// pair together say "conditional", which is the actual ruling.
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+		const right = container.querySelector('[data-testid="headzone-right"]');
+		expect(right).not.toBeNull();
+		expect(right?.innerHTML).toContain('data-testid="market-price-chart-card"');
+	});
 });
 
 /**
- * HTML-FINISH · MARKET DETAIL — the price bar occupies the RAIL, under the
- * chart.
+ * RESO-1 · G-2 — THE PRICE BAR RENDERS ABOVE THE BLOCK ROW, AND EXACTLY ONCE.
  *
- * `.hright` holds `.graph` then `.barrow f` (`d5:1007`, `:1037`). The bar and
- * the chart read the SAME price, so standing them in one column is what lets a
- * reader check one against the other.
+ * ⚠⚠ THIS DESCRIBE REPLACES `the price bar sits in the rail`, which asserted the
+ * exact opposite and is recorded rather than deleted (O-4). It required the bar
+ * in `headzone-right`, absent from `headzone-left`, and BELOW the chart in
+ * source order — d5's `.hright` holding `.graph` then `.barrow f`
+ * (`d5:1007`, `:1037`), on the argument that "the bar and the chart read the
+ * SAME price, so standing them in one column is what lets a reader check one
+ * against the other."
+ * ⇒ R-4 moves it into the reading column, directly above the block row.
  *
- * ⚠ THIS IS THE PLACEMENT HALF ONLY. Row 7 — collapsing `detail` to d5's
- * one-row `.barrow` — was BACKED OUT: `PriceBar`'s detail render is byte-pinned
- * by `tests/unit/discovery/render/price-bar-presets.test.tsx`, which is outside
- * this task's ratified allow-list. Placement is `MarketHeader`'s and is in
- * scope; the bar's internal shape is not. See `PriceBar.tsx`'s docblock.
+ * ⛔ THE "EXACTLY ONE INSTANCE" HALF IS THE ONE THAT EARNS ITS KEEP. A relocation
+ * done by COPY rather than MOVE renders two bars that show the same number, look
+ * plausible in a screenshot, and disagree the moment either is gated
+ * differently. Asserting only "the bar is in the left column" passes on that
+ * build. Both halves are here so neither can be satisfied by breaking the other.
+ *
+ * ⚠ SCOPED TO THE MARKET ARM, DELIBERATELY. `FocusMarketCard` renders a SECOND
+ * `PriceBar` (`size="card"`) on this same route — but on the POST arm, the other
+ * side of `DebateView`'s market↔post ternary, which never renders at the same
+ * time as this one. "One instance" is therefore a per-arm claim, and this file
+ * renders the market arm only.
  */
-describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () => {
-	it("market-header::the-price-bar-renders-in-the-rail", () => {
+describe("RESO-1 — R-4, the price bar sits above the block row", () => {
+	it("market-header::G-2-the-bar-is-in-the-reading-column-and-NOT-in-the-rail", () => {
 		const { container } = render(
 			<MarketHeader
 				market={market(3, 5)}
@@ -333,16 +556,85 @@ describe("HTML-FINISH · MARKET DETAIL — the price bar sits in the rail", () =
 		const left = container.querySelector('[data-testid="headzone-left"]');
 		const right = container.querySelector('[data-testid="headzone-right"]');
 
-		expect(right?.innerHTML).toContain("YES 50%");
-		expect(right?.innerHTML).toContain("NO 50%");
-		// And it is not ALSO left behind in the reading column.
-		expect(left?.innerHTML).not.toContain("YES 50%");
+		expect(left?.innerHTML).toContain("YES 50%");
+		expect(left?.innerHTML).toContain("NO 50%");
+		// ⛔ And it is not ALSO left behind in the rail. The rail is rendered here
+		// (the series is non-null), so this is a real subtree, not a vacuous null.
+		expect(right).not.toBeNull();
+		expect(right?.innerHTML).not.toContain("YES 50%");
+	});
 
-		// Order within the rail: chart above bar.
-		const chart = right?.innerHTML.indexOf("market-price-chart-card") ?? -1;
-		const bar = right?.innerHTML.indexOf("YES 50%") ?? -1;
-		expect(chart).toBeGreaterThan(-1);
-		expect(bar).toBeGreaterThan(chart);
+	it("market-header::G-2-there-is-EXACTLY-ONE-price-bar-on-the-market-arm", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+		// `PriceBar`'s root carries `data-size`; `detail` is its market-detail
+		// preset and has exactly one call site in the repo.
+		expect(container.querySelectorAll('[data-size="detail"]')).toHaveLength(1);
+		// And no OTHER preset leaked onto this arm — a copy that reached for a
+		// different `size` would slip past a `detail`-only count.
+		expect(container.querySelectorAll('[data-size="card"]')).toHaveLength(0);
+		expect(container.querySelectorAll('[data-size="hero"]')).toHaveLength(0);
+	});
+
+	it("market-header::G-2-the-bar-is-ABOVE-the-block-row", () => {
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		const html = left?.innerHTML ?? "";
+
+		const bar = html.indexOf('data-size="detail"');
+		const blocks = html.indexOf('data-testid="resolver-cards"');
+		// Both present — an absent marker indexes to -1 and would satisfy the
+		// ordering below by accident.
+		expect(bar).toBeGreaterThan(-1);
+		expect(blocks).toBeGreaterThan(-1);
+		expect(bar).toBeLessThan(blocks);
+
+		// ⛔ ADJACENCY, not merely order. R-4 says "DIRECTLY above the block row";
+		// a bar three rows up also satisfies `bar < blocks`.
+		// ⚠ THIS WAS `barEl.nextElementSibling`, WHICH IS WRONG IN BOTH DIRECTIONS
+		// (@test-writer). Too tight: wrapping the bar in a `<div className="px-4">`
+		// makes it `null` and reds a correct change. Too loose: it proves DOM
+		// adjacency and calls it VISUAL order — `flex-col-reverse` on the stack, or
+		// `order-*` on either child, renders the bar BELOW the row with source
+		// order untouched, which is exactly the defect this guard names.
+		// ⇒ Walk each to its child-of-the-common-ancestor, compare INDICES, and ban
+		// the two CSS inversions explicitly.
+		const barEl = left?.querySelector('[data-size="detail"]');
+		const blockEl = left?.querySelector('[data-testid="resolver-cards"]');
+		expect(barEl).not.toBeNull();
+		expect(blockEl).not.toBeNull();
+		let anc: Element | null = barEl?.parentElement ?? null;
+		while (anc && !anc.contains(blockEl as Node)) anc = anc.parentElement;
+		expect(anc).not.toBeNull();
+		const childOf = (parent: Element, el: Element): Element => {
+			let n: Element = el;
+			while (n.parentElement && n.parentElement !== parent) n = n.parentElement;
+			return n;
+		};
+		const kids = Array.from((anc as Element).children);
+		const iBar = kids.indexOf(childOf(anc as Element, barEl as Element));
+		const iBlk = kids.indexOf(childOf(anc as Element, blockEl as Element));
+		expect(iBar).toBeGreaterThan(-1);
+		expect(iBlk).toBe(iBar + 1);
+		// ⛔ THE CSS INVERSIONS, which source order cannot see.
+		const ancTokens = ((anc as Element).getAttribute("class") ?? "").split(
+			/\s+/,
+		);
+		expect(ancTokens).not.toContain("flex-col-reverse");
+		for (const el of [kids[iBar], kids[iBlk]]) {
+			for (const t of (el?.getAttribute("class") ?? "").split(/\s+/)) {
+				expect(t).not.toMatch(/^order-/);
+			}
+		}
 	});
 });
 
@@ -500,7 +792,12 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		expect(
 			container.querySelector('[data-testid="price-label-YES"]'),
 		).toBeNull();
-		const right = container.querySelector('[data-testid="headzone-right"]');
-		expect(right?.innerHTML).toContain("YES 50%");
+		// ⚠ RE-POINTED AT RESO-1 · R-4, NOT RELAXED. This read the RAIL
+		// (`headzone-right`), because that is where the bar was. The bar moved to
+		// the reading column; the assertion's subject — "the bar still RENDERS,
+		// it has only lost its affordance" — is unchanged, and it is what makes
+		// every `pick` case above non-vacuous.
+		const left = container.querySelector('[data-testid="headzone-left"]');
+		expect(left?.innerHTML).toContain("YES 50%");
 	});
 });
