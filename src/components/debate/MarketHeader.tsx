@@ -97,9 +97,15 @@ function LifecycleBadge({ status }: { status: DebateMarketHeader["status"] }) {
  * marker · the price bar (`getPrices`) · the attrs (Đ staked · posts · replies).
  * ⚠ THIS LINE USED TO NAME `resolution criterion = markets.description
  * (R-14.4)` AS A THING THIS HEADER RENDERS. It no longer does — RESO-1 · R-2
- * removed the excerpt, and `description` reaches the participant only through
- * the ADR-0025 `.md` export. Corrected here rather than left as a docblock
- * describing a row that is not in the file (doctrine §6.2). Composes into the
+ * removed the excerpt. ⚠ AND THE SENTENCE THAT REPLACED IT — "`description`
+ * reaches the participant only through the ADR-0025 `.md` export" — WAS TRUE FOR
+ * EXACTLY ONE TASK. CRIT-1 restores the criterion to `/m/[slug]` as a collapsed
+ * native disclosure mounted in `DebateView`, so it reaches the participant on the
+ * page again; it is simply no longer THIS component's row. Corrected here rather
+ * than left as a docblock describing a state that has moved on (doctrine §6.2) —
+ * and corrected with some feeling, because this very sentence exists BECAUSE
+ * RESO-1 fixed a docblock naming a row that had left the file. Leaving it stale
+ * would have reproduced, one revision later, the failure it was written to end. Composes into the
  * SHELL `(public)/layout.tsx` shell; the placeholder global header is left
  * untouched (superseded at UI.13). ⚠ The deferred D1 placeholder box was
  * REMOVED at POLISH.3 (PD-3-09 / OD-6) — it rendered a build-time note about
@@ -461,27 +467,37 @@ export function MarketHeader({
 						    ⚠⚠ THE COST IS REAL, IT IS LARGER THAN THE ROW IT REMOVES, AND
 						    IT IS THE FOUNDER'S TO WEIGH — NOT THIS TASK'S. Measured at
 						    RESO-1 recon: `market.description` rendered in EXACTLY ONE place
-						    on `/m/[slug]`, and it was this `<p>`. Removing it leaves the
+						    on `/m/[slug]`, and it was this `<p>`. Removing it left the
 						    pre-registered public resolution criterion with NO on-page
-						    presence on this surface at all — not clamped, not collapsed,
-						    absent. It survives only in the ADR-0025 `.md` export, reachable
-						    from the `Download .md` anchor one row up, which R-3 relocates
-						    and deliberately does not remove.
-						    ⛔ DO NOT "restore" it here as a fix. Whether the criterion keeps
-						    an on-page presence is a founder ruling with dataset consequences
-						    (the 6 November dataset is derived from `markets.description`),
-						    and RESO-1's brief rules it measure-and-report, not resolve. It
-						    is reported at `docs/plans/RESO-1.md` §1 and in the run log.
+						    presence on this surface at all.
+						    ✅ THAT COST IS NOW DISCHARGED, AND THE RULING CAME BACK. The
+						    founder ruled the criterion returns COLLAPSED, and CRIT-1 ships
+						    it: a native `<details>` disclosure, closed by default, carrying
+						    the complete untransformed text, mounted in `DebateView` as a
+						    sibling of the arena. So the sentence that stood here — "not
+						    clamped, not collapsed, absent" — named three states, and the
+						    middle one is what the surface now has.
+						    ⛔ DO NOT "restore" it HERE, and that half is UNCHANGED. The
+						    criterion's home is the disclosure below the band, not this
+						    header: the band is `shrink-0 basis-[24.2dvh]` and its interior
+						    budget is fully allocated, so anything re-added inside this stack
+						    comes straight back out of the four-block row. Re-adding it here
+						    would also give the surface TWO copies of the binding text.
+						    ⚠ What is discharged is the measure-and-report deferral, not the
+						    fence. See `docs/plans/CRIT-1.md`.
 						    ⚠ NO CLAMP SURVIVES THIS REMOVAL. `line-clamp-2` was a class on
 						    the element itself, not a shared helper, so it leaves with it —
 						    there is no orphaned clamp and no prop that existed only to feed
 						    one (`description` stays on `DebateMarketHeader` because the
 						    TYPE MIRRORS THE READ MODEL, which is the real reason — the
 						    ADR-0025 export reads its OWN server model in
-						    `server/debate-export/serialize.ts`, not this view model. After
-						    R-2 no view component reads the field at all, so it crosses the
-						    RSC boundary unrendered; removing it would be a server change and
-						    is out of this task's scope). */}
+						    `server/debate-export/serialize.ts`, not this view model.
+						    ⚠ THE CLAUSE THAT FOLLOWED — "after R-2 no view component reads
+						    the field at all, so it crosses the RSC boundary unrendered" —
+						    IS NO LONGER TRUE: CRIT-1's `CriterionDisclosure`, mounted in
+						    `DebateView`, reads it. The field stopped being a dead wire and
+						    became load-bearing, which is exactly why keeping it on the type
+						    was right). */}
 						{/* ⛔⛔ RESO-1 · R-4 — THE PRICE BAR NOW LIVES HERE, IN THE READING
 						    COLUMN, DIRECTLY ABOVE THE BLOCK ROW. It was the rail's second
 						    occupant, under the chart, on the argument that "the bar and the
