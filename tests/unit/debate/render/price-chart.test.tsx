@@ -1,5 +1,8 @@
 // @vitest-environment jsdom
 
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -412,5 +415,201 @@ describe("UI.19 §9 — market price-chart render (collapsed card, no nodes)", (
 		const noEl = screen.getByTestId(`graph-node-${noNode.id}`);
 		expect(noEl.getAttribute("data-side")).toBe("NO");
 		expect(noEl.getAttribute("fill")).toBe("var(--graph-no)");
+	});
+});
+
+/**
+ * RESO-1 · R-6 — the YES / NO tags at the two lines' terminal points, and R-5's
+ * "no change was needed" pin.
+ *
+ * ⛔⛔ THE WALL THIS ROW IS FENCED BY, ASSERTED RATHER THAN TRUSTED. INV-3's side
+ * poles are `--color-yes` (#181818) and `--color-no` (#fafafa). `--color-yes` IS
+ * the page ground, so a YES-poled mark on this chart is INVISIBLE — and the
+ * poles encode a bet's SIDE, which is semantic and not a palette. The tags
+ * therefore bind to the deliberately-separate GRAPH family, the same tokens the
+ * lines they label already carry. Both halves are asserted: the graph token is
+ * present AND the pole token is absent, because asserting only the first passes
+ * on a tag carrying both.
+ */
+describe("RESO-1 — R-6, the lines are tagged YES and NO", () => {
+	it("line-tags-render-at-each-lines-terminal-point", () => {
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="collapsed" />,
+		);
+		const yes = container.querySelector('[data-testid="line-tag-yes"]');
+		const no = container.querySelector('[data-testid="line-tag-no"]');
+		expect(yes).not.toBeNull();
+		expect(no).not.toBeNull();
+		expect(yes?.textContent).toBe("YES");
+		expect(no?.textContent).toBe("NO");
+
+		// Anchored at the domain's right edge, where both lines terminate.
+		expect(Number(yes?.getAttribute("x"))).toBe(VIEWBOX_W);
+		expect(Number(no?.getAttribute("x"))).toBe(VIEWBOX_W);
+
+		// ⛔ AND AT THEIR OWN LINE'S y. SERIES ends at yes = 0.8, so the YES line
+		// terminates at (1 − 0.8)·320 = 64 and the NO line at 0.8·320 = 256. A tag
+		// pinned to a fixed y would pass a "renders" check and label the wrong line.
+		expect(Number(yes?.getAttribute("y"))).toBe(64);
+		expect(Number(no?.getAttribute("y"))).toBe(256);
+	});
+
+	it("line-tags-bind-to-the-GRAPH-family-and-NEVER-to-the-INV-3-poles", () => {
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="collapsed" />,
+		);
+		const yes = container.querySelector('[data-testid="line-tag-yes"]');
+		const no = container.querySelector('[data-testid="line-tag-no"]');
+
+		expect(yes?.getAttribute("fill")).toBe("var(--graph-yes)");
+		expect(no?.getAttribute("fill")).toBe("var(--graph-no)");
+
+		// ⛔ THE POLE SLOT IS ABSENT. `--color-yes` is the ground; a tag carrying it
+		// would be invisible AND would assert a side encoding this chart does not
+		// use. Checked on the whole tag markup, attributes and classes alike.
+		for (const el of [yes, no]) {
+			expect(el?.outerHTML).not.toContain("--color-yes");
+			expect(el?.outerHTML).not.toContain("--color-no");
+			// …and not as a Tailwind pole utility either, which is the OTHER
+			// spelling `side-pole-binding` exists for.
+			expect(el?.outerHTML).not.toContain("fill-yes");
+			expect(el?.outerHTML).not.toContain("fill-no");
+			expect(el?.outerHTML).not.toContain("text-yes");
+			expect(el?.outerHTML).not.toContain("text-no");
+		}
+	});
+
+	it("line-tags-are-NOT-chips", () => {
+		// The brief's wall: the tags must not read as YES/NO chips, because a chip
+		// is the `SideBadge` family and implies the pole encoding is in play. A
+		// `<text>` node with no background, border or radius is the shape that
+		// cannot be mistaken for one.
+		const { container } = render(
+			<MarketPriceChart series={SERIES} mode="collapsed" />,
+		);
+		for (const id of ["line-tag-yes", "line-tag-no"]) {
+			const el = container.querySelector(`[data-testid="${id}"]`);
+			expect(el?.tagName.toLowerCase()).toBe("text");
+			const cls = el?.getAttribute("class") ?? "";
+			expect(cls).not.toContain("rounded");
+			expect(cls).not.toContain("bg-");
+			expect(cls).not.toContain("border");
+		}
+	});
+
+	it("line-tags-SEPARATE-when-the-two-lines-converge-at-50-percent", () => {
+		// ⛔ THE CASE A NAIVE IMPLEMENTATION GETS WRONG, and it is not an edge case:
+		// a freshly opened market sits at exactly 50/50, where the two mirrored
+		// lines MEET. Tags placed at their raw terminal y would print on top of
+		// each other on the most common market state there is.
+		const FLAT: PricePoint[] = [
+			{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+			{ at: "2026-09-20T00:00:00.000Z", yes: "0.500000000000000000" },
+		];
+		const { container } = render(
+			<MarketPriceChart series={FLAT} mode="collapsed" />,
+		);
+		const yes = Number(
+			container
+				.querySelector('[data-testid="line-tag-yes"]')
+				?.getAttribute("y"),
+		);
+		const no = Number(
+			container.querySelector('[data-testid="line-tag-no"]')?.getAttribute("y"),
+		);
+		// Raw terminal y for both would be 160. They must not be equal…
+		expect(yes).not.toBe(no);
+		// …and must be far enough apart to actually read as two labels.
+		expect(Math.abs(yes - no)).toBeGreaterThanOrEqual(20);
+		// YES stays on top at the tie, which is where the mirror puts it.
+		expect(yes).toBeLessThan(no);
+	});
+
+	it("line-tags-stay-clear-of-the-date-label-band-at-an-extreme-price", () => {
+		// A line at 0% terminates at y = 320, which is BELOW the date labels at
+		// y = 312. Unclamped, the tag would print on top of one.
+		const EXTREME: PricePoint[] = [
+			{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
+			{ at: "2026-09-20T00:00:00.000Z", yes: "1.000000000000000000" },
+		];
+		const { container } = render(
+			<MarketPriceChart series={EXTREME} mode="collapsed" />,
+		);
+		for (const id of ["line-tag-yes", "line-tag-no"]) {
+			const y = Number(
+				container.querySelector(`[data-testid="${id}"]`)?.getAttribute("y"),
+			);
+			expect(y).toBeGreaterThanOrEqual(0);
+			// Clear of the `VIEWBOX_H − 8` date-label row.
+			expect(y).toBeLessThan(320 - 8);
+		}
+	});
+
+	it("line-tags-render-in-BOTH-modes", () => {
+		// "Which line is which" is the same fact in both modes; the larger view
+		// dropping the identification the small one carries would be backwards.
+		const { container } = render(
+			<MarketPriceChart series={SERIES} nodes={[]} mode="expanded" />,
+		);
+		expect(
+			container.querySelector('[data-testid="line-tag-yes"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-testid="line-tag-no"]'),
+		).not.toBeNull();
+	});
+});
+
+/**
+ * RESO-1 · R-5 — THE CHART GROWS INTO THE VACATED SPACE, AND NO CHART CODE
+ * CHANGED. Pinned rather than edited, per the brief: "if the ruled outcome
+ * already holds, pin it with a guard and report that no change was needed."
+ *
+ * ⚠ WHY A SOURCE SCAN. jsdom performs no layout — it resolves no flex, no
+ * percentage height, no Tailwind utility — so a render test structurally cannot
+ * observe a component growing. What IS checkable here is the DECLARATION that
+ * makes it grow, which is the thing a future edit would break.
+ */
+describe("RESO-1 — R-5, the chart fills whatever the rail leaves it", () => {
+	it("the-collapsed-card-declares-flex-1-min-h-0-so-it-ABSORBS-the-freed-space", () => {
+		const source = readFileSync(
+			join(
+				process.cwd(),
+				"src/components/debate/chart/MarketPriceChartCard.tsx",
+			),
+			"utf8",
+		);
+
+		// ⛔⛔ THE NEGATIVES BELOW SCAN `className` VALUES, NEVER THE RAW FILE, AND
+		// THAT IS A CORRECTION MADE IN PLACE. The first version of this test asserted
+		// `expect(source).not.toContain("aspect-[2/1]")` and went RED — not because
+		// the class was on an element, but because the component's own docblock
+		// RECORDS that it used to be ("It was `aspect-[2/1] w-full`, which is
+		// WIDTH-driven"). The guard caught the comment explaining the absence, which
+		// is a failure mode this repo has now hit six times. A source-scan negative
+		// must match SYNTAX — here, a class token inside a class attribute — never a
+		// bare word that prose can contain.
+		const classAttrs = [...source.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
+		const tokens = new Set(
+			classAttrs.flatMap((c) => c.split(/\s+/)).filter(Boolean),
+		);
+
+		// `flex-1` is what takes the leftover; `min-h-0` is what lets it shrink
+		// below its content instead of pushing the band taller. Drop either and
+		// the growth silently stops being growth.
+		expect(source).toContain("flex min-h-0 w-full flex-1 flex-col");
+		expect(tokens.has("flex-1")).toBe(true);
+		expect(tokens.has("min-h-0")).toBe(true);
+
+		// ⛔ A FIXED OR WIDTH-DRIVEN HEIGHT WOULD DEFEAT IT ENTIRELY, and this card
+		// shipped one once: `aspect-[2/1] w-full` ignores the rail it sits in and
+		// measured 182px inside a 146px column, pushing the price bar clean out of
+		// the band.
+		expect(tokens.has("aspect-[2/1]")).toBe(false);
+		expect(tokens.has("h-full")).toBe(false);
+		expect([...tokens].filter((t) => /^h-\[/.test(t))).toEqual([]);
 	});
 });

@@ -143,6 +143,42 @@ export function MarketPriceChart({
 				vectorEffect="non-scaling-stroke"
 			/>
 
+			{/* ✅ RESO-1 · R-6 — WHICH LINE IS WHICH, SAID IN WORDS AT THE POINT THE
+			    READER'S EYE ALREADY IS. Two text tags at the lines' terminal points.
+			    Drawn AFTER the polylines so a tag is never painted under its own
+			    line, and after the axis for the same reason.
+
+			    ⛔⛔ THE POLE ENCODING IS DELIBERATELY *NOT* APPLIED HERE, AND THAT IS
+			    THE WHOLE POINT OF THE ROW. INV-3's side poles are `--color-yes`
+			    (#181818) and `--color-no` (#fafafa); `--color-yes` IS the page
+			    ground, so a YES-poled mark on this chart would be invisible — and
+			    the poles encode a bet's SIDE, which is semantic, not a decorative
+			    palette to reach for. Each tag therefore takes ITS OWN LINE's
+			    `--graph-*` token, the deliberately-separate graph family the lines
+			    themselves already use, so a tag and its line are the same colour and
+			    nothing new enters the build.
+			    ⛔ AND AS LITERALS, NEVER A SIDE-KEYED TERNARY. There is no `side ===
+			    "YES" ? … : …` anywhere below, so this file's entry in
+			    `side-pole-binding.test.ts`'s CLOSED INVENTORY is unchanged by the
+			    row — the guard's set equality is deliberately brittle and a new
+			    side-keyed colour expression here would move it.
+			    ⛔ NOT CHIPS. No background, no border, no radius — a chip would read
+			    as the `SideBadge` family and imply exactly the pole encoding the
+			    paragraph above refuses.
+
+			    ⚠ THE TAGS INHERIT THIS CARD'S DOCUMENTED ANISOTROPY, and it is
+			    carried rather than fixed. `preserveAspectRatio="none"` scales user
+			    space non-uniformly, so a declared 10px lands at ~5.6px and ~15%
+			    narrower than tall (measured, see the axis block above). The three
+			    date labels already ship on exactly these terms and the founder
+			    decided to carry that cost; introducing an HTML overlay for these two
+			    would be a new positioning mechanism on a finished surface, and would
+			    leave the two label families rendering by different rules.
+			    ⚠ `aria-hidden` rides the parent `<svg>` — the accessible readout is
+			    the card's `sr-only` summary, which already names both series. These
+			    tags add no data, so they announce nothing new. */}
+			<LineTags series={series} />
+
 			{/* EXPANDED only — the per-(UTC day, side) top-post nodes (Slice 2). Each
 			    a dot at (post timestamp, its YES price on the 0–100 % scale), filled
 			    by the post's SIDE token (`--graph-yes`/`--graph-no`, INV-3 — never
@@ -164,6 +200,87 @@ export function MarketPriceChart({
 					/>
 				))}
 		</svg>
+	);
+}
+
+/**
+ * RESO-1 · R-6 — the YES / NO tags at the two lines' terminal points.
+ *
+ * ⚠ RENDERED IN BOTH MODES, deliberately. `mode` gates the axis (collapsed) and
+ * the nodes (expanded) because those carry DIFFERENT DATA per mode; "which line
+ * is which" is the same fact in both, and having the LARGER view drop the
+ * identification the small one carries would be backwards.
+ *
+ * ⛔ THE TWO LINES CONVERGE, SO THE TAGS MUST BE ALLOWED TO SEPARATE. The lines
+ * are exact mirrors about the 50 % midline (`yYesPx` + `yNoPx` always sum to
+ * `VIEWBOX_H`), so at a 50/50 market they meet and two tags placed naively would
+ * print on top of each other — the one market state that is both the DEFAULT for
+ * a freshly opened market and the likeliest thing a reviewer opens. When the two
+ * terminal points are closer than `MIN_SEPARATION`, the tags are pushed apart
+ * symmetrically about the midline: YES up, NO down, preserving the one thing the
+ * position means (YES above the midline = YES winning).
+ *
+ * ⛔ AND THEY ARE CLAMPED OFF THE BOTTOM EDGE. The date labels sit at
+ * `VIEWBOX_H − 8`; an unclamped tag on a line at 0 % would land on top of one.
+ * `MAX_Y` keeps a tag clear of that band, so the two label families cannot
+ * collide no matter what the price does.
+ *
+ * ⚠ NO MONEY MATH. `yYesPx`/`yNoPx` are the same pure display helpers the
+ * polylines use, reading the canonical price string exactly as they do — this
+ * places a label, it does not compute a price (CLAUDE.md §2).
+ */
+function LineTags({
+	series,
+}: {
+	series: PricePoint[];
+}): React.JSX.Element | null {
+	const last = series[series.length - 1];
+	if (!last) {
+		return null;
+	}
+	/** Half the vertical room two stacked tags need before they touch. */
+	const MIN_SEPARATION = 26;
+	/** Clear of the `VIEWBOX_H − 8` date-label band, and of the top edge. */
+	const MIN_Y = 12;
+	const MAX_Y = VIEWBOX_H - 26;
+	const mid = VIEWBOX_H / 2;
+
+	let yYes = yYesPx(last.yes);
+	let yNo = yNoPx(last.yes);
+	if (Math.abs(yYes - yNo) < MIN_SEPARATION) {
+		// Push apart about the midline, keeping YES on the side its price puts it.
+		const half = MIN_SEPARATION / 2;
+		const yesAbove = yYes <= yNo;
+		yYes = yesAbove ? mid - half : mid + half;
+		yNo = yesAbove ? mid + half : mid - half;
+	}
+	const clamp = (y: number) => Math.min(MAX_Y, Math.max(MIN_Y, y));
+
+	return (
+		<>
+			<text
+				data-testid="line-tag-yes"
+				x={VIEWBOX_W}
+				y={clamp(yYes)}
+				fill="var(--graph-yes)"
+				className="text-[10px]"
+				textAnchor="end"
+				dominantBaseline="middle"
+			>
+				YES
+			</text>
+			<text
+				data-testid="line-tag-no"
+				x={VIEWBOX_W}
+				y={clamp(yNo)}
+				fill="var(--graph-no)"
+				className="text-[10px]"
+				textAnchor="end"
+				dominantBaseline="middle"
+			>
+				NO
+			</text>
+		</>
 	);
 }
 
