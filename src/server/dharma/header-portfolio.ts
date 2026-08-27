@@ -6,9 +6,12 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import type { DbClient } from "@/db";
 import { payoutEvents, pools, positions } from "@/db/schema";
+import { HEADER_PORTFOLIO_CACHE_TTL_SECONDS } from "@/server/config/limits";
 import { computeSell } from "@/server/cpmm/calculate";
 import { CpmmDecimal, toFixed18 } from "@/server/cpmm/decimal";
 import { safeCaptureException } from "@/server/observability/safe-capture";
+import { getRedisKey } from "@/server/upstash/keys";
+import { redis } from "@/server/upstash/redis";
 
 /**
  * The header Đ PORTFOLIO figure: Σ Đb over the viewer's OPEN holdings, or
@@ -192,4 +195,105 @@ export async function getHeaderPortfolio(
 		});
 		return null;
 	}
+}
+
+/**
+ * HEADER-PORTFOLIO-CACHE — `getHeaderPortfolio` above, held behind a Redis
+ * cache-aside for `HEADER_PORTFOLIO_CACHE_TTL_SECONDS`.
+ *
+ * ADDITIVE, NOT A REPLACEMENT. `getHeaderPortfolio` is untouched — same
+ * three statements, same byte-identity contract with `profile/positions.ts`,
+ * same locked test (`tests/integration/header-portfolio.integration.test.ts`
+ * exercises the uncached function directly and is unaffected by this wrapper
+ * existing). Mirrors the posture S-4 Phase C took with `listOpenMarkets`
+ * ("UNCHANGED and untouched... this is a NEW, additive read") for exactly the
+ * same reason: zero risk to an already-locked read.
+ *
+ * ⛔ NOT `'use cache'`. Every existing Next.js Cache Components function in
+ * this repo (`discovery/list.ts`, `discovery/cached-series.ts`,
+ * `debate-view/cached-view.ts`) is keyed on market-scoped or global
+ * arguments only — `getCachedDebateView`'s docblock states outright that
+ * "NOTHING VIEWER-SCOPED MAY ENTER THIS FUNCTION... a viewer-scoped input
+ * would leak one participant's balance/position/bookmarks to the next."
+ * `userId` is exactly the viewer-scoped input that rule exists to keep out.
+ * Redis, keyed explicitly per user via `getRedisKey`, sidesteps that whole
+ * risk class rather than being the first exception to it.
+ *
+ * NEVER CACHES A FAILURE, same rule R2-MEMO established
+ * (`storage/read-url-memo.ts`): the `SET` happens only after a successful,
+ * non-`null` result. `getHeaderPortfolio` returns `null` to mean "read
+ * failed" (never "no holdings" — that's the canonical zero string), so
+ * caching a `null` would turn one transient DB hiccup into
+ * `HEADER_PORTFOLIO_CACHE_TTL_SECONDS` of "Portfolio unavailable" for a
+ * viewer who has a perfectly good figure available on the next try.
+ *
+ * FAILS OPEN ON REDIS, not just on the underlying read: a `GET` or `SET`
+ * error is caught and swallowed (captured, not silent) rather than
+ * propagated — this is a display-cost optimisation, and a Redis outage must
+ * degrade to "every render pays the DB cost," which is exactly this
+ * function's behaviour before it existed, never to a broken header.
+ *
+ * KNOWN, ACCEPTED STALENESS: no bet-path invalidation hook. After the
+ * viewer's own bet or sell, this figure can lag up to
+ * `HEADER_PORTFOLIO_CACHE_TTL_SECONDS` before reflecting it — bounded,
+ * self-healing on the next poll tick, matching the Latency Register's row-3
+ * verdict ("CACHE — per-request dedupe + short TTL", not "invalidate on
+ * bet"), and consistent with `cached-series.ts`'s documented reason for NOT
+ * hooking cache invalidation into the bet path.
+ */
+export async function getHeaderPortfolioCached(
+	client: DbClient,
+	userId: string,
+): Promise<string | null> {
+	// Key construction is itself wrapped — @security-auditor (HEADER-PORTFOLIO-
+	// CACHE review) flagged that a bare `getRedisKey` call here would be the
+	// ONE throw in this function insulated from nothing, unlike every other
+	// failure mode below. Structurally unreachable in a running deployment
+	// (`instrumentation.ts::register()` refuses to boot without a valid
+	// `ZUGZWANG_ENV`), but this function makes no exception for it — matching
+	// `getHeaderPortfolio`'s own "any error degrades the cluster, never
+	// crashes it" posture. `cacheKey === null` means "skip caching entirely,
+	// still return the live value."
+	let cacheKey: string | null = null;
+	try {
+		cacheKey = getRedisKey("cache", "header-portfolio", userId);
+	} catch (err) {
+		safeCaptureException(err, {
+			tags: { kind: "header_portfolio_cache_key_failed" },
+		});
+	}
+
+	if (cacheKey !== null) {
+		try {
+			const hit = await redis.get<string>(cacheKey);
+			if (hit !== null && hit !== undefined) {
+				return hit;
+			}
+		} catch (err) {
+			// Redis read failure — fail open to a live read, same posture as
+			// every other cache in this repo degrading rather than breaking on
+			// an outage.
+			safeCaptureException(err, {
+				tags: { kind: "header_portfolio_cache_read_failed" },
+			});
+		}
+	}
+
+	const value = await getHeaderPortfolio(client, userId);
+
+	if (value !== null && cacheKey !== null) {
+		try {
+			await redis.set(cacheKey, value, {
+				ex: HEADER_PORTFOLIO_CACHE_TTL_SECONDS,
+			});
+		} catch (err) {
+			// A cache-write failure must never surface to the caller — the next
+			// call simply misses again and recomputes live.
+			safeCaptureException(err, {
+				tags: { kind: "header_portfolio_cache_write_failed" },
+			});
+		}
+	}
+
+	return value;
 }
