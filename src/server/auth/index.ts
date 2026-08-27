@@ -337,13 +337,9 @@ export const auth = betterAuth({
 		provider: "pg",
 		schema,
 		usePlural: true,
-		// ADR-0042. `true` is a CAPABILITY, not a state: it populates
-		// adapter.transaction, and every path that never invokes it is
-		// unaffected — which is why reading the flag and inferring behaviour
-		// put this defect on the wrong door for five days. The one path that
-		// DOES invoke it is createOAuthUser, and it deadlocked: one pooled
-		// connection held for its transaction, a second demanded from the same
-		// pool by consumeIdentityPoolTuple inside the create.before hook.
+		// ⛔ Do not set to `true` — ADR-0042. It is a capability, not a state,
+		// and the one path that invokes it (createOAuthUser) then nests a
+		// second pool checkout inside its own transaction.
 		transaction: false,
 	}),
 	secret: process.env.BETTER_AUTH_SECRET,

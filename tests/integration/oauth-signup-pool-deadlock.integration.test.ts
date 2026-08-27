@@ -96,6 +96,26 @@ import { truncateTables } from "../db/_fixtures/truncate";
 // case, not a failed fix. The diagnostics below print `windowStart` and
 // `windowSize` for exactly that reason.
 //
+// ── ⚠ WHAT THE OVERLAP WITNESS DOES **NOT** PROVE ──────────────────────────
+// Guard 2 counts samples in which the `('active','idle in transaction')` query
+// returned any row. That query filters by DATABASE, not by connection owner —
+// so a background `active` query from another client on the same database
+// satisfies it. Measured: at the step-4 noise floor the background channel was
+// 0 of 8 samples, but in the post-fix step-6 run one witness row was a
+// `pg_class` catalogue query (pid 3253) from a Supabase service, not this
+// test's burst. The background channel is therefore NOT reliably zero.
+//
+// ⇒ The witness establishes "the window overlapped SOME live work", which is
+//   weaker than "the window overlapped THIS TEST'S work" — the reading its
+//   name invites. It is corroborated independently by `maxIdleSampleSize`,
+//   which can only be raised by this file's own transactions.
+//
+// DELIBERATELY NOT FIXED. Owner-filtering the query would change the
+// instrument between the pre-fix and post-fix runs, breaking the before/after
+// pair the exit criterion rests on — for a guard that is a sanity check, not
+// an assertion. Recorded here and in the plan's NOT ESTABLISHED list instead.
+// If this file is ever re-based-lined from scratch, filter by owner then.
+//
 // ── WHY `afterEach` TRUNCATE DOES **NOT** BLOCK PRE-FIX ─────────────────────
 // Recorded because the opposite was predicted, and step 6 must not inherit the
 // prediction. It was reasoned that the wedged transactions would hold
