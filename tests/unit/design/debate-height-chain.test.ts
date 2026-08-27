@@ -388,11 +388,21 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 		// satisfied by a mount inside the second arm. Only the render test caught
 		// it. Recorded rather than quietly re-tightened, because the first fix for a
 		// false receipt was itself a weaker receipt.
-		// ⇒ WHAT ACTUALLY DISCRIMINATES IS DEPTH, NOT ORDER. A direct child of
+		// ⇒ WHAT DISCRIMINATES BETTER IS DEPTH, NOT ORDER. A direct child of
 		// `PageContainer` sits at THREE tabs; anything inside an arm fragment sits at
-		// five. Biome owns indentation deterministically here, so this reads the
-		// structural property — "sibling of the arena, not descendant of an arm" —
-		// rather than a proxy for it.
+		// five. Depth can express CONTAINMENT, which an index interval cannot, so it
+		// is a real class change rather than the same proxy in a costume.
+		// ⛔⛔ BUT IT IS STILL NOT THE RECEIPT FOR THE PLACEMENT DECISION, and an
+		// earlier version of this comment overclaimed that it was. Depth sees the
+		// JSX tree; it cannot see PROPS. This keeps it green while deleting the
+		// criterion from post focus:
+		//     <CriterionDisclosure description={selectedPost ? null : market.description} />
+		// — mounted at depth 3, ordering satisfied, and the component's own
+		// `if (!description) return null` makes it silent (@test-writer).
+		// ⇒ THE RECEIPT IS `criterion::both-arms-POST-FOCUS-arm-shows-the-full-
+		// criterion-too`, which mounts the real view and would red on exactly that.
+		// What lives here is a supporting structural check, and it is labelled as
+		// one.
 		const mountLine = source.slice(0, mount).split("\n").pop() ?? "";
 		expect(mountLine).toBe("\t\t\t");
 	});

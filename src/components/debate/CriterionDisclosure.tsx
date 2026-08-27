@@ -53,18 +53,30 @@
  * fallback that force-expanded the content where `onbeforematch` is missing
  * would violate C-3 — closed by default — in exactly those browsers.
  *
- * ✅ AND THE REVEAL IS MEASURED, NOT INFERRED. The equivalence above proves the
- * two RENDER the same; it does not by itself prove they are REVEALED the same,
- * since one is revealed by attribute removal on `beforematch` and the other by
- * the UA setting `open`. Raised by @code-reviewer as the one inferred claim in
- * the task. Measured directly on the deployed preview with a scroll-to-text
- * fragment — which activates through the same path as find-in-page and, unlike
- * Ctrl-F, is scriptable:
+ * ⚠⚠ THE REVEAL ITSELF IS **NOT** MEASURED, AND AN EARLIER VERSION OF THIS
+ * DOCBLOCK WRONGLY CLAIMED IT WAS. The equivalence above proves the two RENDER
+ * identically; it does not prove they are REVEALED identically, since one is
+ * revealed by attribute removal on `beforematch` and the other by the UA setting
+ * `open`. @code-reviewer raised exactly that gap.
+ * ⇒ I then "closed" it with a scroll-to-text fragment and read `details.open ===
+ * true`. THAT READING WAS AN ARTEFACT OF MY OWN CLICK. I had opened the
+ * disclosure by hand minutes earlier, then navigated to the SAME path with only a
+ * fragment appended — a SAME-DOCUMENT navigation, so the page never reloaded and
+ * the `<details>` was simply still open. Proved by re-running it with a marker on
+ * `window`: the marker SURVIVED the navigation, so no reload occurred, and on a
+ * genuinely fresh cross-document load the fragment does NOT open it here — most
+ * likely because a CDP-driven navigation carries no user activation, which the
+ * feature requires.
+ * ⇒ THE HONEST POSITION: the find-in-page reveal is an INFERENCE from the
+ * identical `content-visibility: hidden` signature — strong grounds, and the
+ * documented behaviour of every major browser — but it is NOT measured here. A
+ * claim that it was would have been the worst kind of false receipt: one
+ * certifying the deliverable's whole purpose.
+ * ⛔ WHAT THIS DOES NOT CHANGE: the case against `hidden="until-found"` is
+ * measured and stands alone — 24px → 24px is a direct observation of the
+ * disclosure failing to open, independent of any find-in-page claim.
  *
- *   /m/chess-fide-tiebreak-response#:~:text=refusal%20or%20a%20dismissal…
- *     → details.open === true, own box 34.5px → 195px, criterion 799 chars
- *
- * ⚠ SCOPE OF THAT CLAIM, STATED HONESTLY: it is measured in Chrome 151. Firefox
+ * ⚠ SCOPE, STATED HONESTLY: the render equivalence is observed in Chrome 151. Firefox
  * implements neither `hidden=until-found` nor, historically, find-in-page
  * expansion of a closed `<details>`, so THERE the find-in-page reveal is not
  * delivered by either approach — which is an argument FOR plain `<details>`, not

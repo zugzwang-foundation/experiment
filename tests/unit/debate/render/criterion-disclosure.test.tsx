@@ -35,11 +35,19 @@ import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.inp
 afterEach(cleanup);
 
 /**
- * ⚠ A REAL SEEDED DESCRIPTION, NOT A LOREM STRING — shape matters here. This is
- * the structure all eight carry (measured at CRIT-1 recon: 6–8 newlines, 3–4
- * blank-line paragraph breaks): question, YES condition, NO condition, deadline.
- * A single-line fixture could not distinguish `whitespace-pre-wrap` working from
- * it being absent, which is half of what this file checks.
+ * ⚠ MODELLED ON THE MEASURED SHAPE OF A SEEDED DESCRIPTION — NOT itself a copy of
+ * one, and the distinction is corrected here because an earlier version of this
+ * comment claimed it WAS one (@test-writer; O-9 — prose making a claim about a
+ * measurement). What IS measured is the shape: all eight seeded descriptions
+ * carry 6–8 newlines and 3–4 blank-line paragraph breaks, ordered question / YES
+ * condition / NO condition / deadline. This reproduces that shape so the
+ * `whitespace-pre-wrap` assertions have something to bite on; a single-line
+ * fixture could not distinguish the class working from it being absent.
+ * ⚠ AND NOTE WHAT THAT MEANS FOR THE OTHER FIXTURE: `mumbaiMetroModel.market
+ * .description`, used by the both-arms tests below, is a SINGLE-LINE string with
+ * zero newlines. So no test in this file asserts against a real seeded
+ * description's STRUCTURE — the structural claim rests on this modelled string
+ * plus the browser measurement in the run log.
  */
 const CRITERION = [
 	"Will FIDE respond publicly on X by 5 November 2026 to Zugzwang's published proposal?",
@@ -92,10 +100,19 @@ describe("CRIT-1 — G-1, the complete criterion is in the DOM while closed", ()
 	});
 
 	it("criterion::G-1-the-text-is-NOT-truncated-for-a-long-description", () => {
-		// ⛔ NON-VACUITY FOR THE ASSERTION ABOVE. `toBe(CRITERION)` passes on a
-		// component that happens not to truncate an 800-character fixture while
-		// still truncating a longer one. The brief cites ~7,481 characters as the
-		// amended length; this is that order of magnitude.
+		// ⛔ WHAT THIS ACTUALLY GUARDS, STATED CORRECTLY. It catches a **JS**
+		// truncation (`.slice`, `substring`) at length. It is BLIND to every CSS
+		// truncation, at every length — which is the mechanism that actually shipped
+		// and the one CRIT-1 exists to prevent — because a CSS clamp does not remove
+		// text from the DOM. This file's own revert experiment proves it: restoring
+		// `line-clamp-2` reddened G-4 only, and left this assertion green. So the
+		// discriminating axis is the MECHANISM, not the length, and G-4 owns the CSS
+		// half (@test-writer corrected the earlier comment, which framed length as
+		// the axis).
+		// ⚠ The length still buys one real thing: it makes the `max-h-[30dvh]
+		// overflow-y-auto` bound non-hypothetical for the browser measurement, where
+		// ~7,500 chars is what forces the body to scroll itself. The brief cites
+		// ~7,481 as the amended length; this is that order of magnitude.
 		const long = `${CRITERION}\n\n${"Additional binding clause. ".repeat(280)}`;
 		expect(long.length).toBeGreaterThan(7000);
 		const { container } = render(<CriterionDisclosure description={long} />);
@@ -167,13 +184,30 @@ describe("CRIT-1 — G-3, it is a NATIVE disclosure and carries no hidden attrib
 		);
 		expect(details).not.toBeNull(); // control — the scan has a subtree
 
-		const scope = [
-			details as Element,
-			...Array.from(details?.querySelectorAll("*") ?? []),
-		];
-		expect(scope.length).toBeGreaterThan(2); // control
+		// ⛔⛔ SCOPE FROM THE RENDERED ROOT, NOT FROM THE `<details>`. Scanning
+		// `details` and downward excludes ANCESTORS by construction, and a wrapper
+		// above the disclosure carrying the attribute reproduces the break while
+		// passing (@test-writer).
+		const scope = [...Array.from(container.querySelectorAll("*"))];
+		// ⛔ IDENTITY, NOT A COUNT. `scope.length > 2` is satisfied by any three
+		// elements; it does not prove the scan reached the BODY, which is the node
+		// the brief would have put the attribute on.
+		const body = container.querySelector('[data-testid="criterion-body"]');
+		expect(body).not.toBeNull();
+		expect(scope).toContain(body as Element);
+
 		for (const el of scope) {
 			expect(el.hasAttribute("hidden")).toBe(false);
+			// ⛔⛔ AND THE CLASS SPELLING OF THE SAME BREAK. This component's own
+			// docblock proves the two are interchangeable — a closed `<details>`'s
+			// `::details-content` and a bare `hidden="until-found"` element compute to
+			// the IDENTICAL `content-visibility: hidden`. So expressing it as a class
+			// reproduces the measured 24px → 24px failure with no `hidden` attribute
+			// anywhere for the scan to find. The guard must pin the MECHANISM, not
+			// the spelling (@test-writer).
+			const cls = el.getAttribute("class") ?? "";
+			expect(cls).not.toMatch(/\[content-visibility:\s*hidden/);
+			expect(el.getAttribute("style") ?? "").not.toMatch(/content-visibility/);
 		}
 	});
 });
@@ -197,12 +231,39 @@ describe("CRIT-1 — G-4, no clamp or truncation on the criterion body", () => {
 		];
 		expect(scope.length).toBeGreaterThan(2); // control
 
-		const banned = /^(truncate|line-clamp-|text-ellipsis|overflow-ellipsis)/;
+		// ⛔⛔ NOT ANCHORED AT `^` — EVERY TAILWIND VARIANT PREFIX DEFEATS THAT, and
+		// this is the highest-probability real regression on this component. A
+		// well-meaning responsive tidy-up ships `max-sm:line-clamp-2`, whose TOKEN
+		// does not start with `line-clamp-`, so an anchored regex passes it — and the
+		// criterion is clamped to two lines ON PHONES, the surface where the terms
+		// matter most. Same for `md:truncate`, `group-hover:truncate`,
+		// `[&>p]:line-clamp-2`. Caught by @test-writer. Matching after the last `:`
+		// covers every variant depth.
+		const banned =
+			/(^|:)(truncate|line-clamp-|text-ellipsis|overflow-ellipsis)/;
+		// ⛔ AND A CSS CLAMP NEED NOT BE A `line-clamp` UTILITY AT ALL. The
+		// arbitrary-property spellings reproduce it exactly and start with `[`.
+		const bannedArbitrary =
+			/\[-webkit-line-clamp|\[display:-webkit-box|\[content-visibility:hidden/;
+		const allTokens: string[] = [];
 		for (const el of scope) {
 			for (const token of (el.getAttribute("class") ?? "").split(/\s+/)) {
+				if (token) allTokens.push(token);
 				expect(token).not.toMatch(banned);
+				expect(token).not.toMatch(bannedArbitrary);
 			}
+			// ⛔ AND NOT VIA `style`, which a class scan cannot see.
+			const style = el.getAttribute("style") ?? "";
+			expect(style).not.toMatch(/line-clamp|text-overflow|content-visibility/);
 		}
+		// ⛔⛔ THE CONTROL THIS SCAN NEEDED. Every assertion above is a negative over
+		// tokens, and an element with no `class` attribute yields `[""]`, which
+		// matches nothing and passes. If this component ever moved to CSS modules or
+		// a `cn()` string the scan read as empty, the WHOLE guard would pass on zero
+		// tokens (@test-writer). Assert the scan actually saw classes, and saw the
+		// one class this component is known to carry.
+		expect(allTokens.length).toBeGreaterThan(3);
+		expect(allTokens).toContain("whitespace-pre-wrap");
 	});
 
 	it("criterion::G-4-the-body-preserves-the-descriptions-own-paragraph-breaks", () => {
@@ -298,14 +359,29 @@ describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", (
 		// ⛔ THE ARM THE SOURCE SCAN COULD NOT SEE. `cmt-p1` is a real post in the
 		// fixture, so this is the post-focus arm, not a variant of the market one.
 		const { container } = renderArm("cmt-p1");
-		// Control: the arm really did swap — the market header's block row is gone.
+		// ⚠ ARM CONTROL — and `resolver-cards` is deliberately NOT it. That was the
+		// obvious discriminator and it is the placeholder docketed at
+		// `docs/parked.md` as "strip or gate before the DP.2 promote": the day it is
+		// stripped, this NEGATIVE control starts passing for the wrong reason,
+		// forever and silently. A control scheduled for deletion is not a control
+		// (@test-writer). `headzone-stack` belongs to the market arm alone and is not
+		// slated for removal, so its absence here — paired with its presence in the
+		// market test — is the symmetric pair.
 		expect(
-			container.querySelector('[data-testid="resolver-cards"]'),
+			container.querySelector('[data-testid="headzone-stack"]'),
 		).toBeNull();
-		// …and the criterion is STILL there, complete.
+		// …and the criterion is STILL there, complete. ⛔ THIS ASSERTION IS THE
+		// RECEIPT FOR CRIT-1'S PLACEMENT DECISION — not the source-scan depth check,
+		// which cannot see a prop and would stay green on
+		// `description={selectedPost ? null : market.description}`.
 		expect(
 			container.querySelector('[data-testid="criterion-text"]')?.textContent,
 		).toBe(mumbaiMetroModel.market.description);
+		// ⛔ EXACTLY ONE. `querySelector` is singular, so without this nothing in
+		// either file would notice a second mount rendering the binding text twice.
+		expect(
+			container.querySelectorAll('[data-testid="criterion-disclosure"]'),
+		).toHaveLength(1);
 	});
 
 	it("criterion::G-5-shrink-0-is-on-the-DETAILS-element-itself", () => {
