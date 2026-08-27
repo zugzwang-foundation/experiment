@@ -380,6 +380,21 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 		expect(mount).toBeGreaterThan(marketArm);
 		expect(mount).toBeGreaterThan(postArm);
 		expect(mount).toBeLessThan(popup);
+
+		// ⛔⛔ AND THE ORDERING ABOVE IS STILL NOT SUFFICIENT ON ITS OWN — measured.
+		// Re-running the un-fix (mount moved INSIDE the market arm) after tightening
+		// the window, the ordering assertions STILL PASSED: the market arm's JSX
+		// lives later in the file than BOTH arm headers, so "after both headers" is
+		// satisfied by a mount inside the second arm. Only the render test caught
+		// it. Recorded rather than quietly re-tightened, because the first fix for a
+		// false receipt was itself a weaker receipt.
+		// ⇒ WHAT ACTUALLY DISCRIMINATES IS DEPTH, NOT ORDER. A direct child of
+		// `PageContainer` sits at THREE tabs; anything inside an arm fragment sits at
+		// five. Biome owns indentation deterministically here, so this reads the
+		// structural property — "sibling of the arena, not descendant of an arm" —
+		// rather than a proxy for it.
+		const mountLine = source.slice(0, mount).split("\n").pop() ?? "";
+		expect(mountLine).toBe("\t\t\t");
 	});
 
 	it("debate-height::the-disclosure-does-not-grow-and-bounds-its-own-open-body", () => {
