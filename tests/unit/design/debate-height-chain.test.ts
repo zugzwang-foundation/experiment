@@ -339,10 +339,16 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 	it("debate-height::the-disclosure-is-NOT-inside-the-band-or-the-header-stack", () => {
 		// ⛔ THE WALL, ASSERTED. Anything mounted inside `headzone-stack` comes
 		// straight back out of the four-block row, which is fully allocated.
+		// ⛔⛔ MATCH JSX SYNTAX, NEVER A BARE WORD. This was
+		// `expect(source).not.toContain("CriterionDisclosure")`, which fires on
+		// PROSE — and `MarketHeader.tsx`'s docblocks must NAME this component to
+		// explain why the criterion left that file. So the bare form would have gone
+		// red on a correct documentation fix, and the cheapest escape from a red
+		// guard is to write a correction that cannot name its subject. That is the
+		// substring-for-token defect this repo has now hit SIX times; the G-4 block
+		// in `criterion-disclosure.test.tsx` avoids it the same way.
 		for (const file of [HEADZONE, "src/components/debate/MarketHeader.tsx"]) {
-			const source = read(file);
-			expect(source).not.toContain("CriterionDisclosure");
-			expect(source).not.toContain("criterion-disclosure");
+			expect(read(file)).not.toMatch(/<CriterionDisclosure\b/);
 		}
 		// …and the positive control: it IS mounted, in the view that owns the
 		// container. Without this the negatives above pass on a component nobody
@@ -355,13 +361,24 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 		// It must sit AFTER the market↔post ternary closes and BEFORE the overlays,
 		// which is what makes it a sibling of the arena rather than a child of
 		// either arm — and what makes one authoring site serve both arms.
+		// ⛔⛔ THE ANCHORS ARE THE TWO ARM HEADERS, NOT THE CONTAINER. This asserted
+		// `mount > indexOf("<PageContainer") && mount < indexOf("<PostPopup")` — a
+		// window that CONTAINS THE WHOLE TERNARY. Measured offsets in this file:
+		// PageContainer 21177 · ternary 23272 · PostFocusHeader 23566 ·
+		// MarketHeader 28029 · CriterionDisclosure 31462 · PostPopup 31523. Moving
+		// the mount inside the market arm — which drops the criterion from post
+		// focus, the ONE failure this placement exists to prevent — kept it green.
+		// It was a false receipt for the task's central decision (@code-reviewer).
+		// ⇒ Being after BOTH arm headers is what "after the ternary" actually means.
 		const mount = source.indexOf("<CriterionDisclosure");
 		const popup = source.indexOf("<PostPopup");
-		const container = source.indexOf("<PageContainer");
-		expect(mount).toBeGreaterThan(-1);
-		expect(popup).toBeGreaterThan(-1);
-		expect(container).toBeGreaterThan(-1);
-		expect(mount).toBeGreaterThan(container);
+		const marketArm = source.indexOf("<MarketHeader");
+		const postArm = source.indexOf("<PostFocusHeader");
+		for (const i of [mount, popup, marketArm, postArm]) {
+			expect(i).toBeGreaterThan(-1);
+		}
+		expect(mount).toBeGreaterThan(marketArm);
+		expect(mount).toBeGreaterThan(postArm);
 		expect(mount).toBeLessThan(popup);
 	});
 
@@ -372,10 +389,15 @@ describe("debate height chain — CRIT-1's criterion disclosure", () => {
 		);
 		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
 
+		// ⚠ THE ELEMENT-BINDING HALF OF THIS MOVED TO THE RENDER TEST, and the
+		// reason is worth keeping: `classAttrs.find(c => …includes("shrink-0"))`
+		// scans EVERY `className` in the file and takes the first hit, so if
+		// `shrink-0` migrated off the `<details>` onto the summary this stayed green
+		// while the crushable element lost its protection — which is precisely the
+		// `<h1>` precedent the comment cites (@code-reviewer). `criterion-disclosure
+		// .test.tsx` now asserts it on the rendered `<details>` node itself. What
+		// remains here is the file-level property: the disclosure does not GROW.
 		const details = classAttrs.find((c) => c.split(/\s+/).includes("shrink-0"));
-		// `shrink-0` — the summary is never crushed. This surface has a MEASURED
-		// precedent for the alternative: an `<h1>` carrying `overflow:hidden`
-		// rendered 0px tall when flex-shrink squeezed it.
 		expect(details).toBeDefined();
 		expect(details?.split(/\s+/)).not.toContain("flex-1");
 

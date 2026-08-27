@@ -53,10 +53,26 @@
  * fallback that force-expanded the content where `onbeforematch` is missing
  * would violate C-3 — closed by default — in exactly those browsers.
  *
- * ⚠ SAFARI AND FIREFOX DO NOT RELIABLY SCROLL TO THE FOUND TEXT (§3 caveat).
- * Expansion still occurs; the viewport just may not travel to it. Recorded, not
- * worked around — a scroll-into-view patch would be JavaScript compensating for
- * a browser bug on a surface that currently needs none.
+ * ✅ AND THE REVEAL IS MEASURED, NOT INFERRED. The equivalence above proves the
+ * two RENDER the same; it does not by itself prove they are REVEALED the same,
+ * since one is revealed by attribute removal on `beforematch` and the other by
+ * the UA setting `open`. Raised by @code-reviewer as the one inferred claim in
+ * the task. Measured directly on the deployed preview with a scroll-to-text
+ * fragment — which activates through the same path as find-in-page and, unlike
+ * Ctrl-F, is scriptable:
+ *
+ *   /m/chess-fide-tiebreak-response#:~:text=refusal%20or%20a%20dismissal…
+ *     → details.open === true, own box 34.5px → 195px, criterion 799 chars
+ *
+ * ⚠ SCOPE OF THAT CLAIM, STATED HONESTLY: it is measured in Chrome 151. Firefox
+ * implements neither `hidden=until-found` nor, historically, find-in-page
+ * expansion of a closed `<details>`, so THERE the find-in-page reveal is not
+ * delivered by either approach — which is an argument FOR plain `<details>`, not
+ * against it: the always-visible summary remains the affordance everywhere, and
+ * the attribute would have bought nothing while breaking the click. Safari and
+ * Firefox may also not scroll to the found text (§3 caveat); expansion still
+ * occurs. Recorded, not worked around — a scroll-into-view patch would be
+ * JavaScript compensating for a browser bug on a surface that needs none.
  */
 export function CriterionDisclosure({
 	description,
@@ -92,12 +108,23 @@ export function CriterionDisclosure({
 			    expanded state — none of which survives being replaced by a `<button>`
 			    plus `aria-expanded` that has to be kept in sync by hand. The register
 			    forbids overriding the role for exactly that reason.
+			    ⚠ THE LEADING IS STATED BECAUSE THE SIZE IS ARBITRARY. An arbitrary
+			    `text-[Npx]` does NOT reset the paired line-height — it inherits
+			    whatever step was in scope — and this surface has a measured case of
+			    exactly that (AGENTS.md §8: every tile 10px short, nothing errored).
+			    This summary's height is the number the ARENA pays for, so it is
+			    declared here rather than inherited from an ancestor. Caught by
+			    @code-reviewer; the body two elements down already paired one, so the
+			    file disagreed with itself.
+			    ⚠ `outline-none` PAIRS THE TOKEN RING. Without it the UA outline draws
+			    too and the control shows a doubled ring; every other focus site in the
+			    repo pairs them (`ui/button.tsx`, `ui/input.tsx`, `shell/HeaderNav.tsx`).
 			    ⚠ `list-style` IS LEFT ALONE. The native marker triangle is the
 			    affordance telling a reader this opens; removing it would leave a line
 			    of text that gives no sign it is a control. */}
 			<summary
 				data-testid="criterion-summary"
-				className="cursor-pointer rounded-(--r) px-3 py-2 text-[11px] font-bold text-n6 select-none focus-visible:shadow-(--state-focus-ring)"
+				className="cursor-pointer rounded-(--r) px-3 py-2 text-[11px] leading-[1.5] font-bold text-n6 outline-none select-none focus-visible:shadow-(--state-focus-ring)"
 			>
 				Resolution criteria
 			</summary>
@@ -134,7 +161,7 @@ export function CriterionDisclosure({
 				    was the defect, so no new value enters the build. */}
 				<p
 					data-testid="criterion-text"
-					className="text-[11px] leading-[1.5] whitespace-pre-wrap text-muted-foreground"
+					className="text-[11px] leading-[1.5] break-words whitespace-pre-wrap text-muted-foreground"
 				>
 					{description}
 				</p>

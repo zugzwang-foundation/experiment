@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { CriterionDisclosure } from "@/components/debate/CriterionDisclosure";
+import { DebateView } from "@/components/debate/DebateView";
+
+import { mumbaiMetroModel } from "../../debate-export/_fixtures/mumbai-metro.input";
 
 /**
  * CRIT-1 · G-1…G-4 — the resolution criterion is on the page it binds, whole,
@@ -218,5 +221,106 @@ describe("CRIT-1 — G-4, no clamp or truncation on the criterion body", () => {
 		// …and the newlines actually survive into the DOM text, which is the
 		// property the class exists to make visible.
 		expect(text?.textContent).toContain("\n\n");
+	});
+});
+
+/**
+ * CRIT-1 · G-5 (element-bound) + THE BOTH-ARMS PROPERTY, asserted through the
+ * REAL `DebateView` rather than through a proxy.
+ *
+ * ⚠⚠ THIS BLOCK EXISTS BECAUSE THE SOURCE-SCAN VERSION WAS A FALSE RECEIPT.
+ * `debate-height-chain.test.ts` checked the mount's position with a window that
+ * turned out to contain the WHOLE market↔post ternary, so moving the mount
+ * inside the market arm — which drops the criterion from post focus, the one
+ * failure the placement decision exists to prevent — kept it green
+ * (@code-reviewer). A source scan can pin where a string sits; only a render can
+ * pin what BOTH ARMS actually show. The window is tightened over there too, but
+ * this is the assertion that proves the property.
+ *
+ * The `next/navigation` mock and the `mumbaiMetroModel` fixture are the harness
+ * `poll.test.tsx` / `auto-advance.test.tsx` already established for mounting
+ * `DebateView` — reused rather than re-derived, so the files cannot disagree
+ * about what a mounted debate view is.
+ */
+vi.mock("next/navigation", () => ({
+	useRouter: () => ({
+		refresh: () => undefined,
+		push: () => undefined,
+		replace: () => undefined,
+		back: () => undefined,
+		forward: () => undefined,
+		prefetch: () => undefined,
+	}),
+	usePathname: () => "/m/mumbai-metro-line-3-1m-riders",
+	useSearchParams: () => new URLSearchParams(),
+}));
+
+describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", () => {
+	// ⛔⛔ FAKE TIMERS, AND NOT AS A STYLE CHOICE. Mounting the real `DebateView`
+	// starts its polled-refresh interval and the arena's auto-advance timers; with
+	// REAL timers those keep firing for the remainder of the worker's life, long
+	// after this file's assertions are done. `auto-advance.test.tsx` and
+	// `poll.test.tsx` both take fake timers for exactly this reason, and the first
+	// version of this block did not — it passed in 72ms while leaving live
+	// intervals behind it. Borrowing a harness means borrowing its clock.
+	beforeEach(() => {
+		vi.useFakeTimers();
+		// The post-param sync calls `history.replaceState`; jsdom has it, but the
+		// scroll reset needs a stub.
+		window.scrollTo = () => undefined;
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	const renderArm = (initialPostId: string | null) =>
+		render(
+			<DebateView
+				model={mumbaiMetroModel}
+				viewer={null}
+				initialPostId={initialPostId}
+				ownPseudonym={null}
+			/>,
+		);
+
+	it("criterion::both-arms-MARKET-arm-shows-the-full-criterion", () => {
+		const { container } = renderArm(null);
+		// Control: we really are on the market arm (its header block is present).
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-testid="criterion-text"]')?.textContent,
+		).toBe(mumbaiMetroModel.market.description);
+	});
+
+	it("criterion::both-arms-POST-FOCUS-arm-shows-the-full-criterion-too", () => {
+		// ⛔ THE ARM THE SOURCE SCAN COULD NOT SEE. `cmt-p1` is a real post in the
+		// fixture, so this is the post-focus arm, not a variant of the market one.
+		const { container } = renderArm("cmt-p1");
+		// Control: the arm really did swap — the market header's block row is gone.
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).toBeNull();
+		// …and the criterion is STILL there, complete.
+		expect(
+			container.querySelector('[data-testid="criterion-text"]')?.textContent,
+		).toBe(mumbaiMetroModel.market.description);
+	});
+
+	it("criterion::G-5-shrink-0-is-on-the-DETAILS-element-itself", () => {
+		// ⚠ ELEMENT-BOUND, not file-bound. The source-scan version took the first
+		// `className` in the file containing `shrink-0`; if it migrated off the
+		// `<details>` onto the summary the scan stayed green while the crushable
+		// element lost its protection — the `<h1>` 698×0 precedent exactly
+		// (@code-reviewer). Asserting it on the rendered node cannot drift.
+		const { container } = renderArm(null);
+		const details = container.querySelector(
+			'[data-testid="criterion-disclosure"]',
+		);
+		expect(details).not.toBeNull(); // control
+		const tokens = (details?.getAttribute("class") ?? "").split(/\s+/);
+		expect(tokens).toContain("shrink-0");
+		expect(tokens).not.toContain("flex-1");
 	});
 });
