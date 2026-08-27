@@ -60,10 +60,16 @@ money path, any surface but Market Detail, any `markets` row on any environment.
 
 ## 4 · Next session starts at
 
-**Gate C: a founder diff-read of PR #426 against the preview at
-`https://experiment-evcyxrc2e-zugzwang-worlds-projects.vercel.app` (canary `f2989e1` — check it
-before trusting the page; four RESO-1 previews exist).** Then rule open question 1. Nothing in
-this branch is merged and nothing should be merged before that read.
+**Gate C: a founder diff-read of PR #426 against its preview.** Then rule open question 1.
+Nothing in this branch is merged and nothing should be merged before that read.
+
+⚠ **Find the preview via the run report's §1, not from memory.** Five RESO-1 previews exist
+(one per commit, plus the base-SHA build used for the BEFORE baseline), and only the newest
+serves the final tree. The report names the URL and the exact canary; verify it with
+`curl -s <preview>/api/health` and check `canary` equals the branch HEAD **before trusting
+anything on the page**. One of the superseded previews ships the empty-rail defect described
+in §3 below and is kept deliberately as its evidence — opening that one and reading it as
+current would be the obvious way to misread this branch.
 
 ## 5 · Context to preserve
 
