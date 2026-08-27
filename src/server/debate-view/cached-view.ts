@@ -103,11 +103,17 @@ export async function getCachedDebateView(
 	// ruling made mechanical: the graph shows how the market MOVED, and a picture
 	// of the past does not need re-drawing four times a minute.
 	//
-	// ⚠ The chart's RIGHT EDGE is not floored with it. `m/[slug]/page.tsx`
-	// recomposes the terminal point from its own live pool read (`withLiveTail`),
-	// so the chart can never disagree with the `PriceBar` beneath it — which is
-	// the objection §9 raised against exactly this trade, answered rather than
-	// waived.
+	// ⚠ On an `Open` market the chart's RIGHT EDGE is not floored with it:
+	// `m/[slug]/page.tsx` recomposes the terminal point from its own live pool
+	// read (`withLiveTail`), so the chart cannot disagree with the `PriceBar`
+	// beneath it — the objection §9 raised against exactly this trade, answered
+	// rather than waived.
+	//
+	// ⛔ On every OTHER state the right edge IS floored with the walk, because
+	// `withLiveTail` returns a non-`Open` series untouched (CHART-1.A). That is
+	// deliberate: a frozen market's chart is its event history, and restamping it
+	// with a live price would put that price on a past event's timestamp
+	// (**INV-4**).
 	const walk = await getCachedReserveWalk(market.id);
 
 	return loadDebateView(db, { market, walk });

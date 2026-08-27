@@ -103,25 +103,64 @@ describe("debate-view::price-chart-domain-frozen-when-not-open", () => {
 		expect(Date.parse(NOW)).toBeGreaterThan(Date.parse(LAST_EVENT));
 	});
 
-	it("still restamps the frozen terminal so it agrees with PriceBar", () => {
-		// A no-op in practice — a closed market's pool cannot move — kept so the
-		// "can never disagree with the bar" property holds by construction in
-		// EVERY state rather than in most of them.
+	// ⚠ THIS CASE INVERTED AT CHART-1.A, AND THE INVERSION IS THE POINT.
+	// It was `still restamps the frozen terminal so it agrees with PriceBar`, and
+	// it asserted `out[last].yes === SPOT` — encoding the rule that a non-`Open`
+	// market's terminal carries the LIVE price, so the chart could never disagree
+	// with `PriceBar` in any state. That rule is reversed: the restamp wrote a
+	// live price onto the last EVENT's timestamp, which is the retro-stamp shape
+	// this same file already rejected on the injected-walk path. The assertion is
+	// rewritten rather than deleted, because the state it exercises still needs a
+	// guard — only the expected answer changed.
+	it("returns a frozen market's series UNTOUCHED — no retro-stamp (INV-4)", () => {
+		// ⛔ THE CONTROL DEPENDS ON `SPOT` DIFFERING FROM THE WALK'S TERMINAL. If
+		// the fixture passed back the value it expects, the assertion could not
+		// observe a restamp at all and would pass against either implementation
+		// (OVN-V3). Asserted first, so the guard cannot silently decay into one.
+		const walkTerminal = HISTORY[HISTORY.length - 1].yes;
+		expect(walkTerminal).not.toBe(SPOT);
+
 		const out = withLiveTail(HISTORY, {
 			spotYes: SPOT,
 			nowIso: NOW,
 			isOpen: false,
 		});
-		expect(out[out.length - 1].yes).toBe(SPOT);
+
+		// Unchanged: same length, same terminal instant, same terminal PRICE.
+		expect(out).toHaveLength(HISTORY.length);
+		expect(out[out.length - 1].at).toBe(LAST_EVENT);
+		expect(out[out.length - 1].yes).toBe(walkTerminal);
+		expect(out[out.length - 1].yes).not.toBe(SPOT);
+		// The whole series, not just its edge — nothing anywhere was rewritten.
+		expect(out).toEqual(HISTORY);
 	});
 });
 
 describe("debate-view::price-chart-tail-pinned-to-live-price", () => {
-	it("puts the live spot on the terminal in both states", () => {
-		for (const isOpen of [true, false]) {
-			const out = withLiveTail(HISTORY, { spotYes: SPOT, nowIso: NOW, isOpen });
-			expect(out[out.length - 1].yes).toBe(SPOT);
-		}
+	// ⚠ THIS CASE ALSO INVERTED AT CHART-1.A — its `false` arm did. It was
+	// `puts the live spot on the terminal in both states`, looping over
+	// `[true, false]` and asserting `out[last].yes === SPOT` for each. The `true`
+	// arm is unchanged and still the point of the row; the `false` arm was
+	// asserting the frozen-market restamp, which is now reversed. Split so the
+	// two states are named separately rather than welded into one loop where
+	// reversing either would silently carry the other with it.
+	it("puts the live spot on the terminal of an OPEN market", () => {
+		const out = withLiveTail(HISTORY, {
+			spotYes: SPOT,
+			nowIso: NOW,
+			isOpen: true,
+		});
+		expect(out[out.length - 1].yes).toBe(SPOT);
+	});
+
+	it("does NOT put it on a frozen market's terminal", () => {
+		const out = withLiveTail(HISTORY, {
+			spotYes: SPOT,
+			nowIso: NOW,
+			isOpen: false,
+		});
+		expect(out[out.length - 1].yes).toBe(HISTORY[HISTORY.length - 1].yes);
+		expect(out[out.length - 1].yes).not.toBe(SPOT);
 	});
 
 	it("leaves every interior point as the pure replay", () => {

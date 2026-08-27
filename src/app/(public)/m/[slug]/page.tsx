@@ -110,11 +110,20 @@ export default async function MarketPage({
 	// block and from the SAME live read, for the same reason (SPEC.1 1.0.40 §9,
 	// "X domain" and "Refresh"). `cachedModel.priceChart.series` is now floored
 	// HISTORY: `getCachedReserveWalk` derives it at most once per
-	// `MARKET_SERIES_MIN_WINDOW_MS` on a key no bet can move. `withLiveTail`
-	// puts the present instant and the live price back on its right edge, so the
-	// chart cannot disagree with the `PriceBar` a few pixels below it — the
-	// objection §9 raised against flooring this series at all, answered here
-	// rather than waived, at zero additional queries.
+	// `MARKET_SERIES_MIN_WINDOW_MS` on a key no bet can move. **On an `Open`
+	// market** `withLiveTail` puts the present instant and the live price back on
+	// its right edge, so the chart cannot disagree with the `PriceBar` a few
+	// pixels below it — the objection §9 raised against flooring this series at
+	// all, answered here rather than waived, at zero additional queries.
+	//
+	// ⛔ ON EVERY OTHER STATE IT RETURNS THE SERIES UNTOUCHED, and this is THE
+	// call site where that branch is reachable — Discovery lists only `Open`
+	// markets. A frozen chart is its event history and nothing else: its terminal
+	// keeps the price its own event produced, and if the pool ever moves after
+	// close the chart and `PriceBar` WILL visibly disagree. That disagreement is
+	// the intended outcome, not a bug to chase — it is true and discoverable,
+	// where writing a live price onto a past event's timestamp is neither.
+	// Changed at CHART-1.A; before it, this branch restamped (**INV-4**).
 	//
 	// ⚠ `isOpen` is READ FROM `market.status`, never assumed. A `Closed`,
 	// `Resolved` or `Voided` market's domain must not advance past its last

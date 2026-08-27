@@ -221,7 +221,11 @@ export const MARKET_SERIES_MAX_POINTS = 256;
  * B, founder-ruled at CHART-1). Within the window a derivation is REUSED; the
  * series' TERMINAL point is composed fresh on every render from the live pool
  * price and is never floored, so the chart's right edge cannot disagree with
- * the `PriceBar` directly beneath it.
+ * the `PriceBar` directly beneath it — **on an `Open` market**. ⚠ On every other
+ * state the series is rendered UNTOUCHED and nothing is recomposed: a frozen
+ * chart is its event history alone, and a visible disagreement with `PriceBar`
+ * there is the correct outcome rather than a defect (**INV-4**; changed at
+ * CHART-1.A, which removed the non-`Open` restamp this sentence used to cover).
  *
  * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (15000), and that
  * inequality is the whole design rather than an oversight. The window exists to

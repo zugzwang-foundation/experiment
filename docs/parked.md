@@ -2955,6 +2955,22 @@ dated-not-triggered row into a table defined around fired triggers would misstat
 file's own convention says about it. Nothing in the SEQUENCE table is edited by this session;
 this paragraph only names what a reader tracking sequence should already know.
 
+## CHART-1.A A-1 carry-forward — the uninjected terminal stamp is unobservable, and should be deleted as dead code
+
+**Originating task:** CHART-1.A (PR #425) A-1 — surfaced at Gate C while removing the same shape from `withLiveTail`'s non-`Open` branch, then **corrected by `@code-reviewer` in the same amendment** (see the ⚠ below; the first draft of this row overstated the harm).
+
+**Deferred work.** `buildSeries` (`src/server/debate-view/price-chart.ts`) still applies the decision-#6 terminal stamp on the **uninjected** path — writing the live pool price onto the series' last event's timestamp. On an `Open` market that is exact, because the uninjected path replays the walk in the same read that fetches the price, so the last step IS the event that produced it. On a **non-`Open`** market whose pool moved after its last event it would be a retro-stamp — the shape A-1 removed from `withLiveTail`.
+
+**⚠ CORRECTED — THE HARM THIS ROW FIRST CLAIMED IS NOT REAL.** The first draft said the `.md` export would render a price at an instant it was never true at, "in a file a reader keeps", and named ADR-0025 export bytes as the binding reason to defer. **Both are false.** The export never serializes the price series: `src/server/debate-export/serialize.ts` reads `model.market.{title,description,status,pricing}` and `model.posts`, and `model.priceChart` is referenced **nowhere** under `src/server/debate-export/` (verified by grep, with a positive control confirming the serializer does read other `model.*` fields). The export is the only caller of the uninjected path, and it discards the stamped series. ⇒ **The stamp is unobservable on every production path, and removing it would change zero exported bytes and need no ADR-0025 ruling.**
+
+**Why deferred, restated honestly.** Not because it is risky or gated — because it is **dead code with no observable effect**, and CHART-1.A's scope was the four Gate-C items, not a cleanup sweep of a path nothing reads. It is a one-line deletion whenever `price-chart.ts` is next opened. ⚠ The *reason to bother* is not correctness but the trap it sets: a future caller that takes the uninjected path and DOES render the series would inherit a retro-stamp nobody is watching for, and `loadMarketPriceSeries` — which also calls `buildSeries` and likewise has no production caller — is exactly the shape such a caller would revive.
+
+**Conditional trigger.** The next task that opens `src/server/debate-view/price-chart.ts`, or any task that gives the uninjected path a caller that renders the series.
+
+**Expected next task.** None scheduled. Evidence: `src/server/debate-view/price-chart.ts` (`buildSeries`, and the `args.walk === undefined` conditional above it recording why the injected path declines the same stamp); `src/server/debate-export/serialize.ts` (no `priceChart` reference); `src/app/(public)/m/[slug]/export/route.ts:47` (`loadDebateView(db, { market })`, no `walk`); `src/server/discovery/price-series.ts` (`withLiveTail`, whose non-`Open` branch this is the leftover of).
+
+---
+
 **The `.html` tracker dashboards are operator-local and were not touched here.** If the
 operator's dashboard still shows PERF-1 as blocking, or does not yet reflect PERF-2 / COLD-START
 / GAUGE, that is a manual move for the operator — not a PR.

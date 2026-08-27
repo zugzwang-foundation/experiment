@@ -107,12 +107,31 @@ export function mapWalkToSeries(
  *   instant — hid it. It also removes the jitter the window would otherwise
  *   introduce, where the right edge slid between "last event" and "whenever the
  *   entry was derived" depending on cache age.
- * - **Every other state** — the terminal is RESTAMPED in place and the domain
- *   does **not** advance (**INV-4**). A resolved market's chart is frozen at its
- *   last event, forever. The restamp is a no-op in practice, since a closed
- *   market's pool cannot move; it is kept so that the "can never disagree with
- *   `PriceBar`" property holds by construction in every state rather than in
- *   most of them.
+ * - **Every other state** — the series is returned **UNTOUCHED**. The domain does
+ *   not advance (**INV-4**) and the terminal keeps the price its own event
+ *   produced. A frozen market's chart is its event history and nothing else.
+ *
+ *   ⚠ THIS BRANCH USED TO RESTAMP THE TERMINAL WITH `spotYes`, and the change is
+ *   a correction rather than a tightening. The old text defended it as "a no-op
+ *   in practice, since a closed market's pool cannot move" — an unguarded
+ *   assumption, and `@security-auditor` named what falsifies it in the same run:
+ *   **the day `pool_unwind` wakes.** A voided market's pool would then move after
+ *   its last event, and the restamp would draw that price at the timestamp of a
+ *   bet placed before it.
+ *
+ *   ⛔ THAT IS THE SHAPE THIS FILE ALREADY REJECTED ONE BRANCH ABOVE. The
+ *   injected-walk path in `deriveMarketPriceChart` declines the identical
+ *   operation for the identical reason — *a price at the wrong time is a false
+ *   statement about the market, not a stale one* — so the two branches were
+ *   answering the same question differently, and only one of them could be
+ *   right. The property the restamp bought was "the chart can never disagree
+ *   with `PriceBar` in EVERY state rather than in most of them". That property
+ *   is not worth a wrong x, and it is worth least of all **here**: INV-4 exists
+ *   because nobody re-examines a resolved market, so a false statement on a
+ *   frozen chart has no natural discovery path. If the pool ever does move after
+ *   close, the chart and `PriceBar` will visibly disagree — and **that
+ *   disagreement is the correct outcome**, because it is true and it is
+ *   findable, where a silent retro-stamp is neither.
  *
  * ⚠ The append can push the series one point past its cap. That is deliberate
  * and is not a cap violation to "fix": the cap bounds how much HISTORY crosses
@@ -133,7 +152,7 @@ export function withLiveTail(
 	if (args.isOpen && Date.parse(args.nowIso) > Date.parse(last.at)) {
 		return [...series, { at: args.nowIso, yes: args.spotYes }];
 	}
-	return [...series.slice(0, -1), { at: last.at, yes: args.spotYes }];
+	return series;
 }
 
 /** 18-dp canonical form for the F-1 reserve comparison — collapses any

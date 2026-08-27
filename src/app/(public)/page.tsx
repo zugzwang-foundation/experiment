@@ -130,10 +130,27 @@ export async function DiscoveryContent() {
 				// put an `Open` market's "now" edge up to a minute in the past — the
 				// exact defect this composition exists to prevent.
 				//
-				// Every market on this surface is `Open` by construction
-				// (`getCachedDiscoveryMarketIds` filters `status = 'Open'`), so the
-				// flag is a literal rather than a read. INV-4 is not reachable from
-				// here; the non-`Open` branch is exercised on `/m/[slug]`.
+				// ⛔ `isOpen` IS A LITERAL HERE, AND ITS LICENCE IS PINNED — read the
+				// guard before changing either. Every market on this surface is
+				// `Open` by construction, because `getCachedDiscoveryMarketIds`
+				// filters `status = 'Open'`. That licence is a fact about ANOTHER
+				// function, so it is held by
+				// `tests/server/discovery/live-tail-wiring.test.ts` →
+				// "Discovery's isOpen literal is licensed by the Open filter, and the
+				// two are pinned together", which asserts the literal and that
+				// `where` in one breath and carries a control proving it fails on a
+				// widened filter.
+				//
+				// ⚠ WHY A LITERAL RATHER THAN A READ, measured at CHART-1.A: neither
+				// cached shape carries `status` — `DiscoveryMarketId` is
+				// `{id, slug, title}` and `CachedMarketDiscoveryData` is
+				// `{totals, imageUrl, series, topPosts}` — and adding it to the
+				// projection would be theatre, not a read: a SELECT from a query that
+				// already filters `status = 'Open'` can only ever return `'Open'`, so
+				// it would carry exactly the information this literal carries while
+				// looking dynamic. The filter IS the observation; the guard is what
+				// makes it load-bearing. INV-4 is not reachable from here; the
+				// non-`Open` branch is exercised on `/m/[slug]`.
 				series: withLiveTail(data.series, {
 					spotYes: priced?.pricing.yes ?? null,
 					nowIso: new Date().toISOString(),

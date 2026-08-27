@@ -297,8 +297,8 @@ Discovery hero, which CHART-1 unified onto the same component. **`C-CHART-1` cla
    gutter is taken from the viewBox, not from the aspect. Labels are clamped inside the box and
    never clip.
 
-4. **Collision - the default case, not an edge case.** YES and NO mirror across 50%, so the
-   vertical gap between the two labels is proportional to |2 x YES - 100| and they overlap on any
+4. **Collision — the default case, not an edge case.** YES and NO mirror across 50%, so the
+   vertical gap between the two labels is proportional to |2·YES − 100| and they overlap on any
    market sitting near even — which is where every market sits at open. When the two label boxes
    would overlap, the labels are pushed apart symmetrically, each by half the deficit plus 2px,
    clamped inside the plot box. **The dots do not move.**
