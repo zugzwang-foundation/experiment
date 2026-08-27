@@ -183,8 +183,28 @@ export function MarketHeader({
 			// ⚠ This restores the contract `HeadZone`'s own docblock describes ("A
 			// consumer with no rail content passes `null` and the surface is one
 			// column"), which the bar's arrival had quietly suspended.
+			//
+			// ⛔⛔ AND THE CONDITION IS `series.length`, NOT `priceChart != null` —
+			// THE FIRST VERSION OF THIS LINE TESTED THE WRONG NULL AND SHIPPED THE
+			// EXACT DEFECT THE PARAGRAPH ABOVE EXISTS TO PREVENT. Measured on the
+			// deployed RESO-1 preview at `38213de`: `headzone-right` present,
+			// 340×188, `innerHTML === ""` — an empty column on EVERY market.
+			// ⇒ THE MECHANISM, because it is subtle and it will recur. `priceChart`
+			// is NOT null on a market with no price history — the read model returns
+			// `{ series: [], nodes: [] }`, which is TRUTHY. The emptiness is decided
+			// one level DOWN, inside `MarketPriceChartHost`, which returns `null` for
+			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
+			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
+			// by its own contract — draws the column around it.
+			// ⇒ THE RAIL'S CONDITION MUST BE THE HOST'S OWN CONDITION, not a proxy
+			// for it. Two components deciding "is there a chart?" by DIFFERENT tests
+			// is what produced the gap; the fix is to ask the same question, not to
+			// ask a different question more carefully.
+			// ⚠ AND THE UNIT GUARD COULD NOT SEE IT. It rendered `priceChart={null}`,
+			// a shape production never produces, so it was green throughout.
+			// `market-header.test.tsx` now also exercises `{ series: [], nodes: [] }`.
 			right={
-				priceChart ? (
+				priceChart && priceChart.series.length > 0 ? (
 					<MarketPriceChartHost
 						series={priceChart.series}
 						nodes={priceChart.nodes}

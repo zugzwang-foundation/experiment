@@ -401,6 +401,34 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		).toContain("Attrs Strip Market Question");
 	});
 
+	it("market-header::an-EMPTY-series-drops-the-rail-too", () => {
+		// ⛔⛔ THE SHAPE PRODUCTION ACTUALLY PRODUCES, AND THE ONE THE FIRST VERSION
+		// OF THIS GUARD MISSED. `priceChart` is NOT null on a market with no price
+		// history — the read model returns `{ series: [], nodes: [] }`, which is
+		// TRUTHY — and `MarketPriceChartHost` returns null for an empty series one
+		// level down. So a rail gated on `priceChart != null` renders an EMPTY
+		// 340×188 column, which is `PD-3-09` verbatim.
+		// ⇒ THIS IS NOT HYPOTHETICAL AND IT IS NOT A NEAR MISS. It SHIPPED to the
+		// RESO-1 preview and was caught by measuring the deployed build:
+		// `headzone-right` present, `innerHTML === ""`, 340×188. The null-shaped
+		// test above was green the whole time. A control that does not exercise the
+		// failing condition IN ITS FAILING SHAPE is not a control (OVN-V3).
+		const { container } = render(
+			<MarketHeader
+				market={market(3, 5)}
+				priceChart={{ series: [], nodes: [] }}
+			/>,
+		);
+		expect(
+			container.querySelector('[data-testid="headzone-right"]'),
+		).toBeNull();
+		// Control: the header still rendered, so the null above is a real absence
+		// rather than a failed render.
+		expect(
+			container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+		).toContain("Attrs Strip Market Question");
+	});
+
 	it("market-header::a-PRESENT-series-still-renders-the-rail", () => {
 		// ⛔ THE POSITIVE CONTROL FOR THE ASSERTION ABOVE (OVN-V1). `toBeNull()`
 		// passes just as happily on a component that renders no rail EVER — including
