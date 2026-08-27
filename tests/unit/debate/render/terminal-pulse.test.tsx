@@ -2,8 +2,8 @@
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
@@ -28,8 +28,6 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // `prefers-reduced-motion` while the dot stays — is measured in the CHART-2
 // contact sheet, in a real browser, because that is the only place it exists.
 
-afterEach(cleanup);
-
 const SERIES: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
 	{ at: "2026-09-20T00:00:00.000Z", yes: "0.650000000000000000" },
@@ -37,10 +35,20 @@ const SERIES: PricePoint[] = [
 
 const MODES = ["collapsed", "expanded", "hero"] as const;
 
+/**
+ * Parsed markup, not a mounted tree — see `terminal-markers.test.tsx`'s
+ * `parseChart` for why (nothing here interacts, and the mounts were destabilising
+ * the DB-backed half of the full suite by slowing it past its hook timeouts).
+ */
 function renderChart(mode: (typeof MODES)[number], isOpen: boolean) {
-	return render(
-		<MarketPriceChart series={SERIES} mode={mode} isOpen={isOpen} />,
-	);
+	return {
+		container: new DOMParser().parseFromString(
+			renderToStaticMarkup(
+				<MarketPriceChart series={SERIES} mode={mode} isOpen={isOpen} />,
+			),
+			"text/html",
+		).body,
+	};
 }
 
 const CSS = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
@@ -97,7 +105,6 @@ describe("C-CHART-2 clause 1 — the pulse is gated on Open", () => {
 			expect(
 				container.querySelector('[data-testid="terminal-label-yes"]'),
 			).not.toBeNull();
-			cleanup();
 		}
 	});
 
@@ -113,7 +120,6 @@ describe("C-CHART-2 clause 1 — the pulse is gated on Open", () => {
 			r: dotOpen?.getAttribute("r"),
 			fill: dotOpen?.getAttribute("fill"),
 		};
-		cleanup();
 
 		const frozen = renderChart("collapsed", false).container;
 		const dotFrozen = frozen.querySelector('[data-testid="terminal-dot-yes"]');

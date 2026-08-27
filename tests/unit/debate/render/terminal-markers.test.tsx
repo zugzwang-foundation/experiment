@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
 	SVG_W,
 	TERMINAL_DOT_R,
@@ -31,8 +30,6 @@ import type { PricePoint } from "@/server/discovery/price-series";
 //
 // There is NO jest-dom here (AGENTS.md §9) — every assertion below is plain
 // DOM.
-
-afterEach(cleanup);
 
 const OPENED = "2026-09-15T00:00:00.000Z";
 const LATER = "2026-09-20T00:00:00.000Z";
@@ -101,10 +98,43 @@ function pct(p: number): string {
 	return p.toFixed(18);
 }
 
+/**
+ * Render a mode to markup and parse it — NO React mounting.
+ *
+ * ⛔ THIS FILE USED TO MOUNT, AND THE COST WAS NOT ACADEMIC. The near-even sweep
+ * below renders 401 charts in a single case, and since CHART-2 each chart is a
+ * flex frame plus an `<svg>` plus an HTML gutter holding three spans. Nothing in
+ * this file interacts — every assertion reads an attribute, a class or a child
+ * order — so the mounts bought nothing and cost enough to destabilise the run
+ * they were part of: with them, the FULL suite intermittently failed 28–161
+ * DB-backed tests in files this task never touches, with foreign-key violations
+ * (23503), deadlocks (40P01) and statement timeouts (57014), a different set
+ * each pass. `vitest.config.ts` runs DB files one at a time precisely to prevent
+ * those three codes; a run slow enough for a `TRUNCATE … CASCADE` to hit the 10s
+ * hook timeout leaves the next file's fixtures half-built, and its foreign keys
+ * then fail. The base commit was green three times for three; the difference was
+ * render cost, not logic.
+ *
+ * ⚠ AND THE SERVER RENDER IS THE MORE HONEST SOURCE ANYWAY — it is the markup
+ * that actually ships, and it is what the `top`-expression case has to read
+ * regardless, because jsdom's CSSOM silently drops nested CSS math.
+ */
+function parseChart(html: string): HTMLElement {
+	return new DOMParser().parseFromString(html, "text/html").body;
+}
+
 function renderChart(yes: string, mode: "collapsed" | "expanded" | "hero") {
-	return render(
-		<MarketPriceChart series={seriesEndingAt(yes)} mode={mode} isOpen={true} />,
-	);
+	return {
+		container: parseChart(
+			renderToStaticMarkup(
+				<MarketPriceChart
+					series={seriesEndingAt(yes)}
+					mode={mode}
+					isOpen={true}
+				/>,
+			),
+		),
+	};
 }
 
 function numAttr(el: Element | null, name: string): number {
@@ -287,13 +317,7 @@ describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
 		for (let bp = 4800; bp <= 5200; bp++) {
 			const p = bp / 10000;
 			const s = pct(p);
-			const { container } = render(
-				<MarketPriceChart
-					series={seriesEndingAt(s)}
-					mode="collapsed"
-					isOpen={true}
-				/>,
-			);
+			const { container } = renderChart(s, "collapsed");
 			const y = {
 				yes: labelPlotY(
 					container.querySelector('[data-testid="terminal-label-yes"]'),
@@ -318,7 +342,6 @@ describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
 					TERMINAL_LABEL_MIN_GAP,
 				);
 			}
-			cleanup();
 		}
 
 		// POSITIVE CONTROL — the sweep must have exercised BOTH branches. A band
@@ -489,7 +512,6 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 			]) {
 				expect(container.querySelector(`[data-testid="${id}"]`)).not.toBeNull();
 			}
-			cleanup();
 		}
 	});
 

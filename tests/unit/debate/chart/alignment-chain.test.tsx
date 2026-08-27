@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
@@ -46,8 +46,6 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // one, so a tidy-up that merely deletes a redundant class stays green while one
 // that changes the behaviour reds.
 
-afterEach(cleanup);
-
 const SERIES: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
 	{ at: "2026-09-20T00:00:00.000Z", yes: "0.650000000000000000" },
@@ -55,9 +53,56 @@ const SERIES: PricePoint[] = [
 
 const MODES = ["collapsed", "expanded", "hero"] as const;
 
-function renderMode(mode: (typeof MODES)[number]) {
-	return render(<MarketPriceChart series={SERIES} mode={mode} isOpen={true} />);
+/**
+ * The three modes' markup, parsed ONCE for the whole file.
+ *
+ * ⛔ NO REACT MOUNTING, AND THE REASON IS MEASURED RATHER THAN STYLISTIC. This
+ * file's sixteen cases originally called `render()` about forty times between
+ * them. Every assertion below reads a class, an attribute or a child order —
+ * nothing interacts, nothing re-renders, nothing needs a live React tree — so
+ * the mounts bought nothing, and they cost enough to destabilise the run they
+ * were part of.
+ *
+ * ⚠ WHAT THAT COST LOOKED LIKE, because it was not obvious and cost a long
+ * detour to find. With this file mounting, the FULL suite failed 34, then 63,
+ * then 161 DB-backed tests across three passes — foreign-key violations
+ * (`23503`), deadlocks (`40P01`) and statement timeouts (`57014`) in files this
+ * task never touched, and a different set each run. The same suite was green at
+ * the base commit, green with this task's `src/` changes and the base tests,
+ * green with this file removed, and green with a trivial file at this exact
+ * path — which is what proved it was this file's CONTENT and not its presence
+ * or the sequencer's ordering. `vitest.config.ts` sets `fileParallelism: false`
+ * precisely because DB files racing each other produce those three error codes;
+ * the mounts pushed the run slow enough for a `TRUNCATE … CASCADE` to hit the
+ * 10s `hookTimeout`, and a half-truncated fixture set is what the next file's
+ * foreign keys then failed against.
+ *
+ * ⚠ SO THE HARNESS CHANGED AND NOT ONE ASSERTION DID. Reading the SERVER render
+ * is also the more honest source: it is the markup that actually ships, and it
+ * is what `terminal-markers.test.tsx` had to fall back to anyway for the `top`
+ * expression, because jsdom's CSSOM silently drops nested CSS math.
+ *
+ * ⚠ AND IT REMAINS A jsdom FILE (`@vitest-environment jsdom`, line 1) — not for
+ * React, but because `DOMParser` is a browser API this parse needs.
+ */
+const PARSED = new Map<(typeof MODES)[number], HTMLElement>();
+
+function renderMode(mode: (typeof MODES)[number]): { container: HTMLElement } {
+	const cached = PARSED.get(mode);
+	if (cached !== undefined) {
+		return { container: cached };
+	}
+	const html = renderToStaticMarkup(
+		<MarketPriceChart series={SERIES} mode={mode} isOpen={true} />,
+	);
+	const body = new DOMParser().parseFromString(html, "text/html").body;
+	PARSED.set(mode, body);
+	return { container: body };
 }
+
+/** A no-op kept so the cases below read unchanged: nothing is mounted any more,
+ * so there is nothing to unmount. */
+function cleanup(): void {}
 
 function cls(container: HTMLElement, testid: string): string {
 	const el = container.querySelector(`[data-testid="${testid}"]`);

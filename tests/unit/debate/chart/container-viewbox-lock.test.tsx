@@ -2,8 +2,8 @@
 
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, it } from "vitest";
 import { SVG_W, VIEWBOX_H } from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import type { PricePoint } from "@/server/discovery/price-series";
@@ -37,8 +37,6 @@ import type { PricePoint } from "@/server/discovery/price-series";
 // viewBox moves, exactly as `aspect-[2/1]` did. Nothing below hard-codes 644,
 // 320 or their quotient.
 
-afterEach(cleanup);
-
 const SERIES: PricePoint[] = [
 	{ at: "2026-09-15T00:00:00.000Z", yes: "0.500000000000000000" },
 	{ at: "2026-09-20T00:00:00.000Z", yes: "0.650000000000000000" },
@@ -71,8 +69,20 @@ function plotAspect(container: HTMLElement): number | null {
 	return parseAspect(plot?.style.aspectRatio ?? "");
 }
 
+/**
+ * Parsed markup, not a mounted tree — see `terminal-markers.test.tsx`'s
+ * `parseChart` for why (nothing here interacts, and the mounts were destabilising
+ * the DB-backed half of the full suite by slowing it past its hook timeouts).
+ */
 function renderMode(mode: "collapsed" | "expanded" | "hero") {
-	return render(<MarketPriceChart series={SERIES} mode={mode} isOpen={true} />);
+	return {
+		container: new DOMParser().parseFromString(
+			renderToStaticMarkup(
+				<MarketPriceChart series={SERIES} mode={mode} isOpen={true} />,
+			),
+			"text/html",
+		).body,
+	};
 }
 
 describe("C-CHART-1 clause 4 — the container's aspect equals the viewBox's", () => {
