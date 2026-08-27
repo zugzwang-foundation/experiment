@@ -56,7 +56,7 @@ import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing
 import { getMarketTotals } from "@/server/debate-view/market-totals";
 import { selectHeroTopPosts } from "@/server/discovery/hero";
 import { getDefaultMarketMediaUrl } from "@/server/discovery/media";
-import { loadPriceSeries } from "@/server/discovery/price-series";
+import { replayReserveSeries } from "@/server/discovery/price-series";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
 import { truncateTables } from "../../db/_fixtures/truncate";
@@ -183,12 +183,19 @@ async function composeDiscovery(): Promise<void> {
 		await getMarketPricingAndReserves(countingDb, m.id);
 		await getMarketTotals(countingDb, m.id);
 		await getDefaultMarketMediaUrl(countingDb, m.id);
-		await loadPriceSeries(countingDb, m.id);
+		// CHART-1 — the hero's series now rides `getCachedReserveWalk`, which wraps
+		// `replayReserveSeries` (3 statements) and NOT `loadPriceSeries` (4 — it
+		// spent a fourth on the live `pools` row for the F-1 drift WARN, which a
+		// floored history makes non-diagnostic). The cached function cannot take a
+		// counting client — a cache key must be serializable and a DB client is not
+		// — so this line replicates what it wraps, exactly as the rest of this
+		// function replicates the cached block around it.
+		await replayReserveSeries(countingDb, m.id);
 		await selectHeroTopPosts(countingDb, m.id, null);
 	}
 }
 
-describe("Discovery round-trip budget — 1 + 12N (plan §3a, the binding constraint)", () => {
+describe("Discovery round-trip budget — 1 + 11N (plan §3a, the binding constraint)", () => {
 	afterEach(async () => {
 		await truncateTables(testClient, [
 			"events",
@@ -208,7 +215,7 @@ describe("Discovery round-trip budget — 1 + 12N (plan §3a, the binding constr
 		vi.clearAllMocks();
 	});
 
-	it("discovery::round-trip-count-is-1-plus-12N", async () => {
+	it("discovery::round-trip-count-is-1-plus-11N", async () => {
 		// TWO markets, so a per-market cost is distinguishable from a fixed one:
 		// a guard at N=1 cannot tell 1+12N from 13, and would miss a regression
 		// that adds a constant read.
@@ -222,12 +229,29 @@ describe("Discovery round-trip budget — 1 + 12N (plan §3a, the binding constr
 
 		// 1 outer market list
 		//   + N getMarketPricingAndReserves + N getMarketTotals + N media
-		//   + 4N loadPriceSeries (events·opened / bets / events·bet.* / pools)
+		//   + 3N replayReserveSeries (events·opened / bets / events·bet.*)
 		//   + 5N selectHeroTopPosts (substrate / removedSet / picked / authors
 		//                            / ordinals)
-		// = 1 + 12N. 25 at N=2. UNCHANGED from pre-Phase-C: the cache boundary
-		// sits on top of this composition, it does not alter it.
-		expect(executed).toBe(1 + 12 * N);
+		// = 1 + 11N. 23 at N=2.
+		//
+		// ⚠ THE PIN MOVED DOWN BY N AT CHART-1 — 1+12N → 1+11N — AND A DECREASE
+		// IS RE-PINNED DELIBERATELY RATHER THAN LEFT SLACK. The dropped statement
+		// is `loadPriceSeries`'s live `pools` read, which existed to WARN when the
+		// event replay disagreed with the pool. Under a floored history that
+		// comparison is no longer diagnostic — a walk up to
+		// `MARKET_SERIES_MIN_WINDOW_MS` old legitimately differs from a pool that
+		// has moved since — and the property it protected is now guaranteed by
+		// construction, because `withLiveTail` composes the chart's right edge
+		// from the page's own live read. Pinning the lower number is what makes
+		// the removal permanent instead of a budget someone can quietly spend.
+		//
+		// ⚠ AND THE REAL WIN IS NOT VISIBLE IN THIS NUMBER AT ALL. This file
+		// measures the UNCACHED cost — what a cold render or a miss pays. CHART-1
+		// changes how OFTEN that cost is paid: the walk moved onto a key no bet
+		// can move, so it is derived once per window instead of once per bet, and
+		// no statement-count assertion can see that. Stated here so the modest
+		// −N is not mistaken for the whole result.
+		expect(executed).toBe(1 + 11 * N);
 	});
 
 	it("discovery::the-V13-lateral-is-not-a-round-trip", async () => {

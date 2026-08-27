@@ -2,8 +2,7 @@
 
 import type { PricePoint } from "@/server/discovery/price-series";
 
-import { formatPercentUnpaired } from "../format";
-import { fmtUtcDay } from "./geometry";
+import { ChartSummary } from "./ChartSummary";
 import { MarketPriceChart } from "./MarketPriceChart";
 
 /** The collapsed in-header price chart — the whole card is the expand control
@@ -28,16 +27,6 @@ export function MarketPriceChartCard({
 	series: PricePoint[];
 	onExpand: () => void;
 }): React.JSX.Element {
-	const opening = series[0];
-	const current = series[series.length - 1];
-	// pctround-allow: genuinely single-side — the OPENING YES price, one point
-	// in TIME, not one half of a pair (SPEC.1 §10.8 escape hatch).
-	const openingPct = formatPercentUnpaired(opening.yes);
-	// pctround-allow: genuinely single-side — the CURRENT YES price, the other
-	// point in TIME. Shares `PriceBar`'s formatter core, so this readout and the
-	// bar a few pixels below can never disagree on the same price.
-	const currentPct = formatPercentUnpaired(current.yes);
-
 	return (
 		<button
 			type="button"
@@ -65,10 +54,7 @@ export function MarketPriceChartCard({
 			    current %, and the two domain endpoints — and is the button's
 			    accessible name (no aria-label overrides it). Unlike the fully
 			    aria-hidden §22 sparkline. */}
-			<span data-testid="market-price-chart-summary" className="sr-only">
-				Price history: opening {openingPct}, current {currentPct},{" "}
-				{fmtUtcDay(opening.at)} to {fmtUtcDay(current.at)}.
-			</span>
+			<ChartSummary series={series} testId="market-price-chart-summary" />
 		</button>
 	);
 }

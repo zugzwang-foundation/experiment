@@ -216,6 +216,32 @@ export const DISCOVERY_SERIES_MAX_POINTS = 64;
  * `DISCOVERY_SERIES_MAX_POINTS`. Integer (a point count, not Dharma). */
 export const MARKET_SERIES_MAX_POINTS = 256;
 
+/** Minimum interval between derivations of a market's price-series HISTORY
+ * (SPEC.1 1.0.40 §9 *Refresh — floored history, live edge* + §16.1 + Appendix
+ * B, founder-ruled at CHART-1). Within the window a derivation is REUSED; the
+ * series' TERMINAL point is composed fresh on every render from the live pool
+ * price and is never floored, so the chart's right edge cannot disagree with
+ * the `PriceBar` directly beneath it — **on an `Open` market**. ⚠ On every other
+ * state the series is rendered UNTOUCHED and nothing is recomposed: a frozen
+ * chart is its event history alone, and a visible disagreement with `PriceBar`
+ * there is the correct outcome rather than a defect (**INV-4**; changed at
+ * CHART-1.A, which removed the non-`Open` restamp this sentence used to cover).
+ *
+ * ⚠ DELIBERATELY LONGER THAN `POLL_INTERVAL_MS_DEBATE_VIEW` (15000), and that
+ * inequality is the whole design rather than an oversight. The window exists to
+ * COALESCE, not to tolerate staleness: fifty bets in thirty seconds become one
+ * derivation instead of fifty, so a busy market's cost stops scaling with how
+ * busy it is. Keying invalidation on the pool instead — which is what the
+ * surrounding `'use cache'` blocks do, since they key on `reserves` — performs
+ * WORST exactly when load is highest, because every bet busts every reader's
+ * entry. That is why this series is keyed on market identity alone.
+ *
+ * A pinned DESIGN value, not a tuned economy value — contrast the poll interval
+ * above, which is explicitly provisional. Read from this constant at every call
+ * site and never inlined, so the HARDEN.6 tune stays a one-line change. Integer
+ * (milliseconds, not Dharma). */
+export const MARKET_SERIES_MIN_WINDOW_MS = 60000;
+
 // === UI.A5: Profile Dharma graph (SPEC.1 §23) =============================
 
 /** Profile graph-series downsample bound (UI-A5 §7 S2, OQ-4 B) — every served

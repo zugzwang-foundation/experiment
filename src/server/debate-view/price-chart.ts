@@ -5,9 +5,11 @@ import { type PostSubstrate, type Side, topOrder } from "@/lib/ranking";
 import { MARKET_SERIES_MAX_POINTS } from "@/server/config/limits";
 import { getPrices, type Reserves } from "@/server/cpmm/calculate";
 import {
+	mapWalkToSeries,
 	type PricePoint,
-	type ReservePoint,
 	replayReserveSeries,
+	toWireWalk,
+	type WireReservePoint,
 } from "@/server/discovery/price-series";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
@@ -46,7 +48,7 @@ export async function loadMarketPriceSeries(
 	marketId: string,
 	spotYes: string | null,
 ): Promise<PricePoint[]> {
-	const walk = await replayReserveSeries(client, marketId);
+	const walk = toWireWalk(await replayReserveSeries(client, marketId));
 	if (walk.length === 0) {
 		return [];
 	}
@@ -67,13 +69,60 @@ export async function deriveMarketPriceChart(
 		postSubstrate: PostSubstrate[];
 		removedSet: Set<string>;
 		spotYes: string | null;
+		/**
+		 * An ALREADY-DERIVED reserve walk, supplied by the caller (CHART-1). When
+		 * present the replay is skipped entirely — this is how the market-detail
+		 * page pays for the walk once per `MARKET_SERIES_MIN_WINDOW_MS` instead of
+		 * once per cache miss (`getCachedReserveWalk`).
+		 *
+		 * ⛔ IT IS A PARAMETER, NEVER FETCHED HERE, AND THAT IS DELIBERATE — the
+		 * same shape `getCachedMarketDiscoveryData` uses for `reserves`. Reaching
+		 * for the cached walk inside this function would put a cache boundary
+		 * underneath `loadDebateView`, which the `.md` export route also calls and
+		 * which ADR-0025 forbids caching. Leaving the choice with the caller keeps
+		 * the export uncached by construction rather than by anyone remembering.
+		 *
+		 * Omitted ⇒ the live replay, byte-for-byte the prior behaviour. The export
+		 * route omits it.
+		 */
+		walk?: WireReservePoint[];
 	},
 ): Promise<{ series: PricePoint[]; nodes: ChartNode[] }> {
-	const walk = await replayReserveSeries(client, args.marketId);
+	const walk =
+		args.walk ?? toWireWalk(await replayReserveSeries(client, args.marketId));
 	if (walk.length === 0) {
 		return { series: [], nodes: [] };
 	}
-	const series = buildSeries(walk, args.spotYes);
+	// ⛔ THE TERMINAL STAMP IS ONLY LEGITIMATE ON A FRESHLY REPLAYED WALK, AND
+	// THIS ARGUMENT IS WHY. Decision #6 stamps the series' last point with the
+	// live pool price so the chart cannot disagree with `PriceBar`. That was
+	// exact while the walk was always replayed inside the same read that fetched
+	// `spotYes`: the walk's last step WAS the event that produced that price, so
+	// the stamp changed nothing and only guaranteed agreement.
+	//
+	// With an INJECTED walk (CHART-1) the two come from different instants. On a
+	// cache miss caused by a bet, the walk can still HIT its own key and arrive
+	// without that bet, while `spotYes` is read live and carries it. Stamping
+	// then writes the NEW price onto the PREVIOUS event's timestamp — drawing the
+	// market as having moved three days ago and sat flat since, if that is when
+	// the previous bet was. ⚠ The error is in X, and it is NOT bounded by the
+	// window: it is the gap to the preceding event, which is unbounded on a quiet
+	// market. A price at the wrong time is a false statement about the market,
+	// not a stale one.
+	//
+	// So the injected path leaves the replay's own terminal alone and lets
+	// `withLiveTail` compose the edge at the page — which appends `(now, spot)`
+	// as a NEW point rather than moving an old one, and is the mechanism that
+	// exists for exactly this. The uninjected path (the `.md` export) keeps
+	// decision #6 byte-for-byte.
+	//
+	// Found by `@code-reviewer` at the CHART-1 cascade. Invisible to the whole
+	// suite: `'use cache'` THROWS under a bare `vitest run`, so no test can put a
+	// stale walk beside a fresh spot.
+	const series = buildSeries(
+		walk,
+		args.walk === undefined ? args.spotYes : null,
+	);
 	const nodes = selectChartNodes(args.postSubstrate, args.removedSet, walk);
 	return { series, nodes };
 }
@@ -92,11 +141,22 @@ export async function deriveMarketPriceChart(
  * step at or before the post's `createdAt`, NEVER interpolating (price is a step
  * function). Per decision (a) a post's `created_at` is ≥ its own `bet.placed`
  * event, so that step is the post's own bet. Nodes are sorted `(at asc, id asc)`.
+ *
+ * ⚠ THAT LAST GUARANTEE WEAKENS WHEN THE WALK IS INJECTED, and saying so is the
+ * point of this paragraph. `postSubstrate` is read fresh on every miss; an
+ * injected `walk` is floored to `MARKET_SERIES_MIN_WINDOW_MS`. A post created
+ * inside that window is therefore in the substrate and NOT in the walk, so
+ * `reservesAt` returns the last step BEFORE its bet and the node is drawn at the
+ * price that preceded it. Expanded mode only, bounded by the window, and it
+ * self-corrects on the next revalidation — but it is a real divergence from the
+ * sentence above rather than a hypothetical. Not clamped here on purpose:
+ * dropping such a post from node eligibility would hide a real argument to
+ * protect a pixel. Raised by `@code-reviewer` at the CHART-1 cascade.
  */
 export function selectChartNodes(
 	substrate: PostSubstrate[],
 	removedSet: Set<string>,
-	walk: ReservePoint[],
+	walk: WireReservePoint[],
 ): ChartNode[] {
 	if (walk.length === 0) {
 		return [];
@@ -132,11 +192,11 @@ export function selectChartNodes(
  * so this is the state after the most recent event at or before `at`; `walk[0]`
  * (the `market.opened` seed) is the floor for the unreachable before-all case.
  */
-function reservesAt(walk: ReservePoint[], at: Date): Reserves {
+function reservesAt(walk: WireReservePoint[], at: Date): Reserves {
 	const t = at.getTime();
 	let chosen = walk[0].reserves;
 	for (const step of walk) {
-		if (step.at.getTime() <= t) {
+		if (Date.parse(step.at) <= t) {
 			chosen = step.reserves;
 		}
 	}
@@ -150,15 +210,10 @@ function reservesAt(walk: ReservePoint[], at: Date): Reserves {
  * construction.
  */
 function buildSeries(
-	walk: ReservePoint[],
+	walk: WireReservePoint[],
 	spotYes: string | null,
 ): PricePoint[] {
-	const full: PricePoint[] = walk.map((step) => ({
-		at: step.at.toISOString(),
-		yes: getPrices(step.reserves).yes,
-	}));
-
-	const series = downsample(full, MARKET_SERIES_MAX_POINTS);
+	const series = mapWalkToSeries(walk, MARKET_SERIES_MAX_POINTS);
 
 	// Stamp the terminal with the shared PriceBar spot (decision #6) — the point
 	// beneath the bar agrees with it by construction, not by monitoring.
@@ -170,20 +225,4 @@ function buildSeries(
 	}
 
 	return series;
-}
-
-/** Uniform-stride thinning to ≤ `max` points — a strict SUBSET (never
- * interpolated), first + last always kept, order preserved (the
- * `discovery/price-series.ts` downsample, re-implemented file-local per the A5
- * precedent — the index helper is never exported). */
-function downsample(series: PricePoint[], max: number): PricePoint[] {
-	if (series.length <= max) {
-		return series;
-	}
-	const n = series.length;
-	const out: PricePoint[] = [];
-	for (let i = 0; i < max; i++) {
-		out.push(series[Math.round((i * (n - 1)) / (max - 1))]);
-	}
-	return out;
 }
