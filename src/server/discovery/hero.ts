@@ -17,6 +17,7 @@ import {
 	resolveAuthors,
 } from "@/server/debate-view/resolve-authors";
 import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
+import { DOWNSTREAM_CACHED_MINUTES } from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 
 /** Mirrors the D9 render-side seam (`load-debate-view.ts`, `media.ts`). Gate C
@@ -273,7 +274,14 @@ export async function selectHeroTopPosts(
 				return;
 			}
 			try {
-				urlById.set(r.id, await signRead(r.imageKey, READ_URL_TTL_SECONDS));
+				urlById.set(
+					r.id,
+					await signRead(
+						r.imageKey,
+						READ_URL_TTL_SECONDS,
+						DOWNSTREAM_CACHED_MINUTES,
+					),
+				);
 			} catch {
 				// R2 unavailable for this object → degrade to no image (the
 				// `mintImageUrls` / `getDefaultMarketMediaUrl` resilience posture).

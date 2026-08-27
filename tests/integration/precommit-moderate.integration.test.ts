@@ -23,16 +23,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // verdict + categories, caller persists). REFUSAL-2 indirect: track_a is
 // the CSAM legal-floor verdict.
 
-const { mockRedis, mockOpenAiModerate, mockSignRead } = vi.hoisted(() => ({
-	mockRedis: {
-		set: vi.fn(),
-		get: vi.fn(),
-		del: vi.fn(),
-		eval: vi.fn(),
-	},
-	mockOpenAiModerate: vi.fn(),
-	mockSignRead: vi.fn(),
-}));
+const { mockRedis, mockOpenAiModerate, mockSignReadSingleUse } = vi.hoisted(
+	() => ({
+		mockRedis: {
+			set: vi.fn(),
+			get: vi.fn(),
+			del: vi.fn(),
+			eval: vi.fn(),
+		},
+		mockOpenAiModerate: vi.fn(),
+		mockSignReadSingleUse: vi.fn(),
+	}),
+);
 
 vi.mock("@/server/upstash/redis", () => ({
 	redis: mockRedis,
@@ -43,7 +45,8 @@ vi.mock("@/server/moderation/openai", () => ({
 }));
 
 vi.mock("@/server/storage/sign-read", () => ({
-	signRead: mockSignRead,
+	signRead: vi.fn(),
+	signReadSingleUse: mockSignReadSingleUse,
 }));
 
 import {
@@ -64,7 +67,7 @@ beforeEach(() => {
 	mockRedis.del.mockReset();
 	mockRedis.eval.mockReset();
 	mockOpenAiModerate.mockReset();
-	mockSignRead.mockReset();
+	mockSignReadSingleUse.mockReset();
 });
 
 afterEach(() => {
@@ -126,7 +129,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 
 		expect(result.outcome).toBe("pass");
 		expect(result.categories).toEqual([]);
-		expect(mockSignRead).not.toHaveBeenCalled();
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled();
 		expect(mockOpenAiModerate).toHaveBeenCalledTimes(1);
 	});
 
@@ -145,7 +148,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 		});
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
-		mockSignRead.mockResolvedValueOnce(
+		mockSignReadSingleUse.mockResolvedValueOnce(
 			"https://r2.example/u/user-1/csam-test.jpg?X-Amz-Signature=mod",
 		);
 		mockOpenAiModerate.mockResolvedValueOnce(
@@ -182,7 +185,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 
 		expect(result.outcome).toBe("track_b");
 		expect(result.categories).toContain("sexual/minors");
-		expect(mockSignRead).not.toHaveBeenCalled(); // text-only — no R2 fetch
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled(); // text-only — no R2 fetch
 	});
 
 	it("precommit-moderate::track-b-sexual-not-minors", async () => {
@@ -253,7 +256,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 		// On collision, no DEL fires (we didn't own the reservation).
 		expect(mockRedis.del).not.toHaveBeenCalled();
 		expect(mockOpenAiModerate).not.toHaveBeenCalled();
-		expect(mockSignRead).not.toHaveBeenCalled();
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled();
 	});
 
 	it("precommit-moderate::reservation-deleted-on-pass", async () => {
@@ -319,7 +322,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 	// === Image path: signed READ URL mint + handoff to openai ==================
 
 	it("precommit-moderate::image-r2-key-mints-signed-read-url-60s", async () => {
-		// imageR2Key provided → impl mints a 60s signed READ URL via signRead
+		// imageR2Key provided → impl mints a 60s signed READ URL via signReadSingleUse
 		// AND passes the URL into openai.moderate as imageUrl. Verifies the
 		// TTL is 60s (READ_URL_TTL_SECONDS_MODERATION) for the moderation
 		// hop (vs. 3600s for render in DEBATE.4).
@@ -331,13 +334,13 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 			"https://r2.example/u/user-1/abc.jpg?X-Amz-Signature=mod";
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
-		mockSignRead.mockResolvedValueOnce(scriptedUrl);
+		mockSignReadSingleUse.mockResolvedValueOnce(scriptedUrl);
 		mockOpenAiModerate.mockResolvedValueOnce(modResult({}));
 
 		const result = await precommitModerate(a);
 
-		expect(mockSignRead).toHaveBeenCalledTimes(1);
-		expect(mockSignRead).toHaveBeenCalledWith(
+		expect(mockSignReadSingleUse).toHaveBeenCalledTimes(1);
+		expect(mockSignReadSingleUse).toHaveBeenCalledWith(
 			"u/user-1/abc.jpg",
 			READ_URL_TTL_SECONDS_MODERATION,
 		);
@@ -361,7 +364,7 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 
 		await precommitModerate(a);
 
-		expect(mockSignRead).not.toHaveBeenCalled();
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled();
 		// Inspect the args passed: imageUrl is either absent or undefined.
 		const call = mockOpenAiModerate.mock.calls[0]?.[0] as {
 			imageUrl?: string;
@@ -399,7 +402,9 @@ describe("precommitModerate (SCAFFOLD.15 §5.2)", () => {
 		});
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
-		mockSignRead.mockRejectedValueOnce(new Error("ECONNREFUSED to R2"));
+		mockSignReadSingleUse.mockRejectedValueOnce(
+			new Error("ECONNREFUSED to R2"),
+		);
 
 		await expect(precommitModerate(a)).rejects.toBeInstanceOf(
 			ModerationUnavailableError,

@@ -29,16 +29,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Mocks: `@/server/upstash/redis`, `@/server/moderation/openai`,
 // `@/server/storage/sign-read` (the precommit-moderate.integration pattern).
 
-const { mockRedis, mockOpenAiModerate, mockSignRead } = vi.hoisted(() => ({
-	mockRedis: {
-		set: vi.fn(),
-		get: vi.fn(),
-		del: vi.fn(),
-		eval: vi.fn(),
-	},
-	mockOpenAiModerate: vi.fn(),
-	mockSignRead: vi.fn(),
-}));
+const { mockRedis, mockOpenAiModerate, mockSignReadSingleUse } = vi.hoisted(
+	() => ({
+		mockRedis: {
+			set: vi.fn(),
+			get: vi.fn(),
+			del: vi.fn(),
+			eval: vi.fn(),
+		},
+		mockOpenAiModerate: vi.fn(),
+		mockSignReadSingleUse: vi.fn(),
+	}),
+);
 
 vi.mock("@/server/upstash/redis", () => ({
 	redis: mockRedis,
@@ -47,7 +49,8 @@ vi.mock("@/server/moderation/openai", () => ({
 	moderate: mockOpenAiModerate,
 }));
 vi.mock("@/server/storage/sign-read", () => ({
-	signRead: mockSignRead,
+	signRead: vi.fn(),
+	signReadSingleUse: mockSignReadSingleUse,
 }));
 
 import { precommitModerate } from "@/server/moderation/precommit";
@@ -58,7 +61,7 @@ beforeEach(() => {
 	mockRedis.del.mockReset();
 	mockRedis.eval.mockReset();
 	mockOpenAiModerate.mockReset();
-	mockSignRead.mockReset();
+	mockSignReadSingleUse.mockReset();
 });
 
 afterEach(() => {
@@ -105,7 +108,7 @@ describe("DEBATE.7 A2 — fixed App.A image→Track A mapping (4 cells)", () => 
 		});
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
-		mockSignRead.mockResolvedValueOnce(
+		mockSignReadSingleUse.mockResolvedValueOnce(
 			"https://r2.example/u/a2-user/img-adult.jpg?X-Amz-Signature=mod",
 		);
 		mockOpenAiModerate.mockResolvedValueOnce(
@@ -137,7 +140,7 @@ describe("DEBATE.7 A2 — fixed App.A image→Track A mapping (4 cells)", () => 
 
 		expect(result.outcome).toBe("track_b");
 		expect(result.categories).toContain("sexual");
-		expect(mockSignRead).not.toHaveBeenCalled();
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled();
 		expect(result.categoryScores).toBeDefined();
 	});
 
@@ -150,7 +153,7 @@ describe("DEBATE.7 A2 — fixed App.A image→Track A mapping (4 cells)", () => 
 		});
 		mockRedis.set.mockResolvedValueOnce("OK");
 		mockRedis.del.mockResolvedValueOnce(1);
-		mockSignRead.mockResolvedValueOnce(
+		mockSignReadSingleUse.mockResolvedValueOnce(
 			"https://r2.example/u/a2-user/img-csam.jpg?X-Amz-Signature=mod",
 		);
 		mockOpenAiModerate.mockResolvedValueOnce(
@@ -179,7 +182,7 @@ describe("DEBATE.7 A2 — fixed App.A image→Track A mapping (4 cells)", () => 
 
 		expect(result.outcome).toBe("track_b");
 		expect(result.categories).toContain("sexual/minors");
-		expect(mockSignRead).not.toHaveBeenCalled();
+		expect(mockSignReadSingleUse).not.toHaveBeenCalled();
 		expect(result.categoryScores).toBeDefined();
 	});
 });

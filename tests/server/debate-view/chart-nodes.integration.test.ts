@@ -46,7 +46,12 @@ vi.mock("@sentry/nextjs", () => ({
 const { mockSignRead } = vi.hoisted(() => ({
 	mockSignRead: vi.fn(async (key: string) => `https://signed.example/${key}`),
 }));
-vi.mock("@/server/storage/sign-read", () => ({ signRead: mockSignRead }));
+vi.mock("@/server/storage/sign-read", () => ({
+	signRead: mockSignRead,
+	signReadSingleUse: vi.fn(
+		async (key: string) => `https://signed.example/${key}`,
+	),
+}));
 
 import {
 	bets,

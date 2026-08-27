@@ -29,7 +29,12 @@ import { safeCaptureException } from "@/server/observability/safe-capture";
 // the same posture as `src/server/upstash/redis.ts` (env-validate at load,
 // throw with a pointer to .env.example on missing values).
 
-type R2Bucket = "uploads" | "pfp" | "market-media";
+// Exported so `read-url-memo.ts` can take the bucket as a typed parameter and
+// build its own memo key from it. Before that, the bucket reached the memo as a
+// caller-written string prefix that had to agree with the bucket passed to
+// `mintReadUrl` — two literals, no check, and the ADR-0026 arm separation
+// resting on them matching.
+export type R2Bucket = "uploads" | "pfp" | "market-media";
 
 interface R2BucketEnv {
 	endpoint: string;

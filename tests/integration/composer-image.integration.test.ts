@@ -44,7 +44,7 @@ const {
 	mockRelease,
 	mockRedis,
 	mockOpenAiModerate,
-	mockSignRead,
+	mockSignReadSingleUse,
 	mockVerifyUploadedObject,
 } = vi.hoisted(() => ({
 	mockGetSession: vi.fn(),
@@ -61,7 +61,9 @@ const {
 	mockOpenAiModerate: vi.fn(),
 	// CALLED on the image path (scenario 1): precommitModerate mints the 60s
 	// moderation read URL for the attached object before the vendor hop.
-	mockSignRead: vi.fn(async () => "https://signed.example/moderation-read"),
+	mockSignReadSingleUse: vi.fn(
+		async () => "https://signed.example/moderation-read",
+	),
 	// The R2 HeadObject boundary (AUDIT-FIX-A1 verify) — the one storage mock.
 	mockVerifyUploadedObject: vi.fn(),
 }));
@@ -98,7 +100,10 @@ vi.mock("@/server/upstash/redis", () => ({ redis: mockRedis }));
 vi.mock("@/server/moderation/openai", () => ({
 	moderate: mockOpenAiModerate,
 }));
-vi.mock("@/server/storage/sign-read", () => ({ signRead: mockSignRead }));
+vi.mock("@/server/storage/sign-read", () => ({
+	signRead: vi.fn(),
+	signReadSingleUse: mockSignReadSingleUse,
+}));
 vi.mock("@/server/storage/verify-object", () => ({
 	verifyUploadedObject: mockVerifyUploadedObject,
 }));
