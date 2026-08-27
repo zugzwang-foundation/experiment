@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ResolverCards } from "@/components/debate/ResolverCards";
 import type { DebateMarketHeader } from "@/components/debate/types";
@@ -88,16 +88,62 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		// four children. That declaration is therefore the honest subject here, and
 		// the RENDERED widths are measured in a real browser and reported in the
 		// RESO-1 run log instead.
-		expect(cls).toContain("grid");
-		expect(cls).toContain("grid-cols-4");
-		// ⛔ AND NO BREAKPOINT MAY FOLD THE ROW. A `sm:`/`md:`/`lg:` column override
-		// would stack them into 2×2 at exactly the widths nobody checks, which
-		// stops satisfying "one row" without stopping satisfying "four blocks".
-		expect(cls).not.toMatch(/\b(sm|md|lg|xl|2xl):grid-cols-/);
+		// ⛔⛔ TOKEN EQUALITY, NOT `toContain`. `expect(cls).toContain("grid")` — which
+		// is what this asserted first — is satisfied by the substring inside
+		// `grid-cols-4`, so it asserted NOTHING about `display`. A flex container
+		// carrying a stray `grid-cols-4` passed it while `grid-template-columns` sat
+		// inert and `flex-wrap` put the blocks on two rows. Caught by @test-writer.
+		const tokens = cls.split(/\s+/);
+		expect(tokens).toContain("grid");
+		// ⛔ EXACTLY ONE column declaration. `toContain("grid-cols-4")` passes on
+		// `grid-cols-4 grid-cols-[2fr_1fr_1fr_1fr]`, where the cascade picks a winner
+		// this test cannot see — the same double-declaration trap the `min-h-0` line
+		// below was written for.
+		expect(tokens.filter((t) => t.includes("grid-cols-"))).toEqual([
+			"grid-cols-4",
+		]);
+		// ⛔ NO VARIANT MAY FOLD THE ROW — and the ban is on ANY variant, not an
+		// enumeration of named breakpoints. The first version listed
+		// `sm|md|lg|xl|2xl`, which `max-[600px]:grid-cols-2` and `print:grid-cols-1`
+		// both walk straight past.
+		expect(cls).not.toMatch(/:grid-cols-/);
 
 		// R-8 — the row GROWS into what R-1/R-2 freed rather than carrying a tuned
 		// literal height. `flex-1` is the mechanism; pinned by name.
-		expect(cls).toContain("flex-1");
+		expect(tokens).toContain("flex-1");
+
+		// ⛔⛔ AND THE FOUR BLOCKS MUST BE THE GRID'S OWN ITEMS, EACH SIZING ITSELF
+		// TO ITS TRACK. The docblock above used to claim equal width is "a property
+		// of the container rather than of the four children" — that is FALSE for
+		// grid ITEMS: the track is `1fr`, but `col-span-*`, `w-*`, `max-w-*` or
+		// `justify-self-*` on a child overrides the stretch, and a wrapper element
+		// takes the block out of the grid entirely. Any of those renders four
+		// unequal blocks, or five tracks' worth on two rows, with the container
+		// class untouched. jsdom cannot measure the result — but it CAN see every
+		// one of these declarations, so they are the checkable half.
+		for (const k of KEYS) {
+			const b = container.querySelector(
+				`[data-testid="resolution-block-${k}"]`,
+			);
+			expect(b).not.toBeNull();
+			// A DIRECT child — no wrapper, no `display:contents` shim.
+			expect(b?.parentElement).toBe(row);
+			for (const t of (b?.getAttribute("class") ?? "").split(/\s+/)) {
+				expect(t).not.toMatch(
+					/^(col-span-|col-start-|col-end-|w-|max-w-|justify-self-)/,
+				);
+				// ⚠ `min-w-0` IS EXPLICITLY ALLOWED, and the first version of this
+				// line banned it — reddening on correct code, which is how a guard
+				// gets suppressed. `min-w-0` does not SET a width; it removes the
+				// automatic minimum so the block may shrink TO its track, which is
+				// what equal-width grid items need and what the label's `truncate`
+				// requires. Any OTHER `min-w-*` is a floor that can break the track.
+				if (t.startsWith("min-w-")) {
+					expect(t).toBe("min-w-0");
+				}
+				expect(t).not.toMatch(/^(contents|hidden)$/);
+			}
+		}
 	});
 
 	it("resolver-cards::the-row-carries-a-CONTENT-FLOOR-not-min-h-0", () => {
@@ -136,11 +182,16 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		// replace would just re-arm the trap for whoever fills these in.
 		const { container } = render(<ResolverCards market={MARKET} />);
 		for (const k of KEYS) {
-			const cls =
-				container
-					.querySelector(`[data-testid="resolution-block-${k}"]`)
-					?.getAttribute("class") ?? "";
-			expect(cls.split(/\s+/)).not.toContain("overflow-hidden");
+			const el = container.querySelector(
+				`[data-testid="resolution-block-${k}"]`,
+			);
+			// ⛔ CONTROL. `?? ""` on a missing block yields `[""]`, which does not
+			// contain "overflow-hidden" — so this loop was green over four blocks
+			// that did not exist (@test-writer).
+			expect(el).not.toBeNull();
+			expect((el?.getAttribute("class") ?? "").split(/\s+/)).not.toContain(
+				"overflow-hidden",
+			);
 		}
 	});
 
@@ -168,10 +219,17 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 			const gc = glyph?.getAttribute("class") ?? "";
 			expect(gc).toContain("aspect-square");
 			expect(gc).toContain("shrink-0");
-			// ⛔ AND NO COMPETING HEIGHT. `aspect-square` plus an explicit `h-*`
-			// is over-determined, and whichever wins, the ratio is no longer the
-			// thing that decides the shape.
-			expect(gc).not.toMatch(/\bh-\[/);
+			// ⛔ AND NO COMPETING LENGTH. `aspect-square` plus an explicit height is
+			// over-determined, and whichever wins the ratio no longer decides the
+			// shape. The first version banned only the ARBITRARY form (`h-[…]`), so
+			// `aspect-square shrink-0 h-8 w-12` — a 32×48 rectangle — passed, and so
+			// did `size-[30px]` paired with `aspect-square` (@test-writer).
+			for (const t of gc.split(/\s+/)) {
+				expect(t).not.toMatch(/^(h-|size-|min-h-|max-h-)/);
+			}
+			// Exactly one width declaration, so the square's one free length is
+			// unambiguous.
+			expect(gc.split(/\s+/).filter((t) => /^w-/.test(t))).toHaveLength(1);
 
 			// The value row is EMPTY and unannounced — an empty announced row is
 			// noise while the label beside it already names the slot.
@@ -183,18 +241,41 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 
 	it("resolver-cards::carries-the-four-PROVISIONAL-fixture-labels", () => {
 		const { container } = render(<ResolverCards market={MARKET} />);
-		// ⛔ Assert on `innerHTML`, never `textContent` (O-7).
 		// ⚠ These four are PROVISIONAL and are NOT copy-register entries — the
 		// RESO-1 brief rules them out of canon explicitly. They are pinned here so
 		// the fixture cannot silently empty itself, not because the words are
 		// ratified.
-		for (const label of ["Resolution", "Resolver", "Closes", "Context"]) {
-			expect(container.innerHTML).toContain(label);
+		// ⛔⛔ EACH LABEL IS BOUND TO ITS OWN BLOCK. This asserted
+		// `container.innerHTML).toContain(label)` over the whole row, which
+		// `innerHTML` satisfies from ATTRIBUTE VALUES — a single
+		// `aria-label="Resolution Resolver Closes Context"` on the row passed all
+		// four with ZERO visible text — and which said nothing about WHICH block a
+		// label sits in, so all four could render inside `closes` (@test-writer).
+		for (const [k, label] of [
+			["resolution", "Resolution"],
+			["resolver", "Resolver"],
+			["closes", "Closes"],
+			["context", "Context"],
+		] as const) {
+			expect(
+				container.querySelector(`[data-testid="resolution-block-label-${k}"]`)
+					?.textContent,
+			).toBe(label);
 		}
 	});
 
 	it("resolver-cards::ships-none-of-the-mockups-MARKET-CONTENT", () => {
 		const { container } = render(<ResolverCards market={MARKET} />);
+
+		// ⛔⛔ POSITIVE CONTROL FIRST, AND THIS `it` WAS WHOLLY VACUOUS WITHOUT IT.
+		// Every assertion below is a `not.toContain`, and all seven pass on a
+		// component that renders NOTHING — which is not hypothetical here: this
+		// file's v1 asserted `innerHTML === ""`, so rendering nothing is a state
+		// this component has actually been in (@test-writer).
+		expect(
+			container.querySelector('[data-testid="resolver-cards"]'),
+		).not.toBeNull();
+		expect(container.innerHTML).toContain("Resolver");
 
 		// ⛔ THE SURVIVING HALF OF THE ORIGINAL RULING, THROUGH THREE REVERSALS.
 		// These four name a market this build does not have; porting them would be
@@ -232,46 +313,75 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
  * check, and a handler with no cursor is silent to a style check.
  */
 describe("RESO-1 — R-12, the blocks are non-interactive", () => {
-	it("resolver-cards::G-4-no-block-exposes-an-href-or-a-click-handler", () => {
+	it("resolver-cards::G-4-NOTHING-in-the-row-is-navigable-or-activatable", () => {
 		const { container } = render(<ResolverCards market={MARKET} />);
 		const row = container.querySelector('[data-testid="resolver-cards"]');
 		expect(row).not.toBeNull();
 
-		// No navigable or activatable element anywhere in the row.
-		expect(row?.querySelectorAll("a")).toHaveLength(0);
-		expect(row?.querySelectorAll("button")).toHaveLength(0);
-		expect(row?.querySelectorAll("[href]")).toHaveLength(0);
-		expect(row?.querySelectorAll("[onclick]")).toHaveLength(0);
-		// React attaches `onClick` via its own delegation rather than an attribute,
-		// so an attribute scan alone could miss it. An interactive ROLE or a
-		// keyboard entry point is the observable trace a click target leaves.
-		expect(row?.querySelectorAll("[role]")).toHaveLength(0);
-		expect(row?.querySelectorAll("[tabindex]")).toHaveLength(0);
+		// ⛔⛔ THE SCOPE INCLUDES THE ROW ITSELF, AND THAT IS THE WHOLE CORRECTION.
+		// This used `row.querySelectorAll(...)`, which matches DESCENDANTS ONLY and
+		// never the element it is called on — so the row could carry
+		// `role="link" tabIndex={0} onClick={…} className="cursor-pointer"` and every
+		// assertion here passed, because no CHILD had changed. @test-writer rated the
+		// old version CANNOT FIRE on the two most likely clickable implementations,
+		// and it was right: a click target on the container is the obvious way
+		// someone "makes the blocks clickable".
+		const scope = [
+			row as Element,
+			...Array.from(row?.querySelectorAll("*") ?? []),
+		];
+		expect(scope.length).toBeGreaterThan(4); // control: the scan has a subtree
+		for (const el of scope) {
+			expect(
+				el.matches("a, button, [href], [onclick], [role], [tabindex]"),
+			).toBe(false);
+		}
+	});
 
-		for (const k of KEYS) {
-			const block = container.querySelector(
-				`[data-testid="resolution-block-${k}"]`,
-			);
-			expect(block?.tagName.toLowerCase()).toBe("div");
-			expect(block?.getAttribute("href")).toBeNull();
-			expect(block?.getAttribute("role")).toBeNull();
-			expect(block?.getAttribute("tabindex")).toBeNull();
+	it("resolver-cards::G-4-clicking-a-block-or-the-row-DOES-NOTHING", () => {
+		// ⛔⛔ THE BEHAVIOURAL HALF, AND THE ONLY THING THAT CAN SEE A DELEGATED
+		// HANDLER AT ALL. React attaches `onClick` at the root — there is NO
+		// `onclick` attribute on the element — so an attribute scan structurally
+		// cannot detect `<div onClick={…}>`, which needs neither `role` nor
+		// `tabindex` to be clickable with a mouse. Only dispatching a click can.
+		const open = vi.spyOn(window, "open").mockImplementation(() => null);
+		try {
+			const { container } = render(<ResolverCards market={MARKET} />);
+			const row = container.querySelector('[data-testid="resolver-cards"]');
+			for (const k of KEYS) {
+				const el = container.querySelector(
+					`[data-testid="resolution-block-${k}"]`,
+				);
+				expect(el).not.toBeNull(); // control
+				fireEvent.click(el as Element);
+			}
+			fireEvent.click(row as Element);
+			expect(open).not.toHaveBeenCalled();
+		} finally {
+			open.mockRestore();
 		}
 	});
 
 	it("resolver-cards::G-4-no-block-LOOKS-clickable-either", () => {
 		const { container } = render(<ResolverCards market={MARKET} />);
-		for (const k of KEYS) {
-			const cls =
-				container
-					.querySelector(`[data-testid="resolution-block-${k}"]`)
-					?.getAttribute("class") ?? "";
-			// A pointer cursor, a hover state or a focus ring each invite a click
-			// that does nothing.
-			expect(cls).not.toContain("cursor-pointer");
-			expect(cls).not.toContain("hover:");
-			expect(cls).not.toContain("focus");
-			expect(cls).not.toContain("group-hover");
+		const row = container.querySelector('[data-testid="resolver-cards"]');
+		const scope = [
+			row as Element,
+			...Array.from(row?.querySelectorAll("*") ?? []),
+		];
+		expect(scope.length).toBeGreaterThan(4); // control
+
+		// ⛔ MATCH A CLASS TOKEN AGAINST A PATTERN, NOT A SUBSTRING AGAINST THE
+		// WHOLE STRING. This asserted `not.toContain("cursor-pointer")` and
+		// `not.toContain("hover:")` on the block's class string, which Tailwind's
+		// arbitrary forms walk straight past: `[cursor:pointer]` contains no
+		// "cursor-pointer", and `[&:hover]:bg-n1` contains no "hover:" (it is
+		// "hover]" then ":"). Both render a block that looks and behaves clickable.
+		// ⚠ AND IT COVERS THE ROW NOW TOO, for the same reason as the test above.
+		for (const el of scope) {
+			for (const t of (el.getAttribute("class") ?? "").split(/\s+/)) {
+				expect(t).not.toMatch(/cursor|hover|focus|active|group-hover/);
+			}
 		}
 	});
 
@@ -285,6 +395,11 @@ describe("RESO-1 — R-12, the blocks are non-interactive", () => {
 		const row = container.querySelector('[data-testid="resolver-cards"]');
 		expect(row).not.toBeNull();
 		expect(row?.children.length).toBe(4);
-		expect(container.innerHTML.length).toBeGreaterThan(200);
+		// ⚠ THE `innerHTML.length > 200` THAT STOOD HERE IS REPLACED. @test-writer
+		// called it near-cosmetic and it was: four empty shells clear 200 characters
+		// on their ATTRIBUTES alone, so it could not distinguish "has content" from
+		// "has testids". Rendered TEXT is the thing that would be missing.
+		expect((row?.textContent ?? "").trim()).toContain("Resolution");
+		expect((row?.textContent ?? "").trim().length).toBeGreaterThan(20);
 	});
 });

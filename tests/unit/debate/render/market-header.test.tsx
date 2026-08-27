@@ -162,16 +162,33 @@ describe("RESO-1 — R-2, the criterion excerpt is gone", () => {
 		expect(container.innerHTML).not.toContain(distinctive);
 	});
 
-	it("market-header::G-1-the-section-label-and-its-hairline-container-are-gone", () => {
-		// R-1. The removed container was the ONLY `[border-top:var(--hairline)]`
-		// node in this header, so its absence is checkable without reaching for the
-		// label text the R-7 fixture now also uses.
+	it("market-header::G-1-every-Resolution-label-belongs-to-a-BLOCK-not-a-section", () => {
+		// R-1 — the SECTION label is gone, asserted structurally rather than by a
+		// class spelling.
+		// ⚠ THIS WAS `not.toContain("[border-top:var(--hairline)]")`, on the stated
+		// premise that "the removed container was the ONLY hairline node in this
+		// header". @test-writer flagged that the premise is unasserted and the
+		// subtree is no longer solely this row's — `ResolverCards` lives there now
+		// and a hairline is exactly what a four-block row acquires next. It was also
+		// a SPELLING pin: `border-t border-n2` or an inline style evade it. Green
+		// today, false-RED on the next styling pass, false-green the day the
+		// spelling changes.
+		// ⇒ THE REAL PROPERTY: the word `Resolution` still appears on this surface
+		// (R-7 ships a block labelled it), and EVERY occurrence must belong to a
+		// block. A surviving section label is an occurrence that does not.
 		const { container } = render(
 			<MarketHeader market={market(3, 5)} priceChart={null} />,
 		);
 		const left = container.querySelector('[data-testid="headzone-left"]');
-		expect(left?.innerHTML).toContain("Attrs Strip Market Question"); // control
-		expect(left?.innerHTML).not.toContain("[border-top:var(--hairline)]");
+		expect(left).not.toBeNull();
+		const leaves = Array.from(left?.querySelectorAll("*") ?? []).filter(
+			(e) => e.children.length === 0 && e.textContent?.trim() === "Resolution",
+		);
+		// CONTROL — the word IS rendered, so the loop below is not vacuous.
+		expect(leaves.length).toBeGreaterThan(0);
+		for (const el of leaves) {
+			expect(el.closest('[data-testid^="resolution-block-"]')).not.toBeNull();
+		}
 	});
 });
 
@@ -209,8 +226,12 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 	const rowOf = (el: Element | null | undefined): Element | null => {
 		let n = el?.parentElement ?? null;
 		while (n) {
-			const c = n.getAttribute("class") ?? "";
-			if (c.includes("flex") && !c.includes("flex-col")) return n;
+			// ⛔ TOKEN MATCH, NOT SUBSTRING. This read
+			// `c.includes("flex") && !c.includes("flex-col")`, and `flex-1` CONTAINS
+			// `flex` — so any `flex-1` ancestor with `display:block` was returned as
+			// "the row" (@test-writer). `ResolverCards`' own row carries `flex-1`.
+			const t = (n.getAttribute("class") ?? "").split(/\s+/);
+			if (t.includes("flex") && !t.includes("flex-col")) return n;
 			n = n.parentElement;
 		}
 		return null;
@@ -237,13 +258,20 @@ describe("RESO-1 — R-3, the meta line and the actions are one row", () => {
 		expect(shared?.contains(meta)).toBe(true);
 		expect(shared?.contains(exportLink as Node)).toBe(true);
 		expect(shared?.contains(badge)).toBe(true);
-		const sharedClass = shared?.getAttribute("class") ?? "";
-		expect(sharedClass).toContain("flex");
-		expect(sharedClass).not.toContain("flex-col");
+		const sharedTokens = (shared?.getAttribute("class") ?? "").split(/\s+/);
+		expect(sharedTokens).toContain("flex");
+		expect(sharedTokens).not.toContain("flex-col");
+		// ⛔ AND IT MAY NOT WRAP OR REVERSE. `flex-wrap` puts the actions on a
+		// SECOND LINE while every source-order and container assertion above stays
+		// green — one row in the markup, two on screen. `flex-col-reverse` and
+		// `flex-row-reverse` invert it without touching source order either.
+		expect(sharedTokens).not.toContain("flex-wrap");
+		expect(sharedTokens).not.toContain("flex-col-reverse");
+		expect(sharedTokens).not.toContain("flex-row-reverse");
 		// R-3 says vertically centred against the meta line. The two children are
 		// different heights (16px strip vs 20px badge row), so this is the
 		// declaration that does the centring, and it is pinned by name.
-		expect(sharedClass).toContain("items-center");
+		expect(sharedTokens).toContain("items-center");
 	});
 
 	it("market-header::G-R3-the-actions-are-pushed-RIGHT-and-the-meta-stays-left", () => {
@@ -429,6 +457,51 @@ describe("HTML-FINISH · MARKET DETAIL — row 4, the chart moves to the rail", 
 		).toContain("Attrs Strip Market Question");
 	});
 
+	it("market-header::G-2-the-rail-renders-IF-AND-ONLY-IF-the-chart-does", () => {
+		// ⛔⛔ THE PROPERTY ITSELF, RATHER THAN A LIST OF SHAPES THAT SATISFY IT.
+		// The three tests around this one pin the gate against three ENUMERATED
+		// inputs (`null`, empty, present), which proves two predicates agree
+		// POINTWISE — `MarketHeader`'s rail gate and `MarketPriceChartHost`'s own
+		// null return — never that they agree. @test-writer's point: a fourth input
+		// shape reopens the defect and no enumeration can be finished.
+		// ⇒ `PD-3-09` / `OD-6` is an EQUIVALENCE — a rail exists exactly when there
+		// is something in it — so state it as one and it holds for any input.
+		// ⚠ The one-point series is in the list deliberately: it is truthy AND
+		// non-empty, so it passes a `length > 0` gate, and it is not exotic (a
+		// market on its first day). Measured: it DOES render the card today, so the
+		// arms agree — but the assertion no longer depends on my having checked.
+		const shapes: Array<{
+			series: PricePointFixture[];
+			nodes: never[];
+		} | null> = [
+			null,
+			{ series: [], nodes: [] },
+			{ series: [CHART_SERIES[0]], nodes: [] },
+			{ series: CHART_SERIES, nodes: [] },
+		];
+		for (const priceChart of shapes) {
+			cleanup();
+			const { container } = render(
+				<MarketHeader market={market(3, 5)} priceChart={priceChart} />,
+			);
+			const right = container.querySelector('[data-testid="headzone-right"]');
+			const card = container.querySelector(
+				'[data-testid="market-price-chart-card"]',
+			);
+			// THE EQUIVALENCE: rail ⟺ chart.
+			expect(right === null).toBe(card === null);
+			// …and PD-3-09 stated verbatim — a rendered rail is never empty.
+			if (right !== null) {
+				expect(right.innerHTML).not.toBe("");
+			}
+			// CONTROL — the header rendered at all, so the nulls above are real
+			// absences rather than a failed render.
+			expect(
+				container.querySelector('[data-testid="headzone-left"]')?.innerHTML,
+			).toContain("Attrs Strip Market Question");
+		}
+	});
+
 	it("market-header::a-PRESENT-series-still-renders-the-rail", () => {
 		// ⛔ THE POSITIVE CONTROL FOR THE ASSERTION ABOVE (OVN-V1). `toBeNull()`
 		// passes just as happily on a component that renders no rail EVER — including
@@ -526,12 +599,42 @@ describe("RESO-1 — R-4, the price bar sits above the block row", () => {
 		expect(bar).toBeLessThan(blocks);
 
 		// ⛔ ADJACENCY, not merely order. R-4 says "DIRECTLY above the block row";
-		// a bar three rows up also satisfies `bar < blocks`. These are siblings, so
-		// the bar's next element sibling is the block row itself.
+		// a bar three rows up also satisfies `bar < blocks`.
+		// ⚠ THIS WAS `barEl.nextElementSibling`, WHICH IS WRONG IN BOTH DIRECTIONS
+		// (@test-writer). Too tight: wrapping the bar in a `<div className="px-4">`
+		// makes it `null` and reds a correct change. Too loose: it proves DOM
+		// adjacency and calls it VISUAL order — `flex-col-reverse` on the stack, or
+		// `order-*` on either child, renders the bar BELOW the row with source
+		// order untouched, which is exactly the defect this guard names.
+		// ⇒ Walk each to its child-of-the-common-ancestor, compare INDICES, and ban
+		// the two CSS inversions explicitly.
 		const barEl = left?.querySelector('[data-size="detail"]');
-		expect(barEl?.nextElementSibling?.getAttribute("data-testid")).toBe(
-			"resolver-cards",
+		const blockEl = left?.querySelector('[data-testid="resolver-cards"]');
+		expect(barEl).not.toBeNull();
+		expect(blockEl).not.toBeNull();
+		let anc: Element | null = barEl?.parentElement ?? null;
+		while (anc && !anc.contains(blockEl as Node)) anc = anc.parentElement;
+		expect(anc).not.toBeNull();
+		const childOf = (parent: Element, el: Element): Element => {
+			let n: Element = el;
+			while (n.parentElement && n.parentElement !== parent) n = n.parentElement;
+			return n;
+		};
+		const kids = Array.from((anc as Element).children);
+		const iBar = kids.indexOf(childOf(anc as Element, barEl as Element));
+		const iBlk = kids.indexOf(childOf(anc as Element, blockEl as Element));
+		expect(iBar).toBeGreaterThan(-1);
+		expect(iBlk).toBe(iBar + 1);
+		// ⛔ THE CSS INVERSIONS, which source order cannot see.
+		const ancTokens = ((anc as Element).getAttribute("class") ?? "").split(
+			/\s+/,
 		);
+		expect(ancTokens).not.toContain("flex-col-reverse");
+		for (const el of [kids[iBar], kids[iBlk]]) {
+			for (const t of (el?.getAttribute("class") ?? "").split(/\s+/)) {
+				expect(t).not.toMatch(/^order-/);
+			}
+		}
 	});
 });
 
