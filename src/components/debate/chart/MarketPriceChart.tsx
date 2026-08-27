@@ -138,7 +138,7 @@ export function MarketPriceChart({
 				   the viewBox to 678×320 without touching it, dropping anisotropy to
 				   0.94395 where no guard was looking, because every guard asserts in
 				   user units and the defect exists only in CSS pixels.
-				   ⛔ IT IS DERIVED, NOT RESTATED. `aspect-[644/320]` would be the
+				   ⛔ IT IS DERIVED, NOT RESTATED. `aspect-[649/320]` would be the
 				   same defect with a newer number; this reads the two constants the
 				   viewBox itself is built from, so the ratio cannot fall out of step
 				   with the box it is meant to match. `tests/unit/debate/chart/
@@ -202,10 +202,21 @@ export function MarketPriceChart({
 			    because it is positioned against the PLOT's x-domain — a date sits
 			    under the series point it names — and moving it out would mean
 			    re-deriving every tick's x in CSS space. That is a real task and it is
-			    not this one. Measured at a pinned 1440×777, `main` at `9d2a920`:
-			    collapsed renders **316 × 137.03** against the CHART-2 viewBox of
-			    644×320, so `scaleX 0.49068` / `scaleY 0.42822` — an anisotropy of
-			    **1.1459**, and a declared 10px date label lands at **4.28px tall**.
+			    not this one. Measured in the CHART-2 contact sheet at a pinned
+			    1440×777: the collapsed `<svg>` renders **288.85 × 137.02** against
+			    the CHART-2 viewBox of 649×320, so `scaleX 0.4451` / `scaleY 0.4282`
+			    — an anisotropy of **1.0394**, and a declared 10px date label lands
+			    at **4.28px tall** (`10 × scaleY`).
+			    ⚠⚠ THIS PARAGRAPH ALSO CARRIED A HYBRID NUMBER, CAUGHT BY
+			    `@code-reviewer` AT THE CASCADE, and the correction matters more than
+			    the digits. It read `316 × 137.03` and `scaleX 0.49068` — the
+			    PRE-change `<svg>` width divided by the POST-change viewBox, giving an
+			    anisotropy of 1.1459 that describes no state this component has ever
+			    been in. The `<svg>` is no longer 316 wide: the label gutter left it,
+			    so it is 288.85. **One measurement from before the change combined
+			    with one constant from after it** — exactly the shape ("one ratio,
+			    written both ways up") that the paragraph immediately below was
+			    rewritten to eliminate, committed in the rewrite itself.
 			    ⚠⚠ THE PARAGRAPH THAT STOOD HERE WAS ARITHMETICALLY WRONG AND IS
 			    CORRECTED RATHER THAN ANNOTATED. It said that CHART-1's widening made
 			    "the anisotropy INVERT to ~0.92: labels are now slightly narrower than
@@ -225,13 +236,13 @@ export function MarketPriceChart({
 			    true on screen, invisible in user units, docketed at CHART-1's Gate C
 			    as a cost to carry. CHART-2 was expected to dissolve it. Measured in
 			    the contact sheet, on this card's real 316px box, in the shipped face:
-			    the plot went **298.29 → 287.05 CSS px, a further 3.8 % NARROWER.**
+			    the plot went **298.29 → 284.85 CSS px, a further 4.5 % NARROWER.**
 			    ⚠ THE GUTTER DID NOT GO AWAY; IT CHANGED CURRENCY. It used to be 38
 			    user units inside the viewBox and is now ~27 CSS px beside it — and it
 			    grew, because the label it holds is a legible 10px rather than a
 			    squashed 5.38px, and a bigger glyph needs more room. **That is the
 			    trade this task made: the line-end labels went 5.38px → 10px, and the
-			    plot paid ~11px of width.** Recorded as a cost, not a recovery,
+			    plot paid ~13px of width.** Recorded as a cost, not a recovery,
 			    because the number says so. */}
 					{mode === "collapsed" && (
 						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
@@ -453,6 +464,23 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 	return (
 		<div
 			data-testid="terminal-label-gutter"
+			// ⛔ ARIA-HIDDEN, AND THIS ATTRIBUTE IS A REGRESSION FIX, NOT TIDINESS.
+			// While the labels were `<text>` they sat inside an `aria-hidden`
+			// `<svg>` and were excluded from every accessible-name computation. Out
+			// here they are ordinary HTML inside the collapsed card's `<button>` and
+			// the Discovery hero's `<Link>`, so they JOINED both accessible names:
+			// measured, the card announced "NO YES Price history: opening 50 %,
+			// current 65 %, …". Two orphan words in front of the sentence that is
+			// supposed to be the readout — and on the hero, in front of a link whose
+			// name length is already a docketed concern (`HeroPanels`, A11Y.0).
+			// ⚠ THE CHART'S ACCESSIBLE CHANNEL IS `ChartSummary` AND ONLY IT. That
+			// is the ruling `C-CHART-1` and SPEC.1 §9 already carry: a screen reader
+			// cannot read a polyline, so announcing the graphic means announcing the
+			// sentence beside it. These two words are a visual key for a visual
+			// mark; they add nothing a reader of the summary does not already have,
+			// and reading them aloud in isolation is noise.
+			// Caught by `@code-reviewer` at the CHART-2 cascade.
+			aria-hidden="true"
 			className="relative shrink-0 pl-[5px] text-[10px] leading-none font-bold tracking-[0.1em]"
 		>
 			{/* ⛔ THE SIZER, AND IT REPLACES A HAND-MEASURED CONSTANT. CHART-1 had to

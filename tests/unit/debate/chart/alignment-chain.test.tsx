@@ -56,34 +56,29 @@ const MODES = ["collapsed", "expanded", "hero"] as const;
 /**
  * The three modes' markup, parsed ONCE for the whole file.
  *
- * ⛔ NO REACT MOUNTING, AND THE REASON IS MEASURED RATHER THAN STYLISTIC. This
- * file's sixteen cases originally called `render()` about forty times between
- * them. Every assertion below reads a class, an attribute or a child order —
- * nothing interacts, nothing re-renders, nothing needs a live React tree — so
- * the mounts bought nothing, and they cost enough to destabilise the run they
- * were part of.
+ * ⛔ THIS FILE USED TO MOUNT, AND THE MOUNTS BOUGHT NOTHING. Nothing here
+ * interacts — every assertion reads an attribute, a class or a child order — and
+ * the near-even sweep alone renders 401 charts in a single case, each of them a
+ * flex frame plus an `<svg>` plus a gutter of three spans since CHART-2. The
+ * server render is also the more honest source: it is the markup that actually
+ * ships, and it is what the `top`-expression case has to read regardless,
+ * because jsdom's CSSOM silently drops nested CSS math.
  *
- * ⚠ WHAT THAT COST LOOKED LIKE, because it was not obvious and cost a long
- * detour to find. With this file mounting, the FULL suite failed 34, then 63,
- * then 161 DB-backed tests across three passes — foreign-key violations
- * (`23503`), deadlocks (`40P01`) and statement timeouts (`57014`) in files this
- * task never touched, and a different set each run. The same suite was green at
- * the base commit, green with this task's `src/` changes and the base tests,
- * green with this file removed, and green with a trivial file at this exact
- * path — which is what proved it was this file's CONTENT and not its presence
- * or the sequencer's ordering. `vitest.config.ts` sets `fileParallelism: false`
- * precisely because DB files racing each other produce those three error codes;
- * the mounts pushed the run slow enough for a `TRUNCATE … CASCADE` to hit the
- * 10s `hookTimeout`, and a half-truncated fixture set is what the next file's
- * foreign keys then failed against.
- *
- * ⚠ SO THE HARNESS CHANGED AND NOT ONE ASSERTION DID. Reading the SERVER render
- * is also the more honest source: it is the markup that actually ships, and it
- * is what `terminal-markers.test.tsx` had to fall back to anyway for the `top`
- * expression, because jsdom's CSSOM silently drops nested CSS math.
- *
- * ⚠ AND IT REMAINS A jsdom FILE (`@vitest-environment jsdom`, line 1) — not for
- * React, but because `DOMParser` is a browser API this parse needs.
+ * ⚠ WHAT WAS MEASURED, AND WHAT IS **NOT** ESTABLISHED (O-13). With the mounts,
+ * the FULL suite intermittently failed 28–161 DB-backed tests in files this task
+ * never touches, with foreign-key violations (23503), deadlocks (40P01) and
+ * statement timeouts (57014), a different set each pass; removing this file, or
+ * replacing it with a trivial file at the same path, was green. After
+ * de-mounting, two passes gave 0 and 4. **But the base commit, re-measured under
+ * the same machine conditions, also failed 1** — so the suite has a
+ * load-sensitive fragility of its own and this change reduced a contribution to
+ * it rather than curing it.
+ * ⛔ THE MECHANISM IS A HYPOTHESIS, NOT A FINDING, and it is written down as one
+ * because the obvious objection is good: `vitest.config.ts` sets
+ * `fileParallelism: false`, so a unit file completes before any DB file starts,
+ * and a simple "this file slowed that file down" story does not survive that.
+ * What is solid is the bisect; the causal chain is not, and nobody should cite
+ * it later as though it were.
  */
 const PARSED = new Map<(typeof MODES)[number], HTMLElement>();
 

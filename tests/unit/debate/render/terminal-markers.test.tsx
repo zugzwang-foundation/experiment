@@ -6,6 +6,7 @@ import {
 	SVG_W,
 	TERMINAL_DOT_R,
 	TERMINAL_LABEL_MIN_GAP,
+	TERMINAL_PULSE_PEAK_SCALE,
 	VIEWBOX_H,
 	VIEWBOX_W,
 	yNoPx,
@@ -101,23 +102,29 @@ function pct(p: number): string {
 /**
  * Render a mode to markup and parse it — NO React mounting.
  *
- * ⛔ THIS FILE USED TO MOUNT, AND THE COST WAS NOT ACADEMIC. The near-even sweep
- * below renders 401 charts in a single case, and since CHART-2 each chart is a
- * flex frame plus an `<svg>` plus an HTML gutter holding three spans. Nothing in
- * this file interacts — every assertion reads an attribute, a class or a child
- * order — so the mounts bought nothing and cost enough to destabilise the run
- * they were part of: with them, the FULL suite intermittently failed 28–161
- * DB-backed tests in files this task never touches, with foreign-key violations
- * (23503), deadlocks (40P01) and statement timeouts (57014), a different set
- * each pass. `vitest.config.ts` runs DB files one at a time precisely to prevent
- * those three codes; a run slow enough for a `TRUNCATE … CASCADE` to hit the 10s
- * hook timeout leaves the next file's fixtures half-built, and its foreign keys
- * then fail. The base commit was green three times for three; the difference was
- * render cost, not logic.
+ * ⛔ THIS FILE USED TO MOUNT, AND THE MOUNTS BOUGHT NOTHING. Nothing here
+ * interacts — every assertion reads an attribute, a class or a child order — and
+ * the near-even sweep alone renders 401 charts in a single case, each of them a
+ * flex frame plus an `<svg>` plus a gutter of three spans since CHART-2. The
+ * server render is also the more honest source: it is the markup that actually
+ * ships, and it is what the `top`-expression case has to read regardless,
+ * because jsdom's CSSOM silently drops nested CSS math.
  *
- * ⚠ AND THE SERVER RENDER IS THE MORE HONEST SOURCE ANYWAY — it is the markup
- * that actually ships, and it is what the `top`-expression case has to read
- * regardless, because jsdom's CSSOM silently drops nested CSS math.
+ * ⚠ WHAT WAS MEASURED, AND WHAT IS **NOT** ESTABLISHED (O-13). With the mounts,
+ * the FULL suite intermittently failed 28–161 DB-backed tests in files this task
+ * never touches, with foreign-key violations (23503), deadlocks (40P01) and
+ * statement timeouts (57014), a different set each pass; removing this file, or
+ * replacing it with a trivial file at the same path, was green. After
+ * de-mounting, two passes gave 0 and 4. **But the base commit, re-measured under
+ * the same machine conditions, also failed 1** — so the suite has a
+ * load-sensitive fragility of its own and this change reduced a contribution to
+ * it rather than curing it.
+ * ⛔ THE MECHANISM IS A HYPOTHESIS, NOT A FINDING, and it is written down as one
+ * because the obvious objection is good: `vitest.config.ts` sets
+ * `fileParallelism: false`, so a unit file completes before any DB file starts,
+ * and a simple "this file slowed that file down" story does not survive that.
+ * What is solid is the bisect; the causal chain is not, and nobody should cite
+ * it later as though it were.
  */
 function parseChart(html: string): HTMLElement {
 	return new DOMParser().parseFromString(html, "text/html").body;
@@ -562,11 +569,19 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 
 		expect(h).toBe(VIEWBOX_H);
 		expect(w).toBe(SVG_W);
-		// Wide enough that the dot cannot clip…
-		expect(w).toBeGreaterThanOrEqual(VIEWBOX_W + TERMINAL_DOT_R);
-		// …and no wider than the dot needs. 38 units of label gutter would fail
-		// this, which is the regression it exists to catch.
-		expect(w - VIEWBOX_W).toBeLessThanOrEqual(TERMINAL_DOT_R + 2);
+		// ⛔ THE BOUND IS THE LARGEST MARK, NOT THE SMALLEST — corrected at the
+		// CHART-2 cascade, where this assertion was actively FORBIDDING the fix to
+		// a real defect. It read `<= TERMINAL_DOT_R + 2`, i.e. 5 units, sized for
+		// the r=3 dot alone. The pulse ring is that circle at 2.4×, so it needs
+		// 7.2, and the allowance had to grow past the cap this line imposed. A
+		// guard derived from one mark, policing a budget shared by three.
+		const peak = TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE;
+		// Wide enough that the largest terminal mark cannot clip…
+		expect(w).toBeGreaterThanOrEqual(VIEWBOX_W + peak);
+		// …and no wider than that mark needs, so the label gutter cannot creep
+		// back into the viewBox: 38 units would fail this, which is the CHART-1
+		// regression it exists to catch.
+		expect(w - VIEWBOX_W).toBeLessThanOrEqual(Math.ceil(peak) + 1);
 	});
 
 	for (const mode of ["collapsed", "expanded", "hero"] as const) {
@@ -674,6 +689,95 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 			);
 			expect(firstPct).toBeCloseTo((dotCy / VIEWBOX_H) * 100, 3);
 		}
+	});
+
+	// ⛔ THE CSS-SPACE HALF OF THE MECHANISM, WHICH NOTHING GUARDED. `upperTop`,
+	// `lowerTop`, the `yesOnTop` branch that decides which label gets which, and
+	// `LABEL_HALF_BOX_PX` had no test at all: swapping the two helpers — in one
+	// branch or both — passed every assertion in this repository, including the
+	// case above that reads the shipped `top` string, because that case accepts
+	// `min|max` alternatively, finds `50%` in both forms, and takes the FIRST
+	// percentage, which is identical either way. Everything else here reads
+	// `data-plot-y`, which is clause 4's raw output and never passes through the
+	// conversion.
+	// ⛔ WHAT A SWAP SHIPS: at YES = 49 % the NO dot sits above the YES dot, but
+	// the NO label would be floored to `50% + 5px` and the YES label to
+	// `50% − 5px` — **each name sitting on the other's line**, in the band where
+	// every market rests. A pole inversion in the one element whose whole job is
+	// to say which line is which.
+	// Caught by `@code-reviewer` at the CHART-2 cascade.
+	for (const [label, p] of [
+		["YES on top (YES 65 %)", 0.65],
+		["NO on top (YES 35 %)", 0.35],
+	] as const) {
+		it(`${label}: the UPPER label is floored upward and the LOWER downward`, () => {
+			const html = renderToStaticMarkup(
+				<MarketPriceChart
+					series={seriesEndingAt(pct(p))}
+					mode="collapsed"
+					isOpen={true}
+				/>,
+			);
+			const read = (side: "yes" | "no") => {
+				const m = html.match(
+					new RegExp(
+						`terminal-label-${side}"[^>]*data-plot-y="([^"]*)"[^>]*style="top:([^"]*)"`,
+					),
+				);
+				return { plotY: Number(m?.[1]), top: m?.[2] ?? "" };
+			};
+			const yes = read("yes");
+			const no = read("no");
+
+			// Non-vacuity: both were found and they are genuinely on opposite
+			// sides — without this the comparisons below could pass on two NaNs.
+			expect(Number.isFinite(yes.plotY)).toBe(true);
+			expect(Number.isFinite(no.plotY)).toBe(true);
+			expect(yes.plotY).not.toBe(no.plotY);
+
+			const upper = yes.plotY < no.plotY ? yes : no;
+			const lower = yes.plotY < no.plotY ? no : yes;
+
+			// The upper one may only be pushed UP toward the midline…
+			expect(upper.top).toContain("min(");
+			expect(upper.top).toContain("calc(50% - ");
+			expect(upper.top).not.toContain("max(");
+			expect(upper.top).not.toContain("calc(50% + ");
+			// …and the lower one only DOWN.
+			expect(lower.top).toContain("max(");
+			expect(lower.top).toContain("calc(50% + ");
+			expect(lower.top).not.toContain("min(");
+			expect(lower.top).not.toContain("calc(50% - ");
+		});
+	}
+
+	it("the CSS half-box is half the type the gutter actually declares", () => {
+		// ⛔ `LABEL_HALF_BOX_PX` COULD BE ANY NUMBER AND NOTHING NOTICED. Set it to
+		// 2 and the labels overlap again — the defect this whole mechanism exists
+		// to prevent — or to 8 and they splay. It is meaningful only as HALF THE
+		// RENDERED BOX, so it is pinned against the type size the gutter declares
+		// rather than asserted as a literal.
+		const html = renderToStaticMarkup(
+			<MarketPriceChart
+				series={seriesEndingAt(pct(0.5))}
+				mode="collapsed"
+				isOpen={true}
+			/>,
+		);
+		const declared = Number(
+			html.match(/terminal-label-gutter"[^>]*text-\[(\d+)px\]/)?.[1],
+		);
+		const halfBox = Number(
+			html.match(
+				/terminal-label-yes"[^>]*style="top:clamp\((\d+(?:\.\d+)?)px/,
+			)?.[1],
+		);
+		expect(declared).toBe(10);
+		expect(halfBox).toBe(declared / 2);
+		// The same number is the midline offset and the edge floor — one box, one
+		// half, used in both places.
+		expect(html).toContain(`calc(50% - ${halfBox}px)`);
+		expect(html).toContain(`calc(100% - ${halfBox}px)`);
 	});
 
 	it("the legend C-CHART-1 clause 3 ratified is gone, not restyled", () => {

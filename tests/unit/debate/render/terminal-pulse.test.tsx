@@ -4,6 +4,12 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import {
+	SVG_W,
+	TERMINAL_DOT_R,
+	TERMINAL_PULSE_PEAK_SCALE,
+	VIEWBOX_W,
+} from "@/components/debate/chart/geometry";
 import { MarketPriceChart } from "@/components/debate/chart/MarketPriceChart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
@@ -37,8 +43,9 @@ const MODES = ["collapsed", "expanded", "hero"] as const;
 
 /**
  * Parsed markup, not a mounted tree — see `terminal-markers.test.tsx`'s
- * `parseChart` for why (nothing here interacts, and the mounts were destabilising
- * the DB-backed half of the full suite by slowing it past its hook timeouts).
+ * `parseChart` for the full rationale and for what is measured versus merely
+ * hypothesised about the DB-suite instability that prompted it. Short version:
+ * nothing here interacts, so the mounts bought nothing.
  */
 function renderChart(mode: (typeof MODES)[number], isOpen: boolean) {
 	return {
@@ -235,6 +242,35 @@ describe("C-CHART-2 clause 7 — motion is CSS, at canon's values, and freezes",
 		expect(CSS).toMatch(/opacity:\s*0\.2/);
 		// Growing out of its own centre rather than sliding off it.
 		expect(CSS).toContain("transform-box: fill-box");
+	});
+
+	it("the keyframe's peak scale is the one the viewBox budgeted for", () => {
+		// ⛔ TWO FILES, ONE NUMBER, AND THE VIEWBOX DEPENDS ON IT. The ring is the
+		// widest mark the chart draws: `TERMINAL_DOT_R × scale`, reaching 7.2 user
+		// units at 2.4. `TERMINAL_DOT_ALLOWANCE` is derived from exactly that, so
+		// the halo is not cut by the `<svg>`'s own edge — which it WAS, by 3.2
+		// units, until the CHART-2 cascade caught it: the allowance had been sized
+		// for the r=3 dot and was then spent by a mark 2.4× larger.
+		// ⛔ SO THE TWO ARE READ AND COMPARED, never restated. Raising the CSS
+		// scale without raising the allowance re-clips the ring; this reds instead.
+		// Same shape as the container/viewBox lock, for the same reason.
+		// ⚠ THE PEAK, NOT THE FIRST MATCH. The keyframe carries `scale(1)` at its
+		// 0 %/100 % stops and the peak at 50 %; a lazy `.match()` returns the 1 and
+		// would compare the resting size against the budget, passing for any peak
+		// whatsoever — the assertion would be exactly backwards.
+		const block =
+			CSS.match(/@keyframes chart-terminal-pulse\s*\{([\s\S]*?)\n\}/)?.[1] ??
+			"";
+		const scales = [...block.matchAll(/scale\(([\d.]+)\)/g)].map((m) =>
+			Number(m[1]),
+		);
+		expect(scales.length).toBeGreaterThan(1);
+		const inCss = Math.max(...scales);
+		expect(Number.isFinite(inCss)).toBe(true);
+		expect(inCss).toBe(TERMINAL_PULSE_PEAK_SCALE);
+
+		// …and the viewBox actually contains a ring at that scale.
+		expect(SVG_W - VIEWBOX_W).toBeGreaterThanOrEqual(TERMINAL_DOT_R * inCss);
 	});
 
 	it("prefers-reduced-motion freezes the pulse — and the branch is PROVEN entered", () => {

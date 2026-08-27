@@ -98,7 +98,7 @@ export function MarketPriceChartOverlay({
 				    div by an aspect would size plot + gutter together and mis-shape
 				    the plot by the gutter's width. `w-full` and nothing else; the
 				    plot derives its own height from `SVG_W / VIEWBOX_H`.
-				    ⚠ Replacing the literal with `aspect-[644/320]` was considered and
+				    ⚠ Replacing the literal with `aspect-[649/320]` was considered and
 				    rejected by ruling: it is the same defect with a newer number.
 				    `C-CHART-1` clause 4 now states a relationship, and
 				    `container-viewbox-lock.test.tsx` asserts it. */}

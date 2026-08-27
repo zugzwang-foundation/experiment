@@ -13,11 +13,12 @@
  * ⚠ "FULL-BLEED" DESCRIBES THE PLOT, NOT THE `<svg>`, and at CHART-2 the two
  * came back almost into line. `C-CHART-2` clause 3 no longer puts a LABEL
  * gutter in the viewBox — the labels are HTML beside the plot now — so all the
- * viewBox still reserves is a **dot allowance**, `TERMINAL_DOT_ALLOWANCE`,
- * enough that the terminal circle at `cx = VIEWBOX_W` cannot half-clip on the
- * right edge. The plot is full-bleed across `VIEWBOX_W × VIEWBOX_H`, `xPx`
+ * viewBox still reserves is a **terminal allowance**, `TERMINAL_DOT_ALLOWANCE`,
+ * enough that the widest mark drawn at `cx = VIEWBOX_W` — the pulse RING, not
+ * the dot — cannot half-clip on the right edge. The plot is full-bleed across
+ * `VIEWBOX_W × VIEWBOX_H`, `xPx`
  * still maps a domain onto 0…640, no plotted coordinate has ever moved, and
- * the `<svg>` is `SVG_W` wide — but `SVG_W` is now 644 rather than 678, which
+ * the `<svg>` is `SVG_W` wide — but `SVG_W` is now 649 rather than 678, which
  * is what gives the plot back the width CHART-1 spent on text. Y is untouched
  * and full-bleed outright.
  *
@@ -36,11 +37,45 @@ export const VIEWBOX_H = 320;
 export const TERMINAL_DOT_R = 3;
 
 /**
- * The ONLY thing the viewBox reserves to the right of the plot — `C-CHART-2`
- * clause 3, as amended at CHART-2. The terminal dot is centred at
- * `cx = VIEWBOX_W`, so without an allowance its right half would sit outside
- * the viewBox and an `<svg>` clips there by default. Radius plus one unit of
- * air.
+ * The pulse ring's peak scale (`C-CHART-2` clause 7).
+ *
+ * ⛔ IT LIVES HERE AND NOT ONLY IN THE KEYFRAME BECAUSE THE VIEWBOX HAS TO
+ * BUDGET FOR IT. The animation itself runs in CSS — this constant is never
+ * applied to anything; it exists so `TERMINAL_DOT_ALLOWANCE` below can be
+ * derived from the LARGEST mark the viewBox must contain rather than from the
+ * smallest. `tests/unit/debate/render/terminal-pulse.test.tsx` reads the
+ * `scale()` out of `globals.css` and asserts it equals this number, so the two
+ * cannot drift — the same read-both-and-compare shape as the container/viewBox
+ * lock, and for the same reason.
+ */
+export const TERMINAL_PULSE_PEAK_SCALE = 2.4;
+
+/**
+ * What the viewBox reserves to the right of the plot — `C-CHART-2` clause 3, as
+ * amended at CHART-2. The terminal marks are centred at `cx = VIEWBOX_W`, so
+ * without an allowance their right halves sit outside the viewBox, and an
+ * `<svg>` clips there by default.
+ *
+ * ⛔ SIZED TO THE RING, NOT THE DOT, AND THAT CORRECTION IS THE WHOLE POINT OF
+ * THIS DOCBLOCK. It was `TERMINAL_DOT_R + 1` = 4 — correct for the r=3 dot and
+ * for nothing else. The pulse ring added in the same commit range is the same
+ * circle scaled to 2.4, so its outer edge reaches **7.2** units and the halo was
+ * cut by a straight vertical chord 3.2 units outside the box: barely visible on
+ * the collapsed card, roughly 4 CSS px off a 9 px radius on the expanded
+ * overlay. **A length that was right for one mark, reused as the budget for a
+ * larger one** — the exact failure this task exists to correct, committed inside
+ * the task correcting it. Caught by `@code-reviewer` at the CHART-2 cascade.
+ * ⚠ THE COST IS REAL AND SMALL: the allowance goes 4 → 9, so the plot takes
+ * 640/649 = 98.6 % of the `<svg>` rather than the 99.4 % a dot-sized allowance
+ * would have bought. The expanded post nodes
+ * (`r=4` plus a 1.5px rim) also fit now, which they did not at 4.
+ * ⚠ WHAT THIS DOES **NOT** FIX, said rather than left to be discovered: the ring
+ * still clips VERTICALLY on a market near 0 % or 100 %, because the dot sits at
+ * its true `cy` and a price of 99 % puts that 3.2 units from the top edge. The
+ * dot marks a price and may not be moved to flatter a decoration, and padding
+ * the viewBox vertically would rescale `yYesPx`/`yNoPx` for every chart in the
+ * product. A halo trimmed at the very top of an almost-resolved market is the
+ * honest cost of both of those.
  *
  * ⛔ THIS REPLACES A 38-UNIT LABEL GUTTER, AND THE DELETION IS THE POINT.
  * CHART-1 sized that gutter by hand-measuring the string `YES` at 23.41 user
@@ -52,21 +87,22 @@ export const TERMINAL_DOT_R = 3;
  * deleted rather than left stale, and no constant in this module encodes a
  * string's width any more.
  */
-export const TERMINAL_DOT_ALLOWANCE = TERMINAL_DOT_R + 1;
+export const TERMINAL_DOT_ALLOWANCE =
+	Math.ceil(TERMINAL_DOT_R * TERMINAL_PULSE_PEAK_SCALE) + 1;
 
 /**
- * The `<svg viewBox>` width — the plot plus the dot allowance. **644.**
+ * The `<svg viewBox>` width — the plot plus the terminal allowance. **649.**
  *
  * ⛔ IT IS STILL ADDED TO THE VIEWBOX RATHER THAN SUBTRACTED FROM THE PLOT, so
  * `VIEWBOX_W` remains the PLOT width, `xPx` still maps the domain onto 0…640,
  * and no plotted coordinate has moved at CHART-1 or here. What changed is the
- * SIZE of the addition: 38 → 4.
+ * SIZE of the addition: 38 → 9.
  *
  * ⚠ AND THAT IS A USER-SPACE FACT WITH A CSS-PIXEL CONSEQUENCE, which is the
  * distinction CHART-1 got wrong. Because `preserveAspectRatio="none"` maps the
  * whole viewBox onto the CSS box, a wider viewBox renders the PLOT narrower in
  * the same box: at 678 the plot took 640/678 = 94.4 % of the `<svg>`'s width.
- * At 644 it takes 640/644 = **99.4 %**.
+ * At 649 it takes 640/649 = **98.6 %**.
  *
  * ⛔⛔ THAT IS NOT THE SAME AS THE PLOT GETTING WIDER, AND MEASUREMENT SAYS IT
  * DID NOT. The CHART-2 brief predicted this change would "close the docketed D4
@@ -77,28 +113,46 @@ export const TERMINAL_DOT_ALLOWANCE = TERMINAL_DOT_R + 1;
  * real 316px box:
  *
  *     before  svg 316.00 wide, viewBox 678  →  plot 298.29 CSS px
- *     after   svg 288.85 wide, viewBox 644  →  plot 287.05 CSS px   (−11.24 px)
+ *     after   svg 288.85 wide, viewBox 649  →  plot 284.85 CSS px   (−13.44 px)
  *
- * **The plot is ~3.8 % NARROWER than CHART-1 left it, not 5.3 % wider.** A
+ * **The plot is ~4.5 % NARROWER than CHART-1 left it, not 5.3 % wider.** A
  * gutter has to be taken from somewhere, and moving it out of the viewBox moves
  * where it is taken from without making it free — it makes it BIGGER, because
  * the label inside it is now a legible 10px instead of a squashed 5.38px and a
  * bigger glyph needs more room. That is the trade, stated plainly rather than
  * booked as a recovery: **the two words at the line ends went from 5.38px to
- * 10px, and the plot paid 11px of width for it.**
- * ⚠ What the 99.4 % figure IS good for is the thing it actually governs — the
+ * 10px, and the plot paid 13.44px of width for it.**
+ * ⚠ What the 98.6 % figure IS good for is the thing it actually governs — the
  * DATE LABELS still inside the `<svg>`, whose distortion fell from an anisotropy
- * of 1.0885 to 1.0475 because the viewBox is closer to the box's own shape.
+ * of 1.0885 to 1.0394 because the viewBox is closer to the box's own shape.
  */
 export const SVG_W = VIEWBOX_W + TERMINAL_DOT_ALLOWANCE;
 
 /** Minimum vertical centre-to-centre distance between the two end labels before
- * they read as one smudge: the 10px type plus 2px of air. */
+ * they read as one smudge, **in PLOT USER UNITS**: ten units of type plus two of
+ * air.
+ * ⛔ THOSE UNITS ARE NOT CSS PIXELS ANY MORE, AND THIS DOCBLOCK SAID THEY WERE.
+ * It read "the 10px type plus 2px of air", which was exact while the label was
+ * SVG `<text>` at `font-size: 10` in this same space. Since CHART-2 the label is
+ * HTML at 10 **CSS px**, and a plot unit is 0.42822 CSS px on the collapsed card
+ * — so twelve of them is **5.14 px** between two boxes that are 10 px tall.
+ * ⚠ THE CONSTANT IS STILL RIGHT AND STILL USED; what changed is that it is no
+ * longer SUFFICIENT on its own. `terminalLabelYs` below is unchanged (clause 4
+ * is a scope fence) and still separates in plot space; the CSS-pixel floor that
+ * makes the separation hold on every surface lives in `MarketPriceChart`'s
+ * `upperTop`/`lowerTop`. Read this number as "clause 4's own threshold", never
+ * as "the gap the reader sees". */
 export const TERMINAL_LABEL_MIN_GAP = 12;
 
-/** Keep a label's centre far enough inside the plot that its 10px box stays
- * within the plot's vertical extent (`C-CHART-2` clause 3, "clamped inside the
- * plot's vertical extent"). 6 is half that box. */
+/** Keep a label's centre far enough inside the plot that its box stays within
+ * the plot's vertical extent (`C-CHART-2` clause 3). **6 is half the box IN
+ * PLOT UNITS**, which is what this function works in.
+ * ⛔ SAME UNIT CORRECTION AS `TERMINAL_LABEL_MIN_GAP` ABOVE: this said "its 10px
+ * box … 6 is half that box", true of a 10-UNIT `<text>` and false of the 10-CSS-
+ * PX HTML label the chart ships since CHART-2 — six plot units is 2.57 px of
+ * clearance on the collapsed card for a 5 px half-box. The floor that actually
+ * holds the edges is the outer `clamp()` in `MarketPriceChart`'s `upperTop`/
+ * `lowerTop`; this one keeps clause 4's own arithmetic inside its own space. */
 function clampLabelY(y: number): number {
 	return Math.min(Math.max(y, 6), VIEWBOX_H - 6);
 }
