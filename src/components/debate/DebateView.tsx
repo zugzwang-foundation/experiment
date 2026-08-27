@@ -9,7 +9,7 @@ import {
 } from "react";
 
 import { PageContainer } from "@/components/shell/PageContainer";
-
+import { CriterionDisclosure } from "./CriterionDisclosure";
 import { AuthGateSlot } from "./composer/AuthGateSlot";
 import { BetComposer } from "./composer/BetComposer";
 import { deriveReplySide } from "./composer/gating";
@@ -718,6 +718,29 @@ export function DebateView({
 					</div>
 				</>
 			)}
+
+			{/* ⚠⚠ CRIT-1 — THE RESOLUTION CRITERION, AND ITS PARENT IS THE DECISION.
+			    It sits here, as a direct child of the one-screen container AFTER the
+			    market↔post ternary, rather than inside either arm.
+			    ⇒ WHY HERE: one authoring site renders it on BOTH ARMS. The capability
+			    CRIT-1 exists to restore is that the binding terms are findable by
+			    find-in-page; mounting it inside the market arm would silently drop
+			    that in post focus, which is half the surface. The alternative —
+			    duplicating it into both arm fragments — buys adjacency to the header
+			    at the cost of two authoring sites for one element.
+			    ⛔ NOT IN `headzone-stack`, AND NOT INSIDE THE BAND. The band is
+			    `shrink-0 basis-[24.2dvh]` and its interior budget is fully allocated:
+			    RESO-1 closed that stack at scroll 188 vs client 188 — exactly zero
+			    overflow — and that was a deliverable. Anything added inside it comes
+			    straight back out of the four-block row.
+			    ⚠ IT IS NOT FREE, AND THE COST IS NAMED RATHER THAN ASSUMED AWAY. This
+			    container is a FIXED `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`
+			    and the arena is its only `flex-1`, so the disclosure's height comes
+			    out of the ARENA — roughly its summary plus this container's `gap-3`
+			    while closed. That is the right trade: the arena's columns scroll
+			    internally, which is this surface's ruled overflow posture, while the
+			    band and the header stack are untouched. */}
+			<CriterionDisclosure description={market.description} />
 
 			<PostPopup post={popupPost} onClose={() => setPopupPost(null)} />
 			<ReplyPopup reply={popupReply} onClose={() => setPopupReply(null)} />

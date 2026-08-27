@@ -313,3 +313,79 @@ describe("debate height chain — the arena band takes the leftover", () => {
 		expect(source).toContain("flex min-h-0 flex-1 flex-col gap-3");
 	});
 });
+
+/**
+ * CRIT-1 · G-5 — THE CHAIN GAINS A NODE, AND THE BAND MUST NOT PAY FOR IT.
+ *
+ * The criterion disclosure is a new flex item of the one-screen container. That
+ * container is a FIXED `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`, so
+ * every child's height comes out of somewhere — and the only thing that may give
+ * is the ARENA, which is the container's sole `flex-1` and whose columns scroll
+ * internally. The band must NOT give: it is `shrink-0 basis-[24.2dvh]`, and
+ * RESO-1 closed `headzone-stack` at scroll 188 vs client 188 — exactly zero
+ * overflow, down from +14. That was a deliverable, and this is what stops the
+ * next change from spending it.
+ *
+ * ⚠ WHY A SOURCE SCAN AND NOT A MEASUREMENT. jsdom performs no layout — it
+ * resolves no `calc()`, no `dvh`, no flex — so `scrollHeight`/`clientHeight` here
+ * are meaningless. What IS checkable is the STRUCTURAL property that protects the
+ * band: the disclosure is a sibling of the band, never a descendant of it. The
+ * rendered scroll-vs-client equality is measured in a browser at the RESO-1
+ * viewport ladder and reported in the CRIT-1 run log.
+ */
+describe("debate height chain — CRIT-1's criterion disclosure", () => {
+	const DISCLOSURE = "src/components/debate/CriterionDisclosure.tsx";
+
+	it("debate-height::the-disclosure-is-NOT-inside-the-band-or-the-header-stack", () => {
+		// ⛔ THE WALL, ASSERTED. Anything mounted inside `headzone-stack` comes
+		// straight back out of the four-block row, which is fully allocated.
+		for (const file of [HEADZONE, "src/components/debate/MarketHeader.tsx"]) {
+			const source = read(file);
+			expect(source).not.toContain("CriterionDisclosure");
+			expect(source).not.toContain("criterion-disclosure");
+		}
+		// …and the positive control: it IS mounted, in the view that owns the
+		// container. Without this the negatives above pass on a component nobody
+		// renders at all.
+		expect(read(VIEW)).toContain("<CriterionDisclosure");
+	});
+
+	it("debate-height::the-disclosure-is-a-DIRECT-child-of-the-one-screen-container", () => {
+		const source = read(VIEW);
+		// It must sit AFTER the market↔post ternary closes and BEFORE the overlays,
+		// which is what makes it a sibling of the arena rather than a child of
+		// either arm — and what makes one authoring site serve both arms.
+		const mount = source.indexOf("<CriterionDisclosure");
+		const popup = source.indexOf("<PostPopup");
+		const container = source.indexOf("<PageContainer");
+		expect(mount).toBeGreaterThan(-1);
+		expect(popup).toBeGreaterThan(-1);
+		expect(container).toBeGreaterThan(-1);
+		expect(mount).toBeGreaterThan(container);
+		expect(mount).toBeLessThan(popup);
+	});
+
+	it("debate-height::the-disclosure-does-not-grow-and-bounds-its-own-open-body", () => {
+		const source = read(DISCLOSURE);
+		const classAttrs = [...source.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
+
+		const details = classAttrs.find((c) => c.split(/\s+/).includes("shrink-0"));
+		// `shrink-0` — the summary is never crushed. This surface has a MEASURED
+		// precedent for the alternative: an `<h1>` carrying `overflow:hidden`
+		// rendered 0px tall when flex-shrink squeezed it.
+		expect(details).toBeDefined();
+		expect(details?.split(/\s+/)).not.toContain("flex-1");
+
+		// ⛔ THE OPEN BODY IS BOUNDED AND SCROLLS ITSELF. Unbounded open content in
+		// an `overflow-hidden` one-screen container is CLIPPED, which this file's
+		// own doctrine calls a failure rather than a pass. The bound is a viewport
+		// FRACTION, matching the band's own `basis-[24.2dvh]` — a pixel cap would be
+		// correct at exactly one viewport height.
+		const body = classAttrs.find((c) => c.includes("overflow-y-auto"));
+		expect(body).toBeDefined();
+		expect(body).toMatch(/max-h-\[\d+(\.\d+)?dvh\]/);
+	});
+});
