@@ -218,14 +218,21 @@ export function MarketPriceChart({
 			    `scaleX/scaleY`. **One ratio, written both ways up, inside one
 			    paragraph** — and nothing could catch it, because no guard in this
 			    repo measures a CSS pixel.
-			    ✅ ITS SUBSTANTIVE HALF WAS CORRECT AND IS NOW DISCHARGED. Because
-			    `preserveAspectRatio="none"` maps the WHOLE viewBox onto the CSS box,
-			    the 678-wide box rendered the PLOT ≈5.6 % narrower in the same space —
-			    true on screen, invisible in user units, and docketed at CHART-1's
-			    Gate C as a cost to carry. CHART-2 dissolves it instead: the viewBox is
-			    644 wide, the plot takes 640/644 = **99.4 %** of the box against
-			    640/678 = 94.4 % before, **recovering ≈5.3 of the 5.6 points.** The
-			    residual 0.62 % is the dot allowance. */}
+			    ⛔ ITS SUBSTANTIVE HALF WAS CORRECT AND IS **NOT** DISCHARGED — and
+			    this paragraph said it was, on a prediction, before the measurement
+			    came back. Because `preserveAspectRatio="none"` maps the WHOLE viewBox
+			    onto the CSS box, the 678-wide box rendered the PLOT ≈5.6 % narrower —
+			    true on screen, invisible in user units, docketed at CHART-1's Gate C
+			    as a cost to carry. CHART-2 was expected to dissolve it. Measured in
+			    the contact sheet, on this card's real 316px box, in the shipped face:
+			    the plot went **298.29 → 287.05 CSS px, a further 3.8 % NARROWER.**
+			    ⚠ THE GUTTER DID NOT GO AWAY; IT CHANGED CURRENCY. It used to be 38
+			    user units inside the viewBox and is now ~27 CSS px beside it — and it
+			    grew, because the label it holds is a legible 10px rather than a
+			    squashed 5.38px, and a bigger glyph needs more room. **That is the
+			    trade this task made: the line-end labels went 5.38px → 10px, and the
+			    plot paid ~11px of width.** Recorded as a cost, not a recovery,
+			    because the number says so. */}
 					{mode === "collapsed" && (
 						<CollapsedAxis series={series} startMs={startMs} endMs={endMs} />
 					)}

@@ -65,10 +65,30 @@ export const TERMINAL_DOT_ALLOWANCE = TERMINAL_DOT_R + 1;
  * ⚠ AND THAT IS A USER-SPACE FACT WITH A CSS-PIXEL CONSEQUENCE, which is the
  * distinction CHART-1 got wrong. Because `preserveAspectRatio="none"` maps the
  * whole viewBox onto the CSS box, a wider viewBox renders the PLOT narrower in
- * the same box: at 678 the plot took 640/678 = 94.4 % of the width, so every
- * `/m/[slug]` chart drew ≈5.6 % narrower than it had. At 644 it takes
- * 640/644 = 99.4 %. **That recovers ≈5.3 of the 5.6 points**; the residual
- * 0.62 % is the dot allowance and is the price of the dot not clipping.
+ * the same box: at 678 the plot took 640/678 = 94.4 % of the `<svg>`'s width.
+ * At 644 it takes 640/644 = **99.4 %**.
+ *
+ * ⛔⛔ THAT IS NOT THE SAME AS THE PLOT GETTING WIDER, AND MEASUREMENT SAYS IT
+ * DID NOT. The CHART-2 brief predicted this change would "close the docketed D4
+ * 5.6 % item". **It does not, and the honest number is the other way.** The
+ * `<svg>` no longer occupies the whole container: the label gutter is CSS now,
+ * so it takes its width from the ROW rather than from the viewBox. Measured in
+ * the CHART-2 contact sheet, in the shipped Geist face, on the collapsed card's
+ * real 316px box:
+ *
+ *     before  svg 316.00 wide, viewBox 678  →  plot 298.29 CSS px
+ *     after   svg 288.85 wide, viewBox 644  →  plot 287.05 CSS px   (−11.24 px)
+ *
+ * **The plot is ~3.8 % NARROWER than CHART-1 left it, not 5.3 % wider.** A
+ * gutter has to be taken from somewhere, and moving it out of the viewBox moves
+ * where it is taken from without making it free — it makes it BIGGER, because
+ * the label inside it is now a legible 10px instead of a squashed 5.38px and a
+ * bigger glyph needs more room. That is the trade, stated plainly rather than
+ * booked as a recovery: **the two words at the line ends went from 5.38px to
+ * 10px, and the plot paid 11px of width for it.**
+ * ⚠ What the 99.4 % figure IS good for is the thing it actually governs — the
+ * DATE LABELS still inside the `<svg>`, whose distortion fell from an anisotropy
+ * of 1.0885 to 1.0475 because the viewBox is closer to the box's own shape.
  */
 export const SVG_W = VIEWBOX_W + TERMINAL_DOT_ALLOWANCE;
 
