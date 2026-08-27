@@ -3,14 +3,15 @@
 **Task** RESO-1 · Market Detail resolution block, geometry pass
 **Mode** autonomous overnight (no operator gates) · **Session** 2026-08-27, 07:37Z → close
 **Branch** `feat/reso-1-resolution-geometry` · **PR** [#426](https://github.com/zugzwang-foundation/experiment/pull/426) — **OPEN, UNMERGED**
-**Base** `83cf6fb` → merged `origin/main` `9d2a920` mid-run · **HEAD** `f2989e1`
+**Base** `83cf6fb` → merged `origin/main` `9d2a920` mid-run · **HEAD** — read it from the branch;
+this line intentionally names no SHA, for the reason §4 gives about pointers that carry versions
 **Full run report** `~/Downloads/zz_RESO-1_run_2026-08-27T0740.md` (uploaded separately; not committed)
 
 ---
 
 ## 1 · What landed
 
-Four commits on `feat/reso-1-resolution-geometry`, PR #426 open:
+Seven commits on `feat/reso-1-resolution-geometry`, PR #426 open and unmerged:
 
 | SHA | What |
 |---|---|
@@ -19,6 +20,8 @@ Four commits on `feat/reso-1-resolution-geometry`, PR #426 open:
 | `5b48120` | the empty-rail fix (gate the rail on the series, not on the object) |
 | `b3d8295` | the content-floor fix + nine `@code-reviewer` findings |
 | `f2989e1` | merge `origin/main` (CHART-1 #425); R-6 discharged by it |
+| `a3db237` | `@test-writer` hardening — G-4 could not fire; `toContain("grid")` asserted nothing; six vacuous negatives. Plus this log |
+| `a9fa2c4` | this log's Gate-C pointer de-staled |
 
 **Files:** `src/components/debate/MarketHeader.tsx` · `ResolverCards.tsx` ·
 `chart/MarketPriceChartHost.tsx` · `chart/MarketPriceChartCard.tsx` (comments only) ·
@@ -27,8 +30,9 @@ three guard files under `tests/unit/debate/render/` · `docs/plans/RESO-1.md`.
 **Not touched:** any schema, any migration (head unmoved), `src/server/**`, auth, ledger,
 money path, any surface but Market Detail, any `markets` row on any environment.
 
-**Gates:** `biome` 0 · `tsc` 0 · `next build` 0 · full suite **391 files / 3624 tests, exit 0** ·
-**CI `33055952223` on `f2989e1` = success**.
+**Gates:** `biome` 0 · `tsc` 0 · `next build` 0 · full suite **391 files / 3626 tests, exit 0** ·
+**CI green on `f2989e1` (`33055952223`)**; the commits after it change **0 files under `src/`** —
+tests and this log only — so the rendered surface is unchanged from the build CI passed.
 
 ## 2 · Decisions made
 
@@ -85,6 +89,12 @@ current would be the obvious way to misread this branch.
   line **14.25px**, value line **11px**, 1:1 placeholder **44 × 44**, block row floor **97px**.
 - **CLS is not measurable through the CDP browser tools** — a hidden tab never paints, so
   `layout-shift` records nothing and returns a clean-looking zero. Recorded to memory.
+- **Two of this task's own guards could not fail when written**, and an adversarial pass found
+  it: the non-interactivity scan never scanned the row it was called on (so a handler on the
+  container passed), and `toContain("grid")` is satisfied by the substring inside
+  `grid-cols-4`. Both are substring-vs-token errors. Every guard here is now verified by
+  writing the wrong implementation and watching it red — including the reviewer's own
+  false-greens.
 
 ## 6 · Time
 
