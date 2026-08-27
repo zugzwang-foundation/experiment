@@ -313,3 +313,126 @@ describe("debate height chain — the arena band takes the leftover", () => {
 		expect(source).toContain("flex min-h-0 flex-1 flex-col gap-3");
 	});
 });
+
+/**
+ * CRIT-1 · G-5 — THE CHAIN GAINS A NODE, AND THE BAND MUST NOT PAY FOR IT.
+ *
+ * The criterion disclosure is a new flex item of the one-screen container. That
+ * container is a FIXED `h-[calc(100dvh-60px-2px)]` with `overflow-hidden`, so
+ * every child's height comes out of somewhere — and the only thing that may give
+ * is the ARENA, which is the container's sole `flex-1` and whose columns scroll
+ * internally. The band must NOT give: it is `shrink-0 basis-[24.2dvh]`, and
+ * RESO-1 closed `headzone-stack` at scroll 188 vs client 188 — exactly zero
+ * overflow, down from +14. That was a deliverable, and this is what stops the
+ * next change from spending it.
+ *
+ * ⚠ WHY A SOURCE SCAN AND NOT A MEASUREMENT. jsdom performs no layout — it
+ * resolves no `calc()`, no `dvh`, no flex — so `scrollHeight`/`clientHeight` here
+ * are meaningless. What IS checkable is the STRUCTURAL property that protects the
+ * band: the disclosure is a sibling of the band, never a descendant of it. The
+ * rendered scroll-vs-client equality is measured in a browser at the RESO-1
+ * viewport ladder and reported in the CRIT-1 run log.
+ */
+describe("debate height chain — CRIT-1's criterion disclosure", () => {
+	const DISCLOSURE = "src/components/debate/CriterionDisclosure.tsx";
+
+	it("debate-height::the-disclosure-is-NOT-inside-the-band-or-the-header-stack", () => {
+		// ⛔ THE WALL, ASSERTED. Anything mounted inside `headzone-stack` comes
+		// straight back out of the four-block row, which is fully allocated.
+		// ⛔⛔ MATCH JSX SYNTAX, NEVER A BARE WORD. This was
+		// `expect(source).not.toContain("CriterionDisclosure")`, which fires on
+		// PROSE — and `MarketHeader.tsx`'s docblocks must NAME this component to
+		// explain why the criterion left that file. So the bare form would have gone
+		// red on a correct documentation fix, and the cheapest escape from a red
+		// guard is to write a correction that cannot name its subject. That is the
+		// substring-for-token defect this repo has now hit SIX times; the G-4 block
+		// in `criterion-disclosure.test.tsx` avoids it the same way.
+		for (const file of [HEADZONE, "src/components/debate/MarketHeader.tsx"]) {
+			expect(read(file)).not.toMatch(/<CriterionDisclosure\b/);
+		}
+		// …and the positive control: it IS mounted, in the view that owns the
+		// container. Without this the negatives above pass on a component nobody
+		// renders at all.
+		expect(read(VIEW)).toContain("<CriterionDisclosure");
+	});
+
+	it("debate-height::the-disclosure-is-a-DIRECT-child-of-the-one-screen-container", () => {
+		const source = read(VIEW);
+		// It must sit AFTER the market↔post ternary closes and BEFORE the overlays,
+		// which is what makes it a sibling of the arena rather than a child of
+		// either arm — and what makes one authoring site serve both arms.
+		// ⛔⛔ THE ANCHORS ARE THE TWO ARM HEADERS, NOT THE CONTAINER. This asserted
+		// `mount > indexOf("<PageContainer") && mount < indexOf("<PostPopup")` — a
+		// window that CONTAINS THE WHOLE TERNARY. Measured offsets in this file:
+		// PageContainer 21177 · ternary 23272 · PostFocusHeader 23566 ·
+		// MarketHeader 28029 · CriterionDisclosure 31462 · PostPopup 31523. Moving
+		// the mount inside the market arm — which drops the criterion from post
+		// focus, the ONE failure this placement exists to prevent — kept it green.
+		// It was a false receipt for the task's central decision (@code-reviewer).
+		// ⇒ Being after BOTH arm headers is what "after the ternary" actually means.
+		const mount = source.indexOf("<CriterionDisclosure");
+		const popup = source.indexOf("<PostPopup");
+		const marketArm = source.indexOf("<MarketHeader");
+		const postArm = source.indexOf("<PostFocusHeader");
+		for (const i of [mount, popup, marketArm, postArm]) {
+			expect(i).toBeGreaterThan(-1);
+		}
+		expect(mount).toBeGreaterThan(marketArm);
+		expect(mount).toBeGreaterThan(postArm);
+		expect(mount).toBeLessThan(popup);
+
+		// ⛔⛔ AND THE ORDERING ABOVE IS STILL NOT SUFFICIENT ON ITS OWN — measured.
+		// Re-running the un-fix (mount moved INSIDE the market arm) after tightening
+		// the window, the ordering assertions STILL PASSED: the market arm's JSX
+		// lives later in the file than BOTH arm headers, so "after both headers" is
+		// satisfied by a mount inside the second arm. Only the render test caught
+		// it. Recorded rather than quietly re-tightened, because the first fix for a
+		// false receipt was itself a weaker receipt.
+		// ⇒ WHAT DISCRIMINATES BETTER IS DEPTH, NOT ORDER. A direct child of
+		// `PageContainer` sits at THREE tabs; anything inside an arm fragment sits at
+		// five. Depth can express CONTAINMENT, which an index interval cannot, so it
+		// is a real class change rather than the same proxy in a costume.
+		// ⛔⛔ BUT IT IS STILL NOT THE RECEIPT FOR THE PLACEMENT DECISION, and an
+		// earlier version of this comment overclaimed that it was. Depth sees the
+		// JSX tree; it cannot see PROPS. This keeps it green while deleting the
+		// criterion from post focus:
+		//     <CriterionDisclosure description={selectedPost ? null : market.description} />
+		// — mounted at depth 3, ordering satisfied, and the component's own
+		// `if (!description) return null` makes it silent (@test-writer).
+		// ⇒ THE RECEIPT IS `criterion::both-arms-POST-FOCUS-arm-shows-the-full-
+		// criterion-too`, which mounts the real view and would red on exactly that.
+		// What lives here is a supporting structural check, and it is labelled as
+		// one.
+		const mountLine = source.slice(0, mount).split("\n").pop() ?? "";
+		expect(mountLine).toBe("\t\t\t");
+	});
+
+	it("debate-height::the-disclosure-does-not-grow-and-bounds-its-own-open-body", () => {
+		const source = read(DISCLOSURE);
+		const classAttrs = [...source.matchAll(/className="([^"]*)"/g)].map(
+			(m) => m[1] ?? "",
+		);
+		expect(classAttrs.length).toBeGreaterThan(0); // the scan found something
+
+		// ⚠ THE ELEMENT-BINDING HALF OF THIS MOVED TO THE RENDER TEST, and the
+		// reason is worth keeping: `classAttrs.find(c => …includes("shrink-0"))`
+		// scans EVERY `className` in the file and takes the first hit, so if
+		// `shrink-0` migrated off the `<details>` onto the summary this stayed green
+		// while the crushable element lost its protection — which is precisely the
+		// `<h1>` precedent the comment cites (@code-reviewer). `criterion-disclosure
+		// .test.tsx` now asserts it on the rendered `<details>` node itself. What
+		// remains here is the file-level property: the disclosure does not GROW.
+		const details = classAttrs.find((c) => c.split(/\s+/).includes("shrink-0"));
+		expect(details).toBeDefined();
+		expect(details?.split(/\s+/)).not.toContain("flex-1");
+
+		// ⛔ THE OPEN BODY IS BOUNDED AND SCROLLS ITSELF. Unbounded open content in
+		// an `overflow-hidden` one-screen container is CLIPPED, which this file's
+		// own doctrine calls a failure rather than a pass. The bound is a viewport
+		// FRACTION, matching the band's own `basis-[24.2dvh]` — a pixel cap would be
+		// correct at exactly one viewport height.
+		const body = classAttrs.find((c) => c.includes("overflow-y-auto"));
+		expect(body).toBeDefined();
+		expect(body).toMatch(/max-h-\[\d+(\.\d+)?dvh\]/);
+	});
+});
