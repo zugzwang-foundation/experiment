@@ -88,19 +88,38 @@ above, and it is not worth carrying that failure mode as a rider.
 
 ---
 
-## Interaction with S-4 — the tracker's one factual slip
+## Interaction with S-4 — not a smaller win, a defect
+
+⚠ **This section was wrong when it was written, and wrong in the direction that let the change
+look safe. Corrected in place rather than appended to, because an appendix reverses nothing a
+reader reaches first (O-5).**
 
 The tracker says this touches *"nothing S-4 is working on — separate files entirely."* Different
 files, **yes**. Independent, **no**.
 
-S-4 (branch `Ritam`, unmerged) caches the market page's whole view model — **including the
-`imageUrl` fields these calls produce**. On an S-4 cache hit the same URLs are already being
-re-served. The overlap is partial: S-4's cache is keyed on pool reserves, so it busts on **any
-bet**, after which the URLs re-mint.
+S-4 caches the market page's whole view model — **including the `imageUrl` fields these calls
+produce**. It is **merged**, not an unmerged branch: it landed as #405/#423 and `cacheComponents`
+is on. Three `'use cache'` boundaries wrap these call sites today, and CHART-1 has since added a
+fourth.
 
-**Practical consequence:** on the market page the win is smaller than headline once S-4 merges;
-on Discovery, the admin feed and every other surface it is full-size. Worth knowing before
-anyone measures the market page and concludes the fix is not working.
+**The claim this section used to make — that the cache "busts on any bet, after which the URLs
+re-mint" — is the exact inverse of what happens.** A bust re-runs the cached block, which calls
+`signRead` again, which now **hits the memo and returns the original URL**. The mint does not
+happen. Cache-busting no longer refreshes the URL; the memo is precisely what stops it.
+
+That inversion is what made the interaction look like a smaller win instead of what it is. The
+premise `load-debate-view.ts` states for its 7200 s TTL — that the URL embedded in a cache entry
+was *minted at generation time* — is the premise this module removes. A URL can now be up to
+6000 s old **before** the entry carrying it is generated, and that entry is then served for up to
+`cacheLife("minutes").expire` = 3600 s more. `6000 + 3600 = 9600 > 7200`: the last ~2400 s of the
+serve window hands out an already-dead URL. Silent — the mint succeeded, so nothing throws, and
+no test in the suite passes 7200 through the memo.
+
+**Practical consequence:** on Discovery, the debate view and every other cached surface this is
+**not a reduced benefit — it is a correctness regression**, and it re-opens the presigned-URL
+silent-breakage class ADR-0041:126 recorded as closed. The admin feed and the moderation hop are
+uncached and unaffected by *this* mechanism; the 60 s hop has its own separate margin question.
+Read the invariant a fix has to satisfy as `hold + max_downstream_cache_age < signature_ttl`.
 
 ---
 
