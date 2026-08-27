@@ -504,3 +504,96 @@ describe("HTML-FINISH · MARKET DETAIL — row 8, the clickable percent labels",
 		expect(right?.innerHTML).toContain("YES 50%");
 	});
 });
+
+/**
+ * CHART-2 · `C-CHART-2` clause 1 — THE PULSE IS GATED ON THIS MARKET'S OWN
+ * STATUS, and this is the file where that can be proven.
+ *
+ * ⛔ WHAT `terminal-pulse.test.tsx` CANNOT SEE, AND WHY THAT GAP HAS A NAME
+ * HERE ALREADY. That file renders `MarketPriceChart` with `isOpen` held still
+ * by the test, which proves the COMPONENT honours the flag. It cannot prove
+ * that this page HANDS IT THE RIGHT ONE — the identical distinction
+ * `tests/server/discovery/live-tail-wiring.test.ts` was written to close for
+ * `withLiveTail`'s own `isOpen`, whose docblock says it plainly: `/m/[slug]` is
+ * "the ONLY call site where that branch is reachable, so nothing else in the
+ * repository would notice." CHART-2 adds a SECOND `isOpen`, at a DIFFERENT call
+ * site, with the same reachability and — until this block — no equivalent pin.
+ *
+ * ⛔ MEASURED, NOT ASSUMED: replacing `isOpen={market.status === "Open"}` with
+ * `isOpen={true}` in `MarketHeader.tsx` left the whole of `tests/unit` GREEN at
+ * 2296/2296 against the tree at `e152dec`. That build pulses the terminal dots
+ * of every `Closed`, `Resolving`, `Resolved` and `Voided` market — a rendered
+ * claim that a terminated market is live, on the surface where stake is
+ * committed (**INV-4**).
+ *
+ * ⚠ BEHAVIOURAL, NOT A SOURCE SCAN, because it can be: the fixture already
+ * carries a `status` and the chart already renders under it, so the wrong
+ * wiring is reachable by rendering rather than by reading. A source scan would
+ * pin the expression; this pins the CONSEQUENCE, and survives a refactor that
+ * keeps the behaviour.
+ *
+ * ⚠ Queries are targeted, per this file's own standing note — no
+ * `container.innerHTML` pin, so the block cannot become a tripwire for an
+ * unrelated change to the rail.
+ */
+describe("CHART-2 — the terminal pulse is gated on market.status (INV-4)", () => {
+	const FROZEN = ["Closed", "Resolving", "Resolved", "Voided"] as const;
+
+	function renderWithStatus(status: DebateMarketHeader["status"]) {
+		return render(
+			<MarketHeader
+				market={{ ...market(3, 5), status }}
+				priceChart={{ series: CHART_SERIES, nodes: [] }}
+			/>,
+		);
+	}
+
+	it("market-header::an-Open-market-pulses", () => {
+		// The positive control for every absence below, and a real requirement:
+		// without it, a header that rendered no chart at all would satisfy the
+		// whole of the rest of this block.
+		const { container } = renderWithStatus("Open");
+		expect(
+			container.querySelector('[data-testid="terminal-pulse-yes"]'),
+		).not.toBeNull();
+		expect(
+			container.querySelector('[data-testid="terminal-pulse-no"]'),
+		).not.toBeNull();
+	});
+
+	for (const status of FROZEN) {
+		it(`market-header::a-${status}-market-does-NOT-pulse`, () => {
+			const { container } = renderWithStatus(status);
+
+			// GUARD IS ALIVE — the chart is present and drawing, so the two nulls
+			// below read as "no pulse" and not as "no chart".
+			expect(
+				container.querySelector('[data-testid="market-price-chart"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="line-yes"]'),
+			).not.toBeNull();
+
+			expect(
+				container.querySelector('[data-testid="terminal-pulse-yes"]'),
+			).toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-pulse-no"]'),
+			).toBeNull();
+
+			// …and the DOT survives the freeze — clause 1's second half. Gating the
+			// whole marker subtree on `isOpen` would satisfy every assertion above
+			// and delete the line's terminal mark, taking the HTML label's anchor
+			// with it.
+			expect(
+				container.querySelector('[data-testid="terminal-dot-yes"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-dot-no"]'),
+			).not.toBeNull();
+			expect(
+				container.querySelector('[data-testid="terminal-label-yes"]'),
+			).not.toBeNull();
+		});
+	}
+});

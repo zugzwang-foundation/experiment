@@ -263,3 +263,90 @@ describe("C-CHART-2 clause 7 — motion is CSS, at canon's values, and freezes",
 		expect(block).not.toMatch(/opacity:\s*0\s*;/);
 	});
 });
+
+describe("C-CHART-2 clauses 1 and 7 — CHART-2 audit: two documented properties nothing asserted", () => {
+	for (const mode of MODES) {
+		it(`${mode}: the ring is painted BEFORE the dot, so the dot stays crisp`, () => {
+			// ⛔ `TerminalMarkers`' own docblock states this as a requirement — "THE
+			// RING IS DRAWN BEFORE THE DOT so the solid dot paints over it and stays
+			// crisp at its own radius" — and nothing asserted it. SVG paints in
+			// document order, so swapping the two JSX blocks puts a ring that grows
+			// to 2.4× radius at 0.35 fill-opacity ON TOP of the mark it is meant to
+			// halo: the terminal dot, the one element on this chart that states a
+			// price, washes out twice a second on every Open market. Nothing else in
+			// the suite reads order, and a reorder changes no attribute, no
+			// coordinate and no token.
+			//
+			// ⚠ O-7 — `innerHTML`, never `textContent`. Order is a property of the
+			// markup, and `textContent` flattens exactly the thing being asserted.
+			const { container } = renderChart(mode, true);
+			const svg = container.querySelector('[data-testid="market-price-chart"]');
+			const html = svg?.innerHTML ?? "";
+
+			for (const side of ["yes", "no"] as const) {
+				const ring = html.indexOf(`data-testid="terminal-pulse-${side}"`);
+				const dot = html.indexOf(`data-testid="terminal-dot-${side}"`);
+				// Both present — an absent marker indexes to -1 and would satisfy the
+				// ordering below by accident, which is the whole failure shape of an
+				// index comparison.
+				expect(ring).toBeGreaterThan(-1);
+				expect(dot).toBeGreaterThan(-1);
+				expect(ring).toBeLessThan(dot);
+			}
+		});
+	}
+
+	it("EVERY reduced-motion rule that touches the pulse freezes it and hides nothing", () => {
+		// ⛔ THE CASE ABOVE READS THE FIRST BLOCK ONLY, AND ONE BLOCK IS NOT THE
+		// RULE. `CSS.match(/@media \(prefers-reduced-motion: reduce\)…/)` without
+		// `/g` returns the first match and stops, so a SECOND reduce block added
+		// later — `.chart-terminal-pulse { display: none }`, the tidy way to
+		// "respect" the preference — would sit in the file unread while the
+		// existing assertions stayed green on the block above it. Clause 7's rule
+		// is that the pulse freezes and **the dot REMAINS**; deleting the marker
+		// for the readers this media query exists to serve is the failure it names
+		// in terms.
+		const blocks = [
+			...CSS.matchAll(
+				/@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?)\n\}/g,
+			),
+		].map((m) => m[1]);
+
+		// The collector found real blocks — without this, "every block satisfies X"
+		// is vacuously true over an empty list, which is the single most common way
+		// a for-all assertion certifies nothing.
+		expect(blocks.length).toBeGreaterThanOrEqual(1);
+		expect(blocks.every((b) => b.length > 20)).toBe(true);
+
+		const HIDES = /display:\s*none|visibility:\s*hidden|opacity:\s*0\s*;/;
+		const touching = blocks.filter((b) => b.includes(".chart-terminal-pulse"));
+		// At least one block governs the pulse — the reduced-motion posture exists
+		// at all, rather than every block being about something else.
+		expect(touching.length).toBeGreaterThanOrEqual(1);
+		for (const block of touching) {
+			expect(block).toContain("animation: none");
+			expect(HIDES.test(block)).toBe(false);
+		}
+
+		// …and no rule ANYWHERE in the stylesheet hides the ring, reduce-scoped or
+		// not. The freeze is the only thing this class may ever receive.
+		expect(
+			/chart-terminal-pulse[^}]*(display:\s*none|visibility:\s*hidden)/.test(
+				CSS,
+			),
+		).toBe(false);
+
+		// POSITIVE CONTROL — the hiding matcher fires on every form it is written
+		// against, so the `false`s above are readings rather than a dead regex.
+		for (const hidden of [
+			"\t.chart-terminal-pulse { display: none; }",
+			"\t.chart-terminal-pulse { visibility: hidden; }",
+			"\t.chart-terminal-pulse { opacity: 0; }",
+		]) {
+			expect(HIDES.test(hidden)).toBe(true);
+		}
+		expect(HIDES.test("\t.chart-terminal-pulse { animation: none; }")).toBe(
+			false,
+		);
+	});
+});

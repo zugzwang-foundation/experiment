@@ -444,6 +444,12 @@ function TerminalMarkers({
  */
 function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 	const labelY = terminalLabelYs(yes);
+	// Which of the two clause-4 already put on top. Read off its OUTPUT rather
+	// than recomputed from the price, so the tie-break at exactly 50 % stays
+	// clause 4's and is not decided a second time here.
+	const yesOnTop = labelY.yes <= labelY.no;
+	const upperPct = labelTopPct(yesOnTop ? labelY.yes : labelY.no);
+	const lowerPct = labelTopPct(yesOnTop ? labelY.no : labelY.yes);
 	return (
 		<div
 			data-testid="terminal-label-gutter"
@@ -459,20 +465,82 @@ function TerminalLabels({ yes }: { yes: string }): React.JSX.Element {
 			</span>
 			<span
 				data-testid="terminal-label-no"
+				data-plot-y={labelY.no}
 				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-no)]"
-				style={{ top: `${labelTopPct(labelY.no)}%` }}
+				style={{ top: yesOnTop ? lowerTop(lowerPct) : upperTop(upperPct) }}
 			>
 				NO
 			</span>
 			<span
 				data-testid="terminal-label-yes"
+				data-plot-y={labelY.yes}
 				className="absolute left-[5px] -translate-y-1/2 text-[color:var(--graph-yes)]"
-				style={{ top: `${labelTopPct(labelY.yes)}%` }}
+				style={{ top: yesOnTop ? upperTop(upperPct) : lowerTop(lowerPct) }}
 			>
 				YES
 			</span>
 		</div>
 	);
+}
+
+/**
+ * Half the label's rendered box, in CSS PIXELS — the type is `text-[10px]` at
+ * `leading-none`, so the box is 10px and half of it is 5.
+ *
+ * ⛔ IN PIXELS, NOT PLOT UNITS, AND THAT DISTINCTION IS A DEFECT THIS TASK
+ * ALMOST SHIPPED. `TERMINAL_LABEL_MIN_GAP = 12` and `clampLabelY`'s floor of 6
+ * were both exactly right while the label was SVG `<text>` at `font-size: 10`
+ * **in user units** — 10 units of type plus 2 of air, and 6 units of half-box.
+ * The moment the label became HTML at 10 **CSS px**, those numbers stopped
+ * describing it: a plot unit is 0.42822 CSS px on the collapsed card, so 12
+ * units of separation is **5.14 px** between two boxes that are 10 px tall.
+ * Measured, the two labels OVERLAP by ~3 px for every market between YES ≈
+ * 46.35 % and 53.65 % — the resting state of every market and six of the eight
+ * seeded ones — on the surface that is the market's primary price display.
+ * Caught by `@test-writer` at the CHART-2 cascade.
+ */
+const LABEL_HALF_BOX_PX = 5;
+
+/**
+ * The two end labels' CSS `top`, and the one place plot space and CSS space are
+ * reconciled.
+ *
+ * ⛔ `terminalLabelYs` IS UNTOUCHED — `C-CHART-2` clause 4's arithmetic is a
+ * scope fence and stays exactly as it was. What these two helpers add is a FLOOR
+ * expressed in the unit the labels are now drawn in, layered ON TOP of clause
+ * 4's answer, never replacing it:
+ *
+ *   upper:  clamp(5px, min(P%, calc(50% - 5px)), calc(100% - 5px))
+ *   lower:  clamp(5px, max(P%, calc(50% + 5px)), calc(100% - 5px))
+ *
+ * ⚠ WHY 50 % IS THE RIGHT PIVOT AND NOT AN ASSUMPTION. YES and NO mirror about
+ * the midline by construction (design-language §3.2), so the only place the two
+ * can approach each other is there. Far from even, `min`/`max` are no-ops and
+ * clause 4's plot-space positions pass through untouched — which is why the
+ * expanded overlay still separates by clause 4's own 12 units (~20 px) rather
+ * than being flattened to 10.
+ *
+ * ⛔ AND WHY CSS MATH RATHER THAN A BIGGER CONSTANT. The alternative was to
+ * raise `TERMINAL_LABEL_MIN_GAP` to ~24 units so that 12 px survived the worst
+ * scale factor. That would over-separate the two larger surfaces by 3× — and,
+ * worse, it would be **the very error this task exists to correct, one level
+ * up**: a single number chosen against one surface's scale, wrong everywhere
+ * else. `min()`/`max()`/`clamp()` mix `%` and `px` in the browser's own layout
+ * pass, so the guarantee is exact on every surface without anyone knowing the
+ * box's height at render time — which, being server-rendered, nobody does.
+ *
+ * The outer `clamp` is the same fix in the other axis: `clampLabelY`'s 6-unit
+ * floor is 2.57 px on the collapsed card against a 5 px half-box, so a market
+ * near 99 % put the upper label's box partly ABOVE the plot. The gutter does not
+ * clip — that is the point of it — so it escaped into whatever sits above the
+ * chart rather than being cut off.
+ */
+function upperTop(pct: number): string {
+	return `clamp(${LABEL_HALF_BOX_PX}px, min(${pct}%, calc(50% - ${LABEL_HALF_BOX_PX}px)), calc(100% - ${LABEL_HALF_BOX_PX}px))`;
+}
+
+function lowerTop(pct: number): string {
+	return `clamp(${LABEL_HALF_BOX_PX}px, max(${pct}%, calc(50% + ${LABEL_HALF_BOX_PX}px)), calc(100% - ${LABEL_HALF_BOX_PX}px))`;
 }
 
 /**

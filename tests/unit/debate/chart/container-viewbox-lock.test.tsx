@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
@@ -155,5 +155,89 @@ describe("C-CHART-1 clause 4 — the container's aspect equals the viewBox's", (
 		// the four `not.toMatch` above mean "absent", not "nothing scanned".
 		expect(scanned).toBeGreaterThan(10_000);
 		expect(files).toHaveLength(4);
+	});
+
+	it("no CALL SITE anywhere in src/ wraps this chart in a declared aspect", () => {
+		// ⛔⛔ THE CASE ABOVE SCANS FOUR HARD-CODED FILES, AND THE CONTAINER THAT
+		// BROKE THE CHART IS NOT REQUIRED TO BE ONE OF THEM. `C-CHART-1` clause 4
+		// governs "every container that sizes this chart", and two of them live
+		// outside `src/components/debate/chart/` entirely: the Discovery hero's
+		// `min-h-24 flex-1` panel in `HeroPanels.tsx`, and the rail in
+		// `MarketHeader.tsx`. MEASURED against the tree at `e152dec`: adding
+		// `aspect-[2/1]` to the hero's chart panel — the CHART-1 defect verbatim,
+		// at a different address — left `tests/unit/debate`, `tests/unit/discovery`
+		// and `tests/unit/design` GREEN at 555/555.
+		//
+		// ⛔ SO THE CALL SITES ARE DISCOVERED, NOT LISTED. A hard-coded file list
+		// is a guard that a FIFTH call site silently escapes, and the whole lesson
+		// of CHART-1 is that the container which drifts is the one nobody thought
+		// to write down. This walks `src/` and finds every JSX use of the four
+		// chart components, so a new surface is covered the day it is written.
+		const sourceFiles = readdirSync(join(process.cwd(), "src"), {
+			recursive: true,
+			withFileTypes: true,
+		})
+			.filter((e) => e.isFile() && e.name.endsWith(".tsx"))
+			.map((e) => join(e.parentPath, e.name));
+
+		const TAGS = [
+			"MarketPriceChart",
+			"MarketPriceChartCard",
+			"MarketPriceChartHost",
+			"MarketPriceChartOverlay",
+		];
+		// The wrapping element's `className` is what sizes the chart, and in this
+		// codebase it sits on the line or two immediately above the tag. A window
+		// rather than a whole-file scan is deliberate: a file is free to carry an
+		// `aspect-square` avatar or an `aspect-[16/9]` media panel that has nothing
+		// to do with the plot, and a guard that reddens on those is a guard someone
+		// eventually relaxes.
+		const WINDOW = 300;
+		const sites: { file: string; window: string }[] = [];
+
+		for (const file of sourceFiles) {
+			const code = readFileSync(file, "utf8")
+				.replace(/\/\*[\s\S]*?\*\//g, "")
+				.replace(/\/\/[^\n]*/g, "");
+			for (const tag of TAGS) {
+				// `<Tag` followed by whitespace, `/` or `>` — a JSX USE, so
+				// `<MarketPriceChartCard` is not also collected as `<MarketPriceChart`.
+				const re = new RegExp(`<${tag}(?=[\\s/>])`, "g");
+				for (const m of code.matchAll(re)) {
+					sites.push({
+						file: file.replace(`${process.cwd()}/`, ""),
+						window: code.slice(Math.max(0, m.index - WINDOW), m.index),
+					});
+				}
+			}
+		}
+
+		const ASPECT = /(^|[\s"'`{])aspect-/;
+		const offenders = sites
+			.filter((s) => ASPECT.test(s.window))
+			.map((s) => s.file);
+		expect(offenders).toEqual([]);
+
+		// POSITIVE CONTROL 1 — the walk actually found the call sites. An empty
+		// `sites` array satisfies `offenders === []` perfectly, which is the exact
+		// shape of a guard that certifies nothing.
+		expect(sites.length).toBeGreaterThanOrEqual(4);
+		expect(new Set(sites.map((s) => s.file)).size).toBeGreaterThanOrEqual(3);
+		// …and it reached OUTSIDE the chart directory, which is the whole point of
+		// discovering the sites rather than listing them.
+		expect(
+			sites.some((s) => !s.file.includes("components/debate/chart/")),
+		).toBe(true);
+
+		// POSITIVE CONTROL 2 — the matcher fires on a REAL window from this run
+		// with the literal spliced back in, not on a string a test author invented.
+		const sample = sites.find((s) => s.window.includes('className="'));
+		expect(sample).toBeDefined();
+		const reintroduced = (sample?.window ?? "").replace(
+			'className="',
+			'className="aspect-[2/1] ',
+		);
+		expect(reintroduced).not.toBe(sample?.window);
+		expect(ASPECT.test(reintroduced)).toBe(true);
 	});
 });

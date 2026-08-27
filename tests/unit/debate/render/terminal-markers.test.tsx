@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, render } from "@testing-library/react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it } from "vitest";
 import {
 	SVG_W,
@@ -41,14 +42,49 @@ const LATER = "2026-09-20T00:00:00.000Z";
  * `-translate-y-1/2`, so the box spans `y ± 5`. Pinned against the component's
  * own classes by the last case in this describe block, so it can never drift
  * from the type actually rendered.
- * ⚠ SINCE CHART-2 THIS IS A DELIBERATE OVER-ESTIMATE IN THE CLAMP'S FAVOUR, and
- * saying so matters. The label is HTML now, so its box is 10 CSS px, while this
- * bound is 10 PLOT units — and a plot unit is smaller than a CSS pixel on the
- * collapsed card (scaleY 0.428), so 10 units is ~4.3px of real box. Asserting
- * the clamp against the larger figure keeps the guard STRICTER than the thing
- * it guards, which is the safe direction: it cannot pass a build whose real box
- * clips. It is not the CSS-pixel measurement — jsdom performs no layout — and
- * that measurement is taken in the contact sheet instead. */
+ * ⛔⛔ THIS BLOCK CLAIMED THE OPPOSITE OF THE TRUTH AND IS CORRECTED HERE AT THE
+ * CHART-2 TEST AUDIT — the assertions below are untouched, only the reasoning
+ * about them. It read: "SINCE CHART-2 THIS IS A DELIBERATE OVER-ESTIMATE IN THE
+ * CLAMP'S FAVOUR … a plot unit is smaller than a CSS pixel on the collapsed card
+ * (scaleY 0.428), so 10 units is ~4.3px of real box. Asserting the clamp against
+ * the larger figure keeps the guard STRICTER than the thing it guards."
+ *
+ * ⛔ IT IS LOOSER, NOT STRICTER, AND BY A FACTOR OF ABOUT 2.3. The paragraph
+ * converted the GUARD's bound into CSS pixels (10 plot units × 0.428 = 4.3px)
+ * and then compared it against the BOX as though the box were also 10 plot
+ * units. It is not: since CHART-2 the label is HTML, so its box is **10 CSS px**
+ * — which on the collapsed card is **10 / 0.42822 = 23.35 PLOT units**, not 10.
+ * One quantity, converted on one side of the comparison only. The honest
+ * statement is that `LABEL_HALF_BOX = 5` is HALF THE BOX IN THE OLD UNITS, and
+ * the clamp it checks (`clampLabelY`, floor 6 plot units) is likewise a
+ * plot-unit constant sized for a label that was 10 plot units tall.
+ *
+ * ⚠ WHAT THAT MEANT FOR THE TWO BOX CASES BELOW: on the EXPANDED overlay
+ * (scaleY 1.325) and the Discovery hero (0.92422) the constants still hold in
+ * CSS px; on the COLLAPSED card (scaleY 0.42822) they did not — the clamp floor
+ * of 6 plot units is 2.57 CSS px from the top edge for a 5 CSS px half-box, so
+ * at YES = 99 % the label's upper half sat ~2.4px ABOVE the plot, and between
+ * YES ≈ 46.35 % and 53.65 % the two boxes overlapped. The cases below cannot see
+ * either, because every number in them is a plot unit and in plot units nothing
+ * moved — the same shape as the CHART-1 regression this task exists to fix, one
+ * constant over.
+ *
+ * ✅ FIXED IN THE SAME CASCADE THAT FOUND IT, and the fix is NOT a bigger
+ * constant. `terminalLabelYs` is untouched — clause 4's arithmetic is a scope
+ * fence — and the pixel guarantee was added to the OUTPUT MAPPING instead, which
+ * is the half the brief put in scope: the label's CSS `top` is now
+ * `clamp(5px, min(P%, calc(50% ∓ 5px)), calc(100% − 5px))`, so the browser's own
+ * layout pass floors the separation and the edges in REAL PIXELS on every
+ * surface. Raising `TERMINAL_LABEL_MIN_GAP` to ~24 units was the obvious
+ * alternative and was rejected: it would over-separate the two larger surfaces
+ * threefold and would be this very defect one level up — a single number chosen
+ * against one surface's scale.
+ *
+ * ⛔ SO THIS CONSTANT AND THE CASES BELOW ARE NOW A PLOT-SPACE GUARD ON A
+ * PLOT-SPACE RULE, which is exactly what they should be. They assert clause 4
+ * still does its own job; the CSS-pixel floor on top of it is asserted by "the
+ * alignment is WIDTH-INDEPENDENT by construction" (which reads the shipped
+ * `style` attribute) and measured in the contact sheet. */
 const LABEL_HALF_BOX = 5;
 
 /** A two-point series ending at `yes`. Two points so the domain is real; the
@@ -89,12 +125,22 @@ function numAttr(el: Element | null, name: string): number {
  * the tie-break — are still asserted against the numbers `terminalLabelYs`
  * actually produced, at the same tolerances, in the same units.
  *
- * ⚠ THIS IS A UNIT CONVERSION, NOT A RE-DERIVATION. It reads what the component
- * emitted and rescales it; it does not recompute where the label ought to be.
+ * ⚠ THIS IS A READ, NOT A RE-DERIVATION. It reads what the component emitted; it
+ * does not recompute where the label ought to be.
+ *
+ * ⛔ IT READS `data-plot-y`, NOT `style.top`, SINCE THE CHART-2 CASCADE FIX. The
+ * CSS `top` is now a `clamp(… min(…) …)` expression that reconciles clause 4's
+ * plot-space answer with a CSS-PIXEL floor — because the label's box is 10 CSS
+ * px while clause 4's threshold is 12 PLOT units, and on the collapsed card
+ * those are 10 px and 5.14 px respectively. Parsing a number back out of that
+ * expression would be reverse-engineering a layout string, and it would silently
+ * read the wrong term the first time the expression's shape changed. The
+ * component therefore states clause 4's own output directly, and this reads it.
+ * The CSS-pixel behaviour the expression produces cannot be observed in jsdom at
+ * all and is measured in the contact sheet.
  */
 function labelPlotY(el: Element | null): number {
-	const top = (el as HTMLElement | null)?.style.top ?? "";
-	return (Number.parseFloat(top) / 100) * VIEWBOX_H;
+	return Number(el?.getAttribute("data-plot-y"));
 }
 
 describe("debate-view::price-chart-terminal-labels-never-overlap", () => {
@@ -560,18 +606,51 @@ describe("C-CHART-2 — the end label is bound to its own line's token", () => {
 				container.querySelector(`[data-testid="terminal-dot-${side}"]`),
 				"cy",
 			);
-			const top = (
-				container.querySelector(
-					`[data-testid="terminal-label-${side}"]`,
-				) as HTMLElement | null
-			)?.style.top;
-			// The position is a percentage — the unit that makes it box-agnostic.
-			expect(top).toMatch(/^[\d.]+%$/);
-			// …and it is the SAME fraction the dot sits at.
-			expect(Number.parseFloat(top ?? "")).toBeCloseTo(
-				(dotCy / VIEWBOX_H) * 100,
-				3,
+			// ⛔ READ OFF THE SHIPPED MARKUP, NOT `element.style.top`, AND THE REASON
+			// IS A jsdom LIMITATION THAT WOULD OTHERWISE READ AS A PRODUCT DEFECT.
+			// jsdom's CSSOM (cssstyle) does not parse nested CSS math, so assigning
+			// `clamp(5px, min(…), calc(…))` through `node.style.top` is REJECTED and
+			// the property comes back as the empty string. Browsers accept it — and
+			// so does the server render, which is what actually ships. Asserting the
+			// live CSSOM here would have concluded the position was missing when it
+			// is present in the HTML and honoured in Chrome (verified in the CHART-2
+			// contact sheet).
+			const top =
+				renderToStaticMarkup(
+					<MarketPriceChart
+						series={seriesEndingAt(pct(0.65))}
+						mode="collapsed"
+						isOpen={true}
+					/>,
+				).match(
+					new RegExp(`terminal-label-${side}[^>]*style="top:([^"]*)"`),
+				)?.[1] ?? "";
+
+			// The position is expressed in PERCENT, which is what makes it
+			// box-agnostic. A pixel offset would have needed the box's height —
+			// unknown at render on a server-rendered tree — and could only have been
+			// right at one size.
+			expect(top).toMatch(/\d+(\.\d+)?%/);
+
+			// ⛔ AND IT IS FLOORED IN CSS PIXELS, WHICH PERCENT ALONE CANNOT DO.
+			// Clause 4's threshold is 12 PLOT units; the label's box is 10 CSS px;
+			// on this card a plot unit is 0.428 px, so the plot-space rule delivers
+			// 5.14 px of separation between two 10 px boxes and they overlap. The
+			// `min`/`max` term against the midline is the floor that fixes it, and
+			// the outer `clamp` is the same fix for the top and bottom edges. Both
+			// are asserted here because a "tidy-up" back to a bare `N%` would
+			// reintroduce a defect nothing else in jsdom can see.
+			expect(top).toMatch(/clamp\(/);
+			expect(top).toMatch(/(min|max)\(/);
+			expect(top).toContain("50%");
+
+			// …and the percentage term is still the SAME fraction the dot sits at,
+			// so the floor is a floor and not a second opinion about where the
+			// label belongs.
+			const firstPct = Number.parseFloat(
+				(top ?? "").match(/(\d+(?:\.\d+)?)%/)?.[1] ?? "",
 			);
+			expect(firstPct).toBeCloseTo((dotCy / VIEWBOX_H) * 100, 3);
 		}
 	});
 
