@@ -7,6 +7,7 @@ import { getCachedDebateView } from "@/server/debate-view/cached-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { resolvePostParam } from "@/server/debate-view/resolve-post-param";
 import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
+import { withLiveTail } from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 /**
@@ -105,7 +106,51 @@ export default async function MarketPage({
 	// function, same reserves, guaranteed by the key match); the override
 	// exists so that identity is an explicit assignment at the call site, not
 	// an implicit property of the cache key nobody reading this file can see.
-	const model =
+	// CHART-1 — the price chart's live right edge, composed in the SAME override
+	// block and from the SAME live read, for the same reason (SPEC.1 1.0.40 §9,
+	// "X domain" and "Refresh"). `cachedModel.priceChart.series` is now floored
+	// HISTORY: `getCachedReserveWalk` derives it at most once per
+	// `MARKET_SERIES_MIN_WINDOW_MS` on a key no bet can move. **On an `Open`
+	// market** `withLiveTail` puts the present instant and the live price back on
+	// its right edge, so the chart cannot disagree with the `PriceBar` a few
+	// pixels below it — the objection §9 raised against flooring this series at
+	// all, answered here rather than waived, at zero additional queries.
+	//
+	// ⛔ ON EVERY OTHER STATE IT RETURNS THE SERIES UNTOUCHED, and this is THE
+	// call site where that branch is reachable — Discovery lists only `Open`
+	// markets. A frozen chart is its event history and nothing else: its terminal
+	// keeps the price its own event produced, and if the pool ever moves after
+	// close the chart and `PriceBar` WILL visibly disagree. That disagreement is
+	// the intended outcome, not a bug to chase — it is true and discoverable,
+	// where writing a live price onto a past event's timestamp is neither.
+	// Changed at CHART-1.A; before it, this branch restamped (**INV-4**).
+	//
+	// ⚠ `isOpen` is READ FROM `market.status`, never assumed. A `Closed`,
+	// `Resolved` or `Voided` market's domain must not advance past its last
+	// event (**INV-4**), and this is the one call site where that branch is
+	// reachable — Discovery only ever renders `Open` markets.
+	//
+	// ⚠ `new Date()` is called HERE, at render, and must never move inside
+	// `getCachedReserveWalk`: a clock read behind a cached boundary freezes for
+	// the whole window, which would silently put an `Open` market's "now" edge up
+	// to a minute in the past.
+	const nowIso = new Date().toISOString();
+	const withPinnedChart = (m: typeof cachedModel): typeof cachedModel =>
+		m.priceChart === null
+			? m
+			: {
+					...m,
+					priceChart: {
+						...m.priceChart,
+						series: withLiveTail(m.priceChart.series, {
+							spotYes: priced?.pricing.yes ?? null,
+							nowIso,
+							isOpen: market.status === "Open",
+						}),
+					},
+				};
+
+	const model = withPinnedChart(
 		priced === null
 			? cachedModel
 			: {
@@ -115,7 +160,8 @@ export default async function MarketPage({
 						pricing: priced.pricing,
 						unitToWin: priced.unitToWin,
 					},
-				};
+				},
+	);
 
 	// UI.A2 §3.3 — the viewer-session context, composed BESIDE the masked view
 	// model (the masking gate stays viewer-independent — SG-3). Signed-out →

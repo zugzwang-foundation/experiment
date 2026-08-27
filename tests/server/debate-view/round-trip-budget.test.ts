@@ -44,6 +44,10 @@ import { bets, comments, events, markets, pools, users } from "@/db/schema";
 import { loadDebateView } from "@/server/debate-view/load-debate-view";
 import { getMarketPricingAndReserves } from "@/server/debate-view/market-pricing";
 import { loadViewerMarketContext } from "@/server/debate-view/viewer-context";
+import {
+	replayReserveSeries,
+	toWireWalk,
+} from "@/server/discovery/price-series";
 import { getMarketBySlug } from "@/server/markets/get-by-slug";
 
 import { testClient, testDb } from "../../db/_fixtures/db";
@@ -229,6 +233,50 @@ describe("/m/[slug] read budget — the polled surface (S-4 Phase E)", () => {
 		//   issuing an empty `inArray` — the +1 case is exercised separately in
 		//   the load-debate-view integration suite.
 		expect(executed).toBe(12);
+	});
+
+	// ── CHART-1 — the same 12, now split across TWO keys ─────────────────────
+	//
+	// ⛔ THE TOTAL DID NOT MOVE, AND THAT IS THE FINDING, NOT A DISAPPOINTMENT.
+	// A cold render still pays 12. What changed is that 3 of those 12 — the
+	// reserve replay behind the price chart — moved onto `getCachedReserveWalk`,
+	// which is keyed on the MARKET ID ALONE. The block around it is keyed on
+	// `(market, reserves)`, so every bet changes that key and forces a miss; no
+	// bet touches the walk's key. So the 9 are re-paid per bet and the 3 are
+	// re-paid once per `MARKET_SERIES_MIN_WINDOW_MS`, however busy the market is
+	// (SPEC.1 1.0.40 §9 *Refresh*).
+	//
+	// ⚠ A STATEMENT COUNT CANNOT SEE THAT, WHICH IS EXACTLY WHY THE SPLIT IS
+	// PINNED AND NOT JUST THE TOTAL. Pinning 12 alone would stay green if
+	// someone moved the replay back inside the reserves-keyed block — the
+	// regression this task exists to prevent — because the sum is identical
+	// either way. The two assertions below fail on that change; the one above
+	// does not.
+	it("debate-view::price-chart-history-floored-to-min-window — the walk is 3 of the 12", async () => {
+		const { marketId } = await seedMarket();
+
+		executed = 0;
+		await replayReserveSeries(countingDb, marketId);
+
+		// events·opened / bets·ids / events·bet.* — the whole cost that moved.
+		expect(executed).toBe(3);
+	});
+
+	it("debate-view::price-chart-history-floored-to-min-window — the remainder is 9 when the walk is supplied", async () => {
+		const { marketId } = await seedMarket();
+		const market = await getMarketBySlug(testDb, SLUG);
+		expect(market?.id).toBe(marketId);
+
+		const walk = toWireWalk(await replayReserveSeries(testDb, marketId));
+
+		executed = 0;
+		// biome-ignore lint/style/noNonNullAssertion: asserted non-null above.
+		await loadDebateView(countingDb, { market: market!, walk });
+
+		// 12 − 3. The `walk` argument is what `getCachedDebateView` passes after
+		// resolving it from its own cache, so this is the real per-bet cost of a
+		// market-detail render once the history has been derived this window.
+		expect(executed).toBe(9);
 	});
 
 	it("the VIEWER CONTEXT costs 3 statements with no held position", async () => {
