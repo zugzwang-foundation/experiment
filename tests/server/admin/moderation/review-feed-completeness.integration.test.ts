@@ -26,6 +26,9 @@ vi.mock("@/server/storage/sign-read", () => ({
 		async (key: string, ttl: number) =>
 			`https://signed.example/${encodeURIComponent(key)}?ttl=${ttl}`,
 	),
+	signReadSingleUse: vi.fn(
+		async (key: string) => `https://signed.example/${key}`,
+	),
 }));
 
 import {
