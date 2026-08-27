@@ -316,8 +316,23 @@ vi.mock("next/navigation", () => ({
 	useSearchParams: () => new URLSearchParams(),
 }));
 
-describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", () => {
-	// ⛔⛔ FAKE TIMERS, AND NOT AS A STYLE CHOICE. Mounting the real `DebateView`
+describe("RESO-3 · CHANGE 6 — the disclosure is NOT mounted on either arm", () => {
+	// ⛔⛔ THIS BLOCK IS INVERTED, NOT DELETED, AND THE INVERSION IS THE POINT.
+	// It read `the disclosure renders on BOTH arms` and was CRIT-1's central
+	// receipt. RESO-3 · CHANGE 6 is a founder ruling that the criterion leaves
+	// `/m/[slug]` again, so the two `it`s that asserted presence would now be
+	// asserting the opposite of the shipped decision.
+	// ⇒ Deleting them would have left the removal unguarded, and the removal is
+	// exactly the kind of thing a later reader "fixes" by re-adding one line —
+	// `CriterionDisclosure.tsx` is still in the repo, still exported, still
+	// importable, which makes re-mounting it a one-line change with nothing in the
+	// way. So the receipt is kept and its polarity flipped: the same two arms, the
+	// same controls, the opposite expectation.
+	// ⚠ WHAT THIS DOES NOT ASSERT: that the component is wrong. G-1…G-5 below and
+	// above still exercise it directly and still pass, because the file is
+	// deliberately retained. The ruling is about PLACEMENT, not about the
+	// component, and this block is scoped to placement alone.
+	// ⛔ FAKE TIMERS, AND NOT AS A STYLE CHOICE. Mounting the real `DebateView`
 	// starts its polled-refresh interval and the arena's auto-advance timers; with
 	// REAL timers those keep firing for the remainder of the worker's life, long
 	// after this file's assertions are done. `auto-advance.test.tsx` and
@@ -344,20 +359,31 @@ describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", (
 			/>,
 		);
 
-	it("criterion::both-arms-MARKET-arm-shows-the-full-criterion", () => {
+	it("criterion::RESO-3-the-MARKET-arm-does-not-mount-the-disclosure", () => {
 		const { container } = renderArm(null);
-		// Control: we really are on the market arm (its header block is present).
+		// ⛔ POSITIVE CONTROL FIRST. A negative assertion about a component is
+		// satisfied by a view that failed to render at all, so the arm has to prove
+		// it is really here before its absence means anything.
 		expect(
 			container.querySelector('[data-testid="resolver-cards"]'),
 		).not.toBeNull();
 		expect(
-			container.querySelector('[data-testid="criterion-text"]')?.textContent,
-		).toBe(mumbaiMetroModel.market.description);
+			container.querySelector('[data-testid="criterion-disclosure"]'),
+		).toBeNull();
+		// ⚠ AND THE BODY, NOT ONLY THE ROW — the same discipline SC-1 states for
+		// masking. A testid can be dropped while the text still reaches the DOM
+		// through some other path, and it is the binding TEXT that CHANGE 6 removes.
+		expect(container.textContent ?? "").not.toContain(
+			mumbaiMetroModel.market.description,
+		);
 	});
 
-	it("criterion::both-arms-POST-FOCUS-arm-shows-the-full-criterion-too", () => {
-		// ⛔ THE ARM THE SOURCE SCAN COULD NOT SEE. `cmt-p1` is a real post in the
-		// fixture, so this is the post-focus arm, not a variant of the market one.
+	it("criterion::RESO-3-the-POST-FOCUS-arm-does-not-mount-it-either", () => {
+		// ⛔ THE ARM THE SOURCE SCAN COULD NOT SEE, and the reason this block still
+		// renders BOTH. CRIT-1's mount was a direct child of the container precisely
+		// so one authoring site served both arms; a removal that only reached the
+		// market arm would leave the criterion alive in post focus, which is the
+		// mirror of the failure the original placement existed to prevent.
 		const { container } = renderArm("cmt-p1");
 		// ⚠ ARM CONTROL — and `resolver-cards` is deliberately NOT it. That was the
 		// obvious discriminator and it is the placeholder docketed at
@@ -370,18 +396,12 @@ describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", (
 		expect(
 			container.querySelector('[data-testid="headzone-stack"]'),
 		).toBeNull();
-		// …and the criterion is STILL there, complete. ⛔ THIS ASSERTION IS THE
-		// RECEIPT FOR CRIT-1'S PLACEMENT DECISION — not the source-scan depth check,
-		// which cannot see a prop and would stay green on
-		// `description={selectedPost ? null : market.description}`.
 		expect(
-			container.querySelector('[data-testid="criterion-text"]')?.textContent,
-		).toBe(mumbaiMetroModel.market.description);
-		// ⛔ EXACTLY ONE. `querySelector` is singular, so without this nothing in
-		// either file would notice a second mount rendering the binding text twice.
-		expect(
-			container.querySelectorAll('[data-testid="criterion-disclosure"]'),
-		).toHaveLength(1);
+			container.querySelector('[data-testid="criterion-disclosure"]'),
+		).toBeNull();
+		expect(container.textContent ?? "").not.toContain(
+			mumbaiMetroModel.market.description,
+		);
 	});
 
 	it("criterion::G-5-shrink-0-is-on-the-DETAILS-element-itself", () => {
@@ -390,7 +410,15 @@ describe("CRIT-1 — the disclosure renders on BOTH arms, and is crush-proof", (
 		// `<details>` onto the summary the scan stayed green while the crushable
 		// element lost its protection — the `<h1>` 698×0 precedent exactly
 		// (@code-reviewer). Asserting it on the rendered node cannot drift.
-		const { container } = renderArm(null);
+		// ⛔⛔ REBOUND FROM `renderArm(null)` TO A DIRECT RENDER, because CHANGE 6
+		// removed the mount this used to reach through. The PROPERTY is unchanged
+		// and still worth holding: the component is retained for re-mounting, and it
+		// must still be crush-proof on the day someone re-mounts it. Reaching it
+		// through the view was never what made this guard meaningful — being bound
+		// to the ELEMENT was.
+		const { container } = render(
+			<CriterionDisclosure description={mumbaiMetroModel.market.description} />,
+		);
 		const details = container.querySelector(
 			'[data-testid="criterion-disclosure"]',
 		);
