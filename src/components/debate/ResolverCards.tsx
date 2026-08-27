@@ -72,8 +72,11 @@ import type { DebateMarketHeader } from "./types";
 const BLOCKS = [
 	{ key: "resolution", label: "Resolution" },
 	{ key: "resolver", label: "Resolver" },
-	{ key: "closes", label: "Closes" },
-	{ key: "context", label: "Context" },
+	{ key: "closes", label: "Closes on" },
+	// ⚠ RESO-2 · CHANGE 5 — `Context` is RETIRED and `Flavour` takes the slot.
+	// Still PROVISIONAL, still not a copy-register entry: the brief says so in
+	// terms, and the same fence applies to these four as to the four they replace.
+	{ key: "flavour", label: "Flavour" },
 ] as const;
 
 export function ResolverCards({
@@ -124,11 +127,19 @@ export function ResolverCards({
 			// chain's own guard calls out in terms: "a fixed height does not make
 			// content fit — it CLIPS it, and clipping to hit a number is a failure,
 			// not a pass."
-			// ⚠ 97 IS MEASURED, NOT ESTIMATED. A block's intrinsic content on the
-			// deployed preview at `5b48120`: padding 18 + square 44 + gap 8 + text
-			// group 26.25 (label 14.25 + gap 1 + value 11) = **96.25px**, rounded up
-			// to the next whole pixel. At the floor nothing clips; below it the STACK
+			// ⚠ THE FLOOR IS MEASURED, NOT ESTIMATED, AND RESO-2 MOVED IT. It was 97,
+			// from a block whose intrinsic content was padding 18 + square 44 + gap 8
+			// + text group 26.25 = 96.25px. CHANGE 4 takes the square to 30px and the
+			// padding to 8px, so intrinsic becomes 16 + 14.25 + 6 + 30 + 6 + 11 =
+			// **83.25px** → floor 84. At the floor nothing clips; below it the STACK
 			// scrolls, which is where the overflow was always supposed to go.
+			// ⚠⚠ `mt-4` IS THE ONLY THING THAT ACTUALLY SHORTENS THE BLOCK, and that
+			// is worth stating because the two CHANGE-4 asks look independent and are
+			// not. This row is `flex-1` inside a band of fixed height, so its height
+			// is WHAT IS LEFT OVER — shrinking the square makes the block emptier,
+			// never shorter. Taking 16px above the row does both at once: it is the
+			// separation the bar group was owed, and it is 16px the row no longer
+			// has. Measured 111.99 → 95.99.
 			// ⇒ CONSEQUENCE, STATED: below a viewport height of about 715px the
 			// header stack scrolls instead of compressing. That is the ruled
 			// behaviour for this surface — the page never scrolls, regions do.
@@ -138,7 +149,7 @@ export function ResolverCards({
 			// ⚠ `flex-1` still does the growing above the floor; grid items stretch by
 			// default, so equal height across the four is a property of the grid and
 			// not something each block declares.
-			className="grid min-h-[97px] flex-1 grid-cols-4 gap-2"
+			className="mt-4 grid min-h-[84px] flex-1 grid-cols-4 gap-2"
 		>
 			{BLOCKS.map((b) => (
 				<ResolutionBlock key={b.key} blockKey={b.key} label={b.label} />
@@ -210,42 +221,52 @@ function ResolutionBlock({
 			// to be replaced by the content pass would just re-arm the same trap for
 			// whoever fills these in. If something ever does overflow, it should be
 			// VISIBLE, and the stack should scroll.
-			className="flex min-h-0 min-w-0 flex-col justify-between gap-2 rounded-(--r) px-[11px] py-[9px] [border:var(--hairline)]"
+			// ⚠ RESO-2 · CHANGE 4 — SHORTER. `py` 9px → 8px and the 1:1 placeholder
+			// 44px → 30px take ~16px out of the block's intrinsic content (96.25 →
+			// 83.25). ⛔ Height itself is still `flex-1`'s to decide, not this
+			// element's, so the visible reduction comes from the row's new top margin
+			// (see `resolver-cards`); these two values are what stop the block
+			// looking EMPTY at the smaller height rather than merely shorter.
+			className="flex min-h-0 min-w-0 flex-col justify-between gap-1.5 rounded-(--r) px-[11px] py-2 [border:var(--hairline)]"
 		>
-			{/* The 1:1 slot. `aspect-square` states the ratio R-8 asks for as a
-			    RATIO rather than as two equal lengths that a later edit could
-			    desynchronise, and `w-[44px]` gives it a definite size inside a
-			    column whose height is not fixed. `shrink-0` so it stays square when
-			    the row is compressed rather than being squashed into a rectangle —
-			    which is the one way a 1:1 placeholder silently stops being 1:1. */}
+			{/* ⛔⛔ RESO-2 · CHANGE 5 — THE LABEL READS FIRST. It was the second row of
+			    a text column BELOW the placeholder, so the first thing a reader met
+			    in each block was an empty grey square. Now it is the block's first
+			    child.
+			    ⚠ WHAT WAS TAKEN FROM STAGING, EXACTLY: the ORDERING — staging's card
+			    puts `.reslabel` as the first child of its content stack, before the
+			    placeholder rows. Nothing else. Its card is a horizontal row with the
+			    glyph beside the text and a `size-[30px]` box carrying byte-carried
+			    `LOGO`/`X` text; none of that is here. The overline recipe below is
+			    NOT a copy either — main already carried it byte-identically.
+			    ⛔ Staging has diverged from main by 52 commits and is not a source to
+			    pull from; one ordering decision was read and reproduced. */}
+			<span
+				data-testid={`resolution-block-label-${blockKey}`}
+				className="truncate text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase"
+			>
+				{label}
+			</span>
+			{/* The 1:1 slot. `aspect-square` states the ratio as a RATIO rather than
+			    as two equal lengths a later edit could desynchronise; `w-[30px]` is
+			    RESO-2 · CHANGE 4's reduction from 44px. `shrink-0` so it stays square
+			    when the row is compressed rather than being squashed into a rectangle
+			    — the one way a 1:1 placeholder silently stops being 1:1. */}
 			<span
 				aria-hidden="true"
 				data-testid={`resolution-block-glyph-${blockKey}`}
-				className="aspect-square w-[44px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
+				className="aspect-square w-[30px] shrink-0 rounded-[var(--imgr)] bg-n1 [border:var(--hairline)]"
 			/>
-			<span className="flex min-w-0 flex-col gap-px">
-				{/* The `.overline` recipe (`d5:468-469`) — 9.5px / 800 / .14em /
-				    uppercase / n4, ported BY TOKEN and never by hex. The source text
-				    is title case and `uppercase` does the rendering, exactly as the
-				    removed RESOLUTION label did. */}
-				<span
-					data-testid={`resolution-block-label-${blockKey}`}
-					className="truncate text-[9.5px] font-extrabold tracking-[.14em] text-n4 uppercase"
-				>
-					{label}
-				</span>
-				{/* The value line, EMPTY. No column can fill it and no copy is
-				    authored to stand in — see the fixture's own note for why the
-				    emptiness is a refusal rather than a gap. `min-h` keeps the shape
-				    without content; `aria-hidden` because an empty announced row is
-				    noise to a screen reader while the label above already names the
-				    slot. */}
-				<span
-					aria-hidden="true"
-					data-testid={`resolution-block-value-${blockKey}`}
-					className="block min-h-[11px] w-full rounded-(--r-dot) bg-n1"
-				/>
-			</span>
+			{/* The value line, EMPTY. No column can fill it and no copy is authored
+			    to stand in — see the fixture's own note for why the emptiness is a
+			    refusal rather than a gap. `min-h` keeps the shape without content;
+			    `aria-hidden` because an empty announced row is noise while the label
+			    above already names the slot. */}
+			<span
+				aria-hidden="true"
+				data-testid={`resolution-block-value-${blockKey}`}
+				className="block min-h-[11px] w-full rounded-(--r-dot) bg-n1"
+			/>
 		</div>
 	);
 }

@@ -49,7 +49,7 @@ const MARKET: DebateMarketHeader = {
 	},
 };
 
-const KEYS = ["resolution", "resolver", "closes", "context"] as const;
+const KEYS = ["resolution", "resolver", "closes", "flavour"] as const;
 
 describe("RESO-1 — R-7, four blocks from one fixture", () => {
 	it("resolver-cards::G-3-renders-EXACTLY-four-blocks", () => {
@@ -168,7 +168,16 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 			container
 				.querySelector('[data-testid="resolver-cards"]')
 				?.getAttribute("class") ?? "";
-		expect(cls).toContain("min-h-[97px]");
+		// ⚠ THE NUMBER MOVED AT RESO-2 AND THE GUARD CAUGHT IT, which is the guard
+		// working. It pinned `min-h-[97px]`, derived from a block whose intrinsic
+		// content was padding 18 + square 44 + gap 8 + text group 26.25 = 96.25px.
+		// CHANGE 4 takes the square to 30px and the padding to 8px, so intrinsic is
+		// now 16 + label 14.25 + gap 6 + square 30 + gap 6 + value 11 = **83.25px**
+		// → floor 84. The floor is re-derived, never relaxed.
+		expect(cls).toContain("min-h-[84px]");
+		// ⛔ AND IT IS STILL A REAL FLOOR, not just some `min-h-*`. A guard that
+		// accepted any value would have passed the `min-h-0` this test exists for.
+		expect(cls).toMatch(/min-h-\[\d+px\]/);
 		// ⛔ And NOT the shape that disabled the backstop. `toContain` alone would
 		// pass on `min-h-0 min-h-[97px]`, where the cascade decides which wins.
 		expect(cls.split(/\s+/)).not.toContain("min-h-0");
@@ -254,8 +263,8 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		for (const [k, label] of [
 			["resolution", "Resolution"],
 			["resolver", "Resolver"],
-			["closes", "Closes"],
-			["context", "Context"],
+			["closes", "Closes on"],
+			["flavour", "Flavour"],
 		] as const) {
 			expect(
 				container.querySelector(`[data-testid="resolution-block-label-${k}"]`)
