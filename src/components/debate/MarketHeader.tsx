@@ -4,7 +4,10 @@ import { GLOSSARY } from "@/lib/copy/glossary";
 import type { ChartNode } from "@/server/debate-view/price-chart";
 import type { PricePoint } from "@/server/discovery/price-series";
 
-import { MarketPriceChartHost } from "./chart/MarketPriceChartHost";
+import {
+	hasRenderableSeries,
+	MarketPriceChartHost,
+} from "./chart/MarketPriceChartHost";
 import { formatDharma } from "./format";
 import { HeadZone } from "./HeadZone";
 import { MarketMediaPanel } from "./MarketMediaPanel";
@@ -196,7 +199,11 @@ export function MarketHeader({
 			// an empty series. So `priceChart ? <Host/> : null` hands `HeadZone` a
 			// non-null React element that renders NOTHING, and `HeadZone` — correctly,
 			// by its own contract — draws the column around it.
-			// ⇒ THE RAIL'S CONDITION MUST BE THE HOST'S OWN CONDITION, not a proxy
+			// ⇒ THE RAIL'S CONDITION IS NOW LITERALLY THE HOST'S OWN CONDITION —
+			// `hasRenderableSeries`, exported from the host for exactly this, so the
+			// two cannot drift. It was a HAND-COPY of that test first; @code-reviewer
+			// flagged that a second null path in the host would re-open the defect,
+			// and a copied condition is a proxy
 			// for it. Two components deciding "is there a chart?" by DIFFERENT tests
 			// is what produced the gap; the fix is to ask the same question, not to
 			// ask a different question more carefully.
@@ -204,7 +211,7 @@ export function MarketHeader({
 			// a shape production never produces, so it was green throughout.
 			// `market-header.test.tsx` now also exercises `{ series: [], nodes: [] }`.
 			right={
-				priceChart && priceChart.series.length > 0 ? (
+				priceChart && hasRenderableSeries(priceChart.series) ? (
 					<MarketPriceChartHost
 						series={priceChart.series}
 						nodes={priceChart.nodes}
@@ -240,29 +247,43 @@ export function MarketHeader({
 					    (`DebateColumn`'s `.colwrap`, `d5:568`): the page never scrolls,
 					    and anything that does not fit scrolls INSIDE its own region.
 					    Nothing is clipped and nothing is deleted — the marker, the
-					    export and both resolver cards stay reachable.
-					    ✅ THE UNDERLYING SIZE IS NOW FIXED, and this block's previous
-					    "⛔ THIS IS NOT A FIX" note is discharged. `ResolverCards` is sized
-					    to d5's `.rescard` (71.8px → 56.3px) and this stack's gap drops
-					    from 12px to 5px, so the content fits the band AT REST and the
-					    `overflow-y-auto` above stops firing — it stays as the backstop for
-					    a long criterion, which is what it was for.
+					    export and all FOUR resolution blocks stay reachable (they were two
+					    resolver cards until RESO-1 · R-7).
+					    ⚠ THE PARAGRAPH THAT STOOD HERE IS SUPERSEDED BY RESO-1 AND IS KEPT
+					    AS THE RECORD. It read: "`ResolverCards` is sized to d5's `.rescard`
+					    (71.8px -> 56.3px) and this stack's gap drops from 12px to 5px, so
+					    the content fits the band AT REST and the `overflow-y-auto` above
+					    stops firing — it stays as the backstop for a long criterion, which
+					    is what it was for." ⇒ The block row is no longer sized to `.rescard`
+					    at all (R-8 makes it `flex-1`, measured 111.99px), and it cannot be
+					    a backstop "for a long criterion" because R-2 removed the criterion.
+					    ⇒ WHAT `overflow-y-auto` IS FOR NOW: the block row carries a MEASURED
+					    content floor (`min-h-[97px]`, see `ResolverCards.tsx`), so below a
+					    viewport height of ~715px the stack's content exceeds the band and
+					    THIS is what scrolls. Without that floor the row absorbed every
+					    shortfall by shrinking and each block clipped in silence — which is
+					    what shipped for one commit, and what @code-reviewer caught.
 
-					    ⛔⛔ 5px IS NOT d5's GAP, AND d5's GAP CANNOT FIT — the arithmetic,
-					    because the founder's target numbers predate Q-1. d5 spaces this
-					    stack 8 / 12 / 10 = **30px across THREE gaps** (`.attrs{margin-top:
-					    8px}`, `.criterion{margin-top:12px}`, `.rescards{margin-top:10px}`).
-					    Q-1 added a FOURTH child — the lifecycle marker + `.md` export row —
-					    which costs 20px of content plus a fourth gap.
-					    MEASURED on staging at `b983a5f`, with the resolver card already at
-					    d5's height: content sums to 167.1px before gaps, in a 188px band, so
-					    the whole gap budget is **20.9px across four gaps**. d5's own spacing
-					    would need 38px and lands at 205 — 17px over. A uniform 8px lands at
-					    197 (9 over); 6px at 189 (1 over); **5px at 185, the largest uniform
-					    gap that fits**, with 3px of slack for font-rendering variance.
-					    ⇒ Reported rather than smoothed over: this stack is TIGHTER than the
-					    mockup's, and it is tighter because the marker row is a build element
-					    d5 has no equivalent of. Moving that row is not this fence's. */}
+					    ⛔⛔ 5px IS NOT d5's GAP, AND THE ARITHMETIC THAT JUSTIFIED IT IS
+					    RE-DERIVED AT RESO-1 — the superseded version is recorded because
+					    the NUMBER did not move and the REASON did. It read: d5 spaces this
+					    stack 8 / 12 / 10 = 30px across THREE gaps; Q-1 added a FOURTH child
+					    (the lifecycle marker + `.md` export row); content sums to 167.1px
+					    before gaps in a 188px band, so the budget is 20.9px across FOUR
+					    gaps, and 5px was the largest uniform gap that fits.
+					    ⇒ EVERY TERM OF THAT IS NOW FALSE. R-3 merged the marker row INTO
+					    the attrs row, so the fourth child is gone; R-1/R-2 removed the
+					    criterion, so `.criterion` is not in this stack at all; and R-7's
+					    row is `flex-1`, so it has no fixed height to sum.
+					    ⇒ THE STACK IS NOW `h1 · mergedRow · priceBar · blockRow` — FOUR
+					    children, THREE gaps. Measured on the deployed preview at 1440x777:
+					    26.04 + 20 + 15 + 3x5 = 76.04px of fixed content and gaps, and the
+					    block row takes the remaining 111.99px of the 188.03px band.
+					    ⇒ 5px SURVIVES AS A COMPOSITION CHOICE, not as the output of a
+					    budget: the row that grows is the block row, so these gaps no longer
+					    compete with anything for space. Kept because changing it would be a
+					    spacing change nobody ruled, not because 20.9px still divides by
+					    four. */}
 					<div
 						data-testid="headzone-stack"
 						className="flex min-h-0 min-w-0 flex-1 flex-col gap-[5px] overflow-y-auto"
@@ -279,9 +300,16 @@ export function MarketHeader({
 							    with no in-place way to read the rest. `title` carries the
 							    full string for pointer users and the accessible name is
 							    unaffected (the text node is whole in the DOM); the ADR-0025
-							    `.md` export carries it in full. This follows the founder's
-							    own adoption of `.crittext`'s 2-line clamp one block down —
-							    the two rulings would otherwise contradict each other. */}
+							    `.md` export carries it in full. 
+							    ⚠ ITS STATED GROUND CHANGED AT RESO-1; THE TRUNCATION DID NOT.
+							    This read "This follows the founder's own adoption of
+							    `.crittext`'s 2-line clamp one block down — the two rulings
+							    would otherwise contradict each other." R-2 removed that clamp,
+							    so the coherence argument now cites a sibling ruling that is
+							    gone. The truncation stands on its own original ground instead —
+							    D5-02 / v0.9 ruled the market title to a single line with an
+							    ellipsis — and that ruling is untouched by RESO-1. Recorded
+							    rather than quietly re-justified. */}
 						{/* ⚠ `min-w-0 flex-1` — `.question` (`d5:463`) is a BLOCK filling
 							    `.hstack`, and `truncate` only ellipsises what it is given. As a
 							    shrink-to-fit flex item beside the badge cluster the heading
@@ -309,13 +337,18 @@ export function MarketHeader({
 						>
 							{market.title}
 						</h1>
-						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS BETWEEN
-					    THE QUESTION AND THE CRITERION. The mockup's `.hstack` orders its
-					    `vm` children `.question` → `.attrs` → `.criterion` → `.rescards`
+						{/* HTML-FINISH · MARKET DETAIL row 6 — THE ATTRS STRIP SITS DIRECTLY
+					    UNDER THE QUESTION. The mockup's `.hstack` orders its `vm` children
+					    `.question` -> `.attrs` -> `.criterion` -> `.rescards`
 					    (`d5:958-985`); this strip used to render LAST, below the chart and
-					    the price bar. Reading order is the whole substance of the row: the
-					    market's size is context for the question, and the criterion — the
-					    terms of the bet — is the thing you read last and most carefully.
+					    the price bar.
+					    ⚠ THIS BLOCK USED TO READ "…SITS BETWEEN THE QUESTION AND THE
+					    CRITERION … the criterion — the terms of the bet — is the thing you
+					    read last and most carefully." Both clauses died with RESO-1 · R-2:
+					    there is no criterion in this stack, so the strip sits between the
+					    question and the price bar. Reading order is still the substance of
+					    the row — the market's size is context for the question — but the
+					    thing you read last is now the block row, not the terms.
 					    ⛔ ORDER ONLY. The strip's own composition is untouched: the same
 					    three spans, the same `flex flex-wrap` container, the same spaced
 					    `Đ ` grammar and the same PD-3-08 plural rule, all still pinned by
@@ -442,8 +475,13 @@ export function MarketHeader({
 						    ⚠ NO CLAMP SURVIVES THIS REMOVAL. `line-clamp-2` was a class on
 						    the element itself, not a shared helper, so it leaves with it —
 						    there is no orphaned clamp and no prop that existed only to feed
-						    one (`description` stays on `DebateMarketHeader`; the export
-						    reads it). */}
+						    one (`description` stays on `DebateMarketHeader` because the
+						    TYPE MIRRORS THE READ MODEL, which is the real reason — the
+						    ADR-0025 export reads its OWN server model in
+						    `server/debate-export/serialize.ts`, not this view model. After
+						    R-2 no view component reads the field at all, so it crosses the
+						    RSC boundary unrendered; removing it would be a server change and
+						    is out of this task's scope). */}
 						{/* ⛔⛔ RESO-1 · R-4 — THE PRICE BAR NOW LIVES HERE, IN THE READING
 						    COLUMN, DIRECTLY ABOVE THE BLOCK ROW. It was the rail's second
 						    occupant, under the chart, on the argument that "the bar and the

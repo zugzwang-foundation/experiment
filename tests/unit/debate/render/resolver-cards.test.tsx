@@ -100,6 +100,50 @@ describe("RESO-1 — R-7, four blocks from one fixture", () => {
 		expect(cls).toContain("flex-1");
 	});
 
+	it("resolver-cards::the-row-carries-a-CONTENT-FLOOR-not-min-h-0", () => {
+		// ⛔⛔ THE REGRESSION THIS EXISTS FOR SHIPPED ONCE, and it was invisible.
+		// With `min-h-0` this row's flex base is `0%`, so its hypothetical main size
+		// is 0 and the STACK's content minimum is only its fixed children (~76px).
+		// `scrollHeight` can then never exceed `clientHeight` at any realistic
+		// viewport, which makes the stack's `overflow-y-auto` DEAD: every shortfall
+		// gets absorbed by this row shrinking, and each block clips its own label
+		// with no scrollbar anywhere to reach it. The band's spill goes to zero by
+		// CLIPPING rather than by FITTING — which the height-chain guard names as a
+		// failure in terms: "clipping to hit a number is a failure, not a pass".
+		// ⚠ 97 IS MEASURED: a block's intrinsic content is padding 18 + square 44 +
+		// gap 8 + text group 26.25 = 96.25px, rounded up. Below the floor the stack
+		// scrolls, which is where the overflow was always supposed to go.
+		// ⚠ THIS IS A CLASS ASSERTION FOR THE USUAL REASON — jsdom performs no
+		// layout, so the clipping itself is unobservable here. The DECLARATION that
+		// prevents it is the checkable thing; the rendered behaviour is measured in
+		// a browser and reported in the run log.
+		const { container } = render(<ResolverCards market={MARKET} />);
+		const cls =
+			container
+				.querySelector('[data-testid="resolver-cards"]')
+				?.getAttribute("class") ?? "";
+		expect(cls).toContain("min-h-[97px]");
+		// ⛔ And NOT the shape that disabled the backstop. `toContain` alone would
+		// pass on `min-h-0 min-h-[97px]`, where the cascade decides which wins.
+		expect(cls.split(/\s+/)).not.toContain("min-h-0");
+	});
+
+	it("resolver-cards::a-block-does-NOT-clip-its-own-content", () => {
+		// The other half of the same fix. `overflow-hidden` on the block is what
+		// made the compression silent — the label was cut and nothing reported it.
+		// With the floor in place the clip is unreachable, and keeping an
+		// unreachable clip on a placeholder whose content the content pass will
+		// replace would just re-arm the trap for whoever fills these in.
+		const { container } = render(<ResolverCards market={MARKET} />);
+		for (const k of KEYS) {
+			const cls =
+				container
+					.querySelector(`[data-testid="resolution-block-${k}"]`)
+					?.getAttribute("class") ?? "";
+			expect(cls.split(/\s+/)).not.toContain("overflow-hidden");
+		}
+	});
+
 	it("resolver-cards::each-block-has-a-1-to-1-placeholder-a-label-and-a-value-line", () => {
 		const { container } = render(<ResolverCards market={MARKET} />);
 

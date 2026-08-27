@@ -41,11 +41,20 @@ import type { DebateMarketHeader } from "./types";
  * something label-shaped in it to be measured against; the content pass replaces
  * them. ⇒ Do not cite this array as a source for copy anywhere.
  *
- * ⚠⚠ REVIEW-SURFACE ONLY — the docket entry is unchanged and now covers four
- * placeholders instead of two. `docs/parked.md`
- * (`HTML-FINISH-MD-PLACEHOLDERS`): strip or gate all of them before the DP.2
- * production promote. The `PD-3-09` objection was never WRONG about what this is
- * — a build-time note about unbuilt work — it is outranked for the review
+ * ⚠⚠ REVIEW-SURFACE ONLY, AND THE DOCKET'S "FOUR" IS NOT THIS ROW'S FOUR — the
+ * coincidence must not be read as agreement. `docs/parked.md`'s
+ * `HTML-FINISH-MD-PLACEHOLDERS` is titled "four visible placeholders ship on
+ * `/m/[slug]`" and counts placeholder KINDS across the whole surface:
+ * market-media, post-image, resolver-card, x-official-card. After RESO-1 the true
+ * inventory is market-media + post-image + these FOUR resolution blocks — SIX
+ * placeholders of THREE kinds. The docket text is therefore stale and is
+ * deliberately NOT edited here (RESO-1 is fenced against prescriptive doc edits);
+ * the corrected inventory is FLAGGED in the run report so the operator's
+ * pre-promote strip list is right.
+ * ⇒ THE DOCKET'S INSTRUCTION IS UNCHANGED and now covers six things rather than
+ * four: strip or gate every placeholder on this surface before the DP.2
+ * production promote. The `PD-3-09` objection was never WRONG about what these
+ * are — a build-time note about unbuilt work — it is outranked for the review
  * surface and must not survive to a real participant.
  */
 
@@ -101,11 +110,35 @@ export function ResolverCards({
 			// criterion block measured 63.25px for a two-line clamp) and it moves
 			// again with the band, which is a viewport FRACTION (`basis-[24.2dvh]`),
 			// not a fixed 188px. A tuned literal is correct at exactly one viewport.
-			// ⚠ `min-h-0` so the row may shrink below its content rather than push
-			// the band taller — the stack scrolls, which is what its `overflow-y-auto`
-			// is for. Grid items stretch by default, so equal height across the four
-			// is a property of the grid and not something each block declares.
-			className="grid min-h-0 flex-1 grid-cols-4 gap-2"
+			// ⛔⛔ `min-h-[97px]` IS A CONTENT FLOOR AND IT REPLACES A `min-h-0` THAT
+			// SILENTLY DISABLED THE WHOLE SCROLL BACKSTOP. Caught by `@code-reviewer`;
+			// the arithmetic is worth keeping because the failure was invisible.
+			// With `min-h-0`, this row's flex base is `0%` and its hypothetical main
+			// size is 0 — so the STACK's content minimum was only its fixed children
+			// (h1 26.04 + merged row 20 + bar 15 + 3×5 gaps = 76px). `scrollHeight`
+			// could then never exceed `clientHeight` above a ~314px viewport, which
+			// makes the stack's `overflow-y-auto` DEAD CODE: every shortfall was
+			// absorbed by this row shrinking, and each block clipped its own content
+			// with no scrollbar anywhere to reach it. The band's 13.51px spill would
+			// have gone to zero BY CLIPPING rather than by fitting — which the height
+			// chain's own guard calls out in terms: "a fixed height does not make
+			// content fit — it CLIPS it, and clipping to hit a number is a failure,
+			// not a pass."
+			// ⚠ 97 IS MEASURED, NOT ESTIMATED. A block's intrinsic content on the
+			// deployed preview at `5b48120`: padding 18 + square 44 + gap 8 + text
+			// group 26.25 (label 14.25 + gap 1 + value 11) = **96.25px**, rounded up
+			// to the next whole pixel. At the floor nothing clips; below it the STACK
+			// scrolls, which is where the overflow was always supposed to go.
+			// ⇒ CONSEQUENCE, STATED: below a viewport height of about 715px the
+			// header stack scrolls instead of compressing. That is the ruled
+			// behaviour for this surface — the page never scrolls, regions do.
+			// ⚠ THE HEIGHT-CHAIN GUARD CANNOT SEE ANY OF THIS: it scans `headzone`,
+			// `-left`, `-right`, `arena` and `column-scroll`, and this row is not a
+			// chain node. That is why the reasoning lives here.
+			// ⚠ `flex-1` still does the growing above the floor; grid items stretch by
+			// default, so equal height across the four is a property of the grid and
+			// not something each block declares.
+			className="grid min-h-[97px] flex-1 grid-cols-4 gap-2"
 		>
 			{BLOCKS.map((b) => (
 				<ResolutionBlock key={b.key} blockKey={b.key} label={b.label} />
@@ -153,7 +186,11 @@ function ResolutionBlock({
 	blockKey,
 	label,
 }: {
-	blockKey: string;
+	/** ⚠ THE FIXTURE'S OWN KEY UNION, not `string`. The guards query these blocks
+	 * by `data-testid="resolution-block-<key>"`, so a typo here would silently
+	 * drift four testids away from four assertions; typed this way it is a
+	 * compile error instead (@code-reviewer LOW, accepted). */
+	blockKey: (typeof BLOCKS)[number]["key"];
 	label: string;
 }) {
 	return (
@@ -164,7 +201,16 @@ function ResolutionBlock({
 			// children across an unknown height keeps the composition legible at any
 			// of them; stacking them at the top would leave a growing empty gap under
 			// the value line as the band gets taller.
-			className="flex min-h-0 min-w-0 flex-col justify-between gap-2 overflow-hidden rounded-(--r) px-[11px] py-[9px] [border:var(--hairline)]"
+			// ⚠ `overflow-hidden` WAS HERE AND IS DELIBERATELY GONE, as the second half
+			// of the row's content-floor fix. It was the thing that made the
+			// compression SILENT: the row shrank, each block clipped its own label,
+			// and nothing anywhere reported it. With the floor in place the block can
+			// no longer be squeezed below its content, so the clip is unreachable —
+			// and keeping an unreachable clip on a placeholder whose content is about
+			// to be replaced by the content pass would just re-arm the same trap for
+			// whoever fills these in. If something ever does overflow, it should be
+			// VISIBLE, and the stack should scroll.
+			className="flex min-h-0 min-w-0 flex-col justify-between gap-2 rounded-(--r) px-[11px] py-[9px] [border:var(--hairline)]"
 		>
 			{/* The 1:1 slot. `aspect-square` states the ratio R-8 asks for as a
 			    RATIO rather than as two equal lengths that a later edit could

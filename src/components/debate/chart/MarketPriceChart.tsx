@@ -238,7 +238,10 @@ function LineTags({
 	if (!last) {
 		return null;
 	}
-	/** Half the vertical room two stacked tags need before they touch. */
+	/** The vertical room two stacked tags need before they touch. ⚠ This said
+	 * "Half" until @code-reviewer caught the off-by-a-factor: the trigger below
+	 * is `< MIN_SEPARATION` and the push yields exactly it, so this is the WHOLE
+	 * gap. The geometry was always right; only the sentence was not. */
 	const MIN_SEPARATION = 26;
 	/** Clear of the `VIEWBOX_H − 8` date-label band, and of the top edge. */
 	const MIN_Y = 12;
