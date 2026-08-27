@@ -17,6 +17,7 @@
 | `3b6ac49` | `@code-reviewer` fixes — the false-receipt placement guard, the prose-matching negative, paired leading, element-bound crush guard |
 | `5103e32` | three `MarketHeader.tsx` docblocks this change falsified, corrected in place |
 | `afeca63` | the placement guard again — depth, not order (the first repair was also insufficient) |
+| `9d2369a` | retracting a measurement I never made, plus `@test-writer`'s guard fixes and this log |
 
 **Files:** `src/components/debate/CriterionDisclosure.tsx` (new) · `DebateView.tsx` (one mount) ·
 `MarketHeader.tsx` (docblocks only) · `tests/unit/debate/render/criterion-disclosure.test.tsx`
@@ -25,7 +26,11 @@
 **Not touched:** `src/server/**` (**zero files**), any schema or migration (head unmoved), the
 four RESO-1 blocks, `HeadZone.tsx`, the `.md` export route, `docs/parked.md`, any other surface.
 
-**Gates:** `biome` 0 · `tsc` 0 · `next build` 0 · full suite **392 files / 3640 tests, exit 0**.
+**Gates:** `biome` 0 · `tsc` 0 · `next build` 0 · **CI green on `afeca63`** (fresh Postgres).
+Full local suite **392 files / 3640 tests, exit 0** earlier in the session; at HEAD `tests/unit` is
+**177 files / 2302 tests, exit 0**, including all **45 files / 442 tests** across
+`tests/unit/debate` + `tests/unit/design` — this diff's entire surface. ⚠ The full local suite is
+no longer a usable gate on this machine tonight; see §5.
 
 ## 2 · Decisions made
 
@@ -34,8 +39,9 @@ four RESO-1 blocks, `HeadZone.tsx`, the `.md` export route, `docs/parked.md`, an
   `content-visibility: hidden` and the element's own box goes 24px → 24px instead of 24px → 312px.
   A user clicking would see nothing, and it would look correct in every screenshot.
 - **It is also unnecessary.** A closed `<details>` hides content via `::details-content`, whose
-  computed signature is byte-identical to a bare `hidden="until-found"` element. Verified
-  end-to-end with a scroll-to-text fragment: the collapsed disclosure auto-opened.
+  computed signature is byte-identical to a bare `hidden="until-found"` element — the
+  find-in-page-revealable class. ⚠ That the reveal then HAPPENS is an **inference** from the
+  equivalence, not a measurement; see §5. The case against the attribute is measured and separate.
 - **C-5's fallback is moot and not implemented** — with plain `<details>` the content is never
   unfindable, and force-expanding in older browsers would violate C-3 there.
 - **Mounted after the market↔post ternary**, so one authoring site serves BOTH arms. Verified by
@@ -73,14 +79,23 @@ several CRIT-1 previews exist, including a base-SHA build used for the BEFORE me
   reports 160.5px of body height and `content-visibility: visible` on the child, because Chrome
   hides it on the `::details-content` pseudo-element which is not in the `parentElement` chain.
   **Measure the `<details>`'s own box.** It caught my first probe.
-- **Scroll-to-text-fragment (`#:~:text=`) is a scriptable proxy for find-in-page** — same
-  activation path, and unlike Ctrl-F it can be driven from a test harness. It is how the one
-  inferred claim in this task became a measured one.
-- **The local suite rotated reds all session** — four runs, four different failure sets, one
-  clean, all in DB/integration files untouched by this diff, all passing in isolation. PG's
-  catalog is healthy (8 MB, 0 dead tuples, no slots), `fileParallelism` is already `false`. The
-  proximate cause was almost certainly a full-suite run I killed at a 10-minute timeout. **A clean
-  run on the same tree is what settles it** — a regression cannot produce one.
+- ⛔ **I claimed to have measured the find-in-page reveal and I had not.** The scroll-to-text
+  fragment reading was an artefact: I had clicked the disclosure open by hand, then navigated to
+  the SAME path with only a fragment appended — a same-document navigation, so nothing reloaded
+  and it was still open. Proved with a `window` marker that survived the navigation; on a fresh
+  load the fragment opens nothing here. **The reveal is an inference from the identical
+  `content-visibility` signature, not a measurement.** The case AGAINST the attribute
+  (24px → 24px) is measured and unaffected. Corrected in the component, the report and the PR.
+- **The local Postgres DEGRADED across ~9 full-suite runs tonight and is now the limiting
+  factor.** Signature: statement timeouts plus FK violations in files the diff never touches, and
+  suite time climbing 156s → 258s. Measured cause: **`pg_class` at 950 live rows / 58,529 dead
+  tuples**. `VACUUM (FULL, ANALYZE) pg_class` → 9016 kB → 424 kB — and it re-bloated to 23,598
+  dead in ONE subsequent run, so the suite's truncate churn out-runs autovacuum at this cadence.
+  ⇒ **Run `supabase db reset` before the next session.** Not done here: destructive, shared with
+  other lanes. ⚠ Two hypotheses I formed and discarded: residue from a killed run (partly true
+  early, does not explain the monotonic decay) and a drained `identity_pool` (**wrong** — tests
+  truncate and insert their own; an empty pool at rest is normal, and my reseed changed nothing).
+  **CI on a fresh Postgres is the honest gate, and it is green.**
 - **Never mount `DebateView` in a test without fake timers.** It starts poll and auto-advance
   intervals that outlive the file; mine passed in 72ms and stopped the suite from finishing.
 
