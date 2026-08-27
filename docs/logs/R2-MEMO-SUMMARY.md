@@ -52,14 +52,18 @@ control, dependencies (none added), and already-uploaded images.
 
 ### 4.1 The hold is a **calculation**, never a second constant
 
+⚠ **SUPERSEDED BY ADR-0042 — corrected here rather than in an appendix (O-5). The formula below
+IS the C-1 defect; the one that shipped subtracts the caller's cache window first.**
+
 ```
-hold = ttl × 5/6
+hold = max(0, floor((ttl − downstream) × 5/6))
 ```
 
-| Link type | TTL | Held for | Margin |
-|---|---|---|---|
-| Participant / market images | 3600 s | 3000 s (50 min) | 10 min |
-| **Admin moderation images** | **60 s** | **50 s** | **10 s** |
+| Link type | TTL | downstream | Held for | Σ | Margin |
+|---|---|---|---|---|---|
+| Render images (3 call sites) | 7200 s | 3900 s | 2750 s | 6650 | 550 s |
+| **Admin moderation feed** | **60 s** | **30 s** | **25 s** | **55** | **5 s** |
+| OpenAI moderation hop | 60 s | — | **not memoised** | — | — |
 
 ⚠ **Why this matters more than it looks.** A hardcoded *"hold for 50 minutes"* would be correct
 for the first row and **catastrophic** for the second — it would serve a link that died
@@ -67,7 +71,7 @@ for the first row and **catastrophic** for the second — it would serve a link 
 from each link's own lifetime makes that mistake **unrepresentable**: a shorter TTL
 automatically gets a shorter hold, and there is no second number for a later edit to forget.
 
-### 4.2 The memo key carries **bucket + object + TTL**
+### 4.2 The memo key carries **bucket + object + TTL + downstream**
 
 | Component | Why it must be in the key |
 |---|---|
@@ -121,12 +125,17 @@ miss simply re-mints, which is exactly what happened before this module existed.
 
 ## 7 · Interaction with S-4
 
-S-4 caches the market page's whole view model — **including these image URLs**. On an S-4 cache
-hit, the same URLs were already being re-served.
+⚠ **This section read "the marginal win is smaller than headline." That was the inverse of the
+truth and it is what let C-1 look like a question of degree. Corrected in place (O-5).**
 
-⇒ **On the market page the marginal win is smaller than headline**, because S-4 captures part of
-it. **Everywhere else — Discovery, the admin feed, profiles — it is full size.** Worth knowing
-before anyone measures only the market page and concludes the fix is not working.
+S-4 caches the market page's whole view model — **including these image URLs** — and it is
+merged, not pending. Within one cache entry the URL was already stable, so the browser-cache win
+on those surfaces was **already delivered by S-4**. What the memo adds there is stability ACROSS
+invalidations: those blocks key on pool reserves, so every bet busts every reader's entry, and
+without the hold one bet costs every open tab a full re-download of an unchanged image.
+
+It also meant a bust no longer re-minted the URL — the memo returned the held one — which is how
+a URL could reach 9900 s of age against a 7200 s signature. That is C-1, and ADR-0042 is the fix.
 
 ---
 
@@ -146,7 +155,29 @@ before anyone measures only the market page and concludes the fix is not working
 
 ## 9 · Status
 
-- ✅ Committed (`4e22141`), merged up to current `main` (`c6a4492`), **zero conflicts**
-- ❌ **Not pushed** — local only
-- ❌ **Commit is unsigned** — branch protection will refuse it at merge. This is the one blocker.
-- ❌ No PR, no review cascade
+⚠ **This section named the wrong blocker, and every clause of the sentence that
+named it was false. Corrected in place (O-5).**
+
+- ✅ Committed, opened as **PR #424** (branch `Ritam_2_S4`), merged up to current
+  `main` — zero conflicts
+- ✅ **The commits ARE signed.** They were signed with a second contributor's SSH
+  key, which GitHub has registered for **authentication** and not for
+  **signing** — so GitHub reports `unknown_key` and shows *Unverified*, while
+  the signature itself is cryptographically good. Two different remedies: the
+  GitHub badge needs that key re-added as a Signing Key; a local `%G?` of `G`
+  needs it in `~/.ssh/allowed_signers`. Neither is a merge blocker — a
+  squash-merge is signed by GitHub's own key regardless.
+- ⛔ **There is no branch protection on this repository, on any branch**, so
+  nothing "will refuse it at merge." CLAUDE.md §5.13 carries the measurement and
+  its date. Asserting a control that does not exist is **O-13**, and doing it
+  while claiming to name the one blocker is how a real blocker goes unlooked-for.
+- ⛔ **The actual blocker was C-1** — the hold composed with the `'use cache'`
+  boundaries the render paths sit inside, so a URL could be served up to
+  `6000 + 3900 = 9900 s` after minting against a 7200 s signature — counting the
+  cache's `expire` AND the client router's `stale` window, per ADR-0042 D-3.
+  Found by the
+  pre-merge cascade, not by this document. Fixed in this same PR: the hold is
+  now budgeted against the caller's declared downstream window
+  (`hold + downstream < ttl`, ADR-0042), and `read-url-hold-budget.test.ts`
+  asserts it row by row.
+- ✅ Review cascade run — `@code-reviewer` then `@security-auditor`

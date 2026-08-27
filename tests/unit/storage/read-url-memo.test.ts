@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
 	__resetReadUrlMemo,
+	DOWNSTREAM_CACHED_MINUTES,
+	DOWNSTREAM_NONE,
 	holdWindowMs,
 	memoizedReadUrl,
 } from "@/server/storage/read-url-memo";
@@ -26,6 +28,8 @@ import {
  */
 
 const HOUR = 3600;
+/** The render-path TTL that actually ships (ADR-0041 D-6). */
+const RENDER = 7200;
 const MODERATION = 60;
 
 /** A stub signer that returns a distinguishable URL per call. */
@@ -53,16 +57,16 @@ describe("hold window — derived, never a second constant", () => {
 	it("is a fraction of the TTL, so a shorter TTL gets a shorter hold", () => {
 		// The whole safety argument. A hardcoded "50 minutes" would be right for
 		// the hour TTL and would hand out a URL 49 minutes dead for the 60s one.
-		expect(holdWindowMs(HOUR)).toBe(3_000_000); // 50 min of a 60 min TTL
-		expect(holdWindowMs(MODERATION)).toBe(50_000); // 50 s of a 60 s TTL
+		expect(holdWindowMs(HOUR, DOWNSTREAM_NONE)).toBe(3_000_000);
+		expect(holdWindowMs(MODERATION, DOWNSTREAM_NONE)).toBe(50_000);
 	});
 
 	it("ALWAYS expires strictly before the URL does — at both TTLs", () => {
 		// The invariant that makes this change safe at all, asserted directly
 		// rather than inferred. If this ever fails, the memo is serving URLs that
 		// are already dead.
-		for (const ttl of [MODERATION, 300, HOUR, 86_400]) {
-			expect(holdWindowMs(ttl)).toBeLessThan(ttl * 1000);
+		for (const ttl of [MODERATION, HOUR, RENDER]) {
+			expect(holdWindowMs(ttl, DOWNSTREAM_NONE)).toBeLessThan(ttl * 1000);
 		}
 	});
 });
@@ -71,9 +75,27 @@ describe("holding — the same object returns the same URL", () => {
 	it("mints once, then serves the held URL", async () => {
 		const mint = makeMint("a");
 
-		const first = await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn);
-		const second = await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn);
-		const third = await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn);
+		const first = await memoizedReadUrl(
+			"uploads",
+			"a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
+		const second = await memoizedReadUrl(
+			"uploads",
+			"a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
+		const third = await memoizedReadUrl(
+			"uploads",
+			"a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 
 		expect(second).toBe(first);
 		expect(third).toBe(first);
@@ -84,17 +106,31 @@ describe("holding — the same object returns the same URL", () => {
 
 	it("re-mints once the hold lapses, and before the URL expires", async () => {
 		const mint = makeMint("a");
-		const first = await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn);
+		const first = await memoizedReadUrl(
+			"uploads",
+			"a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 
 		// One millisecond inside the hold — still the same URL.
-		vi.advanceTimersByTime(holdWindowMs(HOUR) - 1);
-		expect(await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn)).toBe(first);
+		vi.advanceTimersByTime(holdWindowMs(HOUR, DOWNSTREAM_NONE) - 1);
+		expect(
+			await memoizedReadUrl("uploads", "a", HOUR, DOWNSTREAM_NONE, mint.fn),
+		).toBe(first);
 		expect(mint.calls()).toBe(1);
 
 		// Past the hold — a fresh mint, while the old URL still had 10 minutes of
 		// validity left. That margin is the point: the swap happens early.
 		vi.advanceTimersByTime(2);
-		const renewed = await memoizedReadUrl("uploads:a:3600", HOUR, mint.fn);
+		const renewed = await memoizedReadUrl(
+			"uploads",
+			"a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 		expect(renewed).not.toBe(first);
 		expect(mint.calls()).toBe(2);
 	});
@@ -107,8 +143,20 @@ describe("POSITIVE CONTROLS — the memo discriminates", () => {
 		// one participant's image in place of another's.
 		const mint = makeMint("shared");
 
-		const a = await memoizedReadUrl("uploads:image-a:3600", HOUR, mint.fn);
-		const b = await memoizedReadUrl("uploads:image-b:3600", HOUR, mint.fn);
+		const a = await memoizedReadUrl(
+			"uploads",
+			"image-a",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
+		const b = await memoizedReadUrl(
+			"uploads",
+			"image-b",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 
 		expect(a).not.toBe(b);
 		expect(mint.calls()).toBe(2);
@@ -121,10 +169,18 @@ describe("POSITIVE CONTROLS — the memo discriminates", () => {
 		// later — or moderation could be handed an hour-long one.
 		const mint = makeMint("same-object");
 
-		const render = await memoizedReadUrl("uploads:k:3600", HOUR, mint.fn);
+		const render = await memoizedReadUrl(
+			"uploads",
+			"k",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 		const moderation = await memoizedReadUrl(
-			"uploads:k:60",
+			"uploads",
+			"k",
 			MODERATION,
+			DOWNSTREAM_NONE,
 			mint.fn,
 		);
 
@@ -138,11 +194,60 @@ describe("POSITIVE CONTROLS — the memo discriminates", () => {
 		// are different objects and must not answer for each other.
 		const mint = makeMint("cross-bucket");
 
-		const uploads = await memoizedReadUrl("uploads:k:3600", HOUR, mint.fn);
-		const media = await memoizedReadUrl("market-media:k:3600", HOUR, mint.fn);
+		const uploads = await memoizedReadUrl(
+			"uploads",
+			"k",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
+		const media = await memoizedReadUrl(
+			"market-media",
+			"k",
+			HOUR,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
 
 		expect(uploads).not.toBe(media);
 		expect(mint.calls()).toBe(2);
+	});
+
+	it("the SAME object at DIFFERENT downstream windows never shares an entry", async () => {
+		// ⚠ Found while implementing the fix, not before it. An entry stores the
+		// hold computed when it MISSED, so two call sites sharing an object at
+		// one TTL but sitting behind different caches would share that entry —
+		// and the one behind the LONGER cache could be handed a URL held on the
+		// assumption that nobody was caching. That is C-1 again, one level down.
+		const mint = makeMint("same-object-two-callers");
+
+		const uncached = await memoizedReadUrl(
+			"uploads",
+			"k",
+			RENDER,
+			DOWNSTREAM_NONE,
+			mint.fn,
+		);
+		const cached = await memoizedReadUrl(
+			"uploads",
+			"k",
+			RENDER,
+			DOWNSTREAM_CACHED_MINUTES,
+			mint.fn,
+		);
+
+		expect(cached).not.toBe(uncached);
+		expect(mint.calls()).toBe(2);
+	});
+
+	it("holds the CACHED caller for less time than the uncached one", async () => {
+		// The discriminating half: separate entries are only worth having if the
+		// holds actually differ. If these ever came out equal, the downstream
+		// parameter would be decorative.
+		expect(holdWindowMs(RENDER, DOWNSTREAM_CACHED_MINUTES)).toBeLessThan(
+			holdWindowMs(RENDER, DOWNSTREAM_NONE),
+		);
+		expect(holdWindowMs(RENDER, DOWNSTREAM_CACHED_MINUTES)).toBe(2_750_000);
 	});
 });
 
@@ -161,12 +266,12 @@ describe("failure posture is unchanged", () => {
 		};
 
 		await expect(
-			memoizedReadUrl("uploads:flaky:3600", HOUR, flaky),
+			memoizedReadUrl("uploads", "flaky", HOUR, DOWNSTREAM_NONE, flaky),
 		).rejects.toThrow("r2 unavailable");
 
 		// The retry reaches the signer rather than a cached failure.
 		await expect(
-			memoizedReadUrl("uploads:flaky:3600", HOUR, flaky),
+			memoizedReadUrl("uploads", "flaky", HOUR, DOWNSTREAM_NONE, flaky),
 		).resolves.toBe("https://signed.test/recovered");
 		expect(calls).toBe(2);
 	});

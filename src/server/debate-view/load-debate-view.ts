@@ -23,6 +23,7 @@ import { PFP_PLACEHOLDER } from "@/server/identity-pool/pfp-url";
 import type { MarketSummary } from "@/server/markets/get-by-slug";
 import { safeCaptureMessage } from "@/server/observability/safe-capture";
 import type { Marker } from "@/server/positions/compute";
+import { DOWNSTREAM_CACHED_MINUTES } from "@/server/storage/read-url-memo";
 import { signRead } from "@/server/storage/sign-read";
 import { type DebateComment, listMarketComments } from "./list-comments";
 import { getMarketPricingAndUnitToWin } from "./market-pricing";
@@ -515,7 +516,10 @@ async function mintImageUrls(
 				return;
 			}
 			try {
-				urlByComment.set(c.id, await signRead(key, READ_URL_TTL_SECONDS));
+				urlByComment.set(
+					c.id,
+					await signRead(key, READ_URL_TTL_SECONDS, DOWNSTREAM_CACHED_MINUTES),
+				);
 			} catch {
 				// R2 unavailable for this object → degrade to no image (resilient
 				// read render). The bet/comment are untouched.

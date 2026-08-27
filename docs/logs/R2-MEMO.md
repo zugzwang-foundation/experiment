@@ -27,23 +27,35 @@ and the storage reads behind them.**
 | `src/server/discovery/media.ts` | routes through the memo, keyed `market-media:<key>:<ttl>` |
 | `tests/unit/storage/read-url-memo.test.ts` | **new** — 8 tests, 3 of them positive controls |
 
-**The hold is a calculation, never a second constant.** `HOLD_FRACTION = 5/6` of the URL's own
-TTL:
+⚠ **SUPERSEDED BY ADR-0042 — corrected in place (O-5), because this paragraph states the formula
+that caused C-1 and states it as the thing that makes the change safe.**
 
-- `READ_URL_TTL_SECONDS` 3600 → held **3000 s** (50 min, 10 min margin)
-- `READ_URL_TTL_SECONDS_MODERATION` 60 → held **50 s** (10 s margin)
+The hold was `ttl × 5/6`. It is now `max(0, floor((ttl − downstream) × 5/6))`: the ratio divides
+what is LEFT after the caller's own cache has finished serving, not the whole signature. The
+first form is correct only if a URL is consumed as soon as it is produced, and on three of the
+four call sites it is not — they sit inside `"use cache"` blocks whose entries keep serving an
+embedded URL long after the call returned. See the section on S-4 below for the arithmetic.
 
-A hardcoded "hold 50 minutes" would be right for the first and **catastrophic** for the second —
-it would hand out a URL that expired 49 minutes earlier and admin moderation images would
-silently stop loading. Deriving the hold from the TTL makes that class of mistake
-unrepresentable.
+| call site | ttl | downstream | hold | Σ | < ttl |
+|---|---|---|---|---|---|
+| `load-debate-view.ts` | 7200 | 3900 | 2750 | 6650 | ✓ |
+| `hero.ts` | 7200 | 3900 | 2750 | 6650 | ✓ |
+| `media.ts` | 7200 | 3900 | 2750 | 6650 | ✓ |
+| `review-feed.ts` | 60 | 30 | 25 | 55 | ✓ |
+| `precommit.ts` | 60 | — | — | — | not memoised |
 
-**The memo key carries bucket + object + TTL**, and both extra components are load-bearing:
+**The memo key carries bucket + object + TTL + downstream**, and every component is load-bearing:
 
-- **TTL** — `signRead` serves *both* the 60 s moderation path and the 3600 s render path. Keyed
-  on the object alone, a render could be handed the 60-second URL and break a minute later.
+- **TTL** — `signRead` serves *both* the 60 s feed path and the 7200 s render path. Keyed on the
+  object alone, a render could be handed the 60-second URL and break a minute later.
 - **Bucket** — plan §1e keeps the participant `uploads` arm and the admin `market-media` arm
   separate. Identically-named keys in the two buckets are different objects.
+- **Downstream** — an entry stores the hold computed when it MISSED, so two callers behind
+  different caches would otherwise share one, and the one behind the longer cache would inherit a
+  hold computed as if nothing were caching.
+
+The key is now built INSIDE the module from a typed bucket, rather than passed in as a string
+whose prefix had to agree with the bucket handed to `mintReadUrl`.
 
 **Failure posture unchanged:** the `set` happens only after the await resolves, so a throwing
 mint stores nothing and the next call retries. A cached failure would turn one transient R2 blip
@@ -111,7 +123,8 @@ That inversion is what made the interaction look like a smaller win instead of w
 premise `load-debate-view.ts` states for its 7200 s TTL — that the URL embedded in a cache entry
 was *minted at generation time* — is the premise this module removes. A URL can now be up to
 6000 s old **before** the entry carrying it is generated, and that entry is then served for up to
-`cacheLife("minutes").expire` = 3600 s more. `6000 + 3600 = 9600 > 7200`: the last ~2400 s of the
+`cacheLife("minutes").expire` = 3600 s more, plus the `stale` = 300 s window in which a client
+router keeps showing a response it already received. `6000 + 3900 = 9900 > 7200`: the last 2700 s of the
 serve window hands out an already-dead URL. Silent — the mint succeeded, so nothing throws, and
 no test in the suite passes 7200 through the memo.
 

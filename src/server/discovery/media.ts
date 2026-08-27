@@ -5,7 +5,10 @@ import { and, asc, eq } from "drizzle-orm";
 import type { DbClient, DbTransaction } from "@/db";
 import { marketMedia } from "@/db/schema";
 import { mintReadUrl } from "@/server/storage/r2";
-import { memoizedReadUrl } from "@/server/storage/read-url-memo";
+import {
+	DOWNSTREAM_CACHED_MINUTES,
+	memoizedReadUrl,
+} from "@/server/storage/read-url-memo";
 
 /** A bound read client — top-level `db` OR a caller's transaction. */
 type DiscoveryReader = DbClient | DbTransaction;
@@ -30,19 +33,29 @@ const READ_URL_TTL_SECONDS = 7200;
  * every 15 s. Re-minting per render meant a new URL, and so a full re-download
  * of an unchanged image, on every one of those.
  *
- * ⚠ THE BUCKET IS PART OF THE MEMO KEY. This arm and `signRead`'s `"uploads"`
- * arm are DIFFERENT buckets, and the §1e separation above is a rule about
- * which objects an admin path may serve — not a naming convention. A memo
- * keyed on the object alone would let one bucket's URL answer for the other's
- * identically-named key, quietly defeating it. Prefixing keeps the two
- * namespaces disjoint by construction.
+ * ⚠ THE BUCKET IS PART OF THE MEMO KEY, and the memo now builds that key from
+ * the bucket it is HANDED rather than from a prefix written here. This arm and
+ * `signRead`'s `"uploads"` arm are DIFFERENT buckets, and the §1e separation
+ * above is a rule about which objects an admin path may serve — not a naming
+ * convention. A memo keyed on the object alone would let one bucket's URL
+ * answer for the other's identically-named key, quietly defeating it. Passing
+ * the bucket instead of a hand-written prefix means the key and the mint can no
+ * longer disagree about which arm this is.
+ *
+ * ⚠ CALLERS STATE THEIR DOWNSTREAM WINDOW. Both call sites below sit inside
+ * `"use cache"` blocks; see `read-url-memo.ts` for why that has to be counted.
  */
 export async function signReadMarketMedia(
 	key: string,
 	ttlSeconds: number,
+	downstreamMaxAgeSeconds: number,
 ): Promise<string> {
-	return memoizedReadUrl(`market-media:${key}:${ttlSeconds}`, ttlSeconds, () =>
-		mintReadUrl("market-media", key, ttlSeconds),
+	return memoizedReadUrl(
+		"market-media",
+		key,
+		ttlSeconds,
+		downstreamMaxAgeSeconds,
+		() => mintReadUrl("market-media", key, ttlSeconds),
 	);
 }
 
@@ -72,7 +85,11 @@ export async function getDefaultMarketMediaUrl(
 		return null;
 	}
 	try {
-		return await signReadMarketMedia(row.key, READ_URL_TTL_SECONDS);
+		return await signReadMarketMedia(
+			row.key,
+			READ_URL_TTL_SECONDS,
+			DOWNSTREAM_CACHED_MINUTES,
+		);
 	} catch {
 		// R2 unavailable for this object → degrade to no image (resilient read
 		// render). The market card itself still serves.
@@ -131,7 +148,11 @@ export async function getSecondaryMarketMediaUrl(
 		return null;
 	}
 	try {
-		return await signReadMarketMedia(row.key, READ_URL_TTL_SECONDS);
+		return await signReadMarketMedia(
+			row.key,
+			READ_URL_TTL_SECONDS,
+			DOWNSTREAM_CACHED_MINUTES,
+		);
 	} catch {
 		// R2 unavailable for this object → degrade to no image (same resilience
 		// posture as getDefaultMarketMediaUrl — a single unavailable object must
