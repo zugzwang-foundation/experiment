@@ -80,7 +80,16 @@ experiment/
 │   │   ├── api/                    # _smoke-error, auth/[...all], bets/{place,sell}, cron/{r2-orphan-sweep,close-due-markets,alarms-drain}, health, uploads/sign, visits
 │   │   ├── globals.css, layout.tsx, page.tsx
 │   ├── components/                 # art/ bookmarks/ debate/ discovery/ profile/ shell/ ui/
-│   │   └── art/warli/              #   WARLI-1 — a decorative SVG art layer, MOUNTED
+│   │                               #   debate/ gained five components at HTML-FINISH ·
+│   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
+│   │                               #   header frame), MarketMediaPanel, FocusMarketCard
+│   │                               #   (the post arm's rail — and the EXIT), ResolverCards
+│   │                               #   (the resolver + X-official PLACEHOLDER cards —
+│   │                               #   it rendered `null` until round 2's R2 reversed
+│   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
+│   │                               #   gate before the DP.2 promote), ScrollRail (the
+│   │                               #   rail — and, since R3, the auto-advance countdown)
+│   │   ├── art/warli/              #   WARLI-1 — a decorative SVG art layer, MOUNTED
 │   │                               #   NOWHERE. Two counter-rotating rings of sixteen
 │   │                               #   Warli-inspired figures around a still centre the
 │   │                               #   auth card sits in. Sealed: it imports nothing but
@@ -96,15 +105,6 @@ experiment/
 │   │                               #   collision-free. Copy the pattern only when the
 │   │                               #   same measurement holds; it is not a general
 │   │                               #   licence to ship component-scoped stylesheets.
-│   │                               #   debate/ gained five components at HTML-FINISH ·
-│   │                               #   MARKET DETAIL: HeadZone (the arm-scoped two-column
-│   │                               #   header frame), MarketMediaPanel, FocusMarketCard
-│   │                               #   (the post arm's rail — and the EXIT), ResolverCards
-│   │                               #   (the resolver + X-official PLACEHOLDER cards —
-│   │                               #   it rendered `null` until round 2's R2 reversed
-│   │                               #   OD-2; see docs/parked.md SEQUENCE #5, strip or
-│   │                               #   gate before the DP.2 promote), ScrollRail (the
-│   │                               #   rail — and, since R3, the auto-advance countdown)
 │   │   └── ui/                     #   14 files, and they are NOT all shadcn. NINE shadcn
 │   │                               #   primitives: avatar, badge, button, card, dialog,
 │   │                               #   input, separator, skeleton, textarea. FIVE are
